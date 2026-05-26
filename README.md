@@ -25,16 +25,16 @@
 # DreamCoder
 
 <p align="center">
-  <strong>中文原生 AI 编程桌面工作台</strong>
+  <strong>立志成为 DreamField 官方 Coding Agent</strong>
 </p>
 
 <p align="center">
-  集成 AI 对话、代码生成/编辑、项目管理、多模型切换于一体的桌面应用，专为国内开发者打造。
+  中文原生 AI 编程桌面工作台 — 集成 AI 对话、代码生成/编辑、项目管理、多模型切换于一体，专为国内开发者打造。
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Tauri-2-blue" alt="Tauri 2" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React 19" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6" alt="TypeScript" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
@@ -43,28 +43,45 @@
 
 ## 特性
 
-- 🖥️ **桌面工作台** — 基于 Tauri 2 的跨平台桌面应用（macOS / Windows）
+- 🖥️ **桌面工作台** — 基于 Tauri 2 的 Windows 桌面应用
 - 💬 **多会话管理** — 标签页式会话，支持项目切换与 Worktree 隔离
 - 🔀 **代码 Diff 面板** — 实时查看 AI 编辑的代码变更
-- 🤖 **多模型支持** — 一键接入 DeepSeek、通义千问、文心一言、Kimi 等国产模型
+- 🤖 **多模型支持** — DreamField 官方 Provider + DeepSeek、通义千问、Kimi 等
+- 🏠 **DreamField 深度集成** — 默认接入 DreamField 平台，开箱即用
 - 🔐 **权限审批流** — 危险操作集中审批，安全可控
 - 🇨🇳 **中文原生** — 全中文界面、文档与预设 Prompt
-- 📊 **用量统计** — Token 消耗趋势一目了然
-- 🔄 **工作流模板** — 预置代码审查、Bug 修复、测试生成等一键工作流
+- 🔌 **MCP 支持** — 接入任意 MCP 工具服务器
 
 ## 快速开始
 
-> 🚧 项目正在开发中，敬请期待...
+```bash
+# 安装依赖
+bun install
+
+# 启动桌面端开发
+cd desktop && bun run dev
+
+# 或启动后端服务
+SERVER_PORT=3456 bun run src/server/index.ts
+```
 
 ## 技术栈
 
 | 类别 | 技术 |
 |------|------|
 | 桌面框架 | Tauri 2 |
-| 前端 UI | React 19 + Vite + TailwindCSS |
+| 前端 UI | React 19 + Vite + TailwindCSS 4 |
+| 状态管理 | Zustand |
 | 本地运行时 | Bun |
 | 语言 | TypeScript |
-| 协议 | MCP |
+| 协议 | MCP, LSP |
+
+## Roadmap
+
+- ✅ Phase 1: Windows 桌面端 + 后端服务 + 多模型支持
+- 🔜 Phase 2: CLI 终端 UI (macOS + Windows)
+- 🔜 Phase 3: IM 适配器 (飞书/Telegram/微信/钉钉)
+- 🔜 Phase 4: Computer Use / H5 远程 / 定时任务 / Teams
 
 ## 贡献
 
