@@ -11,7 +11,7 @@ let tmpDir: string
 let originalConfigDir: string | undefined
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cc-haha-diagnostics-test-'))
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-diagnostics-test-'))
   originalConfigDir = process.env.CLAUDE_CONFIG_DIR
   process.env.CLAUDE_CONFIG_DIR = tmpDir
 })
@@ -76,13 +76,13 @@ describe('DiagnosticsService', () => {
       },
     })
 
-    const raw = await fs.readFile(path.join(tmpDir, 'cc-haha', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
+    const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
     expect(raw).toContain('cli_start_failed')
     expect(raw).toContain('[REDACTED]')
     expect(raw).not.toContain('sk-secret')
     expect(raw).not.toContain(os.homedir())
 
-    const runtime = await fs.readFile(path.join(tmpDir, 'cc-haha', 'diagnostics', 'runtime-errors.log'), 'utf-8')
+    const runtime = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'runtime-errors.log'), 'utf-8')
     expect(runtime).toContain('cli_start_failed')
     expect(runtime).toContain('"nested"')
     expect(runtime).toContain('[REDACTED]')
@@ -91,9 +91,9 @@ describe('DiagnosticsService', () => {
 
   test('exports a single diagnostics tarball without provider secrets', async () => {
     const service = new DiagnosticsService()
-    await fs.mkdir(path.join(tmpDir, 'cc-haha'), { recursive: true })
+    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
     await fs.writeFile(
-      path.join(tmpDir, 'cc-haha', 'providers.json'),
+      path.join(tmpDir, 'dreamcoder', 'providers.json'),
       JSON.stringify({
         activeId: 'provider-1',
         providers: [{
@@ -116,7 +116,7 @@ describe('DiagnosticsService', () => {
       details: { accessToken: 'provider-secret' },
     })
     await fs.writeFile(
-      path.join(tmpDir, 'cc-haha', 'diagnostics', 'cli-diagnostics.jsonl'),
+      path.join(tmpDir, 'dreamcoder', 'diagnostics', 'cli-diagnostics.jsonl'),
       '{"event":"cli_streaming_idle_timeout","data":{"authorization":"Bearer provider-secret"}}\n',
       'utf-8',
     )
@@ -170,7 +170,7 @@ describe('DiagnosticsService', () => {
       expect(stderr).toContain('[Server] Uncaught exception:')
       expect(stderr).toContain(`Failed to start server. Is port ${port} in use?`)
 
-      const raw = await fs.readFile(path.join(tmpDir, 'cc-haha', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
+      const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
       expect(raw).toContain('server_uncaught_exception')
       expect(raw).toContain(`Failed to start server. Is port ${port} in use?`)
     } finally {
@@ -193,7 +193,7 @@ describe('diagnostics API', () => {
     const statusRes = await handleDiagnosticsApi(statusReq.req, statusReq.url, statusReq.segments)
     expect(statusRes.status).toBe(200)
     const status = await statusRes.json() as { logDir: string; cliDiagnosticsPath: string; recentErrorCount: number }
-    expect(status.logDir).toContain(path.join('cc-haha', 'diagnostics'))
+    expect(status.logDir).toContain(path.join('dreamcoder', 'diagnostics'))
     expect(status.cliDiagnosticsPath).toContain('cli-diagnostics.jsonl')
     expect(status.recentErrorCount).toBe(1)
 

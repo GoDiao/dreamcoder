@@ -7,12 +7,12 @@ describe('provider managed env compatibility', () => {
     const { env, changed } = normalizeLegacyDeepSeekManagedEnv({
       ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic',
       ANTHROPIC_MODEL: 'deepseek-v4-pro',
-      CC_HAHA_SEND_DISABLED_THINKING: '1',
+      DREAMCODER_SEND_DISABLED_THINKING: '1',
       USER_CUSTOM_ENV: 'keep-me',
     })
 
     expect(changed).toBe(true)
-    expect(env.CC_HAHA_SEND_DISABLED_THINKING).toBeUndefined()
+    expect(env.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
     expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES).toBe(
       'thinking,effort,adaptive_thinking,max_effort',
     )
@@ -29,7 +29,7 @@ describe('provider managed env compatibility', () => {
     const input = {
       ANTHROPIC_BASE_URL: 'https://open.bigmodel.cn/api/anthropic',
       ANTHROPIC_MODEL: 'glm-5.1',
-      CC_HAHA_SEND_DISABLED_THINKING: '1',
+      DREAMCODER_SEND_DISABLED_THINKING: '1',
     }
 
     const { env, changed } = normalizeLegacyDeepSeekManagedEnv(input)

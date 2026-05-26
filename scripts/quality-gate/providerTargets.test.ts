@@ -10,8 +10,8 @@ import {
 
 function withProviderIndex(index: unknown, fn: (configDir: string) => void) {
   const configDir = join(tmpdir(), `quality-provider-targets-${crypto.randomUUID()}`)
-  mkdirSync(join(configDir, 'cc-haha'), { recursive: true })
-  writeFileSync(join(configDir, 'cc-haha', 'providers.json'), JSON.stringify(index, null, 2))
+  mkdirSync(join(configDir, 'dreamcoder'), { recursive: true })
+  writeFileSync(join(configDir, 'dreamcoder', 'providers.json'), JSON.stringify(index, null, 2))
 
   try {
     fn(configDir)

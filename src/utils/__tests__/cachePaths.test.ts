@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe('CACHE_PATHS portable mode', () => {
   test('places logs under CLAUDE_CONFIG_DIR when portable mode is active', () => {
-    const configDir = join(tmpdir(), 'cc-haha-portable-cache')
+    const configDir = join(tmpdir(), 'dreamcoder-portable-cache')
     process.env.CLAUDE_CONFIG_DIR = configDir
 
     expect(CACHE_PATHS.baseLogs().startsWith(join(configDir, 'Cache'))).toBe(true)

@@ -75,18 +75,18 @@ describe('ensureDesktopCliLauncherInstalled', () => {
   })
 
   unixOnly('installs a launcher wrapper in the user bin dir and configures PATH', async () => {
-    const sourcePath = join(tempSourceDir, 'claude-sidecar')
+    const sourcePath = join(tempSourceDir, 'dreamcoder-sidecar')
     await writeFile(sourcePath, '#!/bin/sh\necho desktop-sidecar\n', 'utf8')
     await chmod(sourcePath, 0o755)
     process.env.CLAUDE_CLI_PATH = sourcePath
 
     const status = await ensureDesktopCliLauncherInstalled()
-    const launcherPath = join(tempHome, '.local', 'bin', 'claude-haha')
+    const launcherPath = join(tempHome, '.local', 'bin', 'dreamcoder')
     const shellConfigPath = join(tempHome, '.zshrc')
 
     expect(status.supported).toBe(true)
     expect(status.installed).toBe(true)
-    expect(status.command).toBe('claude-haha')
+    expect(status.command).toBe('dreamcoder')
     expect(status.launcherPath).toBe(launcherPath)
     expect(status.availableInNewTerminals).toBe(true)
     expect(status.needsTerminalRestart).toBe(true)
@@ -102,7 +102,7 @@ describe('ensureDesktopCliLauncherInstalled', () => {
   })
 
   unixOnly('pins portable config dir in the installed launcher wrapper', async () => {
-    const sourcePath = join(tempSourceDir, 'claude-sidecar')
+    const sourcePath = join(tempSourceDir, 'dreamcoder-sidecar')
     const portableDir = join(tempHome, 'portable-config')
     await writeFile(sourcePath, '#!/bin/sh\necho desktop-sidecar\n', 'utf8')
     await chmod(sourcePath, 0o755)
@@ -111,15 +111,15 @@ describe('ensureDesktopCliLauncherInstalled', () => {
 
     await ensureDesktopCliLauncherInstalled()
 
-    const launcher = await readFile(join(tempHome, '.local', 'bin', 'claude-haha'), 'utf8')
+    const launcher = await readFile(join(tempHome, '.local', 'bin', 'dreamcoder'), 'utf8')
     expect(launcher).toContain(`export CLAUDE_CONFIG_DIR='${portableDir}'`)
   })
 
   it('uses a Windows cmd launcher so portable env can be injected', () => {
-    expect(getDesktopCliCommandName('win32')).toBe('claude-haha.cmd')
+    expect(getDesktopCliCommandName('win32')).toBe('dreamcoder.cmd')
 
     process.env.CLAUDE_CONFIG_DIR = 'C:\\Portable\\ClaudeConfig'
-    const wrapper = buildWindowsLauncherWrapper('C:\\Apps\\cc-haha\\claude-sidecar.exe')
+    const wrapper = buildWindowsLauncherWrapper('C:\\Apps\\dreamcoder\\dreamcoder-sidecar.exe')
 
     expect(wrapper).toContain('set "CLAUDE_CONFIG_DIR=C:\\Portable\\ClaudeConfig"')
     expect(wrapper).toContain(
@@ -136,6 +136,6 @@ describe('ensureDesktopCliLauncherInstalled', () => {
 
     expect(status.supported).toBe(false)
     expect(status.installed).toBe(false)
-    expect(status.command).toBe('claude-haha')
+    expect(status.command).toBe('dreamcoder')
   })
 })

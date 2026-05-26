@@ -286,7 +286,7 @@ export function resolveCronProjectRoot(
   options: CronCliResolutionOptions = {},
 ): string {
   const env = options.env ?? process.env
-  const explicitRoot = env.CC_HAHA_ROOT?.trim()
+  const explicitRoot = env.DREAMCODER_ROOT?.trim()
   if (explicitRoot && isSourceProjectRoot(path.resolve(explicitRoot))) {
     return path.resolve(explicitRoot)
   }
@@ -672,7 +672,7 @@ export class CronScheduler {
       CLAUDE_CODE_ENTRYPOINT: 'sdk-cli',
       CALLER_DIR: workDir,
       PWD: workDir,
-      CC_HAHA_SKIP_DOTENV: '1',
+      DREAMCODER_SKIP_DOTENV: '1',
       ...(explicitProviderEnv
         ? {
             CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: '1',
@@ -696,7 +696,7 @@ export class CronScheduler {
       return true
     }
 
-    const ccHahaDir = path.join(this.getConfigDir(), 'cc-haha')
+    const ccHahaDir = path.join(this.getConfigDir(), 'dreamcoder')
     if (existsSync(path.join(ccHahaDir, 'providers.json'))) {
       return true
     }
@@ -726,7 +726,7 @@ export class CronScheduler {
 
     try {
       const raw = readFileSync(
-        path.join(this.getConfigDir(), 'cc-haha', 'settings.json'),
+        path.join(this.getConfigDir(), 'dreamcoder', 'settings.json'),
         'utf-8',
       )
       const parsed = JSON.parse(raw) as { env?: Record<string, string> }

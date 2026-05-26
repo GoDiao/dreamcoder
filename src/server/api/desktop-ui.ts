@@ -1,7 +1,7 @@
 /**
  * Desktop UI Preferences REST API
  *
- * GET  /api/desktop-ui/preferences          — read cc-haha UI preferences
+ * GET  /api/desktop-ui/preferences          — read dreamcoder UI preferences
  * PUT  /api/desktop-ui/preferences/sidebar  — persist sidebar project preferences
  */
 

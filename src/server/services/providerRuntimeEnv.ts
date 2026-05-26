@@ -234,7 +234,7 @@ export function readActiveProviderManagedEnv(
   options?: { serverPort?: number },
 ): Record<string, string> | null {
   try {
-    const raw = fs.readFileSync(path.join(configDir, 'cc-haha', 'providers.json'), 'utf-8')
+    const raw = fs.readFileSync(path.join(configDir, 'dreamcoder', 'providers.json'), 'utf-8')
     const index = normalizeProvidersIndex(JSON.parse(raw))
     if (!index?.activeId) return null
 

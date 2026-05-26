@@ -27,7 +27,7 @@ export const DEFAULT_DESKTOP_GRANT_FLAGS: CuGrantFlags = {
 export function getComputerUseConfigPath(): string {
   return join(
     getClaudeConfigHomeDir(),
-    'cc-haha',
+    'dreamcoder',
     'computer-use-config.json',
   )
 }

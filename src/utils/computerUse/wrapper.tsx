@@ -49,7 +49,7 @@ type Binding = {
  */
 let binding: Binding | undefined;
 let currentToolUseContext: ToolUseContext | undefined;
-const desktopServerUrl = process.env.CC_HAHA_DESKTOP_SERVER_URL;
+const desktopServerUrl = process.env.DREAMCODER_DESKTOP_SERVER_URL;
 function tuc(): ToolUseContext {
   // Safe: `binding` is only populated when `currentToolUseContext` is set.
   // Called only from within `ctx` callbacks, which only fire during dispatch.
@@ -261,7 +261,7 @@ async function runDesktopPermissionDialog(
 }
 
 /**
- * Load pre-authorized apps from ~/.claude/cc-haha/computer-use-config.json.
+ * Load pre-authorized apps from ~/.claude/dreamcoder/computer-use-config.json.
  * Called once when the binding is first created. Pre-authorized apps
  * are injected into appState so `getAllowedApps()` returns them
  * immediately — no runtime permission dialog needed.

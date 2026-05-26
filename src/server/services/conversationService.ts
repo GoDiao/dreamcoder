@@ -238,7 +238,7 @@ export class ConversationService {
 
     // IMPORTANT (Bug#5): 必须覆盖子进程继承的 CALLER_DIR / PWD。
     // preload.ts 顶层读 process.env.CALLER_DIR 并调用 process.chdir(CALLER_DIR)。
-    // 在 bundled 桌面端里，server sidecar 被 Tauri 从 cwd=/ 启动，claude-sidecar.ts
+    // 在 bundled 桌面端里，server sidecar 被 Tauri 从 cwd=/ 启动，dreamcoder-sidecar.ts
     // 在 server/cli 模式入口把 CALLER_DIR 默认设成 process.cwd()（即 '/'），
     // 随后这个 env 被完整继承到 Bun.spawn 的 CLI 子进程；即使这里显式传了
     // cwd: workDir，CLI 子进程里 preload.ts 还是会 chdir('/')，结果把
@@ -916,7 +916,7 @@ export class ConversationService {
   ): Promise<Record<string, string>> {
     // Provider isolation: when Desktop has its own provider config/index,
     // strip inherited provider env vars so the child CLI reads fresh values
-    // from ~/.claude/cc-haha/settings.json instead of stale process.env.
+    // from ~/.claude/dreamcoder/settings.json instead of stale process.env.
     //
     // If the user never configured a Desktop provider and only launched the
     // app/server with ANTHROPIC_* env vars, keep those env vars so Windows
@@ -932,7 +932,7 @@ export class ConversationService {
       'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
       'ANTHROPIC_DEFAULT_OPUS_MODEL',
       'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
-      'CC_HAHA_SEND_DISABLED_THINKING',
+      'DREAMCODER_SEND_DISABLED_THINKING',
       'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
       'CLAUDE_CODE_ATTRIBUTION_HEADER',
       'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
@@ -988,25 +988,25 @@ export class ConversationService {
       CALLER_DIR: workDir,
       PWD: workDir,
       ...(sdkUrl
-        ? { CC_HAHA_COMPUTER_USE_HOST_BUNDLE_ID: 'com.claude-code-haha.desktop' }
+        ? { DREAMCODER_COMPUTER_USE_HOST_BUNDLE_ID: 'com.dreamcoder.desktop' }
         : {}),
       ...(desktopServerUrl
-        ? { CC_HAHA_DESKTOP_SERVER_URL: desktopServerUrl }
+        ? { DREAMCODER_DESKTOP_SERVER_URL: desktopServerUrl }
         : {}),
       ...(sdkUrl
         ? {
-            CC_HAHA_DESKTOP_AWAIT_MCP: '1',
-            CC_HAHA_DESKTOP_AWAIT_MCP_TIMEOUT_MS: '5000',
+            DREAMCODER_DESKTOP_AWAIT_MCP: '1',
+            DREAMCODER_DESKTOP_AWAIT_MCP_TIMEOUT_MS: '5000',
           }
         : {}),
       // Tell the CLI entrypoint to skip project .env loading. Provider env
       // should come from Desktop-managed config or inherited launch env, not
       // be reintroduced from the repo's .env file.
-      CC_HAHA_SKIP_DOTENV: '1',
+      DREAMCODER_SKIP_DOTENV: '1',
       ...(explicitProviderEnv
         ? { CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: '1' }
         : {}),
-      // "官方" 模式 (cc-haha/settings.json 没 provider env) 下,把 CLI 标记为
+      // "官方" 模式 (dreamcoder/settings.json 没 provider env) 下,把 CLI 标记为
       // managed-OAuth,让它忽略外部 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
       // 残留、只走用户 /login 的 OAuth token。自定义 provider 模式绝不能设,
       // 否则 CLI 会忽略 provider 的 AUTH_TOKEN、错误地走 OAuth 打到第三方
@@ -1069,7 +1069,7 @@ export class ConversationService {
 
     const configDir =
       process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-    const ccHahaDir = path.join(configDir, 'cc-haha')
+    const ccHahaDir = path.join(configDir, 'dreamcoder')
     const providersIndexPath = path.join(ccHahaDir, 'providers.json')
     const settingsPath = path.join(ccHahaDir, 'settings.json')
 
@@ -1092,7 +1092,7 @@ export class ConversationService {
         'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
         'ANTHROPIC_DEFAULT_OPUS_MODEL',
         'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
-        'CC_HAHA_SEND_DISABLED_THINKING',
+        'DREAMCODER_SEND_DISABLED_THINKING',
         'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
         'CLAUDE_CODE_ATTRIBUTION_HEADER',
         'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
@@ -1110,7 +1110,7 @@ export class ConversationService {
    * 这种情况下 CLI 必须按 token 路径走第三方 endpoint,不能被 managed 规则
    * 强制切 OAuth。
    *
-   * 默认 (读不到 settings.json) 按"官方"处理 — 即使用户从未用过 cc-haha
+   * 默认 (读不到 settings.json) 按"官方"处理 — 即使用户从未用过 dreamcoder
    * provider 管理,也希望官方 OAuth 能正常工作。
    */
   private shouldMarkManagedOAuth(providerId?: string | null): boolean {
@@ -1123,7 +1123,7 @@ export class ConversationService {
 
     const configDir =
       process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-    const settingsPath = path.join(configDir, 'cc-haha', 'settings.json')
+    const settingsPath = path.join(configDir, 'dreamcoder', 'settings.json')
     try {
       const raw = fs.readFileSync(settingsPath, 'utf-8')
       const parsed = JSON.parse(raw) as { env?: Record<string, string> }
@@ -1161,7 +1161,7 @@ export class ConversationService {
           ...baseArgs,
         ]
       }
-      return [path.resolve(import.meta.dir, '../../../bin/claude-haha'), ...baseArgs]
+      return [path.resolve(import.meta.dir, '../../../bin/dreamcoder'), ...baseArgs]
     }
 
     return buildClaudeCliArgs(launcher, baseArgs, process.env.CLAUDE_APP_ROOT)
@@ -1213,7 +1213,7 @@ export class ConversationService {
       )
     ) {
       return new ConversationStartupError(
-        'Desktop chat could not start because Claude CLI is not authenticated. Run `./bin/claude-haha /login` or provide valid API credentials, then retry.',
+        'Desktop chat could not start because Claude CLI is not authenticated. Run `./bin/dreamcoder /login` or provide valid API credentials, then retry.',
         'CLI_AUTH_REQUIRED',
       )
     }

@@ -40,7 +40,7 @@ function makeRequest(
 }
 
 async function readDesktopUiFile(): Promise<Record<string, unknown>> {
-  const raw = await fs.readFile(path.join(tmpDir, 'cc-haha', 'desktop-ui.json'), 'utf-8')
+  const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'desktop-ui.json'), 'utf-8')
   return JSON.parse(raw) as Record<string, unknown>
 }
 
@@ -67,9 +67,9 @@ describe('DesktopUiPreferencesService', () => {
   })
 
   test('normalizes old schema files and preserves unknown fields when updating sidebar preferences', async () => {
-    await fs.mkdir(path.join(tmpDir, 'cc-haha'), { recursive: true })
+    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
     await fs.writeFile(
-      path.join(tmpDir, 'cc-haha', 'desktop-ui.json'),
+      path.join(tmpDir, 'dreamcoder', 'desktop-ui.json'),
       JSON.stringify({
         futureField: { keep: true },
         sidebar: {
@@ -116,12 +116,12 @@ describe('DesktopUiPreferencesService', () => {
   })
 
   test('quarantines corrupt desktop-ui.json and reports defaults as missing', async () => {
-    await fs.mkdir(path.join(tmpDir, 'cc-haha'), { recursive: true })
-    await fs.writeFile(path.join(tmpDir, 'cc-haha', 'desktop-ui.json'), '{bad json', 'utf-8')
+    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+    await fs.writeFile(path.join(tmpDir, 'dreamcoder', 'desktop-ui.json'), '{bad json', 'utf-8')
 
     const service = new DesktopUiPreferencesService()
     const result = await service.readPreferences()
-    const files = await fs.readdir(path.join(tmpDir, 'cc-haha'))
+    const files = await fs.readdir(path.join(tmpDir, 'dreamcoder'))
 
     expect(result.exists).toBe(false)
     expect(result.preferences.sidebar.hiddenProjects).toEqual([])
@@ -133,7 +133,7 @@ describe('desktop UI preferences API', () => {
   beforeEach(setup)
   afterEach(teardown)
 
-  test('persists sidebar preferences under cc-haha desktop-ui.json', async () => {
+  test('persists sidebar preferences under dreamcoder desktop-ui.json', async () => {
     const putReq = makeRequest('PUT', '/api/desktop-ui/preferences/sidebar', {
       projectOrder: ['/workspace/beta', '/workspace/alpha'],
       pinnedProjects: ['/workspace/beta'],

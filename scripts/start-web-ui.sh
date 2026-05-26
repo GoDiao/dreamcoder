@@ -8,7 +8,7 @@ SERVER_PORT_START="${SERVER_PORT:-3456}"
 WEB_PORT_START="${WEB_PORT:-2024}"
 MAX_PORT_SCAN="${MAX_PORT_SCAN:-100}"
 RUN_ID="$(date +%s)-$RANDOM"
-LOG_DIR="${LOG_DIR:-/tmp/cc-haha-web-ui-${RUN_ID}}"
+LOG_DIR="${LOG_DIR:-/tmp/dreamcoder-web-ui-${RUN_ID}}"
 SERVER_LOG="${LOG_DIR}/server.log"
 WEB_LOG="${LOG_DIR}/web.log"
 

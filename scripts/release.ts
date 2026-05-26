@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Release script for Claude Code Haha Desktop
+ * Release script for DreamCoder Desktop
  *
  * Usage:
  *   bun run scripts/release.ts patch       # 0.1.0 → 0.1.1

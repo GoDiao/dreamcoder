@@ -13,7 +13,7 @@ let originalEnv: {
   PATH?: string
   SHELL?: string
   ZDOTDIR?: string
-  CC_HAHA_DISABLE_TERMINAL_SHELL_ENV?: string
+  DREAMCODER_DISABLE_TERMINAL_SHELL_ENV?: string
 }
 
 async function writeExecutable(filePath: string, content: string) {
@@ -51,10 +51,10 @@ describe('MCP stdio environment', () => {
       PATH: process.env.PATH,
       SHELL: process.env.SHELL,
       ZDOTDIR: process.env.ZDOTDIR,
-      CC_HAHA_DISABLE_TERMINAL_SHELL_ENV:
-        process.env.CC_HAHA_DISABLE_TERMINAL_SHELL_ENV,
+      DREAMCODER_DISABLE_TERMINAL_SHELL_ENV:
+        process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV,
     }
-    delete process.env.CC_HAHA_DISABLE_TERMINAL_SHELL_ENV
+    delete process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV
     resetMcpStdioEnvironmentCacheForTests()
   })
 

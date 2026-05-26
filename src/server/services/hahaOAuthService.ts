@@ -71,7 +71,7 @@ export class HahaOAuthService {
   private getOAuthFilePath(): string {
     const configDir =
       process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-    return path.join(configDir, 'cc-haha', 'oauth.json')
+    return path.join(configDir, 'dreamcoder', 'oauth.json')
   }
 
   async loadTokens(): Promise<StoredOAuthTokens | null> {

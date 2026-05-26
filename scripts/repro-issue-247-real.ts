@@ -185,7 +185,7 @@ async function connect(sessionId: string): Promise<{
 }
 
 async function main() {
-  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cc-haha-issue-247-real-'))
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-issue-247-real-'))
   const server = startServer(port, '127.0.0.1')
   await sleep(500)
 

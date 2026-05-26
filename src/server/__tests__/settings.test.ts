@@ -420,7 +420,7 @@ describe('Settings API', () => {
   it('GET /api/settings/cli-launcher should expose bundled launcher status', async () => {
     if (process.platform === 'win32') return
 
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'dreamcoder-sidecar')
     await fs.writeFile(sidecarPath, '#!/bin/sh\necho desktop-sidecar\n', {
       encoding: 'utf8',
       mode: 0o755,
@@ -432,7 +432,7 @@ describe('Settings API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.command).toBe('claude-haha')
+    expect(body.command).toBe('dreamcoder')
     expect(body.installed).toBe(true)
     expect(body.availableInNewTerminals).toBe(true)
   })
@@ -565,7 +565,7 @@ describe('Models API', () => {
     expect(res.status).toBe(400)
   })
 
-  it('GET /api/models/current should prefer cc-haha managed model over global user model when provider is active', async () => {
+  it('GET /api/models/current should prefer dreamcoder managed model over global user model when provider is active', async () => {
     const settingsSvc = new SettingsService()
     await settingsSvc.updateUserSettings({ model: 'kimi-k2.6' })
 
@@ -594,7 +594,7 @@ describe('Models API', () => {
     expect(body.model.id).toBe('glm-5-turbo')
   })
 
-  it('PUT /api/models/current should persist to cc-haha managed settings when provider is active', async () => {
+  it('PUT /api/models/current should persist to dreamcoder managed settings when provider is active', async () => {
     const settingsSvc = new SettingsService()
     const providerSvc = new ProviderService()
     const provider = await providerSvc.addProvider({

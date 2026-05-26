@@ -26,7 +26,7 @@ function getDesktopTokenFilePath(): string | null {
 function getCcHahaDir(): string {
   const configDir =
     process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-  return path.join(configDir, 'cc-haha')
+  return path.join(configDir, 'dreamcoder')
 }
 
 function getFileBackedStorageMarkerPath(): string {

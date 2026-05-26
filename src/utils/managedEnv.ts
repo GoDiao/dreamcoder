@@ -95,14 +95,14 @@ function filterSettingsEnv(
 }
 
 /**
- * Read env vars from ~/.claude/cc-haha/settings.json (Haha-specific provider
+ * Read env vars from ~/.claude/dreamcoder/settings.json (Haha-specific provider
  * config). This file is written by ProviderService.syncToSettings() and
  * contains ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, model defaults, etc.
  * Returns an empty object if the file doesn't exist or is invalid.
  */
 function getCcHahaSettingsEnv(): Record<string, string> {
   try {
-    const ccHahaSettings = join(getClaudeConfigHomeDir(), 'cc-haha', 'settings.json')
+    const ccHahaSettings = join(getClaudeConfigHomeDir(), 'dreamcoder', 'settings.json')
     const raw = readFileSync(ccHahaSettings, 'utf-8')
     const parsed = JSON.parse(raw) as { env?: Record<string, string> }
     const settingsEnv = normalizeLegacyDeepSeekManagedEnv(parsed.env ?? {}).env
@@ -170,7 +170,7 @@ export function applySafeConfigEnvironmentVariables(): void {
     )
   }
 
-  // cc-haha provider isolation: apply env from ~/.claude/cc-haha/settings.json
+  // dreamcoder provider isolation: apply env from ~/.claude/dreamcoder/settings.json
   // AFTER userSettings so Haha-specific provider config takes priority over
   // the original Claude Code's settings. This prevents Haha from polluting
   // ~/.claude/settings.json while still allowing it to override provider vars.
@@ -217,7 +217,7 @@ export function applyConfigEnvironmentVariables(): void {
 
   Object.assign(process.env, filterSettingsEnv(getSettings_DEPRECATED()?.env))
 
-  // cc-haha provider isolation: same as in applySafeConfigEnvironmentVariables,
+  // dreamcoder provider isolation: same as in applySafeConfigEnvironmentVariables,
   // apply Haha-specific env last so it overrides the original settings.
   Object.assign(process.env, filterSettingsEnv(getCcHahaSettingsEnv()))
 

@@ -35,7 +35,7 @@ describe('changedFilesForLocalPrCheck', () => {
     originalCwd = process.cwd()
     originalBaseRef = process.env.PR_BASE_REF
     delete process.env.PR_BASE_REF
-    tempDir = mkdtempSync(join(tmpdir(), 'cc-haha-changed-files-'))
+    tempDir = mkdtempSync(join(tmpdir(), 'dreamcoder-changed-files-'))
     process.chdir(tempDir)
     runGit(['init', '-b', 'main'])
     runGit(['config', 'user.email', 'test@example.com'])

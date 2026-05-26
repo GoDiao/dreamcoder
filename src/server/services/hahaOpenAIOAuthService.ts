@@ -56,7 +56,7 @@ const SESSION_TTL_MS = 5 * 60 * 1000
 const HTML_SUCCESS = `<!doctype html>
 <html><head><meta charset="utf-8"><title>OpenAI Login Success</title>
 <style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa;color:#333}.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06)}h1{color:#16a34a;margin:0 0 12px}p{color:#666}</style>
-</head><body><div class="card"><h1>OpenAI Login Successful</h1><p>You can close this window and return to Claude Code Haha.</p></div>
+</head><body><div class="card"><h1>OpenAI Login Successful</h1><p>You can close this window and return to DreamCoder.</p></div>
 <script>setTimeout(() => window.close(), 1500)</script>
 </body></html>`
 
@@ -80,7 +80,7 @@ function escapeHtml(s: string): string {
 export function getHahaOpenAIOAuthFilePath(): string {
   const configDir =
     process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-  return path.join(configDir, 'cc-haha', 'openai-oauth.json')
+  return path.join(configDir, 'dreamcoder', 'openai-oauth.json')
 }
 
 export class HahaOpenAIOAuthService {
