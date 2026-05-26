@@ -18,7 +18,7 @@ describe('uiStore theme handling', () => {
   })
 
   it('hydrates and applies the pure white theme as a light color scheme', async () => {
-    window.localStorage.setItem('cc-haha-theme', 'white')
+    window.localStorage.setItem('dreamcoder-theme', 'white')
 
     const { initializeTheme, useUIStore } = await import('./uiStore')
 

@@ -1,4 +1,4 @@
-# Claude Code Haha Desktop
+# DreamCoder Desktop
 
 基于 Tauri 2 + React 的桌面客户端。
 
@@ -26,5 +26,5 @@ bun run tauri dev
 ### macOS 提示"已损坏，无法打开"
 
 ```bash
-xattr -cr /Applications/Claude\ Code\ Haha.app
+xattr -cr /Applications/DreamCoder.app
 ```

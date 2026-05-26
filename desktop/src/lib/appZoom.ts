@@ -1,5 +1,5 @@
-export const APP_ZOOM_STORAGE_KEY = 'cc-haha-app-zoom'
-export const LEGACY_UI_ZOOM_STORAGE_KEY = 'cc-haha-ui-zoom'
+export const APP_ZOOM_STORAGE_KEY = 'dreamcoder-app-zoom'
+export const LEGACY_UI_ZOOM_STORAGE_KEY = 'dreamcoder-ui-zoom'
 export const DEFAULT_APP_ZOOM = 1
 export const MIN_APP_ZOOM = 0.5
 export const MAX_APP_ZOOM = 2

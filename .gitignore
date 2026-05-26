@@ -22,6 +22,7 @@ extracted-natives/
 .playwright-mcp/
 
 # OMX state/logs
+.omc/
 .omx/
 
 # E2E screenshots

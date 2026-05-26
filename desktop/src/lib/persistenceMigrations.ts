@@ -7,7 +7,7 @@ import {
 } from './appZoom'
 
 export const CURRENT_DESKTOP_PERSISTENCE_SCHEMA_VERSION = 1
-export const DESKTOP_PERSISTENCE_VERSION_KEY = 'cc-haha.persistence.schemaVersion'
+export const DESKTOP_PERSISTENCE_VERSION_KEY = 'dreamcoder.persistence.schemaVersion'
 
 type DesktopMigrationReport = {
   migratedKeys: string[]
@@ -15,10 +15,10 @@ type DesktopMigrationReport = {
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
-const TAB_STORAGE_KEY = 'cc-haha-open-tabs'
-const SESSION_RUNTIME_STORAGE_KEY = 'cc-haha-session-runtime'
-const THEME_STORAGE_KEY = 'cc-haha-theme'
-const LOCALE_STORAGE_KEY = 'cc-haha-locale'
+const TAB_STORAGE_KEY = 'dreamcoder-open-tabs'
+const SESSION_RUNTIME_STORAGE_KEY = 'dreamcoder-session-runtime'
+const THEME_STORAGE_KEY = 'dreamcoder-theme'
+const LOCALE_STORAGE_KEY = 'dreamcoder-locale'
 
 function readJson(storage: StorageLike, key: string): unknown {
   const raw = storage.getItem(key)

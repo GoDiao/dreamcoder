@@ -85,7 +85,7 @@ describe('updateStore', () => {
     useUpdateStore.getState().dismissPrompt()
 
     expect(useUpdateStore.getState().shouldPrompt).toBe(false)
-    expect(window.localStorage.getItem('cc-haha-dismissed-update-version')).toBe('0.2.0')
+    expect(window.localStorage.getItem('dreamcoder-dismissed-update-version')).toBe('0.2.0')
 
     await useUpdateStore.getState().checkForUpdates({ silent: true })
 

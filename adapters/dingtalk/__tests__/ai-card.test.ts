@@ -63,8 +63,8 @@ describe('DingTalk AI Card streaming', () => {
   })
 
   it('times out a hung card streaming request', async () => {
-    const previousTimeout = process.env.CC_HAHA_IM_CARD_REQUEST_TIMEOUT_MS
-    process.env.CC_HAHA_IM_CARD_REQUEST_TIMEOUT_MS = '20'
+    const previousTimeout = process.env.DREAMCODER_IM_CARD_REQUEST_TIMEOUT_MS
+    process.env.DREAMCODER_IM_CARD_REQUEST_TIMEOUT_MS = '20'
     globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({
         url: String(url),
@@ -92,9 +92,9 @@ describe('DingTalk AI Card streaming', () => {
       )
     } finally {
       if (previousTimeout === undefined) {
-        delete process.env.CC_HAHA_IM_CARD_REQUEST_TIMEOUT_MS
+        delete process.env.DREAMCODER_IM_CARD_REQUEST_TIMEOUT_MS
       } else {
-        process.env.CC_HAHA_IM_CARD_REQUEST_TIMEOUT_MS = previousTimeout
+        process.env.DREAMCODER_IM_CARD_REQUEST_TIMEOUT_MS = previousTimeout
       }
     }
   })

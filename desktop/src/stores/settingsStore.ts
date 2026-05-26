@@ -33,7 +33,7 @@ import {
 } from '../lib/appZoom'
 import { useUIStore } from './uiStore'
 
-const LOCALE_STORAGE_KEY = 'cc-haha-locale'
+const LOCALE_STORAGE_KEY = 'dreamcoder-locale'
 export const UI_ZOOM_MIN = MIN_APP_ZOOM
 export const UI_ZOOM_MAX = MAX_APP_ZOOM
 export const UI_ZOOM_STEP = APP_ZOOM_CONTROL_STEP

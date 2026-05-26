@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { RuntimeSelection } from '../types/runtime'
 
-const STORAGE_KEY = 'cc-haha-session-runtime'
+const STORAGE_KEY = 'dreamcoder-session-runtime'
 
 export const DRAFT_RUNTIME_SELECTION_KEY = '__draft__'
 

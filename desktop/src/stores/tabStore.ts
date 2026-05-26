@@ -3,7 +3,7 @@ import { sessionsApi } from '../api/sessions'
 import { dropSession as dropVirtualHeightSession } from '../components/chat/virtualHeightCache'
 import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
-const TAB_STORAGE_KEY = 'cc-haha-open-tabs'
+const TAB_STORAGE_KEY = 'dreamcoder-open-tabs'
 
 export const SETTINGS_TAB_ID = '__settings__'
 export const SCHEDULED_TAB_ID = '__scheduled__'

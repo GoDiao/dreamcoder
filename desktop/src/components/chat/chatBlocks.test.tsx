@@ -135,7 +135,7 @@ describe('chat blocks', () => {
         toolName="mcp__computer-use__left_click"
         input={{ coordinate: [120, 220] }}
         result={{
-          content: '"Claude Code Haha" is not in the allowed applications and is currently in front. Take a new screenshot — it may have appeared since your last one.',
+          content: '"DreamCoder" is not in the allowed applications and is currently in front. Take a new screenshot — it may have appeared since your last one.',
           isError: true,
         }}
       />,

@@ -149,7 +149,7 @@ describe('TerminalSettings', () => {
 
     expect(button).toHaveAttribute('aria-expanded', 'true')
     expect(help).toHaveTextContent('plugin, skill, and MCP setup')
-    expect(help).toHaveTextContent('claude-haha plugin install')
+    expect(help).toHaveTextContent('claude-cli plugin install')
   })
 
   it('lets the settings page keep scrolling when the terminal is not focused', async () => {

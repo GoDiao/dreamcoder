@@ -16,7 +16,7 @@ type PresetsResponse = { presets: ProviderPreset[] }
 type TestResultResponse = { result: ProviderTestResult }
 type AuthStatusResponse = {
   hasAuth: boolean
-  source: 'cc-haha-provider' | 'openai-oauth' | 'original-settings' | 'env' | 'none'
+  source: 'dreamcoder-provider' | 'openai-oauth' | 'original-settings' | 'env' | 'none'
   activeProvider?: string
 }
 

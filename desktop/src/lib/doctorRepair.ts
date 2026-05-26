@@ -3,10 +3,10 @@ import { APP_ZOOM_STORAGE_KEY, LEGACY_UI_ZOOM_STORAGE_KEY } from './appZoom'
 import { DESKTOP_PERSISTENCE_VERSION_KEY } from './persistenceMigrations'
 
 export const SAFE_DOCTOR_STORAGE_KEYS = [
-  'cc-haha-open-tabs',
-  'cc-haha-session-runtime',
-  'cc-haha-theme',
-  'cc-haha-locale',
+  'dreamcoder-open-tabs',
+  'dreamcoder-session-runtime',
+  'dreamcoder-theme',
+  'dreamcoder-locale',
   APP_ZOOM_STORAGE_KEY,
   LEGACY_UI_ZOOM_STORAGE_KEY,
   DESKTOP_PERSISTENCE_VERSION_KEY,
