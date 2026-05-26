@@ -1,21 +1,29 @@
 [
   {
-    "id": "official",
-    "name": "Claude Official",
-    "baseUrl": "",
-    "apiFormat": "anthropic",
+    "id": "dreamfield",
+    "name": "DreamField 官方",
+    "baseUrl": "https://www.dreamfield.top",
+    "apiFormat": "openai",
     "defaultModels": {
-      "main": "",
-      "haiku": "",
-      "sonnet": "",
-      "opus": ""
+      "main": "deepseek-v4-pro",
+      "haiku": "DeepSeek-V4-Flash",
+      "sonnet": "deepseek-v4-pro",
+      "opus": "deepseek-v4-pro"
     },
-    "needsApiKey": false,
-    "websiteUrl": "https://www.anthropic.com/claude-code"
+    "needsApiKey": true,
+    "websiteUrl": "https://www.dreamfield.top",
+    "authStrategy": "api-key",
+    "promoText": "DreamField — AI 算力服务平台，DreamCoder 官方推荐 Provider",
+    "featured": true,
+    "modelContextWindows": {
+      "deepseek-v4-pro": 1000000,
+      "DeepSeek-V4-Flash": 1000000,
+      "GLM-5.1": 200000
+    }
   },
   {
     "id": "deepseek",
-    "name": "DeepSeek",
+    "name": "DeepSeek 官方",
     "baseUrl": "https://api.deepseek.com/anthropic",
     "apiFormat": "anthropic",
     "defaultModels": {
@@ -41,33 +49,23 @@
     }
   },
   {
-    "id": "zhipuglm",
-    "name": "Zhipu GLM",
-    "baseUrl": "https://open.bigmodel.cn/api/anthropic",
-    "apiFormat": "anthropic",
+    "id": "qwen",
+    "name": "通义千问",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "apiFormat": "openai",
     "defaultModels": {
-      "main": "glm-5.1",
-      "haiku": "glm-4.5-air",
-      "sonnet": "glm-5-turbo",
-      "opus": "glm-5.1"
+      "main": "qwen-max",
+      "haiku": "qwen-turbo",
+      "sonnet": "qwen-plus",
+      "opus": "qwen-max"
     },
     "needsApiKey": true,
-    "websiteUrl": "https://open.bigmodel.cn",
-    "apiKeyUrl": "https://www.bigmodel.cn/invite?icode=d41B2qi8Z5xNwTGLNPPF3OZLO2QH3C0EBTSr%2BArzMw4%3D",
-    "promoText": "智谱 GLM 为 dreamcoder 用户准备了专属邀请福利，使用此链接注册后可领取新用户权益。",
-    "authStrategy": "auth_token",
-    "defaultEnv": {
-      "DREAMCODER_SEND_DISABLED_THINKING": "1"
-    },
-    "modelContextWindows": {
-      "glm-5.1": 200000,
-      "glm-5-turbo": 200000,
-      "glm-4.5-air": 128000
-    }
+    "websiteUrl": "https://dashscope.console.aliyun.com",
+    "authStrategy": "api-key"
   },
   {
     "id": "kimi",
-    "name": "Kimi",
+    "name": "Kimi (Moonshot)",
     "baseUrl": "https://api.kimi.com/coding",
     "apiFormat": "anthropic",
     "defaultModels": {
@@ -85,91 +83,30 @@
     },
     "modelContextWindows": {
       "kimi-k2.6": 262144,
-      "kimi-k2.5": 262144,
-      "kimi-k2-0905-preview": 262144,
-      "kimi-k2-turbo-preview": 262144,
-      "kimi-k2-thinking": 262144,
-      "kimi-k2-thinking-turbo": 262144
+      "kimi-k2.5": 262144
     }
   },
   {
-    "id": "minimax",
-    "name": "MiniMax",
-    "baseUrl": "https://api.minimaxi.com/anthropic",
+    "id": "zhipuglm",
+    "name": "智谱 GLM",
+    "baseUrl": "https://open.bigmodel.cn/api/anthropic",
     "apiFormat": "anthropic",
     "defaultModels": {
-      "main": "MiniMax-M2.7",
-      "haiku": "MiniMax-M2.7",
-      "sonnet": "MiniMax-M2.7",
-      "opus": "MiniMax-M2.7"
+      "main": "glm-5.1",
+      "haiku": "glm-4.5-air",
+      "sonnet": "glm-5-turbo",
+      "opus": "glm-5.1"
     },
     "needsApiKey": true,
-    "websiteUrl": "https://platform.minimaxi.com",
-    "apiKeyUrl": "https://platform.minimaxi.com/subscribe/token-plan?code=1TG2Cseab2&source=link",
-    "authStrategy": "auth_token",
-    "modelContextWindows": {
-      "MiniMax-M2.7": 204800,
-      "MiniMax-M2.7-highspeed": 204800,
-      "MiniMax-M2.5": 204800,
-      "MiniMax-M2.5-highspeed": 204800,
-      "MiniMax-M2.1": 204800,
-      "MiniMax-M2.1-highspeed": 204800,
-      "MiniMax-M2": 204800
-    }
-  },
-  {
-    "id": "jiekouai",
-    "name": "接口AI",
-    "baseUrl": "https://api.jiekou.ai/anthropic",
-    "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "claude-sonnet-4-6",
-      "haiku": "claude-haiku-4-5-20251001",
-      "sonnet": "claude-sonnet-4-6",
-      "opus": "claude-opus-4-7"
-    },
-    "needsApiKey": true,
-    "websiteUrl": "https://jiekou.ai",
-    "apiKeyUrl": "https://jiekou.ai/referral?invited_code=OBNU3K",
-    "promoText": "接口AI为 dreamcoder 的用户提供官方资源与稳定高性能体验，订阅包价格为官方 8 折；绑定 GitHub 后还可领取 3 美元优惠券。",
-    "featured": true,
+    "websiteUrl": "https://open.bigmodel.cn",
     "authStrategy": "auth_token",
     "defaultEnv": {
-      "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES": "none"
+      "DREAMCODER_SEND_DISABLED_THINKING": "1"
     },
     "modelContextWindows": {
-      "claude-sonnet-4-6": 1000000,
-      "claude-haiku-4-5-20251001": 200000,
-      "claude-haiku-4-5": 200000,
-      "claude-opus-4-7": 1000000
-    }
-  },
-  {
-    "id": "shengsuanyun",
-    "name": "胜算云",
-    "baseUrl": "https://router.shengsuanyun.com/api",
-    "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "anthropic/claude-sonnet-4.6",
-      "haiku": "anthropic/claude-haiku-4.5:thinking",
-      "sonnet": "anthropic/claude-sonnet-4.6",
-      "opus": "anthropic/claude-opus-4.7"
-    },
-    "needsApiKey": true,
-    "websiteUrl": "https://www.shengsuanyun.com",
-    "apiKeyUrl": "https://www.shengsuanyun.com/?from=CH_LEJ88KWR",
-    "promoText": "胜算云为 dreamcoder 的用户提供了特别福利，使用此链接注册的新用户可获 10 元模力及首充 10% 赠送！",
-    "featured": true,
-    "authStrategy": "auth_token",
-    "defaultEnv": {
-      "API_TIMEOUT_MS": "3000000",
-      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-      "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES": "none"
-    },
-    "modelContextWindows": {
-      "anthropic/claude-sonnet-4.6": 1000000,
-      "anthropic/claude-haiku-4.5:thinking": 200000,
-      "anthropic/claude-opus-4.7": 1000000
+      "glm-5.1": 200000,
+      "glm-5-turbo": 200000,
+      "glm-4.5-air": 128000
     }
   },
   {
@@ -184,8 +121,7 @@
       "opus": "qwen/qwen3.6-27b"
     },
     "needsApiKey": false,
-    "websiteUrl": "https://lmstudio.ai/docs/integrations/claude-code",
-    "promoText": "LM Studio 使用 Anthropic 兼容协议，Base URL 填 http://localhost:1234，不要追加 /v1。Claude Code 的提示词、工具和 Skill 会占用较多上下文，请在本地模型设置里把 Context Window 调大，建议至少 200K。",
+    "websiteUrl": "https://lmstudio.ai",
     "authStrategy": "auth_token_empty_api_key",
     "defaultEnv": {
       "ANTHROPIC_AUTH_TOKEN": "lmstudio"
@@ -203,8 +139,7 @@
       "opus": "qwen3.6:27b"
     },
     "needsApiKey": false,
-    "websiteUrl": "https://docs.ollama.com/integrations/claude-code",
-    "promoText": "Ollama 使用 Anthropic 兼容协议，Base URL 填 http://localhost:11434，不要追加 /v1。Claude Code 的提示词、工具和 Skill 会占用较多上下文，请在本地模型设置里把 Context Window 调大，建议至少 200K。",
+    "websiteUrl": "https://ollama.com",
     "authStrategy": "auth_token_empty_api_key",
     "defaultEnv": {
       "ANTHROPIC_AUTH_TOKEN": "ollama"
@@ -212,7 +147,7 @@
   },
   {
     "id": "custom",
-    "name": "Custom",
+    "name": "自定义 Provider",
     "baseUrl": "",
     "apiFormat": "anthropic",
     "defaultModels": {
@@ -222,7 +157,6 @@
       "opus": ""
     },
     "needsApiKey": true,
-    "websiteUrl": "",
     "authStrategy": "auth_token"
   }
 ]
