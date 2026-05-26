@@ -26,7 +26,7 @@
         }
 
         function renderStartupError(reason) {
-          if (window.__CC_HAHA_BOOTSTRAPPED__) return
+          if (window.__DREAMCODER_BOOTSTRAPPED__) return
           var root = document.getElementById('root')
           if (!root) return
 
@@ -75,7 +75,7 @@
           root.appendChild(shell)
         }
 
-        window.__CC_HAHA_SHOW_STARTUP_ERROR__ = renderStartupError
+        window.__DREAMCODER_SHOW_STARTUP_ERROR__ = renderStartupError
 
         window.addEventListener('error', function (event) {
           var target = event.target

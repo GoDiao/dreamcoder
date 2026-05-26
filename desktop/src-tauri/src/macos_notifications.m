@@ -5,23 +5,23 @@
 #include <stdint.h>
 #include <string.h>
 
-typedef void (*CCHHNotificationResponseCallback)(const char *target_json);
+typedef void (*DCNotificationResponseCallback)(const char *target_json);
 
-@interface CCHHNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@interface DCNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
 
-static CCHHNotificationResponseCallback cchhNotificationResponseCallback = NULL;
+static DCNotificationResponseCallback dcNotificationResponseCallback = NULL;
 
-static void cchh_emit_notification_response(NSString *target) {
-    if (cchhNotificationResponseCallback == NULL) {
+static void dc_emit_notification_response(NSString *target) {
+    if (dcNotificationResponseCallback == NULL) {
         return;
     }
 
     const char *targetJson = target != nil ? [target UTF8String] : NULL;
-    cchhNotificationResponseCallback(targetJson);
+    dcNotificationResponseCallback(targetJson);
 }
 
-@implementation CCHHNotificationDelegate
+@implementation DCNotificationDelegate
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
        willPresentNotification:(UNNotification *)notification
          withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler {
@@ -35,30 +35,30 @@ static void cchh_emit_notification_response(NSString *target) {
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
 didReceiveNotificationResponse:(UNNotificationResponse *)response
          withCompletionHandler:(void (^)(void))completionHandler {
-    NSString *target = response.notification.request.content.userInfo[@"cchh_target"];
-    cchh_emit_notification_response(target);
+    NSString *target = response.notification.request.content.userInfo[@"dc_target"];
+    dc_emit_notification_response(target);
     completionHandler();
 }
 @end
 
-@interface CCHHUserNotificationDelegate : NSObject <NSUserNotificationCenterDelegate>
+@interface DCUserNotificationDelegate : NSObject <NSUserNotificationCenterDelegate>
 @end
 
-@implementation CCHHUserNotificationDelegate
+@implementation DCUserNotificationDelegate
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     return YES;
 }
 
 - (void)userNotificationCenter:(NSUserNotificationCenter *)center didActivateNotification:(NSUserNotification *)notification {
-    NSString *target = notification.userInfo[@"cchh_target"];
-    cchh_emit_notification_response(target);
+    NSString *target = notification.userInfo[@"dc_target"];
+    dc_emit_notification_response(target);
 }
 @end
 
-static CCHHNotificationDelegate *cchhNotificationDelegate = nil;
-static CCHHUserNotificationDelegate *cchhUserNotificationDelegate = nil;
+static DCNotificationDelegate *dcNotificationDelegate = nil;
+static DCUserNotificationDelegate *dcUserNotificationDelegate = nil;
 
-static void cchh_copy_error(char *buffer, uintptr_t buffer_len, NSString *message) {
+static void dc_copy_error(char *buffer, uintptr_t buffer_len, NSString *message) {
     if (buffer == NULL || buffer_len == 0) {
         return;
     }
@@ -78,7 +78,7 @@ static void cchh_copy_error(char *buffer, uintptr_t buffer_len, NSString *messag
     buffer[max_len] = '\0';
 }
 
-static void cchh_run_on_main_sync(dispatch_block_t block) {
+static void dc_run_on_main_sync(dispatch_block_t block) {
     if ([NSThread isMainThread]) {
         block();
         return;
@@ -87,53 +87,53 @@ static void cchh_run_on_main_sync(dispatch_block_t block) {
     dispatch_sync(dispatch_get_main_queue(), block);
 }
 
-void cchh_set_notification_response_callback(CCHHNotificationResponseCallback callback) {
-    cchhNotificationResponseCallback = callback;
+void dc_set_notification_response_callback(DCNotificationResponseCallback callback) {
+    dcNotificationResponseCallback = callback;
 }
 
-static UNUserNotificationCenter *cchh_notification_center(void) {
+static UNUserNotificationCenter *dc_notification_center(void) {
     static dispatch_once_t onceToken;
     static UNUserNotificationCenter *center = nil;
 
     dispatch_once(&onceToken, ^{
         center = [UNUserNotificationCenter currentNotificationCenter];
-        cchhNotificationDelegate = [[CCHHNotificationDelegate alloc] init];
-        center.delegate = cchhNotificationDelegate;
+        dcNotificationDelegate = [[DCNotificationDelegate alloc] init];
+        center.delegate = dcNotificationDelegate;
     });
 
     return center;
 }
 
-static NSUserNotificationCenter *cchh_user_notification_center(void) {
+static NSUserNotificationCenter *dc_user_notification_center(void) {
     static dispatch_once_t onceToken;
     static NSUserNotificationCenter *center = nil;
 
     dispatch_once(&onceToken, ^{
         center = [NSUserNotificationCenter defaultUserNotificationCenter];
-        cchhUserNotificationDelegate = [[CCHHUserNotificationDelegate alloc] init];
-        center.delegate = cchhUserNotificationDelegate;
+        dcUserNotificationDelegate = [[DCUserNotificationDelegate alloc] init];
+        center.delegate = dcUserNotificationDelegate;
     });
 
     return center;
 }
 
-int cchh_notification_authorization_status(char *error_buffer, uintptr_t error_buffer_len) {
+int dc_notification_authorization_status(char *error_buffer, uintptr_t error_buffer_len) {
     @autoreleasepool {
-        cchh_copy_error(error_buffer, error_buffer_len, nil);
+        dc_copy_error(error_buffer, error_buffer_len, nil);
 
         if (@available(macOS 10.14, *)) {
             __block NSInteger status = UNAuthorizationStatusNotDetermined;
             dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-            cchh_run_on_main_sync(^{
-                [cchh_notification_center() getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+            dc_run_on_main_sync(^{
+                [dc_notification_center() getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
                     status = settings.authorizationStatus;
                     dispatch_semaphore_signal(semaphore);
                 }];
             });
 
             if (dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
-                cchh_copy_error(error_buffer, error_buffer_len, @"Timed out while reading macOS notification permission");
+                dc_copy_error(error_buffer, error_buffer_len, @"Timed out while reading macOS notification permission");
                 return -1;
             }
 
@@ -144,9 +144,9 @@ int cchh_notification_authorization_status(char *error_buffer, uintptr_t error_b
     }
 }
 
-bool cchh_request_notification_authorization(char *error_buffer, uintptr_t error_buffer_len) {
+bool dc_request_notification_authorization(char *error_buffer, uintptr_t error_buffer_len) {
     @autoreleasepool {
-        cchh_copy_error(error_buffer, error_buffer_len, nil);
+        dc_copy_error(error_buffer, error_buffer_len, nil);
 
         if (@available(macOS 10.14, *)) {
             __block BOOL granted = NO;
@@ -154,8 +154,8 @@ bool cchh_request_notification_authorization(char *error_buffer, uintptr_t error
             dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
             UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound;
 
-            cchh_run_on_main_sync(^{
-                [cchh_notification_center() requestAuthorizationWithOptions:options completionHandler:^(BOOL isGranted, NSError *error) {
+            dc_run_on_main_sync(^{
+                [dc_notification_center() requestAuthorizationWithOptions:options completionHandler:^(BOOL isGranted, NSError *error) {
                     granted = isGranted;
                     requestError = error;
                     dispatch_semaphore_signal(semaphore);
@@ -163,12 +163,12 @@ bool cchh_request_notification_authorization(char *error_buffer, uintptr_t error
             });
 
             if (dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC)) != 0) {
-                cchh_copy_error(error_buffer, error_buffer_len, @"Timed out while requesting macOS notification permission");
+                dc_copy_error(error_buffer, error_buffer_len, @"Timed out while requesting macOS notification permission");
                 return false;
             }
 
             if (requestError != nil) {
-                cchh_copy_error(error_buffer, error_buffer_len, [requestError localizedDescription]);
+                dc_copy_error(error_buffer, error_buffer_len, [requestError localizedDescription]);
                 return false;
             }
 
@@ -179,27 +179,27 @@ bool cchh_request_notification_authorization(char *error_buffer, uintptr_t error
     }
 }
 
-bool cchh_send_user_notification(const char *title, const char *body, const char *target, char *error_buffer, uintptr_t error_buffer_len) {
+bool dc_send_user_notification(const char *title, const char *body, const char *target, char *error_buffer, uintptr_t error_buffer_len) {
     @autoreleasepool {
-        cchh_copy_error(error_buffer, error_buffer_len, nil);
+        dc_copy_error(error_buffer, error_buffer_len, nil);
 
-        int status = cchh_notification_authorization_status(error_buffer, error_buffer_len);
+        int status = dc_notification_authorization_status(error_buffer, error_buffer_len);
         if (status < 0) {
             return false;
         }
         if (status == UNAuthorizationStatusNotDetermined || status == UNAuthorizationStatusDenied) {
-            cchh_copy_error(error_buffer, error_buffer_len, @"not_authorized");
+            dc_copy_error(error_buffer, error_buffer_len, @"not_authorized");
             return false;
         }
 
         if (@available(macOS 10.14, *)) {
             UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
-            content.title = title != NULL ? [NSString stringWithUTF8String:title] : @"Claude Code Haha";
+            content.title = title != NULL ? [NSString stringWithUTF8String:title] : @"DreamCoder";
             if (body != NULL && strlen(body) > 0) {
                 content.body = [NSString stringWithUTF8String:body];
             }
             if (target != NULL && strlen(target) > 0) {
-                content.userInfo = @{ @"cchh_target": [NSString stringWithUTF8String:target] };
+                content.userInfo = @{ @"dc_target": [NSString stringWithUTF8String:target] };
             }
             content.sound = [UNNotificationSound defaultSound];
 
@@ -208,20 +208,20 @@ bool cchh_send_user_notification(const char *title, const char *body, const char
             __block NSError *deliveryError = nil;
             dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-            cchh_run_on_main_sync(^{
-                [cchh_notification_center() addNotificationRequest:request withCompletionHandler:^(NSError *error) {
+            dc_run_on_main_sync(^{
+                [dc_notification_center() addNotificationRequest:request withCompletionHandler:^(NSError *error) {
                     deliveryError = error;
                     dispatch_semaphore_signal(semaphore);
                 }];
             });
 
             if (dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
-                cchh_copy_error(error_buffer, error_buffer_len, @"Timed out while delivering macOS notification");
+                dc_copy_error(error_buffer, error_buffer_len, @"Timed out while delivering macOS notification");
                 return false;
             }
 
             if (deliveryError != nil) {
-                cchh_copy_error(error_buffer, error_buffer_len, [deliveryError localizedDescription]);
+                dc_copy_error(error_buffer, error_buffer_len, [deliveryError localizedDescription]);
                 return false;
             }
 
@@ -229,16 +229,16 @@ bool cchh_send_user_notification(const char *title, const char *body, const char
         }
 
         NSUserNotification *notification = [[NSUserNotification alloc] init];
-        notification.title = title != NULL ? [NSString stringWithUTF8String:title] : @"Claude Code Haha";
+        notification.title = title != NULL ? [NSString stringWithUTF8String:title] : @"DreamCoder";
         if (body != NULL && strlen(body) > 0) {
             notification.informativeText = [NSString stringWithUTF8String:body];
         }
         if (target != NULL && strlen(target) > 0) {
-            notification.userInfo = @{ @"cchh_target": [NSString stringWithUTF8String:target] };
+            notification.userInfo = @{ @"dc_target": [NSString stringWithUTF8String:target] };
         }
         notification.soundName = NSUserNotificationDefaultSoundName;
 
-        [cchh_user_notification_center() deliverNotification:notification];
+        [dc_user_notification_center() deliverNotification:notification];
         return true;
     }
 }

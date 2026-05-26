@@ -6,12 +6,12 @@ const html = readFileSync(join(__dirname, 'index.html'), 'utf-8')
 
 describe('desktop index startup diagnostics', () => {
   it('installs a non-module startup watchdog before the app module loads', () => {
-    const watchdogIndex = html.indexOf('__CC_HAHA_SHOW_STARTUP_ERROR__')
+    const watchdogIndex = html.indexOf('__DREAMCODER_SHOW_STARTUP_ERROR__')
     const moduleIndex = html.indexOf('type="module"')
 
     expect(watchdogIndex).toBeGreaterThan(0)
     expect(moduleIndex).toBeGreaterThan(watchdogIndex)
-    expect(html).toContain('__CC_HAHA_BOOTSTRAPPED__')
+    expect(html).toContain('__DREAMCODER_BOOTSTRAPPED__')
     expect(html).toContain('Desktop startup failed')
   })
 

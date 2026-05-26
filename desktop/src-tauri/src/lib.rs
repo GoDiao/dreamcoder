@@ -39,22 +39,22 @@ mod macos_notifications {
     const ERROR_BUFFER_LEN: usize = 1024;
 
     unsafe extern "C" {
-        fn cchh_notification_authorization_status(
+        fn dc_notification_authorization_status(
             error_buffer: *mut c_char,
             error_buffer_len: usize,
         ) -> c_int;
-        fn cchh_request_notification_authorization(
+        fn dc_request_notification_authorization(
             error_buffer: *mut c_char,
             error_buffer_len: usize,
         ) -> bool;
-        fn cchh_send_user_notification(
+        fn dc_send_user_notification(
             title: *const c_char,
             body: *const c_char,
             target: *const c_char,
             error_buffer: *mut c_char,
             error_buffer_len: usize,
         ) -> bool;
-        fn cchh_set_notification_response_callback(callback: Option<extern "C" fn(*const c_char)>);
+        fn dc_set_notification_response_callback(callback: Option<extern "C" fn(*const c_char)>);
     }
 
     #[derive(Clone, Serialize)]
@@ -92,7 +92,7 @@ mod macos_notifications {
     pub fn permission_state() -> Result<String, String> {
         let mut error_buffer = new_error_buffer();
         let status = unsafe {
-            cchh_notification_authorization_status(error_buffer.as_mut_ptr(), ERROR_BUFFER_LEN)
+            dc_notification_authorization_status(error_buffer.as_mut_ptr(), ERROR_BUFFER_LEN)
         };
 
         if status < 0 {
@@ -106,7 +106,7 @@ mod macos_notifications {
     pub fn request_permission() -> Result<String, String> {
         let mut error_buffer = new_error_buffer();
         let granted = unsafe {
-            cchh_request_notification_authorization(error_buffer.as_mut_ptr(), ERROR_BUFFER_LEN)
+            dc_request_notification_authorization(error_buffer.as_mut_ptr(), ERROR_BUFFER_LEN)
         };
 
         if granted {
@@ -150,7 +150,7 @@ mod macos_notifications {
         if let Ok(mut guard) = handle.lock() {
             *guard = Some(app);
         }
-        unsafe { cchh_set_notification_response_callback(Some(handle_notification_response)) };
+        unsafe { dc_set_notification_response_callback(Some(handle_notification_response)) };
     }
 
     pub fn send_notification(
@@ -171,7 +171,7 @@ mod macos_notifications {
 
         let mut error_buffer = new_error_buffer();
         let sent = unsafe {
-            cchh_send_user_notification(
+            dc_send_user_notification(
                 title.as_ptr(),
                 body.as_ref()
                     .map_or(std::ptr::null(), |value| value.as_ptr()),
@@ -301,7 +301,7 @@ fn dir_has_portable_data(dir: &Path) -> bool {
         || dir.join("skills").is_dir()
         || dir.join("plugins").is_dir()
         || dir.join("cowork_plugins").is_dir()
-        || dir.join("cc-haha").is_dir()
+        || dir.join("dreamcoder").is_dir()
 }
 
 /// Resolve the default portable config directory: exe_dir/CLAUDE_CONFIG_DIR.
@@ -402,7 +402,7 @@ struct StoredWindowState {
 
 /// 与 ServerState 平级的 adapter 子进程状态。
 ///
-/// adapter sidecar（claude-sidecar adapters --telegram 等）的生命周期
+/// adapter sidecar（dreamcoder-sidecar adapters --telegram 等）的生命周期
 /// 跟 server 不同：它没有 HTTP 端口可探活，没配凭据时会自己干净退出，
 /// 而且需要支持运行时热重启 —— 用户在设置页保存 IM 凭据后，
 /// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
@@ -539,7 +539,7 @@ fn get_app_mode(app: AppHandle) -> serde_json::Value {
         .clone()
         .or_else(|| app.path().app_config_dir().ok());
     let config_dir_source = if env_config_dir.is_some() {
-        if std::env::var_os("CC_HAHA_APP_PORTABLE_DIR").is_some() {
+        if std::env::var_os("DREAMCODER_APP_PORTABLE_DIR").is_some() {
             "portable"
         } else {
             "environment"
@@ -719,7 +719,7 @@ fn is_window_state_visible_on_any_monitor(
 fn window_state_path(app: &AppHandle) -> Option<PathBuf> {
     // honour CLAUDE_CONFIG_DIR so portable installs keep window-state.json
     // and terminal-config.json alongside the config dir instead of
-    // %APPDATA%\com.claude-code-haha.desktop\.
+    // %APPDATA%\com.dreamcoder.desktop\.
     resolve_portable_state_path().or_else(|| match app.path().app_config_dir() {
         Ok(dir) => Some(dir.join(WINDOW_STATE_FILE)),
         Err(err) => {
@@ -870,13 +870,13 @@ fn show_main_window(app: &AppHandle) {
 
 fn setup_system_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
-        .text(TRAY_SHOW_ID, "Show Claude Code Haha")
+        .text(TRAY_SHOW_ID, "Show DreamCoder")
         .separator()
-        .text(TRAY_QUIT_ID, "Quit Claude Code Haha")
+        .text(TRAY_QUIT_ID, "Quit DreamCoder")
         .build()?;
 
     let mut tray = TrayIconBuilder::with_id("main-tray")
-        .tooltip("Claude Code Haha")
+        .tooltip("DreamCoder")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -1583,7 +1583,7 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
     // 单一合并 sidecar：第一个参数选 server / cli / adapters 模式。
     let mut sidecar = app
         .shell()
-        .sidecar("claude-sidecar")
+        .sidecar("dreamcoder-sidecar")
         .map_err(|err| format!("resolve sidecar: {err}"))?;
     for (key, value) in terminal_environment(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
@@ -1719,7 +1719,7 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
     ] {
         let mut sidecar = app
             .shell()
-            .sidecar("claude-sidecar")
+            .sidecar("dreamcoder-sidecar")
             .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
         for (key, value) in terminal_environment(&default_shell(None)) {
             sidecar = sidecar.env(key, value);
@@ -1826,7 +1826,7 @@ fn kill_stale_unix_adapter_sidecars() {
         if pid == current_pid {
             continue;
         }
-        if !command.contains("claude-sidecar") || !command.contains(" adapters") {
+        if !command.contains("dreamcoder-sidecar") || !command.contains(" adapters") {
             continue;
         }
 
@@ -1837,9 +1837,9 @@ fn kill_stale_unix_adapter_sidecars() {
 #[cfg(target_os = "windows")]
 fn kill_windows_sidecars() {
     for image_name in [
-        "claude-sidecar-x86_64-pc-windows-msvc.exe",
-        "claude-sidecar-aarch64-pc-windows-msvc.exe",
-        "claude-sidecar.exe",
+        "dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
+        "dreamcoder-sidecar-aarch64-pc-windows-msvc.exe",
+        "dreamcoder-sidecar.exe",
     ] {
         let _ = StdCommand::new("taskkill")
             .args(["/F", "/T", "/IM", image_name])
@@ -1972,7 +1972,7 @@ mod tests {
     #[test]
     fn terminal_bash_path_normalizer_rejects_missing_files() {
         let missing =
-            std::env::temp_dir().join(format!("cchh-missing-bash-{}", std::process::id()));
+            std::env::temp_dir().join(format!("dc-missing-bash-{}", std::process::id()));
 
         let error = normalize_terminal_bash_path(Some(missing.to_string_lossy().to_string()))
             .expect_err("missing path should be rejected");
@@ -1982,7 +1982,7 @@ mod tests {
 
     #[test]
     fn terminal_bash_path_normalizer_accepts_existing_files() {
-        let path = std::env::temp_dir().join(format!("cchh-bash-path-test-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("dc-bash-path-test-{}", std::process::id()));
         fs::write(&path, "").expect("write bash path fixture");
 
         assert_eq!(
@@ -2037,7 +2037,7 @@ mod tests {
     fn terminal_cwd_defaults_to_portable_config_dir_when_present() {
         let original = std::env::var_os("CLAUDE_CONFIG_DIR");
         let dir = std::env::temp_dir().join(format!(
-            "cchh-terminal-portable-cwd-{}",
+            "dc-terminal-portable-cwd-{}",
             std::process::id()
         ));
         fs::create_dir_all(&dir).expect("create portable config dir");
@@ -2058,7 +2058,7 @@ mod tests {
     #[test]
     fn portable_data_detection_includes_cli_state_dirs() {
         let root = std::env::temp_dir().join(format!(
-            "cchh-portable-data-detect-{}",
+            "dc-portable-data-detect-{}",
             std::process::id()
         ));
         let skills = root.join("skills");
@@ -2117,7 +2117,7 @@ mod tests {
 
     #[test]
     fn h5_dist_dir_prefers_tauri_parent_resource_mapping() {
-        let root = std::env::temp_dir().join(format!("cchh-h5-dist-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("dc-h5-dist-test-{}", std::process::id()));
         let resource_dir = root.join("Contents").join("Resources");
         let app_root = root.join("Contents").join("MacOS");
         let mapped_dist = resource_dir.join("_up_").join("dist");
@@ -2189,12 +2189,12 @@ pub fn run() {
     let builder = builder
         .menu(|app| {
             let about_item =
-                MenuItemBuilder::with_id("nav_about", "关于 Claude Code Haha").build(app)?;
+                MenuItemBuilder::with_id("nav_about", "关于 DreamCoder").build(app)?;
             let settings_item = MenuItemBuilder::with_id("nav_settings", "设置...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
 
-            let app_submenu = SubmenuBuilder::new(app, "Claude Code Haha")
+            let app_submenu = SubmenuBuilder::new(app, "DreamCoder")
                 .item(&about_item)
                 .separator()
                 .item(&settings_item)

@@ -3,7 +3,7 @@ import path from 'node:path'
 export type SidecarMode = 'server' | 'cli' | 'adapters'
 
 const EXPLICIT_MODES = new Set<SidecarMode>(['server', 'cli', 'adapters'])
-const DESKTOP_CLI_NAMES = new Set(['claude-haha', 'claude-haha.exe'])
+const DESKTOP_CLI_NAMES = new Set(['dreamcoder', 'dreamcoder.exe'])
 
 export function resolveSidecarInvocation(
   rawArgs: string[],
@@ -57,7 +57,7 @@ export function parseLauncherArgs(
   }
 
   if (!appRoot) {
-    throw new Error('Missing --app-root for claude-sidecar')
+    throw new Error('Missing --app-root for dreamcoder-sidecar')
   }
 
   return { appRoot, args: nextArgs }

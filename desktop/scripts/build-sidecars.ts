@@ -28,11 +28,11 @@ await mkdir(binariesDir, { recursive: true })
 
 // 单一合并 sidecar：server / cli 共享一份 bun runtime + 共享依赖代码。
 // 调用方（Tauri lib.rs / conversationService）通过第一个 positional 参数
-// 选择 'server' 或 'cli' 模式，详见 desktop/sidecars/claude-sidecar.ts。
+// 选择 'server' 或 'cli' 模式，详见 desktop/sidecars/dreamcoder-sidecar.ts。
 await compileExecutable({
-  entrypoint: path.join(desktopRoot, 'sidecars/claude-sidecar.ts'),
-  outfileBase: path.join(binariesDir, `claude-sidecar-${targetTriple}`),
-  productName: 'Claude Code Sidecar',
+  entrypoint: path.join(desktopRoot, 'sidecars/dreamcoder-sidecar.ts'),
+  outfileBase: path.join(binariesDir, `dreamcoder-sidecar-${targetTriple}`),
+  productName: 'DreamCoder Sidecar',
   bunTarget,
 })
 
@@ -144,7 +144,7 @@ async function compileExecutable({
       autoloadPackageJson: true,
       windows: {
         title: productName,
-        publisher: 'Claude Code',
+        publisher: 'DreamCoder',
         description: productName,
         hideConsole: true,
       },

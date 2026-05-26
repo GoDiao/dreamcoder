@@ -22,7 +22,7 @@ fn main() {
             "CLAUDE_CONFIG_DIR",
             portable_dir.to_string_lossy().to_string(),
         );
-        std::env::set_var("CC_HAHA_APP_PORTABLE_DIR", "1");
+        std::env::set_var("DC_APP_PORTABLE_DIR", "1");
     }
 
     // If CLAUDE_CONFIG_DIR is set (either from env or from our startup logic above),
@@ -35,7 +35,7 @@ fn main() {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_data);
     }
 
-    claude_code_desktop_lib::run()
+    dreamcoder_desktop_lib::run()
 }
 
 /// Determine if we should start in portable mode.
@@ -99,7 +99,7 @@ fn determine_startup_portable_dir() -> Option<PathBuf> {
 
     if let Some(ref sys_cfg) = system_config {
         // 修复：必须使用 Tauri 默认的 bundle identifier
-        let app_subdir = sys_cfg.join("com.claude-code-haha.desktop");
+        let app_subdir = sys_cfg.join("com.dreamcoder.desktop");
         if let Some((mode, portable_dir)) = get_mode_from_config(&app_subdir) {
             if mode == "portable" {
                 return Some(portable_dir.unwrap_or(default_portable.clone()));
@@ -129,7 +129,7 @@ fn determine_startup_portable_dir() -> Option<PathBuf> {
             || dir.join("skills").is_dir()
             || dir.join("plugins").is_dir()
             || dir.join("cowork_plugins").is_dir()
-            || dir.join("cc-haha").is_dir()
+            || dir.join("dreamcoder").is_dir()
     }
 
     if dir_has_portable_data(&default_portable) {

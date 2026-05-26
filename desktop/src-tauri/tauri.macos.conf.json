@@ -2,7 +2,7 @@
   "app": {
     "windows": [
       {
-        "title": "Claude Code Haha",
+        "title": "DreamCoder",
         "width": 1440,
         "height": 960,
         "minWidth": 960,

@@ -1,10 +1,10 @@
 [package]
-name = "claude-code-desktop"
+name = "dreamcoder-desktop"
 version = "0.3.1"
 edition = "2021"
 
 [lib]
-name = "claude_code_desktop_lib"
+name = "dreamcoder_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

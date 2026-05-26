@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-capabilities-schema-v2.json",
   "identifier": "default",
-  "description": "Default capabilities for Claude Code Desktop",
+  "description": "Default capabilities for DreamCoder Desktop",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -19,7 +19,7 @@
             "server",
             { "validator": "regex", "value": "^(--port|--host|--config)=.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -27,7 +27,7 @@
             "adapters",
             { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -35,7 +35,7 @@
             "cli",
             { "validator": "regex", "value": "^.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         }
       ]
@@ -48,7 +48,7 @@
             "server",
             { "validator": "regex", "value": "^(--port|--host|--config)=.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -56,7 +56,7 @@
             "adapters",
             { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -64,7 +64,7 @@
             "cli",
             { "validator": "regex", "value": "^.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         }
       ]
@@ -77,7 +77,7 @@
             "server",
             { "validator": "regex", "value": "^(--port|--host|--config)=.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -85,7 +85,7 @@
             "adapters",
             { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         },
         {
@@ -93,7 +93,7 @@
             "cli",
             { "validator": "regex", "value": "^.+$" }
           ],
-          "name": "binaries/claude-sidecar",
+          "name": "binaries/dreamcoder-sidecar",
           "sidecar": true
         }
       ]

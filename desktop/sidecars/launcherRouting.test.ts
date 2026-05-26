@@ -7,7 +7,7 @@ describe('resolveSidecarInvocation', () => {
     expect(
       resolveSidecarInvocation(
         ['server', '--host', '127.0.0.1'],
-        '/tmp/claude-sidecar',
+        '/tmp/dreamcoder-sidecar',
         null,
       ),
     ).toEqual({
@@ -17,11 +17,11 @@ describe('resolveSidecarInvocation', () => {
     })
   })
 
-  it('defaults claude-haha invocations to cli mode', () => {
+  it('defaults dreamcoder invocations to cli mode', () => {
     expect(
       resolveSidecarInvocation(
         ['plugin', 'install', 'demo'],
-        '/Users/demo/.local/bin/claude-haha',
+        '/Users/demo/.local/bin/dreamcoder',
         null,
       ),
     ).toEqual({
