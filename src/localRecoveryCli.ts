@@ -7,7 +7,7 @@ type OutputFormat = 'text' | 'json'
 function printHelp(): void {
   process.stdout.write(
     [
-      'Usage: dreamcoder [options] [prompt]',
+      'Usage: claude-haha [options] [prompt]',
       '',
       'Local recovery mode for this leaked source tree.',
       '',

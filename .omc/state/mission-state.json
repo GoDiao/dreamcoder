@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-26T17:54:23.522Z",
+  "updatedAt": "2026-05-26T18:04:36.850Z",
   "missions": [
     {
       "id": "session:07db39b9-52cd-4784-b90c-5798235d2a40:none",
@@ -7,14 +7,14 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-05-26T17:12:28.794Z",
-      "updatedAt": "2026-05-26T17:54:23.522Z",
+      "updatedAt": "2026-05-26T18:04:36.850Z",
       "status": "running",
-      "workerCount": 2,
+      "workerCount": 3,
       "taskCounts": {
-        "total": 2,
+        "total": 3,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 1,
+        "inProgress": 2,
         "completed": 1,
         "failed": 0
       },
@@ -38,17 +38,19 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-05-26T17:54:23.522Z"
+        },
+        {
+          "name": "executor:a1456c0",
+          "role": "executor",
+          "ownership": "a1456c0bbbec0fbe6",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-05-26T18:04:36.850Z"
         }
       ],
       "timeline": [
-        {
-          "id": "session-start:aa228c29f65153060:2026-05-26T17:12:28.794Z",
-          "at": "2026-05-26T17:12:28.794Z",
-          "kind": "update",
-          "agent": "executor:aa228c2",
-          "detail": "started executor:aa228c2",
-          "sourceKey": "session-start:aa228c29f65153060"
-        },
         {
           "id": "session-start:a48c1deb735db23b2:2026-05-26T17:36:51.979Z",
           "at": "2026-05-26T17:36:51.979Z",
@@ -64,6 +66,14 @@
           "agent": "executor:a48c1de",
           "detail": "completed",
           "sourceKey": "session-stop:a48c1deb735db23b2"
+        },
+        {
+          "id": "session-start:a1456c0bbbec0fbe6:2026-05-26T18:04:36.850Z",
+          "at": "2026-05-26T18:04:36.850Z",
+          "kind": "update",
+          "agent": "executor:a1456c0",
+          "detail": "started executor:a1456c0",
+          "sourceKey": "session-start:a1456c0bbbec0fbe6"
         }
       ]
     }

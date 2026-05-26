@@ -2739,7 +2739,7 @@ async function run(): Promise<CommanderCommand> {
         }, configs).catch(err => logForDebugging(`[MCP] ${label} connect error: ${err}`));
       };
       const getDesktopMcpStartupTimeoutMs = (): number => {
-        const raw = process.env.DREAMCODER_DESKTOP_AWAIT_MCP_TIMEOUT_MS;
+        const raw = process.env.CC_HAHA_DESKTOP_AWAIT_MCP_TIMEOUT_MS;
         if (raw === undefined) return 5_000;
         const parsed = Number.parseInt(raw, 10);
         if (!Number.isFinite(parsed) || parsed < 0) return 5_000;
@@ -2779,7 +2779,7 @@ async function run(): Promise<CommanderCommand> {
       profileCheckpoint('before_connectMcp');
       const regularMcpConnect = connectMcpBatch(regularMcpConfigs, 'regular');
       if (sdkUrl) {
-        if (process.env.DREAMCODER_DESKTOP_AWAIT_MCP === '1') {
+        if (process.env.CC_HAHA_DESKTOP_AWAIT_MCP === '1') {
           await waitForDesktopMcpStartup(regularMcpConnect, 'regular MCP');
         }
       } else {

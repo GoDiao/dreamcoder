@@ -15,10 +15,17 @@
       "status": "completed",
       "completed_at": "2026-05-26T17:54:23.522Z",
       "duration_ms": 1051543
+    },
+    {
+      "agent_id": "a1456c0bbbec0fbe6",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-05-26T18:04:36.850Z",
+      "parent_mode": "none",
+      "status": "running"
     }
   ],
-  "total_spawned": 2,
+  "total_spawned": 3,
   "total_completed": 1,
   "total_failed": 0,
-  "last_updated": "2026-05-26T17:54:23.626Z"
+  "last_updated": "2026-05-26T18:04:36.963Z"
 }

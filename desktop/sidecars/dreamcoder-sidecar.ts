@@ -37,7 +37,9 @@ if (mode === 'adapters') {
     const { startServer } = await import('../../src/server/index.ts')
     startServer()
   } else if (mode === 'cli') {
-    await import('../../src/entrypoints/cli.tsx')
+    // CLI mode not available in MVP (Phase 2)
+    console.error('[dreamcoder-sidecar] cli mode is not available in DreamCoder MVP (Phase 2)')
+    process.exit(1)
   } else {
     console.error(`dreamcoder-sidecar: unknown mode "${mode}" (expected "server", "cli" or "adapters")`)
     process.exit(2)
