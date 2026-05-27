@@ -38,6 +38,7 @@ import { OPENAI_OFFICIAL_PROVIDER_ID } from '../constants/openaiOfficialProvider
 import { useUpdateStore } from '../stores/updateStore'
 import { formatBytes } from '../lib/formatBytes'
 import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isValidHttpProxyUrl } from '../lib/validation'
 import {
   getDesktopNotificationPermission,
   notifyDesktop,
@@ -3465,15 +3466,6 @@ const GITHUB_REPO = 'https://github.com/GoDiao/dreamcoder'
 const GITHUB_ISSUES = `${GITHUB_REPO}/issues`
 const GITHUB_RELEASES = `${GITHUB_REPO}/releases`
 const AUTHOR_GITHUB = 'https://github.com/GoDiao'
-
-function isValidHttpProxyUrl(value: string) {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
 
 function AboutSettings() {
   const t = useTranslation()
