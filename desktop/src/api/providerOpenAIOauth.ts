@@ -2,6 +2,8 @@
 
 import { api, getBaseUrl } from './client'
 
+import { currentServerPort } from './providerOAuth'
+
 export type ProviderOpenAIOAuthStatus =
   | { loggedIn: false }
   | {
@@ -10,15 +12,6 @@ export type ProviderOpenAIOAuthStatus =
       email: string | null
       accountId: string | null
     }
-
-function currentServerPort(): number {
-  const port = new URL(getBaseUrl()).port
-  const parsed = Number.parseInt(port, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Cannot determine server port from baseUrl: ${getBaseUrl()}`)
-  }
-  return parsed
-}
 
 export const providerOpenAIOAuthApi = {
   start() {

@@ -11,7 +11,7 @@ export type ProviderOAuthStatus =
       subscriptionType: 'pro' | 'max' | 'team' | 'enterprise' | null
     }
 
-function currentServerPort(): number {
+export function currentServerPort(): number {
   const port = new URL(getBaseUrl()).port
   const parsed = Number.parseInt(port, 10)
   if (!Number.isFinite(parsed) || parsed <= 0) {
