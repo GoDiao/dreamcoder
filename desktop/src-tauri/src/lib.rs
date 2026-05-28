@@ -8,7 +8,7 @@ use std::{
     str,
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
     },
     thread,
     time::{Duration, Instant},
@@ -929,7 +929,7 @@ fn terminal_spawn(
 
     let mut cmd = CommandBuilder::new(&shell);
     cmd.cwd(cwd_path.as_os_str());
-    for (key, value) in terminal_environment(&shell) {
+    for (key, value) in terminal_environment_cached(&shell) {
         cmd.env(key, value);
     }
     cmd.env("TERM", "xterm-256color");
@@ -969,7 +969,7 @@ fn terminal_spawn(
 
     let output_app = app.clone();
     thread::spawn(move || {
-        let mut buffer = [0_u8; 8192];
+        let mut buffer = [0_u8; 32768];
         let mut pending_utf8 = Vec::new();
         loop {
             match reader.read(&mut buffer) {
@@ -1222,11 +1222,15 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
     output
 }
 
-fn terminal_environment(shell: &str) -> HashMap<String, String> {
-    let mut env: HashMap<String, String> = std::env::vars().collect();
-    env.extend(login_shell_environment(shell));
-    ensure_utf8_locale(&mut env);
-    env
+static TERMINAL_ENV_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+fn terminal_environment_cached(shell: &str) -> &'static HashMap<String, String> {
+    TERMINAL_ENV_CACHE.get_or_init(|| {
+        let mut env: HashMap<String, String> = std::env::vars().collect();
+        env.extend(login_shell_environment(shell));
+        ensure_utf8_locale(&mut env);
+        env
+    })
 }
 
 fn ensure_utf8_locale(env: &mut HashMap<String, String>) {
@@ -1585,7 +1589,7 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
         .shell()
         .sidecar("dreamcoder-sidecar")
         .map_err(|err| format!("resolve sidecar: {err}"))?;
-    for (key, value) in terminal_environment(&default_shell(None)) {
+    for (key, value) in terminal_environment_cached(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
     }
     // Pass through CLAUDE_CONFIG_DIR so the sidecar (Node.js) uses the same
@@ -1721,7 +1725,7 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
             .shell()
             .sidecar("dreamcoder-sidecar")
             .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
-        for (key, value) in terminal_environment(&default_shell(None)) {
+        for (key, value) in terminal_environment_cached(&default_shell(None)) {
             sidecar = sidecar.env(key, value);
         }
         // Pass through CLAUDE_CONFIG_DIR for portable installs

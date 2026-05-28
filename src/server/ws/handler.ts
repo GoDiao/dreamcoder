@@ -67,6 +67,8 @@ const sessionTitleState = new Map<string, {
   startedGenerationCounts: Set<number>
 }>()
 
+const MAX_ALL_USER_MESSAGES = 3
+
 const runtimeOverrides = new Map<string, {
   providerId: string | null
   modelId: string
@@ -315,6 +317,9 @@ async function handleUserMessage(
   if (titleInput) {
     titleState.userMessageCount++
     titleState.allUserMessages.push(titleInput)
+    if (titleState.allUserMessages.length > MAX_ALL_USER_MESSAGES) {
+      titleState.allUserMessages.length = MAX_ALL_USER_MESSAGES
+    }
     if (titleState.userMessageCount === 1) {
       titleState.firstUserMessage = titleInput
     }
