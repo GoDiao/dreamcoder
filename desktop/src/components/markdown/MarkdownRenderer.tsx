@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback, useDeferredValue } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import DOMPurify from 'dompurify'
 import katex from 'katex'
@@ -452,9 +452,10 @@ function getProseClasses(variant: 'default' | 'document' | 'compact', className?
 }
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content, variant = 'default', className, cache = true, streaming = false, onLinkClick }: Props) {
+  const deferredContent = useDeferredValue(content)
   const { html, codeBlocks, mathBlocks } = useMemo(
-    () => cache ? getCachedMarkdownParse(content, streaming) : parseMarkdown(content),
-    [cache, content, streaming],
+    () => cache ? getCachedMarkdownParse(deferredContent, streaming) : parseMarkdown(deferredContent),
+    [cache, deferredContent, streaming],
   )
   const proseClasses = useMemo(
     () => getProseClasses(variant, className),

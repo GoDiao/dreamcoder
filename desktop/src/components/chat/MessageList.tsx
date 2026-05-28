@@ -1207,8 +1207,20 @@ const MeasuredRenderItem = memo(function MeasuredRenderItem({
 export function MessageList({ sessionId, compact = false }: MessageListProps = {}) {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const resolvedSessionId = sessionId ?? activeTabId
-  const sessionState = useChatStore((s) =>
-    resolvedSessionId ? s.sessions[resolvedSessionId] : undefined,
+  const messages = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.messages ?? EMPTY_MESSAGES) : EMPTY_MESSAGES,
+  )
+  const chatState = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.chatState ?? 'idle') : 'idle',
+  )
+  const streamingText = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.streamingText ?? '') : '',
+  )
+  const activeThinkingId = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.activeThinkingId ?? null) : null,
+  )
+  const agentTaskNotifications = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.agentTaskNotifications ?? {}) : {},
   )
   const branchSession = useSessionStore((s) => s.branchSession)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
@@ -1218,14 +1230,12 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     resolvedSessionId ? Boolean(s.getMemberBySessionId(resolvedSessionId)) : false,
   )
   const addToast = useUIStore((s) => s.addToast)
-  const messages = sessionState?.messages ?? EMPTY_MESSAGES
-  const chatState = sessionState?.chatState ?? 'idle'
-  const streamingText = sessionState?.streamingText ?? ''
-  const activeThinkingId = sessionState?.activeThinkingId ?? null
-  const agentTaskNotifications = sessionState?.agentTaskNotifications ?? {}
+  const pendingPermission = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.pendingPermission ?? null) : null,
+  )
   const activeAskUserQuestionToolUseId =
-    sessionState?.pendingPermission?.toolName === 'AskUserQuestion'
-      ? sessionState.pendingPermission.toolUseId
+    pendingPermission?.toolName === 'AskUserQuestion'
+      ? pendingPermission.toolUseId
       : null
   const shouldFollowContentResize =
     streamingText.trim().length > 0 ||
@@ -1265,13 +1275,19 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     viewportHeight: VIRTUAL_DEFAULT_VIEWPORT_HEIGHT,
   })
   const [measuredItemsVersion, setMeasuredItemsVersion] = useState(0)
+  const activeToolUseId = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.activeToolUseId ?? null) : null,
+  )
+  const activeToolName = useChatStore((s) =>
+    resolvedSessionId ? (s.sessions[resolvedSessionId]?.activeToolName ?? null) : null,
+  )
   const branchActionsDisabled =
     isMemberSession ||
     chatState !== 'idle' ||
     streamingText.trim().length > 0 ||
     Boolean(activeThinkingId) ||
-    Boolean(sessionState?.activeToolUseId) ||
-    Boolean(sessionState?.activeToolName)
+    Boolean(activeToolUseId) ||
+    Boolean(activeToolName)
   const hasCompactingDivider = messages.some((message) =>
     message.type === 'compact_summary' && message.phase === 'compacting')
 
