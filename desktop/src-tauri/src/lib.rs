@@ -14,6 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use dashmap::DashMap;
+
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::menu::MenuBuilder;
@@ -412,8 +414,11 @@ struct AdapterState(Mutex<Vec<CommandChild>>);
 #[derive(Default)]
 struct TerminalState {
     next_id: AtomicU32,
-    sessions: Mutex<HashMap<u32, TerminalSession>>,
+    sessions: DashMap<u32, TerminalSession>,
 }
+
+static LAST_WINDOW_SAVE: Mutex<Option<Instant>> = Mutex::new(None);
+const WINDOW_SAVE_DEBOUNCE_MS: u64 = 500;
 
 struct TerminalSession {
     master: Box<dyn MasterPty + Send>,
@@ -953,11 +958,7 @@ fn terminal_spawn(
     let session_id = state.next_id.fetch_add(1, Ordering::Relaxed) + 1;
 
     {
-        let mut sessions = state
-            .sessions
-            .lock()
-            .map_err(|_| "terminal state is unavailable".to_string())?;
-        sessions.insert(
+        state.sessions.insert(
             session_id,
             TerminalSession {
                 master: pair.master,
@@ -1008,9 +1009,7 @@ fn terminal_spawn(
     thread::spawn(move || {
         let status = child.wait();
         if let Some(state) = exit_app.try_state::<TerminalState>() {
-            if let Ok(mut sessions) = state.sessions.lock() {
-                sessions.remove(&session_id);
-            }
+            state.sessions.remove(&session_id);
         }
         match status {
             Ok(status) => {
@@ -1048,11 +1047,8 @@ fn terminal_write(
     session_id: u32,
     data: String,
 ) -> Result<(), String> {
-    let sessions = state
+    let session = state
         .sessions
-        .lock()
-        .map_err(|_| "terminal state is unavailable".to_string())?;
-    let session = sessions
         .get(&session_id)
         .ok_or_else(|| "terminal session is not running".to_string())?;
     let mut writer = session
@@ -1075,11 +1071,8 @@ fn terminal_resize(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let sessions = state
+    let session = state
         .sessions
-        .lock()
-        .map_err(|_| "terminal state is unavailable".to_string())?;
-    let session = sessions
         .get(&session_id)
         .ok_or_else(|| "terminal session is not running".to_string())?;
     session
@@ -1096,13 +1089,7 @@ fn terminal_resize(
 
 #[tauri::command]
 fn terminal_kill(state: State<'_, TerminalState>, session_id: u32) -> Result<(), String> {
-    let session = {
-        let mut sessions = state
-            .sessions
-            .lock()
-            .map_err(|_| "terminal state is unavailable".to_string())?;
-        sessions.remove(&session_id)
-    };
+    let session = state.sessions.remove(&session_id).map(|(_, v)| v);
 
     if let Some(session) = session {
         let mut killer = session
@@ -2253,29 +2240,36 @@ pub fn run() {
             macos_notifications::install_click_handler(app.handle().clone());
             restore_main_window_state(&app.handle());
 
-            let state = app.state::<ServerState>();
-            let mut guard = state
-                .0
-                .lock()
-                .map_err(|_| IoError::new(ErrorKind::Other, "server state lock poisoned"))?;
+            // Start sidecar in background thread to avoid blocking window
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let state = app_handle.state::<ServerState>();
+                let mut guard = state
+                    .0
+                    .lock()
+                    .expect("server state lock poisoned");
 
-            match start_server_sidecar(&app.handle()) {
-                Ok(runtime) => {
-                    guard.runtime = Some(runtime);
-                    guard.startup_error = None;
-                }
-                Err(err) => {
-                    eprintln!("[desktop] failed to start local server: {err}");
-                    guard.runtime = None;
-                    guard.startup_error = Some(err);
-                }
-            }
-            drop(guard);
+                match start_server_sidecar(&app_handle) {
+                    Ok(runtime) => {
+                        guard.runtime = Some(runtime);
+                        guard.startup_error = None;
+                        drop(guard);
 
-            // server 起来之后再起 adapter sidecar —— start_adapters_sidecar
-            // 内部会从 ServerState 读 server URL 注入 ADAPTER_SERVER_URL env，
-            // 让 adapter 连上动态端口。
-            spawn_and_track_adapters_sidecar(&app.handle());
+                        // server 起来之后再起 adapter sidecar
+                        spawn_and_track_adapters_sidecar(&app_handle);
+
+                        let _ = app_handle.emit("server-ready", true);
+                    }
+                    Err(err) => {
+                        eprintln!("[desktop] failed to start local server: {err}");
+                        guard.runtime = None;
+                        guard.startup_error = Some(err);
+                        drop(guard);
+
+                        let _ = app_handle.emit("server-error", err);
+                    }
+                }
+            });
 
             Ok(())
         })
@@ -2299,7 +2293,20 @@ pub fn run() {
             event: WindowEvent::Moved(_) | WindowEvent::Resized(_),
             ..
         } if label == MAIN_WINDOW_LABEL => {
-            save_main_window_state(app_handle);
+            let now = Instant::now();
+            let should_save = {
+                let mut last = LAST_WINDOW_SAVE.lock().unwrap();
+                match *last {
+                    Some(prev) if now.duration_since(prev).as_millis() < WINDOW_SAVE_DEBOUNCE_MS as u128 => false,
+                    _ => {
+                        *last = Some(now);
+                        true
+                    }
+                }
+            };
+            if should_save {
+                save_main_window_state(app_handle);
+            }
         }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen {
