@@ -2,6 +2,34 @@
 
 > 基于 `docs/perf-optimization-report.md`，按依赖关系和投入产出比排列
 
+## 完成状态
+
+| Phase | 状态 | Commit |
+|-------|------|--------|
+| Phase 1: 快速修复 | ✅ 已完成 | `edf968f`, `8626e85` |
+| Phase 2: Rust 层优化 | ✅ 已完成 | `57c60a4` |
+| Phase 3: 前端优化 | ✅ 已完成 | `8636592` |
+| Phase 4: Server 核心优化 | ✅ 已完成（4.1） | `563ffcf` |
+| Phase 5: 架构重构 | ⏳ 待定 | - |
+
+**已完成的优化项**:
+- [x] 1.1 PTY 读缓冲区 8KB → 32KB
+- [x] 1.2 `allUserMessages` 加上限 (MAX=3)
+- [x] 1.3 Team 成员轮询加 in-flight 守卫
+- [x] 1.4 工具模块 lazy import
+- [x] 1.5 `terminal_environment()` 结果缓存
+- [x] 1.6 移除未使用的 reqwest 依赖
+- [x] 2.1 窗口状态持久化防抖
+- [x] 2.2 Sidecar 启动异步化
+- [x] 2.3 Terminal sessions 换 DashMap
+- [x] 3.1 elapsed timer 移出 Zustand
+- [x] 3.2 chatStore granular selectors (MessageList)
+- [x] 3.3 Markdown 解析异步化 (useDeferredValue)
+- [x] 4.1 会话元数据缓存
+- [ ] 4.2 Query Loop 内部遍历合并（不可行，有显式顺序依赖）
+- [ ] 5.1 通信层重构 - pipe
+- [ ] 5.2 通信层重构 - 二进制协议
+
 ---
 
 ## Phase 1: 快速修复（1-2 天，零依赖，可并行）
