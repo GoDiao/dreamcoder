@@ -4,7 +4,7 @@ import { ContentRouter } from './ContentRouter'
 import { ToastContainer } from '../shared/Toast'
 import { UpdateChecker } from '../shared/UpdateChecker'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useUIStore, type SettingsTab } from '../../stores/uiStore'
+import { useUIStore, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, type SettingsTab } from '../../stores/uiStore'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import {
   H5ConnectionRequiredError,
@@ -35,6 +35,8 @@ export function AppShell() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const [ready, setReady] = useState(false)
   const [startupError, setStartupError] = useState<string | null>(null)
   const [h5StartupError, setH5StartupError] = useState<H5ConnectionRequiredError | null>(null)
@@ -220,12 +222,16 @@ export function AppShell() {
         data-state={effectiveSidebarOpen ? 'open' : 'closed'}
         data-mobile={isMobileShell ? 'true' : 'false'}
         className={`sidebar-shell${isMobileShell ? ' sidebar-shell--mobile' : ''}`}
+        style={isMobileShell ? undefined : { '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
         {...sidebarHiddenProps}
       >
         {!isMobileShell || effectiveSidebarOpen ? (
           <Sidebar isMobile={isMobileShell} onRequestClose={() => setEffectiveSidebarOpen(false)} />
         ) : null}
       </div>
+      {!isMobileShell && effectiveSidebarOpen ? (
+        <SidebarResizeHandle width={sidebarWidth} setWidth={setSidebarWidth} />
+      ) : null}
       <main
         id="content-area"
         data-sidebar-state={effectiveSidebarOpen ? 'open' : 'closed'}
@@ -284,5 +290,71 @@ export function AppShell() {
       <ToastContainer />
       <UpdateChecker />
     </div>
+  )
+}
+
+const SIDEBAR_RESIZE_STEP = 10
+
+function SidebarResizeHandle({ width, setWidth }: { width: number; setWidth: (w: number) => void }) {
+  const [dragState, setDragState] = useState<{ startX: number; startWidth: number } | null>(null)
+  const dragStateRef = useRef(dragState)
+
+  useEffect(() => {
+    dragStateRef.current = dragState
+  }, [dragState])
+
+  useEffect(() => {
+    if (!dragState) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const current = dragStateRef.current
+      if (!current) return
+      setWidth(current.startWidth + (event.clientX - current.startX))
+    }
+
+    const handlePointerUp = () => {
+      setDragState(null)
+    }
+
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+
+    return () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [dragState, setWidth])
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={width}
+      aria-valuemin={SIDEBAR_MIN_WIDTH}
+      aria-valuemax={SIDEBAR_MAX_WIDTH}
+      tabIndex={0}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        setDragState({ startX: event.clientX, startWidth: width })
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault()
+          setWidth(width + SIDEBAR_RESIZE_STEP)
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          setWidth(width - SIDEBAR_RESIZE_STEP)
+        }
+      }}
+      className="group relative z-10 flex w-1.5 shrink-0 cursor-col-resize items-stretch justify-center outline-none transition-colors hover:bg-[var(--color-border-focus)]/30 focus-visible:bg-[var(--color-surface-container)]"
+    />
   )
 }
