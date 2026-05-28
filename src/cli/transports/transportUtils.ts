@@ -1,6 +1,7 @@
 import { URL } from 'url'
 import { isEnvTruthy } from '../../utils/envUtils.js'
 import { HybridTransport } from './HybridTransport.js'
+import { PipeTransport } from './PipeTransport.js'
 import { SSETransport } from './SSETransport.js'
 import type { Transport } from './Transport.js'
 import { WebSocketTransport } from './WebSocketTransport.js'
@@ -9,9 +10,10 @@ import { WebSocketTransport } from './WebSocketTransport.js'
  * Helper function to get the appropriate transport for a URL.
  *
  * Transport selection priority:
- * 1. SSETransport (SSE reads + POST writes) when CLAUDE_CODE_USE_CCR_V2 is set
- * 2. HybridTransport (WS reads + POST writes) when CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2 is set
- * 3. WebSocketTransport (WS reads + WS writes) — default
+ * 1. PipeTransport (stdin/stdout) when protocol is 'pipe:'
+ * 2. SSETransport (SSE reads + POST writes) when CLAUDE_CODE_USE_CCR_V2 is set
+ * 3. HybridTransport (WS reads + POST writes) when CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2 is set
+ * 4. WebSocketTransport (WS reads + WS writes) — default
  */
 export function getTransportForUrl(
   url: URL,
@@ -19,6 +21,11 @@ export function getTransportForUrl(
   sessionId?: string,
   refreshHeaders?: () => Record<string, string>,
 ): Transport {
+  // Pipe transport for direct stdin/stdout communication (no network hop)
+  if (url.protocol === 'pipe:') {
+    return new PipeTransport()
+  }
+
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_CCR_V2)) {
     // v2: SSE for reads, HTTP POST for writes
     // --sdk-url is the session URL (.../sessions/{id});

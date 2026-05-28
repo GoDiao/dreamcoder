@@ -30,6 +30,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
+import { isEnvTruthy } from '../../utils/envUtils.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, loadNetworkSettings } from './networkSettings.js'
 
@@ -63,6 +64,7 @@ type SessionProcess = {
   outputDrain: Promise<void>
   sdkMessages: any[]
   initMessage: any | null
+  usePipe: boolean
   pendingPermissionRequests: Map<
     string,
     {
@@ -131,11 +133,16 @@ export class ConversationService {
           ]
         : []
 
+    // Use pipe:// protocol for direct stdin/stdout communication (no network hop)
+    const usePipe = isEnvTruthy(process.env.DREAMCODER_USE_PIPE_TRANSPORT)
+    const transportArgs = usePipe
+      ? ['--sdk-url', 'pipe://stdin']
+      : ['--sdk-url', sdkUrl]
+
     return this.resolveCliArgs([
       '--print',
       '--verbose',
-      '--sdk-url',
-      sdkUrl,
+      ...transportArgs,
       '--enable-auth-status',
       '--input-format',
       'stream-json',
@@ -290,6 +297,7 @@ export class ConversationService {
       startupPending: true,
       startupExitCode: null,
       stdoutLines: [],
+      usePipe: isEnvTruthy(process.env.DREAMCODER_USE_PIPE_TRANSPORT),
       stderrLines: [],
       outputDrain: Promise.resolve(),
       sdkMessages: [],
@@ -299,7 +307,9 @@ export class ConversationService {
     this.sessions.set(sessionId, session)
 
     session.outputDrain = Promise.all([
-      this.readProcessOutputStream(sessionId, proc.stdout, 'stdout'),
+      session.usePipe
+        ? this.readPipeOutputStream(sessionId, proc.stdout)
+        : this.readProcessOutputStream(sessionId, proc.stdout, 'stdout'),
       this.readProcessOutputStream(sessionId, proc.stderr, 'stderr'),
     ]).then(() => undefined)
 
@@ -803,6 +813,44 @@ export class ConversationService {
     }
   }
 
+  /**
+   * Read stdout from pipe transport and process SDK messages directly.
+   * This eliminates the WebSocket hop - messages go from CLI stdout -> server.
+   */
+  private async readPipeOutputStream(
+    sessionId: string,
+    stream: ReadableStream | null | undefined,
+  ): Promise<void> {
+    if (!stream) return
+
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete lines
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+
+          // Process as SDK message (same as handleSdkPayload)
+          this.handleSdkPayload(sessionId, trimmed + '\n')
+        }
+      }
+    } catch {
+      // Process output read failures should not kill the session.
+    }
+  }
+
   private async waitForProcessOutputDrain(
     session: SessionProcess,
     timeoutMs = 250,
@@ -822,7 +870,16 @@ export class ConversationService {
     if (!session) return false
 
     const line = JSON.stringify(payload) + '\n'
-    if (session.sdkSocket) {
+
+    // Use pipe transport (stdin) if enabled, otherwise use WebSocket
+    if (session.usePipe) {
+      try {
+        session.proc.stdin?.write(line)
+      } catch (err) {
+        console.error(`[ConversationService] Failed to write to stdin for ${sessionId}:`, err)
+        return false
+      }
+    } else if (session.sdkSocket) {
       session.sdkSocket.send(line)
     } else {
       session.pendingOutbound.push(line)
