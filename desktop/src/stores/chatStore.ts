@@ -82,7 +82,6 @@ export type PerSessionState = {
   agentTaskNotifications: Record<string, AgentTaskNotification>
   backgroundAgentTasks?: Record<string, BackgroundAgentTask>
   activeGoal?: ActiveGoalState | null
-  elapsedTimer: ReturnType<typeof setInterval> | null
   composerPrefill?: {
     text: string
     attachments?: UIAttachment[]
@@ -111,7 +110,6 @@ const DEFAULT_SESSION_STATE: PerSessionState = {
   agentTaskNotifications: {},
   backgroundAgentTasks: {},
   activeGoal: null,
-  elapsedTimer: null,
   composerPrefill: null,
   composerInsertion: null,
   composerDraft: null,
@@ -848,8 +846,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   disconnectSession: (sessionId) => {
-    const session = get().sessions[sessionId]
-    if (session?.elapsedTimer) clearInterval(session.elapsedTimer)
     if (pendingDeltaBySession.has(sessionId)) {
       const text = consumePendingDelta(sessionId)
       set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, (sess) => ({ streamingText: sess.streamingText + text })) }))
@@ -926,14 +922,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ...(isMemberSession ? { pending: true } : {}),
       })
 
-      if (!isMemberSession && session.elapsedTimer) clearInterval(session.elapsedTimer)
-
-      const timer = !isMemberSession
-        ? setInterval(() => {
-            set((st) => ({ sessions: updateSessionIn(st.sessions, sessionId, (sess) => ({ elapsedSeconds: sess.elapsedSeconds + 1 })) }))
-          }, 1000)
-        : null
-
       return {
         sessions: {
           ...s.sessions,
@@ -945,7 +933,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             streamingText: '',
             statusVerb: isMemberSession ? '' : randomSpinnerVerb(),
             apiRetry: null,
-            elapsedTimer: timer,
             connectionState: isMemberSession ? 'connected' : session.connectionState,
           },
         },
@@ -1024,7 +1011,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((s) => {
       const session = s.sessions[sessionId]
       if (!session) return s
-      if (session.elapsedTimer) clearInterval(session.elapsedTimer)
       return {
         sessions: {
           ...s.sessions,
@@ -1034,7 +1020,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             pendingPermission: null,
             pendingComputerUsePermission: null,
             apiRetry: null,
-            elapsedTimer: null,
           },
         },
       }
@@ -1106,7 +1091,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set((state) => {
         const session = state.sessions[sessionId]
         if (!session) return state
-        if (session.elapsedTimer) clearInterval(session.elapsedTimer)
         return {
           sessions: updateSessionIn(state.sessions, sessionId, () => ({
             messages: mergeBackgroundTaskMessages(uiMessages, restoredBackgroundTasks),
@@ -1121,7 +1105,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             streamingToolInput: '',
             pendingPermission: null,
             pendingComputerUsePermission: null,
-            elapsedTimer: null,
             statusVerb: '',
             apiRetry: null,
           })),
@@ -1261,13 +1244,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             } : pendingText !== session.streamingText ? { streamingText: pendingText } : {}),
           }
         })
-        if (msg.state === 'idle') {
-          const session = get().sessions[sessionId]
-          if (session?.elapsedTimer) {
-            clearInterval(session.elapsedTimer)
-            update(() => ({ elapsedTimer: null }))
-          }
-        }
         // Sync tab status
         useTabStore.getState().updateTabStatus(sessionId, msg.state === 'idle' ? 'idle' : 'running')
         break
@@ -1560,14 +1536,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         } else if (text !== session.streamingText) {
           update(() => ({ streamingText: text }))
         }
-        if (session.elapsedTimer) clearInterval(session.elapsedTimer)
         update(() => ({
           tokenUsage: msg.usage,
           chatState: 'idle',
           activeThinkingId: null,
           pendingPermission: null,
           pendingComputerUsePermission: null,
-          elapsedTimer: null,
           apiRetry: null,
         }))
         useTabStore.getState().updateTabStatus(sessionId, 'idle')
@@ -1609,13 +1583,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }
         })
         useTabStore.getState().updateTabStatus(sessionId, 'error')
-        {
-          const session = get().sessions[sessionId]
-          if (session?.elapsedTimer) {
-            clearInterval(session.elapsedTimer)
-            update(() => ({ elapsedTimer: null }))
-          }
-        }
         break
 
       case 'team_created':
@@ -1653,8 +1620,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             })
         }
         if (msg.subtype === 'session_cleared') {
-          const session = get().sessions[sessionId]
-          if (session?.elapsedTimer) clearInterval(session.elapsedTimer)
           update(() => ({
             messages: [],
             streamingText: '',
@@ -1665,7 +1630,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             pendingPermission: null,
             pendingComputerUsePermission: null,
             chatState: 'idle',
-            elapsedTimer: null,
             elapsedSeconds: 0,
             statusVerb: '',
             apiRetry: null,

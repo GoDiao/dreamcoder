@@ -1269,7 +1269,6 @@ describe('WorkspacePanel', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

@@ -177,7 +177,6 @@ describe('chat blocks', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

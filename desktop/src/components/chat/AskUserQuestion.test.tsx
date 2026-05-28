@@ -67,7 +67,6 @@ describe('AskUserQuestion', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

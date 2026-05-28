@@ -35,7 +35,6 @@ function makeChatSession(chatState: ChatState): PerSessionState {
     agentTaskNotifications: {},
     backgroundAgentTasks: {},
     activeGoal: null,
-    elapsedTimer: null,
     composerPrefill: null,
     composerDraft: null,
   }

@@ -263,7 +263,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -306,7 +305,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -354,7 +352,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -421,7 +418,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -491,7 +487,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -547,7 +542,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -609,7 +603,6 @@ describe('Content-only pages render without errors', () => {
             })),
           ],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -667,7 +660,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -752,7 +744,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -808,7 +799,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -872,7 +862,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -952,7 +941,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1035,7 +1023,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1104,7 +1091,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1201,7 +1187,6 @@ describe('Content-only pages render without errors', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
