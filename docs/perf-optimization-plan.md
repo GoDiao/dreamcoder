@@ -21,7 +21,7 @@
 - [x] 1.6 移除未使用的 reqwest 依赖
 - [x] 2.1 窗口状态持久化防抖
 - [x] 2.2 Sidecar 启动异步化
-- [x] 2.3 Terminal sessions 换 DashMap
+- [ ] 2.3 Terminal sessions 换 DashMap（不可行，TerminalSession 不满足 Sync trait bound）
 - [x] 3.1 elapsed timer 移出 Zustand
 - [x] 3.2 chatStore granular selectors (MessageList)
 - [x] 3.3 Markdown 解析异步化 (useDeferredValue)
