@@ -14,7 +14,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use dashmap::DashMap;
 
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
@@ -414,7 +413,7 @@ struct AdapterState(Mutex<Vec<CommandChild>>);
 #[derive(Default)]
 struct TerminalState {
     next_id: AtomicU32,
-    sessions: DashMap<u32, TerminalSession>,
+    sessions: Mutex<HashMap<u32, TerminalSession>>,
 }
 
 static LAST_WINDOW_SAVE: Mutex<Option<Instant>> = Mutex::new(None);
@@ -958,7 +957,11 @@ fn terminal_spawn(
     let session_id = state.next_id.fetch_add(1, Ordering::Relaxed) + 1;
 
     {
-        state.sessions.insert(
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| "terminal state is unavailable".to_string())?;
+        sessions.insert(
             session_id,
             TerminalSession {
                 master: pair.master,
@@ -1009,7 +1012,9 @@ fn terminal_spawn(
     thread::spawn(move || {
         let status = child.wait();
         if let Some(state) = exit_app.try_state::<TerminalState>() {
-            state.sessions.remove(&session_id);
+            if let Ok(mut sessions) = state.sessions.lock() {
+                sessions.remove(&session_id);
+            }
         }
         match status {
             Ok(status) => {
@@ -1047,8 +1052,11 @@ fn terminal_write(
     session_id: u32,
     data: String,
 ) -> Result<(), String> {
-    let session = state
+    let sessions = state
         .sessions
+        .lock()
+        .map_err(|_| "terminal state is unavailable".to_string())?;
+    let session = sessions
         .get(&session_id)
         .ok_or_else(|| "terminal session is not running".to_string())?;
     let mut writer = session
@@ -1071,8 +1079,11 @@ fn terminal_resize(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let session = state
+    let sessions = state
         .sessions
+        .lock()
+        .map_err(|_| "terminal state is unavailable".to_string())?;
+    let session = sessions
         .get(&session_id)
         .ok_or_else(|| "terminal session is not running".to_string())?;
     session
@@ -1089,7 +1100,13 @@ fn terminal_resize(
 
 #[tauri::command]
 fn terminal_kill(state: State<'_, TerminalState>, session_id: u32) -> Result<(), String> {
-    let session = state.sessions.remove(&session_id).map(|(_, v)| v);
+    let session = {
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| "terminal state is unavailable".to_string())?;
+        sessions.remove(&session_id)
+    };
 
     if let Some(session) = session {
         let mut killer = session
@@ -2263,7 +2280,7 @@ pub fn run() {
                     Err(err) => {
                         eprintln!("[desktop] failed to start local server: {err}");
                         guard.runtime = None;
-                        guard.startup_error = Some(err);
+                        guard.startup_error = Some(err.clone());
                         drop(guard);
 
                         let _ = app_handle.emit("server-error", err);
