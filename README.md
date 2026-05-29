@@ -186,6 +186,38 @@ dreamcoder/
 - [ ] **Phase 3** — IM 适配器上线 (飞书 / 钉钉 / Telegram / 微信)
 - [ ] **Phase 4** — Computer Use / H5 远程访问 / 定时任务
 
+---
+
+## 性能优化分支说明
+
+> **分支**: `perf/optimization-report` | **日期**: 2026-05-29
+
+本分支包含完整的性能审计和优化实施，共 14 项优化（11 项已完成，2 项不可行，1 项暂缓）。
+
+### Benchmark 关键结果
+
+| 优化项 | Before | After | 提升 |
+|--------|--------|-------|------|
+| 会话元数据缓存 | 2.02s (cold) | 81ms (warm) | **24.8x** |
+| Elapsed timer 外置 | 10.91ms in-store | 6.74ms external | **1.6x** |
+| Markdown useDeferredValue | 105µs blocking | yields to UI | 主线程不阻塞 |
+| Pipe transport | WS JSON | JSON+encode (+49%/msg) | 消除双跳延迟 |
+
+### 相关文档
+
+- `docs/perf-optimization-report.md` — 性能审计报告
+- `docs/perf-optimization-plan.md` — 实施计划（含完成状态）
+- `docs/perf-optimization-results.md` — Benchmark 结果详情
+- `scripts/benchmark.ts` — 自动化 benchmark 脚本
+
+### 运行 Benchmark
+
+```bash
+bun run scripts/benchmark.ts
+```
+
+---
+
 ## 贡献
 
 欢迎提交 Issue 和 PR！
