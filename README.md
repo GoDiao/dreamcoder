@@ -194,6 +194,36 @@ dreamcoder/
 
 本分支包含完整的性能审计和优化实施，共 14 项优化（11 项已完成，2 项不可行，1 项暂缓）。
 
+### 已完成的优化
+
+**Phase 1: 快速修复**
+1. PTY 读缓冲区 8KB → 32KB — 大文件 `cat` 输出更流畅
+2. `allUserMessages` 上限 3 条 — 防止标题生成内存无限增长
+3. Team 成员轮询 in-flight 守卫 — 慢网络下不再堆叠请求
+4. 工具模块 lazy import — `require()` 延迟加载 25+ 个工具模块
+5. `terminal_environment()` OnceLock 缓存 — 环境变量只探测一次
+6. 移除未使用的 `reqwest` 依赖 — 减少 Rust 编译时间和二进制体积
+
+**Phase 2: Rust 层**
+7. 窗口状态持久化防抖 500ms — 拖动窗口时写盘从数十次/秒降至 ≤2次/秒
+8. Sidecar 启动异步化 — `std::thread::spawn`，窗口立即可交互
+
+**Phase 3: 前端**
+9. Elapsed timer 移出 Zustand — 计时器不再每秒触发全局 store 更新
+10. chatStore granular selectors — MessageList 等组件只订阅需要的字段
+11. Markdown 解析 `useDeferredValue` — 长代码输出时 UI 保持响应
+
+**Phase 4: Server**
+12. 会话元数据缓存 — 基于 mtime 的缓存，594 文件从 2s 降到 81ms
+
+**Phase 5: 架构**
+13. CLI↔Server pipe transport — stdin/stdout 替代 WebSocket 双跳（`DREAMCODER_USE_PIPE_TRANSPORT=1` 启用）
+
+### 不可行 / 暂缓
+- ~~Terminal sessions 换 DashMap~~ — `TerminalSession` 不满足 `Sync` trait
+- ~~Query loop 遍历合并~~ — 内部有显式顺序依赖
+- ~~二进制协议 (msgpack)~~ — 消息体积小，投入产出比低
+
 ### Benchmark 关键结果
 
 | 优化项 | Before | After | 提升 |
