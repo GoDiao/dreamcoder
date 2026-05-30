@@ -526,9 +526,11 @@ export class ProviderService {
   ): Promise<ProviderTestStepResult> {
     const start = Date.now()
     try {
+      // Strip [1m] suffix — it's a client-side extended-context marker, not a real model ID
+      const apiModelId = modelId.replace(/\[1m\]$/i, '').trim()
       // Build an Anthropic Messages API request (same shape as what CLI sends)
       const anthropicReq: AnthropicRequest = {
-        model: modelId,
+        model: apiModelId,
         max_tokens: 64,
         messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
       }
@@ -595,20 +597,22 @@ function buildDirectTestRequest(
   format: ApiFormat,
   authStrategy: ProviderAuthStrategy,
 ): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
+  // Strip [1m] suffix — it's a client-side extended-context marker, not a real model ID
+  const apiModelId = modelId.replace(/\[1m\]$/i, '').trim()
   const prompt = 'Say "ok" and nothing else.'
 
   if (format === 'openai_chat') {
     return {
       url: `${base}/v1/chat/completions`,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: modelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
+      body: { model: apiModelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
     }
   }
   if (format === 'openai_responses') {
     return {
       url: `${base}/v1/responses`,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: modelId, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
+      body: { model: apiModelId, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
     }
   }
   // anthropic
@@ -619,7 +623,7 @@ function buildDirectTestRequest(
       'anthropic-version': '2023-06-01',
       ...buildAnthropicAuthHeaders(apiKey, authStrategy),
     },
-    body: { model: modelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
+    body: { model: apiModelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
   }
 }
 
