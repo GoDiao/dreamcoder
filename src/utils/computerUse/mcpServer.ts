@@ -13,7 +13,8 @@ import { enableConfigs } from '../config.js'
 import { logForDebugging } from '../debug.js'
 import { filterAppsForDescription } from './appNames.js'
 import { getChicagoCoordinateMode } from './gates.js'
-import { getComputerUseHostAdapter } from './hostAdapter.js'
+import { getComputerUseHostAdapter, setComputerUseMode } from './hostAdapter.js'
+import { loadStoredComputerUseConfig } from './preauthorizedConfig.js'
 
 const APP_ENUM_TIMEOUT_MS = 1000
 
@@ -60,13 +61,20 @@ async function tryGetInstalledAppNames(): Promise<string[] | undefined> {
 export async function createComputerUseMcpServerForCli(): Promise<
   ReturnType<typeof createComputerUseMcpServer>
 > {
+  // Read mode from stored config and set it BEFORE creating the adapter
+  const storedConfig = await loadStoredComputerUseConfig()
+  setComputerUseMode(storedConfig.mode ?? 'vision')
+
   const adapter = getComputerUseHostAdapter()
   const coordinateMode = getChicagoCoordinateMode()
   const server = createComputerUseMcpServer(adapter, coordinateMode)
 
   const installedAppNames = await tryGetInstalledAppNames()
   const tools = buildComputerUseTools(
-    adapter.executor.capabilities,
+    {
+      ...adapter.executor.capabilities,
+      uiaMode: storedConfig.mode === 'uia_tree',
+    },
     coordinateMode,
     installedAppNames,
   )

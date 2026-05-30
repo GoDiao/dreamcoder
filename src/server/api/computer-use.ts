@@ -16,17 +16,22 @@ import type { CuPermissionRequest } from '../../vendor/computer-use-mcp/types.js
 import { computerUseApprovalService } from '../services/computerUseApprovalService.js'
 import { detectPythonRuntime, isPythonVersionAtLeast } from './computer-use-python.js'
 import { buildPipInstallAttempts } from '../../utils/computerUse/pipInstall.js'
+import { setComputerUseMode } from '../../utils/computerUse/hostAdapter.js'
 import {
   DEFAULT_DESKTOP_GRANT_FLAGS,
+  DEFAULT_COMPUTER_USE_MODE,
   loadStoredComputerUseConfig,
   normalizePythonPath,
   saveStoredComputerUseConfig,
+  type ComputerUseMode,
 } from '../../utils/computerUse/preauthorizedConfig.js'
 // Embed helper scripts at compile time so they're available in bundled mode
 // @ts-ignore — Bun text import
 import MAC_HELPER_CONTENT from '../../../runtime/mac_helper.py' with { type: 'text' }
 // @ts-ignore — Bun text import
 import WIN_HELPER_CONTENT from '../../../runtime/win_helper.py' with { type: 'text' }
+// @ts-ignore — Bun text import
+import UIA_HELPER_CONTENT from '../../../runtime/uia_helper.py' with { type: 'text' }
 // @ts-ignore — Bun text import
 import REQUIREMENTS_DARWIN from '../../../runtime/requirements.txt' with { type: 'text' }
 // @ts-ignore — Bun text import
@@ -156,6 +161,11 @@ async function ensureRuntimeFiles(): Promise<void> {
   // helper script — write the platform-appropriate version
   const helperContent = isWindows ? WIN_HELPER_CONTENT : MAC_HELPER_CONTENT
   await writeFile(getHelperPath(), helperContent, 'utf8')
+
+  // uia_helper.py — Windows only, for UIA Tree mode
+  if (isWindows) {
+    await writeFile(join(runtimeStateRoot, 'uia_helper.py'), UIA_HELPER_CONTENT, 'utf8')
+  }
 }
 
 type EnvStatus = {
@@ -469,6 +479,7 @@ type AuthorizedApp = {
 
 type ComputerUseConfig = {
   enabled: boolean
+  mode: ComputerUseMode
   authorizedApps: AuthorizedApp[]
   grantFlags: {
     clipboardRead: boolean
@@ -485,6 +496,7 @@ type RequestAccessBody = {
 
 const DEFAULT_CONFIG: ComputerUseConfig = {
   enabled: true,
+  mode: DEFAULT_COMPUTER_USE_MODE,
   authorizedApps: [],
   grantFlags: DEFAULT_DESKTOP_GRANT_FLAGS,
   pythonPath: null,
@@ -558,10 +570,14 @@ export async function handleComputerUseApi(
       const body = (await req.json()) as Partial<ComputerUseConfig>
       const config = await loadConfig()
       if (body.enabled !== undefined) config.enabled = body.enabled
+      if (body.mode !== undefined) config.mode = body.mode
       if (body.authorizedApps) config.authorizedApps = body.authorizedApps
       if (body.grantFlags) config.grantFlags = { ...config.grantFlags, ...body.grantFlags }
       if ('pythonPath' in body) config.pythonPath = normalizePythonPath(body.pythonPath)
       await saveConfig(config)
+      if (body.mode !== undefined) {
+        setComputerUseMode(config.mode)
+      }
       return Response.json({ ok: true })
     } catch {
       return Response.json({ error: 'Invalid JSON' }, { status: 400 })

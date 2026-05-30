@@ -3,7 +3,7 @@
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk'
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
-export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber'] as const
+export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight'] as const
 export type ThemeMode = (typeof THEME_MODES)[number]
 
 export function isThemeMode(value: unknown): value is ThemeMode {

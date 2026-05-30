@@ -22,8 +22,8 @@ const isWindows = process.platform === 'win32'
 
 // Always read from ~/.claude/.runtime/ — works in both dev and bundled mode.
 const requirementsPath = path.join(runtimeStateRoot, 'requirements.txt')
-const helperFileName = isWindows ? 'win_helper.py' : 'mac_helper.py'
-const helperPath = path.join(runtimeStateRoot, helperFileName)
+const defaultHelperFileName = isWindows ? 'win_helper.py' : 'mac_helper.py'
+const defaultHelperPath = path.join(runtimeStateRoot, defaultHelperFileName)
 
 let bootstrapPromise: Promise<void> | undefined
 
@@ -100,7 +100,7 @@ async function ensureRuntimeFiles(): Promise<void> {
 
   const devReqFile = isWindows ? 'requirements-win.txt' : 'requirements.txt'
   const devRequirements = path.join(projectRoot, 'runtime', devReqFile)
-  const devHelper = path.join(projectRoot, 'runtime', helperFileName)
+  const devHelper = path.join(projectRoot, 'runtime', defaultHelperFileName)
 
   // Always sync from dev runtime/ so source changes are reflected immediately.
   // Previously this only copied when the dest was missing, causing stale files
@@ -110,7 +110,16 @@ async function ensureRuntimeFiles(): Promise<void> {
     await writeFile(requirementsPath, await readFile(devRequirements, 'utf8'), 'utf8')
   }
   if (await pathExists(devHelper)) {
-    await writeFile(helperPath, await readFile(devHelper, 'utf8'), 'utf8')
+    await writeFile(defaultHelperPath, await readFile(devHelper, 'utf8'), 'utf8')
+  }
+
+  // Also copy uia_helper.py if present (Windows only for UIA Tree mode)
+  if (isWindows) {
+    const devUiaHelper = path.join(projectRoot, 'runtime', 'uia_helper.py')
+    const uiaHelperPath = path.join(runtimeStateRoot, 'uia_helper.py')
+    if (await pathExists(devUiaHelper)) {
+      await writeFile(uiaHelperPath, await readFile(devUiaHelper, 'utf8'), 'utf8')
+    }
   }
 }
 
@@ -156,11 +165,18 @@ export async function ensureBootstrapped(): Promise<void> {
   }
 }
 
-export async function callPythonHelper<T>(command: string, payload: Record<string, unknown> = {}): Promise<T> {
+export async function callPythonHelper<T>(
+  command: string,
+  payload: Record<string, unknown> = {},
+  helperFile?: string,
+): Promise<T> {
   await ensureBootstrapped()
+  const resolvedHelperPath = helperFile
+    ? path.join(runtimeStateRoot, helperFile)
+    : defaultHelperPath
   const { code, stdout, stderr } = await execFileNoThrow(
     pythonBinPath(),
-    [helperPath, command, '--payload', JSON.stringify(payload)],
+    [resolvedHelperPath, command, '--payload', JSON.stringify(payload)],
     { useCwd: false, env: getPythonCommandEnv() },
   )
 

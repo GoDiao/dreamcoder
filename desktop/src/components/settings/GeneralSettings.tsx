@@ -171,6 +171,7 @@ export function GeneralSettings() {
     { value: 'white', label: t('settings.general.appearance.white') },
     { value: 'light', label: t('settings.general.appearance.light') },
     { value: 'dark', label: t('settings.general.appearance.dark') },
+    { value: 'midnight', label: t('settings.general.appearance.midnight') },
     { value: 'dreamfield', label: t('settings.general.appearance.dreamfield') },
     { value: 'amber', label: t('settings.general.appearance.amber') },
   ]

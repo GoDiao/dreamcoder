@@ -121,6 +121,8 @@ export function buildComputerUseTools(
     platform: "darwin" | "win32";
     /** Include request_teach_access + teach_step. Read once at server construction. */
     teachMode?: boolean;
+    /** Register UIA tools instead of vision tools. */
+    uiaMode?: boolean;
   },
   coordinateMode: CoordinateMode,
   installedAppNames?: string[],
@@ -567,6 +569,9 @@ export function buildComputerUseTools(
     },
 
     ...(caps.teachMode ? buildTeachTools(coord, installedAppsHint) : []),
+
+    // UIA Tree mode tools — registered when uiaMode=true
+    ...(caps.uiaMode ? buildUiaTools() : []),
   ];
 }
 
@@ -700,6 +705,106 @@ function buildTeachTools(
           },
         },
         required: ["steps"],
+      },
+    },
+  ];
+}
+
+/**
+ * UIA Tree mode tools. The model reads the UIA accessibility tree as text
+ * (TOON format) and interacts by element ID instead of screen coordinates.
+ */
+function buildUiaTools(): Tool[] {
+  return [
+    {
+      name: "uia_get_state",
+      description:
+        "Get the current desktop UI Automation tree as structured text. " +
+        "Returns a TOON-format list of interactive UI elements with their IDs, window names, " +
+        "control types, names, and screen coordinates. " +
+        "Use this to understand what's on screen without taking a screenshot. " +
+        "Each element has a numeric ID used by uia_click, uia_type, and uia_scroll.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    {
+      name: "uia_click",
+      description:
+        "Click a UI element by its ID (from uia_get_state). " +
+        "The element is located by its center coordinates and clicked with pyautogui.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          id: {
+            type: "integer",
+            description: "Element ID from uia_get_state.",
+          },
+          button: {
+            type: "string",
+            enum: ["left", "right", "middle"],
+            description: "Mouse button. Default: left.",
+          },
+          count: {
+            type: "integer",
+            minimum: 1,
+            maximum: 3,
+            description: "Click count (1=single, 2=double, 3=triple). Default: 1.",
+          },
+        },
+        required: ["id"],
+      },
+    },
+    {
+      name: "uia_type",
+      description:
+        "Type text into a UI element by its ID (from uia_get_state). " +
+        "Tries the UIA ValuePattern first (direct set); falls back to click + pyautogui.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          id: {
+            type: "integer",
+            description: "Element ID from uia_get_state.",
+          },
+          text: {
+            type: "string",
+            description: "Text to type into the element.",
+          },
+          clear_first: {
+            type: "boolean",
+            description: "Clear the field before typing. Default: false.",
+          },
+        },
+        required: ["id", "text"],
+      },
+    },
+    {
+      name: "uia_scroll",
+      description:
+        "Scroll a UI element by its ID (from uia_get_state). " +
+        "Tries the UIA ScrollPattern first; falls back to pyautogui scroll.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          id: {
+            type: "integer",
+            description: "Element ID from uia_get_state.",
+          },
+          direction: {
+            type: "string",
+            enum: ["up", "down", "left", "right"],
+            description: "Scroll direction.",
+          },
+          amount: {
+            type: "string",
+            enum: ["small_increment", "large_increment", "small_decrement", "large_decrement"],
+            description: "Scroll amount. Default: large_increment.",
+          },
+        },
+        required: ["id", "direction"],
       },
     },
   ];

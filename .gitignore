@@ -80,3 +80,10 @@ runtime/__pycache__
 
 # Codex logs
 .codex-logs/
+
+
+.worktrees/
+scripts/benchmark.ts
+
+# Sidecar binaries
+sidecar/*.exe

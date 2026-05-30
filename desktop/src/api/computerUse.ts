@@ -47,8 +47,11 @@ export type AuthorizedApp = {
   authorizedAt: string
 }
 
+export type ComputerUseMode = 'vision' | 'uia_tree'
+
 export type ComputerUseConfig = {
   enabled: boolean
+  mode: ComputerUseMode
   authorizedApps: AuthorizedApp[]
   grantFlags: {
     clipboardRead: boolean

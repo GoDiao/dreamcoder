@@ -9,14 +9,18 @@ export type StoredAuthorizedApp = {
   authorizedAt?: string
 }
 
+export type ComputerUseMode = 'vision' | 'uia_tree'
+
 export type StoredComputerUseConfig = {
   enabled?: boolean
+  mode?: ComputerUseMode
   authorizedApps?: StoredAuthorizedApp[]
   grantFlags?: Partial<CuGrantFlags>
   pythonPath?: string | null
 }
 
 export const DEFAULT_COMPUTER_USE_ENABLED = true
+export const DEFAULT_COMPUTER_USE_MODE: ComputerUseMode = 'vision'
 
 export const DEFAULT_DESKTOP_GRANT_FLAGS: CuGrantFlags = {
   clipboardRead: true,
@@ -36,12 +40,14 @@ export function resolveStoredComputerUseConfig(
   config?: StoredComputerUseConfig,
 ): {
   enabled: boolean
+  mode: ComputerUseMode
   authorizedApps: StoredAuthorizedApp[]
   grantFlags: CuGrantFlags
   pythonPath: string | null
 } {
   return {
     enabled: config?.enabled ?? DEFAULT_COMPUTER_USE_ENABLED,
+    mode: config?.mode ?? DEFAULT_COMPUTER_USE_MODE,
     authorizedApps: config?.authorizedApps ?? [],
     grantFlags: {
       ...DEFAULT_DESKTOP_GRANT_FLAGS,

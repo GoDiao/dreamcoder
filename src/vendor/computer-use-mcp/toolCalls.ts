@@ -3370,6 +3370,80 @@ function firstTextContent(r: CuCallToolResult): string {
   return first && first.type === "text" ? first.text : "";
 }
 
+// ---------------------------------------------------------------------------
+// UIA Tree mode handlers
+// ---------------------------------------------------------------------------
+
+async function handleUiaGetState(
+  adapter: ComputerUseHostAdapter,
+): Promise<CuCallToolResult> {
+  if (!adapter.executor.getState) {
+    return errorResult(
+      "UIA Tree mode is not available. The executor does not support getState().",
+      "feature_unavailable",
+    );
+  }
+  const state = await adapter.executor.getState();
+  const lines = [
+    `Found ${state.node_count} interactive elements across ${state.window_count} windows (${state.elapsed_ms}ms).`,
+    `Each line: id|window|control_type|name|coords|metadata`,
+    `Use uia_click(id), uia_type(id, text), or uia_scroll(id, direction) to interact.`,
+    "",
+    state.toon_text,
+  ];
+  if (state.errors && state.errors.length > 0) {
+    lines.push("", "Errors:", ...state.errors.map((e) => `  - ${e}`));
+  }
+  return okText(lines.join("\n"));
+}
+
+async function handleUiaClick(
+  adapter: ComputerUseHostAdapter,
+  args: Record<string, unknown>,
+): Promise<CuCallToolResult> {
+  if (!adapter.executor.clickById) {
+    return errorResult("UIA click not available.", "feature_unavailable");
+  }
+  const id = requireNumber(args, "id");
+  if (id instanceof Error) return errorResult(id.message, "bad_args");
+  const button = (args.button as string) ?? "left";
+  const count = (args.count as number) ?? 1;
+  await adapter.executor.clickById(id, button, count);
+  return okText(`Clicked element ${id} (${button}, ${count}x).`);
+}
+
+async function handleUiaType(
+  adapter: ComputerUseHostAdapter,
+  args: Record<string, unknown>,
+): Promise<CuCallToolResult> {
+  if (!adapter.executor.typeById) {
+    return errorResult("UIA type not available.", "feature_unavailable");
+  }
+  const id = requireNumber(args, "id");
+  if (id instanceof Error) return errorResult(id.message, "bad_args");
+  const text = requireString(args, "text");
+  if (text instanceof Error) return errorResult(text.message, "bad_args");
+  const clearFirst = (args.clear_first as boolean) ?? false;
+  await adapter.executor.typeById(id, text, clearFirst);
+  return okText(`Typed ${text.length} characters into element ${id}.`);
+}
+
+async function handleUiaScroll(
+  adapter: ComputerUseHostAdapter,
+  args: Record<string, unknown>,
+): Promise<CuCallToolResult> {
+  if (!adapter.executor.scrollById) {
+    return errorResult("UIA scroll not available.", "feature_unavailable");
+  }
+  const id = requireNumber(args, "id");
+  if (id instanceof Error) return errorResult(id.message, "bad_args");
+  const direction = requireString(args, "direction");
+  if (direction instanceof Error) return errorResult(direction.message, "bad_args");
+  const amount = (args.amount as string) ?? "large_increment";
+  await adapter.executor.scrollById(id, direction, amount);
+  return okText(`Scrolled element ${id} ${direction} (${amount}).`);
+}
+
 /**
  * Action dispatch shared by handleToolCall and handleComputerBatch. Called
  * AFTER kill-switch + TCC gates have passed. Never sees request_access — it's
@@ -3447,6 +3521,16 @@ async function dispatchAction(
 
     case "computer_batch":
       return handleComputerBatch(adapter, a, overrides, subGates);
+
+    // UIA Tree mode tools
+    case "uia_get_state":
+      return handleUiaGetState(adapter);
+    case "uia_click":
+      return handleUiaClick(adapter, a);
+    case "uia_type":
+      return handleUiaType(adapter, a);
+    case "uia_scroll":
+      return handleUiaScroll(adapter, a);
 
     default:
       return errorResult(`Unknown tool "${name}".`, "bad_args");

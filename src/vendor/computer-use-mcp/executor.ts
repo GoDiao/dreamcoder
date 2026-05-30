@@ -46,12 +46,21 @@ export interface ResolvePrepareCaptureResult extends ScreenshotResult {
   captureError?: string
 }
 
+export interface UiaState {
+  toon_text: string
+  node_count: number
+  window_count: number
+  elapsed_ms: number
+  errors?: string[]
+}
+
 export interface ComputerExecutor {
   capabilities: {
     screenshotFiltering: 'native' | 'none'
     platform: 'darwin' | 'win32'
     hostBundleId: string
     teachMode?: boolean
+    uiaMode?: boolean
   }
   prepareForAction(allowlistBundleIds: string[], displayId?: number): Promise<string[]>
   previewHideSet(allowlistBundleIds: string[], displayId?: number): Promise<Array<{ bundleId: string; displayName: string }>>
@@ -97,4 +106,11 @@ export interface ComputerExecutor {
   openApp(bundleId: string): Promise<void>
   readClipboard(): Promise<string>
   writeClipboard(text: string): Promise<void>
+
+  // UIA mode methods (optional — only present when uiaMode=true)
+  getState?(): Promise<UiaState>
+  clickById?(id: number, button?: string, count?: number): Promise<void>
+  typeById?(id: number, text: string, clearFirst?: boolean): Promise<void>
+  scrollById?(id: number, direction: string, amount: string): Promise<void>
+  doubleClickById?(id: number): Promise<void>
 }
