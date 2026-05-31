@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { CodeViewer } from './CodeViewer'
 import { DiffViewer } from './DiffViewer'
 import { TerminalChrome } from './TerminalChrome'
@@ -19,18 +19,18 @@ type Props = {
   partialInput?: string
 }
 
-const TOOL_ICONS: Record<string, string> = {
-  Bash: 'terminal',
-  Read: 'description',
-  Write: 'edit_document',
-  Edit: 'edit_note',
-  Glob: 'search',
-  Grep: 'find_in_page',
-  Agent: 'smart_toy',
-  WebSearch: 'travel_explore',
-  WebFetch: 'cloud_download',
-  NotebookEdit: 'note',
-  Skill: 'auto_awesome',
+const TOOL_ICONS: Record<string, React.ElementType> = {
+  Bash: Terminal,
+  Read: FileText,
+  Write: Edit3,
+  Edit: FileEdit,
+  Glob: Search,
+  Grep: FileSearch,
+  Agent: Bot,
+  WebSearch: Globe,
+  WebFetch: Download,
+  NotebookEdit: File,
+  Skill: Sparkles,
 }
 
 const WRITER_PREVIEW_MAX_LINES = 120
@@ -40,7 +40,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
   const obj = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const icon = TOOL_ICONS[toolName] || 'build'
+  const IconComponent = TOOL_ICONS[toolName] || Wrench
   const filePath = typeof obj.file_path === 'string' ? obj.file_path : ''
   const summary = getToolSummary(toolName, obj, t)
   const outputSummary = getToolResultSummary(
@@ -61,7 +61,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const expandable = hasEditPreview || hasWritePreview || hasResultDetails || Boolean(isPending && partialInput)
 
   return (
-    <div className={`overflow-hidden rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-surface-container-lowest)] ${
+    <div className={`overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] ${
       compact ? 'mb-0' : 'mb-2'
     }`}>
       <button
@@ -71,23 +71,25 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
             setExpanded((value) => !value)
           }
         }}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]/50"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
       >
-        <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">{icon}</span>
-        <span className="text-[11px] font-semibold text-[var(--color-text-secondary)]">
-          {toolName}
-        </span>
-        {filePath ? (
-          <span className="min-w-0 flex-1 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
-            {filePath.split('/').pop()}
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]">
+          <IconComponent size={16} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col items-start">
+          <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
+            {toolName}
           </span>
-        ) : summary ? (
-          <span className="min-w-0 flex-1 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
-            {summary}
-          </span>
-        ) : (
-          <span className="flex-1" />
-        )}
+          {filePath ? (
+            <span className="mt-0.5 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+              {filePath.split('/').pop()}
+            </span>
+          ) : summary ? (
+            <span className="mt-0.5 min-w-0 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+              {summary}
+            </span>
+          ) : null}
+        </div>
         {pendingSummary ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-outline)]">
             <LoaderCircle size={12} strokeWidth={2.4} className="animate-spin" aria-hidden="true" />
@@ -105,12 +107,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
           </span>
         ) : null}
         {result?.isError && (
-          <span className="material-symbols-outlined shrink-0 text-[14px] text-[var(--color-error)]">error</span>
+          <AlertCircle size={16} className="shrink-0 text-[var(--color-error)]" />
         )}
         {expandable && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">
-            {expanded ? 'expand_less' : 'expand_more'}
-          </span>
+          <div className="text-[var(--color-text-tertiary)]">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </div>
         )}
       </button>
 

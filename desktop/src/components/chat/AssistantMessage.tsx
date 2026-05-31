@@ -25,7 +25,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
             : 'w-full max-w-[88%] sm:max-w-[80%] lg:max-w-[72%]'
         }`}
       >
-        <div className={`rounded-[20px] rounded-tl-[8px] border border-[var(--color-border)]/60 bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-primary)] shadow-sm ${
+        <div className={`rounded-[20px] rounded-tl-[8px] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-dropdown)] ${
           documentLayout ? 'w-full' : 'max-w-full'
         }`}>
           <MarkdownRenderer

@@ -815,7 +815,15 @@
   /* Diff/Code overrides to match slate */
   --color-code-bg: #0A0C12;
   --color-code-fg: #F1F5F9;
+  --color-code-comment: #6E7681;
+  --color-code-string: #A5D6FF;
   --color-code-keyword: #818CF8; /* Indigo keyword */
+  --color-code-function: #7EE787;
+  --color-code-number: #79C0FF;
+  --color-code-property: #FFA657;
+  --color-code-type: #D2A8FF;
+  --color-code-punctuation: #8B949E;
+  --color-code-parameter: #FFA657;
 --color-text-secondary-a72: rgba(183, 170, 165, 0.72);
   --color-text-secondary-a68: rgba(183, 170, 165, 0.68);
   --color-text-primary-a88: rgba(229, 226, 225, 0.88);
