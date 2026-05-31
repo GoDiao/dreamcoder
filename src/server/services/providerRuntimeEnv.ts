@@ -73,6 +73,11 @@ function isSavedProvider(value: unknown): value is SavedProvider {
   )
 }
 
+/** Strip client-side [1m]/[2m] context-window suffix before sending to API. */
+function stripContextSuffix(model: string): string {
+  return model.replace(/\[(1|2)m\]/gi, '')
+}
+
 export function normalizeModelMapping(models: SavedProvider['models']): SavedProvider['models'] {
   const main = models.main.trim()
   return {
@@ -221,10 +226,10 @@ export function buildProviderManagedEnv(
     }),
     ANTHROPIC_BASE_URL: baseUrl,
     ...buildProviderAuthEnv(provider, presetDefaultEnv, needsProxy),
-    ANTHROPIC_MODEL: models.main,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: models.haiku,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: models.sonnet,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: models.opus,
+    ANTHROPIC_MODEL: stripContextSuffix(models.main),
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: stripContextSuffix(models.haiku),
+    ANTHROPIC_DEFAULT_SONNET_MODEL: stripContextSuffix(models.sonnet),
+    ANTHROPIC_DEFAULT_OPUS_MODEL: stripContextSuffix(models.opus),
     ...attributionHeaderEnvForModel(models.main),
   }
 }

@@ -80,7 +80,7 @@ runtime/__pycache__
 
 # Codex logs
 .codex-logs/
-
+.codegraph/
 
 .worktrees/
 scripts/benchmark.ts

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-schema-v2.json",
   "productName": "DreamCoder",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.dreamcoder.desktop",
   "build": {
     "frontendDist": "../dist",

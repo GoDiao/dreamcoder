@@ -525,10 +525,11 @@ export class ProviderService {
     networkSettings: NetworkSettings,
   ): Promise<ProviderTestStepResult> {
     const start = Date.now()
+    const apiModel = stripContextSuffix(modelId)
     try {
       // Build an Anthropic Messages API request (same shape as what CLI sends)
       const anthropicReq: AnthropicRequest = {
-        model: modelId,
+        model: apiModel,
         max_tokens: 64,
         messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
       }
@@ -564,8 +565,8 @@ export class ProviderService {
       // Transform response back to Anthropic format
       const responseBody = await response.json()
       const anthropicRes = format === 'openai_chat'
-        ? openaiChatToAnthropic(responseBody, modelId)
-        : openaiResponsesToAnthropic(responseBody, modelId)
+        ? openaiChatToAnthropic(responseBody, apiModel)
+        : openaiResponsesToAnthropic(responseBody, apiModel)
 
       const latencyMs = Date.now() - start
 
@@ -588,6 +589,11 @@ export class ProviderService {
 
 // ─── Helpers ───────────────────────────────────────────────
 
+/** Strip client-side [1m]/[2m] context-window suffix before sending to API. */
+function stripContextSuffix(model: string): string {
+  return model.replace(/\[(1|2)m\]/gi, '')
+}
+
 function buildDirectTestRequest(
   base: string,
   apiKey: string,
@@ -596,19 +602,20 @@ function buildDirectTestRequest(
   authStrategy: ProviderAuthStrategy,
 ): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
   const prompt = 'Say "ok" and nothing else.'
+  const apiModel = stripContextSuffix(modelId)
 
   if (format === 'openai_chat') {
     return {
       url: `${base}/v1/chat/completions`,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: modelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
+      body: { model: apiModel, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
     }
   }
   if (format === 'openai_responses') {
     return {
       url: `${base}/v1/responses`,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: modelId, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
+      body: { model: apiModel, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
     }
   }
   // anthropic
@@ -619,7 +626,7 @@ function buildDirectTestRequest(
       'anthropic-version': '2023-06-01',
       ...buildAnthropicAuthHeaders(apiKey, authStrategy),
     },
-    body: { model: modelId, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
+    body: { model: apiModel, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
   }
 }
 

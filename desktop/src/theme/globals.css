@@ -539,10 +539,10 @@
   --color-outline-a92: rgba(143, 131, 121, 0.92);
 
   /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 }
 
@@ -733,177 +733,98 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --color-primary: #FFB59F;
-  --color-primary-container: #FF6E40;
-  --color-primary-fixed: #FFD9CF;
-  --color-primary-fixed-dim: #FFB59F;
+  /* ─── Palette: Cold Slate & Physical Floating ─── */
+  /* 宇宙底层 (Base) */
+  --color-app-bg: #030407;
+  --color-surface: #030407;
+  --color-background: #030407;
 
-  --color-on-primary: #2C120B;
-  --color-on-surface: #E5E2E1;
-  --color-on-surface-variant: #B7AAA5;
+  /* Level 1: Sidebar Panel */
+  --color-panel-sidebar: #0A0C12;
+  --color-surface-sidebar: #0A0C12;
+  --color-surface-container-lowest: #0A0C12;
 
-  --color-surface: #131313;
-  --color-surface-bright: #201F1F;
-  --color-surface-dim: #0E0E0E;
-  --color-surface-container: #201F1F;
-  --color-surface-container-low: #1C1B1B;
-  --color-surface-container-high: #2A2929;
-  --color-surface-container-highest: #353534;
-  --color-surface-container-lowest: #0E0E0E;
-  --color-surface-variant: #252120;
-  --color-background: #0E0E0E;
+  /* Level 2: Main Content */
+  --color-panel-main: #11141D;
+  --color-surface-container: #11141D;
+  --color-surface-container-low: #0E1017;
 
-  --color-outline: #8D7F7A;
-  --color-outline-variant: #5A4138;
+  /* Elevated: Inputs, Cards */
+  --color-panel-elevated: #1A1E2B;
+  --color-surface-bright: #1A1E2B;
+  --color-surface-container-highest: #1A1E2B;
 
-  --color-secondary: #CDBDFF;
-  --color-secondary-container: #3A3050;
-  --color-tertiary: #00DAF3;
-  --color-tertiary-container: #003D44;
+  /* Borders & Highlights */
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-separator: rgba(255, 255, 255, 0.04);
+  --color-highlight-top: rgba(255, 255, 255, 0.05);
 
-  --color-error: #FFB4AB;
-  --color-error-container: #93000A;
-  --color-on-error-container: #FFDAD6;
+  /* Text */
+  --color-on-surface: #F1F5F9;
+  --color-on-surface-variant: #8B949E;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #8B949E;
+  --color-text-tertiary: #6E7681;
 
-  --color-inverse-surface: #E5E2E1;
-  --color-inverse-on-surface: #1B1C1A;
-  --color-inverse-primary: #8F482F;
+  /* Primary Brand (Indigo) */
+  --color-primary: #818CF8;
+  --color-primary-container: #6366F1;
+  --color-brand: #818CF8;
+  --color-accent: #818CF8;
 
-  --color-success: #7EDB8B;
-  --color-success-container: rgba(126, 219, 139, 0.16);
-  --color-info: #74E0F7;
-  --color-info-container: rgba(116, 224, 247, 0.16);
-  --color-warning: #F7C46C;
-  --color-warning-container: rgba(247, 196, 108, 0.16);
+  /* Accent States */
+  --color-accent-bg: rgba(129, 140, 248, 0.08);
+  --color-hover: rgba(255, 255, 255, 0.03);
+  --color-surface-hover: rgba(255, 255, 255, 0.03);
+  --color-surface-selected: rgba(129, 140, 248, 0.08);
 
-  --color-surface-sidebar: #171615;
-  --color-surface-hover: var(--color-surface-container-highest);
-  --color-surface-selected: var(--color-surface-container);
-  --color-memory-accent: #7DD3C7;
-  --color-memory-surface: #1D2423;
-  --color-memory-border: #334743;
-  --color-memory-icon-bg: #22302E;
-  --color-goal-accent: var(--color-memory-accent);
-  --color-goal-surface: var(--color-memory-surface);
-  --color-goal-border: var(--color-memory-border);
-  --color-goal-icon-bg: var(--color-memory-icon-bg);
-  --color-goal-chip-bg: var(--color-surface-container-low);
-  --color-goal-chip-border: var(--color-border);
-  --color-model-option-selected-bg: rgba(255, 181, 159, 0.13);
-  --color-model-option-selected-border: rgba(255, 181, 159, 0.34);
-  --color-activity-heat-0: #242322;
-  --color-activity-heat-1: #4A2B24;
-  --color-activity-heat-2: #85432F;
-  --color-activity-heat-3: #C85F3C;
-  --color-activity-heat-4: #FF8A5C;
-  --color-activity-cell-border: rgba(229, 226, 225, 0.08);
-  --color-activity-cell-border-hover: rgba(255, 181, 159, 0.48);
-  --color-activity-cell-border-active: #FBE7E1;
-  --color-activity-tooltip-surface: #F2F1ED;
-  --color-activity-tooltip-border: rgba(255, 181, 159, 0.32);
-  --color-activity-tooltip-text: #1B1C1A;
-  --color-activity-tooltip-muted: #8F3217;
-  --color-inspector-surface: #131211;
-  --color-inspector-panel: #1C1B1B;
-  --color-inspector-chip: #252120;
-  --color-inspector-border: rgba(255, 181, 159, 0.18);
-  --color-inspector-accent: #FFB59F;
-  --color-inspector-accent-hover: #FFD4C8;
-  --color-inspector-accent-secondary: #74E0F7;
-  --color-inspector-text: #E5E2E1;
-  --color-inspector-heading: #F3D6CC;
-  --color-inspector-muted: #A89A95;
-  --color-inspector-muted-strong: #C5B8B2;
-  --color-inspector-success: #7EDB8B;
-  --color-inspector-success-bg: rgba(126, 219, 139, 0.16);
-  --color-inspector-danger: #FFB4AB;
-  --color-inspector-danger-bg: rgba(255, 180, 171, 0.16);
-  --color-inspector-danger-surface: rgba(255, 180, 171, 0.08);
-  --color-inspector-danger-border: rgba(255, 180, 171, 0.22);
-  --color-inspector-capacity: #8F8683;
-  --shadow-inspector: 0 28px 80px rgba(0, 0, 0, 0.58);
-  --color-switch-checked-bg: rgba(116, 224, 247, 0.36);
-  --color-switch-thumb: #E5E2E1;
-  --color-sidebar-filter-bg: rgba(255, 255, 255, 0.01);
-  --color-sidebar-filter-border: rgba(255, 255, 255, 0.08);
-  --color-sidebar-filter-icon-bg: transparent;
+  /* Feedback Colors (Muted for dark slate) */
+  --color-success: #4ADE80;
+  --color-error: #F87171;
+  --color-warning: #FBBF24;
+
+  /* Semantic Aliases Override */
+  --color-surface-sidebar: var(--color-panel-sidebar);
+  --color-surface-hover: var(--color-hover);
+  --color-surface-selected: var(--color-accent-bg);
+  --color-sidebar-item-hover: var(--color-hover);
+  --color-sidebar-item-active: var(--color-accent-bg);
+  --color-sidebar-item-active-border: var(--color-accent); /* Indigo accent line */
   --color-sidebar-search-bg: rgba(255, 255, 255, 0.03);
-  --color-sidebar-search-border: rgba(255, 255, 255, 0.06);
-  --color-sidebar-item-hover: rgba(255, 255, 255, 0.04);
-  --color-sidebar-item-active: rgba(255, 255, 255, 0.06);
-  --color-sidebar-item-active-border: rgba(255, 181, 159, 0.14);
-  --sidebar-panel-bg-image:
-    radial-gradient(circle at top left, rgba(255, 181, 159, 0.045), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  --color-sidebar-search-border: var(--color-border);
 
-  --color-border: rgba(90, 65, 56, 0.18);
-  --color-border-focus: rgba(255, 181, 159, 0.55);
-  --color-border-separator: rgba(90, 65, 56, 0.12);
+  /* Glass & Shadows */
+  --shadow-dropdown: 0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--color-border);
+  --shadow-focus-ring: 0 0 0 1px var(--color-accent);
+  --shadow-button-primary: 0 8px 24px rgba(99, 102, 241, 0.25); /* Indigo shadow */
 
+  /* Text overrides */
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
-  --color-text-tertiary: #8F827D;
+  --color-text-tertiary: #6E7681;
+  --color-text-accent: var(--color-accent);
 
-  --color-surface-info: rgba(32, 31, 31, 0.88);
-  --color-brand: var(--color-primary);
-  --color-text-accent: var(--color-tertiary);
+  /* Terminal overrides (optional, keeping dark grey for contrast) */
+  --color-terminal-bg: #0F1118;
+  --color-terminal-border: #1A1E2B;
 
-  --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.42);
-  --shadow-sidebar-filter: none;
-  --shadow-focus-ring: 0 0 0 1px rgba(255, 181, 159, 0.32);
-  --shadow-error-ring: 0 0 0 1px rgba(255, 180, 171, 0.26);
-  --shadow-button-primary: 0 12px 24px rgba(255, 110, 64, 0.18);
+  /* Glass Panel Overrides for Cold Slate */
+  --color-surface-glass: rgba(20, 23, 33, 0.7);
+  --color-surface-glass-border: rgba(255, 255, 255, 0.06);
 
-  --gradient-btn-primary: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
-  --gradient-btn-primary-hover: linear-gradient(135deg, var(--color-primary-container), var(--color-primary));
-
-  --color-surface-user-msg: rgba(32, 31, 31, 0.92);
-
-  --color-overlay-scrim: rgba(6, 6, 6, 0.56);
-  --color-surface-glass: rgba(32, 31, 31, 0.8);
-  --color-surface-glass-border: rgba(90, 65, 56, 0.18);
-
-  --color-code-bg: #0E0E0E;
-  --color-code-fg: #E5E2E1;
-  --color-code-comment: #8F8683;
-  --color-code-string: #88C988;
-  --color-code-keyword: #FF8F70;
-  --color-code-function: #00DAF3;
-  --color-code-number: #74E0F7;
-  --color-code-property: #FFC9B8;
-  --color-code-type: #CDBDFF;
-  --color-code-parameter: #E5E2E1;
-  --color-code-punctuation: #9B908C;
-  --color-code-inserted: #8EEA9A;
-  --color-code-deleted: #FFB59F;
-
-  --color-diff-added-bg: rgba(126, 219, 139, 0.12);
-  --color-diff-added-word: rgba(126, 219, 139, 0.22);
-  --color-diff-added-gutter: rgba(126, 219, 139, 0.18);
-  --color-diff-added-text: #8EEA9A;
-  --color-diff-removed-bg: rgba(255, 110, 64, 0.12);
-  --color-diff-removed-word: rgba(255, 110, 64, 0.24);
-  --color-diff-removed-gutter: rgba(255, 110, 64, 0.18);
-  --color-diff-removed-text: #FFB59F;
-  --color-diff-highlight-bg: rgba(205, 189, 255, 0.12);
-  --color-diff-highlight-gutter: rgba(205, 189, 255, 0.16);
-  --color-diff-title-bg: var(--color-surface-container-low);
-  --color-diff-title-color: var(--color-text-tertiary);
-  --color-diff-title-border: rgba(90, 65, 56, 0.15);
-
-  --color-terminal-header: #242323;
-  --color-terminal-bg: #121212;
-  --color-terminal-border: #1A1919;
-  --color-terminal-fg: #D7D2D0;
-  --color-terminal-muted: #8F8683;
-  --color-terminal-accent: #7EF18A;
-  --color-terminal-danger: #FF6D67;
-  --color-terminal-warning: #F8C55F;
-
-  --color-window-close-hover: #C63B44;
-  --color-selection-bg: rgba(255, 181, 159, 0.32);
-  --color-selection-fg: #FBE7E1;
-  --color-text-secondary-a72: rgba(183, 170, 165, 0.72);
+  /* Diff/Code overrides to match slate */
+  --color-code-bg: #0A0C12;
+  --color-code-fg: #F1F5F9;
+  --color-code-comment: #6E7681;
+  --color-code-string: #A5D6FF;
+  --color-code-keyword: #818CF8; /* Indigo keyword */
+  --color-code-function: #7EE787;
+  --color-code-number: #79C0FF;
+  --color-code-property: #FFA657;
+  --color-code-type: #D2A8FF;
+  --color-code-punctuation: #8B949E;
+  --color-code-parameter: #FFA657;
+--color-text-secondary-a72: rgba(183, 170, 165, 0.72);
   --color-text-secondary-a68: rgba(183, 170, 165, 0.68);
   --color-text-primary-a88: rgba(229, 226, 225, 0.88);
   --color-text-primary-a82: rgba(229, 226, 225, 0.82);

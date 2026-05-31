@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../../i18n'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 export function ThinkingBlock({ content, isActive = false }: { content: string; isActive?: boolean }) {
   const t = useTranslation()
@@ -24,8 +25,8 @@ export function ThinkingBlock({ content, isActive = false }: { content: string; 
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[12px] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-secondary)]"
       >
-        <span className="text-[10px] text-[var(--color-outline)]">
-          {expanded ? '\u25BE' : '\u25B8'}
+        <span className="text-[var(--color-text-tertiary)]">
+          {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
         </span>
         <span className="shrink-0 font-medium italic">
           {t('thinking.label')}
