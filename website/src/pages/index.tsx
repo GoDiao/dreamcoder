@@ -6,32 +6,32 @@ const features = [
   {
     icon: '🖥️',
     title: '原生桌面体验',
-    description: '多标签页会话管理，内置 PTY 终端，窗口状态自动记忆',
+    description: '多标签页会话管理，内置 PTY 终端，窗口状态自动记忆，开箱即用。',
   },
   {
     icon: '🤖',
     title: 'Computer Use 模式',
-    description: '支持截图视觉模式 + UIA Tree 文本模式，成本更低速度更快',
+    description: '支持截图视觉模式 + UIA Tree 文本模式，成本更低速度更快。',
   },
   {
     icon: '🔌',
     title: '全模型支持',
-    description: 'DeepSeek、通义千问、Kimi、MiniMax、Claude、GPT 一键切换',
+    description: 'DeepSeek、通义千问、Kimi、MiniMax、Claude、GPT 一键切换。',
   },
   {
     icon: '🛡️',
     title: '安全审批流',
-    description: '危险操作逐条确认，API Key 本地加密，隐私零风险',
+    description: '危险操作逐条确认，API Key 本地加密，隐私零风险。',
   },
   {
     icon: '🔧',
     title: 'MCP 扩展',
-    description: 'Model Context Protocol 原生支持，插件生态无限扩展',
+    description: 'Model Context Protocol 原生支持，插件生态无限扩展。',
   },
   {
     icon: '⚡',
     title: '极致性能',
-    description: '14 项深度��化，会话元数据缓存 24.8x 提升',
+    description: '14 项深度优化，会话元数据缓存实现 24.8 倍性能提升。',
   },
 ];
 
@@ -41,124 +41,109 @@ const benchmarks = [
   { metric: 'Markdown 渲染', before: '阻塞主线程', after: '异步不卡顿', improvement: '∞' },
 ];
 
-const codeLines = [
-  { text: '$ dreamcoder init my-project', color: '#8e8e93' },
-  { text: '✓ Initializing DreamCoder...', color: '#27c93f' },
-  { text: '✓ Loading Claude 3.5 Sonnet...', color: '#27c93f' },
-  { text: '✓ Connected to DeepSeek V3 (12ms)', color: '#00ddff' },
-  { text: '', color: '#8e8e93' },
-  { text: '🤖 What would you like to build?', color: '#ffbd2e' },
-  { text: '> Build me a REST API with Express', color: '#e3e3e6' },
-  { text: '', color: '#8e8e93' },
-  { text: '⚡ Analyzing project structure...', color: '#00ddff' },
-  { text: '✓ Generated: src/routes/users.js', color: '#27c93f' },
-  { text: '✓ Generated: src/models/user.js', color: '#27c93f' },
-  { text: '✓ Generated: tests/users.test.js', color: '#27c93f' },
+const terminalLines = [
+  { text: '$ dreamcoder init my-project', className: styles.terminalPrompt },
+  { text: '✓ Initializing DreamCoder...', className: styles.terminalSuccess },
+  { text: '✓ Loading Claude 3.5 Sonnet...', className: styles.terminalSuccess },
+  { text: '✓ Connected to DeepSeek V3 (12ms)', className: styles.terminalSuccess },
+  { text: '', className: '' },
+  { text: '🤖 What would you like to build?', className: styles.terminalAi },
+  { text: '> Build me a REST API with Express', className: styles.terminalUser },
+  { text: '', className: '' },
+  { text: '⚡ Analyzing project structure...', className: styles.terminalSuccess },
+  { text: '✓ Generated: src/routes/users.js', className: styles.terminalSuccess },
+  { text: '✓ Generated: src/models/user.js', className: styles.terminalSuccess },
 ];
 
 export default function Home(): JSX.Element {
-  const [typedLines, setTypedLines] = useState<string[]>([]);
-  const [currentLine, setCurrentLine] = useState(0);
-  const [showCursor, setShowCursor] = useState(true);
+  const [typedLines, setTypedLines] = useState<number>(0);
 
   useEffect(() => {
-    const cursorInterval = setInterval(() => setShowCursor(v => !v), 500);
-    return () => clearInterval(cursorInterval);
-  }, []);
-
-  useEffect(() => {
-    if (currentLine < codeLines.length) {
+    if (typedLines < terminalLines.length) {
       const timer = setTimeout(() => {
-        setTypedLines(prev => [...prev, codeLines[currentLine].text]);
-        setCurrentLine(c => c + 1);
-      }, currentLine === 0 ? 800 : 150);
+        setTypedLines(t => t + 1);
+      }, typedLines === 0 ? 800 : 120);
       return () => clearTimeout(timer);
     }
-  }, [currentLine]);
+  }, [typedLines]);
 
   return (
     <main className={styles.main}>
-      {/* Hero Section with Terminal Animation */}
+      {/* Hero Section */}
       <section className={styles.hero}>
-        <div className={styles.heroBackground}>
-          <div className={styles.gridPattern}></div>
-          <div className={styles.glowOrb1}></div>
-          <div className={styles.glowOrb2}></div>
-        </div>
-
         <div className={styles.heroContent}>
-          <div className={styles.badge}>
-            <span className={styles.badgeDot}></span>
-            开源免费 · MIT 许可证
-          </div>
-
-          <h1 className={styles.heroTitle}>
-            <span className={styles.titleLine1}>DreamCoder</span>
-            <span className={styles.titleLine2}>Claude Code 的桌面版</span>
-          </h1>
-
-          <p className={styles.heroSubtitle}>
-            把强大的 AI 编程能力，装进漂亮的桌面应用。<br/>
-            面向国内开发者的原生体验，无需科学上网。
-          </p>
-
-          <div className={styles.heroCta}>
-            <a href="https://github.com/GoDiao/dreamcoder/releases" className={styles.primaryBtn}>
-              <span>🚀</span> 立即下载 (Windows/macOS)
-            </a>
-            <Link to="/docs/intro" className={styles.secondaryBtn}>
-              查看文档 →
-            </Link>
-          </div>
-
-          <div className={styles.heroStats}>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>14</span>
-              <span className={styles.statLabel}>项性能优化</span>
+          <div className={styles.heroText}>
+            <div className={styles.badge}>
+              <span className={styles.badgeDot}></span>
+              开源免费 · MIT 许可证
             </div>
-            <div className={styles.statDivider}></div>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>8+</span>
-              <span className={styles.statLabel}>模型供应商</span>
-            </div>
-            <div className={styles.statDivider}></div>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>100%</span>
-              <span className={styles.statLabel}>本地隐私</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Terminal Visual */}
-        <div className={styles.terminalContainer}>
-          <div className={styles.terminal}>
-            <div className={styles.terminalHeader}>
-              <div className={styles.terminalDots}>
-                <span className={styles.dotRed}></span>
-                <span className={styles.dotYellow}></span>
-                <span className={styles.dotGreen}></span>
+            <h1 className={styles.heroTitle}>
+              <span className={styles.titleLine1}>DreamCoder</span>
+              <span className={styles.titleLine2}>Claude Code 的桌面版</span>
+            </h1>
+
+            <p className={styles.heroSubtitle}>
+              把强大的 AI 编程能力，装进漂亮的桌面应用。
+              面向国内开发者的原生体验，无需科学上网。
+            </p>
+
+            <div className={styles.heroCta}>
+              <a href="https://github.com/GoDiao/dreamcoder/releases" className={styles.primaryBtn}>
+                立即下载
+              </a>
+              <Link to="/docs/intro" className={styles.secondaryBtn}>
+                查看文档 →
+              </Link>
+            </div>
+
+            <div className={styles.heroStats}>
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>14</span>
+                <span className={styles.statLabel}>项性能优化</span>
               </div>
-              <span className={styles.terminalTitle}>DreamCoder — powered by Claude</span>
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>8+</span>
+                <span className={styles.statLabel}>模型供应商</span>
+              </div>
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>100%</span>
+                <span className={styles.statLabel}>本地隐私</span>
+              </div>
             </div>
-            <div className={styles.terminalBody}>
-              {typedLines.map((line, idx) => (
-                <div key={idx} className={styles.terminalLine} style={{ color: codeLines[idx]?.color || '#e3e3e6' }}>
-                  {line}{idx === typedLines.length - 1 && showCursor && <span className={styles.cursor}>▋</span>}
+          </div>
+
+          {/* Dark Code Editor Card */}
+          <div className={styles.heroCard}>
+            <div className={styles.terminalWindow}>
+              <div className={styles.terminalHeader}>
+                <div className={styles.terminalDots}>
+                  <span className={styles.dotRed}></span>
+                  <span className={styles.dotYellow}></span>
+                  <span className={styles.dotGreen}></span>
                 </div>
-              ))}
+                <span className={styles.terminalTitle}>DreamCoder — powered by Claude</span>
+              </div>
+              <div className={styles.terminalBody}>
+                {terminalLines.slice(0, typedLines).map((line, idx) => (
+                  <div key={idx} className={`${styles.terminalLine} ${line.className}`}>
+                    {line.text}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why DreamCoder Section */}
+      {/* Why Section */}
       <section className={styles.whySection}>
         <div className="container">
           <h2 className={styles.sectionTitle}>
-            ���什么选择 <span className={styles.highlight}>DreamCoder</span>？
+            为什么选择 <span className={styles.highlight}>DreamCoder</span>？
           </h2>
           <p className={styles.sectionSubtitle}>
-            对比纯命令行和其他 GUI 方案，DreamCoder 为国��开发者量身打造
+            对比纯命令行和其他 GUI 方案，DreamCoder 为国内开发者量身打造
           </p>
 
           <div className={styles.compareTable}>
@@ -196,7 +181,7 @@ export default function Home(): JSX.Element {
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Features Grid - Cream Cards */}
       <section className={styles.featuresSection}>
         <div className="container">
           <h2 className={styles.sectionTitle}>核心功能</h2>
@@ -212,7 +197,7 @@ export default function Home(): JSX.Element {
         </div>
       </section>
 
-      {/* Performance Benchmarks */}
+      {/* Benchmark Section - Dark Surface */}
       <section className={styles.benchmarkSection}>
         <div className="container">
           <h2 className={styles.sectionTitle}>极致性能优化</h2>
@@ -240,7 +225,7 @@ export default function Home(): JSX.Element {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section - Coral Full Bleed */}
       <section className={styles.ctaSection}>
         <div className="container">
           <h2 className={styles.ctaTitle}>准备好升级你的编程体验了吗？</h2>
@@ -249,7 +234,7 @@ export default function Home(): JSX.Element {
           </p>
           <div className={styles.ctaButtons}>
             <a href="https://github.com/GoDiao/dreamcoder/releases" className={styles.primaryBtn}>
-              <span>🚀</span> 立即下载
+              立即下载
             </a>
             <a href="https://github.com/GoDiao/dreamcoder" className={styles.secondaryBtn}>
               ⭐ Star on GitHub
@@ -258,15 +243,35 @@ export default function Home(): JSX.Element {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Footer - Dark Navy */}
       <footer className={styles.footer}>
-        <div className="container">
-          <p>
-            © 2024-{new Date().getFullYear()} GoDiao & DreamCoder Contributors ·
-            <Link to="/docs/intro"> 文档</Link> ·
-            <Link to="https://github.com/GoDiao/dreamcoder"> GitHub</Link>
-          </p>
-          <p className={styles.footerLicense}>MIT License · Open Source Forever</p>
+        <div className={styles.footerContent}>
+          <div className={styles.footerColumn}>
+            <h4>产品</h4>
+            <a href="/docs/intro">快速开始</a>
+            <a href="/docs/security">安全说明</a>
+            <a href="https://github.com/GoDiao/dreamcoder/releases">下载</a>
+          </div>
+          <div className={styles.footerColumn}>
+            <h4>资源</h4>
+            <a href="https://github.com/GoDiao/dreamcoder">GitHub</a>
+            <a href="https://github.com/GoDiao/dreamcoder/issues">问题反馈</a>
+            <a href="https://github.com/GoDiao/dreamcoder/discussions">讨论区</a>
+          </div>
+          <div className={styles.footerColumn}>
+            <h4>社区</h4>
+            <a href="https://github.com/GoDiao/dreamcoder/stargazers">Stars</a>
+            <a href="https://github.com/GoDiao/dreamcoder/forks">Forks</a>
+          </div>
+          <div className={styles.footerColumn}>
+            <h4>法律</h4>
+            <a href="https://github.com/GoDiao/dreamcoder/blob/master/LICENSE">MIT 许可证</a>
+          </div>
+        </div>
+        <div className={styles.footerBottom}>
+          <span className={styles.footerCopyright}>
+            © 2024-{new Date().getFullYear()} GoDiao & DreamCoder Contributors
+          </span>
         </div>
       </footer>
     </main>
