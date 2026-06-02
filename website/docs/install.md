@@ -1,10 +1,8 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
 ---
 
-# 快速开始
-
-DreamCoder 是 **Claude Desktop 的开源桌面版工作台**，面向国内开发者设计，让你可以用自然语言完成编程任务，无需科学上网。
+# 安装与配置
 
 ## 环境要求
 
@@ -44,12 +42,25 @@ cd desktop && bun run dev
 ## 配置 AI 模型
 
 1. 打开 DreamCoder，进入 **设置 → Provider (模型供应商)**
-2. 添加你的 API Key（支持 Anthropic、OpenAI、DeepSeek、通义千问、Kimi、Claude 等）
+2. 添加你的 API Key
 3. 选择默认模型，即可开始编程
+
+### 支持的模型供应商
+
+| 供应商 | API 格式 | 特点 |
+|--------|----------|------|
+| DreamField 官方 | Anthropic | 官方推荐，国内直连 |
+| DeepSeek 官方 | Anthropic | 性价比高，1M context |
+| 通义千问 (Qwen) | OpenAI Chat | 阿里系 |
+| Kimi (Moonshot) | Anthropic | 262K context |
+| 智谱 GLM | Anthropic | 清华系 |
+| LM Studio | Anthropic | 本地大模型 |
+| Ollama | Anthropic | 本地大模型 |
+| 自定义 | 可配置 | 自建 API 服务 |
 
 ## 环境变量配置
 
-DreamCoder 支持通过环境变量进行配置，适用于高级用户或 CI/CD 场景。
+DreamCoder 支持通过环境变量进行配置。
 
 ### 常用变量
 
@@ -60,18 +71,6 @@ DreamCoder 支持通过环境变量进行配置，适用于高级用户或 CI/CD
 | `DEEPSEEK_API_KEY` | DeepSeek API Key | - |
 | `DREAMCODER_SERVER_PORT` | 本地服务端口 | `3456` |
 | `DREAMCODER_LOG_LEVEL` | 日志级别 (`debug`/`info`/`warn`) | `info` |
-
-### 配置示例
-
-```powershell
-# PowerShell 示例
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-$env:DEEPSEEK_API_KEY = "sk-..."
-$env:DREAMCODER_LOG_LEVEL = "debug"
-
-# 然后启动 DreamCoder
-dreamcoder
-```
 
 ### 使用 .env 文件
 
@@ -88,23 +87,3 @@ DREAMCODER_LOG_LEVEL=info
 :::tip
 生产环境建议使用 UI 设置界面管理 API Key，DreamCoder 会将凭据加密存储在本地。
 :::
-
-## 核心功能
-
-### 🖥️ 原生桌面体验
-- 多标签页会话管理，每个会话绑定独立项目目录
-- 内置 PTY 终端（PowerShell / bash / zsh）
-- 窗口位置和大小自动记忆
-
-### 🤖 Computer Use 模式
-- 支持截图视觉模式
-- 全新 UIA Tree 文本模式，成本更低、速度更快
-
-### 🔌 全模型支持
-- 一键切换 8+ 模型供应商
-- 首创延迟可视化测试
-
-### 🛡️ 安全审批流
-- 危险操作（文件删除、终端命令）逐条确认
-- API Key 本地加密存储
-- 多级权限模式：自动批准 / 逐条确认 / 计划模式
