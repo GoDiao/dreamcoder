@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkdreamcoder_website=self.webpackChunkdreamcoder_website||[]).push([[2472],{3204(e){e.exports=JSON.parse('{"metadata":{"permalink":"/dreamcoder/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":4,"blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
