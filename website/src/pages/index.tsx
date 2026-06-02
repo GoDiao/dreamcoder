@@ -2,7 +2,6 @@ import React from 'react';
 import Link from '@docusaurus/Link';
 import styles from './index.module.css';
 import ArchitectureGraph from '../components/ArchitectureGraph';
-import InteractiveDemo from '../components/InteractiveDemo';
 import PerfDashboard from '../components/PerfDashboard';
 
 const features = [
@@ -165,19 +164,6 @@ export default function Home(): JSX.Element {
               <div className={`${styles.compareCell} ${styles.compareCellHighlight}`}>✅ 逐条确认</div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Interactive Demo Section */}
-      <section className={styles.demoSection}>
-        <div className="container">
-          <h2 className={styles.sectionTitle}>
-            交互<span className={styles.highlight}>演示</span>
-          </h2>
-          <p className={styles.sectionSubtitle}>
-            切换模型、实时响应、安全审批 — 体验完整的工作流
-          </p>
-          <InteractiveDemo />
         </div>
       </section>
 
