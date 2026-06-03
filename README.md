@@ -46,7 +46,7 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 
 > “我想要 Claude Code 的能力，但我需要一个 GUI 来管理会话、切换模型、处理文件。”
 
-*   **非叉子 (Not a Fork)**：DreamCoder 复用了 Claude Code 的核心逻辑，或��使用兼容的运行时。它只是给命令行体验穿上了一件漂亮的外衣。
+*   **非叉子 (Not a Fork)**：DreamCoder 复用了 Claude Code 的核心逻辑，或使用兼容的运行时。它只是给命令行体验穿上了一件漂亮的外衣。
 *   **隐私优先**：你的 API Key 和数据完全保存在本地。不依赖任何云端服务。
 *   **全模型支持**：无缝切换 Anthropic, OpenAI, DeepSeek, 阿里通义、MiniMax, Azure, Google Vertex 等。
 
@@ -118,7 +118,7 @@ cd desktop && bun run dev
 
 1.  打开 DreamCoder，进入 **设置 -> Provider (模型供应商)**。
 2.  添加你的 API Key (例如：Anthropic, OpenAI, 或 DeepSeek)。
-3.  选择默认��型，即可开始编程。
+3.  选择默认模型，即可开始编程。
 
 ---
 
