@@ -68,7 +68,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #1c1a18;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-hairline);
   padding: 8px 18px;
   border-radius: 9999px;
   position: relative;
@@ -98,15 +99,17 @@
 }
 
 .featureCardDark {
-  background: #2a2826;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-hairline);
   border-radius: 12px;
   padding: 20px;
   text-align: center;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .featureCardDark:hover {
   transform: translateY(-2px);
+  border-color: var(--color-primary);
 }
 
 .featureIcon {
@@ -115,7 +118,7 @@
 }
 
 .featureTitle {
-  color: #f2f0ed;
+  color: var(--color-body-strong);
   font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: 6px;
@@ -123,7 +126,7 @@
 }
 
 .featureDesc {
-  color: #9a9793;
+  color: var(--color-muted);
   font-size: 0.8rem;
   line-height: 1.5;
   margin: 0;

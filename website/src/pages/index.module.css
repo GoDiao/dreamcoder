@@ -209,24 +209,27 @@
 
 /* Hero Illustration Card */
 .heroCard {
-  background: var(--color-surface-dark);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-hairline);
   border-radius: 16px;
   padding: 32px;
-  box-shadow: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 
 .terminalWindow {
-  background: var(--color-surface-dark-soft);
+  background: #faf8f5;
+  border: 1px solid var(--color-hairline-soft);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .terminalHeader {
-  background: var(--color-surface-dark-elevated);
+  background: var(--color-surface-soft);
   padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 8px;
+  border-bottom: 1px solid var(--color-hairline-soft);
 }
 
 .terminalDots {
@@ -240,7 +243,7 @@
 
 .terminalTitle {
   font-size: 12px;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
   margin-left: 12px;
 }
 
@@ -259,7 +262,7 @@
 .terminalPrompt { color: var(--color-accent-teal); }
 .terminalSuccess { color: var(--color-accent-teal); }
 .terminalAi { color: var(--color-accent-amber); }
-.terminalUser { color: var(--color-on-dark); }
+.terminalUser { color: var(--color-body-strong); }
 .terminalPath { color: var(--color-muted-soft); }
 
 /* ===== WHY SECTION ===== */
@@ -420,16 +423,16 @@
 
 /* ===== BENCHMARK SECTION ===== */
 .benchmarkSection {
-  padding: 96px 0;
-  background: var(--color-surface-dark);
+  padding: 80px 0;
+  background: var(--color-surface-card);
 }
 
 .benchmarkSection .sectionTitle {
-  color: var(--color-on-dark);
+  color: var(--color-ink);
 }
 
 .benchmarkSection .sectionSubtitle {
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
 }
 
 .benchmarkGrid {
@@ -442,7 +445,8 @@
 }
 
 .benchmarkCard {
-  background: var(--color-surface-dark-elevated);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
   border-radius: 12px;
   padding: 32px;
   text-align: center;
@@ -450,7 +454,7 @@
 
 .benchmarkMetric {
   font-size: 0.9rem;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
   font-weight: 500;
   margin-bottom: 1rem;
 }
@@ -484,7 +488,7 @@
 .benchmarkImprovement {
   display: inline-block;
   padding: 4px 12px;
-  background: rgba(93, 184, 166, 0.15);
+  background: rgba(74, 158, 140, 0.15);
   color: var(--color-accent-teal);
   border-radius: 9999px;
   font-size: 0.8rem;
@@ -494,7 +498,7 @@
 .benchmarkNote {
   text-align: center;
   margin-top: 2rem;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted-soft);
   font-size: 0.9rem;
 }
 
@@ -518,21 +522,23 @@
 /* ===== CTA SECTION ===== */
 .ctaSection {
   padding: 80px 0;
-  background: var(--color-primary);
+  background: var(--color-surface-soft);
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .ctaTitle {
   font-family: 'Cormorant Garamond', serif;
   font-size: 2rem;
   font-weight: 400;
-  color: var(--color-on-primary);
+  color: var(--color-ink);
   text-align: center;
   margin-bottom: 0.75rem;
 }
 
 .ctaSubtitle {
   font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--color-muted);
   text-align: center;
   margin-bottom: 2rem;
 }
@@ -544,29 +550,31 @@
 }
 
 .ctaSection .primaryBtn {
-  background: var(--color-canvas);
-  color: var(--color-ink) !important;
-}
-
-.ctaSection .primaryBtn:hover {
-  background: var(--color-surface-card);
-}
-
-.ctaSection .secondaryBtn {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--color-primary);
   color: var(--color-on-primary) !important;
 }
 
-.ctaSection .secondaryBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.ctaSection .primaryBtn:hover {
+  background: var(--color-primary-active);
 }
+
+.ctaSection .secondaryBtn {
+  background: var(--color-canvas);
+  border-color: var(--color-hairline);
+  color: var(--color-ink) !important;
+}
+
+.ctaSection .secondaryBtn:hover {
+  background: var(--color-surface-card);
+}
+
+/* ===== RESPONSIVE ===== */
 
 /* ===== FOOTER ===== */
 .footer {
   padding: 64px 0;
-  background: var(--color-surface-dark);
-  border-top: 1px solid var(--color-surface-dark-elevated);
+  background: var(--color-surface-card);
+  border-top: 1px solid var(--color-hairline);
 }
 
 .footerContent {
@@ -581,7 +589,7 @@
 .footerColumn h4 {
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-on-dark);
+  color: var(--color-body-strong);
   margin-bottom: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -589,7 +597,7 @@
 
 .footerColumn a {
   display: block;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
   text-decoration: none;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
@@ -597,14 +605,14 @@
 }
 
 .footerColumn a:hover {
-  color: var(--color-on-dark);
+  color: var(--color-primary);
 }
 
 .footerBottom {
   max-width: 1200px;
   margin: 0 auto;
   padding: 32px 32px 0;
-  border-top: 1px solid var(--color-surface-dark-elevated);
+  border-top: 1px solid var(--color-hairline-soft);
   margin-top: 48px;
   display: flex;
   justify-content: space-between;

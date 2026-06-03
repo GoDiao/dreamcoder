@@ -1,36 +1,19 @@
-/* website/src/css/custom.css */
+/* website/src/css/custom.css - Light Theme */
 
-/* 极客暗黑风 (Night Mode) 主题变量 */
 :root {
-  --dc-bg-primary: #18181c;
-  --dc-bg-secondary: #1e1e24;
-  --dc-bg-tertiary: #25252c;
-  --dc-border: #2e2e38;
-  --dc-text-primary: #e3e3e6;
-  --dc-text-secondary: #c9c9ce;
-  --dc-text-muted: #8e8e93;
-  --dc-accent: #00ddff;
-  --dc-accent-hover: #00b8d9;
-  --dc-success: #27c93f;
-  --dc-warning: #ffbd2e;
-  --dc-danger: #ff5f56;
-  --dc-font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-}
-
-/* 日间模式 (Day Mode) 覆盖变量 */
-[data-theme='light'] {
-  --dc-bg-primary: #ffffff;
-  --dc-bg-secondary: #f7f7f9;
-  --dc-bg-tertiary: #eef0f2;
-  --dc-border: #e1e4e8;
-  --dc-text-primary: #1a1a1a;
-  --dc-text-secondary: #4a4a4a;
-  --dc-text-muted: #71717a;
-  --dc-accent: #0284c7;
-  --dc-accent-hover: #0369a1;
-  --dc-success: #16a34a;
-  --dc-warning: #d97706;
-  --dc-danger: #dc2626;
+  --dc-bg-primary: #f7f4ef;
+  --dc-bg-secondary: #efe8de;
+  --dc-bg-tertiary: #e8e0d4;
+  --dc-border: #dad4c8;
+  --dc-text-primary: #1a1816;
+  --dc-text-secondary: #4a4845;
+  --dc-text-muted: #75716f;
+  --dc-accent: #b87351;
+  --dc-accent-hover: #9a5f42;
+  --dc-success: #4a9e8c;
+  --dc-warning: #d4944a;
+  --dc-danger: #c64545;
+  --dc-font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
 }
 
 /* 全局基础样式 */
@@ -47,78 +30,13 @@ body {
   font-family: var(--dc-font-mono) !important;
 }
 
-/* 主页 Hero 区域特殊样式 */
-.hero__title {
-  font-size: 4rem !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.05em;
-  background: linear-gradient(135deg, var(--dc-text-primary) 0%, var(--dc-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.hero__subtitle {
-  font-size: 1.25rem !important;
-  color: var(--dc-text-secondary);
-  line-height: 1.6;
-}
-
-/* 模拟器面板样式 */
-.dc-simulator {
-  background-color: var(--dc-bg-primary);
-  border: 1px solid var(--dc-border);
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  font-family: var(--dc-font-mono);
-}
-
-.dc-simulator-header {
-  background-color: var(--dc-bg-secondary);
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--dc-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dc-window-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dc-provider-card {
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-
-.dc-provider-card:hover {
-  background-color: var(--dc-bg-tertiary);
-  border-color: var(--dc-border);
-}
-
-.dc-provider-card.active {
-  background-color: rgba(0, 221, 255, 0.1);
-  border-color: var(--dc-accent);
-}
-
-.dc-latency-badge {
-  font-size: 0.75rem;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-/* Docusaurus 组件覆盖 */
+/* Docusaurus 组件覆盖 - Light theme */
 .navbar {
-  background-color: var(--dc-bg-secondary) !important;
-  border-bottom: 1px solid var(--dc-border);
+  background-color: var(--dc-bg-primary) !important;
+  border-bottom: 1px solid var(--dc-border) !important;
 }
 
 .footer {
   background-color: var(--dc-bg-secondary) !important;
-  border-top: 1px solid var(--dc-border);
+  border-top: 1px solid var(--dc-border) !important;
 }

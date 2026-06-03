@@ -5,7 +5,8 @@
 }
 
 .benchmarkCard {
-  background: #2a2826;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 24px;
@@ -19,7 +20,7 @@
 }
 
 .benchmarkName {
-  color: #f2f0ed;
+  color: var(--color-body-strong);
   font-size: 1rem;
   font-weight: 500;
   margin: 0;
@@ -27,8 +28,8 @@
 }
 
 .improvementBadge {
-  background: rgba(184, 115, 81, 0.15);
-  color: #b87351;
+  background: rgba(184, 115, 81, 0.12);
+  color: var(--color-primary);
   padding: 4px 12px;
   border-radius: 9999px;
   font-size: 0.8rem;
@@ -36,13 +37,13 @@
 }
 
 .improvementBadgeTeal {
-  background: rgba(74, 158, 140, 0.15);
-  color: #4a9e8c;
+  background: rgba(74, 158, 140, 0.12);
+  color: var(--color-accent-teal);
 }
 
 .improvementBadgeAmber {
-  background: rgba(212, 148, 74, 0.15);
-  color: #d4944a;
+  background: rgba(212, 148, 74, 0.12);
+  color: var(--color-accent-amber);
 }
 
 .barContainer {
@@ -57,44 +58,42 @@
 }
 
 .barLabelBefore {
-  color: #95928e;
+  color: var(--color-muted-soft);
 }
 
 .barLabelAfter {
-  color: #4a9e8c;
+  color: var(--color-accent-teal);
   font-weight: 600;
 }
 
 .barTrack {
   height: 24px;
-  background: #242220;
+  background: var(--color-surface-soft);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .barFillBefore {
   height: 100%;
-  background: #75716f;
+  background: var(--color-muted-soft);
   border-radius: 6px;
   transition: width 0.8s ease;
 }
 
 .barFillAfter {
   height: 100%;
-  background: #4a9e8c;
+  background: var(--color-accent-teal);
   border-radius: 6px;
   transition: width 0.8s ease;
-  box-shadow: 0 0 20px rgba(74, 158, 140, 0.4);
 }
 
 .barFillAfterAmber {
-  background: #d4944a;
-  box-shadow: 0 0 20px rgba(212, 148, 74, 0.4);
+  background: var(--color-accent-amber);
 }
 
 .note {
   font-size: 0.8rem;
-  color: #95928e;
+  color: var(--color-muted-soft);
 }
 
 /* Summary Stats */
@@ -106,16 +105,16 @@
 }
 
 .statCard {
-  background: #1c1a18;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-hairline);
   border-radius: 12px;
   padding: 24px;
   text-align: center;
-  border: 1px solid #2a2826;
   transition: border-color 0.2s ease;
 }
 
 .statCard:hover {
-  border-color: #b87351;
+  border-color: var(--color-primary);
 }
 
 .statIcon {
@@ -127,14 +126,14 @@
   font-family: 'Cormorant Garamond', serif;
   font-size: 2.5rem;
   font-weight: 600;
-  color: #f2f0ed;
+  color: var(--color-body-strong);
   line-height: 1;
   margin-bottom: 4px;
 }
 
 .statLabel {
   font-size: 0.85rem;
-  color: #9a9793;
+  color: var(--color-muted);
 }
 
 /* Responsive */

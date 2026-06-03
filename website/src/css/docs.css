@@ -118,13 +118,10 @@ p, li, td, th {
   line-height: 1.6 !important;
 }
 
-/* Code blocks */
-pre, code {
-  font-family: 'JetBrains Mono', monospace !important;
-}
-
+/* Code blocks - Light theme */
 pre {
-  background: var(--dc-surface-dark) !important;
+  background: var(--dc-surface-soft) !important;
+  border: 1px solid var(--dc-hairline);
   border-radius: 8px !important;
 }
 
@@ -225,25 +222,26 @@ a:hover {
   color: var(--dc-primary) !important;
 }
 
-/* Footer */
+/* Footer - Light theme */
 .footer {
-  background: var(--dc-surface-dark) !important;
+  background: var(--dc-surface-card) !important;
+  border-top: 1px solid var(--dc-hairline);
   padding: 48px 0 !important;
 }
 
 .footer__title {
-  color: var(--dc-on-dark) !important;
+  color: var(--dc-body-strong) !important;
   font-family: 'Inter', sans-serif !important;
   font-weight: 500 !important;
 }
 
 .footer__link-item {
-  color: var(--dc-on-dark-soft) !important;
+  color: var(--dc-muted) !important;
   font-family: 'Inter', sans-serif !important;
 }
 
 .footer__link-item:hover {
-  color: var(--dc-on-dark) !important;
+  color: var(--dc-primary) !important;
 }
 
 .footer__copyright {
@@ -252,16 +250,17 @@ a:hover {
   font-size: 0.85rem !important;
 }
 
-/* Mermaid diagrams */
+/* Mermaid diagrams - Light theme */
 .mermaid {
-  background: var(--dc-surface-dark) !important;
+  background: var(--dc-surface-card) !important;
+  border: 1px solid var(--dc-hairline);
   border-radius: 12px !important;
   padding: 24px !important;
 }
 
 /* Dark mode toggle */
 [data-theme='dark'] {
-  --ifm-background-color: var(--dc-surface-dark);
+  --ifm-background-color: var(--dc-canvas);
 }
 
 /* Responsive adjustments */

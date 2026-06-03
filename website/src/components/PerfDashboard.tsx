@@ -8,7 +8,6 @@ const benchmarks = [
     after: 81,
     unit: 'ms',
     improvement: '24.8x',
-    color: '#b87351',
     badgeClass: ''
   },
   {
@@ -17,7 +16,6 @@ const benchmarks = [
     after: 6.74,
     unit: 'ms',
     improvement: '1.6x',
-    color: '#4a9e8c',
     badgeClass: styles.improvementBadgeTeal
   },
   {
@@ -26,7 +24,6 @@ const benchmarks = [
     after: 0,
     unit: 'μs',
     improvement: '主线程解放',
-    color: '#d4944a',
     badgeClass: styles.improvementBadgeAmber,
     note: 'useDeferredValue'
   }
@@ -77,9 +74,7 @@ export default function PerfDashboard() {
                 <div
                   className={`${styles.barFillAfter} ${idx === 2 ? styles.barFillAfterAmber : ''}`}
                   style={{
-                    width: item.after === 0 ? '15%' : `${Math.max((item.after / maxBefore) * 100, 8)}%`,
-                    background: item.color,
-                    boxShadow: `0 0 20px ${item.color}40`
+                    width: item.after === 0 ? '15%' : `${Math.max((item.after / maxBefore) * 100, 8)}%`
                   }}
                 />
               </div>

@@ -13,16 +13,16 @@ const architectureData = {
     },
     {
       name: 'Rust 核心',
-      color: '#1c1a18',
-      textColor: '#f2f0ed',
+      color: '#efe8de',
+      textColor: '#1a1816',
       borderColor: '#b87351',
       items: ['窗口状态持久化', '安全审批闸口', 'PTY 终端控制'],
       icon: ''
     },
     {
       name: 'Bun 运行时',
-      color: '#242220',
-      textColor: '#f2f0ed',
+      color: '#e8e0d4',
+      textColor: '#1a1816',
       borderColor: '#4a9e8c',
       items: ['AI Agent 引擎', 'Provider 路由', 'MCP 工具服务'],
       icon: ''
