@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1780597562003,
+  "projectRoot": "E:\\AProject\\TianX\\Personal\\dreamfield\\temp-gh-pages",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 0,
+      "lastAccessed": 1780597561960,
+      "keyFiles": []
+    },
+    "blog": {
+      "path": "blog",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1780597561962,
+      "keyFiles": [
+        "atom.xml",
+        "index.html",
+        "rss.xml"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1780597561964,
+      "keyFiles": []
+    },
+    "img": {
+      "path": "img",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1780597561966,
+      "keyFiles": [
+        "docusaurus-social-card.jpg",
+        "docusaurus.png",
+        "favicon.ico",
+        "logo.svg",
+        "undraw_docusaurus_mountain.svg"
+      ]
+    },
+    "markdown-page": {
+      "path": "markdown-page",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780597561967,
+      "keyFiles": [
+        "index.html"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}
