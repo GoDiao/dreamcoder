@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"E:\\\\AProject\\\\TianX\\\\Personal\\\\dreamfield\\\\temp-gh-pages\\\" && git pull origin gh-pages --allow-unrelated-histories && git push -u origin gh-pages\"}",
-  "error": "Exit code 1\nFrom https://github.com/GoDiao/dreamcoder\n * branch            gh-pages   -> FETCH_HEAD\n * [new branch]      gh-pages   -> origin/gh-pages\nAuto-merging 404.html\nCONFLICT (add/add): Merge conflict in 404.html\nAuto-merging blog/archive/index.html\nCONFLICT (add/add): Merge conflict in blog/archive/index.html\nAuto-merging blog/authors/all-sebastien-lorber-articles/index.html\nCONFLICT (add/add): Merge conflict in blog/authors/all-sebastien-lorber-articles/index.html\nAuto-merging blog/auth...",
-  "timestamp": "2026-06-04T08:58:29.911Z",
-  "retry_count": 2
-}
