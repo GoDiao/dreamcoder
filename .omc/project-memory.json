@@ -80,6 +80,13 @@
       ]
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "docs",
+      "accessCount": 1,
+      "lastAccessed": 1780659832600,
+      "type": "directory"
+    }
+  ],
   "userDirectives": []
 }
