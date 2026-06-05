@@ -78,7 +78,7 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 ---
 
 ### 4. MCP 扩展
-*   **MCP 一等公民**：Model Context Protocol 全面支持。
+*   **MCP 原生支持**：Model Context Protocol 全面支持。
 *   **可视化配置**：告别 JSON 配置，图形界面管理 MCP 服务器。
 *   **开箱即用**：内置常用 MCP 工具集成。
 
