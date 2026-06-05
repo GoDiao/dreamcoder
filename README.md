@@ -59,15 +59,30 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 *   **集成终端**：内置 PTY (PowerShell/Bash/Zsh)，集成 xterm.js。
 *   **可视化设置**：告别手动编辑 JSON 文件，在 UI 上直接管理 Provider 和 API Key。
 
+![主界面](./assets/main.png)
+
 ### 2. 完美对接 Claude Code
 *   **Computer Use 模式**：原生支持视觉模型控制电脑（截图模式），以及全新的 **UIA Tree 模式**（文本辅助访问模式，更快、更低成本）。
 *   **工具调用可视化**：AI 读写文件、执行终端命令的过程全程透明可见。
 *   **MCP 支持**：通过 Model Context Protocol 扩展 AI 能力。
 
+![Computer Use 设置](./assets/setting_computeruse.png)
+
 ### 3. 高级 Provider 系统
 *   **一键切换**：点击即可在不同模型供应商之间切换。
 *   **支持列表**：Anthropic (Claude), OpenAI, DeepSeek, Moonshot (Kimi), MiniMax, Azure OpenAI, Google Vertex, AWS Bedrock。
 *   **可视化测试**：在设置界面直接测试连接状态和延迟。
+
+![Provider 设置](./assets/setting_provider.png)
+
+---
+
+### 4. MCP 扩展
+*   **MCP 一等公民**：Model Context Protocol 全面支持。
+*   **可视化配置**：告别 JSON 配置，图形界面管理 MCP 服务器。
+*   **开箱即用**：内置常用 MCP 工具集成。
+
+![MCP 技能设置](./assets/setting_skills.png)
 
 ---
 
