@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd E:/AProject/TianX/Personal/dreamfield/website && npm run clear && npm run build\",\"timeout\":180000,\"description\":\"Clear Docusaurus cache then build\"}",
-  "error": "Exit code 1\nnpm warn Unknown user config \"store-dir\". This will stop working in the next major version of npm.\n\n> dreamcoder-website@1.0.0 clear\n> docusaurus clear\n\n[ERROR] Could not remove the build output folder at \"E:\\AProject\\TianX\\Personal\\dreamfield\\website\\build\".\n[ERROR] Error: EBUSY: resource busy or locked, rmdir 'E:\\AProject\\TianX\\Personal\\dreamfield\\website\\build'\n[SUCCESS] Removed the generated folder at \".docusaurus\".\n[SUCCESS] Removed the bundler persistent cache folder at \"node_m...",
-  "timestamp": "2026-06-04T18:29:53.275Z",
-  "retry_count": 7
-}
