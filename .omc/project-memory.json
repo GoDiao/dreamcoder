@@ -9,7 +9,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/AProject/TianX/Personal/dreamfield/_reference/webpage\" && npm run build && cp assets/*.png dist/assets/ && cd \"E:/AProject/TianX/Personal/dreamfield\" && rm -rf temp-gh-pages/* && cp -r _reference/webpage/dist/* temp-gh-pages/ && cd temp-gh-pages && git add -A && git commit -m \"fix: 修复首页点击自动滚动问题\" && git push -f origin gh-pages",
+    "buildCommand": "cd \"E:/AProject/TianX/Personal/dreamfield/_reference/webpage\" && npm run build && cp assets/*.png dist/assets/ && cd \"E:/AProject/TianX/Personal/dreamfield\" && rm -rf temp-gh-pages/* && cp -r _reference/webpage/dist/* temp-gh-pages/ && cd temp-gh-pages && git add -A && git commit -m \"fix: 修复截图路径和聊天滚动问题\" && git push -f origin gh-pages",
     "testCommand": null,
     "lintCommand": null,
     "devCommand": null,
