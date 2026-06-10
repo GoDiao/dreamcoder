@@ -234,6 +234,18 @@ const TASK_NOTIFICATION_BLOCK_RE = /<task-notification>\s*[\s\S]*?<\/task-notifi
 
 export class SessionService {
   // --------------------------------------------------------------------------
+  // Metadata cache
+  // --------------------------------------------------------------------------
+
+  private metadataCache = new Map<string, {
+    title: string | undefined
+    workDir: string | undefined
+    projectRoot: string | undefined
+    messageCount: number
+    lastModified: number
+  }>()
+
+  // --------------------------------------------------------------------------
   // Config helpers
   // --------------------------------------------------------------------------
 
@@ -1303,9 +1315,26 @@ export class SessionService {
     const limit = options?.limit ?? 50
     const paginatedFiles = filesWithStats.slice(offset, offset + limit)
 
-    // Build session list items with metadata from file stats & first entries
+    // Build session list items with metadata from cache or file
     const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
       try {
+        const cached = this.metadataCache.get(filePath)
+        if (cached && cached.lastModified === stat.mtimeMs) {
+          // Cache hit - use cached metadata
+          return {
+            id: sessionId,
+            title: cached.title,
+            createdAt: stat.birthtime.toISOString(),
+            modifiedAt: stat.mtime.toISOString(),
+            messageCount: cached.messageCount,
+            projectPath: projectDir,
+            projectRoot: cached.projectRoot,
+            workDir: cached.workDir,
+            workDirExists: await this.pathExists(cached.workDir),
+          }
+        }
+
+        // Cache miss - read and parse JSONL
         const entries = await this.readJsonlFile(filePath)
         const workDir = this.resolveWorkDirFromEntries(entries, projectDir)
         const projectRoot = await this.resolveProjectRootFromEntries(entries, workDir, projectDir)
@@ -1317,6 +1346,15 @@ export class SessionService {
         ).length
 
         const title = this.extractTitle(entries)
+
+        // Update cache
+        this.metadataCache.set(filePath, {
+          title,
+          workDir,
+          projectRoot,
+          messageCount,
+          lastModified: stat.mtimeMs,
+        })
 
         // Find the earliest timestamp from entries, fallback to file birthtime
         let createdAt = stat.birthtime.toISOString()

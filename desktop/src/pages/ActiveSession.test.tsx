@@ -136,7 +136,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -204,7 +203,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -270,7 +268,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -344,7 +341,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -406,7 +402,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -467,7 +462,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -546,7 +540,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -601,7 +594,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -671,7 +663,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -726,7 +717,6 @@ describe('ActiveSession task polling', () => {
             statusVerb: '',
             slashCommands: [],
             agentTaskNotifications: {},
-            elapsedTimer: null,
           },
         },
       })
@@ -779,7 +769,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -838,7 +827,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -945,7 +933,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

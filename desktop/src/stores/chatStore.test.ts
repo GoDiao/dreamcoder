@@ -152,7 +152,6 @@ function makeSession(overrides: Partial<PerSessionState> = {}): PerSessionState 
     slashCommands: [],
     agentTaskNotifications: {},
     backgroundAgentTasks: {},
-    elapsedTimer: null,
     ...overrides,
   }
 }
@@ -1113,7 +1112,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1197,7 +1195,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1364,7 +1361,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [{ name: 'old-command', description: 'Old command' }],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1714,7 +1710,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1777,7 +1772,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1808,7 +1802,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2129,7 +2122,6 @@ describe('chatStore history mapping', () => {
           statusVerb: 'Thinking',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2202,7 +2194,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2247,7 +2238,6 @@ describe('chatStore history mapping', () => {
           statusVerb: 'Compacting conversation',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2301,7 +2291,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2349,7 +2338,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2403,7 +2391,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2647,7 +2634,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2692,7 +2678,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2799,7 +2784,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2869,7 +2853,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3159,7 +3142,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3261,7 +3243,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3313,7 +3294,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3345,7 +3325,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3386,7 +3365,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3450,7 +3428,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -3491,7 +3468,6 @@ describe('chatStore history mapping', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

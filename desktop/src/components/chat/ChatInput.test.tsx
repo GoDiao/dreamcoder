@@ -173,7 +173,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -239,7 +238,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
         [historySessionId]: {
           messages: [{ id: 'history-message', type: 'assistant_text', content: 'ready', timestamp: 1 }],
@@ -257,7 +255,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -348,7 +345,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -399,7 +395,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -445,7 +440,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -509,7 +503,6 @@ describe('ChatInput file mentions', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

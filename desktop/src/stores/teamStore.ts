@@ -15,6 +15,7 @@ const memberSessionId = (agentId: string) => `team-member:${agentId}`
 /** Module-level timer for polling member transcript */
 let memberPollTimer: ReturnType<typeof setInterval> | null = null
 let polledMemberSessionId: string | null = null
+let memberPollInFlight = false
 
 function createMemberSessionState() {
   return {
@@ -33,7 +34,6 @@ function createMemberSessionState() {
     statusVerb: '',
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
   }
 }
 
@@ -187,9 +187,15 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   },
 
   refreshMemberSession: async (sessionId) => {
+    if (memberPollInFlight) return
+    memberPollInFlight = true
+
     const team = get().activeTeam
     const member = get().getMemberBySessionId(sessionId)
-    if (!team || !member) return
+    if (!team || !member) {
+      memberPollInFlight = false
+      return
+    }
 
     try {
       const { messages } = await teamsApi.getMemberTranscript(team.name, member.agentId)
@@ -214,6 +220,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     } catch {
       const existingMessages = useChatStore.getState().sessions[sessionId]?.messages ?? []
       syncMemberSessionMessages(sessionId, member.status, existingMessages)
+    } finally {
+      memberPollInFlight = false
     }
   },
 

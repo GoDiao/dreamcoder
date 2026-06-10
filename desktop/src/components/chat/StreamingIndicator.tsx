@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
+import { useElapsedTimer } from '../../hooks/useElapsedTimer'
 
 function formatElapsed(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
@@ -40,8 +41,10 @@ export function StreamingIndicator() {
   const chatState = sessionState?.chatState ?? 'idle'
   const statusVerb = sessionState?.statusVerb ?? ''
   const apiRetry = sessionState?.apiRetry ?? null
-  const elapsedSeconds = sessionState?.elapsedSeconds ?? 0
   const tokenUsage = sessionState?.tokenUsage ?? { input_tokens: 0, output_tokens: 0 }
+
+  // Use custom hook for elapsed timer instead of Zustand state
+  const elapsedSeconds = useElapsedTimer(activeTabId, chatState === 'thinking')
 
   useEffect(() => {
     if (!apiRetry) return undefined

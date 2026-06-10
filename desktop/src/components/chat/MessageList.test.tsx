@@ -40,7 +40,6 @@ function makeSessionState(overrides: Partial<PerSessionState> = {}): PerSessionS
     apiRetry: null,
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
     composerPrefill: null,
     ...overrides,
   }

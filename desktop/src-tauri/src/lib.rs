@@ -8,11 +8,12 @@ use std::{
     str,
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
     },
     thread,
     time::{Duration, Instant},
 };
+
 
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
@@ -414,6 +415,9 @@ struct TerminalState {
     next_id: AtomicU32,
     sessions: Mutex<HashMap<u32, TerminalSession>>,
 }
+
+static LAST_WINDOW_SAVE: Mutex<Option<Instant>> = Mutex::new(None);
+const WINDOW_SAVE_DEBOUNCE_MS: u64 = 500;
 
 struct TerminalSession {
     master: Box<dyn MasterPty + Send>,
@@ -929,7 +933,7 @@ fn terminal_spawn(
 
     let mut cmd = CommandBuilder::new(&shell);
     cmd.cwd(cwd_path.as_os_str());
-    for (key, value) in terminal_environment(&shell) {
+    for (key, value) in terminal_environment_cached(&shell) {
         cmd.env(key, value);
     }
     cmd.env("TERM", "xterm-256color");
@@ -969,7 +973,7 @@ fn terminal_spawn(
 
     let output_app = app.clone();
     thread::spawn(move || {
-        let mut buffer = [0_u8; 8192];
+        let mut buffer = [0_u8; 32768];
         let mut pending_utf8 = Vec::new();
         loop {
             match reader.read(&mut buffer) {
@@ -1222,11 +1226,15 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
     output
 }
 
-fn terminal_environment(shell: &str) -> HashMap<String, String> {
-    let mut env: HashMap<String, String> = std::env::vars().collect();
-    env.extend(login_shell_environment(shell));
-    ensure_utf8_locale(&mut env);
-    env
+static TERMINAL_ENV_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+fn terminal_environment_cached(shell: &str) -> &'static HashMap<String, String> {
+    TERMINAL_ENV_CACHE.get_or_init(|| {
+        let mut env: HashMap<String, String> = std::env::vars().collect();
+        env.extend(login_shell_environment(shell));
+        ensure_utf8_locale(&mut env);
+        env
+    })
 }
 
 fn ensure_utf8_locale(env: &mut HashMap<String, String>) {
@@ -1585,7 +1593,7 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
         .shell()
         .sidecar("dreamcoder-sidecar")
         .map_err(|err| format!("resolve sidecar: {err}"))?;
-    for (key, value) in terminal_environment(&default_shell(None)) {
+    for (key, value) in terminal_environment_cached(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
     }
     // Pass through CLAUDE_CONFIG_DIR so the sidecar (Node.js) uses the same
@@ -1721,7 +1729,7 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
             .shell()
             .sidecar("dreamcoder-sidecar")
             .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
-        for (key, value) in terminal_environment(&default_shell(None)) {
+        for (key, value) in terminal_environment_cached(&default_shell(None)) {
             sidecar = sidecar.env(key, value);
         }
         // Pass through CLAUDE_CONFIG_DIR for portable installs
@@ -2249,29 +2257,36 @@ pub fn run() {
             macos_notifications::install_click_handler(app.handle().clone());
             restore_main_window_state(&app.handle());
 
-            let state = app.state::<ServerState>();
-            let mut guard = state
-                .0
-                .lock()
-                .map_err(|_| IoError::new(ErrorKind::Other, "server state lock poisoned"))?;
+            // Start sidecar in background thread to avoid blocking window
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let state = app_handle.state::<ServerState>();
+                let mut guard = state
+                    .0
+                    .lock()
+                    .expect("server state lock poisoned");
 
-            match start_server_sidecar(&app.handle()) {
-                Ok(runtime) => {
-                    guard.runtime = Some(runtime);
-                    guard.startup_error = None;
-                }
-                Err(err) => {
-                    eprintln!("[desktop] failed to start local server: {err}");
-                    guard.runtime = None;
-                    guard.startup_error = Some(err);
-                }
-            }
-            drop(guard);
+                match start_server_sidecar(&app_handle) {
+                    Ok(runtime) => {
+                        guard.runtime = Some(runtime);
+                        guard.startup_error = None;
+                        drop(guard);
 
-            // server 起来之后再起 adapter sidecar —— start_adapters_sidecar
-            // 内部会从 ServerState 读 server URL 注入 ADAPTER_SERVER_URL env，
-            // 让 adapter 连上动态端口。
-            spawn_and_track_adapters_sidecar(&app.handle());
+                        // server 起来之后再起 adapter sidecar
+                        spawn_and_track_adapters_sidecar(&app_handle);
+
+                        let _ = app_handle.emit("server-ready", true);
+                    }
+                    Err(err) => {
+                        eprintln!("[desktop] failed to start local server: {err}");
+                        guard.runtime = None;
+                        guard.startup_error = Some(err.clone());
+                        drop(guard);
+
+                        let _ = app_handle.emit("server-error", err);
+                    }
+                }
+            });
 
             Ok(())
         })
@@ -2295,7 +2310,20 @@ pub fn run() {
             event: WindowEvent::Moved(_) | WindowEvent::Resized(_),
             ..
         } if label == MAIN_WINDOW_LABEL => {
-            save_main_window_state(app_handle);
+            let now = Instant::now();
+            let should_save = {
+                let mut last = LAST_WINDOW_SAVE.lock().unwrap();
+                match *last {
+                    Some(prev) if now.duration_since(prev).as_millis() < WINDOW_SAVE_DEBOUNCE_MS as u128 => false,
+                    _ => {
+                        *last = Some(now);
+                        true
+                    }
+                }
+            };
+            if should_save {
+                save_main_window_state(app_handle);
+            }
         }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen {
