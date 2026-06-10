@@ -18,6 +18,7 @@ type BranchSessionResult = Pick<BranchSessionResponse, 'sessionId' | 'title' | '
 
 type SessionStore = {
   sessions: SessionListItem[]
+  sessionsById: Map<string, SessionListItem>
   activeSessionId: string | null
   isLoading: boolean
   error: string | null
@@ -44,8 +45,15 @@ type SessionStore = {
   setActiveSession: (id: string | null) => void
 }
 
+function buildSessionsById(sessions: SessionListItem[]): Map<string, SessionListItem> {
+  const map = new Map<string, SessionListItem>()
+  for (const session of sessions) map.set(session.id, session)
+  return map
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
+  sessionsById: new Map(),
   activeSessionId: null,
   isLoading: false,
   error: null,
@@ -58,7 +66,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const { sessions: raw } = await sessionsApi.list({ project, limit: 100 })
       let syncedSessions: SessionListItem[] = []
       set((state) => {
-        const currentById = new Map(state.sessions.map((session) => [session.id, session]))
+        const currentById = state.sessionsById
         // Deduplicate by session ID - keep the most recently modified entry.
         const byId = new Map<string, SessionListItem>()
         for (const s of raw) {
@@ -71,7 +79,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
         const sessions = [...byId.values()]
         syncedSessions = sessions
-        return { sessions, isLoading: false }
+        return { sessions, sessionsById: byId, isLoading: false }
       })
       syncOpenSessionTabTitles(syncedSessions)
     } catch (err) {
@@ -97,12 +105,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       workDirExists: true,
     }
 
-    set((state) => ({
-      sessions: state.sessions.some((session) => session.id === id)
-        ? state.sessions
-        : [optimisticSession, ...state.sessions],
-      activeSessionId: id,
-    }))
+    set((state) => {
+      if (state.sessions.some((session) => session.id === id)) {
+        return { activeSessionId: id }
+      }
+      const sessions = [optimisticSession, ...state.sessions]
+      return {
+        sessions,
+        sessionsById: buildSessionsById(sessions),
+        activeSessionId: id,
+      }
+    })
 
     void get().fetchSessions()
     return id
@@ -113,7 +126,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       targetMessageId,
       ...(options?.title ? { title: options.title } : {}),
     })
-    const sourceSession = get().sessions.find((session) => session.id === sourceSessionId)
+    const sourceSession = get().sessionsById.get(sourceSessionId)
     const now = new Date().toISOString()
     const optimisticSession: SessionListItem = {
       id: result.sessionId,
@@ -127,15 +140,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       workDirExists: true,
     }
 
-    set((state) => ({
-      sessions: state.sessions.some((session) => session.id === result.sessionId)
+    set((state) => {
+      const sessions = state.sessions.some((session) => session.id === result.sessionId)
         ? state.sessions.map((session) =>
             session.id === result.sessionId
               ? { ...session, ...optimisticSession }
               : session)
-        : [optimisticSession, ...state.sessions],
-      activeSessionId: result.sessionId,
-    }))
+        : [optimisticSession, ...state.sessions]
+      return {
+        sessions,
+        sessionsById: buildSessionsById(sessions),
+        activeSessionId: result.sessionId,
+      }
+    })
 
     void get().fetchSessions()
     return {
@@ -148,11 +165,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSession: async (id: string) => {
     await sessionsApi.delete(id)
     useSessionRuntimeStore.getState().clearSelection(id)
-    set((s) => ({
-      sessions: s.sessions.filter((session) => session.id !== id),
-      activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
-      selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, [id]),
-    }))
+    set((s) => {
+      const sessions = s.sessions.filter((session) => session.id !== id)
+      return {
+        sessions,
+        sessionsById: buildSessionsById(sessions),
+        activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
+        selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, [id]),
+      }
+    })
   },
 
   deleteSessions: async (ids: string[]) => {
@@ -161,13 +182,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     for (const id of result.successes) {
       useSessionRuntimeStore.getState().clearSelection(id)
     }
-    set((s) => ({
-      sessions: s.sessions.filter((session) => !result.successes.includes(session.id)),
-      activeSessionId: s.activeSessionId && result.successes.includes(s.activeSessionId)
-        ? null
-        : s.activeSessionId,
-      selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, result.successes),
-    }))
+    set((s) => {
+      const sessions = s.sessions.filter((session) => !result.successes.includes(session.id))
+      return {
+        sessions,
+        sessionsById: buildSessionsById(sessions),
+        activeSessionId: s.activeSessionId && result.successes.includes(s.activeSessionId)
+          ? null
+          : s.activeSessionId,
+        selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, result.successes),
+      }
+    })
     return result
   },
 
@@ -194,19 +219,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   renameSession: async (id: string, title: string) => {
     await sessionsApi.rename(id, title)
-    set((s) => ({
-      sessions: s.sessions.map((session) =>
+    set((s) => {
+      const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
-      ),
-    }))
+      )
+      return { sessions, sessionsById: buildSessionsById(sessions) }
+    })
   },
 
   updateSessionTitle: (id, title) => {
-    set((s) => ({
-      sessions: s.sessions.map((session) =>
+    set((s) => {
+      const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
-      ),
-    }))
+      )
+      return { sessions, sessionsById: buildSessionsById(sessions) }
+    })
   },
 
   setActiveSession: (id) => set({ activeSessionId: id }),
@@ -241,3 +268,13 @@ function syncOpenSessionTabTitles(sessions: SessionListItem[]): void {
     }
   }
 }
+
+/**
+ * Selector hook: O(1) lookup of a session by ID.
+ *
+ * Prefer this over `useSessionStore((s) => s.sessions.find(...))` — the
+ * latter re-renders on any session list change and runs an O(n) scan each
+ * time. Using the Map index keeps render cost flat and stable.
+ */
+export const useSessionById = (id: string | null | undefined) =>
+  useSessionStore((s) => (id ? s.sessionsById.get(id) : undefined))
