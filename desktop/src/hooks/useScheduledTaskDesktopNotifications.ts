@@ -4,7 +4,8 @@ import { notifyDesktop } from '../lib/desktopNotifications'
 import { devWarn } from '../lib/devLog'
 import type { CronTask, TaskRun } from '../types/task'
 
-const POLL_INTERVAL_MS = 30_000
+const POLL_FAST_MS = 30_000
+const POLL_SLOW_MS = 5 * 60_000
 const NOTIFIED_RUNS_STORAGE_KEY = 'dreamcoder.notifiedDesktopTaskRuns.v1'
 const MAX_STORED_RUN_IDS = 200
 
@@ -69,13 +70,24 @@ export function useScheduledTaskDesktopNotifications(): void {
   useEffect(() => {
     let stopped = false
     let initialized = false
+    let nextDelay = POLL_FAST_MS
+    let timerId: number | null = null
 
     const poll = async () => {
       try {
-        const [{ tasks }, { runs }] = await Promise.all([
-          tasksApi.list(),
-          tasksApi.getRecentRuns(50),
-        ])
+        // First fetch the task list. If no tasks have desktop notifications
+        // enabled, skip the second request and back off to slow polling.
+        const { tasks } = await tasksApi.list()
+        if (stopped) return
+
+        const desktopEnabledTasks = tasks.filter(hasDesktopNotification)
+        if (desktopEnabledTasks.length === 0) {
+          nextDelay = POLL_SLOW_MS
+          return
+        }
+        nextDelay = POLL_FAST_MS
+
+        const { runs } = await tasksApi.getRecentRuns(50)
         if (stopped) return
 
         const notifiedRunIds = readNotifiedRunIds()
@@ -108,14 +120,21 @@ export function useScheduledTaskDesktopNotifications(): void {
       }
     }
 
-    void poll()
-    const interval = window.setInterval(() => {
-      void poll()
-    }, POLL_INTERVAL_MS)
+    const schedule = () => {
+      timerId = window.setTimeout(async () => {
+        await poll()
+        if (!stopped) schedule()
+      }, nextDelay)
+    }
+
+    // Kick off immediately, then schedule subsequent polls based on `nextDelay`.
+    void poll().then(() => {
+      if (!stopped) schedule()
+    })
 
     return () => {
       stopped = true
-      window.clearInterval(interval)
+      if (timerId !== null) window.clearTimeout(timerId)
     }
   }, [])
 }

@@ -89,6 +89,9 @@ type UIStore = {
 
 let toastCounter = 0
 
+let sidebarWidthPersistTimer: ReturnType<typeof setTimeout> | null = null
+const SIDEBAR_WIDTH_PERSIST_DEBOUNCE_MS = 300
+
 export const useUIStore = create<UIStore>((set) => ({
   theme: getStoredTheme(),
   sidebarOpen: true,
@@ -119,8 +122,15 @@ export const useUIStore = create<UIStore>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSidebarWidth: (width) => {
     const clamped = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width))
-    try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)) } catch { /* noop */ }
     set({ sidebarWidth: clamped })
+    // Debounce localStorage write: during a drag this fires ~60×/s.
+    // We only need the final value persisted; the in-memory state above
+    // already updates every frame for instant visual feedback.
+    if (sidebarWidthPersistTimer) clearTimeout(sidebarWidthPersistTimer)
+    sidebarWidthPersistTimer = setTimeout(() => {
+      try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)) } catch { /* noop */ }
+      sidebarWidthPersistTimer = null
+    }, SIDEBAR_WIDTH_PERSIST_DEBOUNCE_MS)
   },
   setActiveView: (view) => set({ activeView: view }),
   setPendingSettingsTab: (tab) => set({ pendingSettingsTab: tab }),

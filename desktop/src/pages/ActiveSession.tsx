@@ -32,7 +32,7 @@ import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
-const TASK_POLL_INTERVAL_MS = 1000
+const TASK_POLL_INTERVAL_MS = 3000
 const WORKSPACE_RESIZE_STEP = 32
 const TERMINAL_RESIZE_STEP = 24
 const CHAT_COLUMN_WITH_WORKSPACE_CLASS =
