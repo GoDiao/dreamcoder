@@ -168,9 +168,14 @@ describe('useScheduledTaskDesktopNotifications', () => {
     })
 
     render(<Harness />)
-    await vi.waitFor(() => expect(getRecentRunsMock).toHaveBeenCalledTimes(1))
+    // Batch C short-circuit: when no task has the desktop channel enabled,
+    // the hook skips the getRecentRuns call entirely and backs off to slow
+    // polling. Wait for the task list call to land, then verify the recent
+    // runs request was never issued and no desktop notification fired.
+    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(30_000)
 
+    expect(getRecentRunsMock).not.toHaveBeenCalled()
     expect(notifyDesktopMock).not.toHaveBeenCalled()
   })
 
