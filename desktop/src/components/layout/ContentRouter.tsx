@@ -9,8 +9,8 @@ import { TerminalSettings } from '../../pages/TerminalSettings'
 export function ContentRouter() {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
+  const liveTerminalIds = useTabStore((s) => s.liveTerminalIds)
   const activeTabType = tabs.find((t) => t.sessionId === activeTabId)?.type
-  const terminalTabs = tabs.filter((tab) => tab.type === 'terminal')
 
   let page: ReactNode = null
   if (!activeTabId || !activeTabType) {
@@ -30,7 +30,9 @@ export function ContentRouter() {
           {page}
         </div>
       )}
-      {terminalTabs.map((tab) => {
+      {liveTerminalIds.map((sessionId) => {
+        const tab = tabs.find((t) => t.sessionId === sessionId)
+        if (!tab || tab.type !== 'terminal') return null
         const active = tab.sessionId === activeTabId
         const visible = activeTabType === 'terminal' && active
         return (

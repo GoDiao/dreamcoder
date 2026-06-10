@@ -1272,39 +1272,56 @@ fn default_utf8_locale() -> &'static str {
 
 #[cfg(not(target_os = "windows"))]
 fn login_shell_environment(shell: &str) -> HashMap<String, String> {
-    let Ok(mut child) = StdCommand::new(shell)
-        .args(["-l", "-c", "env -0"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-    else {
-        return HashMap::new();
-    };
+    // Run the login shell on a blocking-thread-pool slot rather than spinning
+    // on `try_wait()` + `thread::sleep(25ms)` in the caller's thread. The
+    // result is cached behind OnceLock by `terminal_environment_cached`, so
+    // this only runs once per process — the win is avoiding the original
+    // up-to-2s busy-poll on whichever sync command first triggered it
+    // (typically `terminal_spawn` on the Tauri command runtime).
+    let shell = shell.to_string();
+    let handle = thread::spawn(move || {
+        let Ok(mut child) = StdCommand::new(&shell)
+            .args(["-l", "-c", "env -0"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+        else {
+            return HashMap::new();
+        };
 
-    let deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
+        // Read stdout to completion; the child exits as soon as `env -0`
+        // returns. We rely on the OS to deliver EOF instead of polling.
+        let mut stdout = Vec::with_capacity(4096);
+        if let Some(mut pipe) = child.stdout.take() {
+            let _ = pipe.read_to_end(&mut stdout);
+        }
+        // Reap the child; bound the wait so a hung login shell can't pin
+        // the worker thread forever. We give it 2s — the same budget the
+        // previous spin loop enforced.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    return if status.success() {
+                        parse_env_block(&stdout)
+                    } else {
+                        HashMap::new()
+                    };
+                }
+                Ok(None) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
                     return HashMap::new();
                 }
-                let mut stdout = Vec::new();
-                if let Some(mut pipe) = child.stdout.take() {
-                    let _ = pipe.read_to_end(&mut stdout);
-                }
-                return parse_env_block(&stdout);
+                Err(_) => return HashMap::new(),
             }
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(Duration::from_millis(25));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return HashMap::new();
-            }
-            Err(_) => return HashMap::new(),
         }
-    }
+    });
+
+    handle.join().unwrap_or_default()
 }
 
 #[cfg(target_os = "windows")]
