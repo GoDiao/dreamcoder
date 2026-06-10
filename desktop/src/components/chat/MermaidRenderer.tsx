@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
 import { Modal } from '../shared/Modal'
 import { CopyButton } from '../shared/CopyButton'
 
@@ -8,7 +7,21 @@ type Props = {
   code: string
 }
 
+type MermaidAPI = typeof import('mermaid').default
+let mermaidModule: MermaidAPI | null = null
+let mermaidLoading: Promise<MermaidAPI> | null = null
 let mermaidInitialized = false
+
+async function loadMermaid(): Promise<MermaidAPI> {
+  if (mermaidModule) return mermaidModule
+  if (!mermaidLoading) {
+    mermaidLoading = import('mermaid').then((m) => {
+      mermaidModule = m.default
+      return mermaidModule
+    })
+  }
+  return mermaidLoading
+}
 const MIN_PREVIEW_ZOOM = 0.5
 const MAX_PREVIEW_ZOOM = 3
 const PREVIEW_ZOOM_STEP = 0.25
@@ -26,9 +39,9 @@ type DragState = {
   scrollTop: number
 }
 
-function initMermaid() {
+function initMermaid(mod: MermaidAPI) {
   if (mermaidInitialized) return
-  mermaid.initialize({
+  mod.initialize({
     startOnLoad: false,
     theme: 'default',
     securityLevel: 'strict',
@@ -106,24 +119,31 @@ export function MermaidRenderer({ code }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    initMermaid()
 
-    const id = `mermaid-${++mermaidIdCounter}`
+    async function renderMermaid() {
+      const mod = await loadMermaid()
+      if (cancelled) return
+      initMermaid(mod)
 
-    mermaid.render(id, code).then(
-      ({ svg: renderedSvg }) => {
-        if (!cancelled) {
-          setSvg(renderedSvg)
-          setError(null)
-        }
-      },
-      (err) => {
-        if (!cancelled) {
-          setError(String(err?.message || err))
-          setSvg(null)
-        }
-      },
-    )
+      const id = `mermaid-${++mermaidIdCounter}`
+
+      mod.render(id, code).then(
+        ({ svg: renderedSvg }) => {
+          if (!cancelled) {
+            setSvg(renderedSvg)
+            setError(null)
+          }
+        },
+        (err) => {
+          if (!cancelled) {
+            setError(String(err?.message || err))
+            setSvg(null)
+          }
+        },
+      )
+    }
+
+    renderMermaid()
 
     return () => { cancelled = true }
   }, [code])

@@ -1,12 +1,21 @@
-import { memo, useMemo, useCallback, useDeferredValue } from 'react'
+import { memo, useMemo, useCallback, useDeferredValue, useState, useEffect } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import DOMPurify from 'dompurify'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
 import { marked, type Tokens } from 'marked'
 import { CodeViewer } from '../chat/CodeViewer'
 import { MermaidRenderer } from '../chat/MermaidRenderer'
 import { copyTextToClipboard } from '../chat/clipboard'
+
+// ─── v2 Batch A: lazy-load katex ──────────────────────────────────────
+// katex (~300KB) is only needed when math blocks are present.
+let katexModule: typeof import('katex').default | null = null
+
+async function ensureKatex(): Promise<void> {
+  if (katexModule) return
+  await import('katex/dist/katex.min.css')
+  const mod = await import('katex')
+  katexModule = mod.default
+}
 
 type Props = {
   content: string
@@ -233,8 +242,16 @@ function renderMath(block: MathBlock): string {
   const cached = mathRenderCache.get(cacheKey)
   if (cached) return cached
 
+  // v2 Batch A: katex is now lazy-loaded. If not loaded yet, return a placeholder
+  // and trigger load; subsequent renders (after `katexLoaded` state flips) will
+  // hit this path again and produce the real output.
+  if (!katexModule) {
+    void ensureKatex()
+    return DOMPurify.sanitize(`<span class="md-math-pending" data-math-tex="${encodeURIComponent(block.tex)}">${DOMPurify.sanitize(block.tex)}</span>`)
+  }
+
   try {
-    const rendered = katex.renderToString(block.tex, {
+    const rendered = katexModule.renderToString(block.tex, {
       displayMode: block.displayMode,
       output: 'html',
       throwOnError: false,
@@ -453,10 +470,30 @@ function getProseClasses(variant: 'default' | 'document' | 'compact', className?
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content, variant = 'default', className, cache = true, streaming = false, onLinkClick }: Props) {
   const deferredContent = useDeferredValue(content)
+  // v2 Batch A: state bump that flips when katex finishes loading, so math
+  // placeholders get replaced once the lib arrives.
+  const [katexReady, setKatexReady] = useState(() => katexModule !== null)
   const { html, codeBlocks, mathBlocks } = useMemo(
     () => cache ? getCachedMarkdownParse(deferredContent, streaming) : parseMarkdown(deferredContent),
     [cache, deferredContent, streaming],
   )
+
+  // Trigger katex load when the rendered content contains math, and re-render
+  // when it lands. Cheap effect: only runs when mathBlocks count changes.
+  useEffect(() => {
+    if (mathBlocks.length === 0 || katexModule !== null) return
+    let cancelled = false
+    void ensureKatex().then(() => {
+      if (!cancelled) {
+        // Bust the math render cache so previously-stubbed entries re-render.
+        mathRenderCache.clear()
+        setKatexReady(true)
+      }
+    })
+    return () => { cancelled = true }
+  }, [mathBlocks.length])
+  // Keep katexReady visible to lint/typecheck without warning (used in deps below)
+  void katexReady
   const proseClasses = useMemo(
     () => getProseClasses(variant, className),
     [variant, className],
@@ -488,7 +525,9 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
     }
 
     return result
-  }, [html, codeBlocks, mathBlocks])
+    // v2 Batch A: katexReady is intentionally in deps — when katex finishes
+    // loading, parts must re-derive so renderMath() picks up the real module.
+  }, [html, codeBlocks, mathBlocks, katexReady])
 
   const handleClick = useCallback(async (event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null

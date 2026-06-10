@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, type CSSProperties } from 'react'
 import QRCode from 'qrcode'
 import { Copy, Eye, EyeOff, PowerOff, QrCode, RotateCw } from 'lucide-react'
 import { DreamCoderIcon } from '../components/shared/DreamCoderIcon'
@@ -13,21 +13,9 @@ import type { PermissionMode, EffortLevel, ThemeMode, UpdateProxyMode, NetworkPr
 import type { Locale } from '../i18n'
 import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
-import { AdapterSettings } from './AdapterSettings'
 import { usePluginStore } from '../stores/pluginStore'
-import { PluginList } from '../components/plugins/PluginList'
-import { PluginDetail } from '../components/plugins/PluginDetail'
-import { ComputerUseSettings } from './ComputerUseSettings'
-import { H5AccessSettings } from '../components/settings/H5AccessSettings'
-import { McpSettings } from './McpSettings'
-import { TerminalSettings } from './TerminalSettings'
-import { DiagnosticsSettings } from './DiagnosticsSettings'
-import { ActivitySettings } from './ActivitySettings'
-import { MemorySettings } from './MemorySettings'
 import { useUIStore, type SettingsTab } from '../stores/uiStore'
 import { ProxyConfigForm } from '../components/settings/ProxyConfigForm'
-import { GeneralSettings } from '../components/settings/GeneralSettings'
-import { ProviderSettings } from '../components/settings/ProviderSettings'
 import { ProviderFormModal } from '../components/settings/ProviderFormModal'
 import {
   getDesktopNotificationPermission,
@@ -43,9 +31,25 @@ import {
   stripProviderSettingsJsonEnv,
 } from '../lib/providerSettingsJson'
 import { copyTextToClipboard } from '../components/chat/clipboard'
-import { AgentsSettings } from '../components/settings/AgentsSettings'
-import { SkillSettings } from '../components/settings/SkillSettings'
-import { AboutSettings } from '../components/settings/AboutSettings'
+
+// ─── v2 Batch A: lazy-load all settings tab content ────────────────────
+// Each tab is its own chunk. Opening Settings no longer eagerly pulls in
+// shiki/qrcode/mermaid/computer-use code paths that the user may never visit.
+const AdapterSettings        = lazy(() => import('./AdapterSettings').then(m => ({ default: m.AdapterSettings })))
+const PluginList             = lazy(() => import('../components/plugins/PluginList').then(m => ({ default: m.PluginList })))
+const PluginDetail           = lazy(() => import('../components/plugins/PluginDetail').then(m => ({ default: m.PluginDetail })))
+const ComputerUseSettings    = lazy(() => import('./ComputerUseSettings').then(m => ({ default: m.ComputerUseSettings })))
+const H5AccessSettings       = lazy(() => import('../components/settings/H5AccessSettings').then(m => ({ default: m.H5AccessSettings })))
+const McpSettings            = lazy(() => import('./McpSettings').then(m => ({ default: m.McpSettings })))
+const TerminalSettings       = lazy(() => import('./TerminalSettings').then(m => ({ default: m.TerminalSettings })))
+const DiagnosticsSettings    = lazy(() => import('./DiagnosticsSettings').then(m => ({ default: m.DiagnosticsSettings })))
+const ActivitySettings       = lazy(() => import('./ActivitySettings').then(m => ({ default: m.ActivitySettings })))
+const MemorySettings         = lazy(() => import('./MemorySettings').then(m => ({ default: m.MemorySettings })))
+const GeneralSettings        = lazy(() => import('../components/settings/GeneralSettings').then(m => ({ default: m.GeneralSettings })))
+const ProviderSettings       = lazy(() => import('../components/settings/ProviderSettings').then(m => ({ default: m.ProviderSettings })))
+const AgentsSettings         = lazy(() => import('../components/settings/AgentsSettings').then(m => ({ default: m.AgentsSettings })))
+const SkillSettings          = lazy(() => import('../components/settings/SkillSettings').then(m => ({ default: m.SkillSettings })))
+const AboutSettings          = lazy(() => import('../components/settings/AboutSettings').then(m => ({ default: m.AboutSettings })))
 
 const NETWORK_TIMEOUT_MIN_SECONDS = 5
 const NETWORK_TIMEOUT_MAX_SECONDS = 600
@@ -91,23 +95,34 @@ export function Settings() {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          {activeTab === 'providers' && <ProviderSettings />}
-          {activeTab === 'permissions' && <PermissionSettings />}
-          {activeTab === 'activity' && <ActivitySettings />}
-          {activeTab === 'general' && <GeneralSettings />}
-          {activeTab === 'h5Access' && <H5AccessSettings />}
-          {activeTab === 'adapters' && <AdapterSettings />}
-          {activeTab === 'terminal' && <TerminalSettings showPreferences />}
-          {activeTab === 'mcp' && <McpSettings />}
-          {activeTab === 'agents' && <AgentsSettings />}
-          {activeTab === 'skills' && <SkillSettings />}
-          {activeTab === 'memory' && <MemorySettings />}
-          {activeTab === 'plugins' && <PluginSettings />}
-          {activeTab === 'computerUse' && <ComputerUseSettings />}
-          {activeTab === 'diagnostics' && <DiagnosticsSettings />}
-          {activeTab === 'about' && <AboutSettings />}
+          <Suspense fallback={<TabFallback />}>
+            {activeTab === 'providers' && <ProviderSettings />}
+            {activeTab === 'permissions' && <PermissionSettings />}
+            {activeTab === 'activity' && <ActivitySettings />}
+            {activeTab === 'general' && <GeneralSettings />}
+            {activeTab === 'h5Access' && <H5AccessSettings />}
+            {activeTab === 'adapters' && <AdapterSettings />}
+            {activeTab === 'terminal' && <TerminalSettings showPreferences />}
+            {activeTab === 'mcp' && <McpSettings />}
+            {activeTab === 'agents' && <AgentsSettings />}
+            {activeTab === 'skills' && <SkillSettings />}
+            {activeTab === 'memory' && <MemorySettings />}
+            {activeTab === 'plugins' && <PluginSettings />}
+            {activeTab === 'computerUse' && <ComputerUseSettings />}
+            {activeTab === 'diagnostics' && <DiagnosticsSettings />}
+            {activeTab === 'about' && <AboutSettings />}
+          </Suspense>
         </div>
       </div>
+    </div>
+  )
+}
+
+function TabFallback() {
+  return (
+    <div className="flex items-center justify-center py-12 text-[var(--color-text-tertiary)]">
+      <span className="material-symbols-outlined animate-spin text-[18px] mr-2">progress_activity</span>
+      <span className="text-sm">Loading…</span>
     </div>
   )
 }
