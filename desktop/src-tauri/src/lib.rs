@@ -974,7 +974,7 @@ fn terminal_spawn(
     let output_app = app.clone();
     thread::spawn(move || {
         let mut buffer = [0_u8; 32768];
-        let mut pending_utf8 = Vec::new();
+        let mut pending_utf8 = Vec::with_capacity(256);
         loop {
             match reader.read(&mut buffer) {
                 Ok(0) => break,
@@ -1553,7 +1553,7 @@ fn resolve_app_root(_app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn select_h5_dist_dir(resource_dir: Option<&Path>, app_root: &Path) -> PathBuf {
-    let mut candidates = Vec::new();
+    let mut candidates = Vec::with_capacity(4);
     if let Some(resource_dir) = resource_dir {
         candidates.push(resource_dir.join("_up_").join("dist"));
         candidates.push(resource_dir.join("dist"));
@@ -1718,7 +1718,7 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
         server_http_url.clone()
     };
 
-    let mut children = Vec::new();
+    let mut children = Vec::with_capacity(4);
     for (label, flag) in [
         ("feishu", "--feishu"),
         ("telegram", "--telegram"),

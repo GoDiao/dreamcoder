@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { tasksApi } from '../api/tasks'
 import { notifyDesktop } from '../lib/desktopNotifications'
+import { devWarn } from '../lib/devLog'
 import type { CronTask, TaskRun } from '../types/task'
 
 const POLL_INTERVAL_MS = 30_000
@@ -102,7 +103,7 @@ export function useScheduledTaskDesktopNotifications(): void {
         writeNotifiedRunIds(notifiedRunIds)
       } catch (err) {
         if (typeof console !== 'undefined') {
-          console.warn('[scheduledTaskNotifications] failed to poll task runs:', err)
+          devWarn('[scheduledTaskNotifications] failed to poll task runs:', err)
         }
       }
     }

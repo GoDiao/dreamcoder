@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { adaptersApi } from '../api/adapters'
+import { devWarn } from '../lib/devLog'
 import type { AdapterFileConfig } from '../types/adapter'
 import type { DingtalkRegistrationBegin, DingtalkRegistrationPoll } from '../api/adapters'
 
@@ -19,7 +20,7 @@ async function notifyTauriRestartAdapters(): Promise<void> {
   } catch (err) {
     // 不阻塞保存流程 —— 配置文件已经写入，下次启动 App 也会生效
     if (typeof console !== 'undefined') {
-      console.warn('[adapterStore] restart_adapters_sidecar failed:', err)
+      devWarn('[adapterStore] restart_adapters_sidecar failed:', err)
     }
   }
 }
