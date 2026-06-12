@@ -18,7 +18,6 @@ type BranchSessionResult = Pick<BranchSessionResponse, 'sessionId' | 'title' | '
 
 type SessionStore = {
   sessions: SessionListItem[]
-  sessionsById: Map<string, SessionListItem>
   activeSessionId: string | null
   isLoading: boolean
   error: string | null
@@ -51,9 +50,24 @@ function buildSessionsById(sessions: SessionListItem[]): Map<string, SessionList
   return map
 }
 
+/**
+ * Memoized derivation of sessionsById from the sessions array.
+ * The Map is rebuilt only when the sessions reference changes, so all
+ * consumers of `useSessionById` share the same Map instance and benefit
+ * from O(1) lookups without storing two sources of truth.
+ */
+let cachedSessions: SessionListItem[] | null = null
+let cachedById: Map<string, SessionListItem> = new Map()
+function getSessionsById(sessions: SessionListItem[]): Map<string, SessionListItem> {
+  if (sessions !== cachedSessions) {
+    cachedSessions = sessions
+    cachedById = buildSessionsById(sessions)
+  }
+  return cachedById
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
-  sessionsById: new Map(),
   activeSessionId: null,
   isLoading: false,
   error: null,
@@ -66,7 +80,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const { sessions: raw } = await sessionsApi.list({ project, limit: 100 })
       let syncedSessions: SessionListItem[] = []
       set((state) => {
-        const currentById = state.sessionsById
+        const currentById = getSessionsById(state.sessions)
         // Deduplicate by session ID - keep the most recently modified entry.
         const byId = new Map<string, SessionListItem>()
         for (const s of raw) {
@@ -79,7 +93,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
         const sessions = [...byId.values()]
         syncedSessions = sessions
-        return { sessions, sessionsById: byId, isLoading: false }
+        return { sessions, isLoading: false }
       })
       syncOpenSessionTabTitles(syncedSessions)
     } catch (err) {
@@ -112,7 +126,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = [optimisticSession, ...state.sessions]
       return {
         sessions,
-        sessionsById: buildSessionsById(sessions),
         activeSessionId: id,
       }
     })
@@ -126,7 +139,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       targetMessageId,
       ...(options?.title ? { title: options.title } : {}),
     })
-    const sourceSession = get().sessionsById.get(sourceSessionId)
+    const sourceSession = getSessionsById(get().sessions).get(sourceSessionId)
     const now = new Date().toISOString()
     const optimisticSession: SessionListItem = {
       id: result.sessionId,
@@ -149,7 +162,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         : [optimisticSession, ...state.sessions]
       return {
         sessions,
-        sessionsById: buildSessionsById(sessions),
         activeSessionId: result.sessionId,
       }
     })
@@ -169,7 +181,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = s.sessions.filter((session) => session.id !== id)
       return {
         sessions,
-        sessionsById: buildSessionsById(sessions),
         activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
         selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, [id]),
       }
@@ -186,7 +197,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = s.sessions.filter((session) => !result.successes.includes(session.id))
       return {
         sessions,
-        sessionsById: buildSessionsById(sessions),
         activeSessionId: s.activeSessionId && result.successes.includes(s.activeSessionId)
           ? null
           : s.activeSessionId,
@@ -223,7 +233,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
       )
-      return { sessions, sessionsById: buildSessionsById(sessions) }
+      return { sessions }
     })
   },
 
@@ -232,7 +242,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
       )
-      return { sessions, sessionsById: buildSessionsById(sessions) }
+      return { sessions }
     })
   },
 
@@ -274,7 +284,8 @@ function syncOpenSessionTabTitles(sessions: SessionListItem[]): void {
  *
  * Prefer this over `useSessionStore((s) => s.sessions.find(...))` — the
  * latter re-renders on any session list change and runs an O(n) scan each
- * time. Using the Map index keeps render cost flat and stable.
+ * time. The Map index is memoized via `getSessionsById`, so consumers share
+ * the same instance and only rebuild when the sessions reference changes.
  */
 export const useSessionById = (id: string | null | undefined) =>
-  useSessionStore((s) => (id ? s.sessionsById.get(id) : undefined))
+  useSessionStore((s) => (id ? getSessionsById(s.sessions).get(id) : undefined))
