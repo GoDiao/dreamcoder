@@ -8,7 +8,7 @@ import { Button } from '../shared/Button'
 import { Dropdown } from '../shared/Dropdown'
 import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, MAX_LIVE_TERMINALS_OPTIONS } from '../../stores/uiStore'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
 import { ProxyConfigForm } from './ProxyConfigForm'
@@ -86,6 +86,8 @@ export function GeneralSettings() {
   const [isUiZoomDragging, setIsUiZoomDragging] = useState(false)
   const isUiZoomDraggingRef = useRef(false)
   const addToast = useUIStore((s) => s.addToast)
+  const maxLiveTerminals = useUIStore((s) => s.maxLiveTerminals)
+  const setMaxLiveTerminals = useUIStore((s) => s.setMaxLiveTerminals)
   const webSearchDirty = JSON.stringify(webSearchDraft) !== JSON.stringify(webSearch)
   const uiZoomPercent = Math.round(uiZoomDraft * 100)
   const uiZoomRangeProgress = `${Math.round(((uiZoomDraft - UI_ZOOM_MIN) / (UI_ZOOM_MAX - UI_ZOOM_MIN)) * 1000) / 10}%`
@@ -579,6 +581,26 @@ export function GeneralSettings() {
             </div>
           </div>
         </label>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">Max Live Terminals</h2>
+        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">Maximum number of concurrent terminal tabs kept alive. Extra terminals are evicted (LRU). Set to unlimited (0) to disable eviction.</p>
+        <div className="flex gap-2">
+          {([3, 5, 10, 0] as const).map((value) => (
+              <button
+                key={value}
+                onClick={() => setMaxLiveTerminals(value)}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                  maxLiveTerminals === value
+                    ? 'bg-[var(--color-brand)] text-white border-[var(--color-brand)]'
+                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                }`}
+              >
+                {value === 0 ? 'Unlimited' : value}
+              </button>
+          ))}
+        </div>
       </div>
 
       <div className="mt-8">

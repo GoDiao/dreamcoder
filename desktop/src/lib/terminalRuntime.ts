@@ -85,6 +85,11 @@ export function attachTerminalRuntime(runtime: TerminalRuntime, host: HTMLElemen
   runtime.fit?.fit()
 }
 
+export function isTerminalProcessActive(id: string): boolean {
+  const runtime = runtimes.get(id)
+  return runtime?.status === 'running' || runtime?.status === 'starting'
+}
+
 export function destroyTerminalRuntime(id: string) {
   const runtime = runtimes.get(id)
   if (!runtime) return
