@@ -9,12 +9,26 @@ import { copyTextToClipboard } from '../chat/clipboard'
 // ─── v2 Batch A: lazy-load katex ──────────────────────────────────────
 // katex (~300KB) is only needed when math blocks are present.
 let katexModule: typeof import('katex').default | null = null
+let katexLoading: Promise<void> | null = null
+let katexLoadError: Error | null = null
 
 async function ensureKatex(): Promise<void> {
   if (katexModule) return
-  await import('katex/dist/katex.min.css')
-  const mod = await import('katex')
-  katexModule = mod.default
+  if (katexLoadError) throw katexLoadError
+  if (katexLoading) return katexLoading
+  katexLoading = (async () => {
+    try {
+      await import('katex/dist/katex.min.css')
+      const mod = await import('katex')
+      katexModule = mod.default
+    } catch (err) {
+      katexLoadError = err instanceof Error ? err : new Error(String(err))
+      throw katexLoadError
+    } finally {
+      katexLoading = null
+    }
+  })()
+  return katexLoading
 }
 
 type Props = {
@@ -244,9 +258,15 @@ function renderMath(block: MathBlock): string {
 
   // v2 Batch A: katex is now lazy-loaded. If not loaded yet, return a placeholder
   // and trigger load; subsequent renders (after `katexLoaded` state flips) will
-  // hit this path again and produce the real output.
+  // hit this path again and produce the real output. If load failed previously,
+  // surface the error inline rather than spinning forever.
   if (!katexModule) {
-    void ensureKatex()
+    if (katexLoadError) {
+      return DOMPurify.sanitize(
+        `<span class="md-math-error" title="${DOMPurify.sanitize(katexLoadError.message)}">[math: failed to load KaTeX] ${DOMPurify.sanitize(block.tex)}</span>`,
+      )
+    }
+    void ensureKatex().catch(() => {/* surfaced via katexLoadError on next render */})
     return DOMPurify.sanitize(`<span class="md-math-pending" data-math-tex="${encodeURIComponent(block.tex)}">${DOMPurify.sanitize(block.tex)}</span>`)
   }
 
@@ -483,13 +503,22 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
   useEffect(() => {
     if (mathBlocks.length === 0 || katexModule !== null) return
     let cancelled = false
-    void ensureKatex().then(() => {
-      if (!cancelled) {
-        // Bust the math render cache so previously-stubbed entries re-render.
-        mathRenderCache.clear()
-        setKatexReady(true)
-      }
-    })
+    ensureKatex()
+      .then(() => {
+        if (!cancelled) {
+          // Bust the math render cache so previously-stubbed entries re-render.
+          mathRenderCache.clear()
+          setKatexReady(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // Flip katexReady so the renderer re-runs and surfaces the error
+          // placeholder produced by renderMath() (which now checks katexLoadError).
+          mathRenderCache.clear()
+          setKatexReady((prev) => !prev)
+        }
+      })
     return () => { cancelled = true }
   }, [mathBlocks.length])
   // Keep katexReady visible to lint/typecheck without warning (used in deps below)

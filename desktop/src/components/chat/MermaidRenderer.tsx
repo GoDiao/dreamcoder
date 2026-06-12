@@ -14,12 +14,14 @@ let mermaidInitialized = false
 
 async function loadMermaid(): Promise<MermaidAPI> {
   if (mermaidModule) return mermaidModule
-  if (!mermaidLoading) {
-    mermaidLoading = import('mermaid').then((m) => {
-      mermaidModule = m.default
-      return mermaidModule
-    })
-  }
+  if (mermaidLoading) return mermaidLoading
+  mermaidLoading = import('mermaid').then((m) => {
+    mermaidModule = m.default
+    return mermaidModule
+  }).catch((err) => {
+    mermaidLoading = null
+    throw err
+  })
   return mermaidLoading
 }
 const MIN_PREVIEW_ZOOM = 0.5
@@ -121,7 +123,18 @@ export function MermaidRenderer({ code }: Props) {
     let cancelled = false
 
     async function renderMermaid() {
-      const mod = await loadMermaid()
+      let mod: MermaidAPI
+      try {
+        mod = await loadMermaid()
+      } catch (loadErr) {
+        if (!cancelled) {
+          setError(
+            `Failed to load Mermaid renderer: ${String((loadErr as Error)?.message || loadErr)}`,
+          )
+          setSvg(null)
+        }
+        return
+      }
       if (cancelled) return
       initMermaid(mod)
 
