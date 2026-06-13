@@ -5,6 +5,10 @@ All notable changes to DreamCoder will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Phase 3 — H5 Remote Access landed**: access desktop sessions from a phone or browser over LAN. Includes the H5 access toggle with token rotation, QR-code pairing, mobile chat UI, WebSocket remote bridge, and a strict CORS / loopback-vs-token request classifier (`src/server/h5AccessPolicy.ts`).
+- Direct-connect session manager and headless connect entrypoint (`src/server/createDirectConnectSession.ts`, `connectHeadless.ts`).
+- Static H5 asset serving with long-lived cache for `/assets/*` (`src/server/staticH5.ts`).
+- H5 Access settings tab is now visible by default in Settings.
 - Performance optimization: bundle splitting (manualChunks), lazy-loaded Settings page, dynamic KaTeX/Mermaid imports.
 - Performance optimization: sessionsById Map index for O(1) session lookups.
 - Performance optimization: throttle/debounce on noisy polling loops.

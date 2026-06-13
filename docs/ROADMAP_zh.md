@@ -32,15 +32,16 @@
 - [x] 定时任务轮询失败 Toast 提示
 - [x] 可配置终端数量上限
 
-## Phase 3 — H5 远程访问
+## Phase 3 — H5 远程访问 ✅
 
 将桌面端能力通过局域网或反向代理暴露到手机浏览器。
 
-- [ ] H5 访问开关与 Token 管理
-- [ ] 手机端聊天 UI 适配
-- [ ] WebSocket 远程桥接
-- [ ] CORS 安全策略
-- [ ] 反向代理部署指南
+- [x] H5 访问开关与 Token 管理
+- [x] 手机端聊天 UI 适配
+- [x] WebSocket 远程桥接
+- [x] CORS 安全策略
+- [x] LAN 直连 + 二维码配对
+- [ ] 反向代理部署指南（仍在编写）
 
 参考: [Issue #3](https://github.com/GoDiao/dreamcoder/issues/3)
 

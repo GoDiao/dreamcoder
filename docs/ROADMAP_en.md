@@ -32,15 +32,16 @@
 - [x] Scheduled task poll failure toast
 - [x] Configurable max terminal count
 
-## Phase 3 — H5 Remote Access
+## Phase 3 — H5 Remote Access ✅
 
 Expose desktop capabilities to mobile browsers via LAN or reverse proxy.
 
-- [ ] H5 access toggle & token management
-- [ ] Mobile chat UI adaptation
-- [ ] WebSocket remote bridge
-- [ ] CORS security policy
-- [ ] Reverse proxy deployment guide
+- [x] H5 access toggle & token management
+- [x] Mobile chat UI adaptation
+- [x] WebSocket remote bridge
+- [x] CORS security policy
+- [x] LAN direct-connect + QR pairing
+- [ ] Reverse proxy deployment guide (in progress)
 
 See: [Issue #3](https://github.com/GoDiao/dreamcoder/issues/3)
 
