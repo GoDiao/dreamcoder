@@ -1,6 +1,7 @@
 # Reference repos (not part of project)
 _reference/
 docs/superpowers/
+docs/activity_rule.md
 
 .env
 .env.*
