@@ -15,6 +15,7 @@ const memberSessionId = (agentId: string) => `team-member:${agentId}`
 /** Module-level timer for polling member transcript */
 let memberPollTimer: ReturnType<typeof setInterval> | null = null
 let polledMemberSessionId: string | null = null
+let memberPollInFlight = false
 
 function createMemberSessionState() {
   return {
@@ -33,7 +34,6 @@ function createMemberSessionState() {
     statusVerb: '',
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
   }
 }
 
@@ -138,6 +138,17 @@ type TeamStore = {
   handleTeamDeleted: (teamName: string) => void
 }
 
+async function retryWithBackoff<T>(fn: () => Promise<T>, tries = 3, base = 1000): Promise<T> {
+  for (let i = 0; i < tries; i++) {
+    try { return await fn() }
+    catch (e) {
+      if (i === tries - 1) throw e
+      await new Promise(r => setTimeout(r, base * Math.pow(2, i)))
+    }
+  }
+  throw new Error('unreachable')
+}
+
 export const useTeamStore = create<TeamStore>((set, get) => ({
   teams: [],
   activeTeam: null,
@@ -187,9 +198,15 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   },
 
   refreshMemberSession: async (sessionId) => {
+    if (memberPollInFlight) return
+    memberPollInFlight = true
+
     const team = get().activeTeam
     const member = get().getMemberBySessionId(sessionId)
-    if (!team || !member) return
+    if (!team || !member) {
+      memberPollInFlight = false
+      return
+    }
 
     try {
       const { messages } = await teamsApi.getMemberTranscript(team.name, member.agentId)
@@ -214,6 +231,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     } catch {
       const existingMessages = useChatStore.getState().sessions[sessionId]?.messages ?? []
       syncMemberSessionMessages(sessionId, member.status, existingMessages)
+    } finally {
+      memberPollInFlight = false
     }
   },
 
@@ -286,10 +305,13 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     set((s) => ({
       teams: [...s.teams, { name: teamName, memberCount: 0 }],
     }))
-    get().fetchTeamDetail(teamName)
-    setTimeout(() => get().fetchTeamDetail(teamName), 1500)
-    setTimeout(() => get().fetchTeamDetail(teamName), 4000)
-    setTimeout(() => get().fetchTeamDetail(teamName), 8000)
+    // Exponential backoff (1s, 2s, 4s) instead of 4 fire-and-forget setTimeouts.
+    // The original called fetchTeamDetail eagerly + 1.5s / 4s / 8s — 4 requests
+    // regardless of whether the team was already populated. Backoff stops as
+    // soon as the first call succeeds.
+    void retryWithBackoff(() => get().fetchTeamDetail(teamName)).catch(() => {
+      /* fetchTeamDetail already records the error via set({ error }) */
+    })
   },
 
   handleTeamUpdate: (teamName: string, members: TeamMemberStatus[]) => {

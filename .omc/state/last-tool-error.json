@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls \\\"E:/AProject/TianX/Personal/dreamfield/src/server/\\\" 2>/dev/null && echo \\\"---\\\" && ls \\\"E:/AProject/TianX/Personal/dreamfield/src/coordinator/\\\" 2>/dev/null && echo \\\"---\\\" && ls \\\"E:...",
-  "error": "Exit code 2\n__tests__\napi\nbackends\nconfig\nconnectHeadless.ts\ncreateDirectConnectSession.ts\ndirectConnectManager.ts\nh5AccessPolicy.ts\nindex.ts\nlockfile.ts\nmiddleware\nparseConnectUrl.ts\nproxy\nrouter.ts\nserver.ts\nserverBanner.ts\nserverLog.ts\nservices\nsessionManager.ts\nstaticH5.ts\ntypes\ntypes.ts\nws\n---",
-  "timestamp": "2026-05-26T18:04:50.714Z",
-  "retry_count": 1
-}

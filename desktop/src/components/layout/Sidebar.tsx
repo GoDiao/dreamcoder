@@ -129,10 +129,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const showInitialLoading = isLoading && sessions.length === 0
   const filteredSessionIds = useMemo(() => filteredSessions.map((session) => session.id), [filteredSessions])
   const selectedCount = selectedSessionIds.size
-  const sessionsById = useMemo(
-    () => new Map(sessions.map((session) => [session.id, session])),
-    [sessions],
-  )
   const runningSessionIds = useMemo(() => {
     const ids = new Set<string>()
     for (const tab of tabs) {
@@ -145,9 +141,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [chatSessions, tabs])
   const pendingBatchDeleteSessions = useMemo(
     () => (pendingBatchDeleteSessionIds ?? [])
-      .map((sessionId) => sessionsById.get(sessionId))
+      .map((sessionId) => sessions.find((s) => s.id === sessionId))
       .filter((session): session is SessionListItem => Boolean(session)),
-    [pendingBatchDeleteSessionIds, sessionsById],
+    [pendingBatchDeleteSessionIds, sessions],
   )
   const expanded = isMobile ? true : sidebarOpen
   const closeMobileDrawer = useCallback(() => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { useScheduledTaskDesktopNotifications } from './useScheduledTaskDesktopNotifications'
+import { useUIStore } from '../stores/uiStore'
 
 const { listMock, getRecentRunsMock, notifyDesktopMock } = vi.hoisted(() => ({
   listMock: vi.fn(),
@@ -168,9 +169,14 @@ describe('useScheduledTaskDesktopNotifications', () => {
     })
 
     render(<Harness />)
-    await vi.waitFor(() => expect(getRecentRunsMock).toHaveBeenCalledTimes(1))
+    // Batch C short-circuit: when no task has the desktop channel enabled,
+    // the hook skips the getRecentRuns call entirely and backs off to slow
+    // polling. Wait for the task list call to land, then verify the recent
+    // runs request was never issued and no desktop notification fired.
+    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(30_000)
 
+    expect(getRecentRunsMock).not.toHaveBeenCalled()
     expect(notifyDesktopMock).not.toHaveBeenCalled()
   })
 
@@ -211,5 +217,41 @@ describe('useScheduledTaskDesktopNotifications', () => {
 
     await vi.advanceTimersByTimeAsync(30_000)
     await vi.waitFor(() => expect(notifyDesktopMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a toast warning after consecutive poll failures', async () => {
+    // Three consecutive failures should surface a single toast.
+    listMock.mockRejectedValue(new Error('network down'))
+
+    // Replace addToast with a spy. Restore after the test so we don't
+    // leak between cases.
+    const originalAddToast = useUIStore.getState().addToast
+    const addToastSpy = vi.fn()
+    useUIStore.setState({ addToast: addToastSpy })
+
+    try {
+      render(<Harness />)
+      await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1))
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(2))
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(3))
+
+      expect(addToastSpy).toHaveBeenCalledTimes(1)
+      expect(addToastSpy).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'warning',
+        message: expect.stringContaining('轮询失败'),
+      }))
+
+      // Subsequent failures should NOT pile on additional toasts.
+      addToastSpy.mockClear()
+      await vi.advanceTimersByTimeAsync(30_000)
+      await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(4))
+      expect(addToastSpy).not.toHaveBeenCalled()
+    } finally {
+      useUIStore.setState({ addToast: originalAddToast })
+    }
   })
 })

@@ -33,6 +33,7 @@ import {
 } from './composerUtils'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { devWarn } from '../../lib/devLog'
 import {
   filesToComposerAttachments,
   selectNativeFileAttachments,
@@ -766,7 +767,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
         setComposerAttachments((prev) => [...prev, ...nextAttachments])
       })
       .catch((error) => {
-        console.warn('[attachments] Failed to read selected files', error)
+        devWarn('[attachments] Failed to read selected files', error)
       })
   }, [setComposerAttachments])
 
@@ -780,7 +781,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     panelRef,
     onAttachments: appendAttachments,
     onError: (error) => {
-      console.warn('[attachments] Failed to read dropped files', error)
+      devWarn('[attachments] Failed to read dropped files', error)
     },
   })
 

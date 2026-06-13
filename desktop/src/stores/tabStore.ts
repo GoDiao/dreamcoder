@@ -1,13 +1,18 @@
 import { create } from 'zustand'
 import { sessionsApi } from '../api/sessions'
 import { dropSession as dropVirtualHeightSession } from '../components/chat/virtualHeightCache'
-import { destroyTerminalRuntime } from '../lib/terminalRuntime'
+import { destroyTerminalRuntime, getTerminalRuntime, isTerminalProcessActive } from '../lib/terminalRuntime'
+import { useUIStore, MAX_LIVE_TERMINALS_DEFAULT } from './uiStore'
 
 const TAB_STORAGE_KEY = 'dreamcoder-open-tabs'
 
 export const SETTINGS_TAB_ID = '__settings__'
 export const SCHEDULED_TAB_ID = '__scheduled__'
 export const TERMINAL_TAB_PREFIX = '__terminal__'
+
+function getMaxLiveTerminals(): number {
+  return useUIStore.getState().maxLiveTerminals || MAX_LIVE_TERMINALS_DEFAULT
+}
 
 export type TabType = 'session' | 'settings' | 'scheduled' | 'terminal'
 
@@ -28,6 +33,7 @@ type TabPersistence = {
 type TabStore = {
   tabs: Tab[]
   activeTabId: string | null
+  liveTerminalIds: string[]
 
   openTab: (sessionId: string, title: string, type?: TabType) => void
   openTerminalTab: (cwd?: string, terminalRuntimeId?: string) => string
@@ -37,6 +43,10 @@ type TabStore = {
   updateTabStatus: (sessionId: string, status: Tab['status']) => void
   replaceTabSession: (oldSessionId: string, newSessionId: string) => void
   moveTab: (fromIndex: number, toIndex: number) => void
+  /** Promote a terminal to most-recently-used and evict LRU if over the cap. */
+  touchTerminal: (sessionId: string) => void
+  /** True iff this terminal currently has a live xterm runtime. */
+  isTerminalLive: (sessionId: string) => boolean
 
   saveTabs: () => void
   restoreTabs: () => Promise<void>
@@ -45,6 +55,7 @@ type TabStore = {
 export const useTabStore = create<TabStore>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  liveTerminalIds: [],
 
   openTab: (sessionId, title, type = 'session') => {
     const { tabs } = get()
@@ -87,12 +98,13 @@ export const useTabStore = create<TabStore>((set, get) => ({
       tabs: [...tabs, { sessionId, title: `Terminal ${nextIndex}`, type: 'terminal', status: 'idle', terminalCwd: cwd, terminalRuntimeId }],
       activeTabId: sessionId,
     })
+    get().touchTerminal(sessionId)
     get().saveTabs()
     return sessionId
   },
 
   closeTab: (sessionId) => {
-    const { tabs, activeTabId } = get()
+    const { tabs, activeTabId, liveTerminalIds } = get()
     const index = tabs.findIndex((t) => t.sessionId === sessionId)
     if (index < 0) return
 
@@ -109,7 +121,11 @@ export const useTabStore = create<TabStore>((set, get) => ({
       }
     }
 
-    set({ tabs: newTabs, activeTabId: newActiveId })
+    set({
+      tabs: newTabs,
+      activeTabId: newActiveId,
+      liveTerminalIds: liveTerminalIds.filter((id) => id !== sessionId),
+    })
     get().saveTabs()
     const closedTab = tabs[index]
     if (closedTab?.type === 'terminal') {
@@ -120,8 +136,67 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
   setActiveTab: (sessionId) => {
     set({ activeTabId: sessionId })
+    // If we're switching to a terminal tab, promote it in the LRU. This must
+    // run BEFORE the next render so ContentRouter sees it in liveTerminalIds.
+    const tab = get().tabs.find((t) => t.sessionId === sessionId)
+    if (tab?.type === 'terminal') {
+      get().touchTerminal(sessionId)
+    }
     get().saveTabs()
   },
+
+  touchTerminal: (sessionId) => {
+    const { tabs, liveTerminalIds } = get()
+    const tab = tabs.find((t) => t.sessionId === sessionId)
+    if (!tab || tab.type !== 'terminal') return
+
+    // Already at the tail of the LRU — nothing to do.
+    if (liveTerminalIds[liveTerminalIds.length - 1] === sessionId) return
+
+    const cap = getMaxLiveTerminals()
+    const without = liveTerminalIds.filter((id) => id !== sessionId)
+    const next = [...without, sessionId]
+    let evicted: string | null = null
+    if (next.length > cap) {
+      // Find the least-recently-used terminal that does NOT have an active
+      // process. We skip evicting terminals that are currently running so
+      // long-running commands aren't silently killed.
+      let evictCandidates = [...next] // copy
+      let foundActive = false
+      for (let i = 0; i < evictCandidates.length - 1; i++) {
+        const candidate = evictCandidates[i]!
+        const runtimeId = tabs.find((t) => t.sessionId === candidate)?.terminalRuntimeId ?? candidate
+        if (isTerminalProcessActive(runtimeId)) {
+          foundActive = true
+          // Rotate active terminals to the tail so they survive eviction.
+          evictCandidates = [...evictCandidates.filter((id) => id !== candidate), candidate]
+          i-- // re-check this index after splice
+        }
+      }
+      // Now evict the head if still over cap
+      while (evictCandidates.length > cap) {
+        const head = evictCandidates.shift()
+        if (head) {
+          evicted = head
+        }
+      }
+      // Preserve the original sort for non-evicted entries, but append
+      // active terminals that were rotated.
+      const surviving = next.filter((id) => id !== evicted)
+      next.length = 0
+      next.push(
+        ...evictCandidates.filter((id) => surviving.includes(id)),
+        ...evictCandidates.filter((id) => !surviving.includes(id)),
+      )
+    }
+    set({ liveTerminalIds: next })
+    if (evicted) {
+      const evictedTab = tabs.find((t) => t.sessionId === evicted)
+      destroyTerminalRuntime(evictedTab?.terminalRuntimeId ?? evicted)
+    }
+  },
+
+  isTerminalLive: (sessionId) => get().liveTerminalIds.includes(sessionId),
 
   updateTabTitle: (sessionId, title) => {
     set((s) => ({

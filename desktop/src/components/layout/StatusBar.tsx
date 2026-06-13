@@ -1,5 +1,5 @@
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useSessionStore } from '../../stores/sessionStore'
+import { useSessionById } from '../../stores/sessionStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useTabStore } from '../../stores/tabStore'
 
@@ -9,7 +9,7 @@ export function StatusBar() {
   const runtimeSelection = useSessionRuntimeStore((s) =>
     activeTabId ? s.selections[activeTabId] : undefined,
   )
-  const projectPath = useSessionStore((s) => s.sessions.find((session) => session.id === activeTabId)?.projectPath)
+  const projectPath = useSessionById(activeTabId)?.projectPath
 
   const projectName = projectPath
     ? projectPath.split('-').filter(Boolean).pop() || ''

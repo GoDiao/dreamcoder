@@ -28,17 +28,35 @@ describe('uiStore theme handling', () => {
     expect(document.documentElement.style.colorScheme).toBe('light')
   })
 
-  it('cycles through pure white, warm classic, and dark themes', async () => {
+  it('cycles through all theme modes', async () => {
     const { useUIStore } = await import('./uiStore')
 
+    // white → light
     useUIStore.getState().toggleTheme()
     expect(useUIStore.getState().theme).toBe('light')
     expect(document.documentElement.style.colorScheme).toBe('light')
 
+    // light → dark
     useUIStore.getState().toggleTheme()
     expect(useUIStore.getState().theme).toBe('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
 
+    // dark → dreamfield
+    useUIStore.getState().toggleTheme()
+    expect(useUIStore.getState().theme).toBe('dreamfield')
+    expect(document.documentElement.style.colorScheme).toBe('light')
+
+    // dreamfield → amber
+    useUIStore.getState().toggleTheme()
+    expect(useUIStore.getState().theme).toBe('amber')
+    expect(document.documentElement.style.colorScheme).toBe('light')
+
+    // amber → midnight (midnight is a dark color scheme)
+    useUIStore.getState().toggleTheme()
+    expect(useUIStore.getState().theme).toBe('midnight')
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+
+    // midnight → white (wraps)
     useUIStore.getState().toggleTheme()
     expect(useUIStore.getState().theme).toBe('white')
     expect(document.documentElement.style.colorScheme).toBe('light')

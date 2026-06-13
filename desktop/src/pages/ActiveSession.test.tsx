@@ -136,7 +136,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -204,7 +203,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -270,7 +268,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -344,7 +341,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -406,7 +402,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -467,7 +462,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -476,8 +470,11 @@ describe('ActiveSession task polling', () => {
 
     expect(fetchSessionTasks).toHaveBeenCalledWith(sessionId)
 
+    // TASK_POLL_INTERVAL_MS is 3000 (throttled in Batch C). Advance through
+    // three ticks to exercise repeated polling without coupling the assertion
+    // to a single-cadence value.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2200)
+      await vi.advanceTimersByTimeAsync(8900)
     })
 
     expect(
@@ -546,7 +543,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -601,7 +597,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -671,7 +666,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -726,7 +720,6 @@ describe('ActiveSession task polling', () => {
             statusVerb: '',
             slashCommands: [],
             agentTaskNotifications: {},
-            elapsedTimer: null,
           },
         },
       })
@@ -779,7 +772,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -838,7 +830,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -945,7 +936,6 @@ describe('ActiveSession task polling', () => {
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

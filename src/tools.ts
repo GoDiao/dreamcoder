@@ -1,16 +1,47 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { toolMatchesName, type Tool, type Tools } from './Tool.js'
-import { AgentTool } from './tools/AgentTool/AgentTool.js'
-import { SkillTool } from './tools/SkillTool/SkillTool.js'
-import { BashTool } from './tools/BashTool/BashTool.js'
-import { FileEditTool } from './tools/FileEditTool/FileEditTool.js'
-import { FileReadTool } from './tools/FileReadTool/FileReadTool.js'
-import { FileWriteTool } from './tools/FileWriteTool/FileWriteTool.js'
-import { GlobTool } from './tools/GlobTool/GlobTool.js'
-import { NotebookEditTool } from './tools/NotebookEditTool/NotebookEditTool.js'
-import { WebFetchTool } from './tools/WebFetchTool/WebFetchTool.js'
-import { TaskStopTool } from './tools/TaskStopTool/TaskStopTool.js'
-import { BriefTool } from './tools/BriefTool/BriefTool.js'
+
+// Lazy-loaded tool modules - loaded on first use to reduce cold start time
+let _AgentTool: typeof import('./tools/AgentTool/AgentTool.js').AgentTool | null = null
+let _SkillTool: typeof import('./tools/SkillTool/SkillTool.js').SkillTool | null = null
+let _BashTool: typeof import('./tools/BashTool/BashTool.js').BashTool | null = null
+let _FileEditTool: typeof import('./tools/FileEditTool/FileEditTool.js').FileEditTool | null = null
+let _FileReadTool: typeof import('./tools/FileReadTool/FileReadTool.js').FileReadTool | null = null
+let _FileWriteTool: typeof import('./tools/FileWriteTool/FileWriteTool.js').FileWriteTool | null = null
+let _GlobTool: typeof import('./tools/GlobTool/GlobTool.js').GlobTool | null = null
+let _NotebookEditTool: typeof import('./tools/NotebookEditTool/NotebookEditTool.js').NotebookEditTool | null = null
+let _WebFetchTool: typeof import('./tools/WebFetchTool/WebFetchTool.js').WebFetchTool | null = null
+let _TaskStopTool: typeof import('./tools/TaskStopTool/TaskStopTool.js').TaskStopTool | null = null
+let _BriefTool: typeof import('./tools/BriefTool/BriefTool.js').BriefTool | null = null
+
+function lazyLoadTools() {
+  if (!_AgentTool) {
+    _AgentTool = require('./tools/AgentTool/AgentTool.js').AgentTool
+    _SkillTool = require('./tools/SkillTool/SkillTool.js').SkillTool
+    _BashTool = require('./tools/BashTool/BashTool.js').BashTool
+    _FileEditTool = require('./tools/FileEditTool/FileEditTool.js').FileEditTool
+    _FileReadTool = require('./tools/FileReadTool/FileReadTool.js').FileReadTool
+    _FileWriteTool = require('./tools/FileWriteTool/FileWriteTool.js').FileWriteTool
+    _GlobTool = require('./tools/GlobTool/GlobTool.js').GlobTool
+    _NotebookEditTool = require('./tools/NotebookEditTool/NotebookEditTool.js').NotebookEditTool
+    _WebFetchTool = require('./tools/WebFetchTool/WebFetchTool.js').WebFetchTool
+    _TaskStopTool = require('./tools/TaskStopTool/TaskStopTool.js').TaskStopTool
+    _BriefTool = require('./tools/BriefTool/BriefTool.js').BriefTool
+  }
+}
+
+// Getter functions for lazy-loaded tools
+const getAgentTool = () => { lazyLoadTools(); return _AgentTool! }
+const getSkillTool = () => { lazyLoadTools(); return _SkillTool! }
+const getBashTool = () => { lazyLoadTools(); return _BashTool! }
+const getFileEditTool = () => { lazyLoadTools(); return _FileEditTool! }
+const getFileReadTool = () => { lazyLoadTools(); return _FileReadTool! }
+const getFileWriteTool = () => { lazyLoadTools(); return _FileWriteTool! }
+const getGlobTool = () => { lazyLoadTools(); return _GlobTool! }
+const getNotebookEditTool = () => { lazyLoadTools(); return _NotebookEditTool! }
+const getWebFetchTool = () => { lazyLoadTools(); return _WebFetchTool! }
+const getTaskStopTool = () => { lazyLoadTools(); return _TaskStopTool! }
+const getBriefTool = () => { lazyLoadTools(); return _BriefTool! }
 // Dead code elimination: conditional import for ant-only tools
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 const REPLTool =
@@ -52,13 +83,35 @@ const SubscribePRTool = feature('KAIROS_GITHUB_WEBHOOKS')
   ? require('./tools/SubscribePRTool/SubscribePRTool.js').SubscribePRTool
   : null
 /* eslint-enable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
-import { TaskOutputTool } from './tools/TaskOutputTool/TaskOutputTool.js'
-import { WebSearchTool } from './tools/WebSearchTool/WebSearchTool.js'
-import { TodoWriteTool } from './tools/TodoWriteTool/TodoWriteTool.js'
-import { ExitPlanModeV2Tool } from './tools/ExitPlanModeTool/ExitPlanModeV2Tool.js'
-import { TestingPermissionTool } from './tools/testing/TestingPermissionTool.js'
-import { GrepTool } from './tools/GrepTool/GrepTool.js'
-import { TungstenTool } from './tools/TungstenTool/TungstenTool.js'
+
+// Lazy-loaded tool modules (continued)
+let _TaskOutputTool: typeof import('./tools/TaskOutputTool/TaskOutputTool.js').TaskOutputTool | null = null
+let _WebSearchTool: typeof import('./tools/WebSearchTool/WebSearchTool.js').WebSearchTool | null = null
+let _TodoWriteTool: typeof import('./tools/TodoWriteTool/TodoWriteTool.js').TodoWriteTool | null = null
+let _ExitPlanModeV2Tool: typeof import('./tools/ExitPlanModeTool/ExitPlanModeV2Tool.js').ExitPlanModeV2Tool | null = null
+let _TestingPermissionTool: typeof import('./tools/testing/TestingPermissionTool.js').TestingPermissionTool | null = null
+let _GrepTool: typeof import('./tools/GrepTool/GrepTool.js').GrepTool | null = null
+let _TungstenTool: typeof import('./tools/TungstenTool/TungstenTool.js').TungstenTool | null = null
+
+function lazyLoadMoreTools() {
+  if (!_TaskOutputTool) {
+    _TaskOutputTool = require('./tools/TaskOutputTool/TaskOutputTool.js').TaskOutputTool
+    _WebSearchTool = require('./tools/WebSearchTool/WebSearchTool.js').WebSearchTool
+    _TodoWriteTool = require('./tools/TodoWriteTool/TodoWriteTool.js').TodoWriteTool
+    _ExitPlanModeV2Tool = require('./tools/ExitPlanModeTool/ExitPlanModeV2Tool.js').ExitPlanModeV2Tool
+    _TestingPermissionTool = require('./tools/testing/TestingPermissionTool.js').TestingPermissionTool
+    _GrepTool = require('./tools/GrepTool/GrepTool.js').GrepTool
+    _TungstenTool = require('./tools/TungstenTool/TungstenTool.js').TungstenTool
+  }
+}
+
+const getTaskOutputTool = () => { lazyLoadMoreTools(); return _TaskOutputTool! }
+const getWebSearchTool = () => { lazyLoadMoreTools(); return _WebSearchTool! }
+const getTodoWriteTool = () => { lazyLoadMoreTools(); return _TodoWriteTool! }
+const getExitPlanModeV2Tool = () => { lazyLoadMoreTools(); return _ExitPlanModeV2Tool! }
+const getTestingPermissionTool = () => { lazyLoadMoreTools(); return _TestingPermissionTool! }
+const getGrepTool = () => { lazyLoadMoreTools(); return _GrepTool! }
+const getTungstenTool = () => { lazyLoadMoreTools(); return _TungstenTool! }
 // Lazy require to break circular dependency: tools.ts -> TeamCreateTool/TeamDeleteTool -> ... -> tools.ts
 /* eslint-disable @typescript-eslint/no-require-imports */
 const getTeamCreateTool = () =>
@@ -71,19 +124,54 @@ const getSendMessageTool = () =>
   require('./tools/SendMessageTool/SendMessageTool.js')
     .SendMessageTool as typeof import('./tools/SendMessageTool/SendMessageTool.js').SendMessageTool
 /* eslint-enable @typescript-eslint/no-require-imports */
-import { AskUserQuestionTool } from './tools/AskUserQuestionTool/AskUserQuestionTool.js'
-import { LSPTool } from './tools/LSPTool/LSPTool.js'
-import { ListMcpResourcesTool } from './tools/ListMcpResourcesTool/ListMcpResourcesTool.js'
-import { ReadMcpResourceTool } from './tools/ReadMcpResourceTool/ReadMcpResourceTool.js'
-import { ToolSearchTool } from './tools/ToolSearchTool/ToolSearchTool.js'
-import { EnterPlanModeTool } from './tools/EnterPlanModeTool/EnterPlanModeTool.js'
-import { EnterWorktreeTool } from './tools/EnterWorktreeTool/EnterWorktreeTool.js'
-import { ExitWorktreeTool } from './tools/ExitWorktreeTool/ExitWorktreeTool.js'
-import { ConfigTool } from './tools/ConfigTool/ConfigTool.js'
-import { TaskCreateTool } from './tools/TaskCreateTool/TaskCreateTool.js'
-import { TaskGetTool } from './tools/TaskGetTool/TaskGetTool.js'
-import { TaskUpdateTool } from './tools/TaskUpdateTool/TaskUpdateTool.js'
-import { TaskListTool } from './tools/TaskListTool/TaskListTool.js'
+
+// Lazy-loaded tool modules (continued)
+let _AskUserQuestionTool: typeof import('./tools/AskUserQuestionTool/AskUserQuestionTool.js').AskUserQuestionTool | null = null
+let _LSPTool: typeof import('./tools/LSPTool/LSPTool.js').LSPTool | null = null
+let _ListMcpResourcesTool: typeof import('./tools/ListMcpResourcesTool/ListMcpResourcesTool.js').ListMcpResourcesTool | null = null
+let _ReadMcpResourceTool: typeof import('./tools/ReadMcpResourceTool/ReadMcpResourceTool.js').ReadMcpResourceTool | null = null
+let _ToolSearchTool: typeof import('./tools/ToolSearchTool/ToolSearchTool.js').ToolSearchTool | null = null
+let _EnterPlanModeTool: typeof import('./tools/EnterPlanModeTool/EnterPlanModeTool.js').EnterPlanModeTool | null = null
+let _EnterWorktreeTool: typeof import('./tools/EnterWorktreeTool/EnterWorktreeTool.js').EnterWorktreeTool | null = null
+let _ExitWorktreeTool: typeof import('./tools/ExitWorktreeTool/ExitWorktreeTool.js').ExitWorktreeTool | null = null
+let _ConfigTool: typeof import('./tools/ConfigTool/ConfigTool.js').ConfigTool | null = null
+let _TaskCreateTool: typeof import('./tools/TaskCreateTool/TaskCreateTool.js').TaskCreateTool | null = null
+let _TaskGetTool: typeof import('./tools/TaskGetTool/TaskGetTool.js').TaskGetTool | null = null
+let _TaskUpdateTool: typeof import('./tools/TaskUpdateTool/TaskUpdateTool.js').TaskUpdateTool | null = null
+let _TaskListTool: typeof import('./tools/TaskListTool/TaskListTool.js').TaskListTool | null = null
+
+function lazyLoadEvenMoreTools() {
+  if (!_AskUserQuestionTool) {
+    _AskUserQuestionTool = require('./tools/AskUserQuestionTool/AskUserQuestionTool.js').AskUserQuestionTool
+    _LSPTool = require('./tools/LSPTool/LSPTool.js').LSPTool
+    _ListMcpResourcesTool = require('./tools/ListMcpResourcesTool/ListMcpResourcesTool.js').ListMcpResourcesTool
+    _ReadMcpResourceTool = require('./tools/ReadMcpResourceTool/ReadMcpResourceTool.js').ReadMcpResourceTool
+    _ToolSearchTool = require('./tools/ToolSearchTool/ToolSearchTool.js').ToolSearchTool
+    _EnterPlanModeTool = require('./tools/EnterPlanModeTool/EnterPlanModeTool.js').EnterPlanModeTool
+    _EnterWorktreeTool = require('./tools/EnterWorktreeTool/EnterWorktreeTool.js').EnterWorktreeTool
+    _ExitWorktreeTool = require('./tools/ExitWorktreeTool/ExitWorktreeTool.js').ExitWorktreeTool
+    _ConfigTool = require('./tools/ConfigTool/ConfigTool.js').ConfigTool
+    _TaskCreateTool = require('./tools/TaskCreateTool/TaskCreateTool.js').TaskCreateTool
+    _TaskGetTool = require('./tools/TaskGetTool/TaskGetTool.js').TaskGetTool
+    _TaskUpdateTool = require('./tools/TaskUpdateTool/TaskUpdateTool.js').TaskUpdateTool
+    _TaskListTool = require('./tools/TaskListTool/TaskListTool.js').TaskListTool
+  }
+}
+
+const getAskUserQuestionTool = () => { lazyLoadEvenMoreTools(); return _AskUserQuestionTool! }
+const getLSPTool = () => { lazyLoadEvenMoreTools(); return _LSPTool! }
+const getListMcpResourcesTool = () => { lazyLoadEvenMoreTools(); return _ListMcpResourcesTool! }
+const getReadMcpResourceTool = () => { lazyLoadEvenMoreTools(); return _ReadMcpResourceTool! }
+const getToolSearchTool = () => { lazyLoadEvenMoreTools(); return _ToolSearchTool! }
+const getEnterPlanModeTool = () => { lazyLoadEvenMoreTools(); return _EnterPlanModeTool! }
+const getEnterWorktreeTool = () => { lazyLoadEvenMoreTools(); return _EnterWorktreeTool! }
+const getExitWorktreeTool = () => { lazyLoadEvenMoreTools(); return _ExitWorktreeTool! }
+const getConfigTool = () => { lazyLoadEvenMoreTools(); return _ConfigTool! }
+const getTaskCreateTool = () => { lazyLoadEvenMoreTools(); return _TaskCreateTool! }
+const getTaskGetTool = () => { lazyLoadEvenMoreTools(); return _TaskGetTool! }
+const getTaskUpdateTool = () => { lazyLoadEvenMoreTools(); return _TaskUpdateTool! }
+const getTaskListTool = () => { lazyLoadEvenMoreTools(); return _TaskListTool! }
+
 import uniqBy from 'lodash-es/uniqBy.js'
 import { isToolSearchEnabledOptimistic } from './utils/toolSearch.js'
 import { isTodoV2Enabled } from './utils/tasks.js'
@@ -193,37 +281,37 @@ export function getToolsForDefaultPreset(): string[] {
  */
 export function getAllBaseTools(): Tools {
   return [
-    AgentTool,
-    TaskOutputTool,
-    BashTool,
+    getAgentTool(),
+    getTaskOutputTool(),
+    getBashTool(),
     // Ant-native builds have bfs/ugrep embedded in the bun binary (same ARGV0
     // trick as ripgrep). When available, find/grep in Claude's shell are aliased
     // to these fast tools, so the dedicated Glob/Grep tools are unnecessary.
-    ...(hasEmbeddedSearchTools() ? [] : [GlobTool, GrepTool]),
-    ExitPlanModeV2Tool,
-    FileReadTool,
-    FileEditTool,
-    FileWriteTool,
-    NotebookEditTool,
-    WebFetchTool,
-    TodoWriteTool,
-    WebSearchTool,
-    TaskStopTool,
-    AskUserQuestionTool,
-    SkillTool,
-    EnterPlanModeTool,
-    ...(process.env.USER_TYPE === 'ant' ? [ConfigTool] : []),
-    ...(process.env.USER_TYPE === 'ant' ? [TungstenTool] : []),
+    ...(hasEmbeddedSearchTools() ? [] : [getGlobTool(), getGrepTool()]),
+    getExitPlanModeV2Tool(),
+    getFileReadTool(),
+    getFileEditTool(),
+    getFileWriteTool(),
+    getNotebookEditTool(),
+    getWebFetchTool(),
+    getTodoWriteTool(),
+    getWebSearchTool(),
+    getTaskStopTool(),
+    getAskUserQuestionTool(),
+    getSkillTool(),
+    getEnterPlanModeTool(),
+    ...(process.env.USER_TYPE === 'ant' ? [getConfigTool()] : []),
+    ...(process.env.USER_TYPE === 'ant' ? [getTungstenTool()] : []),
     ...(SuggestBackgroundPRTool ? [SuggestBackgroundPRTool] : []),
     ...(WebBrowserTool ? [WebBrowserTool] : []),
     ...(isTodoV2Enabled()
-      ? [TaskCreateTool, TaskGetTool, TaskUpdateTool, TaskListTool]
+      ? [getTaskCreateTool(), getTaskGetTool(), getTaskUpdateTool(), getTaskListTool()]
       : []),
     ...(OverflowTestTool ? [OverflowTestTool] : []),
     ...(CtxInspectTool ? [CtxInspectTool] : []),
     ...(TerminalCaptureTool ? [TerminalCaptureTool] : []),
-    ...(isEnvTruthy(process.env.ENABLE_LSP_TOOL) ? [LSPTool] : []),
-    ...(isWorktreeModeEnabled() ? [EnterWorktreeTool, ExitWorktreeTool] : []),
+    ...(isEnvTruthy(process.env.ENABLE_LSP_TOOL) ? [getLSPTool()] : []),
+    ...(isWorktreeModeEnabled() ? [getEnterWorktreeTool(), getExitWorktreeTool()] : []),
     getSendMessageTool(),
     ...(ListPeersTool ? [ListPeersTool] : []),
     ...(isAgentSwarmsEnabled()
@@ -236,18 +324,18 @@ export function getAllBaseTools(): Tools {
     ...cronTools,
     ...(RemoteTriggerTool ? [RemoteTriggerTool] : []),
     ...(MonitorTool ? [MonitorTool] : []),
-    BriefTool,
+    getBriefTool(),
     ...(SendUserFileTool ? [SendUserFileTool] : []),
     ...(PushNotificationTool ? [PushNotificationTool] : []),
     ...(SubscribePRTool ? [SubscribePRTool] : []),
     ...(getPowerShellTool() ? [getPowerShellTool()] : []),
     ...(SnipTool ? [SnipTool] : []),
-    ...(process.env.NODE_ENV === 'test' ? [TestingPermissionTool] : []),
-    ListMcpResourcesTool,
-    ReadMcpResourceTool,
+    ...(process.env.NODE_ENV === 'test' ? [getTestingPermissionTool()] : []),
+    getListMcpResourcesTool(),
+    getReadMcpResourceTool(),
     // Include ToolSearchTool when tool search might be enabled (optimistic check)
     // The actual decision to defer tools happens at request time in claude.ts
-    ...(isToolSearchEnabledOptimistic() ? [ToolSearchTool] : []),
+    ...(isToolSearchEnabledOptimistic() ? [getToolSearchTool()] : []),
   ]
 }
 
@@ -281,11 +369,11 @@ export const getTools = (permissionContext: ToolPermissionContext): Tools => {
         feature('COORDINATOR_MODE') &&
         coordinatorModeModule?.isCoordinatorMode()
       ) {
-        replSimple.push(TaskStopTool, getSendMessageTool())
+        replSimple.push(getTaskStopTool(), getSendMessageTool())
       }
       return filterToolsByDenyRules(replSimple, permissionContext)
     }
-    const simpleTools: Tool[] = [BashTool, FileReadTool, FileEditTool]
+    const simpleTools: Tool[] = [getBashTool(), getFileReadTool(), getFileEditTool()]
     // When coordinator mode is also active, include AgentTool and TaskStopTool
     // so the coordinator gets Task+TaskStop (via useMergedTools filtering) and
     // workers get Bash/Read/Edit (via filterToolsForAgent filtering).
@@ -293,15 +381,15 @@ export const getTools = (permissionContext: ToolPermissionContext): Tools => {
       feature('COORDINATOR_MODE') &&
       coordinatorModeModule?.isCoordinatorMode()
     ) {
-      simpleTools.push(AgentTool, TaskStopTool, getSendMessageTool())
+      simpleTools.push(getAgentTool(), getTaskStopTool(), getSendMessageTool())
     }
     return filterToolsByDenyRules(simpleTools, permissionContext)
   }
 
   // Get all base tools and filter out special tools that get added conditionally
   const specialTools = new Set([
-    ListMcpResourcesTool.name,
-    ReadMcpResourceTool.name,
+    getListMcpResourcesTool().name,
+    getReadMcpResourceTool().name,
     SYNTHETIC_OUTPUT_TOOL_NAME,
   ])
 

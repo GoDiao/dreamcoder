@@ -8,7 +8,7 @@ import {
   useTabStore,
   type TabType,
 } from '../stores/tabStore'
-import { useSessionStore } from '../stores/sessionStore'
+import { useSessionById } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
@@ -32,7 +32,7 @@ import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
-const TASK_POLL_INTERVAL_MS = 1000
+const TASK_POLL_INTERVAL_MS = 3000
 const WORKSPACE_RESIZE_STEP = 32
 const TERMINAL_RESIZE_STEP = 24
 const CHAT_COLUMN_WITH_WORKSPACE_CLASS =
@@ -260,7 +260,7 @@ export function ActiveSession() {
   const isMobileLayout = useMobileViewport() && !isTauriRuntime()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const activeTabType = useTabStore((s) => s.tabs.find((tab) => tab.sessionId === s.activeTabId)?.type ?? null)
-  const sessions = useSessionStore((s) => s.sessions)
+  const session = useSessionById(activeTabId)
   const connectToSession = useChatStore((s) => s.connectToSession)
   const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
   const pendingComputerUsePermission = sessionState?.pendingComputerUsePermission ?? null
@@ -273,7 +273,6 @@ export function ActiveSession() {
   const hasRunningBackgroundTasks = Object.values(sessionState?.backgroundAgentTasks ?? {})
     .some((task) => task.status === 'running')
 
-  const session = sessions.find((s) => s.id === activeTabId)
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const activeTeam = useTeamStore((s) => s.activeTeam)
   const isMemberSession = !!memberInfo

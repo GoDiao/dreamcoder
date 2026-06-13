@@ -87,3 +87,6 @@ scripts/benchmark.ts
 
 # Sidecar binaries
 sidecar/*.exe
+
+# Benchmark results
+.benchmark-results/

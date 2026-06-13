@@ -1,4 +1,5 @@
 import { isTauriRuntime } from './desktopRuntime'
+import { devWarn } from './devLog'
 
 export type ComposerAttachment = {
   id: string
@@ -60,7 +61,7 @@ export async function selectNativeFileAttachments(): Promise<ComposerAttachment[
     const paths = normalizeDialogSelection(selected)
     return pathsToComposerAttachments(paths)
   } catch (error) {
-    console.warn('[attachments] Native file picker failed; falling back to browser file input', error)
+    devWarn('[attachments] Native file picker failed; falling back to browser file input', error)
     return null
   }
 }

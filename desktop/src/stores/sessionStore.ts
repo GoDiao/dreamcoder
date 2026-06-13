@@ -44,6 +44,28 @@ type SessionStore = {
   setActiveSession: (id: string | null) => void
 }
 
+function buildSessionsById(sessions: SessionListItem[]): Map<string, SessionListItem> {
+  const map = new Map<string, SessionListItem>()
+  for (const session of sessions) map.set(session.id, session)
+  return map
+}
+
+/**
+ * Memoized derivation of sessionsById from the sessions array.
+ * The Map is rebuilt only when the sessions reference changes, so all
+ * consumers of `useSessionById` share the same Map instance and benefit
+ * from O(1) lookups without storing two sources of truth.
+ */
+let cachedSessions: SessionListItem[] | null = null
+let cachedById: Map<string, SessionListItem> = new Map()
+function getSessionsById(sessions: SessionListItem[]): Map<string, SessionListItem> {
+  if (sessions !== cachedSessions) {
+    cachedSessions = sessions
+    cachedById = buildSessionsById(sessions)
+  }
+  return cachedById
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
@@ -58,7 +80,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const { sessions: raw } = await sessionsApi.list({ project, limit: 100 })
       let syncedSessions: SessionListItem[] = []
       set((state) => {
-        const currentById = new Map(state.sessions.map((session) => [session.id, session]))
+        const currentById = getSessionsById(state.sessions)
         // Deduplicate by session ID - keep the most recently modified entry.
         const byId = new Map<string, SessionListItem>()
         for (const s of raw) {
@@ -97,12 +119,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       workDirExists: true,
     }
 
-    set((state) => ({
-      sessions: state.sessions.some((session) => session.id === id)
-        ? state.sessions
-        : [optimisticSession, ...state.sessions],
-      activeSessionId: id,
-    }))
+    set((state) => {
+      if (state.sessions.some((session) => session.id === id)) {
+        return { activeSessionId: id }
+      }
+      const sessions = [optimisticSession, ...state.sessions]
+      return {
+        sessions,
+        activeSessionId: id,
+      }
+    })
 
     void get().fetchSessions()
     return id
@@ -113,7 +139,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       targetMessageId,
       ...(options?.title ? { title: options.title } : {}),
     })
-    const sourceSession = get().sessions.find((session) => session.id === sourceSessionId)
+    const sourceSession = getSessionsById(get().sessions).get(sourceSessionId)
     const now = new Date().toISOString()
     const optimisticSession: SessionListItem = {
       id: result.sessionId,
@@ -127,15 +153,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       workDirExists: true,
     }
 
-    set((state) => ({
-      sessions: state.sessions.some((session) => session.id === result.sessionId)
+    set((state) => {
+      const sessions = state.sessions.some((session) => session.id === result.sessionId)
         ? state.sessions.map((session) =>
             session.id === result.sessionId
               ? { ...session, ...optimisticSession }
               : session)
-        : [optimisticSession, ...state.sessions],
-      activeSessionId: result.sessionId,
-    }))
+        : [optimisticSession, ...state.sessions]
+      return {
+        sessions,
+        activeSessionId: result.sessionId,
+      }
+    })
 
     void get().fetchSessions()
     return {
@@ -148,11 +177,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSession: async (id: string) => {
     await sessionsApi.delete(id)
     useSessionRuntimeStore.getState().clearSelection(id)
-    set((s) => ({
-      sessions: s.sessions.filter((session) => session.id !== id),
-      activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
-      selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, [id]),
-    }))
+    set((s) => {
+      const sessions = s.sessions.filter((session) => session.id !== id)
+      return {
+        sessions,
+        activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
+        selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, [id]),
+      }
+    })
   },
 
   deleteSessions: async (ids: string[]) => {
@@ -161,13 +193,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     for (const id of result.successes) {
       useSessionRuntimeStore.getState().clearSelection(id)
     }
-    set((s) => ({
-      sessions: s.sessions.filter((session) => !result.successes.includes(session.id)),
-      activeSessionId: s.activeSessionId && result.successes.includes(s.activeSessionId)
-        ? null
-        : s.activeSessionId,
-      selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, result.successes),
-    }))
+    set((s) => {
+      const sessions = s.sessions.filter((session) => !result.successes.includes(session.id))
+      return {
+        sessions,
+        activeSessionId: s.activeSessionId && result.successes.includes(s.activeSessionId)
+          ? null
+          : s.activeSessionId,
+        selectedSessionIds: removeIdsFromSet(s.selectedSessionIds, result.successes),
+      }
+    })
     return result
   },
 
@@ -194,19 +229,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   renameSession: async (id: string, title: string) => {
     await sessionsApi.rename(id, title)
-    set((s) => ({
-      sessions: s.sessions.map((session) =>
+    set((s) => {
+      const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
-      ),
-    }))
+      )
+      return { sessions }
+    })
   },
 
   updateSessionTitle: (id, title) => {
-    set((s) => ({
-      sessions: s.sessions.map((session) =>
+    set((s) => {
+      const sessions = s.sessions.map((session) =>
         session.id === id ? { ...session, title } : session,
-      ),
-    }))
+      )
+      return { sessions }
+    })
   },
 
   setActiveSession: (id) => set({ activeSessionId: id }),
@@ -241,3 +278,14 @@ function syncOpenSessionTabTitles(sessions: SessionListItem[]): void {
     }
   }
 }
+
+/**
+ * Selector hook: O(1) lookup of a session by ID.
+ *
+ * Prefer this over `useSessionStore((s) => s.sessions.find(...))` — the
+ * latter re-renders on any session list change and runs an O(n) scan each
+ * time. The Map index is memoized via `getSessionsById`, so consumers share
+ * the same instance and only rebuild when the sessions reference changes.
+ */
+export const useSessionById = (id: string | null | undefined) =>
+  useSessionStore((s) => (id ? getSessionsById(s.sessions).get(id) : undefined))

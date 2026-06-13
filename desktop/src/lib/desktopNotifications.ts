@@ -1,4 +1,5 @@
 import { useSettingsStore } from '../stores/settingsStore'
+import { devWarn } from './devLog'
 
 const DEFAULT_COOLDOWN_MS = 750
 
@@ -86,7 +87,7 @@ async function invokeWindowsNotificationPermissionState(): Promise<DesktopNotifi
     return normalizePermission(granted)
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to read Windows notification permission:', err)
+      devWarn('[desktopNotifications] failed to read Windows notification permission:', err)
     }
     return 'unsupported'
   }
@@ -101,7 +102,7 @@ async function invokeWindowsNotificationPermissionRequest(): Promise<DesktopNoti
     return normalizePermission(permission)
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to request Windows notification permission:', err)
+      devWarn('[desktopNotifications] failed to request Windows notification permission:', err)
     }
     return 'unsupported'
   }
@@ -116,7 +117,7 @@ async function invokeMacNotificationPermissionState(): Promise<DesktopNotificati
     return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to read macOS notification permission:', err)
+      devWarn('[desktopNotifications] failed to read macOS notification permission:', err)
     }
     return 'unsupported'
   }
@@ -131,7 +132,7 @@ async function invokeMacNotificationPermissionRequest(): Promise<DesktopNotifica
     return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to request macOS notification permission:', err)
+      devWarn('[desktopNotifications] failed to request macOS notification permission:', err)
     }
     return 'unsupported'
   }
@@ -220,7 +221,7 @@ async function sendMacNotification(options: { title: string; body?: string; targ
     return typeof sent === 'boolean' ? sent : false
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to send macOS native notification:', err)
+      devWarn('[desktopNotifications] failed to send macOS native notification:', err)
     }
     return false
   }
@@ -423,14 +424,14 @@ export async function notifyDesktop(options: DesktopNotificationOptions): Promis
     }
     if (cooldownScope) pendingCooldownScopes.delete(cooldownScope)
     if (!sent && typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] native notification permission was not granted')
+      devWarn('[desktopNotifications] native notification permission was not granted')
     }
     return sent
   } catch (err) {
     if (options.dedupeKey) pendingKeys.delete(options.dedupeKey)
     if (cooldownScope) pendingCooldownScopes.delete(cooldownScope)
     if (typeof console !== 'undefined') {
-      console.warn('[desktopNotifications] failed to send native notification:', err)
+      devWarn('[desktopNotifications] failed to send native notification:', err)
     }
     return false
   }

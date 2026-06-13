@@ -19,6 +19,7 @@ import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
 import { FileSearchMenu, type FileSearchMenuHandle } from '../components/chat/FileSearchMenu'
 import { LocalSlashCommandPanel, type LocalSlashCommandName } from '../components/chat/LocalSlashCommandPanel'
 import { useMobileViewport } from '../hooks/useMobileViewport'
+import { devWarn } from '../lib/devLog'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 import {
   filesToComposerAttachments,
@@ -446,7 +447,7 @@ export function EmptySession() {
         setAttachments((prev) => [...prev, ...nextAttachments])
       })
       .catch((error) => {
-        console.warn('[attachments] Failed to read selected files', error)
+        devWarn('[attachments] Failed to read selected files', error)
       })
   }, [])
 
@@ -459,7 +460,7 @@ export function EmptySession() {
     panelRef,
     onAttachments: appendAttachments,
     onError: (error) => {
-      console.warn('[attachments] Failed to read dropped files', error)
+      devWarn('[attachments] Failed to read dropped files', error)
     },
   })
 
