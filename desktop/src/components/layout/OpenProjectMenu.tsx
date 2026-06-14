@@ -133,7 +133,8 @@ export function OpenProjectMenu({ path }: Props) {
         <div
           ref={menuRef}
           role="menu"
-          className="fixed z-50 min-w-[220px] overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-dropdown)]"
+          className="motion-menu fixed z-50 min-w-[220px] overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-dropdown)]"
+          data-state="open"
           style={{ top: rect.bottom + 6, right: Math.max(12, window.innerWidth - rect.right) }}
         >
           {targets.map((target) => (

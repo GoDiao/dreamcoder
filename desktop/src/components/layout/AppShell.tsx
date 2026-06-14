@@ -42,6 +42,8 @@ export function AppShell() {
   const [h5StartupError, setH5StartupError] = useState<H5ConnectionRequiredError | null>(null)
   const [bootstrapNonce, setBootstrapNonce] = useState(0)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [mobileSidebarMounted, setMobileSidebarMounted] = useState(false)
+  const [mobileSidebarVisible, setMobileSidebarVisible] = useState(false)
   const t = useTranslation()
   const tauriRuntime = isTauriRuntime()
   const isMobileShell = useMobileViewport() && !tauriRuntime
@@ -53,6 +55,8 @@ export function AppShell() {
   )
   const wasMobileShellRef = useRef(false)
   const effectiveSidebarOpen = isMobileShell ? mobileSidebarOpen : sidebarOpen
+  const effectiveSidebarMounted = !isMobileShell || mobileSidebarMounted
+  const effectiveSidebarVisible = isMobileShell ? mobileSidebarVisible : sidebarOpen
   const activeTab = tabs.find((tab) => tab.sessionId === activeTabId)
   const isActiveChatTab = isChatTab(activeTab)
   const mobileSessionTitle = activeSession?.title || activeTab?.title || t('session.untitled')
@@ -162,6 +166,22 @@ export function AppShell() {
     useTabStore.setState({ activeTabId: null })
   }, [activeTab, activeTabId, isMobileShell, ready, setActiveTab, tabs])
 
+  useEffect(() => {
+    if (!isMobileShell) {
+      setMobileSidebarMounted(false)
+      setMobileSidebarVisible(false)
+      return
+    }
+    if (mobileSidebarOpen) {
+      setMobileSidebarMounted(true)
+      const frame = window.requestAnimationFrame(() => setMobileSidebarVisible(true))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    setMobileSidebarVisible(false)
+    const timer = window.setTimeout(() => setMobileSidebarMounted(false), 280)
+    return () => window.clearTimeout(timer)
+  }, [isMobileShell, mobileSidebarOpen])
+
   const setEffectiveSidebarOpen = (open: boolean) => {
     if (isMobileShell) {
       setMobileSidebarOpen(open)
@@ -207,10 +227,11 @@ export function AppShell() {
 
   return (
     <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}`}>
-      {isMobileShell && effectiveSidebarOpen ? (
+      {isMobileShell && effectiveSidebarMounted ? (
         <button
           type="button"
           data-testid="sidebar-backdrop"
+          data-state={effectiveSidebarVisible ? 'open' : 'closed'}
           className="app-shell-backdrop fixed inset-0 z-40 border-0 p-0"
           aria-label={t('sidebar.collapse')}
           onClick={() => setEffectiveSidebarOpen(false)}
@@ -219,13 +240,13 @@ export function AppShell() {
       <div
         id="sidebar-shell"
         data-testid="sidebar-shell"
-        data-state={effectiveSidebarOpen ? 'open' : 'closed'}
+        data-state={effectiveSidebarVisible ? 'open' : 'closed'}
         data-mobile={isMobileShell ? 'true' : 'false'}
         className={`sidebar-shell${isMobileShell ? ' sidebar-shell--mobile' : ''}`}
         style={isMobileShell ? undefined : { '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
         {...sidebarHiddenProps}
       >
-        {!isMobileShell || effectiveSidebarOpen ? (
+        {effectiveSidebarMounted ? (
           <Sidebar isMobile={isMobileShell} onRequestClose={() => setEffectiveSidebarOpen(false)} />
         ) : null}
       </div>
@@ -234,7 +255,7 @@ export function AppShell() {
       ) : null}
       <main
         id="content-area"
-        data-sidebar-state={effectiveSidebarOpen ? 'open' : 'closed'}
+        data-sidebar-state={effectiveSidebarVisible ? 'open' : 'closed'}
         className={`min-w-0 flex-1 flex flex-col overflow-hidden${isMobileShell ? ' app-shell-main--mobile' : ''}`}
       >
         {isMobileShell ? (

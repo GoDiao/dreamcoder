@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode, type Ref } from 'react'
+import { useEffect, useState, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 
 type Props = {
@@ -34,6 +34,20 @@ export function MobileBottomSheet({
   panelRef,
   testId,
 }: Props) {
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const frame = window.requestAnimationFrame(() => setVisible(true))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    setVisible(false)
+    const timer = window.setTimeout(() => setMounted(false), 220)
+    return () => window.clearTimeout(timer)
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -43,10 +57,10 @@ export function MobileBottomSheet({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] bg-black/25" onClick={onClose}>
+    <div className="motion-bottom-sheet-backdrop fixed inset-0 z-[10000] bg-black/25" data-state={visible ? 'open' : 'closed'} onClick={onClose}>
       <div
         ref={panelRef}
         id={id}
@@ -54,7 +68,8 @@ export function MobileBottomSheet({
         aria-modal={role === 'dialog' ? true : undefined}
         aria-label={ariaLabel ?? (typeof title === 'string' ? title : undefined)}
         data-testid={testId}
-        className={`absolute inset-x-0 bottom-0 flex max-h-[min(78dvh,640px)] min-h-0 flex-col overflow-hidden rounded-t-2xl border-x-0 border-y border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[0_-18px_48px_rgba(54,35,28,0.22)] ${panelClassName}`}
+        className={`motion-bottom-sheet-panel absolute inset-x-0 bottom-0 flex max-h-[min(78dvh,640px)] min-h-0 flex-col overflow-hidden rounded-t-2xl border-x-0 border-y border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[0_-18px_48px_rgba(54,35,28,0.22)] ${panelClassName}`}
+        data-state={visible ? 'open' : 'closed'}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="shrink-0 border-b border-[var(--color-border)] px-4 py-3">

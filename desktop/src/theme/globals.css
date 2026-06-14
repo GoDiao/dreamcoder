@@ -383,6 +383,9 @@
   --statusbar-height: 36px;
   --motion-sidebar-duration: 280ms;
   --motion-sidebar-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 150ms;
+  --motion-medium: 220ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Surface aliases */
   --color-surface-sidebar: var(--color-surface-container-low);
@@ -1492,6 +1495,14 @@ button, input, textarea, select, a, [role="button"] {
 
 .app-shell-backdrop {
   background: var(--color-overlay-scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--motion-ease-out);
+}
+
+.app-shell-backdrop[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sidebar-shell {
@@ -1661,12 +1672,134 @@ button, input, textarea, select, a, [role="button"] {
   pointer-events: none;
 }
 
+.motion-fade-scale,
+.motion-menu,
+.motion-bottom-sheet-backdrop,
+.motion-bottom-sheet-panel,
+.motion-modal-backdrop,
+.motion-modal-panel {
+  transition-duration: var(--motion-medium);
+  transition-timing-function: var(--motion-ease-out);
+}
+
+.motion-fade-scale,
+.motion-modal-panel {
+  opacity: 0;
+  transform: scale(0.98);
+  transition-property: opacity, transform;
+}
+
+.motion-fade-scale[data-state="open"],
+.motion-modal-panel[data-state="open"] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.motion-menu {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: top center;
+  transition-property: opacity, transform;
+}
+
+.motion-menu[data-state="open"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: motion-menu-enter var(--motion-fast) var(--motion-ease-out);
+}
+
+.motion-bottom-sheet-backdrop,
+.motion-modal-backdrop {
+  opacity: 0;
+  transition-property: opacity;
+}
+
+.motion-bottom-sheet-backdrop[data-state="open"],
+.motion-modal-backdrop[data-state="open"] {
+  opacity: 1;
+}
+
+.motion-bottom-sheet-panel {
+  opacity: 0;
+  transform: translateY(100%);
+  transition-property: opacity, transform;
+}
+
+.motion-bottom-sheet-panel[data-state="open"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.motion-page-enter {
+  animation: motion-page-enter var(--motion-fast) var(--motion-ease-out);
+}
+
+.motion-page-transition {
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.motion-page-transition--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.motion-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--motion-medium) var(--motion-ease-out),
+    opacity var(--motion-fast) ease,
+    visibility 0s linear var(--motion-medium);
+}
+
+.motion-collapse[data-state="open"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.motion-collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@keyframes motion-page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes motion-menu-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar-shell,
   .sidebar-panel,
   .sidebar-copy,
-  .sidebar-section {
+  .sidebar-section,
+  .app-shell-backdrop,
+  .motion-fade-scale,
+  .motion-menu,
+  .motion-bottom-sheet-backdrop,
+  .motion-bottom-sheet-panel,
+  .motion-modal-backdrop,
+  .motion-modal-panel,
+  .motion-page-transition,
+  .motion-collapse {
     transition-duration: 0.01ms !important;
+  }
+
+  .motion-menu[data-state="open"],
+  .motion-page-enter {
+    animation-duration: 0.01ms !important;
   }
 }
 
