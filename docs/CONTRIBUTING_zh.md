@@ -150,6 +150,8 @@ bun run tauri dev
 > 99% 是漏跑了 Step 3 `bun run build:sidecars`。
 > 看到 `command not found: tauri` 或 `@tauri-apps/cli` 报错？
 > 99% 是漏跑了 Step 2 `cd desktop && bun install`（Tauri CLI 在 desktop 子包里，根 install 不会装）。
+>
+> 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
 
 ## 许可证
 

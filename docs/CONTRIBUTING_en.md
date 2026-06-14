@@ -150,6 +150,8 @@ bun run tauri dev
 > 99% chance you skipped Step 3 `bun run build:sidecars`.
 > Seeing `command not found: tauri` or a `@tauri-apps/cli` error?
 > 99% chance you skipped Step 2 `cd desktop && bun install` (Tauri CLI lives in the desktop sub-package; root install won't pull it in).
+>
+> More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## License
 
