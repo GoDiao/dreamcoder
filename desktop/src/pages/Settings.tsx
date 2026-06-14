@@ -53,6 +53,7 @@ const NETWORK_TIMEOUT_STEP_SECONDS = 30
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('providers')
+  const [tabContentVisible, setTabContentVisible] = useState(false)
   const pendingSettingsTab = useUIStore((s) => s.pendingSettingsTab)
   const t = useTranslation()
 
@@ -61,6 +62,12 @@ export function Settings() {
     setActiveTab(pendingSettingsTab)
     useUIStore.getState().setPendingSettingsTab(null)
   }, [pendingSettingsTab])
+
+  useEffect(() => {
+    setTabContentVisible(false)
+    const frame = window.requestAnimationFrame(() => setTabContentVisible(true))
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeTab])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[var(--color-surface)]">
@@ -90,21 +97,23 @@ export function Settings() {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          {activeTab === 'providers' && <ProviderSettings />}
-          {activeTab === 'permissions' && <PermissionSettings />}
-          {activeTab === 'activity' && <ActivitySettings />}
-          {activeTab === 'general' && <GeneralSettings />}
-          {activeTab === 'h5Access' && <H5AccessSettings />}
-          {activeTab === 'adapters' && <AdapterSettings />}
-          {activeTab === 'terminal' && <TerminalSettings showPreferences />}
-          {activeTab === 'mcp' && <McpSettings />}
-          {activeTab === 'agents' && <AgentsSettings />}
-          {activeTab === 'skills' && <SkillSettings />}
-          {activeTab === 'memory' && <MemorySettings />}
-          {activeTab === 'plugins' && <PluginSettings />}
-          {activeTab === 'computerUse' && <ComputerUseSettings />}
-          {activeTab === 'diagnostics' && <DiagnosticsSettings />}
-          {activeTab === 'about' && <AboutSettings />}
+          <div className={`motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
+            {activeTab === 'providers' && <ProviderSettings />}
+            {activeTab === 'permissions' && <PermissionSettings />}
+            {activeTab === 'activity' && <ActivitySettings />}
+            {activeTab === 'general' && <GeneralSettings />}
+            {activeTab === 'h5Access' && <H5AccessSettings />}
+            {activeTab === 'adapters' && <AdapterSettings />}
+            {activeTab === 'terminal' && <TerminalSettings showPreferences />}
+            {activeTab === 'mcp' && <McpSettings />}
+            {activeTab === 'agents' && <AgentsSettings />}
+            {activeTab === 'skills' && <SkillSettings />}
+            {activeTab === 'memory' && <MemorySettings />}
+            {activeTab === 'plugins' && <PluginSettings />}
+            {activeTab === 'computerUse' && <ComputerUseSettings />}
+            {activeTab === 'diagnostics' && <DiagnosticsSettings />}
+            {activeTab === 'about' && <AboutSettings />}
+          </div>
         </div>
       </div>
     </div>

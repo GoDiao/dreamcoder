@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { createPortal } from 'react-dom'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -37,6 +37,8 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const sessions = useSessionStore((s) => s.sessions)
   const [open, setOpen] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(false)
+  const [confirmMounted, setConfirmMounted] = useState(false)
+  const [confirmVisible, setConfirmVisible] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -119,6 +121,19 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
       document.removeEventListener('keydown', handleEsc)
     }
   }, [open])
+
+  useEffect(() => {
+    if (confirmDialog) {
+      setConfirmMounted(true)
+      const frame = window.requestAnimationFrame(() => setConfirmVisible(true))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    setConfirmVisible(false)
+    const timer = window.setTimeout(() => setConfirmMounted(false), 180)
+    return () => window.clearTimeout(timer)
+  }, [confirmDialog])
+
+  const closeConfirmDialog = useCallback(() => setConfirmDialog(false), [])
 
   const permissionOptions = (
     <div id={menuId} ref={menuRef} role="menu">
@@ -207,17 +222,18 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
             {permissionOptions}
           </MobileBottomSheet>
         ) : (
-          <div id={menuId} ref={menuRef} role="menu" className="absolute left-0 bottom-full mb-2 w-[320px] rounded-xl bg-[var(--color-surface-container-lowest)] border border-[var(--color-border)] shadow-[var(--shadow-dropdown)] z-50 py-2">
+          <div id={menuId} ref={menuRef} role="menu" className="motion-menu absolute left-0 bottom-full z-50 mb-2 w-[320px] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]" data-state="open">
             {menuContent}
           </div>
         )
       )}
 
       {/* Bypass confirmation dialog */}
-      {confirmDialog && createPortal(
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isMobile ? 'px-4' : 'pl-[var(--sidebar-width)] pr-4'}`} onClick={() => setConfirmDialog(false)}>
+      {confirmMounted && createPortal(
+        <div className={`motion-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isMobile ? 'px-4' : 'pl-[var(--sidebar-width)] pr-4'}`} data-state={confirmVisible ? 'open' : 'closed'} onClick={closeConfirmDialog}>
           <div
-            className={`${isMobile ? 'w-full max-w-md' : 'w-[420px]'} rounded-2xl bg-[var(--color-surface-container-lowest)] border border-[var(--color-border)] shadow-[var(--shadow-dropdown)] overflow-hidden`}
+            className={`motion-modal-panel ${isMobile ? 'w-full max-w-md' : 'w-[420px]'} overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]`}
+            data-state={confirmVisible ? 'open' : 'closed'}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -257,7 +273,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
             {/* Actions */}
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
               <button
-                onClick={() => setConfirmDialog(false)}
+                onClick={closeConfirmDialog}
                 className="px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] rounded-lg transition-colors"
               >
                 {t('common.cancel')}

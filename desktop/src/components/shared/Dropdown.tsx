@@ -58,13 +58,13 @@ export function Dropdown<T extends string>({
       {open && (
         <div
           className={`
-            absolute z-50 mt-1 rounded-[var(--radius-lg)]
+            motion-menu absolute z-50 mt-1 rounded-[var(--radius-lg)]
             bg-[var(--color-surface-container-lowest)] border border-[var(--color-border)]
             shadow-[var(--shadow-dropdown)]
-            animate-in fade-in slide-in-from-top-1
             ${maxHeight ? 'overflow-y-auto' : 'overflow-hidden'}
             ${align === 'right' ? 'right-0' : 'left-0'}
           `}
+          data-state="open"
           style={{ width, maxHeight }}
         >
           {items.map((item, i) => (

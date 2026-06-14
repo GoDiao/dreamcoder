@@ -14,6 +14,7 @@ import { useTerminalPanelStore } from '../../stores/terminalPanelStore'
 import { useTranslation } from '../../i18n'
 import { WindowControls, showWindowControls } from './WindowControls'
 import { OpenProjectMenu } from './OpenProjectMenu'
+import { Modal } from '../shared/Modal'
 import { Folder, FolderOpen, SquareTerminal } from 'lucide-react'
 
 const TAB_WIDTH = 180
@@ -74,6 +75,7 @@ export function TabBar() {
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null)
   const [pendingCloseRequest, setPendingCloseRequest] = useState<PendingCloseRequest | null>(null)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null)
   const [dragOffsetX, setDragOffsetX] = useState(0)
@@ -194,11 +196,27 @@ export function TabBar() {
 
     if (runningSessionIds.length > 0) {
       setPendingCloseRequest({ tabs: targetTabs, runningSessionIds })
+      setCloseConfirmOpen(true)
       return
     }
 
     closeTabsWithPolicy(targetTabs, [], false)
   }, [closeTabsWithPolicy, getRunningSessionIds])
+
+  const closeConfirmDialog = useCallback(() => {
+    setCloseConfirmOpen(false)
+  }, [])
+
+  const clearPendingCloseRequest = useCallback(() => {
+    setPendingCloseRequest(null)
+  }, [])
+
+  const confirmCloseTabs = useCallback((stopRunning: boolean) => {
+    if (!pendingCloseRequest) return
+    closeTabsWithPolicy(pendingCloseRequest.tabs, pendingCloseRequest.runningSessionIds, stopRunning)
+    setCloseConfirmOpen(false)
+    setPendingCloseRequest(null)
+  }, [closeTabsWithPolicy, pendingCloseRequest])
 
   const handleClose = (sessionId: string) => {
     const tab = tabs.find((t) => t.sessionId === sessionId)
@@ -409,7 +427,8 @@ export function TabBar() {
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] py-1 min-w-[160px]"
+          className="motion-menu fixed z-50 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] py-1 min-w-[160px]"
+          data-state="open"
           style={{ left: contextMenu.x, top: contextMenu.y, boxShadow: 'var(--shadow-dropdown)' }}
         >
           <button
@@ -446,47 +465,46 @@ export function TabBar() {
         </div>
       )}
 
-      {pendingCloseRequest && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-          <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6 max-w-sm w-full mx-4" style={{ boxShadow: 'var(--shadow-dropdown)' }}>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+      <Modal
+        open={closeConfirmOpen}
+        onClose={closeConfirmDialog}
+        title={pendingCloseRequest
+          ? pendingCloseRequest.runningSessionIds.length > 1
+            ? t('tabs.closeAllConfirmTitle')
+            : t('tabs.closeConfirmTitle')
+          : undefined}
+        width={420}
+        onExited={clearPendingCloseRequest}
+        footer={pendingCloseRequest && (
+          <>
+            <button onClick={closeConfirmDialog} className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
+              {t('common.cancel')}
+            </button>
+            <button
+              onClick={() => confirmCloseTabs(false)}
+              className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+            >
+              {t('tabs.closeConfirmKeep')}
+            </button>
+            <button
+              onClick={() => confirmCloseTabs(true)}
+              className="px-3 py-1.5 text-xs rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90"
+            >
               {pendingCloseRequest.runningSessionIds.length > 1
-                ? t('tabs.closeAllConfirmTitle')
-                : t('tabs.closeConfirmTitle')}
-            </h3>
-            <p className="text-xs text-[var(--color-text-secondary)] mb-4">
-              {pendingCloseRequest.runningSessionIds.length > 1
-                ? t('tabs.closeAllConfirmMessage', { count: pendingCloseRequest.runningSessionIds.length })
-                : t('tabs.closeConfirmMessage')}
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setPendingCloseRequest(null)} className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={() => {
-                  closeTabsWithPolicy(pendingCloseRequest.tabs, pendingCloseRequest.runningSessionIds, false)
-                  setPendingCloseRequest(null)
-                }}
-                className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-              >
-                {t('tabs.closeConfirmKeep')}
-              </button>
-              <button
-                onClick={() => {
-                  closeTabsWithPolicy(pendingCloseRequest.tabs, pendingCloseRequest.runningSessionIds, true)
-                  setPendingCloseRequest(null)
-                }}
-                className="px-3 py-1.5 text-xs rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90"
-              >
-                {pendingCloseRequest.runningSessionIds.length > 1
-                  ? t('tabs.closeAllConfirmStop')
-                  : t('tabs.closeConfirmStop')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                ? t('tabs.closeAllConfirmStop')
+                : t('tabs.closeConfirmStop')}
+            </button>
+          </>
+        )}
+      >
+        {pendingCloseRequest && (
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            {pendingCloseRequest.runningSessionIds.length > 1
+              ? t('tabs.closeAllConfirmMessage', { count: pendingCloseRequest.runningSessionIds.length })
+              : t('tabs.closeConfirmMessage')}
+          </p>
+        )}
+      </Modal>
     </div>
   )
 }

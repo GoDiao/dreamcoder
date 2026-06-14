@@ -837,9 +837,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               {visibleProjectGroups.map((project) => {
                 const projectCollapsed = collapsedProjectKeys.has(project.key)
                 const sessionsExpanded = expandedProjectKeys.has(project.key)
-                const visibleItems = projectCollapsed
-                  ? []
-                  : getVisibleProjectSessions(project.sessions, sessionsExpanded, activeTabId)
+                const visibleItems = projectCollapsed ? [] : getVisibleProjectSessions(project.sessions, sessionsExpanded, activeTabId)
                 const hiddenCount = project.sessions.length - visibleItems.length
                 const groupIds = project.sessions.map((session) => session.id)
                 const groupSelectedCount = groupIds.filter((id) => selectedSessionIds.has(id)).length
@@ -934,8 +932,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                         )}
                       </div>
                     </div>
-                    {!projectCollapsed && (
-                      <div className="mt-0.5 pl-0">
+                    <div className="motion-collapse mt-0.5 pl-0" data-state={projectCollapsed ? 'closed' : 'open'}>
+                      <div>
                         <div
                           className={hasInternalScroll ? 'max-h-[420px] overflow-y-auto pr-1' : undefined}
                           data-testid={`sidebar-project-session-list-${domSafeProjectKey(project.key)}`}
@@ -1031,7 +1029,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                           </div>
                         )}
                       </div>
-                    )}
+                    </div>
                     {dropAfter && (
                       <div className="pointer-events-none absolute -bottom-1 left-1 right-1 z-10 h-0.5 rounded-full bg-[var(--color-brand)]" />
                     )}
@@ -1068,7 +1066,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[140px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1"
+          className="motion-menu fixed z-50 min-w-[140px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1"
+          data-state="open"
           style={{ left: contextMenu.x, top: contextMenu.y, boxShadow: 'var(--shadow-dropdown)' }}
         >
           <button
@@ -1097,7 +1096,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         return (
           <div
             role="menu"
-            className="fixed z-50 min-w-[230px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
+            className="motion-menu fixed z-50 min-w-[230px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
+            data-state="open"
             style={positionProjectMenu(projectContextMenu.x, projectContextMenu.y)}
             onClick={(event) => event.stopPropagation()}
           >
@@ -1340,11 +1340,11 @@ function ProjectHeaderMenu({
 }) {
   const width = type === 'sort' ? 230 : type === 'create' ? 250 : 270
   const style: React.CSSProperties = { left: x, top: y, width, boxShadow: 'var(--shadow-dropdown)' }
-  const className = 'fixed z-50 overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]'
+  const className = 'motion-menu fixed z-50 overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]'
 
   if (type === 'create') {
     return (
-      <div role="menu" className={className} style={style} onClick={(event) => event.stopPropagation()}>
+      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
         <HeaderMenuItem icon={<SquarePen size={18} aria-hidden="true" />} onClick={onCreateBlank}>
           {t('sidebar.newBlankProject')}
         </HeaderMenuItem>
@@ -1357,7 +1357,7 @@ function ProjectHeaderMenu({
 
   if (type === 'organize') {
     return (
-      <div role="menu" className={className} style={style} onClick={(event) => event.stopPropagation()}>
+      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
         <HeaderMenuItem icon={<Folder size={18} aria-hidden="true" />} checked={organization === 'project'} onClick={() => onSetOrganization('project')}>
           {t('sidebar.organizeByProject')}
         </HeaderMenuItem>
@@ -1373,7 +1373,7 @@ function ProjectHeaderMenu({
 
   if (type === 'sort') {
     return (
-      <div role="menu" className={className} style={style} onClick={(event) => event.stopPropagation()}>
+      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
         <HeaderMenuItem icon={<Clock size={18} aria-hidden="true" />} checked={sortBy === 'createdAt'} onClick={() => onSetSortBy('createdAt')}>
           {t('sidebar.sortByCreatedAt')}
         </HeaderMenuItem>
