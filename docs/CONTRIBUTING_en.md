@@ -102,6 +102,18 @@ dreamcoder/
 
 ## Development Environment
 
+> ⚠️ **Platform support note**
+>
+> DreamCoder is currently developed and verified on **Windows x64 only**.
+> The codebase includes platform branches for macOS / Linux but the maintainer does not
+> run those platforms day-to-day. If you're on macOS or Linux:
+>
+> - The desktop app **may** build and run, but you may hit untested issues
+>   (see [#25](https://github.com/GoDiao/dreamcoder/issues/25) for an active Linux memory investigation).
+> - Bug reports and platform-fix PRs are **highly welcome** — you'd be the first user on that platform.
+> - For first-time contributors on Linux specifically, consider easier non-runtime tasks
+>   (e.g. docs, i18n string fixes) before you've confirmed your build works.
+
 ```bash
 # Prerequisites
 # - Bun >= 1.0

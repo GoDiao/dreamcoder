@@ -70,6 +70,22 @@ DreamCoder brings a **native desktop interface** to that powerful engine.
 
 ---
 
+## 💻 Platform Support
+
+| Platform     | Status                                  | Pre-built Installer                                      |
+|--------------|-----------------------------------------|----------------------------------------------------------|
+| Windows x64  | ✅ Tested by maintainer                  | ✅ NSIS `.exe` + MSI `.msi` (every release)               |
+| macOS arm64  | ⚠️ Untested by maintainer (build script exists) | ❌ Community help wanted                            |
+| Linux x64    | ⚠️ Untested by maintainer                | ❌ Community help wanted                                  |
+
+> DreamCoder is currently developed and verified on **Windows x64**. The codebase includes
+> `#[cfg(target_os = "macos" / "linux")]` branches but the maintainer does not run those
+> platforms day-to-day, so non-Windows builds are best-effort. If you're a macOS/Linux user,
+> bug reports and PRs are extremely welcome — see [#25](https://github.com/GoDiao/dreamcoder/issues/25)
+> for the current Linux investigation.
+
+---
+
 ## 📅 Roadmap
 
 - [x] **Phase 1**: Desktop App (Windows/macOS) + Multi-Provider System + Project Workspace
