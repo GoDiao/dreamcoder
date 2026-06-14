@@ -108,17 +108,29 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Installation
 
+> This is a Bun monorepo (root + `desktop/` each have their own `package.json`). **All four steps are required** — skipping any one breaks `tauri dev` (missing sidecar binary or missing Tauri CLI).
+
 ```bash
-# 1. Clone the repository
+# 0. Clone the repo
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
 
-# 2. Install dependencies
+# 1. Install root workspace deps (sidecar runtime — Anthropic SDK, AWS SDK, ink, etc.)
 bun install
 
-# 3. Run in development mode
-cd desktop && bun run dev
+# 2. Install desktop deps (Tauri CLI + React frontend)
+cd desktop && bun install
+
+# 3. Compile the sidecar binary (without this, step 4 fails because externalBin can't find it)
+bun run build:sidecars
+
+# 4. Launch the desktop app in dev mode
+bun run tauri dev
 ```
+
+> **Linux users**: you also need WebKitGTK, libappindicator, librsvg, and friends installed
+> first — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/).
+> The maintainer doesn't run Linux day-to-day; PRs adding distro-specific install commands welcome.
 
 ### Configuration
 

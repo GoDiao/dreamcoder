@@ -5,20 +5,26 @@
 ## ⚡ 5 分钟快速上手 (TL;DR)
 
 ```bash
-# 1. 在 GitHub 上 Fork，然后 clone 你的 fork
+# 1. 在 GitHub 上 Fork，然后 clone 你的 fork（需要 Bun >= 1.0、Rust、Node >= 18）
 git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 
-# 2. 安装依赖（需要 Bun >= 1.0、Rust、Node >= 18）
+# 2. 装根工作区依赖（sidecar 运行时）
 bun install
 
-# 3. 启动桌面端开发模式
-cd desktop && bun run dev
+# 3. 装桌面端依赖（Tauri CLI + React 前端）
+cd desktop && bun install
 
-# 4. 在 issue 列表挑一个带 `good first issue` 或 `help wanted` 标签的任务，
+# 4. 编译 sidecar 二进制（不跑这步，下一步会因 externalBin 缺失而失败）
+bun run build:sidecars
+
+# 5. 启动桌面端开发模式
+bun run tauri dev
+
+# 6. 在 issue 列表挑一个带 `good first issue` 或 `help wanted` 标签的任务，
 #    从 dev 分支拉一个功能分支
 git checkout dev && git checkout -b feat/your-feature
 
-# 5. 写代码 → bun run lint → bun run test → push → 提 PR 到 dev 分支
+# 7. 写代码 → bun run lint → bun run test → push → 提 PR 到 dev 分支
 ```
 
 👉 **第一次贡献？** 直接看 [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)，每条都有 mentor，可以在 issue 或 PR 里直接 at 他们。
@@ -119,12 +125,31 @@ dreamcoder/
 # - Bun >= 1.0
 # - Rust (用于编译 Tauri)
 # - Node.js >= 18
+# - Linux 还需要 WebKitGTK / libappindicator / librsvg 等系统库
+#   详见 https://v2.tauri.app/start/prerequisites/
 
 git clone https://github.com/GoDiao/dreamcoder.git
-cd dreamcoder/desktop
+cd dreamcoder
+
+# Step 1: 安装根工作区依赖（sidecar：Anthropic SDK / AWS SDK / ink 等）
 bun install
+
+# Step 2: 安装桌面端依赖（Tauri CLI + React 前端）
+cd desktop && bun install
+
+# Step 3: 编译 sidecar 二进制
+#   这一步会产物 desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
+#   tauri.conf.json 里 externalBin 指向它，没有的话 step 4 会启动失败。
+bun run build:sidecars
+
+# Step 4: 启动 dev 模式
 bun run tauri dev
 ```
+
+> 看到 `failed to find binary 'dreamcoder-sidecar-...'`？
+> 99% 是漏跑了 Step 3 `bun run build:sidecars`。
+> 看到 `command not found: tauri` 或 `@tauri-apps/cli` 报错？
+> 99% 是漏跑了 Step 2 `cd desktop && bun install`（Tauri CLI 在 desktop 子包里，根 install 不会装）。
 
 ## 许可证
 

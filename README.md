@@ -140,17 +140,29 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 
 ### 安装与运行
 
+> 这是一个 Bun monorepo（根 + `desktop/` 各有独立 `package.json`），**四步都不能跳**，否则 `tauri dev` 会因为缺 sidecar 二进制 / Tauri CLI 启动失败。
+
 ```bash
-# 1. 克隆仓库
+# 0. 克隆仓库
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
 
-# 2. 安装依赖
+# 1. 安装根工作区依赖（sidecar 运行时：Anthropic SDK / AWS SDK / ink 等）
 bun install
 
-# 3. 启动桌面端开发模式
-cd desktop && bun run dev
+# 2. 安装桌面端依赖（Tauri CLI + React 前端）
+cd desktop && bun install
+
+# 3. 编译 sidecar 二进制（不跑这步，第 4 步会因 externalBin 缺失而失败）
+bun run build:sidecars
+
+# 4. 启动桌面端开发模式
+bun run tauri dev
 ```
+
+> **Linux 用户**：还需要先装好 WebKitGTK / libappindicator / librsvg 等系统库，
+> 详见 [Tauri 官方 prerequisites](https://v2.tauri.app/start/prerequisites/)。
+> 维护者不在 Linux 上日常使用，欢迎 PR 补充发行版具体命令。
 
 ### 配置 AI 模型
 

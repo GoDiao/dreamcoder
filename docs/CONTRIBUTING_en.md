@@ -5,20 +5,26 @@ Thank you for your interest in DreamCoder! Whether you're reporting a bug, sugge
 ## ⚡ 5-Minute Quick Start (TL;DR)
 
 ```bash
-# 1. Fork on GitHub, then clone your fork
+# 1. Fork on GitHub, then clone your fork (Bun >= 1.0, Rust, Node >= 18 required)
 git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 
-# 2. Install dependencies (Bun >= 1.0, Rust, Node >= 18 required)
+# 2. Install root workspace deps (sidecar runtime)
 bun install
 
-# 3. Start the desktop app in dev mode
-cd desktop && bun run dev
+# 3. Install desktop deps (Tauri CLI + React frontend)
+cd desktop && bun install
 
-# 4. Pick an issue with the `good first issue` or `help wanted` label,
+# 4. Compile the sidecar binary (without this, step 5 fails — externalBin can't find it)
+bun run build:sidecars
+
+# 5. Start the desktop app in dev mode
+bun run tauri dev
+
+# 6. Pick an issue with the `good first issue` or `help wanted` label,
 #    create a feature branch from `dev`
 git checkout dev && git checkout -b feat/your-feature
 
-# 5. Code → bun run lint → bun run test → push → open a PR targeting `dev`
+# 7. Code → bun run lint → bun run test → push → open a PR targeting `dev`
 ```
 
 👉 **First time?** Browse [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22). Each one has a mentor — feel free to ping them in the issue or PR.
@@ -119,12 +125,31 @@ dreamcoder/
 # - Bun >= 1.0
 # - Rust (for compiling Tauri)
 # - Node.js >= 18
+# - Linux also needs WebKitGTK, libappindicator, librsvg, etc.
+#   See https://v2.tauri.app/start/prerequisites/
 
 git clone https://github.com/GoDiao/dreamcoder.git
-cd dreamcoder/desktop
+cd dreamcoder
+
+# Step 1: install root workspace deps (sidecar: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
+
+# Step 2: install desktop deps (Tauri CLI + React frontend)
+cd desktop && bun install
+
+# Step 3: compile the sidecar binary
+#   Produces desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
+#   tauri.conf.json's externalBin points at it; step 4 fails to launch without it.
+bun run build:sidecars
+
+# Step 4: launch dev mode
 bun run tauri dev
 ```
+
+> Seeing `failed to find binary 'dreamcoder-sidecar-...'`?
+> 99% chance you skipped Step 3 `bun run build:sidecars`.
+> Seeing `command not found: tauri` or a `@tauri-apps/cli` error?
+> 99% chance you skipped Step 2 `cd desktop && bun install` (Tauri CLI lives in the desktop sub-package; root install won't pull it in).
 
 ## License
 
