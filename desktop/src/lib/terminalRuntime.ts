@@ -25,6 +25,17 @@ export type TerminalRuntime = {
 const runtimes = new Map<string, TerminalRuntime>()
 let localRuntimeCounter = 0
 
+function xtermMemLog(event: string, id: string) {
+  if (typeof process !== 'undefined' && process.memoryUsage) {
+    const m = process.memoryUsage()
+    console.log(
+      `[mem:xterm] ${event} id=${id} count=${runtimes.size}` +
+      ` rss=${(m.rss / 1024 / 1024).toFixed(1)}MB` +
+      ` heapUsed=${(m.heapUsed / 1024 / 1024).toFixed(1)}MB`
+    )
+  }
+}
+
 export function createLocalTerminalRuntimeId() {
   localRuntimeCounter += 1
   return `local-terminal-${localRuntimeCounter}`
@@ -47,6 +58,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
     listeners: new Set(),
   }
   runtimes.set(id, runtime)
+  xtermMemLog('create', id)
   return runtime
 }
 
@@ -89,6 +101,7 @@ export function destroyTerminalRuntime(id: string) {
   const runtime = runtimes.get(id)
   if (!runtime) return
   runtimes.delete(id)
+  xtermMemLog('destroy', id)
 
   const sessionId = runtime.nativeSessionId
   runtime.nativeSessionId = null
