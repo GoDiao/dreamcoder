@@ -1,0 +1,6 @@
+{
+  "name": "DreamCoder",
+  "description": "Claude Code 的开源桌面版 GUI 工作台 (DreamCoder Web UI & Docs Platform)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

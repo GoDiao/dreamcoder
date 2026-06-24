@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Custom palette as specified in the DreamCoder brief */
+  --color-brand-bg-primary: #f7f4ef;
+  --color-brand-bg-secondary: #efe8de;
+  --color-brand-bg-card: #e8e0d4;
+  --color-brand-border: #dad4c8;
+  --color-brand-caramel: #b87351;
+  --color-brand-success: #4a9e8c;
+  --color-brand-highlight: #d4944a;
+  
+  --color-brand-text-title: #1a1816;
+  --color-brand-text-body: #4a4845;
+  --color-brand-text-muted: #75716f;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-brand-bg-primary);
+    color: var(--color-brand-text-body);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-brand-text-title);
+    font-family: var(--font-serif);
+  }
+}
+
+/* Custom Editorial design utilities */
+.editorial-container {
+  max-width: 65ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.serif-display {
+  font-family: var(--font-serif);
+}
+
+.mono-code {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbar styling for that book-like feeling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-brand-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-brand-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-caramel);
+}
+
+/* Elegant selections */
+::selection {
+  background-color: #efe8de;
+  color: var(--color-brand-caramel);
+}
+
