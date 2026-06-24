@@ -1,0 +1,65 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { useTabStore } from '../../stores/tabStore'
+import { EmptySession } from '../../pages/EmptySession'
+import { ActiveSession } from '../../pages/ActiveSession'
+import { ScheduledTasks } from '../../pages/ScheduledTasks'
+import { Settings } from '../../pages/Settings'
+import { TerminalSettings } from '../../pages/TerminalSettings'
+
+export function ContentRouter() {
+  const activeTabId = useTabStore((s) => s.activeTabId)
+  const tabs = useTabStore((s) => s.tabs)
+  const activeTabType = tabs.find((t) => t.sessionId === activeTabId)?.type
+  const terminalTabs = tabs.filter((tab) => tab.type === 'terminal')
+  const [pageAnimating, setPageAnimating] = useState(false)
+
+  useEffect(() => {
+    setPageAnimating(false)
+    const frame = window.requestAnimationFrame(() => setPageAnimating(true))
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeTabId, activeTabType])
+
+  let page: ReactNode = null
+  if (!activeTabId || !activeTabType) {
+    page = <EmptySession />
+  } else if (activeTabType === 'settings') {
+    page = <Settings />
+  } else if (activeTabType === 'scheduled') {
+    page = <ScheduledTasks />
+  } else if (activeTabType !== 'terminal') {
+    page = <ActiveSession />
+  }
+
+  return (
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      {page && (
+        <div className={`absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden motion-page-transition${pageAnimating ? ' motion-page-transition--visible' : ''}`}>
+          {page}
+        </div>
+      )}
+      {terminalTabs.map((tab) => {
+        const active = tab.sessionId === activeTabId
+        const visible = activeTabType === 'terminal' && active
+        return (
+          <div
+            key={tab.sessionId}
+            aria-hidden={!visible}
+            data-testid={`terminal-tab-panel-${tab.sessionId}`}
+            className={`absolute inset-0 flex min-h-0 flex-col overflow-hidden transition-opacity duration-150 ease-out ${
+              visible ? 'z-20 opacity-100' : 'pointer-events-none z-0 opacity-0'
+            }`}
+          >
+            <TerminalSettings
+              active={active}
+              cwd={tab.terminalCwd}
+              runtimeId={tab.terminalRuntimeId ?? tab.sessionId}
+              workspace
+              testId={`terminal-host-${tab.sessionId}`}
+              onNewTerminal={() => useTabStore.getState().openTerminalTab(tab.terminalCwd)}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
