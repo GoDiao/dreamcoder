@@ -22,13 +22,19 @@
 
 ---
 
+<div align="right">
+
+[English](./README_en.md) | 简体中文
+
+</div>
+
 <div align="center">
 
 # DreamCoder
 
-**Claude Code 的开源桌面版 GUI**
+**Claude Code 的开源桌面端图形界面**
 
-*面向创造者的 AI 编程工作台*
+*更适合日常创作与协作的 AI 编程工作台*
 
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-blue)](https://v2.tauri.app/)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
@@ -43,48 +49,48 @@
 
 ---
 
-## ✨ 为什么是 DreamCoder？
+## ✨ 为什么选择 DreamCoder？
 
-Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
-**DreamCoder 将 Claude Code 强大的核心引擎，封装进了现代的原生桌面应用中。**
+Claude Code 的能力很强，但命令行并不适合所有人。
+**DreamCoder 把 Claude Code 的核心能力带进原生桌面应用，让会话管理、模型切换、文件操作都更直观。**
 
-> “我想要 Claude Code 的能力，但我需要一个 GUI 来管理会话、切换模型、处理文件。”
+> “我想要 Claude Code 的能力，也想要一个顺手的桌面界面来管理会话、切换模型、处理文件。”
 
-*   **非叉子 (Not a Fork)**：DreamCoder 复用了 Claude Code 的核心逻辑，或使用兼容的运行时。它只是给命令行体验穿上了一件漂亮的外衣。
-*   **隐私优先**：你的 API Key 和数据完全保存在本地。不依赖任何云端服务。
-*   **全模型支持**：无缝切换 Anthropic, OpenAI, DeepSeek, 阿里通义、MiniMax, Azure, Google Vertex 等。
+*   **基于 Claude Code 核心体验演进**：DreamCoder 复用了 Claude Code 的核心逻辑，或使用兼容运行时，在保留能力边界的同时补上桌面交互体验。
+*   **隐私优先**：API Key 与数据默认保存在本地，不依赖托管云端服务。
+*   **多模型自由切换**：无缝接入 Anthropic、OpenAI、DeepSeek、阿里通义、MiniMax、Azure、Google Vertex 等。
 
 ---
 
 ## 🚀 核心功能
 
 ### 1. 原生桌面体验
-*   **会话管理**：可视化历史、侧边栏导航、多标签页界面。
-*   **集成终端**：内置 PTY (PowerShell/Bash/Zsh)，集成 xterm.js。
-*   **可视化设置**：告别手动编辑 JSON 文件，在 UI 上直接管理 Provider 和 API Key。
+*   **会话管理更顺手**：可视化历史、侧边栏导航、多标签页界面。
+*   **终端无缝融入工作流**：内置 PTY (PowerShell/Bash/Zsh)，集成 xterm.js。
+*   **设置项可视化**：无需手动编辑 JSON，直接在 UI 中管理 Provider 和 API Key。
 
 ![主界面](./assets/main.png)
 
-### 2. 完美对接 Claude Code
-*   **Computer Use 模式**：原生支持视觉模型控制电脑（截图模式），以及全新的 **UIA Tree 模式**（文本辅助访问模式，更快、更低成本）。
-*   **工具调用可视化**：AI 读写文件、执行终端命令的过程全程透明可见。
-*   **MCP 支持**：通过 Model Context Protocol 扩展 AI 能力。
+### 2. 深度适配 Claude Code
+*   **Computer Use 双模式**：同时支持视觉截图模式，以及全新的 **UIA Tree 模式**（文本辅助访问，更快、成本更低）。
+*   **工具调用全程可见**：AI 读写文件、执行终端命令的过程透明呈现，便于理解与审查。
+*   **MCP 扩展能力**：通过 Model Context Protocol 持续扩展 AI 的上下文与工具能力。
 
 ![Computer Use 设置](./assets/setting_computeruse.png)
 
-### 3. 高级 Provider 系统
-*   **一键切换**：点击即可在不同模型供应商之间切换。
-*   **支持列表**：Anthropic (Claude), OpenAI, DeepSeek, Moonshot (Kimi), MiniMax, Azure OpenAI, Google Vertex, AWS Bedrock。
-*   **可视化测试**：在设置界面直接测试连接状态和延迟。
+### 3. 灵活的 Provider 体系
+*   **切换足够轻**：点击即可在不同模型供应商之间切换。
+*   **支持范围够广**：Anthropic (Claude)、OpenAI、DeepSeek、Moonshot (Kimi)、MiniMax、Azure OpenAI、Google Vertex、AWS Bedrock。
+*   **连接状态一眼可见**：可在设置界面直接测试可用性与延迟。
 
 ![Provider 设置](./assets/setting_provider.png)
 
 ---
 
 ### 4. MCP 扩展
-*   **MCP 原生支持**：Model Context Protocol 全面支持。
-*   **可视化配置**：告别 JSON 配置，图形界面管理 MCP 服务器。
-*   **开箱即用**：内置常用 MCP 工具集成。
+*   **原生支持 MCP**：完整接入 Model Context Protocol。
+*   **配置过程图形化**：不再手写 JSON，通过界面管理 MCP 服务器。
+*   **开箱即可扩展**：内置常用 MCP 工具集成，方便快速接入。
 
 ![MCP 技能设置](./assets/setting_skills.png)
 
@@ -107,14 +113,15 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 
 | 平台          | 状态                                          | 预编译安装包                                          |
 |---------------|-----------------------------------------------|-------------------------------------------------------|
-| Windows x64   | ✅ 维护者实测                                  | ✅ NSIS `.exe` + MSI `.msi`（每个 release 都发）       |
-| macOS arm64   | ⚠️ 维护者**未实测**（仅留有构建脚本）           | ❌ 等社区帮忙                                          |
-| Linux x64     | ⚠️ 维护者**未实测**                            | ❌ 等社区帮忙                                          |
+| Windows x64   | ✅ 维护者长期实测                              | ✅ NSIS `.exe` + MSI `.msi`（每个 release 都提供）     |
+| macOS arm64   | ⚠️ 暂未日常验证（已保留构建脚本）               | ❌ 欢迎社区共同补齐                                    |
+| Linux x64     | ⚠️ 暂未日常验证                                | ❌ 欢迎社区共同补齐                                    |
 
-> DreamCoder 当前**仅在 Windows x64 上开发与验证**。代码里有 `#[cfg(target_os = "macos" / "linux")]`
-> 分支，但维护者本人日常不在这两个平台上跑，所以非 Windows 构建处于"理论 cover、实测未知"的状态。
-> 如果你是 macOS / Linux 用户，bug 报告和 PR 都非常欢迎 ——
-> Linux 内存问题正在 [#25](https://github.com/GoDiao/dreamcoder/issues/25) 调查中。
+> DreamCoder 当前主要围绕 **Windows x64** 持续开发和验证。
+> 代码中已经保留 `#[cfg(target_os = "macos" / "linux")]` 分支，但由于维护者并不日常使用这两个平台，
+> 非 Windows 构建目前仍属于“代码已覆盖、体验待更多实机验证”的状态。
+> 如果你正在使用 macOS 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
+> Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
 
 ---
 
@@ -135,12 +142,12 @@ Claude Code 非常强大，但它是一个纯命令行工具 (CLI-only)。
 
 ### 环境要求
 *   [Bun](https://bun.sh/) >= 1.0
-*   [Rust](https://www.rust-lang.org/tools/install) (用于编译桌面端)
-*   Node.js >= 18 (部分依赖需要)
+*   [Rust](https://www.rust-lang.org/tools/install)（用于构建桌面端）
+*   Node.js >= 18（部分依赖仍会用到）
 
 ### 安装与运行
 
-> 这是一个 Bun monorepo（根 + `desktop/` 各有独立 `package.json`），**四步都不能跳**，否则 `tauri dev` 会因为缺 sidecar 二进制 / Tauri CLI 启动失败。
+> 这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）。**下面四步建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制或 Tauri CLI 缺失而无法启动。
 
 ```bash
 # 0. 克隆仓库
@@ -153,32 +160,32 @@ bun install
 # 2. 安装桌面端依赖（Tauri CLI + React 前端）
 cd desktop && bun install
 
-# 3. 编译 sidecar 二进制（不跑这步，第 4 步会因 externalBin 缺失而失败）
+# 3. 编译 sidecar 二进制
 bun run build:sidecars
 
 # 4. 启动桌面端开发模式
 bun run tauri dev
 ```
 
-> **Linux 用户**：还需要先装好 WebKitGTK / libappindicator / librsvg 等系统库，
+> **Linux 用户**：还需要先安装 WebKitGTK、libappindicator、librsvg 等系统依赖，
 > 详见 [Tauri 官方 prerequisites](https://v2.tauri.app/start/prerequisites/)。
-> 维护者不在 Linux 上日常使用，欢迎 PR 补充发行版具体命令。
+> 如果你愿意补充发行版对应命令，欢迎直接提交 PR。
 
 ### 配置 AI 模型
 
-1.  打开 DreamCoder，进入 **设置 -> Provider (模型供应商)**。
-2.  添加你的 API Key (例如：Anthropic, OpenAI, 或 DeepSeek)。
-3.  选择默认模型，即可开始编程。
+1. 打开 DreamCoder，进入 **设置 -> Provider（模型供应商）**。
+2. 添加你的 API Key（例如 Anthropic、OpenAI 或 DeepSeek）。
+3. 选择默认模型后即可开始使用。
 
 ---
 
 ## 🤝 贡献指南
 
-欢迎提交 Issue 和 PR！请阅读我们的 [贡献指南](docs/CONTRIBUTING_zh.md) 了解更多详情。
+欢迎提交 Issue 和 PR。若你准备参与改进 DreamCoder，建议先阅读 [贡献指南](docs/CONTRIBUTING_zh.md)，可以更快熟悉开发流程与协作方式。
 
 ## 📝 更新日志
 
-版本历史详见 [CHANGELOG.md](CHANGELOG.md)。
+版本演进与重要变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 📄 许可证
 

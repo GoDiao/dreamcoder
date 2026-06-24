@@ -1,3 +1,5 @@
+[English](./ROADMAP_en.md) | 简体中文
+
 # 路线图
 
 ## Phase 1 — 桌面端 GUI + 多模型支持 ✅

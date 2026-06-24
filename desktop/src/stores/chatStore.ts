@@ -169,6 +169,20 @@ type ChatStore = {
 
 const TASK_TOOL_NAMES = new Set(['TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TodoWrite'])
 const TASK_STOP_TOOL_NAMES = new Set(['TaskStop', 'KillShell'])
+const MAX_MESSAGES = 5000
+
+/** Trim messages array from the head, preserving the first system message if present. */
+function trimMessages(messages: UIMessage[], max: number = MAX_MESSAGES): UIMessage[] {
+  if (messages.length <= max) return messages
+  const trimCount = messages.length - max
+  const keepHead = messages[0]?.type === 'system' ? 1 : 0
+  return messages.slice(trimCount + keepHead)
+}
+
+/** Append a message and trim if over cap. */
+function appendMessage(messages: UIMessage[], msg: UIMessage): UIMessage[] {
+  return trimMessages([...messages, msg])
+}
 const pendingTaskToolUseIdsBySession = new Map<string, Set<string>>()
 const pendingToolParentUseIdsBySession = new Map<string, Map<string, string>>()
 
@@ -296,7 +310,7 @@ function upsertToolUseMessage(
       message.type === 'tool_use' && message.toolUseId === toolUseId,
   )
   if (existingIndex < 0) {
-    return [...messages, build()]
+    return appendMessage(messages, build())
   }
 
   const next = [...messages]
@@ -406,17 +420,14 @@ function appendAssistantTextMessage(
     return [...messages.slice(0, -1), merged]
   }
 
-  return [
-    ...messages,
-    {
-      id: nextId(),
-      type: 'assistant_text',
-      content,
-      timestamp,
-      ...(transcriptMessageId ? { transcriptMessageId } : {}),
-      ...(model ? { model } : {}),
-    },
-  ]
+  return appendMessage(messages, {
+    id: nextId(),
+    type: 'assistant_text',
+    content,
+    timestamp,
+    ...(transcriptMessageId ? { transcriptMessageId } : {}),
+    ...(model ? { model } : {}),
+  })
 }
 
 function extractCompactSummaryContent(content: unknown): string | null {
@@ -480,16 +491,13 @@ function appendOrUpdateTailCompactSummary(
     ]
   }
 
-  return [
-    ...messages,
-    {
-      id: nextId(),
-      type: 'compact_summary',
-      title: update.title ?? 'Context compacted',
-      ...update,
-      timestamp,
-    },
-  ]
+  return appendMessage(messages, {
+    id: nextId(),
+    type: 'compact_summary',
+    title: update.title ?? 'Context compacted',
+    ...update,
+    timestamp,
+  })
 }
 
 function dropTailCompactingCompactSummary(messages: UIMessage[]): UIMessage[] {
@@ -517,12 +525,12 @@ function upsertBackgroundTaskMessage(
   const existingIndex = messages.findIndex((message) =>
     isSameTaskMessage(message))
   if (existingIndex === -1) {
-    return [...messages, {
+    return appendMessage(messages, {
       id: `background-task-${task.taskId}`,
       type: 'background_task',
       task,
       timestamp,
-    }]
+    })
   }
 
   return messages.map((message, index) =>
@@ -1414,7 +1422,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }
           const id = nextId()
           return {
-            messages: [...base, { id, type: 'thinking', content: msg.text, timestamp: Date.now() }],
+            messages: appendMessage(base, { id, type: 'thinking', content: msg.text, timestamp: Date.now() }),
             chatState: 'thinking',
             activeThinkingId: id,
             streamingText: '',
@@ -1441,12 +1449,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 parentToolUseId,
                 isPending: false,
               }))
-            : [...s.messages, {
+            : appendMessage(s.messages, {
                 id: nextId(), type: 'tool_use', toolName,
                 toolUseId,
                 input: msg.input, timestamp: Date.now(), parentToolUseId,
                 isPending: false,
-              }],
+              }),
           activeToolUseId: null, activeToolName: null, activeThinkingId: null, streamingToolInput: '',
         }))
         if (toolName === 'TodoWrite' && Array.isArray((msg.input as any)?.todos)) {
@@ -1463,10 +1471,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const pendingParentToolUseId = consumePendingToolParentUseId(sessionId, msg.toolUseId)
         const parentToolUseId = msg.parentToolUseId ?? pendingParentToolUseId
         update((s) => {
-          let messages: UIMessage[] = [...s.messages, {
+          let messages: UIMessage[] = appendMessage(s.messages, {
             id: nextId(), type: 'tool_result', toolUseId: msg.toolUseId,
             content: msg.content, isError: msg.isError, timestamp: now, parentToolUseId,
-          }]
+          })
           let backgroundAgentTasks = s.backgroundAgentTasks ?? {}
           const stoppedTask = msg.isError
             ? null
@@ -1517,7 +1525,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           messages:
             msg.toolName === 'AskUserQuestion'
               ? s.messages
-              : [...s.messages, {
+              : appendMessage(s.messages, {
                   id: nextId(),
                   type: 'permission_request',
                   requestId: msg.requestId,
@@ -1526,7 +1534,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                   input: msg.input,
                   description: msg.description,
                   timestamp: Date.now(),
-                }],
+                }),
         }))
         break
 

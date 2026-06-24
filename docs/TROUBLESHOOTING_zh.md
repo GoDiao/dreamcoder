@@ -1,3 +1,5 @@
+[English](./TROUBLESHOOTING.md) | 简体中文
+
 # 常见问题排查
 
 构建或运行 DreamCoder 时的常见问题及解决方法。

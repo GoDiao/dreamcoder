@@ -1,3 +1,5 @@
+English | [简体中文](./ROADMAP_zh.md)
+
 # Roadmap
 
 ## Phase 1 — Desktop GUI + Multi-Provider ✅

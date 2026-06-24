@@ -1,3 +1,5 @@
+English | [简体中文](./CONTRIBUTING_zh.md)
+
 # Contributing to DreamCoder
 
 Thank you for your interest in DreamCoder! Whether you're reporting a bug, suggesting a feature, or submitting code, all contributions are welcome.

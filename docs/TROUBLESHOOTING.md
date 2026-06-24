@@ -1,3 +1,5 @@
+English | [简体中文](./TROUBLESHOOTING_zh.md)
+
 # Troubleshooting
 
 Common issues when building or running DreamCoder, and how to fix them.

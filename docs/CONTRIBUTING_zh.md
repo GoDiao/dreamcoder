@@ -1,3 +1,5 @@
+[English](./CONTRIBUTING_en.md) | 简体中文
+
 # Contributing to DreamCoder
 
 感谢你对 DreamCoder 的关注！无论是报告 bug、提出功能建议，还是提交代码，都非常欢迎。

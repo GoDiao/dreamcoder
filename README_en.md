@@ -4,13 +4,19 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 -->
 
+<div align="right">
+
+English | [简体中文](./README.md)
+
+</div>
+
 <div align="center">
 
 # DreamCoder
 
-**The Open-Source Desktop GUI for Claude Code**
+**An open-source desktop GUI for Claude Code**
 
-*A full-featured AI coding workbench that combines the power of Claude Code with a modern native desktop experience.*
+*A polished AI coding workspace built for everyday creation and collaboration.*
 
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-blue)](https://v2.tauri.app/)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
@@ -27,33 +33,33 @@
 
 ## ✨ Why DreamCoder?
 
-Claude Code is powerful, but it's CLI-only.
-DreamCoder brings a **native desktop interface** to that powerful engine.
+Claude Code is powerful, but the command line is not the best interface for every workflow.
+**DreamCoder brings Claude Code's core capabilities into a native desktop app, making session management, model switching, and file operations far more intuitive.**
 
-> "I want the power of Claude Code, but I need a GUI for session management, provider switching, and visual interaction."
+> "I want the power of Claude Code, plus a desktop interface that makes sessions, models, and files easier to manage."
 
-*   **Not a Fork**: DreamCoder runs alongside Claude Code logic (or replaces it with compatible runtimes). It wraps the CLI experience in a beautiful, usable window.
-*   **Privacy First**: Your API keys and data stay on your machine. No cloud dependency required.
-*   **Universal Provider**: Seamlessly switch between Anthropic, OpenAI, DeepSeek, Azure, Google Vertex, and more.
+*   **Built on the Claude Code experience**: DreamCoder reuses Claude Code's core logic, or a compatible runtime, and adds the desktop interaction layer that many daily workflows need.
+*   **Privacy first**: API keys and data stay on your machine by default, with no hosted cloud dependency required.
+*   **Freedom across providers**: Seamlessly switch between Anthropic, OpenAI, DeepSeek, Azure, Google Vertex, and more.
 
 ---
 
 ## 🚀 Key Features
 
 ### 1. Native Desktop Experience
-*   **Session Management**: Visual history, sidebar navigation, and tabbed interface.
-*   **Integrated Terminal**: Built-in PTY (PowerShell/Bash/Zsh) with xterm.js.
-*   **Settings GUI**: Manage providers, API keys, and preferences without editing JSON files.
+*   **Smoother session management**: Visual history, sidebar navigation, and a tabbed interface.
+*   **Terminal built into the workflow**: Built-in PTY (PowerShell/Bash/Zsh) with xterm.js.
+*   **Settings you can manage visually**: Configure providers, API keys, and preferences without editing JSON files.
 
-### 2. Claude Code Compatibility
-*   **Computer Use Mode**: Native support for visual AI control (screenshots) AND the new **UIA Tree mode** (text-only accessibility, faster, lower cost).
-*   **Tool Execution**: Fully transparent file editing and command execution.
-*   **MCP Support**: Extend AI capabilities with the Model Context Protocol.
+### 2. Deep Claude Code Integration
+*   **Dual Computer Use modes**: Supports both visual screenshot control and the new **UIA Tree mode** (text-based accessibility, faster and more cost-efficient).
+*   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
+*   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
 
-### 3. Advanced Provider System
-*   One-click switching between multiple LLM providers.
-*   **Supported**: Anthropic (Claude), OpenAI, DeepSeek, Moonshot (Kimi), MiniMax, Azure OpenAI, Google Vertex, AWS Bedrock.
-*   **Visual Testing**: Test connectivity and latency directly in the settings UI.
+### 3. Flexible Provider Layer
+*   **Switch providers in one click**: Move between model vendors without friction.
+*   **Broad model coverage**: Anthropic (Claude), OpenAI, DeepSeek, Moonshot (Kimi), MiniMax, Azure OpenAI, Google Vertex, AWS Bedrock.
+*   **Connectivity visible at a glance**: Test availability and latency directly from Settings.
 
 ---
 
@@ -74,15 +80,15 @@ DreamCoder brings a **native desktop interface** to that powerful engine.
 
 | Platform     | Status                                  | Pre-built Installer                                      |
 |--------------|-----------------------------------------|----------------------------------------------------------|
-| Windows x64  | ✅ Tested by maintainer                  | ✅ NSIS `.exe` + MSI `.msi` (every release)               |
-| macOS arm64  | ⚠️ Untested by maintainer (build script exists) | ❌ Community help wanted                            |
-| Linux x64    | ⚠️ Untested by maintainer                | ❌ Community help wanted                                  |
+| Windows x64  | ✅ Maintainer-tested regularly           | ✅ NSIS `.exe` + MSI `.msi` (published with each release) |
+| macOS arm64  | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
+| Linux x64    | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
 
-> DreamCoder is currently developed and verified on **Windows x64**. The codebase includes
-> `#[cfg(target_os = "macos" / "linux")]` branches but the maintainer does not run those
-> platforms day-to-day, so non-Windows builds are best-effort. If you're a macOS/Linux user,
-> bug reports and PRs are extremely welcome — see [#25](https://github.com/GoDiao/dreamcoder/issues/25)
-> for the current Linux investigation.
+> DreamCoder is developed and validated primarily on **Windows x64**.
+> The codebase already includes `#[cfg(target_os = "macos" / "linux")]` branches, but those platforms
+> are not part of the maintainer's day-to-day workflow yet, so non-Windows support is still best-effort.
+> If you're running DreamCoder on macOS or Linux, issues and PRs are especially valuable;
+> for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
 
 ---
 
@@ -103,50 +109,50 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Prerequisites
 *   [Bun](https://bun.sh/) >= 1.0
-*   [Rust](https://www.rust-lang.org/tools/install) (for building the desktop app)
-*   Node.js >= 18 (for some dependencies)
+*   [Rust](https://www.rust-lang.org/tools/install) (required to build the desktop app)
+*   Node.js >= 18 (still needed by parts of the dependency chain)
 
 ### Installation
 
-> This is a Bun monorepo (root + `desktop/` each have their own `package.json`). **All four steps are required** — skipping any one breaks `tauri dev` (missing sidecar binary or missing Tauri CLI).
+> This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all four steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary or missing Tauri CLI pieces.
 
 ```bash
 # 0. Clone the repo
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
 
-# 1. Install root workspace deps (sidecar runtime — Anthropic SDK, AWS SDK, ink, etc.)
+# 1. Install root workspace dependencies (sidecar runtime: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
 
-# 2. Install desktop deps (Tauri CLI + React frontend)
+# 2. Install desktop dependencies (Tauri CLI + React frontend)
 cd desktop && bun install
 
-# 3. Compile the sidecar binary (without this, step 4 fails because externalBin can't find it)
+# 3. Build the sidecar binary
 bun run build:sidecars
 
 # 4. Launch the desktop app in dev mode
 bun run tauri dev
 ```
 
-> **Linux users**: you also need WebKitGTK, libappindicator, librsvg, and friends installed
-> first — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/).
-> The maintainer doesn't run Linux day-to-day; PRs adding distro-specific install commands welcome.
+> **Linux users**: you will also need system packages such as WebKitGTK, libappindicator, and librsvg.
+> See the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/) for details.
+> If you can contribute distro-specific setup commands, a PR would be greatly appreciated.
 
-### Configuration
+### Configure Your Model
 
-1.  Open DreamCoder and go to **Settings -> Providers**.
-2.  Add your API Key (e.g., for Anthropic, OpenAI, or DeepSeek).
-3.  Select the default model and start coding.
+1. Open DreamCoder and go to **Settings -> Providers**.
+2. Add your API key (for example Anthropic, OpenAI, or DeepSeek).
+3. Choose a default model and start coding.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](docs/CONTRIBUTING_en.md) for details.
+Issues and pull requests are welcome. If you'd like to improve DreamCoder, start with the [Contributing Guide](docs/CONTRIBUTING_en.md) to get familiar with the workflow and collaboration style.
 
 ## 📝 Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+For release history and notable updates, see [CHANGELOG.md](CHANGELOG.md).
 
 ## 📄 License
 
