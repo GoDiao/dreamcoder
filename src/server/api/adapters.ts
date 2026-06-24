@@ -1,0 +1,231 @@
+/**
+ * Adapters API — IM Adapter 配置读写
+ *
+ * GET  /api/adapters  → 返回配置（敏感字段脱敏）
+ * PUT  /api/adapters  → 更新配置（浅合并），返回更新后的脱敏配置
+ */
+
+import { adapterService } from '../services/adapterService.js'
+import { ApiError, errorResponse } from '../middleware/errorHandler.js'
+import {
+  pollWechatLoginWithQr,
+  startWechatLoginWithQr,
+  WECHAT_DEFAULT_BASE_URL,
+} from '../../../adapters/wechat/protocol.js'
+
+const ALLOWED_TOP_KEYS = new Set(['serverUrl', 'defaultProjectDir', 'telegram', 'feishu', 'wechat', 'dingtalk', 'pairing'])
+
+type RegistrationApiResponse<T extends Record<string, unknown>> = T & {
+  errcode: number
+  errmsg?: string
+}
+
+type RegistrationBeginPayload = {
+  deviceCode: string
+  userCode?: string
+  verificationUri?: string
+  verificationUriComplete: string
+  expiresInSeconds: number
+  intervalSeconds: number
+  qrDataUrl?: string
+}
+
+const DINGTALK_REGISTRATION_BASE_URL =
+  process.env.DINGTALK_REGISTRATION_BASE_URL?.trim() || 'https://oapi.dingtalk.com'
+const DINGTALK_REGISTRATION_SOURCE =
+  process.env.DINGTALK_REGISTRATION_SOURCE?.trim() || 'DING_DWS_CLAW'
+
+async function postDingtalkRegistration<T extends Record<string, unknown>>(
+  path: string,
+  body: Record<string, unknown>,
+  action: string,
+): Promise<RegistrationApiResponse<T>> {
+  const res = await fetch(`${DINGTALK_REGISTRATION_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => null) as RegistrationApiResponse<T> | null
+  if (!res.ok || !data || data.errcode !== 0) {
+    throw ApiError.internal(`[DingTalk ${action}] ${data?.errmsg || res.statusText || 'unknown error'}`)
+  }
+  return data
+}
+
+async function createQrDataUrl(text: string): Promise<string | undefined> {
+  try {
+    const qr = await import('qrcode') as any
+    return await qr.toDataURL(text, { margin: 1, width: 220 })
+  } catch {
+    return undefined
+  }
+}
+
+async function beginDingtalkRegistration(): Promise<RegistrationBeginPayload> {
+  const initData = await postDingtalkRegistration<{ nonce?: string }>(
+    '/app/registration/init',
+    { source: DINGTALK_REGISTRATION_SOURCE },
+    'init',
+  )
+  const nonce = String(initData.nonce ?? '').trim()
+  if (!nonce) throw ApiError.internal('[DingTalk init] missing nonce')
+
+  const beginData = await postDingtalkRegistration<{
+    device_code?: string
+    user_code?: string
+    verification_uri?: string
+    verification_uri_complete?: string
+    expires_in?: number
+    interval?: number
+  }>('/app/registration/begin', { nonce }, 'begin')
+
+  const deviceCode = String(beginData.device_code ?? '').trim()
+  const verificationUriComplete = String(beginData.verification_uri_complete ?? '').trim()
+  if (!deviceCode) throw ApiError.internal('[DingTalk begin] missing device_code')
+  if (!verificationUriComplete) throw ApiError.internal('[DingTalk begin] missing verification_uri_complete')
+
+  const expiresInSeconds = Number(beginData.expires_in ?? 7200)
+  const intervalSeconds = Number(beginData.interval ?? 3)
+
+  return {
+    deviceCode,
+    userCode: String(beginData.user_code ?? '').trim() || undefined,
+    verificationUri: String(beginData.verification_uri ?? '').trim() || undefined,
+    verificationUriComplete,
+    expiresInSeconds: Number.isFinite(expiresInSeconds) && expiresInSeconds > 0 ? expiresInSeconds : 7200,
+    intervalSeconds: Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds : 3,
+    qrDataUrl: await createQrDataUrl(verificationUriComplete),
+  }
+}
+
+async function pollDingtalkRegistration(deviceCode: string): Promise<Response> {
+  if (!deviceCode) throw ApiError.badRequest('deviceCode is required')
+
+  const pollData = await postDingtalkRegistration<{
+    status?: string
+    client_id?: string
+    client_secret?: string
+    fail_reason?: string
+  }>('/app/registration/poll', { device_code: deviceCode }, 'poll')
+
+  const status = String(pollData.status ?? '').trim().toUpperCase()
+  if (status === 'SUCCESS') {
+    const clientId = String(pollData.client_id ?? '').trim()
+    const clientSecret = String(pollData.client_secret ?? '').trim()
+    if (!clientId || !clientSecret) {
+      throw ApiError.internal('DingTalk authorization succeeded but credentials are missing')
+    }
+    await adapterService.updateConfig({
+      dingtalk: {
+        clientId,
+        clientSecret,
+      },
+    })
+    return Response.json({
+      status,
+      config: await adapterService.getConfig(),
+    })
+  }
+
+  return Response.json({
+    status: status || 'UNKNOWN',
+    failReason: String(pollData.fail_reason ?? '').trim() || undefined,
+  })
+}
+
+export async function handleAdaptersApi(
+  req: Request,
+  _url: URL,
+  _segments: string[],
+): Promise<Response> {
+  try {
+    const tail = _segments.slice(2)
+    if (tail[0] === 'wechat') {
+      return handleWechatAdaptersApi(req, tail.slice(1))
+    }
+    if (tail[0] === 'dingtalk' && req.method === 'POST' && tail[1] === 'unbind') {
+      await adapterService.updateConfig({
+        dingtalk: {
+          clientId: undefined,
+          clientSecret: undefined,
+          allowedUsers: [],
+          pairedUsers: [],
+          permissionCardTemplateId: undefined,
+        },
+      })
+      return Response.json(await adapterService.getConfig())
+    }
+    if (tail[0] === 'dingtalk' && tail[1] === 'registration') {
+      if (req.method === 'POST' && tail[2] === 'begin') {
+        return Response.json(await beginDingtalkRegistration())
+      }
+      if (req.method === 'POST' && tail[2] === 'poll') {
+        const body = await req.json().catch(() => ({})) as { deviceCode?: string }
+        return pollDingtalkRegistration(String(body.deviceCode ?? '').trim())
+      }
+    }
+
+    if (req.method === 'GET') {
+      const config = await adapterService.getConfig()
+      return Response.json(config)
+    }
+
+    if (req.method === 'PUT') {
+      const body = (await req.json()) as Record<string, unknown>
+      // Basic validation: only allow known top-level keys
+      for (const key of Object.keys(body)) {
+        if (!ALLOWED_TOP_KEYS.has(key)) {
+          throw ApiError.badRequest(`Unknown config key: ${key}`)
+        }
+      }
+      await adapterService.updateConfig(body)
+      const config = await adapterService.getConfig()
+      return Response.json(config)
+    }
+
+    throw new ApiError(405, `Method ${req.method} not allowed`, 'METHOD_NOT_ALLOWED')
+  } catch (error) {
+    return errorResponse(error)
+  }
+}
+
+async function handleWechatAdaptersApi(req: Request, tail: string[]): Promise<Response> {
+  if (req.method === 'POST' && tail[0] === 'login' && tail[1] === 'start') {
+    const result = await startWechatLoginWithQr({ force: true })
+    return Response.json(result)
+  }
+
+  if (req.method === 'POST' && tail[0] === 'login' && tail[1] === 'poll') {
+    const body = (await req.json()) as { sessionKey?: string }
+    if (!body.sessionKey) throw ApiError.badRequest('Missing sessionKey')
+    const result = await pollWechatLoginWithQr({ sessionKey: body.sessionKey })
+    if (result.connected) {
+      await adapterService.updateConfig({
+        wechat: {
+          accountId: result.accountId,
+          botToken: result.botToken,
+          baseUrl: result.baseUrl || WECHAT_DEFAULT_BASE_URL,
+          userId: result.userId,
+          pairedUsers: [],
+        },
+      })
+    }
+    return Response.json(result.connected ? await adapterService.getConfig() : result)
+  }
+
+  if (req.method === 'POST' && tail[0] === 'unbind') {
+    await adapterService.updateConfig({
+      wechat: {
+        accountId: undefined,
+        botToken: undefined,
+        baseUrl: WECHAT_DEFAULT_BASE_URL,
+        userId: undefined,
+        pairedUsers: [],
+        allowedUsers: [],
+      },
+    })
+    return Response.json(await adapterService.getConfig())
+  }
+
+  throw new ApiError(404, 'Unknown WeChat adapter endpoint', 'NOT_FOUND')
+}

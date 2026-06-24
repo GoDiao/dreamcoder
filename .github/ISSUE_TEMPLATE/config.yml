@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions / Q&A
+    url: https://github.com/GoDiao/dreamcoder/discussions
+    about: Ask questions, share ideas, or chat with the community.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/GoDiao/dreamcoder/security/advisories/new
+    about: Please disclose security issues privately, not in public Issues.

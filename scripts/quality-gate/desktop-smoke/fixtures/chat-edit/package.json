@@ -1,0 +1,8 @@
+{
+  "name": "desktop-smoke-chat-edit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  }
+}

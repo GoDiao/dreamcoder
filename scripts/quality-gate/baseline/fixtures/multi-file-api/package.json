@@ -1,0 +1,8 @@
+{
+  "name": "quality-gate-multi-file-api-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  }
+}

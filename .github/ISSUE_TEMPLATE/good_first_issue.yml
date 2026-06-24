@@ -1,0 +1,60 @@
+name: 🌱 Good First Issue (maintainers)
+description: Maintainer-only template for proposing onboarding-friendly tasks.
+title: "[good first issue] "
+labels: ["good first issue", "mentor-available"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when curating a task that's friendly for new contributors.
+        Be concrete: someone who has never touched the repo should be able to start in 30 minutes.
+
+  - type: textarea
+    id: background
+    attributes:
+      label: Background / context
+      description: Why does this task exist? Link to related code or prior discussion.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Checklist of concrete steps.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files of interest
+      placeholder: |
+        - desktop/src/components/...
+        - desktop/src/i18n/...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Difficulty
+      options:
+        - "⭐ (30min – 2h)"
+        - "⭐⭐ (half day – 1 day)"
+        - "⭐⭐⭐ (multi-day, design needed)"
+    validations:
+      required: true
+
+  - type: input
+    id: mentor
+    attributes:
+      label: Mentor
+      description: GitHub handle that contributors can ping for help.
+      placeholder: "@GoDiao"
+    validations:
+      required: true

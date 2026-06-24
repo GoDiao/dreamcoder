@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f0726"/>
+      <stop offset="100%" stop-color="#060311"/>
+    </linearGradient>
+    <linearGradient id="dGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="cGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="192" fill="url(#bg)"/>
+
+  <!-- Ambient glow -->
+  <ellipse cx="512" cy="512" rx="320" ry="260" fill="#4f46e5" opacity="0.07"/>
+
+  <!--
+    Re-centered: midpoint of bounding box = 512
+    D: cx=225, cy=512, r=280  |  C: cx=565, cy=512, r=240  |  d=340
+    Left bound: 225-45=180   Right bound: 565+240+40=845
+    Midpoint: (180+845)/2 = 512.5 ✓
+
+    Intersections:
+    a = (280²-240²+340²)/680 = 200.6  h = 195.4
+    → (426, 317) and (426, 707)
+  -->
+
+  <!-- L1: D vertical bar -->
+  <line x1="225" y1="232" x2="225" y2="792"
+    stroke="url(#dGrad)" stroke-width="90" stroke-linecap="round"/>
+
+  <!-- L2: D arc — full semicircle behind C -->
+  <path d="M 225 792 A 280 280 0 0 1 225 232"
+    fill="none" stroke="url(#dGrad)" stroke-width="90"/>
+
+  <!-- L3: C arc — 260° sweep, gap faces right -->
+  <path d="M 719 328 A 240 240 0 1 0 719 696"
+    fill="none" stroke="url(#cGrad)" stroke-width="80" stroke-linecap="round"/>
+
+  <!-- L4: D arc front segment — interlock over C -->
+  <path d="M 426 317 A 280 280 0 0 1 426 707"
+    fill="none" stroke="url(#dGrad)" stroke-width="90"/>
+</svg>

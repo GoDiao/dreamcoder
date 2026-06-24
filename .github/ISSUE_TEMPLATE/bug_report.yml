@@ -1,0 +1,99 @@
+name: 🐛 Bug Report
+description: Report something that is broken or behaves unexpectedly.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report!
+        Please fill in as much as you can — every field helps us reproduce faster.
+
+  - type: checkboxes
+    id: prereqs
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I'm using the latest release (or a recent `dev` build).
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: DreamCoder version
+      description: Settings → About, or the release tag you installed.
+      placeholder: "0.3.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Active provider
+      options:
+        - Anthropic
+        - OpenAI
+        - DeepSeek
+        - Moonshot (Kimi)
+        - MiniMax
+        - Azure OpenAI
+        - Google Vertex
+        - AWS Bedrock
+        - Other / N/A
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably trigger the bug.
+      placeholder: |
+        1. Open DreamCoder
+        2. Go to Settings → Provider
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Paste relevant logs or attach screenshots. Logs from the sidecar terminal are especially helpful.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Network setup (proxy/VPN), unusual configuration, etc.

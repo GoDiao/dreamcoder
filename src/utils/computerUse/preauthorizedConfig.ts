@@ -1,0 +1,83 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import type { CuGrantFlags } from '../../vendor/computer-use-mcp/types.js'
+import { getClaudeConfigHomeDir } from '../envUtils.js'
+
+export type StoredAuthorizedApp = {
+  bundleId: string
+  displayName: string
+  authorizedAt?: string
+}
+
+export type ComputerUseMode = 'vision' | 'uia_tree'
+
+export type StoredComputerUseConfig = {
+  enabled?: boolean
+  mode?: ComputerUseMode
+  authorizedApps?: StoredAuthorizedApp[]
+  grantFlags?: Partial<CuGrantFlags>
+  pythonPath?: string | null
+}
+
+export const DEFAULT_COMPUTER_USE_ENABLED = true
+export const DEFAULT_COMPUTER_USE_MODE: ComputerUseMode = 'vision'
+
+export const DEFAULT_DESKTOP_GRANT_FLAGS: CuGrantFlags = {
+  clipboardRead: true,
+  clipboardWrite: true,
+  systemKeyCombos: true,
+}
+
+export function getComputerUseConfigPath(): string {
+  return join(
+    getClaudeConfigHomeDir(),
+    'dreamcoder',
+    'computer-use-config.json',
+  )
+}
+
+export function resolveStoredComputerUseConfig(
+  config?: StoredComputerUseConfig,
+): {
+  enabled: boolean
+  mode: ComputerUseMode
+  authorizedApps: StoredAuthorizedApp[]
+  grantFlags: CuGrantFlags
+  pythonPath: string | null
+} {
+  return {
+    enabled: config?.enabled ?? DEFAULT_COMPUTER_USE_ENABLED,
+    mode: config?.mode ?? DEFAULT_COMPUTER_USE_MODE,
+    authorizedApps: config?.authorizedApps ?? [],
+    grantFlags: {
+      ...DEFAULT_DESKTOP_GRANT_FLAGS,
+      ...(config?.grantFlags ?? {}),
+    },
+    pythonPath: normalizePythonPath(config?.pythonPath),
+  }
+}
+
+export function normalizePythonPath(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+export async function loadStoredComputerUseConfig(): Promise<
+  ReturnType<typeof resolveStoredComputerUseConfig>
+> {
+  try {
+    const raw = await readFile(getComputerUseConfigPath(), 'utf8')
+    return resolveStoredComputerUseConfig(JSON.parse(raw))
+  } catch {
+    return resolveStoredComputerUseConfig()
+  }
+}
+
+export async function saveStoredComputerUseConfig(
+  config: StoredComputerUseConfig,
+): Promise<void> {
+  const configPath = getComputerUseConfigPath()
+  await mkdir(dirname(configPath), { recursive: true })
+  await writeFile(configPath, JSON.stringify(config, null, 2), 'utf8')
+}

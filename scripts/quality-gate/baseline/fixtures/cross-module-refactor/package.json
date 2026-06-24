@@ -1,0 +1,8 @@
+{
+  "name": "quality-gate-cross-module-refactor-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  }
+}

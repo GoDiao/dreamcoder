@@ -1,0 +1,8 @@
+{
+  "name": "quality-gate-permission-artifact-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  }
+}

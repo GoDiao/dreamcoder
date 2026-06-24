@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient: light mint to white -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0fdf8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ecfdf5;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Main emerald gradient for shapes -->
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Accent gradient for sparkle -->
+    <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6ee7b7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Inner glow filter -->
+    <filter id="innerGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feFlood flood-color="#10b981" flood-opacity="0.18" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft drop shadow -->
+    <filter id="softShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#059669" flood-opacity="0.15"/>
+    </filter>
+
+    <!-- Sparkle glow -->
+    <filter id="sparkleGlow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip to rounded square -->
+    <clipPath id="roundedClip">
+      <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bgGrad)"/>
+
+  <!-- Subtle inner border glow ring -->
+  <rect x="6" y="6" width="500" height="500" rx="108" ry="108"
+        fill="none" stroke="#10b981" stroke-width="2.5" stroke-opacity="0.18"/>
+
+  <!-- ── TERMINAL ">" CHEVRON ── -->
+  <!-- Bold, rounded chevron pointing right, centered slightly left -->
+  <g filter="url(#softShadow)">
+    <polyline
+      points="168,174 296,256 168,338"
+      fill="none"
+      stroke="url(#emeraldGrad)"
+      stroke-width="52"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Underscore cursor bar — blinking cursor metaphor -->
+  <rect x="296" y="318" width="88" height="36" rx="18" ry="18"
+        fill="url(#emeraldGrad)" opacity="0.85"/>
+
+  <!-- ── SPARKLE / STAR MOTIF (top-right quadrant) ── -->
+  <!-- Large 4-point star -->
+  <g filter="url(#sparkleGlow)" transform="translate(358, 148)">
+    <!-- Vertical bar -->
+    <ellipse cx="0" cy="0" rx="9" ry="38" fill="url(#sparkleGrad)" opacity="0.95"/>
+    <!-- Horizontal bar -->
+    <ellipse cx="0" cy="0" rx="38" ry="9" fill="url(#sparkleGrad)" opacity="0.95"/>
+    <!-- Diagonal 1 -->
+    <ellipse cx="0" cy="0" rx="6" ry="26" fill="url(#sparkleGrad)" opacity="0.7"
+             transform="rotate(45)"/>
+    <!-- Diagonal 2 -->
+    <ellipse cx="0" cy="0" rx="6" ry="26" fill="url(#sparkleGrad)" opacity="0.7"
+             transform="rotate(-45)"/>
+  </g>
+
+  <!-- Small secondary sparkle (lower-right, subtle) -->
+  <g filter="url(#sparkleGlow)" transform="translate(400, 310)" opacity="0.55">
+    <ellipse cx="0" cy="0" rx="5" ry="20" fill="#10b981"/>
+    <ellipse cx="0" cy="0" rx="20" ry="5" fill="#10b981"/>
+    <ellipse cx="0" cy="0" rx="3.5" ry="14" fill="#10b981" transform="rotate(45)"/>
+    <ellipse cx="0" cy="0" rx="3.5" ry="14" fill="#10b981" transform="rotate(-45)"/>
+  </g>
+
+  <!-- Tiny dot sparkle accent (top-left area) -->
+  <circle cx="148" cy="152" r="10" fill="#6ee7b7" opacity="0.5"/>
+  <circle cx="130" cy="172" r="5.5" fill="#34d399" opacity="0.35"/>
+
+  <!-- Tiny dot sparkle accent (bottom area) -->
+  <circle cx="200" cy="390" r="7" fill="#6ee7b7" opacity="0.4"/>
+  <circle cx="178" cy="375" r="4" fill="#34d399" opacity="0.3"/>
+
+  <!-- Outer rounded square stroke for polish -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112"
+        fill="none" stroke="#d1fae5" stroke-width="3"/>
+</svg>

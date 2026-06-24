@@ -1,0 +1,163 @@
+[
+  {
+    "id": "dreamfield",
+    "name": "DreamField 官方",
+    "baseUrl": "https://www.dreamfield.top",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "deepseek-v4-pro",
+      "haiku": "DeepSeek-V4-Flash",
+      "sonnet": "deepseek-v4-pro",
+      "opus": "deepseek-v4-pro"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://www.dreamfield.top",
+    "authStrategy": "auth_token",
+    "promoText": "DreamField — AI 算力服务平台，DreamCoder 官方推荐 Provider",
+    "featured": true,
+    "modelContextWindows": {
+      "deepseek-v4-pro": 1000000,
+      "DeepSeek-V4-Flash": 1000000,
+      "GLM-5.1": 200000
+    }
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek 官方",
+    "baseUrl": "https://api.deepseek.com/anthropic",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "deepseek-v4-pro",
+      "haiku": "deepseek-v4-flash",
+      "sonnet": "deepseek-v4-pro",
+      "opus": "deepseek-v4-pro"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://platform.deepseek.com",
+    "apiKeyUrl": "https://platform.deepseek.com/api_keys",
+    "authStrategy": "auth_token",
+    "defaultEnv": {
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort"
+    },
+    "modelContextWindows": {
+      "deepseek-v4-pro": 1000000,
+      "deepseek-v4-flash": 1000000,
+      "deepseek-chat": 1000000,
+      "deepseek-reasoner": 1000000
+    }
+  },
+  {
+    "id": "qwen",
+    "name": "通义千问",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "apiFormat": "openai_chat",
+    "defaultModels": {
+      "main": "qwen-max",
+      "haiku": "qwen-turbo",
+      "sonnet": "qwen-plus",
+      "opus": "qwen-max"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://dashscope.console.aliyun.com",
+    "authStrategy": "api_key"
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi (Moonshot)",
+    "baseUrl": "https://api.kimi.com/coding",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "kimi-k2.6",
+      "haiku": "kimi-k2.6",
+      "sonnet": "kimi-k2.6",
+      "opus": "kimi-k2.6"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://platform.moonshot.cn",
+    "apiKeyUrl": "https://platform.kimi.com/console/api-keys",
+    "authStrategy": "auth_token",
+    "defaultEnv": {
+      "DREAMCODER_SEND_DISABLED_THINKING": "1"
+    },
+    "modelContextWindows": {
+      "kimi-k2.6": 262144,
+      "kimi-k2.5": 262144
+    }
+  },
+  {
+    "id": "zhipuglm",
+    "name": "智谱 GLM",
+    "baseUrl": "https://open.bigmodel.cn/api/anthropic",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "glm-5.1",
+      "haiku": "glm-4.5-air",
+      "sonnet": "glm-5-turbo",
+      "opus": "glm-5.1"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://open.bigmodel.cn",
+    "authStrategy": "auth_token",
+    "defaultEnv": {
+      "DREAMCODER_SEND_DISABLED_THINKING": "1"
+    },
+    "modelContextWindows": {
+      "glm-5.1": 200000,
+      "glm-5-turbo": 200000,
+      "glm-4.5-air": 128000
+    }
+  },
+  {
+    "id": "lmstudio",
+    "name": "LM Studio",
+    "baseUrl": "http://localhost:1234",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "qwen/qwen3.6-27b",
+      "haiku": "qwen/qwen3.6-27b",
+      "sonnet": "qwen/qwen3.6-27b",
+      "opus": "qwen/qwen3.6-27b"
+    },
+    "needsApiKey": false,
+    "websiteUrl": "https://lmstudio.ai",
+    "authStrategy": "auth_token_empty_api_key",
+    "defaultEnv": {
+      "ANTHROPIC_AUTH_TOKEN": "lmstudio"
+    }
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama",
+    "baseUrl": "http://localhost:11434",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "qwen3.6:27b",
+      "haiku": "qwen3.6:27b",
+      "sonnet": "qwen3.6:27b",
+      "opus": "qwen3.6:27b"
+    },
+    "needsApiKey": false,
+    "websiteUrl": "https://ollama.com",
+    "authStrategy": "auth_token_empty_api_key",
+    "defaultEnv": {
+      "ANTHROPIC_AUTH_TOKEN": "ollama"
+    }
+  },
+  {
+    "id": "custom",
+    "name": "自定义 Provider",
+    "baseUrl": "",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "",
+      "haiku": "",
+      "sonnet": "",
+      "opus": ""
+    },
+    "needsApiKey": true,
+    "websiteUrl": "",
+    "authStrategy": "auth_token"
+  }
+]
