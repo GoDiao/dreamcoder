@@ -532,6 +532,64 @@ bun run tauri build
 - **Rust 通道安全性测试**：可在项目 \`src-tauri\` 下执行 \`cargo test\` 进行验证。`
   },
   {
+    id: 'provider-presets',
+    category: '开发手册',
+    title: '新增 Provider 预设',
+    summary: '面向贡献者的 Provider 预设指南：字段位置、连接测试、认证策略和图标边界。',
+    content: `# 新增 Provider 预设
+
+Provider 预设是服务商设置界面里的内置可选项。它不同于用户已经保存的 provider：预设是仓库中的静态默认配置，用户保存的 provider 会写入本地 DreamCoder 配置。
+
+### 1. 预设数据放在哪里
+
+- \`src/server/config/providerPresets.json\`：新增 provider 对象。
+- \`src/server/config/providerPresets.ts\`：导入 JSON 时执行 Zod schema 校验。
+- \`src/server/types/provider.ts\`：维护 \`apiFormat\`、\`authStrategy\`、测试输入和测试结果类型。
+- \`src/server/api/providers.ts\`：通过 \`GET /api/providers/presets\` 暴露预设，通过测试端点验证配置。
+- \`src/server/services/providerRuntimeEnv.ts\`：把 provider 配置映射为运行时环境变量。
+
+每个预设至少需要稳定唯一的 \`id\`、显示名、\`baseUrl\`、\`apiFormat\`、四类默认模型、\`needsApiKey\` 和 \`websiteUrl\`。如果新增 \`modelContextWindows\`，数值必须是 \`16000\` 到 \`10000000\` 之间的整数。
+
+### 2. 选择 API 格式和认证策略
+
+- \`anthropic\`：用于真正兼容 Anthropic Messages API 形态的端点。
+- \`openai_chat\`：用于 OpenAI Chat Completions 兼容端点。
+- \`openai_responses\`：用于 OpenAI Responses 兼容端点。
+
+\`authStrategy\` 是可选字段，但新增预设时如果默认行为不够明确，建议显式写出：\`api_key\`、\`auth_token\`、\`auth_token_empty_api_key\`、\`dual_same_token\` 或 \`dual_dummy\`。本地 provider 可以先参考现有 \`lmstudio\` 和 \`ollama\`，不要发明新的认证模式。
+
+### 3. 如何做连接测试
+
+Provider API 有两个测试路径：
+
+- \`POST /api/providers/test\`：测试尚未保存的配置，body 需要包含 \`baseUrl\`、\`apiKey\`、\`modelId\`，以及可选的 \`apiFormat\` 和 \`authStrategy\`。
+- \`POST /api/providers/:id/test\`：测试已保存的 provider，可传入 \`baseUrl\`、\`modelId\`、\`apiFormat\`、\`authStrategy\` 作为覆盖项。
+
+测试结果会返回 \`connectivity\`；对 \`openai_chat\` 和 \`openai_responses\` 等 OpenAI 兼容格式，还可能返回 \`proxy\`，用于覆盖 Anthropic 与 OpenAI 形态之间的转换链路。如果测试失败，服务端会记录 \`provider_test_failed\` 诊断事件。
+
+### 4. 图标和展示边界
+
+当前 provider preset schema 没有 \`logo\`、\`logoUrl\` 或 \`icon\` 字段。新增普通 provider 预设时不要直接在 JSON 里加入 logo 字段，因为现有 schema 和 UI 都不支持它。
+
+如果某个 provider 必须有独立图标，请把它作为单独的 UI/schema 变更处理：先扩展 \`ProviderPresetSchema\` 和共享类型，再接入前端展示组件，并为 schema 校验添加测试。仅新增 provider 配置时，保持在现有字段内。
+
+### 5. 提交前检查
+
+1. 对照 \`providerPresets.ts\` 确认 JSON 满足 schema。
+2. 检查 \`defaultModels\` 的四个模型 id 是否都是有意选择。
+3. 只有 provider 需要额外环境变量时才添加 \`defaultEnv\`，不要写入密钥、账号信息或用户本地路径。
+4. 修改 \`providerPresets.json\` 后运行：
+
+\`\`\`bash
+bun test src/server/__tests__/provider-presets.test.ts
+bun test src/server/__tests__/provider-runtime-env.test.ts
+bun test src/server/__tests__/providers.test.ts
+git diff --check
+\`\`\`
+
+如果只是文档改动，通常运行 \`git diff --check\` 即可。`
+  },
+  {
     id: 'sessions',
     category: '产品安全',
     title: '会话管理与终端记忆',
@@ -753,6 +811,64 @@ bun run tauri dev
 bun run tauri build
 \`\`\`
 Standalone \`*.dmg\` and \`*.msi\` formats compile and compress in \`src-tauri/target/release/\`.`
+  },
+  {
+    id: 'provider-presets',
+    category: 'Developer',
+    title: 'Adding Provider Presets',
+    summary: 'Contributor guide for provider presets: data files, connection tests, auth strategies, and logo boundaries.',
+    content: `# Adding Provider Presets
+
+Provider presets are the built-in choices shown in the provider settings UI. They are different from saved providers: presets are static defaults in the repository, while saved providers are written to the user's local DreamCoder config.
+
+### 1. Where the preset lives
+
+- \`src/server/config/providerPresets.json\` - add the provider object.
+- \`src/server/config/providerPresets.ts\` - validates the JSON with a Zod schema at import time.
+- \`src/server/types/provider.ts\` - owns \`apiFormat\`, \`authStrategy\`, test input, and test result types.
+- \`src/server/api/providers.ts\` - exposes presets through \`GET /api/providers/presets\` and runs provider test endpoints.
+- \`src/server/services/providerRuntimeEnv.ts\` - maps provider settings into runtime environment variables.
+
+Each preset needs a stable unique \`id\`, display name, \`baseUrl\`, \`apiFormat\`, four default model slots, \`needsApiKey\`, and \`websiteUrl\`. If you add \`modelContextWindows\`, values must be integers from \`16000\` to \`10000000\`.
+
+### 2. Choose the API format and auth strategy
+
+- \`anthropic\` for endpoints that really accept Anthropic Messages API shaped requests.
+- \`openai_chat\` for OpenAI Chat Completions compatible endpoints.
+- \`openai_responses\` for OpenAI Responses compatible endpoints.
+
+\`authStrategy\` is optional, but new presets should set it when the default would be ambiguous: \`api_key\`, \`auth_token\`, \`auth_token_empty_api_key\`, \`dual_same_token\`, or \`dual_dummy\`. For local providers, compare the existing \`lmstudio\` and \`ollama\` presets before introducing a new pattern.
+
+### 3. How to run connection tests
+
+The providers API supports two test paths:
+
+- \`POST /api/providers/test\` tests an unsaved config. The body needs \`baseUrl\`, \`apiKey\`, and \`modelId\`, plus optional \`apiFormat\` and \`authStrategy\`.
+- \`POST /api/providers/:id/test\` tests a saved provider and accepts optional \`baseUrl\`, \`modelId\`, \`apiFormat\`, and \`authStrategy\` overrides.
+
+Test results return \`connectivity\`. For \`openai_chat\` and \`openai_responses\`, results may also include \`proxy\`, covering the Anthropic-to-OpenAI conversion path. Failures are recorded as \`provider_test_failed\` diagnostic events.
+
+### 4. Logo and display boundaries
+
+The current provider preset schema has no \`logo\`, \`logoUrl\`, or \`icon\` field. Do not add a logo field directly to \`providerPresets.json\`: the current schema and UI do not support it.
+
+If a provider needs a dedicated logo, treat that as a separate UI/schema change: extend \`ProviderPresetSchema\` and shared types, wire the frontend display component, and add schema validation coverage. For a normal provider preset PR, stay within the existing fields.
+
+### 5. Before opening a PR
+
+1. Confirm the JSON object matches \`providerPresets.ts\`.
+2. Check that all four \`defaultModels\` entries are intentional.
+3. Add \`defaultEnv\` only when the provider requires extra runtime environment variables. Never include secrets, account details, or local user paths.
+4. After changing \`providerPresets.json\`, run:
+
+\`\`\`bash
+bun test src/server/__tests__/provider-presets.test.ts
+bun test src/server/__tests__/provider-runtime-env.test.ts
+bun test src/server/__tests__/providers.test.ts
+git diff --check
+\`\`\`
+
+For docs-only changes, \`git diff --check\` is usually enough.`
   },
   {
     id: 'sessions',
