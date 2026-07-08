@@ -14,13 +14,18 @@ import type {
   OpenAIToolCall,
   OpenAITool,
 } from './types.js'
+import { extractToolResultContent } from './toolArguments.js'
 
 /**
  * Convert Anthropic Messages request to OpenAI Chat Completions request.
  */
 export function anthropicToOpenaiChat(
   body: AnthropicRequest,
-  options: { roundTripReasoningContent?: boolean; passThinkingToggle?: boolean } = {},
+  options: {
+    roundTripReasoningContent?: boolean
+    passThinkingToggle?: boolean
+    maxOutputTokens?: number
+  } = {},
 ): OpenAIChatRequest {
   const messages: OpenAIChatMessage[] = []
 
@@ -46,9 +51,13 @@ export function anthropicToOpenaiChat(
     stream: body.stream,
   }
 
-  // max_tokens — omit to let upstream provider use its own default/max.
+  // max_tokens — clamp to the provider's known limit when configured.
   // Claude Code sends very large values (e.g. 128K) that exceed many
-  // providers' limits (DeepSeek: 8192, etc.).
+  // providers' limits (DeepSeek: 8192, etc.). Without a configured cap we
+  // omit the field entirely so the upstream uses its own default/max.
+  if (options.maxOutputTokens !== undefined && typeof body.max_tokens === 'number') {
+    result.max_tokens = Math.min(body.max_tokens, options.maxOutputTokens)
+  }
 
   // temperature & top_p
   if (body.temperature !== undefined) result.temperature = body.temperature
@@ -99,7 +108,7 @@ export function anthropicToOpenaiChat(
 function convertMessage(
   msg: AnthropicMessage,
   output: OpenAIChatMessage[],
-  options: { roundTripReasoningContent?: boolean },
+  options: { roundTripReasoningContent?: boolean; passThinkingToggle?: boolean; maxOutputTokens?: number },
 ): void {
   const content = msg.content
 
@@ -134,11 +143,7 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
       contentParts.push({ type: 'image_url', image_url: { url } })
     } else if (block.type === 'tool_result') {
       // tool_result → separate tool message
-      const resultContent = typeof block.content === 'string'
-        ? block.content
-        : Array.isArray(block.content)
-          ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
-          : ''
+      const resultContent = extractToolResultContent(block.content)
       output.push({
         role: 'tool',
         tool_call_id: block.tool_use_id,
@@ -160,7 +165,7 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
 function convertAssistantMessage(
   blocks: AnthropicContentBlock[],
   output: OpenAIChatMessage[],
-  options: { roundTripReasoningContent?: boolean },
+  options: { roundTripReasoningContent?: boolean; passThinkingToggle?: boolean; maxOutputTokens?: number },
 ): void {
   let textContent = ''
   let reasoningContent = ''
