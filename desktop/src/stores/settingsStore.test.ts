@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 
 describe('settingsStore locale defaults', () => {
@@ -7,13 +7,36 @@ describe('settingsStore locale defaults', () => {
     window.localStorage.clear()
   })
 
-  it('defaults to Chinese when no locale is stored', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('defaults to Chinese on first launch when the system locale is zh-*', async () => {
+    vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zh-CN')
+
     const { useSettingsStore } = await import('./settingsStore')
 
     expect(useSettingsStore.getState().locale).toBe('zh')
   })
 
-  it('keeps a stored locale override', async () => {
+  it('defaults to English on first launch when the system locale is not zh', async () => {
+    vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('en-US')
+
+    const { useSettingsStore } = await import('./settingsStore')
+
+    expect(useSettingsStore.getState().locale).toBe('en')
+  })
+
+  it('persists the detected locale immediately on first launch', async () => {
+    vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('fr-FR')
+
+    await import('./settingsStore')
+
+    expect(window.localStorage.getItem('dreamcoder-locale')).toBe('en')
+  })
+
+  it('keeps a stored locale override instead of re-running detection', async () => {
+    vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zh-CN')
     window.localStorage.setItem('dreamcoder-locale', 'en')
 
     const { useSettingsStore } = await import('./settingsStore')

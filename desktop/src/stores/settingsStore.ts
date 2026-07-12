@@ -40,12 +40,24 @@ export const UI_ZOOM_STEP = APP_ZOOM_CONTROL_STEP
 export const UI_ZOOM_DEFAULT = DEFAULT_APP_ZOOM
 let desktopNotificationsSaveQueue: Promise<void> = Promise.resolve()
 
+function detectSystemLocale(): Locale {
+  try {
+    const language = navigator.language
+    if (typeof language === 'string' && language.toLowerCase().startsWith('zh')) return 'zh'
+  } catch { /* navigator unavailable */ }
+  return 'en'
+}
+
 function getStoredLocale(): Locale {
   try {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
     if (stored === 'en' || stored === 'zh') return stored
   } catch { /* localStorage unavailable */ }
-  return 'zh'
+  // First launch: no persisted preference yet. Detect from the OS locale and
+  // persist immediately so subsequent launches never re-run detection.
+  const detected = detectSystemLocale()
+  try { localStorage.setItem(LOCALE_STORAGE_KEY, detected) } catch { /* noop */ }
+  return detected
 }
 
 type SettingsStore = {
