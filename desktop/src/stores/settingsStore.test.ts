@@ -36,12 +36,13 @@ describe('settingsStore locale defaults', () => {
   })
 
   it('keeps a stored locale override instead of re-running detection', async () => {
-    vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zh-CN')
+    const languageSpy = vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zh-CN')
     window.localStorage.setItem('dreamcoder-locale', 'en')
 
     const { useSettingsStore } = await import('./settingsStore')
 
     expect(useSettingsStore.getState().locale).toBe('en')
+    expect(languageSpy).not.toHaveBeenCalled()
   })
 })
 

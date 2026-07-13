@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MessageEntry } from '../types/session'
 import { useSessionRuntimeStore } from './sessionRuntimeStore'
+import { useSettingsStore } from './settingsStore'
 
 const {
   sendMock,
@@ -180,6 +181,7 @@ describe('chatStore history mapping', () => {
     cliTaskStoreSnapshot.sessionId = null
     useSessionRuntimeStore.setState({ selections: {} })
     localStorage.clear()
+    useSettingsStore.setState({ locale: 'zh' })
     useChatStore.setState({
       ...initialState,
       sessions: {},
