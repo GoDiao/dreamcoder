@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Input } from '../shared/Input'
@@ -11,10 +11,13 @@ export function ProviderOnboarding() {
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(false)
+  const requestedPresetsRef = useRef(false)
 
   useEffect(() => {
+    if (presets.length > 0 || requestedPresetsRef.current) return
+    requestedPresetsRef.current = true
     void fetchPresets()
-  }, [fetchPresets])
+  }, [fetchPresets, presets.length])
 
   if (presets.length === 0) {
     return (
