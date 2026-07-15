@@ -6,7 +6,7 @@ import { Button } from '../shared/Button'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 
 export function ProviderOnboarding() {
-  const { presets, createProvider, activateProvider, fetchPresets } = useProviderStore()
+  const { presets, error, isPresetsLoading, createProvider, activateProvider, fetchPresets } = useProviderStore()
   const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted)
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const [apiKey, setApiKey] = useState('')
@@ -20,6 +20,16 @@ export function ProviderOnboarding() {
   }, [fetchPresets, presets.length])
 
   if (presets.length === 0) {
+    // fetchPresets 失败只会写入 store 的 error，这里必须给出重试入口，
+    // 否则全新 profile 会永远停在加载动画上（issue #40 的遗留场景）。
+    if (error && !isPresetsLoading) {
+      return (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)]">
+          <p className="max-w-md px-8 text-center text-sm text-[var(--color-error)]">预设加载失败：{error}</p>
+          <Button onClick={() => void fetchPresets()}>重试</Button>
+        </div>
+      )
+    }
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface)]">
         <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />

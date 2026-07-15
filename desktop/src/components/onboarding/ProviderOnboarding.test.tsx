@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderPreset } from '../../types/providerPreset'
@@ -68,5 +68,25 @@ describe('ProviderOnboarding', () => {
 
     expect(screen.getByRole('textbox', { name: /^API Key/ })).toBeInTheDocument()
     expect(providersApiMock.presets).not.toHaveBeenCalled()
+  })
+
+  it('shows an error with a retry button when preset loading fails, and recovers on retry', async () => {
+    providersApiMock.presets
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce({ presets: [dreamfieldPreset] })
+
+    render(
+      <StrictMode>
+        <ProviderOnboarding />
+      </StrictMode>,
+    )
+
+    const retryButton = await screen.findByRole('button', { name: '重试' })
+    expect(screen.getByText(/network down/)).toBeInTheDocument()
+
+    fireEvent.click(retryButton)
+
+    expect(await screen.findByRole('textbox', { name: /^API Key/ })).toBeInTheDocument()
+    expect(providersApiMock.presets).toHaveBeenCalledTimes(2)
   })
 })
