@@ -1,6 +1,6 @@
 [package]
 name = "dreamcoder-desktop"
-version = "0.4.0"
+version = "0.4.5"
 edition = "2021"
 
 [lib]

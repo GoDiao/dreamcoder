@@ -2,7 +2,7 @@
   "name": "dreamcoder-desktop",
   "private": false,
   "description": "DreamCoder — AI Coding Agent Desktop App",
-  "version": "0.4.0",
+  "version": "0.4.5",
   "author": "GoDiao",
   "license": "MIT",
   "type": "module",

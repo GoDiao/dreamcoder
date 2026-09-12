@@ -108,6 +108,8 @@ dreamcoder/
 └── adapters/              # Third-party platform adapters
 ```
 
+Provider preset contributions have a focused guide in the website documentation under "Adding Provider Presets".
+
 ## Development Environment
 
 > ⚠️ **Platform support note**

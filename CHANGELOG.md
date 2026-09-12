@@ -4,6 +4,23 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.5] — 2026-06-25
+
+### Fixed
+- `chatStore` message list now capped at 5000 entries to prevent unbounded transcript growth during long-running sessions.
+- `sessionService` stream-scanning optimization for `listSessions` reduces peak RSS by ~82% on machines with many sessions.
+- Terminal runtime now emits xterm memory diagnostics to aid future performance investigations.
+
+### Added
+- New benchmark scripts: `mem-compare.ps1` and `mem-monitor.ps1` for sidecar memory profiling.
+- New documentation: TROUBLESHOOTING guide (bilingual), ENVIRONMENT_TESTING matrix, language-switch links across all bilingual docs.
+
+### Changed
+- Repository history rebuilt on a clean orphan baseline (`clean-master`) — all legacy branding ancestry removed.
+- Bilingual README and contributor docs polished with clearer product-oriented language.
+- E2E scripts unified to DreamCoder branding (removed all legacy `cc-haha` references).
+- GitHub default branch switched from `master` to `clean-master`.
+
 ## [0.4.0] — 2026-06-13
 
 ### Added
