@@ -81,8 +81,9 @@ describe('ProviderOnboarding', () => {
       </StrictMode>,
     )
 
-    const retryButton = await screen.findByRole('button', { name: '重试' })
-    expect(screen.getByText(/network down/)).toBeInTheDocument()
+    const errorAlert = await screen.findByRole('alert')
+    expect(errorAlert).toHaveTextContent('network down')
+    const retryButton = screen.getByRole('button', { name: '重试' })
 
     fireEvent.click(retryButton)
 
