@@ -25,7 +25,9 @@ export function ProviderOnboarding() {
     if (error && !isPresetsLoading) {
       return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)]">
-          <p className="max-w-md px-8 text-center text-sm text-[var(--color-error)]">预设加载失败：{error}</p>
+          <p role="alert" className="max-w-md px-8 text-center text-sm text-[var(--color-error)]">
+            预设加载失败：{error}
+          </p>
           <Button onClick={() => void fetchPresets()}>重试</Button>
         </div>
       )
