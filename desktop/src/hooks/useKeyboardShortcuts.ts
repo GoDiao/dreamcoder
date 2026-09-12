@@ -12,7 +12,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 export function useKeyboardShortcuts() {
   const setActiveSession = useSessionStore((s) => s.setActiveSession)
   const setActiveView = useUIStore((s) => s.setActiveView)
-  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
+  const openModal = useUIStore((s) => s.openModal)
   const closeModal = useUIStore((s) => s.closeModal)
   const activeModal = useUIStore((s) => s.activeModal)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
@@ -31,7 +31,30 @@ export function useKeyboardShortcuts() {
   appZoomLevelRef.current = uiZoom
 
   useEffect(() => {
+    const handleQuickSwitcher = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return
+      const meta = e.metaKey || e.ctrlKey
+      // Capture before the terminal consumes Ctrl+K as a control character.
+      if (meta && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!e.repeat && !activeModalRef.current && !document.querySelector('[role="dialog"][aria-modal="true"]')) {
+          openModal('command-palette')
+        }
+        return
+      }
+    }
+
     const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return
+      const meta = e.metaKey || e.ctrlKey
+
+      // The palette owns its keyboard interaction while it is open.
+      if (activeModalRef.current === 'command-palette') {
+        if (meta && (e.key === 'n' || e.key === '.')) e.preventDefault()
+        return
+      }
+
       const zoomAction = getAppZoomKeyboardAction(e)
       if (zoomAction) {
         e.preventDefault()
@@ -41,24 +64,11 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      const meta = e.metaKey || e.ctrlKey
-
       // Cmd+N — New session
       if (meta && e.key === 'n') {
         e.preventDefault()
         setActiveSession(null)
         setActiveView('code')
-      }
-
-      // Cmd+K — Focus search (sidebar search input)
-      if (meta && e.key === 'k') {
-        e.preventDefault()
-        setSidebarOpen(true)
-        requestAnimationFrame(() => {
-          const searchInput = document.querySelector('#sidebar-search') as HTMLInputElement | null
-          searchInput?.focus()
-          searchInput?.select()
-        })
       }
 
       // Escape — Close modal or clear state
@@ -77,7 +87,11 @@ export function useKeyboardShortcuts() {
       }
     }
 
+    document.addEventListener('keydown', handleQuickSwitcher, true)
     document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [closeModal, setActiveSession, setActiveView, setSidebarOpen, setUiZoom, stopGeneration])
+    return () => {
+      document.removeEventListener('keydown', handleQuickSwitcher, true)
+      document.removeEventListener('keydown', handler)
+    }
+  }, [closeModal, openModal, setActiveSession, setActiveView, setUiZoom, stopGeneration])
 }

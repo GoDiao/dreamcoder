@@ -3,6 +3,16 @@ import { setBaseUrl } from './client'
 import { sessionsApi } from './sessions'
 
 describe('sessionsApi', () => {
+  it('requests search metadata and pagination without a project filter', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ sessions: [], total: 0 })))
+    await sessionsApi.list({ limit: 100, offset: 100, includeLastAssistantMessage: true })
+    const url = new URL(String(fetchMock.mock.calls[0]![0]))
+    expect(url.searchParams.get('includeLastAssistantMessage')).toBe('true')
+    expect(url.searchParams.get('limit')).toBe('100')
+    expect(url.searchParams.get('offset')).toBe('100')
+    expect(url.searchParams.has('project')).toBe(false)
+  })
+
   afterEach(() => {
     setBaseUrl('http://127.0.0.1:3456')
     vi.restoreAllMocks()

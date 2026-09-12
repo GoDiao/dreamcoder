@@ -45,6 +45,7 @@ export type SessionListItem = {
   projectRoot: string | null
   workDir: string | null
   workDirExists: boolean
+  lastAssistantMessage?: string
 }
 
 export type DeleteSessionFailure = {
@@ -285,18 +286,23 @@ export class SessionService {
 
   /**
    * Stream a session file once to extract head+tail entries and count transcript
-   * messages. Never loads the full file into memory — peak memory is O(headLines).
+   * messages. Optionally retain the latest visible assistant text for session
+   * search, even when it falls outside the head/tail window. Never loads the
+   * full file into memory.
    */
   private scanSessionFileHead(
     filePath: string,
     headLines: number,
     tailLines: number,
-  ): Promise<{ entries: RawEntry[]; messageCount: number }> {
+    includeLastAssistantMessage = false,
+  ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string }> {
     return new Promise((resolve, reject) => {
       const head: string[] = []
       const tailRing: string[] = new Array(tailLines)
       let lineCount = 0
       let messageCount = 0
+      let lastAssistantMessage = ''
+      let settled = false
 
       const stream = fsSync.createReadStream(filePath, { encoding: 'utf-8' })
       const rl = readline.createInterface({ input: stream, crlfDelay: Infinity })
@@ -320,9 +326,29 @@ export class SessionService {
         ) {
           messageCount++
         }
+
+        if (includeLastAssistantMessage && trimmed.includes('"assistant"')) {
+          try {
+            const entry = JSON.parse(trimmed) as RawEntry
+            if (
+              entry?.type === 'assistant' &&
+              entry.message?.role === 'assistant' &&
+              !entry.isSidechain &&
+              !entry.isMeta &&
+              !entry.parent_tool_use_id &&
+              !this.shouldHideTranscriptEntry(entry)
+            ) {
+              const text = this.extractTextBlocks(entry.message.content).join('\n').trim()
+              // Tool/thinking-only records do not replace the last visible reply.
+              if (text) lastAssistantMessage = text
+            }
+          } catch { /* skip malformed lines, including partially written entries */ }
+        }
       })
 
       rl.on('close', () => {
+        if (settled) return
+        settled = true
         // Reconstruct tail in order from ring buffer
         const tailStart = Math.max(0, lineCount - tailLines)
         const orderedTail: string[] = []
@@ -336,16 +362,22 @@ export class SessionService {
         for (const line of selected) {
           try { entries.push(JSON.parse(line) as RawEntry) } catch { /* skip malformed */ }
         }
-        resolve({ entries, messageCount })
+        resolve({ entries, messageCount, lastAssistantMessage })
       })
 
-      rl.on('error', (err) => {
+      const handleError = (err: Error) => {
+        if (settled) return
+        settled = true
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          resolve({ entries: [], messageCount: 0 })
+          resolve({ entries: [], messageCount: 0, lastAssistantMessage: '' })
         } else {
           reject(err)
         }
-      })
+        rl.close()
+        stream.destroy()
+      }
+      rl.on('error', handleError)
+      stream.on('error', handleError)
     })
   }
 
@@ -1351,6 +1383,7 @@ export class SessionService {
     project?: string
     limit?: number
     offset?: number
+    includeLastAssistantMessage?: boolean
   }): Promise<{ sessions: SessionListItem[]; total: number }> {
     const mem0 = process.memoryUsage()
     console.log(`[mem:sidecar] listSessions:start rss=${(mem0.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem0.heapUsed/1024/1024).toFixed(1)}MB`)
@@ -1376,7 +1409,12 @@ export class SessionService {
     // Build session list items with metadata from file head/tail only (avoid loading full files)
     const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
       try {
-        const { entries: headEntries, messageCount } = await this.scanSessionFileHead(filePath, 100, 100)
+        const { entries: headEntries, messageCount, lastAssistantMessage } = await this.scanSessionFileHead(
+          filePath,
+          100,
+          100,
+          options?.includeLastAssistantMessage,
+        )
         const workDir = this.resolveWorkDirFromEntries(headEntries, projectDir)
         const projectRoot = await this.resolveProjectRootFromEntries(headEntries, workDir, projectDir)
         const workDirExists = await this.pathExists(workDir)
@@ -1402,6 +1440,7 @@ export class SessionService {
           projectRoot,
           workDir,
           workDirExists,
+          ...(options?.includeLastAssistantMessage ? { lastAssistantMessage } : {}),
         }
       } catch {
         // Skip unreadable files

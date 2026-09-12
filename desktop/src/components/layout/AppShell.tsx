@@ -6,6 +6,7 @@ import { UpdateChecker } from '../shared/UpdateChecker'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useUIStore, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, type SettingsTab } from '../../stores/uiStore'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
+import { CommandPalette } from '../CommandPalette/CommandPalette'
 import {
   H5ConnectionRequiredError,
   initializeDesktopServerUrl,
@@ -314,6 +315,7 @@ export function AppShell() {
         <ContentRouter />
       </main>
       <ToastContainer />
+      <CommandPalette />
       <UpdateChecker />
     </div>
   )
