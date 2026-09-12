@@ -214,7 +214,7 @@ describe('CommandPalette', () => {
     expect(last).toHaveFocus()
   })
 
-  it('shows a loading state, reports a failure, and lets the user retry', async () => {
+  it.each(['Network unavailable', 'Request timed out after 30s'])('shows loading, preserves error detail "%s", and clears it after retry', async (detail) => {
     let rejectRequest!: (error: Error) => void
     vi.mocked(sessionsApi.list)
       .mockImplementationOnce(() => new Promise((_, reject) => { rejectRequest = reject }))
@@ -227,14 +227,19 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(connectToSession).not.toHaveBeenCalled()
 
-    await act(async () => rejectRequest(new Error('Network unavailable')))
+    await act(async () => rejectRequest(new Error(detail)))
     const retry = await screen.findByRole('button', { name: /retry/i })
     expect(screen.getByRole('alert')).toHaveTextContent(/could not load/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(detail)
+    act(() => useSettingsStore.setState({ locale: 'zh' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('无法加载全部会话，请重试。')
+    expect(screen.getByRole('alert')).toHaveTextContent(detail)
     expect(screen.queryByRole('option')).not.toBeInTheDocument()
     fireEvent.click(retry)
 
     expect(await screen.findAllByRole('option')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(sessionsApi.list).toHaveBeenCalledTimes(2)
   })
 

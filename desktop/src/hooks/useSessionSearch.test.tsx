@@ -80,7 +80,7 @@ describe('useSessionSearch', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.results.map((item) => item.id)).toEqual(['answer'])
-    expect(result.current.error).toBe(false)
+    expect(result.current.error).toBeNull()
   })
 
   it('shows the ten most recently modified sessions for empty and whitespace queries', async () => {
@@ -171,13 +171,13 @@ describe('useSessionSearch', () => {
       .mockResolvedValueOnce({ sessions: [session('fresh')], total: 1 })
     const { result } = renderHook(() => useSessionSearch(''))
 
-    await waitFor(() => expect(result.current.error).toBe(true))
+    await waitFor(() => expect(result.current.error?.message).toBe('Network unavailable'))
     expect(result.current.isLoading).toBe(false)
     expect(result.current.results).toEqual([])
 
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.results.map((item) => item.id)).toEqual(['fresh']))
-    expect(result.current.error).toBe(false)
+    expect(result.current.error).toBeNull()
     expect(vi.mocked(sessionsApi.list).mock.calls.map(([params]) => params?.offset)).toEqual([0, 100, 0])
   })
 

@@ -40,6 +40,26 @@ afterEach(async () => {
 })
 
 describe('session list assistant search text', () => {
+  it.each([
+    { synthetic: 'No response requested.' },
+    { synthetic: [{ type: 'text', text: 'No response requested.' }] },
+  ])('keeps the visible reply when a hidden synthetic assistant entry follows it: %j', async ({ synthetic }) => {
+    await writeSession([
+      user('Question'),
+      assistant('Last visible answer'),
+      assistant(synthetic),
+    ])
+
+    const { sessions } = await service.listSessions({ includeLastAssistantMessage: true })
+    expect(sessions[0]?.lastAssistantMessage).toBe('Last visible answer')
+  })
+
+  it('does not index a session containing only hidden synthetic assistant replies', async () => {
+    await writeSession([user('Question'), assistant('No response requested.')])
+    const { sessions } = await service.listSessions({ includeLastAssistantMessage: true })
+    expect(sessions[0]?.lastAssistantMessage).toBe('')
+  })
+
   it('finds the latest visible reply outside the head and tail without loading full transcripts', async () => {
     await writeSession([
       user('Initial question'),

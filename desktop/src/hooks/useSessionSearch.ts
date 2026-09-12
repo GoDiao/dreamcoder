@@ -10,14 +10,14 @@ const RESULT_LIMIT = 10
 export function useSessionSearch(query: string) {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
   const [attempt, setAttempt] = useState(0)
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
 
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    setError(false)
+    setError(null)
     setSessions([])
 
     async function load() {
@@ -44,8 +44,8 @@ export function useSessionSearch(query: string) {
         } while (offset < total)
 
         setSessions([...byId.values()].sort((a, b) => Date.parse(b.modifiedAt) - Date.parse(a.modifiedAt)))
-      } catch {
-        if (!cancelled) setError(true)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err : new Error(typeof err === 'string' ? err : ''))
       } finally {
         if (!cancelled) setIsLoading(false)
       }

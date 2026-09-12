@@ -141,6 +141,7 @@ function CommandPaletteContent() {
           {isLoading && <p role="status" className="p-5 text-sm text-[var(--color-text-secondary)]">{t('commandPalette.loading')}</p>}
           {error && <div role="alert" className="p-5 text-sm text-[var(--color-text-secondary)]">
             <p>{t('commandPalette.loadFailed')}</p>
+            {error.message && <p className="mt-2 whitespace-pre-wrap break-words">{error.message}</p>}
             <button type="button" onClick={retry} className="mt-3 rounded px-3 py-2 text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">{t('common.retry')}</button>
           </div>}
           {!isLoading && !error && results.length === 0 && <p role="status" className="p-5 text-sm text-[var(--color-text-secondary)]">{t(query.trim() ? 'sidebar.noMatching' : 'sidebar.noSessions')}</p>}

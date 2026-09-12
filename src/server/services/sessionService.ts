@@ -335,7 +335,8 @@ export class SessionService {
               entry.message?.role === 'assistant' &&
               !entry.isSidechain &&
               !entry.isMeta &&
-              !entry.parent_tool_use_id
+              !entry.parent_tool_use_id &&
+              !this.shouldHideTranscriptEntry(entry)
             ) {
               const text = this.extractTextBlocks(entry.message.content).join('\n').trim()
               // Tool/thinking-only records do not replace the last visible reply.
