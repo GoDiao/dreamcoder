@@ -222,6 +222,7 @@ async function listSessions(url: URL): Promise<Response> {
   const project = url.searchParams.get('project') || undefined
   const limit = parseInt(url.searchParams.get('limit') || '20', 10)
   const offset = parseInt(url.searchParams.get('offset') || '0', 10)
+  const includeLastAssistantMessage = url.searchParams.get('includeLastAssistantMessage') === 'true'
 
   if (isNaN(limit) || limit < 0) {
     throw ApiError.badRequest('Invalid limit parameter')
@@ -230,7 +231,7 @@ async function listSessions(url: URL): Promise<Response> {
     throw ApiError.badRequest('Invalid offset parameter')
   }
 
-  const result = await sessionService.listSessions({ project, limit, offset })
+  const result = await sessionService.listSessions({ project, limit, offset, includeLastAssistantMessage })
   return Response.json(result)
 }
 

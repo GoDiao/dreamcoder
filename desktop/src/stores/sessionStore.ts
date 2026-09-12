@@ -71,6 +71,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             byId.set(s.id, candidate)
           }
         }
+        // Quick-switcher matches can be older than the sidebar's first page.
+        // Keep workspace metadata for open tabs across the periodic refresh.
+        if (!project) {
+          const openSessionIds = new Set(useTabStore.getState().tabs
+            .filter((tab) => tab.type === 'session')
+            .map((tab) => tab.sessionId))
+          for (const session of state.sessions) {
+            if (openSessionIds.has(session.id) && !byId.has(session.id)) {
+              byId.set(session.id, session)
+            }
+          }
+        }
         const sessions = [...byId.values()]
         syncedSessions = sessions
         return { sessions, isLoading: false }

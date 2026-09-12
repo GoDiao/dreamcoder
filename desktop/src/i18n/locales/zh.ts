@@ -1,6 +1,15 @@
 import type { TranslationKey } from './en'
 
 export const zh: Record<TranslationKey, string> = {
+  // ─── Quick switcher ───────────────────────────────
+  'commandPalette.title': '切换会话',
+  'commandPalette.placeholder': '搜索标题或最后一条助手消息...',
+  'commandPalette.close': '关闭会话切换器',
+  'commandPalette.results': '匹配的会话',
+  'commandPalette.recent': '最近会话',
+  'commandPalette.loading': '正在加载全部会话...',
+  'commandPalette.loadFailed': '无法加载全部会话，请重试。',
+  'commandPalette.hint': '↑ ↓ 选择 · Enter 打开 · Esc 关闭',
   // ─── Common ──────────────────────────────────────
   'common.cancel': '取消',
   'common.save': '保存',

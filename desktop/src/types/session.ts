@@ -10,6 +10,7 @@ export type SessionListItem = {
   projectRoot?: string | null
   workDir: string | null
   workDirExists: boolean
+  lastAssistantMessage?: string
 }
 
 export type MessageEntry = {
