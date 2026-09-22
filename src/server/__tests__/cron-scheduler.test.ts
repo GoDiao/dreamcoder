@@ -595,3 +595,17 @@ describe('cronMatches day-of-week Sunday alias', () => {
     expect(cronMatches('0 10 * * 1-5', sunday)).toBe(false)
   })
 })
+
+describe('cronMatches stepped day-of-week range ending in 7', () => {
+  const sunday = new Date(2026, 0, 4, 10, 0) // Sunday
+  const friday = new Date(2026, 0, 2, 10, 0) // Friday
+  const monday = new Date(2026, 0, 5, 10, 0) // Monday
+
+  it('matches the stepped range on Sunday via the 7 alias', () => {
+    // 5-7/2 names Friday and Sunday. Date#getDay() reports 0 for Sunday, so the
+    // step branch has to retry the comparison as 7.
+    expect(cronMatches('0 10 * * 5-7/2', friday)).toBe(true)
+    expect(cronMatches('0 10 * * 5-7/2', sunday)).toBe(true)
+    expect(cronMatches('0 10 * * 5-7/2', monday)).toBe(false)
+  })
+})
