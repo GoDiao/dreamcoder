@@ -16,28 +16,36 @@ function formatTime(hour: number, minute: number): string {
 }
 
 /**
- * Expand a cron day-of-week field into the list of days it names.
+ * Expand a cron day-of-week field into the list of days it names, or `null`
+ * when the field is not a day-of-week list at all.
  *
  * Accepts comma-separated values, `start-end` ranges, and the two mixed
- * (`1-3,5`). Cron allows both 0 and 7 for Sunday, but the UI picker only
- * produces 0-6, so 7 is normalised down here rather than surfacing as an
- * unselectable day.
+ * (`1-3,5`). Returns `null` — rather than a partial result — when any token is
+ * out of range or a range is reversed, because a silently shortened day list
+ * would change what a task does when it is saved.
+ *
+ * Only `0`-`7` are accepted. `7` is the standard alias for Sunday and is
+ * normalised to `0`, which is what `Date#getDay()` returns; anything above `7`
+ * is invalid even though `% 7` would map it back into range.
  */
-function parseDowField(field: string): number[] {
+function parseDowField(field: string): number[] | null {
   const days: number[] = []
   for (const part of field.split(',')) {
     const range = part.match(/^(\d+)-(\d+)$/)
     if (range) {
       const start = parseInt(range[1]!, 10)
       const end = parseInt(range[2]!, 10)
-      // A reversed range (`5-1`) names nothing; skip it instead of looping
-      // backwards and emitting days in a surprising order.
-      for (let i = start; i <= end; i++) days.push(i % 7)
+      if (start > 7 || end > 7 || start > end) return null
+      for (let i = start; i <= end; i++) days.push(i === 7 ? 0 : i)
     } else if (/^\d+$/.test(part)) {
-      days.push(parseInt(part, 10) % 7)
+      const day = parseInt(part, 10)
+      if (day > 7) return null
+      days.push(day === 7 ? 0 : day)
+    } else {
+      return null
     }
   }
-  return days
+  return days.length > 0 ? days : null
 }
 
 function describeDow(field: string, t: TFunc): string {
@@ -170,9 +178,11 @@ export function parseCron(cron: string): ParsedCron {
     // The field may mix values and ranges (`1-3,5`); describeCron already
     // renders any such field as specificDays, so parse it the same way or the
     // edit modal drops back to raw cron text for a schedule it just described.
+    // A field that is not a usable day list stays customCron rather than
+    // opening the modal on a silently shortened selection.
     if (dom === '*' && month === '*' && /^[\d,\-]+$/.test(dow)) {
       const selectedDays = parseDowField(dow)
-      if (selectedDays.length > 0) {
+      if (selectedDays !== null) {
         return { ...DEFAULTS, frequency: 'specificDays', time, selectedDays }
       }
     }
