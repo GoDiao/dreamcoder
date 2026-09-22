@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Input } from '../shared/Input'
@@ -6,17 +6,29 @@ import { Button } from '../shared/Button'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 
 export function ProviderOnboarding() {
-  const { presets, createProvider, activateProvider, fetchPresets } = useProviderStore()
+  const presets = useProviderStore((s) => s.presets)
+  const isPresetsLoading = useProviderStore((s) => s.isPresetsLoading)
+  const fetchPresets = useProviderStore((s) => s.fetchPresets)
+  const createProvider = useProviderStore((s) => s.createProvider)
+  const activateProvider = useProviderStore((s) => s.activateProvider)
   const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted)
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Fetching belongs in an effect, never in the render body: `fetchPresets` sets
+  // `isPresetsLoading` synchronously, which re-renders this component while
+  // `presets` is still empty — firing the fetch again, forever.
+  useEffect(() => {
+    void fetchPresets()
+  }, [fetchPresets])
+
   if (presets.length === 0) {
-    fetchPresets()
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface)]">
-        <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
+        {isPresetsLoading && (
+          <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
+        )}
       </div>
     )
   }
