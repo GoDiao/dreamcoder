@@ -15,7 +15,11 @@ describe('UserMessage', () => {
     expect(bubble.className).toContain('min-w-0')
     expect(bubble.className).toContain('max-w-full')
     expect(bubble.className).toContain('whitespace-pre-wrap')
-    expect(bubble.style.overflowWrap).toBe('anywhere')
-    expect(bubble.style.wordBreak).toBe('break-word')
+    // `break-words` alone maps to `overflow-wrap: break-word`, which will not
+    // break a run with no spaces — a pasted URL has none, so it overflows the
+    // bubble. The assistant side pairs it with `[overflow-wrap:anywhere]`
+    // (MarkdownRenderer BASE_PROSE_CLASSES) for exactly this case.
+    expect(bubble.className).toContain('break-words')
+    expect(bubble.className).toContain('[overflow-wrap:anywhere]')
   })
 })
