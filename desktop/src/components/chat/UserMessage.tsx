@@ -24,7 +24,7 @@ export const UserMessage = memo(function UserMessage({ content, attachments, bra
 
         {hasText && (
           <div
-            className="min-w-0 max-w-full bg-[var(--color-surface-user-msg)] px-4 py-3 text-sm leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap break-words rounded-[18px] rounded-tr-[4px] rounded-br-[18px] rounded-bl-[18px]"
+            className="min-w-0 max-w-full bg-[var(--color-surface-user-msg)] px-4 py-3 text-sm leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[18px] rounded-tr-[4px] rounded-br-[18px] rounded-bl-[18px]"
           >
             {content}
           </div>
