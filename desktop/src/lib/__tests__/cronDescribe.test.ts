@@ -138,3 +138,34 @@ describe('parseCron', () => {
     expect(rebuilt.selectedDays).toEqual([1, 2, 3])
   })
 })
+
+describe('parseCron day-of-week validity', () => {
+  it('normalises the Sunday alias 7 to 0', () => {
+    expect(parseCron('0 9 * * 7').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 7').selectedDays).toEqual([0])
+  })
+
+  it('rejects values above 7 instead of wrapping them into range', () => {
+    // `% 7` used to turn 8 into Monday and 14 into Sunday, silently rewriting
+    // a persisted schedule on save. isValidCron already rejects > 7.
+    expect(parseCron('0 9 * * 8').frequency).toBe('customCron')
+    expect(parseCron('0 9 * * 14').frequency).toBe('customCron')
+  })
+
+  it('rejects a reversed range rather than emitting a partial day list', () => {
+    expect(parseCron('0 9 * * 5-1').frequency).toBe('customCron')
+  })
+
+  it('rejects the whole field when any token is invalid', () => {
+    // 1-3,99 used to parse as [1], dropping 99 without a word.
+    expect(parseCron('0 9 * * 1-3,99').frequency).toBe('customCron')
+    expect(parseCron('0 9 * * 1-3,5').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 1-3,5').selectedDays).toEqual([1, 2, 3, 5])
+  })
+
+  it('still accepts every in-range value', () => {
+    expect(parseCron('0 9 * * 0').selectedDays).toEqual([0])
+    expect(parseCron('0 9 * * 6').selectedDays).toEqual([6])
+    expect(parseCron('0 9 * * 0-6').selectedDays).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+})
