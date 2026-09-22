@@ -169,3 +169,20 @@ describe('parseCron day-of-week validity', () => {
     expect(parseCron('0 9 * * 0-6').selectedDays).toEqual([0, 1, 2, 3, 4, 5, 6])
   })
 })
+
+describe('describeCron with an unusable day-of-week field', () => {
+  // parseDowField returns null for these, and describeDow must not call .map()
+  // on it: TaskRow and NewTaskModal both render describeCron output, so a
+  // persisted invalid cron would otherwise break the whole view.
+  it('falls back to the custom schedule instead of throwing', () => {
+    for (const cron of ['0 9 * * 8', '0 9 * * 5-1', '0 9 * * 1-3,99']) {
+      expect(() => describeCron(cron, t)).not.toThrow()
+      expect(describeCron(cron, t)).toBe('cron.customSchedule')
+    }
+  })
+
+  it('still names the days for a valid field', () => {
+    expect(describeCron('0 9 * * 1,3', t)).toBe('cron.specificDaysAt')
+    expect(describeCron('0 9 * * 7', t)).toBe('cron.specificDaysAt')
+  })
+})
