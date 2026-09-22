@@ -16,17 +16,25 @@ describe('UserMessage', () => {
     expect(bubble.className).toContain('max-w-full')
     expect(bubble.className).toContain('whitespace-pre-wrap')
     expect(bubble.className).toContain('break-words')
-    // Restores the rule d5a667d dropped. That commit moved the border radius
-    // into Tailwind classes and deleted the whole inline style block with it,
-    // taking `overflowWrap: 'anywhere'` (and `wordBreak`) with it. The old
-    // assertions read `.style.overflowWrap`, so they went red the moment the
-    // inline block disappeared and could never pass again; asserting the class
-    // is what actually pins the rule.
+    // Restores the two rules d5a667d dropped. That commit moved the border
+    // radius into Tailwind classes and deleted the whole inline style block
+    // with it, taking `overflowWrap: 'anywhere'` and `wordBreak: 'break-word'`
+    // with it. The old assertions read `.style.overflowWrap`, so they went red
+    // the moment the inline block disappeared and could never pass again;
+    // asserting the class is what actually pins the rules.
     //
-    // `break-word` and `anywhere` both break an unbreakable URL; `anywhere`
-    // additionally contributes those soft wrap opportunities to min-content
-    // sizing. That difference is a layout property this test does not measure,
-    // so it verifies the rule is present, not a rendered regression.
+    // `word-break: break-word` has no Tailwind v4 utility — the `break-*`
+    // family covers `word-break` only for normal/all/keep, and `break-words`
+    // is the legacy alias for `wrap-break-word` (`overflow-wrap`), not for
+    // `word-break` — so it is restored as an arbitrary property, the way
+    // MarkdownRenderer already writes `[word-break:normal]`.
+    //
+    // `overflow-wrap: break-word` and `anywhere` both break an unbreakable
+    // URL; `anywhere` additionally contributes those soft wrap opportunities
+    // to min-content sizing. That difference is a layout property this test
+    // does not measure, so it verifies the rules are present, not a rendered
+    // regression.
     expect(bubble.className).toContain('[overflow-wrap:anywhere]')
+    expect(bubble.className).toContain('[word-break:break-word]')
   })
 })
