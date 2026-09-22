@@ -49,9 +49,11 @@ function parseDowField(field: string): number[] | null {
 }
 
 function describeDow(field: string, t: TFunc): string {
-  return parseDowField(field)
-    .map((d) => t(`cron.dow.${d}` as any))
-    .join(', ') // dynamic key
+  const days = parseDowField(field)
+  // An unusable field has no day names to show; callers fall back to the
+  // custom-schedule description, which is what an invalid cron deserves.
+  if (days === null) return ''
+  return days.map((d) => t(`cron.dow.${d}` as any)).join(', ') // dynamic key
 }
 
 export function describeCron(cron: string, t: TFunc): string {
@@ -101,7 +103,11 @@ export function describeCron(cron: string, t: TFunc): string {
     }
     if (/^[\d,\-]+$/.test(dow)) {
       const days = describeDow(dow, t)
-      return t('cron.specificDaysAt', { days, time })
+      // An unusable field has no day names; describe the raw expression rather
+      // than claiming a specific set of days it does not name.
+      if (days) {
+        return t('cron.specificDaysAt', { days, time })
+      }
     }
   }
 
