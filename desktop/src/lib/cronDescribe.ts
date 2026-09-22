@@ -15,20 +15,35 @@ function formatTime(hour: number, minute: number): string {
   return `${pad(hour)}:${pad(minute)}`
 }
 
-function describeDow(field: string, t: TFunc): string {
-  const parts = field.split(',')
+/**
+ * Expand a cron day-of-week field into the list of days it names.
+ *
+ * Accepts comma-separated values, `start-end` ranges, and the two mixed
+ * (`1-3,5`). Cron allows both 0 and 7 for Sunday, but the UI picker only
+ * produces 0-6, so 7 is normalised down here rather than surfacing as an
+ * unselectable day.
+ */
+function parseDowField(field: string): number[] {
   const days: number[] = []
-  for (const part of parts) {
+  for (const part of field.split(',')) {
     const range = part.match(/^(\d+)-(\d+)$/)
     if (range) {
-      const start = parseInt(range[1]!)
-      const end = parseInt(range[2]!)
-      for (let i = start; i <= end; i++) days.push(i)
-    } else {
-      days.push(parseInt(part))
+      const start = parseInt(range[1]!, 10)
+      const end = parseInt(range[2]!, 10)
+      // A reversed range (`5-1`) names nothing; skip it instead of looping
+      // backwards and emitting days in a surprising order.
+      for (let i = start; i <= end; i++) days.push(i % 7)
+    } else if (/^\d+$/.test(part)) {
+      days.push(parseInt(part, 10) % 7)
     }
   }
-  return days.map((d) => t(`cron.dow.${d % 7}` as any)).join(', ') // dynamic key
+  return days
+}
+
+function describeDow(field: string, t: TFunc): string {
+  return parseDowField(field)
+    .map((d) => t(`cron.dow.${d}` as any))
+    .join(', ') // dynamic key
 }
 
 export function describeCron(cron: string, t: TFunc): string {
@@ -152,8 +167,14 @@ export function parseCron(cron: string): ParsedCron {
       return { ...DEFAULTS, frequency: 'weekdays', time }
     }
     // M H * * <list> → specificDays
-    if (dom === '*' && month === '*' && /^[\d,]+$/.test(dow)) {
-      return { ...DEFAULTS, frequency: 'specificDays', time, selectedDays: dow.split(',').map(Number) }
+    // The field may mix values and ranges (`1-3,5`); describeCron already
+    // renders any such field as specificDays, so parse it the same way or the
+    // edit modal drops back to raw cron text for a schedule it just described.
+    if (dom === '*' && month === '*' && /^[\d,\-]+$/.test(dow)) {
+      const selectedDays = parseDowField(dow)
+      if (selectedDays.length > 0) {
+        return { ...DEFAULTS, frequency: 'specificDays', time, selectedDays }
+      }
     }
     // M H D * * → monthly
     if (/^\d+$/.test(dom) && month === '*' && dow === '*') {
