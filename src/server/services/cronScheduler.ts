@@ -127,6 +127,13 @@ function singleFieldMatches(
   value: number,
   options?: { sundayAlias?: boolean },
 ): boolean {
+  // Sunday is both `0` and `7` in cron, and `Date#getDay()` reports `0`. Try
+  // the alias as a second candidate so a stepped range such as `5-7/2` reaches
+  // Sunday without every branch below having to know about the alias.
+  if (options?.sundayAlias && value === 0) {
+    return singleFieldMatches(part, 0) || singleFieldMatches(part, 7)
+  }
+
   // Step: */n or range/n
   if (part.includes('/')) {
     const [rangePart, stepStr] = part.split('/')
@@ -155,17 +162,11 @@ function singleFieldMatches(
     const [startStr, endStr] = part.split('-')
     const start = parseInt(startStr, 10)
     const end = parseInt(endStr, 10)
-    if (options?.sundayAlias && value === 0) {
-      // Sunday is both `0` and `7`, so a range reaching `7` covers it.
-      return value >= start && value <= end || end === 7
-    }
     return value >= start && value <= end
   }
 
   // Exact number
-  const exact = parseInt(part, 10)
-  if (options?.sundayAlias && value === 0 && exact === 7) return true
-  return exact === value
+  return parseInt(part, 10) === value
 }
 
 /**
