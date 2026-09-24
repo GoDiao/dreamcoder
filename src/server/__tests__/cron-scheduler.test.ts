@@ -573,3 +573,39 @@ describe('Scheduled Tasks API — runs endpoints', () => {
     expect(body.runs[0].taskId).toBe('task-a')
   })
 })
+
+describe('cronMatches day-of-week Sunday alias', () => {
+  // Cron accepts both 0 and 7 for Sunday; Date#getDay() only ever reports 0,
+  // so `* * * * 7` used to validate and read as Sunday in the UI but never fire.
+  const sunday = new Date(2026, 0, 4, 10, 0) // 2026-01-04 is a Sunday
+  const monday = new Date(2026, 0, 5, 10, 0) // 2026-01-05 is a Monday
+
+  it('fires on Sunday for both 0 and 7', () => {
+    expect(sunday.getDay()).toBe(0)
+    expect(cronMatches('0 10 * * 0', sunday)).toBe(true)
+    expect(cronMatches('0 10 * * 7', sunday)).toBe(true)
+  })
+
+  it('does not fire on other days for the 7 alias', () => {
+    expect(cronMatches('0 10 * * 7', monday)).toBe(false)
+  })
+
+  it('treats a range ending at 7 as covering Sunday', () => {
+    expect(cronMatches('0 10 * * 5-7', sunday)).toBe(true)
+    expect(cronMatches('0 10 * * 1-5', sunday)).toBe(false)
+  })
+})
+
+describe('cronMatches stepped day-of-week range ending in 7', () => {
+  const sunday = new Date(2026, 0, 4, 10, 0) // Sunday
+  const friday = new Date(2026, 0, 2, 10, 0) // Friday
+  const monday = new Date(2026, 0, 5, 10, 0) // Monday
+
+  it('matches the stepped range on Sunday via the 7 alias', () => {
+    // 5-7/2 names Friday and Sunday. Date#getDay() reports 0 for Sunday, so the
+    // step branch has to retry the comparison as 7.
+    expect(cronMatches('0 10 * * 5-7/2', friday)).toBe(true)
+    expect(cronMatches('0 10 * * 5-7/2', sunday)).toBe(true)
+    expect(cronMatches('0 10 * * 5-7/2', monday)).toBe(false)
+  })
+})

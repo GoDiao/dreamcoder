@@ -105,16 +105,35 @@ function extractAssistantText(raw: string): string {
  *   1-5        — inclusive range
  *   *​/2        — step from 0
  *   1-10/3     — step within a range
+ *
+ * `sundayAlias` is for the day-of-week field only: cron accepts both `0` and
+ * `7` for Sunday, and `Date#getDay()` reports `0`, so a literal `7` in the
+ * expression must be compared against `0`.
  */
-export function fieldMatches(field: string, value: number): boolean {
+export function fieldMatches(
+  field: string,
+  value: number,
+  options?: { sundayAlias?: boolean },
+): boolean {
   if (field === '*') return true
 
   // Comma-separated list — each element can be a range or step
   const parts = field.split(',')
-  return parts.some((part) => singleFieldMatches(part.trim(), value))
+  return parts.some((part) => singleFieldMatches(part.trim(), value, options))
 }
 
-function singleFieldMatches(part: string, value: number): boolean {
+function singleFieldMatches(
+  part: string,
+  value: number,
+  options?: { sundayAlias?: boolean },
+): boolean {
+  // Sunday is both `0` and `7` in cron, and `Date#getDay()` reports `0`. Try
+  // the alias as a second candidate so a stepped range such as `5-7/2` reaches
+  // Sunday without every branch below having to know about the alias.
+  if (options?.sundayAlias && value === 0) {
+    return singleFieldMatches(part, 0) || singleFieldMatches(part, 7)
+  }
+
   // Step: */n or range/n
   if (part.includes('/')) {
     const [rangePart, stepStr] = part.split('/')
@@ -164,7 +183,10 @@ export function cronMatches(cronExpr: string, date: Date): boolean {
     fieldMatches(hour, date.getHours()) &&
     fieldMatches(dayOfMonth, date.getDate()) &&
     fieldMatches(month, date.getMonth() + 1) &&
-    fieldMatches(dayOfWeek, date.getDay())
+    // `Date#getDay()` returns 0 for Sunday, so the cron `7` alias has to be
+    // normalised here too — otherwise `0 10 * * 7` validates and reads as
+    // Sunday in the UI but never fires.
+    fieldMatches(dayOfWeek, date.getDay(), { sundayAlias: true })
   )
 }
 
