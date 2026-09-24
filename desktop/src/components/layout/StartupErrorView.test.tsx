@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useSettingsStore } from '../../stores/settingsStore'
 import { splitStartupError, StartupErrorView } from './StartupErrorView'
 
 describe('splitStartupError', () => {
@@ -19,6 +20,10 @@ describe('splitStartupError', () => {
 })
 
 describe('StartupErrorView', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ locale: 'zh' })
+  })
+
   it('shows diagnostics and copies the full payload with the legacy fallback', async () => {
     const originalClipboard = navigator.clipboard
     const originalExecCommand = document.execCommand

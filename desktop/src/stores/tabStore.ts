@@ -193,9 +193,22 @@ export const useTabStore = create<TabStore>((set, get) => ({
       }
 
       memLog('restoreTabs:start')
-      const { sessions } = await sessionsApi.list({ limit: 200 })
-      memLog(`restoreTabs:after-list (got ${sessions.length} sessions)`)
-      const existingIds = new Set(sessions.map((s) => s.id))
+      const pendingSessionIds = new Set(data.openTabs
+        .filter((tab) => tab.type !== 'settings' && tab.type !== 'scheduled' && tab.type !== 'terminal')
+        .map((tab) => tab.sessionId))
+      const sessionTitles = new Map<string, string>()
+      const pageSize = 200
+      let offset = 0
+      while (pendingSessionIds.size > 0) {
+        const { sessions, total } = await sessionsApi.list({ limit: pageSize, offset })
+        for (const session of sessions) {
+          if (pendingSessionIds.delete(session.id)) sessionTitles.set(session.id, session.title)
+        }
+        // Unreadable files may produce sparse pages, so use total rather than page length.
+        offset += pageSize
+        if (offset >= total) break
+      }
+      memLog(`restoreTabs:after-list (resolved ${sessionTitles.size} sessions)`)
 
       const validTabs: Tab[] = data.openTabs
         .filter((t) => {
@@ -203,7 +216,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
           if (t.type === 'settings' || t.type === 'scheduled') return true
           if (t.type === 'terminal') return false
           // Session tabs must exist on server
-          return existingIds.has(t.sessionId)
+          return sessionTitles.has(t.sessionId)
         })
         .map((t) => {
           if (t.type === 'settings' || t.type === 'scheduled') {
@@ -211,7 +224,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
           }
           return {
             sessionId: t.sessionId,
-            title: sessions.find((s) => s.id === t.sessionId)?.title || t.title,
+            title: sessionTitles.get(t.sessionId) || t.title,
             type: 'session' as const,
             status: 'idle' as const,
           }

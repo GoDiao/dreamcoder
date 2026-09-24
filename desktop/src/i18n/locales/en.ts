@@ -1,4 +1,13 @@
 export const en = {
+  // ─── Quick switcher ───────────────────────────────
+  'commandPalette.title': 'Switch session',
+  'commandPalette.placeholder': 'Search titles or last assistant messages...',
+  'commandPalette.close': 'Close session switcher',
+  'commandPalette.results': 'Matching sessions',
+  'commandPalette.recent': 'Recent sessions',
+  'commandPalette.loading': 'Loading all sessions...',
+  'commandPalette.loadFailed': 'Could not load all sessions. Please try again.',
+  'commandPalette.hint': '↑ ↓ to navigate · Enter to open · Esc to close',
   // ─── Common ──────────────────────────────────────
   'common.cancel': 'Cancel',
   'common.save': 'Save',

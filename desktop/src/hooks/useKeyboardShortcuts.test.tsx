@@ -1,8 +1,83 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { APP_ZOOM_STORAGE_KEY } from '../lib/appZoom'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import { useUIStore } from '../stores/uiStore'
+import { useSessionStore } from '../stores/sessionStore'
+
+describe('useKeyboardShortcuts quick switcher', () => {
+  beforeEach(() => {
+    useUIStore.setState({ activeModal: null, sidebarOpen: false })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+    useUIStore.setState({ activeModal: null })
+  })
+
+  it.each([{ metaKey: true }, { ctrlKey: true }])('opens the palette from a focused input with %o', (modifier) => {
+    render(<><ShortcutHost /><input aria-label="Composer" /></>)
+    const input = document.querySelector('input')!
+    input.focus()
+    expect(fireEvent.keyDown(input, { key: 'k', ...modifier })).toBe(false)
+    expect(useUIStore.getState().activeModal).toBe('command-palette')
+    expect(useUIStore.getState().sidebarOpen).toBe(false)
+  })
+
+  it.each([
+    { key: 'k' },
+    { key: 'k', ctrlKey: true, altKey: true },
+    { key: 'K', ctrlKey: true, shiftKey: true },
+    { key: 'k', metaKey: true, isComposing: true },
+    { key: 'k', ctrlKey: true, keyCode: 229 },
+    { key: 'k', ctrlKey: true, repeat: true },
+  ])('ignores a non-shortcut, composition, or key repeat: %o', (event) => {
+    render(<ShortcutHost />)
+    fireEvent.keyDown(document, event)
+    expect(useUIStore.getState().activeModal).toBeNull()
+  })
+
+  it('does not replace another open modal', () => {
+    useUIStore.setState({ activeModal: 'rename' })
+    render(<ShortcutHost />)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    expect(useUIStore.getState().activeModal).toBe('rename')
+  })
+
+  it('captures Ctrl+K before a terminal can consume it', () => {
+    const terminalKey = vi.fn((event: React.KeyboardEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+    })
+    render(<><ShortcutHost /><textarea aria-label="Terminal" onKeyDown={terminalKey} /></>)
+    fireEvent.keyDown(document.querySelector('textarea')!, { key: 'k', ctrlKey: true })
+    expect(useUIStore.getState().activeModal).toBe('command-palette')
+    expect(terminalKey).not.toHaveBeenCalled()
+  })
+
+  it('does not cover a locally managed dialog', () => {
+    render(<><ShortcutHost /><div role="dialog" aria-modal="true" /></>)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    expect(useUIStore.getState().activeModal).toBeNull()
+  })
+
+  it('does not run underlying actions while the palette is open', () => {
+    useUIStore.setState({ activeModal: 'command-palette' })
+    const setActiveSession = vi.spyOn(useSessionStore.getState(), 'setActiveSession')
+    render(<ShortcutHost />)
+    fireEvent.keyDown(document, { key: 'n', ctrlKey: true })
+    expect(setActiveSession).not.toHaveBeenCalled()
+  })
+
+  it('removes its listener when unmounted', () => {
+    const { unmount } = render(<ShortcutHost />)
+    unmount()
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    expect(useUIStore.getState().activeModal).toBeNull()
+  })
+})
 
 function ShortcutHost() {
   useKeyboardShortcuts()

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { describeCron, isValidCron } from '../cronDescribe'
+import { describeCron, isValidCron, parseCron } from '../cronDescribe'
 
 // Simple mock t() that returns the key with params interpolated
 const t = (key: string, params?: Record<string, string | number>) => {
@@ -89,5 +89,100 @@ describe('isValidCron', () => {
   it('accepts edge case values', () => {
     expect(isValidCron('0 0 1 1 0')).toBe(true)
     expect(isValidCron('59 23 31 12 7')).toBe(true)
+  })
+})
+
+describe('parseCron', () => {
+  it('recognises the day-of-week ranges describeCron already accepts', () => {
+    // describeCron turns any `[\d,\-]+` dow field into `cron.specificDaysAt`
+    // (cronDescribe.ts:78-81), so parseCron has to read the same field back or
+    // the edit modal loses the frequency the description advertised.
+    expect(parseCron('0 9 * * 1-3').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 1-3').selectedDays).toEqual([1, 2, 3])
+    expect(parseCron('0 9 * * 0-4').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 0-4').selectedDays).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('still expands comma-separated days and the 1-5 weekday range', () => {
+    expect(parseCron('0 9 * * 1,3,5').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 1,3,5').selectedDays).toEqual([1, 3, 5])
+    expect(parseCron('0 9 * * 1-5').frequency).toBe('weekdays')
+    expect(parseCron('0 9 * * 1-5').selectedDays).toEqual([1])
+  })
+
+  it('expands a range mixed into a comma list', () => {
+    expect(parseCron('0 9 * * 1-3,5').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 1-3,5').selectedDays).toEqual([1, 2, 3, 5])
+  })
+
+  it('keeps the other frequencies intact', () => {
+    expect(parseCron('*/15 * * * *').frequency).toBe('everyNMinutes')
+    expect(parseCron('*/15 * * * *').minuteInterval).toBe(15)
+    expect(parseCron('0 */4 * * *').frequency).toBe('everyNHours')
+    expect(parseCron('0 */4 * * *').hourInterval).toBe(4)
+    expect(parseCron('30 9 * * *').frequency).toBe('daily')
+    expect(parseCron('30 9 * * *').time).toBe('09:30')
+    expect(parseCron('0 9 15 * *').frequency).toBe('monthly')
+    expect(parseCron('0 9 15 * *').monthDay).toBe(15)
+    expect(parseCron('0 9 1 6 *').frequency).toBe('customCron')
+    expect(parseCron('0 9 *').frequency).toBe('customCron')
+  })
+
+  it('round-trips what buildCron serialises', () => {
+    // NewTaskModal.buildCron emits `M H * * 1-5` for weekdays and
+    // `M H * * d,d,d` for specific days; both must survive a re-open.
+    expect(parseCron('30 9 * * 1-5').frequency).toBe('weekdays')
+    const rebuilt = parseCron('0 9 * * 1,2,3')
+    expect(rebuilt.frequency).toBe('specificDays')
+    expect(rebuilt.time).toBe('09:00')
+    expect(rebuilt.selectedDays).toEqual([1, 2, 3])
+  })
+})
+
+describe('parseCron day-of-week validity', () => {
+  it('normalises the Sunday alias 7 to 0', () => {
+    expect(parseCron('0 9 * * 7').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 7').selectedDays).toEqual([0])
+  })
+
+  it('rejects values above 7 instead of wrapping them into range', () => {
+    // `% 7` used to turn 8 into Monday and 14 into Sunday, silently rewriting
+    // a persisted schedule on save. isValidCron already rejects > 7.
+    expect(parseCron('0 9 * * 8').frequency).toBe('customCron')
+    expect(parseCron('0 9 * * 14').frequency).toBe('customCron')
+  })
+
+  it('rejects a reversed range rather than emitting a partial day list', () => {
+    expect(parseCron('0 9 * * 5-1').frequency).toBe('customCron')
+  })
+
+  it('rejects the whole field when any token is invalid', () => {
+    // 1-3,99 used to parse as [1], dropping 99 without a word.
+    expect(parseCron('0 9 * * 1-3,99').frequency).toBe('customCron')
+    expect(parseCron('0 9 * * 1-3,5').frequency).toBe('specificDays')
+    expect(parseCron('0 9 * * 1-3,5').selectedDays).toEqual([1, 2, 3, 5])
+  })
+
+  it('still accepts every in-range value', () => {
+    expect(parseCron('0 9 * * 0').selectedDays).toEqual([0])
+    expect(parseCron('0 9 * * 6').selectedDays).toEqual([6])
+    expect(parseCron('0 9 * * 0-6').selectedDays).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+})
+
+describe('describeCron with an unusable day-of-week field', () => {
+  // parseDowField returns null for these, and describeDow must not call .map()
+  // on it: TaskRow and NewTaskModal both render describeCron output, so a
+  // persisted invalid cron would otherwise break the whole view.
+  it('falls back to the custom schedule instead of throwing', () => {
+    for (const cron of ['0 9 * * 8', '0 9 * * 5-1', '0 9 * * 1-3,99']) {
+      expect(() => describeCron(cron, t)).not.toThrow()
+      expect(describeCron(cron, t)).toBe('cron.customSchedule')
+    }
+  })
+
+  it('still names the days for a valid field', () => {
+    expect(describeCron('0 9 * * 1,3', t)).toBe('cron.specificDaysAt')
+    expect(describeCron('0 9 * * 7', t)).toBe('cron.specificDaysAt')
   })
 })

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { branchMock, createMock, listMock } = vi.hoisted(() => ({
+const { branchMock, createMock, listMock, deleteMock, batchDeleteMock } = vi.hoisted(() => ({
   branchMock: vi.fn(),
   createMock: vi.fn(),
   listMock: vi.fn(),
+  deleteMock: vi.fn(),
+  batchDeleteMock: vi.fn(),
 }))
 
 vi.mock('../api/sessions', () => ({
@@ -11,15 +13,32 @@ vi.mock('../api/sessions', () => ({
     branch: branchMock,
     create: createMock,
     list: listMock,
-    delete: vi.fn(),
+    delete: deleteMock,
+    batchDelete: batchDeleteMock,
     rename: vi.fn(),
   },
 }))
 
 import { useSessionStore } from './sessionStore'
 import { useTabStore } from './tabStore'
+import type { SessionListItem } from '../types/session'
 
 const initialState = useSessionStore.getState()
+
+function session(id: string, overrides: Partial<SessionListItem> = {}): SessionListItem {
+  return {
+    id,
+    title: `Session ${id}`,
+    createdAt: '2026-05-01T00:00:00.000Z',
+    modifiedAt: '2026-05-01T00:00:00.000Z',
+    messageCount: 2,
+    projectPath: '/workspace/project',
+    projectRoot: '/workspace/project',
+    workDir: '/workspace/project',
+    workDirExists: true,
+    ...overrides,
+  }
+}
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -38,6 +57,8 @@ describe('sessionStore', () => {
     branchMock.mockReset()
     createMock.mockReset()
     listMock.mockReset()
+    deleteMock.mockReset()
+    batchDeleteMock.mockReset()
     useSessionStore.setState({
       ...initialState,
       sessions: [],
@@ -134,6 +155,77 @@ describe('sessionStore', () => {
     await useSessionStore.getState().fetchSessions()
 
     expect(useTabStore.getState().tabs[0]?.title).toBe('使用bash写一个shell，随便写点什么东西')
+  })
+
+  it('keeps an open older session and its workspace metadata when refreshing the first page', async () => {
+    const recentSessions = Array.from({ length: 100 }, (_, index) => session(`recent-${index}`))
+    const olderSession = session('older-open', {
+      title: 'Older searchable conversation',
+      workDir: '/workspace/older-project',
+      projectRoot: '/workspace/older-project',
+    })
+    useSessionStore.setState({ sessions: [...recentSessions, olderSession, session('older-closed')] })
+    useTabStore.getState().openTab(olderSession.id, olderSession.title)
+    listMock.mockResolvedValue({ sessions: recentSessions, total: 102 })
+
+    await useSessionStore.getState().fetchSessions()
+
+    expect(listMock).toHaveBeenCalledWith({ project: undefined, limit: 100 })
+    expect(useSessionStore.getState().sessions).toHaveLength(101)
+    expect(useSessionStore.getState().sessions.find((item) => item.id === olderSession.id))
+      .toEqual(olderSession)
+    expect(useSessionStore.getState().sessions.some((item) => item.id === 'older-closed')).toBe(false)
+  })
+
+  it('prefers refreshed server metadata over a retained open session without duplicating it', async () => {
+    const oldSession = session('open', { title: 'Previous title', workDir: '/workspace/old' })
+    const refreshedSession = session('open', {
+      title: 'Current title',
+      modifiedAt: '2026-05-02T00:00:00.000Z',
+      workDir: '/workspace/current',
+      messageCount: 12,
+    })
+    useSessionStore.setState({ sessions: [oldSession] })
+    useTabStore.getState().openTab(oldSession.id, oldSession.title)
+    listMock.mockResolvedValue({ sessions: [refreshedSession], total: 1 })
+
+    await useSessionStore.getState().fetchSessions()
+
+    expect(useSessionStore.getState().sessions).toEqual([refreshedSession])
+    expect(useTabStore.getState().tabs[0]?.title).toBe('Current title')
+  })
+
+  it('does not retain open sessions outside an explicitly filtered project list', async () => {
+    const otherSession = session('other-project', { workDir: '/workspace/other' })
+    const matchingSession = session('matching-project')
+    useSessionStore.setState({ sessions: [otherSession] })
+    useTabStore.getState().openTab(otherSession.id, otherSession.title)
+    listMock.mockResolvedValue({ sessions: [matchingSession], total: 1 })
+
+    await useSessionStore.getState().fetchSessions('/workspace/project')
+
+    expect(useSessionStore.getState().sessions).toEqual([matchingSession])
+  })
+
+  it.each(['single', 'batch'] as const)('does not resurrect an open older session after a %s deletion during refresh', async (mode) => {
+    const olderSession = session('older-deleted')
+    const recentSession = session('recent')
+    useSessionStore.setState({ sessions: [recentSession, olderSession] })
+    useTabStore.getState().openTab(olderSession.id, olderSession.title)
+    const refresh = createDeferred<{ sessions: SessionListItem[]; total: number }>()
+    listMock.mockReturnValue(refresh.promise)
+    deleteMock.mockResolvedValue({ ok: true })
+    batchDeleteMock.mockResolvedValue({ successes: [olderSession.id], failures: [] })
+    const pendingRefresh = useSessionStore.getState().fetchSessions()
+
+    if (mode === 'single') await useSessionStore.getState().deleteSession(olderSession.id)
+    else await useSessionStore.getState().deleteSessions([olderSession.id])
+    // Leave the tab open to prove refresh cannot resurrect metadata from the tab alone.
+    expect(useTabStore.getState().tabs[0]?.sessionId).toBe(olderSession.id)
+    refresh.resolve({ sessions: [recentSession], total: 101 })
+    await pendingRefresh
+
+    expect(useSessionStore.getState().sessions).toEqual([recentSession])
   })
 
   it('forwards direct branch switch repository options when creating a session', async () => {

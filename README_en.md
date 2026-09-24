@@ -144,6 +144,10 @@ bun run tauri dev
 2. Add your API key (for example Anthropic, OpenAI, or DeepSeek).
 3. Choose a default model and start coding.
 
+### UI Language
+
+On first launch, DreamCoder detects your system locale: Chinese systems (`zh-*`) get the Chinese UI, everything else defaults to English. You can switch languages anytime in **Settings**, and your manual choice is persisted and always takes precedence afterwards.
+
 ---
 
 ## 🤝 Contributing

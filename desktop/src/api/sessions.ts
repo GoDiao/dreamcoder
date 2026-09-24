@@ -305,11 +305,12 @@ function buildWorkspacePath(
 }
 
 export const sessionsApi = {
-  list(params?: { project?: string; limit?: number; offset?: number }) {
+  list(params?: { project?: string; limit?: number; offset?: number; includeLastAssistantMessage?: boolean }) {
     const query = new URLSearchParams()
     if (params?.project) query.set('project', params.project)
     if (params?.limit) query.set('limit', String(params.limit))
     if (params?.offset) query.set('offset', String(params.offset))
+    if (params?.includeLastAssistantMessage) query.set('includeLastAssistantMessage', 'true')
     const qs = query.toString()
     return api.get<SessionsResponse>(`/api/sessions${qs ? `?${qs}` : ''}`)
   },
