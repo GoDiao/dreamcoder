@@ -10,6 +10,7 @@ type StreamState = {
   nextContentIndex: number
   indexByKey: Map<string, number>        // content part key → Anthropic index
   toolIndexByItemId: Map<string, number> // tool item ID → Anthropic index
+  reasoningIndexByItemId: Map<string, number> // reasoning item ID → Anthropic index
   model: string
   messageStarted: boolean
   messageStopped: boolean
@@ -34,6 +35,7 @@ export function openaiResponsesStreamToAnthropic(
     nextContentIndex: 0,
     indexByKey: new Map(),
     toolIndexByItemId: new Map(),
+    reasoningIndexByItemId: new Map(),
     model,
     messageStarted: false,
     messageStopped: false,
@@ -158,6 +160,19 @@ function processEvent(
             input: {},
           },
         })))
+      } else if (item.type === 'reasoning') {
+        // Open a thinking content block; reasoning summary/text deltas
+        // arrive via response.reasoning_summary_text.delta events.
+        const itemId = (item.id as string) || ''
+        if (itemId && !state.reasoningIndexByItemId.has(itemId)) {
+          const index = state.nextContentIndex++
+          state.reasoningIndexByItemId.set(itemId, index)
+          controller.enqueue(encoder.encode(formatSse('content_block_start', {
+            type: 'content_block_start',
+            index,
+            content_block: { type: 'thinking', thinking: '' },
+          })))
+        }
       }
       break
     }
@@ -254,6 +269,59 @@ function processEvent(
       break
     }
 
+    case 'response.reasoning_summary_text.delta':
+    case 'response.reasoning_text.delta': {
+      const itemId = (data.item_id as string) || ''
+      let index = state.reasoningIndexByItemId.get(itemId)
+      // Some providers omit the reasoning output_item.added event; open
+      // lazily on first delta so the thinking block still surfaces.
+      if (index === undefined) {
+        index = state.nextContentIndex++
+        state.reasoningIndexByItemId.set(itemId, index)
+        if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
+        controller.enqueue(encoder.encode(formatSse('content_block_start', {
+          type: 'content_block_start',
+          index,
+          content_block: { type: 'thinking', thinking: '' },
+        })))
+      }
+
+      const delta = (data.delta as string) || ''
+      controller.enqueue(encoder.encode(formatSse('content_block_delta', {
+        type: 'content_block_delta',
+        index,
+        delta: { type: 'thinking_delta', thinking: delta },
+      })))
+      break
+    }
+
+    case 'response.reasoning_summary_text.done':
+    case 'response.reasoning_text.done': {
+      const itemId = (data.item_id as string) || ''
+      const index = state.reasoningIndexByItemId.get(itemId)
+      if (index === undefined) break
+
+      controller.enqueue(encoder.encode(formatSse('content_block_stop', {
+        type: 'content_block_stop',
+        index,
+      })))
+      break
+    }
+
+    case 'response.reasoning_summary_part.done': {
+      // Some providers emit this in lieu of reasoning_summary_text.done
+      // to signal the end of a summary part; close the thinking block.
+      const itemId = (data.item_id as string) || ''
+      const index = state.reasoningIndexByItemId.get(itemId)
+      if (index === undefined) break
+
+      controller.enqueue(encoder.encode(formatSse('content_block_stop', {
+        type: 'content_block_stop',
+        index,
+      })))
+      break
+    }
+
     case 'response.completed': {
       const response = data.response as Record<string, unknown> | undefined
       const status = (response?.status as string) || 'completed'
@@ -264,12 +332,30 @@ function processEvent(
         ? (hasToolUse ? 'tool_use' : 'end_turn')
         : status === 'incomplete' ? 'max_tokens' : 'end_turn'
 
+      // Map usage including cached tokens when provided. Some providers
+      // surface cache hits via input_tokens_details.cached_tokens.
+      const cached = (usage as Record<string, unknown> | undefined)?.input_tokens_details as
+        | { cached_tokens?: number }
+        | undefined
+
+      // Close any reasoning blocks that didn't receive an explicit .done
+      // event before emitting message_delta (Anthropic requires blocks
+      // closed before message_delta).
+      for (const [, index] of state.reasoningIndexByItemId) {
+        controller.enqueue(encoder.encode(formatSse('content_block_stop', {
+          type: 'content_block_stop',
+          index,
+        })))
+      }
+      state.reasoningIndexByItemId.clear()
+
       controller.enqueue(encoder.encode(formatSse('message_delta', {
         type: 'message_delta',
         delta: { stop_reason: stopReason, stop_sequence: null },
         usage: {
           input_tokens: usage?.input_tokens ?? 0,
           output_tokens: usage?.output_tokens ?? 0,
+          ...(cached?.cached_tokens ? { cache_read_input_tokens: cached.cached_tokens } : {}),
         },
       })))
       if (!state.messageStopped) {

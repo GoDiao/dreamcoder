@@ -232,6 +232,55 @@ describe('anthropicToOpenaiChat', () => {
     expect(content[0].type).toBe('image_url')
     expect(content[0].image_url!.url).toBe('data:image/png;base64,abc123')
   })
+
+  test('tool_result with image content becomes placeholder, not dropped', () => {
+    // Issue 5: non-text tool_result content must surface as a placeholder
+    // rather than being silently discarded.
+    const req: AnthropicRequest = {
+      model: 'gpt-4',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tc_img',
+            content: [
+              { type: 'text', text: 'Screenshot below:' },
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'deadbeef' } },
+            ],
+          },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiChat(req)
+    expect(result.messages[0].role).toBe('tool')
+    expect(result.messages[0].tool_call_id).toBe('tc_img')
+    expect(result.messages[0].content).toBe('Screenshot below:\n[image omitted: image/png]')
+  })
+
+  test('max_tokens clamped to provider cap', () => {
+    // Issue 6: with maxOutputTokens configured, max_tokens is clamped to the
+    // cap rather than dropped, so user-set limits still take effect.
+    const req: AnthropicRequest = {
+      model: 'deepseek-chat',
+      max_tokens: 128000,
+      messages: [{ role: 'user', content: 'Hi' }],
+    }
+    const result = anthropicToOpenaiChat(req, { maxOutputTokens: 8192 })
+    expect(result.max_tokens).toBe(8192)
+  })
+
+  test('max_tokens omitted when no provider cap configured', () => {
+    // Backward-compat: without a cap, max_tokens is omitted (prior behavior).
+    const req: AnthropicRequest = {
+      model: 'deepseek-chat',
+      max_tokens: 128000,
+      messages: [{ role: 'user', content: 'Hi' }],
+    }
+    const result = anthropicToOpenaiChat(req)
+    expect(result.max_tokens).toBeUndefined()
+  })
 })
 
 // ─── openaiChatToAnthropic ──────────────────────────────────────
@@ -465,6 +514,94 @@ describe('anthropicToOpenaiResponses', () => {
     const result = anthropicToOpenaiResponses(req)
     expect((result as Record<string, unknown>).stop).toBeUndefined()
     expect((result as Record<string, unknown>).stop_sequences).toBeUndefined()
+  })
+
+  test('image content uses input_image format (not Chat image_url)', () => {
+    // Issue 2: Responses API requires input_image with a string image_url,
+    // not the Chat Completions image_url object shape.
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc123' } },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message')!
+    expect(msg).toBeDefined()
+    const content = msg.content as Array<{ type: string; image_url?: string }>
+    expect(content[0].type).toBe('input_image')
+    expect(content[0].image_url).toBe('data:image/png;base64,abc123')
+  })
+
+  test('text content uses input_text format in multi-part message', () => {
+    // Issue 2: text parts in Responses input must be input_text.
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is this?' },
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc123' } },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message')!
+    const content = msg.content as Array<{ type: string }>
+    expect(content[0].type).toBe('input_text')
+    expect(content[1].type).toBe('input_image')
+  })
+
+  test('tool_result with image content becomes placeholder, not dropped', () => {
+    // Issue 5: non-text tool_result content must surface as a placeholder.
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tc_img',
+            content: [
+              { type: 'text', text: 'Screenshot:' },
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'ff' } },
+            ],
+          },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const fco = result.input.find((i) => i.type === 'function_call_output')!
+    expect(fco).toBeDefined()
+    expect(fco.output).toBe('Screenshot:\n[image omitted: image/jpeg]')
+  })
+
+  test('max_output_tokens clamped to provider cap', () => {
+    // Issue 6: with maxOutputTokens configured, max_output_tokens is clamped.
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 128000,
+      messages: [{ role: 'user', content: 'Hi' }],
+    }
+    const result = anthropicToOpenaiResponses(req, { maxOutputTokens: 16384 })
+    expect(result.max_output_tokens).toBe(16384)
+  })
+
+  test('max_output_tokens omitted when no provider cap configured', () => {
+    // Backward-compat: without a cap, max_output_tokens is omitted.
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 128000,
+      messages: [{ role: 'user', content: 'Hi' }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    expect(result.max_output_tokens).toBeUndefined()
   })
 })
 
