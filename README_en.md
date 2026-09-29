@@ -32,6 +32,7 @@ DreamCoder runs its desktop app and session service locally, bringing model conf
 *   **Choose a model provider**: Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama; custom endpoints are also supported. Model availability depends on your provider and configuration.
 *   **Follow the work**: Review sessions, file changes, terminal activity, and tool calls on your desktop.
 *   **Continue on your phone**: Enable H5 Access to reach desktop sessions from a phone browser on the same LAN. Access across networks requires a reverse proxy you configure yourself.
+*   **Learn how a coding agent works**: A seven-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
 
 Provider settings and API keys are stored in local files. When you use a cloud model, requests are sent to your chosen provider. See the [privacy notice](PRIVACY.md).
 
@@ -67,6 +68,12 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 *   **Visual configuration**: Manage MCP servers in the UI instead of editing JSON by hand.
 
 ![MCP settings](./assets/setting_skills.png)
+
+---
+
+## 📖 Source Code Walkthrough
+
+To learn how a coding agent works under the hood, read the [Coding Agent Implementation Guide](docs/tutorial/README.en.md) (also available in [Chinese](docs/tutorial/README.md)). The seven-part series follows one small code change through the execution loop, code tools, permissions, sessions and context, streaming and failure recovery, and desktop integration, with source links for each point.
 
 ---
 
