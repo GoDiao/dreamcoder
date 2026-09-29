@@ -95,6 +95,7 @@ const copy = {
 } as const;
 
 const github = 'https://github.com/GoDiao/dreamcoder';
+const atomgit = 'https://atomgit.com/GoDiao/DreamCoder';
 const base = import.meta.env.BASE_URL;
 
 function readRoute(): { doc: DocId | null; lang: Language | null } {
@@ -292,6 +293,7 @@ export default function App() {
         <div className="flex gap-5">
           <a href={`${github}/blob/main/docs/CONTRIBUTING_${lang}.md`} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">{t.contribute}</a>
           <a href={github} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">GitHub</a>
+          <a href={atomgit} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">AtomGit</a>
         </div>
       </footer>
     </div>
