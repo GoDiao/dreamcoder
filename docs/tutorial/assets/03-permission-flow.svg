@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850" width="1200" height="850" role="img" aria-label="DreamCoder 工具权限判定流程">
+<style>text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; } .title { font-size: 24px; font-weight: 600; fill: #111827; } .node { font-size: 18px; font-weight: 600; fill: #111827; } .sub { font-size: 13px; fill: #6b7280; } .edge-label { font-size: 14px; fill: #374151; font-weight: 600; }</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#2563eb"/></marker></defs>
+<rect width="1200" height="850" fill="#ffffff"/>
+<text x="60" y="48" class="title">DreamCoder 的工具权限判定路径</text>
+<text x="60" y="72" class="sub">简化图：具体规则、Hook 和模式按源码中的判定顺序执行</text>
+<rect x="420" y="100" width="360" height="60" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<text x="600.0" y="127" text-anchor="middle" class="node">模型提出 tool_use</text>
+<text x="600.0" y="147" text-anchor="middle" class="sub">工具名称、参数、id</text>
+<rect x="420" y="205" width="360" height="60" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="600.0" y="232" text-anchor="middle" class="node">输入校验</text>
+<text x="600.0" y="252" text-anchor="middle" class="sub">inputSchema → validateInput</text>
+<rect x="420" y="310" width="360" height="60" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="600.0" y="337" text-anchor="middle" class="node">Hook 与权限规则</text>
+<text x="600.0" y="357" text-anchor="middle" class="sub">resolveHookPermissionDecision()</text>
+<polygon points="600,407 690,455 600,503 510,455" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="600" y="461" text-anchor="middle" class="node">权限决定</text>
+<rect x="120" y="565" width="250" height="62" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="245.0" y="592" text-anchor="middle" class="node">allow</text>
+<text x="245.0" y="612" text-anchor="middle" class="sub">直接进入工具执行</text>
+<rect x="475" y="565" width="250" height="62" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="600.0" y="592" text-anchor="middle" class="node">ask</text>
+<text x="600.0" y="612" text-anchor="middle" class="sub">自动检查；必要时交互确认</text>
+<rect x="845" y="565" width="250" height="62" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="970.0" y="592" text-anchor="middle" class="node">deny</text>
+<text x="970.0" y="612" text-anchor="middle" class="sub">拒绝执行</text>
+<polygon points="600,652 670,690 600,728 530,690" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="600" y="696" text-anchor="middle" class="node">确认结果</text>
+<rect x="120" y="745" width="250" height="62" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="245.0" y="772" text-anchor="middle" class="node">tool.call()</text>
+<text x="245.0" y="792" text-anchor="middle" class="sub">执行并返回 tool_result</text>
+<rect x="845" y="745" width="250" height="62" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="970.0" y="772" text-anchor="middle" class="node">错误 tool_result</text>
+<text x="970.0" y="792" text-anchor="middle" class="sub">记录拒绝原因</text>
+<path d="M 600,160 L 600,205" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 600,265 L 600,310" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 600,370 L 600,407" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 510,455 L 245,455 L 245,565" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 600,503 L 600,565" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 690,455 L 970,455 L 970,565" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 245,627 L 245,745" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 600,627 L 600,652" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 970,627 L 970,745" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 530,690 L 410,690 L 410,776 L 370,776" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M 670,690 L 805,690 L 805,776 L 845,776" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="272" y="446" class="edge-label">allow</text>
+<text x="614" y="545" class="edge-label">ask</text>
+<text x="925" y="446" class="edge-label">deny</text>
+<text x="414" y="681" class="edge-label">批准</text>
+<text x="759" y="681" class="edge-label">拒绝</text>
+<text x="60" y="836" class="sub">输入校验失败也直接产生错误 tool_result；图中聚焦通过校验后的权限分支。</text>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-labelledby="title desc">
+<title id="title">DreamCoder 桌面会话与编程智能体执行路径</title>
+<desc id="desc">用户输入从桌面 React 界面，经 Sidecar 会话 WebSocket、ConversationService、CLI QueryEngine 进入 query 执行循环；执行循环与模型服务及本地工具交换请求和结果。</desc>
+<style>text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "SimHei", sans-serif; }</style>
+<defs>
+<marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#2563eb"/></marker>
+<marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#16a34a"/></marker>
+</defs>
+<rect width="1200" height="560" fill="#ffffff"/>
+<text x="60" y="57" fill="#111827" font-size="23" font-weight="600">DreamCoder：桌面会话到执行循环</text>
+<text x="60" y="82" fill="#6b7280" font-size="13">普通用户输入路径</text>
+<text x="60" y="125" fill="#6b7280" font-size="12" font-weight="600" letter-spacing="1">桌面消息通道</text>
+<text x="520" y="336" fill="#6b7280" font-size="12" font-weight="600" letter-spacing="1">工具执行</text>
+<text x="764" y="336" fill="#6b7280" font-size="12" font-weight="600" letter-spacing="1">智能体核心</text>
+<text x="1014" y="336" fill="#6b7280" font-size="12" font-weight="600" letter-spacing="1">外部服务</text>
+<path d="M 240 190 H 300" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 460 190 H 520" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 690 190 H 760" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 845 235 V 350" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 760 376 H 690" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 690 420 H 760" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/>
+<path d="M 930 376 H 1010" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<path d="M 1010 420 H 930" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/>
+<rect x="60" y="145" width="180" height="90" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="300" y="145" width="160" height="90" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<rect x="520" y="145" width="170" height="90" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<rect x="760" y="145" width="170" height="90" rx="8" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1.5"/>
+<rect x="520" y="350" width="170" height="90" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="760" y="350" width="170" height="90" rx="8" fill="#faf5ff" stroke="#ddd6fe" stroke-width="1.5"/>
+<rect x="1010" y="350" width="160" height="90" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="150" y="183" text-anchor="middle" fill="#111827" font-size="16" font-weight="600">桌面 React 界面</text>
+<text x="150" y="207" text-anchor="middle" fill="#6b7280" font-size="12">chatStore.sendMessage()</text>
+<text x="380" y="182" text-anchor="middle" fill="#111827" font-size="15" font-weight="600">会话 WebSocket</text>
+<text x="380" y="207" text-anchor="middle" fill="#6b7280" font-size="12">Sidecar handler</text>
+<text x="605" y="183" text-anchor="middle" fill="#111827" font-size="15" font-weight="600">ConversationService</text>
+<text x="605" y="207" text-anchor="middle" fill="#6b7280" font-size="12">启动并连接 CLI</text>
+<text x="845" y="183" text-anchor="middle" fill="#111827" font-size="15" font-weight="600">CLI / QueryEngine</text>
+<text x="845" y="207" text-anchor="middle" fill="#6b7280" font-size="12">submitMessage()</text>
+<text x="605" y="389" text-anchor="middle" fill="#111827" font-size="16" font-weight="600">本地工具</text>
+<text x="605" y="413" text-anchor="middle" fill="#6b7280" font-size="12">文件与命令等</text>
+<text x="845" y="389" text-anchor="middle" fill="#111827" font-size="16" font-weight="600">query 执行循环</text>
+<text x="845" y="413" text-anchor="middle" fill="#6b7280" font-size="12">模型请求 / 工具编排</text>
+<text x="1090" y="389" text-anchor="middle" fill="#111827" font-size="16" font-weight="600">所选模型服务</text>
+<text x="1090" y="413" text-anchor="middle" fill="#6b7280" font-size="12">模型 API</text>
+<text x="270" y="179" text-anchor="middle" fill="#2563eb" font-size="12">输入</text>
+<text x="490" y="179" text-anchor="middle" fill="#2563eb" font-size="12">转发</text>
+<text x="725" y="179" text-anchor="middle" fill="#2563eb" font-size="12">SDK 消息</text>
+<text x="854" y="297" fill="#2563eb" font-size="12">进入循环</text>
+<text x="725" y="366" text-anchor="middle" fill="#2563eb" font-size="12">tool_use</text>
+<text x="725" y="438" text-anchor="middle" fill="#16a34a" font-size="12">tool_result</text>
+<text x="970" y="366" text-anchor="middle" fill="#2563eb" font-size="12">请求</text>
+<text x="970" y="438" text-anchor="middle" fill="#16a34a" font-size="12">响应</text>
+<line x1="60" y1="492" x2="88" y2="492" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<text x="100" y="497" fill="#6b7280" font-size="12">输入 / 请求</text>
+<line x1="225" y1="492" x2="253" y2="492" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/>
+<text x="265" y="497" fill="#6b7280" font-size="12">工具结果 / 模型响应</text>
+<text x="60" y="533" fill="#6b7280" font-size="12">界面输出沿 CLI → ConversationService → WebSocket 返回；图中省略返回线，避免与输入线重叠。</text>
+</svg>
