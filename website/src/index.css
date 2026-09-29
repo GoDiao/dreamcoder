@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -74,3 +75,49 @@
   background-color: #efe8de;
   color: var(--color-brand-caramel);
 }
+
+/* Tutorial pages rendered from docs/tutorial/*.md */
+.doc-prose {
+  --tw-prose-body: var(--color-brand-text-body);
+  --tw-prose-headings: var(--color-brand-text-title);
+  --tw-prose-links: var(--color-brand-caramel);
+  --tw-prose-bold: var(--color-brand-text-title);
+  --tw-prose-counters: var(--color-brand-text-muted);
+  --tw-prose-bullets: var(--color-brand-caramel);
+  --tw-prose-hr: var(--color-brand-border);
+  --tw-prose-quotes: var(--color-brand-text-body);
+  --tw-prose-quote-borders: var(--color-brand-caramel);
+  --tw-prose-code: var(--color-brand-text-title);
+  --tw-prose-pre-code: var(--color-brand-text-title);
+  --tw-prose-pre-bg: var(--color-brand-bg-secondary);
+  --tw-prose-th-borders: var(--color-brand-border);
+  --tw-prose-td-borders: var(--color-brand-border);
+  line-height: 1.85;
+}
+.doc-prose :where(h1, h2, h3, h4) { scroll-margin-top: 5.5rem; }
+.doc-prose :where(h1) { font-size: 2.4rem; line-height: 1.15; }
+.doc-prose :where(a) { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.doc-prose :where(code):not(:where(pre *)) {
+  background: var(--color-brand-bg-secondary);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-weight: 500;
+}
+.doc-prose :where(code):not(:where(pre *))::before,
+.doc-prose :where(code):not(:where(pre *))::after { content: none; }
+.doc-prose :where(pre) { border: 1px solid var(--color-brand-border); font-size: 0.82rem; line-height: 1.6; }
+.doc-prose :where(blockquote) { font-style: normal; }
+.doc-prose :where(blockquote p)::before,
+.doc-prose :where(blockquote p)::after { content: none; }
+.doc-prose .doc-table { overflow-x: auto; margin: 1.5em 0; }
+.doc-prose .doc-table table { margin: 0; font-size: 0.85rem; }
+.doc-prose :where(img) { border: 1px solid var(--color-brand-border); border-radius: 8px; background: #fff; }
+.doc-mermaid { overflow-x: auto; margin: 1.75em 0; padding: 1rem; border: 1px solid var(--color-brand-border); border-radius: 8px; background: #fff; }
+.doc-mermaid svg { max-width: 100%; height: auto; margin: 0 auto; }
+
+.doc-prose .hljs-keyword, .doc-prose .hljs-built_in, .doc-prose .hljs-literal { color: #8a4b2f; }
+.doc-prose .hljs-string, .doc-prose .hljs-regexp { color: #3f7358; }
+.doc-prose .hljs-number { color: #9a5b12; }
+.doc-prose .hljs-comment { color: #8b8580; font-style: italic; }
+.doc-prose .hljs-title, .doc-prose .hljs-title.function_, .doc-prose .hljs-type { color: #2f5d8a; }
+.doc-prose .hljs-attr, .doc-prose .hljs-property, .doc-prose .hljs-variable { color: #6b4c9a; }
