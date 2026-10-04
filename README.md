@@ -49,20 +49,29 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 *   **终端无缝融入工作流**：内置 PTY (PowerShell/Bash/Zsh)，集成 xterm.js。
 *   **设置项可视化**：无需手动编辑 JSON，直接在 UI 中管理 Provider 和 API Key。
 
-![主界面](./assets/main.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/main.png">
+  <img src="./assets/main.png" alt="主界面">
+</picture>
 
 ### 2. 多模型配置
 *   **Provider 预设与自定义端点**：按所选服务商配置 API Key、地址与模型映射。
 *   **连接检查**：在设置界面测试已配置端点的可用性与延迟。
 
-![Provider 设置](./assets/setting_provider.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_provider.png">
+  <img src="./assets/setting_provider.png" alt="Provider 设置">
+</picture>
 
 ### 3. Claude Code 工作流
 *   **Computer Use 双模式**：支持视觉截图模式和 **UIA Tree 模式**（文本辅助访问）。
 *   **工具调用全程可见**：AI 读写文件、执行终端命令的过程透明呈现，便于理解与审查。
 *   **MCP 扩展能力**：通过 Model Context Protocol 持续扩展 AI 的上下文与工具能力。
 
-![Computer Use 设置](./assets/setting_computeruse.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_computeruse.png">
+  <img src="./assets/setting_computeruse.png" alt="Computer Use 设置">
+</picture>
 
 ### 4. 局域网内手机接续
 *   **H5 接入**：在设置中开启访问、管理 Token，并使用二维码从同一局域网内的手机连接。
@@ -74,7 +83,10 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 *   **支持 MCP**：通过 Model Context Protocol 接入外部工具。
 *   **配置过程图形化**：不再手写 JSON，通过界面管理 MCP 服务器。
 
-![MCP 技能设置](./assets/setting_skills.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_skills.png">
+  <img src="./assets/setting_skills.png" alt="MCP 技能设置">
+</picture>
 
 ---
 

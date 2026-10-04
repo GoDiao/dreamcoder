@@ -49,20 +49,29 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 *   **Terminal built into the workflow**: Built-in PTY (PowerShell/Bash/Zsh) with xterm.js.
 *   **Settings you can manage visually**: Configure providers, API keys, and preferences without editing JSON files.
 
-![Main workspace](./assets/main.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/main.png">
+  <img src="./assets/main.png" alt="Main workspace">
+</picture>
 
 ### 2. Multi-Provider Configuration
 *   **Presets and custom endpoints**: Set the API key, endpoint, and model mapping for your chosen provider.
 *   **Connection check**: Test the availability and latency of configured endpoints in Settings.
 
-![Provider settings](./assets/setting_provider.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_provider.png">
+  <img src="./assets/setting_provider.png" alt="Provider settings">
+</picture>
 
 ### 3. Claude Code Workflows
 *   **Dual Computer Use modes**: Supports visual screenshot control and **UIA Tree mode** (text-based accessibility).
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
 
-![Computer Use settings](./assets/setting_computeruse.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_computeruse.png">
+  <img src="./assets/setting_computeruse.png" alt="Computer Use settings">
+</picture>
 
 ### 4. Continue on Your Phone over LAN
 *   **H5 Access**: Enable access in Settings, manage the token, and use the QR code to connect a phone on the same LAN.
@@ -71,7 +80,10 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 ### 5. MCP Extensions
 *   **Visual configuration**: Manage MCP servers in the UI instead of editing JSON by hand.
 
-![MCP settings](./assets/setting_skills.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_skills.png">
+  <img src="./assets/setting_skills.png" alt="MCP settings">
+</picture>
 
 ---
 
