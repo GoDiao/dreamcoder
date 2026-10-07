@@ -25,6 +25,16 @@ export const en = {
   'common.active': 'ACTIVE',
   'common.copyFailed': 'Copy failed.',
 
+  // ─── Provider onboarding ─────────────────────────
+  'onboarding.welcome': 'Welcome to DreamCoder',
+  'onboarding.tagline': 'The official DreamField AI coding agent',
+  'onboarding.instructions': 'Enter your DreamField API key to get started',
+  'onboarding.apiKeyPlaceholder': 'Enter your DreamField API key',
+  'onboarding.getStarted': 'Get started',
+  'onboarding.noApiKey': "Don't have an API key?",
+  'onboarding.signUp': 'Sign up for DreamField',
+  'onboarding.presetsLoadFailed': 'Failed to load presets: ',
+
   // ─── Sidebar ──────────────────────────────────────
   'sidebar.newSession': 'New session',
   'sidebar.scheduled': 'Scheduled',

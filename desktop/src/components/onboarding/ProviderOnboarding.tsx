@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useTranslation } from '../../i18n'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 
 export function ProviderOnboarding() {
+  const t = useTranslation()
   const { presets, error, isPresetsLoading, createProvider, activateProvider, fetchPresets } = useProviderStore()
   const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted)
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
@@ -26,9 +28,9 @@ export function ProviderOnboarding() {
       return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)]">
           <p role="alert" className="max-w-md px-8 text-center text-sm text-[var(--color-error)]">
-            预设加载失败：{error}
+            {t('onboarding.presetsLoadFailed')}{error}
           </p>
-          <Button onClick={() => void fetchPresets()}>重试</Button>
+          <Button onClick={() => void fetchPresets()}>{t('common.retry')}</Button>
         </div>
       )
     }
@@ -70,20 +72,20 @@ export function ProviderOnboarding() {
       <div className="w-full max-w-md p-8 text-center">
         <DreamCoderIcon size={80} className="mx-auto mb-6" />
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2" style={{ fontFamily: 'var(--font-headline)' }}>
-          欢迎使用 DreamCoder
+          {t('onboarding.welcome')}
         </h1>
         <p className="text-sm text-[var(--color-text-tertiary)] mb-8">
-          DreamField 官方 AI Coding Agent<br />
-          输入你的 DreamField API Key 开始使用
+          {t('onboarding.tagline')}<br />
+          {t('onboarding.instructions')}
         </p>
 
         <div className="space-y-4 text-left">
           <Input
-            label="API Key"
+            label={t('settings.providers.apiKey')}
             required
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="输入 DreamField API Key"
+            placeholder={t('onboarding.apiKeyPlaceholder')}
           />
           <Button
             className="w-full"
@@ -91,12 +93,12 @@ export function ProviderOnboarding() {
             disabled={!apiKey.trim()}
             loading={loading}
           >
-            开始使用
+            {t('onboarding.getStarted')}
           </Button>
         </div>
 
         <p className="text-xs text-[var(--color-text-tertiary)] mt-6">
-          没有 API Key？<a href="https://www.dreamfield.top" target="_blank" rel="noopener noreferrer" className="text-[var(--color-brand)] hover:underline">前往 DreamField 注册</a>
+          {t('onboarding.noApiKey')}{' '}<a href="https://www.dreamfield.top" target="_blank" rel="noopener noreferrer" className="text-[var(--color-brand)] hover:underline">{t('onboarding.signUp')}</a>
         </p>
       </div>
     </div>
