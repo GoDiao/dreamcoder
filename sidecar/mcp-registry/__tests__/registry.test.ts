@@ -139,6 +139,60 @@ describe('validateEntry — invalid entries fail with actionable errors', () => 
     if (!r.ok) expect(r.errors[0].message).toContain('version pin')
   })
 
+  it('rejects a binary runtime with a moving tag version', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: 'latest', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0].message).toContain('exact version pin')
+  })
+
+  it('rejects a binary runtime with a tilde range', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: '~1.2.3', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0].message).toContain('exact version pin')
+  })
+
+  it('rejects a binary runtime with a caret range', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: '^2.0.0', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors.some((e) => e.path.includes('version'))).toBe(true)
+  })
+
+  it('rejects a binary runtime with a comparison range', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: '>=1.0.0', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors.some((e) => e.path.includes('version'))).toBe(true)
+  })
+
+  it('rejects a binary runtime with a wildcard version', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: '1.x', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0].message).toContain('exact version pin')
+  })
+
+  it('accepts a binary runtime with an exact calver pin', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: '2025.4.7', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(true)
+  })
+
+  it('accepts a binary runtime with a leading-v exact pin', () => {
+    const r = validateEntry(
+      validEntry({ runtime: 'binary', version: 'v1.2.3', command: 'my-mcp' }),
+    )
+    expect(r.ok).toBe(true)
+  })
+
   it('accepts a binary runtime WITH a version pin', () => {
     const r = validateEntry(
       validEntry({ runtime: 'binary', version: '2.31.0', command: 'my-mcp' }),

@@ -44,6 +44,16 @@ export const envVarSchema = z
   .strict()
 
 /**
+ * Exact version pins accepted for `runtime: binary` entries.
+ *
+ * Moving tags (`latest`), ranges (`~1.2.3`, `^1.2.3`, `>=1.0.0`) and wildcards
+ * (`1.x`) are rejected: a binary entry that is not pinned to one released
+ * artifact can change behaviour on every install.
+ */
+const EXACT_VERSION_PIN =
+  /^v?\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
+
+/**
  * A single curated MCP server entry.
  *
  * `id` is the stable identifier: lowercase, dash-separated, and never reused
@@ -91,19 +101,28 @@ export const registryEntrySchema = z
      */
     runtime: z.enum(['node', 'bun', 'python', 'uvx', 'binary']),
     /**
-     * Version pin policy for `runtime: binary` entries. The registry prefers
-     * exact pins so a catalog install cannot silently pull new code.
+     * Version pin policy. `runtime: binary` entries MUST carry an exact pin
+     * (e.g. `"2.31.0"` — no `latest`, ranges, or wildcards), because an
+     * unpinned binary install can silently pull new code. For other runtimes
+     * a pin is recommended (`uvx` especially) but not enforced.
      */
     version: z.string().regex(/^[\w.\-+~]+$/).optional(),
     /** Optional maintainer note, e.g. why an entry was curated. */
     notes: z.string().max(300).optional(),
   })
   .strict()
-  // A binary entry without a pin can change behaviour on every install.
-  .refine((e) => e.runtime !== 'binary' || !!e.version, {
-    message: 'runtime "binary" entries require an exact version pin',
-    path: ['version'],
-  })
+  // A binary entry that is not pinned to one released artifact can change
+  // behaviour on every install, so v1 requires an exact pin for `binary`.
+  .refine(
+    (e) =>
+      e.runtime !== 'binary' ||
+      (typeof e.version === 'string' && EXACT_VERSION_PIN.test(e.version)),
+    {
+      message:
+        'runtime "binary" entries require an exact version pin (e.g. "2.31.0"), not a moving tag or range like "latest" or "~2.31.0"',
+      path: ['version'],
+    },
+  )
   // Guard against a secret being smuggled into the catalog.
   .refine(
     (e) =>

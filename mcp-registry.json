@@ -52,25 +52,6 @@
       "version": "2025.4.7"
     },
     {
-      "id": "sqlite",
-      "name": "SQLite",
-      "description": "Run read-only queries against a local SQLite file and get results back as structured rows.",
-      "transport": "stdio",
-      "command": "mcp-server-sqlite",
-      "args": ["--db-path", "{env:DB_PATH}"],
-      "env": [
-        {
-          "name": "DB_PATH",
-          "source": "user",
-          "description": "Path to the SQLite database file. Prefer a copy — the server runs queries against a real file."
-        }
-      ],
-      "homepage": "https://github.com/modelcontextprotocol/servers",
-      "tags": ["database", "sql", "local"],
-      "runtime": "uvx",
-      "version": "0.6.3"
-    },
-    {
       "id": "memory",
       "name": "Memory",
       "description": "A knowledge graph the assistant can write to and recall from, so preferences survive across sessions.",
@@ -87,7 +68,7 @@
       "name": "Brave Search",
       "description": "Web search with ranked results and snippets, for questions that need current information.",
       "transport": "stdio",
-      "command": "mcp-server-brave-search",
+      "command": "@brave/brave-search-mcp-server",
       "args": [],
       "env": [
         {
@@ -96,23 +77,23 @@
           "description": "API key from brave.com/search/api. Stored locally, never in the catalog."
         }
       ],
-      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "homepage": "https://github.com/brave/brave-search-mcp-server",
       "tags": ["search", "web", "research"],
-      "runtime": "uvx",
-      "version": "0.6.2"
+      "runtime": "node",
+      "version": "2.1.4"
     },
     {
       "id": "everything",
       "name": "Everything (reference)",
       "description": "Reference server exposing every MCP tool type, useful for testing an MCP client end to end.",
       "transport": "stdio",
-      "command": "mcp-server-everything",
+      "command": "@modelcontextprotocol/server-everything",
       "args": [],
       "env": [],
       "homepage": "https://github.com/modelcontextprotocol/servers",
       "tags": ["reference", "testing", "demo"],
-      "runtime": "uvx",
-      "version": "2025.3.28",
+      "runtime": "node",
+      "version": "2026.8.31",
       "notes": "Demo/reference server. Curated because it is the canonical way to verify a client works."
     },
     {
