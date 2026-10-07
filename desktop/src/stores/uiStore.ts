@@ -30,7 +30,7 @@ function getStoredTheme(): ThemeMode {
 export function applyTheme(theme: ThemeMode) {
   if (typeof document === 'undefined') return
   document.documentElement.setAttribute('data-theme', theme)
-  document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light'
+  document.documentElement.style.colorScheme = theme === 'dark' || theme === 'aurora' ? 'dark' : 'light'
 }
 
 export function initializeTheme() {

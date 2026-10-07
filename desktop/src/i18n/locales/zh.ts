@@ -853,12 +853,13 @@ export const zh: Record<TranslationKey, string> = {
 
   // Settings > General
   'settings.general.appearanceTitle': '配色主题',
-  'settings.general.appearanceDescription': '在经典暖色、暗色与纯白工作区之间切换。',
+  'settings.general.appearanceDescription': '为工作区选择配色主题。',
   'settings.general.appearance.light': '经典暖色',
   'settings.general.appearance.dark': '暗色',
   'settings.general.appearance.dreamfield': 'DreamField 翡翠',
   'settings.general.appearance.amber': '秋日琥珀',
   'settings.general.appearance.midnight': '午夜',
+  'settings.general.appearance.aurora': '极光',
   'settings.general.appearance.white': '纯白',
   'settings.general.languageTitle': '语言',
   'settings.general.languageDescription': '选择应用程序的显示语言。',

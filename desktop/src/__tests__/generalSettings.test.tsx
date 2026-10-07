@@ -303,6 +303,15 @@ describe('Settings > General tab', () => {
     expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('white')
   })
 
+  it('offers Aurora, saves the selection, and marks it selected', async () => {
+    render(<Settings />)
+    fireEvent.click(screen.getByText('General'))
+    fireEvent.click(screen.getByRole('button', { name: 'Aurora' }))
+
+    expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('aurora')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aurora' })).toHaveAttribute('aria-pressed', 'true'))
+  })
+
   it('marks the pure white appearance theme as selected', () => {
     useSettingsStore.setState({ theme: 'white' })
     render(<Settings />)
