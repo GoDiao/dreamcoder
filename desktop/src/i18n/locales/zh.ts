@@ -27,6 +27,16 @@ export const zh: Record<TranslationKey, string> = {
   'common.active': '已激活',
   'common.copyFailed': '复制失败。',
 
+  // ─── Provider onboarding ─────────────────────────
+  'onboarding.welcome': '欢迎使用 DreamCoder',
+  'onboarding.tagline': 'DreamField 官方 AI Coding Agent',
+  'onboarding.instructions': '输入你的 DreamField API Key 开始使用',
+  'onboarding.apiKeyPlaceholder': '输入 DreamField API Key',
+  'onboarding.getStarted': '开始使用',
+  'onboarding.noApiKey': '没有 API Key？',
+  'onboarding.signUp': '前往 DreamField 注册',
+  'onboarding.presetsLoadFailed': '预设加载失败：',
+
   // ─── Sidebar ──────────────────────────────────────
   'sidebar.newSession': '新建会话',
   'sidebar.scheduled': '定时任务',
