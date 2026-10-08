@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@xterm/xterm/css/xterm.css";
+@import "./aurora.css";
 @plugin "@tailwindcss/typography";
 
 /* ─── Self-hosted fonts (no Google CDN dependency) ────────────── */
@@ -352,6 +353,7 @@
 
   --color-error: #B91C1C;
   --color-error-container: #FEF2F2;
+  --color-on-error: #FFFFFF;
   --color-on-error-container: #7F1D1D;
 
   --color-inverse-surface: #2E2A25;

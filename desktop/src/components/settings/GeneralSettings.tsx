@@ -30,7 +30,7 @@ function SettingsCheckboxMark({ checked, disabled = false }: { checked: boolean;
       aria-hidden="true"
       className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-brand)]/40 ${
         checked
-          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-[var(--shadow-button-primary)]'
+          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] shadow-[var(--shadow-button-primary)]'
           : 'border-[var(--color-border-focus)] bg-[var(--color-surface)] text-transparent'
       } ${disabled ? 'opacity-50' : ''}`}
     >
@@ -174,6 +174,7 @@ export function GeneralSettings() {
     { value: 'midnight', label: t('settings.general.appearance.midnight') },
     { value: 'dreamfield', label: t('settings.general.appearance.dreamfield') },
     { value: 'amber', label: t('settings.general.appearance.amber') },
+    { value: 'aurora', label: t('settings.general.appearance.aurora') },
   ]
 
   const WEB_SEARCH_MODES: Array<{ value: WebSearchMode; label: string }> = [
@@ -481,7 +482,7 @@ export function GeneralSettings() {
       {/* Appearance selector */}
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.appearanceTitle')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.appearanceDescription')}</p>
-      <div className="flex gap-2 mb-8">
+      <div className="grid grid-cols-2 gap-2 mb-8 sm:grid-cols-3">
         {THEMES.map(({ value, label }) => (
           <button
             key={value}
@@ -508,7 +509,7 @@ export function GeneralSettings() {
             onClick={() => setLocale(value)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
               locale === value
-                ? 'bg-[var(--color-brand)] text-white border-[var(--color-brand)]'
+                ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
                 : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
           >
@@ -549,7 +550,7 @@ export function GeneralSettings() {
             onClick={() => setEffort(level)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
               effortLevel === level
-                ? 'bg-[var(--color-brand)] text-white border-[var(--color-brand)]'
+                ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
                 : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
           >
@@ -785,7 +786,7 @@ export function GeneralSettings() {
                 onClick={() => setWebSearchDraft({ ...webSearchDraft, mode: value })}
                 className={`h-9 px-2 text-xs font-semibold rounded-lg border transition-all truncate ${
                   (webSearchDraft.mode ?? 'auto') === value
-                    ? 'bg-[var(--color-brand)] text-white border-[var(--color-brand)]'
+                    ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
                     : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
                 }`}
                 title={label}

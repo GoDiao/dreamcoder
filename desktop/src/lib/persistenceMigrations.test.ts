@@ -56,13 +56,13 @@ describe('desktop persistence migrations', () => {
     expect(window.localStorage.getItem('dreamcoder-theme')).toBeNull()
   })
 
-  test('preserves the pure white theme as a valid persisted theme', () => {
-    window.localStorage.setItem('dreamcoder-theme', 'white')
+  test.each(['white', 'aurora'])('preserves %s as a valid persisted theme', (theme) => {
+    window.localStorage.setItem('dreamcoder-theme', theme)
 
     const report = runDesktopPersistenceMigrations()
 
     expect(report.migratedKeys).not.toContain('dreamcoder-theme')
-    expect(window.localStorage.getItem('dreamcoder-theme')).toBe('white')
+    expect(window.localStorage.getItem('dreamcoder-theme')).toBe(theme)
   })
 
   test('preserves valid app zoom and removes invalid app zoom values', () => {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import css from './globals.css?raw'
+import auroraCss from './aurora.css?raw'
 
-const normalizedCss = css.replace(/\r\n/g, '\n')
+const normalizedCss = `${css}\n${auroraCss}`.replace(/\r\n/g, '\n')
 
-function getThemeBlock(selector: ':root,\n[data-theme="light"]' | '[data-theme="white"]' | '[data-theme="dark"]') {
+function getThemeBlock(selector: ':root,\n[data-theme="light"]' | '[data-theme="white"]' | '[data-theme="dark"]' | '[data-theme="aurora"]') {
   const start = normalizedCss.indexOf(`${selector} {`)
   expect(start).toBeGreaterThanOrEqual(0)
 
@@ -79,6 +80,13 @@ describe('desktop theme tokens', () => {
     }
   })
 
+  it('defines activity and status tokens for Aurora', () => {
+    const block = getThemeBlock('[data-theme="aurora"]')
+    for (const token of requiredTokens) {
+      expect(block, `Aurora should define ${token}`).toContain(`${token}:`)
+    }
+  })
+
   it('avoids color-mix in the startup-critical UI zoom shell chrome for Safari 15 WebView support', () => {
     const zoomShellCss = getCssBetween('.settings-zoom-kbd {', '/* ─── Tailwind Theme Override')
 
@@ -91,4 +99,37 @@ describe('desktop theme tokens', () => {
     expect(css).toContain('--settings-zoom-thumb-border: rgba(255, 181, 159, 0.78);')
     expect(css).toContain('box-shadow: var(--settings-zoom-thumb-shadow);')
   })
+})
+
+function auroraColor(token: string): string {
+  const value = new RegExp(`${token}:\\s*([^;]+);`).exec(auroraCss)?.[1]?.trim()
+  if (!value) throw new Error(`Missing Aurora token: ${token}`)
+  const alias = /^var\((--[\w-]+)\)$/.exec(value)
+  return alias ? auroraColor(alias[1]!) : value
+}
+
+function luminance(color: string): number {
+  const channels = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16) / 255)
+  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+  return linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
+}
+
+it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary buttons', () => {
+  const pairs = [
+    ['--color-text-primary', '--color-surface'],
+    ['--color-text-secondary', '--color-surface-sidebar'],
+    ['--color-text-tertiary', '--color-surface-container-highest'],
+    ['--color-terminal-fg', '--color-terminal-bg'],
+    ['--color-terminal-muted', '--color-terminal-header'],
+    ['--color-btn-primary-fg', '--color-primary'],
+    ['--color-btn-primary-fg', '--color-primary-container'],
+    ['--color-on-error', '--color-error'],
+    ...['fg', 'comment', 'string', 'keyword', 'function', 'number', 'property', 'type', 'punctuation']
+      .map((syntax) => [`--color-code-${syntax}`, '--color-code-bg']),
+  ]
+  for (const [foreground, background] of pairs) {
+    const values = [luminance(auroraColor(foreground!)), luminance(auroraColor(background!))]
+    const contrast = (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)
+    expect(contrast, `${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5)
+  }
 })

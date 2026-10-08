@@ -861,12 +861,13 @@ export const en = {
 
   // Settings > General
   'settings.general.appearanceTitle': 'Appearance',
-  'settings.general.appearanceDescription': 'Switch between the warm classic workspace, dark workspace, and a pure white workspace.',
+  'settings.general.appearanceDescription': 'Choose a color theme for your workspace.',
   'settings.general.appearance.light': 'Warm Classic',
   'settings.general.appearance.dark': 'Dark',
   'settings.general.appearance.dreamfield': 'DreamField Emerald',
   'settings.general.appearance.amber': 'Autumn Amber',
   'settings.general.appearance.midnight': 'Midnight',
+  'settings.general.appearance.aurora': 'Aurora',
   'settings.general.appearance.white': 'Pure White',
   'settings.general.languageTitle': 'Language',
   'settings.general.languageDescription': 'Choose the display language for the application.',
