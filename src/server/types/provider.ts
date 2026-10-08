@@ -54,6 +54,7 @@ export const SavedProviderSchema = z.object({
   models: ModelMappingSchema,
   autoCompactWindow: AutoCompactWindowSchema.optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
+  maxOutputTokens: z.number().int().positive().max(10000000).optional(),
   notes: z.string().optional(),
 })
 
@@ -74,6 +75,7 @@ export const CreateProviderSchema = z.object({
   models: ModelMappingSchema,
   autoCompactWindow: AutoCompactWindowSchema.optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
+  maxOutputTokens: z.number().int().positive().max(10000000).optional(),
   notes: z.string().optional(),
 })
 
@@ -87,6 +89,7 @@ export const UpdateProviderSchema = z.object({
   models: ModelMappingSchema.optional(),
   autoCompactWindow: AutoCompactWindowSchema.nullable().optional(),
   modelContextWindows: ModelContextWindowsSchema.nullable().optional(),
+  maxOutputTokens: z.number().int().positive().max(10000000).nullable().optional(),
   notes: z.string().optional(),
 })
 

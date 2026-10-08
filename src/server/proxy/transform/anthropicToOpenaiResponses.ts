@@ -6,17 +6,20 @@
 
 import type {
   AnthropicRequest,
-  AnthropicContentBlock,
   AnthropicMessage,
   OpenAIResponsesRequest,
   OpenAIResponsesInputItem,
-  OpenAIChatContentPart,
+  OpenAIResponsesContentPart,
 } from './types.js'
+import { extractToolResultContent } from './toolArguments.js'
 
 /**
  * Convert Anthropic Messages request to OpenAI Responses API request.
  */
-export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIResponsesRequest {
+export function anthropicToOpenaiResponses(
+  body: AnthropicRequest,
+  options: { maxOutputTokens?: number } = {},
+): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
 
   // Convert messages to input items
@@ -40,8 +43,12 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
     }
   }
 
-  // max_tokens — omit to let upstream provider use its own default/max.
+  // max_output_tokens — clamp to the provider's known limit when configured.
   // Claude Code sends very large values that exceed many providers' limits.
+  // Without a configured cap we omit the field so upstream uses its default.
+  if (options.maxOutputTokens !== undefined && typeof body.max_tokens === 'number') {
+    result.max_output_tokens = Math.min(body.max_tokens, options.maxOutputTokens)
+  }
 
   // temperature & top_p
   if (body.temperature !== undefined) result.temperature = body.temperature
@@ -96,23 +103,23 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
   }
 
   // Collect text/image parts and handle tool blocks separately
-  const contentParts: (string | OpenAIChatContentPart)[] = []
+  const contentParts: OpenAIResponsesContentPart[] = []
 
   for (const block of content) {
     if (block.type === 'text') {
-      contentParts.push(block.text)
+      contentParts.push({ type: 'input_text', text: block.text })
     } else if (block.type === 'image') {
       contentParts.push({
-        type: 'image_url',
-        image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+        type: 'input_image',
+        image_url: `data:${block.source.media_type};base64,${block.source.data}`,
       })
     } else if (block.type === 'tool_use') {
       // Flush any accumulated content first
       if (contentParts.length > 0) {
-        const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-          ? contentParts[0]
-          : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-        if (flatContent) {
+        const flatContent = contentParts.length === 1 && contentParts[0].type === 'input_text'
+          ? contentParts[0].text
+          : contentParts
+        if (flatContent && (typeof flatContent !== 'object' || (Array.isArray(flatContent) && flatContent.length > 0))) {
           output.push({ type: 'message', role: msg.role, content: flatContent })
         }
         contentParts.length = 0
@@ -126,11 +133,7 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
       })
     } else if (block.type === 'tool_result') {
       // Lift to function_call_output item
-      const resultContent = typeof block.content === 'string'
-        ? block.content
-        : Array.isArray(block.content)
-          ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
-          : ''
+      const resultContent = extractToolResultContent(block.content)
       output.push({
         type: 'function_call_output',
         call_id: block.tool_use_id,
@@ -142,10 +145,10 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
 
   // Flush remaining content
   if (contentParts.length > 0) {
-    const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-      ? contentParts[0]
-      : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-    if (flatContent) {
+    const flatContent = contentParts.length === 1 && contentParts[0].type === 'input_text'
+      ? contentParts[0].text
+      : contentParts
+    if (flatContent && (typeof flatContent !== 'object' || (Array.isArray(flatContent) && flatContent.length > 0))) {
       output.push({ type: 'message', role: msg.role, content: flatContent })
     }
   }

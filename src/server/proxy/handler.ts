@@ -136,9 +136,9 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
 
   try {
     if (config.apiFormat === 'openai_chat') {
-      return await handleOpenaiChat(body, baseUrl, config.apiKey, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
+      return await handleOpenaiChat(body, baseUrl, config.apiKey, config.maxOutputTokens, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
     } else {
-      return await handleOpenaiResponses(body, baseUrl, config.apiKey, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
+      return await handleOpenaiResponses(body, baseUrl, config.apiKey, config.maxOutputTokens, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
     }
   } catch (err) {
     console.error('[Proxy] Upstream request failed:', err)
@@ -159,6 +159,7 @@ async function handleOpenaiChat(
   body: AnthropicRequest,
   baseUrl: string,
   apiKey: string,
+  maxOutputTokens: number | undefined,
   isStream: boolean,
   aiRequestTimeoutMs: number,
   proxyUrl: string | undefined,
@@ -167,6 +168,7 @@ async function handleOpenaiChat(
   const transformed = anthropicToOpenaiChat(body, {
     roundTripReasoningContent: deepSeekCompatible,
     passThinkingToggle: deepSeekCompatible,
+    maxOutputTokens,
   })
   const url = `${baseUrl}/v1/chat/completions`
   const proxyOptions = getProxyFetchOptions({ proxyUrl })
@@ -230,11 +232,12 @@ async function handleOpenaiResponses(
   body: AnthropicRequest,
   baseUrl: string,
   apiKey: string,
+  maxOutputTokens: number | undefined,
   isStream: boolean,
   aiRequestTimeoutMs: number,
   proxyUrl: string | undefined,
 ): Promise<Response> {
-  const transformed = anthropicToOpenaiResponses(body)
+  const transformed = anthropicToOpenaiResponses(body, { maxOutputTokens })
   const url = `${baseUrl}/v1/responses`
   const proxyOptions = getProxyFetchOptions({ proxyUrl })
 

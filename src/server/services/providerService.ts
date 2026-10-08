@@ -377,6 +377,7 @@ export class ProviderService {
     baseUrl: string
     apiKey: string
     apiFormat: ApiFormat
+    maxOutputTokens?: number
   } | null> {
     if (providerId) {
       if (isOpenAIOfficialProviderId(providerId)) {
@@ -387,6 +388,7 @@ export class ProviderService {
         baseUrl: provider.baseUrl,
         apiKey: provider.apiKey,
         apiFormat: provider.apiFormat ?? 'anthropic',
+        maxOutputTokens: provider.maxOutputTokens,
       }
     }
 
@@ -401,6 +403,7 @@ export class ProviderService {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       apiFormat: provider.apiFormat ?? 'anthropic',
+      maxOutputTokens: provider.maxOutputTokens,
     }
   }
 
@@ -408,6 +411,7 @@ export class ProviderService {
     baseUrl: string
     apiKey: string
     apiFormat: ApiFormat
+    maxOutputTokens?: number
   } | null> {
     return this.getProviderForProxy()
   }

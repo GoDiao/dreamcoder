@@ -23,6 +23,21 @@
 import type { OpenAIChatStreamChunk } from '../transform/types.js'
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
 
+// ─── Usage mapping ─────────────────────────────────────────
+
+function mapStreamUsage(usage?: OpenAIChatStreamChunk['usage']): {
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens?: number
+} {
+  if (!usage) return { input_tokens: 0, output_tokens: 0 }
+  return {
+    input_tokens: usage.prompt_tokens ?? 0,
+    output_tokens: usage.completion_tokens ?? 0,
+    cache_read_input_tokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
+  }
+}
+
 // ─── Types ─────────────────────────────────────────────────
 
 type ContentBlockType = 'text' | 'thinking' | 'tool_use'
@@ -470,9 +485,7 @@ function handleFinishReason(
   closeAllOpenBlocks(state)
 
   const stopReason = mapFinishReason(finishReason)
-  const usage = chunk.usage
-    ? { output_tokens: chunk.usage.completion_tokens || 0 }
-    : { output_tokens: 0 }
+  const usage = mapStreamUsage(chunk.usage)
 
   const messageDelta: SseEvent = {
     event: 'message_delta',
@@ -500,7 +513,7 @@ function mergeUsageIntoHeldDelta(
   if (!state.heldMessageDelta) return
 
   const data = state.heldMessageDelta.data as Record<string, unknown>
-  data.usage = { output_tokens: usage.completion_tokens || 0 }
+  data.usage = mapStreamUsage(usage)
   state.messageDeltaSent = true
   state.queue.push(state.heldMessageDelta)
   state.heldMessageDelta = null
