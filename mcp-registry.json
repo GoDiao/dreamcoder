@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "description": "Read, write and search files in directories you explicitly allow. Useful for letting an assistant work inside a project folder.",
+      "transport": "stdio",
+      "command": "@modelcontextprotocol/server-filesystem",
+      "args": ["{env:ALLOWED_DIR}"],
+      "env": [
+        {
+          "name": "ALLOWED_DIR",
+          "source": "user",
+          "description": "Absolute path the server is permitted to access. Keep it as narrow as possible."
+        }
+      ],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["files", "local", "core"],
+      "runtime": "node"
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Inspect history, diffs and branches, and stage changes without leaving the conversation.",
+      "transport": "stdio",
+      "command": "mcp-server-git",
+      "args": ["--repository", "{env:REPO_PATH}"],
+      "env": [
+        {
+          "name": "REPO_PATH",
+          "source": "user",
+          "description": "Path to the local git repository the server operates on."
+        }
+      ],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["git", "vcs", "local", "core"],
+      "runtime": "uvx",
+      "version": "0.6.2"
+    },
+    {
+      "id": "fetch",
+      "name": "Fetch",
+      "description": "Retrieve a web page and convert it to clean markdown, so an assistant can answer from live pages instead of guessing.",
+      "transport": "stdio",
+      "command": "mcp-server-fetch",
+      "args": [],
+      "env": [],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["web", "http", "core"],
+      "runtime": "uvx",
+      "version": "2025.4.7"
+    },
+    {
+      "id": "memory",
+      "name": "Memory",
+      "description": "A knowledge graph the assistant can write to and recall from, so preferences survive across sessions.",
+      "transport": "stdio",
+      "command": "@modelcontextprotocol/server-memory",
+      "args": [],
+      "env": [],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["memory", "knowledge", "core"],
+      "runtime": "node"
+    },
+    {
+      "id": "brave-search",
+      "name": "Brave Search",
+      "description": "Web search with ranked results and snippets, for questions that need current information.",
+      "transport": "stdio",
+      "command": "@brave/brave-search-mcp-server",
+      "args": [],
+      "env": [
+        {
+          "name": "BRAVE_API_KEY",
+          "source": "user",
+          "description": "API key from brave.com/search/api. Stored locally, never in the catalog."
+        }
+      ],
+      "homepage": "https://github.com/brave/brave-search-mcp-server",
+      "tags": ["search", "web", "research"],
+      "runtime": "node",
+      "version": "2.1.4"
+    },
+    {
+      "id": "everything",
+      "name": "Everything (reference)",
+      "description": "Reference server exposing every MCP tool type, useful for testing an MCP client end to end.",
+      "transport": "stdio",
+      "command": "@modelcontextprotocol/server-everything",
+      "args": [],
+      "env": [],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["reference", "testing", "demo"],
+      "runtime": "node",
+      "version": "2026.8.31",
+      "notes": "Demo/reference server. Curated because it is the canonical way to verify a client works."
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "description": "Current time and timezone conversion, so scheduling questions resolve against a real clock.",
+      "transport": "stdio",
+      "command": "mcp-server-time",
+      "args": [],
+      "env": [],
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["utility", "time"],
+      "runtime": "uvx",
+      "version": "0.6.2"
+    }
+  ]
+}
