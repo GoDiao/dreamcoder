@@ -316,10 +316,10 @@ export function ComputerUseSettings() {
         <div className="space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)]">
-              {t('settings.computerUse.modeLabel', { defaultValue: '感知模式' })}
+              {t('settings.computerUse.modeLabel')}
             </label>
             <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-              {t('settings.computerUse.modeDescription', { defaultValue: 'AI 如何"看到"你的屏幕。两种模式使用不同的技术原理，适用于不同类型的模型。' })}
+              {t('settings.computerUse.modeDescription')}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -336,10 +336,10 @@ export function ComputerUseSettings() {
                 <span className="text-sm font-semibold text-[var(--color-text-primary)]">Vision</span>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)] mt-2 leading-relaxed">
-                {t('settings.computerUse.modeVisionDesc', { defaultValue: '截取屏幕截图，由多模态模型"看图"理解界面。点击坐标基于截图位置。' })}
+                {t('settings.computerUse.modeVisionDesc')}
               </p>
               <p className="text-[11px] text-[var(--color-text-tertiary)] mt-2">
-                {t('settings.computerUse.modeVisionRequirement', { defaultValue: '需要多模态模型（如 GPT-4o、Claude Sonnet）' })}
+                {t('settings.computerUse.modeVisionRequirement')}
               </p>
             </button>
             <button
@@ -355,10 +355,10 @@ export function ComputerUseSettings() {
                 <span className="text-sm font-semibold text-[var(--color-text-primary)]">UIA Tree</span>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)] mt-2 leading-relaxed">
-                {t('settings.computerUse.modeUiaDesc', { defaultValue: '读取 Windows 无障碍树，将界面元素序列化为文本。模型按元素 ID 操作，无需"看图"。' })}
+                {t('settings.computerUse.modeUiaDesc')}
               </p>
               <p className="text-[11px] text-[var(--color-text-tertiary)] mt-2">
-                {t('settings.computerUse.modeUiaRequirement', { defaultValue: '纯文本模型即可（如 DeepSeek、GPT-4o-mini）' })}
+                {t('settings.computerUse.modeUiaRequirement')}
               </p>
             </button>
           </div>
