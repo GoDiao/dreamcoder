@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { tasksApi } from '../api/tasks'
+import { t } from '../i18n'
 import { notifyDesktop } from '../lib/desktopNotifications'
 import type { CronTask, TaskRun } from '../types/task'
 
@@ -36,17 +37,17 @@ function writeNotifiedRunIds(runIds: Set<string>): void {
 
 function formatTaskRunNotification(run: TaskRun): { title: string; body: string } {
   const status = run.status === 'completed'
-    ? '完成'
+    ? t('notifications.scheduledTask.statusCompleted')
     : run.status === 'failed'
-      ? '失败'
-      : '超时'
+      ? t('notifications.scheduledTask.statusFailed')
+      : t('notifications.scheduledTask.statusTimeout')
   const detail = run.error || run.output || run.prompt
   const body = detail
-    ? `${status}: ${detail.slice(0, 160)}`
-    : `状态: ${status}`
+    ? t('notifications.scheduledTask.bodyWithDetail', { status, detail: detail.slice(0, 160) })
+    : t('notifications.scheduledTask.bodyStatusOnly', { status })
 
   return {
-    title: `定时任务 ${run.taskName || run.taskId}`,
+    title: t('notifications.scheduledTask.title', { name: run.taskName || run.taskId }),
     body,
   }
 }

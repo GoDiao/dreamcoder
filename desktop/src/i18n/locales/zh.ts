@@ -774,6 +774,14 @@ export const zh: Record<TranslationKey, string> = {
   'notifications.permissionPrompt.toolBody': '{toolName} 请求执行，正在等待允许。',
   'notifications.permissionPrompt.computerUseBody': 'Computer Use 正在等待允许。',
 
+  // 定时任务运行通知
+  'notifications.scheduledTask.title': '定时任务 {name}',
+  'notifications.scheduledTask.statusCompleted': '完成',
+  'notifications.scheduledTask.statusFailed': '失败',
+  'notifications.scheduledTask.statusTimeout': '超时',
+  'notifications.scheduledTask.bodyWithDetail': '{status}: {detail}',
+  'notifications.scheduledTask.bodyStatusOnly': '状态: {status}',
+
   // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',

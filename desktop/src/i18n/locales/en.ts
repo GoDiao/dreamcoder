@@ -772,6 +772,14 @@ export const en = {
   'notifications.permissionPrompt.toolBody': '{toolName} is requesting execution, waiting for permission.',
   'notifications.permissionPrompt.computerUseBody': 'Computer Use is waiting for permission.',
 
+  // Scheduled task run notifications
+  'notifications.scheduledTask.title': 'Scheduled task {name}',
+  'notifications.scheduledTask.statusCompleted': 'Completed',
+  'notifications.scheduledTask.statusFailed': 'Failed',
+  'notifications.scheduledTask.statusTimeout': 'Timed out',
+  'notifications.scheduledTask.bodyWithDetail': '{status}: {detail}',
+  'notifications.scheduledTask.bodyStatusOnly': 'Status: {status}',
+
   // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',

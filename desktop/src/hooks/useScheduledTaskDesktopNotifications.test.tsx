@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
+import { useSettingsStore } from '../stores/settingsStore'
 import { useScheduledTaskDesktopNotifications } from './useScheduledTaskDesktopNotifications'
 
 const { listMock, getRecentRunsMock, notifyDesktopMock } = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ describe('useScheduledTaskDesktopNotifications', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     localStorage.clear()
+    useSettingsStore.setState({ locale: 'zh' })
     listMock.mockReset()
     getRecentRunsMock.mockReset()
     notifyDesktopMock.mockReset()
@@ -94,6 +96,47 @@ describe('useScheduledTaskDesktopNotifications', () => {
       dedupeKey: 'scheduled-task:run-new',
       title: '定时任务 Daily review',
       body: '失败: provider timeout',
+      target: { type: 'scheduled' },
+    })
+  })
+
+  it('localizes notification text in English when the locale is en', async () => {
+    useSettingsStore.setState({ locale: 'en' })
+    listMock.mockResolvedValue({
+      tasks: [{
+        id: 'task-1',
+        name: 'Daily review',
+        cron: '* * * * *',
+        prompt: 'review',
+        enabled: true,
+        createdAt: 1,
+        notification: { enabled: true, channels: ['desktop'] },
+      }],
+    })
+    getRecentRunsMock
+      .mockResolvedValueOnce({ runs: [] })
+      .mockResolvedValueOnce({
+        runs: [{
+          id: 'run-new',
+          taskId: 'task-1',
+          taskName: 'Daily review',
+          startedAt: '2026-05-03T00:01:00.000Z',
+          completedAt: '2026-05-03T00:01:01.000Z',
+          status: 'failed',
+          prompt: 'review',
+          error: 'provider timeout',
+        }],
+      })
+
+    render(<Harness />)
+    await vi.waitFor(() => expect(getRecentRunsMock).toHaveBeenCalledTimes(1))
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await vi.waitFor(() => expect(notifyDesktopMock).toHaveBeenCalledTimes(1))
+    expect(notifyDesktopMock).toHaveBeenCalledWith({
+      dedupeKey: 'scheduled-task:run-new',
+      title: 'Scheduled task Daily review',
+      body: 'Failed: provider timeout',
       target: { type: 'scheduled' },
     })
   })
