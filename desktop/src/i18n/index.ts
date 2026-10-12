@@ -23,7 +23,7 @@ export function translate(
   let text = translations[locale]?.[key] ?? translations.zh[key] ?? translations.en[key] ?? key
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), () => String(v))
     }
   }
   return text
