@@ -183,7 +183,7 @@ describe('Content-only pages render without errors', () => {
       await Promise.resolve()
     })
     expect(container.querySelector('textarea')).toBeInTheDocument()
-    expect(container.innerHTML).toContain('New session')
+    expect(container.innerHTML).toContain('Start Your AI Coding Journey')
     expect(container.innerHTML).toContain('Ask anything')
   })
 
@@ -269,7 +269,7 @@ describe('Content-only pages render without errors', () => {
     })
     const { container } = render(<ActiveSession />)
     // With empty messages, the hero is shown
-    expect(container.innerHTML).toContain('New session')
+    expect(container.innerHTML).toContain('Start Your AI Coding Journey')
     // ChatInput has a textarea
     const textarea = container.querySelector('textarea')
     expect(textarea).toBeInTheDocument()

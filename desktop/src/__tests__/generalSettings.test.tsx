@@ -1112,7 +1112,9 @@ describe('Settings > Providers tab', () => {
     providerStoreState.hasLoadedProviders = true
   })
 
-  it('does not query official OAuth status before providers finish loading', () => {
+  // Official OAuth providers are hidden in ProviderSettings.tsx (commented out);
+  // re-enable these when the Claude/ChatGPT official entries come back.
+  it.skip('does not query official OAuth status before providers finish loading', () => {
     providerStoreState.providers = []
     providerStoreState.activeId = null
     providerStoreState.hasLoadedProviders = false
@@ -1122,7 +1124,7 @@ describe('Settings > Providers tab', () => {
     expect(screen.queryByTestId('claude-official-login')).not.toBeInTheDocument()
   })
 
-  it('does not query ChatGPT OAuth status before providers finish loading', () => {
+  it.skip('does not query ChatGPT OAuth status before providers finish loading', () => {
     providerStoreState.providers = []
     providerStoreState.activeId = 'openai-official'
     providerStoreState.hasLoadedProviders = false
@@ -1132,7 +1134,7 @@ describe('Settings > Providers tab', () => {
     expect(screen.queryByTestId('chatgpt-official-login')).not.toBeInTheDocument()
   })
 
-  it('shows official OAuth status only after official provider is confirmed active', () => {
+  it.skip('shows official OAuth status only after official provider is confirmed active', () => {
     providerStoreState.providers = []
     providerStoreState.activeId = null
     providerStoreState.hasLoadedProviders = true
@@ -1142,7 +1144,7 @@ describe('Settings > Providers tab', () => {
     expect(screen.getByTestId('claude-official-login')).toBeInTheDocument()
   })
 
-  it('shows ChatGPT Official as the active built-in provider', () => {
+  it.skip('shows ChatGPT Official as the active built-in provider', () => {
     providerStoreState.providers = []
     providerStoreState.activeId = 'openai-official'
     providerStoreState.hasLoadedProviders = true
@@ -1322,7 +1324,15 @@ describe('Settings > About tab', () => {
     })
   })
 
-  it('renders release notes with markdown formatting', async () => {
+  it('explains that update checking is disabled', () => {
+    render(<Settings />)
+
+    expect(screen.getByText('The first public release has not been published yet. Update checking is disabled.')).toBeInTheDocument()
+  })
+
+  // Update checking is disabled in AboutSettings.tsx until the first public release
+  // (see the TODO there); re-enable these when the updater UI is restored.
+  it.skip('renders release notes with markdown formatting', async () => {
     render(<Settings />)
 
     expect(await screen.findByRole('heading', { name: 'DreamCoder v0.1.5' })).toBeInTheDocument()
@@ -1330,7 +1340,7 @@ describe('Settings > About tab', () => {
     expect(screen.getByText('Added markdown support')).toBeInTheDocument()
   })
 
-  it('shows downloaded bytes instead of a fake zero percent when total size is unknown', async () => {
+  it.skip('shows downloaded bytes instead of a fake zero percent when total size is unknown', async () => {
     useUpdateStore.setState({
       status: 'downloading',
       availableVersion: '0.1.5',
@@ -1353,7 +1363,7 @@ describe('Settings > About tab', () => {
     expect(screen.queryByText('Downloading update... 0%')).not.toBeInTheDocument()
   })
 
-  it('saves a manual update proxy from the advanced update controls', async () => {
+  it.skip('saves a manual update proxy from the advanced update controls', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByRole('button', { name: /Advanced update proxy/i }))
@@ -1384,7 +1394,7 @@ describe('Settings > About tab', () => {
     })
   })
 
-  it('can switch update proxy settings back to system mode', async () => {
+  it.skip('can switch update proxy settings back to system mode', async () => {
     useSettingsStore.setState({
       updateProxy: { mode: 'manual', url: 'http://127.0.0.1:7890' },
     })

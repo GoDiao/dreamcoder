@@ -203,6 +203,7 @@ describe('ComputerUseSettings', () => {
     })
 
     expect(computerUseApiMock.setAuthorizedApps).toHaveBeenCalledWith({
+      mode: 'vision',
       authorizedApps: [
         expect.objectContaining({
           bundleId: 'com.example.Preview',
@@ -222,6 +223,7 @@ describe('ComputerUseSettings', () => {
     })
 
     expect(computerUseApiMock.setAuthorizedApps).toHaveBeenCalledWith({
+      mode: 'vision',
       authorizedApps: [
         expect.objectContaining({
           bundleId: 'com.example.Preview',

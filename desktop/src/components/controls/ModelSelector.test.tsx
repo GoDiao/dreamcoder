@@ -84,8 +84,13 @@ describe('ModelSelector', () => {
     const setSessionRuntime = vi.fn()
     useSettingsStore.setState({
       locale: 'en',
-      availableModels: MODELS,
-      currentModel: MODELS[0],
+      // With a custom provider active, the list comes from /api/models, which
+      // returns that provider's mapped models.
+      availableModels: [
+        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
+        { id: 'provider-fast', name: 'provider-fast', description: 'Haiku model', context: '' },
+      ],
+      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
       activeProviderName: 'Provider A',
     })
     useProviderStore.setState({
@@ -113,7 +118,7 @@ describe('ModelSelector', () => {
 
     render(<ModelSelector runtimeKey="session-1" />)
 
-    await clickByRole(/alpha/i)
+    await clickByRole(/provider-main/)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /provider-fast/ }))
       await Promise.resolve()
