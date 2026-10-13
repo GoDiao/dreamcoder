@@ -206,6 +206,8 @@ export const zh: Record<TranslationKey, string> = {
   'settings.terminal.windowTitle': '宿主机 Shell',
   'settings.terminal.unavailableTitle': '需要桌面端运行时',
   'settings.terminal.unavailableBody': '请在打包后的桌面端里打开这个页面，才能启动交互式终端。',
+  'settings.terminal.shellFallback': '首选 Shell 不可用，本次会话已切换到 {shell}。',
+  'settings.terminal.detectingShell': '正在检测宿主机 Shell…',
   'settings.general.defaultShell': '默认 Shell',
   'settings.terminal.preferencesTitle': '启动 Shell',
   'settings.terminal.preferencesBody': '用于新开的终端会话，以及点击重启后的终端。',

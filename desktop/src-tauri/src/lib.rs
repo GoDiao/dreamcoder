@@ -428,6 +428,7 @@ struct TerminalSpawnResult {
     session_id: u32,
     shell: String,
     cwd: String,
+    warning: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -918,7 +919,7 @@ fn terminal_spawn(
     cwd: Option<String>,
 ) -> Result<TerminalSpawnResult, String> {
     let cwd_path = resolve_terminal_cwd(cwd)?;
-    let shell = resolved_terminal_shell(&app)?;
+    let selection = resolved_terminal_shell(&app);
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -929,25 +930,11 @@ fn terminal_spawn(
         })
         .map_err(|err| format!("open terminal pty: {err}"))?;
 
-    let mut cmd = CommandBuilder::new(&shell);
-    #[cfg(unix)]
-    if matches!(
-        Path::new(&shell).file_name().and_then(|name| name.to_str()),
-        Some("zsh" | "bash" | "fish")
-    ) {
-        cmd.arg("-l");
-    }
-    cmd.cwd(cwd_path.as_os_str());
-    for (key, value) in terminal_environment(&shell) {
-        cmd.env(key, value);
-    }
-    cmd.env("TERM", "xterm-256color");
-    cmd.env("COLORTERM", "truecolor");
-
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|err| format!("spawn terminal shell: {err}"))?;
+    let (mut child, selection) = terminal_shell::spawn_with_fallback(selection, |shell| {
+        pair.slave.spawn_command(build_terminal_command(shell, &cwd_path))
+    })?;
+    let shell = selection.shell;
+    let warning = selection.warning;
     drop(pair.slave);
 
     let mut reader = pair
@@ -1048,6 +1035,7 @@ fn terminal_spawn(
         session_id,
         shell,
         cwd: cwd_path.to_string_lossy().to_string(),
+        warning,
     })
 }
 
@@ -1252,6 +1240,19 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
     output
 }
 
+fn build_terminal_command(shell: &str, cwd: &Path) -> CommandBuilder {
+    // Preserve interactive non-login startup (for example, bash reads .bashrc).
+    // login_shell_environment already captures the login environment once.
+    let mut cmd = CommandBuilder::new(shell);
+    cmd.cwd(cwd.as_os_str());
+    for (key, value) in terminal_environment(shell) {
+        cmd.env(key, value);
+    }
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd
+}
+
 fn terminal_environment(shell: &str) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = std::env::vars().collect();
     env.extend(login_shell_environment(shell));
@@ -1403,14 +1404,14 @@ fn read_desktop_terminal_config() -> Option<DesktopTerminalConfig> {
     settings.desktop_terminal
 }
 
-fn resolved_terminal_shell(app: &AppHandle) -> Result<String, String> {
+fn resolved_terminal_shell(app: &AppHandle) -> terminal_shell::ShellSelection {
     let terminal_config = TerminalConfig::load(app);
     let system_default = default_shell(terminal_config.bash_path.as_deref());
     let platform = current_terminal_host_platform();
     let configured = read_desktop_terminal_config();
     let override_shell =
-        resolve_desktop_terminal_shell(platform, configured.as_ref(), &system_default)?;
-    Ok(override_shell.unwrap_or(system_default))
+        resolve_desktop_terminal_shell(platform, configured.as_ref(), &system_default);
+    terminal_shell::select_shell(system_default, override_shell)
 }
 
 fn current_terminal_host_platform() -> TerminalHostPlatform {
@@ -1438,15 +1439,10 @@ fn resolve_desktop_terminal_shell(
     };
 
     if platform == TerminalHostPlatform::Posix {
-        let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
-            .map(|value| {
-                std::env::split_paths(&value)
-                    .filter(|path| path.is_absolute())
-                    .collect()
-            })
-            .unwrap_or_default();
-        // GUI launches may have a minimal PATH, including on Homebrew systems.
-        dirs.extend(["/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"].map(PathBuf::from));
+        let dirs = terminal_shell::shell_search_dirs(
+            cfg!(target_os = "macos"),
+            std::env::var_os("PATH").as_deref(),
+        );
         return terminal_shell::resolve_posix_override(
             startup_shell,
             config.custom_shell_path.as_deref(),
@@ -1505,29 +1501,18 @@ fn default_shell(_custom_bash: Option<&str>) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         let env_shell = std::env::var("SHELL").ok();
-        let passwd_shell = if env_shell
+        let account_shell = if env_shell
             .as_deref()
             .is_some_and(|shell| terminal_shell::is_executable(shell.trim()))
         {
             None
         } else {
-            // Match the current UID rather than trusting USER/LOGNAME.
-            StdCommand::new("/usr/bin/id")
-                .arg("-u")
-                .output()
-                .ok()
-                .filter(|output| output.status.success())
-                .and_then(|output| String::from_utf8(output.stdout).ok())
-                .and_then(|uid| {
-                    fs::read_to_string("/etc/passwd")
-                        .ok()
-                        .and_then(|contents| terminal_shell::passwd_shell(&contents, uid.trim()))
-                })
+            terminal_shell::account_shell()
         };
         terminal_shell::detect_posix_shell(
             cfg!(target_os = "macos"),
             env_shell.as_deref(),
-            passwd_shell.as_deref(),
+            account_shell.as_deref(),
             terminal_shell::is_executable,
         )
     }
@@ -1917,7 +1902,7 @@ fn kill_windows_sidecars() {
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_terminal_output, default_utf8_locale, ensure_utf8_locale,
+        build_terminal_command, decode_terminal_output, default_utf8_locale, ensure_utf8_locale,
         dir_has_portable_data, has_meaningful_intersection, is_persistable_window_state,
         normalize_terminal_bash_path, parse_env_block, resolve_desktop_terminal_shell,
         resolve_terminal_cwd, run_notification_bridge,
@@ -1925,6 +1910,16 @@ mod tests {
         SERVER_BIND_HOST, SERVER_CONTROL_HOST,
     };
     use std::{collections::HashMap, fs, path::Path};
+
+    #[cfg(unix)]
+    #[test]
+    fn terminal_command_keeps_non_login_startup_for_supported_shells() {
+        for shell in ["/missing/bash", "/missing/zsh", "/missing/fish"] {
+            let cmd = build_terminal_command(shell, Path::new("/tmp"));
+            assert_eq!(cmd.get_argv(), &[std::ffi::OsString::from(shell)]);
+            assert_eq!(cmd.get_env("SHELL"), Some(std::ffi::OsStr::new(shell)));
+        }
+    }
 
     #[test]
     fn window_state_rejects_too_small_sizes() {

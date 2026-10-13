@@ -630,9 +630,11 @@ export function GeneralSettings() {
         </div>
       </div>
 
-      <div className="mt-8">
-        <TerminalShellSettings title={t('settings.general.defaultShell')} />
-      </div>
+      {isTauriRuntime() && (
+        <div className="mt-8">
+          <TerminalShellSettings />
+        </div>
+      )}
 
       {uiZoomSection}
 

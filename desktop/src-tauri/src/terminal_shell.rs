@@ -7,10 +7,7 @@ pub(crate) fn is_executable(path: &str) -> bool {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        path.metadata()
-            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
-            .unwrap_or(false)
+        nix::unistd::access(path, nix::unistd::AccessFlags::X_OK).is_ok()
     }
     #[cfg(not(unix))]
     {
@@ -23,10 +20,10 @@ pub(crate) fn is_executable(path: &str) -> bool {
 pub(crate) fn detect_posix_shell(
     macos: bool,
     env_shell: Option<&str>,
-    passwd_shell: Option<&str>,
+    account_shell: Option<&str>,
     executable: impl Fn(&str) -> bool,
 ) -> String {
-    [env_shell, passwd_shell]
+    [env_shell, account_shell]
         .into_iter()
         .flatten()
         .map(str::trim)
@@ -35,15 +32,71 @@ pub(crate) fn detect_posix_shell(
         .to_string()
 }
 
-pub(crate) fn passwd_shell(contents: &str, uid: &str) -> Option<String> {
-    contents.lines().find_map(|line| {
-        let fields: Vec<_> = line.split(':').collect();
-        if fields.len() == 7 && fields[2] == uid {
-            Some(fields[6].trim().to_string())
-        } else {
-            None
+#[cfg(unix)]
+pub(crate) fn account_shell() -> Option<String> {
+    use nix::unistd::{Uid, User};
+    // getpwuid_r consults Open Directory on macOS and NSS on Linux. The
+    // reentrant API also avoids sharing a static passwd buffer across threads.
+    User::from_uid(Uid::current())
+        .ok()
+        .flatten()
+        .map(|user| user.shell.to_string_lossy().into_owned())
+}
+
+pub(crate) fn shell_search_dirs(macos: bool, path: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if macos {
+        // Explicit Unix shell choices prefer Homebrew over Apple's old /bin/bash,
+        // even when a GUI launch puts system directories first in PATH.
+        dirs.extend(["/opt/homebrew/bin", "/usr/local/bin"].map(PathBuf::from));
+    }
+    if let Some(path) = path {
+        dirs.extend(std::env::split_paths(path).filter(|dir| dir.is_absolute()));
+    }
+    dirs.extend(["/usr/local/bin", "/usr/bin", "/bin"].map(PathBuf::from));
+    dirs
+}
+
+#[derive(Debug)]
+pub(crate) struct ShellSelection {
+    pub shell: String,
+    pub warning: Option<String>,
+    system_default: String,
+}
+
+pub(crate) fn select_shell(
+    system_default: String,
+    configured: Result<Option<String>, String>,
+) -> ShellSelection {
+    let (shell, warning) = match configured {
+        Ok(Some(shell)) => (shell, None),
+        Ok(None) => (system_default.clone(), None),
+        Err(error) => (system_default.clone(), Some(error)),
+    };
+    ShellSelection {
+        shell,
+        warning,
+        system_default,
+    }
+}
+
+pub(crate) fn spawn_with_fallback<T, E: std::fmt::Display>(
+    mut selection: ShellSelection,
+    mut spawn: impl FnMut(&str) -> Result<T, E>,
+) -> Result<(T, ShellSelection), String> {
+    match spawn(&selection.shell) {
+        Ok(child) => Ok((child, selection)),
+        Err(error) if selection.shell != selection.system_default => {
+            // Retry if the executable disappears after validation, or exec itself
+            // fails (for example, an incompatible custom binary).
+            selection.warning = Some(format!("could not start {}: {error}", selection.shell));
+            selection.shell = selection.system_default.clone();
+            let child = spawn(&selection.shell)
+                .map_err(|error| format!("spawn fallback shell {}: {error}", selection.shell))?;
+            Ok((child, selection))
         }
-    })
+        Err(error) => Err(format!("spawn terminal shell {}: {error}", selection.shell)),
+    }
 }
 
 pub(crate) fn resolve_posix_override(
@@ -88,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn detection_uses_passwd_when_environment_is_missing_blank_or_stale() {
+    fn detection_uses_account_shell_when_environment_is_missing_blank_or_stale() {
         for shell in [None, Some(""), Some("  "), Some("/missing/fish")] {
             assert_eq!(
                 detect_posix_shell(false, shell, Some("/usr/bin/fish"), |p| p
@@ -112,15 +165,112 @@ mod tests {
     }
 
     #[test]
-    fn passwd_lookup_matches_uid_and_ignores_malformed_rows() {
-        let passwd = "# comment\nroot:x:0:0:root:/root:/bin/sh\nbad:501\nuser:x:501:20:User:/home/user:/usr/bin/fish\n";
-        assert_eq!(
-            passwd_shell(passwd, "501").as_deref(),
-            Some("/usr/bin/fish")
-        );
-        assert_eq!(passwd_shell(passwd, "502"), None);
+    #[cfg(unix)]
+    fn account_lookup_reads_current_user_through_system_database() {
+        let shell = account_shell().expect("current user has an account shell");
+        assert!(Path::new(&shell).is_absolute());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn macos_explicit_choices_prefer_homebrew_but_linux_respects_path() {
+        let path = std::ffi::OsStr::new("/bin:/usr/bin:/custom/bin:relative");
+        let mac_dirs = shell_search_dirs(true, Some(path));
+        let linux_dirs = shell_search_dirs(false, Some(path));
+        let installed = |path: &str| ["/bin/bash", "/opt/homebrew/bin/bash"].contains(&path);
+        assert_eq!(
+            resolve_posix_override("bash", None, &mac_dirs, installed).unwrap(),
+            Some("/opt/homebrew/bin/bash".into())
+        );
+        assert_eq!(
+            resolve_posix_override("bash", None, &linux_dirs, installed).unwrap(),
+            Some("/bin/bash".into())
+        );
+        assert!(mac_dirs.iter().all(|path| path.is_absolute()));
+        assert_eq!(
+            resolve_posix_override("bash", None, &mac_dirs, |path| path == "/bin/bash").unwrap(),
+            Some("/bin/bash".into())
+        );
+    }
+
+    #[test]
+    fn missing_named_and_custom_shells_fall_back_with_warning() {
+        for (choice, custom) in [("fish", None), ("custom", Some("/missing/shell"))] {
+            let configured = resolve_posix_override(choice, custom, &[], |_| false);
+            let selection = select_shell("/bin/bash".into(), configured);
+            let (started, selection) =
+                spawn_with_fallback(selection, |shell| Ok::<_, String>(shell.to_string())).unwrap();
+            assert_eq!(started, "/bin/bash");
+            assert!(selection.warning.is_some());
+        }
+    }
+
+    #[test]
+    fn executable_that_fails_to_spawn_retries_system_shell_once() {
+        let selection = select_shell("/bin/bash".into(), Ok(Some("/custom/fish".into())));
+        let mut attempts = Vec::new();
+        let (_, selected) = spawn_with_fallback(selection, |shell| {
+            attempts.push(shell.to_string());
+            if shell == "/custom/fish" {
+                Err("executable disappeared")
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap();
+        assert_eq!(attempts, ["/custom/fish", "/bin/bash"]);
+        assert_eq!(selected.shell, "/bin/bash");
+        assert!(selected.warning.unwrap().contains("executable disappeared"));
+    }
+
+    #[test]
+    fn valid_override_or_system_choice_runs_without_warning() {
+        for configured in [Ok(None), Ok(Some("/custom/fish".into()))] {
+            let selection = select_shell("/bin/bash".into(), configured);
+            let expected = selection.shell.clone();
+            let (_, selected) = spawn_with_fallback(selection, |shell| {
+                assert_eq!(shell, expected);
+                Ok::<_, String>(())
+            })
+            .unwrap();
+            assert!(selected.warning.is_none());
+        }
+    }
+
+    #[test]
+    fn failing_system_default_still_reports_an_error_without_retrying() {
+        let selection = select_shell("/missing/bash".into(), Ok(None));
+        let mut attempts = 0;
+        let result = spawn_with_fallback(selection, |_| {
+            attempts += 1;
+            Err::<(), _>("not found")
+        });
+        assert!(result.unwrap_err().contains("/missing/bash"));
+        assert_eq!(attempts, 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn real_pty_starts_fallback_when_preferred_executable_cannot_spawn() {
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+        let pair = native_pty_system().openpty(PtySize::default()).unwrap();
+        let selection = select_shell(
+            "/bin/sh".into(),
+            Ok(Some("/missing/dreamcoder-shell".into())),
+        );
+        let (mut child, selected) = spawn_with_fallback(selection, |shell| {
+            let mut cmd = CommandBuilder::new(shell);
+            cmd.args(["-c", "exit 0"]);
+            pair.slave.spawn_command(cmd)
+        })
+        .unwrap();
+        drop(pair.slave);
+        assert_eq!(selected.shell, "/bin/sh");
+        assert!(selected.warning.is_some());
+        assert_eq!(child.wait().unwrap().exit_code(), 0);
+    }
+
+    #[cfg(unix)]
     #[test]
     fn explicit_shells_search_path_and_report_missing_installations() {
         let dirs = vec![PathBuf::from("/bin"), PathBuf::from("/opt/homebrew/bin")];

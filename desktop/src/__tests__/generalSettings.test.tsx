@@ -137,7 +137,7 @@ describe('Settings > General tab', () => {
     clipboardMock.copyTextToClipboard.mockReset()
     clipboardMock.copyTextToClipboard.mockResolvedValue(true)
     tauriCoreMock.invoke.mockReset()
-    tauriCoreMock.invoke.mockResolvedValue(undefined)
+    tauriCoreMock.invoke.mockImplementation(async (command: string) => command === 'detect_default_terminal_shell' ? { platform: 'macos', shell: '/bin/zsh' } : undefined)
     tauriDialogMock.open.mockReset()
     tauriDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
     tauriProcessMock.relaunch.mockReset()
@@ -280,16 +280,24 @@ describe('Settings > General tab', () => {
   })
 
   it('offers a default shell dropdown in General settings and persists Unix choices', async () => {
+    (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {}
     useSettingsStore.setState({
       desktopTerminal: { startupShell: 'system', customShellPath: '' },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
-    fireEvent.click(screen.getByRole('button', { name: 'Default shell' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
     fireEvent.click(screen.getByRole('button', { name: 'bash' }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
     expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'bash', customShellPath: '' })
+  })
+
+  it('hides default shell preferences in H5 General settings', () => {
+    render(<Settings />)
+    fireEvent.click(screen.getByText('General'))
+    expect(screen.queryByText('Default shell')).not.toBeInTheDocument()
+    expect(tauriCoreMock.invoke).not.toHaveBeenCalledWith('detect_default_terminal_shell', undefined)
   })
 
   it('shows WebFetch preflight toggle enabled by default', () => {

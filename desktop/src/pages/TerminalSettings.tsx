@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useRef, useState, type WheelEvent } from
 import { Info } from 'lucide-react'
 import { useTranslation, type TranslationKey } from '../i18n'
 import { terminalApi } from '../api/terminal'
-import { TerminalShellSettings } from '../components/settings/TerminalShellSettings'
 import {
   attachTerminalRuntime,
   createLocalTerminalRuntimeId,
@@ -79,6 +78,7 @@ export function TerminalSettings({
   const runtime = runtimeRef.current
   const [, forceRuntimeUpdate] = useState(0)
   const status = runtime.status
+  const warning = runtime.warning
   const error = runtime.error
   const shellInfo = runtime.shellInfo
   const isWindows = typeof navigator !== 'undefined'
@@ -109,7 +109,7 @@ export function TerminalSettings({
     const host = hostRef.current
     if (!host) return
 
-    updateTerminalRuntime(runtime, { error: null, status: 'starting', shellInfo: null })
+    updateTerminalRuntime(runtime, { error: null, warning: null, status: 'starting', shellInfo: null })
 
     const existing = runtime.nativeSessionId
     if (existing) {
@@ -202,6 +202,7 @@ export function TerminalSettings({
       updateTerminalRuntime(runtime, {
         nativeSessionId: result.session_id,
         shellInfo: { shell: result.shell, cwd: result.cwd },
+        warning: result.warning ?? null,
         status: 'running',
       })
       resizeSession()
@@ -349,11 +350,15 @@ export function TerminalSettings({
         </div>
       )}
 
-      {showPreferences && (
-        <>
-          <TerminalShellSettings />
-          {isWindows && <BashPathSettings isTauri={terminalApi.isAvailable()} />}
-        </>
+      {warning && (
+        <div role="status" className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-terminal-warning)]/30 bg-[var(--color-terminal-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+          <p>{t('settings.terminal.shellFallback', { shell: shellInfo?.shell ?? '' })}</p>
+          <p className="mt-1 text-xs">{warning}</p>
+        </div>
+      )}
+
+      {showPreferences && isWindows && terminalApi.isAvailable() && (
+        <BashPathSettings isTauri />
       )}
 
       {status === 'unavailable' ? (

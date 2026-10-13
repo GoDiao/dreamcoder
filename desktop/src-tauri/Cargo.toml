@@ -25,3 +25,6 @@ portable-pty = "0.9.0"
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 reqwest = { version = "0.13", default-features = false, features = ["system-proxy"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", features = ["user", "fs"] }

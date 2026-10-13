@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { terminalApi } from '../../api/terminal'
+import { terminalApi, type TerminalShellDetection } from '../../api/terminal'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { Dropdown } from '../shared/Dropdown'
@@ -7,7 +7,12 @@ import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
 import type { DesktopTerminalStartupShell } from '../../types/settings'
 
-export function TerminalShellSettings({ title }: { title?: string }) {
+export function TerminalShellSettings() {
+  if (!terminalApi.isAvailable()) return null
+  return <DesktopTerminalShellSettings />
+}
+
+function DesktopTerminalShellSettings() {
   const t = useTranslation()
   const desktopTerminal = useSettingsStore((state) => state.desktopTerminal)
   const setDesktopTerminal = useSettingsStore((state) => state.setDesktopTerminal)
@@ -16,22 +21,22 @@ export function TerminalShellSettings({ title }: { title?: string }) {
   const [preferencesError, setPreferencesError] = useState<string | null>(null)
   const [preferencesSaved, setPreferencesSaved] = useState(false)
   const [preferencesSaving, setPreferencesSaving] = useState(false)
-  const [isWindows, setIsWindows] = useState(() => typeof navigator !== 'undefined'
-    && (/^Win/i.test(navigator.platform) || /Windows/i.test(navigator.userAgent)))
-  const [detectedShell, setDetectedShell] = useState<string | null>(null)
+  const [detection, setDetection] = useState<TerminalShellDetection | null>(null)
+  const [detectionError, setDetectionError] = useState<string | null>(null)
+  const isWindows = detection?.platform === 'windows'
   useEffect(() => {
-    if (!terminalApi.isAvailable()) return
     let cancelled = false
     void terminalApi.detectDefaultShell().then((result) => {
       if (cancelled) return
-      setIsWindows(result.platform === 'windows')
-      setDetectedShell(result.shell)
-    }).catch(() => {})
+      setDetection(result)
+    }).catch((error) => {
+      if (!cancelled) setDetectionError(error instanceof Error ? error.message : String(error))
+    })
     return () => { cancelled = true }
   }, [])
 
   const shellItems = [
-    { value: 'system' as const, label: t('settings.terminal.shell.system'), description: detectedShell ?? t('settings.terminal.shell.systemDesc') },
+    { value: 'system' as const, label: t('settings.terminal.shell.system'), description: detection?.shell ?? t('settings.terminal.shell.systemDesc') },
     ...(isWindows ? [
       { value: 'pwsh' as const, label: t('settings.terminal.shell.pwsh'), description: t('settings.terminal.shell.pwshDesc') },
       { value: 'powershell' as const, label: t('settings.terminal.shell.powershell'), description: t('settings.terminal.shell.powershellDesc') },
@@ -90,72 +95,77 @@ export function TerminalShellSettings({ title }: { title?: string }) {
       <div className="flex flex-col gap-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {title ?? t('settings.terminal.preferencesTitle')}
+            {t('settings.general.defaultShell')}
           </h3>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             {t('settings.terminal.preferencesBody')}
           </p>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-[var(--color-text-primary)]">
-            {title ?? t('settings.terminal.startupShell')}
-          </span>
-          <Dropdown<DesktopTerminalStartupShell>
-            items={shellItems}
-            value={startupShell}
-            onChange={(value) => {
-              setStartupShell(value)
-              setPreferencesError(null)
-              setPreferencesSaved(false)
-            }}
-            width="100%"
-            trigger={
-              <button
+        {!detection ? (
+          <p role={detectionError ? 'alert' : 'status'} className="text-sm text-[var(--color-text-secondary)]">
+            {detectionError ?? t('settings.terminal.detectingShell')}
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <Dropdown<DesktopTerminalStartupShell>
+                items={shellItems}
+                value={startupShell}
+                onChange={(value) => {
+                  setStartupShell(value)
+                  setPreferencesError(null)
+                  setPreferencesSaved(false)
+                }}
+                width="100%"
+                trigger={
+                  <button
+                    type="button"
+                    aria-label={t('settings.general.defaultShell')}
+                    className="flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)]"
+                  >
+                    <span>{shellItems.find((item) => item.value === startupShell)?.label ?? startupShell}</span>
+                    <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">expand_more</span>
+                  </button>
+                }
+              />
+            </div>
+
+            {startupShell === 'custom' && (
+              <Input
+                label={t('settings.terminal.customPath')}
+                placeholder={isWindows ? t('settings.terminal.customPathPlaceholder') : '/usr/local/bin/fish'}
+                value={customShellPath}
+                onChange={(event) => {
+                  setCustomShellPath(event.target.value)
+                  setPreferencesError(null)
+                  setPreferencesSaved(false)
+                }}
+                error={preferencesError ?? undefined}
+              />
+            )}
+
+            {preferencesError && startupShell !== 'custom' && (
+              <p className="text-xs text-[var(--color-error)]">{preferencesError}</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
                 type="button"
-                aria-label={title ?? t('settings.terminal.startupShell')}
-                className="flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)]"
+                size="sm"
+                loading={preferencesSaving}
+                onClick={() => void savePreferences()}
               >
-                <span>{shellItems.find((item) => item.value === startupShell)?.label ?? startupShell}</span>
-                <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">expand_more</span>
-              </button>
-            }
-          />
-        </div>
-
-        {startupShell === 'custom' && (
-          <Input
-            label={t('settings.terminal.customPath')}
-            placeholder={isWindows ? t('settings.terminal.customPathPlaceholder') : '/usr/local/bin/fish'}
-            value={customShellPath}
-            onChange={(event) => {
-              setCustomShellPath(event.target.value)
-              setPreferencesError(null)
-              setPreferencesSaved(false)
-            }}
-            error={preferencesError ?? undefined}
-          />
+                {t('settings.terminal.saveShell')}
+              </Button>
+              {preferencesSaved && (
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {t('settings.terminal.saveShellSuccess')}
+                </span>
+              )}
+            </div>
+          </>
         )}
-
-        {preferencesError && startupShell !== 'custom' && (
-          <p className="text-xs text-[var(--color-error)]">{preferencesError}</p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            size="sm"
-            loading={preferencesSaving}
-            onClick={() => void savePreferences()}
-          >
-            {t('settings.terminal.saveShell')}
-          </Button>
-          {preferencesSaved && (
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              {t('settings.terminal.saveShellSuccess')}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   )

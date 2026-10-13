@@ -4,6 +4,7 @@ export type TerminalSpawnResult = {
   session_id: number
   shell: string
   cwd: string
+  warning?: string | null
 }
 
 export type TerminalOutputPayload = {

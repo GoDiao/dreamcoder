@@ -204,6 +204,8 @@ export const en = {
   'settings.terminal.windowTitle': 'Host shell',
   'settings.terminal.unavailableTitle': 'Desktop runtime required',
   'settings.terminal.unavailableBody': 'Open this page in the packaged desktop app to start an interactive terminal.',
+  'settings.terminal.shellFallback': 'Your preferred shell is unavailable. Using {shell} for this session.',
+  'settings.terminal.detectingShell': 'Detecting the host shell…',
   'settings.general.defaultShell': 'Default shell',
   'settings.terminal.preferencesTitle': 'Startup shell',
   'settings.terminal.preferencesBody': 'Use for new terminal sessions and after restart.',
