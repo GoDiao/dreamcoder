@@ -2,18 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
-import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
+import { ProviderFormModal } from '../settings/ProviderFormModal'
+import type { SavedProvider } from '../../types/provider'
 
 export function ProviderOnboarding() {
   const t = useTranslation()
-  const { presets, error, isPresetsLoading, createProvider, activateProvider, fetchPresets } = useProviderStore()
+  const { presets, error, isPresetsLoading, activateProvider, fetchPresets } = useProviderStore()
   const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted)
-  const fetchSettings = useSettingsStore((s) => s.fetchAll)
-  const [apiKey, setApiKey] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const requestedPresetsRef = useRef(false)
+  const createdRef = useRef(false)
 
   useEffect(() => {
     if (presets.length > 0 || requestedPresetsRef.current) return
@@ -41,30 +41,14 @@ export function ProviderOnboarding() {
     )
   }
 
-  const dreamfieldPreset = presets.find((p) => p.id === 'dreamfield')
-  if (!dreamfieldPreset) return null
+  const handleCreated = async (provider: SavedProvider) => {
+    await activateProvider(provider.id)
+    createdRef.current = true
+  }
 
-  const handleSetup = async () => {
-    if (!apiKey.trim()) return
-    setLoading(true)
-    try {
-      const provider = await createProvider({
-        presetId: 'dreamfield',
-        name: dreamfieldPreset.name,
-        apiKey: apiKey.trim(),
-        authStrategy: dreamfieldPreset.authStrategy ?? 'auth_token',
-        baseUrl: dreamfieldPreset.baseUrl,
-        apiFormat: dreamfieldPreset.apiFormat,
-        models: dreamfieldPreset.defaultModels,
-      })
-      await activateProvider(provider.id)
-      await fetchSettings()
-      setOnboardingCompleted()
-    } catch (err) {
-      console.error('Onboarding failed:', err)
-    } finally {
-      setLoading(false)
-    }
+  const handleModalClose = () => {
+    setShowCreateModal(false)
+    if (createdRef.current) setOnboardingCompleted()
   }
 
   return (
@@ -79,28 +63,25 @@ export function ProviderOnboarding() {
           {t('onboarding.instructions')}
         </p>
 
-        <div className="space-y-4 text-left">
-          <Input
-            label={t('settings.providers.apiKey')}
-            required
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={t('onboarding.apiKeyPlaceholder')}
-          />
-          <Button
-            className="w-full"
-            onClick={handleSetup}
-            disabled={!apiKey.trim()}
-            loading={loading}
-          >
-            {t('onboarding.getStarted')}
+        <div className="space-y-3">
+          <Button className="w-full" onClick={() => setShowCreateModal(true)}>
+            {t('settings.providers.addProvider')}
+          </Button>
+          <Button className="w-full" variant="ghost" onClick={setOnboardingCompleted}>
+            {t('onboarding.setUpLater')}
           </Button>
         </div>
-
-        <p className="text-xs text-[var(--color-text-tertiary)] mt-6">
-          {t('onboarding.noApiKey')}{' '}<a href="https://www.dreamfield.top" target="_blank" rel="noopener noreferrer" className="text-[var(--color-brand)] hover:underline">{t('onboarding.signUp')}</a>
-        </p>
       </div>
+
+      {showCreateModal && (
+        <ProviderFormModal
+          open={true}
+          onClose={handleModalClose}
+          mode="create"
+          presets={presets}
+          onCreated={handleCreated}
+        />
+      )}
     </div>
   )
 }

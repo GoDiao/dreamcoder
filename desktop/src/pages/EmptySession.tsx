@@ -8,6 +8,7 @@ import { useChatStore } from '../stores/chatStore'
 import { usePluginStore } from '../stores/pluginStore'
 import { useSessionRuntimeStore, DRAFT_RUNTIME_SELECTION_KEY } from '../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useProviderStore } from '../stores/providerStore'
 import { useUIStore } from '../stores/uiStore'
 import { SETTINGS_TAB_ID, useTabStore } from '../stores/tabStore'
 import { RepositoryLaunchControls } from '../components/shared/RepositoryLaunchControls'
@@ -80,6 +81,7 @@ function resolveCreateSessionErrorMessage(error: unknown, t: Translate): string 
 
 export function EmptySession() {
   const t = useTranslation()
+  const hasNoProviders = useProviderStore((s) => s.hasLoadedProviders && s.providers.length === 0)
   const [input, setInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [workDir, setWorkDir] = useState('')
@@ -548,6 +550,21 @@ export function EmptySession() {
           >
             {t('empty.subtitle')}
           </p>
+          {hasNoProviders && (
+            <p data-testid="empty-session-no-provider" className="mx-auto mt-4 max-w-xs text-sm text-[var(--color-text-tertiary)]">
+              {t('empty.noProvider')}{' '}
+              <button
+                type="button"
+                className="text-[var(--color-brand)] hover:underline"
+                onClick={() => {
+                  useUIStore.getState().setPendingSettingsTab('providers')
+                  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+                }}
+              >
+                {t('settings.providers.addProvider')}
+              </button>
+            </p>
+          )}
         </div>
       </div>
 

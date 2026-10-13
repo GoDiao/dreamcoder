@@ -1,8 +1,9 @@
 import { StrictMode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderPreset } from '../../types/providerPreset'
+import type { SavedProvider } from '../../types/provider'
 
 const providersApiMock = vi.hoisted(() => ({
   presets: vi.fn(),
@@ -12,17 +13,48 @@ vi.mock('../../api/providers', () => ({
   providersApi: providersApiMock,
 }))
 
+const createdProvider: SavedProvider = {
+  id: 'provider-1',
+  presetId: 'deepseek',
+  name: 'DeepSeek',
+  apiKey: 'test-key',
+  baseUrl: 'https://example.invalid/anthropic',
+  apiFormat: 'anthropic',
+  models: { main: 'model-main', haiku: '', sonnet: '', opus: '' },
+}
+
+// The modal has its own tests; here we only need its create/close contract.
+vi.mock('../settings/ProviderFormModal', () => ({
+  ProviderFormModal: ({ onClose, onCreated }: {
+    onClose: () => void
+    onCreated?: (provider: SavedProvider) => Promise<void> | void
+  }) => (
+    <div role="dialog">
+      <button
+        type="button"
+        onClick={async () => {
+          await onCreated?.(createdProvider)
+          onClose()
+        }}
+      >
+        mock-save
+      </button>
+      <button type="button" onClick={onClose}>mock-cancel</button>
+    </div>
+  ),
+}))
+
 import { useProviderStore } from '../../stores/providerStore'
-import { useSettingsStore } from '../../stores/settingsStore'
+import { ONBOARDING_COMPLETED_STORAGE_KEY, useSettingsStore } from '../../stores/settingsStore'
 import { ProviderOnboarding } from './ProviderOnboarding'
 
-const dreamfieldPreset: ProviderPreset = {
-  id: 'dreamfield',
-  name: 'DreamField',
-  baseUrl: 'https://example.invalid/api',
+const deepseekPreset: ProviderPreset = {
+  id: 'deepseek',
+  name: 'DeepSeek',
+  baseUrl: 'https://example.invalid/anthropic',
   apiFormat: 'anthropic',
   defaultModels: {
-    main: 'dreamfield-main',
+    main: 'model-main',
     haiku: '',
     sonnet: '',
     opus: '',
@@ -31,10 +63,13 @@ const dreamfieldPreset: ProviderPreset = {
   websiteUrl: 'https://example.invalid',
 }
 
+const activateProviderMock = vi.fn()
+
 describe('ProviderOnboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useSettingsStore.setState({ locale: 'zh' })
+    localStorage.clear()
+    useSettingsStore.setState({ locale: 'zh', onboardingCompleted: false })
     useProviderStore.setState({
       providers: [],
       activeId: null,
@@ -43,11 +78,16 @@ describe('ProviderOnboarding', () => {
       isLoading: false,
       isPresetsLoading: false,
       error: null,
+      activateProvider: activateProviderMock,
     })
   })
 
+  afterEach(() => {
+    localStorage.clear()
+  })
+
   it('loads presets once after mounting and advances past the loading screen', async () => {
-    providersApiMock.presets.mockResolvedValue({ presets: [dreamfieldPreset] })
+    providersApiMock.presets.mockResolvedValue({ presets: [deepseekPreset] })
 
     render(
       <StrictMode>
@@ -55,31 +95,27 @@ describe('ProviderOnboarding', () => {
       </StrictMode>,
     )
 
-    expect(await screen.findByRole('textbox', { name: /^API 密钥/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '添加服务商' })).toBeInTheDocument()
     expect(providersApiMock.presets).toHaveBeenCalledTimes(1)
   })
 
-  it('does not refetch presets that are already available', () => {
-    useProviderStore.setState({ presets: [dreamfieldPreset] })
+  it('does not refetch when presets are already loaded', () => {
+    useProviderStore.setState({ presets: [deepseekPreset] })
 
-    render(
-      <StrictMode>
-        <ProviderOnboarding />
-      </StrictMode>,
-    )
+    render(<ProviderOnboarding />)
 
-    expect(screen.getByRole('textbox', { name: /^API 密钥/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '添加服务商' })).toBeInTheDocument()
     expect(providersApiMock.presets).not.toHaveBeenCalled()
   })
 
   it.each([
-    { locale: 'zh' as const, errorPrefix: '预设加载失败：', retry: '重试', apiKey: /^API 密钥/ },
-    { locale: 'en' as const, errorPrefix: 'Failed to load presets:', retry: 'Retry', apiKey: /^API Key/ },
-  ])('localizes the loading error and retry action in $locale and recovers on retry', async ({ locale, errorPrefix, retry, apiKey }) => {
+    { locale: 'zh' as const, errorPrefix: '预设加载失败：', retry: '重试', addProvider: '添加服务商' },
+    { locale: 'en' as const, errorPrefix: 'Failed to load presets:', retry: 'Retry', addProvider: 'Add Provider' },
+  ])('localizes the loading error and retry action in $locale and recovers on retry', async ({ locale, errorPrefix, retry, addProvider }) => {
     useSettingsStore.setState({ locale })
     providersApiMock.presets
       .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({ presets: [dreamfieldPreset] })
+      .mockResolvedValueOnce({ presets: [deepseekPreset] })
 
     render(
       <StrictMode>
@@ -90,11 +126,10 @@ describe('ProviderOnboarding', () => {
     const errorAlert = await screen.findByRole('alert')
     expect(errorAlert).toHaveTextContent(errorPrefix)
     expect(errorAlert).toHaveTextContent('network down')
-    const retryButton = screen.getByRole('button', { name: retry })
 
-    fireEvent.click(retryButton)
+    fireEvent.click(screen.getByRole('button', { name: retry }))
 
-    expect(await screen.findByRole('textbox', { name: apiKey })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: addProvider })).toBeInTheDocument()
     expect(providersApiMock.presets).toHaveBeenCalledTimes(2)
   })
 
@@ -102,51 +137,92 @@ describe('ProviderOnboarding', () => {
     {
       locale: 'zh' as const,
       welcome: '欢迎使用 DreamCoder',
-      tagline: 'DreamField 官方 AI Coding Agent',
-      instructions: '输入你的 DreamField API Key 开始使用',
-      apiKey: /^API 密钥/,
-      placeholder: '输入 DreamField API Key',
-      start: '开始使用',
-      noApiKey: '没有 API Key？',
-      signUp: '前往 DreamField 注册',
+      tagline: '本地运行、支持多服务商的 AI 编程工作台',
+      addProvider: '添加服务商',
+      later: '稍后设置',
     },
     {
       locale: 'en' as const,
       welcome: 'Welcome to DreamCoder',
-      tagline: 'The official DreamField AI coding agent',
-      instructions: 'Enter your DreamField API key to get started',
-      apiKey: /^API Key/,
-      placeholder: 'Enter your DreamField API key',
-      start: 'Get started',
-      noApiKey: "Don't have an API key?",
-      signUp: 'Sign up for DreamField',
+      tagline: 'A locally run, multi-provider AI coding workspace',
+      addProvider: 'Add Provider',
+      later: 'Set up later',
     },
-  ])('localizes the onboarding form in $locale', (copy) => {
+  ])('shows provider-neutral copy in $locale', (copy) => {
     useSettingsStore.setState({ locale: copy.locale })
-    useProviderStore.setState({ presets: [dreamfieldPreset] })
+    useProviderStore.setState({ presets: [deepseekPreset] })
 
-    render(<ProviderOnboarding />)
+    const { container } = render(<ProviderOnboarding />)
 
     expect(screen.getByRole('heading', { name: copy.welcome })).toBeInTheDocument()
-    expect(screen.getByText(copy.tagline, { exact: false })).toHaveTextContent(copy.instructions)
-    expect(screen.getByRole('textbox', { name: copy.apiKey })).toHaveAttribute('placeholder', copy.placeholder)
-    expect(screen.getByRole('button', { name: copy.start })).toBeDisabled()
-    const signUp = screen.getByRole('link', { name: copy.signUp })
-    expect(signUp).toHaveAttribute('href', 'https://www.dreamfield.top')
-    expect(signUp.parentElement).toHaveTextContent(copy.noApiKey)
+    expect(screen.getByText(copy.tagline, { exact: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: copy.addProvider })).toBeEnabled()
+    expect(screen.getByRole('button', { name: copy.later })).toBeEnabled()
+    expect(container).not.toHaveTextContent(/DreamField/i)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('updates the copy when the locale changes without losing the entered API key', () => {
-    useProviderStore.setState({ presets: [dreamfieldPreset] })
+  it('lets the user skip setup and remembers it across launches', () => {
+    useProviderStore.setState({ presets: [deepseekPreset] })
     render(<ProviderOnboarding />)
 
-    fireEvent.change(screen.getByRole('textbox', { name: /^API 密钥/ }), {
-      target: { value: 'test-api-key' },
-    })
-    act(() => useSettingsStore.setState({ locale: 'en' }))
+    fireEvent.click(screen.getByRole('button', { name: '稍后设置' }))
 
-    expect(screen.getByRole('heading', { name: 'Welcome to DreamCoder' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: /^API Key/ })).toHaveValue('test-api-key')
-    expect(screen.getByRole('button', { name: 'Get started' })).toBeEnabled()
+    expect(useSettingsStore.getState().onboardingCompleted).toBe(true)
+    expect(localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY)).toBe('true')
+    expect(activateProviderMock).not.toHaveBeenCalled()
+  })
+
+  it('opens the provider form and activates the provider it creates', async () => {
+    useProviderStore.setState({ presets: [deepseekPreset] })
+    render(<ProviderOnboarding />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '添加服务商' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'mock-save' }))
+    })
+
+    expect(activateProviderMock).toHaveBeenCalledWith('provider-1')
+    expect(useSettingsStore.getState().onboardingCompleted).toBe(true)
+    expect(localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY)).toBe('true')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps onboarding open when the provider form is closed without saving', () => {
+    useProviderStore.setState({ presets: [deepseekPreset] })
+    render(<ProviderOnboarding />)
+
+    fireEvent.click(screen.getByRole('button', { name: '添加服务商' }))
+    fireEvent.click(screen.getByRole('button', { name: 'mock-cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(useSettingsStore.getState().onboardingCompleted).toBe(false)
+    expect(localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY)).toBeNull()
+    expect(activateProviderMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('onboarding completion persistence', () => {
+  afterEach(() => {
+    localStorage.clear()
+    vi.resetModules()
+  })
+
+  it('restores the completed flag from storage on startup', async () => {
+    localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, 'true')
+    vi.resetModules()
+    const { useSettingsStore: freshStore } = await import('../../stores/settingsStore')
+
+    expect(freshStore.getState().onboardingCompleted).toBe(true)
+  })
+
+  it('starts incomplete when nothing is stored', async () => {
+    vi.resetModules()
+    const { useSettingsStore: freshStore } = await import('../../stores/settingsStore')
+
+    expect(freshStore.getState().onboardingCompleted).toBe(false)
   })
 })

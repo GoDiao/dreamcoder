@@ -1,29 +1,7 @@
 [
   {
-    "id": "dreamfield",
-    "name": "DreamField 官方",
-    "baseUrl": "https://www.dreamfield.top",
-    "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "deepseek-v4-pro",
-      "haiku": "DeepSeek-V4-Flash",
-      "sonnet": "deepseek-v4-pro",
-      "opus": "deepseek-v4-pro"
-    },
-    "needsApiKey": true,
-    "websiteUrl": "https://www.dreamfield.top",
-    "authStrategy": "auth_token",
-    "promoText": "DreamField — AI 算力服务平台，DreamCoder 官方推荐 Provider",
-    "featured": true,
-    "modelContextWindows": {
-      "deepseek-v4-pro": 1000000,
-      "DeepSeek-V4-Flash": 1000000,
-      "GLM-5.1": 200000
-    }
-  },
-  {
     "id": "deepseek",
-    "name": "DeepSeek 官方",
+    "name": "DeepSeek",
     "baseUrl": "https://api.deepseek.com/anthropic",
     "apiFormat": "anthropic",
     "defaultModels": {
@@ -50,7 +28,7 @@
   },
   {
     "id": "qwen",
-    "name": "通义千问",
+    "name": "Qwen (Alibaba Cloud)",
     "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "apiFormat": "openai_chat",
     "defaultModels": {
@@ -88,7 +66,7 @@
   },
   {
     "id": "zhipuglm",
-    "name": "智谱 GLM",
+    "name": "Zhipu GLM",
     "baseUrl": "https://open.bigmodel.cn/api/anthropic",
     "apiFormat": "anthropic",
     "defaultModels": {
@@ -107,6 +85,26 @@
       "glm-5.1": 200000,
       "glm-5-turbo": 200000,
       "glm-4.5-air": 128000
+    }
+  },
+  {
+    "id": "dreamfield",
+    "name": "DreamField",
+    "baseUrl": "https://www.dreamfield.top",
+    "apiFormat": "anthropic",
+    "defaultModels": {
+      "main": "deepseek-v4-pro",
+      "haiku": "DeepSeek-V4-Flash",
+      "sonnet": "deepseek-v4-pro",
+      "opus": "deepseek-v4-pro"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://www.dreamfield.top",
+    "authStrategy": "auth_token",
+    "modelContextWindows": {
+      "deepseek-v4-pro": 1000000,
+      "DeepSeek-V4-Flash": 1000000,
+      "GLM-5.1": 200000
     }
   },
   {
@@ -147,7 +145,7 @@
   },
   {
     "id": "custom",
-    "name": "自定义 Provider",
+    "name": "Custom Provider",
     "baseUrl": "",
     "apiFormat": "anthropic",
     "defaultModels": {

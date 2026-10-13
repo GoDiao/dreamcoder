@@ -119,6 +119,8 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
 import { usePluginStore } from '../stores/pluginStore'
+import { useProviderStore } from '../stores/providerStore'
+import { SETTINGS_TAB_ID } from '../stores/tabStore'
 import type { RepositoryContextResult } from '../api/sessions'
 
 function okRepositoryContext(overrides: Partial<RepositoryContextResult> = {}): RepositoryContextResult {
@@ -168,6 +170,7 @@ describe('EmptySession', () => {
   const initialRuntimeState = useSessionRuntimeStore.getInitialState()
   const initialUiState = useUIStore.getInitialState()
   const initialPluginState = usePluginStore.getInitialState()
+  const initialProviderState = useProviderStore.getInitialState()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -181,6 +184,7 @@ describe('EmptySession', () => {
     useSessionRuntimeStore.setState(initialRuntimeState, true)
     useUIStore.setState(initialUiState, true)
     usePluginStore.setState(initialPluginState, true)
+    useProviderStore.setState(initialProviderState, true)
 
     mocks.createSession.mockResolvedValue({ sessionId: 'draft-session' })
     mocks.getRepositoryContext.mockResolvedValue(okRepositoryContext())
@@ -218,6 +222,44 @@ describe('EmptySession', () => {
     useSessionRuntimeStore.setState(initialRuntimeState, true)
     useUIStore.setState(initialUiState, true)
     usePluginStore.setState(initialPluginState, true)
+    useProviderStore.setState(initialProviderState, true)
+  })
+
+  it('points to provider settings when no provider is configured', async () => {
+    useProviderStore.setState({ hasLoadedProviders: true, providers: [] })
+
+    render(<EmptySession />)
+
+    const hint = await screen.findByTestId('empty-session-no-provider')
+    expect(hint).toHaveTextContent('No model provider is configured yet.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+
+    expect(useUIStore.getState().pendingSettingsTab).toBe('providers')
+    expect(useTabStore.getState().activeTabId).toBe(SETTINGS_TAB_ID)
+  })
+
+  it('hides the provider hint until providers load and once one exists', () => {
+    useProviderStore.setState({ hasLoadedProviders: false, providers: [] })
+    const { rerender } = render(<EmptySession />)
+    expect(screen.queryByTestId('empty-session-no-provider')).not.toBeInTheDocument()
+
+    act(() => {
+      useProviderStore.setState({
+        hasLoadedProviders: true,
+        providers: [{
+          id: 'provider-1',
+          presetId: 'deepseek',
+          name: 'DeepSeek',
+          apiKey: 'key',
+          baseUrl: 'https://example.invalid',
+          apiFormat: 'anthropic',
+          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+        }],
+      })
+    })
+    rerender(<EmptySession />)
+    expect(screen.queryByTestId('empty-session-no-provider')).not.toBeInTheDocument()
   })
 
   it('uses compact composer controls on phone-sized H5 browsers', async () => {

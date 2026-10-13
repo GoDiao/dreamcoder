@@ -34,6 +34,7 @@ import {
 import { useUIStore } from './uiStore'
 
 const LOCALE_STORAGE_KEY = 'dreamcoder-locale'
+export const ONBOARDING_COMPLETED_STORAGE_KEY = 'dreamcoder-onboarding-completed'
 export const UI_ZOOM_MIN = MIN_APP_ZOOM
 export const UI_ZOOM_MAX = MAX_APP_ZOOM
 export const UI_ZOOM_STEP = APP_ZOOM_CONTROL_STEP
@@ -58,6 +59,13 @@ function getStoredLocale(): Locale {
   const detected = detectSystemLocale()
   try { localStorage.setItem(LOCALE_STORAGE_KEY, detected) } catch { /* noop */ }
   return detected
+}
+
+function getStoredOnboardingCompleted(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY) === 'true'
+  } catch { /* localStorage unavailable */ }
+  return false
 }
 
 type SettingsStore = {
@@ -164,7 +172,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   h5AccessError: null,
   responseLanguage: '',
   uiZoom: readStoredAppZoomLevel(),
-  onboardingCompleted: false,
+  onboardingCompleted: getStoredOnboardingCompleted(),
   isLoading: false,
   error: null,
 
@@ -184,6 +192,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setOnboardingCompleted: () => {
     set({ onboardingCompleted: true })
+    try { localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, 'true') } catch { /* noop */ }
   },
 
   fetchAll: async () => {

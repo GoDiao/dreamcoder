@@ -4,7 +4,7 @@ DreamCoder — AI Coding Agent 桌面应用。DreamSeed 竞赛参赛作品。
 
 ## 功能特性
 
-- **多 AI 服务商支持** — DreamField、Anthropic、OpenAI 及 OpenAI 兼容服务
+- **多 AI 服务商支持** — DeepSeek、通义千问、Kimi、智谱 GLM 等 Anthropic / OpenAI 兼容服务，以及 Ollama、LM Studio 本地模型
 - **内置终端** — 在应用内直接执行命令行操作
 - **MCP 服务管理** — 一键配置和管理 MCP 工具服务
 - **多主题支持** — 包含 DreamField 翡翠绿主题在内的多种配色方案

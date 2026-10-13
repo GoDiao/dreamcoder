@@ -7,6 +7,7 @@ import { useTranslation } from '../../i18n'
 import { Modal } from '../shared/Modal'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
+import { getPresetDisplayName } from './presetDisplayName'
 import { Dropdown } from '../shared/Dropdown'
 import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
@@ -27,6 +28,7 @@ type ProviderFormProps = {
   mode: 'create' | 'edit'
   provider?: SavedProvider
   presets: ProviderPreset[]
+  onCreated?: (provider: SavedProvider) => Promise<void> | void
 }
 
 function requirePreset(preset: ProviderPreset | undefined): ProviderPreset {
@@ -285,7 +287,7 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
 
 // ─── ProviderFormModal Component ────────────────────────────
 
-function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderFormProps) {
+function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }: ProviderFormProps) {
   const { createProvider, updateProvider, testConfig } = useProviderStore()
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const t = useTranslation()
@@ -307,7 +309,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
   )
 
   const [selectedPreset, setSelectedPreset] = useState<ProviderPreset>(initialPreset)
-  const [name, setName] = useState(provider?.name ?? initialPreset.name)
+  const [name, setName] = useState(provider?.name ?? getPresetDisplayName(initialPreset, t))
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? initialPreset.baseUrl)
   const [apiFormat, setApiFormat] = useState<ApiFormat>(provider?.apiFormat ?? initialPreset.apiFormat ?? 'anthropic')
   const [authStrategy, setAuthStrategy] = useState<ProviderAuthStrategy>(provider?.authStrategy ?? getPresetAuthStrategy(initialPreset))
@@ -374,7 +376,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
 
   const handlePresetChange = (preset: ProviderPreset) => {
     setSelectedPreset(preset)
-    setName(preset.name)
+    setName(getPresetDisplayName(preset, t))
     setBaseUrl(preset.baseUrl)
     setApiFormat(preset.apiFormat ?? 'anthropic')
     setAuthStrategy(getPresetAuthStrategy(preset))
@@ -511,7 +513,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
           : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)]'
       }`}
     >
-      {preset.name}
+      {getPresetDisplayName(preset, t)}
     </button>
   )
 
@@ -535,7 +537,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
       }
 
       if (mode === 'create') {
-        await createProvider({
+        const created = await createProvider({
           presetId: selectedPreset.id,
           name: name.trim(),
           apiKey: apiKey.trim(),
@@ -547,6 +549,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
           ...(Object.keys(parsedModelContextWindows).length > 0 && { modelContextWindows: parsedModelContextWindows }),
           notes: notes.trim() || undefined,
         })
+        await onCreated?.(created)
       } else if (provider) {
         const input: UpdateProviderInput = {
           name: name.trim(),

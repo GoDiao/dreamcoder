@@ -29,12 +29,9 @@ export const zh: Record<TranslationKey, string> = {
 
   // ─── Provider onboarding ─────────────────────────
   'onboarding.welcome': '欢迎使用 DreamCoder',
-  'onboarding.tagline': 'DreamField 官方 AI Coding Agent',
-  'onboarding.instructions': '输入你的 DreamField API Key 开始使用',
-  'onboarding.apiKeyPlaceholder': '输入 DreamField API Key',
-  'onboarding.getStarted': '开始使用',
-  'onboarding.noApiKey': '没有 API Key？',
-  'onboarding.signUp': '前往 DreamField 注册',
+  'onboarding.tagline': '本地运行、支持多服务商的 AI 编程工作台',
+  'onboarding.instructions': '添加一个模型服务商即可开始使用，也可以稍后在「设置 → 服务商」中添加。',
+  'onboarding.setUpLater': '稍后设置',
   'onboarding.presetsLoadFailed': '预设加载失败：',
 
   // ─── Sidebar ──────────────────────────────────────
@@ -313,6 +310,7 @@ export const zh: Record<TranslationKey, string> = {
   'settings.providers.title': '服务商',
   'settings.providers.description': '管理 API 服务商以访问模型。',
   'settings.providers.addProvider': '添加服务商',
+  'settings.providers.customPreset': '自定义服务商',
   'settings.providers.officialName': 'Claude 官方',
   'settings.providers.officialDesc': 'Anthropic 原生接入 — 无需 API 密钥',
   'settings.providers.openaiOfficialName': 'ChatGPT 官方',
@@ -1007,7 +1005,8 @@ export const zh: Record<TranslationKey, string> = {
 
   // ─── Empty Session ──────────────────────────────────────
   'empty.title': '开始你的 AI 编程之旅',
-  'empty.subtitle': 'DreamCoder — DreamField 官方 Coding Agent，在下方输入你的需求开始对话',
+  'empty.subtitle': '在下方输入你的需求开始对话',
+  'empty.noProvider': '还没有配置模型服务商。',
   'empty.placeholder': '随便问点什么...',
   'empty.addFiles': '添加文件或图片',
   'empty.slashCommands': '斜杠命令',

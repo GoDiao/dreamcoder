@@ -27,12 +27,9 @@ export const en = {
 
   // ─── Provider onboarding ─────────────────────────
   'onboarding.welcome': 'Welcome to DreamCoder',
-  'onboarding.tagline': 'The official DreamField AI coding agent',
-  'onboarding.instructions': 'Enter your DreamField API key to get started',
-  'onboarding.apiKeyPlaceholder': 'Enter your DreamField API key',
-  'onboarding.getStarted': 'Get started',
-  'onboarding.noApiKey': "Don't have an API key?",
-  'onboarding.signUp': 'Sign up for DreamField',
+  'onboarding.tagline': 'A locally run, multi-provider AI coding workspace',
+  'onboarding.instructions': 'Add a model provider to get started, or do it later in Settings → Providers.',
+  'onboarding.setUpLater': 'Set up later',
   'onboarding.presetsLoadFailed': 'Failed to load presets: ',
 
   // ─── Sidebar ──────────────────────────────────────
@@ -311,6 +308,7 @@ export const en = {
   'settings.providers.title': 'Providers',
   'settings.providers.description': 'Manage API providers for model access.',
   'settings.providers.addProvider': 'Add Provider',
+  'settings.providers.customPreset': 'Custom Provider',
   'settings.providers.officialName': 'Claude Official',
   'settings.providers.officialDesc': 'Anthropic native — no API key required',
   'settings.providers.openaiOfficialName': 'ChatGPT Official',
@@ -1005,7 +1003,8 @@ export const en = {
 
   // ─── Empty Session ──────────────────────────────────────
   'empty.title': 'Start Your AI Coding Journey',
-  'empty.subtitle': 'DreamCoder — Official DreamField Coding Agent. Type your request below to begin',
+  'empty.subtitle': 'Type your request below to begin',
+  'empty.noProvider': 'No model provider is configured yet.',
   'empty.placeholder': 'Ask anything...',
   'empty.addFiles': 'Add files or photos',
   'empty.slashCommands': 'Slash commands',
