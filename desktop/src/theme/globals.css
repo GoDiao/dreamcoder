@@ -829,7 +829,36 @@
   --color-code-type: #D2A8FF;
   --color-code-punctuation: #8B949E;
   --color-code-parameter: #FFA657;
---color-text-secondary-a72: rgba(183, 170, 165, 0.72);
+
+  /* Status, goal/memory and activity tokens (indigo on slate) */
+  --color-success-container: rgba(74, 222, 128, 0.12);
+  --color-info: #79C0FF;
+  --color-info-container: rgba(121, 192, 255, 0.12);
+  --color-warning-container: rgba(251, 191, 36, 0.12);
+  --color-memory-accent: #5EB8A8;
+  --color-memory-surface: #101A1C;
+  --color-memory-border: #1F3333;
+  --color-memory-icon-bg: #142224;
+  --color-goal-accent: var(--color-memory-accent);
+  --color-goal-surface: var(--color-memory-surface);
+  --color-goal-border: var(--color-memory-border);
+  --color-goal-icon-bg: var(--color-memory-icon-bg);
+  --color-goal-chip-bg: var(--color-surface-container-low);
+  --color-goal-chip-border: var(--color-border);
+  --color-activity-heat-0: #1A1E2B;
+  --color-activity-heat-1: #1E2140;
+  --color-activity-heat-2: #312E81;
+  --color-activity-heat-3: #4F46E5;
+  --color-activity-heat-4: #818CF8;
+  --color-activity-cell-border: rgba(255, 255, 255, 0.06);
+  --color-activity-cell-border-hover: rgba(129, 140, 248, 0.30);
+  --color-activity-cell-border-active: #818CF8;
+  --color-activity-tooltip-surface: #1A1E2B;
+  --color-activity-tooltip-border: rgba(129, 140, 248, 0.18);
+  --color-activity-tooltip-text: #F1F5F9;
+  --color-activity-tooltip-muted: #A5B4FC;
+
+  --color-text-secondary-a72: rgba(183, 170, 165, 0.72);
   --color-text-secondary-a68: rgba(183, 170, 165, 0.68);
   --color-text-primary-a88: rgba(229, 226, 225, 0.88);
   --color-text-primary-a82: rgba(229, 226, 225, 0.82);

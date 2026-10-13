@@ -388,6 +388,19 @@ export function GeneralSettings() {
     setUiZoom(nextZoom)
   }
 
+  const renderZoomShortcut = (modifier: string) => (
+    <span className="inline-flex items-center gap-1">
+      <kbd className="settings-zoom-kbd">{modifier}</kbd>
+      <kbd className="settings-zoom-kbd">+</kbd>
+      <span>/</span>
+      <kbd className="settings-zoom-kbd">{modifier}</kbd>
+      <kbd className="settings-zoom-kbd">-</kbd>
+      <span>/</span>
+      <kbd className="settings-zoom-kbd">{modifier}</kbd>
+      <kbd className="settings-zoom-kbd">0</kbd>
+    </span>
+  )
+
   const uiZoomSection = (
     <div className="mt-8">
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -396,16 +409,11 @@ export function GeneralSettings() {
           <p className="text-sm text-[var(--color-text-tertiary)]">{t('settings.general.uiZoomDescription')}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
             <span>{t('settings.general.uiZoomShortcutHint')}</span>
-            <span className="inline-flex items-center gap-1">
-              <kbd className="settings-zoom-kbd">Ctrl</kbd>
-              <kbd className="settings-zoom-kbd">+</kbd>
-              <span>/</span>
-              <kbd className="settings-zoom-kbd">Ctrl</kbd>
-              <kbd className="settings-zoom-kbd">-</kbd>
-              <span>/</span>
-              <kbd className="settings-zoom-kbd">Ctrl</kbd>
-              <kbd className="settings-zoom-kbd">0</kbd>
-            </span>
+            {/* Matches appZoom.ts: Cmd on macOS, Ctrl elsewhere. */}
+            <span>{t('settings.general.uiZoomShortcutMac')}</span>
+            {renderZoomShortcut('⌘')}
+            <span>{t('settings.general.uiZoomShortcutWindows')}</span>
+            {renderZoomShortcut('Ctrl')}
             <span>{t('settings.general.uiZoomShortcutResetHint')}</span>
           </div>
         </div>
