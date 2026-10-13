@@ -87,6 +87,15 @@ static void dc_run_on_main_sync(dispatch_block_t block) {
     dispatch_sync(dispatch_get_main_queue(), block);
 }
 
+// UNUserNotificationCenter throws NSInternalInconsistencyException when the process
+// is not inside an .app bundle (e.g. `tauri dev` runs target/debug/dreamcoder-desktop
+// directly). Callers report this as an error so the frontend falls back to "unsupported".
+static NSString *const DCNotificationsUnavailableError = @"macOS notifications require the app bundle and are unavailable in dev mode";
+
+static BOOL dc_is_app_bundle(void) {
+    return [[[NSBundle mainBundle] bundlePath] hasSuffix:@".app"];
+}
+
 void dc_set_notification_response_callback(DCNotificationResponseCallback callback) {
     dcNotificationResponseCallback = callback;
 }
@@ -121,6 +130,11 @@ int dc_notification_authorization_status(char *error_buffer, uintptr_t error_buf
     @autoreleasepool {
         dc_copy_error(error_buffer, error_buffer_len, nil);
 
+        if (!dc_is_app_bundle()) {
+            dc_copy_error(error_buffer, error_buffer_len, DCNotificationsUnavailableError);
+            return -1;
+        }
+
         if (@available(macOS 10.14, *)) {
             __block NSInteger status = UNAuthorizationStatusNotDetermined;
             dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
@@ -147,6 +161,11 @@ int dc_notification_authorization_status(char *error_buffer, uintptr_t error_buf
 bool dc_request_notification_authorization(char *error_buffer, uintptr_t error_buffer_len) {
     @autoreleasepool {
         dc_copy_error(error_buffer, error_buffer_len, nil);
+
+        if (!dc_is_app_bundle()) {
+            dc_copy_error(error_buffer, error_buffer_len, DCNotificationsUnavailableError);
+            return false;
+        }
 
         if (@available(macOS 10.14, *)) {
             __block BOOL granted = NO;
