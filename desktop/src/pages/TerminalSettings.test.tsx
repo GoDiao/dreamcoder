@@ -29,6 +29,7 @@ const terminalMocks = vi.hoisted(() => {
     kill: vi.fn(),
     onOutput: vi.fn(),
     onExit: vi.fn(),
+    detectDefaultShell: vi.fn(),
     getBashPath: vi.fn(),
     setBashPath: vi.fn(),
   }
@@ -51,6 +52,7 @@ vi.mock('../api/terminal', () => ({
     kill: terminalMocks.kill,
     onOutput: terminalMocks.onOutput,
     onExit: terminalMocks.onExit,
+    detectDefaultShell: terminalMocks.detectDefaultShell,
     getBashPath: terminalMocks.getBashPath,
     setBashPath: terminalMocks.setBashPath,
   },
@@ -76,6 +78,7 @@ describe('TerminalSettings', () => {
     terminalMocks.kill.mockReset()
     terminalMocks.onOutput.mockReset()
     terminalMocks.onExit.mockReset()
+    terminalMocks.detectDefaultShell.mockImplementation(async () => ({ shell: '/bin/zsh', platform: /Win/i.test(navigator.platform) ? 'windows' : 'macos' }))
     terminalMocks.getBashPath.mockReset()
     terminalMocks.setBashPath.mockReset()
     terminalMocks.terminalInstance.loadAddon.mockClear()
@@ -232,7 +235,7 @@ describe('TerminalSettings', () => {
     destroyTerminalRuntime('shared-runtime')
   })
 
-  it('shows Windows-only startup shell controls in settings mode', () => {
+  it('shows startup shell controls in settings mode', () => {
     vi.stubGlobal('navigator', {
       ...navigator,
       platform: 'Win32',

@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type WheelEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type WheelEvent } from 'react'
 import { Info } from 'lucide-react'
 import { useTranslation, type TranslationKey } from '../i18n'
 import { terminalApi } from '../api/terminal'
-import { useSettingsStore } from '../stores/settingsStore'
-import { Dropdown } from '../components/shared/Dropdown'
-import { Input } from '../components/shared/Input'
-import { Button } from '../components/shared/Button'
-import type { DesktopTerminalStartupShell } from '../types/settings'
+import { TerminalShellSettings } from '../components/settings/TerminalShellSettings'
 import {
   attachTerminalRuntime,
   createLocalTerminalRuntimeId,
@@ -70,8 +66,6 @@ export function TerminalSettings({
   preserveOnUnmount = false,
 }: TerminalSettingsProps = {}) {
   const t = useTranslation()
-  const desktopTerminal = useSettingsStore((state) => state.desktopTerminal)
-  const setDesktopTerminal = useSettingsStore((state) => state.setDesktopTerminal)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const localRuntimeIdRef = useRef<string | null>(null)
   if (!localRuntimeIdRef.current) {
@@ -87,55 +81,12 @@ export function TerminalSettings({
   const status = runtime.status
   const error = runtime.error
   const shellInfo = runtime.shellInfo
-  const [startupShell, setStartupShell] = useState<DesktopTerminalStartupShell>(desktopTerminal?.startupShell ?? 'system')
-  const [customShellPath, setCustomShellPath] = useState(desktopTerminal?.customShellPath ?? '')
-  const [preferencesError, setPreferencesError] = useState<string | null>(null)
-  const [preferencesSaved, setPreferencesSaved] = useState(false)
-  const [preferencesSaving, setPreferencesSaving] = useState(false)
-  const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent)
+  const isWindows = typeof navigator !== 'undefined'
+    && (/^Win/i.test(navigator.platform) || /Windows/i.test(navigator.userAgent))
 
   useEffect(() => {
     return subscribeTerminalRuntime(runtime, () => forceRuntimeUpdate((value) => value + 1))
   }, [runtime])
-
-  useEffect(() => {
-    setStartupShell(desktopTerminal?.startupShell ?? 'system')
-    setCustomShellPath(desktopTerminal?.customShellPath ?? '')
-  }, [desktopTerminal])
-
-  useEffect(() => {
-    if (!preferencesSaved) return
-    const timer = window.setTimeout(() => setPreferencesSaved(false), 2500)
-    return () => window.clearTimeout(timer)
-  }, [preferencesSaved])
-
-  const shellItems = useMemo(() => [
-    {
-      value: 'system' as const,
-      label: t('settings.terminal.shell.system'),
-      description: t('settings.terminal.shell.systemDesc'),
-    },
-    {
-      value: 'pwsh' as const,
-      label: t('settings.terminal.shell.pwsh'),
-      description: t('settings.terminal.shell.pwshDesc'),
-    },
-    {
-      value: 'powershell' as const,
-      label: t('settings.terminal.shell.powershell'),
-      description: t('settings.terminal.shell.powershellDesc'),
-    },
-    {
-      value: 'cmd' as const,
-      label: t('settings.terminal.shell.cmd'),
-      description: t('settings.terminal.shell.cmdDesc'),
-    },
-    {
-      value: 'custom' as const,
-      label: t('settings.terminal.shell.custom'),
-      description: t('settings.terminal.shell.customDesc'),
-    },
-  ], [t])
 
   const resizeSession = useCallback(() => {
     const terminal = runtime.terminal
@@ -311,36 +262,6 @@ export function TerminalSettings({
     scroller.scrollBy({ top: event.deltaY, left: event.deltaX })
   }, [])
 
-  const savePreferences = async () => {
-    setPreferencesError(null)
-    setPreferencesSaved(false)
-
-    const trimmedPath = customShellPath.trim()
-    if (startupShell === 'custom') {
-      if (!trimmedPath) {
-        setPreferencesError(t('settings.terminal.customPathRequired'))
-        return
-      }
-      if (!/^[A-Za-z]:[\\/]/.test(trimmedPath)) {
-        setPreferencesError(t('settings.terminal.customPathAbsolute'))
-        return
-      }
-    }
-
-    setPreferencesSaving(true)
-    try {
-      await setDesktopTerminal({
-        startupShell,
-        customShellPath: trimmedPath,
-      })
-      setPreferencesSaved(true)
-    } catch (err) {
-      setPreferencesError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setPreferencesSaving(false)
-    }
-  }
-
   return (
     <div className={`flex h-full flex-col overflow-hidden ${
       docked
@@ -428,80 +349,10 @@ export function TerminalSettings({
         </div>
       )}
 
-      {showPreferences && isWindows && (
+      {showPreferences && (
         <>
-          <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
-            <div className="flex flex-col gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.terminal.preferencesTitle')}
-                </h3>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {t('settings.terminal.preferencesBody')}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {t('settings.terminal.startupShell')}
-                </span>
-                <Dropdown<DesktopTerminalStartupShell>
-                  items={shellItems}
-                  value={startupShell}
-                  onChange={(value) => {
-                    setStartupShell(value)
-                    setPreferencesError(null)
-                    setPreferencesSaved(false)
-                  }}
-                  width="100%"
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)]"
-                    >
-                      <span>{shellItems.find((item) => item.value === startupShell)?.label ?? startupShell}</span>
-                      <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">expand_more</span>
-                    </button>
-                  }
-                />
-              </div>
-
-              {startupShell === 'custom' && (
-                <Input
-                  label={t('settings.terminal.customPath')}
-                  placeholder={t('settings.terminal.customPathPlaceholder')}
-                  value={customShellPath}
-                  onChange={(event) => {
-                    setCustomShellPath(event.target.value)
-                    setPreferencesError(null)
-                    setPreferencesSaved(false)
-                  }}
-                  error={preferencesError ?? undefined}
-                />
-              )}
-
-              {preferencesError && startupShell !== 'custom' && (
-                <p className="text-xs text-[var(--color-error)]">{preferencesError}</p>
-              )}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  loading={preferencesSaving}
-                  onClick={() => void savePreferences()}
-                >
-                  {t('settings.terminal.saveShell')}
-                </Button>
-                {preferencesSaved && (
-                  <span className="text-xs text-[var(--color-text-secondary)]">
-                    {t('settings.terminal.saveShellSuccess')}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <BashPathSettings isTauri={terminalApi.isAvailable()} />
+          <TerminalShellSettings />
+          {isWindows && <BashPathSettings isTauri={terminalApi.isAvailable()} />}
         </>
       )}
 

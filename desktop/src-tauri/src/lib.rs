@@ -14,6 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod terminal_shell;
+
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::menu::MenuBuilder;
@@ -928,6 +930,13 @@ fn terminal_spawn(
         .map_err(|err| format!("open terminal pty: {err}"))?;
 
     let mut cmd = CommandBuilder::new(&shell);
+    #[cfg(unix)]
+    if matches!(
+        Path::new(&shell).file_name().and_then(|name| name.to_str()),
+        Some("zsh" | "bash" | "fish")
+    ) {
+        cmd.arg("-l");
+    }
     cmd.cwd(cwd_path.as_os_str());
     for (key, value) in terminal_environment(&shell) {
         cmd.env(key, value);
@@ -1116,6 +1125,27 @@ fn terminal_kill(state: State<'_, TerminalState>, session_id: u32) -> Result<(),
     Ok(())
 }
 
+#[derive(Serialize)]
+struct TerminalShellDetection {
+    shell: String,
+    platform: &'static str,
+}
+
+#[tauri::command]
+fn detect_default_terminal_shell(app: AppHandle) -> TerminalShellDetection {
+    let config = TerminalConfig::load(&app);
+    TerminalShellDetection {
+        shell: default_shell(config.bash_path.as_deref()),
+        platform: if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        },
+    }
+}
+
 #[tauri::command]
 fn get_terminal_bash_path(app: AppHandle) -> Option<String> {
     let config = TerminalConfig::load(&app);
@@ -1225,6 +1255,8 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
 fn terminal_environment(shell: &str) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = std::env::vars().collect();
     env.extend(login_shell_environment(shell));
+    #[cfg(unix)]
+    env.insert("SHELL".to_string(), shell.to_string());
     ensure_utf8_locale(&mut env);
     env
 }
@@ -1397,10 +1429,6 @@ fn resolve_desktop_terminal_shell(
     config: Option<&DesktopTerminalConfig>,
     _system_default: &str,
 ) -> Result<Option<String>, String> {
-    if platform != TerminalHostPlatform::Windows {
-        return Ok(None);
-    }
-
     let Some(config) = config else {
         return Ok(None);
     };
@@ -1408,6 +1436,24 @@ fn resolve_desktop_terminal_shell(
     let Some(startup_shell) = config.startup_shell.as_deref().map(str::trim) else {
         return Ok(None);
     };
+
+    if platform == TerminalHostPlatform::Posix {
+        let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
+            .map(|value| {
+                std::env::split_paths(&value)
+                    .filter(|path| path.is_absolute())
+                    .collect()
+            })
+            .unwrap_or_default();
+        // GUI launches may have a minimal PATH, including on Homebrew systems.
+        dirs.extend(["/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"].map(PathBuf::from));
+        return terminal_shell::resolve_posix_override(
+            startup_shell,
+            config.custom_shell_path.as_deref(),
+            &dirs,
+            terminal_shell::is_executable,
+        );
+    }
 
     match startup_shell {
         "" | "system" => Ok(None),
@@ -1458,13 +1504,32 @@ fn default_shell(_custom_bash: Option<&str>) -> String {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        std::env::var("SHELL").unwrap_or_else(|_| {
-            if PathBuf::from("/bin/zsh").exists() {
-                "/bin/zsh".to_string()
-            } else {
-                "/bin/bash".to_string()
-            }
-        })
+        let env_shell = std::env::var("SHELL").ok();
+        let passwd_shell = if env_shell
+            .as_deref()
+            .is_some_and(|shell| terminal_shell::is_executable(shell.trim()))
+        {
+            None
+        } else {
+            // Match the current UID rather than trusting USER/LOGNAME.
+            StdCommand::new("/usr/bin/id")
+                .arg("-u")
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(|uid| {
+                    fs::read_to_string("/etc/passwd")
+                        .ok()
+                        .and_then(|contents| terminal_shell::passwd_shell(&contents, uid.trim()))
+                })
+        };
+        terminal_shell::detect_posix_shell(
+            cfg!(target_os = "macos"),
+            env_shell.as_deref(),
+            passwd_shell.as_deref(),
+            terminal_shell::is_executable,
+        )
     }
 }
 
@@ -1859,7 +1924,7 @@ mod tests {
         select_h5_dist_dir, DesktopTerminalConfig, StoredWindowState, TerminalHostPlatform,
         SERVER_BIND_HOST, SERVER_CONTROL_HOST,
     };
-    use std::{collections::HashMap, fs};
+    use std::{collections::HashMap, fs, path::Path};
 
     #[test]
     fn window_state_rejects_too_small_sizes() {
@@ -2109,6 +2174,27 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn desktop_terminal_shell_resolution_applies_posix_preferences() {
+        let bash = DesktopTerminalConfig {
+            startup_shell: Some("bash".to_string()),
+            custom_shell_path: None,
+        };
+        let resolved = resolve_desktop_terminal_shell(
+            TerminalHostPlatform::Posix, Some(&bash), "/bin/zsh",
+        ).expect("bash should resolve").expect("explicit override");
+        assert_eq!(Path::new(&resolved).file_name().unwrap(), "bash");
+
+        let custom = DesktopTerminalConfig {
+            startup_shell: Some("custom".to_string()),
+            custom_shell_path: Some(" /bin/sh ".to_string()),
+        };
+        assert_eq!(resolve_desktop_terminal_shell(
+            TerminalHostPlatform::Posix, Some(&custom), "/bin/zsh",
+        ).unwrap(), Some("/bin/sh".to_string()));
+    }
+
     #[test]
     fn server_sidecar_binds_lan_but_reports_loopback_control_url() {
         assert_eq!(SERVER_BIND_HOST, "0.0.0.0");
@@ -2172,6 +2258,7 @@ pub fn run() {
             terminal_write,
             terminal_resize,
             terminal_kill,
+            detect_default_terminal_shell,
             get_terminal_bash_path,
             set_terminal_bash_path,
             macos_notification_permission_state,

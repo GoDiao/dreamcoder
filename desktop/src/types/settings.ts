@@ -56,6 +56,9 @@ export type H5AccessDiagnostics = {
 
 export type DesktopTerminalStartupShell =
   | 'system'
+  | 'zsh'
+  | 'bash'
+  | 'fish'
   | 'pwsh'
   | 'powershell'
   | 'cmd'

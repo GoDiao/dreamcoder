@@ -279,6 +279,19 @@ describe('Settings > General tab', () => {
     })
   })
 
+  it('offers a default shell dropdown in General settings and persists Unix choices', async () => {
+    useSettingsStore.setState({
+      desktopTerminal: { startupShell: 'system', customShellPath: '' },
+      setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
+    })
+    render(<Settings />)
+    fireEvent.click(screen.getByText('General'))
+    fireEvent.click(screen.getByRole('button', { name: 'Default shell' }))
+    fireEvent.click(screen.getByRole('button', { name: 'bash' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
+    expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'bash', customShellPath: '' })
+  })
+
   it('shows WebFetch preflight toggle enabled by default', () => {
     render(<Settings />)
 
@@ -545,7 +558,10 @@ describe('Settings > General tab', () => {
   it('shows restart preparation failures without relaunching', async () => {
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
-    tauriCoreMock.invoke.mockRejectedValueOnce(new Error('restart preparation failed'))
+    tauriCoreMock.invoke.mockImplementation(async (command: string) => {
+      if (command === 'prepare_for_app_mode_restart') throw new Error('restart preparation failed')
+      return { platform: 'macos', shell: '/bin/zsh' }
+    })
 
     render(<Settings />)
 
