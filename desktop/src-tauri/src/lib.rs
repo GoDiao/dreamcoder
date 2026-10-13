@@ -1607,6 +1607,9 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
     }
+    // Lets the sidecar exit on its own if this process dies without killing it
+    // (see desktop/sidecars/parentWatchdog.ts).
+    let sidecar = sidecar.env("DREAMCODER_PARENT_PID", std::process::id().to_string());
     let sidecar = sidecar.args([
         "server",
         "--app-root",
