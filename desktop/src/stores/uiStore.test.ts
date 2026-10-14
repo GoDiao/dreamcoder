@@ -1,4 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ThemeMode } from '../types/settings'
+
+const EXPECTED_COLOR_SCHEME: Record<ThemeMode, 'dark' | 'light'> = {
+  white: 'light',
+  light: 'light',
+  dark: 'dark',
+  dreamfield: 'light',
+  amber: 'light',
+  midnight: 'dark',
+  aurora: 'dark',
+}
 
 describe('uiStore theme handling', () => {
   beforeEach(() => {
@@ -40,14 +51,11 @@ describe('uiStore theme handling', () => {
 
   it('applies a dark color scheme for dark, midnight and aurora, light for the rest', async () => {
     const { applyTheme } = await import('./uiStore')
-    const { THEME_MODES } = await import('../types/settings')
 
-    for (const theme of THEME_MODES) {
+    for (const [theme, colorScheme] of Object.entries(EXPECTED_COLOR_SCHEME) as [ThemeMode, string][]) {
       applyTheme(theme)
       expect(document.documentElement.getAttribute('data-theme')).toBe(theme)
-      expect(document.documentElement.style.colorScheme).toBe(
-        theme === 'dark' || theme === 'midnight' || theme === 'aurora' ? 'dark' : 'light',
-      )
+      expect(document.documentElement.style.colorScheme).toBe(colorScheme)
     }
   })
 

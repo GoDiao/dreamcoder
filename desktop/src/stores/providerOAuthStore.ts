@@ -22,7 +22,7 @@ export type OAuthApi<TStatus> = {
   logout: () => Promise<{ ok: boolean }>
 }
 
-export function createOAuthStore<TStatus>(api: OAuthApi<TStatus>) {
+export function createOAuthStore<TStatus extends { loggedIn: boolean }>(api: OAuthApi<TStatus>) {
   return create<OAuthStoreState<TStatus>>((set, get) => {
     let pollTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -80,7 +80,7 @@ export function createOAuthStore<TStatus>(api: OAuthApi<TStatus>) {
             pollTimer = null
             await get().fetchStatus()
             const cur = get().status
-            if (cur && (cur as unknown as { loggedIn: boolean }).loggedIn) {
+            if (cur?.loggedIn) {
               get().stopPolling()
               return
             }
