@@ -16,17 +16,20 @@ bun install
 # 3. 装桌面端依赖（Tauri CLI + React 前端）
 cd desktop && bun install
 
-# 4. 编译 sidecar 二进制（不跑这步，下一步会因 externalBin 缺失而失败）
+# 4. 编译 sidecar 二进制（不跑这步，第 6 步会因 externalBin 缺失而失败）
 bun run build:sidecars
 
-# 5. 启动桌面端开发模式
+# 5. 构建一次前端（生成 desktop/dist，tauri dev 启动时需要它）
+bun run build
+
+# 6. 启动桌面端开发模式
 bun run tauri dev
 
-# 6. 在 issue 列表挑一个带 `good first issue` 或 `help wanted` 标签的任务，
+# 7. 在 issue 列表挑一个带 `good first issue` 或 `help wanted` 标签的任务，
 #    从 main 分支拉一个功能分支
 git checkout main && git checkout -b feat/your-feature
 
-# 7. 写代码 → bun run lint → bun run test → push → 提 PR 到 main 分支
+# 8. 写代码 → bun run lint → bun run test → push → 提 PR 到 main 分支
 ```
 
 👉 **第一次贡献？** 直接看 [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)，每条都有 mentor，可以在 issue 或 PR 里直接 at 他们。
@@ -115,12 +118,14 @@ dreamcoder/
 
 > ⚠️ **平台支持说明**
 >
-> DreamCoder 当前**仅在 Windows x64 上开发与验证**。代码里有 macOS / Linux 的平台分支，
-> 但维护者日常不在这两个平台上跑。如果你在 macOS 或 Linux：
+> DreamCoder 当前**主要在 Windows x64 上开发与验证**。
+> **macOS（Apple Silicon）** 已可从源码运行（`bun run tauri dev`），维护者在开发中使用，
+> 但打包后的 macOS 安装包尚未验证。代码里也有 Linux 的平台分支，但维护者日常不在 Linux 上跑。
+> 如果你在 Linux 上，或者要打包 macOS 应用：
 >
 > - 桌面端**可能**能构建运行，但你可能撞到未验证过的问题
 >   （Linux 内存问题正在 [#25](https://github.com/GoDiao/dreamcoder/issues/25) 调查中）。
-> - Bug 报告和平台修复 PR **非常欢迎** —— 你将是这个平台上的第一位用户。
+> - Bug 报告和平台修复 PR **非常欢迎**。
 > - 如果你是 Linux 首次贡献者，建议先选不需要本地运行的任务（如文档、i18n 字符串修复），
 >   待确认能 build 成功后再啃需要跑应用的活儿。
 
@@ -143,10 +148,15 @@ cd desktop && bun install
 
 # Step 3: 编译 sidecar 二进制
 #   这一步会产物 desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
-#   tauri.conf.json 里 externalBin 指向它，没有的话 step 4 会启动失败。
+#   tauri.conf.json 里 externalBin 指向它，没有的话 step 5 会启动失败。
 bun run build:sidecars
 
-# Step 4: 启动 dev 模式
+# Step 4: 构建一次前端
+#   生成 desktop/dist。tauri.conf.json 把它列为打包资源，
+#   所以即使 dev 模式的界面由 Vite 提供，没有它 step 5 也会启动失败。
+bun run build
+
+# Step 5: 启动 dev 模式
 bun run tauri dev
 ```
 
@@ -154,6 +164,8 @@ bun run tauri dev
 > 99% 是漏跑了 Step 3 `bun run build:sidecars`。
 > 看到 `command not found: tauri` 或 `@tauri-apps/cli` 报错？
 > 99% 是漏跑了 Step 2 `cd desktop && bun install`（Tauri CLI 在 desktop 子包里，根 install 不会装）。
+> 看到 ``resource path `../dist` doesn't exist``？
+> 是漏跑了 Step 4 `bun run build`。
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
 

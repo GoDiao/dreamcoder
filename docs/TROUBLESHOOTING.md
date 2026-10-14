@@ -43,9 +43,9 @@ bun run tauri dev
 
 ### `dist/` folder not found
 
-**Symptom:** Tauri fails to launch because `desktop/dist/` is missing.
+**Symptom:** `bun run tauri dev` fails with ``resource path `../dist` doesn't exist``.
 
-**Cause:** Tauri needs the Vite-built frontend assets. `bun run tauri dev` builds them automatically, but if you're running `cargo tauri` directly or something went wrong with the Vite step, the folder may not exist.
+**Cause:** `tauri.conf.json` bundles `../dist` as a resource, so the folder must exist even in dev mode. `bun run tauri dev` only starts the Vite dev server and does not create it, so a fresh clone needs one `bun run build` first.
 
 **Fix:**
 ```bash

@@ -114,12 +114,12 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 | 平台          | 状态                                          | 预编译安装包                                          |
 |---------------|-----------------------------------------------|-------------------------------------------------------|
 | Windows x64   | ✅ 维护者长期实测                              | v0.4.5 未附安装包；请查看 Releases 或按下文从源码运行     |
-| macOS arm64   | ⚠️ 暂未日常验证（已保留构建脚本）               | ❌ 欢迎社区共同补齐                                    |
+| macOS arm64   | 🟡 从源码运行已实测，打包安装包未验证            | ❌ 欢迎社区共同补齐                                    |
 | Linux x64     | ⚠️ 暂未日常验证                                | ❌ 欢迎社区共同补齐                                    |
 
 > DreamCoder 当前主要围绕 **Windows x64** 持续开发和验证。
-> 代码中已经保留 `#[cfg(target_os = "macos" / "linux")]` 分支，但由于维护者并不日常使用这两个平台，
-> 非 Windows 构建目前仍属于“代码已覆盖、体验待更多实机验证”的状态。
+> **macOS（Apple Silicon）** 已可从源码运行（`bun run tauri dev`），维护者在开发中使用，但打包后的安装包尚未验证。
+> **Linux** 代码中保留了 `#[cfg(target_os = "linux")]` 分支，但维护者并不日常使用，仍属于“代码已覆盖、体验待更多实机验证”的状态。
 > 如果你正在使用 macOS 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
 > 安装包供应情况以 [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) 页面中的实际附件为准。
@@ -148,7 +148,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 ### 安装与运行
 
-> v0.4.5 Release 没有预编译安装包。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**四步建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制或 Tauri CLI 缺失而无法启动。
+> v0.4.5 Release 没有预编译安装包。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**以下步骤建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制、前端构建产物或 Tauri CLI 缺失而无法启动。
 
 ```bash
 # 0. 克隆仓库
@@ -164,7 +164,10 @@ cd desktop && bun install
 # 3. 编译 sidecar 二进制
 bun run build:sidecars
 
-# 4. 启动桌面端开发模式
+# 4. 构建一次前端（生成 desktop/dist；没有它 tauri dev 会报 resource path `../dist` doesn't exist）
+bun run build
+
+# 5. 启动桌面端开发模式
 bun run tauri dev
 ```
 

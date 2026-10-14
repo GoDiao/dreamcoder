@@ -16,17 +16,20 @@ bun install
 # 3. Install desktop deps (Tauri CLI + React frontend)
 cd desktop && bun install
 
-# 4. Compile the sidecar binary (without this, step 5 fails — externalBin can't find it)
+# 4. Compile the sidecar binary (without this, step 6 fails — externalBin can't find it)
 bun run build:sidecars
 
-# 5. Start the desktop app in dev mode
+# 5. Build the frontend once (creates desktop/dist, which tauri dev requires)
+bun run build
+
+# 6. Start the desktop app in dev mode
 bun run tauri dev
 
-# 6. Pick an issue with the `good first issue` or `help wanted` label,
+# 7. Pick an issue with the `good first issue` or `help wanted` label,
 #    create a feature branch from `main`
 git checkout main && git checkout -b feat/your-feature
 
-# 7. Code → bun run lint → bun run test → push → open a PR targeting `main`
+# 8. Code → bun run lint → bun run test → push → open a PR targeting `main`
 ```
 
 👉 **First time?** Browse [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22). Each one has a mentor — feel free to ping them in the issue or PR.
@@ -114,13 +117,15 @@ Provider preset contributions have a focused guide in the website documentation 
 
 > ⚠️ **Platform support note**
 >
-> DreamCoder is currently developed and verified on **Windows x64 only**.
-> The codebase includes platform branches for macOS / Linux but the maintainer does not
-> run those platforms day-to-day. If you're on macOS or Linux:
+> DreamCoder is developed and verified primarily on **Windows x64**.
+> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer
+> during development, but packaged macOS builds are not verified yet.
+> The codebase also includes Linux branches, but the maintainer does not run Linux day-to-day.
+> If you're on Linux, or building a packaged macOS app:
 >
 > - The desktop app **may** build and run, but you may hit untested issues
 >   (see [#25](https://github.com/GoDiao/dreamcoder/issues/25) for an active Linux memory investigation).
-> - Bug reports and platform-fix PRs are **highly welcome** — you'd be the first user on that platform.
+> - Bug reports and platform-fix PRs are **highly welcome**.
 > - For first-time contributors on Linux specifically, consider easier non-runtime tasks
 >   (e.g. docs, i18n string fixes) before you've confirmed your build works.
 
@@ -143,10 +148,15 @@ cd desktop && bun install
 
 # Step 3: compile the sidecar binary
 #   Produces desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
-#   tauri.conf.json's externalBin points at it; step 4 fails to launch without it.
+#   tauri.conf.json's externalBin points at it; step 5 fails to launch without it.
 bun run build:sidecars
 
-# Step 4: launch dev mode
+# Step 4: build the frontend once
+#   Produces desktop/dist. tauri.conf.json bundles it as a resource, so step 5
+#   fails without it even though dev mode serves the UI from Vite.
+bun run build
+
+# Step 5: launch dev mode
 bun run tauri dev
 ```
 
@@ -154,6 +164,8 @@ bun run tauri dev
 > 99% chance you skipped Step 3 `bun run build:sidecars`.
 > Seeing `command not found: tauri` or a `@tauri-apps/cli` error?
 > 99% chance you skipped Step 2 `cd desktop && bun install` (Tauri CLI lives in the desktop sub-package; root install won't pull it in).
+> Seeing ``resource path `../dist` doesn't exist``?
+> You skipped Step 4 `bun run build`.
 >
 > More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 

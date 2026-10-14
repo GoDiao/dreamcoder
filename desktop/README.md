@@ -24,16 +24,19 @@ DreamCoder — AI Coding Agent 桌面应用。DreamSeed 竞赛参赛作品。
 
 ## 系统要求
 
-- Windows 10+ (x64)
-- WebView2 Runtime（Windows 10 较新版本已内置）
-- Git Bash
+- Windows 10+ (x64)：需要 WebView2 Runtime（Windows 10 较新版本已内置）和 Git Bash
+- macOS (Apple Silicon)：可从源码运行，打包安装包尚未验证
+- Linux：尚未日常验证，详见根目录 README 的「平台支持现状」
 
 ## 开发指南
 
 ```bash
 git clone https://github.com/GoDiao/dreamcoder.git
-cd dreamcoder/desktop
-bun install
+cd dreamcoder
+bun install                # 根工作区依赖（sidecar 运行时）
+cd desktop && bun install  # 桌面端依赖（Tauri CLI + React 前端）
+bun run build:sidecars     # 编译 sidecar 二进制
+bun run build              # 构建一次前端，生成 desktop/dist
 bun run tauri dev
 ```
 

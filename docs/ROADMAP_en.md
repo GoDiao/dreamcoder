@@ -4,7 +4,7 @@ English | [简体中文](./ROADMAP_zh.md)
 
 ## Phase 1 — Desktop GUI + Multi-Provider ✅
 
-- [x] Tauri 2 desktop app (primarily validated on Windows x64; macOS/Linux still need device feedback)
+- [x] Tauri 2 desktop app (primarily validated on Windows x64; macOS runs from source, packaged builds and Linux still need device feedback)
 - [x] Multi-provider configuration (Anthropic/OpenAI-compatible endpoints; presets for DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama)
 - [x] Visual settings UI (Providers, API Keys, model mapping)
 - [x] Session management (tabs, sidebar, history search)

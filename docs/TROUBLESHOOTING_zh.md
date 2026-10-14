@@ -43,9 +43,9 @@ bun run tauri dev
 
 ### `dist/` 目录不存在
 
-**现象：** Tauri 启动失败，提示找不到 `desktop/dist/`。
+**现象：** `bun run tauri dev` 报错 ``resource path `../dist` doesn't exist``。
 
-**原因：** Tauri 需要 Vite 构建产物。`bun run tauri dev` 通常会自动构建，但如果直接调 `cargo tauri` 或 Vite 步骤出错，dist 可能缺失。
+**原因：** `tauri.conf.json` 把 `../dist` 列为打包资源，即使是 dev 模式也要求这个目录存在。`bun run tauri dev` 只会启动 Vite 开发服务器，不会生成它，所以全新 clone 的仓库需要先跑一次 `bun run build`。
 
 **解决：**
 ```bash

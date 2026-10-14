@@ -111,12 +111,12 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 | Platform     | Status                                  | Pre-built Installer                                      |
 |--------------|-----------------------------------------|----------------------------------------------------------|
 | Windows x64  | ✅ Maintainer-tested regularly           | No installer attached to v0.4.5; check Releases or run from source below |
-| macOS arm64  | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
+| macOS arm64  | 🟡 Runs from source; packaged builds not verified | ❌ Community help welcome                                 |
 | Linux x64    | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
 
 > DreamCoder is developed and validated primarily on **Windows x64**.
-> The codebase already includes `#[cfg(target_os = "macos" / "linux")]` branches, but those platforms
-> are not part of the maintainer's day-to-day workflow yet, so non-Windows support is still best-effort.
+> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer during development, but packaged macOS builds are not verified yet.
+> **Linux** has `#[cfg(target_os = "linux")]` branches in the codebase, but it is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
 > If you're running DreamCoder on macOS or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
 > Check [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) for the actual assets available with each release.
@@ -145,7 +145,7 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Installation
 
-> Release v0.4.5 does not include a pre-built installer. These steps run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all four steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary or missing Tauri CLI pieces.
+> Release v0.4.5 does not include a pre-built installer. These steps run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary, the frontend build output, or missing Tauri CLI pieces.
 
 ```bash
 # 0. Clone the repo
@@ -161,7 +161,10 @@ cd desktop && bun install
 # 3. Build the sidecar binary
 bun run build:sidecars
 
-# 4. Launch the desktop app in dev mode
+# 4. Build the frontend once (creates desktop/dist; without it tauri dev fails with resource path `../dist` doesn't exist)
+bun run build
+
+# 5. Launch the desktop app in dev mode
 bun run tauri dev
 ```
 
