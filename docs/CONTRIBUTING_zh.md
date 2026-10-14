@@ -157,6 +157,64 @@ bun run tauri dev
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
 
+## 向精选 MCP 注册表添加服务器
+
+DreamCoder 在仓库根目录的 [`mcp-registry.json`](../mcp-registry.json) 中内置一份经过审核的
+小型 MCP 服务器目录。契约定义在
+[`sidecar/mcp-registry/schema.ts`](../sidecar/mcp-registry/schema.ts)。
+
+该目录**不是**用于信任校验的官方 MCP URL 注册表。精选目录只描述 DreamCoder 审核过、且会在本地安装的
+服务器；官方注册表是另一个独立的远端信任来源。
+
+### v1 范围
+
+v1 **仅支持 stdio**。在安装流程能够表达远端传输之前，HTTP 与 SSE 条目不在范围内。
+
+### 条目字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `id` | 是 | 稳定的标识符，小写并以短横线分隔。不得把同一个 id 复用于另一个服务器。 |
+| `name` | 是 | 界面展示名称。 |
+| `description` | 是 | 说明用户能得到什么。描述**作用**而非实现原理。 |
+| `transport` | 是 | v1 中必须为 `stdio`。 |
+| `command` | 是 | 包名或相对路径。拒绝绝对路径与 shell 元字符。 |
+| `args` | 否 | 可引用 `{env:VAR_NAME}` 占位符。 |
+| `env` | 否 | 只声明变量**名称**及取值来源。 |
+| `homepage` | 是 | 项目主页或仓库地址。 |
+| `tags` | 是 | 小写，至少一个。 |
+| `runtime` | 是 | `node`、`bun`、`python`、`uvx` 或 `binary`。 |
+| `version` | 条件必填 | `runtime: binary` 时**必须**填写；`uvx` 建议填写。 |
+
+### 安全规则
+
+- **绝不要提交任何密钥。** `env` 条目只描述需要什么（`name`、`source`、`description`），
+  取值由用户在安装时提供。校验会拒绝携带 `value` 字段、或在 `args` 中夹带令牌形态字符串的条目。
+- **不得使用绝对路径。** `command` 必须是包名或相对路径，避免有人通过修改目录指向用户机器上的
+  任意可执行文件。
+- **尽可能锁定版本。** 未固定版本的 `binary` 条目可能在每次安装时行为不同，因此 v1 要求精确版本号。
+
+### 校验你的条目
+
+```bash
+# 校验内置目录及全部非法条目用例
+bun test ./sidecar/mcp-registry/__tests__/registry.test.ts
+```
+
+校验会一次性收集**全部**问题，并为每条错误给出点分路径（例如 `servers.3.homepage`），
+因此可以一轮改完，而不是每次运行只暴露一个错误。
+
+### 评审要求
+
+- 优先选择 [官方 MCP servers 仓库](https://github.com/modelcontextprotocol/servers)
+  或其他有活跃发版历史的、维护良好的项目。
+- 通过 `uvx` 或以二进制方式安装的服务，务必填写精确 `version`。
+- `description` 面向最终用户撰写：它会直接展示在目录界面上。
+- 每个 PR 提交一个条目（或一小批相关条目），评审更快。
+
+跟踪 issue：[#44](https://github.com/GoDiao/dreamcoder/issues/44) ·
+父 issue：[#12](https://github.com/GoDiao/dreamcoder/issues/12)
+
 ## 许可证
 
 贡献即表示你同意将你的代码以 [MIT License](LICENSE) 授权。

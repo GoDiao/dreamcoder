@@ -157,6 +157,70 @@ bun run tauri dev
 >
 > More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+## Adding an MCP Server to the Curated Registry
+
+DreamCoder ships a small, reviewed catalog of MCP servers in
+[`mcp-registry.json`](../mcp-registry.json) at the repository root. The contract
+lives in [`sidecar/mcp-registry/schema.ts`](../sidecar/mcp-registry/schema.ts).
+
+This catalog is **not** the official MCP URL registry used for trust checks.
+The curated catalog only describes servers DreamCoder has reviewed and will
+install locally; the official registry is a separate, remote source of truth.
+
+### v1 scope
+
+v1 is **stdio only**. HTTP and SSE entries are out of scope until the install
+flow can express remote transports.
+
+### Entry contract
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `id` | yes | Stable, lowercase-dash-separated. Never reuse an id for a different server. |
+| `name` | yes | Display name shown in the UI. |
+| `description` | yes | What the user gets. Say *what* it does, not how. |
+| `transport` | yes | Must be `stdio` in v1. |
+| `command` | yes | Package name or relative path. Absolute paths and shell metacharacters are rejected. |
+| `args` | no | May reference `{env:VAR_NAME}` placeholders. |
+| `env` | no | Declares variable **names** and where the value comes from. |
+| `homepage` | yes | Project homepage or repository URL. |
+| `tags` | yes | Lowercase, at least one. |
+| `runtime` | yes | `node`, `bun`, `python`, `uvx` or `binary`. |
+| `version` | conditional | **Required** for `runtime: binary`; recommended for `uvx`. |
+
+### Security rules
+
+- **Never commit a secret.** `env` entries describe *what* is needed
+  (`name`, `source`, `description`) — the value is supplied by the user at
+  install time. Validation rejects an entry that carries a `value` field or a
+  token-shaped string in `args`.
+- **No absolute paths.** `command` must be a package name or relative path so a
+  catalog edit cannot point at an arbitrary binary on a user's machine.
+- **Pin what you can.** An unpinned `binary` entry can change behaviour on every
+  install, so v1 requires an exact version.
+
+### Validate your entry
+
+```bash
+# validates the whole shipped catalog plus the invalid-entry test cases
+bun test ./sidecar/mcp-registry/__tests__/registry.test.ts
+```
+
+Validation collects **every** problem in one pass and reports a dotted path per
+error (e.g. `servers.3.homepage`), so fix them in a single editing round rather
+than one error per run.
+
+### Review expectations
+
+- Prefer servers from the [official MCP servers repo](https://github.com/modelcontextprotocol/servers)
+  or a well-maintained project with an active release history.
+- Use an exact `version` for anything installed via `uvx` or as a binary.
+- Keep `description` user-facing: it is rendered in the catalog UI.
+- One PR per entry (or a small related batch) keeps review fast.
+
+Tracking issue: [#44](https://github.com/GoDiao/dreamcoder/issues/44) ·
+Parent: [#12](https://github.com/GoDiao/dreamcoder/issues/12)
+
 ## License
 
 By contributing, you agree that your code will be licensed under the [MIT License](LICENSE).
