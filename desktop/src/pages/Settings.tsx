@@ -1,18 +1,7 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import QRCode from 'qrcode'
-import { Copy, Eye, EyeOff, PowerOff, QrCode, RotateCw } from 'lucide-react'
-import { DreamCoderIcon } from '../components/shared/DreamCoderIcon'
-import { useSettingsStore, UI_ZOOM_DEFAULT, UI_ZOOM_MIN, UI_ZOOM_MAX, UI_ZOOM_STEP } from '../stores/settingsStore'
+import { useState, useEffect } from 'react'
 import { useTranslation } from '../i18n'
-import { Modal } from '../components/shared/Modal'
-import { ConfirmDialog } from '../components/shared/ConfirmDialog'
-import { Input } from '../components/shared/Input'
-import { Button } from '../components/shared/Button'
-import { Dropdown } from '../components/shared/Dropdown'
-import type { PermissionMode, EffortLevel, ThemeMode, UpdateProxyMode, NetworkProxyMode, WebSearchMode, AppMode } from '../types/settings'
-import type { Locale } from '../i18n'
-import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../types/provider'
-import type { ProviderPreset } from '../types/providerPreset'
+import { useSettingsStore } from '../stores/settingsStore'
+import type { PermissionMode } from '../types/settings'
 import { AdapterSettings } from './AdapterSettings'
 import { usePluginStore } from '../stores/pluginStore'
 import { PluginList } from '../components/plugins/PluginList'
@@ -25,31 +14,11 @@ import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { ActivitySettings } from './ActivitySettings'
 import { MemorySettings } from './MemorySettings'
 import { useUIStore, type SettingsTab } from '../stores/uiStore'
-import { ProxyConfigForm } from '../components/settings/ProxyConfigForm'
 import { GeneralSettings } from '../components/settings/GeneralSettings'
 import { ProviderSettings } from '../components/settings/ProviderSettings'
-import { ProviderFormModal } from '../components/settings/ProviderFormModal'
-import {
-  getDesktopNotificationPermission,
-  notifyDesktop,
-  openDesktopNotificationSettings,
-  requestDesktopNotificationPermission,
-  type DesktopNotificationPermission,
-} from '../lib/desktopNotifications'
-import {
-  API_KEY_JSON_PLACEHOLDER,
-  maskSettingsJsonSecrets,
-  restoreSettingsJsonSecrets,
-  stripProviderSettingsJsonEnv,
-} from '../lib/providerSettingsJson'
-import { copyTextToClipboard } from '../components/chat/clipboard'
 import { AgentsSettings } from '../components/settings/AgentsSettings'
 import { SkillSettings } from '../components/settings/SkillSettings'
 import { AboutSettings } from '../components/settings/AboutSettings'
-
-const NETWORK_TIMEOUT_MIN_SECONDS = 5
-const NETWORK_TIMEOUT_MAX_SECONDS = 600
-const NETWORK_TIMEOUT_STEP_SECONDS = 30
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('providers')

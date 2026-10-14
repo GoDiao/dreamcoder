@@ -80,7 +80,7 @@ export function createOAuthStore<TStatus>(api: OAuthApi<TStatus>) {
             pollTimer = null
             await get().fetchStatus()
             const cur = get().status
-            if (cur && (cur as { loggedIn: boolean }).loggedIn) {
+            if (cur && (cur as unknown as { loggedIn: boolean }).loggedIn) {
               get().stopPolling()
               return
             }
