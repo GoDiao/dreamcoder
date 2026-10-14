@@ -680,12 +680,12 @@ describe('settingsStore desktop terminal shell persistence', () => {
     window.localStorage.clear()
   })
 
-  it('hydrates desktop terminal settings from user settings and falls back to system defaults', async () => {
+  it.each(['pwsh', 'zsh', 'bash', 'fish'] as const)('hydrates the %s terminal preference from user settings', async (startupShell) => {
     vi.doMock('../api/settings', () => ({
       settingsApi: {
         getUser: vi.fn().mockResolvedValue({
           desktopTerminal: {
-            startupShell: 'pwsh',
+            startupShell,
             customShellPath: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
           },
         }),
@@ -731,12 +731,12 @@ describe('settingsStore desktop terminal shell persistence', () => {
     await useSettingsStore.getState().fetchAll()
 
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
-      startupShell: 'pwsh',
+      startupShell,
       customShellPath: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
     })
   })
 
-  it('persists desktop terminal settings explicitly', async () => {
+  it.each(['custom', 'zsh', 'bash', 'fish'] as const)('persists the %s desktop terminal setting explicitly', async (startupShell) => {
     const updateUser = vi.fn().mockResolvedValue({ ok: true })
 
     vi.doMock('../api/settings', () => ({
@@ -777,18 +777,18 @@ describe('settingsStore desktop terminal shell persistence', () => {
     const { useSettingsStore } = await import('./settingsStore')
 
     await useSettingsStore.getState().setDesktopTerminal({
-      startupShell: 'custom',
+      startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
     })
 
     expect(updateUser).toHaveBeenCalledWith({
       desktopTerminal: {
-        startupShell: 'custom',
+        startupShell,
         customShellPath: 'C:\\tools\\pwsh.exe',
       },
     })
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
-      startupShell: 'custom',
+      startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
     })
   })

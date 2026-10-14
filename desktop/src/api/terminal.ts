@@ -4,6 +4,7 @@ export type TerminalSpawnResult = {
   session_id: number
   shell: string
   cwd: string
+  warning?: string | null
 }
 
 export type TerminalOutputPayload = {
@@ -15,6 +16,11 @@ export type TerminalExitPayload = {
   session_id: number
   code: number
   signal?: string | null
+}
+
+export type TerminalShellDetection = {
+  shell: string
+  platform: 'windows' | 'macos' | 'linux'
 }
 
 type Unlisten = () => void
@@ -54,6 +60,10 @@ export const terminalApi = {
   async onExit(handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
     const events = await import('@tauri-apps/api/event')
     return events.listen<TerminalExitPayload>('terminal-exit', (event) => handler(event.payload))
+  },
+
+  detectDefaultShell() {
+    return invoke<TerminalShellDetection>('detect_default_terminal_shell')
   },
 
   getBashPath() {

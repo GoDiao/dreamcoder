@@ -29,6 +29,7 @@ const terminalMocks = vi.hoisted(() => {
     kill: vi.fn(),
     onOutput: vi.fn(),
     onExit: vi.fn(),
+    detectDefaultShell: vi.fn(),
     getBashPath: vi.fn(),
     setBashPath: vi.fn(),
   }
@@ -51,6 +52,7 @@ vi.mock('../api/terminal', () => ({
     kill: terminalMocks.kill,
     onOutput: terminalMocks.onOutput,
     onExit: terminalMocks.onExit,
+    detectDefaultShell: terminalMocks.detectDefaultShell,
     getBashPath: terminalMocks.getBashPath,
     setBashPath: terminalMocks.setBashPath,
   },
@@ -76,6 +78,7 @@ describe('TerminalSettings', () => {
     terminalMocks.kill.mockReset()
     terminalMocks.onOutput.mockReset()
     terminalMocks.onExit.mockReset()
+    terminalMocks.detectDefaultShell.mockImplementation(async () => ({ shell: '/bin/zsh', platform: /Win/i.test(navigator.platform) ? 'windows' : 'macos' }))
     terminalMocks.getBashPath.mockReset()
     terminalMocks.setBashPath.mockReset()
     terminalMocks.terminalInstance.loadAddon.mockClear()
@@ -232,17 +235,24 @@ describe('TerminalSettings', () => {
     destroyTerminalRuntime('shared-runtime')
   })
 
-  it('shows Windows-only startup shell controls in settings mode', () => {
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      platform: 'Win32',
-      userAgent: 'Windows',
-    })
-
+  it('keeps the shell preference editor on the General page only', () => {
     render(<TerminalSettings showPreferences />)
+    expect(screen.queryByText('Startup shell')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save shell' })).not.toBeInTheDocument()
+  })
 
-    expect(screen.getAllByText('Startup shell')).toHaveLength(2)
-    expect(screen.getByText('Use for new terminal sessions and after restart.')).toBeInTheDocument()
+  it('shows fallback details while keeping the terminal running and clears them on restart', async () => {
+    terminalMocks.available = true
+    terminalMocks.spawn.mockResolvedValueOnce({
+      session_id: 7, shell: '/bin/zsh', cwd: '/Users/test', warning: 'terminal shell fish is not installed or executable',
+    })
+    render(<TerminalSettings />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Your preferred shell is unavailable. Using /bin/zsh for this session.')
+    expect(screen.getByRole('status')).toHaveTextContent('fish is not installed')
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Restart$/ }))
+    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('saves a custom Windows bash path from the terminal settings panel', async () => {

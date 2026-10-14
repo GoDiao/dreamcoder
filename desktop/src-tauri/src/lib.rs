@@ -14,6 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod terminal_shell;
+
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::menu::MenuBuilder;
@@ -426,6 +428,7 @@ struct TerminalSpawnResult {
     session_id: u32,
     shell: String,
     cwd: String,
+    warning: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -916,7 +919,7 @@ fn terminal_spawn(
     cwd: Option<String>,
 ) -> Result<TerminalSpawnResult, String> {
     let cwd_path = resolve_terminal_cwd(cwd)?;
-    let shell = resolved_terminal_shell(&app)?;
+    let selection = resolved_terminal_shell(&app);
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -927,18 +930,11 @@ fn terminal_spawn(
         })
         .map_err(|err| format!("open terminal pty: {err}"))?;
 
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.cwd(cwd_path.as_os_str());
-    for (key, value) in terminal_environment(&shell) {
-        cmd.env(key, value);
-    }
-    cmd.env("TERM", "xterm-256color");
-    cmd.env("COLORTERM", "truecolor");
-
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|err| format!("spawn terminal shell: {err}"))?;
+    let (mut child, selection) = terminal_shell::spawn_with_fallback(selection, |shell| {
+        pair.slave.spawn_command(build_terminal_command(shell, &cwd_path))
+    })?;
+    let shell = selection.shell;
+    let warning = selection.warning;
     drop(pair.slave);
 
     let mut reader = pair
@@ -1039,6 +1035,7 @@ fn terminal_spawn(
         session_id,
         shell,
         cwd: cwd_path.to_string_lossy().to_string(),
+        warning,
     })
 }
 
@@ -1114,6 +1111,27 @@ fn terminal_kill(state: State<'_, TerminalState>, session_id: u32) -> Result<(),
             .map_err(|err| format!("kill terminal shell: {err}"))?;
     }
     Ok(())
+}
+
+#[derive(Serialize)]
+struct TerminalShellDetection {
+    shell: String,
+    platform: &'static str,
+}
+
+#[tauri::command]
+fn detect_default_terminal_shell(app: AppHandle) -> TerminalShellDetection {
+    let config = TerminalConfig::load(&app);
+    TerminalShellDetection {
+        shell: default_shell(config.bash_path.as_deref()),
+        platform: if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        },
+    }
 }
 
 #[tauri::command]
@@ -1222,9 +1240,24 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
     output
 }
 
+fn build_terminal_command(shell: &str, cwd: &Path) -> CommandBuilder {
+    // Preserve interactive non-login startup (for example, bash reads .bashrc).
+    // login_shell_environment already captures the login environment once.
+    let mut cmd = CommandBuilder::new(shell);
+    cmd.cwd(cwd.as_os_str());
+    for (key, value) in terminal_environment(shell) {
+        cmd.env(key, value);
+    }
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd
+}
+
 fn terminal_environment(shell: &str) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = std::env::vars().collect();
     env.extend(login_shell_environment(shell));
+    #[cfg(unix)]
+    env.insert("SHELL".to_string(), shell.to_string());
     ensure_utf8_locale(&mut env);
     env
 }
@@ -1371,14 +1404,14 @@ fn read_desktop_terminal_config() -> Option<DesktopTerminalConfig> {
     settings.desktop_terminal
 }
 
-fn resolved_terminal_shell(app: &AppHandle) -> Result<String, String> {
+fn resolved_terminal_shell(app: &AppHandle) -> terminal_shell::ShellSelection {
     let terminal_config = TerminalConfig::load(app);
     let system_default = default_shell(terminal_config.bash_path.as_deref());
     let platform = current_terminal_host_platform();
     let configured = read_desktop_terminal_config();
     let override_shell =
-        resolve_desktop_terminal_shell(platform, configured.as_ref(), &system_default)?;
-    Ok(override_shell.unwrap_or(system_default))
+        resolve_desktop_terminal_shell(platform, configured.as_ref(), &system_default);
+    terminal_shell::select_shell(system_default, override_shell)
 }
 
 fn current_terminal_host_platform() -> TerminalHostPlatform {
@@ -1397,10 +1430,6 @@ fn resolve_desktop_terminal_shell(
     config: Option<&DesktopTerminalConfig>,
     _system_default: &str,
 ) -> Result<Option<String>, String> {
-    if platform != TerminalHostPlatform::Windows {
-        return Ok(None);
-    }
-
     let Some(config) = config else {
         return Ok(None);
     };
@@ -1408,6 +1437,19 @@ fn resolve_desktop_terminal_shell(
     let Some(startup_shell) = config.startup_shell.as_deref().map(str::trim) else {
         return Ok(None);
     };
+
+    if platform == TerminalHostPlatform::Posix {
+        let dirs = terminal_shell::shell_search_dirs(
+            cfg!(target_os = "macos"),
+            std::env::var_os("PATH").as_deref(),
+        );
+        return terminal_shell::resolve_posix_override(
+            startup_shell,
+            config.custom_shell_path.as_deref(),
+            &dirs,
+            terminal_shell::is_executable,
+        );
+    }
 
     match startup_shell {
         "" | "system" => Ok(None),
@@ -1458,13 +1500,21 @@ fn default_shell(_custom_bash: Option<&str>) -> String {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        std::env::var("SHELL").unwrap_or_else(|_| {
-            if PathBuf::from("/bin/zsh").exists() {
-                "/bin/zsh".to_string()
-            } else {
-                "/bin/bash".to_string()
-            }
-        })
+        let env_shell = std::env::var("SHELL").ok();
+        let account_shell = if env_shell
+            .as_deref()
+            .is_some_and(|shell| terminal_shell::is_executable(shell.trim()))
+        {
+            None
+        } else {
+            terminal_shell::account_shell()
+        };
+        terminal_shell::detect_posix_shell(
+            cfg!(target_os = "macos"),
+            env_shell.as_deref(),
+            account_shell.as_deref(),
+            terminal_shell::is_executable,
+        )
     }
 }
 
@@ -1855,14 +1905,24 @@ fn kill_windows_sidecars() {
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_terminal_output, default_utf8_locale, ensure_utf8_locale,
+        build_terminal_command, decode_terminal_output, default_utf8_locale, ensure_utf8_locale,
         dir_has_portable_data, has_meaningful_intersection, is_persistable_window_state,
         normalize_terminal_bash_path, parse_env_block, resolve_desktop_terminal_shell,
         resolve_terminal_cwd, run_notification_bridge,
         select_h5_dist_dir, DesktopTerminalConfig, StoredWindowState, TerminalHostPlatform,
         SERVER_BIND_HOST, SERVER_CONTROL_HOST,
     };
-    use std::{collections::HashMap, fs};
+    use std::{collections::HashMap, fs, path::Path};
+
+    #[cfg(unix)]
+    #[test]
+    fn terminal_command_keeps_non_login_startup_for_supported_shells() {
+        for shell in ["/missing/bash", "/missing/zsh", "/missing/fish"] {
+            let cmd = build_terminal_command(shell, Path::new("/tmp"));
+            assert_eq!(cmd.get_argv(), &[std::ffi::OsString::from(shell)]);
+            assert_eq!(cmd.get_env("SHELL"), Some(std::ffi::OsStr::new(shell)));
+        }
+    }
 
     #[test]
     fn window_state_rejects_too_small_sizes() {
@@ -2112,6 +2172,27 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn desktop_terminal_shell_resolution_applies_posix_preferences() {
+        let bash = DesktopTerminalConfig {
+            startup_shell: Some("bash".to_string()),
+            custom_shell_path: None,
+        };
+        let resolved = resolve_desktop_terminal_shell(
+            TerminalHostPlatform::Posix, Some(&bash), "/bin/zsh",
+        ).expect("bash should resolve").expect("explicit override");
+        assert_eq!(Path::new(&resolved).file_name().unwrap(), "bash");
+
+        let custom = DesktopTerminalConfig {
+            startup_shell: Some("custom".to_string()),
+            custom_shell_path: Some(" /bin/sh ".to_string()),
+        };
+        assert_eq!(resolve_desktop_terminal_shell(
+            TerminalHostPlatform::Posix, Some(&custom), "/bin/zsh",
+        ).unwrap(), Some("/bin/sh".to_string()));
+    }
+
     #[test]
     fn server_sidecar_binds_lan_but_reports_loopback_control_url() {
         assert_eq!(SERVER_BIND_HOST, "0.0.0.0");
@@ -2175,6 +2256,7 @@ pub fn run() {
             terminal_write,
             terminal_resize,
             terminal_kill,
+            detect_default_terminal_shell,
             get_terminal_bash_path,
             set_terminal_bash_path,
             macos_notification_permission_state,

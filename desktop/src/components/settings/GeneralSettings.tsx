@@ -11,6 +11,7 @@ import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
+import { TerminalShellSettings } from './TerminalShellSettings'
 import { ProxyConfigForm } from './ProxyConfigForm'
 import {
   getDesktopNotificationPermission,
@@ -636,6 +637,12 @@ export function GeneralSettings() {
           )}
         </div>
       </div>
+
+      {isTauriRuntime() && (
+        <div className="mt-8">
+          <TerminalShellSettings />
+        </div>
+      )}
 
       {uiZoomSection}
 

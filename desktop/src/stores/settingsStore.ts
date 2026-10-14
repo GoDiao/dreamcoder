@@ -610,6 +610,9 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 function isDesktopTerminalStartupShell(value: unknown): value is DesktopTerminalStartupShell {
   return value === 'system'
+    || value === 'zsh'
+    || value === 'bash'
+    || value === 'fish'
     || value === 'pwsh'
     || value === 'powershell'
     || value === 'cmd'

@@ -18,6 +18,7 @@ export type TerminalRuntime = {
   dataDisposable: IDisposable | null
   status: TerminalStatus
   error: string | null
+  warning: string | null
   shellInfo: TerminalShellInfo | null
   listeners: Set<() => void>
 }
@@ -54,6 +55,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
     dataDisposable: null,
     status: initialStatus,
     error: null,
+    warning: null,
     shellInfo: null,
     listeners: new Set(),
   }
@@ -64,7 +66,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
 
 export function updateTerminalRuntime(
   runtime: TerminalRuntime,
-  patch: Partial<Pick<TerminalRuntime, 'terminal' | 'fit' | 'nativeSessionId' | 'status' | 'error' | 'shellInfo'>>,
+  patch: Partial<Pick<TerminalRuntime, 'terminal' | 'fit' | 'nativeSessionId' | 'status' | 'error' | 'warning' | 'shellInfo'>>,
 ) {
   Object.assign(runtime, patch)
   notifyTerminalRuntime(runtime)
