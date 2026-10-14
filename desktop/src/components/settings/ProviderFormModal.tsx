@@ -1,6 +1,4 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react'
-import QRCode from 'qrcode'
-import { Copy, Eye, EyeOff } from 'lucide-react'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
@@ -11,7 +9,6 @@ import { getPresetDisplayName } from './presetDisplayName'
 import { Dropdown } from '../shared/Dropdown'
 import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
-import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import {
   API_KEY_JSON_PLACEHOLDER,
   maskSettingsJsonSecrets,
