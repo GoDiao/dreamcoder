@@ -20,8 +20,6 @@ import {
 } from '../../lib/providerSettingsJson'
 import { openExternalUrl } from '../../lib/externalUrl'
 
-// ─── Types & Constants ──────────────────────────────────────
-
 type ProviderFormProps = {
   open: boolean
   onClose: () => void
@@ -285,8 +283,6 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
   }
 }
 
-// ─── ProviderFormModal Component ────────────────────────────
-
 function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }: ProviderFormProps) {
   const { createProvider, updateProvider, testConfig } = useProviderStore()
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
@@ -333,9 +329,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [settingsJsonError, setSettingsJsonError] = useState<string | null>(null)
   const jsonPastedRef = useRef(false)
 
-  // Load current settings.json and merge provider env vars
   useEffect(() => {
-    // Skip if JSON was just populated by user paste
     if (jsonPastedRef.current) {
       jsonPastedRef.current = false
       return
@@ -371,7 +365,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         setSettingsJson(JSON.stringify({}, null, 2))
       })
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPreset.id])
 
   const handlePresetChange = (preset: ProviderPreset) => {
@@ -524,15 +517,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     const parsedModelContextWindows = buildModelContextWindows(models, modelContextInputs)
     setIsSubmitting(true)
     try {
-      // Write the edited dreamcoder settings.json first so provider-specific model
-      // settings never conflict with the user's global ~/.claude/settings.json.
       if (settingsJson.trim()) {
         try {
           const parsed = restoreSettingsJsonSecrets(JSON.parse(settingsJson), settingsJson, apiKey)
           const { providersApi } = await import('../../api/providers')
           await providersApi.updateSettings(parsed)
         } catch {
-          // JSON validation already prevents this
         }
       }
 
@@ -622,7 +612,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       }
     >
       <div className="flex flex-col gap-4">
-        {/* Preset chips */}
         {mode === 'create' && (
           <div>
             <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.preset')}</label>
@@ -645,7 +634,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
 
         <Input label={t('settings.providers.baseUrl')} required value={baseUrl} onChange={(e) => handleBaseUrlChange(e.target.value)} placeholder={t('settings.providers.baseUrlPlaceholder')} />
 
-        {/* API Format */}
         {(isCustom || mode === 'edit') ? (
           <div>
             <label className="text-sm font-medium text-[var(--color-text-primary)] mb-1 block">{t('settings.providers.apiFormat')}</label>
@@ -757,7 +745,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           </div>
         )}
 
-        {/* Model Mapping */}
         <div>
           <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.modelMapping')}</label>
           <div className="grid grid-cols-2 gap-2">
@@ -858,7 +845,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           )}
         </div>
 
-        {/* Test connection */}
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="sm" onClick={handleTest} loading={isTesting} disabled={!baseUrl.trim() || !models.main.trim()}>
             {t('settings.providers.testConnection')}
@@ -881,7 +867,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           )}
         </div>
 
-        {/* Settings JSON — editable, shown for all presets including official */}
         <div>
           <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.settingsJson')}</label>
           <textarea
@@ -892,12 +877,10 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                 const parsed = restoreSettingsJsonSecrets(JSON.parse(raw), settingsJson, apiKey)
                 setSettingsJson(JSON.stringify(parsed, null, 2))
                 setSettingsJsonError(null)
-                // Auto-fill form fields from parsed JSON env
                 const env = parsed.env as Record<string, string> | undefined
                 if (env) {
                   if (env.ANTHROPIC_BASE_URL) {
                     setBaseUrl(env.ANTHROPIC_BASE_URL)
-                    // Auto-switch to matching preset or Custom
                     if (mode === 'create') {
                       const matchedPreset = availablePresets.find((p) => p.id !== 'custom' && p.baseUrl === env.ANTHROPIC_BASE_URL)
                       const targetPreset = requirePreset(

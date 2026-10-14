@@ -98,7 +98,6 @@ export class DiagnosticsService {
       }
       await this.enforceRetention().catch(() => {})
     } catch {
-      // Diagnostics must never break the product path.
     }
   }
 

@@ -1,14 +1,3 @@
-/**
- * Diagnostics REST API
- *
- * GET    /api/diagnostics/status       — log directory, retention and counters
- * GET    /api/diagnostics/events       — recent sanitized diagnostic events
- * POST   /api/diagnostics/events       — append a sanitized client diagnostic event
- * POST   /api/diagnostics/export       — write a sanitized tar.gz bundle
- * POST   /api/diagnostics/open-log-dir — open the diagnostics directory
- * DELETE /api/diagnostics              — clear diagnostics files
- */
-
 import { diagnosticsService } from '../services/diagnosticsService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 

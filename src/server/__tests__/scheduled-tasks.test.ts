@@ -1,15 +1,9 @@
-/**
- * Unit tests for CronService, SearchService, and Scheduled Tasks API
- */
-
 import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import { CronService } from '../services/cronService.js'
 import { SearchService } from '../services/searchService.js'
-
-// ─── Test helpers ───────────────────────────────────────────────────────────
 
 let tmpDir: string
 const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
@@ -24,11 +18,8 @@ async function cleanupTmpDir(dir: string): Promise<void> {
   try {
     await fs.rm(dir, { recursive: true, force: true })
   } catch {
-    // ignore
   }
 }
-
-// ─── CronService tests ─────────────────────────────────────────────────────
 
 describe('CronService', () => {
   let service: CronService
@@ -61,7 +52,7 @@ describe('CronService', () => {
     })
 
     expect(task.id).toBeDefined()
-    expect(task.id).toHaveLength(8) // 4 bytes hex
+    expect(task.id).toHaveLength(8)
     expect(task.cron).toBe('0 9 * * *')
     expect(task.prompt).toBe('Review commits')
     expect(task.recurring).toBe(true)
@@ -176,8 +167,6 @@ describe('CronService', () => {
   })
 })
 
-// ─── SearchService tests ────────────────────────────────────────────────────
-
 describe('SearchService', () => {
   let service: SearchService
   let searchDir: string
@@ -187,7 +176,6 @@ describe('SearchService', () => {
     process.env.CLAUDE_CONFIG_DIR = tmpDir
     service = new SearchService()
 
-    // 创建搜索用的临时文件
     searchDir = path.join(tmpDir, 'workspace')
     await fs.mkdir(searchDir, { recursive: true })
     await fs.writeFile(
@@ -223,7 +211,6 @@ describe('SearchService', () => {
   })
 
   it('should respect maxResults limit', async () => {
-    // 写入多行匹配
     const lines = Array.from({ length: 50 }, (_, i) => `match line ${i}`).join(
       '\n',
     )
@@ -246,10 +233,7 @@ describe('SearchService', () => {
   })
 })
 
-// ─── Scheduled Tasks API integration ────────────────────────────────────────
-
 describe('Scheduled Tasks API', () => {
-  // 直接测试 handler 函数，不需要启动完整服务器
   let handleScheduledTasksApi: (
     req: Request,
     url: URL,
@@ -260,7 +244,6 @@ describe('Scheduled Tasks API', () => {
     tmpDir = await createTmpDir()
     process.env.CLAUDE_CONFIG_DIR = tmpDir
 
-    // 动态导入以获取最新的环境变量
     const mod = await import('../api/scheduled-tasks.js')
     handleScheduledTasksApi = mod.handleScheduledTasksApi
   })
@@ -316,7 +299,6 @@ describe('Scheduled Tasks API', () => {
   })
 
   it('should CRUD a full lifecycle', async () => {
-    // Create
     const createReq = new Request('http://localhost/api/scheduled-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -331,7 +313,6 @@ describe('Scheduled Tasks API', () => {
       task: { id: string; prompt: string }
     }
 
-    // Update
     const updateReq = new Request(
       `http://localhost/api/scheduled-tasks/${task.id}`,
       {
@@ -350,7 +331,6 @@ describe('Scheduled Tasks API', () => {
     }
     expect(updated.task.prompt).toBe('Updated task')
 
-    // Delete
     const deleteReq = new Request(
       `http://localhost/api/scheduled-tasks/${task.id}`,
       { method: 'DELETE' },
@@ -362,7 +342,6 @@ describe('Scheduled Tasks API', () => {
     )
     expect(deleteResp.status).toBe(200)
 
-    // Verify empty
     const listReq = new Request('http://localhost/api/scheduled-tasks', {
       method: 'GET',
     })

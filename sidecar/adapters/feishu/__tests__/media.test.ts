@@ -10,8 +10,6 @@ function makeMockClient() {
     im: {
       messageResource: {
         get: mock(async () => ({
-          // node-sdk returns an object with a `.writeFile(path)` helper
-          // that dumps the underlying stream. We fake that here.
           writeFile: async (target: string) => {
             await fs.writeFile(target, Buffer.from('DOWNLOADED'))
           },

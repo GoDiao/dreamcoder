@@ -1,16 +1,3 @@
-/**
- * DreamCoder 桌面端合并 sidecar 入口。
- *
- * 把所有运行模式合并到同一个二进制里，调用方通过
- * 第一个 positional 参数选择模式：
- *
- *   dreamcoder-sidecar server   --app-root <path> --host 127.0.0.1 --port 12345
- *   dreamcoder-sidecar cli      --app-root <path> [其它 CLI 参数...]
- *   dreamcoder-sidecar adapters --app-root <path> [--feishu] [--telegram] [--wechat] [--dingtalk]
- *
- * 注意：adapter 模式在 MVP 阶段不可用（Phase 3）。
- */
-
 import { parseLauncherArgs, resolveSidecarInvocation } from './launcherRouting'
 import { PARENT_PID_ENV, parseParentPid, startParentWatchdog } from './parentWatchdog'
 
@@ -47,9 +34,6 @@ if (mode === 'adapters') {
 }
 
 async function runAdapters(rawArgs: string[]): Promise<void> {
-  // MVP: adapter support is not available (Phase 3).
-  // Keep the function signature for interface compatibility,
-  // but report that this mode is not yet supported.
   console.error('[dreamcoder-sidecar] adapter mode is not available in DreamCoder MVP (Phase 3)')
   process.exit(1)
 }

@@ -22,9 +22,7 @@ const MODE_ICONS: Record<PermissionMode, string> = {
 type Props = {
   workDir?: string
   compact?: boolean
-  /** Controlled mode: override current value */
   value?: PermissionMode
-  /** Controlled mode: called on change instead of updating global store */
   onChange?: (mode: PermissionMode) => void
 }
 
@@ -228,7 +226,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
         )
       )}
 
-      {/* Bypass confirmation dialog */}
       {confirmMounted && createPortal(
         <div className={`motion-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isMobile ? 'px-4' : 'pl-[var(--sidebar-width)] pr-4'}`} data-state={confirmVisible ? 'open' : 'closed'} onClick={closeConfirmDialog}>
           <div
@@ -236,7 +233,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
             data-state={confirmVisible ? 'open' : 'closed'}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center gap-3 px-5 py-4 bg-[var(--color-error)]/8 border-b border-[var(--color-error)]/15">
               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--color-error)]/12">
                 <span className="material-symbols-outlined text-[22px] text-[var(--color-error)]">warning</span>
@@ -247,7 +243,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
               </div>
             </div>
 
-            {/* Body */}
             <div className="px-5 py-4">
               <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed mb-3" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t('permMode.enableBypassBody')) }} />
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--color-surface-container)] border border-[var(--color-border)]" title={workDir}>
@@ -270,7 +265,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
               </ul>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
               <button
                 onClick={closeConfirmDialog}

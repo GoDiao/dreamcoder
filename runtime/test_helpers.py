@@ -18,7 +18,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-# Determine which helper to test based on current platform
 IS_WINDOWS = sys.platform == "win32"
 IS_MACOS = sys.platform == "darwin"
 
@@ -32,11 +31,8 @@ class TestKeyMap(unittest.TestCase):
 
     def _load_key_map(self, helper_path: Path) -> dict[str, str]:
         """Extract KEY_MAP from a helper by importing it with mocked deps."""
-        # Read the file and extract just the KEY_MAP dict
         source = helper_path.read_text()
-        # Find KEY_MAP definition
         start = source.index("KEY_MAP = {")
-        # Find the matching closing brace
         depth = 0
         for i, ch in enumerate(source[start:], start):
             if ch == "{":
@@ -66,11 +62,9 @@ class TestKeyMap(unittest.TestCase):
         km = self._load_key_map(WIN_HELPER)
         self.assertIn("cmd", km)
         self.assertIn("ctrl", km)
-        # Windows maps cmd/command/meta to 'win' key
         self.assertEqual(km["cmd"], "win")
         self.assertEqual(km["command"], "win")
         self.assertEqual(km["meta"], "win")
-        # Windows maps alt/option to 'alt'
         self.assertEqual(km["alt"], "alt")
         self.assertEqual(km["option"], "alt")
 
@@ -80,7 +74,6 @@ class TestKeyMap(unittest.TestCase):
             self.skipTest("Both helpers required")
         mac_km = self._load_key_map(MAC_HELPER)
         win_km = self._load_key_map(WIN_HELPER)
-        # All keys in mac should be in win and vice versa
         self.assertEqual(set(mac_km.keys()), set(win_km.keys()),
                          "KEY_MAP keys must be identical across platforms")
 
@@ -169,9 +162,6 @@ class TestJSONProtocol(unittest.TestCase):
         helper = self._get_helper()
         if not helper.exists():
             self.skipTest("No helper found")
-        # On macOS without venv, mac_helper.py may fail at import (AppKit);
-        # on Windows without venv, win_helper.py may fail at import (win32gui).
-        # Only test if the helper can actually import.
         check = subprocess.run(
             [sys.executable, "-c", f"import importlib.util; "
              f"spec = importlib.util.spec_from_file_location('h', '{helper}')"],
@@ -182,9 +172,7 @@ class TestJSONProtocol(unittest.TestCase):
             capture_output=True, text=True
         )
         if result.returncode == 1 and not result.stdout.strip():
-            # Import failed — platform deps missing, skip this test
             self.skipTest(f"Cannot run {helper.name} on this platform (missing deps)")
-        # Should exit with code 2
         self.assertEqual(result.returncode, 2)
         parsed = json.loads(result.stdout.strip())
         self.assertFalse(parsed["ok"])
@@ -225,16 +213,11 @@ class TestWinHelperPermissions(unittest.TestCase):
         if not WIN_HELPER.exists():
             self.skipTest("win_helper.py not found")
 
-        # Extract and exec just the check_permissions function
         source = WIN_HELPER.read_text()
 
-        # Find the function
         self.assertIn("def check_permissions()", source)
 
-        # The function should return both as True
-        # We can verify by reading the source
         start = source.index("def check_permissions()")
-        # Find next def or end
         rest = source[start:]
         lines = rest.split("\n")
         func_lines = [lines[0]]
@@ -297,11 +280,9 @@ class TestCrossPlatformFunctions(unittest.TestCase):
         lines = rest.split("\n")
         func_lines = [lines[0]]
         for line in lines[1:]:
-            # Stop at next top-level def/class or non-indented non-empty line
             stripped = line.strip()
             if line and not line[0].isspace() and stripped and not stripped.startswith("#"):
                 break
-            # Skip comments and blank lines for comparison
             if stripped.startswith("#") or not stripped:
                 continue
             func_lines.append(line)

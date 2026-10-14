@@ -1,16 +1,3 @@
-/**
- * markdown-style 单元测试
- *
- * 覆盖:
- * - 标题降级 (H1~H3 workaround)
- * - 代码块保护
- * - 空行压缩
- * - Schema 2.0: 连续标题/表格/代码块 <br> 间距
- * - stripInvalidImageKeys
- * - sanitizeTextForCard (表格数限制)
- * - findMarkdownTablesOutsideCodeBlocks
- */
-
 import { describe, it, expect } from 'bun:test'
 import {
   optimizeMarkdownForFeishu,
@@ -19,12 +6,7 @@ import {
   FEISHU_CARD_TABLE_LIMIT,
 } from '../markdown-style.js'
 
-// 默认 cardVersion=2 的 shortcut
 const opt = (text: string, v?: number) => optimizeMarkdownForFeishu(text, v)
-
-// ---------------------------------------------------------------------------
-// 标题降级
-// ---------------------------------------------------------------------------
 
 describe('optimizeMarkdownForFeishu: 标题降级', () => {
   it('H1 → H4 (cardVersion=1 简化检查)', () => {
@@ -44,7 +26,6 @@ describe('optimizeMarkdownForFeishu: 标题降级', () => {
   })
 
   it('纯 H4 文档不触发降级 (cardVersion=1)', () => {
-    // 触发条件: 原文必须有 H1~H3
     expect(opt('#### Already H4', 1)).toBe('#### Already H4')
   })
 
@@ -57,7 +38,6 @@ describe('optimizeMarkdownForFeishu: 标题降级', () => {
   })
 
   it('顺序保证: # 降成 #### 后不会被 #{2,6} 再次吃成 #####', () => {
-    // openclaw-lark 源码里的关键注释：顺序不能颠倒
     expect(opt('# Top', 1)).toBe('#### Top')
   })
 
@@ -71,10 +51,6 @@ describe('optimizeMarkdownForFeishu: 标题降级', () => {
     expect(out).not.toMatch(/^# Title$/m)
   })
 })
-
-// ---------------------------------------------------------------------------
-// 代码块保护
-// ---------------------------------------------------------------------------
 
 describe('optimizeMarkdownForFeishu: 代码块保护', () => {
   it('代码块内的 # 不被降级 (cardVersion=1)', () => {
@@ -99,15 +75,11 @@ describe('optimizeMarkdownForFeishu: 代码块保护', () => {
 
   it('默认 cardVersion=2 下代码块内 # 仍受保护（语义断言）', () => {
     const out = opt('# Heading\n\n```\n# inside\n```')
-    expect(out).toContain('#### Heading') // 外部 H1 降级
-    expect(out).toContain('# inside') // 代码块内保留
-    expect(out).toContain('```') // fence 保留
+    expect(out).toContain('#### Heading')
+    expect(out).toContain('# inside')
+    expect(out).toContain('```')
   })
 })
-
-// ---------------------------------------------------------------------------
-// 空行压缩
-// ---------------------------------------------------------------------------
 
 describe('optimizeMarkdownForFeishu: 空行压缩', () => {
   it('3 个换行 → 2 个 (cardVersion=1)', () => {
@@ -128,14 +100,9 @@ describe('optimizeMarkdownForFeishu: 空行压缩', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// Schema 2.0: <br> 间距
-// ---------------------------------------------------------------------------
-
 describe('optimizeMarkdownForFeishu: Schema 2.0 <br> 间距', () => {
   it('cardVersion=2 默认在代码块前后加 <br>', () => {
     const out = opt('text\n\n```\ncode\n```')
-    // 代码块前后应包裹 <br>
     expect(out).toContain('<br>\n```')
     expect(out).toContain('```\n<br>')
   })
@@ -147,16 +114,13 @@ describe('optimizeMarkdownForFeishu: Schema 2.0 <br> 间距', () => {
 
   it('cardVersion=2 连续标题之间加 <br>', () => {
     const out = opt('# A\n# B')
-    // H1 降级为 H4，之间插入 <br>
     expect(out).toMatch(/#### A\n<br>\n#### B/)
   })
 
   it('cardVersion=2 表格前后加 <br>', () => {
     const input = 'text before\n\n| col1 | col2 |\n|------|------|\n| v1 | v2 |\n\ntext after'
     const out = opt(input)
-    // 表格前: <br> 紧贴文本行（规则 3e 压缩多余空行）
     expect(out).toMatch(/text before\n<br>\n\| col1/)
-    // 表格后: <br> 跟两个换行到下一段文本
     expect(out).toMatch(/\| v1 \| v2 \|\n<br>\n\ntext after/)
   })
 
@@ -169,17 +133,10 @@ describe('optimizeMarkdownForFeishu: Schema 2.0 <br> 间距', () => {
   it('代码块内的 | 不被当表格处理 (Schema 2.0)', () => {
     const input = '```\n| in code | not a table |\n|---|---|\n```'
     const out = opt(input)
-    // 代码块本体应完整保留
     expect(out).toContain('| in code | not a table |')
-    // 代码块外应该没有出现表格 br 标记（因为代码块内不算表格）
-    // 代码块本身会被 <br> 包裹（Schema 2.0）但不会在 | 周围单独加 <br>
     expect(out).toMatch(/<br>\n```\n\| in code/)
   })
 })
-
-// ---------------------------------------------------------------------------
-// stripInvalidImageKeys
-// ---------------------------------------------------------------------------
 
 describe('optimizeMarkdownForFeishu: stripInvalidImageKeys', () => {
   it('img_* 图片 key 保留', () => {
@@ -213,10 +170,6 @@ describe('optimizeMarkdownForFeishu: stripInvalidImageKeys', () => {
     expect(out).not.toContain('![drop]')
   })
 })
-
-// ---------------------------------------------------------------------------
-// findMarkdownTablesOutsideCodeBlocks
-// ---------------------------------------------------------------------------
 
 describe('findMarkdownTablesOutsideCodeBlocks', () => {
   it('识别单张表格', () => {
@@ -252,10 +205,6 @@ describe('findMarkdownTablesOutsideCodeBlocks', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// sanitizeTextForCard
-// ---------------------------------------------------------------------------
-
 describe('sanitizeTextForCard: 表格数量限制', () => {
   function makeTable(label: string): string {
     return `| ${label} h1 | h2 |\n|---|---|\n| v1 | v2 |`
@@ -276,11 +225,9 @@ describe('sanitizeTextForCard: 表格数量限制', () => {
   it('4 张表格: 前 3 张保留，第 4 张包裹成 code block', () => {
     const text = [makeTable('A'), makeTable('B'), makeTable('C'), makeTable('D')].join('\n\n')
     const out = sanitizeTextForCard(text)
-    // 前 3 张表格原样
     expect(out).toContain(makeTable('A'))
     expect(out).toContain(makeTable('B'))
     expect(out).toContain(makeTable('C'))
-    // 第 4 张被包裹
     expect(out).toContain('```\n' + makeTable('D') + '\n```')
   })
 
@@ -307,10 +254,6 @@ describe('sanitizeTextForCard: 表格数量限制', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// 边界与真实场景
-// ---------------------------------------------------------------------------
-
 describe('optimizeMarkdownForFeishu: 边界与真实场景', () => {
   it('screenshot 里的 OpenCutSkill 项目结构报告', () => {
     const input = `## OpenCutSkill 项目架构概览
@@ -328,17 +271,13 @@ opencutskill/
 └── tests/
 \`\`\``
     const out = opt(input)
-    // 所有 H2~H3 应被降级为 H5
     expect(out).toContain('##### OpenCutSkill 项目架构概览')
     expect(out).toContain('##### 1. 项目定位')
     expect(out).toContain('##### 2. 模块结构')
-    // 代码块内容原封不动
     expect(out).toContain('opencutskill/')
     expect(out).toContain('├── cli/')
-    // 原始 ## 字面量不残留
     expect(out).not.toMatch(/^## OpenCutSkill/m)
     expect(out).not.toMatch(/^### 1\./m)
-    // 代码块前后有 <br>（Schema 2.0 默认）
     expect(out).toContain('<br>\n```')
     expect(out).toContain('```\n<br>')
   })

@@ -1,14 +1,3 @@
-/**
- * Proxy Handler — protocol-translating reverse proxy for OpenAI-compatible APIs.
- *
- * Receives Anthropic Messages API requests from the CLI, transforms them to
- * OpenAI Chat Completions or Responses API format, forwards to the upstream
- * provider, and transforms the response back to Anthropic format.
- *
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
 import { signClaudeCodeCCHInTransformedString } from '../../utils/claudeCodeCch.js'
 import { ProviderService } from '../services/providerService.js'
 import { ensureClaudeCodeAttribution } from './claudeCodeAttribution.js'
@@ -55,8 +44,6 @@ async function fetchUpstreamWithTimeout(
     })
   }
 
-  // For streaming requests, this timeout should only cover the connection and
-  // response headers. Keeping the signal alive aborts long generations mid-body.
   const timeout = createTimeoutController(timeoutMs)
   try {
     return await fetch(url, {
@@ -73,7 +60,6 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
   const providerId = providerMatch ? decodeURIComponent(providerMatch[1]!) : undefined
   const isActiveProxyPath = url.pathname === '/proxy/v1/messages'
 
-  // Only handle POST /proxy/v1/messages or POST /proxy/providers/:providerId/v1/messages
   if (req.method !== 'POST' || (!isActiveProxyPath && !providerMatch)) {
     return Response.json(
       {
@@ -84,7 +70,6 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  // Read active/default provider config or an explicitly-scoped provider config.
   const config = await providerService.getProviderForProxy(providerId)
   if (!config) {
     return Response.json(
@@ -116,7 +101,6 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  // Parse request body
   let body: AnthropicRequest
   try {
     body = (await req.json()) as AnthropicRequest
@@ -213,7 +197,6 @@ async function handleOpenaiChat(
     })
   }
 
-  // Non-streaming
   const responseBody = await upstream.json()
   const anthropicResponse = openaiChatToAnthropic(responseBody, body.model)
   return Response.json(anthropicResponse)
@@ -280,7 +263,6 @@ async function handleOpenaiResponses(
     })
   }
 
-  // Non-streaming
   const responseBody = await upstream.json()
   const anthropicResponse = openaiResponsesToAnthropic(responseBody, body.model)
   return Response.json(anthropicResponse)

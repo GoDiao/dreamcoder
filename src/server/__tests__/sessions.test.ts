@@ -1,7 +1,3 @@
-/**
- * Unit tests for SessionService and Sessions API
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
@@ -22,14 +18,9 @@ import { clearPluginCache } from '../../utils/plugins/pluginLoader.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import { updateSessionSlashCommands } from '../ws/handler.js'
 
-// ============================================================================
-// Test helpers
-// ============================================================================
-
 let tmpDir: string
 let service: SessionService
 
-/** Create a temporary config dir and configure the service to use it. */
 async function setupTmpConfigDir(): Promise<string> {
   tmpDir = path.join(os.tmpdir(), `claude-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
@@ -74,7 +65,6 @@ async function createCleanGitRepo(baseDir: string): Promise<string> {
   return workDir
 }
 
-/** Write a JSONL session file with given entries. */
 async function writeSessionFile(
   projectDir: string,
   sessionId: string,
@@ -181,7 +171,6 @@ async function createCleanGitRepo(baseDir: string): Promise<string> {
   return workDir
 }
 
-// Sample entries matching real CLI format
 function makeSnapshotEntry(): Record<string, unknown> {
   return {
     type: 'file-history-snapshot',
@@ -446,10 +435,6 @@ async function createThreeTurnCheckpointFixture(
   }
 }
 
-// ============================================================================
-// SessionService tests
-// ============================================================================
-
 describe('SessionService', () => {
   beforeEach(async () => {
     await setupTmpConfigDir()
@@ -466,10 +451,6 @@ describe('SessionService', () => {
     resetSettingsCache()
     await cleanupTmpDir()
   })
-
-  // --------------------------------------------------------------------------
-  // listSessions
-  // --------------------------------------------------------------------------
 
   it('should return empty list when no sessions exist', async () => {
     const result = await service.listSessions()
@@ -492,7 +473,7 @@ describe('SessionService', () => {
     const session = result.sessions[0]!
     expect(session.id).toBe(sessionId)
     expect(session.title).toBe('Hello Claude')
-    expect(session.messageCount).toBe(2) // 1 user + 1 assistant
+    expect(session.messageCount).toBe(2)
     expect(session.projectPath).toBe('-tmp-testproject')
     expect(session.projectRoot).toBe('/tmp/test')
   })
@@ -523,7 +504,6 @@ describe('SessionService', () => {
   })
 
   it('should paginate results with limit and offset', async () => {
-    // Create 3 sessions
     for (let i = 0; i < 3; i++) {
       const id = `0000000${i}-bbbb-cccc-dddd-eeeeeeeeeeee`
       await writeSessionFile('-tmp-test', id, [
@@ -581,10 +561,6 @@ describe('SessionService', () => {
     expect(resultA.sessions[0]!.id).toBe(id1)
   })
 
-  // --------------------------------------------------------------------------
-  // getSession
-  // --------------------------------------------------------------------------
-
   it('should return null for non-existent session', async () => {
     const result = await service.getSession('00000000-0000-0000-0000-000000000000')
     expect(result).toBeNull()
@@ -620,10 +596,6 @@ describe('SessionService', () => {
     expect(detail!.messages).toHaveLength(1)
     expect(detail!.messages[0]!.content).toBe('Real message')
   })
-
-  // --------------------------------------------------------------------------
-  // getSessionMessages
-  // --------------------------------------------------------------------------
 
   it('should throw for non-existent session messages', async () => {
     expect(
@@ -1218,10 +1190,6 @@ describe('SessionService', () => {
     expect(workDir).toBe('/tmp/from-cwd')
   })
 
-  // --------------------------------------------------------------------------
-  // createSession
-  // --------------------------------------------------------------------------
-
   it('should create a new session file', async () => {
     const workDir = path.join(tmpDir, 'workspace', 'my-project')
     await fs.mkdir(workDir, { recursive: true })
@@ -1230,14 +1198,12 @@ describe('SessionService', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     )
 
-    // Verify the file was created
     const canonicalWorkDir = await fs.realpath(workDir)
     const sanitized = sanitizePath(canonicalWorkDir)
     const filePath = path.join(tmpDir, 'projects', sanitized, `${sessionId}.jsonl`)
     const stat = await fs.stat(filePath)
     expect(stat.isFile()).toBe(true)
 
-    // Verify the file starts with the initial snapshot entry
     const content = await fs.readFile(filePath, 'utf-8')
     const entry = JSON.parse(content.trim().split('\n')[0]!)
     expect(entry.type).toBe('file-history-snapshot')
@@ -1444,17 +1410,12 @@ describe('SessionService', () => {
     )
   })
 
-  // --------------------------------------------------------------------------
-  // deleteSession
-  // --------------------------------------------------------------------------
-
   it('should delete an existing session', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     const filePath = await writeSessionFile('-tmp-project', sessionId, [makeSnapshotEntry()])
 
     await service.deleteSession(sessionId)
 
-    // File should no longer exist
     expect(fs.access(filePath)).rejects.toThrow()
   })
 
@@ -1463,10 +1424,6 @@ describe('SessionService', () => {
       service.deleteSession('00000000-0000-0000-0000-000000000000')
     ).rejects.toThrow('Session not found')
   })
-
-  // --------------------------------------------------------------------------
-  // renameSession
-  // --------------------------------------------------------------------------
 
   it('should rename a session by appending custom-title entry', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -1477,14 +1434,12 @@ describe('SessionService', () => {
 
     await service.renameSession(sessionId, 'My Custom Title')
 
-    // Read the file and check the last entry
     const content = await fs.readFile(filePath, 'utf-8')
     const lines = content.trim().split('\n')
     const lastEntry = JSON.parse(lines[lines.length - 1]!)
     expect(lastEntry.type).toBe('custom-title')
     expect(lastEntry.customTitle).toBe('My Custom Title')
 
-    // Verify the title is now returned in list
     const detail = await service.getSession(sessionId)
     expect(detail!.title).toBe('My Custom Title')
   })
@@ -1494,10 +1449,6 @@ describe('SessionService', () => {
       service.renameSession('00000000-0000-0000-0000-000000000000', 'Title')
     ).rejects.toThrow('Session not found')
   })
-
-  // --------------------------------------------------------------------------
-  // Title extraction
-  // --------------------------------------------------------------------------
 
   it('should use first user message as title when no custom title', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -1580,7 +1531,7 @@ describe('SessionService', () => {
     ])
 
     const detail = await service.getSession(sessionId)
-    expect(detail!.title.length).toBe(83) // 80 + '...'
+    expect(detail!.title.length).toBe(83)
     expect(detail!.title.endsWith('...')).toBe(true)
   })
 
@@ -1790,10 +1741,6 @@ describe('SessionService', () => {
   })
 })
 
-// ============================================================================
-// Sessions API integration tests
-// ============================================================================
-
 describe('Sessions API', () => {
   let baseUrl: string
   let server: ReturnType<typeof Bun.serve> | null = null
@@ -1802,7 +1749,6 @@ describe('Sessions API', () => {
     await setupTmpConfigDir()
     service = new SessionService()
 
-    // Import and start a minimal test server
     const { handleSessionsApi } = await import('../api/sessions.js')
     const { handleConversationsApi } = await import('../api/conversations.js')
 
@@ -1815,7 +1761,6 @@ describe('Sessions API', () => {
         const segments = url.pathname.split('/').filter(Boolean)
 
         if (segments[0] === 'api' && segments[1] === 'sessions') {
-          // Route chat sub-resource to conversations handler
           if (segments[3] === 'chat') {
             return handleConversationsApi(req, url, segments)
           }
@@ -1927,7 +1872,6 @@ describe('Sessions API', () => {
   })
 
   it('GET /api/sessions/:id should return session detail', async () => {
-    // Create a session file
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     await writeSessionFile('-tmp-api-test', sessionId, [
       makeSnapshotEntry(),
@@ -2174,7 +2118,6 @@ describe('Sessions API', () => {
     const res = await fetch(`${baseUrl}/api/sessions/${sessionId}`, { method: 'DELETE' })
     expect(res.status).toBe(200)
 
-    // Verify it's gone
     const res2 = await fetch(`${baseUrl}/api/sessions/${sessionId}`)
     expect(res2.status).toBe(404)
   })
@@ -2346,7 +2289,6 @@ describe('Sessions API', () => {
     })
     expect(res.status).toBe(200)
 
-    // Verify new title
     const detailRes = await fetch(`${baseUrl}/api/sessions/${sessionId}`)
     const detail = (await detailRes.json()) as { title: string }
     expect(detail.title).toBe('New Custom Title')
@@ -4102,10 +4044,6 @@ describe('Sessions API', () => {
     expect(remainingMessages[1]?.type).toBe('assistant')
   })
 
-  // --------------------------------------------------------------------------
-  // Conversations API via /api/sessions/:id/chat
-  // --------------------------------------------------------------------------
-
   it('GET /api/sessions/:id/chat/status should return idle by default', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/chat/status`)
@@ -4141,7 +4079,6 @@ describe('Sessions API', () => {
     })
     expect(res.status).toBe(200)
 
-    // Verify state is idle
     const statusRes = await fetch(`${baseUrl}/api/sessions/${sessionId}/chat/status`)
     const status = (await statusRes.json()) as { state: string }
     expect(status.state).toBe('idle')

@@ -1,14 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Release script for DreamCoder Desktop
- *
- * Usage:
- *   bun run scripts/release.ts patch       # 0.1.0 → 0.1.1
- *   bun run scripts/release.ts minor       # 0.1.0 → 0.2.0
- *   bun run scripts/release.ts major       # 0.1.0 → 1.0.0
- *   bun run scripts/release.ts 2.0.0       # explicit version
- *   bun run scripts/release.ts patch --dry  # preview without changes
- */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -79,8 +69,6 @@ async function run(cmd: string[], cwd = root) {
   return stdout.trim()
 }
 
-// ── Main ──────────────────────────────────────────────
-
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry')
 const bumpArg = args.find((a) => a !== '--dry')
@@ -114,7 +102,6 @@ if (!existsSync(releaseNotesPath)) {
   process.exit(1)
 }
 
-// Update version in all files
 for (const file of VERSION_FILES) {
   const content = readFileSync(file.path, 'utf-8')
   const updated = file.update(content, next)
@@ -122,11 +109,9 @@ for (const file of VERSION_FILES) {
   console.log(`  Updated: ${path.relative(root, file.path)}`)
 }
 
-// Regenerate Cargo.lock
 console.log('\n  Updating Cargo.lock...')
 await run(['cargo', 'generate-lockfile'], path.join(root, 'desktop/src-tauri'))
 
-// Git commit + tag
 console.log('  Creating git commit...')
 await run([
   'git',

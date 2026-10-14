@@ -1,5 +1,3 @@
-// Source: src/server/services/cronService.ts
-
 export type TaskNotificationConfig = {
   enabled: boolean
   channels: ('desktop' | 'telegram' | 'feishu')[]

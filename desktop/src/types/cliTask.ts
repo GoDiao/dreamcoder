@@ -1,5 +1,3 @@
-// Source: src/server/services/taskService.ts (CLI V2 Tasks)
-
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 
 export type CLITask = {

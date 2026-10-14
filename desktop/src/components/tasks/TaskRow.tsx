@@ -25,7 +25,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
   const confirmRef = useRef<HTMLDivElement>(null)
 
-  // Close menu / confirm on outside click
   useEffect(() => {
     if (!showMenu && !confirmAction) return
     const handler = (e: MouseEvent) => {
@@ -44,7 +43,7 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
   const handleRunNow = async () => {
     setConfirmAction(null)
     setIsRunning(true)
-    if (!showLogs) onToggleLogs() // open logs panel (accordion will close others)
+    if (!showLogs) onToggleLogs()
     try {
       await runTask(task.id)
       setLogsRefreshKey((k) => k + 1)
@@ -73,7 +72,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
   return (
     <div className="border-b border-[var(--color-border-separator)]">
       <div className="flex items-center justify-between px-4 py-3 hover:bg-[var(--color-surface-hover)] transition-colors group">
-        {/* Left: status + info */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.enabled ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-tertiary)]'}`} />
           <div className="min-w-0">
@@ -90,14 +88,12 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
           </div>
         </div>
 
-        {/* Right: cron + actions */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-xs text-[var(--color-text-tertiary)]" title={task.cron}>
             {describeCron(task.cron, t)}
           </span>
 
           <div className="flex items-center gap-0.5">
-            {/* Run Now */}
             <div className="relative" ref={confirmAction === 'run' ? confirmRef : undefined}>
               <button
                 onClick={() => isRunning || !task.enabled ? undefined : setConfirmAction(confirmAction === 'run' ? null : 'run')}
@@ -120,7 +116,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
               )}
             </div>
 
-            {/* View Logs */}
             <button
               onClick={onToggleLogs}
               className={`${iconBtn} ${showLogs ? 'text-[var(--color-brand)] bg-[var(--color-surface-selected)]' : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-selected)]'}`}
@@ -129,7 +124,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
               <span className="material-symbols-outlined text-[18px]">receipt_long</span>
             </button>
 
-            {/* More menu */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => { setShowMenu(!showMenu); setConfirmAction(null) }}
@@ -140,7 +134,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
 
               {showMenu && !confirmAction && (
                 <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg py-1">
-                  {/* Edit */}
                   <button
                     onClick={() => { setShowMenu(false); setShowEdit(true) }}
                     className={`${menuItem} text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]`}
@@ -149,7 +142,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
                     {t('tasks.edit')}
                   </button>
 
-                  {/* Toggle */}
                   <button
                     onClick={() => setConfirmAction('toggle')}
                     className={`${menuItem} text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]`}
@@ -162,7 +154,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
 
                   <div className="my-1 h-px bg-[var(--color-border-separator)]" />
 
-                  {/* Delete */}
                   <button
                     onClick={() => setConfirmAction('delete')}
                     className={`${menuItem} text-[var(--color-error)] hover:bg-[var(--color-error-container)]/18`}
@@ -173,7 +164,6 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
                 </div>
               )}
 
-              {/* Confirm popovers for menu actions */}
               {confirmAction === 'toggle' && (
                 <div ref={confirmRef}>
                   <ConfirmPopover
@@ -202,22 +192,18 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
         </div>
       </div>
 
-      {/* Runs panel */}
       {showLogs && (
         <div className="px-4 pb-3">
           <TaskRunsPanel taskId={task.id} onClose={onToggleLogs} refreshKey={logsRefreshKey} />
         </div>
       )}
 
-      {/* Edit modal */}
       {showEdit && (
         <NewTaskModal open editTask={task} onClose={() => setShowEdit(false)} />
       )}
     </div>
   )
 }
-
-// ─── Confirm Popover ─────────────────────────────────────────────────────────
 
 function ConfirmPopover({ message, confirmLabel, onConfirm, onCancel, cancelLabel, variant = 'brand' }: {
   message: string

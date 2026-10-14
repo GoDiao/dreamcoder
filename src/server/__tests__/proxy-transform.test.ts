@@ -1,15 +1,9 @@
-/**
- * Unit tests for proxy protocol transformation
- */
-
 import { describe, test, expect } from 'bun:test'
 import { anthropicToOpenaiChat } from '../proxy/transform/anthropicToOpenaiChat.js'
 import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenaiResponses.js'
 import { openaiChatToAnthropic } from '../proxy/transform/openaiChatToAnthropic.js'
 import { openaiResponsesToAnthropic } from '../proxy/transform/openaiResponsesToAnthropic.js'
 import type { AnthropicRequest, OpenAIChatResponse, OpenAIResponsesResponse } from '../proxy/transform/types.js'
-
-// ─── anthropicToOpenaiChat ──────────────────────────────────────
 
 describe('anthropicToOpenaiChat', () => {
   test('basic text message', () => {
@@ -234,8 +228,6 @@ describe('anthropicToOpenaiChat', () => {
   })
 })
 
-// ─── openaiChatToAnthropic ──────────────────────────────────────
-
 describe('openaiChatToAnthropic', () => {
   test('basic text response', () => {
     const res: OpenAIChatResponse = {
@@ -363,8 +355,6 @@ describe('openaiChatToAnthropic', () => {
   })
 })
 
-// ─── anthropicToOpenaiResponses ─────────────────────────────────
-
 describe('anthropicToOpenaiResponses', () => {
   test('basic message', () => {
     const req: AnthropicRequest = {
@@ -467,8 +457,6 @@ describe('anthropicToOpenaiResponses', () => {
     expect((result as Record<string, unknown>).stop_sequences).toBeUndefined()
   })
 })
-
-// ─── openaiResponsesToAnthropic ─────────────────────────────────
 
 describe('openaiResponsesToAnthropic', () => {
   test('basic text response', () => {

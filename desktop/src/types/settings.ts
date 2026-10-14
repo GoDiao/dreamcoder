@@ -1,5 +1,3 @@
-// Source: src/server/api/models.ts, src/server/api/settings.ts
-
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk'
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'

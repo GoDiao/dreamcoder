@@ -15,14 +15,13 @@ type Props = {
 
 type DirEntry = { name: string; path: string; isDirectory: boolean }
 
-// Module-level cache for recent projects (shared across instances, survives re-renders)
 let cachedProjects: RecentProject[] | null = null
 let cacheTimestamp = 0
-const CACHE_TTL = 30_000 // 30s
+const CACHE_TTL = 30_000
 const DESKTOP_WORKTREE_MARKER = '/.claude/worktrees/'
 const DROPDOWN_WIDTH = 400
 const DROPDOWN_VIEWPORT_MARGIN = 12
-const DROPDOWN_HEIGHT = 380 // approximate max height
+const DROPDOWN_HEIGHT = 380
 
 function isTauriRuntime() {
   return typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
@@ -68,7 +67,6 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
     })
   }, [])
 
-  // Close on outside click (checks both trigger and portal dropdown)
   useEffect(() => {
     if (!isOpen) return
     const handleClick = (e: MouseEvent) => {
@@ -81,7 +79,6 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
     return () => document.removeEventListener('mousedown', handleClick)
   }, [isOpen])
 
-  // Recalculate position on scroll/resize while open
   useEffect(() => {
     if (!isOpen) return
     updateDropdownPos()
@@ -93,10 +90,8 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
     }
   }, [isOpen, updateDropdownPos])
 
-  // Load recent projects when opened (with client-side cache)
   useEffect(() => {
     if (!isOpen || mode !== 'recent') return
-    // Use cache if fresh
     if (cachedProjects && Date.now() - cacheTimestamp < CACHE_TTL) {
       setProjects(cachedProjects)
       return
@@ -119,7 +114,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
       setBrowsePath(result.currentPath)
       setBrowseParent(result.parentPath)
       setBrowseEntries(result.entries)
-    } catch { /* API not available */ }
+    } catch { }
     setLoading(false)
   }
 
@@ -127,13 +122,11 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
     onChange(path)
     setIsOpen(false)
     setMode('recent')
-    // Invalidate cache so next open reflects the new selection
     cachedProjects = null
   }
 
   const handleChooseFolder = async () => {
     if (isTauriRuntime()) {
-      // Desktop: native OS folder dialog
       setIsOpen(false)
       try {
         const { open } = await import('@tauri-apps/plugin-dialog')
@@ -147,13 +140,11 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
         console.error('[DirectoryPicker] Failed to open folder dialog:', err)
       }
     } else {
-      // Web browser: directory tree via backend API
       setMode('browse')
       loadBrowseDir(value || undefined)
     }
   }
 
-  // Find selected project info
   const selectedProject = projects.find((p) => p.realPath === value)
   const isWorkbar = variant === 'workbar'
   const selectedLabel = selectedProject?.repoName || selectedProject?.projectName || projectNameFromPath(value)
@@ -301,7 +292,6 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
 
   return (
     <div ref={ref} className={isWorkbar ? `relative min-w-0 ${isMobileBrowser ? 'flex-1' : 'max-w-[320px] shrink'}` : 'relative'}>
-      {/* Trigger — shows selected project chip or placeholder */}
       {value ? (
         <button
           ref={triggerRef}

@@ -1,9 +1,3 @@
-/**
- * Request transformation: Anthropic Messages → OpenAI Responses API
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
 import type {
   AnthropicRequest,
   AnthropicContentBlock,
@@ -13,13 +7,9 @@ import type {
   OpenAIChatContentPart,
 } from './types.js'
 
-/**
- * Convert Anthropic Messages request to OpenAI Responses API request.
- */
 export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
 
-  // Convert messages to input items
   for (const msg of body.messages) {
     convertMessageToInputItems(msg, input)
   }
@@ -31,7 +21,6 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
     store: false,
   }
 
-  // system → instructions
   if (body.system) {
     if (typeof body.system === 'string') {
       result.instructions = body.system
@@ -40,14 +29,9 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
     }
   }
 
-  // max_tokens — omit to let upstream provider use its own default/max.
-  // Claude Code sends very large values that exceed many providers' limits.
-
-  // temperature & top_p
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
 
-  // tools
   if (body.tools && body.tools.length > 0) {
     result.tools = body.tools
       .filter((t) => t.name !== 'BatchTool')
@@ -59,12 +43,10 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
       }))
   }
 
-  // tool_choice
   if (body.tool_choice !== undefined) {
     result.tool_choice = convertToolChoice(body.tool_choice)
   }
 
-  // thinking → reasoning
   if (body.thinking) {
     const budget = body.thinking.budget_tokens
     if (budget !== undefined) {
@@ -76,15 +58,12 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
     }
   }
 
-  // stop_sequences not supported in Responses API, dropped
-
   return result
 }
 
 function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIResponsesInputItem[]): void {
   const content = msg.content
 
-  // Simple string content
   if (typeof content === 'string') {
     output.push({ type: 'message', role: msg.role, content })
     return
@@ -95,7 +74,6 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
     return
   }
 
-  // Collect text/image parts and handle tool blocks separately
   const contentParts: (string | OpenAIChatContentPart)[] = []
 
   for (const block of content) {
@@ -107,7 +85,6 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
       })
     } else if (block.type === 'tool_use') {
-      // Flush any accumulated content first
       if (contentParts.length > 0) {
         const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
           ? contentParts[0]
@@ -117,7 +94,6 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         }
         contentParts.length = 0
       }
-      // Lift to function_call item
       output.push({
         type: 'function_call',
         call_id: block.id,
@@ -125,7 +101,6 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         arguments: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
       })
     } else if (block.type === 'tool_result') {
-      // Lift to function_call_output item
       const resultContent = typeof block.content === 'string'
         ? block.content
         : Array.isArray(block.content)
@@ -137,10 +112,8 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         output: resultContent,
       })
     }
-    // Skip thinking blocks
   }
 
-  // Flush remaining content
   if (contentParts.length > 0) {
     const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
       ? contentParts[0]

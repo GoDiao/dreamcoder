@@ -319,7 +319,6 @@ export function EmptySession() {
       setSlashMenuOpen(true)
     }
 
-    // Detect @ trigger for file search
     const textBeforeCursor = value.slice(0, cursorPos)
     let pos = -1
     for (let i = textBeforeCursor.length - 1; i >= 0; i--) {
@@ -348,10 +347,8 @@ export function EmptySession() {
   }
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // Ignore key events during IME composition (e.g. Chinese input method)
     if (event.nativeEvent.isComposing) return
 
-    // Route file search navigation keys to FileSearchMenu
     if (fileSearchOpen) {
       const key = event.key
       if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === 'Tab' || key === 'Escape') {

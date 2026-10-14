@@ -31,7 +31,6 @@ describe('virtualHeightCache', () => {
       getHeightsForSession(`session-${i}`).set('marker', i)
     }
     expect(__virtualHeightCacheInternals.size()).toBe(16)
-    // session-0 should have been evicted (oldest, never re-touched)
     const restored = getHeightsForSession('session-0')
     expect(restored.size).toBe(0)
   })
@@ -51,7 +50,6 @@ describe('virtualHeightCache', () => {
     original.set('item-1', 240)
     original.set('item-2', 360)
 
-    // simulate switching to another session, then back
     getHeightsForSession('other-session').set('item-1', 100)
     const restored = getHeightsForSession('long-session')
 

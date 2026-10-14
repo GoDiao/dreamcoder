@@ -263,7 +263,6 @@ describe('AppShell boot flow', () => {
     fireEvent.click(screen.getByTestId('mobile-sidebar-toggle'))
 
     expect(useUIStore.getState().sidebarOpen).toBe(true)
-    // The drawer becomes visible on the next animation frame so the slide-in can run.
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-shell')).toHaveAttribute('data-state', 'open')
     })

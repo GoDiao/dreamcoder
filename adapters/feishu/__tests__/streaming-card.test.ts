@@ -1,16 +1,3 @@
-/**
- * StreamingCard 生命周期测试
- *
- * 用 mock Lark client 覆盖:
- * - ensureCreated: 成功路径 / 降级路径
- * - appendText: 累积 + 触发 throttled flush
- * - finalize: settings(false) + update 顺序、sequence 单调递增
- * - abort: 渲染错误卡片
- * - 230020 → 跳帧
- * - 230099 table limit → 禁用流式，finalize 时仍走 CardKit
- * - 纯 patch fallback 路径
- */
-
 import { describe, it, expect, beforeEach } from 'bun:test'
 import {
   StreamingCard,
@@ -19,10 +6,6 @@ import {
   buildErrorCard,
 } from '../streaming-card.js'
 import { STREAMING_ELEMENT_ID } from '../cardkit.js'
-
-// ---------------------------------------------------------------------------
-// Mock client
-// ---------------------------------------------------------------------------
 
 type ApiCall = { api: string; args: any }
 
@@ -93,16 +76,11 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms))
 }
 
-// ---------------------------------------------------------------------------
-// Card JSON builders
-// ---------------------------------------------------------------------------
-
 describe('buildInitialStreamingCard', () => {
   it('Schema 2.0 + streaming_mode + element_id', () => {
     const card = buildInitialStreamingCard() as any
     expect(card.schema).toBe('2.0')
     expect(card.config.streaming_mode).toBe(true)
-    // 唯一元素：streaming_content，初始内容为 loading 提示
     const elements = card.body.elements as any[]
     expect(elements.length).toBe(1)
     const streaming = elements[0]
@@ -121,7 +99,6 @@ describe('buildRenderedCard', () => {
     const el = card.body.elements[0]
     expect(el.tag).toBe('markdown')
     expect(el.content).toBe('hello world')
-    // 最终卡无需 element_id
     expect(el.element_id).toBeUndefined()
   })
 
@@ -139,10 +116,6 @@ describe('buildErrorCard', () => {
     expect(card.body.elements[0].content).toBe('oops')
   })
 })
-
-// ---------------------------------------------------------------------------
-// StreamingCard lifecycle
-// ---------------------------------------------------------------------------
 
 describe('StreamingCard: ensureCreated (CardKit 主路径)', () => {
   it('依次调用 card.create + im.message.create，sequence=1', async () => {
@@ -162,14 +135,11 @@ describe('StreamingCard: ensureCreated (CardKit 主路径)', () => {
     expect(calls[0]!.api).toBe('cardkit.v1.card.create')
     expect(calls[1]!.api).toBe('im.message.create')
 
-    // 初始卡 JSON 包含 streaming_mode 和 element_id
     const cardJson = JSON.parse(calls[0]!.args.data.data)
     expect(cardJson.schema).toBe('2.0')
     expect(cardJson.config.streaming_mode).toBe(true)
-    // 唯一元素即 streaming_content
     expect(cardJson.body.elements[0].element_id).toBe(STREAMING_ELEMENT_ID)
 
-    // IM message 引用 card_id
     const content = JSON.parse(calls[1]!.args.data.content)
     expect(content).toEqual({ type: 'card', data: { card_id: 'ck_main_1' } })
   })
@@ -183,7 +153,6 @@ describe('StreamingCard: ensureCreated (CardKit 主路径)', () => {
     await sc.ensureCreated()
     await sc.ensureCreated()
     await sc.ensureCreated()
-    // 只一次 create + 一次 send
     const createCalls = calls.filter((c) => c.api === 'cardkit.v1.card.create')
     const sendCalls = calls.filter((c) => c.api === 'im.message.create')
     expect(createCalls.length).toBe(1)
@@ -221,7 +190,6 @@ describe('StreamingCard: ensureCreated (fallback 降级路径)', () => {
     expect(sc._getMessageId()).toBe('om_fb')
     expect(sc._isCardKitStreamActive()).toBe(false)
 
-    // fallback 发送的是 Schema 2.0 interactive 卡
     const createCall = calls.find((c) => c.api === 'im.message.create')
     expect(createCall).toBeDefined()
     expect(createCall!.args.data.msg_type).toBe('interactive')
@@ -259,10 +227,6 @@ describe('StreamingCard: ensureCreated (fallback 降级路径)', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// appendText + flush
-// ---------------------------------------------------------------------------
-
 describe('StreamingCard: appendText + flush', () => {
   it('accumulated 文本写入 cardElement.content，sequence 单调递增', async () => {
     const { client, calls } = makeMockClient({
@@ -272,20 +236,16 @@ describe('StreamingCard: appendText + flush', () => {
     const sc = new StreamingCard({ larkClient: client, chatId: 'c' })
     await sc.ensureCreated()
 
-    // 第一次 appendText 进入节流窗口（刚 ready，lastUpdateTime 还新）
     sc.appendText('Hello ')
     sc.appendText('world')
 
-    // 节流窗口 100ms + 余量
     await sleep(150)
 
     const contentCalls = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content')
     expect(contentCalls.length).toBeGreaterThan(0)
-    // 最后一次 flush 的内容应包含完整累积文本
     const lastCall = contentCalls[contentCalls.length - 1]!
     expect(lastCall.args.data.content).toContain('Hello world')
     expect(lastCall.args.path.element_id).toBe(STREAMING_ELEMENT_ID)
-    // sequence 严格单调递增
     const seqs = contentCalls.map((c) => c.args.data.sequence)
     for (let i = 1; i < seqs.length; i++) {
       expect(seqs[i]).toBeGreaterThan(seqs[i - 1]!)
@@ -303,11 +263,9 @@ describe('StreamingCard: appendText + flush', () => {
     sc.appendText('same')
     await sleep(150)
 
-    // 强制再跑一次 flush（无新文本）
     await sc._getFlushController().flush()
 
     const contentCalls = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content')
-    // 应该只有一次 content 调用
     expect(contentCalls.length).toBe(1)
   })
 
@@ -323,10 +281,6 @@ describe('StreamingCard: appendText + flush', () => {
     expect(sc._getAccumulatedText()).toBe('')
   })
 })
-
-// ---------------------------------------------------------------------------
-// finalize
-// ---------------------------------------------------------------------------
 
 describe('StreamingCard: finalize', () => {
   it('CardKit 路径: settings(false) + card.update，sequence 连续递增', async () => {
@@ -357,14 +311,11 @@ describe('StreamingCard: finalize', () => {
     expect(settingsSeq).toBeGreaterThan(lastContentSeq)
     expect(updateSeq).toBeGreaterThan(settingsSeq)
 
-    // settings 关闭 streaming_mode
     const settings = JSON.parse(settingsCalls[0]!.args.data.settings)
     expect(settings.streaming_mode).toBe(false)
 
-    // update 卡内容是预处理后的 markdown
     const finalCardJson = JSON.parse(updateCalls[0]!.args.data.card.data)
     const finalContent = finalCardJson.body.elements[0].content
-    // H1 被降级为 H4
     expect(finalContent).toContain('#### Title')
     expect(finalContent).toContain('Body')
   })
@@ -377,16 +328,14 @@ describe('StreamingCard: finalize', () => {
     const sc = new StreamingCard({ larkClient: client, chatId: 'c' })
     await sc.ensureCreated()
     sc.appendText('## Heading\n\nContent')
-    await sleep(1600) // 等 PATCH_MS 窗口
+    await sleep(1600)
     await sc.finalize()
 
     const patchCalls = calls.filter((c) => c.api === 'im.message.patch')
     expect(patchCalls.length).toBeGreaterThan(0)
-    // 最后一次 patch 是 finalize 的（full final card）
     const lastPatch = patchCalls[patchCalls.length - 1]!
     const finalCard = JSON.parse(lastPatch.args.data.content)
     const finalContent = finalCard.body.elements[0].content
-    // ## → ##### 降级
     expect(finalContent).toContain('##### Heading')
   })
 
@@ -405,14 +354,12 @@ describe('StreamingCard: finalize', () => {
     const sc = new StreamingCard({ larkClient: client, chatId: 'c' })
     await sc.ensureCreated()
 
-    // 同时塞入三种内容
     sc.appendReasoning('Let me think about this problem carefully...')
     sc.startTool('tu_1', 'Read')
     sc.completeTool('tu_1', 'Read')
     sc.appendText('## 答复\n\n这是最终答复正文。')
     await sleep(150)
 
-    // 流式中间帧应该包含 reasoning + tools + answer 全套
     const lastMidFrame = calls
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .pop()!.args.data.content as string
@@ -422,15 +369,12 @@ describe('StreamingCard: finalize', () => {
 
     await sc.finalize()
 
-    // finalize 用的是 card.update，把整张卡换成只有 answer 的版本
     const updateCall = calls.filter((c) => c.api === 'cardkit.v1.card.update').pop()!
     const finalCardJson = JSON.parse(updateCall.args.data.card.data)
     const finalContent = finalCardJson.body.elements[0].content as string
 
     expect(finalContent).toContain('最终答复正文')
-    // H2 → 降级 H5
     expect(finalContent).toContain('##### 答复')
-    // reasoning + tools 都不应该出现在终态
     expect(finalContent).not.toContain('思考中')
     expect(finalContent).not.toContain('think about this problem')
     expect(finalContent).not.toContain('Read')
@@ -446,14 +390,12 @@ describe('StreamingCard: finalize', () => {
     const sc = new StreamingCard({ larkClient: client, chatId: 'c' })
     await sc.ensureCreated()
 
-    // 只有推理，没有 appendText —— 异常 case 但要可控降级
     sc.appendReasoning('I was thinking but never produced an answer.')
     await sleep(150)
 
     await sc.finalize()
     const updateCall = calls.filter((c) => c.api === 'cardkit.v1.card.update').pop()!
     const finalContent = JSON.parse(updateCall.args.data.card.data).body.elements[0].content as string
-    // 至少能看到推理内容
     expect(finalContent).toContain('thinking')
   })
 
@@ -469,15 +411,10 @@ describe('StreamingCard: finalize', () => {
     await sc.ensureCreated()
     sc.appendText('text')
     await sleep(150)
-    // finalize 内部捕获错误不 rethrow
     await sc.finalize()
     expect(sc._getPhase()).toBe('completed')
   })
 })
-
-// ---------------------------------------------------------------------------
-// Rate limit + table limit
-// ---------------------------------------------------------------------------
 
 describe('StreamingCard: 错误处理', () => {
   it('230020 rate limit → 跳帧，后续 flush 继续', async () => {
@@ -499,12 +436,9 @@ describe('StreamingCard: 错误处理', () => {
     await sc.ensureCreated()
     sc.appendText('first')
     await sleep(150)
-    // 第一次被限流
     sc.appendText(' second')
     await sleep(150)
-    // 第二次应能成功
 
-    // CardKit 仍然 active（没降级）
     expect(sc._isCardKitStreamActive()).toBe(true)
     const contentCalls = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content')
     expect(contentCalls.length).toBeGreaterThanOrEqual(2)
@@ -526,13 +460,11 @@ describe('StreamingCard: 错误处理', () => {
     sc.appendText('some content')
     await sleep(150)
     expect(sc._isCardKitStreamActive()).toBe(false)
-    expect(sc._getCardId()).toBe('ck_tbl') // card_id 保留
+    expect(sc._getCardId()).toBe('ck_tbl')
 
     await sc.finalize()
-    // finalize 仍然走 CardKit 的 settings + update（cardId 还在）
     expect(calls.some((c) => c.api === 'cardkit.v1.card.settings')).toBe(true)
     expect(calls.some((c) => c.api === 'cardkit.v1.card.update')).toBe(true)
-    // 不走 patch
     expect(calls.some((c) => c.api === 'im.message.patch')).toBe(false)
   })
 
@@ -570,10 +502,6 @@ describe('StreamingCard: 错误处理', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// abort
-// ---------------------------------------------------------------------------
-
 describe('StreamingCard: abort', () => {
   it('CardKit 路径: 渲染错误卡并关闭流式', async () => {
     const { client, calls } = makeMockClient({
@@ -593,7 +521,6 @@ describe('StreamingCard: abort', () => {
     const errCard = JSON.parse(updateCalls[updateCalls.length - 1]!.args.data.card.data)
     expect(errCard.header.template).toBe('red')
     expect(errCard.body.elements[0].content).toContain('something went wrong')
-    // 保留已累积的部分文本
     expect(errCard.body.elements[0].content).toContain('partial...')
   })
 
@@ -604,10 +531,6 @@ describe('StreamingCard: abort', () => {
     expect(sc._getPhase()).toBe('aborted')
   })
 })
-
-// ---------------------------------------------------------------------------
-// Reasoning / tool use rendering
-// ---------------------------------------------------------------------------
 
 describe('StreamingCard: appendReasoning', () => {
   it('累积 thinking delta 并渲染在卡片中（plain markdown，不用 blockquote）', async () => {
@@ -629,9 +552,7 @@ describe('StreamingCard: appendReasoning', () => {
     expect(last.args.data.content).toContain('思考中')
     expect(last.args.data.content).toContain('Analyzing the problem.')
     expect(last.args.data.content).toContain('Let me check file A.')
-    // 没有 blockquote `>` 前缀 —— 这是新格式的关键
     expect(last.args.data.content).not.toContain('> Analyzing')
-    // 没有 appendText → 不应有普通正文
     expect(sc._getAccumulatedReasoning()).toContain('Analyzing')
     expect(sc._getAccumulatedText()).toBe('')
   })
@@ -665,7 +586,6 @@ describe('StreamingCard: startTool / completeTool', () => {
     expect(steps[0]!.name).toBe('Read')
     expect(steps[0]!.status).toBe('running')
 
-    // 卡片也应显示 "🛠️ ⚙️ Read"（inline 形式）
     const runningContent = calls
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .map((c) => c.args.data.content)
@@ -679,13 +599,11 @@ describe('StreamingCard: startTool / completeTool', () => {
     steps = sc._getToolSteps()
     expect(steps[0]!.status).toBe('done')
 
-    // 最新 flush 应显示 "✅ Read" 不再有 "⚙️"
     const lastContent = calls
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .pop()!.args.data.content as string
     expect(lastContent).toContain('✅')
     expect(lastContent).toContain('Read')
-    // 这一行整体换成了 `✅ Read`，不该再出现 ⚙️ 图标
     expect(lastContent).not.toContain('⚙️')
   })
 
@@ -713,7 +631,6 @@ describe('StreamingCard: startTool / completeTool', () => {
 
     sc.startTool(undefined, 'Read')
     sc.startTool(undefined, 'Read')
-    // 合成 id 不同 → 两个独立步骤
     expect(sc._getToolSteps().length).toBe(2)
   })
 
@@ -729,7 +646,6 @@ describe('StreamingCard: startTool / completeTool', () => {
     sc.startTool('tu_2', 'Bash')
     sc.completeTool(undefined, 'Bash')
     const steps = sc._getToolSteps()
-    // 更晚的 tu_2 被标记 done
     expect(steps[0]!.status).toBe('running')
     expect(steps[1]!.status).toBe('done')
   })
@@ -748,9 +664,6 @@ describe('StreamingCard: startTool / completeTool', () => {
   })
 })
 
-// 复刻用户的真实场景: 用户发消息 → 服务端 thinking → tool_use → 最终 text。
-// 验证每个阶段都向 cardElement.content 写入了对应内容（不被 throttle / phase
-// gate / 等任何东西吃掉）。
 describe('StreamingCard: 真实事件流（用户场景回归）', () => {
   it('thinking → tool_use → text 应该在每个阶段都触发可见的 flush', async () => {
     const { client, calls } = makeMockClient({
@@ -759,15 +672,9 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
     })
     const sc = new StreamingCard({ larkClient: client, chatId: 'oc_real' })
 
-    // 1. 用户发消息 → handleMessage 预建卡（fire-and-forget）
     const creating = sc.ensureCreated()
-    await creating // 等卡可写
+    await creating
 
-    // 2. 服务端: status streaming + content_start{text} (thinking block)
-    //    feishu/index.ts 的 content_start text 分支会再 await ensureCreated（no-op）
-    // (no direct call here — 等同于 no-op)
-
-    // 3. 服务端: thinking deltas（5 个增量，间隔 30ms 模拟流式）
     sc.appendReasoning('Analyzing the latest commits to find ')
     await sleep(30)
     sc.appendReasoning('breaking changes. Need to look at ')
@@ -778,7 +685,6 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
     await sleep(30)
     sc.appendReasoning('git log first.')
 
-    // 等节流窗口结束
     await sleep(200)
 
     const flushesAfterReasoning = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content').length
@@ -787,11 +693,9 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
     const lastReasoningContent = calls
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .pop()!.args.data.content as string
-    // 应该包含 reasoning 累积内容
     expect(lastReasoningContent).toContain('breaking changes')
     expect(lastReasoningContent).toContain('git log first')
 
-    // 4. 服务端: content_start{tool_use, name: 'Bash'}
     sc.startTool('tu_bash_1', 'Bash')
     await sleep(150)
 
@@ -802,7 +706,6 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
     expect(lastWithTool).toContain('⚙️')
     expect(lastWithTool).toContain('🛠️')
 
-    // 5. 服务端: tool_use_complete
     sc.completeTool('tu_bash_1', 'Bash')
     await sleep(150)
 
@@ -810,17 +713,14 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .pop()!.args.data.content as string
     expect(lastAfterToolDone).toContain('Bash')
-    // ⚙️ 切到 ✅ —— 当前唯一一步已完成
     expect(lastAfterToolDone).toContain('✅')
     expect(lastAfterToolDone).not.toContain('⚙️')
 
-    // 6. 第二个 tool 序列
     sc.startTool('tu_read_1', 'Read')
     await sleep(150)
     sc.completeTool('tu_read_1', 'Read')
     await sleep(150)
 
-    // 7. 最终 text 输出
     sc.appendText('## 破坏性变更分析\n\n')
     await sleep(120)
     sc.appendText('1. **API 重命名**: foo → bar\n')
@@ -831,18 +731,15 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
     const lastWithText = calls
       .filter((c) => c.api === 'cardkit.v1.cardElement.content')
       .pop()!.args.data.content as string
-    // 应该同时包含 reasoning, tools, answer
-    expect(lastWithText).toContain('git log first') // reasoning
-    expect(lastWithText).toContain('Bash') // tool
-    expect(lastWithText).toContain('Read') // tool
-    expect(lastWithText).toContain('破坏性变更分析') // answer (post optimize: H2→H5)
+    expect(lastWithText).toContain('git log first')
+    expect(lastWithText).toContain('Bash')
+    expect(lastWithText).toContain('Read')
+    expect(lastWithText).toContain('破坏性变更分析')
     expect(lastWithText).toContain('API 重命名')
 
-    // 8. message_complete → finalize
     await sc.finalize()
     expect(sc._getPhase()).toBe('completed')
 
-    // 验证有 settings + update 收尾
     expect(calls.some((c) => c.api === 'cardkit.v1.card.settings')).toBe(true)
     expect(calls.some((c) => c.api === 'cardkit.v1.card.update')).toBe(true)
   })
@@ -855,8 +752,6 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
       'cardElement.content': () => {
         if (!firstFrameRejected) {
           firstFrameRejected = true
-          // 模拟一个 *非* rate-limit、*非* table-limit 错误
-          // 当前实现会把 cardKitStreamActive 设 false，本测试就是要发现这个问题
           const err: any = new Error('mystery cardkit error')
           err.code = 999999
           throw err
@@ -869,13 +764,10 @@ describe('StreamingCard: 真实事件流（用户场景回归）', () => {
 
     sc.appendReasoning('first thought')
     await sleep(150)
-    // 此时第一帧已被拒，但我们期望流式仍然开着 —— 这样第二帧能继续
     sc.appendReasoning(' second thought')
     await sleep(150)
-    // 验证: 至少尝试了 2 次 cardElement.content 调用
     const contentCalls = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content')
     expect(contentCalls.length).toBeGreaterThanOrEqual(2)
-    // 而且 streaming 仍是 active
     expect(sc._isCardKitStreamActive()).toBe(true)
   })
 })
@@ -905,7 +797,6 @@ describe('StreamingCard: 组合渲染 (tools + reasoning + text)', () => {
     expect(idxTools).toBeGreaterThan(-1)
     expect(idxReasoning).toBeGreaterThan(-1)
     expect(idxAnswer).toBeGreaterThan(-1)
-    // tools 在最顶部 → reasoning 居中 → answer 在底部
     expect(idxTools).toBeLessThan(idxReasoning)
     expect(idxReasoning).toBeLessThan(idxAnswer)
   })
@@ -923,17 +814,13 @@ describe('StreamingCard: 组合渲染 (tools + reasoning + text)', () => {
     })
     const sc = new StreamingCard({ larkClient: client, chatId: 'c' })
 
-    // 不 await: 在 create 还没 resolve 之前，先压入一个 tool step
     const creating = sc.ensureCreated()
-    // 让事件循环推进到 create 被 await
     await sleep(10)
     sc.startTool('tu_1', 'Glob')
 
-    // 此时 cardMessageReady 仍是 false —— 没有任何 flush
     const contentBefore = calls.filter((c) => c.api === 'cardkit.v1.cardElement.content')
     expect(contentBefore.length).toBe(0)
 
-    // 解锁 create → ensureCreated 继续 → setCardMessageReady(true) → 触发 pending flush
     resolveCreate!()
     await creating
     await sleep(150)

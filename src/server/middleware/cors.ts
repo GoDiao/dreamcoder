@@ -1,7 +1,3 @@
-/**
- * CORS middleware for desktop and temporary open H5 access.
- */
-
 import { isLoopbackHost } from '../h5AccessPolicy.js'
 
 export function corsHeaders(origin?: string | null): Record<string, string> {

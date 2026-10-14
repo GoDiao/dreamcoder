@@ -1,7 +1,3 @@
-// Module-level caches keyed by sessionId so switching tabs back to a previously
-// rendered long transcript can skip estimate→measure thrash. Bounded by an LRU
-// across sessions to avoid unbounded growth across long-running sessions.
-
 export type VirtualRenderItemMetric = {
   signature: string
   contentWeight: number
@@ -14,7 +10,6 @@ const sessionHeightCache = new Map<string, Map<string, number>>()
 const sessionMetricCache = new Map<string, Map<string, VirtualRenderItemMetric>>()
 
 function touchSession(sessionId: string, map: Map<string, Map<string, unknown>>) {
-  // Reinsert to move to LRU tail.
   const existing = map.get(sessionId)
   if (existing) {
     map.delete(sessionId)

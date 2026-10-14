@@ -1,5 +1,3 @@
-// desktop/src/api/providerOAuth.ts
-
 import { api, getBaseUrl } from './client'
 
 export type ProviderOAuthStatus =

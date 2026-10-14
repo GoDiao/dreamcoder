@@ -1,10 +1,3 @@
-/**
- * Claude Code Desktop App — HTTP + WebSocket Server
- *
- * 为桌面端 UI 提供 REST API 和 WebSocket 实时通信。
- * 读写与 CLI 完全相同的文件系统，确保 CLI/UI 数据互通。
- */
-
 import { handleApiRequest } from './router.js'
 import { handleWebSocket, type WebSocketData } from './ws/handler.js'
 import { resolveCors, type CorsResolution } from './middleware/cors.js'
@@ -129,10 +122,6 @@ export function startServer(port = PORT, host = HOST) {
       ? '127.0.0.1'
       : host
 
-  /**
-   * Explicit deployment auth remains a stronger override than H5-scoped
-   * request gating.
-   */
   const forceAuth =
     SERVER_OPTIONS.authRequired ||
     process.env.SERVER_AUTH_REQUIRED === '1'
@@ -183,7 +172,6 @@ export function startServer(port = PORT, host = HOST) {
           return h5AccessDisabledResponse()
         }
 
-        // Handle CORS preflight
         if (req.method === 'OPTIONS') {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
@@ -191,13 +179,11 @@ export function startServer(port = PORT, host = HOST) {
           return new Response(null, { status: 204, headers: cors.headers })
         }
 
-        // WebSocket upgrade
         if (url.pathname.startsWith('/ws/')) {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
           }
 
-          // Enforce authentication when required
           if (authRequired) {
             const authError = await requireH5Token(req, url.searchParams.get('token'))
             if (authError) {
@@ -210,7 +196,6 @@ export function startServer(port = PORT, host = HOST) {
             }
           }
 
-          // Validate session ID format
           const sessionId = url.pathname.split('/').pop() || ''
           if (!sessionId || !/^[0-9a-zA-Z_-]{1,64}$/.test(sessionId)) {
             return new Response('Invalid session ID', { status: 400 })
@@ -229,7 +214,6 @@ export function startServer(port = PORT, host = HOST) {
           return new Response('WebSocket upgrade failed', { status: 400 })
         }
 
-        // Internal SDK WebSocket used by the spawned Claude CLI.
         if (url.pathname.startsWith('/sdk/')) {
           if (classifyH5Request(req, url, h5RequestContext) !== 'internal-sdk') {
             return h5AccessControlRejectedResponse()
@@ -275,13 +259,11 @@ export function startServer(port = PORT, host = HOST) {
           return handleHahaOpenAIOAuthCallback(url)
         }
 
-        // REST API
         if (url.pathname.startsWith('/api/')) {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
           }
 
-          // Enforce authentication when required
           if (authRequired) {
             const authError = await requireH5Token(req)
             if (authError) {
@@ -312,7 +294,6 @@ export function startServer(port = PORT, host = HOST) {
           }
         }
 
-        // Proxy — protocol-translating reverse proxy for OpenAI-compatible APIs
         if (url.pathname.startsWith('/proxy/')) {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
@@ -347,7 +328,6 @@ export function startServer(port = PORT, host = HOST) {
           }
         }
 
-        // Health check
         if (url.pathname === '/health') {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
@@ -359,8 +339,6 @@ export function startServer(port = PORT, host = HOST) {
           )
         }
 
-        // Static H5 shell/assets are non-secret bootstrap content and must load
-        // before the browser can read the QR token; API/proxy/ws stay protected above.
         const staticResponse = await handleStaticH5Request(req, url)
         if (staticResponse) {
           return staticResponse
@@ -378,10 +356,8 @@ export function startServer(port = PORT, host = HOST) {
     throw new Error(message, { cause: error })
   }
 
-  // Start watching ~/.claude/teams/ for real-time WebSocket push
   teamWatcher.start()
 
-  // Start the cron scheduler to execute scheduled tasks
   cronScheduler.start()
 
   void ensureDesktopCliLauncherInstalled().catch((error) => {
@@ -397,7 +373,6 @@ export function startServer(port = PORT, host = HOST) {
   return server
 }
 
-// ─── Graceful shutdown: kill all CLI subprocesses on exit ────────────────────
 import { conversationService } from './services/conversationService.js'
 
 function cleanupAllSessions() {
@@ -426,7 +401,6 @@ process.on('exit', () => {
   cleanupAllSessions()
 })
 
-// Direct execution
 if (import.meta.main) {
   startServer()
 }

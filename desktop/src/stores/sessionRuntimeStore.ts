@@ -29,7 +29,6 @@ function persistSelections(selections: Record<string, RuntimeSelection>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selections))
   } catch {
-    // noop
   }
 }
 

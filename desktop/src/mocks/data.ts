@@ -1,9 +1,3 @@
-/**
- * Mock data for all pages — matches the UI prototypes exactly.
- * Replace with real API calls once server integration is done.
- */
-
-// ─── Sessions ─────────────────────────────────────────────────────
 export const mockSessions = {
   today: [
     { id: 's1', title: 'Refactor login flow', modifiedAt: new Date().toISOString() },
@@ -18,7 +12,6 @@ export const mockSessions = {
   ],
 }
 
-// ─── Active Session Messages ──────────────────────────────────────
 export const mockActiveMessages = [
   {
     id: 'm1',
@@ -43,7 +36,6 @@ export const signToken = (payload) => jwt.sign(payload, SECRET);
   },
 ]
 
-// ─── Agent Teams ──────────────────────────────────────────────────
 export const mockTeam = {
   name: 'session-dev',
   memberCount: 4,
@@ -63,7 +55,6 @@ active: session-dev cluster initiated
 ready: 4 agents assigned`,
 }
 
-// ─── Agent Transcript ─────────────────────────────────────────────
 export const mockTranscript = {
   agentName: 'Frontend Dev',
   messages: [
@@ -101,7 +92,6 @@ export const mockTranscript = {
   ],
 }
 
-// ─── Scheduled Tasks ──────────────────────────────────────────────
 export const mockScheduledTasks = {
   stats: {
     totalTasks: 12,
@@ -137,7 +127,6 @@ export const mockScheduledTasks = {
   ],
 }
 
-// ─── Session Controls ─────────────────────────────────────────────
 export const mockPermissionModes = [
   { id: 'ask', label: 'Ask permissions', description: 'Confirm every file edit or terminal command.', icon: 'lock' },
   { id: 'auto', label: 'Auto accept edits', description: 'DreamCoder writes to disk without asking.', icon: 'edit_note' },
@@ -153,7 +142,6 @@ export const mockModels = [
 
 export const mockEffortLevels = ['Low', 'Medium', 'High', 'Max']
 
-// ─── Tool Inspection (edit_file diff) ─────────────────────────────
 export const mockToolInspection = {
   toolType: 'TOOL CALL',
   toolName: 'edit_file',
@@ -183,14 +171,12 @@ export const mockToolInspection = {
   ],
 }
 
-// ─── New Task Modal ───────────────────────────────────────────────
 export const mockNewTaskDefaults = {
   permissionModes: ['Restricted', 'Standard', 'Full Access'],
   models: ['Claude 3.5 Sonnet', 'Claude 3.5 Haiku', 'Claude 3.5 Opus'],
   frequencies: ['Hourly', 'Daily at 9:00 AM', 'Weekly', 'Monthly', 'Custom cron'],
 }
 
-// ─── Footer / Status Bar ──────────────────────────────────────────
 export const mockStatusBar = {
   user: 'User Avatar',
   username: 'username',

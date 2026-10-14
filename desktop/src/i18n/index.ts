@@ -7,14 +7,6 @@ export type Locale = 'en' | 'zh'
 
 const translations: Record<Locale, Record<string, string>> = { en, zh }
 
-/**
- * Translate a key with optional interpolation params.
- * Falls back to the key itself if no translation is found.
- *
- * @example
- * translate('en', 'settings.providers.connected', { latency: '42' })
- * // => "Connected (42ms)"
- */
 export function translate(
   locale: Locale,
   key: TranslationKey,
@@ -29,14 +21,6 @@ export function translate(
   return text
 }
 
-/**
- * React hook that returns a `t()` function bound to the current locale.
- * Re-renders when the locale changes.
- *
- * @example
- * const t = useTranslation()
- * t('sidebar.newSession')  // => "New session" or "新建会话"
- */
 export function useTranslation() {
   const locale = useSettingsStore((s) => s.locale)
   return useCallback(
@@ -46,10 +30,6 @@ export function useTranslation() {
   )
 }
 
-/**
- * Get a translation outside of React (e.g. in stores).
- * Reads the current locale from the Zustand store directly.
- */
 export function t(key: TranslationKey, params?: Record<string, string | number>): string {
   const locale = useSettingsStore.getState().locale
   return translate(locale, key, params)

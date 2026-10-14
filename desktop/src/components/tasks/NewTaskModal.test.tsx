@@ -32,8 +32,6 @@ describe('NewTaskModal', () => {
         description: '',
         context: '',
       },
-      // With a custom provider active, the list comes from /api/models, which
-      // returns that provider's mapped models.
       availableModels: [
         { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
         { id: 'provider-fast', name: 'provider-fast', description: 'Haiku model', context: '' },

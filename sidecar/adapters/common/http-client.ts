@@ -29,7 +29,6 @@ export type SessionTask = {
 export class AdapterHttpClient {
   readonly httpBaseUrl: string
   private readonly allowedProjectRoots: string[]
-  /** Default timeout for HTTP requests (30 seconds) */
   private static readonly DEFAULT_TIMEOUT_MS = 30_000
 
   constructor(wsUrl: string, options?: { allowedProjectRoots?: string[] }) {
@@ -42,7 +41,6 @@ export class AdapterHttpClient {
       .filter((value): value is string => Boolean(value))
   }
 
-  /** Create an AbortController with timeout */
   private createTimeoutController(timeoutMs = AdapterHttpClient.DEFAULT_TIMEOUT_MS): {
     controller: AbortController
     timer: ReturnType<typeof setTimeout>
@@ -105,10 +103,6 @@ export class AdapterHttpClient {
     }
   }
 
-  /**
-   * Match a project by index (1-based) or fuzzy name from recent projects.
-   * Returns { project, ambiguous[] } — ambiguous is set when multiple projects match.
-   */
   async matchProject(query: string): Promise<{ project?: RecentProject; ambiguous?: RecentProject[] }> {
     const directPath = resolveExistingProjectPath(query)
     if (directPath) {
@@ -132,7 +126,6 @@ export class AdapterHttpClient {
 
     const projects = await this.listRecentProjects()
 
-    // Try as 1-based index
     const num = parseInt(query, 10)
     if (!isNaN(num) && num >= 1 && num <= projects.length && String(num) === query.trim()) {
       return { project: projects[num - 1] }
@@ -140,11 +133,9 @@ export class AdapterHttpClient {
 
     const q = query.toLowerCase()
 
-    // Exact project name match
     const exact = projects.find(p => p.projectName.toLowerCase() === q)
     if (exact) return { project: exact }
 
-    // Fuzzy: name or path contains query
     const matches = projects.filter(p =>
       p.projectName.toLowerCase().includes(q) ||
       p.realPath.toLowerCase().includes(q)

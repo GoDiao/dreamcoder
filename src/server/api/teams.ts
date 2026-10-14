@@ -1,13 +1,3 @@
-/**
- * Teams REST API
- *
- * GET    /api/teams                                — 列出所有团队
- * GET    /api/teams/:name                          — 获取团队详情
- * GET    /api/teams/:name/members/:id/transcript   — 获取成员 transcript
- * POST   /api/teams/:name/members/:id/messages     — 给成员发送消息
- * DELETE /api/teams/:name                          — 删除团队
- */
-
 import { teamService } from '../services/teamService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
@@ -20,13 +10,11 @@ export async function handleTeamsApi(
     const method = req.method
     const teamName = segments[2] ? decodeURIComponent(segments[2]) : undefined
 
-    // ── GET /api/teams ────────────────────────────────────────────────────
     if (method === 'GET' && !teamName) {
       const teams = await teamService.listTeams()
       return Response.json({ teams })
     }
 
-    // ── GET /api/teams/:name/members/:id/transcript ───────────────────────
     if (
       method === 'GET' &&
       teamName &&
@@ -39,7 +27,6 @@ export async function handleTeamsApi(
       return Response.json({ messages })
     }
 
-    // ── POST /api/teams/:name/members/:id/messages ─────────────────────────
     if (
       method === 'POST' &&
       teamName &&
@@ -59,13 +46,11 @@ export async function handleTeamsApi(
       return Response.json({ ok: true })
     }
 
-    // ── GET /api/teams/:name ──────────────────────────────────────────────
     if (method === 'GET' && teamName) {
       const team = await teamService.getTeam(teamName)
       return Response.json(team)
     }
 
-    // ── DELETE /api/teams/:name ───────────────────────────────────────────
     if (method === 'DELETE' && teamName) {
       await teamService.deleteTeam(teamName)
       return Response.json({ ok: true })

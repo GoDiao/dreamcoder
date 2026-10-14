@@ -1,18 +1,5 @@
-/**
- * Pure, stateful extractor that watches a stream of assistant text for
- * markdown image references (`![alt](source)`) and emits PendingUpload
- * records. Used by IM adapters to know which images to upload to IM.
- *
- * - Buffers input so an image marker split across multiple feed() calls
- *   still gets detected.
- * - Dedups by fingerprint of the source so the same image is only emitted
- *   once per watcher lifetime.
- */
-
 import type { PendingUpload } from './attachment-types.js'
 
-// Matches a complete markdown image: ![alt](target)
-// `alt` may be empty; `target` stops at the first closing paren.
 const IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 
 function fingerprint(raw: string): string {
@@ -38,7 +25,7 @@ function classify(target: string): PendingUpload['source'] | null {
   if (target.startsWith('/')) {
     return { kind: 'path', path: target }
   }
-  return null // relative paths — skip, we can't resolve them safely
+  return null
 }
 
 export class ImageBlockWatcher {
@@ -46,7 +33,6 @@ export class ImageBlockWatcher {
   private seen = new Set<string>()
   private accumulated: PendingUpload[] = []
 
-  /** Feed a new chunk of streaming text; returns any NEW PendingUploads. */
   feed(chunk: string): PendingUpload[] {
     this.buffer += chunk
     const out: PendingUpload[] = []
@@ -69,7 +55,6 @@ export class ImageBlockWatcher {
       lastConsumedEnd = m.index + m[0].length
     }
 
-    // Preserve tail that might contain a partially-received marker.
     if (lastConsumedEnd > 0) {
       this.buffer = this.buffer.slice(lastConsumedEnd)
     }
@@ -80,12 +65,10 @@ export class ImageBlockWatcher {
     return out
   }
 
-  /** Return everything seen so far (for end-of-stream reconciliation). */
   drain(): PendingUpload[] {
     return [...this.accumulated]
   }
 
-  /** Reset watcher state (use at /clear or new session). */
   reset(): void {
     this.buffer = ''
     this.seen.clear()

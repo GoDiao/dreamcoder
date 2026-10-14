@@ -1,8 +1,3 @@
-/**
- * Filesystem browser & search API — supports directory browsing and file search
- * for the DirectoryPicker component and @-triggered file search popup.
- */
-
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -64,7 +59,6 @@ function isAllowedFilesystemPath(targetPath: string): boolean {
     return true
   }
 
-  // macOS reports /tmp as /private/tmp via native folder pickers and realpath().
   if (process.platform === 'darwin' && isWithinRoot(resolvedPath, '/private/tmp')) {
     return true
   }
@@ -108,7 +102,6 @@ async function handleServeFile(url: URL): Promise<Response> {
     if (!stat.isFile()) {
       return json({ error: 'Not a file' }, 400)
     }
-    // Limit to 50MB
     if (stat.size > 50 * 1024 * 1024) {
       return json({ error: 'File too large' }, 400)
     }
@@ -161,7 +154,6 @@ async function handleBrowse(url: URL): Promise<Response> {
 
     const entries = fs.readdirSync(resolvedPath, { withFileTypes: true })
 
-    // Browse mode: show dot-prefixed project entries while keeping VCS internals hidden.
     const filtered = entries.filter((e) => {
       if (e.isDirectory()) return !isVcsMetadataDirectoryName(e.name)
       return includeFiles
@@ -376,7 +368,6 @@ function loadSearchIgnorePatterns(repoRoot: string, rootPath: string, includeGit
       ig.add(fs.readFileSync(ignorePath, 'utf8'))
       hasPatterns = true
     } catch {
-      // Missing or unreadable ignore files should not break suggestions.
     }
   }
 

@@ -65,19 +65,6 @@ if [[ "${SKIP_INSTALL:-0}" != "1" ]]; then
   (cd "${DESKTOP_DIR}" && bun install)
 fi
 
-# ── 清理 + 显式预热前端 / sidecar ────────────────────────────
-# 之前遇到过两类"改了源码,build 出来的 .app 还是旧行为"的诡异 case:
-#   1) Bun.build / Tauri bundler 某一层缓存把旧 sidecar binary 复用进新 .app
-#   2) Tauri/Rust target 缓存复用旧编译缓存,导致新 dist 没被嵌进去
-# 第二类尤其隐蔽: dist 是新的,sidecar 也是新的,但 WebView 运行的还是旧前端。
-#
-# 默认做四件事强制 fresh build:
-#   1) 硬删 sidecar 源 binary + Tauri target/bundle 目录 + 前端 dist
-#   2) 显式跑 bun run build + bun run build:sidecars
-#   3) tauri build 用 --config 覆盖 beforeBuildCommand 为 true(no-op),
-#      避免 sidecar 被重复编译浪费 ~10s
-#   4) 复制到 canonical output 前再次清空输出目录
-# 任一步失败,整个脚本立即退出(set -e)。
 echo "[build-macos-arm64] Cleaning stale sidecar binaries, frontend output, and Tauri bundle cache..."
 rm -rf "${DESKTOP_DIR}/src-tauri/binaries/claude-sidecar-"*
 rm -rf "${DESKTOP_DIR}/dist"
@@ -189,7 +176,6 @@ build_canonical_dmg() {
   cp -R "${app_bundle}" "${staging_dir}/"
   ln -s /Applications "${staging_dir}/Applications"
 
-  # Create a read-write DMG first so we can customize the Finder layout
   hdiutil create \
     -volname "DreamCoder" \
     -srcfolder "${staging_dir}" \
@@ -199,17 +185,11 @@ build_canonical_dmg() {
 
   rm -rf "${staging_dir}"
 
-  # Mount the read-write DMG and apply Finder layout via AppleScript
   local dev_name mount_dir
   dev_name=$(hdiutil attach -readwrite -noverify -noautoopen -nobrowse "${rw_dmg}" \
     | grep -E '^/dev/' | head -1 | awk '{print $1}')
   mount_dir=$(hdiutil info | grep -E "${dev_name}" | tail -1 | awk '{$1=$2=""; print}' | xargs)
 
-  # Finder AppleScript 在新版 macOS (Sequoia+) 上某些属性
-  # (toolbar/statusbar visible、某些 container window 属性) 不再支持,
-  # 会返回 -10006 错误。美化失败不是 blocker —— 即便 layout 没设上,
-  # DMG 本身还是可用的,只是用户打开时看到的是 Finder 默认排布。
-  # 所以这里允许 osascript 非零退出,只 warn,不让 set -e 炸掉整个脚本。
   if ! osascript <<APPLESCRIPT
 tell application "Finder"
   tell disk "DreamCoder"
@@ -236,12 +216,9 @@ APPLESCRIPT
   fi
 
   sync
-  # osascript 可能已经让 Finder 打开了 volume 窗口,正常 detach 可能因为
-  # "Resource busy" 失败。失败时用 -force 二次尝试。
   hdiutil detach "${dev_name}" -quiet 2>/dev/null \
     || hdiutil detach "${dev_name}" -force -quiet
 
-  # Convert to compressed read-only DMG
   hdiutil convert "${rw_dmg}" -format UDZO -o "${dmg_output}" -ov >/dev/null
   rm -f "${rw_dmg}"
 }
@@ -262,10 +239,6 @@ sign_canonical_app_bundle() {
     sidecar_cdhash_before="$(codesign_cdhash "${sidecar}")"
   fi
 
-  # Tauri --no-sign leaves the outer .app with no sealed resources, which
-  # fails strict bundle validation once Resources/icon.icns exists. Sign only
-  # the outer bundle: do not pass --deep, because re-signing claude-sidecar
-  # changes its code-signature hash and breaks existing macOS Keychain ACLs.
   codesign --force --sign - --timestamp=none "${app_bundle}"
 
   if [[ -x "${sidecar}" ]]; then
@@ -282,19 +255,8 @@ sign_canonical_app_bundle() {
 }
 
 if [[ -n "${LATEST_APP}" ]]; then
-  # Normalize the Tauri-produced app in place before copying it anywhere.
-  # Without this, opening target/.../bundle/macos/Claude Code Haha.app directly
-  # uses the executable's ad-hoc signing identifier instead of the app bundle id,
-  # which makes macOS notification authorization behave like a different app.
   sign_canonical_app_bundle "${LATEST_APP}"
 
-  # 不要 deep re-sign。曾经脚本在这里跑过
-  # `codesign --force --deep --sign - --identifier <bundle-id>` 来统一
-  # sidecar 和外层的 signing identifier,但这会改变 sidecar binary 的
-  # code signature hash —— macOS Keychain ACL 按 hash 识别 caller,
-  # 重签完再访问时会被 ACL 当作"陌生 binary"静默拒绝,导致 CLI 读不到
-  # OAuth token,最终请求打到 Anthropic 返回 403 "Request not allowed"。
-  # 这里只浅签外层 bundle,让 .app 拥有有效资源封印,同时保留 sidecar hash。
   cp -R "${LATEST_APP}" "${CANONICAL_OUTPUT_DIR}/"
   sign_canonical_app_bundle "${CANONICAL_OUTPUT_DIR}/${APP_BUNDLE_NAME}"
   rm -f "${CANONICAL_OUTPUT_DIR}/"*.dmg

@@ -1,7 +1,3 @@
-/**
- * MCP curated registry — schema and catalog validation tests.
- */
-
 import { describe, it, expect } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -16,7 +12,6 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CATALOG_PATH = join(HERE, '..', '..', '..', 'mcp-registry.json')
 
-/** A minimal entry that passes; tests mutate one field at a time. */
 function validEntry(overrides: Record<string, unknown> = {}) {
   return {
     id: 'example-server',
@@ -246,7 +241,6 @@ describe('shipped catalog', () => {
   it('validates against the schema', () => {
     const r = validateRegistry(catalog)
     if (!r.ok) {
-      // Surface the actual failures in the assertion message.
       throw new Error(
         `catalog is invalid:\n${r.errors.map((e) => `  ${e.path}: ${e.message}`).join('\n')}`,
       )

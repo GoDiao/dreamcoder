@@ -1,10 +1,3 @@
-/**
- * Desktop UI Preferences REST API
- *
- * GET  /api/desktop-ui/preferences          — read dreamcoder UI preferences
- * PUT  /api/desktop-ui/preferences/sidebar  — persist sidebar project preferences
- */
-
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { DesktopUiPreferencesService } from '../services/desktopUiPreferencesService.js'
 

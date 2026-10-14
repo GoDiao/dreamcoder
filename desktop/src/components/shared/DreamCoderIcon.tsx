@@ -29,11 +29,9 @@ export function DreamCoderIcon({ size = 32, className }: { size?: number; classN
         </filter>
       </defs>
 
-      {/* Background */}
       <rect width="512" height="512" rx="112" fill="url(#dc-bg)" />
       <rect x="6" y="6" width="500" height="500" rx="108" fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeOpacity="0.18" />
 
-      {/* Terminal chevron */}
       <g filter="url(#dc-shadow)">
         <polyline
           points="168,174 296,256 168,338"
@@ -45,10 +43,8 @@ export function DreamCoderIcon({ size = 32, className }: { size?: number; classN
         />
       </g>
 
-      {/* Cursor bar */}
       <rect x="296" y="318" width="88" height="36" rx="18" fill="url(#dc-main)" opacity="0.85" />
 
-      {/* Large sparkle */}
       <g filter="url(#dc-glow)" transform="translate(358, 148)">
         <ellipse rx="9" ry="38" fill="url(#dc-sparkle)" opacity="0.95" />
         <ellipse rx="38" ry="9" fill="url(#dc-sparkle)" opacity="0.95" />
@@ -56,7 +52,6 @@ export function DreamCoderIcon({ size = 32, className }: { size?: number; classN
         <ellipse rx="6" ry="26" fill="url(#dc-sparkle)" opacity="0.7" transform="rotate(-45)" />
       </g>
 
-      {/* Small sparkle */}
       <g filter="url(#dc-glow)" transform="translate(400, 310)" opacity="0.55">
         <ellipse rx="5" ry="20" fill="var(--color-primary)" />
         <ellipse rx="20" ry="5" fill="var(--color-primary)" />
@@ -64,13 +59,11 @@ export function DreamCoderIcon({ size = 32, className }: { size?: number; classN
         <ellipse rx="3.5" ry="14" fill="var(--color-primary)" transform="rotate(-45)" />
       </g>
 
-      {/* Dot accents */}
       <circle cx="148" cy="152" r="10" fill="var(--color-primary-fixed)" opacity="0.5" />
       <circle cx="130" cy="172" r="5.5" fill="var(--color-primary-fixed-dim)" opacity="0.35" />
       <circle cx="200" cy="390" r="7" fill="var(--color-primary-fixed)" opacity="0.4" />
       <circle cx="178" cy="375" r="4" fill="var(--color-primary-fixed-dim)" opacity="0.3" />
 
-      {/* Outer stroke */}
       <rect width="512" height="512" rx="112" fill="none" stroke="var(--color-primary-fixed)" strokeWidth="3" />
     </svg>
   )

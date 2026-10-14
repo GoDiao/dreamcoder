@@ -6,8 +6,8 @@ describe('MessageBuffer', () => {
     const flushed: Array<{ text: string; isComplete: boolean }> = []
     const buf = new MessageBuffer(
       (text, isComplete) => { flushed.push({ text, isComplete }) },
-      500,  // 500ms interval
-      1000, // 1000 char threshold
+      500,
+      1000,
     )
 
     buf.append('Hello ')
@@ -17,7 +17,6 @@ describe('MessageBuffer', () => {
     expect(flushed.length).toBeGreaterThanOrEqual(1)
     const allText = flushed.map((f) => f.text).join('')
     expect(allText).toBe('Hello World')
-    // Last flush should be marked complete
     expect(flushed[flushed.length - 1]!.isComplete).toBe(true)
   })
 
@@ -25,13 +24,12 @@ describe('MessageBuffer', () => {
     const flushed: string[] = []
     const buf = new MessageBuffer(
       (text) => { flushed.push(text) },
-      10000, // very long interval (won't trigger)
-      10,    // 10 char threshold
+      10000,
+      10,
     )
 
-    buf.append('12345678901') // 11 chars > threshold
+    buf.append('12345678901')
 
-    // Wait for microtask
     await new Promise((r) => setTimeout(r, 10))
     expect(flushed.length).toBeGreaterThanOrEqual(1)
 
@@ -42,13 +40,12 @@ describe('MessageBuffer', () => {
     const flushed: string[] = []
     const buf = new MessageBuffer(
       (text) => { flushed.push(text) },
-      50, // 50ms interval
+      50,
       1000,
     )
 
     buf.append('hi')
 
-    // Wait for timer
     await new Promise((r) => setTimeout(r, 80))
     expect(flushed).toContain('hi')
 

@@ -87,9 +87,6 @@ static void dc_run_on_main_sync(dispatch_block_t block) {
     dispatch_sync(dispatch_get_main_queue(), block);
 }
 
-// UNUserNotificationCenter throws NSInternalInconsistencyException when the process
-// is not inside an .app bundle (e.g. `tauri dev` runs target/debug/dreamcoder-desktop
-// directly). Callers report this as an error so the frontend falls back to "unsupported".
 static NSString *const DCNotificationsUnavailableError = @"macOS notifications require the app bundle and are unavailable in dev mode";
 
 static BOOL dc_is_app_bundle(void) {

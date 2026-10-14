@@ -1,42 +1,24 @@
-/**
- * TeamWatcher -- monitors ~/.claude/teams/ for changes and pushes
- * real-time updates to all connected WebSocket clients.
- *
- * Uses polling (setInterval) rather than fs.watch for cross-platform reliability.
- * Detects three kinds of events:
- *   - team_created  : a new team directory with config.json appears
- *   - team_update   : an existing team's config.json content changes
- *   - team_deleted  : a previously-seen team directory disappears
- */
-
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { sendToSession, getActiveSessionIds } from '../ws/handler.js'
 import type { ServerMessage, TeamMemberStatus } from '../ws/events.js'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
-
 function getTeamsDir(): string {
   const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
   return path.join(configDir, 'teams')
 }
 
-// ─── TeamWatcher ──────────────────────────────────────────────────────────
-
 export class TeamWatcher {
   private intervalId: ReturnType<typeof setInterval> | null = null
-  private lastSnapshots = new Map<string, string>() // teamName -> raw JSON content
+  private lastSnapshots = new Map<string, string>()
 
-  /** Start polling for team changes. */
   start(intervalMs = 3000): void {
-    if (this.intervalId) return // already running
-    // Run an initial check immediately, then start the interval
+    if (this.intervalId) return
     this.check()
     this.intervalId = setInterval(() => this.check(), intervalMs)
   }
 
-  /** Stop polling. */
   stop(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId)
@@ -44,17 +26,13 @@ export class TeamWatcher {
     }
   }
 
-  /** Visible for testing -- force a single poll cycle. */
   checkNow(): void {
     this.check()
   }
 
-  /** Clear internal snapshot state (useful in tests). */
   reset(): void {
     this.lastSnapshots.clear()
   }
-
-  // ── Core polling logic ─────────────────────────────────────────────────
 
   private check(): void {
     const teamsDir = getTeamsDir()
@@ -63,8 +41,6 @@ export class TeamWatcher {
     try {
       entries = fs.readdirSync(teamsDir, { withFileTypes: true })
     } catch {
-      // teams directory doesn't exist yet -- nothing to watch
-      // If we previously knew about teams, they are now all "deleted"
       for (const [name] of this.lastSnapshots) {
         this.broadcast({ type: 'team_deleted', teamName: name })
       }
@@ -84,40 +60,32 @@ export class TeamWatcher {
       try {
         content = fs.readFileSync(configPath, 'utf-8')
       } catch {
-        // config.json not readable (missing / permissions) -- skip
         continue
       }
 
       const lastContent = this.lastSnapshots.get(teamName)
 
       if (lastContent === undefined) {
-        // New team detected
         this.lastSnapshots.set(teamName, content)
         this.broadcast({ type: 'team_created', teamName })
       } else if (content !== lastContent) {
-        // Team config changed -- extract member statuses and broadcast
         this.lastSnapshots.set(teamName, content)
         try {
           const config = JSON.parse(content)
           const members = this.extractMemberStatuses(config)
-          // Merge inbox-discovered members that are missing from config
           const inboxMembers = this.discoverInboxMembers(teamsDir, teamName, config)
           const subagentMembers = this.discoverSubagentMembers(teamsDir, config)
           const allMembers = [...members, ...inboxMembers, ...subagentMembers]
           this.broadcast({ type: 'team_update', teamName, members: allMembers })
         } catch {
-          // JSON parse failed (likely truncated write) — try to recover partial members
           const recovered = this.recoverPartialMembers(content)
           if (recovered.length > 0) {
             this.broadcast({ type: 'team_update', teamName, members: recovered })
           }
-          // If nothing recoverable, skip broadcast entirely — don't send empty members
         }
       }
-      // else: content unchanged, nothing to do
     }
 
-    // Check for deleted teams (were in lastSnapshots but no longer on disk)
     for (const [name] of this.lastSnapshots) {
       if (!currentTeamNames.has(name)) {
         this.lastSnapshots.delete(name)
@@ -126,16 +94,6 @@ export class TeamWatcher {
     }
   }
 
-  // ── Member status extraction ───────────────────────────────────────────
-
-  /**
-   * Parse the TeamFile config and derive a TeamMemberStatus for each member.
-   *
-   * The raw config has:
-   *   members: [{ agentId, name, agentType, isActive, sessionId, ... }]
-   *
-   * We map `isActive` to the status enum and use `agentType` / `name` as role.
-   */
   extractMemberStatuses(config: Record<string, unknown>): TeamMemberStatus[] {
     const members = config.members
     if (!Array.isArray(members)) return []
@@ -153,14 +111,9 @@ export class TeamWatcher {
 
   private deriveStatus(isActive: boolean | undefined): TeamMemberStatus['status'] {
     if (isActive === false) return 'idle'
-    // isActive === true or undefined => running
     return 'running'
   }
 
-  /**
-   * Discover members from inboxes/ that aren't in config.json.
-   * Fixes the race condition where concurrent writes to config.json lose members.
-   */
   private discoverInboxMembers(
     teamsDir: string,
     teamName: string,
@@ -184,7 +137,7 @@ export class TeamWatcher {
         extra.push({
           agentId: `${name}@${teamName}`,
           role: name,
-          status: 'running', // assume running — they have an inbox
+          status: 'running',
         })
       }
 
@@ -255,13 +208,8 @@ export class TeamWatcher {
     }
   }
 
-  /**
-   * Attempt to recover member data from truncated/corrupted JSON.
-   * Extracts agentId values via regex and constructs minimal member statuses.
-   */
   private recoverPartialMembers(rawContent: string): TeamMemberStatus[] {
     const members: TeamMemberStatus[] = []
-    // Match complete member-like objects: find "agentId":"..." patterns
     const agentIdRegex = /"agentId"\s*:\s*"([^"]+)"/g
     const nameRegex = /"(?:agentType|name)"\s*:\s*"([^"]+)"/g
     const isActiveRegex = /"isActive"\s*:\s*(true|false)/g
@@ -307,7 +255,6 @@ export class TeamWatcher {
             return entry.agentId.split('@')[0] ?? null
           }
         } catch {
-          // Ignore malformed preview lines.
         }
       }
 
@@ -321,8 +268,6 @@ export class TeamWatcher {
       return null
     }
   }
-
-  // ── Broadcasting ───────────────────────────────────────────────────────
 
   private broadcast(message: ServerMessage): void {
     const sessionIds = getActiveSessionIds()

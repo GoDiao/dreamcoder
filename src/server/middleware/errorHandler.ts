@@ -1,7 +1,3 @@
-/**
- * Unified error handling utilities
- */
-
 import { diagnosticsService } from '../services/diagnosticsService.js'
 
 export class ApiError extends Error {

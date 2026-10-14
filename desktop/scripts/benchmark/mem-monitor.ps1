@@ -1,18 +1,3 @@
-# DreamCoder Memory Monitor
-# Samples process memory every N seconds and writes a CSV.
-# Also tails the sidecar log for [mem:xterm] / [mem:sidecar] markers.
-#
-# Usage:
-#   .\mem-monitor.ps1
-#   .\mem-monitor.ps1 -IntervalSec 1 -MaxSamples 300 -Label "before-lru"
-#
-# Output CSV: E:\.cache\tmp\dreamcoder-mem-<label>-<timestamp>.csv
-# Marker log: E:\.cache\tmp\dreamcoder-markers-<label>-<timestamp>.txt
-#
-# [mem:xterm] lines come from the WebView process console — capture them via
-# DevTools or by redirecting Tauri stdout. They appear in the sidecar stdout
-# when the sidecar acts as the JS runtime (non-Tauri dev mode).
-
 param(
     [int]$IntervalSec = 2,
     [string]$OutDir = "E:\.cache\tmp",
@@ -87,7 +72,6 @@ for ($i = 0; $i -lt $MaxSamples; $i++) {
 
             $totalMb += $privateMb
 
-            # Track peak per process name
             if (-not $peakByName.ContainsKey($p.ProcessName) -or $peakByName[$p.ProcessName] -lt $privateMb) {
                 $peakByName[$p.ProcessName] = $privateMb
             }
@@ -110,7 +94,6 @@ for ($i = 0; $i -lt $MaxSamples; $i++) {
     Start-Sleep -Seconds $IntervalSec
 }
 
-# Summary
 Write-Host ""
 Write-Host "=== Peak private memory by process ===" -ForegroundColor Green
 $peakByName.GetEnumerator() | Sort-Object Value -Descending | ForEach-Object {
@@ -120,6 +103,5 @@ Write-Host ""
 Write-Host "[monitor] Done. CSV: $csvPath" -ForegroundColor Green
 Write-Host "[monitor] Run mem-compare.ps1 with two CSVs to get a before/after diff." -ForegroundColor Cyan
 
-# Write marker file placeholder (manual [mem:xterm] lines can be pasted here)
 "# Paste [mem:xterm] / [mem:sidecar] log lines here for correlation" |
     Out-File -FilePath $markerPath -Encoding utf8

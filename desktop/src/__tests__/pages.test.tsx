@@ -72,14 +72,12 @@ vi.mock('../api/sessions', async (importOriginal) => {
   }
 })
 
-// Import all pages
 import { EmptySession } from '../pages/EmptySession'
 import { ActiveSession } from '../pages/ActiveSession'
 import { AgentTeams } from '../pages/AgentTeams'
 import { ScheduledTasks } from '../pages/ScheduledTasks'
 import { ToolInspection } from '../pages/ToolInspection'
 
-// Layout components (chrome is now here, not in pages)
 import { Sidebar } from '../components/layout/Sidebar'
 import { UserMessage } from '../components/chat/UserMessage'
 import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
@@ -116,10 +114,6 @@ function resetPageStores() {
   useChatStore.setState({ sessions: {} })
 }
 
-/**
- * Core rendering tests: content-only pages must render without crashing
- * and contain key structural elements from the prototype.
- */
 describe('Content-only pages render without errors', () => {
   it('EmptySession slash picker includes dynamic skills before the first session starts', async () => {
     vi.mocked(skillsApi.list).mockResolvedValueOnce({
@@ -268,15 +262,12 @@ describe('Content-only pages render without errors', () => {
       },
     })
     const { container } = render(<ActiveSession />)
-    // With empty messages, the hero is shown
     expect(container.innerHTML).toContain('Start Your AI Coding Journey')
-    // ChatInput has a textarea
     const textarea = container.querySelector('textarea')
     expect(textarea).toBeInTheDocument()
     expect(textarea).toHaveAttribute('placeholder', 'Ask anything...')
     expect(textarea).toHaveAttribute('rows', '2')
     expect(container.innerHTML).not.toContain('Preview')
-    // Cleanup
     resetPageStores()
   })
 

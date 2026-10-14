@@ -220,7 +220,6 @@ describe('sessionStore', () => {
 
     if (mode === 'single') await useSessionStore.getState().deleteSession(olderSession.id)
     else await useSessionStore.getState().deleteSessions([olderSession.id])
-    // Leave the tab open to prove refresh cannot resurrect metadata from the tab alone.
     expect(useTabStore.getState().tabs[0]?.sessionId).toBe(olderSession.id)
     refresh.resolve({ sessions: [recentSession], total: 101 })
     await pendingRefresh

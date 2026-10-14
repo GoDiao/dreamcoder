@@ -33,7 +33,6 @@ export function TeamStatusBar() {
 
   if (!activeTeam) return null
 
-  // Filter out leader — main window is already the leader's view
   const members = activeTeam.members.filter(
     (m) => !activeTeam.leadAgentId || m.agentId !== activeTeam.leadAgentId,
   )
@@ -46,7 +45,6 @@ export function TeamStatusBar() {
   return (
     <div className="shrink-0 px-8">
       <div className="mx-auto max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] overflow-hidden mb-2">
-        {/* Header */}
         <button
           onClick={() => setExpanded((v) => !v)}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-container-low)] transition-colors bg-[var(--color-surface-container)]"
@@ -59,7 +57,6 @@ export function TeamStatusBar() {
             {t('teams.team')} {activeTeam.name}
           </span>
 
-          {/* Progress bar */}
           <div className="flex-1 h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden max-w-[200px]">
             <div
               className="h-full rounded-full transition-all duration-300"
@@ -89,7 +86,6 @@ export function TeamStatusBar() {
           </span>
         </button>
 
-        {/* Expanded member list */}
         {expanded && (
           <div className="px-4 pb-2 pt-1 flex flex-col gap-0.5 max-h-[240px] overflow-y-auto border-t border-[var(--color-outline-variant)]/20">
             {members.map((member) => (

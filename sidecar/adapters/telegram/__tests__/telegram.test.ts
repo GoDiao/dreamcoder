@@ -8,13 +8,6 @@ import {
   planTelegramStreamingUpdate,
 } from '../format.js'
 
-/**
- * Telegram Adapter 翻译逻辑测试
- *
- * 由于 grammy Bot 需要实际 Token 才能初始化，
- * 这里测试的是不依赖 Bot 实例的核心翻译逻辑。
- */
-
 describe('Telegram message formatting', () => {
   describe('long message splitting', () => {
     it('splits messages at Telegram 4096 char limit', () => {

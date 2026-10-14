@@ -567,8 +567,6 @@ export function McpSettings() {
             return { ...current, server: updated }
           })
         } catch {
-          // Keep passive checks silent. Explicit reconnect remains the action that
-          // surfaces failures to the user.
         } finally {
           refreshInFlightRef.current.delete(key)
         }

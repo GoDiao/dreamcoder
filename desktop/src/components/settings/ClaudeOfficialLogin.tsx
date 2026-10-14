@@ -1,9 +1,3 @@
-// desktop/src/components/settings/ClaudeOfficialLogin.tsx
-//
-// 显示当前 Claude Official OAuth 登录状态,提供 Login / Logout 按钮。
-// 点击 Login 调 Tauri shell.open 打开浏览器走 OAuth flow;浏览器回 callback
-// 到 haha server 后,store 的 polling 自动刷新 UI 展示"已登录"。
-
 import { useEffect } from 'react'
 import { open as shellOpen } from '@tauri-apps/plugin-shell'
 import { useProviderOAuthStore } from '../../stores/providerOAuthStore'
@@ -40,7 +34,6 @@ export function ClaudeOfficialLogin() {
         })
       }
     } catch {
-      // store.login() errors are already captured into store.error
     }
   }
 

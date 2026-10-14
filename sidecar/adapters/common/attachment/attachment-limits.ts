@@ -1,13 +1,5 @@
-/**
- * Size and MIME restrictions for IM attachments.
- *
- * Limits chosen to sit safely under both Feishu (10 MB image / 30 MB file)
- * and Telegram Bot API (10 MB image / 50 MB file), and under Claude API's
- * own image size bounds.
- */
-
-export const IMAGE_MAX_BYTES = 10 * 1024 * 1024 // 10 MB
-export const FILE_MAX_BYTES = 30 * 1024 * 1024  // 30 MB
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024
+export const FILE_MAX_BYTES = 30 * 1024 * 1024
 
 export const IMAGE_MIME_WHITELIST = [
   'image/jpeg',
@@ -46,7 +38,6 @@ export function checkAttachmentLimit(
     }
     return { ok: true }
   }
-  // kind === 'file'
   if (size > FILE_MAX_BYTES) {
     return {
       ok: false,

@@ -5,7 +5,7 @@ describe('MessageDedup', () => {
   let dedup: MessageDedup
 
   beforeEach(() => {
-    dedup = new MessageDedup(1000, 100) // 1s TTL, 100 max entries
+    dedup = new MessageDedup(1000, 100)
   })
 
   afterEach(() => {
@@ -24,7 +24,7 @@ describe('MessageDedup', () => {
   })
 
   it('allows same ID after TTL expires', async () => {
-    const shortDedup = new MessageDedup(50, 100) // 50ms TTL
+    const shortDedup = new MessageDedup(50, 100)
     expect(shortDedup.tryRecord('msg-1')).toBe(true)
     expect(shortDedup.tryRecord('msg-1')).toBe(false)
     await new Promise((r) => setTimeout(r, 60))
@@ -33,16 +33,12 @@ describe('MessageDedup', () => {
   })
 
   it('evicts oldest entry when at capacity', () => {
-    const smallDedup = new MessageDedup(60_000, 3) // max 3 entries
+    const smallDedup = new MessageDedup(60_000, 3)
     expect(smallDedup.tryRecord('a')).toBe(true)
     expect(smallDedup.tryRecord('b')).toBe(true)
     expect(smallDedup.tryRecord('c')).toBe(true)
-    // Adding 4th should evict 'a'
     expect(smallDedup.tryRecord('d')).toBe(true)
-    // 'a' was evicted, should be treated as new
     expect(smallDedup.tryRecord('a')).toBe(true)
-    // Now store has {c, d, a} — 'b' was evicted when 'a' was re-inserted
-    // 'c' should still be deduped (was not evicted)
     expect(smallDedup.tryRecord('c')).toBe(false)
     smallDedup.destroy()
   })

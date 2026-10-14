@@ -12,8 +12,6 @@ const targetTriple =
 
 const bunTarget = mapTargetTripleToBun(targetTriple)
 
-// 编译前先扫一遍 src/ 把所有缺失的 ant-internal 模块在磁盘上 stub 出来。
-// 见 desktop/scripts/scan-missing-imports.ts。
 console.log('[build-sidecars] scanning for missing imports...')
 const scanProc = Bun.spawn(
   ['bun', 'run', path.join(desktopRoot, 'scripts/scan-missing-imports.ts')],
@@ -26,9 +24,6 @@ if (scanExit !== 0) {
 
 await mkdir(binariesDir, { recursive: true })
 
-// 单一合并 sidecar：server / cli 共享一份 bun runtime + 共享依赖代码。
-// 调用方（Tauri lib.rs / conversationService）通过第一个 positional 参数
-// 选择 'server' 或 'cli' 模式，详见 desktop/sidecars/dreamcoder-sidecar.ts。
 await compileExecutable({
   entrypoint: path.join(desktopRoot, 'sidecars/dreamcoder-sidecar.ts'),
   outfileBase: path.join(binariesDir, `dreamcoder-sidecar-${targetTriple}`),
@@ -72,8 +67,6 @@ function mapTargetTripleToBun(triple: string) {
     case 'x86_64-apple-darwin':
       return 'bun-darwin-x64'
     case 'x86_64-pc-windows-msvc':
-      // Baseline runs on CPUs without AVX2; the default build crashes there with
-      // "Illegal instruction" before the sidecar starts.
       return 'bun-windows-x64-baseline'
     case 'aarch64-pc-windows-msvc':
       return 'bun-windows-arm64'
@@ -103,17 +96,10 @@ async function compileExecutable({
 }) {
   const result = await Bun.build({
     entrypoints: [entrypoint],
-    // minify whitespace + identifiers + dead-code 大概能省 5-15% 的二进制大小，
-    // 代价是 stack trace 里的函数名变成短名 —— 终端用户场景可接受。
     minify: { whitespace: true, identifiers: true, syntax: true },
     sourcemap: 'none',
     target: 'bun',
-    // 可选 npm 包：开 telemetry / 用 sharp 图像 / 用 Bedrock/Vertex 等
-    // 替代 provider 时才需要，全部不在顶层 package.json 里。标 external
-    // 让 bun build 跳过解析；运行时 import 在没装时自然失败，由 try/catch
-    // 或 feature() gate 兜底。
     external: [
-      // OpenTelemetry exporters（开 OTEL_* env 时才加载）
       '@opentelemetry/exporter-trace-otlp-grpc',
       '@opentelemetry/exporter-trace-otlp-http',
       '@opentelemetry/exporter-trace-otlp-proto',
@@ -124,14 +110,12 @@ async function compileExecutable({
       '@opentelemetry/exporter-metrics-otlp-http',
       '@opentelemetry/exporter-metrics-otlp-proto',
       '@opentelemetry/exporter-prometheus',
-      // 替代 LLM provider —— 默认不用，用户自装
       '@aws-sdk/client-bedrock',
       '@aws-sdk/client-sts',
       '@anthropic-ai/bedrock-sdk',
       '@anthropic-ai/foundry-sdk',
       '@anthropic-ai/vertex-sdk',
       '@azure/identity',
-      // ant-internal / 可选工具
       '@anthropic-ai/mcpb',
       'fflate',
       'sharp',
@@ -159,10 +143,6 @@ async function compileExecutable({
   const outputPath = result.outputs[0]?.path ?? outfileBase
   console.log(`[build-sidecars] ${productName} -> ${outputPath}`)
 
-  // macOS Apple System Policy (ASP) requires valid code signatures on all
-  // executables. Bun-compiled binaries ship with an invalid/empty signature
-  // that causes "load code signature error 4" and SIGKILL at launch.
-  // Fix: strip the broken signature, then ad-hoc sign.
   if (process.platform === 'darwin') {
     await adHocSignMacBinary(outputPath)
   }

@@ -1,5 +1,3 @@
-// Source: src/server/services/teamService.ts, src/server/ws/events.ts
-
 export type TeamSummary = {
   name: string
   memberCount: number
@@ -28,7 +26,6 @@ export type AgentColor = 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orang
 
 export const AGENT_COLORS: AgentColor[] = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan']
 
-/** Lifecycle message types that should be filtered from agent output display */
 export const AGENT_LIFECYCLE_TYPES = new Set([
   'shutdown_approved',
   'shutdown_rejected',

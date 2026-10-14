@@ -1,10 +1,3 @@
-/**
- * Adapters API — IM Adapter 配置读写
- *
- * GET  /api/adapters  → 返回配置（敏感字段脱敏）
- * PUT  /api/adapters  → 更新配置（浅合并），返回更新后的脱敏配置
- */
-
 import { adapterService } from '../services/adapterService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import {
@@ -172,7 +165,6 @@ export async function handleAdaptersApi(
 
     if (req.method === 'PUT') {
       const body = (await req.json()) as Record<string, unknown>
-      // Basic validation: only allow known top-level keys
       for (const key of Object.keys(body)) {
         if (!ALLOWED_TOP_KEYS.has(key)) {
           throw ApiError.badRequest(`Unknown config key: ${key}`)

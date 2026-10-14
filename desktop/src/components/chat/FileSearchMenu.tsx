@@ -89,12 +89,10 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
     return { navigateTo: basePath, searchQuery: trimmed }
   }
 
-  // Load directory entries
   const loadDir = useCallback(async (dirPath: string, searchQuery: string) => {
     setLoading(true)
     setErrorMessage(null)
     setErrorKey(null)
-    // Only update currentPath if actually navigating to a different directory
     if (dirPath !== currentPathRef.current) {
       setCurrentPath(dirPath)
       currentPathRef.current = dirPath
@@ -138,7 +136,6 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
     onNavigate?.(relativePath)
   }, [getRelativePath, loadDir, onNavigate])
 
-  // Keep the explicit workspace root stable when the host session changes.
   useEffect(() => {
     currentPathRef.current = cwd
     rootPathRef.current = cwd
@@ -146,13 +143,11 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
     setCurrentPath(cwd)
   }, [cwd])
 
-  // Initial load: parse filter path and navigate accordingly
   useEffect(() => {
     const { navigateTo, searchQuery } = parseFilter(filter)
     void loadDir(navigateTo, searchQuery)
   }, [cwd, filter, loadDir])
 
-  // Keyboard navigation handler exposed via ref
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -180,18 +175,15 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
       }
       return
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, selectedIndex, selectEntry, navigateEntry])
 
   useImperativeHandle(ref, () => ({ handleKeyDown }), [handleKeyDown])
 
-  // Scroll selected into view
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`) as HTMLButtonElement | null
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex])
 
-  // Build breadcrumb segments from current path relative to cwd
   const breadcrumbs: string[] = []
   if (currentPath !== cwd && currentPath.startsWith(cwd)) {
     const rel = currentPath.slice(cwd.length).replace(/^\//, '')
@@ -273,7 +265,6 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
       }`}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {/* Header with path */}
       <div className="flex items-center gap-1.5 border-b border-[var(--color-border)] px-3 py-2 text-[11px]">
         <span className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">folder_open</span>
         <span className="text-[var(--color-text-tertiary)] font-mono">{cwd.split('/').pop() || cwd}</span>
@@ -291,7 +282,6 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
         )}
       </div>
 
-      {/* File list */}
       <div ref={listRef} className="max-h-[300px] overflow-y-auto py-1">
         {loading && entries.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">{t('fileSearch.searching')}</div>
@@ -310,7 +300,6 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
         )}
       </div>
 
-      {/* Footer hint */}
       {!compact ? (
         <div className="flex items-center gap-1.5 border-t border-[var(--color-border)] px-3 py-1.5 text-[10px] text-[var(--color-text-tertiary)]">
           <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-0.5 font-mono">↑↓</kbd>

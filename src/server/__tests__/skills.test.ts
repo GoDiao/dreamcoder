@@ -354,8 +354,6 @@ describe('Skills API', () => {
       expect.objectContaining({ name: 'draw:render', source: 'plugin' }),
     )
 
-    // Simulates the embedded terminal running the CLI against the same
-    // CLAUDE_CONFIG_DIR while the desktop server process stays alive.
     await fs.writeFile(
       settingsPath,
       JSON.stringify({

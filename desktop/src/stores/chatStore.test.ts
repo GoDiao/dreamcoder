@@ -1347,7 +1347,6 @@ describe('chatStore history mapping', () => {
   })
 
   it('keeps parent tool linkage for live tool events', () => {
-    // Initialize the session first
     useChatStore.setState({
       sessions: {
         [TEST_SESSION_ID]: {

@@ -1,5 +1,3 @@
-// desktop/src/components/settings/ChatGPTOfficialLogin.tsx
-
 import { useEffect, useState } from 'react'
 import { open as shellOpen } from '@tauri-apps/plugin-shell'
 import { Copy, LogIn, LogOut } from 'lucide-react'
@@ -48,7 +46,6 @@ export function ChatGPTOfficialLogin() {
         })
       }
     } catch {
-      // store.login() errors are already captured into store.error
     }
   }
 

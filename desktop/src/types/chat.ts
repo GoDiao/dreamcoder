@@ -1,10 +1,6 @@
 import type { PermissionMode } from './settings'
 import type { RuntimeSelection } from './runtime'
 
-// Source: src/server/ws/events.ts
-
-// ─── Client → Server ──────────────────────────────────────────────
-
 export type ClientMessage =
   | { type: 'prewarm_session' }
   | { type: 'user_message'; content: string; attachments?: AttachmentRef[] }
@@ -50,8 +46,6 @@ export type UIAttachment = {
   note?: string
   quote?: string
 }
-
-// ─── Server → Client ──────────────────────────────────────────────
 
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }
@@ -220,8 +214,6 @@ export type ActiveGoalState = {
   message?: string
   updatedAt: number
 }
-
-// ─── UI Message model (rendered in MessageList) ───────────────────
 
 export type TaskSummaryItem = {
   id: string

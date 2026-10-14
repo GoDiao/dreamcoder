@@ -5,7 +5,6 @@ export function ScheduledTasksEmpty() {
   const t = useTranslation()
   return (
     <div className="bg-[var(--color-background)] text-[var(--color-text-primary)] flex min-h-screen font-[Inter,sans-serif]">
-      {/* SideNavBar */}
       <aside className="fixed left-0 top-0 h-full w-[280px] bg-[var(--color-surface-container-low)] flex flex-col p-4 gap-2 text-sm font-medium z-40">
         <div className="flex items-center gap-3 px-2 mb-6 mt-12">
           <div className="w-8 h-8 rounded bg-[var(--color-surface-container-highest)] flex items-center justify-center">
@@ -22,7 +21,6 @@ export function ScheduledTasksEmpty() {
             <span className="material-symbols-outlined">add</span>
             <span>{t('sidebar.newSession')}</span>
           </div>
-          {/* Active State: Scheduled */}
           <div className="px-3 py-2 bg-[var(--color-background)] text-[var(--color-text-primary)] rounded-lg relative before:content-[''] before:absolute before:left-[-8px] before:w-1 before:h-4 before:bg-[var(--color-brand)] before:rounded-full cursor-pointer duration-200 ease-in-out flex items-center gap-3">
             <span className="material-symbols-outlined">calendar_today</span>
             <span>{t('sidebar.scheduled')}</span>
@@ -54,9 +52,7 @@ export function ScheduledTasksEmpty() {
         </div>
       </aside>
 
-      {/* Main Canvas */}
       <main className="flex-1 ml-[280px] flex flex-col min-h-screen">
-        {/* TopAppBar */}
         <header className="fixed top-0 right-0 left-[280px] z-30 bg-[var(--color-background)] flex justify-between items-center px-6 h-12 w-full border-b border-[var(--color-border)]">
           <div className="flex items-center gap-6 h-full">
             <div className="text-sm font-bold text-[var(--color-text-primary)] uppercase tracking-tighter font-[Manrope,sans-serif]">DreamCoder</div>
@@ -76,14 +72,11 @@ export function ScheduledTasksEmpty() {
           </div>
         </header>
 
-        {/* Content Area */}
         <div className="flex-1 mt-12 mb-8 flex flex-col items-center justify-center p-8 bg-[var(--color-background)]">
           <div className="max-w-2xl w-full text-center">
             <h1 className="text-3xl font-[Manrope,sans-serif] font-extrabold text-[var(--color-text-primary)] tracking-tight mb-16">{t('scheduledPage.title')}</h1>
 
-            {/* Empty State Illustration/Card */}
             <div className="relative group">
-              {/* Architectural Background Detail */}
               <div className="absolute -inset-4 bg-[var(--color-surface-container-low)] rounded-[32px] -z-10 transition-all"></div>
               <div className="flex flex-col items-center py-20 px-8">
                 <div className="w-32 h-32 rounded-full bg-[var(--color-surface-container-high)] flex items-center justify-center mb-10 shadow-sm">
@@ -107,7 +100,6 @@ export function ScheduledTasksEmpty() {
               </div>
             </div>
 
-            {/* Subtle Decorative Bento Elements */}
             <div className="grid grid-cols-3 gap-4 mt-20 opacity-40">
               <div className="h-24 bg-[var(--color-surface-container-low)] rounded-xl border border-[var(--color-border)]/10 flex flex-col items-center justify-center p-4">
                 <span className="material-symbols-outlined text-[var(--color-text-tertiary)] mb-2">commit</span>
@@ -125,7 +117,6 @@ export function ScheduledTasksEmpty() {
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="fixed bottom-0 left-0 w-full h-8 bg-[var(--color-background)] flex items-center justify-between px-4 z-50 border-t border-[var(--color-border)]/20 font-[Inter,sans-serif] text-xs tracking-tight">
           <div className="flex items-center gap-3 text-[var(--color-text-tertiary)]">
             <div className="w-2 h-2 rounded-full bg-[var(--color-success)]"></div>

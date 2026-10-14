@@ -1,31 +1,18 @@
-/**
- * WebSocket Bridge
- *
- * 封装与 Claude Code Desktop 服务端 /ws/:sessionId 的通信。
- * 管理 chatId → sessionId 映射，自动重连，心跳。
- */
-
 import WebSocket from 'ws'
 
-/** Attachment reference — mirrors src/server/ws/events.ts AttachmentRef.
- *  The server will either (a) write base64 `data` to
- *  ~/.claude/uploads/{sessionId}/ and convert to ImageBlockParam, or
- *  (b) read `path` from disk and inject `@"path"` into the prompt. */
 export type AttachmentRef = {
   type: 'file' | 'image'
   name?: string
   path?: string
-  data?: string      // base64 payload (images)
+  data?: string
   mimeType?: string
 }
 
-/** Server → Client message (mirrors src/server/ws/events.ts ServerMessage) */
 export type ServerMessage = {
   type: string
   [key: string]: any
 }
 
-/** Callback for server messages */
 export type MessageHandler = (msg: ServerMessage) => void
 
 type Session = {
@@ -42,11 +29,7 @@ const MAX_RECONNECT_ATTEMPTS = 10
 
 export class WsBridge {
   private sessions = new Map<string, Session>()
-  /** Single handler per chatId — separate from sessions so reconnect doesn't duplicate */
   private handlers = new Map<string, MessageHandler>()
-  /** Per-chat FIFO queue of in-flight handler promises.
-   *  Ensures an async handler for message N completes before handler for N+1
-   *  starts, preventing state races at `await` points. */
   private handlerChains = new Map<string, Promise<void>>()
   private serverUrl: string
   private platform: string
@@ -59,7 +42,6 @@ export class WsBridge {
     this.startHeartbeat()
   }
 
-  /** Connect to a session with a known sessionId. Returns false if already connected. */
   connectSession(chatId: string, sessionId: string): boolean {
     const existing = this.sessions.get(chatId)
     if (existing && existing.ws.readyState === WebSocket.OPEN) {
@@ -69,7 +51,6 @@ export class WsBridge {
     return true
   }
 
-  /** Send a user message to the session bound to chatId. */
   sendUserMessage(
     chatId: string,
     content: string,
@@ -82,12 +63,6 @@ export class WsBridge {
     return this.send(chatId, payload)
   }
 
-  /** Respond to a permission request.
-   *
-   * @param rule - optional rule name to make the permission persistent.
-   *   Currently the server supports `'always'`, which uses the CLI's
-   *   permission_suggestions to produce updatedPermissions so the same
-   *   tool call won't prompt again in this session. Omit for one-shot allow. */
   sendPermissionResponse(
     chatId: string,
     requestId: string,
@@ -103,12 +78,10 @@ export class WsBridge {
     return this.send(chatId, message)
   }
 
-  /** Stop the current generation. */
   sendStopGeneration(chatId: string): boolean {
     return this.send(chatId, { type: 'stop_generation' })
   }
 
-  /** Register (or replace) the handler for server messages on a specific chatId. */
   onServerMessage(chatId: string, handler: MessageHandler): void {
     this.handlers.set(chatId, handler)
   }
@@ -124,7 +97,6 @@ export class WsBridge {
     return session.ws.readyState === WebSocket.OPEN
   }
 
-  /** Reset session for a chatId (e.g. /new command). */
   resetSession(chatId: string): void {
     const session = this.sessions.get(chatId)
     if (session) {
@@ -136,12 +108,10 @@ export class WsBridge {
     this.handlerChains.delete(chatId)
   }
 
-  /** Has a session (connected or handler registered) for chatId. */
   hasSession(chatId: string): boolean {
     return this.sessions.has(chatId) || this.handlers.has(chatId)
   }
 
-  /** Destroy all sessions. */
   destroy(): void {
     this.destroyed = true
     if (this.heartbeatTimer) {
@@ -157,13 +127,10 @@ export class WsBridge {
     this.handlerChains.clear()
   }
 
-  // ------- internal -------
-
   private connect(chatId: string, sessionId: string): void {
     const url = `${this.serverUrl}/ws/${sessionId}`
     const ws = new WebSocket(url)
 
-    // Cancel any pending reconnect timer for this chatId
     const prev = this.sessions.get(chatId)
     if (prev) {
       if (prev.reconnectTimer) clearTimeout(prev.reconnectTimer)
@@ -195,14 +162,9 @@ export class WsBridge {
       const handler = this.handlers.get(chatId)
       if (!handler) return
 
-      // Serialize per-chat handler calls: chain each message onto the previous
-      // one so a slow handler (e.g. one awaiting im.message.create) fully
-      // finishes before the next message's handler runs. This prevents state
-      // races where a later message reads stale map entries set up by an
-      // earlier-but-still-in-flight handler.
       const prev = this.handlerChains.get(chatId) ?? Promise.resolve()
       const next = prev
-        .catch(() => {}) // upstream errors must not poison the chain
+        .catch(() => {})
         .then(() => Promise.resolve().then(() => handler(msg)))
         .catch((err) => {
           console.error(`[WsBridge] Handler error on ${chatId}:`, err)
@@ -228,7 +190,6 @@ export class WsBridge {
     })
   }
 
-  /** Wait until the WebSocket for chatId is open. Resolves false on timeout or error. */
   waitForOpen(chatId: string, timeoutMs = 10_000): Promise<boolean> {
     const session = this.sessions.get(chatId)
     if (!session) return Promise.resolve(false)

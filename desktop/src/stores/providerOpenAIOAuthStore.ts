@@ -1,5 +1,3 @@
-// desktop/src/stores/providerOpenAIOAuthStore.ts
-
 import { createOAuthStore } from './providerOAuthStore'
 import {
   providerOpenAIOAuthApi,

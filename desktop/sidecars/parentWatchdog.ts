@@ -1,10 +1,3 @@
-/**
- * 桌面主进程崩溃（例如未捕获的 NSException）时来不及 kill sidecar，
- * sidecar 会被 launchd/init 收养并一直占着端口。主进程启动 sidecar 时
- * 通过 DREAMCODER_PARENT_PID 传入自己的 pid，这里定期检查它是否还在，
- * 不在了就退出。
- */
-
 export const PARENT_PID_ENV = 'DREAMCODER_PARENT_PID'
 const DEFAULT_INTERVAL_MS = 2_000
 
@@ -19,7 +12,6 @@ export function isProcessAlive(pid: number): boolean {
     process.kill(pid, 0)
     return true
   } catch (err) {
-    // EPERM: the process exists but belongs to another user.
     return (err as NodeJS.ErrnoException).code === 'EPERM'
   }
 }

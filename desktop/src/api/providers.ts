@@ -1,5 +1,3 @@
-// desktop/src/api/providers.ts
-
 import { api } from './client'
 import type {
   SavedProvider,

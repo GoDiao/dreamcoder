@@ -32,7 +32,7 @@ describe('splitMessage', () => {
   it('hard-splits at limit if no natural break', () => {
     const text = 'a'.repeat(50)
     const chunks = splitMessage(text, 20)
-    expect(chunks.length).toBe(3) // 20 + 20 + 10
+    expect(chunks.length).toBe(3)
     expect(chunks.every((c) => c.length <= 20)).toBe(true)
   })
 
@@ -40,7 +40,6 @@ describe('splitMessage', () => {
     const text = 'Hello world. This is a test. Foo bar baz.'
     const chunks = splitMessage(text, 15)
     const joined = chunks.join(' ')
-    // All words should be present
     expect(joined).toContain('Hello')
     expect(joined).toContain('test')
     expect(joined).toContain('baz')
@@ -132,7 +131,7 @@ describe('truncateInput', () => {
   it('truncates long input with ellipsis', () => {
     const long = 'x'.repeat(300)
     const result = truncateInput(long, 100)
-    expect(result.length).toBe(101) // 100 chars + '…'
+    expect(result.length).toBe(101)
     expect(result.endsWith('…')).toBe(true)
   })
 

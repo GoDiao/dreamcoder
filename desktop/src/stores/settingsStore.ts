@@ -45,7 +45,7 @@ function detectSystemLocale(): Locale {
   try {
     const language = navigator.language
     if (typeof language === 'string' && language.toLowerCase().startsWith('zh')) return 'zh'
-  } catch { /* navigator unavailable */ }
+  } catch { }
   return 'en'
 }
 
@@ -53,18 +53,16 @@ function getStoredLocale(): Locale {
   try {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
     if (stored === 'en' || stored === 'zh') return stored
-  } catch { /* localStorage unavailable */ }
-  // First launch: no persisted preference yet. Detect from the OS locale and
-  // persist immediately so subsequent launches never re-run detection.
+  } catch { }
   const detected = detectSystemLocale()
-  try { localStorage.setItem(LOCALE_STORAGE_KEY, detected) } catch { /* noop */ }
+  try { localStorage.setItem(LOCALE_STORAGE_KEY, detected) } catch { }
   return detected
 }
 
 function getStoredOnboardingCompleted(): boolean {
   try {
     return localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY) === 'true'
-  } catch { /* localStorage unavailable */ }
+  } catch { }
   return false
 }
 
@@ -192,7 +190,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setOnboardingCompleted: () => {
     set({ onboardingCompleted: true })
-    try { localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, 'true') } catch { /* noop */ }
+    try { localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, 'true') } catch { }
   },
 
   fetchAll: async () => {
@@ -285,7 +283,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setLocale: (locale) => {
     set({ locale })
-    try { localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* noop */ }
+    try { localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { }
   },
 
   setTheme: async (theme) => {
@@ -456,7 +454,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const { invoke } = await import('@tauri-apps/api/core')
       const result: AppModeConfig = await invoke('get_app_mode')
       set({ appMode: result })
-    } catch { /* silently ignore - not in Tauri or command unavailable */ }
+    } catch { }
   },
 
   setAppMode: async (mode, portableDir) => {
@@ -554,15 +552,11 @@ function normalizeH5AccessSettings(settings: H5AccessSettings | undefined): H5Ac
 async function refreshH5DiagnosticsSilent(
   set: (partial: Partial<SettingsStore>) => void,
 ): Promise<void> {
-  // Best-effort diagnostics refresh. Failure here must not surface as an
-  // error on the main H5 action (enable/disable/regenerate/update), because
-  // the main action has already succeeded by the time we reach this point.
   try {
     const response = await h5AccessApi.get()
     const diagnostics = response?.diagnostics ?? null
     set({ h5AccessDiagnostics: diagnostics })
   } catch {
-    // silent: keep previous diagnostics value
   }
 }
 

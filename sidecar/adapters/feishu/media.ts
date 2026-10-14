@@ -1,14 +1,3 @@
-/**
- * Feishu media service — wraps im.messageResource / im.image / im.file
- * so adapters/feishu/index.ts stays focused on flow control.
- *
- * References:
- *  - Feishu OpenAPI:   POST /open-apis/im/v1/images
- *                      POST /open-apis/im/v1/files
- *                      GET  /open-apis/im/v1/messages/{message_id}/resources/{file_key}
- *  - OpenClaw impl:    openclaw-lark/src/messaging/outbound/media.ts:226,281,323,423,454
- */
-
 import * as Lark from '@larksuiteoapi/node-sdk'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -17,7 +6,6 @@ import type { LocalAttachment } from '../common/attachment/attachment-types.js'
 
 type LarkClient = InstanceType<typeof Lark.Client>
 
-/** Map a filename extension to Feishu's file_type enum. */
 function detectFeishuFileType(
   fileName: string,
 ): 'opus' | 'mp4' | 'pdf' | 'doc' | 'xls' | 'ppt' | 'stream' {
@@ -86,15 +74,12 @@ export class FeishuMediaService {
     private readonly store: AttachmentStore,
   ) {}
 
-  /** Download an image or file the user sent in Feishu into the local stage. */
   async downloadResource(params: DownloadParams): Promise<LocalAttachment> {
     const { messageId, fileKey, kind, sessionId } = params
     const fallbackName = `${fileKey}${kind === 'image' ? '.png' : ''}`
     const name = params.fileName || fallbackName
     const target = this.store.resolvePath('feishu', sessionId, name)
 
-    // node-sdk returns an object with a `.writeFile(target)` helper
-    // that dumps the underlying stream. See OpenClaw media.ts:147 and :237.
     const resp: any = await (this.client.im as any).messageResource.get({
       path: { message_id: messageId, file_key: fileKey },
       params: { type: kind },
@@ -121,9 +106,6 @@ export class FeishuMediaService {
     }
   }
 
-  /** Upload an image buffer, returns image_key.
-   *  The Lark node-sdk type for `image` accepts `Buffer | ReadStream`,
-   *  so passing the buffer directly is the simplest path. */
   async uploadImage(buffer: Buffer, _mime: string): Promise<string> {
     const resp: any = await this.client.im.image.create({
       data: {
@@ -136,7 +118,6 @@ export class FeishuMediaService {
     return key
   }
 
-  /** Upload a non-image file, returns file_key. */
   async uploadFile(buffer: Buffer, fileName: string): Promise<string> {
     const resp: any = await this.client.im.file.create({
       data: {
@@ -150,7 +131,6 @@ export class FeishuMediaService {
     return key
   }
 
-  /** Send an image message to a chat. See OpenClaw media.ts:435. */
   async sendImageMessage(chatId: string, imageKey: string): Promise<void> {
     await this.client.im.message.create({
       params: { receive_id_type: 'chat_id' },
@@ -162,7 +142,6 @@ export class FeishuMediaService {
     })
   }
 
-  /** Send a file message to a chat. See OpenClaw media.ts:466. */
   async sendFileMessage(chatId: string, fileKey: string): Promise<void> {
     await this.client.im.message.create({
       params: { receive_id_type: 'chat_id' },

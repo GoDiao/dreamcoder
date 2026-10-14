@@ -73,7 +73,6 @@ async function resolveH5DistDir(): Promise<string | null> {
         return path.resolve(candidate)
       }
     } catch {
-      // Try the next candidate.
     }
   }
 

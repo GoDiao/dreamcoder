@@ -58,14 +58,6 @@ describe('WsBridge', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// Integration: per-chat handler serialization
-//
-// Reproduces the feishu text→tool→text race: a slow handler on msg 1 must
-// complete BEFORE msg 2's handler starts, otherwise msg 2 reads the stale
-// state msg 1's continuation is about to clear.
-// ---------------------------------------------------------------------------
-
 describe('WsBridge: handler serialization', () => {
   let server: WebSocketServer
   let port: number
@@ -74,7 +66,6 @@ describe('WsBridge: handler serialization', () => {
 
   beforeEach(async () => {
     connections = []
-    // port 0 → let the OS pick a free one
     server = new WebSocketServer({ port: 0 })
     server.on('connection', (ws) => {
       connections.push(ws)
@@ -85,13 +76,11 @@ describe('WsBridge: handler serialization', () => {
   })
 
   afterEach(async () => {
-    // Forcibly kill any server-side sockets (not graceful close) so
-    // WebSocketServer.close() doesn't wait for client FIN.
     for (const ws of connections) {
       try { ws.terminate() } catch {}
     }
     await new Promise<void>((resolve) => {
-      const t = setTimeout(() => resolve(), 500) // hard cap
+      const t = setTimeout(() => resolve(), 500)
       server.close(() => {
         clearTimeout(t)
         resolve()
@@ -119,9 +108,6 @@ describe('WsBridge: handler serialization', () => {
     const bridge = new WsBridge(serverUrl, 'test')
     const events: string[] = []
 
-    // The handler simulates an async side effect that takes varying time.
-    // If handlers ran concurrently, fast msgs could finish before slow ones,
-    // producing an out-of-order `events` array.
     bridge.onServerMessage('chat-1', async (msg: any) => {
       const tag = msg.tag as string
       const delay = msg.delay as number
@@ -135,14 +121,10 @@ describe('WsBridge: handler serialization', () => {
     expect(ok).toBe(true)
     const serverWs = await waitForServerConnection()
 
-    // Blast three messages back-to-back. msg1 is slow, msg2/msg3 are fast.
-    // With serialization: start:1, end:1, start:2, end:2, start:3, end:3
-    // Without serialization: start:1, start:2, start:3, end:2, end:3, end:1
     serverWs.send(JSON.stringify({ tag: '1', delay: 40 }))
     serverWs.send(JSON.stringify({ tag: '2', delay: 5 }))
     serverWs.send(JSON.stringify({ tag: '3', delay: 5 }))
 
-    // Wait long enough for all three handlers to run serially
     await new Promise((r) => setTimeout(r, 200))
 
     expect(events).toEqual([

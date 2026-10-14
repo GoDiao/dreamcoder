@@ -520,7 +520,6 @@ async function updateServer(name: string, body: Record<string, unknown>): Promis
         await runWithCwdOverride(previousLookupCwd, () => addMcpConfig(name, previousConfig, previousScope))
       }
     } catch {
-      // Preserve the original update error below.
     }
 
     const message = error instanceof Error ? error.message : String(error)

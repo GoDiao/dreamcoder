@@ -1,15 +1,6 @@
-/**
- * NotificationService — 定时任务完成后通过 IM 渠道推送通知
- *
- * 直接调用 Telegram Bot API / 飞书 Open API（HTTP），不依赖 adapter sidecar
- * 或第三方 SDK，确保即使 adapter 进程未运行也能推送。
- */
-
 import { adapterService, type AdapterFileConfig } from './adapterService.js'
 import type { TaskRun } from './cronScheduler.js'
 import type { TaskNotificationConfig } from './cronService.js'
-
-// ─── Message formatting ──────────────────────────────────────────────────────
 
 function formatDuration(ms: number): string {
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`
@@ -36,10 +27,6 @@ function statusText(status: TaskRun['status']): string {
   }
 }
 
-/**
- * Build the markdown notification body.
- * Shared between Telegram and Feishu — both support markdown.
- */
 function buildMarkdown(run: TaskRun): string {
   const emoji = statusEmoji(run.status)
   const lines: string[] = []
@@ -68,8 +55,6 @@ function buildMarkdown(run: TaskRun): string {
   return lines.join('\n')
 }
 
-// ─── Telegram ─────────────────────────────────────────────────────────────────
-
 const TELEGRAM_API = 'https://api.telegram.org'
 const TELEGRAM_TEXT_LIMIT = 4000
 
@@ -78,7 +63,6 @@ async function sendTelegram(
   chatId: number | string,
   text: string,
 ): Promise<void> {
-  // Telegram message limit ~4096 chars; trim with margin
   const trimmed = text.length > TELEGRAM_TEXT_LIMIT
     ? text.slice(0, TELEGRAM_TEXT_LIMIT) + '…'
     : text
@@ -98,8 +82,6 @@ async function sendTelegram(
     console.error(`[Notification] Telegram send failed (${resp.status}):`, body)
   }
 }
-
-// ─── Feishu ───────────────────────────────────────────────────────────────────
 
 const FEISHU_API = 'https://open.feishu.cn/open-apis'
 
@@ -122,10 +104,6 @@ async function getFeishuTenantToken(appId: string, appSecret: string): Promise<s
   }
 }
 
-/**
- * Get or create a P2P chat with a user (needed because Feishu send-message
- * requires a chat_id, and pairedUsers stores open_id).
- */
 async function getFeishuChatId(
   token: string,
   userId: string,
@@ -147,7 +125,6 @@ async function getFeishuChatId(
     if (data.code === 0 && data.data?.chat_id) {
       return data.data.chat_id
     }
-    // Fallback: try sending with open_id directly using receive_id_type=open_id
     return null
   } catch (err) {
     console.error('[Notification] Feishu get chat_id error:', err)
@@ -164,13 +141,11 @@ async function sendFeishu(
   const headerTemplate = run.status === 'completed' ? 'green' : 'red'
   const headerTitle = `${emoji} ${run.taskName}`
 
-  // Meta line
   const metaLine = [
     `**Status**: ${statusText(run.status)}`,
     run.durationMs != null ? `**Duration**: ${formatDuration(run.durationMs)}` : '',
   ].filter(Boolean).join('　　')
 
-  // Result / error content
   const bodyParts: string[] = []
   if (run.status === 'failed' && run.error) {
     const errorText = run.error.length > 500 ? run.error.slice(0, 500) + '…' : run.error
@@ -181,7 +156,6 @@ async function sendFeishu(
     bodyParts.push(outputText)
   }
 
-  // Schema 2.0 interactive card — renders markdown correctly
   const elements: Record<string, unknown>[] = [
     { tag: 'markdown', content: metaLine, text_align: 'left' },
   ]
@@ -217,8 +191,6 @@ async function sendFeishu(
     console.error(`[Notification] Feishu send failed (${resp.status}):`, body)
   }
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function sendTaskNotification(
   run: TaskRun,

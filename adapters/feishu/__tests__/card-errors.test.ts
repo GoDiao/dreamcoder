@@ -1,7 +1,3 @@
-/**
- * card-errors 单元测试
- */
-
 import { describe, it, expect } from 'bun:test'
 import {
   CARD_ERROR,

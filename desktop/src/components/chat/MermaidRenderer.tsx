@@ -155,7 +155,6 @@ export function MermaidRenderer({ code }: Props) {
       try {
         viewport.releasePointerCapture(dragState.pointerId)
       } catch {
-        // Ignore capture release failures from synthetic test events.
       }
     }
     dragStateRef.current = null
@@ -255,7 +254,6 @@ export function MermaidRenderer({ code }: Props) {
   return (
     <>
       <div className="my-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5 text-[11px] text-[var(--color-text-tertiary)]">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">account_tree</span>
@@ -276,7 +274,6 @@ export function MermaidRenderer({ code }: Props) {
           </div>
         </div>
 
-        {/* Diagram */}
         <div
           ref={containerRef}
           className="flex items-center justify-center overflow-auto bg-white p-4 cursor-pointer"
@@ -286,7 +283,6 @@ export function MermaidRenderer({ code }: Props) {
         />
       </div>
 
-      {/* Fullscreen preview modal */}
       <Modal open={previewOpen} onClose={handlePreviewClose} width={1100}>
         <div className="space-y-3">
           <div className="flex items-center justify-between">

@@ -20,7 +20,6 @@ function inferLanguage(filePath: string): string {
   return langMap[ext ?? ''] || 'text'
 }
 
-/** Shared warm syntax theme — must stay in sync with CodeViewer */
 const warmSyntaxTheme: PrismTheme = {
   plain: {
     color: 'var(--color-code-fg)',
@@ -121,7 +120,6 @@ export function DiffViewer({ filePath, oldString, newString }: Props) {
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5">
         <div className="min-w-0">
           <div className="truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
@@ -139,7 +137,6 @@ export function DiffViewer({ filePath, oldString, newString }: Props) {
         />
       </div>
 
-      {/* Diff area */}
       <div className="max-h-[400px] overflow-auto">
         <ReactDiffViewer
           oldValue={oldString}

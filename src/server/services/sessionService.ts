@@ -1,10 +1,3 @@
-/**
- * Session Service — 会话文件的读写操作封装
- *
- * 读写 CLI 持久化在 ~/.claude/projects/{sanitized_path}/{sessionId}.jsonl 的会话数据，
- * 确保 Desktop App 与 CLI 的数据完全互通。
- */
-
 import * as fs from 'node:fs/promises'
 import * as fsSync from 'node:fs'
 import * as path from 'node:path'
@@ -30,10 +23,6 @@ import {
 import { registerFilesystemAccessRoot } from './filesystemAccessRoots.js'
 import { normalizeDriveRootPathForPlatform } from './windowsDrivePath.js'
 import { cleanSessionTitleSource } from '../../utils/sessionTitleText.js'
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export type SessionListItem = {
   id: string
@@ -166,7 +155,6 @@ export type TranscriptContextEstimate = {
   }
 }
 
-/** Raw entry parsed from a single JSONL line */
 type RawEntry = {
   type?: string
   subtype?: string
@@ -231,15 +219,7 @@ const NO_RESPONSE_REQUESTED_TEXT = 'No response requested.'
 const TASK_NOTIFICATION_RE = /^<task-notification>\s*[\s\S]*<\/task-notification>$/i
 const TASK_NOTIFICATION_BLOCK_RE = /<task-notification>\s*[\s\S]*?<\/task-notification>/i
 
-// ============================================================================
-// Service
-// ============================================================================
-
 export class SessionService {
-  // --------------------------------------------------------------------------
-  // Config helpers
-  // --------------------------------------------------------------------------
-
   private getConfigDir(): string {
     return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
   }
@@ -248,17 +228,9 @@ export class SessionService {
     return path.join(this.getConfigDir(), 'projects')
   }
 
-  /**
-   * Sanitize a path the same way the shared session storage does.
-   * This must remain Windows-safe, so reserved characters such as ':' are normalized too.
-   */
   private sanitizePath(dirPath: string): string {
     return sanitizePortablePath(dirPath)
   }
-
-  // --------------------------------------------------------------------------
-  // JSONL parsing
-  // --------------------------------------------------------------------------
 
   private async readJsonlFile(filePath: string): Promise<RawEntry[]> {
     let content: string
@@ -278,18 +250,11 @@ export class SessionService {
       try {
         entries.push(JSON.parse(trimmed) as RawEntry)
       } catch {
-        // skip malformed lines
       }
     }
     return entries
   }
 
-  /**
-   * Stream a session file once to extract head+tail entries and count transcript
-   * messages. Optionally retain the latest visible assistant text for session
-   * search, even when it falls outside the head/tail window. Never loads the
-   * full file into memory.
-   */
   private scanSessionFileHead(
     filePath: string,
     headLines: number,
@@ -311,15 +276,12 @@ export class SessionService {
         const trimmed = line.trim()
         if (!trimmed) return
 
-        // Head capture
         if (lineCount < headLines) {
           head.push(trimmed)
         }
-        // Ring buffer for tail
         tailRing[lineCount % tailLines] = trimmed
         lineCount++
 
-        // Fast string match for transcript counting
         if (
           (trimmed.includes('"type":"user"') || trimmed.includes('"type":"assistant"')) &&
           trimmed.includes('"role"')
@@ -339,17 +301,15 @@ export class SessionService {
               !this.shouldHideTranscriptEntry(entry)
             ) {
               const text = this.extractTextBlocks(entry.message.content).join('\n').trim()
-              // Tool/thinking-only records do not replace the last visible reply.
               if (text) lastAssistantMessage = text
             }
-          } catch { /* skip malformed lines, including partially written entries */ }
+          } catch { }
         }
       })
 
       rl.on('close', () => {
         if (settled) return
         settled = true
-        // Reconstruct tail in order from ring buffer
         const tailStart = Math.max(0, lineCount - tailLines)
         const orderedTail: string[] = []
         for (let i = tailStart; i < lineCount; i++) {
@@ -360,7 +320,7 @@ export class SessionService {
         const selected = [...head, ...orderedTail]
         const entries: RawEntry[] = []
         for (const line of selected) {
-          try { entries.push(JSON.parse(line) as RawEntry) } catch { /* skip malformed */ }
+          try { entries.push(JSON.parse(line) as RawEntry) } catch { }
         }
         resolve({ entries, messageCount, lastAssistantMessage })
       })
@@ -480,10 +440,6 @@ export class SessionService {
     ).length
   }
 
-  // --------------------------------------------------------------------------
-  // Entry → MessageEntry conversion
-  // --------------------------------------------------------------------------
-
   private entryToMessage(
     entry: RawEntry,
     parentToolUseId?: string,
@@ -491,12 +447,10 @@ export class SessionService {
     const msg = entry.message
     if (!msg || !msg.role) return null
 
-    // Determine our normalized type
     let type: MessageEntry['type']
     const role = msg.role
 
     if (role === 'user') {
-      // Check if the content is a tool_result array
       if (Array.isArray(msg.content)) {
         const hasToolResult = msg.content.some(
           (block: Record<string, unknown>) => block.type === 'tool_result'
@@ -510,7 +464,6 @@ export class SessionService {
         type = 'user'
       }
     } else if (role === 'assistant') {
-      // Check if the content contains tool_use blocks
       if (Array.isArray(msg.content)) {
         const hasToolUse = msg.content.some(
           (block: Record<string, unknown>) => block.type === 'tool_use'
@@ -941,12 +894,7 @@ export class SessionService {
     return resolved
   }
 
-  // --------------------------------------------------------------------------
-  // Title extraction
-  // --------------------------------------------------------------------------
-
   private extractTitle(entries: RawEntry[]): string {
-    // 1. Look for custom title entry (appended by renameSession) — highest priority
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i]!
       if (e.type === 'custom-title' && e.customTitle) {
@@ -954,13 +902,11 @@ export class SessionService {
       }
     }
 
-    // 2. Goal sessions should keep the original objective as the stable title.
     for (const e of entries) {
       const goalTitle = this.goalCreationCommandTitle(e)
       if (goalTitle) return goalTitle
     }
 
-    // 3. Look for AI-generated title (written by titleService)
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i]!
       if (e.type === 'ai-title' && e.aiTitle) {
@@ -969,7 +915,6 @@ export class SessionService {
       }
     }
 
-    // 4. Look for first non-meta user message as title
     for (const e of entries) {
       if (e.type === 'user' && !e.isMeta && e.message?.role === 'user') {
         const content = e.message.content
@@ -992,14 +937,6 @@ export class SessionService {
     return 'Untitled Session'
   }
 
-  // --------------------------------------------------------------------------
-  // Session file discovery
-  // --------------------------------------------------------------------------
-
-  /**
-   * Find all .jsonl session files across all project directories.
-   * Returns an array of { filePath, projectDir, sessionId }.
-   */
   private async discoverSessionFiles(projectFilter?: string): Promise<
     Array<{ filePath: string; projectDir: string; sessionId: string }>
   > {
@@ -1012,7 +949,6 @@ export class SessionService {
       return []
     }
 
-    // Optionally filter to a specific project
     if (projectFilter) {
       const sanitized = this.sanitizePath(normalizeDriveRootPathForPlatform(projectFilter))
       projectDirs = projectDirs.filter((d) => d === sanitized)
@@ -1023,7 +959,6 @@ export class SessionService {
     for (const dir of projectDirs) {
       const dirPath = path.join(projectsDir, dir)
 
-      // Ensure it's a directory
       try {
         const stat = await fs.stat(dirPath)
         if (!stat.isDirectory()) continue
@@ -1052,14 +987,7 @@ export class SessionService {
     return results
   }
 
-  /**
-   * Convert a sanitized directory name back to the original absolute path.
-   * Reverses sanitizePath(): `-Users-nanmi-workspace` → `/Users/nanmi/workspace`.
-   */
   desanitizePath(sanitized: string): string {
-    // The sanitized form replaces all non-alphanumeric characters with '-'.
-    // This fallback is necessarily lossy, but old Windows transcripts without
-    // session-meta still need the drive separator restored well enough to resume.
     const windowsDrivePath = sanitized.match(/^([a-zA-Z])--(.+)$/)
     if (windowsDrivePath) {
       return `${windowsDrivePath[1]}:${path.win32.sep}${windowsDrivePath[2].replace(/-/g, path.win32.sep)}`
@@ -1070,15 +998,9 @@ export class SessionService {
       return `${windowsDriveRoot[1]}:${path.win32.sep}`
     }
 
-    // On POSIX the original path starts with '/', so the sanitized form starts with '-'.
-    // UNC-style Windows paths also recover to a leading double separator on Windows.
     return sanitized.replace(/-/g, path.sep)
   }
 
-  /**
-   * Find the .jsonl file for a given session ID.
-   * Searches across all project directories since sessions may belong to any project.
-   */
   private async findSessionFiles(
     sessionId: string
   ): Promise<Array<{ filePath: string; projectDir: string }>> {
@@ -1118,7 +1040,6 @@ export class SessionService {
   }
 
   private isValidSessionId(id: string): boolean {
-    // UUID v4 format
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   }
 
@@ -1372,13 +1293,6 @@ export class SessionService {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Public API
-  // --------------------------------------------------------------------------
-
-  /**
-   * List all sessions, optionally filtered by project path.
-   */
   async listSessions(options?: {
     project?: string
     limit?: number
@@ -1406,7 +1320,6 @@ export class SessionService {
     const limit = options?.limit ?? 50
     const paginatedFiles = filesWithStats.slice(offset, offset + limit)
 
-    // Build session list items with metadata from file head/tail only (avoid loading full files)
     const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
       try {
         const { entries: headEntries, messageCount, lastAssistantMessage } = await this.scanSessionFileHead(
@@ -1421,7 +1334,6 @@ export class SessionService {
 
         const title = this.extractTitle(headEntries)
 
-        // Find the earliest timestamp from head entries, fallback to file birthtime
         let createdAt = stat.birthtime.toISOString()
         for (const e of headEntries) {
           if (e.timestamp) {
@@ -1443,7 +1355,6 @@ export class SessionService {
           ...(options?.includeLastAssistantMessage ? { lastAssistantMessage } : {}),
         }
       } catch {
-        // Skip unreadable files
         return null
       }
     }))).filter((item): item is SessionListItem => item !== null)
@@ -1453,9 +1364,6 @@ export class SessionService {
     return { sessions: items, total }
   }
 
-  /**
-   * Get full session detail including all messages.
-   */
   async getSession(sessionId: string): Promise<SessionDetail | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null
@@ -1496,9 +1404,6 @@ export class SessionService {
     }
   }
 
-  /**
-   * Get only the messages for a session (lighter than full detail).
-   */
   async getSessionMessages(sessionId: string): Promise<MessageEntry[]> {
     const mem0 = process.memoryUsage()
     const found = await this.findSessionFile(sessionId)
@@ -1517,21 +1422,13 @@ export class SessionService {
     return messages
   }
 
-  /**
-   * Create a new session file for the given working directory.
-   */
   async createSession(
     workDir?: string,
     repositoryOptions?: CreateSessionRepositoryOptions,
   ): Promise<{ sessionId: string; workDir: string }> {
-    // Default to user home directory when no workDir specified
     const resolvedWorkDir = workDir || os.homedir()
     const sessionId = crypto.randomUUID()
 
-    // Resolve to absolute path. NOTE: path.resolve() uses process.cwd() to
-    // expand relative paths — in bundled sidecar mode the server's cwd is
-    // typically '/'. Callers (IM adapters) already send absolute realPath,
-    // but we log here so cwd regressions are caught early.
     const preparedWorkspace = await resolveSessionWorkspaceLaunch(
       resolvedWorkDir,
       repositoryOptions,
@@ -1550,13 +1447,11 @@ export class SessionService {
     const sanitized = this.sanitizePath(absWorkDir)
     const dirPath = path.join(this.getProjectsDir(), sanitized)
 
-    // Ensure the project directory exists
     await fs.mkdir(dirPath, { recursive: true })
 
     const filePath = path.join(dirPath, `${sessionId}.jsonl`)
     const now = new Date().toISOString()
 
-    // Write an initial file-history-snapshot entry (matches CLI behavior)
     const initialEntry = {
       type: 'file-history-snapshot',
       messageId: crypto.randomUUID(),
@@ -1568,7 +1463,6 @@ export class SessionService {
       isSnapshotUpdate: false,
     }
 
-    // Store actual workDir for later retrieval
     const metaEntry = {
       type: 'session-meta',
       isMeta: true,
@@ -1582,9 +1476,6 @@ export class SessionService {
     return { sessionId, workDir: absWorkDir }
   }
 
-  /**
-   * Delete a session's JSONL file.
-   */
   async deleteSession(sessionId: string): Promise<void> {
     const found = await this.findSessionFile(sessionId)
     if (!found) {
@@ -1627,9 +1518,6 @@ export class SessionService {
     return { successes, failures }
   }
 
-  /**
-   * Rename a session by appending a custom-title entry to its JSONL file.
-   */
   async renameSession(sessionId: string, title: string): Promise<void> {
     if (!title || typeof title !== 'string') {
       throw ApiError.badRequest('title is required')
@@ -1649,9 +1537,6 @@ export class SessionService {
     await this.appendJsonlEntry(found.filePath, entry)
   }
 
-  /**
-   * Append an AI-generated title entry to a session's JSONL file.
-   */
   async appendAiTitle(sessionId: string, title: string): Promise<void> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return
@@ -1677,10 +1562,6 @@ export class SessionService {
     return customTitle
   }
 
-  /**
-   * Get the actual working directory for a session.
-   * First checks for stored session-meta entry, then falls back to desanitizePath.
-   */
   async getSessionWorkDir(sessionId: string): Promise<string | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null
@@ -1701,10 +1582,6 @@ export class SessionService {
     return typeof entry?.cwd === 'string' && entry.cwd.trim() ? entry.cwd : null
   }
 
-  /**
-   * Inspect how a session should be launched.
-   * Placeholder desktop-created sessions have zero transcript messages.
-   */
   async getSessionLaunchInfo(sessionId: string): Promise<SessionLaunchInfo | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null
@@ -1979,10 +1856,6 @@ export class SessionService {
     return notifications
   }
 
-  // --------------------------------------------------------------------------
-  // Private helpers
-  // --------------------------------------------------------------------------
-
   private entriesToMessages(entries: RawEntry[]): MessageEntry[] {
     const messages: MessageEntry[] = []
     const entriesByUuid = new Map<string, RawEntry>()
@@ -2002,10 +1875,8 @@ export class SessionService {
         continue
       }
 
-      // Only process transcript entries (user / assistant / system with messages)
       if (!entry.message?.role) continue
 
-      // Skip meta entries (CLI internal bookkeeping)
       if (entry.isMeta) continue
 
       const isTaskNotification =
@@ -2027,7 +1898,6 @@ export class SessionService {
 
       if (this.shouldHideTranscriptEntry(entry)) continue
 
-      // Skip non-transcript entry types
       const entryType = entry.type
       if (
         entryType !== 'user' &&
@@ -2062,5 +1932,4 @@ export class SessionService {
   }
 }
 
-// Singleton instance for shared use across API handlers
 export const sessionService = new SessionService()

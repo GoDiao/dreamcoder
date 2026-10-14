@@ -1,10 +1,3 @@
-/**
- * CronService — 管理定时任务的增删改查
- *
- * 任务持久化到 ~/.claude/scheduled_tasks.json（JSON 文件）。
- * 文件格式: { "tasks": [ CronTask, ... ] }
- */
-
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
@@ -20,11 +13,11 @@ export type CronTask = {
   id: string
   name?: string
   description?: string
-  cron: string // 5-field cron expression
+  cron: string
   prompt: string
-  createdAt: number // epoch ms
-  lastFiredAt?: string // ISO timestamp of last execution
-  enabled?: boolean // allow disabling without deleting (default true)
+  createdAt: number
+  lastFiredAt?: string
+  enabled?: boolean
   recurring?: boolean
   permanent?: boolean
   permissionMode?: string
@@ -42,24 +35,17 @@ type TasksFile = {
 const TASKS_FILE_WRITE_ATTEMPTS = 2
 
 export class CronService {
-  /** 任务文件路径 */
   private getTasksFilePath(): string {
     const configDir =
       process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
     return path.join(configDir, 'scheduled_tasks.json')
   }
 
-  // ---------------------------------------------------------------------------
-  // 公开方法
-  // ---------------------------------------------------------------------------
-
-  /** 获取所有任务 */
   async listTasks(): Promise<CronTask[]> {
     const data = await this.readTasksFile()
     return data.tasks
   }
 
-  /** 创建新任务 */
   async createTask(
     task: Omit<CronTask, 'id' | 'createdAt'>,
   ): Promise<CronTask> {
@@ -78,7 +64,6 @@ export class CronService {
     return newTask
   }
 
-  /** 更新已有任务 */
   async updateTask(id: string, updates: Partial<CronTask>): Promise<CronTask> {
     const data = await this.readTasksFile()
     const index = data.tasks.findIndex((t) => t.id === id)
@@ -86,14 +71,12 @@ export class CronService {
       throw ApiError.notFound(`Task not found: ${id}`)
     }
 
-    // 不允许修改 id 和 createdAt
     const { id: _id, createdAt: _ca, ...safeUpdates } = updates
     data.tasks[index] = { ...data.tasks[index], ...safeUpdates }
     await this.writeTasksFile(data)
     return data.tasks[index]
   }
 
-  /** 删除任务 */
   async deleteTask(id: string): Promise<void> {
     const data = await this.readTasksFile()
     const index = data.tasks.findIndex((t) => t.id === id)
@@ -104,27 +87,20 @@ export class CronService {
     await this.writeTasksFile(data)
   }
 
-  /** 更新任务的最后执行时间 */
   async updateLastFired(taskId: string, timestamp: string): Promise<void> {
     const data = await this.readTasksFile()
     const index = data.tasks.findIndex((t) => t.id === taskId)
     if (index === -1) {
-      return // Task may have been deleted; silently ignore
+      return
     }
     data.tasks[index].lastFiredAt = timestamp
     await this.writeTasksFile(data)
   }
 
-  // ---------------------------------------------------------------------------
-  // 内部: 文件读写
-  // ---------------------------------------------------------------------------
-
-  /** 读取任务 JSON 文件。文件不存在时返回空列表。 */
   private async readTasksFile(): Promise<TasksFile> {
     try {
       const raw = await fs.readFile(this.getTasksFilePath(), 'utf-8')
       const parsed = JSON.parse(raw) as TasksFile
-      // 兼容异常格式
       if (!Array.isArray(parsed.tasks)) {
         return { tasks: [] }
       }
@@ -139,7 +115,6 @@ export class CronService {
     }
   }
 
-  /** 原子写入任务 JSON 文件 */
   private async writeTasksFile(data: TasksFile): Promise<void> {
     const filePath = this.getTasksFilePath()
     const dir = path.dirname(filePath)

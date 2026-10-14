@@ -1,14 +1,3 @@
-/**
- * HahaOpenAIOAuthService — 桌面端自管 OpenAI OAuth token
- *
- * 为什么存在: macOS Keychain ACL 在 .app 被打上 quarantine 属性后
- * 对无 UI sidecar 静默拒绝,导致 CLI 读不到 OAuth token → 403。
- * 这个 service 把 token 存到 haha 自己的目录,并通过 env 注入给 CLI。
- *
- * 复用 src/services/openaiAuth/client.ts 里的 PKCE + token exchange 逻辑,
- * 不复制粘贴 —— 保证跟 CLI 走同一套协议实现。
- */
-
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'

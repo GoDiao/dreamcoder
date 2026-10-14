@@ -505,7 +505,6 @@ export class PluginService {
           names.add(entry.name.replace(/\.md$/i, ''))
         }
       } catch {
-        // Ignore unreadable plugin component directories and keep rendering.
       }
     }
 
@@ -587,7 +586,6 @@ export class PluginService {
           continue
         }
       } catch {
-        // Fall back to scanning as a skill root.
       }
 
       try {
@@ -601,11 +599,9 @@ export class PluginService {
               skillEntriesByName.set(skillEntry.name, skillEntry)
             }
           } catch {
-            // Ignore non-skill directories.
           }
         }
       } catch {
-        // Ignore unreadable plugin component directories and keep rendering.
       }
     }
 
@@ -805,7 +801,6 @@ export class PluginService {
     try {
       await loadPluginHooks()
     } catch {
-      // Hook loading failures are already represented in the shared plugin errors.
     }
 
     return plugins.reduce((sum, plugin) => {

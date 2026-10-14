@@ -1,20 +1,3 @@
-/**
- * Session REST API Routes
- *
- * 提供会话的 CRUD 操作接口，数据来自 CLI 共享的 JSONL 文件。
- *
- * Routes:
- *   GET    /api/sessions            — 列出会话
- *   GET    /api/sessions/:id        — 获取会话详情
- *   GET    /api/sessions/:id/messages — 获取会话消息
- *   GET    /api/sessions/:id/turn-checkpoints — 获取按轮次保留的 checkpoint 预览
- *   GET    /api/sessions/:id/turn-checkpoints/diff — 获取绑定到指定 checkpoint 的 diff
- *   POST   /api/sessions            — 创建新会话
- *   POST   /api/sessions/batch-delete — 批量删除会话
- *   DELETE /api/sessions/:id        — 删除会话
- *   PATCH  /api/sessions/:id        — 重命名会话
- */
-
 import * as path from 'node:path'
 import { sessionService } from '../services/sessionService.js'
 import { conversationService } from '../services/conversationService.js'
@@ -55,13 +38,9 @@ export async function handleSessionsApi(
   segments: string[]
 ): Promise<Response> {
   try {
-    // segments: ['api', 'sessions', ...rest]
-    const sessionId = segments[2] // may be undefined
-    const subResource = segments[3] // e.g. 'messages'
+    const sessionId = segments[2]
+    const subResource = segments[3]
 
-    // -----------------------------------------------------------------------
-    // Collection routes: /api/sessions
-    // -----------------------------------------------------------------------
     if (!sessionId) {
       switch (req.method) {
         case 'GET':
@@ -76,7 +55,6 @@ export async function handleSessionsApi(
       }
     }
 
-    // Special collection route: /api/sessions/batch-delete
     if (sessionId === 'batch-delete') {
       if (req.method !== 'POST') {
         return Response.json(
@@ -87,19 +65,14 @@ export async function handleSessionsApi(
       return await batchDeleteSessions(req)
     }
 
-    // Special collection route: /api/sessions/recent-projects
     if (sessionId === 'recent-projects' && req.method === 'GET') {
       return await getRecentProjects(url)
     }
 
-    // Special collection route: /api/sessions/repository-context
     if (sessionId === 'repository-context' && req.method === 'GET') {
       return await getSessionRepositoryContext(url)
     }
 
-    // -----------------------------------------------------------------------
-    // Sub-resource routes: /api/sessions/:id/messages
-    // -----------------------------------------------------------------------
     if (subResource === 'messages') {
       if (req.method !== 'GET') {
         return Response.json(
@@ -182,20 +155,13 @@ export async function handleSessionsApi(
       return await handleSessionWorkspaceRoute(sessionId, url, segments[4])
     }
 
-    // Route to conversations handler if sub-resource is 'chat'
     if (subResource === 'chat') {
-      // This is handled by the conversations API, but in case the router
-      // forwards it here, we delegate to the conversations module.
-      // Normally the router should route /api/sessions/:id/chat/* to conversations.
       return Response.json(
         { error: 'NOT_FOUND', message: 'Use /api/sessions/:id/chat via conversations API' },
         { status: 404 }
       )
     }
 
-    // -----------------------------------------------------------------------
-    // Item routes: /api/sessions/:id
-    // -----------------------------------------------------------------------
     switch (req.method) {
       case 'GET':
         return await getSession(sessionId)
@@ -213,10 +179,6 @@ export async function handleSessionsApi(
     return errorResponse(error)
   }
 }
-
-// ============================================================================
-// Handler implementations
-// ============================================================================
 
 async function listSessions(url: URL): Promise<Response> {
   const project = url.searchParams.get('project') || undefined
@@ -588,8 +550,6 @@ async function getSessionInspection(sessionId: string, url: URL): Promise<Respon
     }
 
     if (!includeContext) {
-      // Context can be expensive on large live sessions. The desktop UI loads it
-      // separately when the context tab is actually selected.
     } else if (contextResult.status === 'fulfilled' && contextResult.value) {
       response.context = contextResult.value
     } else {
@@ -643,9 +603,6 @@ async function getGitInfo(sessionId: string): Promise<Response> {
   const launchInfo = await sessionService.getSessionLaunchInfo(sessionId).catch(() => null)
   const repository = launchInfo?.repository
   const worktreeSession = launchInfo?.worktreeSession
-  // The visible business branch comes from Desktop's launch choice when present.
-  // CLI originalBranch is the source checkout before creating the worktree, which
-  // can differ from the selected base ref.
   const sessionBranch = repository?.branch || worktreeSession?.originalBranch || null
   const worktree = repository?.worktree || worktreeSession
     ? {
@@ -659,7 +616,6 @@ async function getGitInfo(sessionId: string): Promise<Response> {
     : null
 
   try {
-    // Get branch name
     const branchProc = Bun.spawn(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: workDir,
       stdout: 'pipe',
@@ -677,7 +633,6 @@ async function getGitInfo(sessionId: string): Promise<Response> {
         : gitBranch
     )
 
-    // Get repo name from remote or directory
     let repoName = ''
     try {
       const remoteProc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
@@ -687,16 +642,13 @@ async function getGitInfo(sessionId: string): Promise<Response> {
       })
       const remoteText = await new Response(remoteProc.stdout).text()
       const remote = remoteText.trim()
-      // Extract repo name from URL: git@github.com:user/repo.git or https://...repo.git
       const match = remote.match(/\/([^/]+?)(?:\.git)?$/) || remote.match(/:([^/]+\/[^/]+?)(?:\.git)?$/)
       repoName = match ? match[1]! : ''
     } catch {
-      // No remote, use directory name
       const parts = workDir.split('/')
       repoName = parts[parts.length - 1] || ''
     }
 
-    // Get short status
     const statusProc = Bun.spawn(['git', 'status', '--porcelain'], {
       cwd: workDir,
       stdout: 'pipe',
@@ -713,7 +665,6 @@ async function getGitInfo(sessionId: string): Promise<Response> {
       worktree,
     })
   } catch {
-    // Not a git repo or git not available
     return Response.json({
       branch: sessionBranch,
       repoName: null,
@@ -858,7 +809,6 @@ type RecentProjectEntry = {
   sessionCount: number
 }
 
-// In-memory cache for recent projects (TTL: 30s)
 let recentProjectsCache: { projects: RecentProjectEntry[]; timestamp: number } | null = null
 const RECENT_PROJECTS_CACHE_TTL = 30_000
 const DESKTOP_WORKTREE_MARKER = '/.claude/worktrees/'
@@ -878,7 +828,6 @@ function isDesktopWorktreeBranchName(branch: string | null): boolean {
 async function getRecentProjects(url: URL): Promise<Response> {
   const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10', 10) || 10, 1), 500)
 
-  // Return cached response if fresh
   if (recentProjectsCache && Date.now() - recentProjectsCache.timestamp < RECENT_PROJECTS_CACHE_TTL) {
     return Response.json({ projects: recentProjectsCache.projects.slice(0, limit) })
   }
@@ -886,7 +835,6 @@ async function getRecentProjects(url: URL): Promise<Response> {
   const { sessions } = await sessionService.listSessions({ limit: 200 })
   const validSessions = sessions.filter((session) => session.workDirExists && session.workDir)
 
-  // First pass: group by logical project root so worktrees stay under the same project.
   const realPathMap = new Map<string, { projectPath: string; modifiedAt: string; sessionCount: number; sessionId: string }>()
   for (const s of validSessions) {
     let realPath: string
@@ -910,7 +858,6 @@ async function getRecentProjects(url: URL): Promise<Response> {
     }
   }
 
-  // Build project list with git info — parallelize git operations
   const entries = Array.from(realPathMap.entries())
   const projects = await Promise.all(
     entries.map(async ([realPath, info]) => {
@@ -927,7 +874,6 @@ async function getRecentProjects(url: URL): Promise<Response> {
         isGit = out.trim() === 'true'
 
         if (isGit) {
-          // Run branch + remote in parallel
           const [branchResult, remoteResult] = await Promise.all([
             (async () => {
               const branchProc = Bun.spawn(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -949,7 +895,7 @@ async function getRecentProjects(url: URL): Promise<Response> {
           branch = isDesktopWorktreeBranchName(branchResult) ? null : branchResult
           repoName = remoteResult
         }
-      } catch { /* not a git repo or dir doesn't exist */ }
+      } catch { }
 
       return {
         projectPath: info.projectPath, realPath, projectName, isGit, repoName, branch,
@@ -958,7 +904,6 @@ async function getRecentProjects(url: URL): Promise<Response> {
     })
   )
 
-  // Sort by most recent
   projects.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
 
   recentProjectsCache = { projects, timestamp: Date.now() }

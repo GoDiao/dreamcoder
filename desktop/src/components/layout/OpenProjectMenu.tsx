@@ -89,7 +89,6 @@ export function OpenProjectMenu({ path }: Props) {
     try {
       await openTarget(targetId, path)
     } catch {
-      // Store state already records the failure; keep the control responsive.
     } finally {
       setOpen(false)
     }

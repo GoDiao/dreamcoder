@@ -15,7 +15,6 @@ Object.assign(globalThis, {
     ISSUES_EXPLAINER: '',
   },
 });
-// Switch to the current workspace
 if (process.env.CALLER_DIR) {
   process.chdir(process.env.CALLER_DIR);
 }

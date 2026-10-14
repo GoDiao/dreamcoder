@@ -1,20 +1,8 @@
-/**
- * TeamService — 读取 CLI 生成的 Agent Teams 配置
- *
- * Team 配置存储在 ~/.claude/teams/{name}/config.json
- * 成员 transcript 存储为 JSONL 文件:
- *   - 有 sessionId 的成员: ~/.claude/projects/{project}/{sessionId}.jsonl
- *   - in-process 成员 (无 sessionId): ~/.claude/projects/{project}/{leadSessionId}/subagents/agent-*.jsonl
- * 成员发现: config.json + inboxes/ 目录 (解决并发写入丢失成员的问题)
- */
-
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { writeToMailbox } from '../../utils/teammateMailbox.js'
-
-// ─── Types ─────────────────────────────────────────────────────────────────
 
 export type TeamMember = {
   agentId: string
@@ -52,7 +40,6 @@ export type TranscriptMessage = {
   parentToolUseId?: string
 }
 
-/** Raw config.json structure written by CLI */
 type TeamFileRaw = {
   name: string
   description?: string
@@ -77,8 +64,6 @@ type TeamFileRaw = {
   }>
 }
 
-// ─── Service ───────────────────────────────────────────────────────────────
-
 export class TeamService {
   private getConfigDir(): string {
     return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
@@ -91,8 +76,6 @@ export class TeamService {
   private getProjectsDir(): string {
     return path.join(this.getConfigDir(), 'projects')
   }
-
-  // ── List all teams ──────────────────────────────────────────────────────
 
   async listTeams(): Promise<TeamSummary[]> {
     const teamsDir = this.getTeamsDir()
@@ -111,23 +94,19 @@ export class TeamService {
 
       try {
         const config = await this.loadTeamConfig(entry.name)
-        // Include inbox-discovered members in the count
         const inboxNames = await this.discoverInboxMembers(entry.name)
         const configNames = new Set(config.members.map((m) => m.name))
         const extraCount = inboxNames.filter((n) => !configNames.has(n)).length
         const summary = this.toSummary(config)
         summary.memberCount += extraCount
-        summary.activeMemberCount += extraCount // assume running if newly discovered
+        summary.activeMemberCount += extraCount
         teams.push(summary)
       } catch {
-        // Skip malformed team directories
       }
     }
 
     return teams
   }
-
-  // ── Get team detail ─────────────────────────────────────────────────────
 
   async getTeam(name: string): Promise<TeamDetail> {
     const config = await this.loadTeamConfig(name)
@@ -145,7 +124,6 @@ export class TeamService {
       sessionId: m.sessionId,
     }))
 
-    // Discover members from inboxes/ that aren't in config.json (race condition fix)
     const inboxNames = await this.discoverInboxMembers(name)
     const configNames = new Set(config.members.map((m) => m.name))
 
@@ -155,7 +133,7 @@ export class TeamService {
           agentId: `${inboxName}@${name}`,
           name: inboxName,
           agentType: 'general-purpose',
-          status: 'running', // assume running since we can see their inbox
+          status: 'running',
           joinedAt: config.createdAt,
           cwd: config.members[0]?.cwd || '',
         })
@@ -194,8 +172,6 @@ export class TeamService {
     }
   }
 
-  // ── Get member transcript ───────────────────────────────────────────────
-
   async getMemberTranscript(
     teamName: string,
     agentId: string,
@@ -208,7 +184,6 @@ export class TeamService {
       )
     }
 
-    // Try config.json member with sessionId first
     const member = config.members.find((m) => m.agentId === agentId)
     if (member?.sessionId) {
       const jsonlPath = await this.findTranscriptFile(member.sessionId)
@@ -217,7 +192,6 @@ export class TeamService {
       }
     }
 
-    // Fallback: search subagents directory for this member's transcript
     if (config.leadSessionId) {
       const subagentPath = await this.findSubagentTranscript(
         config.leadSessionId,
@@ -265,8 +239,6 @@ export class TeamService {
     )
   }
 
-  // ── Delete team ─────────────────────────────────────────────────────────
-
   async deleteTeam(name: string): Promise<void> {
     const config = await this.loadTeamConfig(name)
 
@@ -283,8 +255,6 @@ export class TeamService {
     await fs.rm(teamDir, { recursive: true, force: true })
   }
 
-  // ── Internal helpers ────────────────────────────────────────────────────
-
   private async loadTeamConfig(name: string): Promise<TeamFileRaw> {
     const configPath = path.join(this.getTeamsDir(), name, 'config.json')
 
@@ -296,11 +266,6 @@ export class TeamService {
     }
   }
 
-  /**
-   * Discover member names from the inboxes/ directory.
-   * Each file `{name}.json` in inboxes/ represents a team member.
-   * Excludes the team-lead inbox since the leader is already in config.
-   */
   private async discoverInboxMembers(teamName: string): Promise<string[]> {
     const inboxDir = path.join(this.getTeamsDir(), teamName, 'inboxes')
 
@@ -333,7 +298,6 @@ export class TeamService {
     isActive: boolean | undefined,
   ): 'running' | 'completed' | 'idle' | 'failed' {
     if (isActive === false) return 'idle'
-    // isActive === undefined || isActive === true
     return 'running'
   }
 
@@ -410,7 +374,6 @@ export class TeamService {
     return [...discovered]
   }
 
-  /** Search ~/.claude/projects/ for a JSONL file matching the sessionId. */
   private async findTranscriptFile(
     sessionId: string,
   ): Promise<string | null> {
@@ -434,20 +397,12 @@ export class TeamService {
         await fs.access(candidate)
         return candidate
       } catch {
-        // Not in this project directory
       }
     }
 
     return null
   }
 
-  /**
-   * Search subagents directory for a specific member's transcript.
-   * Path: ~/.claude/projects/{project}/{leadSessionId}/subagents/agent-*.jsonl
-   *
-   * Matches by reading the first user message and checking for the member name
-   * in the `<teammate-message>` content (e.g., "你是 **security-reviewer**").
-   */
   private async findSubagentTranscript(
     leadSessionId: string,
     memberName: string,
@@ -481,8 +436,6 @@ export class TeamService {
         continue
       }
 
-      // Check each subagent file — find the one matching this member
-      // Use the most recent file if multiple match (handles retries)
       let bestMatch: { path: string; mtime: number } | null = null
 
       for (const file of files) {
@@ -504,7 +457,6 @@ export class TeamService {
             }
           }
         } catch {
-          // Skip unreadable files
         }
       }
 
@@ -542,7 +494,6 @@ export class TeamService {
             return entry.agentId.split('@')[0] ?? null
           }
         } catch {
-          // Ignore partial or non-JSON lines in the preview window.
         }
       }
 
@@ -557,7 +508,6 @@ export class TeamService {
     }
   }
 
-  /** Parse a JSONL transcript file into messages. */
   private async parseTranscriptFile(
     filePath: string,
   ): Promise<TranscriptMessage[]> {
@@ -570,7 +520,6 @@ export class TeamService {
       try {
         const entry = JSON.parse(line) as Record<string, unknown>
 
-        // Skip non-message entries (snapshots, meta, etc.)
         const entryType = entry.type as string | undefined
         if (
           entryType !== 'user' &&
@@ -582,7 +531,6 @@ export class TeamService {
           continue
         }
 
-        // Skip meta entries
         if (entry.isMeta) continue
 
         const message: TranscriptMessage = {
@@ -597,7 +545,6 @@ export class TeamService {
 
         messages.push(message)
       } catch {
-        // Skip unparseable lines
       }
     }
 

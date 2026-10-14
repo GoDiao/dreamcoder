@@ -1,5 +1,3 @@
-// desktop/src/api/providerOpenAIOauth.ts
-
 import { api, getBaseUrl } from './client'
 
 import { currentServerPort } from './providerOAuth'

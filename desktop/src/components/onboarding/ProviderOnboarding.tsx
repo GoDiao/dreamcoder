@@ -22,8 +22,6 @@ export function ProviderOnboarding() {
   }, [fetchPresets, presets.length])
 
   if (presets.length === 0) {
-    // fetchPresets 失败只会写入 store 的 error，这里必须给出重试入口，
-    // 否则全新 profile 会永远停在加载动画上（issue #40 的遗留场景）。
     if (error && !isPresetsLoading) {
       return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)]">

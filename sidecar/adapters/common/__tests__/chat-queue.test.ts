@@ -18,7 +18,6 @@ describe('ChatQueue', () => {
       }),
     ])
 
-    // Wait for all to complete
     await new Promise((r) => setTimeout(r, 50))
     expect(order).toEqual([1, 2, 3])
   })
@@ -32,13 +31,12 @@ describe('ChatQueue', () => {
     })
 
     const p2 = enqueue('chat-b', async () => {
-      order.push('b') // should run immediately, not wait for chat-a
+      order.push('b')
     })
 
     await Promise.all([p1, p2])
     await new Promise((r) => setTimeout(r, 50))
 
-    // 'b' should appear before 'a' since chat-a has a delay
     expect(order[0]).toBe('b')
     expect(order[1]).toBe('a')
   })
@@ -52,7 +50,7 @@ describe('ChatQueue', () => {
     })
 
     await enqueue('chat-err', async () => {
-      order.push(2) // should still run
+      order.push(2)
     })
 
     await new Promise((r) => setTimeout(r, 20))

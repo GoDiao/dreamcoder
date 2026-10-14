@@ -480,7 +480,6 @@ function BashPathSettings({ isTauri }: { isTauri: boolean }) {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
-      // ignore
     } finally {
       setSaving(false)
     }
@@ -503,7 +502,6 @@ function BashPathSettings({ isTauri }: { isTauri: boolean }) {
         setInvalid(false)
       }
     } catch {
-      // user cancelled
     }
   }
 

@@ -1,5 +1,3 @@
-// desktop/src/stores/providerStore.ts
-
 import { create } from 'zustand'
 import { providersApi } from '../api/providers'
 import { useChatStore } from './chatStore'
@@ -147,8 +145,6 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   activateProvider: async (id) => {
     await providersApi.activate(id)
     await get().fetchProviders()
-    // 更新默认 provider 时，同步刷新默认 model，避免 settings.json 里残留
-    // 旧 provider 的 model id 导致默认选择指向不存在的模型。
     const settings = useSettingsStore.getState()
     if (id === OPENAI_OFFICIAL_PROVIDER_ID) {
       await settings.setModel(OPENAI_OFFICIAL_DEFAULT_MODEL_ID)
@@ -165,7 +161,6 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   activateOfficial: async () => {
     await providersApi.activateOfficial()
     await get().fetchProviders()
-    // 切回官方默认时同样重置 currentModel，避免残留第三方 model id。
     const settings = useSettingsStore.getState()
     await settings.setModel(OFFICIAL_DEFAULT_MODEL_ID)
     await settings.fetchAll()

@@ -14,14 +14,12 @@ export function TaskList({ tasks }: Props) {
 
   return (
     <div>
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <StatCard label={t('tasks.totalTasks')} value={String(tasks.length)} />
         <StatCard label={t('tasks.active')} value={String(enabledCount)} />
         <StatCard label={t('tasks.disabled')} value={String(tasks.length - enabledCount)} />
       </div>
 
-      {/* Task rows — accordion: only one logs panel open at a time */}
       <div className="flex flex-col">
         {tasks.map((task) => (
           <TaskRow

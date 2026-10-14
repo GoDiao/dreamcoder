@@ -1,12 +1,6 @@
-/**
- * Unit tests for proxy streaming SSE transformation
- */
-
 import { describe, test, expect } from 'bun:test'
 import { openaiChatStreamToAnthropic } from '../proxy/streaming/openaiChatStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiResponsesStreamToAnthropic.js'
-
-// ─── Helpers ────────────────────────────────────────────────────
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -44,14 +38,11 @@ async function collectSse(stream: ReadableStream<Uint8Array>): Promise<Array<{ e
       try {
         events.push({ event, data: JSON.parse(data) })
       } catch {
-        // skip unparseable
       }
     }
   }
   return events
 }
-
-// ─── OpenAI Chat Completions SSE → Anthropic SSE ───────────────
 
 describe('openaiChatStreamToAnthropic', () => {
   test('basic text streaming', async () => {
@@ -67,7 +58,6 @@ describe('openaiChatStreamToAnthropic', () => {
     const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
     const events = await collectSse(anthropicStream)
 
-    // Should have: message_start, content_block_start, content_block_delta x2, message_delta, content_block_stop, message_stop
     const eventTypes = events.map((e) => e.event)
     expect(eventTypes[0]).toBe('message_start')
     expect(eventTypes).toContain('content_block_start')
@@ -75,18 +65,15 @@ describe('openaiChatStreamToAnthropic', () => {
     expect(eventTypes).toContain('message_delta')
     expect(eventTypes).toContain('message_stop')
 
-    // Check message_start
     const msgStart = events.find((e) => e.event === 'message_start')!
     expect((msgStart.data.message as Record<string, unknown>).model).toBe('gpt-4')
     expect((msgStart.data.message as Record<string, unknown>).role).toBe('assistant')
 
-    // Check text deltas
     const textDeltas = events.filter((e) => e.event === 'content_block_delta')
     const texts = textDeltas.map((e) => (e.data.delta as Record<string, unknown>).text)
     expect(texts).toContain('Hello')
     expect(texts).toContain(' world')
 
-    // Check stop reason
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('end_turn')
   })
@@ -105,7 +92,6 @@ describe('openaiChatStreamToAnthropic', () => {
     const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
     const events = await collectSse(anthropicStream)
 
-    // Should have content_block_start with type tool_use
     const toolStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
     )
@@ -113,13 +99,11 @@ describe('openaiChatStreamToAnthropic', () => {
     expect((toolStart!.data.content_block as Record<string, unknown>).name).toBe('get_weather')
     expect((toolStart!.data.content_block as Record<string, unknown>).id).toBe('call_1')
 
-    // Should have input_json_delta
     const jsonDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta',
     )
     expect(jsonDeltas.length).toBeGreaterThan(0)
 
-    // Stop reason should be tool_use
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
   })
@@ -149,7 +133,6 @@ describe('openaiChatStreamToAnthropic', () => {
     const upstream = makeStream(['data: [DONE]\n\n'])
     const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
     const events = await collectSse(anthropicStream)
-    // Should at least have message_stop
     expect(events.some((e) => e.event === 'message_stop')).toBe(true)
   })
 
@@ -165,14 +148,12 @@ describe('openaiChatStreamToAnthropic', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
     const types = events.map((e) => e.event)
 
-    // content_block_stop MUST appear before message_delta
     const stopIdx = types.indexOf('content_block_stop')
     const deltaIdx = types.indexOf('message_delta')
     expect(stopIdx).toBeGreaterThan(-1)
     expect(deltaIdx).toBeGreaterThan(-1)
     expect(stopIdx).toBeLessThan(deltaIdx)
 
-    // message_delta before message_stop
     const msgStopIdx = types.indexOf('message_stop')
     expect(deltaIdx).toBeLessThan(msgStopIdx)
   })
@@ -189,25 +170,21 @@ describe('openaiChatStreamToAnthropic', () => {
     const upstream = makeStream(sseChunks)
     const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'deepseek-chat'))
 
-    // Should have thinking block
     const thinkingStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'thinking',
     )
     expect(thinkingStart).toBeDefined()
 
-    // Should have thinking deltas
     const thinkingDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'thinking_delta',
     )
     expect(thinkingDeltas.length).toBeGreaterThan(0)
 
-    // Should have text block after thinking
     const textStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'text',
     )
     expect(textStart).toBeDefined()
 
-    // Text should come after thinking in index order
     expect((textStart!.data as Record<string, unknown>).index).toBeGreaterThan(
       (thinkingStart!.data as Record<string, unknown>).index as number,
     )
@@ -224,7 +201,6 @@ describe('openaiChatStreamToAnthropic', () => {
     const upstream = makeStream(sseChunks)
     const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'glm-5'))
 
-    // Should produce thinking delta from "reasoning" field
     const thinkingDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'thinking_delta',
     )
@@ -262,7 +238,6 @@ describe('openaiChatStreamToAnthropic', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
     const types = events.map((e) => e.event)
 
-    // Should see: text block start, text delta, text block stop, tool block start, ...
     const firstBlockStop = types.indexOf('content_block_stop')
     const toolBlockStart = types.findIndex(
       (_, i) => events[i].event === 'content_block_start' && (events[i].data.content_block as Record<string, unknown>)?.type === 'tool_use',
@@ -270,8 +245,6 @@ describe('openaiChatStreamToAnthropic', () => {
     expect(firstBlockStop).toBeLessThan(toolBlockStart)
   })
 })
-
-// ─── OpenAI Responses SSE → Anthropic SSE ──────────────────────
 
 describe('openaiResponsesStreamToAnthropic', () => {
   test('basic text streaming', async () => {
@@ -297,7 +270,6 @@ describe('openaiResponsesStreamToAnthropic', () => {
     expect(eventTypes).toContain('message_delta')
     expect(eventTypes).toContain('message_stop')
 
-    // Check text deltas
     const textDeltas = events.filter((e) => e.event === 'content_block_delta')
     const texts = textDeltas.map((e) => (e.data.delta as Record<string, unknown>).text)
     expect(texts).toContain('Hello')
@@ -324,20 +296,17 @@ describe('openaiResponsesStreamToAnthropic', () => {
     const anthropicStream = openaiResponsesStreamToAnthropic(upstream, 'gpt-4o')
     const events = await collectSse(anthropicStream)
 
-    // Should have tool_use content_block_start
     const toolStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
     )
     expect(toolStart).toBeDefined()
     expect((toolStart!.data.content_block as Record<string, unknown>).name).toBe('search')
 
-    // Should have input_json_delta
     const jsonDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta',
     )
     expect(jsonDeltas.length).toBeGreaterThan(0)
 
-    // Stop reason should be tool_use
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
   })

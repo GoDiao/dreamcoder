@@ -1,5 +1,3 @@
-// desktop/src/stores/providerOAuthStore.ts
-
 import { create } from 'zustand'
 import { providerOAuthApi, type ProviderOAuthStatus } from '../api/providerOAuth'
 

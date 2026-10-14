@@ -378,9 +378,6 @@ describe('remote H5 auth and CORS integration', () => {
       headers: spoofedHeaders,
     })
     if (apiResponse.status === 200) {
-      // Some local stacks route a request to the machine's own LAN IP as a
-      // loopback peer. In that case this test cannot simulate a distinct LAN
-      // client; the policy-level spoof regression still covers that boundary.
       return
     }
     expect(apiResponse.status).toBe(403)

@@ -10,7 +10,6 @@ export function ScheduledTasksList() {
 
   return (
     <div className="bg-[var(--color-background)] text-[var(--color-text-primary)] flex min-h-screen overflow-hidden font-[Inter,sans-serif]">
-      {/* SideNavBar */}
       <aside className="fixed left-0 top-0 h-full w-[280px] bg-[var(--color-surface-container-low)] flex flex-col p-4 gap-2 z-40">
         <div className="mb-6 px-2 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[var(--color-primary-container)] flex items-center justify-center">
@@ -72,9 +71,7 @@ export function ScheduledTasksList() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col ml-[280px] min-w-0 h-screen">
-        {/* TopAppBar */}
         <header className="bg-[var(--color-background)] h-12 w-full flex justify-between items-center px-6 z-30">
           <div className="flex items-center gap-8">
             <div className="font-[Manrope,sans-serif] font-bold text-[var(--color-text-primary)] uppercase tracking-tighter text-sm">DreamCoder</div>
@@ -100,13 +97,10 @@ export function ScheduledTasksList() {
           </div>
         </header>
 
-        {/* Separation Line */}
         <div className="bg-[var(--color-surface-container-low)] h-[1px] w-full"></div>
 
-        {/* Scrollable Content */}
         <section className="flex-1 overflow-y-auto p-12 bg-[var(--color-background)]">
           <div className="max-w-5xl mx-auto">
-            {/* Page Header */}
             <div className="flex justify-between items-end mb-12">
               <div className="space-y-1">
                 <h1 className="font-[Manrope,sans-serif] text-3xl font-bold tracking-tight text-[var(--color-text-primary)]">{t('scheduledPage.title')}</h1>
@@ -118,9 +112,7 @@ export function ScheduledTasksList() {
               </button>
             </div>
 
-            {/* Bento-style Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-              {/* Total Tasks */}
               <div className="bg-[var(--color-surface-container-low)] p-6 rounded-xl border border-[var(--color-border)]/10">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">{t('tasks.totalTasks')}</span>
@@ -133,7 +125,6 @@ export function ScheduledTasksList() {
                 </div>
               </div>
 
-              {/* Next Run */}
               <div className="bg-[var(--color-surface-container-low)] p-6 rounded-xl border border-[var(--color-border)]/10">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">{t('scheduledPage.nextRun')}</span>
@@ -143,7 +134,6 @@ export function ScheduledTasksList() {
                 <p className="text-sm font-[JetBrains_Mono,monospace] text-[var(--color-secondary)] mt-1">{stats.nextRun.time}</p>
               </div>
 
-              {/* System Health */}
               <div className="bg-[var(--color-surface-container-low)] p-6 rounded-xl border border-[var(--color-border)]/10">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">{t('scheduledPage.systemHealth')}</span>
@@ -154,7 +144,6 @@ export function ScheduledTasksList() {
               </div>
             </div>
 
-            {/* Operational Tasks Table */}
             <div className="bg-[var(--color-surface-container-lowest)] rounded-xl overflow-hidden border border-[var(--color-border)]/20 shadow-[0_4px_20px_rgba(27,28,26,0.04)]">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -167,7 +156,6 @@ export function ScheduledTasksList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]/5">
-                  {/* Task Row 1 - Nightly linting */}
                   <tr className="group hover:bg-[var(--color-surface-container-low)]/30 transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
@@ -212,7 +200,6 @@ export function ScheduledTasksList() {
                     </td>
                   </tr>
 
-                  {/* Task Row 2 - Clean up temp files */}
                   <tr className="group hover:bg-[var(--color-surface-container-low)]/30 transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
@@ -257,7 +244,6 @@ export function ScheduledTasksList() {
                     </td>
                   </tr>
 
-                  {/* Task Row 3 - Database Vacuum */}
                   <tr className="group hover:bg-[var(--color-surface-container-low)]/30 transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
@@ -304,7 +290,6 @@ export function ScheduledTasksList() {
                 </tbody>
               </table>
 
-              {/* End of list placeholder */}
               <div className="p-12 text-center border-t border-[var(--color-border)]/10">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-surface-container-low)] mb-4">
                   <span className="material-symbols-outlined text-[var(--color-text-tertiary)]">history_toggle_off</span>
@@ -314,9 +299,7 @@ export function ScheduledTasksList() {
               </div>
             </div>
 
-            {/* System Logs / Details Panel */}
             <div className="mt-12 flex flex-col md:flex-row gap-8 items-start">
-              {/* Recent Output Logs */}
               <div className="flex-1 space-y-6">
                 <h2 className="font-[Manrope,sans-serif] text-lg font-bold text-[var(--color-text-primary)]">{t('scheduledPage.recentLogs')}</h2>
                 <div className="bg-[var(--color-surface-container-high)] rounded-xl p-6 font-[JetBrains_Mono,monospace] text-[13px] leading-relaxed text-[var(--color-text-secondary)] overflow-x-auto shadow-inner">
@@ -347,7 +330,6 @@ export function ScheduledTasksList() {
                 </div>
               </div>
 
-              {/* Resource Allocation Panel */}
               <div className="w-full md:w-80 shrink-0">
                 <div className="bg-[var(--color-primary-container)]/10 p-6 rounded-xl border border-[var(--color-brand)]/10">
                   <h3 className="font-[Manrope,sans-serif] font-bold text-[var(--color-brand)] text-sm mb-3">{t('scheduledPage.resourceAllocation')}</h3>
@@ -380,7 +362,6 @@ export function ScheduledTasksList() {
           </div>
         </section>
 
-        {/* Footer */}
         <footer className="bg-[var(--color-background)] border-t border-[var(--color-border)]/20 fixed bottom-0 left-0 w-full h-8 flex items-center justify-between px-4 z-50">
           <div className="flex items-center gap-4">
             <span className="font-[Inter,sans-serif] text-xs tracking-tight text-[var(--color-text-tertiary)]">{mockStatusBar.user} &bull; {mockStatusBar.username} &bull; {mockStatusBar.plan}</span>

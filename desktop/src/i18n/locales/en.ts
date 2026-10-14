@@ -1,5 +1,4 @@
 export const en = {
-  // ─── Quick switcher ───────────────────────────────
   'commandPalette.title': 'Switch session',
   'commandPalette.placeholder': 'Search titles or last assistant messages...',
   'commandPalette.close': 'Close session switcher',
@@ -8,7 +7,6 @@ export const en = {
   'commandPalette.loading': 'Loading all sessions...',
   'commandPalette.loadFailed': 'Could not load all sessions. Please try again.',
   'commandPalette.hint': '↑ ↓ to navigate · Enter to open · Esc to close',
-  // ─── Common ──────────────────────────────────────
   'common.cancel': 'Cancel',
   'common.save': 'Save',
   'common.delete': 'Delete',
@@ -25,14 +23,12 @@ export const en = {
   'common.active': 'ACTIVE',
   'common.copyFailed': 'Copy failed.',
 
-  // ─── Provider onboarding ─────────────────────────
   'onboarding.welcome': 'Welcome to DreamCoder',
   'onboarding.tagline': 'A locally run, multi-provider AI coding workspace',
   'onboarding.instructions': 'Add a model provider to get started, or do it later in Settings → Providers.',
   'onboarding.setUpLater': 'Set up later',
   'onboarding.presetsLoadFailed': 'Failed to load presets: ',
 
-  // ─── Sidebar ──────────────────────────────────────
   'sidebar.newSession': 'New session',
   'sidebar.scheduled': 'Scheduled',
   'sidebar.terminal': 'Terminal',
@@ -97,17 +93,14 @@ export const en = {
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
 
-  // ─── Title Bar ──────────────────────────────────────
   'titlebar.code': 'Code',
   'titlebar.terminal': 'Terminal',
   'titlebar.history': 'History',
 
-  // ─── Open Project ──────────────────────────────────────
   'openProject.openProject': 'Open project',
   'openProject.openIn': 'Open in {target}',
   'openProject.openFailed': 'Could not open project',
 
-  // ─── Workspace Panel ───────────────────────────────
   'workspace.changedFiles': 'Changed files',
   'workspace.allFiles': 'All files',
   'workspace.viewTabs': 'Workspace views',
@@ -148,13 +141,11 @@ export const en = {
   'workspace.commentPlaceholder': 'Describe what should change here...',
   'workspace.addCommentToChat': 'Add comment',
 
-  // ─── Status Bar ──────────────────────────────────────
   'status.connected': 'Connected',
   'status.connecting': 'Connecting...',
   'status.reconnecting': 'Reconnecting...',
   'status.disconnected': 'Disconnected',
 
-  // ─── Settings ──────────────────────────────────────
   'settings.title': 'Settings',
   'settings.tab.providers': 'Providers',
   'settings.tab.permissions': 'Permissions',
@@ -167,7 +158,6 @@ export const en = {
   'settings.tab.plugins': 'Plugins',
   'settings.tab.diagnostics': 'Diagnostics',
 
-  // Settings > Usage
   'settings.activity.title': 'Token usage',
   'settings.activity.subtitleLoading': 'Based on local DreamCoder CLI session transcripts',
   'settings.activity.metric.yesterday': 'Yesterday',
@@ -192,7 +182,6 @@ export const en = {
   'settings.activity.less': 'Less',
   'settings.activity.more': 'More',
 
-  // Settings > Terminal
   'settings.terminal.title': 'Terminal',
   'settings.terminal.description': 'Run host-machine commands for plugin, skill, and MCP setup. The desktop app includes the DreamCoder runtime; replace documented claude <args> with the local claude runtime for example: claude plugin install ... or claude mcp add ...',
   'settings.terminal.infoLabel': 'Terminal setup help',
@@ -240,7 +229,6 @@ export const en = {
   'terminal.closePanel': 'Close terminal panel',
   'terminal.resizePanel': 'Resize terminal panel',
 
-  // Settings > Diagnostics
   'settings.diagnostics.title': 'Diagnostics',
   'settings.diagnostics.description': 'Server and CLI runtime logs for debugging startup, provider, and session failures.',
   'settings.diagnostics.refresh': 'Refresh',
@@ -283,7 +271,6 @@ export const en = {
   'errorBoundary.title': 'Something went wrong.',
   'errorBoundary.description': 'The error was recorded in Diagnostics.',
 
-  // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': 'Using official Claude models requires signing in to your Claude.ai account. Click the button below to open the official Claude login page in your browser; you\'ll be returned here after authorizing.',
   'settings.claudeOfficialLogin.loginButton': 'Sign in to Claude',
   'settings.claudeOfficialLogin.loginStarting': 'Opening…',
@@ -294,7 +281,6 @@ export const en = {
   'settings.claudeOfficialLogin.errorPrefix': 'Error: ',
   'settings.claudeOfficialLogin.openBrowserFailed': 'Failed to open browser; please visit the authorization URL manually.',
 
-  // Settings > ChatGPT Official Login
   'settings.chatgptOfficialLogin.intro': 'Sign in with ChatGPT to use GPT models from desktop sessions.',
   'settings.chatgptOfficialLogin.loginButton': 'Sign in with ChatGPT',
   'settings.chatgptOfficialLogin.loginStarting': 'Starting sign-in...',
@@ -307,7 +293,6 @@ export const en = {
   'settings.chatgptOfficialLogin.copyLinkFailed': 'Unable to copy authorization link.',
   'settings.chatgptOfficialLogin.errorPrefix': 'ChatGPT OAuth error: ',
 
-  // Settings > Providers
   'settings.providers.title': 'Providers',
   'settings.providers.description': 'Manage API providers for model access.',
   'settings.providers.addProvider': 'Add Provider',
@@ -389,7 +374,6 @@ export const en = {
   'settings.providers.authStrategyDualDummy': 'Write dummy to both variables',
   'settings.providers.authStrategyDualDummyDesc': 'Local vLLM-compatible services that only need placeholder auth values.',
 
-  // Settings > Permissions
   'settings.permissions.title': 'Permission Mode',
   'settings.permissions.description': 'Controls how tool execution permissions are handled.',
   'settings.permissions.default': 'Ask permissions',
@@ -401,7 +385,6 @@ export const en = {
   'settings.permissions.bypass': 'Bypass all',
   'settings.permissions.bypassDesc': 'Skip all permission checks (dangerous)',
 
-  // Settings > Adapters
   'settings.tab.adapters': 'IM Adapters',
   'settings.adapters.description': 'Configure IM adapters to chat with DreamCoder via WeChat, DingTalk, Telegram, or Feishu.',
   'settings.adapters.telegram': 'Telegram',
@@ -487,7 +470,6 @@ export const en = {
   'settings.adapters.wechatUnbindFailed': 'Failed to unbind WeChat.',
   'settings.adapters.wechatAllowedUsersHint': 'QR binding enables the account only. Users still need to send a pairing code, or you can add allowed WeChat user IDs here.',
 
-  // Settings > MCP
   'settings.mcp.title': 'MCP servers',
   'settings.mcp.description': 'Connect external tools and data sources for DreamCoder. Local, project, and user scopes follow the same behavior as the CLI.',
   'settings.mcp.addServer': 'Add server',
@@ -573,7 +555,6 @@ export const en = {
   'settings.mcp.toast.toggleFailed': 'Failed to update MCP server state',
   'settings.mcp.toast.reconnectFailed': 'Failed to reconnect MCP server',
 
-  // Settings > Agents
   'settings.tab.agents': 'Agents',
   'settings.agents.title': 'Installed Agents',
   'settings.agents.description': 'Browse agents available to Claude across built-in, project, and user sources. Use /agents in TUI to inspect active sources and overrides.',
@@ -612,7 +593,6 @@ export const en = {
   'settings.agents.source.flagSettings': 'CLI arg',
   'settings.agents.source.built-in': 'Built-in',
 
-  // Settings > Skills
   'settings.skills.title': 'Installed Skills',
   'settings.skills.description': 'Skills extend Claude with specialized capabilities. Manage skills in ~/.claude/skills/',
   'settings.skills.browserTitle': 'Browse installed skills',
@@ -654,7 +634,6 @@ export const en = {
   'settings.skills.source.mcp': 'MCP',
   'settings.skills.source.bundled': 'Built-in',
 
-  // Settings > Memory
   'settings.tab.memory': 'Memory',
   'settings.memory.title': 'Project Memory',
   'settings.memory.description': 'Inspect and edit the Markdown memory files Claude writes for each project. These files are stored under ~/.claude/projects/<project>/memory/ and are loaded by the CLI runtime.',
@@ -685,7 +664,6 @@ export const en = {
   'settings.memory.clearSearch': 'Clear search',
   'settings.memory.toggleFolder': 'Toggle {name}',
 
-  // Settings > Plugins
   'settings.plugins.title': 'Installed Plugins',
   'settings.plugins.description': 'Inspect installed plugins, see their health, and apply changes to the desktop runtime.',
   'settings.plugins.browserTitle': 'Browse installed plugins',
@@ -753,7 +731,6 @@ export const en = {
   'settings.plugins.capabilityLabel.mcpServers': 'MCP servers',
   'settings.plugins.capabilityLabel.lspServers': 'LSP servers',
 
-  // Settings > About
   'settings.tab.about': 'About',
   'settings.about.version': 'Version',
   'settings.about.changelog': 'Release Notes',
@@ -767,13 +744,11 @@ export const en = {
   'settings.about.updatesDesc': 'Check GitHub Releases, download the installer, and relaunch after install.',
   'settings.about.updatesNotAvailable': 'The first public release has not been published yet. Update checking is disabled.',
 
-  // Settings > Notifications
   'notifications.agentCompleted.title': 'DreamCoder has finished responding',
   'notifications.permissionPrompt.title': 'DreamCoder needs your confirmation',
   'notifications.permissionPrompt.toolBody': '{toolName} is requesting execution, waiting for permission.',
   'notifications.permissionPrompt.computerUseBody': 'Computer Use is waiting for permission.',
 
-  // Scheduled task run notifications
   'notifications.scheduledTask.title': 'Scheduled task {name}',
   'notifications.scheduledTask.statusCompleted': 'Completed',
   'notifications.scheduledTask.statusFailed': 'Failed',
@@ -781,7 +756,6 @@ export const en = {
   'notifications.scheduledTask.bodyWithDetail': '{status}: {detail}',
   'notifications.scheduledTask.bodyStatusOnly': 'Status: {status}',
 
-  // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',
   'settings.computerUse.description': 'Allow Claude to take screenshots, click, type, and control your computer. Requires Python 3. On macOS, accessibility permissions are also needed.',
@@ -841,7 +815,6 @@ export const en = {
   'settings.computerUse.flagClipboard': 'Clipboard Access',
   'settings.computerUse.flagSystemKeys': 'System Key Combos',
 
-  // Settings > General - Storage
   'settings.general.modeSwitchTitle': 'Switch data storage location?',
   'settings.general.modeSwitchConfirm': 'Save and Restart',
   'settings.general.storageTitle': 'Data Storage Location',
@@ -868,7 +841,6 @@ export const en = {
   'settings.general.storageSwitchDefaultBody': 'After switching back, the desktop app will use the system data source again. Data in the portable directory is not deleted or moved back automatically.',
   'settings.general.storageSwitchRestartBody': 'The app will stop the local server and adapter processes, then relaunch. The new directory takes effect after restart.',
 
-  // Settings > General
   'settings.general.appearanceTitle': 'Appearance',
   'settings.general.appearanceDescription': 'Choose a color theme for your workspace.',
   'settings.general.appearance.light': 'Warm Classic',
@@ -1004,7 +976,6 @@ export const en = {
   'settings.general.uiZoomShortcutResetHint': '0 resets zoom to 100%.',
   'settings.general.uiZoomReset': 'Reset UI zoom to 100%',
 
-  // ─── Empty Session ──────────────────────────────────────
   'empty.title': 'Start Your AI Coding Journey',
   'empty.subtitle': 'Type your request below to begin',
   'empty.noProvider': 'No model provider is configured yet.',
@@ -1021,7 +992,6 @@ export const en = {
   'empty.createError.switchFailed': 'Could not switch the current project branch. Check the Git error, keep your changes safe, then try again. Detail: {detail}',
   'empty.createError.contextFailed': 'Could not inspect this Git project. Check the repository state and try again.',
 
-  // ─── Repository Launch Controls ──────────────────────────────────────
   'repoLaunch.selectBranch': 'Select branch',
   'repoLaunch.searchBranch': 'Search branches',
   'repoLaunch.noBranch': 'No branch',
@@ -1037,7 +1007,6 @@ export const en = {
   'repoLaunch.dirtyWarning': 'Uncommitted changes detected. Direct switching may be blocked; use isolated worktree to continue without touching this folder.',
   'repoLaunch.checkedOutWarning': 'Selected branch is already checked out in another worktree. Direct launch may be blocked by Git; use "Isolated worktree" to avoid changing directories.',
 
-  // ─── Chat Input ──────────────────────────────────────
   'chat.placeholder': 'Ask Claude to edit, debug or explain...',
   'chat.placeholderMissing': 'This session points to a missing workspace. Create a new session or pick another project.',
   'chat.addFiles': 'Add files or photos',
@@ -1231,12 +1200,10 @@ export const en = {
   'chat.turnChangesDiffLoading': 'Loading diff...',
   'chat.turnChangesDiffUnavailable': 'Diff unavailable.',
 
-  // ─── Streaming Indicator ──────────────────────────────────────
   'streaming.thinking': 'Thinking',
   'streaming.running': 'Running',
   'streaming.working': 'Working',
 
-  // ─── Permission Dialog ──────────────────────────────────────
   'permission.allowEditFile': 'Allow Claude to {toolName} {fileName}?',
   'permission.allowEditFileGeneric': 'Allow Claude to {toolName} this file?',
   'permission.allowBash': 'Allow Claude to run this command?',
@@ -1250,7 +1217,6 @@ export const en = {
   'permission.showFullInput': 'Show full input',
   'permission.replacingContent': 'Replacing content in file',
 
-  // ─── Computer Use Approval ──────────────────────────────────────
   'computerUseApproval.titleApps': 'Computer Use wants to control these apps',
   'computerUseApproval.titleTcc': 'Computer Use needs macOS permissions',
   'computerUseApproval.reason': 'Why Claude is asking',
@@ -1272,7 +1238,6 @@ export const en = {
   'computerUseApproval.tccHint': 'Grant the missing permissions in System Settings, then come back and choose "Try again".',
   'computerUseApproval.tryAgainHint': 'Try again returns control to Claude so it can call request_access once more after macOS permission changes take effect.',
 
-  // ─── Ask User Question ──────────────────────────────────────
   'question.needsInput': 'Claude needs your input',
   'question.answered': 'Answered',
   'question.completed': 'Completed',
@@ -1282,10 +1247,8 @@ export const en = {
   'question.answeredPrefix': 'Answered: ',
   'question.resultPrefix': 'Result: ',
 
-  // ─── Thinking Block ──────────────────────────────────────
   'thinking.label': 'Thinking',
 
-  // ─── Tool Calls ──────────────────────────────────────
   'tool.errorOutput': 'Error Output',
   'tool.toolOutput': 'Tool Output',
   'tool.toolInput': 'Tool Input',
@@ -1308,7 +1271,6 @@ export const en = {
   'tool.showLess': 'Show less',
   'tool.showMore': 'Show {count} more characters',
 
-  // ─── Tool Group Verbs ──────────────────────────────────────
   'toolGroup.readOne': 'Read 1 file',
   'toolGroup.readMany': 'Read {count} files',
   'toolGroup.createdOne': 'created a file',
@@ -1334,7 +1296,6 @@ export const en = {
   'toolGroup.fetchedOne': 'fetched a page',
   'toolGroup.fetchedMany': 'fetched {count} pages',
 
-  // ─── Tasks ──────────────────────────────────────
   'tasks.title': 'Tasks',
   'tasks.completed': 'Tasks completed',
   'tasks.dismissCompleted': 'Hide completed tasks',
@@ -1346,7 +1307,6 @@ export const en = {
   'tasks.active': 'Active',
   'tasks.disabled': 'Disabled',
 
-  // ─── New Task Modal ──────────────────────────────────────
   'newTask.title': 'New scheduled task',
   'newTask.localWarning': 'Local tasks only run while your computer is awake.',
   'newTask.name': 'Name',
@@ -1386,7 +1346,6 @@ export const en = {
   'newTask.noChannelConfigured': 'No IM channels configured yet. Go to Settings → IM Adapters to set up.',
   'newTask.noChannelSelected': 'Select at least one notification channel.',
 
-  // ─── Cron Descriptions ──────────────────────────────────────
   'cron.everyMinute': 'Runs every minute',
   'cron.everyNMinutes': 'Runs every {n} minutes',
   'cron.everyHour': 'Runs every hour',
@@ -1405,7 +1364,6 @@ export const en = {
   'cron.dow.5': 'Fri',
   'cron.dow.6': 'Sat',
 
-  // ─── Task Actions & Logs ──────────────────────────────────────
   'tasks.runNow': 'Run now',
   'tasks.confirmRun': 'Execute this task immediately?',
   'tasks.confirmDisable': 'Disable this scheduled task?',
@@ -1432,13 +1390,11 @@ export const en = {
   'tasks.outputHintSession': 'Click "View conversation" to see the full output in session view.',
   'tasks.noOutputText': 'No output available.',
 
-  // ─── Prompt Editor ──────────────────────────────────────
   'promptEditor.worktree': 'worktree',
   'promptEditor.bypassWarning': 'Bypass mode grants full system access',
   'promptEditor.within': 'within',
   'promptEditor.selectFolder': '— select a folder to limit scope',
 
-  // ─── Permission Mode Selector ──────────────────────────────────────
   'permMode.executionPermissions': 'Execution Permissions',
   'permMode.askPermissions': 'Ask permissions',
   'permMode.askPermDesc': 'Confirm file edits and higher-risk commands when CLI asks',
@@ -1457,19 +1413,16 @@ export const en = {
   'permMode.permPackages': 'Install or remove packages',
   'permMode.enableBypassBtn': 'Enable bypass',
 
-  // Mode labels (compact, for chips)
   'permMode.label.default': 'Ask permissions',
   'permMode.label.acceptEdits': 'Auto accept',
   'permMode.label.plan': 'Plan mode',
   'permMode.label.bypassPermissions': 'Bypass',
   'permMode.label.dontAsk': "Don't ask",
 
-  // ─── Model Selector ──────────────────────────────────────
   'model.selectModel': 'Select model',
   'model.configuration': 'Model Configuration',
   'model.effort': 'Effort',
 
-  // ─── Directory Picker ──────────────────────────────────────
   'dirPicker.selectProject': 'Select a project...',
   'dirPicker.recent': 'Recent',
   'dirPicker.noRecent': 'No recent projects',
@@ -1478,7 +1431,6 @@ export const en = {
   'dirPicker.useThisFolder': 'Use this folder',
   'dirPicker.noSubdirs': 'No subdirectories',
 
-  // ─── File Search ──────────────────────────────────────
   'fileSearch.searching': 'Searching...',
   'fileSearch.noMatch': 'No files match',
   'fileSearch.noFiles': 'No files in this directory',
@@ -1495,7 +1447,6 @@ export const en = {
   'fileSearch.fileTag': 'file',
   'fileSearch.openFolder': 'Open folder',
 
-  // ─── Teams ──────────────────────────────────────
   'teams.backToLeader': '\u2190 Back to Leader',
   'teams.viewing': 'Viewing:',
   'teams.transcript': 'transcript',
@@ -1509,7 +1460,6 @@ export const en = {
   'teams.memberPlaceholder': 'Message this teammate directly...',
   'teams.memberSessionHint': 'Messages here go straight to this teammate while you watch its transcript update.',
 
-  // ─── Scheduled Tasks Pages ──────────────────────────────────────
   'scheduledPage.title': 'Scheduled tasks',
   'scheduledPage.subtitle': 'Run tasks on a schedule or whenever you need them. Type {code} in any existing session to create one.',
   'scheduledPage.desktopNotice': 'Scheduled tasks only run while the desktop app is open. Make sure it stays running for tasks to fire on time.',
@@ -1535,7 +1485,6 @@ export const en = {
   'scheduledPage.connectedLocal': 'Connected to local node',
   'scheduledPage.thisMonth': '{count} this month',
 
-  // ─── Update Checker ──────────────────────────────────────
   'update.available': 'v{version} available',
   'update.availableLabel': 'Available',
   'update.checking': 'Checking for updates...',
@@ -1565,7 +1514,6 @@ export const en = {
   'update.upToDate': 'You are up to date on v{version}.',
   'update.failed': 'Update failed: {error}',
 
-  // ─── Active Session ──────────────────────────────────────
   'session.untitled': 'Untitled Session',
   'session.active': 'session active',
   'session.lastUpdated': 'last updated {time}',
@@ -1576,7 +1524,6 @@ export const en = {
   'session.timeHours': '{n}h ago',
   'session.timeDays': '{n}d ago',
 
-  // ─── App Shell ──────────────────────────────────────
   'app.serverFailed': 'Local server failed to start',
   'app.serverFailedHint': 'Please include a screenshot of this diagnostic panel when reporting the issue.',
   'app.startupError': 'Startup error',
@@ -1585,7 +1532,6 @@ export const en = {
   'app.copiedDiagnostics': 'Copied',
   'app.launching': 'Launching local workspace...',
 
-  // ─── Error Codes ──────────────────────────────────────
   'error.CLI_NOT_RUNNING': 'CLI process is not running. The session may have ended or the process crashed.',
   'error.CLI_START_FAILED': 'Failed to start CLI process.',
   'error.CLI_AUTH_REQUIRED': 'Authentication is required. Please log in.',
@@ -1599,7 +1545,6 @@ export const en = {
   'error.NOT_FOUND': 'Resource not found.',
   'error.INTERNAL_ERROR': 'Internal server error.',
 
-  // ─── Server Status Verbs ──────────────────────────────────────
   'serverVerb.Thinking': 'Thinking',
   'serverVerb.Compacting conversation': 'Compacting context',
   'serverVerb.Running': 'Running',
@@ -1613,7 +1558,6 @@ export const en = {
   'chat.retry.networkError': 'network error',
   'chat.retry.waiting': 'waiting {seconds}s',
 
-  // ─── Tabs ──────────────────────────────────────
   'tabs.close': 'Close',
   'tabs.closeOthers': 'Close Others',
   'tabs.closeLeft': 'Close to the Left',

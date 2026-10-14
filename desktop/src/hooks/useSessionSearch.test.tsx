@@ -86,7 +86,6 @@ describe('useSessionSearch', () => {
   it('shows the ten most recently modified sessions for empty and whitespace queries', async () => {
     const sessions = Array.from({ length: 14 }, (_, index) => session(String(index), {
       modifiedAt: new Date(Date.UTC(2026, 8, index + 1)).toISOString(),
-      // Recency is based on modifiedAt, not creation time or the API order.
       createdAt: new Date(Date.UTC(2026, 8, 28 - index)).toISOString(),
     }))
     vi.mocked(sessionsApi.list).mockResolvedValue({ sessions, total: sessions.length })

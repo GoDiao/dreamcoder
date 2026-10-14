@@ -1,11 +1,3 @@
-/**
- * Skills REST API
- *
- * GET /api/skills              — List all installed skills (metadata only)
- * GET /api/skills/detail       — Full skill data (tree + files)
- *       ?source=user&name=xxx
- */
-
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { parseFrontmatter } from '../../utils/frontmatterParser.js'
@@ -18,8 +10,6 @@ import { getSkillDirCommands } from '../../skills/loadSkillsDir.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import type { LoadedPlugin } from '../../types/plugin.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type SkillMeta = {
   name: string
@@ -51,10 +41,8 @@ type SkillFile = {
   isEntry?: boolean
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const MAX_FILES = 50
-const MAX_FILE_SIZE = 100 * 1024 // 100 KB
+const MAX_FILE_SIZE = 100 * 1024
 const SKIP_ENTRIES = new Set(['node_modules', '.git', '__pycache__', '.DS_Store'])
 
 const LANG_MAP: Record<string, string> = {
@@ -64,8 +52,6 @@ const LANG_MAP: Record<string, string> = {
   py: 'python', toml: 'toml', css: 'css', html: 'html',
   txt: 'text', xml: 'xml', sql: 'sql', rs: 'rust', go: 'go',
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function detectLanguage(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
@@ -147,7 +133,6 @@ async function buildFileTree(
       return
     }
 
-    // directories first, then alphabetical
     entries.sort((a, b) => {
       if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1
       return a.name.localeCompare(b.name)
@@ -201,7 +186,6 @@ async function buildFileTree(
             fileCount++
           }
         } catch {
-          // skip unreadable files
         }
       }
     }
@@ -266,7 +250,6 @@ async function resolveSkillDir(
         return skillDir
       }
     } catch {
-      // Try the next candidate root.
     }
   }
 
@@ -339,7 +322,6 @@ async function collectPluginSkillDirectories(): Promise<Map<string, PluginSkillL
           continue
         }
       } catch {
-        // Fall through and inspect as a skills root.
       }
 
       let entries: import('fs').Dirent[]
@@ -429,8 +411,6 @@ export async function listSkillSlashCommands(cwd?: string): Promise<SkillSlashCo
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
-// ─── Router ──────────────────────────────────────────────────────────────────
-
 export async function handleSkillsApi(
   req: Request,
   url: URL,
@@ -456,8 +436,6 @@ export async function handleSkillsApi(
   }
 }
 
-// ─── Handlers ────────────────────────────────────────────────────────────────
-
 async function listSkills(url: URL): Promise<Response> {
   const cwd = getRequestedCwd(url)
   const skills = await collectAllSkills(cwd)
@@ -472,7 +450,6 @@ async function getSkillDetail(url: URL): Promise<Response> {
     throw ApiError.badRequest('Missing required query parameters: source, name')
   }
 
-  // Prevent path traversal
   if (name.includes('..') || name.includes('/') || name.includes('\\')) {
     throw ApiError.badRequest('Invalid skill name')
   }

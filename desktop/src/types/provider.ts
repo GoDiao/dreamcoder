@@ -1,5 +1,3 @@
-// desktop/src/types/provider.ts
-
 export type ApiFormat = 'anthropic' | 'openai_chat' | 'openai_responses'
 
 export type ProviderAuthStrategy =
@@ -24,7 +22,7 @@ export type SavedProvider = {
   id: string
   presetId: string
   name: string
-  apiKey: string  // masked from server
+  apiKey: string
   authStrategy?: ProviderAuthStrategy
   baseUrl: string
   apiFormat: ApiFormat
@@ -79,8 +77,6 @@ export type ProviderTestStepResult = {
 }
 
 export type ProviderTestResult = {
-  /** Step 1: Basic connectivity */
   connectivity: ProviderTestStepResult
-  /** Step 2: Proxy pipeline (only for openai_* formats) */
   proxy?: ProviderTestStepResult
 }

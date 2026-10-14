@@ -32,7 +32,6 @@ type Props = {
   resultMap: Map<string, ToolResult>
   childToolCallsByParent: Map<string, ToolCall[]>
   agentTaskNotifications: Record<string, AgentTaskNotification>
-  /** When true, the last tool is still executing — show expanded */
   isStreaming?: boolean
 }
 
@@ -182,7 +181,6 @@ function ToolCallGroupContent({
     )
   }
 
-  // Single tool call — render directly without group wrapper
   if (toolCalls.length === 1) {
     const tc = toolCalls[0]!
     return (
@@ -413,7 +411,6 @@ function AgentToolGroup({
   )
 }
 
-/** Separated so the useState hook is never called conditionally. */
 function ToolCallGroupMulti({ toolCalls, resultMap, childToolCallsByParent, isStreaming }: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
@@ -1035,14 +1032,9 @@ function isAgentLaunchResult(content: unknown): boolean {
   )
 }
 
-/**
- * Check if agent result content is a lifecycle notification (shutdown, terminated, etc.)
- * rather than actual agent output. These should not be shown to the user as results.
- */
 function isAgentLifecycleResult(content: unknown): boolean {
   const text = extractTextContent(content).trim()
   if (!text) return false
-  // Detect JSON lifecycle messages: shutdown_approved, shutdown_rejected, teammate_terminated
   if (text.startsWith('{') && text.endsWith('}')) {
     try {
       const parsed = JSON.parse(text) as Record<string, unknown>
@@ -1050,7 +1042,6 @@ function isAgentLifecycleResult(content: unknown): boolean {
         return true
       }
     } catch {
-      // Not valid JSON, not a lifecycle message
     }
   }
   return false

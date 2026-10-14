@@ -15,8 +15,6 @@ pub(crate) fn is_executable(path: &str) -> bool {
     }
 }
 
-// Keep detection independent of the process environment so all platforms and
-// stale SHELL values can be tested without changing global environment variables.
 pub(crate) fn detect_posix_shell(
     macos: bool,
     env_shell: Option<&str>,
@@ -35,8 +33,6 @@ pub(crate) fn detect_posix_shell(
 #[cfg(unix)]
 pub(crate) fn account_shell() -> Option<String> {
     use nix::unistd::{Uid, User};
-    // getpwuid_r consults Open Directory on macOS and NSS on Linux. The
-    // reentrant API also avoids sharing a static passwd buffer across threads.
     User::from_uid(Uid::current())
         .ok()
         .flatten()
@@ -46,8 +42,6 @@ pub(crate) fn account_shell() -> Option<String> {
 pub(crate) fn shell_search_dirs(macos: bool, path: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if macos {
-        // Explicit Unix shell choices prefer Homebrew over Apple's old /bin/bash,
-        // even when a GUI launch puts system directories first in PATH.
         dirs.extend(["/opt/homebrew/bin", "/usr/local/bin"].map(PathBuf::from));
     }
     if let Some(path) = path {
@@ -87,8 +81,6 @@ pub(crate) fn spawn_with_fallback<T, E: std::fmt::Display>(
     match spawn(&selection.shell) {
         Ok(child) => Ok((child, selection)),
         Err(error) if selection.shell != selection.system_default => {
-            // Retry if the executable disappears after validation, or exec itself
-            // fails (for example, an incompatible custom binary).
             selection.warning = Some(format!("could not start {}: {error}", selection.shell));
             selection.shell = selection.system_default.clone();
             let child = spawn(&selection.shell)
@@ -121,7 +113,6 @@ pub(crate) fn resolve_posix_override(
             }
             Ok(Some(path.to_string()))
         }
-        // Preferences may have been copied from a Windows installation.
         _ => Ok(None),
     }
 }

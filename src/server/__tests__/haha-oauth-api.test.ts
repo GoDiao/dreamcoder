@@ -1,7 +1,3 @@
-/**
- * Integration tests for /api/haha-oauth/* endpoints.
- */
-
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'

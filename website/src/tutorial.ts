@@ -1,6 +1,3 @@
-// The tutorial pages render the Markdown in docs/tutorial/ directly, so the
-// site and the repository always show the same text.
-
 export type Lang = 'zh' | 'en';
 
 export const docIds = [
@@ -79,8 +76,6 @@ export interface DocTarget {
   hash: string;
 }
 
-// Maps links between tutorial files, such as ./01-execution-loop.zh.md#anchor
-// or ./README.en.md, to the page that renders that file.
 export function parseDocLink(href: string): DocTarget | null {
   const match = /^\.\/(README(?:\.en)?|\d\d-[a-z-]+\.(?:zh|en))\.md(#.*)?$/.exec(href);
   if (!match) return null;

@@ -262,7 +262,6 @@ impl Default for AppModeConfig {
     }
 }
 
-/// Write the persisted app-mode.json to the given config directory.
 fn write_app_mode_config(config_dir: &Path, config: &AppModeConfig) {
     let path = config_dir.join(APP_MODE_FILE);
     if let Some(parent) = path.parent() {
@@ -283,7 +282,6 @@ fn write_app_mode_config(config_dir: &Path, config: &AppModeConfig) {
     }
 }
 
-/// Check if a directory contains portable config/data files.
 fn dir_has_portable_data(dir: &Path) -> bool {
     if !dir.is_dir() {
         return false;
@@ -306,7 +304,6 @@ fn dir_has_portable_data(dir: &Path) -> bool {
         || dir.join("dreamcoder").is_dir()
 }
 
-/// Resolve the default portable config directory: exe_dir/CLAUDE_CONFIG_DIR.
 fn get_default_portable_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let mut dir = exe.parent()?.to_path_buf();
@@ -355,7 +352,6 @@ impl TerminalConfig {
 }
 
 fn terminal_config_path(app: &AppHandle) -> Option<PathBuf> {
-    // honour CLAUDE_CONFIG_DIR for portable installs
     std::env::var("CLAUDE_CONFIG_DIR")
         .ok()
         .map(|dir| PathBuf::from(&dir).join(TERMINAL_CONFIG_FILE))
@@ -402,12 +398,6 @@ struct StoredWindowState {
     maximized: bool,
 }
 
-/// 与 ServerState 平级的 adapter 子进程状态。
-///
-/// adapter sidecar（dreamcoder-sidecar adapters --telegram 等）的生命周期
-/// 跟 server 不同：它没有 HTTP 端口可探活，没配凭据时会自己干净退出，
-/// 而且需要支持运行时热重启 —— 用户在设置页保存 IM 凭据后，
-/// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
 #[derive(Default)]
 struct AdapterState(Mutex<Vec<CommandChild>>);
 
@@ -480,15 +470,6 @@ fn get_server_url(state: State<'_, ServerState>) -> Result<String, String> {
         .unwrap_or_else(|| "desktop server did not start".to_string()))
 }
 
-/// 前端在设置页保存飞书 / Telegram / 微信凭据后调用，触发 adapter sidecar 热重启。
-///
-/// 流程：
-///   1. kill 当前 adapter 子进程（如果在跑）
-///   2. spawn 新的 adapter 子进程
-///   3. 新 sidecar 内部的 loadConfig() 会读到最新的 ~/.claude/adapters.json
-///      并重新建立 WebSocket 连接到飞书 / Telegram
-///
-/// 凭据缺失时 sidecar 自己会 warn + skip + 退出，所以这里不需要前置检查。
 #[tauri::command]
 fn restart_adapters_sidecar(app: AppHandle) -> Result<(), String> {
     stop_adapters_sidecar(&app);
@@ -507,8 +488,6 @@ fn prepare_for_update_install(app: AppHandle) -> Result<(), String> {
         kill_windows_sidecars();
     }
 
-    // Give Windows a short moment to release executable file handles before the
-    // updater starts replacing bundled sidecars in the install directory.
     std::thread::sleep(Duration::from_millis(750));
     Ok(())
 }
@@ -534,7 +513,6 @@ fn cancel_update_install(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Returns the current app mode and portable directory info.
 #[tauri::command]
 fn get_app_mode(app: AppHandle) -> serde_json::Value {
     let env_config_dir = std::env::var("CLAUDE_CONFIG_DIR").ok().map(PathBuf::from);
@@ -561,15 +539,12 @@ fn get_app_mode(app: AppHandle) -> serde_json::Value {
     })
 }
 
-/// Sets the app mode. Persists to app-mode.json in the current active config dir.
-/// Requires restart to take effect.
 #[tauri::command]
 fn set_app_mode(
     app: tauri::AppHandle,
     mode: String,
     portable_dir: Option<String>,
 ) -> Result<(), String> {
-    // 确定当前正在使用的配置目录
     let active_config_dir = if let Ok(cd) = std::env::var("CLAUDE_CONFIG_DIR") {
         std::path::PathBuf::from(&cd)
     } else {
@@ -617,7 +592,6 @@ fn set_app_mode(
         portable_dir: portable_dir.clone(),
     };
 
-    // 写入当前活跃的配置目录
     write_app_mode_config(&active_config_dir, &config);
 
     if let Some(dir) = target_portable_dir.as_ref() {
@@ -626,8 +600,6 @@ fn set_app_mode(
         }
     }
 
-    // 修复：同时始终将模式状态写入系统默认配置目录，
-    // 以防止应用层切换模式后，main.rs在下一次启动时读取到旧的系统全局状态
     if let Ok(sys_dir) = app.path().app_config_dir() {
         if sys_dir != active_config_dir {
             write_app_mode_config(&sys_dir, &config);
@@ -637,7 +609,6 @@ fn set_app_mode(
     Ok(())
 }
 
-/// Checks if the default portable directory has existing data files.
 #[tauri::command]
 fn detect_portable_dir() -> serde_json::Value {
     let default_portable = get_default_portable_dir();
@@ -720,9 +691,6 @@ fn is_window_state_visible_on_any_monitor(
 }
 
 fn window_state_path(app: &AppHandle) -> Option<PathBuf> {
-    // honour CLAUDE_CONFIG_DIR so portable installs keep window-state.json
-    // and terminal-config.json alongside the config dir instead of
-    // %APPDATA%\com.dreamcoder.desktop\.
     resolve_portable_state_path().or_else(|| match app.path().app_config_dir() {
         Ok(dir) => Some(dir.join(WINDOW_STATE_FILE)),
         Err(err) => {
@@ -1241,8 +1209,6 @@ fn decode_terminal_output(pending: &mut Vec<u8>, chunk: &[u8]) -> String {
 }
 
 fn build_terminal_command(shell: &str, cwd: &Path) -> CommandBuilder {
-    // Preserve interactive non-login startup (for example, bash reads .bashrc).
-    // login_shell_environment already captures the login environment once.
     let mut cmd = CommandBuilder::new(shell);
     cmd.cwd(cwd.as_os_str());
     for (key, value) in terminal_environment(shell) {
@@ -1485,7 +1451,6 @@ fn normalize_terminal_bash_path(path: Option<String>) -> Result<Option<String>, 
 }
 
 fn default_shell(_custom_bash: Option<&str>) -> String {
-    // On Windows, use configured bash path if set and valid
     #[cfg(target_os = "windows")]
     if let Some(bash_path) = _custom_bash {
         let trimmed = bash_path.trim();
@@ -1574,18 +1539,6 @@ fn format_server_startup_error(message: &str, logs: &Arc<Mutex<VecDeque<String>>
 }
 
 fn resolve_app_root(_app: &AppHandle) -> Result<PathBuf, String> {
-    // 历史用途：此前 sidecar launcher 用 dynamic file:// import 加载磁盘上
-    // 的 src/server/index.ts 和 preload.ts，所以 Tauri 必须把整个 src/ +
-    // node_modules/ 当 Resource 一起 ship 到 .app/Contents/Resources/app/。
-    //
-    // 现在 launcher 改成静态 import + bun build --compile 整棵静态打进二进制，
-    // sidecar 不再读磁盘上的 src/ 或 node_modules/。CLAUDE_APP_ROOT 现在
-    // 只剩一个名义上的"app 安装根目录"作用，给 conversationService 在
-    // spawn CLI 子进程时通过 --app-root 透传。
-    //
-    // 我们直接用当前可执行文件所在目录作为 app_root：
-    //   Dev:  desktop/src-tauri/target/<profile>/  （rust 跑出来的 binary 那一层）
-    //   Prod: <App>.app/Contents/MacOS/             （sidecar 二进制的同级目录）
     let exe = std::env::current_exe().map_err(|err| format!("resolve current exe path: {err}"))?;
     let dir = exe
         .parent()
@@ -1630,7 +1583,6 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
         .to_string_lossy()
         .to_string();
 
-    // 单一合并 sidecar：第一个参数选 server / cli / adapters 模式。
     let mut sidecar = app
         .shell()
         .sidecar("dreamcoder-sidecar")
@@ -1638,10 +1590,6 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
     for (key, value) in terminal_environment(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
     }
-    // Pass through CLAUDE_CONFIG_DIR so the sidecar (Node.js) uses the same
-    // portable config directory. Also set XDG_CACHE_HOME to redirect the
-    // env-paths cache from %LOCALAPPDATA%\claude-cli-nodejs\ to alongside
-    // the portable config dir.
     if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
         let cache_dir = PathBuf::from(&config_dir).join("Cache");
         if let Err(e) = fs::create_dir_all(&cache_dir) {
@@ -1657,8 +1605,6 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
     }
-    // Lets the sidecar exit on its own if this process dies without killing it
-    // (see desktop/sidecars/parentWatchdog.ts).
     let sidecar = sidecar.env("DREAMCODER_PARENT_PID", std::process::id().to_string());
     let sidecar = sidecar.args([
         "server",
@@ -1727,8 +1673,6 @@ fn stop_server_sidecar(app: &AppHandle) {
     }
 }
 
-/// 启动 adapter sidecars。每个平台单独一个进程，避免某个平台的 SDK / long polling
-/// 影响其它平台（Telegram 尤其要求同一个 Bot Token 只有一个活跃 consumer）。
 fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String> {
     #[cfg(unix)]
     kill_stale_unix_adapter_sidecars();
@@ -1736,13 +1680,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
     let app_root = resolve_app_root(app)?;
     let app_root_arg = app_root.to_string_lossy().to_string();
 
-    // adapter 内部的 WsBridge 默认连 ws://127.0.0.1:3456，但桌面端的 server
-    // 用的是 reserve_local_port() 拿到的动态端口。这里把实际端口通过
-    // ADAPTER_SERVER_URL env var 传过去 —— adapters/common/config.ts 的
-    // loadConfig() 会读它。
-    //
-    // 如果 server 还没起来 / 没拿到 URL，回退到 3456 作为最后兜底（adapter
-    // 自己有重连逻辑，等 server 上线就能连上）。
     let server_http_url = app
         .try_state::<ServerState>()
         .and_then(|state| {
@@ -1753,8 +1690,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
                 .and_then(|guard| guard.runtime.as_ref().map(|r| r.url.clone()))
         })
         .unwrap_or_else(|| "http://127.0.0.1:3456".to_string());
-    // WsBridge 直接 `new WebSocket('${serverUrl}/ws/...')`，必须传 ws://；
-    // 不会自动从 http 转。
     let server_ws_url = if let Some(rest) = server_http_url.strip_prefix("http://") {
         format!("ws://{rest}")
     } else if let Some(rest) = server_http_url.strip_prefix("https://") {
@@ -1777,7 +1712,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
         for (key, value) in terminal_environment(&default_shell(None)) {
             sidecar = sidecar.env(key, value);
         }
-        // Pass through CLAUDE_CONFIG_DIR for portable installs
         let mut sidecar_final = sidecar.env("ADAPTER_SERVER_URL", &server_ws_url);
         if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
             let cache_dir = PathBuf::from(&config_dir).join("Cache");
@@ -1792,8 +1726,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
             .map_err(|err| format!("spawn {label} adapter sidecar: {err}"))?;
         let label = label.to_string();
 
-        // 用一个 async task 把 sidecar 的 stdout/stderr 转发出来。它退出时
-        // 整个 task 也会自然结束。
         tauri::async_runtime::spawn(async move {
             while let Some(event) = rx.recv().await {
                 match event {
@@ -1806,9 +1738,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
                         eprintln!("[claude-adapters:{label}] {}", line.trim_end());
                     }
                     CommandEvent::Terminated(payload) => {
-                        // exit code != 0 是常态：用户没配凭据时 sidecar 内部会
-                        // warn + skip + process.exit(1)。这里只 info 一行，
-                        // 不要当错误冒泡。
                         println!(
                             "[claude-adapters:{label}] sidecar exited (code={:?}, signal={:?})",
                             payload.code, payload.signal
@@ -1825,8 +1754,6 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
     Ok(children)
 }
 
-/// spawn adapter sidecars 并把 child handles 存进 AdapterState。
-/// 在启动 + 重启路径里复用，集中处理"无法 spawn"的日志。
 fn spawn_and_track_adapters_sidecar(app: &AppHandle) {
     match start_adapters_sidecars(app) {
         Ok(children) => {
@@ -2233,7 +2160,6 @@ mod tests {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        // Keep this first so duplicate launches are stopped before sidecars start.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
@@ -2269,7 +2195,6 @@ pub fn run() {
             set_app_zoom
         ]);
 
-    // macOS: native menu bar (traffic-light overlay style)
     #[cfg(target_os = "macos")]
     let builder = builder
         .menu(|app| {
@@ -2353,9 +2278,6 @@ pub fn run() {
             }
             drop(guard);
 
-            // server 起来之后再起 adapter sidecar —— start_adapters_sidecar
-            // 内部会从 ServerState 读 server URL 注入 ADAPTER_SERVER_URL env，
-            // 让 adapter 连上动态端口。
             spawn_and_track_adapters_sidecar(&app.handle());
 
             Ok(())

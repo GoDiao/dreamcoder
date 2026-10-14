@@ -1,7 +1,3 @@
-/**
- * 消息格式化工具
- */
-
 type AdapterChatState =
   | 'idle'
   | 'thinking'
@@ -35,7 +31,6 @@ const IM_HELP_LINES = [
   '权限审批：/allow <id>、/always <id>、/deny <id>',
 ]
 
-/** Split text into chunks that fit within a character limit, respecting paragraph/sentence boundaries. */
 export function splitMessage(text: string, limit: number): string[] {
   if (text.length <= limit) return [text]
 
@@ -54,7 +49,6 @@ export function splitMessage(text: string, limit: number): string[] {
     if (splitAt <= 0) splitAt = remaining.lastIndexOf(' ', limit)
     if (splitAt <= 0) splitAt = limit
 
-    // Include the delimiter for paragraph/sentence breaks
     if (remaining[splitAt] === '\n' || remaining[splitAt] === '.') splitAt += 1
 
     chunks.push(remaining.slice(0, splitAt).trimEnd())
@@ -117,7 +111,6 @@ function formatMarkdownTableAsBullets(table: MarkdownTable): string {
   return output.join('\n')
 }
 
-/** Convert GitHub-flavored Markdown pipe tables into mobile-friendly bullet lists. */
 export function convertMarkdownTablesToBullets(markdown: string): string {
   const lines = markdown.split('\n')
   const output: string[] = []
@@ -157,7 +150,6 @@ export function convertMarkdownTablesToBullets(markdown: string): string {
   return output.join('\n')
 }
 
-/** Format tool use info for display in IM. */
 export function formatToolUse(toolName: string, input: unknown): string {
   const inp = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
   const summary = formatToolSummary(toolName, inp)
@@ -166,7 +158,6 @@ export function formatToolUse(toolName: string, input: unknown): string {
   return `🔧 ${toolName}\n${preview}`
 }
 
-/** Generate a concise human-readable summary for common tools. */
 function formatToolSummary(tool: string, inp: Record<string, unknown>): string | null {
   switch (tool) {
     case 'Bash': {
@@ -231,13 +222,11 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
-/** Format a permission request for display in IM. */
 export function formatPermissionRequest(toolName: string, input: unknown, requestId: string): string {
   const preview = truncateInput(input, 300)
   return `🔐 需要权限确认 [${requestId}]\n工具: ${toolName}\n${preview}`
 }
 
-/** Truncate tool input to a preview string. */
 export function truncateInput(input: unknown, maxLen: number): string {
   try {
     const s = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
@@ -247,7 +236,6 @@ export function truncateInput(input: unknown, maxLen: number): string {
   }
 }
 
-/** Escape special characters for Telegram MarkdownV2. */
 export function escapeMarkdownV2(text: string): string {
   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1')
 }

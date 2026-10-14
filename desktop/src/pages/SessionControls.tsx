@@ -7,9 +7,6 @@ import {
   mockStatusBar,
 } from '../mocks/data'
 
-/* ────────────────────────────────────────────────────────────────────
-   Icon helpers for the permission modes (matching HTML prototype exactly)
-   ──────────────────────────────────────────────────────────────────── */
 const permissionIcons: Record<string, { icon: string; color: string; selectedColor?: string }> = {
   ask:    { icon: 'verified_user', color: 'text-outline' },
   auto:   { icon: 'bolt',          color: 'text-outline' },
@@ -23,10 +20,6 @@ const modelIcons: Record<string, string> = {
   haiku:  'auto_awesome',
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   SessionControls  —  full-page component (sidebar + header + chat +
-   two open dropdown panels + composer + footer)
-   ════════════════════════════════════════════════════════════════════ */
 export default function SessionControls() {
   const [selectedPermission, setSelectedPermission] = useState('ask')
   const [selectedModel, setSelectedModel] = useState('sonnet')
@@ -38,7 +31,6 @@ export default function SessionControls() {
 
   return (
     <div className="h-screen w-screen bg-background text-on-surface font-body selection:bg-primary-fixed overflow-hidden relative">
-      {/* ─── TopAppBar ─────────────────────────────────────────── */}
       <header className="bg-[var(--color-background)] font-headline font-semibold tracking-wide text-sm fixed top-0 left-0 right-0 flex justify-between items-center px-6 h-12 z-40">
         <div className="flex items-center gap-6">
           <span className="text-sm font-bold text-[var(--color-text-primary)] uppercase tracking-tighter">
@@ -69,12 +61,9 @@ export default function SessionControls() {
         </div>
       </header>
 
-      {/* Separator line */}
       <div className="bg-[var(--color-surface-container-low)] h-[1px] w-full fixed top-12 z-40" />
 
-      {/* ─── SideNavBar ────────────────────────────────────────── */}
       <aside className="bg-[var(--color-surface-container-low)] font-body text-sm font-medium fixed left-0 top-0 h-full w-[280px] hidden md:flex flex-col p-4 gap-2 pt-16 z-30">
-        {/* Project header */}
         <div className="px-2 mb-4">
           <div className="flex items-center gap-3 mb-1">
             <img
@@ -91,7 +80,6 @@ export default function SessionControls() {
           </div>
         </div>
 
-        {/* Nav items */}
         <button className="w-full text-left p-2.5 bg-[var(--color-background)] text-[var(--color-text-primary)] rounded-lg relative before:content-[''] before:absolute before:left-[-8px] before:w-1 before:h-4 before:bg-[var(--color-brand)] before:rounded-full before:top-1/2 before:-translate-y-1/2 transition-all duration-200 ease-in-out flex items-center gap-3">
           <span className="material-symbols-outlined text-[var(--color-brand)]">add</span>
           <span>New session</span>
@@ -113,7 +101,6 @@ export default function SessionControls() {
           <span>Older</span>
         </button>
 
-        {/* Bottom modes */}
         <div className="mt-auto pt-4 border-t border-outline/10 flex flex-col gap-1">
           <button className="flex items-center gap-3 p-2 text-outline hover:text-primary transition-colors">
             <span className="material-symbols-outlined text-xs">computer</span>
@@ -126,13 +113,10 @@ export default function SessionControls() {
         </div>
       </aside>
 
-      {/* ─── Main Content Area (blurred / dimmed behind overlays) ── */}
       <main className="md:ml-[280px] pt-12 pb-8 min-h-screen blur-[2px] opacity-60">
         <div className="max-w-4xl mx-auto px-8 py-12">
           <div className="grid grid-cols-12 gap-6">
-            {/* Main Thread */}
             <div className="col-span-8 space-y-8">
-              {/* AI message */}
               <div className="bg-surface-container-low rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-xs">
@@ -150,7 +134,6 @@ export default function SessionControls() {
                 </p>
               </div>
 
-              {/* User message */}
               <div className="flex justify-end">
                 <div className="bg-surface-container-highest rounded-xl p-6 max-w-[80%]">
                   <p className="text-on-surface leading-relaxed">
@@ -160,7 +143,6 @@ export default function SessionControls() {
                 </div>
               </div>
 
-              {/* Code Block Preview */}
               <div className="bg-surface-dim rounded-lg overflow-hidden font-mono text-sm">
                 <div className="bg-surface-container-high px-4 py-2 flex justify-between items-center">
                   <span className="text-xs text-on-surface-variant">
@@ -182,7 +164,6 @@ export default function SessionControls() {
               </div>
             </div>
 
-            {/* Session Meta */}
             <div className="col-span-4 space-y-6">
               <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-4">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-outline mb-4">
@@ -208,11 +189,8 @@ export default function SessionControls() {
         </div>
       </main>
 
-      {/* ─── Overlay Layer (Active Selectors) ──────────────────── */}
       <div className="fixed inset-0 z-50 flex flex-col justify-end items-center pointer-events-none p-8">
-        {/* Floating Dropdown Overlay Container */}
         <div className="w-full max-w-2xl flex gap-4 mb-4 pointer-events-auto items-end">
-          {/* ── Permissions Dropdown ─────────────────────────────── */}
           {showPermissions && (
             <div
               className="w-80 rounded-xl border border-[var(--color-border)] overflow-hidden flex flex-col"
@@ -277,7 +255,6 @@ export default function SessionControls() {
             </div>
           )}
 
-          {/* ── Model & Effort Dropdown ─────────────────────────── */}
           {showModelConfig && (
             <div
               className="w-64 rounded-xl border border-[var(--color-border)] overflow-hidden flex flex-col"
@@ -294,7 +271,6 @@ export default function SessionControls() {
                 </span>
               </div>
 
-              {/* Models */}
               <div className="p-2">
                 {mockModels.map((model) => {
                   const isActive = selectedModel === model.id
@@ -334,10 +310,8 @@ export default function SessionControls() {
                 })}
               </div>
 
-              {/* Divider */}
               <div className="mx-4 h-[1px] bg-[var(--color-border)]" />
 
-              {/* Effort levels */}
               <div className="p-2">
                 <div className="px-2 mb-2">
                   <span className="text-[9px] font-bold text-outline uppercase tracking-tighter">
@@ -347,7 +321,6 @@ export default function SessionControls() {
                 <div className="grid grid-cols-2 gap-1">
                   {mockEffortLevels.map((level) => {
                     const isActive = selectedEffort === level
-                    /* The HTML uses "Med" for the label display of "Medium" */
                     const displayLabel =
                       level === 'Medium' ? 'Med' : level
 
@@ -371,7 +344,6 @@ export default function SessionControls() {
           )}
         </div>
 
-        {/* ── The Composer (Anchor) ─────────────────────────────── */}
         <div
           className="w-full max-w-2xl p-4 rounded-xl border border-outline-variant/15 pointer-events-auto flex flex-col gap-3"
           style={{
@@ -388,7 +360,6 @@ export default function SessionControls() {
           />
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              {/* Permission pill */}
               <button
                 onClick={() => setShowPermissions((v) => !v)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-container-low border border-[var(--color-border)] text-xs font-medium hover:bg-surface-container-high transition-all"
@@ -400,7 +371,6 @@ export default function SessionControls() {
                   'Ask permissions'}
               </button>
 
-              {/* Model pill */}
               <button
                 onClick={() => setShowModelConfig((v) => !v)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-container-low border border-[var(--color-border)] text-xs font-medium hover:bg-surface-container-high transition-all"
@@ -411,13 +381,11 @@ export default function SessionControls() {
                 {activeModel?.name || 'Sonnet 4.6'}
               </button>
 
-              {/* Attach file button */}
               <button className="p-1.5 rounded-lg text-outline hover:bg-surface-container-low transition-colors">
                 <span className="material-symbols-outlined">attach_file</span>
               </button>
             </div>
 
-            {/* Run button */}
             <button className="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
               Run
               <span className="material-symbols-outlined text-base">send</span>
@@ -426,7 +394,6 @@ export default function SessionControls() {
         </div>
       </div>
 
-      {/* ─── Footer / Status Bar ───────────────────────────────── */}
       <footer className="bg-[var(--color-background)] font-body text-xs tracking-tight fixed bottom-0 left-0 w-full h-8 border-t border-[var(--color-border)]/20 flex items-center justify-between px-4 z-[60]">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">

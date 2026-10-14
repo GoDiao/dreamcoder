@@ -171,7 +171,6 @@ const TASK_TOOL_NAMES = new Set(['TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskLis
 const TASK_STOP_TOOL_NAMES = new Set(['TaskStop', 'KillShell'])
 const MAX_MESSAGES = 5000
 
-/** Trim messages array from the head, preserving the first system message if present. */
 function trimMessages(messages: UIMessage[], max: number = MAX_MESSAGES): UIMessage[] {
   if (messages.length <= max) return messages
   const trimCount = messages.length - max
@@ -179,7 +178,6 @@ function trimMessages(messages: UIMessage[], max: number = MAX_MESSAGES): UIMess
   return messages.slice(trimCount + keepHead)
 }
 
-/** Append a message and trim if over cap. */
 function appendMessage(messages: UIMessage[], msg: UIMessage): UIMessage[] {
   return trimMessages([...messages, msg])
 }
@@ -318,8 +316,6 @@ function upsertToolUseMessage(
   return next
 }
 
-// Streaming throttle for content_delta. Buffers must be per-session because
-// multiple desktop tabs can stream at the same time.
 const pendingDeltaBySession = new Map<string, string>()
 const flushTimerBySession = new Map<string, ReturnType<typeof setTimeout>>()
 const pendingToolInputDeltaBySession = new Map<string, string>()
@@ -390,8 +386,6 @@ function appendAssistantTextMessage(
   if (!trimmedContent) return messages
 
   const last = messages[messages.length - 1]
-  // Wake/reconnect replay can resend persisted assistant text without a
-  // transcript id. Ignore chunks that are already present in the hydrated tail.
   if (
     last?.type === 'assistant_text' &&
     last.transcriptMessageId &&
@@ -736,7 +730,6 @@ function buildAgentCompletionNotification(
   }
 }
 
-/** Helper: immutably update a specific session within the sessions record */
 function updateSessionIn(
   sessions: Record<string, PerSessionState>,
   sessionId: string,
@@ -1102,7 +1095,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         useCLITaskStore.getState().markCompletedAndDismissed(sessionId)
       }
     } catch {
-      // Session may not have messages yet
     }
   },
 
@@ -1151,7 +1143,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         useCLITaskStore.getState().markCompletedAndDismissed(sessionId)
       }
     } catch {
-      // Session may not have messages yet
     }
   },
 
@@ -1237,10 +1228,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           const pendingText = `${session.streamingText}${consumePendingDelta(sessionId)}`
           const hasPendingStreamText =
             session.chatState === 'streaming' && pendingText.trim().length > 0
-          // Background task progress can arrive while the assistant is still
-          // streaming one markdown reply. Keep that turn intact so we do not
-          // split formatting markers (for example backticks/strong markers)
-          // across separate bubbles.
           const preserveStreamingTurn = hasPendingStreamText && msg.state !== 'idle' && msg.state !== 'compacting'
           const shouldFlush = hasPendingStreamText && (msg.state === 'idle' || msg.state === 'compacting')
           let nextMessages = session.messages
@@ -1282,7 +1269,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             update(() => ({ elapsedTimer: null }))
           }
         }
-        // Sync tab status
         useTabStore.getState().updateTabStatus(sessionId, msg.state === 'idle' ? 'idle' : 'running')
         break
 
@@ -1663,7 +1649,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               }))
             })
             .catch(() => {
-              // Keep the last known local + CLI union when the authoritative refresh is unavailable.
             })
         }
         if (msg.subtype === 'session_cleared') {
@@ -1848,8 +1833,6 @@ function updateOptimisticSessionTitle(sessionId: string, content: string): void 
   useTabStore.getState().updateTabTitle(sessionId, title)
 }
 
-// ─── History mapping helpers (unchanged from original) ─────────
-
 type AssistantHistoryBlock = { type: string; text?: string; thinking?: string; name?: string; id?: string; input?: unknown }
 type UserHistoryBlock = { type: string; text?: string; tool_use_id?: string; content?: unknown; is_error?: boolean; source?: { data?: string }; mimeType?: string; media_type?: string; name?: string }
 
@@ -1865,11 +1848,6 @@ const GOAL_EVENT_ACTIONS = new Set<GoalEventAction>([
   'message',
 ])
 
-/**
- * Check if text is a teammate-message (internal agent-to-agent communication).
- * Uses full open+close tag match to avoid false positives on user text
- * that merely mentions the tag name (e.g., pasting code or discussing the protocol).
- */
 function isTeammateMessage(text: string): boolean {
   return text.includes('<teammate-message') && text.includes('</teammate-message>')
 }
@@ -2265,7 +2243,6 @@ function extractVisibleTeammateMessageContents(text: string): string[] {
           continue
         }
       } catch {
-        // Keep non-JSON payloads that happen to look like JSON.
       }
     }
 
@@ -2362,21 +2339,12 @@ function extractLeadingFileReferences(text: string): {
   }
 }
 
-/**
- * Reconstruct agentTaskNotifications from history.
- *
- * During a live session, background agents report completion via system_notification
- * events (task_notification). These are NOT persisted in JSONL history. On reload,
- * we reconstruct them by correlating Agent tool_use names with <teammate-message>
- * teammate_ids found in subsequent user messages.
- */
 export function reconstructAgentNotifications(messages: MessageEntry[]): Record<string, AgentTaskNotification> {
   const taskNotifications = messages
     .filter((message) => message.type === 'user')
     .map((message) => extractTaskNotification(message.content))
     .filter((notification): notification is AgentTaskNotification => notification !== null)
 
-  // Step 1: Collect Agent tool_use blocks → map agent name to toolUseId
   const agentNameToToolUseId = new Map<string, string>()
 
   for (const msg of messages) {
@@ -2385,7 +2353,6 @@ export function reconstructAgentNotifications(messages: MessageEntry[]): Record<
         if (block.type === 'tool_use' && block.name === 'Agent' && block.id) {
           const input = block.input as Record<string, unknown> | undefined
           const name = input?.name as string | undefined
-          // Keep first toolUseId per name (consistent with first-wins for teammateContent)
           if (name && !agentNameToToolUseId.has(name)) agentNameToToolUseId.set(name, block.id)
         }
       }
@@ -2396,9 +2363,6 @@ export function reconstructAgentNotifications(messages: MessageEntry[]): Record<
     return agentNotificationRecordFromList(taskNotifications)
   }
 
-  // Step 2: Extract <teammate-message> content by teammate_id
-  // Skip lifecycle messages (shutdown_approved, idle_notification, etc.)
-  // which overwrite actual review content if stored later in history
   const teammateContent = new Map<string, string>()
   for (const msg of messages) {
     if (msg.type !== 'user') continue
@@ -2411,14 +2375,12 @@ export function reconstructAgentNotifications(messages: MessageEntry[]): Record<
     for (const match of text.matchAll(TEAMMATE_CONTENT_REGEX)) {
       if (match[1] && match[2]) {
         const content = match[2].trim()
-        // Skip lifecycle JSON messages (shutdown, idle, terminated notifications)
         if (content.startsWith('{') && content.endsWith('}')) {
           try {
             const parsed = JSON.parse(content) as Record<string, unknown>
             if (typeof parsed.type === 'string' && AGENT_LIFECYCLE_TYPES.has(parsed.type)) continue
-          } catch { /* not JSON, keep it */ }
+          } catch { }
         }
-        // Only store the first meaningful content per teammate (avoid overwrite by later lifecycle msgs)
         if (!teammateContent.has(match[1])) {
           teammateContent.set(match[1], content)
         }
@@ -2426,7 +2388,6 @@ export function reconstructAgentNotifications(messages: MessageEntry[]): Record<
     }
   }
 
-  // Step 3: Correlate and build notifications
   const notifications: Record<string, AgentTaskNotification> = {}
   for (const [name, toolUseId] of agentNameToToolUseId) {
     const content = teammateContent.get(name)

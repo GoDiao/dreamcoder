@@ -34,7 +34,6 @@ export function useKeyboardShortcuts() {
     const handleQuickSwitcher = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return
       const meta = e.metaKey || e.ctrlKey
-      // Capture before the terminal consumes Ctrl+K as a control character.
       if (meta && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         e.stopPropagation()
@@ -49,7 +48,6 @@ export function useKeyboardShortcuts() {
       if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return
       const meta = e.metaKey || e.ctrlKey
 
-      // The palette owns its keyboard interaction while it is open.
       if (activeModalRef.current === 'command-palette') {
         if (meta && (e.key === 'n' || e.key === '.')) e.preventDefault()
         return
@@ -64,21 +62,18 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      // Cmd+N — New session
       if (meta && e.key === 'n') {
         e.preventDefault()
         setActiveSession(null)
         setActiveView('code')
       }
 
-      // Escape — Close modal or clear state
       if (e.key === 'Escape') {
         if (activeModalRef.current) {
           closeModal()
         }
       }
 
-      // Cmd+. — Stop generation
       if (meta && e.key === '.') {
         if (chatStateRef.current !== 'idle' && activeTabIdRef.current) {
           e.preventDefault()

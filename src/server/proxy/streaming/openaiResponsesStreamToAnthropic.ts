@@ -1,15 +1,9 @@
-/**
- * Streaming SSE transformation: OpenAI Responses API → Anthropic Messages
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
 
 type StreamState = {
   nextContentIndex: number
-  indexByKey: Map<string, number>        // content part key → Anthropic index
-  toolIndexByItemId: Map<string, number> // tool item ID → Anthropic index
+  indexByKey: Map<string, number>
+  toolIndexByItemId: Map<string, number>
   model: string
   messageStarted: boolean
   messageStopped: boolean
@@ -19,9 +13,6 @@ function formatSse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 }
 
-/**
- * Transform an OpenAI Responses API SSE stream into an Anthropic Messages SSE stream.
- */
 export function openaiResponsesStreamToAnthropic(
   upstream: ReadableStream<Uint8Array>,
   model: string,
@@ -93,7 +84,7 @@ export function openaiResponsesStreamToAnthropic(
         }
       } catch (err) {
         controller.error(err)
-        return // don't call close() after error()
+        return
       }
       controller.close()
     },

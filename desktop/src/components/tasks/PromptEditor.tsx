@@ -42,7 +42,6 @@ export function PromptEditor({
   const t = useTranslation()
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] focus-within:border-[var(--color-border-focus)] transition-colors overflow-visible">
-      {/* Prompt textarea */}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -52,9 +51,7 @@ export function PromptEditor({
         style={{ minHeight: 120 }}
       />
 
-      {/* Bottom toolbar */}
       <div className="border-t border-[var(--color-border)]/40 px-3 py-2 flex flex-col gap-2 bg-[var(--color-surface-container-low)] rounded-b-[var(--radius-lg)]">
-        {/* Row 1: Permission + Model selectors */}
         <div className="flex items-center justify-between">
           <PermissionModeSelector value={permissionMode} onChange={onPermissionModeChange} workDir={folderPath || undefined} />
           <ModelSelector
@@ -66,12 +63,10 @@ export function PromptEditor({
           />
         </div>
 
-        {/* Row 2: Folder picker */}
         <div className="flex items-center justify-between">
           <DirectoryPicker value={folderPath} onChange={onFolderPathChange} />
         </div>
 
-        {/* Bypass + no folder warning */}
         {permissionMode === 'bypassPermissions' && (
           <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-[var(--color-error)]/8 text-[10px] text-[var(--color-error)]">
             <span className="material-symbols-outlined text-[12px]">warning</span>

@@ -59,7 +59,6 @@ function writeDismissedUpdateVersion(version: string | null) {
       window.localStorage.removeItem(DISMISSED_UPDATE_VERSION_KEY)
     }
   } catch {
-    // Ignore storage write failures.
   }
 }
 
@@ -88,7 +87,6 @@ async function setPendingUpdate(next: Update | null, proxyKey: string | null) {
     try {
       await previous.close()
     } catch {
-      // Ignore stale resource cleanup failures.
     }
   }
 }
@@ -270,7 +268,6 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
           const { invoke } = await import('@tauri-apps/api/core')
           await invoke('cancel_update_install')
         } catch {
-          // Best effort: keep the update prompt recoverable even if native reset fails.
         }
       }
       set((state) => ({

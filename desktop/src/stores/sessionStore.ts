@@ -61,7 +61,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       let syncedSessions: SessionListItem[] = []
       set((state) => {
         const currentById = new Map(state.sessions.map((session) => [session.id, session]))
-        // Deduplicate by session ID - keep the most recently modified entry.
         const byId = new Map<string, SessionListItem>()
         for (const s of raw) {
           const current = currentById.get(s.id)
@@ -71,8 +70,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             byId.set(s.id, candidate)
           }
         }
-        // Quick-switcher matches can be older than the sidebar's first page.
-        // Keep workspace metadata for open tabs across the periodic refresh.
         if (!project) {
           const openSessionIds = new Set(useTabStore.getState().tabs
             .filter((tab) => tab.type === 'session')

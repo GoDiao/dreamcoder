@@ -1,7 +1,3 @@
-/**
- * Unit tests for Settings, Models, and Status APIs
- */
-
 import { describe, it, expect, beforeAll, beforeEach, afterEach, spyOn } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -27,8 +23,6 @@ import {
   updateSettingsForSource,
 } from '../../utils/settings/settings.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
-
-// ─── Test helpers ─────────────────────────────────────────────────────────────
 
 let tmpDir: string
 let originalConfigDir: string | undefined
@@ -161,7 +155,6 @@ function saveTestOpenAIOAuthTokens(tokens: OpenAIOAuthTokens) {
   clearOpenAIOAuthTokenCache()
 }
 
-/** 创建一个模拟 Request */
 function makeRequest(
   method: string,
   urlStr: string,
@@ -177,10 +170,6 @@ function makeRequest(
   const segments = url.pathname.split('/').filter(Boolean)
   return { req, url, segments }
 }
-
-// =============================================================================
-// SettingsService
-// =============================================================================
 
 describe('SettingsService', () => {
   beforeEach(setup)
@@ -281,9 +270,7 @@ describe('SettingsService', () => {
     await svc.updateProjectSettings({ theme: 'light' })
 
     const merged = await svc.getSettings()
-    // project overrides user
     expect(merged.theme).toBe('light')
-    // user value preserved when not overridden
     expect(merged.model).toBe('claude-opus-4-7')
   })
 
@@ -348,16 +335,11 @@ describe('SettingsService', () => {
   })
 })
 
-// =============================================================================
-// Settings API
-// =============================================================================
-
 describe('Settings API', () => {
   beforeEach(setup)
   afterEach(teardown)
 
   it('GET /api/settings should return merged settings', async () => {
-    // Seed some user settings
     const settingsPath = path.join(tmpDir, 'settings.json')
     await fs.writeFile(settingsPath, JSON.stringify({ theme: 'dark' }))
 
@@ -388,7 +370,6 @@ describe('Settings API', () => {
     const body = await res.json()
     expect(body.ok).toBe(true)
 
-    // Verify persisted
     const { req: r2, url: u2, segments: s2 } = makeRequest('GET', '/api/settings/user')
     const res2 = await handleSettingsApi(r2, u2, s2)
     const body2 = await res2.json()
@@ -474,10 +455,6 @@ describe('Settings API', () => {
   })
 })
 
-// =============================================================================
-// Models API
-// =============================================================================
-
 describe('Models API', () => {
   beforeEach(setup)
   afterEach(teardown)
@@ -552,7 +529,6 @@ describe('Models API', () => {
     expect(body.ok).toBe(true)
     expect(body.model).toBe('claude-opus-4-7')
 
-    // Verify persisted
     const { req: r2, url: u2, segments: s2 } = makeRequest('GET', '/api/models/current')
     const res2 = await handleModelsApi(r2, u2, s2)
     const body2 = await res2.json()
@@ -762,10 +738,6 @@ describe('Model Options', () => {
   })
 })
 
-// =============================================================================
-// Status API
-// =============================================================================
-
 describe('Status API', () => {
   beforeEach(async () => {
     await setup()
@@ -831,10 +803,6 @@ describe('Status API', () => {
     expect(res.status).toBe(404)
   })
 })
-
-// =============================================================================
-// Activity Stats API
-// =============================================================================
 
 describe('Activity Stats API', () => {
   let handleApiRequest: typeof import('../router.js').handleApiRequest

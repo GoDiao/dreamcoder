@@ -20,7 +20,6 @@ export function ScheduledTasks() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="px-10 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('scheduledPage.title')}</h1>
@@ -34,7 +33,6 @@ export function ScheduledTasks() {
           <Button onClick={() => openModal('new-task')}>{t('tasks.newTask')}</Button>
         </div>
 
-        {/* Desktop-online notice */}
         <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/15 mb-6">
           <span className="material-symbols-outlined text-[18px] text-[var(--color-warning)]">schedule</span>
           <span className="text-xs text-[var(--color-text-secondary)]">
@@ -42,7 +40,6 @@ export function ScheduledTasks() {
           </span>
         </div>
 
-        {/* Content */}
         {!initialized && isLoading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin w-6 h-6 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
@@ -54,7 +51,6 @@ export function ScheduledTasks() {
         )}
       </div>
 
-      {/* New Task Modal */}
       {activeModal === 'new-task' && (
         <NewTaskModal
           open

@@ -6,7 +6,6 @@ import type { SessionListItem } from '../types/session'
 const PAGE_SIZE = 100
 const RESULT_LIMIT = 10
 
-/** Load search metadata on demand, without hydrating every conversation's history. */
 export function useSessionSearch(query: string) {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -39,7 +38,6 @@ export function useSessionSearch(query: string) {
             }
           }
           total = page.total
-          // The server may skip unreadable files; advance by page size, not result count.
           offset += PAGE_SIZE
         } while (offset < total)
 

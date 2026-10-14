@@ -410,7 +410,6 @@ export function GeneralSettings() {
           <p className="text-sm text-[var(--color-text-tertiary)]">{t('settings.general.uiZoomDescription')}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
             <span>{t('settings.general.uiZoomShortcutHint')}</span>
-            {/* Matches appZoom.ts: Cmd on macOS, Ctrl elsewhere. */}
             <span>{t('settings.general.uiZoomShortcutMac')}</span>
             {renderZoomShortcut('⌘')}
             <span>{t('settings.general.uiZoomShortcutWindows')}</span>
@@ -488,7 +487,6 @@ export function GeneralSettings() {
 
   return (
     <div className="max-w-xl">
-      {/* Appearance selector */}
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.appearanceTitle')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.appearanceDescription')}</p>
       <div className="grid grid-cols-2 gap-2 mb-8 sm:grid-cols-3">
@@ -508,7 +506,6 @@ export function GeneralSettings() {
         ))}
       </div>
 
-      {/* Language selector */}
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.languageTitle')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.languageDescription')}</p>
       <div className="flex gap-2 mb-8">
@@ -527,7 +524,6 @@ export function GeneralSettings() {
         ))}
       </div>
 
-      {/* Response Language */}
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.responseLangTitle')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.responseLangDescription')}</p>
       <Dropdown<string>
@@ -549,7 +545,6 @@ export function GeneralSettings() {
         }
       />
 
-      {/* Effort Level */}
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.effortTitle')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.effortDescription')}</p>
       <div className="flex gap-2">
@@ -1010,7 +1005,6 @@ export function GeneralSettings() {
         </div>
       )}
 
-      {/* Confirm dialog for mode switch */}
       <ConfirmDialog
         open={modeSwitchConfirmOpen}
         onClose={closeModeSwitchConfirm}

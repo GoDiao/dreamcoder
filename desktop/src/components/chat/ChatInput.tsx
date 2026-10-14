@@ -437,7 +437,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     setSlashMenuOpen(true)
   }, [])
 
-  // Detect @ trigger (file search)
   const detectAtTrigger = useCallback((value: string, cursorPos: number) => {
     const textBeforeCursor = value.slice(0, cursorPos)
     let pos = -1
@@ -463,7 +462,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       return
     }
 
-    // Extract filter text after @
     const filter = textBeforeCursor.slice(pos + 1)
     setAtFilter(filter)
     setAtCursorPos(pos)
@@ -653,10 +651,8 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   }
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // Ignore key events during IME composition (e.g. Chinese input method)
     if (composingRef.current || event.nativeEvent.isComposing || event.keyCode === 229) return
 
-    // Route file search navigation keys to FileSearchMenu
     if (fileSearchOpen) {
       const key = event.key
       if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'ArrowRight' || key === 'Enter' || key === 'Tab' || key === 'Escape') {
@@ -670,7 +666,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
         fileSearchRef.current?.handleKeyDown(event.nativeEvent)
         return
       }
-      // Other keys (typing) should go to the textarea - let it propagate
       return
     }
 

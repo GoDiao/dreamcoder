@@ -1,15 +1,7 @@
 import { useState } from 'react'
 import { mockNewTaskDefaults, mockSessions, mockStatusBar } from '../mocks/data'
 
-/**
- * NewTaskModal page -- pixel-perfect replica of the HTML prototype.
- * Renders the full app chrome (header, sidebar, content, footer) dimmed/blurred
- * behind a centered "New Scheduled Task" modal overlay.
- *
- * Everything lives in this single file.  Mock data is imported from ../mocks/data.
- */
 export default function NewTaskModal() {
-  /* ── form state ─────────────────────────────────────────────────── */
   const [taskName, setTaskName] = useState('')
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -21,7 +13,6 @@ export default function NewTaskModal() {
 
   return (
     <div className="bg-[var(--color-background)] text-[var(--color-on-surface)] font-[var(--font-body)] min-h-screen flex flex-col">
-      {/* ─── TopAppBar / Header ──────────────────────────────────── */}
       <header className="bg-[var(--color-background)] flex justify-between items-center px-6 h-12 w-full z-40">
         <div className="flex items-center gap-6">
           <span className="text-sm font-bold text-[var(--color-text-primary)] uppercase tracking-tighter font-[var(--font-headline)]">
@@ -44,14 +35,10 @@ export default function NewTaskModal() {
         </div>
       </header>
 
-      {/* header divider */}
       <div className="bg-[var(--color-surface-container-low)] h-px w-full" />
 
-      {/* ─── Main area (sidebar + content + overlay) ──────────────── */}
       <main className="flex-1 flex overflow-hidden relative">
-        {/* ── Sidebar (dimmed) ────────────────────────────────────── */}
         <aside className="hidden md:flex flex-col p-4 gap-2 bg-[var(--color-surface-container-low)] h-full w-[280px] opacity-30 pointer-events-none">
-          {/* project selector */}
           <div className="flex items-center gap-3 px-2 py-3 mb-2">
             <div className="w-8 h-8 rounded bg-[var(--color-surface-dim)] flex items-center justify-center">
               <span className="material-symbols-outlined text-[var(--color-outline)]">filter</span>
@@ -62,7 +49,6 @@ export default function NewTaskModal() {
             </div>
           </div>
 
-          {/* nav items -- session counts derived from mockSessions */}
           <div className="font-[var(--font-body)] text-sm font-medium space-y-1">
             <div className="flex items-center gap-3 px-3 py-2 text-[var(--color-text-tertiary)]">
               <span className="material-symbols-outlined">add</span>New session
@@ -85,9 +71,7 @@ export default function NewTaskModal() {
           </div>
         </aside>
 
-        {/* ── Content area (dimmed canvas) ────────────────────────── */}
         <div className="flex-1 bg-[var(--color-surface-container-low)] flex flex-col p-8 overflow-y-auto relative">
-          {/* faded background content */}
           <div className="max-w-4xl mx-auto w-full space-y-6 opacity-20">
             <h1 className="font-[var(--font-headline)] text-3xl font-bold tracking-tight">
               Scheduled Tasks
@@ -98,7 +82,6 @@ export default function NewTaskModal() {
             </div>
           </div>
 
-          {/* ═══ MODAL OVERLAY ═══════════════════════════════════════ */}
           <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-[var(--color-on-surface)]/40 backdrop-blur-sm">
             <div
               className="bg-[var(--color-surface-container-lowest)] w-full max-w-lg rounded-xl overflow-hidden flex flex-col"
@@ -107,7 +90,6 @@ export default function NewTaskModal() {
                   '0 4px 20px rgba(27,28,26,0.04), 0 12px 40px rgba(27,28,26,0.08)',
               }}
             >
-              {/* ── Modal Header ─────────────────────────────────── */}
               <div className="px-6 py-4 flex items-center justify-between border-b border-[var(--color-outline-variant)]/10">
                 <h2 className="font-[var(--font-headline)] font-bold text-lg text-[var(--color-on-surface)]">
                   New Scheduled Task
@@ -117,7 +99,6 @@ export default function NewTaskModal() {
                 </span>
               </div>
 
-              {/* ── Modal Body ───────────────────────────────────── */}
               <div
                 className="p-6 overflow-y-auto space-y-5"
                 style={{
@@ -126,7 +107,6 @@ export default function NewTaskModal() {
                   msOverflowStyle: 'none',
                 }}
               >
-                {/* Info Banner */}
                 <div className="bg-[var(--color-surface-container-high)]/50 rounded-lg p-3 flex gap-3 items-start">
                   <span className="material-symbols-outlined text-[var(--color-primary)] text-sm mt-0.5">
                     info
@@ -136,10 +116,8 @@ export default function NewTaskModal() {
                   </p>
                 </div>
 
-                {/* ── Form ───────────────────────────────────────── */}
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4">
-                    {/* Task Name */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                         Task Name
@@ -153,7 +131,6 @@ export default function NewTaskModal() {
                       />
                     </div>
 
-                    {/* Description */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                         Description
@@ -167,7 +144,6 @@ export default function NewTaskModal() {
                       />
                     </div>
 
-                    {/* System Prompt */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                         System Prompt
@@ -182,9 +158,7 @@ export default function NewTaskModal() {
                     </div>
                   </div>
 
-                  {/* Two-column row: Permission Mode + Model */}
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Permission Mode */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                         Permission Mode
@@ -207,7 +181,6 @@ export default function NewTaskModal() {
                       </div>
                     </div>
 
-                    {/* Model */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                         Model
@@ -231,7 +204,6 @@ export default function NewTaskModal() {
                     </div>
                   </div>
 
-                  {/* Root Folder Path */}
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                       Root Folder Path
@@ -252,7 +224,6 @@ export default function NewTaskModal() {
                     </div>
                   </div>
 
-                  {/* Frequency */}
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-outline)] px-1">
                       Frequency
@@ -275,7 +246,6 @@ export default function NewTaskModal() {
                     </div>
                   </div>
 
-                  {/* Worktree Checkbox */}
                   <div className="flex items-center gap-3 pt-2">
                     <div className="relative flex items-center">
                       <input
@@ -296,7 +266,6 @@ export default function NewTaskModal() {
                 </div>
               </div>
 
-              {/* ── Modal Footer ─────────────────────────────────── */}
               <div className="px-6 py-4 bg-[var(--color-surface-container-low)]/50 flex items-center justify-end gap-3">
                 <button className="px-5 py-2 text-sm font-semibold text-[var(--color-outline)] hover:text-[var(--color-on-surface)] transition-colors">
                   Cancel
@@ -316,7 +285,6 @@ export default function NewTaskModal() {
         </div>
       </main>
 
-      {/* ─── Footer / Status Bar ─────────────────────────────────── */}
       <footer className="bg-[var(--color-background)] flex items-center justify-between px-4 z-50 fixed bottom-0 left-0 w-full h-8 border-t border-[var(--color-border)]/20 font-[var(--font-body)] text-xs tracking-tight">
         <div className="flex items-center gap-3">
           <span className="text-[var(--color-text-tertiary)]">

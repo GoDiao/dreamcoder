@@ -57,7 +57,6 @@ export const useTaskStore = create<TaskStore>((set) => ({
       const { runs } = await tasksApi.getRecentRuns()
       set({ recentRuns: runs })
     } catch {
-      // ignore
     }
   },
 

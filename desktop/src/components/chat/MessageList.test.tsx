@@ -663,7 +663,6 @@ describe('MessageList nested tool calls', () => {
     Object.defineProperty(scrollArea, 'scrollHeight', { configurable: true, value: 240 * 200 })
     await waitForProgrammaticScrollReset()
 
-    // Scroll to middle so both top and bottom spacers are present
     scrollArea.scrollTop = 20_000
     await act(async () => {
       fireEvent.scroll(scrollArea)
@@ -678,8 +677,6 @@ describe('MessageList nested tool calls', () => {
     expect(firstTopChunk.style.contentVisibility).toBe('auto')
     expect(firstTopChunk.style.containIntrinsicSize).toMatch(/^0 \d+px$/)
 
-    // Items inside the active window must NOT carry content-visibility (this
-    // is the regression guard that previous content-visibility rollout hit).
     const visibleItems = container.querySelectorAll('[data-virtual-message-item]')
     for (const item of visibleItems) {
       expect((item as HTMLElement).style.contentVisibility).toBe('')

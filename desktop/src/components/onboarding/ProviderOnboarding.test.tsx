@@ -23,7 +23,6 @@ const createdProvider: SavedProvider = {
   models: { main: 'model-main', haiku: '', sonnet: '', opus: '' },
 }
 
-// The modal has its own tests; here we only need its create/close contract.
 vi.mock('../settings/ProviderFormModal', () => ({
   ProviderFormModal: ({ onClose, onCreated }: {
     onClose: () => void

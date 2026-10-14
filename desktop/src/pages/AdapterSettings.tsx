@@ -29,18 +29,13 @@ export function AdapterSettings() {
     unbindDingtalkBot,
   } = useAdapterStore()
 
-  // Active IM tab —— Feishu 默认展示，在前
   const [activeIm, setActiveIm] = useState<ImTab>('feishu')
 
-  // Server —— serverUrl 不再暴露在 UI 里（见下方 Server URL 注释），
-  // 桌面端用 Tauri env var 注入动态端口。
   const [defaultProjectDir, setDefaultProjectDir] = useState('')
 
-  // Telegram
   const [tgBotToken, setTgBotToken] = useState('')
   const [tgAllowedUsers, setTgAllowedUsers] = useState('')
 
-  // Feishu
   const [fsAppId, setFsAppId] = useState('')
   const [fsAppSecret, setFsAppSecret] = useState('')
   const [fsEncryptKey, setFsEncryptKey] = useState('')
@@ -48,7 +43,6 @@ export function AdapterSettings() {
   const [fsAllowedUsers, setFsAllowedUsers] = useState('')
   const [fsStreamingCard, setFsStreamingCard] = useState(false)
 
-  // WeChat
   const [wcAllowedUsers, setWcAllowedUsers] = useState('')
   const [wechatQrUrl, setWechatQrUrl] = useState<string | null>(null)
   const [wechatSessionKey, setWechatSessionKey] = useState<string | null>(null)
@@ -56,7 +50,6 @@ export function AdapterSettings() {
   const [isWechatBinding, setIsWechatBinding] = useState(false)
   const [isUnbindingWechatAccount, setIsUnbindingWechatAccount] = useState(false)
 
-  // DingTalk
   const [dtClientId, setDtClientId] = useState('')
   const [dtClientSecret, setDtClientSecret] = useState('')
   const [dtAllowedUsers, setDtAllowedUsers] = useState('')
@@ -78,7 +71,6 @@ export function AdapterSettings() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
 
-  // Pairing
   const [pairingCode, setPairingCode] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [pendingUnbind, setPendingUnbind] = useState<{ platform: ImPlatform; userId: string | number } | null>(null)
@@ -88,7 +80,6 @@ export function AdapterSettings() {
     fetchConfig()
   }, [])
 
-  // Sync form state when config is loaded
   useEffect(() => {
     setDefaultProjectDir(config.defaultProjectDir ?? '')
     setTgBotToken(config.telegram?.botToken ?? '')
@@ -365,7 +356,6 @@ export function AdapterSettings() {
     }
   }, [pendingUnbind, removePairedUser, fetchConfig])
 
-  // Collect all paired users across platforms
   const allPairedUsers = [
     ...(config.telegram?.pairedUsers ?? []).map((u) => ({ ...u, platform: 'telegram' as const })),
     ...(config.feishu?.pairedUsers ?? []).map((u) => ({ ...u, platform: 'feishu' as const })),
@@ -373,7 +363,6 @@ export function AdapterSettings() {
     ...(config.dingtalk?.pairedUsers ?? []).map((u) => ({ ...u, platform: 'dingtalk' as const })),
   ]
 
-  // Check pairing expiry
   const pairingExpiry = config.pairing?.expiresAt
   const isPairingActive = pairingExpiry ? Date.now() < pairingExpiry : false
   const minutesLeft = pairingExpiry ? Math.max(0, Math.ceil((pairingExpiry - Date.now()) / 60000)) : 0
@@ -390,12 +379,10 @@ export function AdapterSettings() {
 
   return (
     <div className="max-w-2xl space-y-8">
-      {/* Description */}
       <div>
         <p className="text-sm text-[var(--color-text-secondary)]">{t('settings.adapters.description')}</p>
       </div>
 
-      {/* Pairing */}
       <section className="rounded-xl border border-[var(--color-border)] overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 bg-[var(--color-surface-hover)] border-b border-[var(--color-border)]">
           <span className="material-symbols-outlined text-[18px] text-[var(--color-text-secondary)]">link</span>
@@ -404,7 +391,6 @@ export function AdapterSettings() {
         <div className="p-4 space-y-4">
           <p className="text-sm text-[var(--color-text-secondary)]">{t('settings.adapters.pairingDesc')}</p>
 
-          {/* Generate code */}
           <div className="flex items-center gap-3">
             <Button onClick={handleGenerateCode} loading={isGenerating}>
               {pairingCode || isPairingActive ? t('settings.adapters.regenerateCode') : t('settings.adapters.generateCode')}
@@ -429,7 +415,6 @@ export function AdapterSettings() {
             <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.adapters.pairingCodeHint')}</p>
           )}
 
-          {/* Paired users list */}
           <div>
             <h4 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">{t('settings.adapters.pairedUsers')}</h4>
             {allPairedUsers.length === 0 ? (
@@ -464,13 +449,6 @@ export function AdapterSettings() {
         </div>
       </section>
 
-      {/* Server URL —— 之前是个手填字段，但桌面端 Tauri 启动 adapter sidecar
-          时已经把 server 的动态端口通过 ADAPTER_SERVER_URL env var 注进去了，
-          loadConfig() 里 env 优先级高于这里的 file value，所以这个字段在桌面
-          运行时完全不会被读到。用户也根本不知道该填什么端口（每次启动随机）。
-          Standalone 模式（直接 bun run adapters/...）保留 file 字段兜底就够了。 */}
-
-      {/* Default Project */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-[var(--color-text-primary)]">
           {t('settings.adapters.defaultProject')}
@@ -481,7 +459,6 @@ export function AdapterSettings() {
         </p>
       </div>
 
-      {/* IM Adapter Tabs —— Feishu 默认在前，Telegram 在后 */}
       <section className="rounded-xl border border-[var(--color-border)] overflow-hidden">
         <div role="tablist" aria-label="IM adapter" className="flex items-stretch border-b border-[var(--color-border)] bg-[var(--color-surface-hover)]">
           <ImTabButton
@@ -758,7 +735,6 @@ export function AdapterSettings() {
         )}
       </section>
 
-      {/* Save */}
       <div className="flex items-center gap-3">
         <Button onClick={handleSave} loading={isSaving}>
           {saveStatus === 'saved' ? t('settings.adapters.saved') : t('settings.adapters.save')}

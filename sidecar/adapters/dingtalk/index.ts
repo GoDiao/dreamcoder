@@ -1,10 +1,3 @@
-/**
- * DingTalk Adapter for Claude Code Desktop.
- *
- * Uses DingTalk Stream to receive bot messages without a public webhook.
- * The desktop Settings page stores clientId/clientSecret via QR registration.
- */
-
 import path from 'node:path'
 import { DWClient, TOPIC_CARD, TOPIC_ROBOT } from 'dingtalk-stream'
 import { WsBridge, type ServerMessage, type AttachmentRef } from '../common/ws-bridge.js'
@@ -247,7 +240,6 @@ async function buildStatusText(chatId: string): Promise<string> {
     projectName = gitInfo.repoName || path.basename(gitInfo.workDir) || projectName
     branch = gitInfo.branch
   } catch {
-    // Status should still be useful when git lookup fails.
   }
 
   let taskCounts:
@@ -270,7 +262,6 @@ async function buildStatusText(chatId: string): Promise<string> {
       }
     }
   } catch {
-    // Ignore task lookup failures.
   }
 
   return formatImStatus({
@@ -692,7 +683,6 @@ async function start(): Promise<void> {
     try {
       await client.disconnect()
     } catch {
-      // ignore
     }
     process.exit(0)
   }

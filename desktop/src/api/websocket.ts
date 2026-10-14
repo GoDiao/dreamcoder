@@ -68,7 +68,6 @@ class WebSocketManager {
           handler(msg)
         }
       } catch {
-        // Ignore malformed messages
       }
     }
 
@@ -80,7 +79,6 @@ class WebSocketManager {
     }
 
     ws.onerror = () => {
-      // onclose will fire after onerror
     }
   }
 

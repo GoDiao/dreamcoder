@@ -1,10 +1,3 @@
-/**
- * Business Flow E2E Tests
- *
- * 完整的业务流程测试：涵盖定时任务、权限模式、Agent 管理、
- * WebSocket 对话、搜索、会话历史互通等所有核心业务逻辑。
- */
-
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -44,10 +37,6 @@ describe('Business Flow: Scheduled Tasks', () => {
     server?.stop()
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
-
-  // ==========================================================================
-  // 定时任务完整生命周期
-  // ==========================================================================
 
   it('should start with no scheduled tasks', async () => {
     const { status, data } = await api('GET', '/api/scheduled-tasks')
@@ -106,7 +95,6 @@ describe('Business Flow: Scheduled Tasks', () => {
     expect(status).toBe(200)
     expect(data.task.cron).toBe('0 8 * * 1-5')
     expect(data.task.description).toBe('Updated: earlier standup')
-    // Other fields should remain unchanged
     expect(data.task.name).toBe('morning-standup')
     expect(data.task.prompt).toContain('git log')
   })
@@ -178,7 +166,6 @@ describe('Business Flow: Permission Modes', () => {
       expect(status).toBe(200)
       expect(data.mode).toBe(mode)
 
-      // Verify it persisted
       const { data: verify } = await api('GET', '/api/permissions/mode')
       expect(verify.mode).toBe(mode)
     })
@@ -481,7 +468,6 @@ describe('Business Flow: Sessions & CLI Interop', () => {
     const dirs = await fs.readdir(projectDir)
     expect(dirs.length).toBeGreaterThan(0)
 
-    // Find the session file
     let found = false
     for (const dir of dirs) {
       const files = await fs.readdir(path.join(projectDir, dir))
@@ -494,7 +480,6 @@ describe('Business Flow: Sessions & CLI Interop', () => {
   })
 
   it('should simulate CLI writing messages (JSONL format)', async () => {
-    // Simulate what CLI does: append JSONL entries
     const projectDir = path.join(tmpDir, 'projects')
     const dirs = await fs.readdir(projectDir)
     let sessionFile = ''
@@ -508,7 +493,6 @@ describe('Business Flow: Sessions & CLI Interop', () => {
     }
     expect(sessionFile).not.toBe('')
 
-    // Append user message (mimicking CLI JSONL format - must include message.role)
     const userEntry = {
       type: 'user',
       uuid: 'msg-001',
@@ -518,7 +502,6 @@ describe('Business Flow: Sessions & CLI Interop', () => {
     }
     await fs.appendFile(sessionFile, JSON.stringify(userEntry) + '\n')
 
-    // Append assistant message
     const assistantEntry = {
       type: 'assistant',
       uuid: 'msg-002',
@@ -577,7 +560,6 @@ describe('Business Flow: Sessions & CLI Interop', () => {
 describe('Business Flow: Search', () => {
   beforeAll(async () => {
     await startTestServer()
-    // Create test files to search
     const testDir = path.join(tmpDir, 'test-workspace')
     await fs.mkdir(testDir, { recursive: true })
     await fs.writeFile(path.join(testDir, 'main.ts'), 'export function startServer() {\n  console.log("starting")\n}\n')
@@ -680,7 +662,6 @@ describe('Business Flow: WebSocket Chat', () => {
     expect(types).toContain('content_delta')
     expect(types).toContain('message_complete')
 
-    // Should have thinking state first
     const statusMsgs = messages.filter((m) => m.type === 'status')
     expect(statusMsgs[0].state).toBe('thinking')
   })
@@ -755,11 +736,9 @@ describe('Business Flow: WebSocket Chat', () => {
   })
 
   it('should reject invalid session ID in WebSocket URL', async () => {
-    // Path traversal gets resolved by URL parser, so test with special chars
     const res = await fetch(`${baseUrl}/ws/invalid session!@#`, {
       headers: { 'Upgrade': 'websocket', 'Connection': 'Upgrade' },
     })
-    // URL with special chars either returns 400 (invalid ID) or 404 (path resolution)
     expect([400, 404]).toContain(res.status)
   })
 })
@@ -793,13 +772,11 @@ describe('Business Flow: Settings Persistence', () => {
   })
 
   it('should merge settings (not overwrite)', async () => {
-    // First write
     await api('PUT', '/api/settings/user', { theme: 'dark' })
-    // Second write (should merge, not overwrite)
     await api('PUT', '/api/settings/user', { outputStyle: 'concise' })
 
     const { data } = await api('GET', '/api/settings/user')
-    expect(data.theme).toBe('dark') // Should still be there
+    expect(data.theme).toBe('dark')
     expect(data.outputStyle).toBe('concise')
   })
 

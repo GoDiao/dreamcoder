@@ -14,10 +14,6 @@ type Props = {
   description?: string
 }
 
-/**
- * Icons for known tool types.
- * Uses Material Symbols Outlined names.
- */
 const TOOL_META: Record<string, { icon: string; label: string; color: string }> = {
   Bash: { icon: 'terminal', label: 'Bash', color: 'var(--color-warning)' },
   Edit: { icon: 'edit_note', label: 'Edit File', color: 'var(--color-brand)' },
@@ -32,9 +28,6 @@ const TOOL_META: Record<string, { icon: string; label: string; color: string }> 
   Skill: { icon: 'auto_awesome', label: 'Skill', color: 'var(--color-tertiary)' },
 }
 
-/**
- * Extract human-readable detail lines from tool input.
- */
 function extractToolDetails(toolName: string, input: unknown, t: (key: TranslationKey, params?: Record<string, string | number>) => string): { primary: string; secondary?: string } {
   const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
 
@@ -134,7 +127,6 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         ? 'border-[var(--color-warning)] bg-[var(--color-surface-container-lowest)]'
         : 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-low)] opacity-70'
     }`}>
-      {/* Header */}
       <div className={`flex items-center gap-3 px-4 py-3 ${
         isPending
           ? 'bg-[var(--color-surface-container)]'
@@ -174,7 +166,6 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         </div>
       </div>
 
-      {/* Tool details */}
       <div className="border-t border-[var(--color-outline-variant)]/20 px-4 py-3">
         {preview ? (
           <div className="space-y-2">
@@ -199,7 +190,6 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
           </div>
         ) : null}
 
-        {/* Secondary detail */}
         {details.secondary && (
           <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{details.secondary}</p>
         )}
@@ -223,7 +213,6 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         )}
       </div>
 
-      {/* Action buttons */}
       {isPending && (
         <div className="flex items-center gap-2 border-t border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)] px-4 py-3">
           <Button

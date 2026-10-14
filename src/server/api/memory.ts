@@ -1,12 +1,3 @@
-/**
- * Memory REST API
- *
- * GET  /api/memory/projects?cwd=...       — list project-scoped memory dirs
- * GET  /api/memory/files?projectId=...    — list markdown memory files
- * GET  /api/memory/file?projectId=...&path=...
- * PUT  /api/memory/file                   — update/create a markdown memory file
- */
-
 import * as fs from 'node:fs/promises'
 import { homedir } from 'node:os'
 import * as path from 'node:path'
@@ -186,7 +177,6 @@ async function listMemoryFiles(projectId: string): Promise<MemoryFile[]> {
               : undefined
         }
       } catch {
-        // Metadata is best-effort. The file remains editable from the UI.
       }
 
       files.push({
@@ -400,7 +390,6 @@ async function inferProjectPathFromSessionFiles(projectId: string): Promise<stri
       const stat = await fs.stat(filePath)
       sessionFiles.push({ filePath, mtimeMs: stat.mtimeMs })
     } catch {
-      // A racing delete should not hide the rest of the memory projects.
     }
   }
 

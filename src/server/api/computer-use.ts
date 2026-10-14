@@ -1,11 +1,3 @@
-/**
- * Computer Use API — 环境检测与依赖安装
- *
- * Routes:
- *   GET  /api/computer-use/status  — 检测 Python3、venv、依赖、权限状态
- *   POST /api/computer-use/setup   — 创建 venv 并安装依赖
- */
-
 import { homedir } from 'os'
 import { join } from 'path'
 import { access, readFile, mkdir, writeFile, rm } from 'fs/promises'
@@ -25,7 +17,6 @@ import {
   saveStoredComputerUseConfig,
   type ComputerUseMode,
 } from '../../utils/computerUse/preauthorizedConfig.js'
-// Embed helper scripts at compile time so they're available in bundled mode
 // @ts-ignore — Bun text import
 import MAC_HELPER_CONTENT from '../../../runtime/mac_helper.py' with { type: 'text' }
 // @ts-ignore — Bun text import
@@ -44,8 +35,6 @@ const claudeHome = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
 const runtimeStateRoot = join(claudeHome, '.runtime')
 const venvRoot = join(runtimeStateRoot, 'venv')
 const installStampPath = join(runtimeStateRoot, 'requirements.sha256')
-// 记录上次创建 venv 时所用的 config.pythonPath 原值。读取该文件来判断当前
-// venv 是否仍与最新的自定义路径配置一致。
 const baseInterpreterMarkerPath = join(runtimeStateRoot, 'venv-base-interpreter.txt')
 const MIN_PYTHON_MAJOR = 3
 const MIN_PYTHON_MINOR = 9
@@ -62,7 +51,6 @@ function getPythonCommandEnv(): Record<string, string> | undefined {
   } as Record<string, string>
 }
 
-// Paths that resolve correctly in both dev and bundled modes
 function getRequirementsPath(): string {
   return join(runtimeStateRoot, 'requirements.txt')
 }
@@ -84,20 +72,6 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
-/**
- * 判断现有 venv 是否与当前 config.pythonPath 配置一致。
- *
- * 通过 marker 文件记录上次 setup 时所用的解释器路径——这比解析 pyvenv.cfg
- * 可靠得多：当用户自定义 Python 自身在一个 venv 里时（conda/pyenv/手工 venv
- * 都是这种情况），Python 的 venv 模块会跳过外层 venv 直接指向 base 解释器，
- * 导致 pyvenv.cfg 的 home 字段记录的是 base 而非用户提供的那个路径。
- *
- * 兼容性：marker 缺失时——
- * - 若用户也没设置自定义路径（current === ''），视为老用户的合法 venv，
- *   返回 true 不打扰。
- * - 若用户设置了自定义路径（current !== ''），说明这是 marker 引入前建立
- *   的旧 venv，绝非由当前自定义路径建立，返回 false 触发重建。
- */
 async function venvBaseInterpreterMatches(
   currentCustomPath: string | null | undefined,
 ): Promise<boolean> {
@@ -145,24 +119,14 @@ export async function runPipInstallWithFallback(
   return firstFailure ?? { ok: false, stdout: '', stderr: 'pip install failed', code: -1 }
 }
 
-/**
- * Ensure runtime source files (requirements.txt, mac_helper.py) exist in
- * ~/.claude/.runtime/. In dev mode they are copied from the project's
- * runtime/ directory; in bundled mode requirements.txt is written from the
- * embedded constant and mac_helper.py is copied from the project dir (if
- * available) or skipped (it will already have been extracted on a prior run).
- */
 async function ensureRuntimeFiles(): Promise<void> {
   await mkdir(runtimeStateRoot, { recursive: true })
 
-  // requirements.txt — always write from embedded constant (authoritative)
   await writeFile(getRequirementsPath(), REQUIREMENTS_CONTENT, 'utf8')
 
-  // helper script — write the platform-appropriate version
   const helperContent = isWindows ? WIN_HELPER_CONTENT : MAC_HELPER_CONTENT
   await writeFile(getHelperPath(), helperContent, 'utf8')
 
-  // uia_helper.py — Windows only, for UIA Tree mode
   if (isWindows) {
     await writeFile(join(runtimeStateRoot, 'uia_helper.py'), UIA_HELPER_CONTENT, 'utf8')
   }
@@ -196,7 +160,6 @@ async function checkStatus(): Promise<EnvStatus> {
   const platform = process.platform
   const supported = platform === 'darwin' || platform === 'win32'
 
-  // Check venv — different paths on Windows vs Unix
   const venvPython = isWindows
     ? join(venvRoot, 'Scripts', 'python.exe')
     : join(venvRoot, 'bin', 'python3')
@@ -210,18 +173,12 @@ async function checkStatus(): Promise<EnvStatus> {
     config.pythonPath,
   )
 
-  // 校验现有 venv 是否与当前 config.pythonPath 配置一致：
-  // - 老用户从未设过自定义路径 → marker 不存在 + current 为空 → 视为匹配，
-  //   原行为完全不变。
-  // - 配置变更（设置/切换/清空自定义路径）→ marker 与 current 不一致 →
-  //   effectiveVenvCreated 置为 false，UI 提示需要重新 setup。
   let effectiveVenvCreated = venvCreated
   if (venvCreated) {
     const matches = await venvBaseInterpreterMatches(config.pythonPath)
     if (!matches) effectiveVenvCreated = false
   }
 
-  // Check dependencies — use the state dir copy
   const reqPath = getRequirementsPath()
   const requirementsFound = await pathExists(reqPath)
   let depsInstalled = false
@@ -236,9 +193,6 @@ async function checkStatus(): Promise<EnvStatus> {
     }
   }
 
-  // Check macOS permissions without triggering a system prompt. The helper
-  // uses preflight + visible-window metadata as a passive fallback because
-  // plain preflight can misreport child processes launched by the desktop app.
   let accessibility: boolean | null = null
   let screenRecording: boolean | null = null
   if (supported && effectiveVenvCreated && depsInstalled) {
@@ -308,14 +262,9 @@ async function runSetup(): Promise<SetupResult> {
   let venvExists = await pathExists(venvPython)
   const config = await loadConfig()
 
-  // 校验现有 venv 是否与当前 config.pythonPath 配置一致（marker 机制详见
-  // venvBaseInterpreterMatches 注释）。不一致则删除以便后续步骤重建。
-  // 老用户从未设过自定义路径时此分支不会触发，原行为完全保留。
   if (venvExists && !(await venvBaseInterpreterMatches(config.pythonPath))) {
     try {
       await rm(venvRoot, { recursive: true, force: true })
-      // 同时清除 stamp，否则 Step 5 会因 digest 匹配而跳过依赖安装，
-      // 导致重建出的 venv 没有依赖。
       await rm(installStampPath, { force: true })
       await rm(baseInterpreterMarkerPath, { force: true })
       venvExists = false
@@ -334,7 +283,6 @@ async function runSetup(): Promise<SetupResult> {
     }
   }
 
-  // Step 1: Check python
   const pythonRuntime = await detectPythonRuntime(
     process.platform,
     runCommand,
@@ -364,7 +312,6 @@ async function runSetup(): Promise<SetupResult> {
   const unsupportedVersionStep = getUnsupportedPythonVersionStep(pythonRuntime.version)
   if (unsupportedVersionStep) return { success: false, steps: [...steps, unsupportedVersionStep] }
 
-  // Step 2: Extract runtime files to ~/.claude/.runtime/
   try {
     await ensureRuntimeFiles()
     steps.push({ name: 'runtime_files', ok: true, message: '运行时文件已就绪' })
@@ -377,7 +324,6 @@ async function runSetup(): Promise<SetupResult> {
     return { success: false, steps }
   }
 
-  // Step 3: Create venv
   if (!venvExists) {
     if (!pythonRuntime.command) {
       steps.push({
@@ -401,7 +347,6 @@ async function runSetup(): Promise<SetupResult> {
       })
       return { success: false, steps }
     }
-    // 记录本次创建 venv 时所用的自定义路径配置，供后续 checkStatus 比对。
     try {
       await writeFile(baseInterpreterMarkerPath, config.pythonPath ?? '', 'utf8')
     } catch (err) {
@@ -417,7 +362,6 @@ async function runSetup(): Promise<SetupResult> {
     steps.push({ name: 'venv', ok: true, message: '虚拟环境已存在' })
   }
 
-  // Step 4: Ensure pip
   const pipPath = isWindows
     ? join(venvRoot, 'Scripts', 'pip.exe')
     : join(venvRoot, 'bin', 'pip')
@@ -438,7 +382,6 @@ async function runSetup(): Promise<SetupResult> {
   }
   steps.push({ name: 'pip', ok: true, message: 'pip 已就绪' })
 
-  // Step 5: Install requirements
   const reqPath = getRequirementsPath()
   const requirements = await readFile(reqPath, 'utf8')
   const digest = createHash('sha256').update(requirements).digest('hex')
@@ -466,10 +409,6 @@ async function runSetup(): Promise<SetupResult> {
 
   return { success: true, steps }
 }
-
-// ============================================================================
-// Authorized Apps configuration — stored in ~/.claude/dreamcoder/computer-use-config.json
-// ============================================================================
 
 type AuthorizedApp = {
   bundleId: string
@@ -531,10 +470,6 @@ async function listInstalledApps(): Promise<{ bundleId: string; displayName: str
   }
 }
 
-// ============================================================================
-// Route handler
-// ============================================================================
-
 export async function handleComputerUseApi(
   req: Request,
   _url: URL,
@@ -552,19 +487,16 @@ export async function handleComputerUseApi(
     return Response.json(result)
   }
 
-  // GET /api/computer-use/apps — list installed macOS apps
   if (action === 'apps' && req.method === 'GET') {
     const apps = await listInstalledApps()
     return Response.json({ apps })
   }
 
-  // GET /api/computer-use/authorized-apps — current authorized app config
   if (action === 'authorized-apps' && req.method === 'GET') {
     const config = await loadConfig()
     return Response.json(config)
   }
 
-  // PUT /api/computer-use/authorized-apps — update authorized apps
   if (action === 'authorized-apps' && req.method === 'PUT') {
     try {
       const body = (await req.json()) as Partial<ComputerUseConfig>
@@ -584,7 +516,6 @@ export async function handleComputerUseApi(
     }
   }
 
-  // POST /api/computer-use/open-settings — open system settings pane
   if (action === 'open-settings' && req.method === 'POST') {
     const body = (await req.json().catch(() => ({}))) as { pane?: string }
     const pane = body.pane ?? 'Privacy_ScreenCapture'
@@ -597,8 +528,6 @@ export async function handleComputerUseApi(
       const url = `x-apple.systempreferences:com.apple.preference.security?${pane}`
       await runCommand('open', [url])
     } else if (process.platform === 'win32') {
-      // Windows doesn't need privacy settings like macOS TCC, but we can
-      // open the general privacy page if requested
       await runCommand('cmd', ['/c', 'start', 'ms-settings:privacy'])
     } else {
       return Response.json({ error: 'Unsupported platform' }, { status: 400 })

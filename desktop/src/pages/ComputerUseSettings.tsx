@@ -44,7 +44,6 @@ export function ComputerUseSettings() {
   const [setupRunning, setSetupRunning] = useState(false)
   const [setupResult, setSetupResult] = useState<SetupResult | null>(null)
 
-  // App authorization state
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([])
   const [authorizedBundleIds, setAuthorizedBundleIds] = useState<Set<string>>(new Set())
   const [authorizedApps, setAuthorizedApps] = useState<AuthorizedApp[]>([])
@@ -79,8 +78,6 @@ export function ComputerUseSettings() {
   ) => {
     if (requestSeq !== configMutationSeqRef.current) return
     setComputerUseEnabled(configResult.enabled)
-    // Don't overwrite mode if user just changed it locally — the API response
-    // might be from a request that was in-flight before the mode change.
     if (!modeLocallySetRef.current) {
       setComputerUseMode(configResult.mode ?? 'vision')
     }
@@ -97,7 +94,6 @@ export function ComputerUseSettings() {
     try {
       applyConfig(await computerUseApi.getAuthorizedApps(), requestSeq)
     } catch {
-      // API not ready
     }
   }, [applyConfig])
 
@@ -112,7 +108,6 @@ export function ComputerUseSettings() {
       setInstalledApps(appsResult.apps)
       applyConfig(configResult, requestSeq)
     } catch {
-      // API not ready
     } finally {
       setAppsLoading(false)
     }
@@ -123,7 +118,6 @@ export function ComputerUseSettings() {
     fetchConfig()
   }, [fetchStatus, fetchConfig])
 
-  // Load apps when environment is ready
   const envReady = status?.venv.created && status?.dependencies.installed
   useEffect(() => {
     if (envReady) fetchApps()
@@ -162,7 +156,6 @@ export function ComputerUseSettings() {
     setAuthorizedBundleIds(newSet)
     setAuthorizedApps(newAuthorized)
 
-    // Auto-save (include mode to prevent race with concurrent setMode)
     computerUseApi.setAuthorizedApps({
       mode: computerUseMode,
       authorizedApps: newAuthorized,
@@ -263,7 +256,6 @@ export function ComputerUseSettings() {
       ? `${t('settings.computerUse.pythonCustomInvalid')} — ${status.python.path}${status.python.error ? `: ${status.python.error}` : ''}`
       : t('settings.computerUse.pythonNotFound')
 
-  // Filter apps by search query
   const filteredApps = useMemo(() => {
     if (!searchQuery) return installedApps
     const q = searchQuery.toLowerCase()
@@ -272,7 +264,6 @@ export function ComputerUseSettings() {
     )
   }, [installedApps, searchQuery])
 
-  // Sort: authorized apps first, then alphabetical
   const sortedApps = useMemo(() => {
     return [...filteredApps].sort((a, b) => {
       const aAuth = authorizedBundleIds.has(a.bundleId) ? 0 : 1
@@ -284,7 +275,6 @@ export function ComputerUseSettings() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Title */}
       <div>
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -311,7 +301,6 @@ export function ComputerUseSettings() {
         </div>
       )}
 
-      {/* Mode selector — Vision vs UIA Tree */}
       {computerUseEnabled && (
         <div className="space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
           <div>
@@ -382,7 +371,6 @@ export function ComputerUseSettings() {
             </div>
           )}
 
-          {/* Status checks */}
           <div className="space-y-2">
             <StatusRow
               label={t('settings.computerUse.python')}
@@ -449,7 +437,6 @@ export function ComputerUseSettings() {
             </p>
           </div>
 
-          {/* macOS Permissions — only shown on macOS (darwin) */}
           {envReady && status.platform === 'darwin' && (
             <>
               <StatusRow
@@ -519,7 +506,6 @@ export function ComputerUseSettings() {
             </div>
           )}
 
-          {/* Action buttons */}
           <div className="flex gap-3">
             {!status.python.installed && (
               <button
@@ -549,7 +535,6 @@ export function ComputerUseSettings() {
             </button>
           </div>
 
-          {/* ─── App Authorization Section ─── */}
           {envReady && (
             <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div>
@@ -567,7 +552,6 @@ export function ComputerUseSettings() {
                 </p>
               </div>
 
-              {/* Grant flags */}
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
                   <input
@@ -589,7 +573,6 @@ export function ComputerUseSettings() {
                 </label>
               </div>
 
-              {/* Search */}
               <div className="relative">
                 <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2">search</span>
                 <input
@@ -601,7 +584,6 @@ export function ComputerUseSettings() {
                 />
               </div>
 
-              {/* App list */}
               {appsLoading ? (
                 <div className="py-6 text-center text-sm text-[var(--color-text-tertiary)]">
                   {t('settings.computerUse.appsLoading')}

@@ -135,7 +135,6 @@ export function AboutSettings() {
 
   return (
     <div className="w-full min-w-0 max-w-lg mx-auto flex flex-col items-center py-6">
-      {/* Logo + App Name + Version */}
       <DreamCoderIcon size={80} className="mb-4" />
       <h1 className="text-xl font-bold text-[var(--color-text-primary)]">DreamCoder</h1>
       {version && (
@@ -151,7 +150,6 @@ export function AboutSettings() {
         </div>
       )}
 
-      {/* GitHub Repo */}
       <div className="mt-6 w-full">
         <button
           onClick={() => openUrl(GITHUB_REPO)}
@@ -165,7 +163,6 @@ export function AboutSettings() {
         </button>
       </div>
 
-      {/* TODO: Restore update checker after first public release */}
       <div className="mt-4 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
         <div className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.about.updates')}</div>
         <div className="text-xs text-[var(--color-text-tertiary)] mt-1">
@@ -173,10 +170,8 @@ export function AboutSettings() {
         </div>
       </div>
 
-      {/* Divider */}
       <div className="w-full border-t border-[var(--color-border)]/40 my-6" />
 
-      {/* Author */}
       <div className="w-full">
         <h3 className="text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider mb-3">{t('settings.about.author')}</h3>
         <button

@@ -1,11 +1,3 @@
-/**
- * OpenAI API type definitions for protocol transformation.
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
-// ─── OpenAI Chat Completions ────────────────────────────────
-
 export type OpenAIChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content?: string | OpenAIChatContentPart[] | null
@@ -101,8 +93,6 @@ export type OpenAIChatStreamChunk = {
   usage?: OpenAIChatResponse['usage']
 }
 
-// ─── OpenAI Responses API ───────────────────────────────────
-
 export type OpenAIResponsesInputItem =
   | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | OpenAIChatContentPart[] }
   | { type: 'function_call'; call_id: string; name: string; arguments: unknown }
@@ -145,8 +135,6 @@ export type OpenAIResponsesResponse = {
     total_tokens: number
   }
 }
-
-// ─── Anthropic Types (subset used by transforms) ───────────
 
 export type AnthropicContentBlock =
   | { type: 'text'; text: string; cache_control?: unknown }

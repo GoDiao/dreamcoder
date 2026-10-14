@@ -1,14 +1,3 @@
-/**
- * Haha OAuth REST API
- *
- * POST   /api/haha-oauth/start    — 生成 PKCE+state,返回 authorize URL
- * GET    /callback                — 用户浏览器 redirect 到此,完成 token 交换
- * GET    /api/haha-oauth/callback — 兼容旧路径
- * GET    /api/haha-oauth          — 查询当前登录状态(不回传 token 本体)
- * GET    /api/haha-oauth/status   — 同上(legacy path)
- * DELETE /api/haha-oauth          — 登出,删除 token 文件
- */
-
 import { z } from 'zod'
 import { hahaOAuthService } from '../services/hahaOAuthService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
@@ -30,7 +19,7 @@ export async function handleHahaOAuthApi(
   segments: string[],
 ): Promise<Response> {
   try {
-    const action = segments[2] // segments: ['api', 'haha-oauth', <action?>]
+    const action = segments[2]
 
     if (action === 'start' && req.method === 'POST') {
       let body: unknown

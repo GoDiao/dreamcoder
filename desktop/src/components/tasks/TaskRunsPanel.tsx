@@ -10,7 +10,6 @@ import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 function RunOutput({ run }: { run: TaskRun }) {
   const t = useTranslation()
 
-  // Show error prominently if present
   if (run.error) {
     return (
       <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-[var(--radius-sm)] border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/28 p-2.5 text-xs text-[var(--color-error)]">
@@ -74,28 +73,22 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
     }).catch(() => setLoading(false))
   }
 
-  // Initial fetch + re-fetch when refreshKey changes
   useEffect(() => {
     setLoading(true)
     refresh()
   }, [taskId, fetchTaskRuns, refreshKey])
 
-  // Auto-poll while any run is "running" or shortly after a manual trigger.
-  // Uses faster 1s polling for the first 10s after refreshKey changes, then 3s.
   const hasRunning = runs.some((r) => r.status === 'running')
   useEffect(() => {
-    if (!hasRunning && refreshKey === 0) return // no reason to poll initially
-    // Start with fast polling (1s) to give snappy feedback after "Run Now"
+    if (!hasRunning && refreshKey === 0) return
     let interval = 1000
     let timer = setInterval(refresh, interval)
-    // After 10s, switch to slower 3s polling if still running
     const slowDown = setTimeout(() => {
       clearInterval(timer)
       if (hasRunning) {
         timer = setInterval(refresh, 3000)
       }
     }, 10000)
-    // If nothing is running and initial window passes, stop entirely
     const stopTimer = hasRunning ? undefined : setTimeout(() => clearInterval(timer), 12000)
     return () => {
       clearInterval(timer)
@@ -106,7 +99,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
 
   return (
     <div className="mt-2 mb-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--color-surface-container)]">
         <span className="text-xs font-medium text-[var(--color-text-primary)]">{t('tasks.logsTitle')}</span>
         <button
@@ -117,7 +109,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
         </button>
       </div>
 
-      {/* Content */}
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-6">
@@ -135,7 +126,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
               return (
                 <div key={run.id} className="px-4 py-2.5">
                   <div className="flex items-center gap-3">
-                    {/* Status icon */}
                     <span
                       className={`material-symbols-outlined text-[16px] ${run.status === 'running' ? 'animate-spin' : ''}`}
                       style={{ color: cfg.color, fontVariationSettings: "'FILL' 1" }}
@@ -143,17 +133,14 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                       {cfg.icon}
                     </span>
 
-                    {/* Status text */}
                     <span className="text-xs font-medium" style={{ color: cfg.color }}>
-                      {t(`tasks.runStatus.${run.status}` as any)} {/* dynamic key */}
+                      {t(`tasks.runStatus.${run.status}` as any)}
                     </span>
 
-                    {/* Time */}
                     <span className="text-xs text-[var(--color-text-tertiary)]">
                       {new Date(run.startedAt).toLocaleString()}
                     </span>
 
-                    {/* Duration */}
                     {run.durationMs != null && (
                       <span className="text-xs text-[var(--color-text-tertiary)]">
                         {t('tasks.duration', { s: Math.round(run.durationMs / 1000) })}
@@ -161,7 +148,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                     )}
 
                     <div className="ml-auto flex items-center gap-2">
-                      {/* Open session — only after run completes (session is empty while running) */}
                       {run.sessionId && run.status !== 'running' && (
                         <button
                           onClick={() => openSession(run.sessionId!, run.taskName)}
@@ -172,7 +158,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                         </button>
                       )}
 
-                      {/* Summary toggle */}
                       {(run.output || run.error) && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : run.id)}
@@ -184,7 +169,6 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                     </div>
                   </div>
 
-                  {/* Expanded output */}
                   {isExpanded && (
                     <RunOutput run={run} />
                   )}

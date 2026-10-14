@@ -1,23 +1,3 @@
-/**
- * Feishu inbound message parser.
- *
- * Converts a raw Feishu `im.message.receive_v1` event payload (the JSON
- * string inside `message.content` plus its `message_type`) into a
- * structured `InboundPayload` containing:
- *   - plain text (for direct forwarding to Claude)
- *   - a list of `PendingDownload` refs describing any attachments we
- *     need to fetch via FeishuMediaService.downloadResource()
- *
- * Supports the five message_type values we care about:
- *   - text         → text only
- *   - post         → rich text (text nodes + img + file elements)
- *   - image        → single image_key
- *   - file         → single file_key
- *   - file_archive → single file_key (same shape as file)
- *
- * Any other shape returns an empty payload (text: '', downloads: []).
- */
-
 export type PendingDownload =
   | { kind: 'image'; fileKey: string; fileName?: string }
   | { kind: 'file'; fileKey: string; fileName?: string }

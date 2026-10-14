@@ -34,7 +34,6 @@ afterEach(() => {
   useProviderOpenAIOAuthStore.setState(useProviderOpenAIOAuthStore.getInitialState(), true)
 })
 
-// Prevent real API calls from fetchStatus on mount
 beforeEach(() => {
   useProviderOAuthStore.setState({ fetchStatus: async () => {} })
   useProviderOpenAIOAuthStore.setState({ fetchStatus: async () => {} })
@@ -84,8 +83,6 @@ describe('ModelSelector', () => {
     const setSessionRuntime = vi.fn()
     useSettingsStore.setState({
       locale: 'en',
-      // With a custom provider active, the list comes from /api/models, which
-      // returns that provider's mapped models.
       availableModels: [
         { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
         { id: 'provider-fast', name: 'provider-fast', description: 'Haiku model', context: '' },

@@ -1,10 +1,3 @@
-/**
- * Telegram Adapter for Claude Code Desktop
- *
- * 基于 grammY 的轻量 Telegram Bot，直连服务端 /ws/:sessionId。
- * 启动：TELEGRAM_BOT_TOKEN=xxx bun run telegram/index.ts
- */
-
 import { Bot, InlineKeyboard, type Context } from 'grammy'
 import * as path from 'node:path'
 import { WsBridge, type ServerMessage } from '../common/ws-bridge.js'
@@ -43,10 +36,8 @@ import { ImageBlockWatcher } from '../common/attachment/image-block-watcher.js'
 import type { PendingUpload } from '../common/attachment/attachment-types.js'
 import * as fs from 'node:fs/promises'
 
-const TELEGRAM_TEXT_LIMIT = 4000 // leave margin below 4096
-const TELEGRAM_STREAMING_TEXT_LIMIT = TELEGRAM_TEXT_LIMIT - 2 // reserve room for cursor
-
-// ---------- init ----------
+const TELEGRAM_TEXT_LIMIT = 4000
+const TELEGRAM_STREAMING_TEXT_LIMIT = TELEGRAM_TEXT_LIMIT - 2
 
 const config = loadConfig()
 if (!config.telegram.botToken) {
@@ -66,18 +57,13 @@ attachmentStore.gc().catch((err) => {
   console.warn('[Telegram] AttachmentStore.gc failed:', err instanceof Error ? err.message : err)
 })
 
-// Track placeholder messages for streaming updates
 const placeholders = new Map<string, { chatId: string; messageId: number }>()
-// Track accumulated text per chat for streaming
 const accumulatedText = new Map<string, string>()
 const accumulatedThinkingText = new Map<string, string>()
-// Message buffers per chat
 const buffers = new Map<string, MessageBuffer>()
-// Track chats waiting for project selection
 const pendingProjectSelection = new Map<string, boolean>()
 const runtimeStates = new Map<string, ChatRuntimeState>()
 const pendingPermissions = new Map<string, Set<string>>()
-/** Per-chat outbound image watcher for Agent-produced markdown images. */
 const tgImageWatchers = new Map<string, ImageBlockWatcher>()
 
 function getTgWatcher(chatId: string): ImageBlockWatcher {
@@ -95,8 +81,6 @@ type ChatRuntimeState = {
   model?: string
   pendingPermissionCount: number
 }
-
-// ---------- helpers ----------
 
 function getBuffer(chatId: string): MessageBuffer {
   let buf = buffers.get(chatId)
@@ -175,7 +159,6 @@ async function buildStatusText(chatId: string): Promise<string> {
     projectName = gitInfo.repoName || path.basename(gitInfo.workDir) || projectName
     branch = gitInfo.branch
   } catch {
-    // Ignore git lookup failures and fall back to stored workDir
   }
 
   let taskCounts:
@@ -198,7 +181,6 @@ async function buildStatusText(chatId: string): Promise<string> {
       }
     }
   } catch {
-    // Ignore task lookup failures in IM status summary
   }
 
   return formatImStatus({
@@ -226,7 +208,7 @@ async function flushToTelegram(chatId: string, newText: string, isComplete: bool
       const chunks = splitMessage(formatTelegramOutboundText(fullText), TELEGRAM_TEXT_LIMIT)
       try {
         await bot.api.editMessageText(numericChatId, placeholder.messageId, chunks[0]!)
-      } catch { /* ignore */ }
+      } catch { }
       for (let i = 1; i < chunks.length; i++) {
         await bot.api.sendMessage(numericChatId, chunks[i]!)
       }
@@ -259,7 +241,7 @@ async function flushToTelegram(chatId: string, newText: string, isComplete: bool
         } else {
           await bot.api.editMessageText(numericChatId, placeholder.messageId, formatTelegramStreamingText(activeChunk))
         }
-      } catch { /* ignore */ }
+      } catch { }
     }
   } else if (isComplete && (prev + newText).trim()) {
     const fullText = prev + newText
@@ -279,8 +261,6 @@ async function flushToTelegram(chatId: string, newText: string, isComplete: bool
   }
 }
 
-// ---------- session management ----------
-
 async function ensureSession(chatId: string): Promise<boolean> {
   const stored = await ensureExistingSession(chatId)
   if (stored) return true
@@ -297,9 +277,6 @@ async function ensureSession(chatId: string): Promise<boolean> {
 async function createSessionForChat(chatId: string, workDir: string): Promise<boolean> {
   const numericChatId = Number(chatId)
   try {
-    // Always tear down any stale WS connection before creating a new session.
-    // Without this, bridge.connectSession() below would short-circuit when an
-    // old OPEN connection still exists, leaving messages routed to the old session.
     bridge.resetSession(chatId)
 
     const sessionId = await httpClient.createSession(workDir)
@@ -341,11 +318,6 @@ async function showProjectPicker(chatId: string): Promise<void> {
   }
 }
 
-// ---------- outbound media dispatch ----------
-
-/** Upload a PendingUpload found in streaming output and send it via
- *  bot.api.sendPhoto as an independent message. Runs fire-and-forget
- *  from the stream handler so streaming text isn't blocked. */
 async function dispatchOutboundMedia(chatId: string, pending: PendingUpload): Promise<void> {
   const numericChatId = Number(chatId)
   try {
@@ -386,8 +358,6 @@ async function dispatchOutboundMedia(chatId: string, pending: PendingUpload): Pr
   }
 }
 
-// ---------- server message handler ----------
-
 async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<void> {
   const numericChatId = Number(chatId)
   const buf = getBuffer(chatId)
@@ -417,10 +387,7 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
           accumulatedText.set(chatId, '')
         }
       } else if (msg.blockType === 'tool_use') {
-        // Finalize current text placeholder before tool calls,
-        // so text after tools gets a fresh message
         await buf.complete()
-        // If placeholder still exists (buffer was already empty), clean up directly
         if (placeholders.has(chatId)) {
           const text = accumulatedText.get(chatId)
           if (text?.trim()) {
@@ -430,7 +397,7 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
                 placeholders.get(chatId)!.messageId,
                 formatTelegramOutboundText(text),
               )
-            } catch { /* ignore */ }
+            } catch { }
           }
           placeholders.delete(chatId)
           accumulatedText.delete(chatId)
@@ -463,17 +430,14 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
             placeholders.get(chatId)!.messageId,
             update.messageText,
           )
-        } catch { /* ignore */ }
+        } catch { }
       }
       break
 
     case 'tool_use_complete':
-      // Tool details are noise for IM users; visible in Desktop if needed.
       break
 
     case 'tool_result':
-      // Tool errors are handled internally by the AI (retries etc.)
-      // No need to notify the user for every failed attempt.
       break
 
     case 'permission_request': {
@@ -496,7 +460,6 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
       runtime.state = 'idle'
       runtime.verb = undefined
       await buf.complete()
-      // Ensure placeholder is always cleaned up even if buffer was already empty
       if (placeholders.has(chatId)) {
         const text = accumulatedText.get(chatId)
         if (text?.trim()) {
@@ -506,7 +469,7 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
             for (let i = 1; i < chunks.length; i++) {
               await bot.api.sendMessage(numericChatId, chunks[i]!)
             }
-          } catch { /* ignore */ }
+          } catch { }
         }
         placeholders.delete(chatId)
         accumulatedText.delete(chatId)
@@ -519,8 +482,6 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
       runtime.state = 'idle'
       runtime.verb = undefined
       accumulatedThinkingText.delete(chatId)
-      // Auto-recover from stale thinking block signatures by creating a fresh session.
-      // This happens when the API key or provider changed since the session was created.
       if (msg.message && /Invalid.*signature.*thinking/i.test(msg.message)) {
         const stored = sessionStore.get(chatId)
         const workDir = stored?.workDir || defaultWorkDir
@@ -554,8 +515,6 @@ async function handleServerMessage(chatId: string, msg: ServerMessage): Promise<
   }
 }
 
-// ---------- bot handlers ----------
-
 async function sendHelp(ctx: Context): Promise<void> {
   await ctx.reply(`👋 Claude Code Bot 已就绪。\n\n${formatImHelp()}`)
 }
@@ -563,9 +522,6 @@ async function sendHelp(ctx: Context): Promise<void> {
 bot.command('start', (ctx) => void sendHelp(ctx))
 bot.command('help', (ctx) => void sendHelp(ctx))
 
-/** Reset session state and start a new session for chatId.
- *  If `query` is provided, match a project by index or name;
- *  otherwise use the configured/default work directory. */
 async function startNewSession(chatId: string, query?: string): Promise<void> {
   const numericChatId = Number(chatId)
 
@@ -666,9 +622,6 @@ for (const command of ['allow', 'always', 'allow-always', 'deny'] as const) {
   })
 }
 
-/** Shared per-user-message pipeline: dedup, pairing check, project-pick
- *  routing, enqueue, ensureSession, sendUserMessage with attachments.
- *  Caller has already extracted text and attachments from the context. */
 async function routeUserMessage(
   ctx: Context,
   text: string,
@@ -716,9 +669,6 @@ async function routeUserMessage(
   })
 }
 
-/** Scan ctx.message for photo/document/video/audio/voice, download
- *  each via TelegramMediaService, apply size/mime limits, and produce
- *  a ready-to-send AttachmentRef[] plus any rejection hints. */
 async function collectAttachmentsFromCtx(
   ctx: Context,
 ): Promise<{ attachments: AttachmentRef[]; rejections: string[] }> {
@@ -761,7 +711,6 @@ async function collectAttachmentsFromCtx(
     }
   }
 
-  // Photos: grammY exposes an array of sizes, largest last.
   if (msg.photo && msg.photo.length > 0) {
     const largest = msg.photo[msg.photo.length - 1]!
     await runOne(largest.file_id, `photo-${largest.file_unique_id}.jpg`, 'image/jpeg')
@@ -821,12 +770,10 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.editMessageText(
       ctx.callbackQuery.message?.text + `\n\n${statusText}`,
     )
-  } catch { /* ignore */ }
+  } catch { }
 
   await ctx.answerCallbackQuery(statusText)
 })
-
-// ---------- start ----------
 
 console.log('[Telegram] Starting bot...')
 console.log(`[Telegram] Server: ${config.serverUrl}`)
@@ -836,7 +783,6 @@ bot.start({
   onStart: () => console.log('[Telegram] Bot is running!'),
 })
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('[Telegram] Shutting down...')
   bot.stop()

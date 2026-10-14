@@ -1,7 +1,6 @@
 import type { TranslationKey } from './en'
 
 export const zh: Record<TranslationKey, string> = {
-  // ─── Quick switcher ───────────────────────────────
   'commandPalette.title': '切换会话',
   'commandPalette.placeholder': '搜索标题或最后一条助手消息...',
   'commandPalette.close': '关闭会话切换器',
@@ -10,7 +9,6 @@ export const zh: Record<TranslationKey, string> = {
   'commandPalette.loading': '正在加载全部会话...',
   'commandPalette.loadFailed': '无法加载全部会话，请重试。',
   'commandPalette.hint': '↑ ↓ 选择 · Enter 打开 · Esc 关闭',
-  // ─── Common ──────────────────────────────────────
   'common.cancel': '取消',
   'common.save': '保存',
   'common.delete': '删除',
@@ -27,14 +25,12 @@ export const zh: Record<TranslationKey, string> = {
   'common.active': '已激活',
   'common.copyFailed': '复制失败。',
 
-  // ─── Provider onboarding ─────────────────────────
   'onboarding.welcome': '欢迎使用 DreamCoder',
   'onboarding.tagline': '本地运行、支持多服务商的 AI 编程工作台',
   'onboarding.instructions': '添加一个模型服务商即可开始使用，也可以稍后在「设置 → 服务商」中添加。',
   'onboarding.setUpLater': '稍后设置',
   'onboarding.presetsLoadFailed': '预设加载失败：',
 
-  // ─── Sidebar ──────────────────────────────────────
   'sidebar.newSession': '新建会话',
   'sidebar.scheduled': '定时任务',
   'sidebar.terminal': '终端',
@@ -99,17 +95,14 @@ export const zh: Record<TranslationKey, string> = {
   'sidebar.collapse': '折叠侧边栏',
   'sidebar.expand': '展开侧边栏',
 
-  // ─── Title Bar ──────────────────────────────────────
   'titlebar.code': '代码',
   'titlebar.terminal': '终端',
   'titlebar.history': '历史',
 
-  // ─── Open Project ──────────────────────────────────────
   'openProject.openProject': '打开项目',
   'openProject.openIn': '用 {target} 打开',
   'openProject.openFailed': '无法打开项目',
 
-  // ─── Workspace Panel ───────────────────────────────
   'workspace.changedFiles': '已更改文件',
   'workspace.allFiles': '所有文件',
   'workspace.viewTabs': '工作区视图',
@@ -150,13 +143,11 @@ export const zh: Record<TranslationKey, string> = {
   'workspace.commentPlaceholder': '描述你希望这里怎么改...',
   'workspace.addCommentToChat': '添加评论',
 
-  // ─── Status Bar ──────────────────────────────────────
   'status.connected': '已连接',
   'status.connecting': '连接中...',
   'status.reconnecting': '重连中...',
   'status.disconnected': '已断开',
 
-  // ─── Settings ──────────────────────────────────────
   'settings.title': '设置',
   'settings.tab.providers': '服务商',
   'settings.tab.permissions': '权限',
@@ -169,7 +160,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.tab.plugins': '插件',
   'settings.tab.diagnostics': '诊断',
 
-  // Settings > Usage
   'settings.activity.title': 'Token 用量',
   'settings.activity.subtitleLoading': '基于本机 DreamCoder CLI 会话记录统计',
   'settings.activity.metric.yesterday': '昨天',
@@ -194,7 +184,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.activity.less': '少',
   'settings.activity.more': '多',
 
-  // Settings > Terminal
   'settings.terminal.title': '终端',
   'settings.terminal.description': '直接运行宿主机命令，用于安装插件、Skills、MCP 等扩展。桌面端已内置 DreamCoder 运行时；文档里的 claude <参数> 可替换成本地 claude 运行时，例如 claude plugin install ... 或 claude mcp add ...',
   'settings.terminal.infoLabel': '终端安装说明',
@@ -242,7 +231,6 @@ export const zh: Record<TranslationKey, string> = {
   'terminal.closePanel': '关闭终端面板',
   'terminal.resizePanel': '调整终端面板大小',
 
-  // Settings > Diagnostics
   'settings.diagnostics.title': '诊断',
   'settings.diagnostics.description': '记录服务端与 CLI 的启动、服务商、会话运行错误，便于复现和定位问题。',
   'settings.diagnostics.refresh': '刷新',
@@ -285,7 +273,6 @@ export const zh: Record<TranslationKey, string> = {
   'errorBoundary.title': '出现异常。',
   'errorBoundary.description': '错误已记录到诊断日志。',
 
-  // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': '使用官方 Claude 模型需要登录你的 Claude.ai 账号。点击下方按钮,浏览器会打开 Claude 官方登录页面,授权后自动回到这里。',
   'settings.claudeOfficialLogin.loginButton': '登录 Claude 账号',
   'settings.claudeOfficialLogin.loginStarting': '正在启动…',
@@ -296,7 +283,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.claudeOfficialLogin.errorPrefix': '错误:',
   'settings.claudeOfficialLogin.openBrowserFailed': '无法打开浏览器,请手动访问授权链接。',
 
-  // Settings > ChatGPT Official Login
   'settings.chatgptOfficialLogin.intro': '登录 ChatGPT 后,就可以在桌面端会话里使用 GPT 模型。',
   'settings.chatgptOfficialLogin.loginButton': '登录 ChatGPT',
   'settings.chatgptOfficialLogin.loginStarting': '正在启动登录...',
@@ -309,7 +295,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.chatgptOfficialLogin.copyLinkFailed': '无法复制授权链接。',
   'settings.chatgptOfficialLogin.errorPrefix': 'ChatGPT OAuth 错误:',
 
-  // Settings > Providers
   'settings.providers.title': '服务商',
   'settings.providers.description': '管理 API 服务商以访问模型。',
   'settings.providers.addProvider': '添加服务商',
@@ -391,7 +376,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.providers.authStrategyDualDummy': '两个变量写 dummy',
   'settings.providers.authStrategyDualDummyDesc': 'vLLM 等本地兼容服务，只需要占位认证值。',
 
-  // Settings > Permissions
   'settings.permissions.title': '权限模式',
   'settings.permissions.description': '控制工具执行权限的处理方式。',
   'settings.permissions.default': '询问权限',
@@ -403,7 +387,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.permissions.bypass': '跳过全部',
   'settings.permissions.bypassDesc': '跳过所有权限检查（危险）',
 
-  // Settings > Adapters
   'settings.tab.adapters': 'IM 接入',
   'settings.adapters.description': '配置即时通讯适配器，通过微信、钉钉、Telegram 或飞书与 DreamCoder 对话。',
   'settings.adapters.telegram': 'Telegram',
@@ -489,7 +472,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.adapters.wechatUnbindFailed': '微信解绑失败。',
   'settings.adapters.wechatAllowedUsersHint': '微信扫码只绑定账号能力；用户仍需发送配对码，或在这里额外填写允许的微信用户 ID。',
 
-  // Settings > MCP
   'settings.mcp.title': 'MCP 服务',
   'settings.mcp.description': '在桌面端直接管理外部工具与数据源。Local、Project、User 三种范围与 CLI 保持一致。',
   'settings.mcp.addServer': '添加服务',
@@ -575,7 +557,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.mcp.toast.toggleFailed': '更新 MCP 服务状态失败',
   'settings.mcp.toast.reconnectFailed': '重连 MCP 服务失败',
 
-  // Settings > Agents
   'settings.tab.agents': 'Agents',
   'settings.agents.title': '已安装的 Agents',
   'settings.agents.description': '浏览 Claude 当前可用的 Agents，包括内置、项目和用户来源。可在 TUI 中使用 /agents 查看当前生效项与覆盖关系。',
@@ -614,7 +595,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.agents.source.flagSettings': 'CLI 参数',
   'settings.agents.source.built-in': '内置',
 
-  // Settings > Skills
   'settings.skills.title': '已安装技能',
   'settings.skills.description': '技能扩展 Claude 的能力。在 ~/.claude/skills/ 中管理技能。',
   'settings.skills.browserTitle': '浏览已安装技能',
@@ -656,7 +636,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.skills.source.mcp': 'MCP',
   'settings.skills.source.bundled': '内置',
 
-  // Settings > Memory
   'settings.tab.memory': '记忆',
   'settings.memory.title': '项目记忆',
   'settings.memory.description': '查看和编辑 Claude 为每个项目写入的 Markdown 记忆文件。这些文件存放在 ~/.claude/projects/<project>/memory/，会被 CLI 运行时加载。',
@@ -687,7 +666,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.memory.clearSearch': '清空搜索',
   'settings.memory.toggleFolder': '展开或折叠 {name}',
 
-  // Settings > Plugins
   'settings.plugins.title': '已安装插件',
   'settings.plugins.description': '查看已安装插件、运行状态，并把插件变更应用到桌面端运行时。',
   'settings.plugins.browserTitle': '浏览已安装插件',
@@ -755,7 +733,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.plugins.capabilityLabel.mcpServers': 'MCP 服务',
   'settings.plugins.capabilityLabel.lspServers': 'LSP 服务',
 
-  // Settings > About
   'settings.tab.about': '关于',
   'settings.about.version': '版本',
   'settings.about.changelog': '更新日志',
@@ -769,13 +746,11 @@ export const zh: Record<TranslationKey, string> = {
   'settings.about.updatesDesc': '检查 GitHub Releases，下载安装包，并在安装后自动重启。',
   'settings.about.updatesNotAvailable': '首个公开版本尚未发布，更新检查暂未开放。',
 
-  // Settings > Notifications
   'notifications.agentCompleted.title': 'DreamCoder 已完成回复',
   'notifications.permissionPrompt.title': 'DreamCoder 需要你的确认',
   'notifications.permissionPrompt.toolBody': '{toolName} 请求执行，正在等待允许。',
   'notifications.permissionPrompt.computerUseBody': 'Computer Use 正在等待允许。',
 
-  // 定时任务运行通知
   'notifications.scheduledTask.title': '定时任务 {name}',
   'notifications.scheduledTask.statusCompleted': '完成',
   'notifications.scheduledTask.statusFailed': '失败',
@@ -783,7 +758,6 @@ export const zh: Record<TranslationKey, string> = {
   'notifications.scheduledTask.bodyWithDetail': '{status}: {detail}',
   'notifications.scheduledTask.bodyStatusOnly': '状态: {status}',
 
-  // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',
   'settings.computerUse.description': '允许 Claude 截屏、点击、打字并控制你的电脑。需要 Python 3，macOS 上还需要辅助功能权限。',
@@ -843,7 +817,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.computerUse.flagClipboard': '剪贴板访问',
   'settings.computerUse.flagSystemKeys': '系统快捷键',
 
-  // Settings > General - Storage
   'settings.general.modeSwitchTitle': '切换数据存储位置？',
   'settings.general.modeSwitchConfirm': '保存并重启',
   'settings.general.storageTitle': '数据存储位置',
@@ -870,7 +843,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.general.storageSwitchDefaultBody': '切回系统目录后，桌面端会回到系统默认数据源。当前便携目录中的数据不会被删除，也不会自动迁回。',
   'settings.general.storageSwitchRestartBody': '应用将先关闭本地服务和适配器进程，然后自动重启。重启后新目录才会生效。',
 
-  // Settings > General
   'settings.general.appearanceTitle': '配色主题',
   'settings.general.appearanceDescription': '为工作区选择配色主题。',
   'settings.general.appearance.light': '经典暖色',
@@ -1006,7 +978,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.general.uiZoomShortcutResetHint': '0 表示恢复到 100%。',
   'settings.general.uiZoomReset': '重置界面缩放到 100%',
 
-  // ─── Empty Session ──────────────────────────────────────
   'empty.title': '开始你的 AI 编程之旅',
   'empty.subtitle': '在下方输入你的需求开始对话',
   'empty.noProvider': '还没有配置模型服务商。',
@@ -1023,7 +994,6 @@ export const zh: Record<TranslationKey, string> = {
   'empty.createError.switchFailed': '无法切换当前项目分支。请先确认 Git 错误并保护好本地改动后重试。详情：{detail}',
   'empty.createError.contextFailed': '无法检查这个 Git 项目。请确认仓库状态后重试。',
 
-  // ─── Repository Launch Controls ──────────────────────────────────────
   'repoLaunch.selectBranch': '选择分支',
   'repoLaunch.searchBranch': '搜索分支',
   'repoLaunch.noBranch': '无分支',
@@ -1039,7 +1009,6 @@ export const zh: Record<TranslationKey, string> = {
   'repoLaunch.dirtyWarning': '检测到未提交变更，直接切换可能会被阻止；使用独立工作树可以继续，且不会改动当前目录。',
   'repoLaunch.checkedOutWarning': '选中的分支已在其他工作树中检出。直接启动可能会被 Git 阻止；使用“独立工作树”可以避免切换当前目录。',
 
-  // ─── Chat Input ──────────────────────────────────────
   'chat.placeholder': '让 Claude 编辑、调试或解释代码...',
   'chat.placeholderMissing': '此会话指向的工作目录缺失。请新建会话或选择其他项目。',
   'chat.addFiles': '添加文件或图片',
@@ -1233,12 +1202,10 @@ export const zh: Record<TranslationKey, string> = {
   'chat.turnChangesDiffLoading': '正在加载 diff...',
   'chat.turnChangesDiffUnavailable': 'Diff 不可用。',
 
-  // ─── Streaming Indicator ──────────────────────────────────────
   'streaming.thinking': '思考中',
   'streaming.running': '运行中',
   'streaming.working': '工作中',
 
-  // ─── Permission Dialog ──────────────────────────────────────
   'permission.allowEditFile': '允许 Claude {toolName} {fileName}？',
   'permission.allowEditFileGeneric': '允许 Claude {toolName}此文件？',
   'permission.allowBash': '允许 Claude 执行此命令？',
@@ -1252,7 +1219,6 @@ export const zh: Record<TranslationKey, string> = {
   'permission.showFullInput': '显示完整输入',
   'permission.replacingContent': '替换文件内容',
 
-  // ─── Computer Use Approval ──────────────────────────────────────
   'computerUseApproval.titleApps': 'Computer Use 想控制这些应用',
   'computerUseApproval.titleTcc': 'Computer Use 需要 macOS 权限',
   'computerUseApproval.reason': '请求原因',
@@ -1274,7 +1240,6 @@ export const zh: Record<TranslationKey, string> = {
   'computerUseApproval.tccHint': '先在系统设置里授予缺失权限，返回后再点“稍后重试”。',
   'computerUseApproval.tryAgainHint': '“稍后重试”会把控制权交还给 Claude，让它在 macOS 权限生效后重新调用 request_access。',
 
-  // ─── Ask User Question ──────────────────────────────────────
   'question.needsInput': 'Claude 需要你的输入',
   'question.answered': '已回答',
   'question.completed': '已结束',
@@ -1284,10 +1249,8 @@ export const zh: Record<TranslationKey, string> = {
   'question.answeredPrefix': '已回答: ',
   'question.resultPrefix': '结果: ',
 
-  // ─── Thinking Block ──────────────────────────────────────
   'thinking.label': '思考中',
 
-  // ─── Tool Calls ──────────────────────────────────────
   'tool.errorOutput': '错误输出',
   'tool.toolOutput': '工具输出',
   'tool.toolInput': '工具输入',
@@ -1310,7 +1273,6 @@ export const zh: Record<TranslationKey, string> = {
   'tool.showLess': '收起',
   'tool.showMore': '展开 {count} 个字符',
 
-  // ─── Tool Group Verbs ──────────────────────────────────────
   'toolGroup.readOne': '读取了 1 个文件',
   'toolGroup.readMany': '读取了 {count} 个文件',
   'toolGroup.createdOne': '创建了一个文件',
@@ -1336,7 +1298,6 @@ export const zh: Record<TranslationKey, string> = {
   'toolGroup.fetchedOne': '获取了一个页面',
   'toolGroup.fetchedMany': '获取了 {count} 个页面',
 
-  // ─── Tasks ──────────────────────────────────────
   'tasks.title': '任务',
   'tasks.completed': '已完成的任务',
   'tasks.dismissCompleted': '隐藏已完成任务',
@@ -1348,7 +1309,6 @@ export const zh: Record<TranslationKey, string> = {
   'tasks.active': '活跃',
   'tasks.disabled': '已禁用',
 
-  // ─── New Task Modal ──────────────────────────────────────
   'newTask.title': '新建定时任务',
   'newTask.localWarning': '本地任务仅在电脑唤醒时运行。',
   'newTask.name': '名称',
@@ -1388,7 +1348,6 @@ export const zh: Record<TranslationKey, string> = {
   'newTask.noChannelConfigured': '尚未配置任何 IM 渠道，请前往 设置 → IM 接入 进行配置。',
   'newTask.noChannelSelected': '请至少选择一个通知渠道。',
 
-  // ─── Cron 描述 ──────────────────────────────────────
   'cron.everyMinute': '每分钟执行',
   'cron.everyNMinutes': '每 {n} 分钟执行',
   'cron.everyHour': '每小时执行',
@@ -1407,7 +1366,6 @@ export const zh: Record<TranslationKey, string> = {
   'cron.dow.5': '周五',
   'cron.dow.6': '周六',
 
-  // ─── 任务操作与日志 ──────────────────────────────────────
   'tasks.runNow': '立即执行',
   'tasks.confirmRun': '确定要立即执行此任务吗？',
   'tasks.confirmDisable': '确定要禁用此定时任务吗？',
@@ -1434,13 +1392,11 @@ export const zh: Record<TranslationKey, string> = {
   'tasks.outputHintSession': '点击「查看完整对话」可在会话中查看完整输出。',
   'tasks.noOutputText': '暂无输出内容。',
 
-  // ─── Prompt Editor ──────────────────────────────────────
   'promptEditor.worktree': '工作树',
   'promptEditor.bypassWarning': '跳过模式将授予完整系统访问权限',
   'promptEditor.within': '范围',
   'promptEditor.selectFolder': '— 选择文件夹以限制范围',
 
-  // ─── Permission Mode Selector ──────────────────────────────────────
   'permMode.executionPermissions': '执行权限',
   'permMode.askPermissions': '询问权限',
   'permMode.askPermDesc': 'CLI 请求时确认文件编辑和高风险命令',
@@ -1459,19 +1415,16 @@ export const zh: Record<TranslationKey, string> = {
   'permMode.permPackages': '安装或移除软件包',
   'permMode.enableBypassBtn': '启用跳过',
 
-  // Mode labels (compact, for chips)
   'permMode.label.default': '询问权限',
   'permMode.label.acceptEdits': '自动接受',
   'permMode.label.plan': '计划模式',
   'permMode.label.bypassPermissions': '跳过',
   'permMode.label.dontAsk': '不询问',
 
-  // ─── Model Selector ──────────────────────────────────────
   'model.selectModel': '选择模型',
   'model.configuration': '模型配置',
   'model.effort': '推理强度',
 
-  // ─── Directory Picker ──────────────────────────────────────
   'dirPicker.selectProject': '选择项目...',
   'dirPicker.recent': '最近',
   'dirPicker.noRecent': '暂无最近项目',
@@ -1480,7 +1433,6 @@ export const zh: Record<TranslationKey, string> = {
   'dirPicker.useThisFolder': '使用此文件夹',
   'dirPicker.noSubdirs': '无子目录',
 
-  // ─── File Search ──────────────────────────────────────
   'fileSearch.searching': '搜索中...',
   'fileSearch.noMatch': '没有匹配的文件',
   'fileSearch.noFiles': '此目录下无文件',
@@ -1497,7 +1449,6 @@ export const zh: Record<TranslationKey, string> = {
   'fileSearch.fileTag': '文件',
   'fileSearch.openFolder': '打开目录',
 
-  // ─── Teams ──────────────────────────────────────
   'teams.backToLeader': '\u2190 返回主控',
   'teams.viewing': '查看:',
   'teams.transcript': '记录',
@@ -1511,7 +1462,6 @@ export const zh: Record<TranslationKey, string> = {
   'teams.memberPlaceholder': '直接给这个 Agent 发消息...',
   'teams.memberSessionHint': '这里发送的消息会直接投递给该 Agent，同时继续刷新它的 transcript。',
 
-  // ─── Scheduled Tasks Pages ──────────────────────────────────────
   'scheduledPage.title': '定时任务',
   'scheduledPage.subtitle': '按计划或在需要时运行任务。在任意会话中输入 {code} 即可创建。',
   'scheduledPage.desktopNotice': '定时任务仅在桌面应用打开时运行。请确保应用持续运行以按时触发任务。',
@@ -1537,7 +1487,6 @@ export const zh: Record<TranslationKey, string> = {
   'scheduledPage.connectedLocal': '已连接到本地节点',
   'scheduledPage.thisMonth': '本月 {count}',
 
-  // ─── 更新检查 ──────────────────────────────────────
   'update.available': 'v{version} 可用',
   'update.availableLabel': '可更新版本',
   'update.checking': '正在检查更新...',
@@ -1567,7 +1516,6 @@ export const zh: Record<TranslationKey, string> = {
   'update.upToDate': '当前已是最新版本 v{version}。',
   'update.failed': '更新失败: {error}',
 
-  // ─── 活跃会话 ──────────────────────────────────────
   'session.untitled': '未命名会话',
   'session.active': '会话活跃中',
   'session.lastUpdated': '最后更新 {time}',
@@ -1578,7 +1526,6 @@ export const zh: Record<TranslationKey, string> = {
   'session.timeHours': '{n}小时前',
   'session.timeDays': '{n}天前',
 
-  // ─── 应用外壳 ──────────────────────────────────────
   'app.serverFailed': '本地服务启动失败',
   'app.serverFailedHint': '反馈这个问题时，请把这块诊断信息截图一起发到 issue 里。',
   'app.startupError': '启动错误',
@@ -1587,7 +1534,6 @@ export const zh: Record<TranslationKey, string> = {
   'app.copiedDiagnostics': '已复制',
   'app.launching': '正在启动本地工作区...',
 
-  // ─── Error Codes ──────────────────────────────────────
   'error.CLI_NOT_RUNNING': 'CLI 进程未运行。会话可能已结束或进程已崩溃。',
   'error.CLI_START_FAILED': 'CLI 进程启动失败。',
   'error.CLI_AUTH_REQUIRED': '需要认证。请先登录。',
@@ -1601,7 +1547,6 @@ export const zh: Record<TranslationKey, string> = {
   'error.NOT_FOUND': '资源未找到。',
   'error.INTERNAL_ERROR': '内部服务器错误。',
 
-  // ─── Server Status Verbs ──────────────────────────────────────
   'serverVerb.Thinking': '思考中',
   'serverVerb.Compacting conversation': '正在压缩上下文',
   'serverVerb.Running': '运行中',
@@ -1615,7 +1560,6 @@ export const zh: Record<TranslationKey, string> = {
   'chat.retry.networkError': '网络错误',
   'chat.retry.waiting': '等待 {seconds}s',
 
-  // ─── Tabs ──────────────────────────────────────
   'tabs.close': '关闭',
   'tabs.closeOthers': '关闭其他',
   'tabs.closeLeft': '关闭左侧',

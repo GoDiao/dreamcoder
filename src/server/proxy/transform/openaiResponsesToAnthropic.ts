@@ -1,9 +1,3 @@
-/**
- * Response transformation: OpenAI Responses API → Anthropic Messages
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
 import type {
   OpenAIResponsesResponse,
   OpenAIResponsesOutputItem,
@@ -12,9 +6,6 @@ import type {
 } from './types.js'
 import { parseOpenAIToolArguments } from './toolArguments.js'
 
-/**
- * Convert OpenAI Responses API response to Anthropic Messages response.
- */
 export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, model: string): AnthropicResponse {
   const content: AnthropicContentBlock[] = []
   let hasToolUse = false
@@ -24,7 +15,6 @@ export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, mo
     if (item.type === 'function_call') hasToolUse = true
   }
 
-  // If no content, add empty text
   if (content.length === 0) {
     content.push({ type: 'text', text: '' })
   }

@@ -150,7 +150,6 @@ async function sendTypingIndicator(chatId: string, status: 'typing' | 'cancel'):
         })
         return
       } catch {
-        // Fall through to the warning below with the original error.
       }
     }
     console.warn('[WeChat] sendTyping failed:', err instanceof Error ? err.message : err)
@@ -228,7 +227,6 @@ async function buildStatusText(chatId: string): Promise<string> {
     projectName = gitInfo.repoName || path.basename(gitInfo.workDir) || projectName
     branch = gitInfo.branch
   } catch {
-    // Keep IM status best-effort.
   }
 
   let taskCounts:
@@ -251,7 +249,6 @@ async function buildStatusText(chatId: string): Promise<string> {
       }
     }
   } catch {
-    // Keep IM status best-effort.
   }
 
   return formatImStatus({

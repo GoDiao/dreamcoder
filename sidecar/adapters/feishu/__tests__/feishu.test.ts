@@ -1,13 +1,5 @@
-/**
- * 飞书 Adapter 翻译逻辑测试
- *
- * 不启动真实 Bot，只测试事件解析和消息翻译逻辑。
- */
-
 import { describe, it, expect } from 'bun:test'
 import { isOutsideWorkDir } from '../path-safety.js'
-
-// ---------- helpers extracted from feishu/index.ts for testability ----------
 
 function extractText(content: string, msgType: string): string | null {
   try {
@@ -147,8 +139,6 @@ function buildProjectPickerCard(projects: RecentProject[]): Record<string, unkno
     },
   }
 }
-
-// ---------- permission card helpers (mirrored from feishu/index.ts) ----------
 
 type ToolCallSummary = {
   icon: string
@@ -328,8 +318,6 @@ function buildPermissionCard(
   }
 }
 
-// ---------- tests ----------
-
 describe('Feishu: event parsing', () => {
   describe('extractText', () => {
     it('extracts text from text message', () => {
@@ -369,7 +357,6 @@ describe('Feishu: event parsing', () => {
 
     it('returns null for empty text', () => {
       const content = JSON.stringify({ text: '' })
-      // empty string is falsy, so ?? null returns ''
       expect(extractText(content, 'text')).toBe('')
     })
   })
@@ -422,7 +409,6 @@ describe('Feishu: event parsing', () => {
 })
 
 describe('Feishu: permission card', () => {
-  // Helpers to reach into Schema 2.0 body.elements
   function getBodyElements(card: Record<string, unknown>): any[] {
     return ((card.body as any).elements ?? []) as any[]
   }
@@ -435,15 +421,13 @@ describe('Feishu: permission card', () => {
     )
   }
 
-  // ----- Schema 2.0 regression -----
-
   it('uses Schema 2.0 with body.elements wrapper (not top-level elements)', () => {
     const card = buildPermissionCard('Bash', { command: 'npm test' }, 'abc')
     expect(card.schema).toBe('2.0')
-    expect(card.elements).toBeUndefined() // old bug had top-level elements
+    expect(card.elements).toBeUndefined()
     expect((card.body as any).elements).toBeDefined()
     expect((card.config as any).update_multi).toBe(true)
-    expect((card.config as any).wide_screen_mode).toBe(false) // mobile-first
+    expect((card.config as any).wide_screen_mode).toBe(false)
   })
 
   it('header has title, subtitle, template, icon', () => {
@@ -454,8 +438,6 @@ describe('Feishu: permission card', () => {
     expect(header.template).toBe('orange')
     expect(header.icon.tag).toBe('standard_icon')
   })
-
-  // ----- Three buttons -----
 
   it('has three action buttons in order: 允许 | 永久允许 | 拒绝', () => {
     const card = buildPermissionCard('Read', {}, 'xyz')
@@ -500,8 +482,6 @@ describe('Feishu: permission card', () => {
     })
   })
 
-  // ----- Tool summary rendering -----
-
   it('renders Write with ✏️ 写入文件 header and file path target', () => {
     const card = buildPermissionCard(
       'Write',
@@ -512,7 +492,6 @@ describe('Feishu: permission card', () => {
     expect(elements[0].content).toContain('✏️')
     expect(elements[0].content).toContain('写入文件')
     expect(elements[0].content).toContain('`Write`')
-    // Target rendered as fenced code block
     expect(elements[1].content).toContain('/tmp/output.txt')
     expect(elements[1].content.startsWith('```')).toBe(true)
   })
@@ -543,7 +522,6 @@ describe('Feishu: permission card', () => {
     const card = buildPermissionCard('Bash', { command: longCmd }, 'req')
     const targetEl = getBodyElements(card)[1]
     expect(targetEl.content).toContain('…')
-    // Fenced code wraps ~10 extra chars
     expect(targetEl.content.length).toBeLessThanOrEqual(180)
   })
 
@@ -579,11 +557,8 @@ describe('Feishu: permission card', () => {
   it('has no target line when input is empty', () => {
     const card = buildPermissionCard('Bash', {}, 'req')
     const elements = getBodyElements(card)
-    // elements: [header_md, hr, action_column_set]
     expect(elements[1].tag).toBe('hr')
   })
-
-  // ----- Cross-directory detection -----
 
   it('does NOT show cross-dir warning when file is inside workDir', () => {
     const card = buildPermissionCard(
@@ -632,7 +607,6 @@ describe('Feishu: permission card', () => {
       'Write',
       { file_path: '/tmp/x.ts' },
       'req',
-      // workDir omitted
     )
     const elements = getBodyElements(card)
     const hasWarn = elements.some(
@@ -669,8 +643,6 @@ describe('Feishu: isOutsideWorkDir', () => {
   })
 
   it('does not match prefix collisions (proj vs proj2)', () => {
-    // /Users/me/proj2/a.ts starts with "/Users/me/proj" as a string
-    // but is NOT inside /Users/me/proj
     expect(isOutsideWorkDir('/Users/me/proj2/a.ts', '/Users/me/proj')).toBe(true)
   })
 })
@@ -769,11 +741,9 @@ describe('Feishu: project picker card', () => {
     const info = getRowInfoElements(row1)
 
     expect(info.length).toBe(2)
-    // Title markdown
     expect(info[0].tag).toBe('markdown')
     expect(info[0].content).toContain('**claude-code-haha**')
     expect(info[0].content).toContain('*main*')
-    // Path markdown (notation = small grey)
     expect(info[1].tag).toBe('markdown')
     expect(info[1].text_size).toBe('notation')
     expect(info[1].content).toContain('claude-code-haha')
@@ -844,7 +814,7 @@ describe('Feishu: project picker card', () => {
   })
 
   it('middle-truncates very long paths with ellipsis', () => {
-    const veryLong = '/x/'.repeat(40) + 'project' // ~123 chars
+    const veryLong = '/x/'.repeat(40) + 'project'
     const project: RecentProject = {
       ...sampleProjects[0]!,
       realPath: veryLong,

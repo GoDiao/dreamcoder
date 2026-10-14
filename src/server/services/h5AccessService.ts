@@ -237,10 +237,6 @@ export function resolveEffectiveH5PublicBaseUrl({
     return autoPublicBaseUrl
   }
 
-  // Stale-host fallback: stored is a plain private-LAN URL pointing at an IP
-  // that no longer belongs to any of this machine's interfaces (e.g. user
-  // switched Wi-Fi). Fall back to the auto-discovered URL without overwriting
-  // the stored value, so reconnecting to the original network restores it.
   if (
     Array.isArray(localInterfaceHosts) &&
     isStaleLanPublicBaseUrl(storedPublicBaseUrl, localInterfaceHosts)
@@ -266,13 +262,6 @@ function isStaleLanPublicBaseUrl(value: string, localInterfaceHosts: string[]): 
   }
 }
 
-/**
- * Classify a stored or input H5 publicBaseUrl. A "plain-lan" URL is a bare
- * `http://<private-ipv4>:<port>` with no path and no userinfo — we know we
- * can reach it only if the host is bound to one of our local interfaces.
- * Everything else (https, custom path, hostname/proxy URL) is treated as a
- * user-managed proxy URL we cannot reachability-check.
- */
 export function classifyH5PublicBaseUrl(value: string): H5PublicBaseUrlClassification | 'invalid' {
   let url: URL
   try {

@@ -129,7 +129,6 @@ export function AppShell() {
     }
   }, [bootstrapNonce, fetchSettings, tauriRuntime])
 
-  // Listen for macOS native menu navigation events (About / Settings)
   useEffect(() => {
     if (!tauriRuntime) return
     let unlisten: (() => void) | undefined

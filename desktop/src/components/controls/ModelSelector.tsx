@@ -116,8 +116,6 @@ function buildProviderChoices(
 
   const choices: ProviderChoice[] = []
 
-  // Only show official providers when there's NO active custom provider
-  // (i.e., user is using official Claude or OpenAI directly)
   const showOfficialProviders = !activeId || activeId === OPENAI_OFFICIAL_PROVIDER_ID
 
   if (showOfficialProviders && claudeOfficialLoggedIn) {
@@ -132,9 +130,6 @@ function buildProviderChoices(
     ))
   }
 
-  // For custom providers, only show the active provider's models
-  // The availableModels already comes from /api/models which returns
-  // only the active provider's models
   if (activeId && activeId !== OPENAI_OFFICIAL_PROVIDER_ID) {
     const activeProvider = providers.find((p) => p.id === activeId)
     if (activeProvider && availableModels.length > 0) {
@@ -146,7 +141,6 @@ function buildProviderChoices(
       })
     }
   } else if (!activeId) {
-    // No active provider - show all providers' models (legacy behavior)
     for (const provider of providers) {
       choices.push({
         providerId: provider.id,

@@ -1,17 +1,7 @@
-/**
- * Real LLM Integration Test
- *
- * 真实调用 MiniMax API，验证完整的 WebSocket 对话流：
- * Server → CLI subprocess → MiniMax API → streaming response → WebSocket → client
- *
- * 使用 .env 中的 MiniMax 配置。
- */
-
 const SERVER_PORT = 19876
 const BASE_URL = `http://127.0.0.1:${SERVER_PORT}`
 const WS_URL = `ws://127.0.0.1:${SERVER_PORT}`
 
-// Generate a valid UUID for session ID (CLI requires UUID format)
 function uuid(): string {
   return crypto.randomUUID()
 }
@@ -19,8 +9,6 @@ function uuid(): string {
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
-
-// ─── Test helpers ──────────────────────────────────────────────────────────
 
 type ServerMsg = {
   type: string
@@ -48,7 +36,6 @@ function createWebSocket(sessionId: string): Promise<{
       try {
         const msg = JSON.parse(event.data as string) as ServerMsg
         messages.push(msg)
-        // Check waiters
         for (let i = waiters.length - 1; i >= 0; i--) {
           if (waiters[i].types.includes(msg.type)) {
             waiters[i].resolve(msg)
@@ -69,7 +56,6 @@ function createWebSocket(sessionId: string): Promise<{
         ws,
         messages,
         waitForType(type: string, timeoutMs = 60000) {
-          // Check existing messages first
           const existing = messages.find((m) => m.type === type)
           if (existing) return Promise.resolve(existing)
 
@@ -121,14 +107,12 @@ function createWebSocket(sessionId: string): Promise<{
   })
 }
 
-// ─── Tests ─────────────────────────────────────────────────────────────────
-
 let server: ReturnType<typeof import('../index.js').startServer> | null = null
 
 async function startTestServer() {
   const { startServer } = await import('../index.js')
   server = startServer(SERVER_PORT, '127.0.0.1')
-  await sleep(500) // Let server start
+  await sleep(500)
   console.log(`\n✅ Server started on port ${SERVER_PORT}`)
 }
 
@@ -141,8 +125,6 @@ async function stopTestServer() {
   }
 }
 
-// ── Test 1: REST API health check ──────────────────────────────────────
-
 async function testHealthCheck() {
   console.log('\n── Test 1: Health Check ──')
   const res = await fetch(`${BASE_URL}/health`)
@@ -152,8 +134,6 @@ async function testHealthCheck() {
   }
   console.log('✅ Health check passed')
 }
-
-// ── Test 2: REST API sessions ──────────────────────────────────────────
 
 async function testSessionsApi() {
   console.log('\n── Test 2: Sessions API ──')
@@ -165,8 +145,6 @@ async function testSessionsApi() {
   console.log(`✅ Sessions API returned ${body.sessions?.length ?? 0} sessions`)
 }
 
-// ── Test 3: REST API settings ──────────────────────────────────────────
-
 async function testSettingsApi() {
   console.log('\n── Test 3: Settings API ──')
   const res = await fetch(`${BASE_URL}/api/settings`)
@@ -177,8 +155,6 @@ async function testSettingsApi() {
   console.log(`✅ Settings API returned:`, Object.keys(body.settings || body))
 }
 
-// ── Test 4: REST API models ────────────────────────────────────────────
-
 async function testModelsApi() {
   console.log('\n── Test 4: Models API ──')
   const res = await fetch(`${BASE_URL}/api/models`)
@@ -188,8 +164,6 @@ async function testModelsApi() {
   const body = await res.json()
   console.log(`✅ Models API returned:`, body)
 }
-
-// ── Test 5: WebSocket connection ───────────────────────────────────────
 
 async function testWebSocketConnect() {
   console.log('\n── Test 5: WebSocket Connect ──')
@@ -203,8 +177,6 @@ async function testWebSocketConnect() {
   await sleep(200)
   console.log('✅ WebSocket connected and received session ID')
 }
-
-// ── Test 6: WebSocket ping/pong ────────────────────────────────────────
 
 async function testWebSocketPing() {
   console.log('\n── Test 6: WebSocket Ping/Pong ──')
@@ -222,8 +194,6 @@ async function testWebSocketPing() {
   console.log('✅ Ping/Pong works')
 }
 
-// ── Test 7: Real LLM chat (the critical test!) ────────────────────────
-
 async function testRealLLMChat() {
   console.log('\n── Test 7: Real LLM Chat (MiniMax API) ──')
   console.log('   This will spawn a CLI subprocess and call the real API...')
@@ -233,7 +203,6 @@ async function testRealLLMChat() {
   await client.waitForType('connected', 5000)
   console.log(`   Session: ${sessionId}`)
 
-  // Send a simple message
   client.ws.send(
     JSON.stringify({
       type: 'user_message',
@@ -243,14 +212,12 @@ async function testRealLLMChat() {
 
   console.log('   Message sent, waiting for response...')
 
-  // We should get a status:thinking first
   const statusMsg = await client.waitForType('status', 10000)
   console.log(`   Got status: ${statusMsg.state} ${statusMsg.verb || ''}`)
 
-  // Wait for either content_delta (success) or error
   const responseMsg = await client.waitForAny(
     ['content_delta', 'content_start', 'error', 'message_complete'],
-    120000 // 2 minutes for LLM response
+    120000
   )
 
   console.log(`   Got response type: ${responseMsg.type}`)
@@ -260,13 +227,11 @@ async function testRealLLMChat() {
     throw new Error(`LLM returned error: ${responseMsg.message}`)
   }
 
-  // Collect all messages until message_complete
   let fullText = ''
   if (responseMsg.type === 'content_delta' && responseMsg.text) {
     fullText += responseMsg.text
   }
 
-  // Wait for message_complete
   try {
     const complete = await client.waitForType('message_complete', 120000)
     console.log(`   Usage: input=${complete.usage?.input_tokens}, output=${complete.usage?.output_tokens}`)
@@ -274,7 +239,6 @@ async function testRealLLMChat() {
     console.log('   Warning: message_complete not received within timeout')
   }
 
-  // Gather all content_delta text
   for (const msg of client.messages) {
     if (msg.type === 'content_delta' && msg.text) {
       if (!fullText.includes(msg.text)) {
@@ -286,7 +250,6 @@ async function testRealLLMChat() {
   console.log(`   Response text: "${fullText.substring(0, 200)}"`)
 
   if (fullText.length === 0) {
-    // Check all messages for debugging
     console.log('   All messages received:')
     for (const msg of client.messages) {
       console.log(`     ${msg.type}: ${JSON.stringify(msg).substring(0, 150)}`)
@@ -299,12 +262,9 @@ async function testRealLLMChat() {
   console.log('✅ Real LLM chat works! Got response from MiniMax API')
 }
 
-// ── Test 8: Scheduled tasks CRUD ───────────────────────────────────────
-
 async function testScheduledTasks() {
   console.log('\n── Test 8: Scheduled Tasks CRUD ──')
 
-  // Create
   const createRes = await fetch(`${BASE_URL}/api/scheduled-tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -321,14 +281,12 @@ async function testScheduledTasks() {
   const { task } = await createRes.json()
   console.log(`   Created task: ${task.id}`)
 
-  // List
   const listRes = await fetch(`${BASE_URL}/api/scheduled-tasks`)
   const listBody = await listRes.json()
   const found = listBody.tasks?.find((t: any) => t.id === task.id)
   if (!found) throw new Error('Created task not found in list')
   console.log(`   Listed ${listBody.tasks.length} tasks`)
 
-  // Update
   const updateRes = await fetch(`${BASE_URL}/api/scheduled-tasks/${task.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -336,7 +294,6 @@ async function testScheduledTasks() {
   })
   if (updateRes.status !== 200) throw new Error(`Update failed: ${updateRes.status}`)
 
-  // Delete
   const deleteRes = await fetch(`${BASE_URL}/api/scheduled-tasks/${task.id}`, {
     method: 'DELETE',
   })
@@ -345,16 +302,12 @@ async function testScheduledTasks() {
   console.log('✅ Scheduled Tasks CRUD works')
 }
 
-// ── Test 9: Settings read/write ────────────────────────────────────────
-
 async function testSettingsReadWrite() {
   console.log('\n── Test 9: Settings Read/Write ──')
 
-  // Read current
   const readRes = await fetch(`${BASE_URL}/api/settings`)
   const original = await readRes.json()
 
-  // Update via /api/settings/user
   const updateRes = await fetch(`${BASE_URL}/api/settings/user`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -362,11 +315,9 @@ async function testSettingsReadWrite() {
   })
   if (updateRes.status !== 200) throw new Error(`Settings update failed: ${updateRes.status}`)
 
-  // Read back
   const readBack = await fetch(`${BASE_URL}/api/settings/user`)
   const updated = await readBack.json()
 
-  // Clean up: remove test key via overwrite
   const cleanSettings = { ...updated }
   delete cleanSettings.testKey_integration
   await fetch(`${BASE_URL}/api/settings/user`, {
@@ -378,8 +329,6 @@ async function testSettingsReadWrite() {
   console.log('✅ Settings read/write works')
 }
 
-// ── Test 10: Permission mode ──────────────────────────────────────────
-
 async function testPermissionMode() {
   console.log('\n── Test 10: Permission Mode ──')
   const res = await fetch(`${BASE_URL}/api/permissions/mode`)
@@ -388,8 +337,6 @@ async function testPermissionMode() {
   console.log(`   Current mode: ${body.mode || body.permissionMode || JSON.stringify(body)}`)
   console.log('✅ Permission mode API works')
 }
-
-// ── Test 11: Search API ────────────────────────────────────────────────
 
 async function testSearchApi() {
   console.log('\n── Test 11: Search API ──')
@@ -404,8 +351,6 @@ async function testSearchApi() {
   console.log('✅ Search API works')
 }
 
-// ── Test 12: Agents API ────────────────────────────────────────────────
-
 async function testAgentsApi() {
   console.log('\n── Test 12: Agents API ──')
   const res = await fetch(`${BASE_URL}/api/agents`)
@@ -414,8 +359,6 @@ async function testAgentsApi() {
   console.log(`   Active agents: ${body.activeAgents?.length ?? body.agents?.length ?? 0}`)
   console.log('✅ Agents API works')
 }
-
-// ── Test 13: Teams API ─────────────────────────────────────────────────
 
 async function testTeamsApi() {
   console.log('\n── Test 13: Teams API ──')
@@ -426,8 +369,6 @@ async function testTeamsApi() {
   console.log('✅ Teams API works')
 }
 
-// ── Test 14: Tasks API ─────────────────────────────────────────────────
-
 async function testTasksApi() {
   console.log('\n── Test 14: Tasks API ──')
   const res = await fetch(`${BASE_URL}/api/tasks`)
@@ -437,8 +378,6 @@ async function testTasksApi() {
   console.log('✅ Tasks API works')
 }
 
-// ── Test 15: Status/Diagnostics API ────────────────────────────────────
-
 async function testStatusApi() {
   console.log('\n── Test 15: Status API ──')
   const res = await fetch(`${BASE_URL}/api/status`)
@@ -447,8 +386,6 @@ async function testStatusApi() {
   console.log(`   Status: ${body.status || JSON.stringify(body).substring(0, 100)}`)
   console.log('✅ Status API works')
 }
-
-// ─── Main ──────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log('╔══════════════════════════════════════════════════════════╗')
@@ -460,7 +397,6 @@ async function main() {
   try {
     await startTestServer()
 
-    // REST API tests (fast, run first)
     const restTests = [
       testHealthCheck,
       testSessionsApi,
@@ -485,7 +421,6 @@ async function main() {
       }
     }
 
-    // WebSocket tests
     const wsTests = [testWebSocketConnect, testWebSocketPing]
 
     for (const test of wsTests) {
@@ -497,7 +432,6 @@ async function main() {
       }
     }
 
-    // Real LLM test (slow, run last)
     try {
       await testRealLLMChat()
     } catch (err: any) {
@@ -508,7 +442,6 @@ async function main() {
     await stopTestServer()
   }
 
-  // Summary
   console.log('\n' + '═'.repeat(60))
   if (failures.length === 0) {
     console.log('🎉 ALL TESTS PASSED!')

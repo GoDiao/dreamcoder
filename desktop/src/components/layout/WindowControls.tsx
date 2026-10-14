@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 
-/** Whether to render custom window controls (Windows + Tauri only) */
 export const showWindowControls = isTauri && isWindows
 
 export function WindowControls() {
@@ -44,7 +43,6 @@ export function WindowControls() {
 
   return (
     <div data-testid="window-controls" className="flex items-stretch flex-shrink-0 -my-px">
-      {/* Minimize */}
       <button
         onClick={() => runWindowAction(() => win.minimize())}
         aria-label="Minimize window"
@@ -55,7 +53,6 @@ export function WindowControls() {
         </svg>
       </button>
 
-      {/* Maximize / Restore */}
       <button
         onClick={() => runWindowAction(() => win.toggleMaximize())}
         aria-label={maximized ? 'Restore window' : 'Maximize window'}
@@ -73,7 +70,6 @@ export function WindowControls() {
         )}
       </button>
 
-      {/* Close */}
       <button
         onClick={() => runWindowAction(() => win.close())}
         aria-label="Close window"

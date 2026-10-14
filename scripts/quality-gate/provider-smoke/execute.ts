@@ -25,7 +25,6 @@ async function waitForHttp(url: string, timeoutMs: number) {
       const response = await fetch(url)
       if (response.ok) return
     } catch {
-      // Keep polling until timeout.
     }
     await Bun.sleep(500)
   }

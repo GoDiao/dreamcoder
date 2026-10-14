@@ -1,10 +1,3 @@
-/**
- * Authentication middleware
- *
- * 本地桌面应用场景下，使用 Anthropic API Key 做简单鉴权。
- * 验证请求头中的 Authorization: Bearer <key> 与 .env 中的 ANTHROPIC_API_KEY 是否匹配。
- */
-
 import { H5AccessService } from '../services/h5AccessService.js'
 
 type AuthResult = { valid: boolean; error?: string }
@@ -41,9 +34,6 @@ export function validateAuth(req: Request): AuthResult {
   return { valid: true }
 }
 
-/**
- * Helper to check auth and return 401 if invalid
- */
 export async function validateRequestAuth(
   req: Request,
   tokenOverride?: string | null,

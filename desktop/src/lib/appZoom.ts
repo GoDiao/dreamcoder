@@ -60,7 +60,6 @@ function persistAppZoomLevel(level: number, storage: StorageLike | null = getDef
   try {
     storage.setItem(APP_ZOOM_STORAGE_KEY, String(level))
   } catch {
-    // localStorage can be unavailable in hardened browser contexts.
   }
 }
 

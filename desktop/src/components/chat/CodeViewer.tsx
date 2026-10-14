@@ -272,7 +272,6 @@ export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = fa
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5 text-[11px] text-[var(--color-text-tertiary)]">
         <div className="flex items-center gap-3">
           <span className="font-semibold uppercase tracking-[0.14em]">{languageLabel}</span>
@@ -284,14 +283,12 @@ export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = fa
         />
       </div>
 
-      {/* Code area */}
       <CodeArea
         code={visibleCode}
         language={language}
         showLineNumbers={effectiveShowLineNumbers}
       />
 
-      {/* Expand/collapse toggle */}
       {showExpandToggle && (
         <button
           onClick={() => setExpanded((value) => !value)}

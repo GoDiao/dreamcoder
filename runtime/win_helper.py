@@ -25,10 +25,6 @@ os.environ.setdefault("PYAUTOGUI_HIDE_SUPPORT_PROMPT", "1")
 
 import pyautogui  # noqa: E402
 
-# The desktop app decodes helper stdout as UTF-8. On Windows, redirected Python
-# stdout defaults to the active ANSI code page (for example GBK), which mangles
-# localized app names from the registry. Force UTF-8 at process start so JSON
-# responses stay stable regardless of the user's system locale.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="strict")
 if hasattr(sys.stderr, "reconfigure"):
@@ -37,9 +33,6 @@ if hasattr(sys.stderr, "reconfigure"):
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
-# ---------------------------------------------------------------------------
-# Key mapping — Windows uses 'win' instead of 'command'
-# ---------------------------------------------------------------------------
 KEY_MAP = {
     "a": "a", "b": "b", "c": "c", "d": "d", "e": "e",
     "f": "f", "g": "g", "h": "h", "i": "i", "j": "j",
@@ -49,7 +42,6 @@ KEY_MAP = {
     "z": "z",
     "0": "0", "1": "1", "2": "2", "3": "3", "4": "4",
     "5": "5", "6": "6", "7": "7", "8": "8", "9": "9",
-    # Modifier keys — map macOS names to Windows equivalents
     "cmd": "win",
     "command": "win",
     "meta": "win",
@@ -61,7 +53,6 @@ KEY_MAP = {
     "option": "alt",
     "opt": "alt",
     "fn": "fn",
-    # Navigation / editing
     "escape": "esc",
     "esc": "esc",
     "enter": "enter",
@@ -80,11 +71,9 @@ KEY_MAP = {
     "pageup": "pageup",
     "pagedown": "pagedown",
     "capslock": "capslock",
-    # Function keys
     "f1": "f1", "f2": "f2", "f3": "f3", "f4": "f4",
     "f5": "f5", "f6": "f6", "f7": "f7", "f8": "f8",
     "f9": "f9", "f10": "f10", "f11": "f11", "f12": "f12",
-    # Symbols
     "-": "-", "=": "=", "[": "[", "]": "]", "\\": "\\",
     ";": ";", "'": "'", ",": ",", ".": ".", "/": "/", "`": "`",
 }
@@ -96,10 +85,6 @@ def normalize_key(name: str) -> str:
         raise ValueError(f"Unsupported key: {name}")
     return KEY_MAP[key]
 
-
-# ---------------------------------------------------------------------------
-# JSON output helpers
-# ---------------------------------------------------------------------------
 
 def json_output(payload: dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False))
@@ -117,10 +102,6 @@ def bool_env(name: str, default: bool = False) -> bool:
         return default
     return value not in {"0", "false", "False", ""}
 
-
-# ---------------------------------------------------------------------------
-# Display / Monitor helpers (via screeninfo + ctypes)
-# ---------------------------------------------------------------------------
 
 def get_displays() -> list[dict[str, Any]]:
     """Enumerate monitors via screeninfo, with DPI scale from ctypes."""
@@ -149,11 +130,9 @@ def _get_monitor_scale(monitor: Any) -> float:
     """Get the DPI scale factor for a monitor. Returns 1.0 on failure."""
     try:
         import ctypes
-        # SetProcessDPIAware so we get real pixel values
         ctypes.windll.user32.SetProcessDPIAware()
-        # Get DPI for the primary — simplified; per-monitor DPI is complex
         hdc = ctypes.windll.user32.GetDC(0)
-        dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
+        dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
         ctypes.windll.user32.ReleaseDC(0, hdc)
         return dpi / 96.0
     except Exception:
@@ -174,10 +153,6 @@ def choose_display(display_id: int | None) -> dict[str, Any]:
             return display
     raise RuntimeError(f"Unknown display: {display_id}")
 
-
-# ---------------------------------------------------------------------------
-# Screen capture (mss — cross-platform, identical to mac_helper)
-# ---------------------------------------------------------------------------
 
 def capture_display(display_id: int | None, resize: tuple[int, int] | None = None) -> dict[str, Any]:
     display = choose_display(display_id)
@@ -220,10 +195,6 @@ def capture_region(region: dict[str, int], resize: tuple[int, int] | None = None
     return {"base64": base64_data, "width": image.width, "height": image.height}
 
 
-# ---------------------------------------------------------------------------
-# Window management (win32gui)
-# ---------------------------------------------------------------------------
-
 def list_windows() -> list[dict[str, Any]]:
     """List visible on-screen windows with their bounds."""
     import win32gui
@@ -242,7 +213,6 @@ def list_windows() -> list[dict[str, Any]]:
         height = bottom - top
         if width <= 1 or height <= 1:
             return
-        # Get the process name as owner
         owner = _get_window_process_name(hwnd)
         results.append({
             "ownerName": owner,
@@ -265,10 +235,6 @@ def _get_window_process_name(hwnd: int) -> str:
     except Exception:
         return ""
 
-
-# ---------------------------------------------------------------------------
-# Application management
-# ---------------------------------------------------------------------------
 
 def _get_exe_path_for_pid(pid: int) -> str | None:
     try:
@@ -311,7 +277,6 @@ def installed_apps() -> list[dict[str, Any]]:
                 except OSError:
                     winreg.CloseKey(app_key)
                     continue
-                # Use the registry key name as a stable identifier (like bundleId)
                 try:
                     install_location = winreg.QueryValueEx(app_key, "InstallLocation")[0]
                 except OSError:
@@ -359,11 +324,9 @@ def running_apps() -> list[dict[str, Any]]:
             exe_path = proc.info["exe"] or ""
             if not name or name in seen:
                 continue
-            # Skip system/background processes (no window)
             if not exe_path:
                 continue
             seen.add(name)
-            # Use exe name (without .exe) as bundleId
             bundle_id = Path(exe_path).stem if exe_path else name
             apps.append({"bundleId": bundle_id, "displayName": name})
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -415,8 +378,7 @@ def app_under_point(x: int, y: int) -> dict[str, str] | None:
     hwnd = win32gui.WindowFromPoint((x, y))
     if not hwnd:
         return frontmost_app()
-    # Walk up to the top-level owner
-    root = win32gui.GetAncestor(hwnd, 3)  # GA_ROOTOWNER = 3
+    root = win32gui.GetAncestor(hwnd, 3)
     if root:
         hwnd = root
     try:
@@ -439,7 +401,6 @@ def find_window_displays(bundle_ids: list[str]) -> list[dict[str, Any]]:
     displays = get_displays()
     windows = list_windows()
 
-    # Build exe-stem -> ownerName mapping
     names_by_bundle: dict[str, str | None] = {}
     for bid in bundle_ids:
         names_by_bundle[bid] = app_display_name(bid)
@@ -452,13 +413,11 @@ def find_window_displays(bundle_ids: list[str]) -> list[dict[str, Any]]:
             owner = window["ownerName"]
             if not owner:
                 continue
-            # Match by exe name
             owner_stem = Path(owner).stem if owner.endswith(".exe") else owner
             if target_name and owner != target_name and owner_stem != bundle_id:
                 continue
             if not target_name and owner_stem != bundle_id and owner != bundle_id:
                 continue
-            # Check which displays this window overlaps
             wx = window["bounds"]["x"]
             wy = window["bounds"]["y"]
             ww = window["bounds"]["width"]
@@ -468,7 +427,6 @@ def find_window_displays(bundle_ids: list[str]) -> list[dict[str, Any]]:
                 dy = display["originY"]
                 dw = display["width"]
                 dh = display["height"]
-                # Check rectangle intersection
                 if wx < dx + dw and wx + ww > dx and wy < dy + dh and wy + wh > dy:
                     display_ids.add(int(display["displayId"]))
         result.append({"bundleId": bundle_id, "displayIds": sorted(display_ids)})
@@ -477,7 +435,6 @@ def find_window_displays(bundle_ids: list[str]) -> list[dict[str, Any]]:
 
 def open_app(bundle_id: str) -> None:
     """Open an application by its bundleId (exe path or program name)."""
-    # Try to find the exe path from registry
     import winreg
     exe_path = None
 
@@ -535,16 +492,11 @@ def open_app(bundle_id: str) -> None:
     if exe_path and Path(exe_path).exists():
         os.startfile(exe_path)
     else:
-        # Fallback: try to run it directly
         try:
             subprocess.Popen([bundle_id], shell=True)
         except Exception:
             raise RuntimeError(f"App not found for identifier: {bundle_id}")
 
-
-# ---------------------------------------------------------------------------
-# Clipboard (pyperclip — cross-platform)
-# ---------------------------------------------------------------------------
 
 def read_clipboard() -> str:
     import pyperclip
@@ -563,10 +515,6 @@ def paste_clipboard() -> None:
     pyautogui.hotkey("ctrl", "v", interval=0.02)
 
 
-# ---------------------------------------------------------------------------
-# Permissions — Windows doesn't have macOS-style TCC
-# ---------------------------------------------------------------------------
-
 def check_permissions() -> dict[str, bool | None]:
     """Windows does not require explicit accessibility/screen-recording
     permissions like macOS TCC. Always report as granted."""
@@ -575,10 +523,6 @@ def check_permissions() -> dict[str, bool | None]:
         "screenRecording": True,
     }
 
-
-# ---------------------------------------------------------------------------
-# Input actions (pyautogui — identical to mac_helper)
-# ---------------------------------------------------------------------------
 
 def click(x: int, y: int, button: str, count: int, modifiers: list[str] | None) -> None:
     pyautogui.moveTo(x, y)
@@ -627,10 +571,6 @@ def hold_keys(keys: list[str], duration_ms: int) -> None:
 def type_text(text: str) -> None:
     pyautogui.write(text, interval=0.008)
 
-
-# ---------------------------------------------------------------------------
-# Main dispatcher — exact same command protocol as mac_helper.py
-# ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser()

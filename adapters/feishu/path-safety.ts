@@ -1,7 +1,5 @@
 import * as path from 'node:path'
 
-/** True if `filePath` resolves to a location outside of `workDir`.
- *  Relative paths are resolved against workDir first. */
 export function isOutsideWorkDir(filePath: string, workDir: string): boolean {
   const pathApi = usesWindowsPath(filePath) || usesWindowsPath(workDir) ? path.win32 : path.posix
   const abs = pathApi.isAbsolute(filePath)

@@ -95,10 +95,6 @@ describe('H5AccessService', () => {
 
   test('configured public URL overrides stale stored local URLs', async () => {
     const service = new H5AccessService()
-    // Use loopback rather than a private-LAN IP so updateSettings's new
-    // local-interface validation does not reject the fixture URL. The intent
-    // here is still "stale stored URL overridden by configured" — loopback is
-    // treated as a proxy URL by classifyH5PublicBaseUrl and accepted as-is.
     await service.updateSettings({
       publicBaseUrl: 'http://127.0.0.1:5179',
     })
@@ -300,8 +296,6 @@ describe('H5AccessService', () => {
   })
 
   test('stale stored LAN host falls back to auto when not bound to any local interface', () => {
-    // User saved 192.168.1.207 on a previous network; current interfaces only have 192.168.0.105.
-    // Effective URL must hop over to the auto-discovered host:port.
     expect(resolveEffectiveH5PublicBaseUrl({
       enabled: true,
       storedPublicBaseUrl: 'http://192.168.1.207:55379',
@@ -310,7 +304,6 @@ describe('H5AccessService', () => {
       localInterfaceHosts: ['192.168.0.105'],
     })).toBe('http://192.168.0.105:55379')
 
-    // When stored host IS on a local interface, keep refreshing only the port (existing behavior).
     expect(resolveEffectiveH5PublicBaseUrl({
       enabled: true,
       storedPublicBaseUrl: 'http://192.168.1.100:5179',
@@ -319,7 +312,6 @@ describe('H5AccessService', () => {
       localInterfaceHosts: ['192.168.1.100'],
     })).toBe('http://192.168.1.100:55379')
 
-    // Reverse-proxy stored URLs are never replaced by auto fallback, even if host is unreachable.
     expect(resolveEffectiveH5PublicBaseUrl({
       enabled: true,
       storedPublicBaseUrl: 'https://h5.mydomain.com',
@@ -328,7 +320,6 @@ describe('H5AccessService', () => {
       localInterfaceHosts: ['192.168.0.105'],
     })).toBe('https://h5.mydomain.com')
 
-    // Backward compat: without localInterfaceHosts the legacy port-refresh-only path still works.
     expect(resolveEffectiveH5PublicBaseUrl({
       enabled: true,
       storedPublicBaseUrl: 'http://192.168.1.207:5179',
@@ -341,12 +332,10 @@ describe('H5AccessService', () => {
     expect(classifyH5PublicBaseUrl('http://192.168.0.105:55379')).toBe('plain-lan')
     expect(classifyH5PublicBaseUrl('http://10.0.0.5:8080')).toBe('plain-lan')
     expect(classifyH5PublicBaseUrl('http://172.20.16.1:39876')).toBe('plain-lan')
-    // proxy: https / custom path / hostname instead of IP
     expect(classifyH5PublicBaseUrl('https://h5.mydomain.com')).toBe('proxy')
     expect(classifyH5PublicBaseUrl('http://192.168.0.105:8080/h5')).toBe('proxy')
     expect(classifyH5PublicBaseUrl('https://192.168.0.105:8443')).toBe('proxy')
     expect(classifyH5PublicBaseUrl('http://my-tunnel:8443')).toBe('proxy')
-    // invalid
     expect(classifyH5PublicBaseUrl('not a url')).toBe('invalid')
     expect(classifyH5PublicBaseUrl('ftp://example.com')).toBe('invalid')
     expect(classifyH5PublicBaseUrl('http://user:pass@example.com')).toBe('invalid')
@@ -390,9 +379,6 @@ describe('H5AccessService', () => {
 
   test('updateSettings rejects a stale LAN host', async () => {
     const service = new H5AccessService()
-    // Pick a private-LAN IP that is virtually guaranteed not to be on the
-    // test machine's interfaces (192.168.255.0/24 is reserved-ish in practice
-    // and we never see it in CI / dev environments).
     await expect(
       service.updateSettings({
         publicBaseUrl: 'http://192.168.255.254:55379',
@@ -434,19 +420,16 @@ describe('H5AccessService', () => {
   test('getDiagnostics reports stale, ok, proxy and unset states', async () => {
     const service = new H5AccessService()
 
-    // unset: no stored URL
     let diag = await service.getDiagnostics()
     expect(diag.storedHostStaleness).toBe('unset')
     expect(diag.storedPublicBaseUrl).toBeNull()
     expect(Array.isArray(diag.localInterfaceHosts)).toBe(true)
 
-    // proxy stored URL
     await service.updateSettings({ publicBaseUrl: 'https://h5.mydomain.com' })
     diag = await service.getDiagnostics()
     expect(diag.storedHostStaleness).toBe('proxy')
     expect(diag.storedPublicBaseUrl).toBe('https://h5.mydomain.com')
 
-    // ok: stored URL host is on local interfaces
     const localHost = collectLocalIPv4Hosts()[0]
     if (localHost) {
       await service.updateSettings({ publicBaseUrl: `http://${localHost}:55379` })

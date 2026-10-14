@@ -68,7 +68,6 @@ describe('TelegramMediaService', () => {
     expect(bot.api.sendPhoto).toHaveBeenCalledTimes(1)
     const args = (bot.api.sendPhoto as any).mock.calls[0]
     expect(args[0]).toBe(42)
-    // grammY InputFile wraps the buffer; just verify it's an object.
     expect(args[1]).toBeDefined()
     expect(args[2]?.caption).toBe('caption text')
   })

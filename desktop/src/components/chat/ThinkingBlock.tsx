@@ -13,7 +13,6 @@ export function ThinkingBlock({ content, isActive = false }: { content: string; 
     }
   }, [content, expanded, isActive])
 
-  // Preview: take first meaningful line, not first 140 chars
   const lines = content.split('\n').filter((l) => l.trim())
   const firstLine = lines[0]?.replace(/\s+/g, ' ').trim() || ''
   const preview = firstLine.length > 80 ? firstLine.slice(0, 80) + '...' : firstLine

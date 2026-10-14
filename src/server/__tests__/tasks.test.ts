@@ -1,16 +1,8 @@
-/**
- * Unit tests for TaskService and Tasks API
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import { TaskService } from '../services/taskService.js'
-
-// ============================================================================
-// TaskService unit tests
-// ============================================================================
 
 describe('TaskService', () => {
   let tmpDir: string
@@ -57,7 +49,6 @@ describe('TaskService', () => {
     const svc = new TaskService()
     const tasks = await svc.listTasks()
     expect(tasks.length).toBe(2)
-    // 按 createdAt 倒序
     expect(tasks[0].id).toBe('task-002')
     expect(tasks[1].id).toBe('task-001')
   })
@@ -112,10 +103,6 @@ describe('TaskService', () => {
     expect(tasks).toEqual([])
   })
 })
-
-// ============================================================================
-// Tasks API integration tests
-// ============================================================================
 
 describe('Tasks API', () => {
   let server: any

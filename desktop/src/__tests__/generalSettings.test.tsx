@@ -1136,8 +1136,6 @@ describe('Settings > Providers tab', () => {
     providerStoreState.hasLoadedProviders = true
   })
 
-  // Official OAuth providers are hidden in ProviderSettings.tsx (commented out);
-  // re-enable these when the Claude/ChatGPT official entries come back.
   it.skip('does not query official OAuth status before providers finish loading', () => {
     providerStoreState.providers = []
     providerStoreState.activeId = null
@@ -1354,8 +1352,6 @@ describe('Settings > About tab', () => {
     expect(screen.getByText('The first public release has not been published yet. Update checking is disabled.')).toBeInTheDocument()
   })
 
-  // Update checking is disabled in AboutSettings.tsx until the first public release
-  // (see the TODO there); re-enable these when the updater UI is restored.
   it.skip('renders release notes with markdown formatting', async () => {
     render(<Settings />)
 

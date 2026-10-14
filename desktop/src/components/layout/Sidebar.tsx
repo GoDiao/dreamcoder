@@ -91,7 +91,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   useEffect(() => {
     if (!contextMenu) return
     if (!sidebarOpen) setContextMenu(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidebarOpen])
 
   useEffect(() => {
@@ -205,7 +204,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         }
       })
       .catch(() => {
-        // The sidebar remains usable with the local cache if the server is still booting.
       })
 
     return () => {
@@ -688,7 +686,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         >
           {t('sidebar.newSession')}
         </NavItem>
-        {/* Scheduled Tasks */}
         {!isMobile && (
           <NavItem
             active={activeTabId === SCHEDULED_TAB_ID}
@@ -1533,7 +1530,6 @@ function writeStoredProjectOrder(projectOrder: string[]): void {
   try {
     localStorage.setItem(PROJECT_ORDER_STORAGE_KEY, JSON.stringify(projectOrder))
   } catch {
-    // Sidebar ordering is a UI preference; ignore storage failures.
   }
 }
 
@@ -1552,7 +1548,6 @@ function writeStoredProjectPins(projectKeys: Set<string>): void {
   try {
     localStorage.setItem(PROJECT_PINNED_STORAGE_KEY, JSON.stringify([...projectKeys]))
   } catch {
-    // Sidebar pinning is a UI preference; ignore storage failures.
   }
 }
 
@@ -1571,7 +1566,6 @@ function writeStoredProjectHidden(projectKeys: Set<string>): void {
   try {
     localStorage.setItem(PROJECT_HIDDEN_STORAGE_KEY, JSON.stringify([...projectKeys]))
   } catch {
-    // Hidden projects are a local UI preference; ignore storage failures.
   }
 }
 
@@ -1585,7 +1579,6 @@ function writeStoredProjectOrganization(organization: SidebarProjectOrganization
   try {
     localStorage.setItem(PROJECT_ORGANIZATION_STORAGE_KEY, organization)
   } catch {
-    // Sidebar organization is a UI preference; ignore storage failures.
   }
 }
 
@@ -1599,7 +1592,6 @@ function writeStoredProjectSortBy(sortBy: SidebarProjectSortBy): void {
   try {
     localStorage.setItem(PROJECT_SORT_STORAGE_KEY, sortBy)
   } catch {
-    // Sidebar sorting is a UI preference; ignore storage failures.
   }
 }
 

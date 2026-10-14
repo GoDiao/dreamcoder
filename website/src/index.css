@@ -7,7 +7,6 @@
   --font-serif: "Fraunces", Georgia, serif;
   --font-mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Custom palette as specified in the DreamCoder brief */
   --color-brand-bg-primary: #f7f4ef;
   --color-brand-bg-secondary: #efe8de;
   --color-brand-bg-card: #e8e0d4;
@@ -36,7 +35,6 @@
   }
 }
 
-/* Custom Editorial design utilities */
 .editorial-container {
   max-width: 65ch;
   margin-left: auto;
@@ -51,7 +49,6 @@
   font-family: var(--font-mono);
 }
 
-/* Scrollbar styling for that book-like feeling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -70,13 +67,11 @@
   background: var(--color-brand-caramel);
 }
 
-/* Elegant selections */
 ::selection {
   background-color: #efe8de;
   color: var(--color-brand-caramel);
 }
 
-/* Tutorial pages rendered from docs/tutorial/*.md */
 .doc-prose {
   --tw-prose-body: var(--color-brand-text-body);
   --tw-prose-headings: var(--color-brand-text-title);

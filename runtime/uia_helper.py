@@ -26,20 +26,11 @@ import sys
 from io import BytesIO
 from time import perf_counter
 
-# ---------------------------------------------------------------------------
-# Minimal comtypes UIA COM interface definitions
-# ---------------------------------------------------------------------------
-# We define only the interfaces and methods we actually use, at their correct
-# vtable indices. This avoids depending on a pre-generated UIAutomationClient
-# module while still getting correct COM dispatch via comtypes.
-# ---------------------------------------------------------------------------
-
 import comtypes
 import comtypes.client
 from comtypes import GUID, IUnknown, BSTR
 from ctypes import POINTER, c_int, c_double, c_bool, c_void_p, byref
 
-# COM RECT structure used by UIA BoundingRectangle
 class COMRECT(ctypes.Structure):
     _fields_ = [
         ("left", ctypes.c_long),
@@ -49,7 +40,6 @@ class COMRECT(ctypes.Structure):
     ]
 
 
-# ---------- IUIAutomationCacheRequest ----------
 class IUIAutomationCacheRequest(IUnknown):
     _iid_ = GUID('{B322B023-3AD2-4671-B358-2C62AB58C489}')
     _methods_ = [
@@ -60,37 +50,14 @@ class IUIAutomationCacheRequest(IUnknown):
     ]
 
 
-# ---------- IUIAutomationCondition ----------
 class IUIAutomationCondition(IUnknown):
     _iid_ = GUID('{352FFBA8-0973-437C-A61F-F64CAFD81DF9}')
-    _methods_ = []  # no methods beyond IUnknown
+    _methods_ = []
 
 
-# ---------- IUIAutomationElement ----------
-# Vtable layout (IUnknown 0-2, then element methods):
-#   3:SetFocus 5:Name 6:ControlType 7:LocalizedControlType
-#   8:AutomationId 9:ClassName 10:HelpText 11:Culture
-#   12:ControlType 13:LocalizedControlType 14:AcceleratorKey 15:AccessKey
-#   16:HasKeyboardFocus 17:IsKeyboardFocusable 18:IsEnabled 19:IsPassword
-#   20:IsOffscreen 21:IsContentElement 22:IsControlElement 23:LabeledBy
-#   24:Culture 25-27:layout props 28:IsPeripheral 30:ProviderOptions
-#   ... (Current* methods continue)
-#   75:CachedProviderOptions 76:CachedName 77:AcceleratorKey
-#   78:CachedControlType 79:CachedLocalizedControlType 80:CachedAutomationId
-#   81:CachedClassName 82:CachedHelpText 83:CachedCulture
-#   84:CachedControlType 85:CachedLocalizedControlType
-#   86:CachedAcceleratorKey 87:CachedAccessKey
-#   88:CachedHasKeyboardFocus 89:CachedIsKeyboardFocusable
-#   90:CachedIsEnabled 91:CachedIsPassword 92:CachedIsOffscreen
-#   93:CachedIsControlElement 94:CachedBoundingRectangle
-#   ...
-#   113:GetCachedPattern 114:FindFirst 115:FindAll
-#   116:GetUpdatedCache 117:BuildUpdatedCache
 class IUIAutomationElement(IUnknown):
     _iid_ = GUID('{D22108AA-8AC5-49A5-834B-99046913A269}')
     _methods_ = [
-        # IUnknown: QI=0, AddRef=1, Release=2
-        # --- Current properties ---
         (3, 'SetFocus', []),
         (5, 'CurrentName',        ['propget', 'out,retval'], POINTER(BSTR)),
         (12, 'CurrentControlType',  ['propget', 'out,retval'], POINTER(c_int)),
@@ -103,7 +70,6 @@ class IUIAutomationElement(IUnknown):
         (28, 'CurrentBoundingRectangle',    ['propget', 'out,retval'], POINTER(COMRECT)),
         (30, 'CurrentLocalizedControlType2', ['propget', 'out,retval'], POINTER(BSTR)),
         (31, 'GetCurrentPattern',  ([], c_int, 'patternId', 'out,retval'), POINTER(IUnknown)),
-        # --- Cached properties (indices 75+) ---
         (76, 'CachedName',         ['propget', 'out,retval'], POINTER(BSTR)),
         (78, 'CachedControlType',  ['propget', 'out,retval'], POINTER(c_int)),
         (79, 'CachedLocalizedControlType', ['propget', 'out,retval'], POINTER(BSTR)),
@@ -114,7 +80,6 @@ class IUIAutomationElement(IUnknown):
         (92, 'CachedIsOffscreen',  ['propget', 'out,retval'], POINTER(c_bool)),
         (93, 'CachedIsControlElement', ['propget', 'out,retval'], POINTER(c_bool)),
         (113, 'GetCachedPattern',  ([], c_int, 'patternId', 'out,retval'), POINTER(IUnknown)),
-        # --- Tree operations ---
         (114, 'FindFirst',
          ([], c_int, 'scope'),
          ([], POINTER(IUIAutomationCondition), 'condition'),
@@ -129,7 +94,6 @@ class IUIAutomationElement(IUnknown):
     ]
 
 
-# ---------- IUIAutomationElementArray ----------
 class IUIAutomationElementArray(IUnknown):
     _iid_ = GUID('{14314595-B4BC-4055-96F2-239DEA3D7AB1}')
     _methods_ = [
@@ -138,7 +102,6 @@ class IUIAutomationElementArray(IUnknown):
     ]
 
 
-# ---------- Pattern interfaces ----------
 class IUIAutomationInvokePattern(IUnknown):
     _iid_ = GUID('{FB377FBE-8EA6-46D5-9C73-6499642D3059}')
     _methods_ = [
@@ -173,7 +136,6 @@ class IUIAutomationTogglePattern(IUnknown):
     ]
 
 
-# ---------- IUIAutomationTreeWalker ----------
 class IUIAutomationTreeWalker(IUnknown):
     _iid_ = GUID('{4042C624-389C-4AFC-A630-9D8C931E6531}')
     _methods_ = [
@@ -198,11 +160,9 @@ class IUIAutomationTreeWalker(IUnknown):
         (9, 'get_Condition', ['out,retval'], POINTER(POINTER(IUIAutomationCondition))),
     ]
 
-# ---------- IUIAutomation (root factory) ----------
 class IUIAutomation(IUnknown):
     _iid_ = GUID('{30CBE57D-D9D0-452A-AB13-7AC5AC4825EE}')
     _methods_ = [
-        # IUnknown: QI=0, AddRef=1, Release=2
         (3, 'CompareElements',
          ([], POINTER(IUIAutomationElement), 'el1'),
          ([], POINTER(IUIAutomationElement), 'el2'),
@@ -252,25 +212,17 @@ class IUIAutomation(IUnknown):
     ]
 
 
-# ---------------------------------------------------------------------------
-# UIA object singleton (created once per subprocess)
-# ---------------------------------------------------------------------------
-
 _uia = None
 
 def _get_uia():
     global _uia
     if _uia is None:
         _uia = comtypes.client.CreateObject(
-            '{FF48DBA4-60EF-4201-AA87-54103EEF594E}',  # CUIAutomation CLSID
+            '{FF48DBA4-60EF-4201-AA87-54103EEF594E}',
             interface=IUIAutomation,
         )
     return _uia
 
-
-# ---------------------------------------------------------------------------
-# Control type constants and names
-# ---------------------------------------------------------------------------
 
 CONTROL_TYPE_NAMES = {
     50000: "Button", 50001: "Calendar", 50002: "CheckBox",
@@ -289,35 +241,32 @@ CONTROL_TYPE_NAMES = {
     50039: "SemanticZoom", 50040: "AppBar",
 }
 
-# Interactive control types (whitelist for get_state)
 INTERACTIVE_TYPES = {
-    50000,  # Button
-    50002,  # CheckBox
-    50003,  # ComboBox
-    50004,  # Edit
-    50005,  # Hyperlink
-    50007,  # ListItem
-    50011,  # MenuItem
-    50013,  # RadioButton
-    50015,  # Slider
-    50016,  # Spinner
-    50018,  # Tab
-    50019,  # TabItem
-    50024,  # TreeItem
-    50029,  # DataItem
-    50030,  # Document
-    50031,  # SplitButton
-    50035,  # HeaderItem
+    50000,
+    50002,
+    50003,
+    50004,
+    50005,
+    50007,
+    50011,
+    50013,
+    50015,
+    50016,
+    50018,
+    50019,
+    50024,
+    50029,
+    50030,
+    50031,
+    50035,
 }
 
-# UIA Pattern IDs
 PATTERN_INVOKE    = 10000
 PATTERN_VALUE     = 10002
 PATTERN_SCROLL    = 10004
 PATTERN_TOGGLE    = 10015
 PATTERN_EXPAND    = 10005
 
-# ScrollAmount constants
 SCROLL_LARGE_DECREMENT = 0
 SCROLL_SMALL_DECREMENT = 1
 SCROLL_NO_AMOUNT       = 2
@@ -335,7 +284,6 @@ SCROLL_AMOUNT_MAP = {
     "right": SCROLL_LARGE_INCREMENT,
 }
 
-# Property IDs
 PROP_NAME               = 30005
 PROP_CONTROL_TYPE       = 30003
 PROP_BOUNDING_RECT      = 30001
@@ -345,16 +293,11 @@ PROP_IS_CONTROL_ELEMENT = 30016
 PROP_IS_KB_FOCUSABLE    = 30009
 PROP_HAS_KB_FOCUS       = 30008
 
-# TreeScope
 SCOPE_ELEMENT    = 1
 SCOPE_CHILDREN   = 2
 SCOPE_DESCENDANTS = 4
 SCOPE_SUBTREE    = 7
 
-
-# ---------------------------------------------------------------------------
-# SelectorMap: index ↔ IUIAutomationElement
-# ---------------------------------------------------------------------------
 
 _selector_map: list[tuple[dict, 'IUIAutomationElement']] = []
 
@@ -371,10 +314,6 @@ def _add_to_selector_map(node_dict, element):
     return idx
 
 
-# ---------------------------------------------------------------------------
-# JSON output helpers (same as win_helper.py)
-# ---------------------------------------------------------------------------
-
 def json_output(payload: dict) -> None:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False, default=str))
     sys.stdout.write("\n")
@@ -384,10 +323,6 @@ def json_output(payload: dict) -> None:
 def error_output(message: str, code: str = "runtime_error") -> None:
     json_output({"ok": False, "error": {"code": code, "message": message}})
 
-
-# ---------------------------------------------------------------------------
-# UIA element property helpers (safe access for potentially dead elements)
-# ---------------------------------------------------------------------------
 
 def _safe_name(element) -> str:
     try:
@@ -467,10 +402,6 @@ def _is_interactive(element) -> bool:
         return False
 
 
-# ---------------------------------------------------------------------------
-# Tree traversal — recursive walk with cache
-# ---------------------------------------------------------------------------
-
 def _build_cache_request(uia):
     req = uia.CreateCacheRequest()
     req.put_TreeScope(SCOPE_ELEMENT | SCOPE_CHILDREN)
@@ -516,7 +447,6 @@ def _traverse_tree(element, window_name, depth, max_depth, max_nodes, cache_req)
         }
         _add_to_selector_map(node, cached)
 
-    # Enumerate children via BuildUpdatedCache result
     try:
         walker = _get_uia().RawViewWalker
         child = walker.GetFirstChildElement(cached)
@@ -531,10 +461,6 @@ def _traverse_tree(element, window_name, depth, max_depth, max_nodes, cache_req)
     except Exception:
         pass
 
-
-# ---------------------------------------------------------------------------
-# EnumWindows — list visible windows
-# ---------------------------------------------------------------------------
 
 EnumWindows = ctypes.windll.user32.EnumWindows
 GetWindowTextW = ctypes.windll.user32.GetWindowTextW
@@ -576,10 +502,6 @@ def _enumerate_windows():
     return results
 
 
-# ---------------------------------------------------------------------------
-# Commands
-# ---------------------------------------------------------------------------
-
 def cmd_get_state(payload: dict) -> None:
     t0 = perf_counter()
     _clear_selector_map()
@@ -604,7 +526,6 @@ def cmd_get_state(payload: dict) -> None:
         if max_nodes and len(_selector_map) >= max_nodes:
             break
 
-    # Build TOON-format text
     lines = []
     for idx, (node, _) in enumerate(_selector_map):
         line = f"{idx}|{node['window']}|{node['control_type']}|{node['name']}|{node['coords']}|"
@@ -660,7 +581,6 @@ def cmd_type_by_id(payload: dict) -> None:
     text = str(payload.get("text", ""))
     clear_first = bool(payload.get("clear_first", False))
 
-    # Try UIA ValuePattern first
     typed_via_pattern = False
     try:
         raw = element.GetCurrentPattern(PATTERN_VALUE)
@@ -674,7 +594,6 @@ def cmd_type_by_id(payload: dict) -> None:
         pass
 
     if not typed_via_pattern:
-        # Fallback: click center then pyautogui
         rect = _safe_rect(element)
         x = (rect[0] + rect[2]) // 2
         y = (rect[1] + rect[3]) // 2
@@ -706,7 +625,6 @@ def cmd_scroll_by_id(payload: dict) -> None:
     except Exception:
         pass
 
-    # Fallback: pyautogui scroll on element center
     import pyautogui
     rect = _safe_rect(element)
     x = (rect[0] + rect[2]) // 2
@@ -727,7 +645,7 @@ def cmd_screenshot(payload: dict) -> None:
         if display_id is not None and 0 <= display_id < len(sct.monitors) - 1:
             monitor = sct.monitors[display_id + 1]
         else:
-            monitor = sct.monitors[1]  # primary
+            monitor = sct.monitors[1]
         raw = sct.grab(monitor)
         image = Image.frombytes("RGB", raw.size, raw.rgb)
 
@@ -749,10 +667,6 @@ def cmd_screenshot(payload: dict) -> None:
         },
     })
 
-
-# ---------------------------------------------------------------------------
-# Main dispatcher (same pattern as win_helper.py)
-# ---------------------------------------------------------------------------
 
 COMMANDS = {
     "get_state":          cmd_get_state,

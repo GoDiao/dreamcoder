@@ -31,19 +31,14 @@ type Props = {
   result?: unknown
 }
 
-/**
- * Parse the AskUserQuestion input which may come in different shapes.
- */
 function parseInput(input: unknown): Question[] {
   if (!input || typeof input !== 'object') return []
   const obj = input as AskUserInput
 
-  // Shape 1: { questions: [...] }
   if (Array.isArray(obj.questions)) {
     return obj.questions
   }
 
-  // Shape 2: { question: "...", options: [...] }
   if (typeof obj.question === 'string') {
     return [{
       question: obj.question,
@@ -196,7 +191,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     })
   }
 
-  // All questions must be answered (via selection or free text) to enable submit
   const allAnswered = questions.every((_, i) =>
     Boolean(freeTexts[i]?.trim()) || (selections[i]?.length ?? 0) > 0,
   )
@@ -209,7 +203,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         ? 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-low)] opacity-70'
         : 'border-[var(--color-secondary)] bg-[var(--color-surface-container-lowest)]'
     }`}>
-      {/* Header */}
       <div className={`flex items-center gap-3 px-4 py-3 ${
         submitted
           ? 'bg-[var(--color-surface-container-low)]'
@@ -232,7 +225,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         </div>
       </div>
 
-      {/* Question tabs — horizontal tab bar (only show when multiple questions) */}
       {questions.length > 1 && (
         <div className="flex px-4 border-b border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)] overflow-x-auto">
           {questions.map((q, i) => {
@@ -262,13 +254,11 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         </div>
       )}
 
-      {/* Active question content */}
       <div className="px-4 py-3">
         <p className="text-sm font-medium text-[var(--color-text-primary)] mb-3">
           {activeQuestion.question}
         </p>
 
-        {/* Option cards */}
         {activeQuestion.options && activeQuestion.options.length > 0 && (
           <div className="space-y-2 mb-3">
             {activeQuestion.options.map((opt, optIndex) => {
@@ -286,7 +276,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
                   } ${submitted ? 'cursor-default' : ''}`}
                 >
                   <div className="flex items-start gap-3">
-                    {/* Selection indicator */}
                     <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
                       isSelected
                         ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]'
@@ -319,7 +308,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
           </div>
         )}
 
-        {/* Free text input */}
         {!submitted && (
           <div>
             <label className="text-xs text-[var(--color-text-tertiary)] mb-1.5 block">
@@ -345,7 +333,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
           </div>
         )}
 
-        {/* Submitted answer display */}
         {submitted && (
           <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]">check_circle</span>
@@ -356,7 +343,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         )}
       </div>
 
-      {/* Submit button */}
       {!submitted && (
         <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)]">
           <Button

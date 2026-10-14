@@ -29,8 +29,6 @@ interface DocPageProps {
   onNavigate: (target: DocTarget) => void;
 }
 
-// The first line of each file links to the other language. The site header
-// already has a language switch, so the line is dropped here.
 function stripLanguageSwitch(markdown: string): string {
   return markdown.replace(/^(?:\[English\]\([^)]*\) \| 简体中文|English \| \[简体中文\]\([^)]*\))\s*\n+/, '');
 }
@@ -74,9 +72,6 @@ export default function DocPage({ id, lang, onNavigate }: DocPageProps) {
   const t = labels[lang];
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  // Diagrams render after the text and push later headings down, so the
-  // target of a #hash link is scrolled into view again after each diagram
-  // until the reader scrolls on their own.
   const pendingHash = useRef('');
   const keepHashInView = useCallback(() => {
     const target = pendingHash.current ? document.getElementById(pendingHash.current) : null;

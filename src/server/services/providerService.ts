@@ -1,11 +1,3 @@
-/**
- * Provider Service — preset-based provider configuration
- *
- * Storage: ~/.claude/dreamcoder/providers.json (lightweight index)
- * Active provider env vars written to ~/.claude/dreamcoder/settings.json
- * (isolated from the original Claude Code's ~/.claude/settings.json)
- */
-
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
@@ -122,8 +114,6 @@ export class ProviderService {
     }))
   }
 
-  // --- CRUD ---
-
   async listProviders(): Promise<{ providers: SavedProvider[]; activeId: string | null }> {
     const index = await this.readIndex()
     return { providers: index.providers, activeId: index.activeId }
@@ -212,8 +202,6 @@ export class ProviderService {
     await this.writeIndex(index)
   }
 
-  // --- Activation ---
-
   async activateProvider(id: string): Promise<void> {
     const index = await this.readIndex()
     const provider = isOpenAIOfficialProviderId(id)
@@ -239,8 +227,6 @@ export class ProviderService {
     await this.writeIndex(index)
     await this.clearProviderFromSettings()
   }
-
-  // --- Settings sync ---
 
   private buildManagedEnv(
     provider: SavedProvider,
@@ -306,21 +292,11 @@ export class ProviderService {
     })
   }
 
-  // --- Auth status ---
-
-  /**
-   * Check whether any usable auth exists:
-   *  1. A dreamcoder provider is active → has auth
-   *  2. Original ~/.claude/settings.json has ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY → has auth
-   *  3. process.env already has ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN → has auth
-   *  4. None of the above → needs setup
-   */
   async checkAuthStatus(): Promise<{
     hasAuth: boolean
     source: 'dreamcoder-provider' | 'openai-oauth' | 'original-settings' | 'env' | 'none'
     activeProvider?: string
   }> {
-    // 1. Check dreamcoder active provider
     const index = await this.readIndex()
     if (index.activeId) {
       if (isOpenAIOfficialProviderId(index.activeId)) {
@@ -350,12 +326,10 @@ export class ProviderService {
       }
     }
 
-    // 2. Check process.env (covers .env file + inherited env)
     if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) {
       return { hasAuth: true, source: 'env' }
     }
 
-    // 3. Check original ~/.claude/settings.json
     try {
       const originalPath = path.join(this.getConfigDir(), 'settings.json')
       const raw = await fs.readFile(originalPath, 'utf-8')
@@ -365,13 +339,10 @@ export class ProviderService {
         return { hasAuth: true, source: 'original-settings' }
       }
     } catch {
-      // File doesn't exist or invalid
     }
 
     return { hasAuth: false, source: 'none' }
   }
-
-  // --- Proxy support ---
 
   async getProviderForProxy(providerId?: string): Promise<{
     baseUrl: string
@@ -412,8 +383,6 @@ export class ProviderService {
     return this.getProviderForProxy()
   }
 
-  // --- Test ---
-
   async testProvider(
     id: string,
     overrides?: { baseUrl?: string; modelId?: string; apiFormat?: ApiFormat; authStrategy?: ProviderAuthStrategy },
@@ -447,28 +416,21 @@ export class ProviderService {
     const base = input.baseUrl.replace(/\/+$/, '')
     const networkSettings = await loadNetworkSettings()
 
-    // ── Step 1: Basic connectivity ───────────────────────────
-    // Directly call the upstream API to verify URL, key, and model.
     const step1 = await this.testConnectivity(base, input.apiKey, input.modelId, format, authStrategy, networkSettings)
 
-    // If connectivity failed, no point running step 2
     if (!step1.success) {
       return { connectivity: step1 }
     }
 
-    // For native Anthropic format, no proxy pipeline to test
     if (format === 'anthropic') {
       return { connectivity: step1 }
     }
 
-    // ── Step 2: Full proxy pipeline ──────────────────────────
-    // Anthropic request → transform → upstream → transform back → validate
     const step2 = await this.testProxyPipeline(base, input.apiKey, input.modelId, format, networkSettings)
 
     return { connectivity: step1, proxy: step2 }
   }
 
-  /** Step 1: Direct upstream call to verify connectivity, auth, and model. */
   private async testConnectivity(
     base: string,
     apiKey: string,
@@ -500,7 +462,6 @@ export class ProviderService {
         return { success: false, latencyMs, error, modelUsed: modelId, httpStatus: response.status }
       }
 
-      // Validate response structure
       const valid = validateResponseBody(resBody, format)
       if (!valid.ok) {
         return { success: false, latencyMs, error: valid.error, modelUsed: modelId, httpStatus: response.status }
@@ -516,7 +477,6 @@ export class ProviderService {
     }
   }
 
-  /** Step 2: Full proxy pipeline — Anthropic → transform → upstream → transform back → validate. */
   private async testProxyPipeline(
     base: string,
     apiKey: string,
@@ -527,14 +487,12 @@ export class ProviderService {
     const start = Date.now()
     const apiModel = stripContextSuffix(modelId)
     try {
-      // Build an Anthropic Messages API request (same shape as what CLI sends)
       const anthropicReq: AnthropicRequest = {
         model: apiModel,
         max_tokens: 64,
         messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
       }
 
-      // Transform to OpenAI format
       let upstreamUrl: string
       let transformedBody: unknown
       if (format === 'openai_chat') {
@@ -546,7 +504,6 @@ export class ProviderService {
       }
       const proxyOptions = getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) })
 
-      // Call upstream with transformed request
       const response = await fetch(upstreamUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -562,7 +519,6 @@ export class ProviderService {
           error: `Upstream HTTP ${response.status}: ${errText.slice(0, 200)}` }
       }
 
-      // Transform response back to Anthropic format
       const responseBody = await response.json()
       const anthropicRes = format === 'openai_chat'
         ? openaiChatToAnthropic(responseBody, apiModel)
@@ -570,7 +526,6 @@ export class ProviderService {
 
       const latencyMs = Date.now() - start
 
-      // Validate the final Anthropic response
       if (anthropicRes.type !== 'message' || !Array.isArray(anthropicRes.content)) {
         return { success: false, latencyMs, modelUsed: modelId,
           error: 'Proxy transform produced invalid Anthropic response' }
@@ -587,9 +542,6 @@ export class ProviderService {
   }
 }
 
-// ─── Helpers ───────────────────────────────────────────────
-
-/** Strip client-side [1m]/[2m] context-window suffix before sending to API. */
 function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }
@@ -618,7 +570,6 @@ function buildDirectTestRequest(
       body: { model: apiModel, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
     }
   }
-  // anthropic
   return {
     url: `${base}/v1/messages`,
     headers: {
@@ -665,7 +616,6 @@ function validateResponseBody(
     }
     return { ok: true, model: (body.model as string) || undefined }
   }
-  // anthropic
   if (body.type !== 'message' || !Array.isArray(body.content)) {
     return { ok: false, error: 'Not a valid Anthropic Messages endpoint' }
   }

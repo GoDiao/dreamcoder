@@ -1,13 +1,3 @@
-/**
- * Settings Service — 读写用户级和项目级设置文件
- *
- * 设置文件为 JSON 格式：
- *   - 用户级: ~/.claude/settings.json
- *   - 项目级: {projectRoot}/.claude/settings.json
- *
- * 合并策略：Object.assign({}, userSettings, projectSettings)
- */
-
 import * as fs from 'fs/promises'
 import { randomBytes } from 'node:crypto'
 import * as path from 'path'
@@ -35,17 +25,14 @@ export class SettingsService {
     this.projectRoot = projectRoot
   }
 
-  /** 配置目录，支持通过环境变量覆盖（便于测试） */
   private getConfigDir(): string {
     return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
   }
 
-  /** 用户级设置文件路径 */
   private getUserSettingsPath(): string {
     return path.join(this.getConfigDir(), 'settings.json')
   }
 
-  /** 项目级设置文件路径 */
   private getProjectSettingsPath(projectRoot?: string): string {
     const root = projectRoot || this.projectRoot
     if (!root) {
@@ -54,11 +41,6 @@ export class SettingsService {
     return path.join(root, '.claude', 'settings.json')
   }
 
-  // ---------------------------------------------------------------------------
-  // 读取
-  // ---------------------------------------------------------------------------
-
-  /** 安全读取 JSON 文件，文件不存在时返回空对象 */
   private async readJsonFile(filePath: string): Promise<Record<string, unknown>> {
     await ensurePersistentStorageUpgraded()
     return readRecoverableJsonFile({
@@ -69,33 +51,24 @@ export class SettingsService {
     })
   }
 
-  /** 获取合并后的设置（user + project） */
   async getSettings(projectRoot?: string): Promise<Record<string, unknown>> {
     const user = await this.getUserSettings()
     try {
       const project = await this.getProjectSettings(projectRoot)
       return Object.assign({}, user, project)
     } catch {
-      // project root 未指定时，仅返回 user settings
       return user
     }
   }
 
-  /** 获取用户级设置 */
   async getUserSettings(): Promise<Record<string, unknown>> {
     return this.readJsonFile(this.getUserSettingsPath())
   }
 
-  /** 获取项目级设置 */
   async getProjectSettings(projectRoot?: string): Promise<Record<string, unknown>> {
     return this.readJsonFile(this.getProjectSettingsPath(projectRoot))
   }
 
-  // ---------------------------------------------------------------------------
-  // 写入（原子写入：先写临时文件，再 rename）
-  // ---------------------------------------------------------------------------
-
-  /** 原子写入 JSON 文件 */
   private async withWriteLock<T>(
     filePath: string,
     task: () => Promise<T>,
@@ -150,7 +123,6 @@ export class SettingsService {
     )
   }
 
-  /** 更新用户级设置（浅合并） */
   async updateUserSettings(settings: Record<string, unknown>): Promise<void> {
     const filePath = this.getUserSettingsPath()
     await this.withWriteLock(filePath, async () => {
@@ -160,7 +132,6 @@ export class SettingsService {
     })
   }
 
-  /** 更新项目级设置（浅合并） */
   async updateProjectSettings(
     settings: Record<string, unknown>,
     projectRoot?: string,
@@ -173,11 +144,6 @@ export class SettingsService {
     })
   }
 
-  // ---------------------------------------------------------------------------
-  // 权限模式
-  // ---------------------------------------------------------------------------
-
-  /** 获取当前权限模式 */
   async getPermissionMode(): Promise<string> {
     const settings = await this.getUserSettings()
     const mode = settings.defaultMode
@@ -186,7 +152,6 @@ export class SettingsService {
       : 'default'
   }
 
-  /** 设置权限模式 */
   async setPermissionMode(mode: string): Promise<void> {
     if (!VALID_PERMISSION_MODES.includes(mode as PermissionMode)) {
       throw ApiError.badRequest(

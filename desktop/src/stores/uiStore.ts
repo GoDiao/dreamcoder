@@ -15,7 +15,7 @@ function getStoredSidebarWidth(): number {
       const val = Number(stored)
       if (Number.isFinite(val)) return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, val))
     }
-  } catch { /* localStorage unavailable */ }
+  } catch { }
   return SIDEBAR_DEFAULT_WIDTH
 }
 
@@ -23,7 +23,7 @@ function getStoredTheme(): ThemeMode {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY)
     if (isThemeMode(stored)) return stored
-  } catch { /* localStorage unavailable */ }
+  } catch { }
   return 'white'
 }
 
@@ -101,7 +101,7 @@ export const useUIStore = create<UIStore>((set) => ({
 
   setTheme: (theme) => {
     applyTheme(theme)
-    try { localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { /* noop */ }
+    try { localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { }
     set({ theme })
   },
 
@@ -110,7 +110,7 @@ export const useUIStore = create<UIStore>((set) => ({
       const currentIndex = THEME_MODES.indexOf(state.theme)
       const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? 'white'
       applyTheme(next)
-      try { localStorage.setItem(THEME_STORAGE_KEY, next) } catch { /* noop */ }
+      try { localStorage.setItem(THEME_STORAGE_KEY, next) } catch { }
       return { theme: next }
     })
   },
@@ -119,7 +119,7 @@ export const useUIStore = create<UIStore>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSidebarWidth: (width) => {
     const clamped = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width))
-    try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)) } catch { /* noop */ }
+    try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)) } catch { }
     set({ sidebarWidth: clamped })
   },
   setActiveView: (view) => set({ activeView: view }),
@@ -131,7 +131,6 @@ export const useUIStore = create<UIStore>((set) => ({
   addToast: (toast) => {
     const id = `toast-${++toastCounter}`
     set((s) => ({ toasts: [...s.toasts, { ...toast, id }] }))
-    // Auto-remove after duration
     const duration = toast.duration ?? 4000
     if (duration > 0) {
       setTimeout(() => {

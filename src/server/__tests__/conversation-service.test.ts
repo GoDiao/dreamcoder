@@ -48,8 +48,6 @@ describe('ConversationService', () => {
     process.env.ANTHROPIC_BASE_URL = 'https://example.invalid/anthropic'
     process.env.ANTHROPIC_MODEL = 'test-model'
     process.env.CLAUDE_CODE_OAUTH_TOKEN = 'inherited-parent-oauth-token'
-    // Clear inherited CLAUDE_CODE_ENTRYPOINT so tests can assert whether
-    // buildChildEnv injects it or not without interference from the shell env.
     delete process.env.CLAUDE_CODE_ENTRYPOINT
     delete process.env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST
     delete process.env.CLAUDE_CODE_DIAGNOSTICS_FILE

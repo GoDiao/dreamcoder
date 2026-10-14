@@ -36,7 +36,6 @@ describe('tabStore', () => {
       { sessionId: 'session-204', title: 'Server title session-204', type: 'session', status: 'idle' },
     ])
     expect(useTabStore.getState().activeTabId).toBe('session-204')
-    // All requested IDs are resolved; do not scan the remaining page.
     expect(list.mock.calls.map(([params]) => params)).toEqual([
       { limit: 200, offset: 0 }, { limit: 200, offset: 200 },
     ])

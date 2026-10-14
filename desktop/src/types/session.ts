@@ -1,5 +1,3 @@
-// Source: src/server/services/sessionService.ts
-
 export type SessionListItem = {
   id: string
   title: string

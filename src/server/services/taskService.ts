@@ -1,10 +1,3 @@
-/**
- * TaskService — CLI Task V2 的读取与查询
- *
- * 任务信息存储在 ~/.claude/tasks/<task_list_id>/ 目录下，每个任务一个 JSON 文件。
- * Task list ID 可以是 session ID、team name 等。
- */
-
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
@@ -41,7 +34,6 @@ export class TaskService {
     return path.join(this.getConfigDir(), 'tasks')
   }
 
-  /** 列出所有 task list (目录) */
   async listTaskLists(): Promise<TaskListSummary[]> {
     const tasksDir = this.getTasksDir()
     try {
@@ -69,7 +61,6 @@ export class TaskService {
     }
   }
 
-  /** 获取指定 task list 的所有任务 */
   async getTasksForList(taskListId: string): Promise<TaskInfo[]> {
     const listDir = path.join(this.getTasksDir(), taskListId)
     try {
@@ -84,11 +75,9 @@ export class TaskService {
           const task = this.parseTaskFile(data, taskListId)
           if (task) tasks.push(task)
         } catch {
-          // skip unparseable files
         }
       }
 
-      // Sort by numeric ID
       return tasks.sort((a, b) => {
         const numA = parseInt(a.id, 10)
         const numB = parseInt(b.id, 10)
@@ -101,7 +90,6 @@ export class TaskService {
     }
   }
 
-  /** 列出所有任务（跨所有 task list） */
   async listTasks(): Promise<TaskInfo[]> {
     const taskLists = await this.listTaskLists()
     const allTasks: TaskInfo[] = []
@@ -112,18 +100,15 @@ export class TaskService {
     return allTasks
   }
 
-  /** 获取单个任务详情 */
   async getTask(taskListId: string, taskId: string): Promise<TaskInfo | null> {
     const tasks = await this.getTasksForList(taskListId)
     return tasks.find((t) => t.id === taskId) || null
   }
 
-  /** 解析单个任务文件 — 匹配 CLI V2 Task 格式 */
   private parseTaskFile(data: any, taskListId: string): TaskInfo | null {
     if (!data || typeof data !== 'object') return null
     if (!data.id || !data.subject) return null
 
-    // Skip internal tasks
     if (data.metadata?._internal) return null
 
     return {

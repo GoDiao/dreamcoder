@@ -1,10 +1,3 @@
-/**
- * Search REST API
- *
- * POST /api/search          — 全局工作区搜索
- * POST /api/search/sessions — 搜索会话历史
- */
-
 import { SearchService } from '../services/searchService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
@@ -17,7 +10,7 @@ export async function handleSearchApi(
 ): Promise<Response> {
   try {
     const method = req.method
-    const sub = segments[2] // 'sessions' | undefined
+    const sub = segments[2]
 
     if (method !== 'POST') {
       throw new ApiError(
@@ -33,13 +26,11 @@ export async function handleSearchApi(
       throw ApiError.badRequest('Missing or invalid "query" in request body')
     }
 
-    // ── POST /api/search/sessions ──────────────────────────────────────────
     if (sub === 'sessions') {
       const results = await searchService.searchSessions(query)
       return Response.json({ results })
     }
 
-    // ── POST /api/search ───────────────────────────────────────────────────
     if (!sub) {
       const results = await searchService.searchWorkspace(query, {
         cwd: body.cwd as string | undefined,
@@ -55,8 +46,6 @@ export async function handleSearchApi(
     return errorResponse(error)
   }
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {

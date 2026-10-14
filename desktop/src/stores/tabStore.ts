@@ -5,7 +5,6 @@ import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
 const TAB_STORAGE_KEY = 'dreamcoder-open-tabs'
 
-// Debug helper for memory profiling during startup
 const memLog = (label: string) => {
   if (typeof process !== 'undefined' && process.memoryUsage) {
     const m = process.memoryUsage()
@@ -177,7 +176,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
     }
     try {
       localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(data))
-    } catch { /* noop */ }
+    } catch { }
   },
 
   restoreTabs: async () => {
@@ -204,7 +203,6 @@ export const useTabStore = create<TabStore>((set, get) => ({
         for (const session of sessions) {
           if (pendingSessionIds.delete(session.id)) sessionTitles.set(session.id, session.title)
         }
-        // Unreadable files may produce sparse pages, so use total rather than page length.
         offset += pageSize
         if (offset >= total) break
       }
@@ -212,10 +210,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
       const validTabs: Tab[] = data.openTabs
         .filter((t) => {
-          // Special tabs are always valid
           if (t.type === 'settings' || t.type === 'scheduled') return true
           if (t.type === 'terminal') return false
-          // Session tabs must exist on server
           return sessionTitles.has(t.sessionId)
         })
         .map((t) => {
@@ -241,6 +237,6 @@ export const useTabStore = create<TabStore>((set, get) => ({
         : validTabs[0]!.sessionId
 
       set({ tabs: validTabs, activeTabId: activeId })
-    } catch { /* noop */ }
+    } catch { }
   },
 }))

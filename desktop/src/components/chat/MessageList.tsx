@@ -795,8 +795,6 @@ const VIRTUAL_OVERSCAN_PX = 1200
 const VIRTUAL_DEFAULT_VIEWPORT_HEIGHT = 720
 const VIRTUAL_MIN_ITEM_HEIGHT = 48
 const VIRTUAL_MAX_ITEM_HEIGHT = 24_000
-// Windows WebView2 can report 1px oscillations for live chat content; don't
-// convert those into bottom-scroll corrections.
 const CONTENT_RESIZE_FOLLOW_MIN_DELTA_PX = 2
 const EMPTY_MESSAGES: UIMessage[] = []
 const CHAT_SCROLL_AREA_CLASS = [
@@ -880,9 +878,6 @@ function setScrollToBottomWithoutLayoutRead(element: HTMLElement, behavior: Scro
   }
   element.scrollTop = SCROLL_BOTTOM_SENTINEL
 
-  // Browsers clamp the large value to the true bottom without needing us to
-  // synchronously read layout metrics. JSDOM test doubles do not clamp, so keep
-  // the old numeric behavior there as a fallback.
   if (element.scrollTop === SCROLL_BOTTOM_SENTINEL) {
     element.scrollTop = getBottomScrollTop(element)
   }
@@ -1138,9 +1133,6 @@ function VirtualSpacer({ height, position }: { height: number; position: 'top' |
     )
   }
 
-  // Splitting the spacer into chunks lets the WebView keep painting placeholder
-  // boxes via content-visibility:auto + contain-intrinsic-size, instead of
-  // leaving a single huge area unpainted while React reconciles the window.
   const chunkCount = Math.max(1, Math.ceil(height / VIRTUAL_SPACER_CHUNK_PX))
   const chunkHeight = Math.floor(height / chunkCount)
   const remainder = height - chunkHeight * chunkCount
@@ -1321,7 +1313,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
       })
     }
     setShowJumpToLatest(false)
-    // Reset flag after the scroll event(s) from scrollIntoView have fired
     requestAnimationFrame(() => {
       const latestContainer = scrollContainerRef.current
       if (
@@ -1373,8 +1364,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   }, [flushMeasuredHeightVersion])
 
   const updateAutoScrollState = useCallback(() => {
-    // Ignore scroll events triggered by our own programmatic scrolling to
-    // prevent the jump-to-latest button from flickering during auto-scroll.
     const container = scrollContainerRef.current
     if (!container) return
     const shouldIgnoreRecentProgrammaticScroll =
@@ -1425,9 +1414,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
         }))
         setShowJumpToLatest(true)
       } else if (container) {
-        // Switch to a session we were at the bottom of (or first visit): write
-        // the bottom sentinel without going through scrollToBottom's read path,
-        // so we never force a layout flush during the switch's commit.
         ignoreProgrammaticScrollUntilRef.current = performance.now() + 250
         ignoreProgrammaticScrollTopRef.current = null
         lastAutoScrollAtRef.current = performance.now()
@@ -1445,8 +1431,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           })
         }
       } else {
-        // No container yet (initial mount before ref settles): fall back to the
-        // existing scrollToBottom path which is safe pre-mount.
         scrollToBottom('auto')
       }
     }
@@ -1510,10 +1494,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     () => buildRenderModel(messages, activeAskUserQuestionToolUseId),
     [activeAskUserQuestionToolUseId, messages],
   )
-  // Defer the per-message branchable / completed-turn computations so the first
-  // commit on tab switch can render the virtualization window without doing two
-  // additional O(N) walks synchronously. They re-run in a low-priority render
-  // once the initial frame is painted.
   const deferredMessages = useDeferredValue(messages)
   const branchableMessageTargets = useMemo(
     () => branchActionsDisabled
@@ -1736,8 +1716,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     }
   }, [addToast, branchSession, branchingMessageId, resolvedSessionId, t])
 
-  // Pre-compute per-message branchAction + toolResult lookups so MessageBlock's
-  // memo barrier is not broken by inline object literals on every render.
   const branchActionByMessageId = useMemo(() => {
     if (branchableMessageTargets.size === 0) {
       return new Map<string, { label: string; loading: boolean; onBranch: () => void }>()
@@ -1859,10 +1837,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
             <CompactStatusDivider state="compacting" />
           )}
 
-          {/* Show StreamingIndicator when:
-              - tool_executing: background work is running
-              - thinking but no active ThinkingBlock yet: the gap between
-                sending a message and receiving the first thinking delta */}
           {(chatState === 'tool_executing' || (chatState === 'thinking' && !activeThinkingId)) && (
             <StreamingIndicator />
           )}

@@ -5,7 +5,6 @@ type Props = {
   onChange: (days: number[]) => void
 }
 
-// Display order: Mon(1) → Sun(0), matching Chinese convention
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 const DAY_KEYS = [
@@ -23,7 +22,6 @@ export function DayOfWeekPicker({ selected, onChange }: Props) {
 
   const toggle = (day: number) => {
     if (selected.includes(day)) {
-      // Don't allow deselecting the last day
       if (selected.length <= 1) return
       onChange(selected.filter((d) => d !== day))
     } else {

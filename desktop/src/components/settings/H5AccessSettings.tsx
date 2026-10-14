@@ -9,8 +9,6 @@ import { Input } from '../shared/Input'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { copyTextToClipboard } from '../chat/clipboard'
 
-// ─── Helper functions (private to H5AccessSettings) ──────────────
-
 function buildH5LaunchUrl(baseUrl: string | null, token: string | null): string | null {
   if (!baseUrl) return null
 
@@ -89,8 +87,6 @@ function buildH5PublicBaseUrlFromHostDraft(draft: string, currentBaseUrl: string
   }
 }
 
-// ─── H5 Access Settings Component ───────────────────────────────
-
 export function H5AccessSettings() {
   const {
     h5Access,
@@ -149,7 +145,6 @@ export function H5AccessSettings() {
     try {
       await action()
     } catch {
-      // The store owns H5-specific error state.
     } finally {
       setH5ActionRunning(false)
     }
@@ -167,7 +162,6 @@ export function H5AccessSettings() {
     const suggested = h5AccessDiagnostics?.suggestedHost
     if (!suggested) return
     await runH5Action(async () => {
-      // Build URL using current port if available, otherwise let backend pick.
       const port = extractH5AccessPort(h5Access.publicBaseUrl)
       const nextUrl = port ? `http://${suggested}:${port}` : `http://${suggested}`
       await updateH5AccessSettings({ publicBaseUrl: nextUrl })

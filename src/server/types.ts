@@ -15,11 +15,8 @@ export type ServerConfig = {
   host: string
   authToken: string
   unix?: string
-  /** Idle timeout for detached sessions (ms). 0 = never expire. */
   idleTimeoutMs?: number
-  /** Maximum number of concurrent sessions. */
   maxSessions?: number
-  /** Default workspace directory for sessions that don't specify cwd. */
   workspace?: string
 }
 
@@ -39,14 +36,8 @@ export type SessionInfo = {
   sessionKey?: string
 }
 
-/**
- * Stable session key → session metadata. Persisted to ~/.claude/server-sessions.json
- * so sessions can be resumed across server restarts.
- */
 export type SessionIndexEntry = {
-  /** Server-assigned session ID (matches the subprocess's claude session). */
   sessionId: string
-  /** The claude transcript session ID for --resume. Same as sessionId for direct sessions. */
   transcriptSessionId: string
   cwd: string
   permissionMode?: string

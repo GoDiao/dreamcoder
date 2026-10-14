@@ -1,13 +1,3 @@
-/**
- * cardkit.ts 单元测试
- *
- * 不调用真实的 Lark API —— 用 mock client 捕获调用参数，验证:
- * - 每个函数构造的 payload 结构
- * - 非零 code 响应抛出 CardKitApiError（可被 card-errors 识别）
- * - 缺失关键字段时抛错
- * - sequence 正确传递
- */
-
 import { describe, it, expect } from 'bun:test'
 import {
   createCardEntity,
@@ -19,10 +9,6 @@ import {
   STREAMING_ELEMENT_ID,
 } from '../cardkit.js'
 import { isCardRateLimitError, isCardTableLimitError } from '../card-errors.js'
-
-// ---------------------------------------------------------------------------
-// Mock client factory
-// ---------------------------------------------------------------------------
 
 type MockCall = { api: string; args: any }
 
@@ -61,10 +47,6 @@ function makeMockClient(responses: Record<string, any>) {
   return { client, calls }
 }
 
-// ---------------------------------------------------------------------------
-// createCardEntity
-// ---------------------------------------------------------------------------
-
 describe('createCardEntity', () => {
   it('构造 card_json payload 并返回 card_id', async () => {
     const { client, calls } = makeMockClient({
@@ -80,7 +62,6 @@ describe('createCardEntity', () => {
     expect(calls.length).toBe(1)
     expect(calls[0]!.api).toBe('cardkit.v1.card.create')
     expect(calls[0]!.args.data.type).toBe('card_json')
-    // data.data 应当是 card 的 JSON 字符串
     expect(calls[0]!.args.data.data).toBe(JSON.stringify(card))
   })
 
@@ -107,10 +88,6 @@ describe('createCardEntity', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// sendCardAsMessage
-// ---------------------------------------------------------------------------
-
 describe('sendCardAsMessage', () => {
   it('无 replyTo: 走 im.message.create 使用 chat_id', async () => {
     const { client, calls } = makeMockClient({
@@ -123,7 +100,6 @@ describe('sendCardAsMessage', () => {
     expect(calls[0]!.args.params.receive_id_type).toBe('chat_id')
     expect(calls[0]!.args.data.receive_id).toBe('oc_chat_123')
     expect(calls[0]!.args.data.msg_type).toBe('interactive')
-    // content 格式: {"type":"card","data":{"card_id":"xxx"}}
     const parsed = JSON.parse(calls[0]!.args.data.content)
     expect(parsed).toEqual({ type: 'card', data: { card_id: 'ck_id_xyz' } })
   })
@@ -150,10 +126,6 @@ describe('sendCardAsMessage', () => {
     )
   })
 })
-
-// ---------------------------------------------------------------------------
-// streamCardContent
-// ---------------------------------------------------------------------------
 
 describe('streamCardContent', () => {
   it('构造 content + sequence payload，path 包含 card_id + element_id', async () => {
@@ -205,10 +177,6 @@ describe('streamCardContent', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// setCardStreamingMode
-// ---------------------------------------------------------------------------
-
 describe('setCardStreamingMode', () => {
   it('streaming_mode=false + sequence 正确传递', async () => {
     const { client, calls } = makeMockClient({
@@ -220,7 +188,6 @@ describe('setCardStreamingMode', () => {
     expect(calls[0]!.api).toBe('cardkit.v1.card.settings')
     expect(calls[0]!.args.path).toEqual({ card_id: 'ck_xxx' })
     expect(calls[0]!.args.data.sequence).toBe(99)
-    // settings 是 JSON 字符串
     const settings = JSON.parse(calls[0]!.args.data.settings)
     expect(settings).toEqual({ streaming_mode: false })
   })
@@ -234,10 +201,6 @@ describe('setCardStreamingMode', () => {
     expect(settings).toEqual({ streaming_mode: true })
   })
 })
-
-// ---------------------------------------------------------------------------
-// updateCardKitCard
-// ---------------------------------------------------------------------------
 
 describe('updateCardKitCard', () => {
   it('把 card 包装成 card_json payload + sequence', async () => {
@@ -262,10 +225,6 @@ describe('updateCardKitCard', () => {
     await expect(updateCardKitCard(client, 'ck', {}, 1)).rejects.toThrow(CardKitApiError)
   })
 })
-
-// ---------------------------------------------------------------------------
-// CardKitApiError
-// ---------------------------------------------------------------------------
 
 describe('CardKitApiError', () => {
   it('携带 code 和 msg，可被 parseCardApiError 识别', () => {

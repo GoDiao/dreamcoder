@@ -1,18 +1,3 @@
-# DreamCoder Memory Before/After Comparator
-#
-# Usage:
-#   .\mem-compare.ps1 -Before path\to\before.csv -After path\to\after.csv
-#
-# Reads two CSVs produced by mem-monitor.ps1 and prints:
-#   - Peak private memory per process (before vs after, delta, % change)
-#   - Average private memory per process
-#   - Total peak comparison
-#
-# Example:
-#   .\mem-compare.ps1 `
-#     -Before E:\.cache\tmp\dreamcoder-mem-before-lru-20260101-120000.csv `
-#     -After  E:\.cache\tmp\dreamcoder-mem-after-lru-20260101-130000.csv
-
 param(
     [Parameter(Mandatory)][string]$Before,
     [Parameter(Mandatory)][string]$After,
@@ -26,7 +11,6 @@ function Read-MemCsv([string]$path) {
         throw "File not found: $path"
     }
     $rows = Import-Csv -Path $path -Encoding utf8
-    # Group by process name, compute peak and average private_mb
     $byName = @{}
     foreach ($row in $rows) {
         $name = $row.name
@@ -62,12 +46,10 @@ Write-Host ""
 $bData = Read-MemCsv $Before
 $aData = Read-MemCsv $After
 
-# Union of all process names
 $allNames = @($bData.Keys) + @($aData.Keys) | Sort-Object -Unique
 
 $lines = @()
 
-# Header
 $hdr = "{0,-35} {1,10} {2,10} {3,22} {4,10} {5,10} {6,22}" -f `
     "Process", "Peak-B(MB)", "Peak-A(MB)", "Peak-Delta", "Avg-B(MB)", "Avg-A(MB)", "Avg-Delta"
 Write-Host $hdr -ForegroundColor White
@@ -94,7 +76,6 @@ foreach ($name in $allNames) {
     $row = "{0,-35} {1,10:F1} {2,10:F1} {3,-22} {4,10:F1} {5,10:F1} {6,-22}" -f `
         $name, $peakB, $peakA, $peakDelta.text, $avgB, $avgA, $avgDelta.text
 
-    # Print with color on the delta columns (approximate — PS doesn't support per-segment color easily)
     $deltaColor = $peakDelta.color
     Write-Host $row -ForegroundColor $deltaColor
     $lines += $row
@@ -109,7 +90,6 @@ Write-Host $totalRow -ForegroundColor ($totalDelta.color)
 
 Write-Host ""
 
-# xterm-specific summary
 $xtermNames = $allNames | Where-Object { $_ -match "dreamcoder|msedge|WebKit|bun" }
 if ($xtermNames) {
     Write-Host "=== WebView / Renderer processes (most relevant for xterm) ===" -ForegroundColor Yellow
@@ -124,7 +104,6 @@ if ($xtermNames) {
     Write-Host ""
 }
 
-# Optionally write report to file
 if ($OutReport) {
     $report = @(
         "DreamCoder Memory Comparison Report"

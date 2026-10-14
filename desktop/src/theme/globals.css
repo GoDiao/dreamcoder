@@ -3,9 +3,6 @@
 @import "./aurora.css";
 @plugin "@tailwindcss/typography";
 
-/* ─── Self-hosted fonts (no Google CDN dependency) ────────────── */
-
-/* Inter – variable weight 400-600, latin */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
@@ -23,7 +20,6 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* Manrope – variable weight 400-800, latin */
 @font-face {
   font-family: 'Manrope';
   font-style: normal;
@@ -41,7 +37,6 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* JetBrains Mono – weight 400, latin */
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
@@ -59,7 +54,6 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* Material Symbols Outlined – variable weight, use block to avoid showing raw text */
 @font-face {
   font-family: 'Material Symbols Outlined';
   font-style: normal;
@@ -320,7 +314,6 @@
   }
 }
 
-/* ─── Tailwind Theme Override (matches prototype design system) ─── */
 @theme {
   --color-primary: #D97756;
   --color-primary-container: #B2533E;
@@ -373,12 +366,10 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-/* ─── Semantic Aliases (used by layout & infrastructure components) ── */
 :root,
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Layout dimensions */
   --sidebar-width: 280px;
   --sidebar-rail-width: 72px;
   --titlebar-height: 40px;
@@ -389,7 +380,6 @@
   --motion-medium: 220ms;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Surface aliases */
   --color-surface-sidebar: var(--color-surface-container-low);
   --color-surface-hover: var(--color-surface-container-high);
   --color-surface-selected: var(--color-surface-container);
@@ -452,44 +442,35 @@
   --color-sidebar-item-active-border: rgba(217, 119, 86, 0.12);
   --sidebar-panel-bg-image: none;
 
-  /* Border aliases */
   --color-border: var(--color-outline-variant);
   --color-border-focus: #8B98A7;
   --color-border-separator: var(--color-outline-variant);
 
-  /* Text aliases */
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
   --color-text-tertiary: var(--color-outline);
 
-  /* Info surface (for team status bar, notifications) */
   --color-surface-info: var(--color-surface-container-low);
 
-  /* Brand & accents */
   --color-brand: var(--color-primary);
   --color-text-accent: var(--color-secondary);
 
-  /* Shadows */
   --shadow-dropdown: 0 4px 20px rgba(30, 27, 24, 0.04), 0 12px 40px rgba(30, 27, 24, 0.08);
   --shadow-sidebar-filter: none;
   --shadow-focus-ring: 0 0 0 1px rgba(217, 119, 86, 0.16);
   --shadow-error-ring: 0 0 0 1px rgba(185, 28, 28, 0.18);
   --shadow-button-primary: 0 8px 24px rgba(217, 119, 86, 0.18);
 
-  /* Button colors */
   --color-btn-primary-fg: var(--color-on-primary);
   --gradient-btn-primary: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
   --gradient-btn-primary-hover: linear-gradient(135deg, var(--color-primary-container), var(--color-primary));
 
-  /* User message bubble */
   --color-surface-user-msg: var(--color-surface-container);
 
-  /* Glass / overlays */
   --color-overlay-scrim: rgba(30, 27, 24, 0.48);
   --color-surface-glass: rgba(255, 255, 255, 0.84);
   --color-surface-glass-border: rgba(230, 221, 211, 0.22);
 
-  /* Code + diff */
   --color-code-bg: #FEFDFB;
   --color-code-fg: #1E1B18;
   --color-code-comment: #7B6F60;
@@ -518,7 +499,6 @@
   --color-diff-title-color: #8F8379;
   --color-diff-title-border: #E6DDD3;
 
-  /* Terminal */
   --color-terminal-header: #2E2A25;
   --color-terminal-bg: #1E1B18;
   --color-terminal-border: #14120F;
@@ -528,7 +508,6 @@
   --color-terminal-danger: #EF4444;
   --color-terminal-warning: #F59E0B;
 
-  /* Misc */
   --color-window-close-hover: #DC2626;
   --color-selection-bg: rgba(252, 238, 233, 0.9);
   --color-selection-fg: #3D1A0A;
@@ -543,7 +522,6 @@
   --color-outline-a78: rgba(143, 131, 121, 0.78);
   --color-outline-a92: rgba(143, 131, 121, 0.92);
 
-  /* Radii */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -738,91 +716,75 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* ─── Palette: Cold Slate & Physical Floating ─── */
-  /* 宇宙底层 (Base) */
   --color-app-bg: #030407;
   --color-surface: #030407;
   --color-background: #030407;
 
-  /* Level 1: Sidebar Panel */
   --color-panel-sidebar: #0A0C12;
   --color-surface-sidebar: #0A0C12;
   --color-surface-container-lowest: #0A0C12;
 
-  /* Level 2: Main Content */
   --color-panel-main: #11141D;
   --color-surface-container: #11141D;
   --color-surface-container-low: #0E1017;
 
-  /* Elevated: Inputs, Cards */
   --color-panel-elevated: #1A1E2B;
   --color-surface-bright: #1A1E2B;
   --color-surface-container-highest: #1A1E2B;
 
-  /* Borders & Highlights */
   --color-border: rgba(255, 255, 255, 0.06);
   --color-border-separator: rgba(255, 255, 255, 0.04);
   --color-highlight-top: rgba(255, 255, 255, 0.05);
 
-  /* Text */
   --color-on-surface: #F1F5F9;
   --color-on-surface-variant: #8B949E;
   --color-text-primary: #F1F5F9;
   --color-text-secondary: #8B949E;
   --color-text-tertiary: #6E7681;
 
-  /* Primary Brand (Indigo) */
   --color-primary: #818CF8;
   --color-primary-container: #6366F1;
   --color-brand: #818CF8;
   --color-accent: #818CF8;
 
-  /* Accent States */
   --color-accent-bg: rgba(129, 140, 248, 0.08);
   --color-hover: rgba(255, 255, 255, 0.03);
   --color-surface-hover: rgba(255, 255, 255, 0.03);
   --color-surface-selected: rgba(129, 140, 248, 0.08);
 
-  /* Feedback Colors (Muted for dark slate) */
   --color-success: #4ADE80;
   --color-error: #F87171;
   --color-warning: #FBBF24;
 
-  /* Semantic Aliases Override */
   --color-surface-sidebar: var(--color-panel-sidebar);
   --color-surface-hover: var(--color-hover);
   --color-surface-selected: var(--color-accent-bg);
   --color-sidebar-item-hover: var(--color-hover);
   --color-sidebar-item-active: var(--color-accent-bg);
-  --color-sidebar-item-active-border: var(--color-accent); /* Indigo accent line */
+  --color-sidebar-item-active-border: var(--color-accent);
   --color-sidebar-search-bg: rgba(255, 255, 255, 0.03);
   --color-sidebar-search-border: var(--color-border);
 
-  /* Glass & Shadows */
   --shadow-dropdown: 0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--color-border);
   --shadow-focus-ring: 0 0 0 1px var(--color-accent);
-  --shadow-button-primary: 0 8px 24px rgba(99, 102, 241, 0.25); /* Indigo shadow */
+  --shadow-button-primary: 0 8px 24px rgba(99, 102, 241, 0.25);
 
-  /* Text overrides */
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
   --color-text-tertiary: #6E7681;
   --color-text-accent: var(--color-accent);
 
-  /* Terminal overrides (optional, keeping dark grey for contrast) */
   --color-terminal-bg: #0F1118;
   --color-terminal-border: #1A1E2B;
 
-  /* Glass Panel Overrides for Cold Slate */
   --color-surface-glass: rgba(20, 23, 33, 0.7);
   --color-surface-glass-border: rgba(255, 255, 255, 0.06);
 
-  /* Diff/Code overrides to match slate */
   --color-code-bg: #0A0C12;
   --color-code-fg: #F1F5F9;
   --color-code-comment: #6E7681;
   --color-code-string: #A5D6FF;
-  --color-code-keyword: #818CF8; /* Indigo keyword */
+  --color-code-keyword: #818CF8;
   --color-code-function: #7EE787;
   --color-code-number: #79C0FF;
   --color-code-property: #FFA657;
@@ -830,7 +792,6 @@
   --color-code-punctuation: #8B949E;
   --color-code-parameter: #FFA657;
 
-  /* Status, goal/memory and activity tokens (indigo on slate) */
   --color-success-container: rgba(74, 222, 128, 0.12);
   --color-info: #79C0FF;
   --color-info-container: rgba(121, 192, 255, 0.12);
@@ -1424,7 +1385,6 @@
   --color-outline-a92: rgba(88, 92, 100, 0.92);
 }
 
-/* ─── Material Symbols ─────────────────────────────────────────── */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -1443,7 +1403,6 @@
   vertical-align: middle;
 }
 
-/* ─── Base styles ──────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
 }
@@ -1464,7 +1423,6 @@ html, body, #root {
   color: var(--color-selection-fg);
 }
 
-/* Tauri drag region */
 [data-tauri-drag-region] {
   -webkit-app-region: drag;
 }
@@ -1479,7 +1437,6 @@ button, input, textarea, select, a, [role="button"] {
   -webkit-app-region: no-drag;
 }
 
-/* Custom shadow from prototype */
 .custom-shadow {
   box-shadow: var(--shadow-dropdown);
 }
@@ -1855,7 +1812,6 @@ button, input, textarea, select, a, [role="button"] {
   color: inherit;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-outline); border-radius: 9999px; opacity: 0.3; }
@@ -1892,7 +1848,6 @@ button, input, textarea, select, a, [role="button"] {
   background: var(--color-outline-a92);
 }
 
-/* Animations */
 @keyframes shimmer {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
@@ -1916,7 +1871,6 @@ button, input, textarea, select, a, [role="button"] {
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
-/* Progress bar */
 @keyframes progress-fill {
   from { width: 0%; }
 }

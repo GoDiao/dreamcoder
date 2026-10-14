@@ -1,13 +1,3 @@
-/**
- * Models REST API
- *
- * GET  /api/models          — 获取可用模型列表
- * GET  /api/models/current  — 获取当前选中的模型
- * PUT  /api/models/current  — 切换模型
- * GET  /api/effort          — 获取 Effort 等级
- * PUT  /api/effort          — 设置 Effort 等级
- */
-
 import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
 import { attributionHeaderEnvForModel } from '../services/attributionHeaderPolicy.js'
@@ -19,8 +9,6 @@ import {
   OPENAI_OFFICIAL_PROVIDER_NAME,
   isOpenAIOfficialProviderId,
 } from '../services/openaiOfficialProvider.js'
-
-// ─── Fallback models (used when no provider is configured) ────────────────────
 
 const DEFAULT_MODELS = [
   {
@@ -161,26 +149,21 @@ function normalizeEffortLevel(value: unknown): (typeof EFFORT_LEVELS)[number] {
     : DEFAULT_EFFORT
 }
 
-// ─── Router ───────────────────────────────────────────────────────────────────
-
 export async function handleModelsApi(
   req: Request,
   url: URL,
   segments: string[],
 ): Promise<Response> {
   try {
-    const resource = segments[1] // 'models' | 'effort'
-    const sub = segments[2] // 'current' | undefined
+    const resource = segments[1]
+    const sub = segments[2]
 
-    // ── /api/effort ───────────────────────────────────────────────────
     if (resource === 'effort') {
       return await handleEffort(req)
     }
 
-    // ── /api/models/* ─────────────────────────────────────────────────
     switch (sub) {
       case undefined:
-        // GET /api/models — 优先从激活的 Provider 读取模型列表
         if (req.method !== 'GET') throw methodNotAllowed(req.method)
         return await handleModelsList()
 
@@ -194,8 +177,6 @@ export async function handleModelsApi(
     return errorResponse(error)
   }
 }
-
-// ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async function handleModelsList(): Promise<Response> {
   const { providers, activeId } = await providerService.listProviders()
@@ -222,7 +203,6 @@ async function handleModelsList(): Promise<Response> {
 
 async function handleCurrentModel(req: Request): Promise<Response> {
   if (req.method === 'GET') {
-    // Build the full model list: prefer active provider's models, fall back to defaults
     const { providers, activeId } = await providerService.listProviders()
     const isOpenAIProviderActive = isOpenAIOfficialProviderId(activeId)
     const activeProvider = activeId ? providers.find((p) => p.id === activeId) : null
@@ -241,9 +221,6 @@ async function handleCurrentModel(req: Request): Promise<Response> {
       currentModelId = explicitModel || env.ANTHROPIC_MODEL || 'gpt-5.3-codex'
       currentModelName = currentModelId
     } else if (activeProvider) {
-      // Provider is active — only use the provider-managed dreamcoder settings.
-      // This avoids leaking global ~/.claude/settings.json model choices into
-      // the active provider flow.
       const providerEnvModel = env.ANTHROPIC_MODEL
       if (providerEnvModel && !explicitModel) {
         currentModelId = providerEnvModel
@@ -253,14 +230,12 @@ async function handleCurrentModel(req: Request): Promise<Response> {
         currentModelName = currentModelId
       }
     } else {
-      // No provider — use settings model with context tier
       currentModelId = explicitModel || envModel || DEFAULT_MODEL
       currentModelName = currentModelId
     }
 
     const lookupId = contextTier ? `${currentModelId}:${contextTier}` : currentModelId
 
-    // Build available models for name lookup
     const availableModels = isOpenAIProviderActive
       ? buildOpenAIModelList()
       : activeProvider
@@ -286,8 +261,6 @@ async function handleCurrentModel(req: Request): Promise<Response> {
       throw ApiError.badRequest('Missing or invalid "modelId" in request body')
     }
 
-    // Parse composite IDs like 'claude-opus-4-7-20250610:1m'
-    // Persist the base model ID for CLI compatibility and context tier separately
     const colonIdx = modelId.indexOf(':')
     const baseId = colonIdx !== -1 ? modelId.slice(0, colonIdx) : modelId
     const contextTier = colonIdx !== -1 ? modelId.slice(colonIdx + 1) : undefined
@@ -296,7 +269,6 @@ async function handleCurrentModel(req: Request): Promise<Response> {
     if (contextTier) {
       updates.modelContext = contextTier
     } else {
-      // Clear context tier when switching to a non-composite model
       updates.modelContext = undefined
     }
     const { activeId } = await providerService.listProviders()
@@ -344,8 +316,6 @@ async function handleEffort(req: Request): Promise<Response> {
 
   throw methodNotAllowed(req.method)
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {

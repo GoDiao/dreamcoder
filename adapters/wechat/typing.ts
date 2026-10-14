@@ -2,10 +2,6 @@ export type WechatTypingStatus = 'typing' | 'cancel'
 
 type SendTyping = (chatId: string, status: WechatTypingStatus) => Promise<void>
 
-/**
- * WeChat typing indicators expire quickly. Keep sending typing while the
- * desktop session is active, then cancel when the turn completes.
- */
 export class WechatTypingController {
   private readonly active = new Map<string, ReturnType<typeof setInterval>>()
 

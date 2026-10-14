@@ -1,7 +1,3 @@
-/**
- * Integration tests for /api/haha-openai-oauth/* endpoints.
- */
-
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -141,7 +137,6 @@ describe('GET /api/haha-openai-oauth', () => {
     expect(data.loggedIn).toBe(true)
     expect(data.email).toBe('test@example.com')
     expect(data.accountId).toBe('acct_123')
-    // Never leak token values
     expect(JSON.stringify(data)).not.toContain('openai-access-token')
     expect(JSON.stringify(data)).not.toContain('openai-refresh-token')
   })

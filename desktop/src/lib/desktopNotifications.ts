@@ -237,7 +237,6 @@ export async function getDesktopNotificationPermission(): Promise<DesktopNotific
     const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
     if (await isPermissionGranted()) return 'granted'
   } catch {
-    // Fall back to the Web Notification permission state below.
   }
   return readBrowserNotificationPermission()
 }
@@ -272,7 +271,6 @@ export async function openDesktopNotificationSettings(): Promise<boolean> {
       const opened = await invoke<boolean>('open_windows_notification_settings')
       if (opened) return true
     } catch {
-      // Fall back to shell.open/window.open below.
     }
   }
 
@@ -327,7 +325,6 @@ async function focusCurrentWindow(): Promise<void> {
     await (win as unknown as { show?: () => Promise<void> | void }).show?.()
     await (win as unknown as { setFocus?: () => Promise<void> | void }).setFocus?.()
   } catch {
-    // Best effort only: the notification target can still be opened in the UI.
   }
 }
 
@@ -360,7 +357,6 @@ export async function installDesktopNotificationClickListener(
     })
     cleanups.push(unlisten)
   } catch {
-    // Non-Tauri browser tests and unsupported runtimes do not expose native events.
   }
 
   try {
@@ -372,7 +368,6 @@ export async function installDesktopNotificationClickListener(
       cleanups.push(() => disposePluginListener(listener))
     }
   } catch {
-    // The desktop plugin does not expose click actions on every platform.
   }
 
   return () => {

@@ -101,7 +101,6 @@ async function resolveCommandFromPath(
         )
         return resolvedPath
       } catch {
-        // Continue searching other PATH entries.
       }
     }
   }

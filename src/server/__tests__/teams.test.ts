@@ -1,16 +1,8 @@
-/**
- * Unit tests for TeamService and Teams API
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { TeamService } from '../services/teamService.js'
-
-// ============================================================================
-// Test helpers
-// ============================================================================
 
 let tmpDir: string
 let service: TeamService
@@ -33,7 +25,6 @@ async function cleanupTmpDir(): Promise<void> {
   delete process.env.CLAUDE_CONFIG_DIR
 }
 
-/** Write a team config.json to the temp directory. */
 async function writeTeamConfig(
   teamName: string,
   config: Record<string, unknown>,
@@ -45,7 +36,6 @@ async function writeTeamConfig(
   return configPath
 }
 
-/** Write a mock JSONL transcript file under projects. */
 async function writeTranscriptFile(
   projectDir: string,
   sessionId: string,
@@ -73,7 +63,6 @@ async function writeSubagentTranscriptFile(
   return filePath
 }
 
-/** Create a standard team config for testing. */
 function makeTeamConfig(overrides?: Record<string, unknown>) {
   return {
     name: 'test-team',
@@ -110,10 +99,6 @@ function makeTeamConfig(overrides?: Record<string, unknown>) {
   }
 }
 
-// ============================================================================
-// TeamService tests
-// ============================================================================
-
 describe('TeamService', () => {
   beforeEach(async () => {
     await setupTmpConfigDir()
@@ -123,10 +108,6 @@ describe('TeamService', () => {
   afterEach(async () => {
     await cleanupTmpDir()
   })
-
-  // --------------------------------------------------------------------------
-  // listTeams
-  // --------------------------------------------------------------------------
 
   it('should return empty list when no teams exist', async () => {
     const teams = await service.listTeams()
@@ -156,26 +137,20 @@ describe('TeamService', () => {
     const teams = await service.listTeams()
     expect(teams).toHaveLength(1)
     expect(teams[0]!.memberCount).toBe(2)
-    expect(teams[0]!.activeMemberCount).toBe(1) // only lead is active
+    expect(teams[0]!.activeMemberCount).toBe(1)
   })
 
   it('should skip malformed team directories', async () => {
-    // Create a team dir with invalid JSON
     const badDir = path.join(tmpDir, 'teams', 'bad-team')
     await fs.mkdir(badDir, { recursive: true })
     await fs.writeFile(path.join(badDir, 'config.json'), 'not json', 'utf-8')
 
-    // Also create a valid team
     await writeTeamConfig('good-team', makeTeamConfig({ name: 'good-team' }))
 
     const teams = await service.listTeams()
     expect(teams).toHaveLength(1)
     expect(teams[0]!.name).toBe('good-team')
   })
-
-  // --------------------------------------------------------------------------
-  // getTeam
-  // --------------------------------------------------------------------------
 
   it('should return team detail with members', async () => {
     await writeTeamConfig(
@@ -251,7 +226,6 @@ describe('TeamService', () => {
 
   it('should derive running status when isActive is undefined', async () => {
     const config = makeTeamConfig({ name: 'undef-team' })
-    // Remove isActive from the first member to simulate undefined
     delete (config.members[0] as Record<string, unknown>).isActive
     await writeTeamConfig('undef-team', config)
 
@@ -264,14 +238,9 @@ describe('TeamService', () => {
     expect(service.getTeam('nonexistent')).rejects.toThrow('Team not found')
   })
 
-  // --------------------------------------------------------------------------
-  // getMemberTranscript
-  // --------------------------------------------------------------------------
-
   it('should return transcript messages for a member', async () => {
     await writeTeamConfig('transcript-team', makeTeamConfig({ name: 'transcript-team' }))
 
-    // Write a mock transcript JSONL for the lead session
     await writeTranscriptFile('-tmp-project', 'session-lead-001', [
       {
         type: 'file-history-snapshot',
@@ -320,7 +289,6 @@ describe('TeamService', () => {
   it('should return empty array when transcript file not found', async () => {
     await writeTeamConfig('no-file-team', makeTeamConfig({ name: 'no-file-team' }))
 
-    // Don't write any transcript file
     const messages = await service.getMemberTranscript(
       'no-file-team',
       'agent-lead',
@@ -359,10 +327,6 @@ describe('TeamService', () => {
     expect(messages).toHaveLength(1)
     expect(messages[0]!.id).toBe('msg-real')
   })
-
-  // --------------------------------------------------------------------------
-  // sendMemberMessage
-  // --------------------------------------------------------------------------
 
   it('should write member messages into the teammate inbox', async () => {
     await writeTeamConfig('mailbox-team', makeTeamConfig({ name: 'mailbox-team' }))
@@ -415,13 +379,8 @@ describe('TeamService', () => {
     expect(inbox.at(-1)?.text).toBe('Check the auth changes')
   })
 
-  // --------------------------------------------------------------------------
-  // deleteTeam
-  // --------------------------------------------------------------------------
-
   it('should delete a team with no active members', async () => {
     const config = makeTeamConfig({ name: 'deletable' })
-    // Set all members to inactive
     for (const member of config.members) {
       ;(member as Record<string, unknown>).isActive = false
     }
@@ -429,7 +388,6 @@ describe('TeamService', () => {
 
     await service.deleteTeam('deletable')
 
-    // Team dir should be gone
     const teamDir = path.join(tmpDir, 'teams', 'deletable')
     expect(fs.access(teamDir)).rejects.toThrow()
   })
@@ -446,10 +404,6 @@ describe('TeamService', () => {
     expect(service.deleteTeam('ghost')).rejects.toThrow('Team not found')
   })
 })
-
-// ============================================================================
-// Teams API integration tests
-// ============================================================================
 
 describe('Teams API', () => {
   let baseUrl: string
@@ -604,7 +558,6 @@ describe('Teams API', () => {
     const body = (await res.json()) as { ok: boolean }
     expect(body.ok).toBe(true)
 
-    // Verify it's gone
     const res2 = await fetch(`${baseUrl}/api/teams/del-team`)
     expect(res2.status).toBe(404)
   })

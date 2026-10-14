@@ -1,10 +1,3 @@
-/**
- * 流式消息缓冲
- *
- * 将 content_delta 累积后按时间窗口或字符数批量 flush。
- * 用于 Telegram editMessage / 飞书流式卡片更新。
- */
-
 export type FlushCallback = (text: string, isComplete: boolean) => void | Promise<void>
 
 const DEFAULT_INTERVAL_MS = 500
@@ -23,7 +16,6 @@ export class MessageBuffer {
     private charThreshold = DEFAULT_CHAR_THRESHOLD,
   ) {}
 
-  /** Append text delta. Triggers flush if threshold reached. */
   append(text: string): void {
     this.buffer += text
     if (this.buffer.length >= this.charThreshold) {
@@ -33,14 +25,12 @@ export class MessageBuffer {
     }
   }
 
-  /** Immediately flush all remaining content (called on message_complete). */
   async complete(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer)
       this.timer = null
     }
     if (this.flushing) {
-      // A flush is in-flight; mark pending so it fires after current flush finishes
       this.pendingComplete = true
       await this.activeFlush
       return
@@ -48,7 +38,6 @@ export class MessageBuffer {
     await this.flush(true)
   }
 
-  /** Reset the buffer for a new message. */
   reset(): void {
     this.buffer = ''
     this.pendingComplete = false
@@ -88,7 +77,6 @@ export class MessageBuffer {
       } finally {
         this.flushing = false
         this.activeFlush = null
-        // If complete() was called while we were flushing, do the final flush now.
         if (this.pendingComplete) {
           this.pendingComplete = false
           await this.flush(true)

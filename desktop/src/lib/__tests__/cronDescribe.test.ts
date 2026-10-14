@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { describeCron, isValidCron, parseCron } from '../cronDescribe'
 
-// Simple mock t() that returns the key with params interpolated
 const t = (key: string, params?: Record<string, string | number>) => {
   let text = key
   if (params) {
@@ -77,13 +76,13 @@ describe('isValidCron', () => {
   it('rejects invalid expressions', () => {
     expect(isValidCron('')).toBe(false)
     expect(isValidCron('hello')).toBe(false)
-    expect(isValidCron('0 9 *')).toBe(false)  // too few fields
-    expect(isValidCron('0 9 * * * *')).toBe(false)  // too many fields
-    expect(isValidCron('60 9 * * *')).toBe(false)  // minute > 59
-    expect(isValidCron('0 25 * * *')).toBe(false)  // hour > 23
-    expect(isValidCron('0 9 32 * *')).toBe(false)  // day > 31
-    expect(isValidCron('0 9 * 13 *')).toBe(false)  // month > 12
-    expect(isValidCron('0 9 * * 8')).toBe(false)   // dow > 7
+    expect(isValidCron('0 9 *')).toBe(false)
+    expect(isValidCron('0 9 * * * *')).toBe(false)
+    expect(isValidCron('60 9 * * *')).toBe(false)
+    expect(isValidCron('0 25 * * *')).toBe(false)
+    expect(isValidCron('0 9 32 * *')).toBe(false)
+    expect(isValidCron('0 9 * 13 *')).toBe(false)
+    expect(isValidCron('0 9 * * 8')).toBe(false)
   })
 
   it('accepts edge case values', () => {
@@ -94,9 +93,6 @@ describe('isValidCron', () => {
 
 describe('parseCron', () => {
   it('recognises the day-of-week ranges describeCron already accepts', () => {
-    // describeCron turns any `[\d,\-]+` dow field into `cron.specificDaysAt`
-    // (cronDescribe.ts:78-81), so parseCron has to read the same field back or
-    // the edit modal loses the frequency the description advertised.
     expect(parseCron('0 9 * * 1-3').frequency).toBe('specificDays')
     expect(parseCron('0 9 * * 1-3').selectedDays).toEqual([1, 2, 3])
     expect(parseCron('0 9 * * 0-4').frequency).toBe('specificDays')
@@ -129,8 +125,6 @@ describe('parseCron', () => {
   })
 
   it('round-trips what buildCron serialises', () => {
-    // NewTaskModal.buildCron emits `M H * * 1-5` for weekdays and
-    // `M H * * d,d,d` for specific days; both must survive a re-open.
     expect(parseCron('30 9 * * 1-5').frequency).toBe('weekdays')
     const rebuilt = parseCron('0 9 * * 1,2,3')
     expect(rebuilt.frequency).toBe('specificDays')
@@ -146,8 +140,6 @@ describe('parseCron day-of-week validity', () => {
   })
 
   it('rejects values above 7 instead of wrapping them into range', () => {
-    // `% 7` used to turn 8 into Monday and 14 into Sunday, silently rewriting
-    // a persisted schedule on save. isValidCron already rejects > 7.
     expect(parseCron('0 9 * * 8').frequency).toBe('customCron')
     expect(parseCron('0 9 * * 14').frequency).toBe('customCron')
   })
@@ -157,7 +149,6 @@ describe('parseCron day-of-week validity', () => {
   })
 
   it('rejects the whole field when any token is invalid', () => {
-    // 1-3,99 used to parse as [1], dropping 99 without a word.
     expect(parseCron('0 9 * * 1-3,99').frequency).toBe('customCron')
     expect(parseCron('0 9 * * 1-3,5').frequency).toBe('specificDays')
     expect(parseCron('0 9 * * 1-3,5').selectedDays).toEqual([1, 2, 3, 5])
@@ -171,9 +162,6 @@ describe('parseCron day-of-week validity', () => {
 })
 
 describe('describeCron with an unusable day-of-week field', () => {
-  // parseDowField returns null for these, and describeDow must not call .map()
-  // on it: TaskRow and NewTaskModal both render describeCron output, so a
-  // persisted invalid cron would otherwise break the whole view.
   it('falls back to the custom schedule instead of throwing', () => {
     for (const cron of ['0 9 * * 8', '0 9 * * 5-1', '0 9 * * 1-3,99']) {
       expect(() => describeCron(cron, t)).not.toThrow()

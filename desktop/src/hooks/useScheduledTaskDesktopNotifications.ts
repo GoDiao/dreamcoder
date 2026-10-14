@@ -31,7 +31,6 @@ function writeNotifiedRunIds(runIds: Set<string>): void {
     const trimmed = [...runIds].slice(-MAX_STORED_RUN_IDS)
     localStorage.setItem(NOTIFIED_RUNS_STORAGE_KEY, JSON.stringify(trimmed))
   } catch {
-    // Notification dedupe is best-effort; storage failures should not break the app.
   }
 }
 

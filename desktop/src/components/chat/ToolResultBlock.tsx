@@ -10,16 +10,10 @@ type Props = {
   standalone?: boolean
 }
 
-/**
- * Standalone tool result block — only shown when not already rendered
- * inline within ToolCallBlock (i.e., when the tool_use and tool_result
- * are NOT grouped together by MessageList).
- */
 export const ToolResultBlock = memo(function ToolResultBlock({ content, isError, toolName, standalone = true }: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
 
-  // Don't render standalone if this result is already rendered inline
   if (!standalone) return null
 
   const text = extractText(content)
@@ -32,7 +26,6 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
         ? 'border-[var(--color-error)]/20'
         : 'border-[var(--color-outline-variant)]/20'
     }`}>
-      {/* Status header */}
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
@@ -57,10 +50,8 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
         </span>
       </button>
 
-      {/* Inline image gallery from detected paths */}
       <InlineImageGallery text={text} />
 
-      {/* Content */}
       {expanded ? (
         isError ? (
           <div className="bg-[var(--color-error-container)]/50 px-3 py-2.5 font-[var(--font-mono)] text-[11px] leading-[1.5] whitespace-pre-wrap break-words text-[var(--color-error)]">

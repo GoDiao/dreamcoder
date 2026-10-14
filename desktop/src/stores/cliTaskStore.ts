@@ -9,33 +9,19 @@ type TodoItem = {
 }
 
 type CLITaskStore = {
-  /** Current session ID being tracked */
   sessionId: string | null
-  /** Tasks for the current session */
   tasks: CLITask[]
-  /** True while the persisted task list is being cleared remotely */
   resetting: boolean
-  /** Whether the task bar is expanded */
   expanded: boolean
-  /** True when all tasks completed and the user already continued chatting.
-   *  Set during history load so the sticky bar is suppressed on page refresh. */
   completedAndDismissed: boolean
-  /** Snapshot of the completed task set that was dismissed */
   dismissedCompletionKey: string | null
 
-  /** Fetch tasks for a given session (uses sessionId as taskListId) */
   fetchSessionTasks: (sessionId: string) => Promise<void>
-  /** Refresh tasks for the currently tracked session, or a specific session if provided */
   refreshTasks: (sessionId?: string) => Promise<void>
-  /** Update tasks from TodoWrite V1 tool input (in-memory, no disk read needed) */
   setTasksFromTodos: (todos: TodoItem[], sessionId?: string) => void
-  /** Mark that completed tasks were already dismissed (conversation continued) */
   markCompletedAndDismissed: (sessionId?: string) => void
-  /** Clear a completed task list locally and remotely so the next cycle starts clean */
   resetCompletedTasks: (sessionId?: string) => Promise<void>
-  /** Clear task tracking state */
   clearTasks: (sessionId?: string) => void
-  /** Toggle expanded state */
   toggleExpanded: () => void
 }
 
@@ -101,7 +87,6 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
 
     try {
       const { tasks } = await cliTasksApi.getTasksForList(sessionId)
-      // Only update if still tracking the same session
       if (get().sessionId === sessionId && !get().resetting) {
         set((state) => ({
           tasks,
@@ -109,7 +94,6 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
         }))
       }
     } catch {
-      // No tasks for this session — that's fine
       if (get().sessionId === sessionId && !get().resetting) {
         set({ tasks: [], completedAndDismissed: false, dismissedCompletionKey: null, expanded: false })
       }
@@ -128,7 +112,6 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
         }))
       }
     } catch {
-      // ignore
     }
   },
 

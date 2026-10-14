@@ -1,10 +1,3 @@
-/**
- * Tests for ConversationService and WebSocket chat integration
- *
- * ConversationService 管理 CLI 子进程的生命周期。
- * WebSocket 集成测试验证消息从客户端经过服务端到达 CLI 的完整流转。
- */
-
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -32,10 +25,6 @@ async function rmWithRetry(targetPath: string): Promise<void> {
     }
   }
 }
-
-// ============================================================================
-// ConversationService unit tests
-// ============================================================================
 
 describe('ConversationService', () => {
   it('should report no session for unknown ID', () => {
@@ -531,10 +520,6 @@ describe('ConversationService', () => {
   })
 })
 
-// ============================================================================
-// WebSocket integration tests (with mock CLI using the SDK websocket protocol)
-// ============================================================================
-
 describe('WebSocket Chat Integration', () => {
   let server: ReturnType<typeof Bun.serve>
   let baseUrl: string
@@ -899,7 +884,6 @@ describe('WebSocket Chat Integration', () => {
             JSON.stringify({ type: 'user_message', content: 'Hello from test' })
           )
         }
-        // Wait until we receive completion after the streamed response
         if (
           msg.type === 'message_complete' &&
           messages.some((entry) => entry.type === 'thinking')
@@ -921,13 +905,11 @@ describe('WebSocket Chat Integration', () => {
     const types = messages.map((m) => m.type)
     expect(types).toContain('connected')
     expect(types).toContain('status')
-    // Mock SDK flow produces text streaming, thinking, and completion events.
     expect(types).toContain('content_start')
     expect(types).toContain('content_delta')
     expect(types).toContain('thinking')
     expect(types).toContain('message_complete')
 
-    // Verify thinking was first status
     const statusMsgs = messages.filter((m) => m.type === 'status')
     expect(statusMsgs[0].state).toBe('thinking')
   })
@@ -1389,7 +1371,6 @@ describe('WebSocket Chat Integration', () => {
         const msg = JSON.parse(e.data as string)
         messages.push(msg)
         if (msg.type === 'connected') {
-          // Send a permission response (no active session, should not crash)
           ws.send(
             JSON.stringify({
               type: 'permission_response',
@@ -1397,7 +1378,6 @@ describe('WebSocket Chat Integration', () => {
               allowed: true,
             })
           )
-          // Give a moment then close
           setTimeout(() => {
             ws.close()
             resolve()
@@ -1414,7 +1394,6 @@ describe('WebSocket Chat Integration', () => {
       }, 3000)
     })
 
-    // Should have received connected and no error
     expect(messages[0].type).toBe('connected')
     expect(messages.some((m) => m.type === 'error')).toBe(false)
   })

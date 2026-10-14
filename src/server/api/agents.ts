@@ -1,16 +1,3 @@
-/**
- * Agents REST API
- *
- * GET    /api/agents        — 获取 Agent 列表
- * GET    /api/agents/:name  — 获取 Agent 详情
- * POST   /api/agents        — 创建 Agent
- * PUT    /api/agents/:name  — 更新 Agent
- * DELETE /api/agents/:name  — 删除 Agent
- *
- * GET    /api/tasks         — 获取后台任务列表
- * GET    /api/tasks/:id     — 获取任务详情
- */
-
 import { AgentService } from '../services/agentService.js'
 import { taskService } from '../services/taskService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
@@ -35,7 +22,7 @@ export async function handleAgentsApi(
   segments: string[],
 ): Promise<Response> {
   try {
-    const resource = segments[1] // 'agents' | 'tasks'
+    const resource = segments[1]
 
     if (resource === 'tasks') {
       return await handleTasksApi(req, segments)
@@ -47,8 +34,6 @@ export async function handleAgentsApi(
   }
 }
 
-// ─── Agent CRUD ─────────────────────────────────────────────────────────────
-
 async function handleAgents(
   req: Request,
   url: URL,
@@ -57,7 +42,6 @@ async function handleAgents(
   const method = req.method
   const agentName = segments[2] ? decodeURIComponent(segments[2]) : undefined
 
-  // ── GET /api/agents ──────────────────────────────────────────────────
   if (method === 'GET' && !agentName) {
     const cwd = url.searchParams.get('cwd') || getCwd()
     const { activeAgents, allAgents } = await getAgentDefinitionsWithOverrides(cwd)
@@ -69,7 +53,6 @@ async function handleAgents(
     })
   }
 
-  // ── GET /api/agents/:name ────────────────────────────────────────────
   if (method === 'GET' && agentName) {
     const agent = await agentService.getAgent(agentName)
     if (!agent) {
@@ -78,7 +61,6 @@ async function handleAgents(
     return Response.json({ agent })
   }
 
-  // ── POST /api/agents ─────────────────────────────────────────────────
   if (method === 'POST' && !agentName) {
     const body = await parseJsonBody(req)
     if (!body.name || typeof body.name !== 'string') {
@@ -96,7 +78,6 @@ async function handleAgents(
     return Response.json({ ok: true }, { status: 201 })
   }
 
-  // ── PUT /api/agents/:name ────────────────────────────────────────────
   if (method === 'PUT' && agentName) {
     const body = await parseJsonBody(req)
     await agentService.updateAgent(agentName, body as Record<string, unknown>)
@@ -105,7 +86,6 @@ async function handleAgents(
     return Response.json({ agent: updated })
   }
 
-  // ── DELETE /api/agents/:name ─────────────────────────────────────────
   if (method === 'DELETE' && agentName) {
     await agentService.deleteAgent(agentName)
     clearAgentDefinitionsCache()
@@ -119,19 +99,11 @@ async function handleAgents(
   )
 }
 
-// ─── Tasks API ─────────────────────────────────────────────────────────────
-//
-// GET /api/tasks                         → list all tasks (across all task lists)
-// GET /api/tasks/lists                   → list all task lists with summaries
-// GET /api/tasks/lists/:taskListId       → get all tasks for a specific task list
-// GET /api/tasks/lists/:taskListId/:id   → get a single task
-// POST /api/tasks/lists/:taskListId/reset → clear a completed task list
-
 async function handleTasksApi(
   req: Request,
   segments: string[],
 ): Promise<Response> {
-  const sub = segments[2] // 'lists' or undefined
+  const sub = segments[2]
 
   if (sub === 'lists') {
     const taskListId = segments[3]
@@ -151,19 +123,16 @@ async function handleTasksApi(
     }
 
     if (taskListId && taskId) {
-      // GET /api/tasks/lists/:taskListId/:taskId
       const task = await taskService.getTask(taskListId, taskId)
       if (!task) throw ApiError.notFound(`Task not found: ${taskListId}/${taskId}`)
       return Response.json({ task })
     }
 
     if (taskListId) {
-      // GET /api/tasks/lists/:taskListId
       const tasks = await taskService.getTasksForList(taskListId)
       return Response.json({ tasks })
     }
 
-    // GET /api/tasks/lists
     const lists = await taskService.listTaskLists()
     return Response.json({ lists })
   }
@@ -176,12 +145,9 @@ async function handleTasksApi(
     )
   }
 
-  // GET /api/tasks — list all tasks
   const tasks = await taskService.listTasks()
   return Response.json({ tasks })
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {

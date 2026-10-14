@@ -53,7 +53,6 @@ function CommandPaletteContent() {
   }, [index, selected?.id])
 
   function openSession(session: SessionListItem) {
-    // Older matches may not be in the sidebar's first page. Keep their workspace metadata available.
     useSessionStore.setState((state) => ({
       sessions: state.sessions.some((item) => item.id === session.id)
         ? state.sessions.map((item) => item.id === session.id ? { ...item, ...session } : item)

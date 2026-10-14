@@ -62,7 +62,6 @@ export function clearStoredH5Connection() {
       window.localStorage.removeItem(H5_SERVER_URL_STORAGE_KEY)
       window.localStorage.removeItem(H5_TOKEN_STORAGE_KEY)
     } catch {
-      // Ignore storage failures
     }
   }
 
@@ -97,7 +96,6 @@ export async function saveAndVerifyH5Connection(serverUrl: string, token: string
     try {
       window.localStorage.setItem(H5_TOKEN_STORAGE_KEY, normalizedToken)
     } catch {
-      // Ignore storage failures after a successful verification.
     }
   }
 
@@ -187,7 +185,6 @@ async function initializeBrowserServerUrl(fallbackUrl: string) {
     try {
       window.localStorage.setItem(H5_TOKEN_STORAGE_KEY, queryToken)
     } catch {
-      // Ignore storage failures after successful verification.
     }
   }
 
@@ -334,7 +331,6 @@ function rememberStoredH5ServerUrl(serverUrl: string) {
   try {
     window.localStorage.setItem(H5_SERVER_URL_STORAGE_KEY, serverUrl)
   } catch {
-    // Ignore storage failures.
   }
 }
 
@@ -343,7 +339,6 @@ function clearStoredH5Token() {
     try {
       window.localStorage.removeItem(H5_TOKEN_STORAGE_KEY)
     } catch {
-      // Ignore storage failures.
     }
   }
 

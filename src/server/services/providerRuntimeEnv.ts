@@ -73,7 +73,6 @@ function isSavedProvider(value: unknown): value is SavedProvider {
   )
 }
 
-/** Strip client-side [1m]/[2m] context-window suffix before sending to API. */
 function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }

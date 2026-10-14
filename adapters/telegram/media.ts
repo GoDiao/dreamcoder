@@ -1,11 +1,3 @@
-/**
- * Telegram media service — wraps grammY download/upload helpers.
- *
- * Telegram file download flow:
- *   1. bot.api.getFile(file_id)  → { file_path }
- *   2. GET https://api.telegram.org/file/bot<token>/<file_path>
- */
-
 import { InputFile, type Bot } from 'grammy'
 import { AttachmentStore } from '../common/attachment/attachment-store.js'
 import type { LocalAttachment } from '../common/attachment/attachment-types.js'

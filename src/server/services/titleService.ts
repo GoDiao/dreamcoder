@@ -1,11 +1,3 @@
-/**
- * Title Service — AI-powered session title generation
- *
- * Two-stage approach matching the CLI:
- * 1. deriveTitle() — instant placeholder from first user message
- * 2. generateTitle() — async Haiku call for a polished 3-7 word title
- */
-
 import { ProviderService } from './providerService.js'
 import { SettingsService } from './settingsService.js'
 import { sessionService } from './sessionService.js'
@@ -34,10 +26,6 @@ Bad (too vague): {"title": "Code changes"}
 Bad (too long): {"title": "Investigate and fix the issue where the login button does not respond on mobile devices"}
 Bad (wrong case): {"title": "Fix Login Button On Mobile"}`
 
-/**
- * Quick placeholder title derived from user message text.
- * Returns first sentence, collapsed to single line, max 50 chars.
- */
 export function deriveTitle(raw: string): string | undefined {
   const clean = cleanSessionTitleSource(raw)
   const firstSentence = /^(.*?[.!?。！？])\s/.exec(clean)?.[1] ?? clean
@@ -48,10 +36,6 @@ export function deriveTitle(raw: string): string | undefined {
     : flat
 }
 
-/**
- * Generate an AI title using the session's provider Haiku model when possible.
- * Fire-and-forget — returns null on any failure.
- */
 export async function generateTitle(
   conversationText: string,
   providerId?: string | null,
@@ -241,11 +225,6 @@ async function shouldDisableThinkingForTitle(): Promise<boolean> {
   return settings.alwaysThinkingEnabled === false
 }
 
-/**
- * Persist an AI-generated title to the session's JSONL file.
- * Returns false when a user custom title exists, because custom titles are
- * intentional and must not be replaced by automatic title refreshes.
- */
 export async function saveAiTitle(sessionId: string, title: string): Promise<boolean> {
   if (await sessionService.getCustomTitle(sessionId)) {
     return false

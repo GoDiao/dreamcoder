@@ -92,7 +92,7 @@ describe('desktop theme tokens', () => {
   })
 
   it('avoids color-mix in the startup-critical UI zoom shell chrome for Safari 15 WebView support', () => {
-    const zoomShellCss = getCssBetween('.settings-zoom-kbd {', '/* ─── Tailwind Theme Override')
+    const zoomShellCss = getCssBetween('.settings-zoom-kbd {', '@theme {')
 
     expect(zoomShellCss).not.toContain('color-mix(')
   })

@@ -1,9 +1,3 @@
-/**
- * SearchService — 工作区文件搜索 & 会话历史搜索
- *
- * 优先使用 ripgrep (rg)，不可用时降级到 grep。
- */
-
 import { spawn } from 'child_process'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -25,11 +19,6 @@ export type SessionSearchResult = {
 }
 
 export class SearchService {
-  // ---------------------------------------------------------------------------
-  // 工作区搜索
-  // ---------------------------------------------------------------------------
-
-  /** 使用 ripgrep 搜索工作目录 */
   async searchWorkspace(
     query: string,
     options?: {
@@ -46,13 +35,11 @@ export class SearchService {
     const cwd = options?.cwd || process.cwd()
     const maxResults = options?.maxResults || 200
 
-    // 尝试 rg，降级到 grep
     const hasRg = await this.commandExists('rg')
     if (hasRg) {
       try {
         return await this.searchWithRipgrep(query, cwd, maxResults, options)
       } catch {
-        // rg 执行失败，降级到 grep
       }
     }
 
@@ -61,18 +48,12 @@ export class SearchService {
       try {
         return await this.searchWithGrep(query, cwd, maxResults, options)
       } catch {
-        // grep failed or is not available; fall back to a portable search.
       }
     }
 
     return this.searchWithFilesystem(query, cwd, maxResults, options)
   }
 
-  // ---------------------------------------------------------------------------
-  // 会话历史搜索
-  // ---------------------------------------------------------------------------
-
-  /** 搜索会话历史文件 */
   async searchSessions(query: string): Promise<SessionSearchResult[]> {
     if (!query) {
       throw ApiError.badRequest('Search query is required')
@@ -87,11 +68,9 @@ export class SearchService {
     try {
       await fs.access(projectsDir)
     } catch {
-      // 目录不存在，返回空
       return results
     }
 
-    // 遍历 projects/ 下的 JSONL 会话文件
     const entries = await this.walkJsonlFiles(projectsDir)
     const lowerQuery = query.toLowerCase()
 
@@ -106,7 +85,6 @@ export class SearchService {
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i]
           if (line.toLowerCase().includes(lowerQuery)) {
-            // 尝试提取可读文本
             try {
               const obj = JSON.parse(line) as Record<string, unknown>
               const text =
@@ -116,7 +94,6 @@ export class SearchService {
                     ? obj.content
                     : line.slice(0, 200)
 
-              // 提取 title
               if (i === 0 && typeof obj.title === 'string') {
                 title = obj.title
               }
@@ -134,20 +111,15 @@ export class SearchService {
             sessionId,
             title,
             matchCount: matches.length,
-            matches: matches.slice(0, 20), // 每个会话最多 20 条匹配
+            matches: matches.slice(0, 20),
           })
         }
       } catch {
-        // 跳过无法读取的文件
       }
     }
 
     return results
   }
-
-  // ---------------------------------------------------------------------------
-  // ripgrep 搜索
-  // ---------------------------------------------------------------------------
 
   private async searchWithRipgrep(
     query: string,
@@ -164,7 +136,6 @@ export class SearchService {
       args.push('--ignore-case')
     }
 
-    // 添加上下文行
     args.push('-C', '4')
 
     if (options?.glob) {
@@ -177,7 +148,6 @@ export class SearchService {
     return this.parseRipgrepJson(output, maxResults)
   }
 
-  /** 解析 ripgrep JSON 输出 */
   private parseRipgrepJson(
     output: string,
     maxResults: number,
@@ -185,7 +155,6 @@ export class SearchService {
     const results: SearchResult[] = []
     const lines = output.split('\n').filter(Boolean)
 
-    // 收集上下文：key = `${file}:${matchLine}`
     const contextMap = new Map<
       string,
       { file: string; line: number; text: string; context: string[] }
@@ -209,7 +178,6 @@ export class SearchService {
 
           contextMap.set(key, { file, line: lineNum, text, context: [] })
         } else if (obj.type === 'context') {
-          // 上下文行归属到最近的 match
           const data = obj.data as {
             path?: { text?: string }
             line_number?: number
@@ -217,7 +185,6 @@ export class SearchService {
           }
           const text = (data.lines?.text || '').replace(/\n$/, '')
 
-          // 附加到最后一个相同文件的 match
           const file = data.path?.text || ''
           for (const [key, entry] of contextMap) {
             if (key.startsWith(file + ':')) {
@@ -226,7 +193,6 @@ export class SearchService {
           }
         }
       } catch {
-        // 跳过无法解析的行
       }
     }
 
@@ -242,10 +208,6 @@ export class SearchService {
 
     return results
   }
-
-  // ---------------------------------------------------------------------------
-  // grep 降级
-  // ---------------------------------------------------------------------------
 
   private async searchWithGrep(
     query: string,
@@ -272,7 +234,6 @@ export class SearchService {
     return this.parseGrepOutput(output, maxResults)
   }
 
-  /** 解析 grep 输出 (file:line:text) */
   private parseGrepOutput(output: string, maxResults: number): SearchResult[] {
     const results: SearchResult[] = []
     const lines = output.split('\n').filter(Boolean)
@@ -280,7 +241,6 @@ export class SearchService {
     for (const line of lines) {
       if (results.length >= maxResults) break
 
-      // grep -n 输出格式: file:line:text
       const match = line.match(/^(.+?):(\d+):(.*)$/)
       if (match) {
         results.push({
@@ -293,10 +253,6 @@ export class SearchService {
 
     return results
   }
-
-  // ---------------------------------------------------------------------------
-  // Portable filesystem fallback
-  // ---------------------------------------------------------------------------
 
   private async searchWithFilesystem(
     query: string,
@@ -389,11 +345,6 @@ export class SearchService {
     return new RegExp(`^${escaped}$`).test(fileName)
   }
 
-  // ---------------------------------------------------------------------------
-  // 工具方法
-  // ---------------------------------------------------------------------------
-
-  /** 运行外部命令，返回 stdout */
   private runCommand(cmd: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -403,7 +354,6 @@ export class SearchService {
 
       proc.on('close', (code) => {
         const output = Buffer.concat(chunks).toString('utf-8')
-        // rg/grep 返回 1 表示无匹配，不视为错误
         if (code === 0 || code === 1) {
           resolve(output)
         } else {
@@ -419,7 +369,6 @@ export class SearchService {
     })
   }
 
-  /** 检测命令是否存在 */
   private commandExists(cmd: string): Promise<boolean> {
     return new Promise((resolve) => {
       const lookup = process.platform === 'win32' ? 'where' : 'which'
@@ -429,7 +378,6 @@ export class SearchService {
     })
   }
 
-  /** 递归查找 .jsonl 文件 */
   private async walkJsonlFiles(dir: string): Promise<string[]> {
     const results: string[] = []
 
@@ -445,7 +393,6 @@ export class SearchService {
         }
       }
     } catch {
-      // 跳过不可访问的目录
     }
 
     return results

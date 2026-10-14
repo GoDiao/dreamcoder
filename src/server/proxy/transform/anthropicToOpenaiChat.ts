@@ -1,9 +1,3 @@
-/**
- * Request transformation: Anthropic Messages → OpenAI Chat Completions
- * Derived from cc-switch (https://github.com/farion1231/cc-switch)
- * Original work by Jason Young, MIT License
- */
-
 import type {
   AnthropicRequest,
   AnthropicContentBlock,
@@ -15,16 +9,12 @@ import type {
   OpenAITool,
 } from './types.js'
 
-/**
- * Convert Anthropic Messages request to OpenAI Chat Completions request.
- */
 export function anthropicToOpenaiChat(
   body: AnthropicRequest,
   options: { roundTripReasoningContent?: boolean; passThinkingToggle?: boolean } = {},
 ): OpenAIChatRequest {
   const messages: OpenAIChatMessage[] = []
 
-  // Convert system prompt
   if (body.system) {
     if (typeof body.system === 'string') {
       messages.push({ role: 'system', content: body.system })
@@ -34,32 +24,23 @@ export function anthropicToOpenaiChat(
     }
   }
 
-  // Convert messages
   for (const msg of body.messages) {
     convertMessage(msg, messages, options)
   }
 
-  // Build request
   const result: OpenAIChatRequest = {
     model: body.model,
     messages,
     stream: body.stream,
   }
 
-  // max_tokens — omit to let upstream provider use its own default/max.
-  // Claude Code sends very large values (e.g. 128K) that exceed many
-  // providers' limits (DeepSeek: 8192, etc.).
-
-  // temperature & top_p
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
 
-  // stop_sequences → stop
   if (body.stop_sequences && body.stop_sequences.length > 0) {
     result.stop = body.stop_sequences
   }
 
-  // tools
   if (body.tools && body.tools.length > 0) {
     result.tools = body.tools
       .filter((t) => t.name !== 'BatchTool')
@@ -73,12 +54,10 @@ export function anthropicToOpenaiChat(
       }))
   }
 
-  // tool_choice
   if (body.tool_choice !== undefined) {
     result.tool_choice = convertToolChoice(body.tool_choice)
   }
 
-  // thinking → reasoning_effort
   if (body.thinking) {
     const budget = body.thinking.budget_tokens
     if (budget !== undefined) {
@@ -103,13 +82,11 @@ function convertMessage(
 ): void {
   const content = msg.content
 
-  // Simple string content
   if (typeof content === 'string') {
     output.push({ role: msg.role, content })
     return
   }
 
-  // Array content blocks
   if (!Array.isArray(content) || content.length === 0) {
     output.push({ role: msg.role, content: '' })
     return
@@ -123,7 +100,6 @@ function convertMessage(
 }
 
 function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatMessage[]): void {
-  // Separate tool_result blocks from other content
   const contentParts: OpenAIChatContentPart[] = []
 
   for (const block of blocks) {
@@ -133,7 +109,6 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
       const url = `data:${block.source.media_type};base64,${block.source.data}`
       contentParts.push({ type: 'image_url', image_url: { url } })
     } else if (block.type === 'tool_result') {
-      // tool_result → separate tool message
       const resultContent = typeof block.content === 'string'
         ? block.content
         : Array.isArray(block.content)

@@ -4,13 +4,7 @@ import { getBaseUrl } from '../../api/client'
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i
 
-/**
- * Extracts absolute image file paths from text content.
- * Matches paths like /Users/.../image.png, /tmp/output.jpg, etc.
- */
 export function extractImagePaths(text: string): string[] {
-  // Match absolute paths ending with image extensions
-  // Handles paths that may be wrapped in backticks, quotes, or standalone
   const regex = /(?:^|[\s`"'(])(\/?(?:[A-Za-z]:[\\/]|\/)[^\s`"')<>]+\.(?:png|jpe?g|gif|webp|svg|bmp|avif|ico))/gim
   const paths: string[] = []
   const seen = new Set<string>()
@@ -73,7 +67,6 @@ export function InlineImageGallery({ text }: Props) {
                 className="w-full object-cover"
                 style={{ maxHeight: images.length === 1 ? 400 : 240 }}
                 onError={(e) => {
-                  // Hide broken images
                   (e.target as HTMLImageElement).closest('button')!.style.display = 'none'
                 }}
               />

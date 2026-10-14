@@ -72,14 +72,12 @@ export function Settings() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[var(--color-surface)]">
       <div className="flex-1 flex overflow-hidden">
-        {/* Tab navigation */}
         <div className="w-[180px] border-r border-[var(--color-border)] py-3 flex-shrink-0 flex flex-col">
           <div className="flex-1">
             <TabButton icon="dns" label={t('settings.tab.providers')} active={activeTab === 'providers'} onClick={() => setActiveTab('providers')} />
             <TabButton icon="shield" label={t('settings.tab.permissions')} active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} />
             <TabButton icon="tune" label={t('settings.tab.general')} active={activeTab === 'general'} onClick={() => setActiveTab('general')} />
             <TabButton icon="qr_code_2" label={t('settings.tab.h5Access')} active={activeTab === 'h5Access'} onClick={() => setActiveTab('h5Access')} />
-            {/* <TabButton icon="chat" label={t('settings.tab.adapters')} active={activeTab === 'adapters'} onClick={() => setActiveTab('adapters')} /> */}
             <TabButton icon="terminal" label={t('settings.tab.terminal')} active={activeTab === 'terminal'} onClick={() => setActiveTab('terminal')} />
             <TabButton icon="dns" label={t('settings.tab.mcp')} active={activeTab === 'mcp'} onClick={() => setActiveTab('mcp')} />
             <TabButton icon="smart_toy" label={t('settings.tab.agents')} active={activeTab === 'agents'} onClick={() => setActiveTab('agents')} />
@@ -95,7 +93,6 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           <div className={`motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
             {activeTab === 'providers' && <ProviderSettings />}
@@ -135,8 +132,6 @@ function TabButton({ icon, label, active, onClick }: { icon: string; label: stri
     </button>
   )
 }
-
-// ─── Permission Settings ──────────────────────────────────────
 
 function PermissionSettings() {
   const { permissionMode, setPermissionMode } = useSettingsStore()

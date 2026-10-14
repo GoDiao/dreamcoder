@@ -9,10 +9,8 @@ import { useTabStore } from './tabStore'
 const MEMBER_POLL_INTERVAL_MS = 1500
 const MEMBER_TRANSCRIPT_MATCH_WINDOW_MS = 120_000
 
-/** Generate a synthetic sessionId for team member tabs */
 const memberSessionId = (agentId: string) => `team-member:${agentId}`
 
-/** Module-level timer for polling member transcript */
 let memberPollTimer: ReturnType<typeof setInterval> | null = null
 let polledMemberSessionId: string | null = null
 
@@ -132,7 +130,6 @@ type TeamStore = {
   stopMemberPolling: () => void
   clearTeam: () => void
 
-  // WebSocket handlers
   handleTeamCreated: (teamName: string) => void
   handleTeamUpdate: (teamName: string, members: TeamMemberStatus[]) => void
   handleTeamDeleted: (teamName: string) => void
@@ -167,7 +164,6 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         members,
         createdAt: raw.createdAt != null ? String(raw.createdAt) : undefined,
       }
-      // Assign colors to members
       const colors = new Map<string, AgentColor>()
       detail.members.forEach((m, i) => {
         colors.set(m.agentId, AGENT_COLORS[i % AGENT_COLORS.length]!)

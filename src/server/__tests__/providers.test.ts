@@ -1,7 +1,3 @@
-/**
- * Unit tests for ProviderService and Providers REST API
- */
-
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -10,8 +6,6 @@ import { ProviderService } from '../services/providerService.js'
 import { handleProvidersApi } from '../api/providers.js'
 import { handleProxyRequest } from '../proxy/handler.js'
 import type { CreateProviderInput } from '../types/provider.js'
-
-// ─── Test helpers ─────────────────────────────────────────────────────────────
 
 let tmpDir: string
 let originalConfigDir: string | undefined
@@ -31,7 +25,6 @@ async function teardown() {
   await fs.rm(tmpDir, { recursive: true, force: true })
 }
 
-/** Create a mock Request */
 function makeRequest(
   method: string,
   urlStr: string,
@@ -48,7 +41,6 @@ function makeRequest(
   return { req, url, segments }
 }
 
-/** A sample provider input for reuse across tests */
 function sampleInput(overrides?: Partial<CreateProviderInput>): CreateProviderInput {
   return {
     presetId: 'custom',
@@ -66,27 +58,19 @@ function sampleInput(overrides?: Partial<CreateProviderInput>): CreateProviderIn
   }
 }
 
-/** Read the settings.json written to the temp config dir */
 async function readSettings(): Promise<Record<string, unknown>> {
   const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'settings.json'), 'utf-8')
   return JSON.parse(raw) as Record<string, unknown>
 }
 
-/** Read the providers.json written to the temp config dir */
 async function readProvidersConfig(): Promise<Record<string, unknown>> {
   const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'providers.json'), 'utf-8')
   return JSON.parse(raw) as Record<string, unknown>
 }
 
-// =============================================================================
-// ProviderService
-// =============================================================================
-
 describe('ProviderService', () => {
   beforeEach(setup)
   afterEach(teardown)
-
-  // ─── listProviders ───────────────────────────────────────────────────────
 
   describe('listProviders', () => {
     test('should return empty array when no providers exist', async () => {
@@ -139,8 +123,6 @@ describe('ProviderService', () => {
       expect(activeId).toBeNull()
     })
   })
-
-  // ─── addProvider ─────────────────────────────────────────────────────────
 
   describe('addProvider', () => {
     test('should add a provider and return it with generated fields', async () => {
@@ -288,8 +270,6 @@ describe('ProviderService', () => {
       })
     })
   })
-
-  // ─── getProvider ─────────────────────────────────────────────────────────
 
   describe('getProvider', () => {
     test('should return the provider by id', async () => {
@@ -449,15 +429,13 @@ describe('ProviderService', () => {
 
       try {
         await svc.getProvider('non-existent-id')
-        expect(true).toBe(false) // should not reach here
+        expect(true).toBe(false)
       } catch (err: unknown) {
         const apiErr = err as { statusCode: number }
         expect(apiErr.statusCode).toBe(404)
       }
     })
   })
-
-  // ─── updateProvider ──────────────────────────────────────────────────────
 
   describe('updateProvider', () => {
     test('should update provider fields', async () => {
@@ -471,7 +449,6 @@ describe('ProviderService', () => {
 
       expect(updated.name).toBe('Updated Name')
       expect(updated.baseUrl).toBe('https://new-api.example.com')
-      // unchanged fields preserved
       expect(updated.apiKey).toBe('sk-test-key-123')
     })
 
@@ -579,15 +556,12 @@ describe('ProviderService', () => {
     })
   })
 
-  // ─── deleteProvider ──────────────────────────────────────────────────────
-
   describe('deleteProvider', () => {
     test('should delete an inactive provider', async () => {
       const svc = new ProviderService()
       await svc.addProvider(sampleInput({ name: 'First' }))
       const second = await svc.addProvider(sampleInput({ name: 'Second' }))
 
-      // Second is inactive, so deletion should succeed
       await svc.deleteProvider(second.id)
 
       const { providers } = await svc.listProviders()
@@ -622,8 +596,6 @@ describe('ProviderService', () => {
     })
   })
 
-  // ─── activateProvider ────────────────────────────────────────────────────
-
   describe('activateProvider', () => {
     test('should activate a provider with a valid model', async () => {
       const svc = new ProviderService()
@@ -638,7 +610,6 @@ describe('ProviderService', () => {
 
       await svc.activateProvider(second.id)
 
-      // Second should now be active
       const { activeId, providers } = await svc.listProviders()
       expect(activeId).toBe(second.id)
       expect(providers.find((p) => p.id === first.id)).toBeDefined()
@@ -844,7 +815,6 @@ describe('ProviderService', () => {
     })
 
     test('should preserve existing settings.json fields on activation', async () => {
-      // Pre-seed settings with an extra field
       await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
       await fs.writeFile(
         path.join(tmpDir, 'dreamcoder', 'settings.json'),
@@ -854,7 +824,6 @@ describe('ProviderService', () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput())
 
-      // Re-activate to verify merge behavior
       await svc.activateProvider(provider.id)
 
       const settings = await readSettings()
@@ -903,8 +872,6 @@ describe('ProviderService', () => {
       expect(config.activeId).toBe(provider.id)
     })
   })
-
-  // ─── getProviderForProxy ─────────────────────────────────────────────────
 
   describe('getProviderForProxy', () => {
     test('should return null when no provider is active', async () => {
@@ -1138,15 +1105,9 @@ describe('ProviderService', () => {
   })
 })
 
-// =============================================================================
-// Providers REST API
-// =============================================================================
-
 describe('Providers API', () => {
   beforeEach(setup)
   afterEach(teardown)
-
-  // ─── GET /api/providers ──────────────────────────────────────────────────
 
   test('GET /api/providers should return empty list initially', async () => {
     const { req, url, segments } = makeRequest('GET', '/api/providers')
@@ -1158,7 +1119,6 @@ describe('Providers API', () => {
   })
 
   test('GET /api/providers should list added providers', async () => {
-    // Seed a provider via service
     const svc = new ProviderService()
     await svc.addProvider(sampleInput())
 
@@ -1171,8 +1131,6 @@ describe('Providers API', () => {
     expect(body.providers[0].name).toBe('Test Provider')
     expect(body.providers[0].apiKey).toBe('sk-test-key-123')
   })
-
-  // ─── POST /api/providers ─────────────────────────────────────────────────
 
   test('POST /api/providers should create a provider', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/providers', {
@@ -1200,7 +1158,7 @@ describe('Providers API', () => {
 
   test('POST /api/providers should return 400 for invalid input', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/providers', {
-      name: '', // invalid: empty name
+      name: '',
     })
     const res = await handleProvidersApi(req, url, segments)
 
@@ -1227,8 +1185,6 @@ describe('Providers API', () => {
     expect(res.status).toBe(400)
   })
 
-  // ─── GET /api/providers/:id ──────────────────────────────────────────────
-
   test('GET /api/providers/:id should return a provider', async () => {
     const svc = new ProviderService()
     const added = await svc.addProvider(sampleInput())
@@ -1248,8 +1204,6 @@ describe('Providers API', () => {
     expect(res.status).toBe(404)
   })
 
-  // ─── PUT /api/providers/:id ──────────────────────────────────────────────
-
   test('PUT /api/providers/:id should update a provider', async () => {
     const svc = new ProviderService()
     const added = await svc.addProvider(sampleInput())
@@ -1263,8 +1217,6 @@ describe('Providers API', () => {
     const body = (await res.json()) as { provider: { name: string } }
     expect(body.provider.name).toBe('Renamed Provider')
   })
-
-  // ─── DELETE /api/providers/:id ───────────────────────────────────────────
 
   test('DELETE /api/providers/:id should delete an inactive provider', async () => {
     const svc = new ProviderService()
@@ -1290,8 +1242,6 @@ describe('Providers API', () => {
     expect(res.status).toBe(409)
   })
 
-  // ─── POST /api/providers/:id/activate ────────────────────────────────────
-
   test('POST /api/providers/:id/activate should activate a provider', async () => {
     const svc = new ProviderService()
     await svc.addProvider(sampleInput({ name: 'First' }))
@@ -1313,7 +1263,6 @@ describe('Providers API', () => {
     const body = (await res.json()) as { ok: boolean }
     expect(body.ok).toBe(true)
 
-    // Verify settings were synced
     const settings = await readSettings()
     const env = settings.env as Record<string, string>
     expect(env.ANTHROPIC_BASE_URL).toBe('https://second.example.com')
@@ -1349,8 +1298,6 @@ describe('Providers API', () => {
 
     expect(res.status).toBe(200)
   })
-
-  // ─── Method not allowed ──────────────────────────────────────────────────
 
   test('should return 405 for unsupported methods', async () => {
     const { req, url, segments } = makeRequest('PATCH', '/api/providers')

@@ -81,9 +81,7 @@ describe('ImageBlockWatcher', () => {
     const w = new ImageBlockWatcher()
     w.feed('![a](/tmp/a.png)')
     w.reset()
-    // After reset, drain() is empty
     expect(w.drain().length).toBe(0)
-    // And re-feeding the same image yields a fresh emit (dedup state cleared)
     const out = w.feed('![a](/tmp/a.png)')
     expect(out.length).toBe(1)
   })
@@ -109,7 +107,6 @@ describe('ImageBlockWatcher', () => {
   it('rejects malformed data URI (not base64)', () => {
     const w = new ImageBlockWatcher()
     const out = w.feed('![bad](data:image/png,ABC)')
-    // Not in `;base64,` form → classify returns null → skipped
     expect(out.length).toBe(0)
   })
 })

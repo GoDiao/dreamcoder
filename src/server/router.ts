@@ -1,7 +1,3 @@
-/**
- * API Router — 将请求路由到对应的 API handler
- */
-
 import { handleSessionsApi } from './api/sessions.js'
 import { handleSettingsApi } from './api/settings.js'
 import { handleModelsApi } from './api/models.js'
@@ -30,14 +26,12 @@ import { handleDesktopUiApi } from './api/desktop-ui.js'
 
 export async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
-  const segments = path.split('/').filter(Boolean) // ['api', 'sessions', ...]
+  const segments = path.split('/').filter(Boolean)
 
-  // Route to appropriate handler based on the second segment
   const resource = segments[1]
 
   switch (resource) {
     case 'sessions': {
-      // Route /api/sessions/:id/chat/* to conversations handler
       const subResource = segments[3]
       if (subResource === 'chat') {
         return handleConversationsApi(req, url, segments)
@@ -56,7 +50,7 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
       return handleModelsApi(req, url, segments)
 
     case 'permissions':
-      return handleSettingsApi(req, url, segments) // permissions under settings
+      return handleSettingsApi(req, url, segments)
 
     case 'scheduled-tasks':
       return handleScheduledTasksApi(req, url, segments)

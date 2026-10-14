@@ -54,7 +54,6 @@ async function makeExternalFixtureDir(): Promise<string | null> {
       if (!isDefaultAllowed) return fixtureDir
       await fsp.rm(fixtureDir, { recursive: true, force: true })
     } catch {
-      // Try the next common writable system directory.
     }
   }
 

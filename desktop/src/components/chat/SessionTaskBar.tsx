@@ -32,7 +32,6 @@ export function SessionTaskBar() {
 
   if (tasks.length === 0) return null
 
-  // Don't show sticky bar if tasks were completed and the user already continued chatting
   const allCompleted = tasks.every((tk) => tk.status === 'completed')
   if (allCompleted && completedAndDismissed) return null
 
@@ -43,7 +42,6 @@ export function SessionTaskBar() {
   return (
     <div className="shrink-0 px-8">
       <div className="mx-auto max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] overflow-hidden mb-2">
-        {/* Header — always visible, clickable to toggle */}
         <div className="flex items-center gap-2 bg-[var(--color-surface-container)] px-2 py-1.5">
           <button
             type="button"
@@ -62,7 +60,6 @@ export function SessionTaskBar() {
               {t('tasks.title')}
             </span>
 
-            {/* Progress bar */}
             <div className="flex-1 h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden max-w-[200px]">
               <div
                 className="h-full rounded-full transition-all duration-300"
@@ -99,7 +96,6 @@ export function SessionTaskBar() {
           )}
         </div>
 
-        {/* Expanded task list */}
         {expanded && (
           <div className="px-4 pb-2 pt-1 flex flex-col gap-0.5 max-h-[240px] overflow-y-auto border-t border-[var(--color-outline-variant)]/20">
             {tasks.map((task) => (

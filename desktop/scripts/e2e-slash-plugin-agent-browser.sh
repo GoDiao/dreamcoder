@@ -146,7 +146,6 @@ echo "Using MCP plugin: ${MCP_PLUGIN_NAME} (${MCP_PLUGIN_ID})"
 wait_for_text "Claude Code Haha"
 "${AB[@]}" screenshot "${ARTIFACT_DIR}/01-home.png" >/dev/null
 
-# Always work from a fresh chat surface so slash-command behavior is deterministic.
 "${AB[@]}" find role button click --name "New session"
 "${AB[@]}" wait textarea >/dev/null
 

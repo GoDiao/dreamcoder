@@ -1,15 +1,3 @@
-/**
- * Settings REST API
- *
- * GET  /api/settings            — 获取合并后的设置
- * GET  /api/settings/user       — 获取用户设置
- * GET  /api/settings/project    — 获取项目设置
- * PUT  /api/settings/user       — 更新用户设置
- * PUT  /api/settings/project    — 更新项目设置
- * GET  /api/permissions/mode    — 获取权限模式
- * PUT  /api/permissions/mode    — 设置权限模式
- */
-
 import { SettingsService } from '../services/settingsService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { ensureDesktopCliLauncherInstalled } from '../services/desktopCliLauncherService.js'
@@ -23,10 +11,9 @@ export async function handleSettingsApi(
   segments: string[],
 ): Promise<Response> {
   try {
-    const resource = segments[1] // 'settings' | 'permissions'
-    const sub = segments[2] // 'user' | 'project' | 'mode' | undefined
+    const resource = segments[1]
+    const sub = segments[2]
 
-    // ── /api/permissions/* ──────────────────────────────────────────────
     if (resource === 'permissions') {
       if (sub === 'mode') {
         return await handlePermissionMode(req)
@@ -34,12 +21,10 @@ export async function handleSettingsApi(
       throw ApiError.notFound(`Unknown permissions endpoint: ${sub}`)
     }
 
-    // ── /api/settings/* ─────────────────────────────────────────────────
     const method = req.method
 
     switch (sub) {
       case undefined:
-        // GET /api/settings
         if (method !== 'GET') throw methodNotAllowed(method)
         return Response.json(await settingsService.getSettings())
 
@@ -60,8 +45,6 @@ export async function handleSettingsApi(
     return errorResponse(error)
   }
 }
-
-// ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async function handleUserSettings(req: Request): Promise<Response> {
   if (req.method === 'GET') {
@@ -112,8 +95,6 @@ async function handlePermissionMode(req: Request): Promise<Response> {
 
   throw methodNotAllowed(req.method)
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {

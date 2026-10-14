@@ -9,13 +9,10 @@ export function ToolInspection() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[var(--color-surface)]">
-      {/* Separator */}
       <div className="h-px w-full bg-[var(--color-surface-container)]" />
 
-      {/* Content */}
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto w-full">
         <div className="flex flex-col gap-6">
-          {/* ── Title row + action buttons ─────────────────── */}
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -38,7 +35,6 @@ export function ToolInspection() {
             </div>
           </div>
 
-          {/* ── Metadata cards ─────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[var(--color-surface-container-low)] rounded-xl p-4 flex flex-col gap-1">
               <span className="text-[10px] font-bold text-[var(--color-outline)] uppercase tracking-wider">
@@ -78,7 +74,6 @@ export function ToolInspection() {
             </div>
           </div>
 
-          {/* ── Diff Viewer ────────────────────────────────── */}
           <div className="bg-[var(--color-surface-dim)] rounded-xl overflow-hidden border border-[var(--color-outline-variant)]/20 shadow-sm">
             <div className="px-4 py-2.5 bg-[var(--color-surface-container-high)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/20">
               <div className="flex items-center gap-3">
@@ -152,7 +147,6 @@ export function ToolInspection() {
             </div>
           </div>
 
-          {/* ── Implementation Context ─────────────────────── */}
           <div className="p-6 bg-[var(--color-surface-container-lowest)] rounded-2xl border border-[var(--color-outline-variant)]/10">
             <h3 className="font-[var(--font-headline)] font-bold text-sm text-[var(--color-on-surface)] mb-4">
               Implementation Context

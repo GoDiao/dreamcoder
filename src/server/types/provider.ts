@@ -1,16 +1,9 @@
-/**
- * Provider types — preset-based provider configuration.
- *
- * Providers are stored in ~/.claude/dreamcoder/providers.json as a lightweight index.
- * The active provider's env vars are written to ~/.claude/settings.json.
- */
-
 import { z } from 'zod'
 
 export const ApiFormatSchema = z.enum([
-  'anthropic',         // Native Anthropic Messages API (passthrough, no proxy)
-  'openai_chat',       // OpenAI Chat Completions /v1/chat/completions
-  'openai_responses',  // OpenAI Responses API /v1/responses
+  'anthropic',
+  'openai_chat',
+  'openai_responses',
 ])
 export type ApiFormat = z.infer<typeof ApiFormatSchema>
 
@@ -98,7 +91,6 @@ export const TestProviderSchema = z.object({
   apiFormat: ApiFormatSchema.default('anthropic'),
 })
 
-// TypeScript types
 export type ModelMapping = z.infer<typeof ModelMappingSchema>
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
@@ -115,8 +107,6 @@ export interface ProviderTestStepResult {
 }
 
 export interface ProviderTestResult {
-  /** Step 1: Basic connectivity — API reachable, key valid, model exists */
   connectivity: ProviderTestStepResult
-  /** Step 2: Proxy pipeline — full Anthropic→OpenAI→Anthropic round-trip (only for openai_* formats) */
   proxy?: ProviderTestStepResult
 }

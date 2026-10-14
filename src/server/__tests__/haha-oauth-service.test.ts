@@ -1,7 +1,3 @@
-/**
- * Unit tests for HahaOAuthService — haha 自管 OAuth 的核心 service 层。
- */
-
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'

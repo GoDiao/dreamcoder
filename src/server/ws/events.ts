@@ -1,13 +1,3 @@
-/**
- * WebSocket event type definitions
- *
- * 定义客户端与服务器之间 WebSocket 通信的消息类型。
- */
-
-// ============================================================================
-// Client → Server
-// ============================================================================
-
 export type ClientMessage =
   | { type: 'prewarm_session' }
   | { type: 'user_message'; content: string; attachments?: AttachmentRef[] }
@@ -32,14 +22,10 @@ export type AttachmentRef = {
   type: 'file' | 'image'
   name?: string
   path?: string
-  data?: string // base64 for images
+  data?: string
   mimeType?: string
   isDirectory?: boolean
 }
-
-// ============================================================================
-// Server → Client
-// ============================================================================
 
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }
@@ -146,10 +132,6 @@ export type ComputerUsePermissionResponse = {
   flags: ComputerUseGrantFlags
   userConsented?: boolean
 }
-
-// ============================================================================
-// Internal types
-// ============================================================================
 
 export type WebSocketSession = {
   sessionId: string

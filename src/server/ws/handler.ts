@@ -1,11 +1,3 @@
-/**
- * WebSocket connection handler
- *
- * 管理 WebSocket 连接生命周期，处理消息路由。
- * 用户消息通过 CLI 子进程（stream-json 模式）处理，
- * CLI stdout 消息被转换为 ServerMessage 并转发到 WebSocket。
- */
-
 import type { ServerWebSocket } from 'bun'
 import type { ClientMessage, ServerMessage } from './events.js'
 import * as os from 'node:os'
@@ -31,9 +23,6 @@ import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaun
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
 
-/**
- * Cache slash commands from CLI init messages, keyed by sessionId.
- */
 export type SessionSlashCommand = {
   name: string
   description: string
@@ -42,23 +31,12 @@ export type SessionSlashCommand = {
 
 const sessionSlashCommands = new Map<string, SessionSlashCommand[]>()
 
-/**
- * Timers for delayed session cleanup after client disconnect.
- * If a client reconnects before the timer fires, the timer is cancelled.
- */
 const CLIENT_DISCONNECT_CLEANUP_MS = 30_000
 const PENDING_PERMISSION_DISCONNECT_CLEANUP_MS = 30 * 60_000
 const sessionCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-/**
- * Track sessions where user requested stop — suppress the CLI_ERROR that
- * follows an interrupt so the frontend doesn't show "处理过程中发生错误".
- */
 const sessionStopRequested = new Set<string>()
 
-/**
- * Track user message count and title state per session for auto-title generation.
- */
 const sessionTitleState = new Map<string, {
   userMessageCount: number
   hasCustomTitle: boolean
@@ -109,8 +87,6 @@ export type WebSocketData = {
   serverHost: string
 }
 
-// Active WebSocket clients, grouped by session. Desktop, H5, and IM adapters can
-// legitimately watch the same running session at the same time.
 const activeSessions = new Map<string, Set<ServerWebSocket<WebSocketData>>>()
 const clientOutputCallbacks = new Map<
   ServerWebSocket<WebSocketData>,
@@ -138,7 +114,6 @@ export const handleWebSocket = {
 
     console.log(`[WS] Client connected for session: ${sessionId}`)
 
-    // Cancel pending cleanup timer if client reconnects
     const pendingTimer = sessionCleanupTimers.get(sessionId)
     if (pendingTimer) {
       clearTimeout(pendingTimer)
@@ -241,8 +216,6 @@ export const handleWebSocket = {
 
     computerUseApprovalService.cancelSession(sessionId)
 
-    // Schedule delayed cleanup. Sessions waiting on user input need a longer
-    // grace period so transient renderer disconnects do not abort the prompt.
     const cleanupDelayMs = getDisconnectCleanupDelayMs(sessionId)
     const cleanupTimer = setTimeout(() => {
       sessionCleanupTimers.delete(sessionId)
@@ -256,13 +229,8 @@ export const handleWebSocket = {
   },
 
   drain(ws: ServerWebSocket<WebSocketData>) {
-    // Backpressure handling - called when the socket is ready to receive more data
   },
 }
-
-// ============================================================================
-// Message handlers
-// ============================================================================
 
 async function handleUserMessage(
   ws: ServerWebSocket<WebSocketData>,
@@ -270,7 +238,6 @@ async function handleUserMessage(
 ) {
   const { sessionId } = ws.data
 
-  // Clear any stale stop flag from a previous turn
   sessionStopRequested.delete(sessionId)
   clearPrewarmState(sessionId)
 
@@ -290,7 +257,6 @@ async function handleUserMessage(
     return
   }
 
-  // Send thinking status
   sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
 
   const initialRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(ws, sessionId)
@@ -299,7 +265,6 @@ async function handleUserMessage(
     sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
   }
 
-  // Track and emit the first placeholder title before CLI startup/streaming.
   let titleState = sessionTitleState.get(sessionId)
   if (!titleState) {
     titleState = {
@@ -321,7 +286,6 @@ async function handleUserMessage(
     triggerTitleGeneration(ws, sessionId)
   }
 
-  // 启动 CLI 子进程（如果还没有）
   try {
     await ensureCliSessionStarted(ws, sessionId, 'user_message')
   } catch (err) {
@@ -349,9 +313,6 @@ async function handleUserMessage(
     return
   }
 
-  // Register the callback before sending the turn so startup errors are not lost.
-  // Keep output muted until the current user turn is enqueued to avoid forwarding
-  // any pre-turn SDK chatter as fresh chat history.
   let userMessageSent = false
   const shouldForwardCurrentTurnLocalCommand =
     createCurrentTurnLocalCommandForwarder(desktopSlashCommand)
@@ -485,11 +446,6 @@ function handleSetPermissionMode(
 ) {
   const { sessionId } = ws.data
 
-  // Switching to/from bypassPermissions requires the CLI to be (re)started with
-  // --dangerously-skip-permissions. The CLI rejects a runtime set_permission_mode
-  // to bypassPermissions if it wasn't launched with that flag.  Rather than just
-  // sending the SDK message (which would silently fail), restart the CLI subprocess
-  // with the correct arguments so the new permission mode takes effect.
   const needsRestart =
     conversationService.hasSession(sessionId) &&
     (message.mode === 'bypassPermissions' || conversationService.getSessionPermissionMode(sessionId) === 'bypassPermissions')
@@ -567,13 +523,11 @@ async function restartSessionWithPermissionMode(
   mode: string,
 ): Promise<void> {
   try {
-    // Persist the new mode first so it's read on restart
     await settingsService.setPermissionMode(mode)
 
     const workDir = conversationService.getSessionWorkDir(sessionId)
     conversationService.stopSession(sessionId)
 
-    // Rebuild runtime settings (will pick up the persisted mode)
     const runtimeSettings = await getRuntimeSettings(sessionId)
     const sdkUrl =
       `ws://${ws.data.serverHost}:${ws.data.serverPort}/sdk/${sessionId}` +
@@ -649,10 +603,8 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   sessionStopRequested.add(sessionId)
 
   if (conversationService.hasSession(sessionId)) {
-    // First try graceful interrupt via SDK control message
     conversationService.sendInterrupt(sessionId)
 
-    // Force-kill if still running after 3 seconds
     setTimeout(() => {
       if (conversationService.hasSession(sessionId)) {
         console.log(`[WS] Force-killing CLI subprocess for session: ${sessionId}`)
@@ -664,17 +616,12 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   sendMessage(ws, { type: 'status', state: 'idle' })
 }
 
-// ============================================================================
-// Title generation
-// ============================================================================
-
 function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: string): void {
   const state = sessionTitleState.get(sessionId)
   if (!state || state.hasCustomTitle) return
 
   const count = state.userMessageCount
 
-  // Generate on count 1 (first response) and count 3 (with more context)
   if (count !== 1 && count !== 3) return
   if (state.startedGenerationCounts.has(count)) return
   state.startedGenerationCounts.add(count)
@@ -684,10 +631,8 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
     : state.allUserMessages.join('\n')
   const runtimeProviderId = runtimeOverrides.get(sessionId)?.providerId
 
-  // Fire-and-forget: derive quick title, then upgrade with AI
   void (async () => {
     try {
-      // Stage 1: quick placeholder (only on first message)
       if (count === 1) {
         const placeholder = deriveTitle(text)
         if (placeholder) {
@@ -700,7 +645,6 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
         }
       }
 
-      // Stage 2: AI-generated title
       const aiTitle = await generateTitle(text, runtimeProviderId)
       if (aiTitle) {
         const saved = await saveAiTitle(sessionId, aiTitle)
@@ -716,21 +660,11 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
   })()
 }
 
-// ============================================================================
-// CLI message translation
-// ============================================================================
-
-/**
- * Per-session streaming state to avoid cross-session interference.
- * Each session tracks its own dedup flag, active block types, and tool blocks.
- */
 type SessionStreamState = {
   hasReceivedStreamEvents: boolean
   activeBlockTypes: Map<number, 'text' | 'tool_use' | 'thinking'>
   activeToolBlocks: Map<number, { toolName: string; toolUseId: string; inputJson: string; parentToolUseId?: string }>
   pendingLocalCommand?: { name: string; args: string }
-  /** Tool blocks whose input JSON failed to parse in content_block_stop.
-   *  The assistant message carries the complete input — defer to that. */
   pendingToolBlocks: Map<string, { toolName: string; toolUseId: string; parentToolUseId?: string }>
   toolParentUseIds: Map<string, string>
   lastApiError?: {
@@ -783,7 +717,6 @@ function consumeToolParentUseId(
   return parentToolUseId
 }
 
-/** Clean up stream state when session disconnects */
 function cleanupStreamState(sessionId: string) {
   sessionStreamStates.delete(sessionId)
 }
@@ -974,16 +907,11 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         }]
       }
 
-      // If we already received stream_events, text/thinking were already sent.
-      // Only extract tool_use blocks (stream_event's content_block_stop lacks complete tool info).
       if (cliMsg.message?.content && Array.isArray(cliMsg.message.content)) {
         const messages: ServerMessage[] = []
 
         for (const block of cliMsg.message.content) {
           if (streamState.hasReceivedStreamEvents) {
-            // Stream events handled most blocks — but any tool_use whose
-            // input JSON failed to parse in content_block_stop was deferred.
-            // Emit those now with the complete input from the assistant message.
             if (block.type === 'tool_use' && streamState.pendingToolBlocks.has(block.id)) {
               const pending = streamState.pendingToolBlocks.get(block.id)!
               streamState.pendingToolBlocks.delete(block.id)
@@ -997,7 +925,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
               })
             }
           } else {
-            // No stream events received — this is the only source, process everything
             if (block.type === 'thinking' && block.thinking) {
               messages.push({ type: 'thinking', text: block.thinking })
             } else if (block.type === 'text' && block.text) {
@@ -1017,7 +944,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           }
         }
 
-        // Reset flags for next turn
         streamState.hasReceivedStreamEvents = false
         streamState.pendingToolBlocks.clear()
         return messages
@@ -1026,8 +952,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
     }
 
     case 'user': {
-      // Bug #1: 处理 tool_result 消息
-      // CLI 发送 type:'user' 消息，其中 content 包含 tool_result 块
       const messages: ServerMessage[] = []
 
       if (isCompactSummaryMessageContent(cliMsg.message?.content)) {
@@ -1105,7 +1029,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           if (contentBlock.type === 'tool_use') {
             const parentToolUseId = cliParentToolUseId(cliMsg)
             streamState.activeBlockTypes.set(index, 'tool_use')
-            // Track tool info so content_block_stop can emit complete data
             streamState.activeToolBlocks.set(index, {
               toolName: contentBlock.name || '',
               toolUseId: contentBlock.id || '',
@@ -1138,7 +1061,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
             return [{ type: 'content_delta', text: delta.text }]
           }
           if (delta.type === 'input_json_delta' && delta.partial_json) {
-            // Accumulate tool input JSON
             const index = event.index ?? 0
             const toolBlock = streamState.activeToolBlocks.get(index)
             if (toolBlock) toolBlock.inputJson += delta.partial_json
@@ -1175,8 +1097,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
                 }]
               }
 
-              // JSON parse failed — defer to the assistant message which
-              // carries the complete, already-parsed tool input.
               console.warn(
                 `[WS] Tool input JSON parse failed for ${toolBlock.toolName} (${toolBlock.toolUseId}), deferring to assistant message`,
               )
@@ -1191,12 +1111,10 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         }
 
         case 'message_stop': {
-          // message_stop is handled by the 'result' message
           return []
         }
 
         case 'message_delta': {
-          // message_delta may contain stop_reason or usage updates
           return []
         }
 
@@ -1206,7 +1124,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
     }
 
     case 'control_request': {
-      // 权限请求 — CLI 需要用户授权才能执行工具
       if (cliMsg.request?.subtype === 'can_use_tool') {
         return [{
           type: 'permission_request',
@@ -1227,15 +1144,12 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
       return []
 
     case 'result': {
-      // 对话结果（成功或错误）
       const usage = {
         input_tokens: cliMsg.usage?.input_tokens || 0,
         output_tokens: cliMsg.usage?.output_tokens || 0,
       }
 
       if (cliMsg.is_error) {
-        // If the user requested stop, this "error" is just the interrupt
-        // result — don't show it as an error in the chat UI.
         if (sessionStopRequested.has(sessionId)) {
           sessionStopRequested.delete(sessionId)
           return [{ type: 'message_complete', usage }]
@@ -1250,7 +1164,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           streamState.lastApiError = undefined
           return [{ type: 'message_complete', usage }]
         }
-        // 错误和完成消息都发送
         return [
           {
             type: 'error',
@@ -1261,30 +1174,22 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         ]
       }
 
-      // Clear stop flag on successful completion too
       sessionStopRequested.delete(sessionId)
       streamState.lastApiError = undefined
       return [{ type: 'message_complete', usage }]
     }
 
     case 'system': {
-      // 区分不同的 system 子类型
       const subtype = cliMsg.subtype
       if (subtype === 'api_retry') {
         const apiRetryMessage = toApiRetryServerMessage(cliMsg)
         return apiRetryMessage ? [apiRetryMessage] : []
       }
       if (subtype === 'init') {
-        // CLI 初始化完成 — 缓存 slash commands 并发送模型信息
-        // NOTE: Do NOT send status:idle here — the CLI init fires while
-        // processing the first user message, and sending idle would reset
-        // the frontend's streaming state prematurely.
         cacheSessionInitMetadata(sessionId, cliMsg)
         const messages: ServerMessage[] = [
-          // Send model info as a system notification, not a status change
           { type: 'system_notification', subtype: 'init', message: `Model: ${cliMsg.model || 'unknown'}`, data: { model: cliMsg.model } },
         ]
-        // Send slash commands to frontend
         const cmds = sessionSlashCommands.get(sessionId)
         if (cmds && cmds.length > 0) {
           messages.push({
@@ -1321,7 +1226,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return []
       }
       if (subtype === 'hook_started' || subtype === 'hook_response') {
-        // Hook 执行中 — 不转发给前端
         return []
       }
       if (subtype === 'local_command' || subtype === 'local_command_output') {
@@ -1354,7 +1258,6 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           { type: 'content_delta', text: localCommandOutput },
         ]
       }
-      // Bug #7: 处理 task/team system 消息
       if (subtype === 'task_notification') {
         return [{
           type: 'system_notification',
@@ -1409,20 +1312,14 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           data: cliMsg.compact_metadata ?? cliMsg,
         }]
       }
-      // 其他 system 消息
       return []
     }
 
     default:
-      // 未知类型 — 调试输出但不转发
       console.log(`[WS] Unknown CLI message type: ${cliMsg.type}`, JSON.stringify(cliMsg).substring(0, 200))
       return []
   }
 }
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
@@ -1849,7 +1746,6 @@ async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> 
 }
 
 async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
-  // Check if a custom provider is active
   const { providers, activeId } = await providerService.listProviders()
   let resolvedActiveId = activeId
   if (activeId && !isKnownRuntimeProviderId(activeId, providers)) {
@@ -1875,8 +1771,6 @@ async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
 
   let model: string | undefined
   if (resolvedActiveId) {
-    // Provider is active — only consult provider-managed dreamcoder settings.
-    // Global ~/.claude/settings.json model values must not bleed into provider mode.
     const baseModel =
       typeof modelSettings.model === 'string' && modelSettings.model.trim()
         ? modelSettings.model
@@ -1886,7 +1780,6 @@ async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
       if (modelContext) model += `:${modelContext}`
     }
   } else {
-    // No provider — pass model normally
     const baseModel =
       typeof userSettings.model === 'string' && userSettings.model.trim()
         ? userSettings.model
@@ -2013,9 +1906,6 @@ async function waitForRuntimeTransitionBeforeUserTurn(
   return { ok: true, waited }
 }
 
-/**
- * Send a message to a specific session's WebSocket (for use by services)
- */
 export function sendToSession(sessionId: string, message: ServerMessage): boolean {
   const clients = activeSessions.get(sessionId)
   if (!clients || clients.size === 0) return false

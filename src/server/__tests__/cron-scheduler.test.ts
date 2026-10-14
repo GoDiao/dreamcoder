@@ -1,7 +1,3 @@
-/**
- * Tests for CronScheduler — cron matching, task execution, log storage, and API endpoints
- */
-
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -13,8 +9,6 @@ import {
   type TaskRun,
 } from '../services/cronScheduler.js'
 import { CronService, type CronTask } from '../services/cronService.js'
-
-// ─── Test helpers ───────────────────────────────────────────────────────────
 
 let tmpDir: string
 const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
@@ -32,11 +26,8 @@ async function cleanupTmpDir(dir: string): Promise<void> {
   try {
     await fs.rm(dir, { recursive: true, force: true })
   } catch {
-    // ignore
   }
 }
-
-// ─── fieldMatches tests ────────────────────────────────────────────────────
 
 describe('fieldMatches', () => {
   it('should match wildcard', () => {
@@ -98,11 +89,9 @@ describe('fieldMatches', () => {
   })
 })
 
-// ─── cronMatches tests ─────────────────────────────────────────────────────
-
 describe('cronMatches', () => {
   it('should match every-minute expression', () => {
-    const date = new Date(2026, 3, 5, 14, 30, 0) // April 5, 2026 14:30 (Sunday)
+    const date = new Date(2026, 3, 5, 14, 30, 0)
     expect(cronMatches('* * * * *', date)).toBe(true)
   })
 
@@ -122,16 +111,13 @@ describe('cronMatches', () => {
   })
 
   it('should match weekdays at 14:30', () => {
-    // April 6, 2026 is a Monday (dow = 1)
     const monday = new Date(2026, 3, 6, 14, 30, 0)
-    // April 5, 2026 is a Sunday (dow = 0)
     const sunday = new Date(2026, 3, 5, 14, 30, 0)
     expect(cronMatches('30 14 * * 1-5', monday)).toBe(true)
     expect(cronMatches('30 14 * * 1-5', sunday)).toBe(false)
   })
 
   it('should match specific month and day', () => {
-    // January 15 at midnight
     const jan15 = new Date(2026, 0, 15, 0, 0)
     const feb15 = new Date(2026, 1, 15, 0, 0)
     expect(cronMatches('0 0 15 1 *', jan15)).toBe(true)
@@ -140,20 +126,17 @@ describe('cronMatches', () => {
 
   it('should reject invalid cron expressions', () => {
     const date = new Date()
-    expect(cronMatches('* * *', date)).toBe(false) // only 3 fields
+    expect(cronMatches('* * *', date)).toBe(false)
     expect(cronMatches('', date)).toBe(false)
-    expect(cronMatches('* * * * * *', date)).toBe(false) // 6 fields
+    expect(cronMatches('* * * * * *', date)).toBe(false)
   })
 
   it('should match day-of-week with Sunday as 0', () => {
-    // Sunday = 0
-    const sunday = new Date(2026, 3, 5, 10, 0) // April 5, 2026 is Sunday
+    const sunday = new Date(2026, 3, 5, 10, 0)
     expect(cronMatches('0 10 * * 0', sunday)).toBe(true)
     expect(cronMatches('0 10 * * 6', sunday)).toBe(false)
   })
 })
-
-// ─── CronScheduler execution tests ────────────────────────────────────────
 
 describe('CronScheduler', () => {
   let cronService: CronService
@@ -179,14 +162,12 @@ describe('CronScheduler', () => {
   it('should start and stop without errors', () => {
     scheduler.start()
     scheduler.stop()
-    // Starting again after stop should also work
     scheduler.start()
     scheduler.stop()
   })
 
   it('should not start twice', () => {
     scheduler.start()
-    // Second start should be a no-op (no error)
     scheduler.start()
     scheduler.stop()
   })
@@ -202,8 +183,6 @@ describe('CronScheduler', () => {
   })
 
   it('should persist a task run to the log file', async () => {
-    // Create a task that runs "echo hello" — we'll invoke executeTask directly
-    // with a mock-like approach: create a task then check the log file
     const task = await cronService.createTask({
       cron: '* * * * *',
       prompt: 'echo test',
@@ -211,14 +190,9 @@ describe('CronScheduler', () => {
       recurring: true,
     })
 
-    // We can't easily mock Bun.spawn in bun:test, so we'll check the log
-    // file was created by reading it after execution attempt.
-    // The CLI subprocess will likely fail (not a real CLI available in tests),
-    // but the run should still be logged with 'failed' status.
     try {
       await scheduler.executeTask(task)
     } catch {
-      // Expected — CLI binary may not be available in test environment
     }
 
     const logPath = path.join(tmpDir, 'scheduled_tasks_log.json')
@@ -247,10 +221,8 @@ describe('CronScheduler', () => {
     try {
       await scheduler.executeTask(task)
     } catch {
-      // CLI may not be available
     }
 
-    // After execution, the task should be disabled
     const tasks = await cronService.listTasks()
     const updated = tasks.find((t) => t.id === task.id)
     expect(updated?.enabled).toBe(false)
@@ -266,12 +238,10 @@ describe('CronScheduler', () => {
     try {
       await scheduler.executeTask(task)
     } catch {
-      // CLI may not be available
     }
 
     const tasks = await cronService.listTasks()
     const updated = tasks.find((t) => t.id === task.id)
-    // enabled should not have been set to false
     expect(updated?.enabled).not.toBe(false)
   })
 
@@ -287,20 +257,17 @@ describe('CronScheduler', () => {
     try {
       await scheduler.executeTask(task)
     } catch {
-      // CLI may not be available
     }
 
     const tasks = await cronService.listTasks()
     const updated = tasks.find((t) => t.id === task.id)
     expect(updated?.lastFiredAt).toBeDefined()
-    // lastFiredAt should be a valid ISO timestamp at or after beforeExec
     expect(new Date(updated!.lastFiredAt!).getTime()).toBeGreaterThanOrEqual(
-      new Date(beforeExec).getTime() - 1000, // allow 1s tolerance
+      new Date(beforeExec).getTime() - 1000,
     )
   })
 
   it('should skip disabled tasks during tick', async () => {
-    // Create a task matching every minute but disabled
     const task = await cronService.createTask({
       cron: '* * * * *',
       prompt: 'should not run',
@@ -310,7 +277,6 @@ describe('CronScheduler', () => {
 
     await scheduler.tick()
 
-    // No runs should be logged
     const runs = await scheduler.getTaskRuns(task.id)
     expect(runs).toHaveLength(0)
   })
@@ -322,21 +288,17 @@ describe('CronScheduler', () => {
       recurring: true,
     })
 
-    // Execute twice
     try {
       await scheduler.executeTask(task)
     } catch {
-      /* ignore */
     }
     try {
       await scheduler.executeTask(task)
     } catch {
-      /* ignore */
     }
 
     const runs = await scheduler.getTaskRuns(task.id)
     expect(runs.length).toBeGreaterThanOrEqual(2)
-    // Should be sorted newest first
     if (runs.length >= 2) {
       expect(
         new Date(runs[0].startedAt).getTime(),
@@ -351,12 +313,10 @@ describe('CronScheduler', () => {
       recurring: true,
     })
 
-    // Execute 3 times
     for (let i = 0; i < 3; i++) {
       try {
         await scheduler.executeTask(task)
       } catch {
-        /* ignore */
       }
     }
 
@@ -364,8 +324,6 @@ describe('CronScheduler', () => {
     expect(runs.length).toBeLessThanOrEqual(2)
   })
 })
-
-// ─── Execution log trimming ────────────────────────────────────────────────
 
 describe('Execution log trimming', () => {
   let cronService: CronService
@@ -389,7 +347,6 @@ describe('Execution log trimming', () => {
   })
 
   it('should keep log entries within the max limit', async () => {
-    // Pre-populate the log file with 105 entries for a single task
     const logPath = path.join(tmpDir, 'scheduled_tasks_log.json')
     const runs: TaskRun[] = []
     for (let i = 0; i < 105; i++) {
@@ -407,7 +364,6 @@ describe('Execution log trimming', () => {
     }
     await fs.writeFile(logPath, JSON.stringify({ runs }, null, 2), 'utf-8')
 
-    // Now execute one more task run — this triggers a trim
     const task = await cronService.createTask({
       cron: '* * * * *',
       prompt: 'trigger trim',
@@ -417,20 +373,15 @@ describe('Execution log trimming', () => {
     try {
       await scheduler.executeTask(task)
     } catch {
-      /* ignore */
     }
 
-    // Read back the log
     const logContent = JSON.parse(await fs.readFile(logPath, 'utf-8')) as {
       runs: TaskRun[]
     }
     const task1Runs = logContent.runs.filter((r) => r.taskId === 'task-1')
-    // Should have been trimmed to at most 100
     expect(task1Runs.length).toBeLessThanOrEqual(100)
   })
 })
-
-// ─── Scheduled Tasks API with runs endpoints ──────────────────────────────
 
 describe('Scheduled Tasks API — runs endpoints', () => {
   let handleScheduledTasksApi: (
@@ -489,7 +440,6 @@ describe('Scheduled Tasks API — runs endpoints', () => {
   })
 
   it('GET /api/scheduled-tasks/runs should return runs from log', async () => {
-    // Write some runs to the log file
     const logPath = path.join(tmpDir, 'scheduled_tasks_log.json')
     const runs: TaskRun[] = [
       {
@@ -575,10 +525,8 @@ describe('Scheduled Tasks API — runs endpoints', () => {
 })
 
 describe('cronMatches day-of-week Sunday alias', () => {
-  // Cron accepts both 0 and 7 for Sunday; Date#getDay() only ever reports 0,
-  // so `* * * * 7` used to validate and read as Sunday in the UI but never fire.
-  const sunday = new Date(2026, 0, 4, 10, 0) // 2026-01-04 is a Sunday
-  const monday = new Date(2026, 0, 5, 10, 0) // 2026-01-05 is a Monday
+  const sunday = new Date(2026, 0, 4, 10, 0)
+  const monday = new Date(2026, 0, 5, 10, 0)
 
   it('fires on Sunday for both 0 and 7', () => {
     expect(sunday.getDay()).toBe(0)
@@ -597,13 +545,11 @@ describe('cronMatches day-of-week Sunday alias', () => {
 })
 
 describe('cronMatches stepped day-of-week range ending in 7', () => {
-  const sunday = new Date(2026, 0, 4, 10, 0) // Sunday
-  const friday = new Date(2026, 0, 2, 10, 0) // Friday
-  const monday = new Date(2026, 0, 5, 10, 0) // Monday
+  const sunday = new Date(2026, 0, 4, 10, 0)
+  const friday = new Date(2026, 0, 2, 10, 0)
+  const monday = new Date(2026, 0, 5, 10, 0)
 
   it('matches the stepped range on Sunday via the 7 alias', () => {
-    // 5-7/2 names Friday and Sunday. Date#getDay() reports 0 for Sunday, so the
-    // step branch has to retry the comparison as 7.
     expect(cronMatches('0 10 * * 5-7/2', friday)).toBe(true)
     expect(cronMatches('0 10 * * 5-7/2', sunday)).toBe(true)
     expect(cronMatches('0 10 * * 5-7/2', monday)).toBe(false)

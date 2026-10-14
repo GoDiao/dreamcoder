@@ -806,7 +806,6 @@ describe('Sidebar', () => {
     useSessionStore.setState({
       sessions: [
         makeSession('child-1', 'Child Session', 'D:\\workspace\\code\\dreamcoder', now),
-        // ...
       ],
     })
     useTabStore.setState({

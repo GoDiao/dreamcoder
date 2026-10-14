@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { mockTeam, mockTeamMessages } from '../mocks/data'
 
-// ─── Inline keyframes for pulse-subtle animation ─────────────────
 const pulseSubtleStyle = `
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; }
@@ -20,12 +19,9 @@ export function AgentTeams() {
       <style>{pulseSubtleStyle}</style>
 
       <div className="flex-1 flex flex-col relative overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]" style={{ fontFamily: 'var(--font-body)' }}>
-        {/* Code Content Area */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 max-w-5xl mx-auto w-full">
           <div className="space-y-8">
-            {/* ─── Message Thread ─── */}
             <div className="space-y-6">
-              {/* USER message */}
               <div className="flex gap-4 group">
                 <div className="w-8 h-8 rounded-full bg-[var(--color-primary-fixed)] flex-shrink-0 flex items-center justify-center text-[var(--color-on-primary)] font-bold text-xs">
                   U
@@ -40,7 +36,6 @@ export function AgentTeams() {
                 </div>
               </div>
 
-              {/* CLAUDE COMPANION response */}
               <div className="flex gap-4 group">
                 <div className="w-8 h-8 rounded-full bg-[var(--color-tertiary-container)] flex-shrink-0 flex items-center justify-center text-[var(--color-tertiary)]">
                   <span
@@ -70,12 +65,10 @@ export function AgentTeams() {
               </div>
             </div>
 
-            {/* ─── TEAM STRIP ─── */}
             <div className="relative py-8">
               <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-[var(--color-border-separator)]" />
 
               <div className="relative glass-panel p-4 rounded-2xl flex flex-col md:flex-row md:items-center gap-4 overflow-hidden">
-                {/* Team label */}
                 <div className="flex items-center gap-3 pr-4 md:border-r border-[var(--color-border-separator)]">
                   <div className="p-2 bg-[var(--color-primary-fixed)]/20 rounded-lg">
                     <span className="material-symbols-outlined text-[var(--color-brand)] text-xl">
@@ -92,7 +85,6 @@ export function AgentTeams() {
                   </div>
                 </div>
 
-                {/* Agent Chips */}
                 <div className="flex flex-wrap gap-2 items-center flex-1">
                   {mockTeam.members.map((member) => {
                     if (member.status === 'completed') {
@@ -152,14 +144,12 @@ export function AgentTeams() {
                   })}
                 </div>
 
-                {/* Expand button */}
                 <button className="ml-auto p-2 hover:bg-[var(--color-surface-hover)] rounded-full transition-colors text-[var(--color-text-tertiary)]">
                   <span className="material-symbols-outlined text-sm">expand_more</span>
                 </button>
               </div>
             </div>
 
-            {/* ─── Chat Composer ─── */}
             <div className="max-w-3xl mx-auto w-full mt-auto">
               <div className="glass-panel relative rounded-xl p-1.5 flex items-center gap-2 transition-all">
                 <div className="p-2 text-[var(--color-text-secondary)]">

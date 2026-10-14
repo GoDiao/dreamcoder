@@ -347,21 +347,18 @@ async function replaceFile(tempPath: string, targetPath: string) {
   try {
     await unlink(targetPath)
   } catch {
-    // noop
   }
 
   try {
     await rename(tempPath, targetPath)
     return
   } catch {
-    // The existing executable may still be in use. Rename it away and retry.
   }
 
   const backupPath = `${targetPath}.old.${Date.now()}`
   try {
     await rename(targetPath, backupPath)
   } catch {
-    // noop
   }
 
   await rename(tempPath, targetPath)
@@ -383,7 +380,6 @@ async function removeLegacyWindowsBinaryLauncher(targetPath: string) {
     await unlink(legacyPath)
     return
   } catch {
-    // Retry below by renaming the stale executable out of PATHEXT lookup.
   }
 
   const backupPath = `${legacyPath}.old.${Date.now()}`

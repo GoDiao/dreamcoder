@@ -568,8 +568,6 @@ def detect_accessibility_permission() -> bool:
         application_services.AXIsProcessTrusted.argtypes = []
         return bool(application_services.AXIsProcessTrusted())
     except Exception:
-        # Fail closed: if the trust API can't be queried, treat accessibility
-        # as unavailable instead of reporting a misleading success state.
         return False
 
 

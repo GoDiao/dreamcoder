@@ -13,11 +13,6 @@ type StreamFallbackState = {
   usage: OpenAIResponsesResponse['usage']
 }
 
-/**
- * Collect a streamed OpenAI Responses API response into one Anthropic message.
- * ChatGPT Codex requires upstream stream=true, but some Anthropic SDK callers
- * still expect a non-streaming JSON response.
- */
 export async function openaiResponsesStreamToAnthropicResponse(
   upstream: ReadableStream<Uint8Array>,
   model: string,

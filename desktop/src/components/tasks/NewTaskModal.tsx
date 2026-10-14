@@ -101,7 +101,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
   const [notifyChannels, setNotifyChannels] = useState<NotificationChannel[]>(editTask?.notification?.channels || [])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Enhanced scheduling state
   const [minuteInterval, setMinuteInterval] = useState(parsed?.minuteInterval || 15)
   const [hourInterval, setHourInterval] = useState(parsed?.hourInterval || 1)
   const [minuteOffset, setMinuteOffset] = useState(parsed?.minuteOffset || 0)
@@ -170,7 +169,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         </>
       }
     >
-      {/* Info banner */}
       <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] mb-5">
         <span className="material-symbols-outlined text-[18px] text-[var(--color-text-secondary)]">info</span>
         <span className="text-xs text-[var(--color-text-secondary)]">
@@ -195,7 +193,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           placeholder={t('newTask.descPlaceholder')}
         />
 
-        {/* Prompt editor with embedded controls */}
         <PromptEditor
           value={prompt}
           onChange={setPrompt}
@@ -212,7 +209,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           onUseWorktreeChange={setUseWorktree}
         />
 
-        {/* Frequency */}
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('newTask.frequency')}</label>
           <div className="relative">
@@ -231,7 +227,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           </div>
         </div>
 
-        {/* Sub-controls based on frequency */}
         {frequency === 'everyNMinutes' && (
           <div className="relative">
             <select
@@ -319,7 +314,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           </div>
         )}
 
-        {/* Time picker — shown for daily, weekdays, specificDays, monthly */}
         {showTime && (
           <div className="flex flex-col gap-1">
             <input
@@ -332,7 +326,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           </div>
         )}
 
-        {/* Notification */}
         <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -412,7 +405,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           )}
         </div>
 
-        {/* Cron preview */}
         <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] text-xs text-[var(--color-text-secondary)]">
           <span className="material-symbols-outlined text-[16px]">schedule</span>
           <span>

@@ -1,11 +1,3 @@
-/**
- * ConversationService — CLI subprocess manager
- *
- * Each desktop session owns one CLI subprocess. The subprocess talks back to
- * the desktop server over the SDK WebSocket bridge, while the desktop UI talks
- * to the server over its own client WebSocket.
- */
-
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -141,8 +133,6 @@ export class ConversationService {
       'stream-json',
       '--output-format',
       'stream-json',
-      // Desktop chat depends on partial assistant deltas; without this the
-      // server only sees the completed assistant message at turn end.
       '--include-partial-messages',
       ...(shouldResume ? ['--resume', sessionId] : ['--session-id', sessionId]),
       ...worktreeArgs,
@@ -236,16 +226,6 @@ export class ConversationService {
       `[ConversationService] Starting CLI for ${sessionId}, cwd: ${launchWorkDir} (process.cwd()=${process.cwd()}, CALLER_DIR will be pinned to workDir)`,
     )
 
-    // IMPORTANT (Bug#5): 必须覆盖子进程继承的 CALLER_DIR / PWD。
-    // preload.ts 顶层读 process.env.CALLER_DIR 并调用 process.chdir(CALLER_DIR)。
-    // 在 bundled 桌面端里，server sidecar 被 Tauri 从 cwd=/ 启动，dreamcoder-sidecar.ts
-    // 在 server/cli 模式入口把 CALLER_DIR 默认设成 process.cwd()（即 '/'），
-    // 随后这个 env 被完整继承到 Bun.spawn 的 CLI 子进程；即使这里显式传了
-    // cwd: workDir，CLI 子进程里 preload.ts 还是会 chdir('/')，结果把
-    // STATE.cwd / "Primary working directory" 打回根目录，IM 会话里 AI 感知的
-    // 工作目录就变成 `/`。把 CALLER_DIR / PWD 显式覆盖成 workDir，preload.ts
-    // chdir 后落到正确目录。
-    //
     const childEnv = await this.buildChildEnv(launchWorkDir, sdkUrl, options)
 
     let proc: ReturnType<typeof Bun.spawn>
@@ -799,7 +779,6 @@ export class ConversationService {
         }
       }
     } catch {
-      // Process output read failures should not kill the session.
     }
   }
 
@@ -914,13 +893,6 @@ export class ConversationService {
     sdkUrl?: string,
     options?: SessionStartOptions,
   ): Promise<Record<string, string>> {
-    // Provider isolation: when Desktop has its own provider config/index,
-    // strip inherited provider env vars so the child CLI reads fresh values
-    // from ~/.claude/dreamcoder/settings.json instead of stale process.env.
-    //
-    // If the user never configured a Desktop provider and only launched the
-    // app/server with ANTHROPIC_* env vars, keep those env vars so Windows
-    // dev-mode and env-only setups can still authenticate successfully.
     const PROVIDER_ENV_KEYS = [
       'ANTHROPIC_API_KEY',
       'ANTHROPIC_BASE_URL',
@@ -976,7 +948,6 @@ export class ConversationService {
     try {
       fs.mkdirSync(path.dirname(cliDiagnosticsPath), { recursive: true })
     } catch {
-      // Diagnostics must never block session startup.
     }
 
     return {
@@ -999,18 +970,10 @@ export class ConversationService {
             DREAMCODER_DESKTOP_AWAIT_MCP_TIMEOUT_MS: '5000',
           }
         : {}),
-      // Tell the CLI entrypoint to skip project .env loading. Provider env
-      // should come from Desktop-managed config or inherited launch env, not
-      // be reintroduced from the repo's .env file.
       DREAMCODER_SKIP_DOTENV: '1',
       ...(explicitProviderEnv
         ? { CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: '1' }
         : {}),
-      // "官方" 模式 (dreamcoder/settings.json 没 provider env) 下,把 CLI 标记为
-      // managed-OAuth,让它忽略外部 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
-      // 残留、只走用户 /login 的 OAuth token。自定义 provider 模式绝不能设,
-      // 否则 CLI 会忽略 provider 的 AUTH_TOKEN、错误地走 OAuth 打到第三方
-      // endpoint。详见 src/utils/auth.ts isManagedOAuthContext()。
       ...(explicitProviderEnv ?? {}),
       ...networkEnv,
       ...(this.shouldMarkManagedOAuth(options?.providerId)
@@ -1034,20 +997,11 @@ export class ConversationService {
     ).normalize('NFC')
   }
 
-  /**
-   * 官方模式下构造 CLI 子进程的 auth env:
-   * - CLAUDE_CODE_ENTRYPOINT=claude-desktop 让 CLI 忽略外部残留 ANTHROPIC_* env
-   * - 如果 haha 自管的 oauth.json 里有可用 token,注入 CLAUDE_CODE_OAUTH_TOKEN
-   *   让 CLI 直接拿 env 里的 token,不碰 Keychain,绕开 macOS ACL 静默拒绝
-   *   (这是 DMG 安装 .app 后 403 "Request not allowed" 的唯一根治方案)
-   */
   private async buildOfficialOAuthEnv(): Promise<Record<string, string>> {
     const env: Record<string, string> = {
       CLAUDE_CODE_ENTRYPOINT: 'claude-desktop',
     }
     try {
-      // deferred import: avoids instantiating the OAuth singleton on every
-      // ConversationService construction — only loaded when official mode hits.
       const { hahaOAuthService } = await import('./hahaOAuthService.js')
       const token = await hahaOAuthService.ensureFreshAccessToken()
       if (token) {
@@ -1104,15 +1058,6 @@ export class ConversationService {
     }
   }
 
-  /**
-   * 只有当用户处于"官方"模式(没有激活任何自定义 provider)时,才把 CLI 标记为
-   * managed-OAuth。激活自定义 provider 时 settings.json 里有 ANTHROPIC_AUTH_TOKEN;
-   * 这种情况下 CLI 必须按 token 路径走第三方 endpoint,不能被 managed 规则
-   * 强制切 OAuth。
-   *
-   * 默认 (读不到 settings.json) 按"官方"处理 — 即使用户从未用过 dreamcoder
-   * provider 管理,也希望官方 OAuth 能正常工作。
-   */
   private shouldMarkManagedOAuth(providerId?: string | null): boolean {
     if (providerId === null) {
       return true

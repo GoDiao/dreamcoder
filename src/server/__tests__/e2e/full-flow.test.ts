@@ -1,9 +1,3 @@
-/**
- * E2E Test — 完整流程测试
- *
- * 启动真实服务器，模拟 UI 前端的完整操作流程。
- */
-
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as path from 'path'
@@ -13,12 +7,10 @@ let server: ReturnType<typeof Bun.serve>
 let baseUrl: string
 let tmpDir: string
 
-// Use dynamic import to avoid bundling issues
 async function startTestServer() {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-e2e-'))
   process.env.CLAUDE_CONFIG_DIR = tmpDir
 
-  // Create required directories
   await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
 
   const { startServer } = await import('../../index.js')
@@ -47,10 +39,6 @@ describe('E2E: Full Flow', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  // =============================================
-  // 1. Health & Status
-  // =============================================
-
   it('should return healthy status', async () => {
     const res = await fetch(`${baseUrl}/health`)
     const data = await res.json()
@@ -68,10 +56,6 @@ describe('E2E: Full Flow', () => {
     expect(data.platform).toBe('darwin')
     expect(data.configDir).toBe(tmpDir)
   })
-
-  // =============================================
-  // 2. Sessions CRUD
-  // =============================================
 
   let sessionId: string
 
@@ -123,10 +107,6 @@ describe('E2E: Full Flow', () => {
     expect(data.sessions.length).toBe(0)
   })
 
-  // =============================================
-  // 3. Settings
-  // =============================================
-
   it('should get empty settings initially', async () => {
     const { data } = await api('GET', '/api/settings/user')
     expect(data).toEqual({})
@@ -152,10 +132,6 @@ describe('E2E: Full Flow', () => {
     expect(status).toBe(400)
   })
 
-  // =============================================
-  // 4. Models
-  // =============================================
-
   it('should list available models', async () => {
     const { data } = await api('GET', '/api/models')
     expect(data.models.length).toBe(4)
@@ -175,10 +151,6 @@ describe('E2E: Full Flow', () => {
     const { data } = await api('GET', '/api/effort')
     expect(data.level).toBe('high')
   })
-
-  // =============================================
-  // 5. Scheduled Tasks
-  // =============================================
 
   let taskId: string
 
@@ -223,12 +195,7 @@ describe('E2E: Full Flow', () => {
     expect(data.tasks).toEqual([])
   })
 
-  // =============================================
-  // 6. Search
-  // =============================================
-
   it('should search workspace', async () => {
-    // Create a test file to search
     await fs.writeFile(path.join(tmpDir, 'test-search.txt'), 'Hello World\nFoo Bar Baz\n')
 
     const { status, data } = await api('POST', '/api/search', {
@@ -239,10 +206,6 @@ describe('E2E: Full Flow', () => {
     expect(data.results.length).toBeGreaterThan(0)
     expect(data.results[0].text).toContain('Hello')
   })
-
-  // =============================================
-  // 7. Agents
-  // =============================================
 
   it('should start with shared active/all agent payload', async () => {
     const { data } = await api('GET', '/api/agents')
@@ -275,10 +238,6 @@ describe('E2E: Full Flow', () => {
     expect([200, 204]).toContain(status)
   })
 
-  // =============================================
-  // 8. WebSocket Chat
-  // =============================================
-
   it('should connect via WebSocket', async () => {
     const wsUrl = baseUrl.replace('http://', 'ws://') + '/ws/test-ws-session'
 
@@ -287,13 +246,11 @@ describe('E2E: Full Flow', () => {
 
     await new Promise<void>((resolve, reject) => {
       ws.onopen = () => {
-        // Should receive connected message
       }
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data as string)
         messages.push(msg)
         if (msg.type === 'connected') {
-          // Send a test message
           ws.send(JSON.stringify({ type: 'user_message', content: 'Hello' }))
         }
         if (msg.type === 'status' && msg.state === 'idle' && messages.length > 2) {
@@ -312,25 +269,15 @@ describe('E2E: Full Flow', () => {
     expect(messages[0].sessionId).toBe('test-ws-session')
   })
 
-  // =============================================
-  // 9. Conversation Status
-  // =============================================
-
   it('should get chat status', async () => {
-    // Create a session first
     const { data: created } = await api('POST', '/api/sessions', { workDir: tmpDir })
 
     const { status, data } = await api('GET', `/api/sessions/${created.sessionId}/chat/status`)
     expect(status).toBe(200)
     expect(data.state).toBe('idle')
 
-    // Cleanup
     await api('DELETE', `/api/sessions/${created.sessionId}`)
   })
-
-  // =============================================
-  // 10. CORS
-  // =============================================
 
   it('should handle CORS preflight', async () => {
     const res = await fetch(`${baseUrl}/api/status`, {
@@ -340,10 +287,6 @@ describe('E2E: Full Flow', () => {
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000')
   })
-
-  // =============================================
-  // 11. Error Handling
-  // =============================================
 
   it('should return 404 for unknown API', async () => {
     const { status } = await api('GET', '/api/nonexistent')
