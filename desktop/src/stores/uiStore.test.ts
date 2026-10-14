@@ -38,6 +38,19 @@ describe('uiStore theme handling', () => {
     expect(document.documentElement.style.colorScheme).toBe('dark')
   })
 
+  it('applies a dark color scheme for dark, midnight and aurora, light for the rest', async () => {
+    const { applyTheme } = await import('./uiStore')
+    const { THEME_MODES } = await import('../types/settings')
+
+    for (const theme of THEME_MODES) {
+      applyTheme(theme)
+      expect(document.documentElement.getAttribute('data-theme')).toBe(theme)
+      expect(document.documentElement.style.colorScheme).toBe(
+        theme === 'dark' || theme === 'midnight' || theme === 'aurora' ? 'dark' : 'light',
+      )
+    }
+  })
+
   it('cycles through all themes, persists Aurora, and wraps back to white', async () => {
     const { useUIStore } = await import('./uiStore')
 
