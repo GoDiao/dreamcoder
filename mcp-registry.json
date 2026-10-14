@@ -93,7 +93,7 @@
       "homepage": "https://github.com/modelcontextprotocol/servers",
       "tags": ["reference", "testing", "demo"],
       "runtime": "node",
-      "version": "2026.8.31",
+      "version": "1.0.0",
       "notes": "Demo/reference server. Curated because it is the canonical way to verify a client works."
     },
     {
