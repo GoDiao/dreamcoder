@@ -8,6 +8,7 @@ import type {
   OpenAIToolCall,
   OpenAITool,
 } from './types.js'
+import { extractToolResultContent } from './toolArguments.js'
 
 export function anthropicToOpenaiChat(
   body: AnthropicRequest,
@@ -109,11 +110,7 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
       const url = `data:${block.source.media_type};base64,${block.source.data}`
       contentParts.push({ type: 'image_url', image_url: { url } })
     } else if (block.type === 'tool_result') {
-      const resultContent = typeof block.content === 'string'
-        ? block.content
-        : Array.isArray(block.content)
-          ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
-          : ''
+      const resultContent = extractToolResultContent(block.content)
       output.push({
         role: 'tool',
         tool_call_id: block.tool_use_id,
