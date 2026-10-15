@@ -2,6 +2,8 @@
 
 All notable changes to DreamCoder will be documented in this file.
 
+> DreamCoder is derived from [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1 (MIT License, see [LICENSE](./LICENSE)). Much of the functionality listed in the 0.2.0–0.4.0 entries, including multi-provider support, the desktop GUI, H5 remote access and the IM adapters, was inherited from cc-haha rather than built from scratch in DreamCoder. Entries below have been annotated where this was previously unclear.
+
 ## [Unreleased]
 
 ## [0.4.5] — 2026-06-25
@@ -16,17 +18,15 @@ All notable changes to DreamCoder will be documented in this file.
 - New documentation: TROUBLESHOOTING guide (bilingual), ENVIRONMENT_TESTING matrix, language-switch links across all bilingual docs.
 
 ### Changed
-- Repository history rebuilt on a clean orphan baseline (`clean-master`) — all legacy branding ancestry removed.
+- Repository history restarted from a new orphan baseline (`clean-master`). The upstream [cc-haha](https://github.com/NanmiCoder/cc-haha) history is not part of this repository's git history; DreamCoder remains derived from cc-haha v0.3.1 (see LICENSE).
 - Bilingual README and contributor docs polished with clearer product-oriented language.
-- E2E scripts unified to DreamCoder branding (removed all legacy `cc-haha` references).
+- E2E scripts renamed to DreamCoder branding.
 - GitHub default branch switched from `master` to `clean-master`.
 
 ## [0.4.0] — 2026-06-13
 
 ### Added
-- **Phase 3 — H5 Remote Access landed**: access desktop sessions from a phone or browser over LAN. Includes the H5 access toggle with token rotation, QR-code pairing, mobile chat UI, WebSocket remote bridge, and a strict CORS / loopback-vs-token request classifier (`src/server/h5AccessPolicy.ts`).
-- Direct-connect session manager and headless connect entrypoint (`src/server/createDirectConnectSession.ts`, `connectHeadless.ts`).
-- Static H5 asset serving with long-lived cache for `/assets/*` (`src/server/staticH5.ts`).
+- **Phase 3 — H5 Remote Access enabled**: access desktop sessions from a phone or browser over LAN. The H5 implementation (token rotation, QR-code pairing, mobile chat UI, WebSocket remote bridge, CORS / loopback-vs-token request classifier in `src/server/h5AccessPolicy.ts`, direct-connect session manager, headless connect entrypoint and static H5 asset serving) is inherited from [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1; DreamCoder exposes it in Settings and documents it.
 - H5 Access settings tab is now visible by default in Settings.
 - Performance optimization: bundle splitting (manualChunks), lazy-loaded Settings page, dynamic KaTeX/Mermaid imports.
 - Performance optimization: sessionsById Map index for O(1) session lookups.
@@ -77,6 +77,8 @@ All notable changes to DreamCoder will be documented in this file.
 - Missing `uia_helper.py` in runtime bundle.
 
 ## [0.2.0] — 2026-05-28
+
+First DreamCoder release, based on [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1. Most items under "Added" describe functionality inherited from cc-haha.
 
 ### Added
 - Multi-provider support: Anthropic, OpenAI, DeepSeek, Moonshot (Kimi), MiniMax, Azure OpenAI, Google Vertex, AWS Bedrock.

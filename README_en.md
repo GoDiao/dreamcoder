@@ -125,6 +125,8 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 
 ## 📅 Roadmap
 
+> Several items below (e.g. multi-provider support, H5 LAN access, the IM adapter code) are inherited from cc-haha v0.3.1; see [Acknowledgements](#-acknowledgements).
+
 - [x] **Phase 1**: Desktop GUI implementation + Multi-Provider System + Project Workspace
 - [x] **Phase 2**: CLI Backend Integration + Computer Use + MCP + Skills + Agent Teams
 - [x] **Phase 2.5**: Performance — bundle splitting, polling throttle, terminal LRU, sessionStore refactor
@@ -194,7 +196,7 @@ For release history and notable updates, see [CHANGELOG.md](CHANGELOG.md).
 
 ## 🙏 Acknowledgements
 
-Parts of DreamCoder are derived from [cc-haha](https://github.com/NanmiCoder/cc-haha) (MIT License, Copyright (c) 2026 cc-haha). Thanks to its authors for their open-source work.
+DreamCoder is built on [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1 (MIT License, Copyright (c) 2026 cc-haha). Features such as multi-provider configuration, the desktop GUI, H5 remote access and the IM adapters are inherited from cc-haha. Thanks to its authors for their open-source work.
 
 ## 📄 License
 

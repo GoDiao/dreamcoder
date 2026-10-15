@@ -128,6 +128,8 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 ## 📅 路线图
 
+> 下列阶段中有不少功能（如多模型支持、H5 局域网访问、IM 适配器代码）继承自 cc-haha v0.3.1，见[致谢](#-致谢)。
+
 - [x] **Phase 1**: 桌面端 GUI + 多模型支持 + 项目工作台
 - [x] **Phase 2**: CLI 后端集成 + Computer Use + MCP + Skills + Agent Teams
 - [x] **Phase 2.5**: 性能优化 — bundle 拆分、轮询节流、终端 LRU、sessionStore 重构
@@ -197,7 +199,7 @@ bun run tauri dev
 
 ## 🙏 致谢
 
-DreamCoder 的部分代码来源于 [cc-haha](https://github.com/NanmiCoder/cc-haha)（MIT 协议，Copyright (c) 2026 cc-haha），感谢原作者的开源工作。
+DreamCoder 基于 [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1 开发（MIT 协议，Copyright (c) 2026 cc-haha）。多模型配置、桌面 GUI、H5 远程访问、IM 适配器等功能继承自 cc-haha，感谢原作者的开源工作。
 
 ## 📄 许可证
 
