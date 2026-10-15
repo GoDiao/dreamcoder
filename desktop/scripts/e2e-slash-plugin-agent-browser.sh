@@ -143,7 +143,7 @@ echo "Using MCP plugin: ${MCP_PLUGIN_NAME} (${MCP_PLUGIN_ID})"
 
 "${AB[@]}" open "${WEB_URL}"
 "${AB[@]}" wait --load networkidle
-wait_for_text "Claude Code Haha"
+wait_for_text "DreamCoder"
 "${AB[@]}" screenshot "${ARTIFACT_DIR}/01-home.png" >/dev/null
 
 "${AB[@]}" find role button click --name "New session"

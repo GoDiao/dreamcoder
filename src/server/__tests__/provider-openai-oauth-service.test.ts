@@ -4,14 +4,14 @@ import * as path from 'path'
 import * as os from 'os'
 import { createConnection, createServer } from 'net'
 import {
-  HahaOpenAIOAuthService,
-  getHahaOpenAIOAuthFilePath,
+  ProviderOpenAIOAuthService,
+  getProviderOpenAIOAuthFilePath,
   type StoredOpenAIOAuthTokens,
-} from '../services/hahaOpenAIOAuthService.js'
+} from '../services/providerOpenAIOAuthService.js'
 
 let tmpDir: string
 let originalConfigDir: string | undefined
-let service: HahaOpenAIOAuthService
+let service: ProviderOpenAIOAuthService
 let callbackPort: number
 
 async function getFreePort(): Promise<number> {
@@ -67,12 +67,12 @@ function mockJwt(payload: Record<string, unknown>): string {
 
 async function setup() {
   tmpDir = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'haha-openai-oauth-test-'),
+    path.join(os.tmpdir(), 'provider-openai-oauth-test-'),
   )
   originalConfigDir = process.env.CLAUDE_CONFIG_DIR
   process.env.CLAUDE_CONFIG_DIR = tmpDir
   callbackPort = await getFreePort()
-  service = new HahaOpenAIOAuthService({ callbackPort })
+  service = new ProviderOpenAIOAuthService({ callbackPort })
 }
 
 async function teardown() {
@@ -85,7 +85,7 @@ async function teardown() {
   await fs.rm(tmpDir, { recursive: true, force: true })
 }
 
-describe('HahaOpenAIOAuthService — file storage', () => {
+describe('ProviderOpenAIOAuthService — file storage', () => {
   beforeEach(setup)
   afterEach(teardown)
 
@@ -105,7 +105,7 @@ describe('HahaOpenAIOAuthService — file storage', () => {
     }
     await service.saveTokens(tokens)
 
-    const oauthPath = getHahaOpenAIOAuthFilePath()
+    const oauthPath = getProviderOpenAIOAuthFilePath()
     const stat = await fs.stat(oauthPath)
     if (process.platform !== 'win32') {
       expect(stat.mode & 0o777).toBe(0o600)
@@ -149,7 +149,7 @@ describe('HahaOpenAIOAuthService — file storage', () => {
       renameSpy.mockRestore()
     }
 
-    const oauthPath = getHahaOpenAIOAuthFilePath()
+    const oauthPath = getProviderOpenAIOAuthFilePath()
     const files = await fs.readdir(path.dirname(oauthPath))
     expect(
       files.filter((name) => name.startsWith('openai-oauth.json.tmp.')),
@@ -158,7 +158,7 @@ describe('HahaOpenAIOAuthService — file storage', () => {
   })
 })
 
-describe('HahaOpenAIOAuthService — session management', () => {
+describe('ProviderOpenAIOAuthService — session management', () => {
   beforeEach(setup)
   afterEach(teardown)
 
@@ -285,7 +285,7 @@ describe('HahaOpenAIOAuthService — session management', () => {
   })
 })
 
-describe('HahaOpenAIOAuthService — ensureFreshAccessToken', () => {
+describe('ProviderOpenAIOAuthService — ensureFreshAccessToken', () => {
   beforeEach(setup)
   afterEach(teardown)
 

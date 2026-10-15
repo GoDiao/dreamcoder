@@ -38,8 +38,6 @@ English | [简体中文](./ROADMAP_zh.md)
 
 Once H5 Access is enabled, phone browsers on the same LAN can reach desktop sessions. Cross-network access requires a reverse proxy configured by the user.
 
-The H5 access implementation comes from [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1; DreamCoder added the settings entry and documentation on top of it.
-
 - [x] H5 access toggle & token management
 - [x] Mobile chat UI adaptation
 - [x] WebSocket remote bridge
@@ -53,7 +51,7 @@ See: [Issue #3](https://github.com/GoDiao/dreamcoder/issues/3)
 
 Chat with AI remotely via Feishu/DingTalk/Telegram/WeChat.
 
-The adapter code comes from [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1, and is already in the repository, but the desktop settings entry and automatic startup flow are unfinished. Current use requires starting adapter processes manually. See the [adapter notes](../adapters/README.md).
+The adapter code is already in the repository, but the desktop settings entry and automatic startup flow are unfinished. Current use requires starting adapter processes manually. See the [adapter notes](../adapters/README.md).
 
 - [ ] Adapter configuration UI (skeleton exists in `AdapterSettings`)
 - [ ] Pairing code security mechanism

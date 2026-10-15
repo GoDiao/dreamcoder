@@ -13,7 +13,7 @@ import {
   OPENAI_OFFICIAL_PROVIDER,
   isOpenAIOfficialProviderId,
 } from './openaiOfficialProvider.js'
-import { hahaOpenAIOAuthService } from './hahaOpenAIOAuthService.js'
+import { providerOpenAIOAuthService } from './providerOpenAIOAuthService.js'
 import {
   CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
   ensurePersistentStorageUpgraded,
@@ -66,12 +66,12 @@ export class ProviderService {
     return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
   }
 
-  private getCcHahaDir(): string {
+  private getDreamcoderDir(): string {
     return path.join(this.getConfigDir(), 'dreamcoder')
   }
 
   private getIndexPath(): string {
-    return path.join(this.getCcHahaDir(), 'providers.json')
+    return path.join(this.getDreamcoderDir(), 'providers.json')
   }
 
   private async readIndex(): Promise<ProvidersIndex> {
@@ -294,7 +294,7 @@ export class ProviderService {
     const index = await this.readIndex()
     if (index.activeId) {
       if (isOpenAIOfficialProviderId(index.activeId)) {
-        const tokens = await hahaOpenAIOAuthService.ensureFreshTokens()
+        const tokens = await providerOpenAIOAuthService.ensureFreshTokens()
         if (tokens?.accessToken && tokens.refreshToken) {
           return {
             hasAuth: true,

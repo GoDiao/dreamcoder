@@ -6,8 +6,8 @@ import { teamWatcher } from './services/teamWatcher.js'
 import { cronScheduler } from './services/cronScheduler.js'
 import { handleProxyRequest } from './proxy/handler.js'
 import { ProviderService } from './services/providerService.js'
-import { handleHahaOAuthCallback } from './api/haha-oauth.js'
-import { handleHahaOpenAIOAuthCallback } from './api/haha-openai-oauth.js'
+import { handleProviderOAuthCallback } from './api/provider-oauth.js'
+import { handleProviderOpenAIOAuthCallback } from './api/provider-openai-oauth.js'
 import { OPENAI_CODEX_REDIRECT_PATH } from '../services/openaiAuth/client.js'
 import { ensureDesktopCliLauncherInstalled } from './services/desktopCliLauncherService.js'
 import { enableConfigs } from '../utils/config.js'
@@ -249,14 +249,14 @@ export function startServer(port = PORT, host = HOST) {
         }
 
         if (url.pathname === '/callback') {
-          return handleHahaOAuthCallback(url)
+          return handleProviderOAuthCallback(url)
         }
 
         if (
           url.pathname === OPENAI_CODEX_REDIRECT_PATH ||
           url.pathname === '/callback/openai'
         ) {
-          return handleHahaOpenAIOAuthCallback(url)
+          return handleProviderOpenAIOAuthCallback(url)
         }
 
         if (url.pathname.startsWith('/api/')) {

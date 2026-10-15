@@ -66,13 +66,13 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function getHahaOpenAIOAuthFilePath(): string {
+export function getProviderOpenAIOAuthFilePath(): string {
   const configDir =
     process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
   return path.join(configDir, 'dreamcoder', 'openai-oauth.json')
 }
 
-export class HahaOpenAIOAuthService {
+export class ProviderOpenAIOAuthService {
   private sessions = new Map<string, OpenAIOAuthSession>()
   private refreshFn: OpenAIRefreshFn = refreshOpenAITokens
   private callbackPort: number
@@ -96,7 +96,7 @@ export class HahaOpenAIOAuthService {
   }
 
   getOAuthFilePath(): string {
-    return getHahaOpenAIOAuthFilePath()
+    return getProviderOpenAIOAuthFilePath()
   }
 
   async loadTokens(): Promise<StoredOpenAIOAuthTokens | null> {
@@ -239,7 +239,7 @@ export class HahaOpenAIOAuthService {
           this.sessions.delete(session.state)
         }
         console.error(
-          '[HahaOpenAIOAuthService] OAuth callback listener failed:',
+          '[ProviderOpenAIOAuthService] OAuth callback listener failed:',
           err instanceof Error ? err.message : err,
         )
       })
@@ -331,7 +331,7 @@ export class HahaOpenAIOAuthService {
       return updated
     } catch (err) {
       console.error(
-        '[HahaOpenAIOAuthService] token refresh failed:',
+        '[ProviderOpenAIOAuthService] token refresh failed:',
         err instanceof Error ? err.message : err,
       )
       return null
@@ -344,4 +344,4 @@ export class HahaOpenAIOAuthService {
   }
 }
 
-export const hahaOpenAIOAuthService = new HahaOpenAIOAuthService()
+export const providerOpenAIOAuthService = new ProviderOpenAIOAuthService()

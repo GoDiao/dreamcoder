@@ -650,11 +650,11 @@ describe('Feishu: isOutsideWorkDir', () => {
 describe('Feishu: project picker card', () => {
   const sampleProjects: RecentProject[] = [
     {
-      projectPath: '/Users/dev/claude-code-haha',
-      realPath: '/Users/dev/claude-code-haha',
-      projectName: 'claude-code-haha',
+      projectPath: '/Users/dev/dreamcoder',
+      realPath: '/Users/dev/dreamcoder',
+      projectName: 'dreamcoder',
       isGit: true,
-      repoName: 'claude-code-haha',
+      repoName: 'dreamcoder',
       branch: 'main',
       modifiedAt: '2026-04-11T00:00:00Z',
       sessionCount: 3,
@@ -742,11 +742,11 @@ describe('Feishu: project picker card', () => {
 
     expect(info.length).toBe(2)
     expect(info[0].tag).toBe('markdown')
-    expect(info[0].content).toContain('**claude-code-haha**')
+    expect(info[0].content).toContain('**dreamcoder**')
     expect(info[0].content).toContain('*main*')
     expect(info[1].tag).toBe('markdown')
     expect(info[1].text_size).toBe('notation')
-    expect(info[1].content).toContain('claude-code-haha')
+    expect(info[1].content).toContain('dreamcoder')
   })
 
   it('row without branch has no separator dot in title', () => {
@@ -765,8 +765,8 @@ describe('Feishu: project picker card', () => {
     expect(btn1.text.content).toBe('选择')
     expect(btn1.size).toBe('small')
     expect(btn1.value.action).toBe('pick_project')
-    expect(btn1.value.realPath).toBe('/Users/dev/claude-code-haha')
-    expect(btn1.value.projectName).toBe('claude-code-haha')
+    expect(btn1.value.realPath).toBe('/Users/dev/dreamcoder')
+    expect(btn1.value.projectName).toBe('dreamcoder')
 
     const btn2 = getRowButton(rows[1])
     expect(btn2.value.realPath).toBe('/Users/dev/desktop')
@@ -848,16 +848,16 @@ describe('Feishu: card.action.trigger parsing', () => {
       action: {
         value: {
           action: 'pick_project',
-          realPath: '/Users/dev/claude-code-haha',
-          projectName: 'claude-code-haha',
+          realPath: '/Users/dev/dreamcoder',
+          projectName: 'dreamcoder',
         },
       },
       context: { open_chat_id: 'oc_chat_123' },
     }
 
     expect(event.action.value.action).toBe('pick_project')
-    expect(event.action.value.realPath).toBe('/Users/dev/claude-code-haha')
-    expect(event.action.value.projectName).toBe('claude-code-haha')
+    expect(event.action.value.realPath).toBe('/Users/dev/dreamcoder')
+    expect(event.action.value.projectName).toBe('dreamcoder')
   })
 
   it('ignores non-handled actions', () => {

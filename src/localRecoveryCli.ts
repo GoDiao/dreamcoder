@@ -240,7 +240,7 @@ async function runInteractive(parsed: {
   })
 
   process.stdout.write(
-    `Claude Haha local interactive mode\nmodel: ${model}\ncommands: /exit, /clear\n\n`,
+    `DreamCoder local interactive mode\nmodel: ${model}\ncommands: /exit, /clear\n\n`,
   )
   rl.prompt()
 

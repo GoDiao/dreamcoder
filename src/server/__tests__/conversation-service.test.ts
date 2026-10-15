@@ -147,7 +147,7 @@ describe('ConversationService', () => {
 
   test('buildChildEnv pins desktop memory to the current sanitized project directory', async () => {
     const service = new ConversationService() as any
-    const workDir = path.join(tmpDir, 'workspace', 'myself_code', 'claude-code-haha')
+    const workDir = path.join(tmpDir, 'workspace', 'myself_code', 'dreamcoder')
     await fs.mkdir(workDir, { recursive: true })
 
     const env = (await service.buildChildEnv(workDir)) as Record<string, string>
@@ -191,10 +191,10 @@ describe('ConversationService', () => {
   })
 
   test('strips inherited provider env when desktop provider config exists', async () => {
-    const ccHahaDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(ccHahaDir, { recursive: true })
+    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
-      path.join(ccHahaDir, 'providers.json'),
+      path.join(dreamcoderDir, 'providers.json'),
       JSON.stringify({ activeId: null, providers: [] }),
       'utf-8',
     )
@@ -230,19 +230,19 @@ describe('ConversationService', () => {
     expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
   })
 
-  test('buildChildEnv injects CLAUDE_CODE_OAUTH_TOKEN when official mode + haha oauth token exists', async () => {
-    const ccHahaDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(ccHahaDir, { recursive: true })
+  test('buildChildEnv injects CLAUDE_CODE_OAUTH_TOKEN when official mode + provider oauth token exists', async () => {
+    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
-      path.join(ccHahaDir, 'settings.json'),
+      path.join(dreamcoderDir, 'settings.json'),
       JSON.stringify({ env: {} }),
       'utf-8',
     )
 
-    const { hahaOAuthService } = await import('../services/hahaOAuthService.js')
-    await hahaOAuthService.saveTokens({
-      accessToken: 'haha-fresh-token',
-      refreshToken: 'haha-refresh-xxx',
+    const { providerOAuthService } = await import('../services/providerOAuthService.js')
+    await providerOAuthService.saveTokens({
+      accessToken: 'fresh-token',
+      refreshToken: 'refresh-xxx',
       expiresAt: Date.now() + 30 * 60_000,
       scopes: ['user:inference'],
       subscriptionType: 'max',
@@ -252,21 +252,21 @@ describe('ConversationService', () => {
     const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
 
     expect(env.CLAUDE_CODE_ENTRYPOINT).toBe('claude-desktop')
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('haha-fresh-token')
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('fresh-token')
   })
 
   test('buildChildEnv does NOT inject CLAUDE_CODE_OAUTH_TOKEN when not official mode', async () => {
-    const ccHahaDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(ccHahaDir, { recursive: true })
+    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
-      path.join(ccHahaDir, 'settings.json'),
+      path.join(dreamcoderDir, 'settings.json'),
       JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'custom-provider-token' } }),
       'utf-8',
     )
 
-    const { hahaOAuthService } = await import('../services/hahaOAuthService.js')
-    await hahaOAuthService.saveTokens({
-      accessToken: 'haha-token-should-not-be-used',
+    const { providerOAuthService } = await import('../services/providerOAuthService.js')
+    await providerOAuthService.saveTokens({
+      accessToken: 'token-should-not-be-used',
       refreshToken: null,
       expiresAt: null,
       scopes: [],
@@ -371,16 +371,16 @@ describe('ConversationService', () => {
 
 
   test('buildChildEnv can force official auth even when a custom default provider exists', async () => {
-    const ccHahaDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(ccHahaDir, { recursive: true })
+    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
-      path.join(ccHahaDir, 'settings.json'),
+      path.join(dreamcoderDir, 'settings.json'),
       JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'custom-provider-token' } }),
       'utf-8',
     )
 
-    const { hahaOAuthService } = await import('../services/hahaOAuthService.js')
-    await hahaOAuthService.saveTokens({
+    const { providerOAuthService } = await import('../services/providerOAuthService.js')
+    await providerOAuthService.saveTokens({
       accessToken: 'forced-official-token',
       refreshToken: 'forced-official-refresh',
       expiresAt: Date.now() + 30 * 60_000,
@@ -402,8 +402,8 @@ describe('ConversationService', () => {
     const providerService = new ProviderService()
     await providerService.activateProvider('openai-official')
 
-    const { hahaOAuthService } = await import('../services/hahaOAuthService.js')
-    await hahaOAuthService.saveTokens({
+    const { providerOAuthService } = await import('../services/providerOAuthService.js')
+    await providerOAuthService.saveTokens({
       accessToken: 'claude-oauth-token-that-must-not-be-used',
       refreshToken: 'claude-refresh-token',
       expiresAt: Date.now() + 30 * 60_000,
@@ -442,10 +442,10 @@ describe('ConversationService', () => {
   })
 
   test('buildChildEnv does not leak inherited CLAUDE_CODE_OAUTH_TOKEN when official token is unavailable', async () => {
-    const ccHahaDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(ccHahaDir, { recursive: true })
+    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
-      path.join(ccHahaDir, 'settings.json'),
+      path.join(dreamcoderDir, 'settings.json'),
       JSON.stringify({ env: {} }),
       'utf-8',
     )

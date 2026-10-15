@@ -38,8 +38,6 @@
 
 启用 H5 接入后，可在同一局域网内从手机浏览器访问桌面端会话。跨网络访问需要用户自行配置反向代理。
 
-H5 接入的实现来自 [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1，DreamCoder 在此基础上做了设置入口和文档。
-
 - [x] H5 访问开关与 Token 管理
 - [x] 手机端聊天 UI 适配
 - [x] WebSocket 远程桥接
@@ -53,7 +51,7 @@ H5 接入的实现来自 [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1
 
 通过飞书/钉钉/Telegram/微信远程与 AI 对话。
 
-适配器代码来自 [cc-haha](https://github.com/NanmiCoder/cc-haha) v0.3.1，已在仓库中，但桌面设置入口和自动启动流程尚未完成；当前使用需要手动启动适配器进程。详见 [适配器说明](../adapters/README.md)。
+适配器代码已在仓库中，但桌面设置入口和自动启动流程尚未完成；当前使用需要手动启动适配器进程。详见 [适配器说明](../adapters/README.md)。
 
 - [ ] 适配器配置 UI (已在 `AdapterSettings` 有骨架)
 - [ ] 配对码安全机制

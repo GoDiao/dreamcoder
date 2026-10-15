@@ -6,7 +6,7 @@ import { OPENAI_CODEX_API_ENDPOINT } from '../../services/openaiAuth/client.js'
 import { ProviderService } from '../services/providerService.js'
 import { deriveTitle, generateTitle, parseGeneratedTitleText, saveAiTitle } from '../services/titleService.js'
 import { sessionService } from '../services/sessionService.js'
-import { hahaOpenAIOAuthService } from '../services/hahaOpenAIOAuthService.js'
+import { providerOpenAIOAuthService } from '../services/providerOpenAIOAuthService.js'
 
 describe('titleService', () => {
   let tmpDir: string
@@ -22,7 +22,7 @@ describe('titleService', () => {
 
   afterEach(async () => {
     globalThis.fetch = originalFetch
-    hahaOpenAIOAuthService.dispose()
+    providerOpenAIOAuthService.dispose()
     restoreEnv('CLAUDE_CONFIG_DIR', originalConfigDir)
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
@@ -195,7 +195,7 @@ describe('titleService', () => {
   test('generates titles when ChatGPT Official OAuth is active', async () => {
     const providerService = new ProviderService()
     await providerService.activateProvider('openai-official')
-    await hahaOpenAIOAuthService.saveTokens({
+    await providerOpenAIOAuthService.saveTokens({
       accessToken: 'access-for-title',
       refreshToken: 'refresh-for-title',
       expiresAt: Date.now() + 60 * 60_000,

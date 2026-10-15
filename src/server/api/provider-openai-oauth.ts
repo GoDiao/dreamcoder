@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { hahaOpenAIOAuthService } from '../services/hahaOpenAIOAuthService.js'
+import { providerOpenAIOAuthService } from '../services/providerOpenAIOAuthService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 const StartRequestSchema = z.object({
@@ -13,7 +13,7 @@ function html(body: string): Response {
   })
 }
 
-export async function handleHahaOpenAIOAuthApi(
+export async function handleProviderOpenAIOAuthApi(
   req: Request,
   url: URL,
   segments: string[],
@@ -32,7 +32,7 @@ export async function handleHahaOpenAIOAuthApi(
       if (!parsed.success) {
         throw ApiError.badRequest('serverPort (positive integer) required')
       }
-      const session = await hahaOpenAIOAuthService.startSession({
+      const session = await providerOpenAIOAuthService.startSession({
         serverPort: parsed.data.serverPort,
       })
       return Response.json({
@@ -42,7 +42,7 @@ export async function handleHahaOpenAIOAuthApi(
     }
 
     if (action === undefined && req.method === 'GET') {
-      const tokens = await hahaOpenAIOAuthService.ensureFreshTokens()
+      const tokens = await providerOpenAIOAuthService.ensureFreshTokens()
       if (!tokens) {
         return Response.json({ loggedIn: false })
       }
@@ -55,7 +55,7 @@ export async function handleHahaOpenAIOAuthApi(
     }
 
     if (action === undefined && req.method === 'DELETE') {
-      await hahaOpenAIOAuthService.deleteTokens()
+      await providerOpenAIOAuthService.deleteTokens()
       return Response.json({ ok: true })
     }
 
@@ -65,7 +65,7 @@ export async function handleHahaOpenAIOAuthApi(
   }
 }
 
-export async function handleHahaOpenAIOAuthCallback(url: URL): Promise<Response> {
+export async function handleProviderOpenAIOAuthCallback(url: URL): Promise<Response> {
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
   const error = url.searchParams.get('error')
@@ -78,7 +78,7 @@ export async function handleHahaOpenAIOAuthCallback(url: URL): Promise<Response>
   }
 
   try {
-    await hahaOpenAIOAuthService.completeSession(code, state)
+    await providerOpenAIOAuthService.completeSession(code, state)
     return html(renderCallbackPage(true, null))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

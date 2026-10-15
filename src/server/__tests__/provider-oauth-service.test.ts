@@ -3,19 +3,19 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import {
-  HahaOAuthService,
+  ProviderOAuthService,
   type StoredOAuthTokens,
-} from '../services/hahaOAuthService.js'
+} from '../services/providerOAuthService.js'
 
 let tmpDir: string
 let originalConfigDir: string | undefined
-let service: HahaOAuthService
+let service: ProviderOAuthService
 
 async function setup() {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'haha-oauth-test-'))
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'provider-oauth-test-'))
   originalConfigDir = process.env.CLAUDE_CONFIG_DIR
   process.env.CLAUDE_CONFIG_DIR = tmpDir
-  service = new HahaOAuthService()
+  service = new ProviderOAuthService()
 }
 
 async function teardown() {
@@ -27,7 +27,7 @@ async function teardown() {
   await fs.rm(tmpDir, { recursive: true, force: true })
 }
 
-describe('HahaOAuthService — file storage', () => {
+describe('ProviderOAuthService — file storage', () => {
   beforeEach(setup)
   afterEach(teardown)
 
@@ -68,7 +68,7 @@ describe('HahaOAuthService — file storage', () => {
   })
 })
 
-describe('HahaOAuthService — session management', () => {
+describe('ProviderOAuthService — session management', () => {
   beforeEach(setup)
   afterEach(teardown)
 
@@ -119,7 +119,7 @@ describe('HahaOAuthService — session management', () => {
   })
 })
 
-describe('HahaOAuthService — ensureFreshAccessToken', () => {
+describe('ProviderOAuthService — ensureFreshAccessToken', () => {
   beforeEach(setup)
   afterEach(teardown)
 

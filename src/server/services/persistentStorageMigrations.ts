@@ -280,10 +280,10 @@ function buildManagedSettingsForMigratedProvider(provider: JsonObject | undefine
 
 async function migrateLegacyRootProviders(
   configDir: string,
-  ccHahaDir: string,
+  dreamcoderDir: string,
   report: MigrationReport,
 ): Promise<void> {
-  const targetPath = path.join(ccHahaDir, 'providers.json')
+  const targetPath = path.join(dreamcoderDir, 'providers.json')
   try {
     await fs.access(targetPath)
     return
@@ -306,7 +306,7 @@ async function migrateLegacyRootProviders(
     await writeJsonFile(targetPath, migrated)
     report.migratedEntries.push('providers.json -> dreamcoder/providers.json')
 
-    const settingsPath = path.join(ccHahaDir, 'settings.json')
+    const settingsPath = path.join(dreamcoderDir, 'settings.json')
     const settings = await readJsonFile(settingsPath).catch(() => ({ missing: false, value: undefined, raw: '' }))
     if (!settings.missing) return
 
@@ -332,18 +332,18 @@ async function migrateLegacyRootProviders(
 
 async function runPersistentStorageMigrations(configDir: string): Promise<MigrationReport> {
   const report: MigrationReport = { migratedEntries: [], failures: [] }
-  const ccHahaDir = path.join(configDir, 'dreamcoder')
+  const dreamcoderDir = path.join(configDir, 'dreamcoder')
 
-  await migrateLegacyRootProviders(configDir, ccHahaDir, report)
+  await migrateLegacyRootProviders(configDir, dreamcoderDir, report)
 
   await migrateJsonEntry(
-    path.join(ccHahaDir, 'providers.json'),
+    path.join(dreamcoderDir, 'providers.json'),
     'dreamcoder/providers.json',
     report,
     migrateProvidersIndex,
   )
   await migrateJsonEntry(
-    path.join(ccHahaDir, 'settings.json'),
+    path.join(dreamcoderDir, 'settings.json'),
     'dreamcoder/settings.json',
     report,
     migrateManagedSettings,

@@ -1,7 +1,7 @@
 import { ProviderService } from './providerService.js'
 import { SettingsService } from './settingsService.js'
 import { sessionService } from './sessionService.js'
-import { hahaOpenAIOAuthService } from './hahaOpenAIOAuthService.js'
+import { providerOpenAIOAuthService } from './providerOpenAIOAuthService.js'
 import { isOpenAIOfficialProviderId } from './openaiOfficialProvider.js'
 import { OPENAI_CODEX_API_ENDPOINT } from '../../services/openaiAuth/client.js'
 import { resolveOpenAICodexModel } from '../../services/openaiAuth/models.js'
@@ -108,7 +108,7 @@ async function generateOpenAIOfficialTitle(
   trimmed: string,
   model: string,
 ): Promise<string | null> {
-  const tokens = await hahaOpenAIOAuthService.ensureFreshTokens()
+  const tokens = await providerOpenAIOAuthService.ensureFreshTokens()
   if (!tokens?.accessToken) return null
 
   const mappedModel = resolveOpenAICodexModel(model)

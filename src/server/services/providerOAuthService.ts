@@ -44,7 +44,7 @@ type FetchProfileFn = (
 const SESSION_TTL_MS = 5 * 60 * 1000
 const OAUTH_CALLBACK_PATH = '/callback'
 
-export class HahaOAuthService {
+export class ProviderOAuthService {
   private sessions = new Map<string, OAuthSession>()
   private refreshFn: RefreshFn = refreshOAuthToken
   private fetchProfileFn: FetchProfileFn = fetchProfileInfo
@@ -227,7 +227,7 @@ export class HahaOAuthService {
       return updated
     } catch (err) {
       console.error(
-        '[HahaOAuthService] token refresh failed:',
+        '[ProviderOAuthService] token refresh failed:',
         err instanceof Error ? err.message : err,
       )
       return null
@@ -240,4 +240,4 @@ export class HahaOAuthService {
   }
 }
 
-export const hahaOAuthService = new HahaOAuthService()
+export const providerOAuthService = new ProviderOAuthService()

@@ -1002,8 +1002,8 @@ export class ConversationService {
       CLAUDE_CODE_ENTRYPOINT: 'claude-desktop',
     }
     try {
-      const { hahaOAuthService } = await import('./hahaOAuthService.js')
-      const token = await hahaOAuthService.ensureFreshAccessToken()
+      const { providerOAuthService } = await import('./providerOAuthService.js')
+      const token = await providerOAuthService.ensureFreshAccessToken()
       if (token) {
         env.CLAUDE_CODE_OAUTH_TOKEN = token
       }
@@ -1023,9 +1023,9 @@ export class ConversationService {
 
     const configDir =
       process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-    const ccHahaDir = path.join(configDir, 'dreamcoder')
-    const providersIndexPath = path.join(ccHahaDir, 'providers.json')
-    const settingsPath = path.join(ccHahaDir, 'settings.json')
+    const dreamcoderDir = path.join(configDir, 'dreamcoder')
+    const providersIndexPath = path.join(dreamcoderDir, 'providers.json')
+    const settingsPath = path.join(dreamcoderDir, 'settings.json')
 
     if (fs.existsSync(providersIndexPath)) {
       return true

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { hahaOAuthService } from '../services/hahaOAuthService.js'
+import { providerOAuthService } from '../services/providerOAuthService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 const StartRequestSchema = z.object({
@@ -13,7 +13,7 @@ function html(body: string): Response {
   })
 }
 
-export async function handleHahaOAuthApi(
+export async function handleProviderOAuthApi(
   req: Request,
   url: URL,
   segments: string[],
@@ -32,7 +32,7 @@ export async function handleHahaOAuthApi(
       if (!parsed.success) {
         throw ApiError.badRequest('serverPort (positive integer) required')
       }
-      const session = hahaOAuthService.startSession({
+      const session = providerOAuthService.startSession({
         serverPort: parsed.data.serverPort,
       })
       return Response.json({
@@ -42,11 +42,11 @@ export async function handleHahaOAuthApi(
     }
 
     if (action === 'callback' && req.method === 'GET') {
-      return handleHahaOAuthCallback(url)
+      return handleProviderOAuthCallback(url)
     }
 
     if ((action === undefined || action === 'status') && req.method === 'GET') {
-      const tokens = await hahaOAuthService.ensureFreshTokens()
+      const tokens = await providerOAuthService.ensureFreshTokens()
       if (!tokens) {
         return Response.json({ loggedIn: false })
       }
@@ -59,7 +59,7 @@ export async function handleHahaOAuthApi(
     }
 
     if (action === undefined && req.method === 'DELETE') {
-      await hahaOAuthService.deleteTokens()
+      await providerOAuthService.deleteTokens()
       return Response.json({ ok: true })
     }
 
@@ -69,7 +69,7 @@ export async function handleHahaOAuthApi(
   }
 }
 
-export async function handleHahaOAuthCallback(url: URL): Promise<Response> {
+export async function handleProviderOAuthCallback(url: URL): Promise<Response> {
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
   const error = url.searchParams.get('error')
@@ -82,7 +82,7 @@ export async function handleHahaOAuthCallback(url: URL): Promise<Response> {
   }
 
   try {
-    await hahaOAuthService.completeSession(code, state)
+    await providerOAuthService.completeSession(code, state)
     return html(renderCallbackPage(true, null))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
