@@ -212,13 +212,7 @@ export class ProviderService {
     index.activeId = id
     await this.writeIndex(index)
 
-    if (provider.runtimeKind === 'openai_oauth') {
-      await this.syncToSettings(provider)
-    } else if (provider.presetId === 'official') {
-      await this.clearProviderFromSettings()
-    } else {
-      await this.syncToSettings(provider)
-    }
+    await this.syncToSettings(provider)
   }
 
   async activateOfficial(): Promise<void> {

@@ -719,38 +719,33 @@ describe('ProviderService', () => {
     test('should include preset default env on activation and runtime env', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
-        presetId: 'shengsuanyun',
-        baseUrl: 'https://router.shengsuanyun.com/api',
+        presetId: 'kimi',
+        baseUrl: 'https://api.kimi.com/coding',
       }))
 
       await svc.activateProvider(provider.id)
 
       const settings = await readSettings()
       const env = settings.env as Record<string, string>
-      expect(env.API_TIMEOUT_MS).toBe('3000000')
-      expect(env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+      expect(env.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
       expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
       expect(JSON.parse(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'anthropic/claude-sonnet-4.6': 1000000,
-        'anthropic/claude-haiku-4.5:thinking': 200000,
-        'anthropic/claude-opus-4.7': 1000000,
+        'kimi-k2.6': 262144,
+        'kimi-k2.5': 262144,
       })
 
       const runtimeEnv = await svc.getProviderRuntimeEnv(provider.id)
-      expect(runtimeEnv.API_TIMEOUT_MS).toBe('3000000')
-      expect(runtimeEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+      expect(runtimeEnv.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
       expect(runtimeEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
       expect(JSON.parse(runtimeEnv.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'anthropic/claude-sonnet-4.6': 1000000,
-        'anthropic/claude-haiku-4.5:thinking': 200000,
-        'anthropic/claude-opus-4.7': 1000000,
+        'kimi-k2.6': 262144,
+        'kimi-k2.5': 262144,
       })
 
       await svc.activateOfficial()
       const clearedSettings = await readSettings()
       const clearedEnv = (clearedSettings.env as Record<string, string> | undefined) ?? {}
-      expect(clearedEnv.API_TIMEOUT_MS).toBeUndefined()
-      expect(clearedEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBeUndefined()
+      expect(clearedEnv.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
       expect(clearedEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
       expect(clearedEnv.CLAUDE_CODE_ATTRIBUTION_HEADER).toBeUndefined()
       expect(clearedEnv.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBeUndefined()
@@ -830,6 +825,23 @@ describe('ProviderService', () => {
       expect(settings.theme).toBe('dark')
       const env = settings.env as Record<string, string>
       expect(env.CUSTOM_VAR).toBe('keep-me')
+      expect(env.ANTHROPIC_BASE_URL).toBe('https://api.example.com')
+    })
+
+    test('should not modify the original settings.json in the config dir', async () => {
+      const original = {
+        effortLevel: 'high',
+        env: { ANTHROPIC_BASE_URL: 'https://original.example.com', ANTHROPIC_API_KEY: 'original-key' },
+      }
+      await fs.writeFile(path.join(tmpDir, 'settings.json'), JSON.stringify(original))
+
+      const svc = new ProviderService()
+      const provider = await svc.addProvider(sampleInput())
+      await svc.activateProvider(provider.id)
+
+      const raw = await fs.readFile(path.join(tmpDir, 'settings.json'), 'utf-8')
+      expect(JSON.parse(raw)).toEqual(original)
+      const env = (await readSettings()).env as Record<string, string>
       expect(env.ANTHROPIC_BASE_URL).toBe('https://api.example.com')
     })
 

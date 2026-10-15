@@ -16,8 +16,6 @@ export type ProviderPreset = {
   needsApiKey: boolean
   websiteUrl: string
   apiKeyUrl?: string
-  promoText?: string
-  featured?: boolean
   authStrategy?: ProviderAuthStrategy
   defaultEnv?: Record<string, string>
   modelContextWindows?: Record<string, number>

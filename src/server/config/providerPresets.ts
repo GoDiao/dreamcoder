@@ -19,8 +19,6 @@ const ProviderPresetSchema = z.object({
   needsApiKey: z.boolean(),
   websiteUrl: z.string(),
   apiKeyUrl: z.string().optional(),
-  promoText: z.string().optional(),
-  featured: z.boolean().optional(),
   authStrategy: ProviderAuthStrategySchema.optional(),
   defaultEnv: z.record(z.string(), z.string()).optional(),
   modelContextWindows: z.record(
