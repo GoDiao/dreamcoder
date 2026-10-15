@@ -108,6 +108,22 @@
     }
   },
   {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "apiFormat": "openai_chat",
+    "defaultModels": {
+      "main": "anthropic/claude-sonnet-5.5",
+      "haiku": "anthropic/claude-haiku-5.5",
+      "sonnet": "anthropic/claude-sonnet-5.5",
+      "opus": "anthropic/claude-opus-5.5"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://openrouter.ai",
+    "apiKeyUrl": "https://openrouter.ai/keys",
+    "authStrategy": "api_key"
+  },
+  {
     "id": "lmstudio",
     "name": "LM Studio",
     "baseUrl": "http://localhost:1234",

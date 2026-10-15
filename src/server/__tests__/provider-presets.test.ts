@@ -112,6 +112,23 @@ describe('provider presets API', () => {
     expect(shengsuanyun?.modelContextWindows?.['anthropic/claude-sonnet-4.6']).toBe(1000000)
   })
 
+  test('openrouter preset is a valid OpenAI-compatible provider entry', () => {
+    const openrouter = PROVIDER_PRESETS.find((preset) => preset.id === 'openrouter')
+
+    expect(openrouter).toBeDefined()
+    expect(openrouter?.name).toBe('OpenRouter')
+    expect(openrouter?.baseUrl).toBe('https://openrouter.ai/api/v1')
+    expect(openrouter?.apiFormat).toBe('openai_chat')
+    expect(openrouter?.needsApiKey).toBe(true)
+    expect(openrouter?.websiteUrl).toBe('https://openrouter.ai')
+    expect(openrouter?.apiKeyUrl).toBe('https://openrouter.ai/keys')
+    expect(openrouter?.authStrategy).toBe('api_key')
+    expect(openrouter?.defaultModels.main).toBe('anthropic/claude-sonnet-5.5')
+    expect(openrouter?.defaultModels.haiku).toBe('anthropic/claude-haiku-5.5')
+    expect(openrouter?.defaultModels.sonnet).toBe('anthropic/claude-sonnet-5.5')
+    expect(openrouter?.defaultModels.opus).toBe('anthropic/claude-opus-5.5')
+  })
+
   test('configured presets can expose optional API key and promo metadata', () => {
     const lmstudio = PROVIDER_PRESETS.find((preset) => preset.id === 'lmstudio')
     const ollama = PROVIDER_PRESETS.find((preset) => preset.id === 'ollama')
