@@ -3,6 +3,7 @@ import { Button } from '../components/shared/Button'
 import { DirectoryPicker } from '../components/shared/DirectoryPicker'
 import { Input } from '../components/shared/Input'
 import { Modal } from '../components/shared/Modal'
+import { McpCatalog } from '../components/settings/McpCatalog'
 import { useTranslation } from '../i18n'
 import { useUIStore } from '../stores/uiStore'
 import { useMcpStore } from '../stores/mcpStore'
@@ -447,6 +448,8 @@ export function McpSettings() {
   const sessions = useSessionStore((s) => s.sessions)
   const activeSessionId = useSessionStore((s) => s.activeSessionId)
   const t = useTranslation()
+  const [tab, setTab] = useState<'installed' | 'browse'>('installed')
+  const [hasBrowsed, setHasBrowsed] = useState(false)
   const [view, setView] = useState<EditorMode>({ type: 'list' })
   const [draft, setDraft] = useState<McpDraft>(createEmptyDraft)
   const [isSaving, setIsSaving] = useState(false)
@@ -511,6 +514,7 @@ export function McpSettings() {
     attention: servers.filter((server) => server.status === 'failed' || server.status === 'needs-auth').length,
   }), [servers])
   const showListLoading = isInitialLoading || (isLoading && servers.length === 0)
+  const installedNames = useMemo(() => new Set(servers.map((server) => server.name)), [servers])
 
   const beginCreate = () => {
     setDraft(createEmptyDraft())
@@ -1075,12 +1079,43 @@ export function McpSettings() {
             {t('settings.mcp.description')}
           </p>
         </div>
-        <Button variant="secondary" size="lg" onClick={beginCreate}>
+        {tab === 'installed' && <Button variant="secondary" size="lg" onClick={beginCreate}>
           <span className="material-symbols-outlined text-[18px]">add</span>
           {t('settings.mcp.addServer')}
-        </Button>
+        </Button>}
       </div>
 
+      <div role="tablist" aria-label={t('settings.mcp.title')} className="mb-6 flex gap-2 border-b border-[var(--color-border)]">
+        {(['installed', 'browse'] as const).map((value) => (
+          <button
+            key={value}
+            id={`mcp-tab-${value}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            aria-controls={`mcp-panel-${value}`}
+            tabIndex={tab === value ? 0 : -1}
+            onClick={() => { setTab(value); if (value === 'browse') setHasBrowsed(true) }}
+            onKeyDown={(event) => {
+              const next = event.key === 'Home' ? 'installed' : event.key === 'End' ? 'browse'
+                : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? (value === 'installed' ? 'browse' : 'installed') : null
+              if (!next) return
+              event.preventDefault()
+              setTab(next)
+              if (next === 'browse') setHasBrowsed(true)
+              document.getElementById(`mcp-tab-${next}`)?.focus()
+            }}
+            className={`border-b-2 px-4 py-3 text-sm font-semibold ${tab === value ? 'border-[var(--color-brand)] text-[var(--color-text-primary)]' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'}`}
+          >
+            {t(`settings.mcp.tab.${value}`)}
+          </button>
+        ))}
+      </div>
+
+      <div id="mcp-panel-browse" role="tabpanel" aria-labelledby="mcp-tab-browse" hidden={tab !== 'browse'} tabIndex={0}>
+        {hasBrowsed && <McpCatalog installedNames={installedNames} installedStatus={error ? 'error' : isInitialLoading || isLoading ? 'loading' : 'ready'} />}
+      </div>
+      <div id="mcp-panel-installed" role="tabpanel" aria-labelledby="mcp-tab-installed" hidden={tab !== 'installed'} tabIndex={0}>
       {showListLoading ? (
         <LoadingState label={t('common.loading')} />
       ) : (
@@ -1142,6 +1177,7 @@ export function McpSettings() {
           )}
         </>
       )}
+      </div>
       {deleteModal}
     </div>
   )

@@ -233,6 +233,28 @@ than one error per run.
 Tracking issue: [#44](https://github.com/GoDiao/dreamcoder/issues/44) ·
 Parent: [#12](https://github.com/GoDiao/dreamcoder/issues/12)
 
+### Browse UI
+
+Settings → MCP → Browse is read-only. It shows the curated stdio catalog,
+supports text and tag filters, and marks exact installed configuration names
+matching an entry's ID or display name. A badge does not verify the installed
+package or version. Environment requirements are descriptions, never inputs.
+
+The desktop imports the root JSON through Vite as a lazy raw module and validates
+it with the shared schema before showing any entries. The module is emitted into
+`desktop/dist`, which Tauri already packages, so neither a source checkout nor a
+catalog endpoint is needed at runtime. Invalid catalogs fail closed with field
+paths; homepage links must additionally use HTTP or HTTPS. An empty registry is
+invalid under v1; the empty Browse state is for searches with no matching entries.
+
+Run the catalog UI/model tests with:
+
+```bash
+cd desktop
+bun run test --run src/lib/mcpCatalog.test.ts src/components/settings/McpCatalog.test.tsx src/pages/McpSettings.test.tsx
+bun run build
+```
+
 ## License
 
 By contributing, you agree that your code will be licensed under the [MIT License](LICENSE).

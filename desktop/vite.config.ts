@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 const host = process.env.TAURI_DEV_HOST
+const mcpCatalogPath = path.resolve(__dirname, '../mcp-registry.json')
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -24,6 +25,10 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
+    fs: {
+      // Vite 8 checks both the file and raw module ID outside the desktop root.
+      allow: [searchForWorkspaceRoot(__dirname), mcpCatalogPath, `${mcpCatalogPath}?raw`],
+    },
     port: 1420,
     strictPort: true,
     host: host || false,

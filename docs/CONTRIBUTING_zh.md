@@ -227,6 +227,23 @@ bun test ./sidecar/mcp-registry/__tests__/registry.test.ts
 跟踪 issue：[#44](https://github.com/GoDiao/dreamcoder/issues/44) ·
 父 issue：[#12](https://github.com/GoDiao/dreamcoder/issues/12)
 
+### 浏览界面
+
+设置 → MCP → 浏览为只读界面，支持文本和标签筛选。当已安装的配置名称与条目的
+ID 或显示名称完全匹配时显示标记；该标记不验证软件包或版本。环境变量仅展示
+需求说明，不收集任何值。
+
+桌面端通过 Vite 将根目录 JSON 作为延迟加载的原始文本模块导入，并在展示前使用
+共享 schema 验证整个目录。模块输出到 Tauri 已打包的 `desktop/dist`，运行时无需
+源码目录或目录接口。无效数据不展示任何条目，并报告字段路径；主页链接额外限制为
+HTTP 或 HTTPS。v1 不允许空目录，浏览的空状态表示筛选后没有匹配条目。
+
+```bash
+cd desktop
+bun run test --run src/lib/mcpCatalog.test.ts src/components/settings/McpCatalog.test.tsx src/pages/McpSettings.test.tsx
+bun run build
+```
+
 ## 许可证
 
 贡献即表示你同意将你的代码以 [MIT License](LICENSE) 授权。
