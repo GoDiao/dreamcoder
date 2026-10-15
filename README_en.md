@@ -192,6 +192,12 @@ Issues and pull requests are welcome. If you'd like to improve DreamCoder, start
 
 For release history and notable updates, see [CHANGELOG.md](CHANGELOG.md).
 
+## 🙏 Acknowledgements
+
+Parts of DreamCoder are derived from [cc-haha](https://github.com/NanmiCoder/cc-haha) (MIT License, Copyright (c) 2026 cc-haha). Thanks to its authors for their open-source work.
+
 ## 📄 License
 
 [MIT](./LICENSE) &copy; 2024-2026 GoDiao & DreamCoder Contributors
+
+Includes code derived from [cc-haha](https://github.com/NanmiCoder/cc-haha); its copyright notice and the full MIT license text are reproduced in [LICENSE](./LICENSE).

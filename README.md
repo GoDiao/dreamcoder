@@ -195,6 +195,12 @@ bun run tauri dev
 
 版本演进与重要变更见 [CHANGELOG.md](CHANGELOG.md)。
 
+## 🙏 致谢
+
+DreamCoder 的部分代码来源于 [cc-haha](https://github.com/NanmiCoder/cc-haha)（MIT 协议，Copyright (c) 2026 cc-haha），感谢原作者的开源工作。
+
 ## 📄 许可证
 
 [MIT](./LICENSE) &copy; 2024-2026 GoDiao & DreamCoder Contributors
+
+包含源自 [cc-haha](https://github.com/NanmiCoder/cc-haha) 的代码，其版权声明与 MIT 许可全文见 [LICENSE](./LICENSE)。
