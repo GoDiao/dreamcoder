@@ -113,14 +113,14 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 | 平台          | 状态                                          | 预编译安装包                                          |
 |---------------|-----------------------------------------------|-------------------------------------------------------|
-| Windows x64   | ✅ 维护者长期实测                              | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）  |
-| macOS arm64   | ✅ 维护者日常使用                              | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）        |
+| Windows x64   | ✅ 长期实测（维护者此前的主力平台）            | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）  |
+| macOS arm64   | ✅ 维护者日常开发平台                          | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）        |
 | Linux x64     | ⚠️ 暂未日常验证                                | ❌ 欢迎社区共同补齐                                    |
 
-> DreamCoder 当前主要围绕 **Windows x64** 持续开发和验证。
-> **macOS（Apple Silicon）** 已可从源码运行（`bun run tauri dev`），维护者在开发中使用，自 v0.5.0 起提供 `.dmg` 安装包。
+> 维护者目前主要在 **macOS（Apple Silicon）** 上开发，从源码运行（`bun run tauri dev`），自 v0.5.0 起提供 `.dmg` 安装包。
+> **Windows x64** 是此前的主力平台，经过长期实测；维护者现在不在 Windows 上日常开发，新改动在 Windows 上的表现尤其欢迎反馈。
 > **Linux** 代码中保留了 `#[cfg(target_os = "linux")]` 分支，但维护者并不日常使用，仍属于“代码已覆盖、体验待更多实机验证”的状态。
-> 如果你正在使用 macOS 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
+> 如果你正在使用 Windows 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
 > 安装包供应情况以 [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) 页面中的实际附件为准。
 

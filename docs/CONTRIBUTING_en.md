@@ -118,11 +118,12 @@ Provider preset contributions have a focused guide in the website documentation 
 
 > ⚠️ **Platform support note**
 >
-> DreamCoder is developed and verified primarily on **Windows x64**.
-> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer
-> during development, but packaged macOS builds are not verified yet.
+> The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source
+> (`bun run tauri dev`); packaged macOS builds are not verified yet. **Windows x64** was the
+> main platform before and has been tested extensively, but the maintainer no longer develops
+> on it day to day, so help verifying new changes on Windows is especially welcome.
 > The codebase also includes Linux branches, but the maintainer does not run Linux day-to-day.
-> If you're on Linux, or building a packaged macOS app:
+> If you're on Windows or Linux, or building a packaged macOS app:
 >
 > - The desktop app **may** build and run, but you may hit untested issues
 >   (see [#25](https://github.com/GoDiao/dreamcoder/issues/25) for an active Linux memory investigation).
