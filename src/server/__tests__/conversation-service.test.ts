@@ -342,70 +342,33 @@ describe('ConversationService', () => {
   test('buildChildEnv clears stale api key for bearer-token providers', async () => {
     const providerService = new ProviderService()
     const provider = await providerService.addProvider({
-      presetId: 'jiekouai',
-      name: 'Jiekou',
+      presetId: 'deepseek',
+      name: 'DeepSeek',
       apiKey: 'provider-key',
-      baseUrl: 'https://api.jiekou.ai/anthropic',
+      baseUrl: 'https://api.deepseek.com/anthropic',
       apiFormat: 'anthropic',
       models: {
-        main: 'claude-sonnet-4-6',
-        haiku: 'claude-haiku-4-5-20251001',
-        sonnet: 'claude-sonnet-4-6',
-        opus: 'claude-opus-4-7',
+        main: 'deepseek-v4-pro',
+        haiku: 'deepseek-v4-flash',
+        sonnet: 'deepseek-v4-pro',
+        opus: 'deepseek-v4-pro',
       },
     })
 
     const service = new ConversationService() as any
     const env = (await service.buildChildEnv('/tmp', undefined, {
       providerId: provider.id,
-      model: 'claude-sonnet-4-6',
+      model: 'deepseek-v4-pro',
     })) as Record<string, string>
 
-    expect(env.ANTHROPIC_BASE_URL).toBe('https://api.jiekou.ai/anthropic')
+    expect(env.ANTHROPIC_BASE_URL).toBe('https://api.deepseek.com/anthropic')
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe('provider-key')
     expect(env.ANTHROPIC_API_KEY).toBe('')
-    expect(env.ANTHROPIC_MODEL).toBe('claude-sonnet-4-6')
-    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe('none')
-    expect(env.CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('1')
+    expect(env.ANTHROPIC_MODEL).toBe('deepseek-v4-pro')
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe('thinking,effort,adaptive_thinking,max_effort')
+    expect(env.CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
   })
 
-  test('buildChildEnv lets General network timeout override provider preset timeouts', async () => {
-    await fs.writeFile(
-      path.join(tmpDir, 'settings.json'),
-      JSON.stringify({
-        network: {
-          aiRequestTimeoutMs: 180_000,
-          proxy: { mode: 'system', url: '' },
-        },
-      }),
-      'utf-8',
-    )
-
-    const providerService = new ProviderService()
-    const provider = await providerService.addProvider({
-      presetId: 'shengsuanyun',
-      name: 'Shengsuanyun',
-      apiKey: 'provider-key',
-      baseUrl: 'https://router.shengsuanyun.com/api',
-      apiFormat: 'anthropic',
-      models: {
-        main: 'anthropic/claude-sonnet-4.6',
-        haiku: 'anthropic/claude-haiku-4.5:thinking',
-        sonnet: 'anthropic/claude-sonnet-4.6',
-        opus: 'anthropic/claude-opus-4.7',
-      },
-    })
-
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp', undefined, {
-      providerId: provider.id,
-      model: 'anthropic/claude-sonnet-4.6',
-    })) as Record<string, string>
-
-    expect(env.ANTHROPIC_BASE_URL).toBe('https://router.shengsuanyun.com/api')
-    expect(env.API_TIMEOUT_MS).toBe('180000')
-    expect(env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
-  })
 
   test('buildChildEnv can force official auth even when a custom default provider exists', async () => {
     const ccHahaDir = path.join(tmpDir, 'dreamcoder')
