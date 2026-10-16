@@ -137,6 +137,10 @@ async function handleTasksApi(
     return Response.json({ lists })
   }
 
+  if (sub) {
+    throw ApiError.notFound(`Unknown tasks resource: ${sub}`)
+  }
+
   if (req.method !== 'GET') {
     throw new ApiError(
       405,

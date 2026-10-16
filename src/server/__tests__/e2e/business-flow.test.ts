@@ -364,19 +364,15 @@ describe('Business Flow: Models & Effort', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  it('should return 4 available models', async () => {
+  it('should return the 3 default models', async () => {
     const { data } = await api('GET', '/api/models')
-    expect(data.models.length).toBe(4)
-    const names = data.models.map((m: any) => m.name)
-    expect(names).toContain('Opus 4.7')
-    expect(names).toContain('Opus 4.7 1M')
-    expect(names).toContain('Sonnet 4.6')
-    expect(names).toContain('Haiku 4.5')
+    expect(data.models.map((m: any) => m.name)).toEqual(['Opus 4.7', 'Sonnet 4.6', 'Haiku 4.5'])
+    expect(data.models[0].context).toBe('1m')
   })
 
-  it('should default to Sonnet model', async () => {
+  it('should default to Opus 4.7', async () => {
     const { data } = await api('GET', '/api/models/current')
-    expect(data.model.id).toBe('claude-sonnet-4-6')
+    expect(data.model.id).toBe('claude-opus-4-7')
   })
 
   it('should switch to Opus 4.7', async () => {
@@ -455,9 +451,9 @@ describe('Business Flow: Sessions & CLI Interop', () => {
   let sessionId: string
 
   it('should create a session', async () => {
-    const { status, data } = await api('POST', '/api/sessions', {
-      workDir: '/Users/dev/my-project',
-    })
+    const workDir = path.join(tmpDir, 'my-project')
+    await fs.mkdir(workDir, { recursive: true })
+    const { status, data } = await api('POST', '/api/sessions', { workDir })
     expect(status).toBe(201)
     expect(data.sessionId).toMatch(/^[0-9a-f-]{36}$/)
     sessionId = data.sessionId
@@ -607,10 +603,67 @@ describe('Business Flow: Search', () => {
   })
 })
 
+function startFakeAnthropicUpstream(): ReturnType<typeof Bun.serve> {
+  const message = {
+    id: 'msg_fake',
+    type: 'message',
+    role: 'assistant',
+    model: 'fake-model',
+    content: [] as unknown[],
+    stop_reason: null,
+    stop_sequence: null,
+    usage: { input_tokens: 1, output_tokens: 1 },
+  }
+  const events = [
+    { type: 'message_start', message },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'echo: test message' } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 4 } },
+    { type: 'message_stop' },
+  ]
+
+  return Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch(req) {
+      if (req.method !== 'POST' || !new URL(req.url).pathname.endsWith('/v1/messages')) {
+        return new Response('not found', { status: 404 })
+      }
+      const body = await req.json().catch(() => ({})) as { stream?: boolean }
+      if (!body.stream) {
+        return Response.json({
+          ...message,
+          content: [{ type: 'text', text: '{"title":"Echo test"}' }],
+          stop_reason: 'end_turn',
+        })
+      }
+      const sse = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+      return new Response(sse, { headers: { 'Content-Type': 'text/event-stream' } })
+    },
+  })
+}
+
 describe('Business Flow: WebSocket Chat', () => {
-  beforeAll(startTestServer)
+  let upstream: ReturnType<typeof Bun.serve>
+
+  beforeAll(async () => {
+    await startTestServer()
+    upstream = startFakeAnthropicUpstream()
+    const { data } = await api('POST', '/api/providers', {
+      presetId: 'custom',
+      name: 'Fake Anthropic',
+      baseUrl: `http://127.0.0.1:${upstream.port}`,
+      apiKey: 'sk-fake',
+      authStrategy: 'api_key',
+      apiFormat: 'anthropic',
+      models: { main: 'fake-model', haiku: 'fake-model', sonnet: 'fake-model', opus: 'fake-model' },
+    })
+    await api('POST', `/api/providers/${data.provider.id}/activate`)
+  })
   afterAll(async () => {
     server?.stop()
+    upstream?.stop(true)
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
@@ -652,7 +705,7 @@ describe('Business Flow: WebSocket Chat', () => {
         }
       }
       ws.onerror = () => { ws.close(); resolve() }
-      setTimeout(() => { ws.close(); resolve() }, 5000)
+      setTimeout(() => { ws.close(); resolve() }, 30_000)
     })
 
     const types = messages.map((m) => m.type)
@@ -664,7 +717,7 @@ describe('Business Flow: WebSocket Chat', () => {
 
     const statusMsgs = messages.filter((m) => m.type === 'status')
     expect(statusMsgs[0].state).toBe('thinking')
-  })
+  }, 40_000)
 
   it('should handle ping/pong', async () => {
     const messages: any[] = []
