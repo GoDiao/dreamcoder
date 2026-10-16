@@ -39,7 +39,7 @@ describe('Qwen request URLs', () => {
     calls = []
     originalFetch = globalThis.fetch
     // Capture the actual transport boundary; never contact DashScope.
-    globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+    globalThis.fetch = Object.assign(mock(async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), method: init?.method, authorization: new Headers(init?.headers).get('Authorization') })
       const body = JSON.parse(String(init?.body))
       if (body.stream) {
@@ -50,7 +50,7 @@ describe('Qwen request URLs', () => {
         choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       })
-    }) as typeof fetch
+    }), { preconnect: originalFetch.preconnect })
   })
 
   afterEach(async () => {
