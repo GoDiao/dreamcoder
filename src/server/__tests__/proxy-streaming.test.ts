@@ -129,11 +129,24 @@ describe('openaiChatStreamToAnthropic', () => {
     expect(blockStops[0].data.index).toBe(0)
   })
 
-  test('empty stream (just DONE)', async () => {
+  test('empty stream (just DONE) surfaces an error instead of an empty reply', async () => {
     const upstream = makeStream(['data: [DONE]\n\n'])
     const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
     const events = await collectSse(anthropicStream)
-    expect(events.some((e) => e.event === 'message_stop')).toBe(true)
+    expect(events.map((e) => e.event)).toEqual(['error'])
+  })
+
+  test('upstream error chunk mid-stream becomes an Anthropic error event', async () => {
+    const upstream = makeStream([
+      'data: {"id":"c1","object":"chat.completion.chunk","created":0,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}]}\n\n',
+      'data: {"error":{"message":"quota exceeded"}}\n\n',
+      'data: [DONE]\n\n',
+    ])
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
+    const types = events.map((e) => e.event)
+    expect(types.at(-1)).toBe('error')
+    expect(types).not.toContain('message_stop')
+    expect((events.at(-1)!.data as { error: { message: string } }).error.message).toBe('quota exceeded')
   })
 
   test('event ordering: content_block_stop before message_delta', async () => {
@@ -309,5 +322,60 @@ describe('openaiResponsesStreamToAnthropic', () => {
 
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
+  })
+
+  test('response.failed becomes an Anthropic error event with the upstream message', async () => {
+    const upstream = makeStream([
+      'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","model":"gpt-4o"}}\n\n',
+      'event: response.failed\ndata: {"type":"response.failed","response":{"status":"failed","error":{"code":"insufficient_quota","message":"quota exceeded"}}}\n\n',
+    ])
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o'))
+    const last = events.at(-1)!
+    expect(last.event).toBe('error')
+    expect((last.data.error as Record<string, unknown>).message).toBe('quota exceeded')
+    expect(events.map((e) => e.event)).not.toContain('message_stop')
+  })
+
+  test('stream-level error events without an event line become Anthropic error events', async () => {
+    const upstream = makeStream([
+      'data: {"type":"error","code":"rate_limit_exceeded","message":"slow down"}\n\n',
+    ])
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o'))
+    expect(events.map((e) => e.event)).toEqual(['error'])
+    expect((events[0].data.error as Record<string, unknown>).message).toBe('slow down')
+  })
+
+  test('response.incomplete finishes the message with max_tokens', async () => {
+    const upstream = makeStream([
+      'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","model":"o4-mini"}}\n\n',
+      'event: response.incomplete\ndata: {"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":5,"output_tokens":16}}}\n\n',
+    ])
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'o4-mini'))
+    const delta = events.find((e) => e.event === 'message_delta')!
+    expect((delta.data.delta as Record<string, unknown>).stop_reason).toBe('max_tokens')
+    expect(events.at(-1)!.event).toBe('message_stop')
+  })
+})
+
+describe('stream cancellation', () => {
+  test.each([
+    ['openaiChatStreamToAnthropic', openaiChatStreamToAnthropic, 'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"x"},"finish_reason":null}]}\n\n'],
+    ['openaiResponsesStreamToAnthropic', openaiResponsesStreamToAnthropic, 'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","model":"m"}}\n\n'],
+  ] as const)('%s cancels the upstream body when the client cancels', async (_name, convert, firstChunk) => {
+    let upstreamCancelReason: unknown = 'not cancelled'
+    const upstream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(firstChunk))
+      },
+      cancel(reason) {
+        upstreamCancelReason = reason
+      },
+    })
+
+    const reader = convert(upstream, 'm').getReader()
+    await reader.read()
+    await reader.cancel('client gone')
+
+    expect(upstreamCancelReason).toBe('client gone')
   })
 })

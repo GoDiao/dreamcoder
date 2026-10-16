@@ -168,6 +168,15 @@ describe('upstream client', () => {
     })
   })
 
+  test('reports conversion failures as 502 instead of throwing', async () => {
+    mockFetch(() => Response.json({ choices: [{}] }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.httpStatus).toBe(502)
+  })
+
   test('reports network failures without throwing', async () => {
     globalThis.fetch = mock(async () => {
       throw new Error('connect ECONNREFUSED')

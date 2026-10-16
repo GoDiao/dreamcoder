@@ -100,10 +100,14 @@ export async function sendToUpstream(
   if (invalid) {
     return { ok: false, httpStatus: 502, error: invalid }
   }
-  return {
-    ok: true,
-    httpStatus: response.status,
-    message: toAnthropicMessage(target.apiFormat, body!, anthropicRequest.model),
+  try {
+    return {
+      ok: true,
+      httpStatus: response.status,
+      message: toAnthropicMessage(target.apiFormat, body!, anthropicRequest.model),
+    }
+  } catch (err) {
+    return { ok: false, httpStatus: 502, error: err instanceof Error ? err.message : String(err) }
   }
 }
 

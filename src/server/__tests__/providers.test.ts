@@ -1104,6 +1104,75 @@ describe('ProviderService', () => {
       }
     })
 
+    test.each([
+      ['a JSON error body', '{"error":{"message":"invalid api key"}}', 'invalid api key'],
+      ['an HTML page', '<html>hi</html>', 'no valid Chat Completions chunks'],
+      ['an SSE error chunk', 'data: {"error":{"message":"quota exceeded"}}\n\n', 'quota exceeded'],
+      ['an empty body', '', 'no valid Chat Completions chunks'],
+    ])('fails OpenAI Chat tests when a 200 response carries %s', async (_label, body, expectedError) => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity.success).toBe(false)
+        expect(result.connectivity.error).toContain(expectedError)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('shows the upstream message when a Responses stream fails', async () => {
+      const originalFetch = globalThis.fetch
+      const body = 'event: response.failed\ndata: {"type":"response.failed","response":{"status":"failed","error":{"message":"quota exceeded"}}}\n\n'
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_responses',
+        })
+
+        expect(result.connectivity).toMatchObject({ success: false, error: 'quota exceeded' })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('passes OpenAI Chat tests when the model stops at max_tokens before any text', async () => {
+      const originalFetch = globalThis.fetch
+      const chunks = [
+        { id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'gpt-main', choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },
+        { id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'gpt-main', choices: [{ index: 0, delta: {}, finish_reason: 'length' }] },
+      ]
+      const body = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity.success).toBe(true)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
     test('reports a failed test when the stream ends without message_stop', async () => {
       const originalFetch = globalThis.fetch
       globalThis.fetch = mock(async () => new Response('', {
