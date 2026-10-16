@@ -1,11 +1,11 @@
 import type {
   AnthropicRequest,
-  AnthropicContentBlock,
   AnthropicMessage,
   OpenAIResponsesRequest,
   OpenAIResponsesInputItem,
-  OpenAIChatContentPart,
+  OpenAIResponsesContentPart,
 } from './types.js'
+import { extractToolResultContent } from './toolArguments.js'
 
 export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
@@ -74,22 +74,22 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
     return
   }
 
-  const contentParts: (string | OpenAIChatContentPart)[] = []
+  const contentParts: OpenAIResponsesContentPart[] = []
 
   for (const block of content) {
     if (block.type === 'text') {
-      contentParts.push(block.text)
+      contentParts.push({ type: 'input_text', text: block.text })
     } else if (block.type === 'image') {
       contentParts.push({
-        type: 'image_url',
-        image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+        type: 'input_image',
+        image_url: `data:${block.source.media_type};base64,${block.source.data}`,
       })
     } else if (block.type === 'tool_use') {
       if (contentParts.length > 0) {
-        const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-          ? contentParts[0]
-          : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-        if (flatContent) {
+        const flatContent = contentParts.length === 1 && contentParts[0].type === 'input_text'
+          ? contentParts[0].text
+          : contentParts
+        if (flatContent && (typeof flatContent !== 'object' || (Array.isArray(flatContent) && flatContent.length > 0))) {
           output.push({ type: 'message', role: msg.role, content: flatContent })
         }
         contentParts.length = 0
@@ -101,11 +101,7 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         arguments: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
       })
     } else if (block.type === 'tool_result') {
-      const resultContent = typeof block.content === 'string'
-        ? block.content
-        : Array.isArray(block.content)
-          ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
-          : ''
+      const resultContent = extractToolResultContent(block.content)
       output.push({
         type: 'function_call_output',
         call_id: block.tool_use_id,
@@ -115,10 +111,10 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
   }
 
   if (contentParts.length > 0) {
-    const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-      ? contentParts[0]
-      : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-    if (flatContent) {
+    const flatContent = contentParts.length === 1 && contentParts[0].type === 'input_text'
+      ? contentParts[0].text
+      : contentParts
+    if (flatContent && (typeof flatContent !== 'object' || (Array.isArray(flatContent) && flatContent.length > 0))) {
       output.push({ type: 'message', role: msg.role, content: flatContent })
     }
   }
