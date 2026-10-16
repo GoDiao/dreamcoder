@@ -17,90 +17,71 @@ describe('TaskService', () => {
     delete process.env.CLAUDE_CONFIG_DIR
   })
 
+  async function writeTask(taskListId: string, task: Record<string, unknown> | string): Promise<void> {
+    const listDir = path.join(tmpDir, 'tasks', taskListId)
+    await fs.mkdir(listDir, { recursive: true })
+    const id = typeof task === 'string' ? 'bad' : String(task.id)
+    await fs.writeFile(
+      path.join(listDir, `${id}.json`),
+      typeof task === 'string' ? task : JSON.stringify(task),
+    )
+  }
+
   it('should return empty list when no tasks dir', async () => {
     const svc = new TaskService()
     const tasks = await svc.listTasks()
     expect(tasks).toEqual([])
   })
 
-  it('should list tasks from JSON files', async () => {
-    const tasksDir = path.join(tmpDir, 'tasks')
-    await fs.mkdir(tasksDir, { recursive: true })
-
-    await fs.writeFile(path.join(tasksDir, 'task-001.json'), JSON.stringify({
-      id: 'task-001',
-      type: 'local_agent',
-      status: 'completed',
-      name: 'code-review',
-      description: 'Review PR #42',
-      createdAt: Date.now() - 60000,
-      completedAt: Date.now(),
-    }))
-
-    await fs.writeFile(path.join(tasksDir, 'task-002.json'), JSON.stringify({
-      id: 'task-002',
-      type: 'in_process_teammate',
-      status: 'running',
-      name: 'frontend-dev',
-      teamName: 'ui-team',
-      createdAt: Date.now(),
-    }))
+  it('should list tasks from every task list, sorted by numeric id', async () => {
+    await writeTask('session-a', { id: '10', subject: 'Ship', status: 'pending' })
+    await writeTask('session-a', { id: '2', subject: 'Build', status: 'in_progress', blockedBy: ['1'] })
+    await writeTask('session-b', { id: '1', subject: 'Review', status: 'completed' })
 
     const svc = new TaskService()
     const tasks = await svc.listTasks()
-    expect(tasks.length).toBe(2)
-    expect(tasks[0].id).toBe('task-002')
-    expect(tasks[1].id).toBe('task-001')
+
+    expect(tasks.map((t) => `${t.taskListId}/${t.id}`).sort()).toEqual(['session-a/10', 'session-a/2', 'session-b/1'])
+    expect((await svc.getTasksForList('session-a')).map((t) => t.id)).toEqual(['2', '10'])
+    expect(tasks.find((t) => t.id === '2')).toMatchObject({ subject: 'Build', blockedBy: ['1'], blocks: [] })
   })
 
-  it('should scan nested team task directories', async () => {
-    const teamDir = path.join(tmpDir, 'tasks', 'my-team')
-    await fs.mkdir(teamDir, { recursive: true })
-
-    await fs.writeFile(path.join(teamDir, 'member-1.json'), JSON.stringify({
-      id: 'member-1',
-      type: 'in_process_teammate',
-      status: 'completed',
-      teamName: 'my-team',
-    }))
+  it('should summarize task lists and skip empty ones', async () => {
+    await writeTask('team-a', { id: '1', subject: 'A', status: 'completed' })
+    await writeTask('team-a', { id: '2', subject: 'B', status: 'in_progress' })
+    await writeTask('team-a', { id: '3', subject: 'C', status: 'pending' })
+    await fs.mkdir(path.join(tmpDir, 'tasks', 'empty-list'), { recursive: true })
+    await fs.writeFile(path.join(tmpDir, 'tasks', 'stray.json'), '{}')
 
     const svc = new TaskService()
-    const tasks = await svc.listTasks()
-    expect(tasks.length).toBe(1)
-    expect(tasks[0].teamName).toBe('my-team')
+    expect(await svc.listTaskLists()).toEqual([
+      { id: 'team-a', taskCount: 3, completedCount: 1, inProgressCount: 1, pendingCount: 1 },
+    ])
   })
 
-  it('should get single task by ID', async () => {
-    const tasksDir = path.join(tmpDir, 'tasks')
-    await fs.mkdir(tasksDir, { recursive: true })
-
-    await fs.writeFile(path.join(tasksDir, 'abc.json'), JSON.stringify({
-      id: 'abc',
-      type: 'local_shell',
-      status: 'failed',
-      name: 'build',
-    }))
+  it('should get single task by list and id', async () => {
+    await writeTask('session-a', { id: '7', subject: 'Deploy', status: 'unknown-status' })
 
     const svc = new TaskService()
-    const task = await svc.getTask('abc')
-    expect(task).toBeDefined()
-    expect(task!.status).toBe('failed')
+    const task = await svc.getTask('session-a', '7')
+    expect(task).toMatchObject({ id: '7', subject: 'Deploy', status: 'pending', taskListId: 'session-a' })
   })
 
   it('should return null for unknown task', async () => {
+    await writeTask('session-a', { id: '1', subject: 'Only', status: 'pending' })
+
     const svc = new TaskService()
-    const task = await svc.getTask('nonexistent')
-    expect(task).toBeNull()
+    expect(await svc.getTask('session-a', 'missing')).toBeNull()
+    expect(await svc.getTask('no-such-list', '1')).toBeNull()
   })
 
-  it('should skip invalid JSON files gracefully', async () => {
-    const tasksDir = path.join(tmpDir, 'tasks')
-    await fs.mkdir(tasksDir, { recursive: true })
-    await fs.writeFile(path.join(tasksDir, 'bad.json'), 'not json {{{')
+  it('should skip invalid, incomplete and internal task files', async () => {
+    await writeTask('session-a', 'not json {{{')
+    await writeTask('session-a', { id: '1', status: 'pending' })
+    await writeTask('session-a', { id: '2', subject: 'Internal', metadata: { _internal: true } })
 
     const svc = new TaskService()
-    const tasks = await svc.listTasks()
-    expect(tasks).toEqual([])
+    expect(await svc.listTasks()).toEqual([])
   })
 })
 
@@ -134,19 +115,24 @@ describe('Tasks API', () => {
   })
 
   it('should return tasks when files exist', async () => {
-    const tasksDir = path.join(tmpDir, 'tasks')
-    await fs.mkdir(tasksDir, { recursive: true })
-    await fs.writeFile(path.join(tasksDir, 'test.json'), JSON.stringify({
-      id: 'test', type: 'local_agent', status: 'completed', name: 'test-task',
+    const listDir = path.join(tmpDir, 'tasks', 'session-a')
+    await fs.mkdir(listDir, { recursive: true })
+    await fs.writeFile(path.join(listDir, '1.json'), JSON.stringify({
+      id: '1', subject: 'test-task', status: 'completed',
     }))
 
     const res = await fetch(`${baseUrl}/api/tasks`)
     const data = await res.json()
     expect(data.tasks.length).toBe(1)
-    expect(data.tasks[0].name).toBe('test-task')
+    expect(data.tasks[0]).toMatchObject({ subject: 'test-task', taskListId: 'session-a' })
   })
 
   it('should return 404 for unknown task', async () => {
+    const res = await fetch(`${baseUrl}/api/tasks/lists/session-a/nonexistent`)
+    expect(res.status).toBe(404)
+  })
+
+  it('should return 404 for unknown tasks sub-resources', async () => {
     const res = await fetch(`${baseUrl}/api/tasks/nonexistent`)
     expect(res.status).toBe(404)
   })

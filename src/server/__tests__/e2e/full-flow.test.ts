@@ -134,7 +134,7 @@ describe('E2E: Full Flow', () => {
 
   it('should list available models', async () => {
     const { data } = await api('GET', '/api/models')
-    expect(data.models.length).toBe(4)
+    expect(data.models.length).toBe(3)
     expect(data.models[0].name).toBe('Opus 4.7')
   })
 

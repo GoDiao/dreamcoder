@@ -534,19 +534,27 @@ describe('SessionService', () => {
 
     const serviceWithSpy = service as unknown as {
       readJsonlFile: (...args: unknown[]) => Promise<unknown>
+      scanSessionFileHead: (...args: unknown[]) => Promise<unknown>
     }
     const originalReadJsonlFile = serviceWithSpy.readJsonlFile.bind(service)
-    let readCount = 0
+    const originalScanSessionFileHead = serviceWithSpy.scanSessionFileHead.bind(service)
+    let fullReadCount = 0
+    let headScanCount = 0
     serviceWithSpy.readJsonlFile = async (...args) => {
-      readCount += 1
+      fullReadCount += 1
       return originalReadJsonlFile(...args)
+    }
+    serviceWithSpy.scanSessionFileHead = async (...args) => {
+      headScanCount += 1
+      return originalScanSessionFileHead(...args)
     }
 
     const result = await service.listSessions({ limit: 3, offset: 0 })
 
     expect(result.total).toBe(12)
     expect(result.sessions).toHaveLength(3)
-    expect(readCount).toBe(3)
+    expect(headScanCount).toBe(3)
+    expect(fullReadCount).toBe(0)
   })
 
   it('should filter sessions by project', async () => {
