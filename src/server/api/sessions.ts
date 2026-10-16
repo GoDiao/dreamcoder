@@ -16,7 +16,6 @@ import {
   previewSessionRewind,
   type RewindTargetSelector,
 } from '../services/sessionRewindService.js'
-import { SessionStore } from '../../../adapters/common/session-store.js'
 import {
   createSessionBranch,
   SessionBranchingError,
@@ -349,7 +348,6 @@ async function deleteSession(sessionId: string): Promise<Response> {
     throw error
   }
   closeSessionConnection(sessionId, 'session deleted')
-  cleanupAdapterSessionMappings(sessionId)
   return Response.json({ ok: true })
 }
 
@@ -371,7 +369,6 @@ async function batchDeleteSessions(req: Request): Promise<Response> {
 
   for (const sessionId of result.successes) {
     closeSessionConnection(sessionId, 'session deleted')
-    cleanupAdapterSessionMappings(sessionId)
   }
 
   return Response.json({
@@ -399,13 +396,6 @@ function normalizeSessionIds(value: unknown): string[] {
   }
 
   return [...new Set(sessionIds)]
-}
-
-function cleanupAdapterSessionMappings(sessionId: string): void {
-  const removedChatIds = new SessionStore().deleteBySessionId(sessionId)
-  if (removedChatIds.length > 0) {
-    console.log(`[Sessions API] Removed ${removedChatIds.length} adapter session mapping(s) for ${sessionId}`)
-  }
 }
 
 function mergeSessionSlashCommands(

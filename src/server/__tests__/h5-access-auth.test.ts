@@ -411,13 +411,6 @@ describe('remote H5 auth and CORS integration', () => {
     await expectWebSocketUpgradeThenClose(`${wsBaseUrl}/sdk/h5-auth-test`)
   })
 
-  test('keeps local loopback adapter requests tokenless while H5 access is disabled', async () => {
-    const response = await fetch(`${baseUrl}/api/adapters`)
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({})
-  })
-
   test('keeps local loopback settings surface requests tokenless while H5 access is disabled', async () => {
     for (const endpoint of settingsSurfaceEndpoints) {
       const response = await fetch(`${baseUrl}${endpoint.path}`)
@@ -739,15 +732,6 @@ describe('remote H5 auth and CORS integration', () => {
     await expectWebSocketUpgradeThenClose(`${wsBaseUrl}/sdk/h5-auth-test`)
   })
 
-  test('keeps local loopback adapter requests tokenless when H5 access is enabled', async () => {
-    await enableH5Access()
-
-    const response = await fetch(`${baseUrl}/api/adapters`)
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({})
-  })
-
   test('keeps local loopback settings surface requests tokenless when H5 access is enabled', async () => {
     await enableH5Access()
 
@@ -756,18 +740,6 @@ describe('remote H5 auth and CORS integration', () => {
 
       expect(response.status).toBe(200)
     }
-  })
-
-  test('blocks adapter requests from non-local browser origins when H5 access is enabled', async () => {
-    await enableH5Access()
-
-    const response = await fetch(`${baseUrl}/api/adapters`, {
-      headers: {
-        Origin: PHONE_ORIGIN,
-      },
-    })
-
-    expect(response.status).toBe(403)
   })
 
   test('blocks settings surface requests from untrusted browser origins when H5 access is enabled', async () => {

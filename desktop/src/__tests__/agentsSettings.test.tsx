@@ -37,10 +37,6 @@ vi.mock('../stores/providerStore', () => ({
   }),
 }))
 
-vi.mock('../pages/AdapterSettings', () => ({
-  AdapterSettings: () => <div>Adapter Settings Mock</div>,
-}))
-
 vi.mock('../components/chat/CodeViewer', () => ({
   CodeViewer: ({ code }: { code: string }) => <pre data-testid="code-viewer">{code}</pre>,
 }))

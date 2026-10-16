@@ -5,7 +5,6 @@ import { existsSync, readFileSync, appendFileSync } from 'node:fs'
 export type ChangeArea =
   | 'desktop'
   | 'server'
-  | 'adapters'
   | 'docs'
   | 'release'
   | 'cli-core'
@@ -24,7 +23,6 @@ export type ChangePolicyResult = {
   checks: {
     desktop: boolean
     server: boolean
-    adapters: boolean
     desktopNative: boolean
     docs: boolean
     coverage: boolean
@@ -38,7 +36,6 @@ const ALLOW_COVERAGE_BASELINE_LABEL = 'allow-coverage-baseline-change'
 const areaLabels: Record<ChangeArea, string> = {
   desktop: 'area:desktop',
   server: 'area:server',
-  adapters: 'area:adapters',
   docs: 'area:docs',
   release: 'area:release',
   'cli-core': 'area:cli-core',
@@ -116,10 +113,6 @@ function areasForPath(path: string): ChangeArea[] {
     areas.add('server')
   }
 
-  if (path.startsWith('adapters/')) {
-    areas.add('adapters')
-  }
-
   if (
     path.startsWith('docs/') ||
     path.startsWith('release-notes/') ||
@@ -159,7 +152,6 @@ function missingTestSignals(files: string[]) {
   const signals: string[] = []
   const desktopProd = changedProductionFiles(files, (file) => file.startsWith('desktop/src/'))
   const serverProd = changedProductionFiles(files, (file) => file.startsWith('src/server/'))
-  const adapterProd = changedProductionFiles(files, (file) => file.startsWith('adapters/'))
   const agentRuntimeProd = changedProductionFiles(files, (file) => (
     file.startsWith('src/tools/') ||
     file.startsWith('src/utils/')
@@ -170,9 +162,6 @@ function missingTestSignals(files: string[]) {
   }
   if (serverProd.length > 0 && !hasMatchingTest(files, (file) => file.startsWith('src/server/'))) {
     signals.push('Server product files changed without a server test file in the PR.')
-  }
-  if (adapterProd.length > 0 && !hasMatchingTest(files, (file) => file.startsWith('adapters/'))) {
-    signals.push('Adapter product files changed without an adapter test file in the PR.')
   }
   if (agentRuntimeProd.length > 0 && !hasMatchingTest(files, (file) => file.startsWith('src/tools/') || file.startsWith('src/utils/'))) {
     signals.push('Agent/runtime product files changed without a tools/utils test file in the PR.')
@@ -217,7 +206,6 @@ export function evaluateChangePolicy(
 
   const touchesDesktopNative = files.some((file) => (
     file.startsWith('desktop/') ||
-    file.startsWith('adapters/') ||
     file.startsWith('src/server/') ||
     desktopNativeExactPaths.has(file)
   ))
@@ -232,7 +220,6 @@ export function evaluateChangePolicy(
     file.startsWith('src/server/') ||
     file.startsWith('src/tools/') ||
     file.startsWith('src/utils/') ||
-    file.startsWith('adapters/') ||
     file.startsWith('scripts/quality-gate/') ||
     file === 'package.json' ||
     file === 'desktop/package.json' ||
@@ -255,7 +242,6 @@ export function evaluateChangePolicy(
     checks: {
       desktop: areas.has('desktop') || areas.has('server'),
       server: areas.has('server') || files.some((file) => file.startsWith('src/tools/') || file.startsWith('src/utils/')),
-      adapters: areas.has('adapters'),
       desktopNative: touchesDesktopNative,
       docs: touchesDocs,
       coverage: touchesCoverage,
@@ -300,7 +286,7 @@ function formatSummary(result: ChangePolicyResult) {
     'PR change policy',
     `  Areas: ${result.areas.length ? result.areas.join(', ') : 'none'}`,
     `  Labels: ${result.labels.length ? result.labels.join(', ') : 'none'}`,
-    `  Checks: desktop=${result.checks.desktop}, server=${result.checks.server}, adapters=${result.checks.adapters}, desktopNative=${result.checks.desktopNative}, docs=${result.checks.docs}, coverage=${result.checks.coverage}`,
+    `  Checks: desktop=${result.checks.desktop}, server=${result.checks.server}, desktopNative=${result.checks.desktopNative}, docs=${result.checks.docs}, coverage=${result.checks.coverage}`,
   ]
 
   if (result.cliCoreFiles.length > 0) {
@@ -346,7 +332,6 @@ function writeGithubOutputs(result: ChangePolicyResult) {
     blocked: String(result.blocked),
     desktop_checks: String(result.checks.desktop),
     server_checks: String(result.checks.server),
-    adapter_checks: String(result.checks.adapters),
     desktop_native_checks: String(result.checks.desktopNative),
     docs_checks: String(result.checks.docs),
     coverage_checks: String(result.checks.coverage),

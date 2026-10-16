@@ -38,10 +38,6 @@ vi.mock('../stores/providerStore', () => ({
   }),
 }))
 
-vi.mock('../pages/AdapterSettings', () => ({
-  AdapterSettings: () => <div>Adapter Settings Mock</div>,
-}))
-
 vi.mock('../stores/agentStore', () => ({
   useAgentStore: Object.assign((selector?: (state: any) => unknown) => {
     const state = {

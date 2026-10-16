@@ -14,7 +14,6 @@ describe('quality gate modes', () => {
     expect(lanes).toContain('policy-checks')
     expect(lanes).toContain('desktop-checks')
     expect(lanes).toContain('server-checks')
-    expect(lanes).toContain('adapter-checks')
     expect(lanes).toContain('native-checks')
     expect(lanes).toContain('docs-checks')
     expect(lanes).toContain('persistence-upgrade')

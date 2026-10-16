@@ -7,7 +7,6 @@ describe('PR quality workflow', () => {
 
     expect(workflow).toContain("if: needs.change-policy.outputs.desktop_checks == 'true'")
     expect(workflow).toContain("if: needs.change-policy.outputs.server_checks == 'true'")
-    expect(workflow).toContain("if: needs.change-policy.outputs.adapter_checks == 'true'")
     expect(workflow).toContain("if: needs.change-policy.outputs.desktop_native_checks == 'true'")
     expect(workflow).toContain("if: needs.change-policy.outputs.docs_checks == 'true'")
     expect(workflow).toContain("if: needs.change-policy.outputs.coverage_checks == 'true'")

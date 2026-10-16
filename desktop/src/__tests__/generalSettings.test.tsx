@@ -85,10 +85,6 @@ vi.mock('../components/settings/ChatGPTOfficialLogin', () => ({
   ChatGPTOfficialLogin: () => <div data-testid="chatgpt-official-login" />,
 }))
 
-vi.mock('../pages/AdapterSettings', () => ({
-  AdapterSettings: () => <div>Adapter Settings Mock</div>,
-}))
-
 vi.mock('../pages/ActivitySettings', () => ({
   ActivitySettings: () => <div>Activity Settings Mock</div>,
 }))

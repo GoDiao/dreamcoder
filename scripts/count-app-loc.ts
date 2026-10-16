@@ -14,7 +14,7 @@ type FileStat = Bucket & {
 
 const root = process.cwd()
 
-const targetRoots = ['adapters', 'desktop', 'runtime', 'src/server']
+const targetRoots = ['desktop', 'runtime', 'src/server']
 
 const codeExtensions = new Set([
   '.css',
@@ -186,10 +186,6 @@ function areaForPath(path: string) {
 
   if (path.startsWith('desktop/')) {
     return 'desktop support'
-  }
-
-  if (path.startsWith('adapters/')) {
-    return 'adapters'
   }
 
   if (path.startsWith('runtime/')) {

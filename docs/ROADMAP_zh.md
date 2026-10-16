@@ -47,19 +47,7 @@
 
 参考: [Issue #3](https://github.com/GoDiao/dreamcoder/issues/3)
 
-## Phase 4 — IM 适配器集成
-
-通过飞书/钉钉/Telegram/微信远程与 AI 对话。
-
-适配器代码已在仓库中，但桌面设置入口和自动启动流程尚未完成；当前使用需要手动启动适配器进程。详见 [适配器说明](../adapters/README.md)。
-
-- [ ] 适配器配置 UI (已在 `AdapterSettings` 有骨架)
-- [ ] 配对码安全机制
-- [ ] 各平台适配器验证与调试
-- [ ] 会话映射持久化
-- [ ] 权限审批流适配 (按钮/卡片形式)
-
-## Phase 5 — Release 自动化
+## Phase 4 — Release 自动化
 
 - [ ] GitHub Actions 自动构建与发布
 - [ ] 跨平台打包 (Windows/macOS)

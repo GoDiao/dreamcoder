@@ -56,17 +56,6 @@ describe('evaluateChangePolicy', () => {
     expect(result.missingTestSignals).toContain('Server product files changed without a server test file in the PR.')
   })
 
-  test('routes adapter changes to adapter and native checks', () => {
-    const result = evaluateChangePolicy(['adapters/telegram/index.ts'])
-
-    expect(result.areas).toEqual(['adapters'])
-    expect(result.checks.adapters).toBe(true)
-    expect(result.checks.desktopNative).toBe(true)
-    expect(result.checks.coverage).toBe(true)
-    expect(result.blocked).toBe(true)
-    expect(result.missingTestSignals).toEqual(['Adapter product files changed without an adapter test file in the PR.'])
-  })
-
   test('allows production changes when matching tests are included', () => {
     const result = evaluateChangePolicy([
       'desktop/src/pages/Settings.tsx',

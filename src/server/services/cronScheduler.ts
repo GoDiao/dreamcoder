@@ -5,7 +5,6 @@ import * as os from 'os'
 import * as crypto from 'crypto'
 import { CronService, type CronTask } from './cronService.js'
 import { SessionService } from './sessionService.js'
-import { sendTaskNotification } from './notificationService.js'
 import { ProviderService } from './providerService.js'
 import { isProviderManagedEnvVar } from '../../utils/managedEnvConstants.js'
 import {
@@ -511,12 +510,6 @@ export class CronScheduler {
       }
 
       await updateRun(completedRun)
-
-      if (task.notification?.enabled && task.notification.channels.length > 0) {
-        sendTaskNotification(completedRun, task.notification).catch((err) => {
-          console.error(`[CronScheduler] Notification error for task ${task.id}:`, err)
-        })
-      }
 
       if (!task.recurring) {
         await this.cronService.updateTask(task.id, { enabled: false }).catch(() => {

@@ -186,7 +186,7 @@ describe('useScheduledTaskDesktopNotifications', () => {
     })
   })
 
-  it('ignores task runs without the desktop notification channel', async () => {
+  it('ignores tasks saved with only a removed IM notification channel', async () => {
     listMock.mockResolvedValue({
       tasks: [{
         id: 'task-1',
@@ -195,7 +195,7 @@ describe('useScheduledTaskDesktopNotifications', () => {
         prompt: 'review',
         enabled: true,
         createdAt: 1,
-        notification: { enabled: true, channels: ['telegram'] },
+        notification: { enabled: true, channels: ['telegram'] as never },
       }],
     })
     getRecentRunsMock.mockResolvedValue({

@@ -132,8 +132,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 - [x] **Phase 2**: CLI 后端集成 + Computer Use + MCP + Skills + Agent Teams
 - [x] **Phase 2.5**: 性能优化 — bundle 拆分、轮询节流、终端 LRU、sessionStore 重构
 - [x] **Phase 3**: H5 局域网访问 (启用后从手机/浏览器接入桌面端会话)
-- [ ] **Phase 4**: IM 适配器集成 (飞书/钉钉/Telegram/微信)
-- [ ] **Phase 5**: Release 自动化 + 自动更新
+- [ ] **Phase 4**: Release 自动化 + 自动更新
 
 详见 [ROADMAP](docs/ROADMAP_zh.md)
 

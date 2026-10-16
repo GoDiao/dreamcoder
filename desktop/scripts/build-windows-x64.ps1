@@ -173,20 +173,6 @@ if ($env:SKIP_INSTALL -ne '1') {
   } finally {
     Pop-Location
   }
-
-  $adaptersDir = Join-Path $repoRoot 'adapters'
-  if (Test-Path (Join-Path $adaptersDir 'package.json')) {
-    Write-Step 'Installing adapter dependencies...'
-    Push-Location $adaptersDir
-    try {
-      & bun install
-      if ($LASTEXITCODE -ne 0) {
-        throw "[build-windows-x64] bun install failed in adapters (exit $LASTEXITCODE)"
-      }
-    } finally {
-      Pop-Location
-    }
-  }
 }
 
 $tauriBuildArgs = @(

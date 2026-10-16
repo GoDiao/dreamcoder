@@ -399,9 +399,6 @@ struct StoredWindowState {
 }
 
 #[derive(Default)]
-struct AdapterState(Mutex<Vec<CommandChild>>);
-
-#[derive(Default)]
 struct TerminalState {
     next_id: AtomicU32,
     sessions: Mutex<HashMap<u32, TerminalSession>>,
@@ -471,17 +468,9 @@ fn get_server_url(state: State<'_, ServerState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn restart_adapters_sidecar(app: AppHandle) -> Result<(), String> {
-    stop_adapters_sidecar(&app);
-    spawn_and_track_adapters_sidecar(&app);
-    Ok(())
-}
-
-#[tauri::command]
 fn prepare_for_update_install(app: AppHandle) -> Result<(), String> {
     mark_app_quitting(&app);
     stop_server_sidecar(&app);
-    stop_adapters_sidecar(&app);
 
     #[cfg(target_os = "windows")]
     {
@@ -496,7 +485,6 @@ fn prepare_for_update_install(app: AppHandle) -> Result<(), String> {
 fn prepare_for_app_mode_restart(app: AppHandle) -> Result<(), String> {
     mark_app_quitting(&app);
     stop_server_sidecar(&app);
-    stop_adapters_sidecar(&app);
 
     #[cfg(target_os = "windows")]
     {
@@ -1673,147 +1661,6 @@ fn stop_server_sidecar(app: &AppHandle) {
     }
 }
 
-fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String> {
-    #[cfg(unix)]
-    kill_stale_unix_adapter_sidecars();
-
-    let app_root = resolve_app_root(app)?;
-    let app_root_arg = app_root.to_string_lossy().to_string();
-
-    let server_http_url = app
-        .try_state::<ServerState>()
-        .and_then(|state| {
-            state
-                .0
-                .lock()
-                .ok()
-                .and_then(|guard| guard.runtime.as_ref().map(|r| r.url.clone()))
-        })
-        .unwrap_or_else(|| "http://127.0.0.1:3456".to_string());
-    let server_ws_url = if let Some(rest) = server_http_url.strip_prefix("http://") {
-        format!("ws://{rest}")
-    } else if let Some(rest) = server_http_url.strip_prefix("https://") {
-        format!("wss://{rest}")
-    } else {
-        server_http_url.clone()
-    };
-
-    let mut children = Vec::new();
-    for (label, flag) in [
-        ("feishu", "--feishu"),
-        ("telegram", "--telegram"),
-        ("wechat", "--wechat"),
-        ("dingtalk", "--dingtalk"),
-    ] {
-        let mut sidecar = app
-            .shell()
-            .sidecar("dreamcoder-sidecar")
-            .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
-        for (key, value) in terminal_environment(&default_shell(None)) {
-            sidecar = sidecar.env(key, value);
-        }
-        let mut sidecar_final = sidecar.env("ADAPTER_SERVER_URL", &server_ws_url);
-        if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
-            let cache_dir = PathBuf::from(&config_dir).join("Cache");
-            sidecar_final = sidecar_final
-                .env("CLAUDE_CONFIG_DIR", &config_dir)
-                .env("XDG_CACHE_HOME", cache_dir.to_string_lossy().to_string());
-        }
-        let sidecar = sidecar_final.args(["adapters", "--app-root", &app_root_arg, flag]);
-
-        let (mut rx, child) = sidecar
-            .spawn()
-            .map_err(|err| format!("spawn {label} adapter sidecar: {err}"))?;
-        let label = label.to_string();
-
-        tauri::async_runtime::spawn(async move {
-            while let Some(event) = rx.recv().await {
-                match event {
-                    CommandEvent::Stdout(line) => {
-                        let line = String::from_utf8_lossy(&line);
-                        println!("[claude-adapters:{label}] {}", line.trim_end());
-                    }
-                    CommandEvent::Stderr(line) => {
-                        let line = String::from_utf8_lossy(&line);
-                        eprintln!("[claude-adapters:{label}] {}", line.trim_end());
-                    }
-                    CommandEvent::Terminated(payload) => {
-                        println!(
-                            "[claude-adapters:{label}] sidecar exited (code={:?}, signal={:?})",
-                            payload.code, payload.signal
-                        );
-                    }
-                    _ => {}
-                }
-            }
-        });
-
-        children.push(child);
-    }
-
-    Ok(children)
-}
-
-fn spawn_and_track_adapters_sidecar(app: &AppHandle) {
-    match start_adapters_sidecars(app) {
-        Ok(children) => {
-            if let Some(state) = app.try_state::<AdapterState>() {
-                if let Ok(mut guard) = state.0.lock() {
-                    *guard = children;
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("[desktop] failed to start adapter sidecar: {err}");
-        }
-    }
-}
-
-fn stop_adapters_sidecar(app: &AppHandle) {
-    let Some(state) = app.try_state::<AdapterState>() else {
-        return;
-    };
-    let Ok(mut guard) = state.0.lock() else {
-        return;
-    };
-    for child in guard.drain(..) {
-        let _ = child.kill();
-    }
-}
-
-#[cfg(unix)]
-fn kill_stale_unix_adapter_sidecars() {
-    let current_pid = std::process::id();
-    let Ok(output) = StdCommand::new("ps")
-        .args(["-axo", "pid=,command="])
-        .output()
-    else {
-        return;
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let mut parts = line.trim_start().splitn(2, char::is_whitespace);
-        let Some(pid_text) = parts.next() else {
-            continue;
-        };
-        let Some(command) = parts.next() else {
-            continue;
-        };
-        let Ok(pid) = pid_text.parse::<u32>() else {
-            continue;
-        };
-        if pid == current_pid {
-            continue;
-        }
-        if !command.contains("dreamcoder-sidecar") || !command.contains(" adapters") {
-            continue;
-        }
-
-        let _ = StdCommand::new("kill").arg(pid.to_string()).status();
-    }
-}
-
 #[cfg(target_os = "windows")]
 fn kill_windows_sidecars() {
     for image_name in [
@@ -2164,7 +2011,6 @@ pub fn run() {
             show_main_window(app);
         }))
         .manage(ServerState::default())
-        .manage(AdapterState::default())
         .manage(TerminalState::default())
         .manage(AppExitState::default())
         .plugin(tauri_plugin_shell::init())
@@ -2174,7 +2020,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_server_url,
-            restart_adapters_sidecar,
             prepare_for_update_install,
             prepare_for_app_mode_restart,
             cancel_update_install,
@@ -2278,8 +2123,6 @@ pub fn run() {
             }
             drop(guard);
 
-            spawn_and_track_adapters_sidecar(&app.handle());
-
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -2315,13 +2158,11 @@ pub fn run() {
             mark_app_quitting(app_handle);
             save_main_window_state(app_handle);
             stop_server_sidecar(app_handle);
-            stop_adapters_sidecar(app_handle);
         }
         RunEvent::Exit => {
             mark_app_quitting(app_handle);
             save_main_window_state(app_handle);
             stop_server_sidecar(app_handle);
-            stop_adapters_sidecar(app_handle);
         }
         _ => {}
     });
