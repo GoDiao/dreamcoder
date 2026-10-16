@@ -9,6 +9,7 @@ import type {
   ProvidersIndex,
   SavedProvider,
 } from '../types/provider.js'
+import { normalizeUpstreamBaseUrl } from '../upstream/baseUrl.js'
 import {
   ATTRIBUTION_HEADER_ENV_KEY,
   attributionHeaderEnvForModel,
@@ -73,7 +74,7 @@ function isSavedProvider(value: unknown): value is SavedProvider {
   )
 }
 
-function stripContextSuffix(model: string): string {
+export function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }
 
@@ -144,6 +145,13 @@ function getPresetModelContextWindows(presetId: string): Record<string, number> 
   return PROVIDER_PRESETS.find((preset) => preset.id === presetId)?.modelContextWindows ?? {}
 }
 
+export function resolveProviderApiKey(
+  provider: SavedProvider,
+  presetDefaultEnv: Record<string, string>,
+): string {
+  return provider.apiKey || presetDefaultEnv.ANTHROPIC_AUTH_TOKEN || presetDefaultEnv.ANTHROPIC_API_KEY || ''
+}
+
 export function buildProviderAuthEnv(
   provider: SavedProvider,
   presetDefaultEnv: Record<string, string>,
@@ -154,7 +162,7 @@ export function buildProviderAuthEnv(
   }
 
   const strategy = provider.authStrategy ?? getPresetAuthStrategy(provider.presetId)
-  const key = provider.apiKey || presetDefaultEnv.ANTHROPIC_AUTH_TOKEN || presetDefaultEnv.ANTHROPIC_API_KEY || ''
+  const key = resolveProviderApiKey(provider, presetDefaultEnv)
 
   switch (strategy) {
     case 'api_key':
@@ -196,7 +204,7 @@ export function buildProviderManagedEnv(
   const serverPort = options?.serverPort ?? 3456
   const baseUrl = needsProxy
     ? `http://127.0.0.1:${serverPort}${proxyPath}`
-    : provider.baseUrl
+    : normalizeUpstreamBaseUrl(provider.baseUrl)
 
   const models = normalizeModelMapping(provider.models)
   const modelContextWindows = {

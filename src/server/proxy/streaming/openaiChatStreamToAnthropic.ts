@@ -30,6 +30,9 @@ type StreamState = {
   messageStopSent: boolean
 
   heldMessageDelta: SseEvent | null
+
+  sawValidChunk: boolean
+  upstreamError: string | null
 }
 
 function formatSse(event: string, data: unknown): string {
@@ -50,6 +53,8 @@ function createState(model: string): StreamState {
     messageDeltaSent: false,
     messageStopSent: false,
     heldMessageDelta: null,
+    sawValidChunk: false,
+    upstreamError: null,
   }
 }
 
@@ -61,10 +66,11 @@ export function openaiChatStreamToAnthropic(
   const decoder = new TextDecoder()
   let buffer = ''
   const state = createState(model)
+  const reader = upstream.getReader()
+  let cancelled = false
 
   return new ReadableStream({
     async start(controller) {
-      const reader = upstream.getReader()
       let errored = false
 
       try {
@@ -86,7 +92,12 @@ export function openaiChatStreamToAnthropic(
               continue
             }
 
-            if (!trimmed.startsWith('data: ')) continue
+            if (!trimmed.startsWith('data: ')) {
+              if (!state.upstreamError && trimmed.startsWith('{')) {
+                state.upstreamError = readUpstreamError(parseJson(trimmed))
+              }
+              continue
+            }
             const jsonStr = trimmed.slice(6)
 
             let chunk: OpenAIChatStreamChunk
@@ -96,20 +107,39 @@ export function openaiChatStreamToAnthropic(
               continue
             }
 
+            if (state.upstreamError) continue
+            const upstreamError = readUpstreamError(chunk)
+            if (upstreamError) {
+              state.upstreamError = upstreamError
+              finalizeStream(state)
+              flushQueue(state, controller, encoder)
+              continue
+            }
+            if (Array.isArray(chunk.choices)) state.sawValidChunk = true
+
             processChunk(chunk, state)
             flushQueue(state, controller, encoder)
           }
+        }
+
+        const rest = buffer.trim()
+        if (!state.upstreamError && rest.startsWith('{')) {
+          state.upstreamError = readUpstreamError(parseJson(rest))
         }
       } catch (err) {
         errored = true
         controller.error(err)
       } finally {
-        if (!errored) {
+        if (!errored && !cancelled) {
           finalizeStream(state)
           flushQueue(state, controller, encoder)
           controller.close()
         }
       }
+    },
+    cancel(reason) {
+      cancelled = true
+      return reader.cancel(reason)
     },
   })
 }
@@ -423,9 +453,35 @@ function mergeUsageIntoHeldDelta(
   state.heldMessageDelta = null
 }
 
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function readUpstreamError(chunk: unknown): string | null {
+  const error = (chunk as { error?: unknown } | null)?.error
+  if (!error || typeof error !== 'object') return null
+  const message = (error as { message?: unknown }).message
+  return typeof message === 'string' && message ? message : 'Upstream returned an error'
+}
+
 function finalizeStream(state: StreamState): void {
   if (state.messageStopSent) return
   state.messageStopSent = true
+
+  if (state.upstreamError || !state.sawValidChunk) {
+    enqueue(state, 'error', {
+      type: 'error',
+      error: {
+        type: 'api_error',
+        message: state.upstreamError ?? 'Upstream returned no valid Chat Completions chunks',
+      },
+    })
+    return
+  }
 
   ensureMessageStart(state)
 

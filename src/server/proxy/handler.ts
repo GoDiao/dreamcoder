@@ -1,59 +1,9 @@
-import { signClaudeCodeCCHInTransformedString } from '../../utils/claudeCodeCch.js'
 import { ProviderService } from '../services/providerService.js'
+import { sendToUpstream } from '../upstream/client.js'
 import { ensureClaudeCodeAttribution } from './claudeCodeAttribution.js'
-import { anthropicToOpenaiChat } from './transform/anthropicToOpenaiChat.js'
-import { anthropicToOpenaiResponses } from './transform/anthropicToOpenaiResponses.js'
-import { openaiChatToAnthropic } from './transform/openaiChatToAnthropic.js'
-import { openaiResponsesToAnthropic } from './transform/openaiResponsesToAnthropic.js'
-import { openaiChatStreamToAnthropic } from './streaming/openaiChatStreamToAnthropic.js'
-import { openaiResponsesStreamToAnthropic } from './streaming/openaiResponsesStreamToAnthropic.js'
 import type { AnthropicRequest } from './transform/types.js'
-import { getProxyFetchOptions } from '../../utils/proxy.js'
-import { getManualNetworkProxyUrl, loadNetworkSettings } from '../services/networkSettings.js'
 
 const providerService = new ProviderService()
-
-type ProxyFetchOptions = ReturnType<typeof getProxyFetchOptions>
-type UpstreamRequestInit = RequestInit & ProxyFetchOptions
-
-function createTimeoutController(timeoutMs: number): {
-  signal: AbortSignal
-  clear: () => void
-} {
-  const controller = new AbortController()
-  const timer = setTimeout(() => {
-    controller.abort(new DOMException('The operation timed out.', 'TimeoutError'))
-  }, timeoutMs)
-
-  return {
-    signal: controller.signal,
-    clear: () => clearTimeout(timer),
-  }
-}
-
-async function fetchUpstreamWithTimeout(
-  url: string,
-  init: Omit<UpstreamRequestInit, 'signal'>,
-  timeoutMs: number,
-  isStream: boolean,
-): Promise<Response> {
-  if (!isStream) {
-    return fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-  }
-
-  const timeout = createTimeoutController(timeoutMs)
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: timeout.signal,
-    })
-  } finally {
-    timeout.clear()
-  }
-}
 
 export async function handleProxyRequest(req: Request, url: URL): Promise<Response> {
   const providerMatch = url.pathname.match(/^\/proxy\/providers\/([^/]+)\/v1\/messages$/)
@@ -70,8 +20,8 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  const config = await providerService.getProviderForProxy(providerId)
-  if (!config) {
+  const target = await providerService.getProviderForProxy(providerId)
+  if (!target) {
     return Response.json(
       {
         type: 'error',
@@ -86,7 +36,7 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  if (config.apiFormat === 'anthropic') {
+  if (target.apiFormat === 'anthropic') {
     return Response.json(
       {
         type: 'error',
@@ -111,83 +61,18 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  body = ensureClaudeCodeAttribution(body)
+  const result = await sendToUpstream(target, ensureClaudeCodeAttribution(body))
 
-  const isStream = body.stream === true
-  const baseUrl = config.baseUrl.replace(/\/+$/, '')
-  const networkSettings = await loadNetworkSettings()
-  const proxyUrl = getManualNetworkProxyUrl(networkSettings)
-
-  try {
-    if (config.apiFormat === 'openai_chat') {
-      return await handleOpenaiChat(body, baseUrl, config.apiKey, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
-    } else {
-      return await handleOpenaiResponses(body, baseUrl, config.apiKey, isStream, networkSettings.aiRequestTimeoutMs, proxyUrl)
-    }
-  } catch (err) {
-    console.error('[Proxy] Upstream request failed:', err)
+  if (!result.ok) {
+    console.error('[Proxy] Upstream request failed:', result.error)
     return Response.json(
-      {
-        type: 'error',
-        error: {
-          type: 'api_error',
-          message: err instanceof Error ? err.message : String(err),
-        },
-      },
-      { status: 502 },
-    )
-  }
-}
-
-async function handleOpenaiChat(
-  body: AnthropicRequest,
-  baseUrl: string,
-  apiKey: string,
-  isStream: boolean,
-  aiRequestTimeoutMs: number,
-  proxyUrl: string | undefined,
-): Promise<Response> {
-  const deepSeekCompatible = shouldUseDeepSeekReasoningCompat(baseUrl)
-  const transformed = anthropicToOpenaiChat(body, {
-    roundTripReasoningContent: deepSeekCompatible,
-    passThinkingToggle: deepSeekCompatible,
-  })
-  const url = `${baseUrl}/v1/chat/completions`
-  const proxyOptions = getProxyFetchOptions({ proxyUrl })
-
-  const upstream = await fetchUpstreamWithTimeout(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: signClaudeCodeCCHInTransformedString(JSON.stringify(transformed)),
-    ...proxyOptions,
-  }, aiRequestTimeoutMs, isStream)
-
-  if (!upstream.ok) {
-    const errText = await upstream.text().catch(() => '')
-    return Response.json(
-      {
-        type: 'error',
-        error: {
-          type: 'api_error',
-          message: `Upstream returned HTTP ${upstream.status}: ${errText.slice(0, 500)}`,
-        },
-      },
-      { status: upstream.status },
+      { type: 'error', error: { type: 'api_error', message: result.error } },
+      { status: result.httpStatus ?? 502 },
     )
   }
 
-  if (isStream) {
-    if (!upstream.body) {
-      return Response.json(
-        { type: 'error', error: { type: 'api_error', message: 'Upstream returned no body for stream' } },
-        { status: 502 },
-      )
-    }
-    const anthropicStream = openaiChatStreamToAnthropic(upstream.body, body.model)
-    return new Response(anthropicStream, {
+  if ('stream' in result) {
+    return new Response(result.stream, {
       status: 200,
       headers: {
         'Content-Type': 'text/event-stream',
@@ -197,73 +82,5 @@ async function handleOpenaiChat(
     })
   }
 
-  const responseBody = await upstream.json()
-  const anthropicResponse = openaiChatToAnthropic(responseBody, body.model)
-  return Response.json(anthropicResponse)
-}
-
-function shouldUseDeepSeekReasoningCompat(baseUrl: string): boolean {
-  return (
-    /(^|[./-])deepseek([./-]|$)/i.test(baseUrl) ||
-    /(^|[./-])opencode\.ai([:/]|$)/i.test(baseUrl)
-  )
-}
-
-async function handleOpenaiResponses(
-  body: AnthropicRequest,
-  baseUrl: string,
-  apiKey: string,
-  isStream: boolean,
-  aiRequestTimeoutMs: number,
-  proxyUrl: string | undefined,
-): Promise<Response> {
-  const transformed = anthropicToOpenaiResponses(body)
-  const url = `${baseUrl}/v1/responses`
-  const proxyOptions = getProxyFetchOptions({ proxyUrl })
-
-  const upstream = await fetchUpstreamWithTimeout(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: signClaudeCodeCCHInTransformedString(JSON.stringify(transformed)),
-    ...proxyOptions,
-  }, aiRequestTimeoutMs, isStream)
-
-  if (!upstream.ok) {
-    const errText = await upstream.text().catch(() => '')
-    return Response.json(
-      {
-        type: 'error',
-        error: {
-          type: 'api_error',
-          message: `Upstream returned HTTP ${upstream.status}: ${errText.slice(0, 500)}`,
-        },
-      },
-      { status: upstream.status },
-    )
-  }
-
-  if (isStream) {
-    if (!upstream.body) {
-      return Response.json(
-        { type: 'error', error: { type: 'api_error', message: 'Upstream returned no body for stream' } },
-        { status: 502 },
-      )
-    }
-    const anthropicStream = openaiResponsesStreamToAnthropic(upstream.body, body.model)
-    return new Response(anthropicStream, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    })
-  }
-
-  const responseBody = await upstream.json()
-  const anthropicResponse = openaiResponsesToAnthropic(responseBody, body.model)
-  return Response.json(anthropicResponse)
+  return Response.json(result.message)
 }

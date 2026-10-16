@@ -8,6 +8,7 @@ import { resolveOpenAICodexModel } from '../../services/openaiAuth/models.js'
 import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenaiResponses.js'
 import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 import { cleanSessionTitleSource, hasSessionTitleMarkup } from '../../utils/sessionTitleText.js'
+import { resolveUpstreamTarget, sendToUpstream } from '../upstream/client.js'
 
 const TITLE_MAX_LEN = 50
 const TITLE_MAX_OUTPUT_TOKENS = 100
@@ -67,35 +68,22 @@ export async function generateTitle(
       )
     }
 
-    if (!resolvedProvider?.baseUrl || !resolvedProvider?.apiKey) return null
+    if (!resolvedProvider) return null
+    const target = resolveUpstreamTarget(resolvedProvider)
+    if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) return null
 
-    const model = resolvedProvider.models.haiku || resolvedProvider.models.main
-    const url = `${resolvedProvider.baseUrl.replace(/\/+$/, '')}/v1/messages`
     const shouldDisableThinking = await shouldDisableThinkingForTitle()
+    const result = await sendToUpstream(target, {
+      model: resolvedProvider.models.haiku || resolvedProvider.models.main,
+      max_tokens: TITLE_MAX_OUTPUT_TOKENS,
+      system: TITLE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],
+      ...(shouldDisableThinking && { thinking: { type: 'disabled' } }),
+    }, { timeoutMs: 15_000 })
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': resolvedProvider.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 100,
-        system: TITLE_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],
-        ...(shouldDisableThinking && { thinking: { type: 'disabled' } }),
-      }),
-      signal: AbortSignal.timeout(15_000),
-    })
-
-    if (!response.ok) return null
-
-    const body = (await response.json()) as {
-      content?: Array<{ type: string; text?: string }>
-    }
-    const text = body.content?.find((b) => b.type === 'text')?.text
+    if (!result.ok || !('message' in result)) return null
+    const block = result.message.content.find((b) => b.type === 'text')
+    const text = block?.type === 'text' ? block.text : undefined
     if (!text) return null
 
     return parseGeneratedTitleText(text)

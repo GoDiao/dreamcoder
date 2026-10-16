@@ -35,6 +35,7 @@ describe('titleService', () => {
       async fetch(req) {
         requestBody = await req.json() as Record<string, unknown>
         return Response.json({
+          type: 'message',
           content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
         })
       },
@@ -85,6 +86,7 @@ describe('titleService', () => {
       async fetch(req) {
         requestBody = await req.json() as Record<string, unknown>
         return Response.json({
+          type: 'message',
           content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
         })
       },
@@ -127,6 +129,63 @@ describe('titleService', () => {
     }
   })
 
+  test('generates titles through the OpenAI Chat format for OpenAI-compatible providers', async () => {
+    let requestPath = ''
+    let authorization: string | null = null
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        requestPath = new URL(req.url).pathname
+        authorization = req.headers.get('authorization')
+        return Response.json({
+          id: 'chatcmpl-title',
+          object: 'chat.completion',
+          created: 0,
+          model: 'gpt-mini',
+          choices: [{
+            index: 0,
+            message: { role: 'assistant', content: '{"title":"Trace ok"}' },
+            finish_reason: 'stop',
+          }],
+        })
+      },
+    })
+
+    try {
+      const providerId = 'openai-chat-test'
+      await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+      await fs.writeFile(
+        path.join(tmpDir, 'dreamcoder', 'providers.json'),
+        JSON.stringify({
+          activeId: providerId,
+          providers: [
+            {
+              id: providerId,
+              presetId: 'custom',
+              name: 'OpenAI Compatible',
+              apiKey: 'test-key',
+              baseUrl: `http://127.0.0.1:${server.port}/v1`,
+              apiFormat: 'openai_chat',
+              models: {
+                main: 'gpt-main',
+                haiku: 'gpt-mini',
+                sonnet: 'gpt-main',
+                opus: 'gpt-main',
+              },
+            },
+          ],
+        }, null, 2),
+      )
+
+      await expect(generateTitle('请只回复 trace-ok')).resolves.toBe('Trace ok')
+      expect(requestPath).toBe('/v1/chat/completions')
+      expect(authorization).toBe('Bearer test-key')
+    } finally {
+      server.stop(true)
+    }
+  })
+
   test('derives slash-command titles from command metadata without raw XML tags', () => {
     const raw = [
       '<command-message>frontend-design</command-message>',
@@ -149,6 +208,7 @@ describe('titleService', () => {
           messages?: Array<{ content?: string }>
         }
         return Response.json({
+          type: 'message',
           content: [{ type: 'text', text: '{"title":"Redesign website"}' }],
         })
       },

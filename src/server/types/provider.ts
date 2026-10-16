@@ -108,5 +108,4 @@ export interface ProviderTestStepResult {
 
 export interface ProviderTestResult {
   connectivity: ProviderTestStepResult
-  proxy?: ProviderTestStepResult
 }

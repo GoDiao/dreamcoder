@@ -78,5 +78,4 @@ export type ProviderTestStepResult = {
 
 export type ProviderTestResult = {
   connectivity: ProviderTestStepResult
-  proxy?: ProviderTestStepResult
 }

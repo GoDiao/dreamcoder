@@ -824,13 +824,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                   ? t('settings.providers.connectivityOk', { latency: String(testResult.connectivity.latencyMs) })
                   : t('settings.providers.connectivityFailed', { error: testResult.connectivity.error || '' })}
               </span>
-              {testResult.proxy && (
-                <span className={`text-xs ${testResult.proxy.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>
-                  {testResult.proxy.success
-                    ? t('settings.providers.proxyOk', { latency: String(testResult.proxy.latencyMs) })
-                    : t('settings.providers.proxyFailed', { error: testResult.proxy.error || '' })}
-                </span>
-              )}
             </div>
           )}
         </div>

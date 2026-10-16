@@ -58,6 +58,18 @@ function sampleInput(overrides?: Partial<CreateProviderInput>): CreateProviderIn
   }
 }
 
+function anthropicStreamResponse(model: string): Response {
+  const events = [
+    { type: 'message_start', message: { id: 'msg_1', type: 'message', role: 'assistant', model, content: [] } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_stop' },
+  ]
+  const body = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+}
+
 async function readSettings(): Promise<Record<string, unknown>> {
   const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'settings.json'), 'utf-8')
   return JSON.parse(raw) as Record<string, unknown>
@@ -980,14 +992,7 @@ describe('ProviderService', () => {
       const calls: Array<{ headers: Record<string, string> }> = []
       globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
         calls.push({ headers: init?.headers as Record<string, string> })
-        return new Response(JSON.stringify({
-          type: 'message',
-          model: 'lmstudio-model',
-          content: [],
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return anthropicStreamResponse('lmstudio-model')
       }) as typeof fetch
 
       try {
@@ -1024,14 +1029,7 @@ describe('ProviderService', () => {
           url: String(url),
           headers: init?.headers as Record<string, string>,
         })
-        return new Response(JSON.stringify({
-          type: 'message',
-          model: 'model-main',
-          content: [],
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return anthropicStreamResponse('model-main')
       }) as typeof fetch
 
       try {
@@ -1069,6 +1067,135 @@ describe('ProviderService', () => {
       }
     })
 
+    test('tests OpenAI Chat providers through the same streaming path as chat', async () => {
+      const originalFetch = globalThis.fetch
+      const calls: Array<{ url: string; body: Record<string, unknown> }> = []
+      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), body: JSON.parse(String(init?.body)) as Record<string, unknown> })
+        const chunk = {
+          id: 'c1',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-main',
+          choices: [{ index: 0, delta: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        }
+        return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        })
+      }) as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://openrouter.ai/api/v1',
+          apiKey: 'sk-or',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(calls[0].url).toBe('https://openrouter.ai/api/v1/chat/completions')
+        expect(calls[0].body.stream).toBe(true)
+        expect(result).toEqual({
+          connectivity: expect.objectContaining({ success: true, modelUsed: 'gpt-main', httpStatus: 200 }),
+        })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test.each([
+      ['a JSON error body', '{"error":{"message":"invalid api key"}}', 'invalid api key'],
+      ['an HTML page', '<html>hi</html>', 'no valid Chat Completions chunks'],
+      ['an SSE error chunk', 'data: {"error":{"message":"quota exceeded"}}\n\n', 'quota exceeded'],
+      ['an empty body', '', 'no valid Chat Completions chunks'],
+    ])('fails OpenAI Chat tests when a 200 response carries %s', async (_label, body, expectedError) => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity.success).toBe(false)
+        expect(result.connectivity.error).toContain(expectedError)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('shows the upstream message when a Responses stream fails', async () => {
+      const originalFetch = globalThis.fetch
+      const body = 'event: response.failed\ndata: {"type":"response.failed","response":{"status":"failed","error":{"message":"quota exceeded"}}}\n\n'
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_responses',
+        })
+
+        expect(result.connectivity).toMatchObject({ success: false, error: 'quota exceeded' })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('passes OpenAI Chat tests when the model stops at max_tokens before any text', async () => {
+      const originalFetch = globalThis.fetch
+      const chunks = [
+        { id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'gpt-main', choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },
+        { id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'gpt-main', choices: [{ index: 0, delta: {}, finish_reason: 'length' }] },
+      ]
+      const body = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
+      globalThis.fetch = mock(async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity.success).toBe(true)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('reports a failed test when the stream ends without message_stop', async () => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => new Response('', {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com/anthropic',
+          apiKey: 'sk-api',
+          modelId: 'model-main',
+          apiFormat: 'anthropic',
+        })
+
+        expect(result.connectivity.success).toBe(false)
+        expect(result.connectivity.error).toContain('message_stop')
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
     test('should use configured network timeout for provider tests', async () => {
       await fs.writeFile(
         path.join(tmpDir, 'settings.json'),
@@ -1081,22 +1208,15 @@ describe('ProviderService', () => {
         'utf-8',
       )
       const originalFetch = globalThis.fetch
-      const originalTimeout = AbortSignal.timeout
-      const timeoutCalls: number[] = []
+      const originalSetTimeout = globalThis.setTimeout
+      const timeoutCalls: Array<number | undefined> = []
       globalThis.fetch = mock(async (_url: string | URL | Request, _init?: RequestInit) => {
-        return new Response(JSON.stringify({
-          type: 'message',
-          model: 'model-main',
-          content: [],
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return anthropicStreamResponse('model-main')
       }) as typeof fetch
-      AbortSignal.timeout = ((ms: number) => {
+      globalThis.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
         timeoutCalls.push(ms)
-        return originalTimeout(ms)
-      }) as typeof AbortSignal.timeout
+        return originalSetTimeout(handler, ms, ...args)
+      }) as typeof setTimeout
 
       try {
         const svc = new ProviderService()
@@ -1108,9 +1228,10 @@ describe('ProviderService', () => {
           apiFormat: 'anthropic',
         })
 
-        expect(timeoutCalls).toEqual([180_000])
+        expect(timeoutCalls[0]).toBe(180_000)
+        expect(timeoutCalls.every((ms) => ms !== undefined && ms <= 180_000)).toBe(true)
       } finally {
-        AbortSignal.timeout = originalTimeout
+        globalThis.setTimeout = originalSetTimeout
         globalThis.fetch = originalFetch
       }
     })

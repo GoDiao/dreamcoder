@@ -30,9 +30,11 @@ export function openaiResponsesStreamToAnthropic(
     messageStopped: false,
   }
 
+  const reader = upstream.getReader()
+  let cancelled = false
+
   return new ReadableStream({
     async start(controller) {
-      const reader = upstream.getReader()
       let currentEvent = ''
 
       try {
@@ -72,7 +74,9 @@ export function openaiResponsesStreamToAnthropic(
                 continue
               }
 
-              processEvent(currentEvent, data, state, controller, encoder)
+              if (!state.messageStopped) {
+                processEvent(currentEvent || String(data.type ?? ''), data, state, controller, encoder)
+              }
               currentEvent = ''
               continue
             }
@@ -83,10 +87,14 @@ export function openaiResponsesStreamToAnthropic(
           }
         }
       } catch (err) {
-        controller.error(err)
+        if (!cancelled) controller.error(err)
         return
       }
-      controller.close()
+      if (!cancelled) controller.close()
+    },
+    cancel(reason) {
+      cancelled = true
+      return reader.cancel(reason)
     },
   })
 }
@@ -245,6 +253,22 @@ function processEvent(
       break
     }
 
+    case 'response.failed':
+    case 'error': {
+      const response = data.response as Record<string, unknown> | undefined
+      const error = (response?.error ?? data.error ?? data) as Record<string, unknown> | undefined
+      const message = typeof error?.message === 'string' && error.message
+        ? error.message
+        : 'Upstream Responses stream failed'
+      state.messageStopped = true
+      controller.enqueue(encoder.encode(formatSse('error', {
+        type: 'error',
+        error: { type: 'api_error', message },
+      })))
+      break
+    }
+
+    case 'response.incomplete':
     case 'response.completed': {
       const response = data.response as Record<string, unknown> | undefined
       const status = (response?.status as string) || 'completed'

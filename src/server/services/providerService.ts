@@ -4,11 +4,6 @@ import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { readRecoverableJsonFile } from './recoverableJsonFile.js'
 import { ManagedSettingsService } from './managedSettingsService.js'
-import { anthropicToOpenaiChat } from '../proxy/transform/anthropicToOpenaiChat.js'
-import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenaiResponses.js'
-import { openaiChatToAnthropic } from '../proxy/transform/openaiChatToAnthropic.js'
-import { openaiResponsesToAnthropic } from '../proxy/transform/openaiResponsesToAnthropic.js'
-import type { AnthropicRequest, AnthropicResponse } from '../proxy/transform/types.js'
 import {
   OPENAI_OFFICIAL_PROVIDER,
   isOpenAIOfficialProviderId,
@@ -22,17 +17,12 @@ import {
   buildProviderAuthEnv,
   buildProviderManagedEnv,
   getManagedEnvKeys,
-  getPresetAuthStrategy,
   getPresetDefaultEnv,
   normalizeModelMapping,
   normalizeProvidersIndex,
 } from './providerRuntimeEnv.js'
-import { getProxyFetchOptions } from '../../utils/proxy.js'
-import {
-  getManualNetworkProxyUrl,
-  loadNetworkSettings,
-  type NetworkSettings,
-} from './networkSettings.js'
+import { loadNetworkSettings } from './networkSettings.js'
+import { resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
 import type {
   SavedProvider,
   ProvidersIndex,
@@ -40,7 +30,6 @@ import type {
   UpdateProviderInput,
   TestProviderInput,
   ProviderTestResult,
-  ProviderTestStepResult,
   ApiFormat,
   ProviderAuthStrategy,
 } from '../types/provider.js'
@@ -338,43 +327,16 @@ export class ProviderService {
     return { hasAuth: false, source: 'none' }
   }
 
-  async getProviderForProxy(providerId?: string): Promise<{
-    baseUrl: string
-    apiKey: string
-    apiFormat: ApiFormat
-  } | null> {
+  async getProviderForProxy(providerId?: string): Promise<UpstreamTarget | null> {
     if (providerId) {
-      if (isOpenAIOfficialProviderId(providerId)) {
-        return null
-      }
-      const provider = await this.getProvider(providerId)
-      return {
-        baseUrl: provider.baseUrl,
-        apiKey: provider.apiKey,
-        apiFormat: provider.apiFormat ?? 'anthropic',
-      }
+      if (isOpenAIOfficialProviderId(providerId)) return null
+      return resolveUpstreamTarget(await this.getProvider(providerId))
     }
 
     const index = await this.readIndex()
-    if (!index.activeId) return null
-    if (isOpenAIOfficialProviderId(index.activeId)) {
-      return null
-    }
+    if (!index.activeId || isOpenAIOfficialProviderId(index.activeId)) return null
     const provider = await this.getProvider(index.activeId).catch(() => null)
-    if (!provider) return null
-    return {
-      baseUrl: provider.baseUrl,
-      apiKey: provider.apiKey,
-      apiFormat: provider.apiFormat ?? 'anthropic',
-    }
-  }
-
-  async getActiveProviderForProxy(): Promise<{
-    baseUrl: string
-    apiKey: string
-    apiFormat: ApiFormat
-  } | null> {
-    return this.getProviderForProxy()
+    return provider ? resolveUpstreamTarget(provider) : null
   }
 
   async testProvider(
@@ -382,236 +344,121 @@ export class ProviderService {
     overrides?: { baseUrl?: string; modelId?: string; apiFormat?: ApiFormat; authStrategy?: ProviderAuthStrategy },
   ): Promise<ProviderTestResult> {
     const provider = await this.getProvider(id)
-    const baseUrl = overrides?.baseUrl || provider.baseUrl
-    const modelId = overrides?.modelId || provider.models.main
-    const apiFormat = overrides?.apiFormat ?? provider.apiFormat ?? 'anthropic'
-    const authStrategy = overrides?.authStrategy ?? provider.authStrategy ?? getPresetAuthStrategy(provider.presetId)
-    const presetDefaultEnv = getPresetDefaultEnv(provider.presetId)
-    const apiKey = provider.apiKey
-      || presetDefaultEnv.ANTHROPIC_AUTH_TOKEN
-      || presetDefaultEnv.ANTHROPIC_API_KEY
-      || (authStrategy === 'dual_dummy' ? 'dummy' : '')
-
-    if (!baseUrl || !apiKey) {
-      return { connectivity: { success: false, latencyMs: 0, error: 'Missing baseUrl or apiKey' } }
-    }
-    return this.testProviderConfig({
-      baseUrl,
-      apiKey,
-      modelId,
-      authStrategy,
-      apiFormat,
-    })
+    const target = resolveUpstreamTarget(provider)
+    return this.runProviderTest({
+      ...target,
+      baseUrl: overrides?.baseUrl || target.baseUrl,
+      apiFormat: overrides?.apiFormat ?? target.apiFormat,
+      authStrategy: overrides?.authStrategy ?? target.authStrategy,
+    }, overrides?.modelId || provider.models.main)
   }
 
   async testProviderConfig(input: TestProviderInput): Promise<ProviderTestResult> {
-    const format: ApiFormat = input.apiFormat ?? 'anthropic'
-    const authStrategy = input.authStrategy ?? 'api_key'
-    const base = input.baseUrl.replace(/\/+$/, '')
-    const networkSettings = await loadNetworkSettings()
-
-    const step1 = await this.testConnectivity(base, input.apiKey, input.modelId, format, authStrategy, networkSettings)
-
-    if (!step1.success) {
-      return { connectivity: step1 }
-    }
-
-    if (format === 'anthropic') {
-      return { connectivity: step1 }
-    }
-
-    const step2 = await this.testProxyPipeline(base, input.apiKey, input.modelId, format, networkSettings)
-
-    return { connectivity: step1, proxy: step2 }
+    return this.runProviderTest({
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey,
+      apiFormat: input.apiFormat ?? 'anthropic',
+      authStrategy: input.authStrategy ?? 'api_key',
+    }, input.modelId)
   }
 
-  private async testConnectivity(
-    base: string,
-    apiKey: string,
-    modelId: string,
-    format: ApiFormat,
-    authStrategy: ProviderAuthStrategy,
-    networkSettings: NetworkSettings,
-  ): Promise<ProviderTestStepResult> {
+  private async runProviderTest(target: UpstreamTarget, modelId: string): Promise<ProviderTestResult> {
+    if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) {
+      return { connectivity: { success: false, latencyMs: 0, error: 'Missing baseUrl or apiKey' } }
+    }
+
+    const { aiRequestTimeoutMs } = await loadNetworkSettings()
     const start = Date.now()
-    try {
-      const { url, headers, body } = buildDirectTestRequest(base, apiKey, modelId, format, authStrategy)
-      const proxyOptions = getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) })
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(networkSettings.aiRequestTimeoutMs),
-        ...proxyOptions,
-      })
+    const result = await sendToUpstream(target, {
+      model: modelId,
+      max_tokens: 16,
+      stream: true,
+      messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
+    }, { timeoutMs: aiRequestTimeoutMs })
 
-      const latencyMs = Date.now() - start
-      const resBody = await response.json().catch(() => null) as Record<string, unknown> | null
+    if (!result.ok) {
+      return {
+        connectivity: {
+          success: false,
+          latencyMs: Date.now() - start,
+          error: result.error,
+          modelUsed: modelId,
+          httpStatus: result.httpStatus,
+        },
+      }
+    }
 
-      if (!response.ok) {
-        let error = `HTTP ${response.status}`
-        if (resBody?.error && typeof resBody.error === 'object') {
-          error = ((resBody.error as Record<string, unknown>).message as string) || error
+    const outcome = 'stream' in result
+      ? await readAnthropicStream(result.stream, Math.max(aiRequestTimeoutMs - (Date.now() - start), 0))
+      : { ok: true as const, model: result.message.model }
+    const latencyMs = Date.now() - start
+
+    if (!outcome.ok) {
+      return {
+        connectivity: { success: false, latencyMs, error: outcome.error, modelUsed: modelId, httpStatus: result.httpStatus },
+      }
+    }
+    return {
+      connectivity: { success: true, latencyMs, modelUsed: outcome.model || modelId, httpStatus: result.httpStatus },
+    }
+  }
+}
+
+async function readAnthropicStream(
+  stream: ReadableStream<Uint8Array>,
+  timeoutMs: number,
+): Promise<{ ok: true; model?: string } | { ok: false; error: string }> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let model: string | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Request timed out (${Math.round(timeoutMs / 1000)}s)`)), timeoutMs)
+  })
+
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), timeout])
+      if (done) break
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+
+      let boundary: number
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const event = parseSseData(buffer.slice(0, boundary))
+        buffer = buffer.slice(boundary + 2)
+        if (!event) continue
+        if (event.type === 'message_start') {
+          const message = event.message as Record<string, unknown> | undefined
+          model = typeof message?.model === 'string' ? message.model : model
+        } else if (event.type === 'error') {
+          const error = event.error as Record<string, unknown> | undefined
+          return { ok: false, error: (error?.message as string) || 'Upstream stream returned an error' }
+        } else if (event.type === 'message_stop') {
+          return { ok: true, model }
         }
-        return { success: false, latencyMs, error, modelUsed: modelId, httpStatus: response.status }
       }
-
-      const valid = validateResponseBody(resBody, format)
-      if (!valid.ok) {
-        return { success: false, latencyMs, error: valid.error, modelUsed: modelId, httpStatus: response.status }
-      }
-
-      return { success: true, latencyMs, modelUsed: valid.model || modelId, httpStatus: response.status }
-    } catch (err: unknown) {
-      const latencyMs = Date.now() - start
-      if (err instanceof DOMException && err.name === 'TimeoutError') {
-        return { success: false, latencyMs, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)`, modelUsed: modelId }
-      }
-      return { success: false, latencyMs, error: err instanceof Error ? err.message : String(err), modelUsed: modelId }
     }
-  }
-
-  private async testProxyPipeline(
-    base: string,
-    apiKey: string,
-    modelId: string,
-    format: 'openai_chat' | 'openai_responses',
-    networkSettings: NetworkSettings,
-  ): Promise<ProviderTestStepResult> {
-    const start = Date.now()
-    const apiModel = stripContextSuffix(modelId)
-    try {
-      const anthropicReq: AnthropicRequest = {
-        model: apiModel,
-        max_tokens: 64,
-        messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
-      }
-
-      let upstreamUrl: string
-      let transformedBody: unknown
-      if (format === 'openai_chat') {
-        transformedBody = anthropicToOpenaiChat(anthropicReq)
-        upstreamUrl = `${base}/v1/chat/completions`
-      } else {
-        transformedBody = anthropicToOpenaiResponses(anthropicReq)
-        upstreamUrl = `${base}/v1/responses`
-      }
-      const proxyOptions = getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) })
-
-      const response = await fetch(upstreamUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify(transformedBody),
-        signal: AbortSignal.timeout(networkSettings.aiRequestTimeoutMs),
-        ...proxyOptions,
-      })
-
-      if (!response.ok) {
-        const latencyMs = Date.now() - start
-        const errText = await response.text().catch(() => '')
-        return { success: false, latencyMs, modelUsed: modelId, httpStatus: response.status,
-          error: `Upstream HTTP ${response.status}: ${errText.slice(0, 200)}` }
-      }
-
-      const responseBody = await response.json()
-      const anthropicRes = format === 'openai_chat'
-        ? openaiChatToAnthropic(responseBody, apiModel)
-        : openaiResponsesToAnthropic(responseBody, apiModel)
-
-      const latencyMs = Date.now() - start
-
-      if (anthropicRes.type !== 'message' || !Array.isArray(anthropicRes.content)) {
-        return { success: false, latencyMs, modelUsed: modelId,
-          error: 'Proxy transform produced invalid Anthropic response' }
-      }
-
-      return { success: true, latencyMs, modelUsed: anthropicRes.model || modelId, httpStatus: response.status }
-    } catch (err: unknown) {
-      const latencyMs = Date.now() - start
-      if (err instanceof DOMException && err.name === 'TimeoutError') {
-        return { success: false, latencyMs, error: `Proxy pipeline timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)`, modelUsed: modelId }
-      }
-      return { success: false, latencyMs, error: err instanceof Error ? err.message : String(err), modelUsed: modelId }
-    }
+    return { ok: false, error: 'Stream ended before message_stop — not a valid streaming endpoint' }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    clearTimeout(timer)
+    reader.cancel().catch(() => {})
   }
 }
 
-function stripContextSuffix(model: string): string {
-  return model.replace(/\[(1|2)m\]/gi, '')
-}
-
-function buildDirectTestRequest(
-  base: string,
-  apiKey: string,
-  modelId: string,
-  format: ApiFormat,
-  authStrategy: ProviderAuthStrategy,
-): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
-  const prompt = 'Say "ok" and nothing else.'
-  const apiModel = stripContextSuffix(modelId)
-
-  if (format === 'openai_chat') {
-    return {
-      url: `${base}/v1/chat/completions`,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: apiModel, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
-    }
+function parseSseData(block: string): Record<string, unknown> | null {
+  const data = block
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .join('\n')
+  if (!data || data === '[DONE]') return null
+  try {
+    const parsed = JSON.parse(data)
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+  } catch {
+    return null
   }
-  if (format === 'openai_responses') {
-    return {
-      url: `${base}/v1/responses`,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: apiModel, max_output_tokens: 16, input: [{ type: 'message', role: 'user', content: prompt }] },
-    }
-  }
-  return {
-    url: `${base}/v1/messages`,
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      ...buildAnthropicAuthHeaders(apiKey, authStrategy),
-    },
-    body: { model: apiModel, max_tokens: 16, messages: [{ role: 'user', content: prompt }] },
-  }
-}
-
-function buildAnthropicAuthHeaders(apiKey: string, authStrategy: ProviderAuthStrategy): Record<string, string> {
-  switch (authStrategy) {
-    case 'api_key':
-      return { 'x-api-key': apiKey }
-    case 'auth_token':
-    case 'auth_token_empty_api_key':
-      return { Authorization: `Bearer ${apiKey}` }
-    case 'dual_same_token':
-      return { 'x-api-key': apiKey, Authorization: `Bearer ${apiKey}` }
-    case 'dual_dummy':
-      return { 'x-api-key': 'dummy', Authorization: 'Bearer dummy' }
-  }
-}
-
-function validateResponseBody(
-  body: Record<string, unknown> | null,
-  format: ApiFormat,
-): { ok: true; model?: string } | { ok: false; error: string } {
-  if (!body) return { ok: false, error: 'Empty response — not a valid API endpoint' }
-  if (body.error && typeof body.error === 'object') {
-    return { ok: false, error: ((body.error as Record<string, unknown>).message as string) || 'Error in response body' }
-  }
-
-  if (format === 'openai_chat') {
-    if (!Array.isArray(body.choices) || body.choices.length === 0) {
-      return { ok: false, error: 'Response missing choices — not a valid Chat Completions endpoint' }
-    }
-    return { ok: true, model: (body.model as string) || undefined }
-  }
-  if (format === 'openai_responses') {
-    if (!Array.isArray(body.output)) {
-      return { ok: false, error: 'Response missing output — not a valid Responses API endpoint' }
-    }
-    return { ok: true, model: (body.model as string) || undefined }
-  }
-  if (body.type !== 'message' || !Array.isArray(body.content)) {
-    return { ok: false, error: 'Not a valid Anthropic Messages endpoint' }
-  }
-  return { ok: true, model: (body.model as string) || undefined }
 }
