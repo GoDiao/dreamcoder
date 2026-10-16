@@ -31,9 +31,6 @@ function commandList(result: ReturnType<typeof evaluateChangePolicy>) {
   if (result.checks.server) {
     commands.push('bun run check:server')
   }
-  if (result.checks.adapters) {
-    commands.push('bun run check:adapters')
-  }
   if (result.checks.desktopNative) {
     commands.push('bun run check:native')
   }
@@ -67,7 +64,6 @@ function coverageWarnings(files: string[]) {
   const warnings: string[] = []
   const desktopProd = changedProductionFiles(files, (file) => file.startsWith('desktop/src/'))
   const serverProd = changedProductionFiles(files, (file) => file.startsWith('src/server/'))
-  const adapterProd = changedProductionFiles(files, (file) => file.startsWith('adapters/'))
   const agentRuntimeProd = changedProductionFiles(files, (file) => (
     file.startsWith('src/server/ws/') ||
     file.startsWith('src/server/services/conversation') ||
@@ -81,10 +77,6 @@ function coverageWarnings(files: string[]) {
 
   if (serverProd.length > 0 && !hasMatchingTest(files, (file) => file.startsWith('src/server/'))) {
     warnings.push('Server product files changed without a server test file in the PR.')
-  }
-
-  if (adapterProd.length > 0 && !hasMatchingTest(files, (file) => file.startsWith('adapters/'))) {
-    warnings.push('Adapter product files changed without an adapter test file in the PR.')
   }
 
   if (agentRuntimeProd.length > 0) {

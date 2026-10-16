@@ -4,7 +4,7 @@
 
 在终端里使用 CLI 时，模型服务由启动前设置的环境变量决定，输入和输出都在终端里。桌面端的用户则在设置页选择模型服务，同时打开多个会话，还可能从手机继续对话。界面和 CLI 之间因此需要一个本地服务：把设置转成 CLI 的运行环境，为每个会话启动 CLI 进程，在客户端和 CLI 之间转发消息。DreamCoder 中这个服务叫 Sidecar，是桌面应用附带的本地服务进程。
 
-本篇的主线是会话集成：先用四步说明这个服务的最小形式，再对照 DreamCoder 的 `ProviderService`、`ConversationService` 和 WebSocket 处理代码。主线之后有两段扩展阅读：服务商接口为 OpenAI 格式时，模型请求怎样经 Sidecar 内的本地代理转换协议；手机 H5 怎样接入同一个会话。CLI 内部怎样组装和发送模型请求见[第一篇](./01-execution-loop.zh.md)和[第五篇](./05-streaming-recovery.zh.md)。官方 OpenAI 登录（`runtimeKind: 'openai_oauth'`）由 CLI 在 [`client.ts`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/api/client.ts#L187) 中选择另一套传输，不经过下文的代理；IM 适配器也能连接会话。这两部分本篇不展开。
+本篇的主线是会话集成：先用四步说明这个服务的最小形式，再对照 DreamCoder 的 `ProviderService`、`ConversationService` 和 WebSocket 处理代码。主线之后有两段扩展阅读：服务商接口为 OpenAI 格式时，模型请求怎样经 Sidecar 内的本地代理转换协议；手机 H5 怎样接入同一个会话。CLI 内部怎样组装和发送模型请求见[第一篇](./01-execution-loop.zh.md)和[第五篇](./05-streaming-recovery.zh.md)。官方 OpenAI 登录（`runtimeKind: 'openai_oauth'`）由 CLI 在 [`client.ts`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/api/client.ts#L187) 中选择另一套传输，不经过下文的代理，本篇不展开。
 
 ## 最小的桌面集成
 

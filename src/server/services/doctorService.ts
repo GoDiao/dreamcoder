@@ -172,13 +172,6 @@ export class DoctorService {
         'user',
         path.join(this.configDir, 'dreamcoder', 'settings.json'),
       ),
-      this.jsonTarget('adapters', 'Adapters config', 'user', path.join(this.configDir, 'adapters.json')),
-      this.jsonTarget(
-        'adapter-sessions',
-        'Adapter sessions',
-        'user',
-        path.join(this.configDir, 'adapter-sessions.json'),
-      ),
       this.directoryTarget('user-skills', 'User skills', 'user', path.join(this.configDir, 'skills')),
       this.directoryTarget('teams', 'Teams', 'user', path.join(this.configDir, 'teams')),
       this.directoryTarget('plugins', 'Plugins', 'user', path.join(this.configDir, 'plugins')),

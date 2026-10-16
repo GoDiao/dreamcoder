@@ -19,12 +19,6 @@
       "branches": 0,
       "statements": 14.42
     },
-    "adapters": {
-      "lines": 75.94,
-      "functions": 83.35,
-      "branches": 0,
-      "statements": 75.94
-    },
     "desktop": {
       "lines": 67.23,
       "functions": 52.49,
@@ -47,11 +41,6 @@
       "lines": 60,
       "functions": 60,
       "statements": 60
-    },
-    "adapters": {
-      "lines": 80,
-      "functions": 85,
-      "statements": 80
     },
     "desktop": {
       "lines": 75,

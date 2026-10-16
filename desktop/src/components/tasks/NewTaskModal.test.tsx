@@ -3,14 +3,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import '@testing-library/jest-dom'
 
 import { NewTaskModal } from './NewTaskModal'
-import { useAdapterStore } from '../../stores/adapterStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTaskStore } from '../../stores/taskStore'
 
 afterEach(() => {
   cleanup()
-  useAdapterStore.setState(useAdapterStore.getInitialState(), true)
   useProviderStore.setState(useProviderStore.getInitialState(), true)
   useSettingsStore.setState(useSettingsStore.getInitialState(), true)
   useTaskStore.setState(useTaskStore.getInitialState(), true)
@@ -20,10 +18,6 @@ describe('NewTaskModal', () => {
   it('creates scheduled tasks with a provider-scoped model selection', async () => {
     const createTask = vi.fn(async () => {})
     useTaskStore.setState({ createTask } as Partial<ReturnType<typeof useTaskStore.getState>>)
-    useAdapterStore.setState({
-      fetchConfig: vi.fn(async () => {}),
-      config: {},
-    } as Partial<ReturnType<typeof useAdapterStore.getState>>)
     useSettingsStore.setState({
       locale: 'en',
       currentModel: {

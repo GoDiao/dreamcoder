@@ -41,14 +41,14 @@ describe('h5AccessPolicy', () => {
     expect(shouldRequireH5Token({ request, url: new URL(request.url), h5Enabled: true, context: remoteContext })).toBe(false)
   })
 
-  test('keeps adapter API routes tokenless for local integrations', () => {
-    const request = req('http://127.0.0.1:3456/api/adapters')
+  test('keeps loopback API routes tokenless for local integrations', () => {
+    const request = req('http://127.0.0.1:3456/api/mcp')
     expect(classifyH5Request(request, new URL(request.url), localContext)).toBe('local-trusted')
     expect(shouldRequireH5Token({ request, url: new URL(request.url), h5Enabled: true, context: localContext })).toBe(false)
   })
 
-  test('does not trust loopback adapter requests from non-local browser origins', () => {
-    const request = req('http://127.0.0.1:3456/api/adapters', {
+  test('does not trust loopback API requests from non-local browser origins', () => {
+    const request = req('http://127.0.0.1:3456/api/mcp', {
       headers: { Origin: 'https://blocked.example.com' },
     })
     expect(classifyH5Request(request, new URL(request.url), localContext)).toBe('h5-browser')

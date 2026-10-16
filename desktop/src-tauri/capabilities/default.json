@@ -24,14 +24,6 @@
         },
         {
           "args": [
-            "adapters",
-            { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
-          ],
-          "name": "binaries/dreamcoder-sidecar",
-          "sidecar": true
-        },
-        {
-          "args": [
             "cli",
             { "validator": "regex", "value": "^.+$" }
           ],
@@ -53,14 +45,6 @@
         },
         {
           "args": [
-            "adapters",
-            { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
-          ],
-          "name": "binaries/dreamcoder-sidecar",
-          "sidecar": true
-        },
-        {
-          "args": [
             "cli",
             { "validator": "regex", "value": "^.+$" }
           ],
@@ -76,14 +60,6 @@
           "args": [
             "server",
             { "validator": "regex", "value": "^(--port|--host|--config)=.+$" }
-          ],
-          "name": "binaries/dreamcoder-sidecar",
-          "sidecar": true
-        },
-        {
-          "args": [
-            "adapters",
-            { "validator": "regex", "value": "^(feishu|telegram|wechat|dingtalk|lark|slack)(:.+)?$" }
           ],
           "name": "binaries/dreamcoder-sidecar",
           "sidecar": true

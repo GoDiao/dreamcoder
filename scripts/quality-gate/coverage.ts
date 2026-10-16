@@ -125,14 +125,6 @@ const ROOT_COVERAGE_SCOPES: CoverageScope[] = [
   },
 ]
 
-const ADAPTERS_SCOPE: CoverageScope = {
-  id: 'adapters',
-  title: 'IM adapters',
-  includePrefixes: ['adapters/'],
-  excludePrefixes: ['adapters/node_modules/'],
-  excludeSuffixes: ['.test.ts', '.test.tsx', '.d.ts'],
-}
-
 const DESKTOP_SCOPE: CoverageScope = {
   id: 'desktop',
   title: 'Desktop React',
@@ -146,7 +138,6 @@ const DESKTOP_SCOPE: CoverageScope = {
 
 const CHANGED_LINE_SCOPES = [
   ...ROOT_COVERAGE_SCOPES,
-  ADAPTERS_SCOPE,
   DESKTOP_SCOPE,
 ]
 
@@ -751,23 +742,6 @@ export async function runCoverageGate(options: {
       for (const [file, coverage] of lcovLineCoverage(rootLcov, scope.id, scope, rootDir)) {
         coverageByFile.set(file, coverage)
       }
-    }
-  }
-
-  const adapters = await runSuite(
-    'adapters',
-    'IM adapters',
-    ['bun', 'test', '--coverage', '--coverage-reporter=lcov', '--coverage-reporter=text', '--coverage-dir', join(outputDir, 'adapters')],
-    join(rootDir, 'adapters'),
-    join(outputDir, 'adapters'),
-    () => parseLcov(readFileSync(join(outputDir, 'adapters', 'lcov.info'), 'utf8')),
-  )
-  suites.push(adapters)
-  const adaptersLcovPath = join(outputDir, 'adapters', 'lcov.info')
-  if (adapters.status === 'passed' && existsSync(adaptersLcovPath)) {
-    const adaptersLcov = prefixRelativeLcovSourcePaths(readFileSync(adaptersLcovPath, 'utf8'), 'adapters')
-    for (const [file, coverage] of lcovLineCoverage(adaptersLcov, 'adapters', ADAPTERS_SCOPE, rootDir)) {
-      coverageByFile.set(file, coverage)
     }
   }
 

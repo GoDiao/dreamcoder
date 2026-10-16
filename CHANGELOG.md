@@ -4,6 +4,9 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- IM adapters (Feishu, DingTalk, Telegram, WeChat) are no longer planned. Removed the `adapters/` package, the `/api/adapters` API, the hidden IM settings page, the adapter sidecar processes the desktop app spawned on startup, and the Telegram/Feishu notification channels for scheduled tasks. Scheduled-task notifications are desktop-only; tasks saved with only an IM channel no longer notify.
+
 ## [0.4.5] — 2026-06-25
 
 ### Fixed

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { PermissionMode } from '../types/settings'
-import { AdapterSettings } from './AdapterSettings'
 import { usePluginStore } from '../stores/pluginStore'
 import { PluginList } from '../components/plugins/PluginList'
 import { PluginDetail } from '../components/plugins/PluginDetail'
@@ -69,7 +68,6 @@ export function Settings() {
             {activeTab === 'activity' && <ActivitySettings />}
             {activeTab === 'general' && <GeneralSettings />}
             {activeTab === 'h5Access' && <H5AccessSettings />}
-            {activeTab === 'adapters' && <AdapterSettings />}
             {activeTab === 'terminal' && <TerminalSettings showPreferences />}
             {activeTab === 'mcp' && <McpSettings />}
             {activeTab === 'agents' && <AgentsSettings />}

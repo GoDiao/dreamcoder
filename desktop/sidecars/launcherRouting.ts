@@ -1,8 +1,8 @@
 import path from 'node:path'
 
-export type SidecarMode = 'server' | 'cli' | 'adapters'
+export type SidecarMode = 'server' | 'cli'
 
-const EXPLICIT_MODES = new Set<SidecarMode>(['server', 'cli', 'adapters'])
+const EXPLICIT_MODES = new Set<SidecarMode>(['server', 'cli'])
 const DESKTOP_CLI_NAMES = new Set(['dreamcoder', 'dreamcoder.exe'])
 
 export function resolveSidecarInvocation(

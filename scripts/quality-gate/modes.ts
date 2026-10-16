@@ -43,16 +43,6 @@ export function lanesForMode(mode: QualityGateMode, baselineTargets: BaselineTar
       category: 'unit',
     },
     {
-      id: 'adapter-checks',
-      title: 'Adapter checks',
-      description: 'Run adapter tests when IM adapter paths changed.',
-      kind: 'command',
-      command: ['bun', 'run', 'check:adapters'],
-      impactRequiredCheck: 'bun run check:adapters',
-      requiredForModes: ['pr'],
-      category: 'unit',
-    },
-    {
       id: 'native-checks',
       title: 'Native desktop checks',
       description: 'Build sidecars and run the Tauri native compile check when native or packaging paths changed.',

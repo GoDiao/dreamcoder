@@ -107,8 +107,7 @@ dreamcoder/
 │   │   └── i18n/          # Internationalization
 │   └── src-tauri/         # Rust backend
 ├── src/                   # CLI and backend server (src/server/)
-├── docs/                  # Documentation
-└── adapters/              # Third-party platform adapters
+└── docs/                  # Documentation
 ```
 
 Provider preset contributions have a focused guide in the website documentation under "Adding Provider Presets".

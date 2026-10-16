@@ -4,9 +4,8 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dir, '../..')
 const srcRoot = path.join(repoRoot, 'src')
-const adaptersRoot = path.join(repoRoot, 'adapters')
 
-const ALLOWED_STUB_ROOTS = [srcRoot, adaptersRoot]
+const ALLOWED_STUB_ROOTS = [srcRoot]
 
 const STUB_MARKER_TS = '// @generated stub from scan-missing-imports'
 const STUB_MARKER_TEXT = '<!-- @generated stub from scan-missing-imports -->'
@@ -126,7 +125,7 @@ async function main() {
   const missing = new Map<string, Set<string>>()
   let scannedFiles = 0
 
-  for await (const file of walkRoots([srcRoot, adaptersRoot])) {
+  for await (const file of walkRoots([srcRoot])) {
     scannedFiles++
     let contents: string
     try {

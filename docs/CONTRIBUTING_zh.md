@@ -108,8 +108,7 @@ dreamcoder/
 │   └── src-tauri/         # Rust 后端
 ├── src/                   # CLI 与后端服务（src/server/）
 ├── website/               # 项目官网
-├── docs/                  # 文档
-└── adapters/              # 第三方平台适配器
+└── docs/                  # 文档
 ```
 
 如果你要新增 Provider 预设，请先阅读网站技术手册中的“新增 Provider 预设”。
