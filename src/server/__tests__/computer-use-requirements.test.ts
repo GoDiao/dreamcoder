@@ -20,4 +20,8 @@ describe('computer use requirements', () => {
     expect(findRequirement(darwinRequirements, 'Pillow')).toBe('Pillow>=11.3.0,<12')
     expect(findRequirement(win32Requirements, 'Pillow')).toBe('Pillow>=11.3.0,<12')
   })
+
+  test('installs comtypes on Windows for the UIA helper', () => {
+    expect(findRequirement(win32Requirements, 'comtypes')).toBe('comtypes>=1.4.14')
+  })
 })
