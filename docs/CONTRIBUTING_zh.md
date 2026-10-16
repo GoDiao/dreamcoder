@@ -106,7 +106,7 @@ dreamcoder/
 │   │   ├── pages/         # 页面组件
 │   │   └── i18n/          # 国际化
 │   └── src-tauri/         # Rust 后端
-├── sidecar/               # Bun 后端服务
+├── src/                   # CLI 与后端服务（src/server/）
 ├── website/               # 项目官网
 ├── docs/                  # 文档
 └── adapters/              # 第三方平台适配器
@@ -173,7 +173,7 @@ bun run tauri dev
 
 DreamCoder 在仓库根目录的 [`mcp-registry.json`](../mcp-registry.json) 中内置一份经过审核的
 小型 MCP 服务器目录。契约定义在
-[`sidecar/mcp-registry/schema.ts`](../sidecar/mcp-registry/schema.ts)。
+[`src/server/mcpRegistry/schema.ts`](../src/server/mcpRegistry/schema.ts)。
 
 该目录**不是**用于信任校验的官方 MCP URL 注册表。精选目录只描述 DreamCoder 审核过、且会在本地安装的
 服务器；官方注册表是另一个独立的远端信任来源。
@@ -210,7 +210,7 @@ v1 **仅支持 stdio**。在安装流程能够表达远端传输之前，HTTP �
 
 ```bash
 # 校验内置目录及全部非法条目用例
-bun test ./sidecar/mcp-registry/__tests__/registry.test.ts
+bun test ./src/server/__tests__/mcp-registry.test.ts
 ```
 
 校验会一次性收集**全部**问题，并为每条错误给出点分路径（例如 `servers.3.homepage`），
