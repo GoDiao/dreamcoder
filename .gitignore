@@ -85,6 +85,3 @@ runtime/__pycache__
 
 .worktrees/
 scripts/benchmark.ts
-
-# Sidecar binaries
-sidecar/*.exe

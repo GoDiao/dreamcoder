@@ -7,7 +7,7 @@ import {
   validateEntry,
   registryEntrySchema,
   REGISTRY_VERSION,
-} from '../schema.js'
+} from '../mcpRegistry/schema.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CATALOG_PATH = join(HERE, '..', '..', '..', 'mcp-registry.json')

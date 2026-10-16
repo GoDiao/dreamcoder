@@ -106,7 +106,7 @@ dreamcoder/
 │   │   ├── pages/         # Page components
 │   │   └── i18n/          # Internationalization
 │   └── src-tauri/         # Rust backend
-├── sidecar/               # Bun backend service
+├── src/                   # CLI and backend server (src/server/)
 ├── docs/                  # Documentation
 └── adapters/              # Third-party platform adapters
 ```
@@ -173,7 +173,7 @@ bun run tauri dev
 
 DreamCoder ships a small, reviewed catalog of MCP servers in
 [`mcp-registry.json`](../mcp-registry.json) at the repository root. The contract
-lives in [`sidecar/mcp-registry/schema.ts`](../sidecar/mcp-registry/schema.ts).
+lives in [`src/server/mcpRegistry/schema.ts`](../src/server/mcpRegistry/schema.ts).
 
 This catalog is **not** the official MCP URL registry used for trust checks.
 The curated catalog only describes servers DreamCoder has reviewed and will
@@ -215,7 +215,7 @@ flow can express remote transports.
 
 ```bash
 # validates the whole shipped catalog plus the invalid-entry test cases
-bun test ./sidecar/mcp-registry/__tests__/registry.test.ts
+bun test ./src/server/__tests__/mcp-registry.test.ts
 ```
 
 Validation collects **every** problem in one pass and reports a dotted path per
