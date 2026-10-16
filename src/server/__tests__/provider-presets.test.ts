@@ -53,6 +53,12 @@ describe('provider presets API', () => {
     expect(PROVIDER_PRESETS.some((preset) => preset.id === 'custom')).toBe(true)
   })
 
+  test('Qwen leaves the version path to the OpenAI chat transport', () => {
+    const qwen = PROVIDER_PRESETS.find((preset) => preset.id === 'qwen')
+    expect(qwen?.baseUrl).toBe('https://dashscope.aliyuncs.com/compatible-mode')
+    expect(qwen?.apiFormat).toBe('openai_chat')
+  })
+
   test('local Anthropic-compatible presets appear immediately before custom', () => {
     expect(PROVIDER_PRESETS.at(-3)?.id).toBe('lmstudio')
     expect(PROVIDER_PRESETS.at(-2)?.id).toBe('ollama')
