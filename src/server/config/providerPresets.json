@@ -108,6 +108,22 @@
     }
   },
   {
+    "id": "powertokens",
+    "name": "PowerTokens",
+    "baseUrl": "https://api.powertokens.ai",
+    "apiFormat": "openai_chat",
+    "defaultModels": {
+      "main": "glm-5.2",
+      "haiku": "glm-4.7-flash",
+      "sonnet": "MiniMax-M3",
+      "opus": "deepseek-v3-2-251201"
+    },
+    "needsApiKey": true,
+    "websiteUrl": "https://powertokens.ai?utm_source=github&utm_medium=oss&utm_campaign=dreamcoder",
+    "apiKeyUrl": "https://powertokens.ai?utm_source=github&utm_medium=oss&utm_campaign=dreamcoder",
+    "authStrategy": "api_key"
+  },
+  {
     "id": "lmstudio",
     "name": "LM Studio",
     "baseUrl": "http://localhost:1234",
