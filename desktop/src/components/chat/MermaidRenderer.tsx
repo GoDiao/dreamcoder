@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import mermaid from 'mermaid'
 import { Modal } from '../shared/Modal'
 import { CopyButton } from '../shared/CopyButton'
+import { useTranslation } from '../../i18n'
 
 type Props = {
   code: string
@@ -92,6 +93,7 @@ function parseSvgMetrics(svg: string): SvgMetrics | null {
 }
 
 export function MermaidRenderer({ code }: Props) {
+  const t = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const previewViewportRef = useRef<HTMLDivElement>(null)
   const previewContentRef = useRef<HTMLDivElement>(null)
@@ -231,10 +233,11 @@ export function MermaidRenderer({ code }: Props) {
       <div className="my-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-error)]/30">
         <div className="flex items-center gap-2 border-b border-[var(--color-error)]/20 bg-[var(--color-error-container)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-error)]">
           <span className="material-symbols-outlined text-[14px]">error</span>
-          Mermaid Error
+          {t('chat.mermaid.errorTitle')}
         </div>
-        <div className="bg-[var(--color-error-container)]/30 px-3 py-2 font-[var(--font-mono)] text-[11px] text-[var(--color-error)]">
-          {error}
+        <div className="bg-[var(--color-error-container)]/30 px-3 py-2 text-[11px] text-[var(--color-error)]">
+          <p className="mb-1">{t('chat.mermaid.errorHint')}</p>
+          <p className="font-[var(--font-mono)] opacity-80">{error}</p>
         </div>
       </div>
     )
