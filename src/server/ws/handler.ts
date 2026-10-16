@@ -19,43 +19,26 @@ import {
   LOCAL_COMMAND_STDOUT_TAG,
 } from '../../constants/xml.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
+import {
+  clearPrewarmState,
+  createStreamState,
+  disposeAllSessionRuntimes,
+  disposeSessionRuntime,
+  getConnectedSessionIds,
+  getSessionRuntime,
+  peekSessionRuntime,
+  resetConversationState,
+  type SessionSlashCommand,
+  type SessionStreamState,
+} from './sessionRuntime.js'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
 
-export type SessionSlashCommand = {
-  name: string
-  description: string
-  argumentHint?: string
-}
-
-const sessionSlashCommands = new Map<string, SessionSlashCommand[]>()
+export type { SessionSlashCommand } from './sessionRuntime.js'
 
 const CLIENT_DISCONNECT_CLEANUP_MS = 30_000
 const PENDING_PERMISSION_DISCONNECT_CLEANUP_MS = 30 * 60_000
-const sessionCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>()
-
-const sessionStopRequested = new Set<string>()
-
-const sessionTitleState = new Map<string, {
-  userMessageCount: number
-  hasCustomTitle: boolean
-  firstUserMessage: string
-  allUserMessages: string[]
-  startedGenerationCounts: Set<number>
-}>()
-
-const runtimeOverrides = new Map<string, {
-  providerId: string | null
-  modelId: string
-}>()
-
-const runtimeTransitionPromises = new Map<string, Promise<void>>()
-const sessionStartupPromises = new Map<string, Promise<void>>()
-const lastResolvedStartupWorkDirs = new Map<string, string>()
-const prewarmPendingSessions = new Set<string>()
-const prewarmedSessions = new Set<string>()
-const prewarmIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 5 * 60_000
 
 async function sendRepositoryStartupStatus(
@@ -75,7 +58,7 @@ async function sendRepositoryStartupStatus(
 }
 
 export function getSlashCommands(sessionId: string): SessionSlashCommand[] {
-  return sessionSlashCommands.get(sessionId) || []
+  return peekSessionRuntime(sessionId)?.slashCommands || []
 }
 
 export type WebSocketData = {
@@ -87,7 +70,6 @@ export type WebSocketData = {
   serverHost: string
 }
 
-const activeSessions = new Map<string, Set<ServerWebSocket<WebSocketData>>>()
 const clientOutputCallbacks = new Map<
   ServerWebSocket<WebSocketData>,
   {
@@ -114,14 +96,14 @@ export const handleWebSocket = {
 
     console.log(`[WS] Client connected for session: ${sessionId}`)
 
-    const pendingTimer = sessionCleanupTimers.get(sessionId)
-    if (pendingTimer) {
-      clearTimeout(pendingTimer)
-      sessionCleanupTimers.delete(sessionId)
+    const runtime = getSessionRuntime(sessionId)
+    if (runtime.disconnectCleanupTimer) {
+      clearTimeout(runtime.disconnectCleanupTimer)
+      runtime.disconnectCleanupTimer = undefined
     }
 
-    addActiveClient(sessionId, ws)
-    if (prewarmedSessions.has(sessionId)) {
+    runtime.clients.add(ws)
+    if (runtime.prewarm.done) {
       bindPrewarmMetadataCapture(sessionId)
     } else {
       bindClientSessionOutput(sessionId, ws)
@@ -218,14 +200,15 @@ export const handleWebSocket = {
 
     const cleanupDelayMs = getDisconnectCleanupDelayMs(sessionId)
     const cleanupTimer = setTimeout(() => {
-      sessionCleanupTimers.delete(sessionId)
+      const current = peekSessionRuntime(sessionId)
+      if (current) current.disconnectCleanupTimer = undefined
       if (!hasActiveClients(sessionId)) {
         console.log(`[WS] Session ${sessionId} not reconnected after ${cleanupDelayMs}ms, stopping CLI subprocess`)
         conversationService.stopSession(sessionId)
-        cleanupSessionRuntimeState(sessionId)
+        disposeSessionRuntime(sessionId)
       }
     }, cleanupDelayMs)
-    sessionCleanupTimers.set(sessionId, cleanupTimer)
+    getSessionRuntime(sessionId).disconnectCleanupTimer = cleanupTimer
   },
 
   drain(ws: ServerWebSocket<WebSocketData>) {
@@ -238,8 +221,11 @@ async function handleUserMessage(
 ) {
   const { sessionId } = ws.data
 
-  sessionStopRequested.delete(sessionId)
-  clearPrewarmState(sessionId)
+  const runtime = peekSessionRuntime(sessionId)
+  if (runtime) {
+    runtime.stopRequested = false
+    clearPrewarmState(runtime)
+  }
 
   const desktopSlashCommand = getDesktopSlashCommand(message.content)
   if (desktopSlashCommand?.commandName === 'clear' && desktopSlashCommand.args.trim()) {
@@ -265,7 +251,7 @@ async function handleUserMessage(
     sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
   }
 
-  let titleState = sessionTitleState.get(sessionId)
+  let titleState = peekSessionRuntime(sessionId)?.title
   if (!titleState) {
     titleState = {
       userMessageCount: 0,
@@ -274,7 +260,7 @@ async function handleUserMessage(
       allUserMessages: [],
       startedGenerationCounts: new Set<number>(),
     }
-    sessionTitleState.set(sessionId, titleState)
+    getSessionRuntime(sessionId).title = titleState
   }
   const titleInput = getTitleInputForUserMessage(message.content, desktopSlashCommand)
   if (titleInput) {
@@ -352,9 +338,8 @@ async function handleDesktopClearCommand(
   const workDir = conversationService.getSessionWorkDir(sessionId)
   conversationService.stopSession(sessionId)
   conversationService.clearOutputCallbacks(sessionId)
-  sessionSlashCommands.delete(sessionId)
-  sessionTitleState.delete(sessionId)
-  cleanupStreamState(sessionId)
+  const runtime = peekSessionRuntime(sessionId)
+  if (runtime) resetConversationState(runtime)
 
   try {
     await sessionService.clearSessionTranscript(sessionId, workDir || undefined)
@@ -382,7 +367,7 @@ async function handleDesktopClearCommand(
 
 async function handlePrewarmSession(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
-  if (conversationService.hasSession(sessionId) || sessionStartupPromises.has(sessionId)) {
+  if (conversationService.hasSession(sessionId) || peekSessionRuntime(sessionId)?.startup) {
     return
   }
 
@@ -392,15 +377,18 @@ async function handlePrewarmSession(ws: ServerWebSocket<WebSocketData>) {
     return
   }
 
-  prewarmPendingSessions.add(sessionId)
+  getSessionRuntime(sessionId).prewarm.pending = true
   void ensureCliSessionStarted(ws, sessionId, 'prewarm_session')
     .then(() => {
-      if (!prewarmPendingSessions.delete(sessionId)) return
+      const runtime = peekSessionRuntime(sessionId)
+      if (!runtime?.prewarm.pending) return
+      runtime.prewarm.pending = false
       bindPrewarmMetadataCapture(sessionId)
       markPrewarmed(sessionId)
     })
     .catch((err) => {
-      prewarmPendingSessions.delete(sessionId)
+      const runtime = peekSessionRuntime(sessionId)
+      if (runtime) runtime.prewarm.pending = false
       console.warn(
         `[WS] Prewarm failed for ${sessionId}: ${
           err instanceof Error ? err.message : String(err)
@@ -482,8 +470,9 @@ async function handleSetRuntimeConfig(
     providerId: message.providerId ?? null,
     modelId,
   }
-  const prevOverride = runtimeOverrides.get(sessionId)
-  runtimeOverrides.set(sessionId, nextOverride)
+  const runtime = getSessionRuntime(sessionId)
+  const prevOverride = runtime.runtimeOverride
+  runtime.runtimeOverride = nextOverride
 
   if (
     prevOverride &&
@@ -494,11 +483,11 @@ async function handleSetRuntimeConfig(
   }
 
   if (!conversationService.hasSession(sessionId)) {
-    const pendingStartup = sessionStartupPromises.get(sessionId)
+    const pendingStartup = runtime.startup
     if (pendingStartup) {
       await enqueueRuntimeTransition(sessionId, async () => {
         await pendingStartup.catch(() => undefined)
-        const currentOverride = runtimeOverrides.get(sessionId)
+        const currentOverride = peekSessionRuntime(sessionId)?.runtimeOverride
         if (
           currentOverride?.providerId !== nextOverride.providerId ||
           currentOverride.modelId !== nextOverride.modelId ||
@@ -581,7 +570,7 @@ async function restartSessionWithRuntimeConfig(
       severity: 'error',
       sessionId,
       summary: errMsg,
-      details: { runtimeOverride: runtimeOverrides.get(sessionId), error: err },
+      details: { runtimeOverride: peekSessionRuntime(sessionId)?.runtimeOverride, error: err },
     })
     console.error(`[WS] Failed to restart CLI for ${sessionId} after runtime override: ${errMsg}`)
     sendMessage(ws, {
@@ -600,7 +589,7 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
   console.log(`[WS] Stop generation requested for session: ${sessionId}`)
 
-  sessionStopRequested.add(sessionId)
+  getSessionRuntime(sessionId).stopRequested = true
 
   if (conversationService.hasSession(sessionId)) {
     conversationService.sendInterrupt(sessionId)
@@ -617,8 +606,9 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
 }
 
 function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: string): void {
-  const state = sessionTitleState.get(sessionId)
-  if (!state || state.hasCustomTitle) return
+  const runtime = peekSessionRuntime(sessionId)
+  const state = runtime?.title
+  if (!runtime || !state || state.hasCustomTitle) return
 
   const count = state.userMessageCount
 
@@ -629,7 +619,7 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
   const text = count === 1
     ? state.firstUserMessage
     : state.allUserMessages.join('\n')
-  const runtimeProviderId = runtimeOverrides.get(sessionId)?.providerId
+  const runtimeProviderId = runtime.runtimeOverride?.providerId
 
   void (async () => {
     try {
@@ -660,36 +650,10 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
   })()
 }
 
-type SessionStreamState = {
-  hasReceivedStreamEvents: boolean
-  activeBlockTypes: Map<number, 'text' | 'tool_use' | 'thinking'>
-  activeToolBlocks: Map<number, { toolName: string; toolUseId: string; inputJson: string; parentToolUseId?: string }>
-  pendingLocalCommand?: { name: string; args: string }
-  pendingToolBlocks: Map<string, { toolName: string; toolUseId: string; parentToolUseId?: string }>
-  toolParentUseIds: Map<string, string>
-  lastApiError?: {
-    message: string
-    code: string
-  }
-}
-
-const sessionStreamStates = new Map<string, SessionStreamState>()
-
 function getStreamState(sessionId: string): SessionStreamState {
-  let state = sessionStreamStates.get(sessionId)
-  if (!state) {
-    state = {
-      hasReceivedStreamEvents: false,
-      activeBlockTypes: new Map(),
-      activeToolBlocks: new Map(),
-      pendingLocalCommand: undefined,
-      pendingToolBlocks: new Map(),
-      toolParentUseIds: new Map(),
-      lastApiError: undefined,
-    }
-    sessionStreamStates.set(sessionId, state)
-  }
-  return state
+  const runtime = getSessionRuntime(sessionId)
+  runtime.stream ??= createStreamState()
+  return runtime.stream
 }
 
 function cliParentToolUseId(cliMsg: any): string | undefined {
@@ -717,21 +681,6 @@ function consumeToolParentUseId(
   return parentToolUseId
 }
 
-function cleanupStreamState(sessionId: string) {
-  sessionStreamStates.delete(sessionId)
-}
-
-function cleanupSessionRuntimeState(sessionId: string) {
-  cleanupStreamState(sessionId)
-  sessionSlashCommands.delete(sessionId)
-  sessionTitleState.delete(sessionId)
-  runtimeOverrides.delete(sessionId)
-  runtimeTransitionPromises.delete(sessionId)
-  sessionStartupPromises.delete(sessionId)
-  lastResolvedStartupWorkDirs.delete(sessionId)
-  clearPrewarmState(sessionId)
-}
-
 function getPrewarmIdleTimeoutMs(): number {
   const raw = process.env.DREAMCODER_PREWARM_IDLE_TIMEOUT_MS
   if (!raw) return DEFAULT_PREWARM_IDLE_TIMEOUT_MS
@@ -741,32 +690,23 @@ function getPrewarmIdleTimeoutMs(): number {
     : DEFAULT_PREWARM_IDLE_TIMEOUT_MS
 }
 
-function clearPrewarmState(sessionId: string) {
-  prewarmPendingSessions.delete(sessionId)
-  prewarmedSessions.delete(sessionId)
-  const timer = prewarmIdleTimers.get(sessionId)
-  if (timer) {
-    clearTimeout(timer)
-    prewarmIdleTimers.delete(sessionId)
-  }
-}
-
 function markPrewarmed(sessionId: string) {
-  prewarmedSessions.add(sessionId)
+  const runtime = getSessionRuntime(sessionId)
+  runtime.prewarm.done = true
   const timeoutMs = getPrewarmIdleTimeoutMs()
   if (timeoutMs === 0) return
 
-  const existingTimer = prewarmIdleTimers.get(sessionId)
-  if (existingTimer) clearTimeout(existingTimer)
+  if (runtime.prewarm.idleTimer) clearTimeout(runtime.prewarm.idleTimer)
 
-  const timer = setTimeout(() => {
-    prewarmIdleTimers.delete(sessionId)
-    if (!prewarmedSessions.has(sessionId)) return
+  runtime.prewarm.idleTimer = setTimeout(() => {
+    const current = peekSessionRuntime(sessionId)
+    if (!current) return
+    current.prewarm.idleTimer = undefined
+    if (!current.prewarm.done) return
     console.log(`[WS] Prewarmed session ${sessionId} idle for ${timeoutMs}ms, stopping CLI subprocess`)
     conversationService.stopSession(sessionId)
-    prewarmedSessions.delete(sessionId)
+    current.prewarm.done = false
   }, timeoutMs)
-  prewarmIdleTimers.set(sessionId, timer)
 }
 
 function cacheSessionInitMetadata(sessionId: string, cliMsg: any) {
@@ -862,7 +802,7 @@ async function ensureCliSessionStarted(
   sessionId: string,
   reason: 'user_message' | 'prewarm_session',
 ): Promise<void> {
-  const pendingStartup = sessionStartupPromises.get(sessionId)
+  const pendingStartup = peekSessionRuntime(sessionId)?.startup
   if (pendingStartup) {
     await pendingStartup
     return
@@ -872,7 +812,7 @@ async function ensureCliSessionStarted(
 
   const startup = (async () => {
     const workDir = await resolveSessionWorkDir(sessionId)
-    lastResolvedStartupWorkDirs.set(sessionId, workDir)
+    getSessionRuntime(sessionId).lastStartupWorkDir = workDir
     const runtimeSettings = await getRuntimeSettings(sessionId)
     const sdkUrl =
       `ws://${ws.data.serverHost}:${ws.data.serverPort}/sdk/${sessionId}` +
@@ -882,12 +822,13 @@ async function ensureCliSessionStarted(
     await conversationService.startSession(sessionId, workDir, sdkUrl, runtimeSettings)
   })()
 
-  sessionStartupPromises.set(sessionId, startup)
+  getSessionRuntime(sessionId).startup = startup
   try {
     await startup
   } finally {
-    if (sessionStartupPromises.get(sessionId) === startup) {
-      sessionStartupPromises.delete(sessionId)
+    const runtime = peekSessionRuntime(sessionId)
+    if (runtime?.startup === startup) {
+      runtime.startup = undefined
     }
   }
 }
@@ -1150,8 +1091,9 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
       }
 
       if (cliMsg.is_error) {
-        if (sessionStopRequested.has(sessionId)) {
-          sessionStopRequested.delete(sessionId)
+        const runtime = peekSessionRuntime(sessionId)
+        if (runtime?.stopRequested) {
+          runtime.stopRequested = false
           return [{ type: 'message_complete', usage }]
         }
 
@@ -1174,7 +1116,8 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         ]
       }
 
-      sessionStopRequested.delete(sessionId)
+      const runtime = peekSessionRuntime(sessionId)
+      if (runtime) runtime.stopRequested = false
       streamState.lastApiError = undefined
       return [{ type: 'message_complete', usage }]
     }
@@ -1190,7 +1133,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         const messages: ServerMessage[] = [
           { type: 'system_notification', subtype: 'init', message: `Model: ${cliMsg.model || 'unknown'}`, data: { model: cliMsg.model } },
         ]
-        const cmds = sessionSlashCommands.get(sessionId)
+        const cmds = peekSessionRuntime(sessionId)?.slashCommands
         if (cmds && cmds.length > 0) {
           messages.push({
             type: 'system_notification',
@@ -1614,33 +1557,18 @@ function isCompactSummaryMessageContent(content: unknown): content is string {
   )
 }
 
-function addActiveClient(
-  sessionId: string,
-  ws: ServerWebSocket<WebSocketData>,
-): void {
-  let clients = activeSessions.get(sessionId)
-  if (!clients) {
-    clients = new Set()
-    activeSessions.set(sessionId, clients)
-  }
-  clients.add(ws)
-}
-
 function removeActiveClient(
   sessionId: string,
   ws: ServerWebSocket<WebSocketData>,
 ): boolean {
-  const clients = activeSessions.get(sessionId)
+  const clients = peekSessionRuntime(sessionId)?.clients
   if (!clients?.has(ws)) return false
   clients.delete(ws)
-  if (clients.size === 0) {
-    activeSessions.delete(sessionId)
-  }
   return true
 }
 
 function hasActiveClients(sessionId: string): boolean {
-  return (activeSessions.get(sessionId)?.size ?? 0) > 0
+  return (peekSessionRuntime(sessionId)?.clients.size ?? 0) > 0
 }
 
 function removeClientOutputCallback(ws: ServerWebSocket<WebSocketData>): void {
@@ -1656,7 +1584,7 @@ function bindAllClientSessionOutputs(
     shouldForward?: (cliMsg: any) => boolean
   },
 ): void {
-  const clients = activeSessions.get(sessionId)
+  const clients = peekSessionRuntime(sessionId)?.clients
   if (!clients) return
   for (const ws of clients) {
     bindClientSessionOutput(sessionId, ws, options)
@@ -1712,7 +1640,7 @@ function isKnownRuntimeProviderId(
 }
 
 async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
-  const runtimeOverride = sessionId ? runtimeOverrides.get(sessionId) : undefined
+  const runtimeOverride = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride : undefined
   if (runtimeOverride) {
     if (typeof runtimeOverride.providerId === 'string') {
       const { providers } = await providerService.listProviders()
@@ -1721,7 +1649,8 @@ async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> 
         console.warn(
           `[WS] Ignoring stale runtime provider id for ${sessionId}: ${runtimeOverride.providerId}`,
         )
-        runtimeOverrides.delete(sessionId!)
+        const runtime = peekSessionRuntime(sessionId!)
+        if (runtime) runtime.runtimeOverride = undefined
         return getDefaultRuntimeSettings()
       }
     }
@@ -1814,7 +1743,7 @@ async function buildSessionStartupDiagnosticMessage(
   ]
 
   try {
-    const recentWorkDir = lastResolvedStartupWorkDirs.get(sessionId)
+    const recentWorkDir = peekSessionRuntime(sessionId)?.lastStartupWorkDir
     const workDir =
       recentWorkDir ||
       conversationService.getSessionWorkDir(sessionId) ||
@@ -1824,7 +1753,7 @@ async function buildSessionStartupDiagnosticMessage(
     lines.push(`- workDir: failed to resolve (${err instanceof Error ? err.message : String(err)})`)
   }
 
-  const runtimeOverride = runtimeOverrides.get(sessionId)
+  const runtimeOverride = peekSessionRuntime(sessionId)?.runtimeOverride
   if (runtimeOverride) {
     lines.push(`- runtimeOverride.providerId: ${runtimeOverride.providerId ?? '(official)'}`)
     lines.push(`- runtimeOverride.modelId: ${runtimeOverride.modelId}`)
@@ -1854,16 +1783,17 @@ function enqueueRuntimeTransition(
   sessionId: string,
   transition: () => Promise<void>,
 ): Promise<void> {
-  const previous = runtimeTransitionPromises.get(sessionId) ?? Promise.resolve()
+  const previous = peekSessionRuntime(sessionId)?.runtimeTransition ?? Promise.resolve()
   const next = previous
     .catch(() => {})
     .then(transition)
     .finally(() => {
-      if (runtimeTransitionPromises.get(sessionId) === next) {
-        runtimeTransitionPromises.delete(sessionId)
+      const runtime = peekSessionRuntime(sessionId)
+      if (runtime?.runtimeTransition === next) {
+        runtime.runtimeTransition = undefined
       }
     })
-  runtimeTransitionPromises.set(sessionId, next)
+  getSessionRuntime(sessionId).runtimeTransition = next
   return next
 }
 
@@ -1872,7 +1802,7 @@ async function waitForRuntimeTransitionBeforeUserTurn(
   sessionId: string,
 ): Promise<{ ok: boolean; waited: boolean }> {
   let waited = false
-  let pendingRuntimeTransition = runtimeTransitionPromises.get(sessionId)
+  let pendingRuntimeTransition = peekSessionRuntime(sessionId)?.runtimeTransition
   while (pendingRuntimeTransition) {
     waited = true
     try {
@@ -1896,7 +1826,7 @@ async function waitForRuntimeTransitionBeforeUserTurn(
       return { ok: false, waited }
     }
 
-    const nextTransition = runtimeTransitionPromises.get(sessionId)
+    const nextTransition = peekSessionRuntime(sessionId)?.runtimeTransition
     pendingRuntimeTransition =
       nextTransition && nextTransition !== pendingRuntimeTransition
         ? nextTransition
@@ -1907,7 +1837,7 @@ async function waitForRuntimeTransitionBeforeUserTurn(
 }
 
 export function sendToSession(sessionId: string, message: ServerMessage): boolean {
-  const clients = activeSessions.get(sessionId)
+  const clients = peekSessionRuntime(sessionId)?.clients
   if (!clients || clients.size === 0) return false
   const payload = JSON.stringify(message)
   for (const ws of clients) {
@@ -1925,7 +1855,7 @@ export function updateSessionSlashCommands(
     .map(normalizeSessionSlashCommand)
     .filter((command): command is SessionSlashCommand => command !== null)
 
-  sessionSlashCommands.set(sessionId, normalized)
+  getSessionRuntime(sessionId).slashCommands = normalized
 
   if (options.notifyClient !== false) {
     sendToSession(sessionId, {
@@ -1966,19 +1896,12 @@ function normalizeSessionSlashCommand(command: unknown): SessionSlashCommand | n
 }
 
 export function closeSessionConnection(sessionId: string, reason = 'session closed'): boolean {
-  const cleanupTimer = sessionCleanupTimers.get(sessionId)
-  if (cleanupTimer) {
-    clearTimeout(cleanupTimer)
-    sessionCleanupTimers.delete(sessionId)
-  }
   computerUseApprovalService.cancelSession(sessionId)
   conversationService.clearOutputCallbacks(sessionId)
-  cleanupSessionRuntimeState(sessionId)
-
-  const clients = activeSessions.get(sessionId)
+  // Dispose before closing sockets so their close events find no session and are ignored.
+  const clients = disposeSessionRuntime(sessionId)?.clients
   if (!clients || clients.size === 0) return false
 
-  activeSessions.delete(sessionId)
   for (const ws of clients) {
     clientOutputCallbacks.delete(ws)
     ws.close(1000, reason)
@@ -1987,14 +1910,10 @@ export function closeSessionConnection(sessionId: string, reason = 'session clos
 }
 
 export function getActiveSessionIds(): string[] {
-  return Array.from(activeSessions.keys())
+  return getConnectedSessionIds()
 }
 
 export function __resetWebSocketHandlerStateForTests(): void {
-  for (const timer of sessionCleanupTimers.values()) clearTimeout(timer)
-  for (const timer of prewarmIdleTimers.values()) clearTimeout(timer)
-  activeSessions.clear()
+  disposeAllSessionRuntimes()
   clientOutputCallbacks.clear()
-  sessionCleanupTimers.clear()
-  prewarmIdleTimers.clear()
 }
