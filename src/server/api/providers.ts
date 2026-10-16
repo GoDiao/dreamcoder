@@ -75,18 +75,17 @@ export async function handleProvidersApi(
         if (body && typeof body === 'object') overrides = body as typeof overrides
       } catch { }
       const result = await providerService.testProvider(id, overrides)
-      if (!result.connectivity.success || result.proxy?.success === false) {
+      if (!result.connectivity.success) {
         void diagnosticsService.recordEvent({
           type: 'provider_test_failed',
           severity: 'warn',
-          summary: result.connectivity.error || result.proxy?.error || 'Provider test failed',
+          summary: result.connectivity.error || 'Provider test failed',
           details: {
             providerId: id,
-            httpStatus: result.connectivity.httpStatus ?? result.proxy?.httpStatus,
+            httpStatus: result.connectivity.httpStatus,
             apiFormat: overrides?.apiFormat,
             modelId: overrides?.modelId,
             connectivity: result.connectivity,
-            proxy: result.proxy,
           },
         })
       }
@@ -140,18 +139,17 @@ async function handleTestUnsaved(req: Request): Promise<Response> {
   try {
     const input = TestProviderSchema.parse(body)
     const result = await providerService.testProviderConfig(input)
-    if (!result.connectivity.success || result.proxy?.success === false) {
+    if (!result.connectivity.success) {
       void diagnosticsService.recordEvent({
         type: 'provider_test_failed',
         severity: 'warn',
-        summary: result.connectivity.error || result.proxy?.error || 'Provider test failed',
+        summary: result.connectivity.error || 'Provider test failed',
         details: {
           providerId: null,
           baseUrl: input.baseUrl,
           apiFormat: input.apiFormat,
           modelId: input.modelId,
           connectivity: result.connectivity,
-          proxy: result.proxy,
         },
       })
     }

@@ -59,6 +59,25 @@ describe('providerRuntimeEnv', () => {
     })
   })
 
+  test('strips a trailing /v1 from native Anthropic base URLs', async () => {
+    await writeJson(path.join(tmpDir, 'dreamcoder', 'providers.json'), {
+      activeId: 'provider-1',
+      providers: [
+        {
+          id: 'provider-1',
+          presetId: 'custom',
+          name: 'Active Provider',
+          apiKey: 'sk-active',
+          baseUrl: 'https://api.example.com/anthropic/v1/',
+          apiFormat: 'anthropic',
+          models: { main: 'm', haiku: 'm', sonnet: 'm', opus: 'm' },
+        },
+      ],
+    })
+
+    expect(readActiveProviderManagedEnv(tmpDir)?.ANTHROPIC_BASE_URL).toBe('https://api.example.com/anthropic')
+  })
+
   test('active provider env overrides stale proxy settings while preserving unrelated env', async () => {
     await writeJson(path.join(tmpDir, 'dreamcoder', 'providers.json'), {
       activeId: 'provider-1',

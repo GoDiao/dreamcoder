@@ -142,13 +142,6 @@ function ProviderSettings() {
                           ? t('settings.providers.connectivityOk', { latency: String(test.result.connectivity.latencyMs) })
                           : t('settings.providers.connectivityFailed', { error: test.result.connectivity.error || '' })}
                       </span>
-                      {test.result.proxy && (
-                        <span className={test.result.proxy.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}>
-                          {test.result.proxy.success
-                            ? t('settings.providers.proxyOk', { latency: String(test.result.proxy.latencyMs) })
-                            : t('settings.providers.proxyFailed', { error: test.result.proxy.error || '' })}
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
