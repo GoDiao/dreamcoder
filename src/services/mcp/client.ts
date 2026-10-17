@@ -111,6 +111,7 @@ import {
 } from './elicitationHandler.js'
 import { buildMcpToolName } from './mcpStringUtils.js'
 import { normalizeNameForMCP } from './normalization.js'
+import { createMcpEnvironmentRedactor } from './redactEnvironment.js'
 import { getLoggingSafeMcpBaseUrl } from './utils.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -603,6 +604,9 @@ export const connectToServer = memoize(
     },
   ): Promise<MCPServerConnection> => {
     const connectStartTime = Date.now()
+    const redactEnvironment = createMcpEnvironmentRedactor(
+      'env' in serverRef ? serverRef.env : undefined,
+    )
     let inProcessServer:
       | { connect(t: Transport): Promise<void>; close(): Promise<void> }
       | undefined
@@ -1073,7 +1077,8 @@ export const connectToServer = memoize(
       try {
         await Promise.race([connectPromise, timeoutPromise])
         if (stderrOutput) {
-          logMCPError(name, `Server stderr: ${stderrOutput}`)
+          // Redact after accumulation so values split across stderr chunks are covered.
+          logMCPError(name, `Server stderr: ${redactEnvironment(stderrOutput)}`)
           stderrOutput = '' // Release accumulated string to prevent memory growth
         }
         const elapsed = Date.now() - connectStartTime
@@ -1143,7 +1148,7 @@ export const connectToServer = memoize(
         }
         transport.close().catch(() => {})
         if (stderrOutput) {
-          logMCPError(name, `Server stderr: ${stderrOutput}`)
+          logMCPError(name, `Server stderr: ${redactEnvironment(stderrOutput)}`)
         }
         throw error
       }
@@ -1300,7 +1305,7 @@ export const connectToServer = memoize(
               `Failed to spawn process - check command and permissions`,
             )
           } else {
-            logMCPDebug(name, `Connection error: ${error.message}`)
+            logMCPDebug(name, `Connection error: ${redactEnvironment(error.message)}`)
           }
         }
 
@@ -1598,6 +1603,7 @@ export const connectToServer = memoize(
       }
     } catch (error) {
       const connectionDurationMs = Date.now() - connectStartTime
+      const safeErrorMessage = redactEnvironment(errorMessage(error))
       logEvent('tengu_mcp_server_connection_failed', {
         connectionDurationMs,
         totalServers: serverStats?.totalServers || 1,
@@ -1616,9 +1622,9 @@ export const connectToServer = memoize(
       })
       logMCPDebug(
         name,
-        `Connection failed after ${connectionDurationMs}ms: ${errorMessage(error)}`,
+        `Connection failed after ${connectionDurationMs}ms: ${safeErrorMessage}`,
       )
-      logMCPError(name, `Connection failed: ${errorMessage(error)}`)
+      logMCPError(name, `Connection failed: ${safeErrorMessage}`)
 
       if (inProcessServer) {
         inProcessServer.close().catch(() => {})
@@ -1627,7 +1633,7 @@ export const connectToServer = memoize(
         name,
         type: 'failed' as const,
         config: serverRef,
-        error: errorMessage(error),
+        error: safeErrorMessage,
       }
     }
   },

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mcpApi } from '../../api/mcp'
 import { useTranslation } from '../../i18n'
+import { Button } from '../shared/Button'
 import type { McpCatalogEntry } from '../../types/mcp'
 
-export function McpCatalogBrowse({ installedNames }: { installedNames: string[] }) {
+export function McpCatalogBrowse({ installedNames, onInstall }: {
+  installedNames: string[]
+  onInstall: (entry: McpCatalogEntry) => void
+}) {
   const t = useTranslation()
   const [entries, setEntries] = useState<McpCatalogEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +75,7 @@ export function McpCatalogBrowse({ installedNames }: { installedNames: string[] 
               key={entry.id}
               entry={entry}
               installed={installed.has(entry.id) || installed.has(entry.name.toLowerCase())}
+              onInstall={() => onInstall(entry)}
             />
           ))}
         </div>
@@ -79,7 +84,7 @@ export function McpCatalogBrowse({ installedNames }: { installedNames: string[] 
   )
 }
 
-function CatalogCard({ entry, installed }: { entry: McpCatalogEntry; installed: boolean }) {
+function CatalogCard({ entry, installed, onInstall }: { entry: McpCatalogEntry; installed: boolean; onInstall: () => void }) {
   const t = useTranslation()
   return (
     <article className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
@@ -119,6 +124,11 @@ function CatalogCard({ entry, installed }: { entry: McpCatalogEntry; installed: 
       >
         {t('settings.mcp.browse.homepage')}
       </a>
+      <div className="mt-4">
+        <Button variant="secondary" onClick={onInstall} aria-label={t('settings.mcp.install.actionFor', { name: entry.name })}>
+          {t('settings.mcp.install.action')}
+        </Button>
+      </div>
     </article>
   )
 }

@@ -157,6 +157,9 @@ export const useMcpStore = create<McpStore>((set) => ({
 
   refreshServerStatus: async (server, cwd) => {
     const response = await mcpApi.status(server.name, cwd)
+    // Status resolves a name by scope precedence. A newly installed or removed
+    // override may change that resolution; only a list refresh reconciles it.
+    if (response.server.name !== server.name || response.server.scope !== server.scope) return server
     const updated = attachProjectPath(response.server, cwd ?? server.projectPath)
     set((state) => ({
       servers: replaceServer(state.servers, server, updated, cwd ?? server.projectPath),
