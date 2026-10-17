@@ -189,9 +189,12 @@ export function extractLocalCommandOutput(
   return options.allowUntagged ? text : null
 }
 
-/** `/compact` reports `Compacted`; the compaction card already covers it. */
+/**
+ * `/compact` reports `Compacted`, followed by the output of any PreCompact or
+ * PostCompact hooks; the compaction card already covers it.
+ */
 export function isCompactCommandOutput(output: string): boolean {
-  return output.trim() === 'Compacted'
+  return /^Compacted(?:\s|$)/.test(output.trim())
 }
 
 export function isGoalCommandOutput(output: string): boolean {

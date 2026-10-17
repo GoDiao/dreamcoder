@@ -155,6 +155,16 @@ describe('WebSocket compact events', () => {
     ])
   })
 
+  it('suppresses compact output that carries compaction hook results', () => {
+    expect(translateCliMessage({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: '<local-command-stdout>Compacted PostCompact [notify.sh] completed successfully: {}</local-command-stdout>',
+      },
+    }, 'session-1')).toEqual([])
+  })
+
   it('suppresses compact local command output after the compact summary', () => {
     expect(translateCliMessage({
       type: 'user',
