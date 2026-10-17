@@ -1,0 +1,480 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`session transcript fixtures plain 1`] = `
+{
+  "agentNotifications": {},
+  "hasMessagesAfterTaskCompletion": true,
+  "items": [
+    {
+      "content": "Summarize the README",
+      "id": "u1",
+      "timestamp": 1777629602000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "content": "Read the file first.",
+      "id": "a1:0",
+      "timestamp": 1777629604000,
+      "type": "thinking",
+    },
+    {
+      "content": "The README covers setup and usage.",
+      "id": "a1:1",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629604000,
+      "transcriptMessageId": "a1",
+      "type": "assistant_text",
+    },
+    {
+      "id": "a2:0",
+      "input": {
+        "todos": [
+          {
+            "activeForm": "Writing summary",
+            "content": "Write summary",
+            "status": "in_progress",
+          },
+        ],
+      },
+      "parentToolUseId": undefined,
+      "timestamp": 1777629605000,
+      "toolName": "TodoWrite",
+      "toolUseId": "toolu_todo",
+      "type": "tool_use",
+    },
+    {
+      "content": "Todos updated",
+      "id": "r2:0",
+      "isError": false,
+      "parentToolUseId": undefined,
+      "timestamp": 1777629606000,
+      "toolUseId": "toolu_todo",
+      "type": "tool_result",
+    },
+    {
+      "content": "Thanks",
+      "id": "u2",
+      "timestamp": 1777629610000,
+      "transcriptMessageId": "u2",
+      "type": "user_text",
+    },
+    {
+      "content": "You are welcome.",
+      "id": "a5:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629611000,
+      "transcriptMessageId": "a5",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": [
+    {
+      "activeForm": "Writing summary",
+      "content": "Write summary",
+      "status": "in_progress",
+    },
+  ],
+}
+`;
+
+exports[`session transcript fixtures subagent 1`] = `
+{
+  "agentNotifications": {},
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "content": "Investigate the failing test",
+      "id": "u1",
+      "timestamp": 1777629601000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "id": "a1:0",
+      "input": {
+        "description": "Find failure",
+        "prompt": "Run the tests",
+      },
+      "parentToolUseId": undefined,
+      "timestamp": 1777629602000,
+      "toolName": "Agent",
+      "toolUseId": "toolu_agent",
+      "type": "tool_use",
+    },
+    {
+      "id": "sa1:0",
+      "input": {
+        "file_path": "/tmp/transcript-fixture/test.ts",
+      },
+      "parentToolUseId": "toolu_agent",
+      "timestamp": 1777629603000,
+      "toolName": "Read",
+      "toolUseId": "toolu_read",
+      "type": "tool_use",
+    },
+    {
+      "content": "expect(1).toBe(2)",
+      "id": "sr1:0",
+      "isError": false,
+      "parentToolUseId": "toolu_agent",
+      "timestamp": 1777629604000,
+      "toolUseId": "toolu_read",
+      "type": "tool_result",
+    },
+    {
+      "content": "The assertion compares 1 with 2.",
+      "id": "r1:0",
+      "isError": false,
+      "parentToolUseId": undefined,
+      "timestamp": 1777629605000,
+      "toolUseId": "toolu_agent",
+      "type": "tool_result",
+    },
+    {
+      "content": "The test asserts the wrong value.",
+      "id": "a2:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629606000,
+      "transcriptMessageId": "a2",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": null,
+}
+`;
+
+exports[`session transcript fixtures compaction 1`] = `
+{
+  "agentNotifications": {},
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "content": "Build the billing import",
+      "id": "u1",
+      "timestamp": 1777629601000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "content": "Implemented the import.",
+      "id": "a1:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629602000,
+      "transcriptMessageId": "a1",
+      "type": "assistant_text",
+    },
+    {
+      "id": "cs1:compact",
+      "phase": "complete",
+      "summary": "The billing import is implemented; tests remain.",
+      "timestamp": 1777629604000,
+      "title": "Context compacted",
+      "type": "compact_summary",
+    },
+    {
+      "content": "Now add tests",
+      "id": "u2",
+      "timestamp": 1777629606000,
+      "transcriptMessageId": "u2",
+      "type": "user_text",
+    },
+    {
+      "content": "Added tests.",
+      "id": "a2:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629607000,
+      "transcriptMessageId": "a2",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": null,
+}
+`;
+
+exports[`session transcript fixtures goal 1`] = `
+{
+  "agentNotifications": {},
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "content": "/goal ship the smoke test",
+      "id": "g1",
+      "timestamp": 1777629601000,
+      "type": "user_text",
+    },
+    {
+      "action": "created",
+      "id": "g2",
+      "message": "Goal set: ship the smoke test",
+      "objective": "ship the smoke test",
+      "status": "active",
+      "timestamp": 1777629602000,
+      "type": "goal_event",
+    },
+    {
+      "content": "Start with the CI config",
+      "id": "u1",
+      "timestamp": 1777629603000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "content": "Updated CI.",
+      "id": "a1:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629604000,
+      "transcriptMessageId": "a1",
+      "type": "assistant_text",
+    },
+    {
+      "action": "completed",
+      "id": "g3",
+      "message": "Goal marked complete.",
+      "timestamp": 1777629607000,
+      "type": "goal_event",
+    },
+    {
+      "content": "/goal add release notes",
+      "id": "g4",
+      "timestamp": 1777629608000,
+      "type": "user_text",
+    },
+    {
+      "action": "created",
+      "id": "g5",
+      "message": "Goal set: add release notes",
+      "objective": "add release notes",
+      "status": "active",
+      "timestamp": 1777629609000,
+      "type": "goal_event",
+    },
+    {
+      "content": "/goal clear",
+      "id": "g6",
+      "timestamp": 1777629610000,
+      "type": "user_text",
+    },
+    {
+      "action": "cleared",
+      "id": "g7",
+      "message": "Goal cleared: add release notes",
+      "timestamp": 1777629611000,
+      "type": "goal_event",
+    },
+  ],
+  "lastTodos": null,
+}
+`;
+
+exports[`session transcript fixtures task-notification 1`] = `
+{
+  "agentNotifications": {
+    "toolu_bg": {
+      "outputFile": "/tmp/bg-1.output",
+      "status": "completed",
+      "summary": "Build finished & passed",
+      "taskId": "bg-1",
+      "timestamp": "2026-05-01T10:00:05.000Z",
+      "toolUseId": "toolu_bg",
+    },
+  },
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "content": "Run the build in the background",
+      "id": "u1",
+      "timestamp": 1777629601000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "id": "a1:0",
+      "input": {
+        "command": "bun run build",
+        "run_in_background": true,
+      },
+      "parentToolUseId": undefined,
+      "timestamp": 1777629602000,
+      "toolName": "Bash",
+      "toolUseId": "toolu_bg",
+      "type": "tool_use",
+    },
+    {
+      "content": "Command running in background with ID: bg-1",
+      "id": "r1:0",
+      "isError": false,
+      "parentToolUseId": undefined,
+      "timestamp": 1777629603000,
+      "toolUseId": "toolu_bg",
+      "type": "tool_result",
+    },
+    {
+      "content": "The build is running.",
+      "id": "a2:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629604000,
+      "transcriptMessageId": "a2",
+      "type": "assistant_text",
+    },
+    {
+      "content": "Great, deploy it",
+      "id": "u2",
+      "timestamp": 1777629607000,
+      "transcriptMessageId": "u2",
+      "type": "user_text",
+    },
+    {
+      "content": "Deploying.",
+      "id": "a4:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629608000,
+      "transcriptMessageId": "a4",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": null,
+}
+`;
+
+exports[`session transcript fixtures teammate 1`] = `
+{
+  "agentNotifications": {
+    "toolu_researcher": {
+      "status": "completed",
+      "summary": "The API returns 404 for /v2/items.",
+      "taskId": "toolu_researcher",
+      "toolUseId": "toolu_researcher",
+    },
+  },
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "content": "Ask the researcher to check the API",
+      "id": "u1",
+      "timestamp": 1777629601000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "id": "a1:0",
+      "input": {
+        "description": "Check API",
+        "name": "researcher",
+        "prompt": "Check the API",
+      },
+      "parentToolUseId": undefined,
+      "timestamp": 1777629602000,
+      "toolName": "Agent",
+      "toolUseId": "toolu_researcher",
+      "type": "tool_use",
+    },
+    {
+      "content": "Spawned researcher",
+      "id": "r1:0",
+      "isError": false,
+      "parentToolUseId": undefined,
+      "timestamp": 1777629603000,
+      "toolUseId": "toolu_researcher",
+      "type": "tool_result",
+    },
+    {
+      "content": "The researcher found a 404.",
+      "id": "a2:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629606000,
+      "transcriptMessageId": "a2",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": null,
+}
+`;
+
+exports[`session transcript fixtures attachments 1`] = `
+{
+  "agentNotifications": {},
+  "hasMessagesAfterTaskCompletion": false,
+  "items": [
+    {
+      "attachments": [
+        {
+          "name": "app.ts",
+          "path": "/tmp/transcript-fixture/src/app.ts",
+          "type": "file",
+        },
+        {
+          "data": "iVBORw0KGgo=",
+          "mimeType": undefined,
+          "name": "image",
+          "type": "image",
+        },
+      ],
+      "content": "What does this export?",
+      "id": "u1",
+      "modelContent": "@"/tmp/transcript-fixture/src/app.ts" What does this export?",
+      "timestamp": 1777629601000,
+      "transcriptMessageId": "u1",
+      "type": "user_text",
+    },
+    {
+      "id": "a1:0",
+      "input": {
+        "questions": [
+          {
+            "options": [
+              {
+                "label": "default",
+              },
+              {
+                "label": "named",
+              },
+            ],
+            "question": "Which export?",
+          },
+        ],
+      },
+      "parentToolUseId": undefined,
+      "timestamp": 1777629602000,
+      "toolName": "AskUserQuestion",
+      "toolUseId": "toolu_ask",
+      "type": "tool_use",
+    },
+    {
+      "content": {
+        "answers": {
+          "Which export?": "named",
+        },
+        "questions": [
+          {
+            "options": [
+              {
+                "label": "default",
+              },
+              {
+                "label": "named",
+              },
+            ],
+            "question": "Which export?",
+          },
+        ],
+      },
+      "id": "r1:0",
+      "isError": false,
+      "parentToolUseId": undefined,
+      "timestamp": 1777629603000,
+      "toolUseId": "toolu_ask",
+      "type": "tool_result",
+    },
+    {
+      "content": "It exports createApp.",
+      "id": "a2:0",
+      "model": "claude-sonnet-4-6",
+      "timestamp": 1777629604000,
+      "transcriptMessageId": "a2",
+      "type": "assistant_text",
+    },
+  ],
+  "lastTodos": null,
+}
+`;

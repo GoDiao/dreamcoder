@@ -82,6 +82,16 @@ export async function handleSessionsApi(
       return await getSessionMessages(sessionId)
     }
 
+    if (subResource === 'transcript') {
+      if (req.method !== 'GET') {
+        return Response.json(
+          { error: 'METHOD_NOT_ALLOWED', message: `Method ${req.method} not allowed` },
+          { status: 405 }
+        )
+      }
+      return Response.json(await sessionService.getSessionTranscript(sessionId))
+    }
+
     if (subResource === 'git-info') {
       if (req.method !== 'GET') {
         return Response.json(

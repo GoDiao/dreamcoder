@@ -23,6 +23,17 @@ import {
 import { registerFilesystemAccessRoot } from './filesystemAccessRoots.js'
 import { normalizeDriveRootPathForPlatform } from './windowsDrivePath.js'
 import { cleanSessionTitleSource } from '../../utils/sessionTitleText.js'
+import { extractTextBlocks, parseLocalCommand, type TaskNotification } from '../transcript/classify.js'
+import {
+  collectTaskNotifications,
+  entriesToMessages,
+  findSubagentLinks,
+  shouldHideTranscriptEntry,
+  subagentEntriesToMessages,
+  type MessageEntry,
+} from '../transcript/entries.js'
+import { buildSessionTranscript } from '../transcript/history.js'
+import type { SessionTranscript } from '../transcript/items.js'
 
 export type SessionListItem = {
   id: string
@@ -67,27 +78,7 @@ export type TrimSessionResult = {
   removedMessageIds: string[]
 }
 
-export type MessageEntry = {
-  id: string
-  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result'
-  content: unknown
-  toolUseResult?: unknown
-  timestamp: string
-  model?: string
-  parentUuid?: string
-  parentToolUseId?: string
-  isSidechain?: boolean
-}
-
-export type SessionTaskNotification = {
-  taskId: string
-  toolUseId: string
-  status: 'completed' | 'failed' | 'stopped'
-  summary?: string
-  result?: string
-  outputFile?: string
-  timestamp?: string
-}
+export type SessionTaskNotification = TaskNotification
 
 export type TranscriptUsageSnapshot = {
   source: 'transcript'
@@ -208,17 +199,6 @@ type PersistedWorktreeSession = {
   hookBased?: boolean
 }
 
-type ContentBlock = Record<string, unknown>
-
-const USER_INTERRUPTION_TEXTS = new Set([
-  '[Request interrupted by user]',
-  '[Request interrupted by user for tool use]',
-])
-
-const NO_RESPONSE_REQUESTED_TEXT = 'No response requested.'
-const TASK_NOTIFICATION_RE = /^<task-notification>\s*[\s\S]*<\/task-notification>$/i
-const TASK_NOTIFICATION_BLOCK_RE = /<task-notification>\s*[\s\S]*?<\/task-notification>/i
-
 export class SessionService {
   private getConfigDir(): string {
     return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
@@ -298,9 +278,9 @@ export class SessionService {
               !entry.isSidechain &&
               !entry.isMeta &&
               !entry.parent_tool_use_id &&
-              !this.shouldHideTranscriptEntry(entry)
+              !shouldHideTranscriptEntry(entry)
             ) {
-              const text = this.extractTextBlocks(entry.message.content).join('\n').trim()
+              const text = extractTextBlocks(entry.message.content).join('\n').trim()
               if (text) lastAssistantMessage = text
             }
           } catch { }
@@ -440,230 +420,6 @@ export class SessionService {
     ).length
   }
 
-  private entryToMessage(
-    entry: RawEntry,
-    parentToolUseId?: string,
-  ): MessageEntry | null {
-    const msg = entry.message
-    if (!msg || !msg.role) return null
-
-    let type: MessageEntry['type']
-    const role = msg.role
-
-    if (role === 'user') {
-      if (Array.isArray(msg.content)) {
-        const hasToolResult = msg.content.some(
-          (block: Record<string, unknown>) => block.type === 'tool_result'
-        )
-        if (hasToolResult) {
-          type = 'tool_result'
-        } else {
-          type = 'user'
-        }
-      } else {
-        type = 'user'
-      }
-    } else if (role === 'assistant') {
-      if (Array.isArray(msg.content)) {
-        const hasToolUse = msg.content.some(
-          (block: Record<string, unknown>) => block.type === 'tool_use'
-        )
-        type = hasToolUse ? 'tool_use' : 'assistant'
-      } else {
-        type = 'assistant'
-      }
-    } else {
-      type = 'system'
-    }
-
-    return {
-      id: entry.uuid || crypto.randomUUID(),
-      type,
-      content: msg.content,
-      ...(entry.toolUseResult !== undefined ? { toolUseResult: entry.toolUseResult } : {}),
-      timestamp: entry.timestamp || new Date().toISOString(),
-      model: msg.model,
-      parentUuid: entry.parentUuid ?? undefined,
-      parentToolUseId,
-      isSidechain: entry.isSidechain,
-    }
-  }
-
-  private extractTextBlocks(content: unknown): string[] {
-    if (typeof content === 'string') return [content]
-    if (!Array.isArray(content)) return []
-
-    return content
-      .flatMap((block) => {
-        if (!block || typeof block !== 'object') return []
-        const record = block as Record<string, unknown>
-        return record.type === 'text' && typeof record.text === 'string'
-          ? [record.text]
-          : []
-      })
-      .map((text) => text.trim())
-      .filter(Boolean)
-  }
-
-  private isInternalCommandBreadcrumb(content: unknown): boolean {
-    if (typeof content !== 'string') return false
-
-    return (
-      content.includes('<command-name>') ||
-      content.includes('<command-message>') ||
-      content.includes('<command-args>') ||
-      content.includes('<local-command-caveat>')
-    )
-  }
-
-  private isSyntheticUserInterruption(content: unknown): boolean {
-    const textBlocks = this.extractTextBlocks(content)
-    return (
-      textBlocks.length > 0 &&
-      textBlocks.every((text) => USER_INTERRUPTION_TEXTS.has(text))
-    )
-  }
-
-  private isSyntheticNoResponseAssistant(content: unknown): boolean {
-    const textBlocks = this.extractTextBlocks(content)
-    return (
-      textBlocks.length > 0 &&
-      textBlocks.every((text) => text === NO_RESPONSE_REQUESTED_TEXT)
-    )
-  }
-
-  private isToolResultContent(content: unknown): boolean {
-    return (
-      Array.isArray(content) &&
-      content.some((block) =>
-        block &&
-        typeof block === 'object' &&
-        (block as Record<string, unknown>).type === 'tool_result'
-      )
-    )
-  }
-
-  private isTaskNotificationContent(content: unknown): boolean {
-    const textBlocks = this.extractTextBlocks(content)
-    return (
-      textBlocks.length > 0 &&
-      textBlocks.every((text) => this.extractTaskNotificationXml(text) !== null)
-    )
-  }
-
-  private extractTaskNotificationXml(text: string): string | null {
-    const trimmed = text.trim()
-    if (TASK_NOTIFICATION_RE.test(trimmed)) return trimmed
-    return trimmed.match(TASK_NOTIFICATION_BLOCK_RE)?.[0] ?? null
-  }
-
-  private decodeXmlText(text: string): string {
-    return text
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, '&')
-  }
-
-  private readXmlTag(xml: string, tag: string): string | undefined {
-    const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'))
-    return match?.[1] ? this.decodeXmlText(match[1].trim()) : undefined
-  }
-
-  private parseTaskNotificationContent(
-    content: unknown,
-    timestamp?: string,
-  ): SessionTaskNotification | null {
-    const xml = this.extractTextBlocks(content)
-      .map((text) => this.extractTaskNotificationXml(text))
-      .find((value): value is string => value !== null)
-    if (!xml) return null
-
-    const toolUseId = this.readXmlTag(xml, 'tool-use-id')
-    const status = this.readXmlTag(xml, 'status')
-    if (
-      !toolUseId ||
-      (status !== 'completed' && status !== 'failed' && status !== 'stopped')
-    ) {
-      return null
-    }
-
-    const taskId = this.readXmlTag(xml, 'task-id') || toolUseId
-    const summary = this.readXmlTag(xml, 'summary')
-    const result = this.readXmlTag(xml, 'result')
-    const outputFile = this.readXmlTag(xml, 'output-file')
-    return {
-      taskId,
-      toolUseId,
-      status,
-      ...(summary ? { summary } : {}),
-      ...(result ? { result } : {}),
-      ...(outputFile ? { outputFile } : {}),
-      ...(timestamp ? { timestamp } : {}),
-    }
-  }
-
-  private shouldHideTranscriptEntry(entry: RawEntry): boolean {
-    const role = entry.message?.role
-    const content = entry.message?.content
-
-    if (role === 'user') {
-      return (
-        this.isInternalCommandBreadcrumb(content) ||
-        this.isSyntheticUserInterruption(content) ||
-        this.isTaskNotificationContent(content)
-      )
-    }
-
-    if (role === 'assistant') {
-      return this.isSyntheticNoResponseAssistant(content)
-    }
-
-    return false
-  }
-
-  private isGoalLocalCommandOutput(output: string): boolean {
-    const trimmed = output.trim()
-    return (
-      trimmed.startsWith('Goal set:') ||
-      trimmed.startsWith('Goal cleared:') ||
-      trimmed === 'Goal cleared.' ||
-      trimmed === 'Goal marked complete.' ||
-      trimmed === 'No active goal.'
-    )
-  }
-
-  private isGoalLocalCommandEntry(entry: RawEntry): boolean {
-    if (
-      entry.type !== 'system' ||
-      entry.subtype !== 'local_command' ||
-      typeof entry.content !== 'string'
-    ) {
-      return false
-    }
-
-    const commandName = this.readXmlTag(entry.content, 'command-name')?.replace(/^\//, '')
-    if (commandName) return commandName === 'goal'
-
-    const output =
-      this.readXmlTag(entry.content, 'local-command-stdout') ??
-      this.readXmlTag(entry.content, 'local-command-stderr')
-    return output ? this.isGoalLocalCommandOutput(output) : false
-  }
-
-  private goalLocalCommandEntryToMessage(entry: RawEntry): MessageEntry | null {
-    if (!this.isGoalLocalCommandEntry(entry)) return null
-    return {
-      id: entry.uuid || crypto.randomUUID(),
-      type: 'system',
-      content: entry.content,
-      timestamp: entry.timestamp || new Date().toISOString(),
-      parentUuid: entry.parentUuid ?? undefined,
-      isSidechain: entry.isSidechain,
-    }
-  }
-
   private goalCreationCommandTitle(entry: RawEntry): string | null {
     if (
       entry.type !== 'system' ||
@@ -673,101 +429,14 @@ export class SessionService {
       return null
     }
 
-    const commandName = this.readXmlTag(entry.content, 'command-name')?.replace(/^\//, '')
-    if (commandName !== 'goal') return null
+    const command = parseLocalCommand(entry.content)
+    if (command?.name !== 'goal') return null
 
-    const args = this.readXmlTag(entry.content, 'command-args')?.trim()
+    const args = command.args
     if (!args || /^clear\b/i.test(args)) return null
 
     const title = cleanSessionTitleSource(`/goal ${args}`)
     return title ? title.length > 80 ? title.slice(0, 80) + '...' : title : null
-  }
-
-  private extractAgentToolUseId(entry: RawEntry): string | undefined {
-    const content = entry.message?.content
-    if (!Array.isArray(content)) return undefined
-
-    for (const block of content as Array<Record<string, unknown>>) {
-      if (
-        block.type === 'tool_use' &&
-        block.name === 'Agent' &&
-        typeof block.id === 'string'
-      ) {
-        return block.id
-      }
-    }
-
-    return undefined
-  }
-
-  private extractAgentToolUseIdsFromMessage(message: MessageEntry): string[] {
-    if (message.type !== 'tool_use' || !Array.isArray(message.content)) {
-      return []
-    }
-
-    return (message.content as ContentBlock[])
-      .filter((block) => block.type === 'tool_use' && block.name === 'Agent')
-      .flatMap((block) => (typeof block.id === 'string' ? [block.id] : []))
-  }
-
-  private extractTextFromContent(content: unknown): string {
-    if (typeof content === 'string') return content
-    if (!Array.isArray(content)) return ''
-
-    return (content as ContentBlock[])
-      .flatMap((block) => (typeof block.text === 'string' ? [block.text] : []))
-      .join('\n')
-  }
-
-  private extractAgentIdFromResultText(text: string): string | undefined {
-    const match = text.match(/(?:^|\n)\s*agentId:\s*([A-Za-z0-9_-]+)/)
-    return match?.[1]
-  }
-
-  private extractAgentResultLinks(messages: MessageEntry[]): Map<string, string> {
-    const agentToolUseIds = new Set(
-      messages.flatMap((message) => this.extractAgentToolUseIdsFromMessage(message)),
-    )
-    const resultLinks = new Map<string, string>()
-
-    for (const message of messages) {
-      if (message.type !== 'tool_result' || !Array.isArray(message.content)) {
-        continue
-      }
-
-      for (const block of message.content as ContentBlock[]) {
-        if (block.type !== 'tool_result' || typeof block.tool_use_id !== 'string') {
-          continue
-        }
-        if (!agentToolUseIds.has(block.tool_use_id)) {
-          continue
-        }
-
-        const agentId = this.extractAgentIdFromResultText(
-          this.extractTextFromContent(block.content),
-        )
-        if (agentId) {
-          resultLinks.set(block.tool_use_id, agentId)
-        }
-      }
-    }
-
-    return resultLinks
-  }
-
-  private namespaceSubagentContentIds(content: unknown, namespace: string): unknown {
-    if (!Array.isArray(content)) return content
-
-    return (content as ContentBlock[]).map((block) => {
-      if (!block || typeof block !== 'object') return block
-      if (block.type === 'tool_use' && typeof block.id === 'string') {
-        return { ...block, id: `${namespace}/${block.id}` }
-      }
-      if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
-        return { ...block, tool_use_id: `${namespace}/${block.tool_use_id}` }
-      }
-      return block
-    })
   }
 
   private subagentTranscriptPath(
@@ -791,34 +460,8 @@ export class SessionService {
     parentToolUseId: string,
     agentId: string,
   ): Promise<MessageEntry[]> {
-    const filePath = this.subagentTranscriptPath(projectDir, sessionId, agentId)
-    const entries = await this.readJsonlFile(filePath)
-    const namespace = `${parentToolUseId}/${agentId}`
-    const messages: MessageEntry[] = []
-
-    for (const entry of entries) {
-      if (!entry.message?.role || entry.isMeta) continue
-      if (this.shouldHideTranscriptEntry(entry)) continue
-      if (entry.type !== 'user' && entry.type !== 'assistant' && entry.type !== 'system') {
-        continue
-      }
-
-      const message = this.entryToMessage(
-        {
-          ...entry,
-          message: {
-            ...entry.message,
-            content: this.namespaceSubagentContentIds(entry.message.content, namespace),
-          },
-        },
-        parentToolUseId,
-      )
-      if (message && (message.type === 'tool_use' || message.type === 'tool_result')) {
-        messages.push(message)
-      }
-    }
-
-    return messages
+    const entries = await this.readJsonlFile(this.subagentTranscriptPath(projectDir, sessionId, agentId))
+    return subagentEntriesToMessages(entries, parentToolUseId, agentId)
   }
 
   private async appendSubagentToolMessages(
@@ -826,7 +469,7 @@ export class SessionService {
     sessionId: string,
     messages: MessageEntry[],
   ): Promise<MessageEntry[]> {
-    const resultLinks = this.extractAgentResultLinks(messages)
+    const resultLinks = findSubagentLinks(messages)
     if (resultLinks.size === 0) {
       return messages
     }
@@ -837,61 +480,6 @@ export class SessionService {
       ),
     )
     return [...messages, ...childMessages.flat()]
-  }
-
-  private resolveParentToolUseId(
-    entry: RawEntry,
-    entriesByUuid: Map<string, RawEntry>,
-    cache: Map<string, string | undefined>,
-  ): string | undefined {
-    if (
-      typeof entry.parent_tool_use_id === 'string' &&
-      entry.parent_tool_use_id.length > 0
-    ) {
-      return entry.parent_tool_use_id
-    }
-
-    if (entry.isSidechain !== true) {
-      return undefined
-    }
-
-    const cacheKey = entry.uuid
-    if (cacheKey && cache.has(cacheKey)) {
-      return cache.get(cacheKey)
-    }
-
-    let resolved: string | undefined
-    let currentParentUuid =
-      typeof entry.parentUuid === 'string' ? entry.parentUuid : undefined
-    const visited = new Set<string>()
-
-    while (currentParentUuid && !visited.has(currentParentUuid)) {
-      visited.add(currentParentUuid)
-      const parentEntry = entriesByUuid.get(currentParentUuid)
-      if (!parentEntry) break
-
-      const directAgentToolUseId = this.extractAgentToolUseId(parentEntry)
-      if (directAgentToolUseId) {
-        resolved = directAgentToolUseId
-        break
-      }
-
-      if (parentEntry.uuid && cache.has(parentEntry.uuid)) {
-        resolved = cache.get(parentEntry.uuid)
-        break
-      }
-
-      currentParentUuid =
-        typeof parentEntry.parentUuid === 'string'
-          ? parentEntry.parentUuid
-          : undefined
-    }
-
-    if (cacheKey) {
-      cache.set(cacheKey, resolved)
-    }
-
-    return resolved
   }
 
   private extractTitle(entries: RawEntry[]): string {
@@ -1375,7 +963,7 @@ export class SessionService {
     const messages = await this.appendSubagentToolMessages(
       projectDir,
       sessionId,
-      this.entriesToMessages(entries),
+      entriesToMessages(entries),
     )
     const title = this.extractTitle(entries)
     const workDir = this.resolveWorkDirFromEntries(entries, projectDir)
@@ -1415,7 +1003,7 @@ export class SessionService {
     const messages = await this.appendSubagentToolMessages(
       found.projectDir,
       sessionId,
-      this.entriesToMessages(entries),
+      entriesToMessages(entries),
     )
     const mem1 = process.memoryUsage()
     console.log(`[mem:sidecar] getSessionMessages:done session=${sessionId} entries=${entries.length} msgs=${messages.length} rss=${(mem1.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem1.heapUsed/1024/1024).toFixed(1)}MB (delta rss=${((mem1.rss-mem0.rss)/1024/1024).toFixed(1)}MB)`)
@@ -1749,7 +1337,7 @@ export class SessionService {
     }
 
     const entries = await this.readJsonlFile(found.filePath)
-    const activeMessages = this.entriesToMessages(entries)
+    const activeMessages = entriesToMessages(entries)
     const startIndex = activeMessages.findIndex((message) => message.id === startMessageId)
 
     if (startIndex < 0) {
@@ -1844,80 +1432,23 @@ export class SessionService {
     }
 
     const entries = await this.readJsonlFile(found.filePath)
-    const notifications: SessionTaskNotification[] = []
-    for (const entry of entries) {
-      if (entry.message?.role !== 'user') continue
-      const notification = this.parseTaskNotificationContent(
-        entry.message.content,
-        entry.timestamp,
-      )
-      if (notification) notifications.push(notification)
-    }
-    return notifications
+    return collectTaskNotifications(entries)
   }
 
-  private entriesToMessages(entries: RawEntry[]): MessageEntry[] {
-    const messages: MessageEntry[] = []
-    const entriesByUuid = new Map<string, RawEntry>()
-    const parentToolUseIdCache = new Map<string, string | undefined>()
-    let suppressTaskNotificationResponse = false
-
-    for (const entry of entries) {
-      if (typeof entry.uuid === 'string' && entry.uuid.length > 0) {
-        entriesByUuid.set(entry.uuid, entry)
-      }
+  /** Reads the session file once and interprets it into display items. */
+  async getSessionTranscript(sessionId: string): Promise<SessionTranscript> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) {
+      throw ApiError.notFound(`Session not found: ${sessionId}`)
     }
 
-    for (const entry of entries) {
-      const goalLocalCommandMessage = this.goalLocalCommandEntryToMessage(entry)
-      if (goalLocalCommandMessage) {
-        messages.push(goalLocalCommandMessage)
-        continue
-      }
-
-      if (!entry.message?.role) continue
-
-      if (entry.isMeta) continue
-
-      const isTaskNotification =
-        entry.message.role === 'user' &&
-        this.isTaskNotificationContent(entry.message.content)
-      if (isTaskNotification) {
-        suppressTaskNotificationResponse = true
-        continue
-      }
-
-      if (
-        entry.message.role === 'user' &&
-        !this.isToolResultContent(entry.message.content)
-      ) {
-        suppressTaskNotificationResponse = false
-      } else if (suppressTaskNotificationResponse) {
-        continue
-      }
-
-      if (this.shouldHideTranscriptEntry(entry)) continue
-
-      const entryType = entry.type
-      if (
-        entryType !== 'user' &&
-        entryType !== 'assistant' &&
-        entryType !== 'system'
-      ) {
-        continue
-      }
-
-      const parentToolUseId = this.resolveParentToolUseId(
-        entry,
-        entriesByUuid,
-        parentToolUseIdCache,
-      )
-      const msg = this.entryToMessage(entry, parentToolUseId)
-      if (msg) {
-        messages.push(msg)
-      }
-    }
-    return messages
+    const entries = await this.readJsonlFile(found.filePath)
+    const messages = await this.appendSubagentToolMessages(
+      found.projectDir,
+      sessionId,
+      entriesToMessages(entries),
+    )
+    return buildSessionTranscript(messages, collectTaskNotifications(entries))
   }
 
   private async pathExists(targetPath: string | null): Promise<boolean> {

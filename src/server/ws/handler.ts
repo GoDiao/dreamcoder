@@ -14,6 +14,12 @@ import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 import {
+  isCompactCommandOutput,
+  isCompactSummaryContent,
+  isGoalCommandOutput,
+  parseGoalEvent,
+} from '../transcript/classify.js'
+import {
   COMMAND_NAME_TAG,
   LOCAL_COMMAND_STDERR_TAG,
   LOCAL_COMMAND_STDOUT_TAG,
@@ -895,7 +901,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
     case 'user': {
       const messages: ServerMessage[] = []
 
-      if (isCompactSummaryMessageContent(cliMsg.message?.content)) {
+      if (isCompactSummaryContent(cliMsg.message?.content)) {
         messages.push({
           type: 'system_notification',
           subtype: 'compact_summary',
@@ -912,8 +918,8 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
       if (localCommandOutput) {
         const pendingLocalCommand = streamState.pendingLocalCommand
         streamState.pendingLocalCommand = undefined
-        if (!isCompactLocalCommandOutput(localCommandOutput)) {
-          const goalEvent = extractGoalEvent(
+        if (!isCompactCommandOutput(localCommandOutput)) {
+          const goalEvent = parseGoalEvent(
             localCommandOutput,
             pendingLocalCommand,
           )
@@ -1183,7 +1189,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
           { allowUntagged: subtype === 'local_command_output' },
         )
         if (!localCommandOutput) return []
-        const goalEvent = extractGoalEvent(
+        const goalEvent = parseGoalEvent(
           localCommandOutput,
           streamState.pendingLocalCommand,
         )
@@ -1378,7 +1384,7 @@ export function createCurrentTurnLocalCommandForwarder(
         cliMsg.content ?? cliMsg.message,
         { allowUntagged: cliMsg.subtype === 'local_command_output' },
       )
-      if (output && looksLikeGoalCommandOutput(output)) {
+      if (output && isGoalCommandOutput(output)) {
         awaitingCurrentTurnLocalCommandOutput = false
         return true
       }
@@ -1455,10 +1461,6 @@ function extractLocalCommandOutput(
   return null
 }
 
-function isCompactLocalCommandOutput(output: string): boolean {
-  return output.trim() === 'Compacted'
-}
-
 function extractTaggedContent(raw: string, tag: string): string | null {
   const match = raw.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))
   return match?.[1]?.trim() ?? null
@@ -1485,59 +1487,6 @@ function extractLocalCommand(content: unknown): { name: string; args: string } |
   }
 }
 
-type GoalEventData = {
-  action: 'created' | 'replaced' | 'status' | 'paused' | 'resumed' | 'completed' | 'cleared' | 'message'
-  status?: string
-  objective?: string
-  budget?: string
-  elapsed?: string
-  continuations?: string
-  message?: string
-}
-
-function extractGoalEvent(
-  output: string,
-  command?: { name: string; args: string },
-): GoalEventData | null {
-  if (command && command.name !== 'goal') return null
-
-  const trimmed = output.trim()
-  if (!trimmed) return null
-
-  if (trimmed === 'Goal cleared.' || trimmed.startsWith('Goal cleared:')) {
-    return { action: 'cleared', message: trimmed }
-  }
-  if (trimmed === 'Goal marked complete.') {
-    return { action: 'completed', message: trimmed }
-  }
-  if (trimmed === 'No active goal.') {
-    return { action: 'message', message: trimmed }
-  }
-
-  if (trimmed.startsWith('Goal set:')) {
-    const objective = trimmed.slice('Goal set:'.length).trim()
-    return {
-      action: 'created',
-      status: 'active',
-      objective: objective || undefined,
-      message: trimmed,
-    }
-  }
-
-  return command?.name === 'goal' ? { action: 'message', message: trimmed } : null
-}
-
-function looksLikeGoalCommandOutput(output: string): boolean {
-  const trimmed = output.trim()
-  return (
-    trimmed.startsWith('Goal set:') ||
-    trimmed.startsWith('Goal cleared:') ||
-    trimmed === 'Goal cleared.' ||
-    trimmed === 'Goal marked complete.' ||
-    trimmed === 'No active goal.'
-  )
-}
-
 function getCompactBoundaryMessage(cliMsg: any): string {
   const message = typeof cliMsg?.message === 'string' ? cliMsg.message.trim() : ''
   if (message) return message
@@ -1546,15 +1495,6 @@ function getCompactBoundaryMessage(cliMsg: any): string {
   if (content) return content
 
   return 'Context compacted'
-}
-
-function isCompactSummaryMessageContent(content: unknown): content is string {
-  return (
-    typeof content === 'string' &&
-    content.trim().startsWith(
-      'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
-    )
-  )
 }
 
 function removeActiveClient(
