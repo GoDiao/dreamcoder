@@ -4,6 +4,8 @@ export type AgentSource =
   | 'built-in'
   | 'plugin'
   | 'userSettings'
+  // Display-only: a user agent inherited read-only from Claude Code's directory
+  | 'claudeCode'
   | 'projectSettings'
   | 'localSettings'
   | 'flagSettings'
@@ -20,7 +22,12 @@ export type AgentDefinition = {
   source: AgentSource
   baseDir?: string
   overriddenBy?: AgentSource
+  inheritedFromClaudeCode?: boolean
   isActive: boolean
+}
+
+function withDisplaySource(agent: AgentDefinition): AgentDefinition {
+  return agent.inheritedFromClaudeCode ? { ...agent, source: 'claudeCode' } : agent
 }
 
 export type AgentListResponse = {
@@ -31,6 +38,9 @@ export type AgentListResponse = {
 export const agentsApi = {
   list: (cwd?: string) => {
     const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''
-    return api.get<AgentListResponse>(`/api/agents${query}`)
+    return api.get<AgentListResponse>(`/api/agents${query}`).then((response) => ({
+      activeAgents: response.activeAgents.map(withDisplaySource),
+      allAgents: response.allAgents.map(withDisplaySource),
+    }))
   },
 }

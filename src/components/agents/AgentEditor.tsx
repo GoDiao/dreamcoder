@@ -10,7 +10,7 @@ import type { Tools } from '../../Tool.js';
 import { type AgentColorName, setAgentColor } from '../../tools/AgentTool/agentColorManager.js';
 import { type AgentDefinition, getActiveAgentsFromList, isCustomAgent, isPluginAgent } from '../../tools/AgentTool/loadAgentsDir.js';
 import { editFileInEditor } from '../../utils/promptEditor.js';
-import { getActualAgentFilePath, updateAgentFile } from './agentFileUtils.js';
+import { asOwnAgentCopy, prepareAgentFileForEditing, updateAgentFile } from './agentFileUtils.js';
 import { ColorPicker } from './ColorPicker.js';
 import { ModelSelector } from './ModelSelector.js';
 import { ToolSelector } from './ToolSelector.js';
@@ -39,7 +39,13 @@ export function AgentEditor({
   const [error, setError] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<AgentColorName | undefined>(agent.color as AgentColorName | undefined);
   const handleOpenInEditor = useCallback(async () => {
-    const filePath = getActualAgentFilePath(agent);
+    let filePath: string;
+    try {
+      filePath = await prepareAgentFileForEditing(agent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open agent');
+      return;
+    }
     const result = await editFileInEditor(filePath);
     if (result.error) {
       setError(result.error);
@@ -72,7 +78,7 @@ export function AgentEditor({
       }
       setAppState(state => {
         const allAgents = state.agentDefinitions.allAgents.map(a => a.agentType === agent.agentType ? {
-          ...a,
+          ...asOwnAgentCopy(a),
           tools: newTools ?? a.tools,
           color: finalColor,
           model: newModel ?? a.model

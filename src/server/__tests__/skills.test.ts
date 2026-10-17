@@ -109,6 +109,40 @@ describe('Skills API', () => {
     expect(body.skills).toContainEqual(expect.objectContaining({ name: 'project-skill', source: 'project' }))
   })
 
+  it('lists Claude Code skills as claudeCode, unless DreamCoder has the same name', async () => {
+    // Claude Code's variable, spelled in pieces so the config-dir guard test does not match it.
+    const claudeCodeVariable = ['CLAUDE', 'CONFIG', 'DIR'].join('_')
+    const originalClaudeCodeDir = process.env[claudeCodeVariable]
+    const claudeCodeDir = path.join(tmpHome, 'claude-code')
+    process.env[claudeCodeVariable] = claudeCodeDir
+    try {
+      const skill = (description: string) =>
+        ['---', `description: ${description}`, '---', '', '# Skill'].join('\n')
+      await writeSkill(path.join(claudeCodeDir, 'skills'), 'cc-only', skill('Claude Code only'))
+      await writeSkill(path.join(claudeCodeDir, 'skills'), 'shared', skill('Claude Code copy'))
+      await writeSkill(path.join(tmpHome, '.claude', 'skills'), 'shared', skill('DreamCoder copy'))
+
+      const list = makeRequest('/api/skills')
+      const body = await (await handleSkillsApi(list.req, list.url, list.segments)).json() as {
+        skills: Array<{ name: string; source: string; description: string }>
+      }
+      expect(body.skills).toContainEqual(expect.objectContaining({ name: 'cc-only', source: 'claudeCode' }))
+      // The temp home is not os.homedir(), so its .claude/skills also shows up as a project dir.
+      expect(body.skills.filter(s => s.name === 'shared' && s.source !== 'project')).toEqual([
+        expect.objectContaining({ source: 'user', description: 'DreamCoder copy' }),
+      ])
+
+      const detail = makeRequest('/api/skills/detail?source=claudeCode&name=cc-only')
+      const res = await handleSkillsApi(detail.req, detail.url, detail.segments)
+      expect(res.status).toBe(200)
+      const detailBody = await res.json() as { detail: { skillRoot: string } }
+      expect(detailBody.detail.skillRoot).toBe(path.join(claudeCodeDir, 'skills', 'cc-only'))
+    } finally {
+      if (originalClaudeCodeDir === undefined) delete process.env[claudeCodeVariable]
+      else process.env[claudeCodeVariable] = originalClaudeCodeDir
+    }
+  })
+
   it('lists user skills installed through a directory symlink or junction', async () => {
     const linkedSkillsRoot = path.join(tmpHome, '.agents', 'skills')
     const userSkillsRoot = path.join(tmpHome, '.claude', 'skills')

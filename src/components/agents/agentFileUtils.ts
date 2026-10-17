@@ -1,4 +1,5 @@
-import { mkdir, open, unlink } from 'fs/promises'
+import { constants as fsConstants } from 'fs'
+import { copyFile, mkdir, open, unlink } from 'fs/promises'
 import { join } from 'path'
 import type { SettingSource } from 'src/utils/settings/constants.js'
 import { getManagedFilePath } from 'src/utils/settings/managedPath.js'
@@ -115,6 +116,53 @@ export function getActualAgentFilePath(agent: AgentDefinition): string {
   return join(dirPath, `${filename}.md`)
 }
 
+function isInheritedAgent(agent: AgentDefinition): boolean {
+  return 'inheritedFromClaudeCode' in agent && !!agent.inheritedFromClaudeCode
+}
+
+/**
+ * The agent as DreamCoder's own copy: what an inherited agent becomes once it
+ * is edited, since edits land in DreamCoder's directory.
+ */
+export function asOwnAgentCopy<T extends AgentDefinition>(agent: T): T {
+  if (!isInheritedAgent(agent) || agent.source === 'built-in' || agent.source === 'plugin') {
+    return agent
+  }
+  return {
+    ...agent,
+    inheritedFromClaudeCode: undefined,
+    baseDir: getAgentDirectoryPath(agent.source),
+  }
+}
+
+/**
+ * Path of the file to edit for an agent. An inherited agent is first copied,
+ * unless a copy already exists, into DreamCoder's directory, which then
+ * overrides Claude Code's file; Claude Code's file is never edited.
+ */
+export async function prepareAgentFileForEditing(
+  agent: AgentDefinition,
+): Promise<string> {
+  const filePath = getActualAgentFilePath(agent)
+  if (isInheritedAgent(agent) && agent.baseDir) {
+    const filename = agent.filename || agent.agentType
+    await mkdir(getAgentDirectoryPath(agent.source as SettingSource), {
+      recursive: true,
+    })
+    try {
+      await copyFile(
+        join(agent.baseDir, `${filename}.md`),
+        filePath,
+        fsConstants.COPYFILE_EXCL,
+      )
+    } catch (e: unknown) {
+      if (getErrnoCode(e) !== 'EEXIST') throw e
+    }
+    clearAgentDefinitionsCache()
+  }
+  return filePath
+}
+
 /**
  * Gets the relative file path for a new agent based on its name
  * Used for displaying where new agent files will be created
@@ -221,7 +269,14 @@ export async function updateAgentFile(
     throw new Error('Cannot update built-in agents')
   }
 
+  // An agent inherited from Claude Code is never edited in place: the path is
+  // DreamCoder's own directory, so this saves a copy that overrides it.
   const filePath = getActualAgentFilePath(agent)
+  if (isInheritedAgent(agent)) {
+    await mkdir(getAgentDirectoryPath(agent.source as SettingSource), {
+      recursive: true,
+    })
+  }
 
   const content = formatAgentAsMarkdown(
     agent.agentType,
@@ -246,6 +301,11 @@ export async function deleteAgentFromFile(
 ): Promise<void> {
   if (agent.source === 'built-in') {
     throw new Error('Cannot delete built-in agents')
+  }
+  if (isInheritedAgent(agent)) {
+    throw new Error(
+      "This agent is inherited from Claude Code and is read-only. Delete it in Claude Code's agents directory.",
+    )
   }
 
   const filePath = getActualAgentFilePath(agent)

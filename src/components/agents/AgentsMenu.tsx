@@ -183,6 +183,7 @@ export function AgentsMenu(t0) {
       } catch (t13) {
         const error = t13;
         logError(toError(error));
+        setChanges(prev_1 => [...prev_1, toError(error).message]);
       }
     };
     $[26] = setAppState;

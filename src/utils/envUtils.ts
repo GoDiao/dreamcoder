@@ -1,6 +1,7 @@
+import { realpathSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
-import { join } from 'path'
+import { join, resolve } from 'path'
 
 /**
  * DreamCoder's own config directory variable. Claude Code's variable is
@@ -23,6 +24,38 @@ export const getClaudeConfigHomeDir = memoize(
     )
   },
   () => getConfigDirOverride(),
+)
+
+// Claude Code's own variable. Read only to locate Claude Code's directory, never
+// to place DreamCoder's data.
+const CLAUDE_CODE_CONFIG_DIR_ENV = 'CLAUDE_CONFIG_DIR'
+
+function realPathOrResolved(path: string): string {
+  try {
+    return realpathSync(path).normalize('NFC')
+  } catch {
+    return resolve(path).normalize('NFC')
+  }
+}
+
+/**
+ * Claude Code's user config directory, from which DreamCoder inherits skills,
+ * agents, commands, CLAUDE.md and rules as a read-only, lower-priority source.
+ * Undefined when it is DreamCoder's own directory, so nothing loads twice.
+ * The directory may not exist; loaders treat that as empty.
+ */
+export const getInheritedClaudeCodeDir = memoize(
+  (): string | undefined => {
+    const dir = (
+      process.env[CLAUDE_CODE_CONFIG_DIR_ENV] || join(homedir(), '.claude')
+    ).normalize('NFC')
+    if (realPathOrResolved(dir) === realPathOrResolved(getClaudeConfigHomeDir())) {
+      return undefined
+    }
+    return dir
+  },
+  () =>
+    `${getConfigDirOverride() ?? ''}\0${process.env[CLAUDE_CODE_CONFIG_DIR_ENV] ?? ''}\0${homedir()}`,
 )
 
 export function getTeamsDir(): string {

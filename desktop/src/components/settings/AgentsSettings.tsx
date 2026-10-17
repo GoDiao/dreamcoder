@@ -19,6 +19,7 @@ const AGENT_COLORS: Record<string, string> = {
 
 const AGENT_SOURCE_ORDER: AgentSource[] = [
   'userSettings',
+  'claudeCode',
   'projectSettings',
   'localSettings',
   'policySettings',
@@ -35,6 +36,8 @@ function getAgentSourceIcon(source: AgentSource) {
   switch (source) {
     case 'userSettings':
       return 'person'
+    case 'claudeCode':
+      return 'download'
     case 'projectSettings':
       return 'folder'
     case 'localSettings':
@@ -54,6 +57,8 @@ function getAgentSourceAccentClass(source: AgentSource) {
   switch (source) {
     case 'userSettings':
       return 'bg-[var(--color-primary-fixed)] text-[var(--color-brand)]'
+    case 'claudeCode':
+      return 'bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]'
     case 'projectSettings':
       return 'bg-[var(--color-success-container)] text-[var(--color-success)]'
     case 'localSettings':
