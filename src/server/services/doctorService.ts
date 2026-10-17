@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Dirent } from 'node:fs'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { getClaudeConfigHomeDir, getConfigDirOverride } from '../../utils/envUtils.js'
 import { diagnosticsService } from './diagnosticsService.js'
 
 export type DoctorItemKind = 'json' | 'jsonl' | 'directory'
@@ -91,7 +91,7 @@ export class DoctorService {
     this.configDir = options.configDir || getClaudeConfigHomeDir()
     this.homeDir = options.homeDir || inferHomeDir(this.configDir)
     this.projectRoot = options.projectRoot
-    this.usesConfigDirOverride = Boolean(options.configDir || process.env.CLAUDE_CONFIG_DIR)
+    this.usesConfigDirOverride = Boolean(options.configDir || getConfigDirOverride())
   }
 
   async getReport(): Promise<DoctorReport> {

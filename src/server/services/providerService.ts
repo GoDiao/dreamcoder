@@ -1,6 +1,5 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { readRecoverableJsonFile } from './recoverableJsonFile.js'
 import { ManagedSettingsService } from './managedSettingsService.js'
@@ -33,6 +32,7 @@ import type {
   ApiFormat,
   ProviderAuthStrategy,
 } from '../types/provider.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 const DEFAULT_INDEX: ProvidersIndex = {
   schemaVersion: CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
@@ -52,7 +52,7 @@ export class ProviderService {
     return ProviderService.serverPort
   }
   private getConfigDir(): string {
-    return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    return getClaudeConfigHomeDir()
   }
 
   private getDreamcoderDir(): string {

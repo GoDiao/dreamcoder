@@ -1,6 +1,5 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { writeToMailbox } from '../../utils/teammateMailbox.js'
 import {
@@ -11,6 +10,7 @@ import {
 import { buildSessionTranscript } from '../transcript/history.js'
 import type { SessionTranscript } from '../transcript/items.js'
 import { readJsonlFile } from './jsonlFile.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type TeamMember = {
   agentId: string
@@ -65,7 +65,7 @@ type TeamFileRaw = {
 
 export class TeamService {
   private getConfigDir(): string {
-    return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    return getClaudeConfigHomeDir()
   }
 
   private getTeamsDir(): string {

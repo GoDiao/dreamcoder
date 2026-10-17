@@ -1,11 +1,11 @@
 import * as fs from 'fs/promises'
 import { randomBytes } from 'node:crypto'
 import * as path from 'path'
-import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { normalizeJsonObject, readRecoverableJsonFile } from './recoverableJsonFile.js'
 import { ensurePersistentStorageUpgraded } from './persistentStorageMigrations.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 const VALID_PERMISSION_MODES = [
   'default',
@@ -26,7 +26,7 @@ export class SettingsService {
   }
 
   private getConfigDir(): string {
-    return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    return getClaudeConfigHomeDir()
   }
 
   private getUserSettingsPath(): string {

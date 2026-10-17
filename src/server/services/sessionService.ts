@@ -35,6 +35,7 @@ import {
 } from '../transcript/entries.js'
 import { buildSessionTranscript } from '../transcript/history.js'
 import type { SessionTranscript } from '../transcript/items.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type SessionListItem = {
   id: string
@@ -200,7 +201,7 @@ type PersistedWorktreeSession = {
 
 export class SessionService {
   private getConfigDir(): string {
-    return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    return getClaudeConfigHomeDir()
   }
 
   private getProjectsDir(): string {
