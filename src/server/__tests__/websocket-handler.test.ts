@@ -260,3 +260,31 @@ async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<voi
     await Bun.sleep(5)
   }
 }
+
+describe('WebSocket permission mode updates', () => {
+  afterEach(() => {
+    __resetWebSocketHandlerStateForTests()
+    mock.restore()
+  })
+
+  it('rejects an unknown permission mode instead of forwarding it to the CLI', () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue(true)
+
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'yolo' }))
+
+    expect(setPermissionMode).not.toHaveBeenCalled()
+    expect(ws.sent.map((payload) => JSON.parse(payload))).toContainEqual(
+      expect.objectContaining({ type: 'error', code: 'INVALID_PERMISSION_MODE' }),
+    )
+  })
+
+  it('forwards a known permission mode', () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue(true)
+
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'plan' }))
+
+    expect(setPermissionMode).toHaveBeenCalledWith(ws.data.sessionId, 'plan')
+  })
+})

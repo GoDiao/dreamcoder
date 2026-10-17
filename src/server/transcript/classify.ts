@@ -53,6 +53,13 @@ export type GoalEvent = {
 
 export type LocalCommand = { name: string; args: string }
 
+/** Resource use a background task reports when it finishes or progresses. */
+export type TaskUsage = {
+  totalTokens?: number
+  toolUses?: number
+  durationMs?: number
+}
+
 export type TaskNotification = {
   taskId: string
   toolUseId: string
@@ -60,6 +67,7 @@ export type TaskNotification = {
   summary?: string
   result?: string
   outputFile?: string
+  usage?: TaskUsage
   timestamp?: string
 }
 

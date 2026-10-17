@@ -1,5 +1,7 @@
 import type { ServerWebSocket } from 'bun'
-import type { ClientMessage, ServerMessage } from './events.js'
+import type { ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
+import { PERMISSION_MODES } from './protocol.js'
+import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
 import {
   ConversationStartupError,
@@ -434,11 +436,24 @@ function handleComputerUsePermissionResponse(
   }
 }
 
+// The wire type mirrors the CLI's modes; fail to compile if they drift apart.
+type SameModes<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+const permissionModesMatchCli: SameModes<PermissionMode, ExternalPermissionMode> = true
+void permissionModesMatchCli
+
 function handleSetPermissionMode(
   ws: ServerWebSocket<WebSocketData>,
   message: Extract<ClientMessage, { type: 'set_permission_mode' }>
 ) {
   const { sessionId } = ws.data
+  if (!PERMISSION_MODES.includes(message.mode)) {
+    sendMessage(ws, {
+      type: 'error',
+      message: `Unknown permission mode: ${String(message.mode)}`,
+      code: 'INVALID_PERMISSION_MODE',
+    })
+    return
+  }
 
   const needsRestart =
     conversationService.hasSession(sessionId) &&

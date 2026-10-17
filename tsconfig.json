@@ -15,6 +15,9 @@
       ],
       "src/*": [
         "./src/*"
+      ],
+      "@protocol": [
+        "./src/server/ws/protocol.ts"
       ]
     },
     "types": [

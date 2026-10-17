@@ -1,3 +1,19 @@
+/**
+ * The WebSocket protocol between the server and the desktop. The desktop
+ * imports this file type-only (`@protocol`), so it must not import anything
+ * that needs Node or the SDK.
+ */
+import type { TaskNotification, TaskUsage } from '../transcript/classify.js'
+
+export type { TaskNotification, TaskUsage }
+export type { GoalEventAction } from '../transcript/classify.js'
+export type { MemoryEventFile, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
+
+/** The permission modes a client may set; mirrors the CLI's `ExternalPermissionMode`. */
+export type PermissionMode = 'acceptEdits' | 'bypassPermissions' | 'default' | 'dontAsk' | 'plan'
+
+export const PERMISSION_MODES: readonly PermissionMode[] = ['acceptEdits', 'bypassPermissions', 'default', 'dontAsk', 'plan']
+
 export type ClientMessage =
   | { type: 'prewarm_session' }
   | { type: 'user_message'; content: string; attachments?: AttachmentRef[] }
@@ -13,7 +29,7 @@ export type ClientMessage =
       requestId: string
       response: ComputerUsePermissionResponse
     }
-  | { type: 'set_permission_mode'; mode: string }
+  | { type: 'set_permission_mode'; mode: PermissionMode }
   | { type: 'set_runtime_config'; providerId: string | null; modelId: string }
   | { type: 'stop_generation' }
   | { type: 'ping' }
@@ -25,6 +41,10 @@ export type AttachmentRef = {
   data?: string
   mimeType?: string
   isDirectory?: boolean
+  lineStart?: number
+  lineEnd?: number
+  note?: string
+  quote?: string
 }
 
 export type ServerMessage =
@@ -131,11 +151,4 @@ export type ComputerUsePermissionResponse = {
   }>
   flags: ComputerUseGrantFlags
   userConsented?: boolean
-}
-
-export type WebSocketSession = {
-  sessionId: string
-  connectedAt: number
-  abortController?: AbortController
-  isGenerating: boolean
 }

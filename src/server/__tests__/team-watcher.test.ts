@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises'
 import * as fsSyn from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import type { TeamMemberStatus } from '../ws/events.js'
+import type { TeamMemberStatus } from '../ws/protocol.js'
 
 let tmpDir: string
 
