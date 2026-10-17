@@ -177,7 +177,6 @@ function appendMessage(messages: UIMessage[], msg: UIMessage): UIMessage[] {
   return trimMessages([...messages, msg])
 }
 const pendingTaskToolUseIdsBySession = new Map<string, Set<string>>()
-const pendingToolParentUseIdsBySession = new Map<string, Map<string, string>>()
 
 function addPendingTaskToolUseId(sessionId: string, toolUseId: string): void {
   const ids = pendingTaskToolUseIdsBySession.get(sessionId) ?? new Set<string>()
@@ -197,33 +196,6 @@ function clearPendingTaskToolUseIds(sessionId: string): void {
   pendingTaskToolUseIdsBySession.delete(sessionId)
 }
 
-function rememberPendingToolParentUseId(
-  sessionId: string,
-  toolUseId: string | null | undefined,
-  parentToolUseId: string | undefined,
-): void {
-  if (!toolUseId || !parentToolUseId) return
-  const parentUseIds = pendingToolParentUseIdsBySession.get(sessionId) ?? new Map<string, string>()
-  parentUseIds.set(toolUseId, parentToolUseId)
-  pendingToolParentUseIdsBySession.set(sessionId, parentUseIds)
-}
-
-function getPendingToolParentUseId(sessionId: string, toolUseId: string): string | undefined {
-  return pendingToolParentUseIdsBySession.get(sessionId)?.get(toolUseId)
-}
-
-function consumePendingToolParentUseId(sessionId: string, toolUseId: string): string | undefined {
-  const parentUseIds = pendingToolParentUseIdsBySession.get(sessionId)
-  if (!parentUseIds) return undefined
-  const parentToolUseId = parentUseIds.get(toolUseId)
-  parentUseIds.delete(toolUseId)
-  if (parentUseIds.size === 0) pendingToolParentUseIdsBySession.delete(sessionId)
-  return parentToolUseId
-}
-
-function clearPendingToolParentUseIds(sessionId: string): void {
-  pendingToolParentUseIdsBySession.delete(sessionId)
-}
 const AGENT_COMPLETION_NOTIFICATION_PREVIEW_CHARS = 160
 
 let msgCounter = 0
@@ -788,7 +760,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     clearPendingToolInputDelta(sessionId)
     clearPendingTaskToolUseIds(sessionId)
-    clearPendingToolParentUseIds(sessionId)
     wsManager.disconnect(sessionId)
     set((s) => {
       const { [sessionId]: _, ...rest } = s.sessions
@@ -1128,7 +1099,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   clearMessages: (sessionId) => {
     clearPendingTaskToolUseIds(sessionId)
-    clearPendingToolParentUseIds(sessionId)
     clearPendingToolInputDelta(sessionId)
     set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({
       messages: [],
@@ -1216,7 +1186,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
         } else if (msg.blockType === 'tool_use') {
           clearPendingToolInputDelta(sessionId)
-          rememberPendingToolParentUseId(sessionId, msg.toolUseId, msg.parentToolUseId)
           const toolUseId = msg.toolUseId ?? null
           const toolName = msg.toolName ?? 'unknown'
           update((s) => ({
@@ -1304,7 +1273,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                             toolUseId: activeToolUseId,
                             input: buildPartialToolInputPreview(partialInput, existing?.input),
                             timestamp: existing?.timestamp ?? Date.now(),
-                            parentToolUseId: existing?.parentToolUseId ?? getPendingToolParentUseId(sessionId, activeToolUseId),
+                            parentToolUseId: existing?.parentToolUseId,
                             isPending: true,
                             partialInput,
                           }
@@ -1346,8 +1315,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const session = get().sessions[sessionId]
         const toolName = msg.toolName || session?.activeToolName || 'unknown'
         const toolUseId = msg.toolUseId || session?.activeToolUseId || ''
-        const parentToolUseId = msg.parentToolUseId ?? getPendingToolParentUseId(sessionId, toolUseId)
-        rememberPendingToolParentUseId(sessionId, toolUseId, parentToolUseId)
         update((s) => ({
           messages: toolUseId
             ? upsertToolUseMessage(s.messages, toolUseId, (existing) => ({
@@ -1357,13 +1324,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 toolUseId,
                 input: msg.input,
                 timestamp: existing?.timestamp ?? Date.now(),
-                parentToolUseId,
+                parentToolUseId: msg.parentToolUseId ?? existing?.parentToolUseId,
                 isPending: false,
               }))
             : appendMessage(s.messages, {
                 id: nextId(), type: 'tool_use', toolName,
                 toolUseId,
-                input: msg.input, timestamp: Date.now(), parentToolUseId,
+                input: msg.input, timestamp: Date.now(), parentToolUseId: msg.parentToolUseId,
                 isPending: false,
               }),
           activeToolUseId: null, activeToolName: null, activeThinkingId: null, streamingToolInput: '',
@@ -1379,12 +1346,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       case 'tool_result': {
         const now = Date.now()
-        const pendingParentToolUseId = consumePendingToolParentUseId(sessionId, msg.toolUseId)
-        const parentToolUseId = msg.parentToolUseId ?? pendingParentToolUseId
         update((s) => {
           let messages: UIMessage[] = appendMessage(s.messages, {
             id: nextId(), type: 'tool_result', toolUseId: msg.toolUseId,
-            content: msg.content, isError: msg.isError, timestamp: now, parentToolUseId,
+            content: msg.content, isError: msg.isError, timestamp: now, parentToolUseId: msg.parentToolUseId,
           })
           let backgroundAgentTasks = s.backgroundAgentTasks ?? {}
           const stoppedTask = msg.isError
@@ -1601,8 +1566,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
           clearPendingDelta(sessionId)
           clearPendingTaskToolUseIds(sessionId)
-          clearPendingToolParentUseIds(sessionId)
-          useCLITaskStore.getState().clearTasks(sessionId)
+                useCLITaskStore.getState().clearTasks(sessionId)
           useSessionStore.getState().updateSessionTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabStatus(sessionId, 'idle')

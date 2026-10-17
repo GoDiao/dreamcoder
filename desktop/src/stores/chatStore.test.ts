@@ -841,7 +841,7 @@ describe('chatStore history mapping', () => {
     ])
   })
 
-  it('retains live parent linkage when only content_start carries the parent id', () => {
+  it('keeps the content_start parent when tool_use_complete omits it', () => {
     useChatStore.setState({
       sessions: {
         [TEST_SESSION_ID]: makeSession(),
@@ -868,6 +868,7 @@ describe('chatStore history mapping', () => {
       toolUseId: 'tool-1',
       content: 'ok',
       isError: false,
+      parentToolUseId: 'agent-1',
     })
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
