@@ -27,6 +27,7 @@ vi.mock('../api/mcp', async (importOriginal) => {
     mcpApi: {
       ...actual.mcpApi,
       projectPaths: vi.fn(),
+      catalog: vi.fn(),
     },
   }
 })
@@ -55,6 +56,14 @@ describe('McpSettings', () => {
     })
     vi.mocked(mcpApi.projectPaths).mockResolvedValue({
       projectPaths: ['/workspace/config-project'],
+    })
+    vi.mocked(mcpApi.catalog).mockResolvedValue({
+      catalog: {
+        version: 1,
+        servers: [{
+          id: 'filesystem', name: 'Filesystem', description: 'Read and write an explicitly allowed directory.', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'], env: [{ name: 'ALLOWED_DIR', source: 'user' }], homepage: 'https://example.com/filesystem', tags: ['files', 'local'], runtime: 'node',
+        }],
+      },
     })
     useSettingsStore.setState({ locale: 'en' })
     useSessionStore.setState({
@@ -142,6 +151,16 @@ describe('McpSettings', () => {
     expect(screen.getByText('MCP servers')).toBeInTheDocument()
     expect(screen.getByText('No MCP servers configured yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add server/i })).toBeInTheDocument()
+  })
+
+  it('browses the read-only curated catalog without changing installed servers', async () => {
+    await renderLoadedMcpSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+
+    expect(await screen.findByText('Filesystem')).toBeInTheDocument()
+    expect(screen.getByText('Read and write an explicitly allowed directory.')).toBeInTheDocument()
+    expect(mcpApi.catalog).toHaveBeenCalledTimes(1)
+    expect(useMcpStore.getState().createServer).not.toHaveBeenCalled()
   })
 
   it('shows plugin and user MCP servers in grouped sections', async () => {

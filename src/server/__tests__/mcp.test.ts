@@ -89,6 +89,15 @@ describe('MCP API', () => {
     }))
   })
 
+  it('serves the validated curated catalog without reading or changing MCP config', async () => {
+    const request = makeRequest('GET', '/api/mcp/catalog')
+    const response = await handleMcpApi(request.req, request.url, request.segments)
+    expect(response.status).toBe(200)
+    const body = await response.json() as { catalog: { version: number; servers: Array<{ id: string }> } }
+    expect(body.catalog.version).toBe(1)
+    expect(body.catalog.servers.some((server) => server.id === 'filesystem')).toBe(true)
+  })
+
   afterEach(async () => {
     connectSpy?.mockRestore()
     connectSpy = undefined
