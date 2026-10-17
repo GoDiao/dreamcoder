@@ -1566,7 +1566,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
           clearPendingDelta(sessionId)
           clearPendingTaskToolUseIds(sessionId)
-                useCLITaskStore.getState().clearTasks(sessionId)
+          useCLITaskStore.getState().clearTasks(sessionId)
           useSessionStore.getState().updateSessionTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabStatus(sessionId, 'idle')

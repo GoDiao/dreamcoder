@@ -184,9 +184,12 @@ export function extractLocalCommandOutput(
 ): string | null {
   const text = contentText(content).trim()
   if (!text) return null
-  const tagged = readLocalCommandTag(text, 'local-command-stdout') ?? readLocalCommandTag(text, 'local-command-stderr')
-  if (tagged !== undefined) return tagged || null
-  return options.allowUntagged ? text : null
+  const stdout = readLocalCommandTag(text, 'local-command-stdout')
+  const stderr = readLocalCommandTag(text, 'local-command-stderr')
+  if (stdout === undefined && stderr === undefined) {
+    return options.allowUntagged ? text : null
+  }
+  return stdout || stderr || null
 }
 
 /**

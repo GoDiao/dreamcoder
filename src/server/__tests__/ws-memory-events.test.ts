@@ -4,6 +4,7 @@ import {
   translateCliMessage,
 } from '../ws/handler.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
+import { extractLocalCommandOutput } from '../transcript/classify.js'
 import type { ServerMessage } from '../ws/protocol.js'
 
 /** A transcript_item message; live items get a fresh id and the current time. */
@@ -399,6 +400,14 @@ describe('WebSocket goal command events', () => {
       subtype: 'local_command_output',
       content: '<local-command-stdout></local-command-stdout>',
     }, sessionId)).toEqual([])
+  })
+
+  it('falls back to stderr when the stdout tag is empty', () => {
+    expect(extractLocalCommandOutput(
+      '<local-command-stdout></local-command-stdout><local-command-stderr>err</local-command-stderr>',
+    )).toBe('err')
+    expect(extractLocalCommandOutput('<local-command-stdout>out</local-command-stdout><local-command-stderr>err</local-command-stderr>')).toBe('out')
+    expect(extractLocalCommandOutput('<local-command-stdout> </local-command-stdout>', { allowUntagged: true })).toBeNull()
   })
 
   it('classifies /goal clear and completion output for the desktop client', () => {
