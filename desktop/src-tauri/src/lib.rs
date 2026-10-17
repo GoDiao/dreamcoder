@@ -493,6 +493,14 @@ fn prepare_for_app_mode_restart(app: AppHandle) -> Result<(), String> {
     mark_app_quitting(&app);
     stop_server_sidecar(&app);
 
+    // The relaunched process inherits this environment. Drop the directory that
+    // portable mode set so it reads app-mode.json again; a directory from the
+    // launch environment has no marker and stays.
+    if std::env::var_os(PORTABLE_MARKER_ENV).is_some() {
+        std::env::remove_var(CONFIG_DIR_ENV);
+        std::env::remove_var(PORTABLE_MARKER_ENV);
+    }
+
     #[cfg(target_os = "windows")]
     {
         kill_windows_sidecars();
