@@ -31,6 +31,7 @@ import {
 } from '../utils/effort.js'
 import {
   getClaudeConfigHomeDir,
+  getInheritedClaudeCodeDir,
   isBareMode,
   isEnvTruthy,
 } from '../utils/envUtils.js'
@@ -290,6 +291,7 @@ export function createSkillCommand({
   paths,
   effort,
   shell,
+  inheritedFromClaudeCode,
 }: {
   skillName: string
   displayName: string | undefined
@@ -313,10 +315,12 @@ export function createSkillCommand({
   paths: string[] | undefined
   effort: EffortValue | undefined
   shell: FrontmatterShell | undefined
+  inheritedFromClaudeCode?: boolean
 }): Command {
   return {
     type: 'prompt',
     name: skillName,
+    ...(inheritedFromClaudeCode && { inheritedFromClaudeCode }),
     description,
     hasUserSpecifiedDescription,
     allowedTools,
@@ -407,6 +411,7 @@ export function createSkillCommand({
 async function loadSkillsFromSkillsDir(
   basePath: string,
   source: SettingSource,
+  inheritedFromClaudeCode = false,
 ): Promise<SkillWithPath[]> {
   const fs = getFsImplementation()
 
@@ -466,6 +471,7 @@ async function loadSkillsFromSkillsDir(
             baseDir: skillDirPath,
             loadedFrom: 'skills',
             paths,
+            inheritedFromClaudeCode,
           }),
           filePath: skillFilePath,
         }
@@ -578,6 +584,7 @@ async function loadSkillsFromCommandsDir(
       frontmatter,
       content,
       source,
+      inheritedFromClaudeCode,
     } of processedFiles) {
       try {
         const isSkillFormat = isSkillFile(filePath)
@@ -607,6 +614,7 @@ async function loadSkillsFromCommandsDir(
             baseDir: skillDirectory,
             loadedFrom: 'commands_DEPRECATED',
             paths: undefined,
+            inheritedFromClaudeCode,
           }),
           filePath,
         })
@@ -638,6 +646,8 @@ async function loadSkillsFromCommandsDir(
 export const getSkillDirCommands = memoize(
   async (cwd: string): Promise<Command[]> => {
     const userSkillsDir = join(getClaudeConfigHomeDir(), 'skills')
+    const claudeCodeDir = getInheritedClaudeCodeDir()
+    const inheritedSkillsDir = claudeCodeDir && join(claudeCodeDir, 'skills')
     const managedSkillsDir = join(getManagedFilePath(), '.claude', 'skills')
     const projectSkillsDirs = getProjectDirsUpToHome('skills', cwd)
 
@@ -648,6 +658,8 @@ export const getSkillDirCommands = memoize(
     // Load from additional directories (--add-dir)
     const additionalDirs = getAdditionalDirectoriesForClaudeMd()
     const skillsLocked = isRestrictedToPluginOnly('skills')
+    const userSettingsEnabled =
+      isSettingSourceEnabled('userSettings') && !skillsLocked
     const projectSettingsEnabled =
       isSettingSourceEnabled('projectSettings') && !skillsLocked
 
@@ -679,6 +691,7 @@ export const getSkillDirCommands = memoize(
     const [
       managedSkills,
       userSkills,
+      inheritedSkills,
       projectSkillsNested,
       additionalSkillsNested,
       legacyCommands,
@@ -686,8 +699,11 @@ export const getSkillDirCommands = memoize(
       isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_POLICY_SKILLS)
         ? Promise.resolve([])
         : loadSkillsFromSkillsDir(managedSkillsDir, 'policySettings'),
-      isSettingSourceEnabled('userSettings') && !skillsLocked
+      userSettingsEnabled
         ? loadSkillsFromSkillsDir(userSkillsDir, 'userSettings')
+        : Promise.resolve([]),
+      userSettingsEnabled && inheritedSkillsDir
+        ? loadSkillsFromSkillsDir(inheritedSkillsDir, 'userSettings', true)
         : Promise.resolve([]),
       projectSettingsEnabled
         ? Promise.all(
@@ -713,13 +729,29 @@ export const getSkillDirCommands = memoize(
       skillsLocked ? Promise.resolve([]) : loadSkillsFromCommandsDir(cwd),
     ])
 
-    // Flatten and combine all skills
+    // Flatten and combine all skills. Claude Code's skills and commands come
+    // right after DreamCoder's user skills; a name DreamCoder's user directory
+    // already has drops Claude Code's copy.
+    const ownUserNames = new Set(
+      [...userSkills, ...legacyCommands]
+        .filter(
+          ({ skill }) =>
+            skill.type === 'prompt' &&
+            skill.source === 'userSettings' &&
+            !skill.inheritedFromClaudeCode,
+        )
+        .map(({ skill }) => skill.name),
+    )
+    const notOverridden = ({ skill }: SkillWithPath) =>
+      !(skill.type === 'prompt' && skill.inheritedFromClaudeCode) ||
+      !ownUserNames.has(skill.name)
     const allSkillsWithPaths = [
       ...managedSkills,
       ...userSkills,
+      ...inheritedSkills.filter(notOverridden),
       ...projectSkillsNested.flat(),
       ...additionalSkillsNested.flat(),
-      ...legacyCommands,
+      ...legacyCommands.filter(notOverridden),
     ]
 
     // Deduplicate by resolved path (handles symlinks and duplicate parent directories)
@@ -796,7 +828,7 @@ export const getSkillDirCommands = memoize(
     }
 
     logForDebugging(
-      `Loaded ${deduplicatedSkills.length} unique skills (${unconditionalSkills.length} unconditional, ${newConditionalSkills.length} conditional, managed: ${managedSkills.length}, user: ${userSkills.length}, project: ${projectSkillsNested.flat().length}, additional: ${additionalSkillsNested.flat().length}, legacy commands: ${legacyCommands.length})`,
+      `Loaded ${deduplicatedSkills.length} unique skills (${unconditionalSkills.length} unconditional, ${newConditionalSkills.length} conditional, managed: ${managedSkills.length}, user: ${userSkills.length}, Claude Code: ${inheritedSkills.length}, project: ${projectSkillsNested.flat().length}, additional: ${additionalSkillsNested.flat().length}, legacy commands: ${legacyCommands.length})`,
     )
 
     return unconditionalSkills

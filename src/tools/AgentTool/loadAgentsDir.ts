@@ -148,6 +148,9 @@ export type CustomAgentDefinition = BaseAgentDefinition & {
   source: SettingSource
   filename?: string
   baseDir?: string
+  // Read from Claude Code's user directory: read-only, and DreamCoder's own
+  // same-named agent wins
+  inheritedFromClaudeCode?: boolean
 }
 
 // Plugin agents - similar to custom but with plugin metadata, prompt stored via closure
@@ -308,8 +311,9 @@ export const getAgentDefinitionsWithOverrides = memoize(
       const markdownFiles = await loadMarkdownFilesForSubdir('agents', cwd)
 
       const failedFiles: Array<{ path: string; error: string }> = []
-      const customAgents = markdownFiles
-        .map(({ filePath, baseDir, frontmatter, content, source }) => {
+      const parsedAgents = markdownFiles
+        .map(file => {
+          const { filePath, baseDir, frontmatter, content, source } = file
           const agent = parseAgentFromMarkdown(
             filePath,
             baseDir,
@@ -337,9 +341,22 @@ export const getAgentDefinitionsWithOverrides = memoize(
             })
             return null
           }
-          return agent
+          return file.inheritedFromClaudeCode
+            ? { ...agent, inheritedFromClaudeCode: true }
+            : agent
         })
         .filter(agent => agent !== null)
+
+      // Claude Code's agents load after DreamCoder's, so within the user
+      // group they would win; drop the ones DreamCoder's directory overrides.
+      const ownUserAgentTypes = new Set(
+        parsedAgents
+          .filter(a => a.source === 'userSettings' && !a.inheritedFromClaudeCode)
+          .map(a => a.agentType),
+      )
+      const customAgents = parsedAgents.filter(
+        a => !a.inheritedFromClaudeCode || !ownUserAgentTypes.has(a.agentType),
+      )
 
       // Kick off plugin agent loading concurrently with memory snapshot init —
       // loadPluginAgents is memoized and takes no args, so it's independent.

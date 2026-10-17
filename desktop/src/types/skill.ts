@@ -1,4 +1,4 @@
-export type SkillSource = 'user' | 'project' | 'plugin' | 'mcp' | 'bundled'
+export type SkillSource = 'user' | 'claudeCode' | 'project' | 'plugin' | 'mcp' | 'bundled'
 
 export type SkillMeta = {
   name: string

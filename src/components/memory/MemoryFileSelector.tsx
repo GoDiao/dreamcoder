@@ -17,10 +17,11 @@ import { useAppState } from '../../state/AppState.js';
 import { getAgentMemoryDir } from '../../tools/AgentTool/agentMemory.js';
 import { openPath } from '../../utils/browser.js';
 import { getMemoryFiles, type MemoryFileInfo } from '../../utils/claudemd.js';
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js';
+import { getClaudeConfigHomeDir, getInheritedClaudeCodeDir } from '../../utils/envUtils.js';
 import { getDisplayPath } from '../../utils/file.js';
 import { formatRelativeTimeAgo } from '../../utils/format.js';
 import { projectIsInGitRepo } from '../../utils/memory/versions.js';
+import { pathInWorkingPath } from '../../utils/permissions/filesystem.js';
 import { updateSettingsForSource } from '../../utils/settings/settings.js';
 import { Select } from '../CustomSelect/index.js';
 import { ListItem } from '../design-system/ListItem.js';
@@ -52,7 +53,11 @@ export function MemoryFileSelector(t0) {
   const projectMemoryPath = join(getOriginalCwd(), "CLAUDE.md");
   const hasUserMemory = existingMemoryFiles.some(f => f.path === userMemoryPath);
   const hasProjectMemory = existingMemoryFiles.some(f_0 => f_0.path === projectMemoryPath);
-  const allMemoryFiles = [...existingMemoryFiles.filter(_temp).map(_temp2), ...(hasUserMemory ? [] : [{
+  // Files from Claude Code's directory, and what they @-import, are read-only here.
+  const inheritedFiles = getInheritedClaudeCodeFiles(existingMemoryFiles);
+  const claudeCodeDir = getInheritedClaudeCodeDir();
+  const inheritsClaudeMd = !!claudeCodeDir && inheritedFiles.has(join(claudeCodeDir, "CLAUDE.md"));
+  const allMemoryFiles = [...existingMemoryFiles.filter((f_3: MemoryFileInfo) => _temp(f_3) && !inheritedFiles.has(f_3.path)).map(_temp2), ...(hasUserMemory ? [] : [{
     path: userMemoryPath,
     type: "User" as const,
     content: "",
@@ -86,7 +91,9 @@ export function MemoryFileSelector(t0) {
     }
     let description;
     const isGit = projectIsInGitRepo(getOriginalCwd());
-    if (file.type === "User" && !file.isNested) {
+    if (file.type === "User" && !file.isNested && !file.exists && inheritsClaudeMd) {
+      description = "Not created yet. Creating it replaces the CLAUDE.md inherited from Claude Code";
+    } else if (file.type === "User" && !file.isNested) {
       description = "Saved in ~/.claude/CLAUDE.md";
     } else {
       if (file.type === "Project" && !file.isNested && file.path === projectMemoryPath) {
@@ -431,6 +438,18 @@ function _temp2(f_2) {
     ...f_2,
     exists: true
   };
+}
+function getInheritedClaudeCodeFiles(files: MemoryFileInfo[]): Set<string> {
+  const inherited = new Set<string>();
+  const claudeCodeDir = getInheritedClaudeCodeDir();
+  if (!claudeCodeDir) return inherited;
+  // Parents come before the files they import, so one pass follows the chain.
+  for (const file of files) {
+    if (pathInWorkingPath(file.path, claudeCodeDir) || file.parent && inherited.has(file.parent)) {
+      inherited.add(file.path);
+    }
+  }
+  return inherited;
 }
 function _temp(f_1) {
   return f_1.type !== "AutoMem" && f_1.type !== "TeamMem";

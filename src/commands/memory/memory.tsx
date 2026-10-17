@@ -7,9 +7,10 @@ import { getRelativeMemoryPath } from '../../components/memory/MemoryUpdateNotif
 import { Box, Link, Text } from '../../ink.js';
 import type { LocalJSXCommandCall } from '../../types/command.js';
 import { clearMemoryFileCaches, getMemoryFiles } from '../../utils/claudemd.js';
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js';
+import { getClaudeConfigHomeDir, getInheritedClaudeCodeDir } from '../../utils/envUtils.js';
 import { getErrnoCode } from '../../utils/errors.js';
 import { logError } from '../../utils/log.js';
+import { pathInWorkingPath } from '../../utils/permissions/filesystem.js';
 import { editFileInEditor } from '../../utils/promptEditor.js';
 function MemoryCommand({
   onDone
@@ -20,6 +21,14 @@ function MemoryCommand({
 }): React.ReactNode {
   const handleSelectMemoryFile = async (memoryPath: string) => {
     try {
+      // Claude Code's files are inherited read-only
+      const claudeCodeDir = getInheritedClaudeCodeDir();
+      if (claudeCodeDir && pathInWorkingPath(memoryPath, claudeCodeDir)) {
+        onDone(`${memoryPath} is inherited from Claude Code and is read-only here.`, {
+          display: 'system'
+        });
+        return;
+      }
       // Create claude directory if it doesn't exist (idempotent with recursive)
       if (memoryPath.includes(getClaudeConfigHomeDir())) {
         await mkdir(getClaudeConfigHomeDir(), {

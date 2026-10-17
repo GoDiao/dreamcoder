@@ -1,7 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { parseFrontmatter } from '../../utils/frontmatterParser.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { getClaudeConfigHomeDir, getInheritedClaudeCodeDir } from '../../utils/envUtils.js'
 import { getProjectDirsUpToHome } from '../../utils/markdownConfigLoader.js'
 import { getCwd } from '../../utils/cwd.js'
 import { clearInstalledPluginsCache } from '../../utils/plugins/installedPluginsManager.js'
@@ -15,7 +15,8 @@ type SkillMeta = {
   name: string
   displayName?: string
   description: string
-  source: 'user' | 'project' | 'plugin'
+  // claudeCode: inherited read-only from Claude Code's user directory
+  source: 'user' | 'claudeCode' | 'project' | 'plugin'
   userInvocable: boolean
   version?: string
   contentLength: number
@@ -71,6 +72,11 @@ function normalizeFrontmatter(content: string, sourcePath?: string): {
 
 function getUserSkillsDir(): string {
   return path.join(getClaudeConfigHomeDir(), 'skills')
+}
+
+function getClaudeCodeSkillsDirs(): string[] {
+  const dir = getInheritedClaudeCodeDir()
+  return dir ? [path.join(dir, 'skills')] : []
 }
 
 function getRequestedCwd(url: URL): string {
@@ -238,9 +244,11 @@ async function resolveSkillDir(
   const skillRoots =
     source === 'user'
       ? [getUserSkillsDir()]
-      : source === 'project'
-        ? getProjectSkillsDirs(cwd)
-        : []
+      : source === 'claudeCode'
+        ? getClaudeCodeSkillsDirs()
+        : source === 'project'
+          ? getProjectSkillsDirs(cwd)
+          : []
 
   for (const root of skillRoots) {
     const skillDir = path.join(root, name)
@@ -374,13 +382,21 @@ async function collectPluginSkills(): Promise<SkillMeta[]> {
 }
 
 async function collectAllSkills(cwd?: string): Promise<SkillMeta[]> {
-  const [userSkills, projectSkills, pluginSkills] = await Promise.all([
+  const [userSkills, claudeCodeSkills, projectSkills, pluginSkills] = await Promise.all([
     collectSkillsFromRoots([getUserSkillsDir()], 'user'),
+    collectSkillsFromRoots(getClaudeCodeSkillsDirs(), 'claudeCode'),
     collectSkillsFromRoots(getProjectSkillsDirs(cwd), 'project'),
     collectPluginSkills(),
   ])
 
-  const skills = [...userSkills, ...projectSkills, ...pluginSkills]
+  // DreamCoder's own user skill wins over Claude Code's of the same name.
+  const userNames = new Set(userSkills.map((skill) => skill.name))
+  const skills = [
+    ...userSkills,
+    ...claudeCodeSkills.filter((skill) => !userNames.has(skill.name)),
+    ...projectSkills,
+    ...pluginSkills,
+  ]
   skills.sort((a, b) => a.name.localeCompare(b.name))
   return skills
 }
@@ -454,7 +470,7 @@ async function getSkillDetail(url: URL): Promise<Response> {
     throw ApiError.badRequest('Invalid skill name')
   }
 
-  if (source !== 'user' && source !== 'project' && source !== 'plugin') {
+  if (source !== 'user' && source !== 'claudeCode' && source !== 'project' && source !== 'plugin') {
     throw ApiError.badRequest(`Unsupported source: ${source}`)
   }
 

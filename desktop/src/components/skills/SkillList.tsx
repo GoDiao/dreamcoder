@@ -4,10 +4,11 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import type { SkillMeta, SkillSource } from '../../types/skill'
 
-const SOURCE_ORDER: SkillSource[] = ['user', 'project', 'plugin', 'mcp', 'bundled']
+const SOURCE_ORDER: SkillSource[] = ['user', 'claudeCode', 'project', 'plugin', 'mcp', 'bundled']
 
 const SOURCE_ICONS: Record<SkillSource, string> = {
   user: 'person',
+  claudeCode: 'download',
   project: 'folder',
   plugin: 'extension',
   mcp: 'hub',
@@ -16,6 +17,7 @@ const SOURCE_ICONS: Record<SkillSource, string> = {
 
 const SOURCE_ACCENT_CLASSES: Record<SkillSource, string> = {
   user: 'bg-[var(--color-primary-fixed)] text-[var(--color-brand)]',
+  claudeCode: 'bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]',
   project: 'bg-[var(--color-success-container)] text-[var(--color-success)]',
   plugin: 'bg-[var(--color-warning-container)] text-[var(--color-warning)]',
   mcp: 'bg-[var(--color-info-container)] text-[var(--color-info)]',

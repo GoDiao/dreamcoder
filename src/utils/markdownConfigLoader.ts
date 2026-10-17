@@ -10,7 +10,11 @@ import {
 } from 'src/services/analytics/index.js'
 import { getProjectRoot } from '../bootstrap/state.js'
 import { logForDebugging } from './debug.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
+import {
+  getClaudeConfigHomeDir,
+  getInheritedClaudeCodeDir,
+  isEnvTruthy,
+} from './envUtils.js'
 import { isFsInaccessible } from './errors.js'
 import { normalizePathForComparison } from './file.js'
 import type { FrontmatterData } from './frontmatterParser.js'
@@ -43,7 +47,12 @@ export type MarkdownFile = {
   frontmatter: FrontmatterData
   content: string
   source: SettingSource
+  /** Read from Claude Code's directory: read-only, and DreamCoder's own same-named item wins. */
+  inheritedFromClaudeCode?: boolean
 }
+
+// Subdirectories inherited from Claude Code's directory.
+const INHERITED_SUBDIRS: readonly ClaudeConfigDirectory[] = ['agents', 'commands']
 
 /**
  * Extracts a description from markdown content
@@ -303,6 +312,14 @@ export const loadMarkdownFilesForSubdir = memoize(
     const userDir = join(getClaudeConfigHomeDir(), subdir)
     const managedDir = join(getManagedFilePath(), '.claude', subdir)
     const projectDirs = getProjectDirsUpToHome(subdir, cwd)
+    const claudeCodeDir = getInheritedClaudeCodeDir()
+    const inheritedDir =
+      claudeCodeDir && INHERITED_SUBDIRS.includes(subdir)
+        ? join(claudeCodeDir, subdir)
+        : undefined
+    const userFilesEnabled =
+      isSettingSourceEnabled('userSettings') &&
+      !(subdir === 'agents' && isRestrictedToPluginOnly('agents'))
 
     // For git worktrees where the worktree does NOT have .claude/<subdir> checked
     // out (e.g. sparse-checkout), fall back to the main repository's copy.
@@ -334,48 +351,65 @@ export const loadMarkdownFilesForSubdir = memoize(
       }
     }
 
-    const [managedFiles, userFiles, projectFilesNested] = await Promise.all([
-      // Always load managed (policy settings)
-      loadMarkdownFiles(managedDir).then(_ =>
-        _.map(file => ({
-          ...file,
-          baseDir: managedDir,
-          source: 'policySettings' as const,
-        })),
-      ),
-      // Conditionally load user files
-      isSettingSourceEnabled('userSettings') &&
-      !(subdir === 'agents' && isRestrictedToPluginOnly('agents'))
-        ? loadMarkdownFiles(userDir).then(_ =>
-            _.map(file => ({
-              ...file,
-              baseDir: userDir,
-              source: 'userSettings' as const,
-            })),
-          )
-        : Promise.resolve([]),
-      // Conditionally load project files from all directories up to home
-      isSettingSourceEnabled('projectSettings') &&
-      !(subdir === 'agents' && isRestrictedToPluginOnly('agents'))
-        ? Promise.all(
-            projectDirs.map(projectDir =>
-              loadMarkdownFiles(projectDir).then(_ =>
-                _.map(file => ({
-                  ...file,
-                  baseDir: projectDir,
-                  source: 'projectSettings' as const,
-                })),
+    const [managedFiles, userFiles, inheritedFiles, projectFilesNested] =
+      await Promise.all([
+        // Always load managed (policy settings)
+        loadMarkdownFiles(managedDir).then(_ =>
+          _.map(file => ({
+            ...file,
+            baseDir: managedDir,
+            source: 'policySettings' as const,
+          })),
+        ),
+        // Conditionally load user files
+        userFilesEnabled
+          ? loadMarkdownFiles(userDir).then(_ =>
+              _.map(file => ({
+                ...file,
+                baseDir: userDir,
+                source: 'userSettings' as const,
+              })),
+            )
+          : Promise.resolve([]),
+        // Claude Code's user files, under the same switches as DreamCoder's
+        userFilesEnabled && inheritedDir
+          ? loadMarkdownFiles(inheritedDir).then(_ =>
+              _.map(file => ({
+                ...file,
+                baseDir: inheritedDir,
+                source: 'userSettings' as const,
+                inheritedFromClaudeCode: true,
+              })),
+            )
+          : Promise.resolve([]),
+        // Conditionally load project files from all directories up to home
+        isSettingSourceEnabled('projectSettings') &&
+        !(subdir === 'agents' && isRestrictedToPluginOnly('agents'))
+          ? Promise.all(
+              projectDirs.map(projectDir =>
+                loadMarkdownFiles(projectDir).then(_ =>
+                  _.map(file => ({
+                    ...file,
+                    baseDir: projectDir,
+                    source: 'projectSettings' as const,
+                  })),
+                ),
               ),
-            ),
-          )
-        : Promise.resolve([]),
-    ])
+            )
+          : Promise.resolve([]),
+      ])
 
     // Flatten nested project files array
     const projectFiles = projectFilesNested.flat()
 
-    // Combine all files with priority: managed > user > project
-    const allFiles = [...managedFiles, ...userFiles, ...projectFiles]
+    // Combine all files with priority: managed > user > Claude Code's user > project.
+    // Same-named items are resolved by each consumer (agents and commands differ).
+    const allFiles = [
+      ...managedFiles,
+      ...userFiles,
+      ...inheritedFiles,
+      ...projectFiles,
+    ]
 
     // Deduplicate files that resolve to the same physical file (same inode).
     // This prevents the same file from appearing multiple times when ~/.claude is
@@ -417,6 +451,7 @@ export const loadMarkdownFilesForSubdir = memoize(
       durationMs: Date.now() - searchStartTime,
       managedFilesFound: managedFiles.length,
       userFilesFound: userFiles.length,
+      inheritedFilesFound: inheritedFiles.length,
       projectFilesFound: projectFiles.length,
       projectDirsSearched: projectDirs.length,
       subdir:

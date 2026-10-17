@@ -30,6 +30,9 @@ export type PromptCommand = {
   allowedTools?: string[]
   model?: string
   source: SettingSource | 'builtin' | 'mcp' | 'plugin' | 'bundled'
+  // Read from Claude Code's user directory: read-only, and DreamCoder's own
+  // same-named skill or command wins
+  inheritedFromClaudeCode?: boolean
   pluginInfo?: {
     pluginManifest: PluginManifest
     repository: string

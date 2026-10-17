@@ -56,7 +56,11 @@ import {
 } from './config.js'
 import { logForDebugging } from './debug.js'
 import { logForDiagnosticsNoPII } from './diagLogs.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
+import {
+  getClaudeConfigHomeDir,
+  getInheritedClaudeCodeDir,
+  isEnvTruthy,
+} from './envUtils.js'
 import { getErrnoCode } from './errors.js'
 import { normalizePathForComparison } from './file.js'
 import { cacheKeys, type FileStateCache } from './fileStateCache.js'
@@ -787,6 +791,24 @@ export async function processMdRules({
   }
 }
 
+/**
+ * The global CLAUDE.md and rules/ come from one directory only: DreamCoder's
+ * own when it exists (an empty CLAUDE.md included), else Claude Code's.
+ */
+function getActiveUserMemoryPath(): string {
+  const own = getMemoryPath('User')
+  const claudeCodeDir = getInheritedClaudeCodeDir()
+  if (!claudeCodeDir || getFsImplementation().existsSync(own)) return own
+  return join(claudeCodeDir, 'CLAUDE.md')
+}
+
+function getActiveUserRulesDir(): string {
+  const own = getUserClaudeRulesDir()
+  const claudeCodeDir = getInheritedClaudeCodeDir()
+  if (!claudeCodeDir || getFsImplementation().existsSync(own)) return own
+  return join(claudeCodeDir, 'rules')
+}
+
 export const getMemoryFiles = memoize(
   async (forceIncludeExternal: boolean = false): Promise<MemoryFileInfo[]> => {
     const startTime = Date.now()
@@ -824,7 +846,7 @@ export const getMemoryFiles = memoize(
 
     // Process User file (only if userSettings is enabled)
     if (isSettingSourceEnabled('userSettings')) {
-      const userClaudeMd = getMemoryPath('User')
+      const userClaudeMd = getActiveUserMemoryPath()
       result.push(
         ...(await processMemoryFile(
           userClaudeMd,
@@ -834,7 +856,7 @@ export const getMemoryFiles = memoize(
         )),
       )
       // Process User ~/.claude/rules/*.md files
-      const userClaudeRulesDir = getUserClaudeRulesDir()
+      const userClaudeRulesDir = getActiveUserRulesDir()
       result.push(
         ...(await processMdRules({
           rulesDir: userClaudeRulesDir,
@@ -1222,7 +1244,7 @@ export async function getManagedAndUserConditionalRules(
 
   if (isSettingSourceEnabled('userSettings')) {
     // Process User conditional .claude/rules/*.md files
-    const userClaudeRulesDir = getUserClaudeRulesDir()
+    const userClaudeRulesDir = getActiveUserRulesDir()
     result.push(
       ...(await processConditionedMdRules(
         targetPath,
