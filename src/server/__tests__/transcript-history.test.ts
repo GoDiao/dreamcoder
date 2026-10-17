@@ -123,6 +123,25 @@ describe('interpretTranscript', () => {
     expect(items[0]).toMatchObject({ type: 'compact_summary', summary: 'Kept the billing import implementation details.' })
   })
 
+  it('drops the /compact stdout when compaction hooks append their output', () => {
+    const items = interpretTranscript([
+      {
+        id: 'compact-stdout',
+        type: 'user',
+        content: '<local-command-stdout>Compacted PostCompact [notify.sh] completed successfully: {}</local-command-stdout>',
+        timestamp: '2026-05-19T10:00:02.000Z',
+      },
+      {
+        id: 'compacted-word',
+        type: 'user',
+        content: '<local-command-stdout>CompactedFiles: 3</local-command-stdout>',
+        timestamp: '2026-05-19T10:00:03.000Z',
+      },
+    ])
+
+    expect(items.map((item) => item.id)).toEqual(['compacted-word'])
+  })
+
   it('restores saved memory events', () => {
     const items = interpretTranscript([
       {

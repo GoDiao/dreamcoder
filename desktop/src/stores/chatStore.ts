@@ -19,12 +19,9 @@ import type {
   ApiRetryState,
   AttachmentRef,
   BackgroundAgentTask,
-  BackgroundAgentTaskUsage,
   ChatState,
   ComputerUsePermissionRequest,
   ComputerUsePermissionResponse,
-  GoalEventAction,
-  MemoryEventFile,
   UIAttachment,
   UIMessage,
   ServerMessage,
@@ -180,7 +177,6 @@ function appendMessage(messages: UIMessage[], msg: UIMessage): UIMessage[] {
   return trimMessages([...messages, msg])
 }
 const pendingTaskToolUseIdsBySession = new Map<string, Set<string>>()
-const pendingToolParentUseIdsBySession = new Map<string, Map<string, string>>()
 
 function addPendingTaskToolUseId(sessionId: string, toolUseId: string): void {
   const ids = pendingTaskToolUseIdsBySession.get(sessionId) ?? new Set<string>()
@@ -200,41 +196,7 @@ function clearPendingTaskToolUseIds(sessionId: string): void {
   pendingTaskToolUseIdsBySession.delete(sessionId)
 }
 
-function rememberPendingToolParentUseId(
-  sessionId: string,
-  toolUseId: string | null | undefined,
-  parentToolUseId: string | undefined,
-): void {
-  if (!toolUseId || !parentToolUseId) return
-  const parentUseIds = pendingToolParentUseIdsBySession.get(sessionId) ?? new Map<string, string>()
-  parentUseIds.set(toolUseId, parentToolUseId)
-  pendingToolParentUseIdsBySession.set(sessionId, parentUseIds)
-}
-
-function getPendingToolParentUseId(sessionId: string, toolUseId: string): string | undefined {
-  return pendingToolParentUseIdsBySession.get(sessionId)?.get(toolUseId)
-}
-
-function consumePendingToolParentUseId(sessionId: string, toolUseId: string): string | undefined {
-  const parentUseIds = pendingToolParentUseIdsBySession.get(sessionId)
-  if (!parentUseIds) return undefined
-  const parentToolUseId = parentUseIds.get(toolUseId)
-  parentUseIds.delete(toolUseId)
-  if (parentUseIds.size === 0) pendingToolParentUseIdsBySession.delete(sessionId)
-  return parentToolUseId
-}
-
-function clearPendingToolParentUseIds(sessionId: string): void {
-  pendingToolParentUseIdsBySession.delete(sessionId)
-}
 const AGENT_COMPLETION_NOTIFICATION_PREVIEW_CHARS = 160
-const COMPACT_SUMMARY_PREFIX =
-  'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.'
-const COMPACT_SUMMARY_CUTOFFS = [
-  '\n\nIf you need specific details from before compaction',
-  '\n\nContinue the conversation from where it left off',
-  '\nContinue the conversation from where it left off',
-]
 
 let msgCounter = 0
 const nextId = () => `msg-${++msgCounter}-${Date.now()}`
@@ -420,45 +382,6 @@ function appendAssistantTextMessage(
     ...(transcriptMessageId ? { transcriptMessageId } : {}),
     ...(model ? { model } : {}),
   })
-}
-
-function extractCompactSummaryContent(content: unknown): string | null {
-  if (typeof content !== 'string') return null
-  const trimmed = content.trim()
-  if (!trimmed.startsWith(COMPACT_SUMMARY_PREFIX)) return null
-
-  let summary = trimmed.slice(COMPACT_SUMMARY_PREFIX.length).trim()
-  for (const marker of COMPACT_SUMMARY_CUTOFFS) {
-    const index = summary.indexOf(marker)
-    if (index >= 0) {
-      summary = summary.slice(0, index).trim()
-    }
-  }
-  return summary || null
-}
-
-function compactMetadataFromUnknown(data: unknown): Pick<CompactSummaryMessage, 'trigger' | 'preTokens' | 'messagesSummarized'> {
-  if (!data || typeof data !== 'object') return {}
-  const record = data as Record<string, unknown>
-  const trigger = record.trigger === 'manual' || record.trigger === 'auto'
-    ? record.trigger
-    : undefined
-  const preTokens = typeof record.preTokens === 'number'
-    ? record.preTokens
-    : typeof record.pre_tokens === 'number'
-      ? record.pre_tokens
-      : undefined
-  const messagesSummarized = typeof record.messagesSummarized === 'number'
-    ? record.messagesSummarized
-    : typeof record.messages_summarized === 'number'
-      ? record.messages_summarized
-      : undefined
-
-  return {
-    ...(trigger ? { trigger } : {}),
-    ...(preTokens !== undefined ? { preTokens } : {}),
-    ...(messagesSummarized !== undefined ? { messagesSummarized } : {}),
-  }
 }
 
 function appendOrUpdateTailCompactSummary(
@@ -683,23 +606,6 @@ function refreshCompletedTranscriptHistory(
   })
 }
 
-function normalizeMemoryEventFiles(data: unknown): MemoryEventFile[] {
-  if (!data || typeof data !== 'object') return []
-  const writtenPaths = (data as { writtenPaths?: unknown }).writtenPaths
-  if (!Array.isArray(writtenPaths)) return []
-  return writtenPaths
-    .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
-    .map((path) => ({ path, action: 'saved' as const }))
-}
-
-function normalizeMemoryTeamCount(data: unknown): number | undefined {
-  if (!data || typeof data !== 'object') return undefined
-  const teamCount = (data as { teamCount?: unknown }).teamCount
-  return typeof teamCount === 'number' && Number.isFinite(teamCount)
-    ? teamCount
-    : undefined
-}
-
 function normalizeNotificationPreview(content: string): string {
   return content
     .replace(/```[\s\S]*?```/g, ' code block ')
@@ -854,7 +760,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     clearPendingToolInputDelta(sessionId)
     clearPendingTaskToolUseIds(sessionId)
-    clearPendingToolParentUseIds(sessionId)
     wsManager.disconnect(sessionId)
     set((s) => {
       const { [sessionId]: _, ...rest } = s.sessions
@@ -1194,7 +1099,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   clearMessages: (sessionId) => {
     clearPendingTaskToolUseIds(sessionId)
-    clearPendingToolParentUseIds(sessionId)
     clearPendingToolInputDelta(sessionId)
     set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({
       messages: [],
@@ -1282,7 +1186,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
         } else if (msg.blockType === 'tool_use') {
           clearPendingToolInputDelta(sessionId)
-          rememberPendingToolParentUseId(sessionId, msg.toolUseId, msg.parentToolUseId)
           const toolUseId = msg.toolUseId ?? null
           const toolName = msg.toolName ?? 'unknown'
           update((s) => ({
@@ -1370,7 +1273,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                             toolUseId: activeToolUseId,
                             input: buildPartialToolInputPreview(partialInput, existing?.input),
                             timestamp: existing?.timestamp ?? Date.now(),
-                            parentToolUseId: existing?.parentToolUseId ?? getPendingToolParentUseId(sessionId, activeToolUseId),
+                            parentToolUseId: existing?.parentToolUseId,
                             isPending: true,
                             partialInput,
                           }
@@ -1412,8 +1315,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const session = get().sessions[sessionId]
         const toolName = msg.toolName || session?.activeToolName || 'unknown'
         const toolUseId = msg.toolUseId || session?.activeToolUseId || ''
-        const parentToolUseId = msg.parentToolUseId ?? getPendingToolParentUseId(sessionId, toolUseId)
-        rememberPendingToolParentUseId(sessionId, toolUseId, parentToolUseId)
         update((s) => ({
           messages: toolUseId
             ? upsertToolUseMessage(s.messages, toolUseId, (existing) => ({
@@ -1423,13 +1324,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 toolUseId,
                 input: msg.input,
                 timestamp: existing?.timestamp ?? Date.now(),
-                parentToolUseId,
+                parentToolUseId: msg.parentToolUseId ?? existing?.parentToolUseId,
                 isPending: false,
               }))
             : appendMessage(s.messages, {
                 id: nextId(), type: 'tool_use', toolName,
                 toolUseId,
-                input: msg.input, timestamp: Date.now(), parentToolUseId,
+                input: msg.input, timestamp: Date.now(), parentToolUseId: msg.parentToolUseId,
                 isPending: false,
               }),
           activeToolUseId: null, activeToolName: null, activeThinkingId: null, streamingToolInput: '',
@@ -1445,12 +1346,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       case 'tool_result': {
         const now = Date.now()
-        const pendingParentToolUseId = consumePendingToolParentUseId(sessionId, msg.toolUseId)
-        const parentToolUseId = msg.parentToolUseId ?? pendingParentToolUseId
         update((s) => {
           let messages: UIMessage[] = appendMessage(s.messages, {
             id: nextId(), type: 'tool_result', toolUseId: msg.toolUseId,
-            content: msg.content, isError: msg.isError, timestamp: now, parentToolUseId,
+            content: msg.content, isError: msg.isError, timestamp: now, parentToolUseId: msg.parentToolUseId,
           })
           let backgroundAgentTasks = s.backgroundAgentTasks ?? {}
           const stoppedTask = msg.isError
@@ -1667,146 +1566,47 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
           clearPendingDelta(sessionId)
           clearPendingTaskToolUseIds(sessionId)
-          clearPendingToolParentUseIds(sessionId)
           useCLITaskStore.getState().clearTasks(sessionId)
           useSessionStore.getState().updateSessionTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabTitle(sessionId, 'New Session')
           useTabStore.getState().updateTabStatus(sessionId, 'idle')
         }
-        if (msg.subtype === 'compact_boundary') {
-          const metadata = compactMetadataFromUnknown(msg.data)
+        break
+      case 'transcript_item': {
+        const { item } = msg
+        if (item.type === 'compact_summary') {
+          const { id: _id, type: _type, timestamp, ...summaryUpdate } = item
           update((session) => ({
             chatState: session.chatState === 'compacting' ? 'thinking' : session.chatState,
             statusVerb: session.chatState === 'compacting' ? '' : session.statusVerb,
-            messages: appendOrUpdateTailCompactSummary(
-              session.messages,
-              {
-                title: typeof msg.message === 'string' && msg.message.trim()
-                  ? msg.message
-                  : 'Context compacted',
-                phase: 'complete',
-                ...metadata,
-              },
-              Date.now(),
-            ),
+            messages: appendOrUpdateTailCompactSummary(session.messages, summaryUpdate, timestamp),
           }))
-        }
-        if (msg.subtype === 'compact_summary') {
-          const summary = extractCompactSummaryContent(msg.message)
-          if (summary) {
-            update((session) => ({
-              messages: appendOrUpdateTailCompactSummary(
-                session.messages,
-                {
-                  title: 'Context compacted',
-                  phase: 'complete',
-                  summary,
-                  ...compactMetadataFromUnknown(msg.data),
-                },
-                Date.now(),
-              ),
-            }))
-          }
-        }
-        if (msg.subtype === 'memory_saved') {
-          const files = normalizeMemoryEventFiles(msg.data)
-          if (files.length > 0) {
-            update((session) => ({
-              messages: [
-                ...session.messages,
-                {
-                  id: nextId(),
-                  type: 'memory_event',
-                  event: 'saved',
-                  files,
-                  message: msg.message,
-                  teamCount: normalizeMemoryTeamCount(msg.data),
-                  timestamp: Date.now(),
-                },
-              ],
-            }))
-          }
-        }
-        if (msg.subtype === 'goal_event') {
-          const goalEvent = normalizeGoalEventData(msg.data, msg.message)
-          if (goalEvent) {
-            update((session) => ({
-              activeGoal: applyGoalEventToActiveGoal(session.activeGoal ?? null, goalEvent, Date.now()),
-              messages: [
-                ...session.messages,
-                {
-                  id: nextId(),
-                  type: 'goal_event',
-                  ...goalEvent,
-                  timestamp: Date.now(),
-                },
-              ],
-            }))
-          }
-        }
-        if ((msg.subtype === 'task_started' || msg.subtype === 'task_progress') && msg.data && typeof msg.data === 'object') {
-          const taskEvent = normalizeBackgroundAgentTaskEvent(msg.data, msg.subtype)
-          if (taskEvent) {
-            const now = Date.now()
-            update((session) => {
-              const backgroundAgentTasks = upsertBackgroundAgentTask(
-                session.backgroundAgentTasks ?? {},
-                taskEvent,
-                now,
-              )
-              const task = backgroundAgentTasks[taskEvent.taskId]
-              return {
-                backgroundAgentTasks,
-                ...(task ? { messages: upsertBackgroundTaskMessage(session.messages, task, now) } : {}),
-              }
-            })
-          }
-        }
-        if (msg.subtype === 'task_notification' && msg.data && typeof msg.data === 'object') {
-          const data = msg.data as Record<string, unknown>
-          const taskEvent = normalizeBackgroundAgentTaskEvent(data, 'task_notification')
-          const toolUseId =
-            typeof data.tool_use_id === 'string' && data.tool_use_id.trim()
-              ? data.tool_use_id
-              : null
-          const taskResult = readNonEmptyString(data, 'result')
-          const taskStatus = data.status
-          if (taskEvent) {
-            const now = Date.now()
-            update((session) => {
-              const backgroundAgentTasks = upsertBackgroundAgentTask(
-                session.backgroundAgentTasks ?? {},
-                taskEvent,
-                now,
-              )
-              const task = backgroundAgentTasks[taskEvent.taskId]
-              return {
-                backgroundAgentTasks,
-                ...(task ? { messages: upsertBackgroundTaskMessage(session.messages, task, now) } : {}),
-                agentTaskNotifications: {
-                  ...session.agentTaskNotifications,
-                  ...(toolUseId &&
-                  (taskStatus === 'completed' ||
-                    taskStatus === 'failed' ||
-                    taskStatus === 'stopped')
-                    ? {
-                        [toolUseId]: {
-                          taskId: taskEvent.taskId,
-                          toolUseId,
-                          status: taskStatus,
-                          summary: taskEvent.summary,
-                          result: taskResult,
-                          outputFile: taskEvent.outputFile,
-                          usage: taskEvent.usage,
-                        },
-                      }
-                    : {}),
-                },
-              }
-            })
-          }
+        } else if (item.type === 'goal_event') {
+          update((session) => ({
+            activeGoal: applyGoalEventToActiveGoal(session.activeGoal ?? null, item, item.timestamp),
+            messages: [...session.messages, item],
+          }))
+        } else {
+          update((session) => ({ messages: [...session.messages, item] }))
         }
         break
+      }
+      case 'background_task': {
+        const { event, notification } = msg
+        const now = Date.now()
+        update((session) => {
+          const backgroundAgentTasks = upsertBackgroundAgentTask(session.backgroundAgentTasks ?? {}, event, now)
+          const task = backgroundAgentTasks[event.taskId]
+          return {
+            backgroundAgentTasks,
+            ...(task ? { messages: upsertBackgroundTaskMessage(session.messages, task, now) } : {}),
+            ...(notification
+              ? { agentTaskNotifications: { ...session.agentTaskNotifications, [notification.toolUseId]: notification } }
+              : {}),
+          }
+        })
+        break
+      }
       case 'pong':
         break
     }
@@ -1823,17 +1623,6 @@ function updateOptimisticSessionTitle(sessionId: string, content: string): void 
   useSessionStore.getState().updateSessionTitle(sessionId, title)
   useTabStore.getState().updateTabTitle(sessionId, title)
 }
-
-const GOAL_EVENT_ACTIONS = new Set<GoalEventAction>([
-  'created',
-  'replaced',
-  'status',
-  'paused',
-  'resumed',
-  'completed',
-  'cleared',
-  'message',
-])
 
 function readNonEmptyString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -1892,54 +1681,6 @@ function getStoppedBackgroundTaskFromToolResult(
   }
 }
 
-function normalizeBackgroundTaskUsage(value: unknown): BackgroundAgentTaskUsage | undefined {
-  if (!value || typeof value !== 'object') return undefined
-  const record = value as Record<string, unknown>
-  const usage: BackgroundAgentTaskUsage = {}
-  const totalTokens = record.total_tokens ?? record.totalTokens
-  const toolUses = record.tool_uses ?? record.toolUses
-  const durationMs = record.duration_ms ?? record.durationMs
-  if (typeof totalTokens === 'number') usage.totalTokens = totalTokens
-  if (typeof toolUses === 'number') usage.toolUses = toolUses
-  if (typeof durationMs === 'number') usage.durationMs = durationMs
-  return Object.keys(usage).length > 0 ? usage : undefined
-}
-
-function normalizeBackgroundAgentTaskEvent(
-  data: unknown,
-  subtype: string,
-): Partial<BackgroundAgentTask> & Pick<BackgroundAgentTask, 'taskId' | 'status'> | null {
-  if (!data || typeof data !== 'object') return null
-  const record = data as Record<string, unknown>
-  const taskId = readNonEmptyString(record, 'task_id', 'taskId')
-  const toolUseId = readNonEmptyString(record, 'tool_use_id', 'toolUseId')
-  const id = taskId ?? toolUseId
-  if (!id) return null
-
-  const rawStatus = readNonEmptyString(record, 'status')
-  const status = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'stopped'
-    ? rawStatus
-    : rawStatus === 'killed'
-      ? 'stopped'
-      : subtype === 'task_notification'
-        ? 'completed'
-        : 'running'
-
-  return {
-    taskId: id,
-    toolUseId,
-    status,
-    description: readNonEmptyString(record, 'description', 'message', 'title'),
-    taskType: readNonEmptyString(record, 'task_type', 'taskType'),
-    workflowName: readNonEmptyString(record, 'workflow_name', 'workflowName'),
-    prompt: readNonEmptyString(record, 'prompt'),
-    summary: readNonEmptyString(record, 'summary'),
-    lastToolName: readNonEmptyString(record, 'last_tool_name', 'lastToolName'),
-    outputFile: readNonEmptyString(record, 'output_file', 'outputFile'),
-    usage: normalizeBackgroundTaskUsage(record.usage),
-  }
-}
-
 function upsertBackgroundAgentTask(
   current: Record<string, BackgroundAgentTask>,
   event: Partial<BackgroundAgentTask> & Pick<BackgroundAgentTask, 'taskId' | 'status'>,
@@ -1973,34 +1714,6 @@ function upsertBackgroundAgentTask(
       startedAt: existing?.startedAt ?? now,
       updatedAt: now,
     },
-  }
-}
-
-function normalizeGoalEventData(
-  data: unknown,
-  fallbackMessage?: string,
-): Omit<Extract<UIMessage, { type: 'goal_event' }>, 'id' | 'type' | 'timestamp'> | null {
-  if (!data || typeof data !== 'object') {
-    const message = typeof fallbackMessage === 'string' ? fallbackMessage.trim() : ''
-    return message ? { action: 'message', message } : null
-  }
-
-  const record = data as Record<string, unknown>
-  const action = typeof record.action === 'string' && GOAL_EVENT_ACTIONS.has(record.action as GoalEventAction)
-    ? record.action as GoalEventAction
-    : 'message'
-  const read = (key: string) =>
-    typeof record[key] === 'string' && record[key].trim()
-      ? record[key].trim()
-      : undefined
-  return {
-    action,
-    status: read('status'),
-    objective: read('objective'),
-    budget: read('budget'),
-    elapsed: read('elapsed'),
-    continuations: read('continuations'),
-    message: read('message') ?? (typeof fallbackMessage === 'string' ? fallbackMessage.trim() : undefined),
   }
 }
 

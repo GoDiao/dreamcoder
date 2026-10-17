@@ -1,5 +1,7 @@
 import type { ServerWebSocket } from 'bun'
-import type { ClientMessage, ServerMessage } from './events.js'
+import type { ClientMessage, LiveTranscriptItem, PermissionMode, ServerMessage } from './protocol.js'
+import { PERMISSION_MODES } from './protocol.js'
+import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
 import {
   ConversationStartupError,
@@ -14,16 +16,17 @@ import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 import {
+  extractCompactSummary,
+  extractLocalCommandOutput,
   isCompactCommandOutput,
-  isCompactSummaryContent,
   isGoalCommandOutput,
+  parseBackgroundTaskMessage,
   parseGoalEvent,
+  parseLocalCommand,
+  parseMemorySaved,
+  readCompactMetadata,
+  type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
-import {
-  COMMAND_NAME_TAG,
-  LOCAL_COMMAND_STDERR_TAG,
-  LOCAL_COMMAND_STDOUT_TAG,
-} from '../../constants/xml.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
 import {
   clearPrewarmState,
@@ -434,11 +437,24 @@ function handleComputerUsePermissionResponse(
   }
 }
 
+// The wire type mirrors the CLI's modes; fail to compile if they drift apart.
+type SameModes<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+const permissionModesMatchCli: SameModes<PermissionMode, ExternalPermissionMode> = true
+void permissionModesMatchCli
+
 function handleSetPermissionMode(
   ws: ServerWebSocket<WebSocketData>,
   message: Extract<ClientMessage, { type: 'set_permission_mode' }>
 ) {
   const { sessionId } = ws.data
+  if (!PERMISSION_MODES.includes(message.mode)) {
+    sendMessage(ws, {
+      type: 'error',
+      message: `Unknown permission mode: ${String(message.mode)}`,
+      code: 'INVALID_PERMISSION_MODE',
+    })
+    return
+  }
 
   const needsRestart =
     conversationService.hasSession(sessionId) &&
@@ -901,15 +917,9 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
     case 'user': {
       const messages: ServerMessage[] = []
 
-      if (isCompactSummaryContent(cliMsg.message?.content)) {
-        messages.push({
-          type: 'system_notification',
-          subtype: 'compact_summary',
-          message: cliMsg.message.content,
-          data: {
-            isSynthetic: cliMsg.isSynthetic,
-          },
-        })
+      const compactSummary = extractCompactSummary(cliMsg.message?.content)
+      if (compactSummary) {
+        messages.push(liveItem({ type: 'compact_summary', title: 'Context compacted', phase: 'complete', summary: compactSummary }))
       }
 
       const localCommandOutput = extractLocalCommandOutput(
@@ -924,12 +934,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
             pendingLocalCommand,
           )
           if (goalEvent) {
-            messages.push({
-              type: 'system_notification',
-              subtype: 'goal_event',
-              message: goalEvent.message,
-              data: goalEvent,
-            })
+            messages.push(liveItem({ type: 'goal_event', ...goalEvent }))
           } else {
             messages.push({ type: 'content_start', blockType: 'text' })
             messages.push({ type: 'content_delta', text: localCommandOutput })
@@ -1150,16 +1155,8 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return messages
       }
       if (subtype === 'memory_saved') {
-        return [{
-          type: 'system_notification',
-          subtype: 'memory_saved',
-          message: cliMsg.message,
-          data: {
-            writtenPaths: Array.isArray(cliMsg.writtenPaths) ? cliMsg.writtenPaths : [],
-            teamCount: typeof cliMsg.teamCount === 'number' ? cliMsg.teamCount : undefined,
-            verb: typeof cliMsg.verb === 'string' ? cliMsg.verb : undefined,
-          },
-        }]
+        const saved = parseMemorySaved(cliMsg)
+        return saved ? [liveItem({ type: 'memory_event', event: 'saved', ...saved })] : []
       }
       if (subtype === 'status') {
         if (cliMsg.status === 'compacting') {
@@ -1178,7 +1175,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return []
       }
       if (subtype === 'local_command' || subtype === 'local_command_output') {
-        const localCommand = extractLocalCommand(cliMsg.content ?? cliMsg.message)
+        const localCommand = parseLocalCommand(cliMsg.content ?? cliMsg.message)
         if (localCommand) {
           streamState.pendingLocalCommand = localCommand
           return []
@@ -1195,12 +1192,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         )
         streamState.pendingLocalCommand = undefined
         if (goalEvent) {
-          return [{
-            type: 'system_notification',
-            subtype: 'goal_event',
-            message: goalEvent.message,
-            data: goalEvent,
-          }]
+          return [liveItem({ type: 'goal_event', ...goalEvent })]
         }
         return [
           { type: 'content_start', blockType: 'text' },
@@ -1208,21 +1200,11 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         ]
       }
       if (subtype === 'task_notification') {
-        return [{
-          type: 'system_notification',
-          subtype: 'task_notification',
-          message: cliMsg.message || cliMsg.title,
-          data: cliMsg,
-        }]
+        return backgroundTaskMessages(cliMsg, subtype)
       }
       if (subtype === 'task_started') {
         return [
-          {
-            type: 'system_notification',
-            subtype: 'task_started',
-            message: cliMsg.message || cliMsg.description || 'Task started',
-            data: cliMsg,
-          },
+          ...backgroundTaskMessages(cliMsg, subtype),
           {
             type: 'status',
             state: 'tool_executing',
@@ -1232,12 +1214,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
       }
       if (subtype === 'task_progress') {
         return [
-          {
-            type: 'system_notification',
-            subtype: 'task_progress',
-            message: cliMsg.message || cliMsg.summary || cliMsg.description || 'Task in progress',
-            data: cliMsg,
-          },
+          ...backgroundTaskMessages(cliMsg, subtype),
           {
             type: 'status',
             state: 'tool_executing',
@@ -1254,12 +1231,12 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         }]
       }
       if (subtype === 'compact_boundary') {
-        return [{
-          type: 'system_notification',
-          subtype: 'compact_boundary',
-          message: getCompactBoundaryMessage(cliMsg),
-          data: cliMsg.compact_metadata ?? cliMsg,
-        }]
+        return [liveItem({
+          type: 'compact_summary',
+          title: getCompactBoundaryMessage(cliMsg),
+          phase: 'complete',
+          ...readCompactMetadata(cliMsg.compact_metadata ?? cliMsg),
+        })]
       }
       return []
     }
@@ -1407,7 +1384,7 @@ function isMatchingCurrentTurnLocalCommand(
   if (cliMsg?.type !== 'system' || cliMsg?.subtype !== 'local_command') {
     return false
   }
-  const localCommand = extractLocalCommand(cliMsg.content ?? cliMsg.message)
+  const localCommand = parseLocalCommand(cliMsg.content ?? cliMsg.message)
   if (!localCommand) return false
   return (
     localCommand.name === command.commandName &&
@@ -1429,62 +1406,19 @@ function isLocalCommandOutputMessage(cliMsg: any): boolean {
   ) !== null
 }
 
-function extractLocalCommandOutput(
-  content: unknown,
-  options: { allowUntagged?: boolean } = {},
-): string | null {
-  const raw = typeof content === 'string'
-    ? content
-    : Array.isArray(content)
-      ? content
-        .flatMap((block) => {
-          if (!block || typeof block !== 'object') return []
-          const text = (block as { text?: unknown }).text
-          return typeof text === 'string' ? [text] : []
-        })
-        .join('\n')
-      : ''
+type LiveItemContent<T = LiveTranscriptItem> = T extends LiveTranscriptItem ? Omit<T, 'id' | 'timestamp'> : never
 
-  if (!raw) return null
-
-  const stdout = extractTaggedContent(raw, LOCAL_COMMAND_STDOUT_TAG)
-  if (stdout !== null) return stdout
-
-  const stderr = extractTaggedContent(raw, LOCAL_COMMAND_STDERR_TAG)
-  if (stderr !== null) return stderr
-
-  if (options.allowUntagged) {
-    const normalized = raw.trim()
-    return normalized || null
-  }
-
-  return null
-}
-
-function extractTaggedContent(raw: string, tag: string): string | null {
-  const match = raw.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))
-  return match?.[1]?.trim() ?? null
-}
-
-function extractLocalCommand(content: unknown): { name: string; args: string } | null {
-  const raw = typeof content === 'string'
-    ? content
-    : Array.isArray(content)
-      ? content
-        .flatMap((block) => {
-          if (!block || typeof block !== 'object') return []
-          const text = (block as { text?: unknown }).text
-          return typeof text === 'string' ? [text] : []
-        })
-        .join('\n')
-      : ''
-
-  const name = extractTaggedContent(raw, COMMAND_NAME_TAG)
-  if (!name) return null
+/** A transcript item recognized in the live stream, stamped like one read from history. */
+function liveItem(content: LiveItemContent): ServerMessage {
   return {
-    name: name.replace(/^\//, ''),
-    args: extractTaggedContent(raw, 'command-args') ?? '',
+    type: 'transcript_item',
+    item: { ...content, id: crypto.randomUUID(), timestamp: Date.now() } as LiveTranscriptItem,
   }
+}
+
+function backgroundTaskMessages(cliMsg: unknown, subtype: BackgroundTaskMessageSubtype): ServerMessage[] {
+  const parsed = parseBackgroundTaskMessage(cliMsg, subtype)
+  return parsed ? [{ type: 'background_task', ...parsed }] : []
 }
 
 function getCompactBoundaryMessage(cliMsg: any): string {

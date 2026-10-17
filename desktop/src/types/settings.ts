@@ -1,4 +1,6 @@
-export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk'
+import type { PermissionMode } from '@protocol'
+
+export type { PermissionMode }
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
 export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora'] as const

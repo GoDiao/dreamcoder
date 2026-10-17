@@ -4,6 +4,16 @@ import {
   translateCliMessage,
 } from '../ws/handler.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
+import { extractLocalCommandOutput } from '../transcript/classify.js'
+import type { ServerMessage } from '../ws/protocol.js'
+
+/** A transcript_item message; live items get a fresh id and the current time. */
+function liveItem(fields: Record<string, unknown>): ServerMessage {
+  return {
+    type: 'transcript_item',
+    item: { id: expect.any(String), timestamp: expect.any(Number), ...fields },
+  } as ServerMessage
+}
 
 describe('WebSocket memory events', () => {
   it('forwards CLI memory_saved system messages to the desktop client', () => {
@@ -22,20 +32,20 @@ describe('WebSocket memory events', () => {
     )
 
     expect(messages).toEqual([
-      {
-        type: 'system_notification',
-        subtype: 'memory_saved',
-        message: undefined,
-        data: {
-          writtenPaths: [
-            '/Users/test/.claude/projects/example/memory/preferences.md',
-            '/Users/test/.claude/projects/example/memory/team/MEMORY.md',
-          ],
-          teamCount: 1,
-          verb: 'Saved',
-        },
-      },
+      liveItem({
+        type: 'memory_event',
+        event: 'saved',
+        files: [
+          { path: '/Users/test/.claude/projects/example/memory/preferences.md', action: 'saved' },
+          { path: '/Users/test/.claude/projects/example/memory/team/MEMORY.md', action: 'saved' },
+        ],
+        teamCount: 1,
+      }),
     ])
+  })
+
+  it('drops memory_saved messages that saved nothing', () => {
+    expect(translateCliMessage({ type: 'system', subtype: 'memory_saved', writtenPaths: [] }, 'session-1')).toEqual([])
   })
 })
 
@@ -105,7 +115,24 @@ describe('WebSocket compact events', () => {
     }, 'session-1')).toEqual([])
   })
 
-  it('forwards compact summaries as system notifications instead of user chat bubbles', () => {
+  it('sends the compact boundary as a compaction item with its metadata', () => {
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'compact_boundary',
+      content: 'Conversation compacted',
+      compact_metadata: { trigger: 'auto', pre_tokens: 180000 },
+    }, 'session-1')).toEqual([
+      liveItem({
+        type: 'compact_summary',
+        title: 'Conversation compacted',
+        phase: 'complete',
+        trigger: 'auto',
+        preTokens: 180000,
+      }),
+    ])
+  })
+
+  it('sends compact summaries as compaction items instead of user chat bubbles', () => {
     const summary = [
       'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
       '',
@@ -120,13 +147,23 @@ describe('WebSocket compact events', () => {
       },
       isSynthetic: true,
     }, 'session-1')).toEqual([
-      {
-        type: 'system_notification',
-        subtype: 'compact_summary',
-        message: summary,
-        data: { isSynthetic: true },
-      },
+      liveItem({
+        type: 'compact_summary',
+        title: 'Context compacted',
+        phase: 'complete',
+        summary: 'Built the compact UI and verified the WebSocket event path.',
+      }),
     ])
+  })
+
+  it('suppresses compact output that carries compaction hook results', () => {
+    expect(translateCliMessage({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: '<local-command-stdout>Compacted PostCompact [notify.sh] completed successfully: {}</local-command-stdout>',
+      },
+    }, 'session-1')).toEqual([])
   })
 
   it('suppresses compact local command output after the compact summary', () => {
@@ -164,7 +201,7 @@ describe('WebSocket API retry events', () => {
 })
 
 describe('WebSocket background task events', () => {
-  it('forwards task start and progress as structured desktop notifications', () => {
+  it('sends task start and progress as parsed background task events', () => {
     const started = {
       type: 'system',
       subtype: 'task_started',
@@ -177,10 +214,15 @@ describe('WebSocket background task events', () => {
 
     expect(translateCliMessage(started, 'session-1')).toEqual([
       {
-        type: 'system_notification',
-        subtype: 'task_started',
-        message: 'Verify the todo app',
-        data: started,
+        type: 'background_task',
+        event: {
+          taskId: 'agent-task-1',
+          toolUseId: 'agent-tool-1',
+          status: 'running',
+          description: 'Verify the todo app',
+          taskType: 'local_agent',
+          prompt: 'Run E2E checks',
+        },
       },
       {
         type: 'status',
@@ -206,16 +248,67 @@ describe('WebSocket background task events', () => {
 
     expect(translateCliMessage(progress, 'session-1')).toEqual([
       {
-        type: 'system_notification',
-        subtype: 'task_progress',
-        message: 'Running Playwright checks',
-        data: progress,
+        type: 'background_task',
+        event: {
+          taskId: 'agent-task-1',
+          toolUseId: 'agent-tool-1',
+          status: 'running',
+          description: 'Verify the todo app',
+          summary: 'Running Playwright checks',
+          lastToolName: 'Bash',
+          usage: { totalTokens: 1200, toolUses: 4, durationMs: 45000 },
+        },
       },
       {
         type: 'status',
         state: 'tool_executing',
         verb: 'Running Playwright checks',
       },
+    ])
+  })
+})
+
+describe('WebSocket background task notifications', () => {
+  it('attaches the tool card notification to a terminal task_notification', () => {
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'task_notification',
+      task_id: 'agent-task-1',
+      tool_use_id: 'agent-tool-1',
+      status: 'completed',
+      summary: 'All checks passed',
+      result: 'Report written',
+      output_file: '/tmp/agent-task-1.output',
+    }, 'session-1')).toEqual([
+      {
+        type: 'background_task',
+        event: {
+          taskId: 'agent-task-1',
+          toolUseId: 'agent-tool-1',
+          status: 'completed',
+          summary: 'All checks passed',
+          outputFile: '/tmp/agent-task-1.output',
+        },
+        notification: {
+          taskId: 'agent-task-1',
+          toolUseId: 'agent-tool-1',
+          status: 'completed',
+          summary: 'All checks passed',
+          result: 'Report written',
+          outputFile: '/tmp/agent-task-1.output',
+        },
+      },
+    ])
+  })
+
+  it('maps a killed task to stopped without a notification', () => {
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'task_notification',
+      task_id: 'shell-1',
+      status: 'killed',
+    }, 'session-1')).toEqual([
+      { type: 'background_task', event: { taskId: 'shell-1', status: 'stopped' } },
     ])
   })
 })
@@ -270,35 +363,60 @@ describe('WebSocket goal command events', () => {
         '</local-command-stdout>',
       ].join('\n'),
     }, sessionId)).toEqual([
-      {
-        type: 'system_notification',
-        subtype: 'goal_event',
+      liveItem({
+        type: 'goal_event',
+        action: 'created',
+        status: 'active',
+        objective: 'ship the smoke test',
         message: goalStatusOutput,
-        data: {
-          action: 'created',
-          status: 'active',
-          objective: 'ship the smoke test',
-          message: goalStatusOutput,
-        },
-      },
+      }),
     ])
+  })
+
+  it('decodes &amp;, &lt; and &gt; in local command output, like Claude Code', () => {
+    expect(runGoalCommand(`goal-entities-${crypto.randomUUID()}`, 'ship A&amp;B', 'Goal set: ship A&amp;B &lt;now&gt; &quot;x&quot;')).toEqual([
+      liveItem({
+        type: 'goal_event',
+        action: 'created',
+        status: 'active',
+        objective: 'ship A&B <now> &quot;x&quot;',
+        message: 'Goal set: ship A&B <now> &quot;x&quot;',
+      }),
+    ])
+  })
+
+  it('reads untagged local_command_output and ignores an empty stdout tag', () => {
+    const sessionId = `local-untagged-${crypto.randomUUID()}`
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'local_command_output',
+      content: 'Set model to opus',
+    }, sessionId)).toEqual([
+      { type: 'content_start', blockType: 'text' },
+      { type: 'content_delta', text: 'Set model to opus' },
+    ])
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'local_command_output',
+      content: '<local-command-stdout></local-command-stdout>',
+    }, sessionId)).toEqual([])
+  })
+
+  it('falls back to stderr when the stdout tag is empty', () => {
+    expect(extractLocalCommandOutput(
+      '<local-command-stdout></local-command-stdout><local-command-stderr>err</local-command-stderr>',
+    )).toBe('err')
+    expect(extractLocalCommandOutput('<local-command-stdout>out</local-command-stdout><local-command-stderr>err</local-command-stderr>')).toBe('out')
+    expect(extractLocalCommandOutput('<local-command-stdout> </local-command-stdout>', { allowUntagged: true })).toBeNull()
   })
 
   it('classifies /goal clear and completion output for the desktop client', () => {
     expect(runGoalCommand(`goal-complete-${crypto.randomUUID()}`, 'complete', 'Goal marked complete.')).toEqual([
-      expect.objectContaining({
-        type: 'system_notification',
-        subtype: 'goal_event',
-        data: { action: 'completed', message: 'Goal marked complete.' },
-      }),
+      liveItem({ type: 'goal_event', action: 'completed', message: 'Goal marked complete.' }),
     ])
 
     expect(runGoalCommand(`goal-clear-${crypto.randomUUID()}`, 'clear', 'Goal cleared: ship docs')).toEqual([
-      expect.objectContaining({
-        type: 'system_notification',
-        subtype: 'goal_event',
-        data: { action: 'cleared', message: 'Goal cleared: ship docs' },
-      }),
+      liveItem({ type: 'goal_event', action: 'cleared', message: 'Goal cleared: ship docs' }),
     ])
   })
 
@@ -316,12 +434,7 @@ describe('WebSocket goal command events', () => {
 
   it('keeps negative /goal command output visible as a goal message event', () => {
     expect(runGoalCommand(`goal-empty-${crypto.randomUUID()}`, '', 'No active goal.', 'user')).toEqual([
-      {
-        type: 'system_notification',
-        subtype: 'goal_event',
-        message: 'No active goal.',
-        data: { action: 'message', message: 'No active goal.' },
-      },
+      liveItem({ type: 'goal_event', action: 'message', message: 'No active goal.' }),
     ])
   })
 
@@ -437,6 +550,48 @@ describe('WebSocket stream event translation', () => {
         isError: false,
         parentToolUseId: 'agent-1',
       },
+    ])
+  })
+
+  it('keeps subagent parent linkage when tool input is parsed from the assistant message', () => {
+    const sessionId = `subagent-deferred-${crypto.randomUUID()}`
+
+    translateCliMessage({
+      type: 'stream_event',
+      parent_tool_use_id: 'agent-1',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'grep-1', name: 'Grep' },
+      },
+    }, sessionId)
+    translateCliMessage({
+      type: 'stream_event',
+      event: { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"pattern":' } },
+    }, sessionId)
+    expect(translateCliMessage({
+      type: 'stream_event',
+      event: { type: 'content_block_stop', index: 0 },
+    }, sessionId)).toEqual([])
+
+    expect(translateCliMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'todo' } }] },
+    }, sessionId)).toEqual([
+      {
+        type: 'tool_use_complete',
+        toolName: 'Grep',
+        toolUseId: 'grep-1',
+        input: { pattern: 'todo' },
+        parentToolUseId: 'agent-1',
+      },
+    ])
+
+    expect(translateCliMessage({
+      type: 'user',
+      message: { content: [{ type: 'tool_result', tool_use_id: 'grep-1', content: 'no matches' }] },
+    }, sessionId)).toEqual([
+      { type: 'tool_result', toolUseId: 'grep-1', content: 'no matches', isError: false, parentToolUseId: 'agent-1' },
     ])
   })
 

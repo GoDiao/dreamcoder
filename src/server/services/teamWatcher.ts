@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { sendToSession, getActiveSessionIds } from '../ws/handler.js'
-import type { ServerMessage, TeamMemberStatus } from '../ws/events.js'
+import type { ServerMessage, TeamMemberStatus } from '../ws/protocol.js'
 
 function getTeamsDir(): string {
   const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
