@@ -25,7 +25,7 @@ export type ProviderIndex = {
 const DEFAULT_INDEX: ProviderIndex = { activeId: null, providers: [] }
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-export function getProviderIndexPath(configDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')) {
+export function getProviderIndexPath(configDir = process.env.DREAMCODER_CONFIG_DIR || join(homedir(), '.claude')) {
   return join(configDir, 'dreamcoder', 'providers.json')
 }
 
@@ -215,7 +215,7 @@ function providerSelector(provider: SavedProviderIndexEntry, index: ProviderInde
   return matchingSlugCount === 1 ? slug : provider.id
 }
 
-export function formatProviderTargets(index: ProviderIndex = loadProviderIndex(), configDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')) {
+export function formatProviderTargets(index: ProviderIndex = loadProviderIndex(), configDir = process.env.DREAMCODER_CONFIG_DIR || join(homedir(), '.claude')) {
   const lines = [
     'Quality gate provider targets',
     `Config: ${getProviderIndexPath(configDir)}`,

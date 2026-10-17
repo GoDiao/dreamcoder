@@ -397,11 +397,11 @@ describe('ConversationService', () => {
   })
 
   it('should reconstruct usage and metadata from a persisted transcript', async () => {
-    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
     const previousAnthropicApiKey = process.env.ANTHROPIC_API_KEY
     const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-transcript-'))
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-workdir-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
     process.env.ANTHROPIC_API_KEY = 'test-key'
 
     try {
@@ -449,9 +449,9 @@ describe('ConversationService', () => {
       expect(usage?.models[0]?.model).toBe('mock-model')
     } finally {
       if (previousConfigDir === undefined) {
-        delete process.env.CLAUDE_CONFIG_DIR
+        delete process.env.DREAMCODER_CONFIG_DIR
       } else {
-        process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
       }
       if (previousAnthropicApiKey === undefined) {
         delete process.env.ANTHROPIC_API_KEY
@@ -464,11 +464,11 @@ describe('ConversationService', () => {
   })
 
   it('should reconstruct Sonnet 4.6 transcript usage before CLI config is initialized', async () => {
-    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
     const previousNodeEnv = process.env.NODE_ENV
     const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-transcript-sonnet-'))
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-workdir-sonnet-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
     process.env.NODE_ENV = 'development'
 
     try {
@@ -505,9 +505,9 @@ describe('ConversationService', () => {
       expect(contextEstimate?.categories.some((category) => category.name === 'Output tokens' && category.tokens === 20)).toBe(true)
     } finally {
       if (previousConfigDir === undefined) {
-        delete process.env.CLAUDE_CONFIG_DIR
+        delete process.env.DREAMCODER_CONFIG_DIR
       } else {
-        process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
       }
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV
@@ -790,7 +790,7 @@ describe('WebSocket Chat Integration', () => {
 
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-conv-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     process.env.CLAUDE_CLI_PATH = fileURLToPath(
       new URL('./fixtures/mock-sdk-cli.ts', import.meta.url)
     )
@@ -813,7 +813,7 @@ describe('WebSocket Chat Integration', () => {
     } else {
       delete process.env.CLAUDE_CLI_PATH
     }
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   })
 
   it('should connect and receive connected event', async () => {

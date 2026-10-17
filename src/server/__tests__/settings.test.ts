@@ -41,7 +41,7 @@ let originalAnthropicDefaultOpusModel: string | undefined
 async function setup() {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-test-'))
   resetSettingsCache()
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   originalHome = process.env.HOME
   originalUserProfile = process.env.USERPROFILE
   originalShell = process.env.SHELL
@@ -53,7 +53,7 @@ async function setup() {
   originalAnthropicDefaultHaikuModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL
   originalAnthropicDefaultSonnetModel = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL
   originalAnthropicDefaultOpusModel = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   process.env.HOME = tmpDir
   process.env.USERPROFILE = tmpDir
   process.env.SHELL = '/bin/zsh'
@@ -76,9 +76,9 @@ async function teardown() {
   resetSettingsCache()
 
   if (originalConfigDir !== undefined) {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   }
 
   if (originalHome !== undefined) {

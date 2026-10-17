@@ -10,7 +10,7 @@ import {
 } from '../sessionStorage.js'
 import type { CustomTitleMessage } from '../../types/logs.js'
 
-const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
 
 async function createTmpDir(): Promise<string> {
   const dir = path.join(
@@ -26,16 +26,16 @@ describe('sessionStorage flush', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     resetProjectForTesting()
   })
 
   afterEach(async () => {
     resetProjectForTesting()
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   })

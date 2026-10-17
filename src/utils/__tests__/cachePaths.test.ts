@@ -3,20 +3,20 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { CACHE_PATHS } from '../cachePaths.js'
 
-const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalClaudeConfigDir = process.env.DREAMCODER_CONFIG_DIR
 
 afterEach(() => {
   if (originalClaudeConfigDir === undefined) {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   } else {
-    process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalClaudeConfigDir
   }
 })
 
 describe('CACHE_PATHS portable mode', () => {
-  test('places logs under CLAUDE_CONFIG_DIR when portable mode is active', () => {
+  test('places logs under DREAMCODER_CONFIG_DIR when portable mode is active', () => {
     const configDir = join(tmpdir(), 'dreamcoder-portable-cache')
-    process.env.CLAUDE_CONFIG_DIR = configDir
+    process.env.DREAMCODER_CONFIG_DIR = configDir
 
     expect(CACHE_PATHS.baseLogs().startsWith(join(configDir, 'Cache'))).toBe(true)
     expect(CACHE_PATHS.errors().startsWith(join(configDir, 'Cache'))).toBe(true)

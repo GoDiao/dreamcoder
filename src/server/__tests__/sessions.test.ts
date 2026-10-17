@@ -24,7 +24,7 @@ let service: SessionService
 async function setupTmpConfigDir(): Promise<string> {
   tmpDir = path.join(os.tmpdir(), `claude-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   return tmpDir
 }
 
@@ -32,7 +32,7 @@ async function cleanupTmpDir(): Promise<void> {
   if (tmpDir) {
     await fs.rm(tmpDir, { recursive: true, force: true })
   }
-  delete process.env.CLAUDE_CONFIG_DIR
+  delete process.env.DREAMCODER_CONFIG_DIR
 }
 
 function git(cwd: string, ...args: string[]): string {

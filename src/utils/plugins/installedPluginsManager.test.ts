@@ -15,17 +15,17 @@ describe('deletePluginCache', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'plugin-cache-delete-'))
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalPluginCacheDir = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
-    process.env.CLAUDE_CONFIG_DIR = path.join(tempDir, '.claude')
+    process.env.DREAMCODER_CONFIG_DIR = path.join(tempDir, '.claude')
     delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
   })
 
   afterEach(async () => {
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     if (originalPluginCacheDir === undefined) {
       delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
@@ -117,7 +117,7 @@ describe('deletePluginCache', () => {
       'utf-8',
     )
 
-    process.env.CLAUDE_CONFIG_DIR = newConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = newConfigDir
     clearInstalledPluginsCache()
 
     const loaded = loadInstalledPluginsV2()

@@ -201,7 +201,7 @@ UPSTREAM_PID=$!
 
 (
   cd "${ROOT_DIR}"
-  CLAUDE_CONFIG_DIR="${CONFIG_DIR}" SERVER_PORT="${API_PORT}" \
+  DREAMCODER_CONFIG_DIR="${CONFIG_DIR}" SERVER_PORT="${API_PORT}" \
     bun run src/server/index.ts --host 127.0.0.1 --port "${API_PORT}" \
       >"${ARTIFACT_DIR}/server.log" 2>&1
 ) &

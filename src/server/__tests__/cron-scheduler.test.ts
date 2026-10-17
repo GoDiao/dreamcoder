@@ -11,7 +11,7 @@ import {
 import { CronService, type CronTask } from '../services/cronService.js'
 
 let tmpDir: string
-const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
 
 async function createTmpDir(): Promise<string> {
   const dir = path.join(
@@ -144,7 +144,7 @@ describe('CronScheduler', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     cronService = new CronService()
     scheduler = new CronScheduler(cronService)
   })
@@ -152,9 +152,9 @@ describe('CronScheduler', () => {
   afterEach(async () => {
     scheduler.stop()
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })
@@ -331,7 +331,7 @@ describe('Execution log trimming', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     cronService = new CronService()
     scheduler = new CronScheduler(cronService)
   })
@@ -339,9 +339,9 @@ describe('Execution log trimming', () => {
   afterEach(async () => {
     scheduler.stop()
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })
@@ -392,7 +392,7 @@ describe('Scheduled Tasks API — runs endpoints', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
 
     const mod = await import('../api/scheduled-tasks.js')
     handleScheduledTasksApi = mod.handleScheduledTasksApi
@@ -400,9 +400,9 @@ describe('Scheduled Tasks API — runs endpoints', () => {
 
   afterEach(async () => {
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })

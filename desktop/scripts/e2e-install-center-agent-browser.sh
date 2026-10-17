@@ -22,9 +22,9 @@ SERVER_LOG="${ARTIFACT_DIR}/server.log"
 WEB_LOG="${ARTIFACT_DIR}/web.log"
 
 if [[ "${DREAMCODER_E2E_USE_REAL_CONFIG:-1}" == "1" ]]; then
-  CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  CONFIG_DIR="${DREAMCODER_CONFIG_DIR:-$HOME/.claude}"
 else
-  CONFIG_DIR="${CLAUDE_CONFIG_DIR:-${ARTIFACT_DIR}/claude-config}"
+  CONFIG_DIR="${DREAMCODER_CONFIG_DIR:-${ARTIFACT_DIR}/claude-config}"
   mkdir -p "${CONFIG_DIR}"
 fi
 
@@ -50,7 +50,7 @@ trap cleanup EXIT
 echo "Starting isolated backend on ${BASE_URL}"
 (
   cd "${ROOT_DIR}"
-  CLAUDE_CONFIG_DIR="${CONFIG_DIR}" SERVER_PORT="${API_PORT}" bun run src/server/index.ts --host 127.0.0.1 --port "${API_PORT}"
+  DREAMCODER_CONFIG_DIR="${CONFIG_DIR}" SERVER_PORT="${API_PORT}" bun run src/server/index.ts --host 127.0.0.1 --port "${API_PORT}"
 ) >"${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 

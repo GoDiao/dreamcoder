@@ -46,12 +46,12 @@ describe('Skills API', () => {
     tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-skills-test-'))
     originalHome = process.env.HOME
     originalUserProfile = process.env.USERPROFILE
-    originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalClaudeConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalCwdState = getCwdState()
 
     process.env.HOME = tmpHome
     process.env.USERPROFILE = tmpHome
-    process.env.CLAUDE_CONFIG_DIR = path.join(tmpHome, '.claude')
+    process.env.DREAMCODER_CONFIG_DIR = path.join(tmpHome, '.claude')
     setCwdState(tmpHome)
     clearInstalledPluginsCache()
     clearPluginCache('skills-api-test-setup')
@@ -75,9 +75,9 @@ describe('Skills API', () => {
     }
 
     if (originalClaudeConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalClaudeConfigDir
     }
 
     setCwdState(originalCwdState)

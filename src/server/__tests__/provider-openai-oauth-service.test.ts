@@ -69,8 +69,8 @@ async function setup() {
   tmpDir = await fs.mkdtemp(
     path.join(os.tmpdir(), 'provider-openai-oauth-test-'),
   )
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   callbackPort = await getFreePort()
   service = new ProviderOpenAIOAuthService({ callbackPort })
 }
@@ -78,9 +78,9 @@ async function setup() {
 async function teardown() {
   service.dispose()
   if (originalConfigDir === undefined) {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   } else {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   }
   await fs.rm(tmpDir, { recursive: true, force: true })
 }

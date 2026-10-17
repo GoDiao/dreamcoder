@@ -96,16 +96,16 @@ function totalForDate(
 
 describe('activity stats token accounting', () => {
   beforeEach(async () => {
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     tmpConfigDir = await mkdtemp(join(tmpdir(), 'dreamcoder-stats-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
   })
 
   afterEach(async () => {
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     await rm(tmpConfigDir, { recursive: true, force: true })
   })
