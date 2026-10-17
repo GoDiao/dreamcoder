@@ -18,7 +18,7 @@ vi.mock('../../api/websocket', () => ({
 
 vi.mock('../../api/sessions', () => ({
   sessionsApi: {
-    getMessages: vi.fn(async () => ({ messages: [] })),
+    getTranscript: vi.fn(async () => ({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })),
     getSlashCommands: vi.fn(async () => ({ commands: [] })),
   },
 }))

@@ -1,12 +1,7 @@
 import { api } from './client'
-import type { AgentTaskNotification } from '../types/chat'
-import type { SessionListItem, MessageEntry } from '../types/session'
+import type { SessionListItem, SessionTranscript } from '../types/session'
 
 type SessionsResponse = { sessions: SessionListItem[]; total: number }
-type MessagesResponse = {
-  messages: MessageEntry[]
-  taskNotifications?: AgentTaskNotification[]
-}
 type CreateSessionResponse = { sessionId: string; workDir?: string }
 export type BatchDeleteSessionsResponse = {
   ok: boolean
@@ -315,8 +310,8 @@ export const sessionsApi = {
     return api.get<SessionsResponse>(`/api/sessions${qs ? `?${qs}` : ''}`)
   },
 
-  getMessages(sessionId: string) {
-    return api.get<MessagesResponse>(`/api/sessions/${sessionId}/messages`)
+  getTranscript(sessionId: string) {
+    return api.get<SessionTranscript>(`/api/sessions/${sessionId}/transcript`)
   },
 
   create(input?: string | CreateSessionRequest) {

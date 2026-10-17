@@ -111,7 +111,7 @@ wait_for_text() {
 
 session_contains() {
   local needle="$1"
-  curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}/messages" | NEEDLE="${needle}" bun -e '
+  curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}" | NEEDLE="${needle}" bun -e '
     const input = await Bun.stdin.text()
     const data = JSON.parse(input)
     const haystack = JSON.stringify(data)

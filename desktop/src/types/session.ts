@@ -1,3 +1,5 @@
+import type { AgentTaskNotification, UIMessage } from './chat'
+
 export type SessionListItem = {
   id: string
   title: string
@@ -21,6 +23,18 @@ export type MessageEntry = {
   parentUuid?: string
   parentToolUseId?: string
   isSidechain?: boolean
+}
+
+/**
+ * The server's reading of a CLI transcript, for a session or a team member:
+ * display items plus what the desktop restores alongside them.
+ */
+export type SessionTranscript = {
+  items: UIMessage[]
+  /** Terminal task notifications keyed by the tool use id of the task's tool call. */
+  agentNotifications: Record<string, AgentTaskNotification>
+  lastTodos: Array<{ content: string; status: string; activeForm?: string }> | null
+  hasMessagesAfterTaskCompletion: boolean
 }
 
 export type SessionDetail = SessionListItem & {

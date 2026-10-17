@@ -1511,10 +1511,10 @@ describe('WebSocket Chat Integration', () => {
     ).toBe(true)
     expect(clearTurn.some((m) => m.type === 'content_delta')).toBe(false)
 
-    const messagesRes = await fetch(`${baseUrl}/api/sessions/${sessionId}/messages`)
-    expect(messagesRes.status).toBe(200)
-    const body = await messagesRes.json() as { messages: unknown[] }
-    expect(body.messages).toEqual([])
+    const transcriptRes = await fetch(`${baseUrl}/api/sessions/${sessionId}/transcript`)
+    expect(transcriptRes.status).toBe(200)
+    const body = await transcriptRes.json() as { items: unknown[] }
+    expect(body.items).toEqual([])
   })
 
   it('should reject /clear arguments without clearing the desktop session', async () => {

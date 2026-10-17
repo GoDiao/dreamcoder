@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   delete: vi.fn(),
   list: vi.fn(),
-  getMessages: vi.fn(),
+  getTranscript: vi.fn(),
   getGitInfo: vi.fn(),
   getSlashCommands: vi.fn(),
   getRepositoryContext: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('../../api/sessions', () => ({
     create: mocks.create,
     delete: mocks.delete,
     list: mocks.list,
-    getMessages: mocks.getMessages,
+    getTranscript: mocks.getTranscript,
     getGitInfo: mocks.getGitInfo,
     getSlashCommands: mocks.getSlashCommands,
     getRepositoryContext: mocks.getRepositoryContext,
@@ -183,7 +183,7 @@ describe('ChatInput file mentions', () => {
     mocks.create.mockResolvedValue({ sessionId: 'created-session', workDir: '/repo' })
     mocks.delete.mockResolvedValue({ ok: true })
     mocks.list.mockResolvedValue({ sessions: [], total: 0 })
-    mocks.getMessages.mockResolvedValue({ messages: [] })
+    mocks.getTranscript.mockResolvedValue({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })
     mocks.getSlashCommands.mockResolvedValue({ commands: [] })
   })
 

@@ -23,8 +23,7 @@ export async function handleTeamsApi(
       segments[5] === 'transcript'
     ) {
       const agentId = decodeURIComponent(segments[4])
-      const messages = await teamService.getMemberTranscript(teamName, agentId)
-      return Response.json({ messages })
+      return Response.json(await teamService.getMemberTranscript(teamName, agentId))
     }
 
     if (

@@ -167,9 +167,11 @@ exports[`session transcript fixtures compaction 1`] = `
     {
       "id": "cs1:compact",
       "phase": "complete",
+      "preTokens": 12000,
       "summary": "The billing import is implemented; tests remain.",
       "timestamp": 1777629604000,
       "title": "Context compacted",
+      "trigger": "manual",
       "type": "compact_summary",
     },
     {
@@ -404,8 +406,8 @@ exports[`session transcript fixtures attachments 1`] = `
           "type": "file",
         },
         {
-          "data": "iVBORw0KGgo=",
-          "mimeType": undefined,
+          "data": "data:image/png;base64,iVBORw0KGgo=",
+          "mimeType": "image/png",
           "name": "image",
           "type": "image",
         },

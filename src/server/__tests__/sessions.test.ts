@@ -925,7 +925,7 @@ describe('SessionService', () => {
     ])
 
     const messages = await service.getSessionMessages(sessionId)
-    const taskNotifications = await service.getSessionTaskNotifications(sessionId)
+    const { agentNotifications } = await service.getSessionTranscript(sessionId)
 
     expect(messages.map((message) => message.id)).toEqual([
       firstUserId,
@@ -937,15 +937,15 @@ describe('SessionService', () => {
     expect(JSON.stringify(messages)).not.toContain('旧后台任务通知')
     expect(JSON.stringify(messages)).not.toContain('server restarted')
     expect(JSON.stringify(messages)).not.toContain('后台任务触发的工具调用完成')
-    expect(taskNotifications).toEqual([
-      {
+    expect(agentNotifications).toEqual({
+      toolu_bg: {
         taskId: 'bg-1',
         toolUseId: 'toolu_bg',
         status: 'completed',
         summary: 'Background command completed',
         timestamp: '2026-01-01T00:01:00.000Z',
       },
-    ])
+    })
   })
 
   it('should reconstruct parent agent tool linkage from parentUuid chains', async () => {
@@ -1901,41 +1901,6 @@ describe('Sessions API', () => {
     expect(res.status).toBe(404)
   })
 
-  it('GET /api/sessions/:id/messages should return messages', async () => {
-    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
-    await writeSessionFile('-tmp-api-test', sessionId, [
-      makeSnapshotEntry(),
-      makeUserEntry('Hello'),
-      makeAssistantEntry('World'),
-      makeUserEntry(
-        '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>failed</status>\n<summary>Background command failed &amp; stopped</summary>\n<result>Stack trace &amp; failed assertion</result>\n<output-file>C:\\Temp\\bg.output</output-file>\n</task-notification>',
-        crypto.randomUUID(),
-      ),
-      makeAssistantEntry('internal task response'),
-    ])
-
-    const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/messages`)
-    expect(res.status).toBe(200)
-
-    const body = (await res.json()) as {
-      messages: unknown[]
-      taskNotifications: unknown[]
-    }
-    expect(body.messages).toHaveLength(2)
-    expect(JSON.stringify(body.messages)).not.toContain('<task-notification>')
-    expect(body.taskNotifications).toEqual([
-      {
-        taskId: 'bg-1',
-        toolUseId: 'toolu_bg',
-        status: 'failed',
-        summary: 'Background command failed & stopped',
-        result: 'Stack trace & failed assertion',
-        outputFile: 'C:\\Temp\\bg.output',
-        timestamp: expect.any(String),
-      },
-    ])
-  })
-
   it('GET /api/sessions/:id/transcript should return display items and task notifications', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-ffffffffffff'
     await writeSessionFile('-tmp-api-test', sessionId, [
@@ -1943,7 +1908,7 @@ describe('Sessions API', () => {
       makeUserEntry('Hello'),
       makeAssistantEntry('World'),
       makeUserEntry(
-        '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>failed</status>\n</task-notification>',
+        '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>failed</status>\n<summary>Background command failed &amp; stopped</summary>\n<result>Stack trace &amp; failed assertion</result>\n<output-file>C:\\Temp\\bg.output</output-file>\n</task-notification>',
         crypto.randomUUID(),
       ),
       makeAssistantEntry('internal task response'),
@@ -1960,7 +1925,17 @@ describe('Sessions API', () => {
       ['user_text', 'Hello'],
       ['assistant_text', 'World'],
     ])
-    expect(body.agentNotifications.toolu_bg).toMatchObject({ taskId: 'bg-1', status: 'failed' })
+    expect(body.agentNotifications).toEqual({
+      toolu_bg: {
+        taskId: 'bg-1',
+        toolUseId: 'toolu_bg',
+        status: 'failed',
+        summary: 'Background command failed & stopped',
+        result: 'Stack trace & failed assertion',
+        outputFile: 'C:\\Temp\\bg.output',
+        timestamp: expect.any(String),
+      },
+    })
   })
 
   it('GET /api/sessions/:id/git-info should prefer the active CLI workDir', async () => {

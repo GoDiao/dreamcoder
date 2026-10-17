@@ -72,16 +72,6 @@ export async function handleSessionsApi(
       return await getSessionRepositoryContext(url)
     }
 
-    if (subResource === 'messages') {
-      if (req.method !== 'GET') {
-        return Response.json(
-          { error: 'METHOD_NOT_ALLOWED', message: `Method ${req.method} not allowed` },
-          { status: 405 }
-        )
-      }
-      return await getSessionMessages(sessionId)
-    }
-
     if (subResource === 'transcript') {
       if (req.method !== 'GET') {
         return Response.json(
@@ -212,14 +202,6 @@ async function getSession(sessionId: string): Promise<Response> {
     throw ApiError.notFound(`Session not found: ${sessionId}`)
   }
   return Response.json(detail)
-}
-
-async function getSessionMessages(sessionId: string): Promise<Response> {
-  const [messages, taskNotifications] = await Promise.all([
-    sessionService.getSessionMessages(sessionId),
-    sessionService.getSessionTaskNotifications(sessionId),
-  ])
-  return Response.json({ messages, taskNotifications })
 }
 
 async function handleSessionWorkspaceRoute(

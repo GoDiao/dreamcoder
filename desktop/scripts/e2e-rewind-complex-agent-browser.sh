@@ -212,7 +212,7 @@ if [[ "${PREFILL_VALUE}" != "${SECOND_PROMPT}" ]]; then
   exit 1
 fi
 
-TRANSCRIPT_CHECK="$(curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}/messages" \
+TRANSCRIPT_CHECK="$(curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}" \
   | FIRST_PROMPT="${FIRST_PROMPT}" SECOND_PROMPT="${SECOND_PROMPT}" bun -e '
 const input = await Bun.stdin.text()
 const data = JSON.parse(input)

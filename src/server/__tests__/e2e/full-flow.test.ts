@@ -93,10 +93,10 @@ describe('E2E: Full Flow', () => {
     expect(data.title).toBe('My Test Session')
   })
 
-  it('should get session messages', async () => {
-    const { status, data } = await api('GET', `/api/sessions/${sessionId}/messages`)
+  it('should get session transcript', async () => {
+    const { status, data } = await api('GET', `/api/sessions/${sessionId}/transcript`)
     expect(status).toBe(200)
-    expect(Array.isArray(data.messages)).toBe(true)
+    expect(Array.isArray(data.items)).toBe(true)
   })
 
   it('should delete session', async () => {

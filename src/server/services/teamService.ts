@@ -3,6 +3,14 @@ import * as path from 'path'
 import * as os from 'os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { writeToMailbox } from '../../utils/teammateMailbox.js'
+import {
+  collectTaskNotifications,
+  entriesToMessages,
+  type TranscriptEntry,
+} from '../transcript/entries.js'
+import { buildSessionTranscript } from '../transcript/history.js'
+import type { SessionTranscript } from '../transcript/items.js'
+import { readJsonlFile } from './jsonlFile.js'
 
 export type TeamMember = {
   agentId: string
@@ -29,15 +37,6 @@ export type TeamDetail = TeamSummary & {
   leadAgentId: string
   leadSessionId?: string
   members: TeamMember[]
-}
-
-export type TranscriptMessage = {
-  id: string
-  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result'
-  content: unknown
-  timestamp: string
-  model?: string
-  parentToolUseId?: string
 }
 
 type TeamFileRaw = {
@@ -175,7 +174,7 @@ export class TeamService {
   async getMemberTranscript(
     teamName: string,
     agentId: string,
-  ): Promise<TranscriptMessage[]> {
+  ): Promise<SessionTranscript> {
     const config = await this.loadTeamConfig(teamName)
     const memberName = await this.resolveMemberName(config, teamName, agentId)
     if (!memberName) {
@@ -188,7 +187,7 @@ export class TeamService {
     if (member?.sessionId) {
       const jsonlPath = await this.findTranscriptFile(member.sessionId)
       if (jsonlPath) {
-        return this.parseTranscriptFile(jsonlPath)
+        return this.readMemberTranscript(jsonlPath)
       }
     }
 
@@ -198,11 +197,20 @@ export class TeamService {
         memberName,
       )
       if (subagentPath) {
-        return this.parseTranscriptFile(subagentPath)
+        return this.readMemberTranscript(subagentPath)
       }
     }
 
-    return []
+    return buildSessionTranscript([], [], { includeTeammateMessages: true })
+  }
+
+  private async readMemberTranscript(filePath: string): Promise<SessionTranscript> {
+    const entries = await readJsonlFile<TranscriptEntry>(filePath)
+    return buildSessionTranscript(
+      entriesToMessages(entries),
+      collectTaskNotifications(entries),
+      { includeTeammateMessages: true },
+    )
   }
 
   async sendMemberMessage(
@@ -508,48 +516,6 @@ export class TeamService {
     }
   }
 
-  private async parseTranscriptFile(
-    filePath: string,
-  ): Promise<TranscriptMessage[]> {
-    const raw = await fs.readFile(filePath, 'utf-8')
-    const lines = raw.split('\n').filter((line) => line.trim().length > 0)
-
-    const messages: TranscriptMessage[] = []
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line) as Record<string, unknown>
-
-        const entryType = entry.type as string | undefined
-        if (
-          entryType !== 'user' &&
-          entryType !== 'assistant' &&
-          entryType !== 'system' &&
-          entryType !== 'tool_use' &&
-          entryType !== 'tool_result'
-        ) {
-          continue
-        }
-
-        if (entry.isMeta) continue
-
-        const message: TranscriptMessage = {
-          id: (entry.uuid as string) || crypto.randomUUID(),
-          type: entryType as TranscriptMessage['type'],
-          content: entry.message ?? entry.content ?? null,
-          timestamp:
-            (entry.timestamp as string) || new Date().toISOString(),
-          ...(typeof entry.parentToolUseId === 'string' ? { parentToolUseId: entry.parentToolUseId } : {}),
-          ...(typeof entry.model === 'string' ? { model: entry.model } : {}),
-        }
-
-        messages.push(message)
-      } catch {
-      }
-    }
-
-    return messages
-  }
 }
 
 export const teamService = new TeamService()

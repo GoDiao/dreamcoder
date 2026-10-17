@@ -52,6 +52,9 @@ export type TranscriptItem =
       title: string
       phase?: 'compacting' | 'complete'
       summary?: string
+      trigger?: 'manual' | 'auto'
+      preTokens?: number
+      messagesSummarized?: number
       timestamp: number
     }
   | {

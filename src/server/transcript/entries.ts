@@ -27,6 +27,13 @@ export type TranscriptEntry = {
   [key: string]: unknown
 }
 
+/** What the CLI records about a compaction on its `compact_boundary` entry. */
+export type CompactMetadata = {
+  trigger?: 'manual' | 'auto'
+  preTokens?: number
+  messagesSummarized?: number
+}
+
 /** A visible conversation message, before it is split into display items. */
 export type MessageEntry = {
   id: string
@@ -38,6 +45,8 @@ export type MessageEntry = {
   parentUuid?: string
   parentToolUseId?: string
   isSidechain?: boolean
+  /** Set on the summary message that follows a compaction. */
+  compactMetadata?: CompactMetadata
 }
 
 type ContentBlock = Record<string, unknown>
@@ -156,6 +165,18 @@ function goalLocalCommandEntryToMessage(entry: TranscriptEntry): MessageEntry | 
   }
 }
 
+function readCompactMetadata(entry: TranscriptEntry | undefined): CompactMetadata | undefined {
+  if (entry?.type !== 'system' || entry.subtype !== 'compact_boundary') return undefined
+  const raw = entry.compactMetadata
+  if (!raw || typeof raw !== 'object') return undefined
+  const { trigger, preTokens, messagesSummarized } = raw as Record<string, unknown>
+  return {
+    ...(trigger === 'manual' || trigger === 'auto' ? { trigger } : {}),
+    ...(typeof preTokens === 'number' ? { preTokens } : {}),
+    ...(typeof messagesSummarized === 'number' ? { messagesSummarized } : {}),
+  }
+}
+
 function agentToolUseId(entry: TranscriptEntry): string | undefined {
   const content = entry.message?.content
   if (!Array.isArray(content)) return undefined
@@ -261,7 +282,9 @@ export function entriesToMessages(entries: TranscriptEntry[]): MessageEntry[] {
 
     const parentToolUseId = resolveParentToolUseId(entry, entriesByUuid, parentToolUseIdCache)
     const msg = entryToMessage(entry, parentToolUseId)
-    if (msg) messages.push(msg)
+    if (!msg) continue
+    const compactMetadata = entry.parentUuid ? readCompactMetadata(entriesByUuid.get(entry.parentUuid)) : undefined
+    messages.push(compactMetadata ? { ...msg, compactMetadata } : msg)
   }
   return messages
 }
