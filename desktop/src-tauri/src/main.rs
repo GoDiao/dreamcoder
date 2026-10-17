@@ -6,13 +6,13 @@ use std::path::PathBuf;
 fn main() {
     if let Some(portable_dir) = determine_startup_portable_dir() {
         std::env::set_var(
-            "CLAUDE_CONFIG_DIR",
+            dreamcoder_desktop_lib::CONFIG_DIR_ENV,
             portable_dir.to_string_lossy().to_string(),
         );
-        std::env::set_var("DC_APP_PORTABLE_DIR", "1");
+        std::env::set_var(dreamcoder_desktop_lib::PORTABLE_MARKER_ENV, "1");
     }
 
-    if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+    if let Ok(config_dir) = std::env::var(dreamcoder_desktop_lib::CONFIG_DIR_ENV) {
         let webview_data = PathBuf::from(&config_dir).join("EBWebView");
         if let Err(e) = fs::create_dir_all(&webview_data) {
             eprintln!("[desktop] failed to create EBWebView dir: {e}");
@@ -24,14 +24,14 @@ fn main() {
 }
 
 fn determine_startup_portable_dir() -> Option<PathBuf> {
-    if std::env::var("CLAUDE_CONFIG_DIR").is_ok() {
+    if std::env::var(dreamcoder_desktop_lib::CONFIG_DIR_ENV).is_ok() {
         return None;
     }
 
     let exe = std::env::current_exe().ok()?;
     let exe_dir = exe.parent()?;
     let mut default_portable = exe_dir.to_path_buf();
-    default_portable.push("CLAUDE_CONFIG_DIR");
+    default_portable.push(dreamcoder_desktop_lib::PORTABLE_DIR_NAME);
 
     fn get_mode_from_config(dir: &std::path::Path) -> Option<(String, Option<PathBuf>)> {
         let path = dir.join("app-mode.json");
