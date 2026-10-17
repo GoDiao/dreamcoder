@@ -55,6 +55,12 @@ See: [Issue #3](https://github.com/GoDiao/dreamcoder/issues/3)
 - [ ] Release notes auto-generation
 - [ ] Auto-update signing & distribution
 
+## Phase 5 — Remote Agent Backend
+
+- [ ] Run the agent on a remote host over SSH / WebSocket, with the local desktop as the UI
+
+See: [RFC #24](https://github.com/GoDiao/dreamcoder/issues/24)
+
 ## Future Exploration
 
 - Token usage statistics panel
