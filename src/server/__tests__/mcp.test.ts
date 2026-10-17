@@ -206,6 +206,170 @@ describe('MCP API', () => {
     expect(connectSpy).not.toHaveBeenCalled()
   })
 
+  describe('confirmed stdio creation', () => {
+    const scopes = ['local', 'project', 'user'] as const
+    type EditableScope = typeof scopes[number]
+    let previousNodeEnv: string | undefined
+
+    beforeEach(() => {
+      previousNodeEnv = process.env.NODE_ENV
+      // Exercise persisted user config instead of the in-memory test config.
+      process.env.NODE_ENV = 'development'
+      clearConfigPathCaches()
+    })
+
+    afterEach(() => {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV
+      } else {
+        process.env.NODE_ENV = previousNodeEnv
+      }
+      clearConfigPathCaches()
+    })
+
+    function configFilePath(scope: EditableScope): string {
+      return scope === 'project'
+        ? path.join(projectRoot, '.mcp.json')
+        : getGlobalClaudeFile()
+    }
+
+    async function readStoredServers(scope: EditableScope) {
+      const stored = JSON.parse(await fs.readFile(configFilePath(scope), 'utf8'))
+      return scope === 'local'
+        ? stored.projects[projectRoot].mcpServers
+        : stored.mcpServers
+    }
+
+    function confirmedConfig() {
+      const allowedDir = path.join(projectRoot, 'allowed directory')
+      return {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@example/reviewed-server@1.2.3', '--directory', allowedDir],
+        env: {
+          ALLOWED_DIR: allowedDir,
+          API_TOKEN: 'fixture-token-only',
+        },
+      }
+    }
+
+    it.each(scopes)('roundtrips the confirmed command, args and env in %s scope', async (scope) => {
+      const config = confirmedConfig()
+      const create = makeRequest('POST', '/api/mcp', {
+        cwd: projectRoot,
+        name: 'reviewed-server',
+        scope,
+        config,
+      })
+
+      const createRes = await handleMcpApi(create.req, create.url, create.segments)
+
+      expect(createRes.status).toBe(201)
+      await expect(createRes.json()).resolves.toMatchObject({
+        server: { name: 'reviewed-server', scope, status: 'checking', config },
+      })
+      expect(hostPreflightSpy).toHaveBeenCalledWith('npx', projectRoot, config.env)
+      expect(await readStoredServers(scope)).toEqual({ 'reviewed-server': config })
+
+      clearConfigPathCaches()
+      const list = makeRequest('GET', `/api/mcp?cwd=${encodeURIComponent(projectRoot)}`)
+      const listRes = await handleMcpApi(list.req, list.url, list.segments)
+      const body = await listRes.json()
+
+      expect(listRes.status).toBe(200)
+      expect(body.servers).toHaveLength(1)
+      expect(body.servers[0]).toMatchObject({ name: 'reviewed-server', scope, config })
+      expect(connectSpy).not.toHaveBeenCalled()
+    })
+
+    it.each(scopes)('leaves %s config unchanged when host preflight fails', async (scope) => {
+      const config = confirmedConfig()
+      const existing = makeRequest('POST', '/api/mcp', {
+        cwd: projectRoot,
+        name: 'existing-server',
+        scope,
+        config,
+      })
+      const existingRes = await handleMcpApi(existing.req, existing.url, existing.segments)
+      expect(existingRes.status).toBe(201)
+      const before = await fs.readFile(configFilePath(scope), 'utf8')
+
+      hostPreflightSpy?.mockResolvedValueOnce({
+        ok: false,
+        message: 'Host command "npx" is not available in PATH.',
+      })
+      const create = makeRequest('POST', '/api/mcp', {
+        cwd: projectRoot,
+        name: 'reviewed-server',
+        scope,
+        config,
+      })
+      const createRes = await handleMcpApi(create.req, create.url, create.segments)
+
+      expect(createRes.status).toBe(400)
+      await expect(createRes.json()).resolves.toMatchObject({
+        message: 'Host command "npx" is not available in PATH.',
+      })
+      expect(await fs.readFile(configFilePath(scope), 'utf8')).toBe(before)
+      expect(await readStoredServers(scope)).toEqual({ 'existing-server': config })
+      expect(connectSpy).not.toHaveBeenCalled()
+    })
+
+    it.each(scopes)('preserves the existing %s server on duplicate submission', async (scope) => {
+      const config = confirmedConfig()
+      const create = makeRequest('POST', '/api/mcp', {
+        cwd: projectRoot,
+        name: 'reviewed-server',
+        scope,
+        config,
+      })
+      const createRes = await handleMcpApi(create.req, create.url, create.segments)
+      expect(createRes.status).toBe(201)
+      const before = await fs.readFile(configFilePath(scope), 'utf8')
+
+      const duplicate = makeRequest('POST', '/api/mcp', {
+        cwd: projectRoot,
+        name: 'reviewed-server',
+        scope,
+        config: { ...config, args: ['different-package'], env: { API_TOKEN: 'different-fixture' } },
+      })
+      const duplicateRes = await handleMcpApi(duplicate.req, duplicate.url, duplicate.segments)
+
+      expect(duplicateRes.status).toBe(409)
+      expect((await duplicateRes.json()).message).toContain('already exists')
+      expect(await fs.readFile(configFilePath(scope), 'utf8')).toBe(before)
+      expect(await readStoredServers(scope)).toEqual({ 'reviewed-server': config })
+      expect(connectSpy).not.toHaveBeenCalled()
+    })
+
+    it.each(scopes)('allows one successful %s create after a failed host preflight', async (scope) => {
+      const config = confirmedConfig()
+      const body = { cwd: projectRoot, name: 'reviewed-server', scope, config }
+      hostPreflightSpy?.mockResolvedValueOnce({
+        ok: false,
+        message: 'Host command "npx" is not available in PATH.',
+      })
+      const failed = makeRequest('POST', '/api/mcp', body)
+      const failedRes = await handleMcpApi(failed.req, failed.url, failed.segments)
+
+      expect(failedRes.status).toBe(400)
+      await expect(fs.stat(configFilePath(scope))).rejects.toMatchObject({ code: 'ENOENT' })
+
+      const retry = makeRequest('POST', '/api/mcp', body)
+      const retryRes = await handleMcpApi(retry.req, retry.url, retry.segments)
+
+      expect(retryRes.status).toBe(201)
+      expect(await readStoredServers(scope)).toEqual({ 'reviewed-server': config })
+
+      const duplicate = makeRequest('POST', '/api/mcp', body)
+      const duplicateRes = await handleMcpApi(duplicate.req, duplicate.url, duplicate.segments)
+
+      expect(duplicateRes.status).toBe(409)
+      expect(await readStoredServers(scope)).toEqual({ 'reviewed-server': config })
+      expect(connectSpy).not.toHaveBeenCalled()
+    })
+  })
+
   it('lists project paths that contain user-private MCP servers', async () => {
     const previousNodeEnv = process.env.NODE_ENV
     const projectB = path.join(tmpDir, 'project-b')
