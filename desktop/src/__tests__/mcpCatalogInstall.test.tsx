@@ -104,7 +104,7 @@ function fillEnvironment() {
 }
 
 function chooseScope(scope: McpWritableScope) {
-  const labels = { local: /^Local Private/, project: /^Project Shared/, user: /^User Available/ }
+  const labels = { local: 'Local', project: 'Project', user: 'User' }
   fireEvent.click(screen.getByRole('button', { name: labels[scope] }))
 }
 
@@ -167,7 +167,7 @@ describe('MCP catalog installation flow', () => {
 
     expect(screen.getByLabelText(/^ALLOWED_DIR/)).toHaveValue('')
     expect(screen.getByLabelText(/^API_TOKEN/)).toHaveValue('')
-    expect(screen.getByRole('button', { name: /^User Available/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'User' })).toHaveAttribute('aria-pressed', 'false')
     expect(confirmButton()).toBeDisabled()
     expect(mockedMcpApi.create).not.toHaveBeenCalled()
   })
@@ -209,7 +209,7 @@ describe('MCP catalog installation flow', () => {
   it('hides entered values in password fields and uses placeholders in the configuration preview', async () => {
     const { container } = await openReview()
     fillEnvironment()
-    const preview = container.querySelector('pre')
+    const preview = screen.getByRole('region', { name: 'Configuration to save' })
 
     expect(screen.getByLabelText(/^ALLOWED_DIR/)).toHaveAttribute('type', 'password')
     expect(screen.getByLabelText(/^API_TOKEN/)).toHaveAttribute('type', 'password')
@@ -277,7 +277,7 @@ describe('MCP catalog installation flow', () => {
     expect(container).not.toHaveTextContent(secret)
     expect(screen.getByLabelText(/^API_TOKEN/)).toHaveValue(secret)
     expect(screen.getByLabelText('Project folder')).toHaveValue(newProject)
-    expect(screen.getByRole('button', { name: /^Project Shared/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAttribute('aria-pressed', 'true')
     expect(useMcpStore.getState().servers).toEqual([])
     expect(mockedMcpApi.list).toHaveBeenCalledWith(newProject)
     expect(confirmButton()).toBeEnabled()
@@ -298,13 +298,18 @@ describe('MCP catalog installation flow', () => {
     chooseScope('user')
     fireEvent.click(confirmButton())
 
-    expect(await screen.findByText('MCP server already exists: filesystem')).toBeInTheDocument()
-    expect(screen.getByText(/This name is already configured in the selected scope and project/)).toBeInTheDocument()
+    await waitFor(() => {
+      const messages = screen.getAllByRole('alert').map((alert) => alert.textContent)
+      expect(messages).toEqual(expect.arrayContaining([
+        expect.stringContaining('MCP server already exists: filesystem'),
+        expect.stringContaining('This name is already configured in the selected scope and project'),
+      ]))
+    })
     expect(confirmButton()).toBeDisabled()
     expect(screen.getByLabelText(/^API_TOKEN/)).toHaveValue(secret)
     expect(mockedMcpApi.create).toHaveBeenCalledTimes(1)
 
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'filesystem-personal' } })
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'filesystem-personal' } })
     expect(confirmButton()).toBeEnabled()
     fireEvent.click(confirmButton())
 
@@ -350,7 +355,7 @@ describe('MCP catalog installation flow', () => {
       expect(confirmButton()).toBeDisabled()
       expect(mockedMcpApi.create).not.toHaveBeenCalled()
 
-      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'filesystem-new' } })
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'filesystem-new' } })
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(confirmButton()).toBeEnabled()
     },
@@ -381,7 +386,11 @@ describe('MCP catalog installation flow', () => {
     fireEvent.click(confirmButton())
 
     const message = 'A higher-priority configuration already uses this name. Choose another name so the new installation remains visible.'
-    expect((await screen.findAllByText(message)).length).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(screen.getAllByRole('alert').map((alert) => alert.textContent)).toEqual(
+        expect.arrayContaining([expect.stringContaining(message)]),
+      )
+    })
     expect(mockedMcpApi.list).toHaveBeenCalledWith(newProject)
     expect(mockedMcpApi.create).not.toHaveBeenCalled()
     expect(useMcpStore.getState().servers).toEqual(installedServers)
@@ -429,13 +438,14 @@ describe('MCP catalog installation flow', () => {
     await openReview()
     fillEnvironment()
     chooseScope('user')
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'invalid name' } })
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'invalid name' } })
 
-    expect(screen.getByText('Use letters, numbers, hyphens, or underscores for the server name.')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'true')
     expect(confirmButton()).toBeDisabled()
     expect(mockedMcpApi.create).not.toHaveBeenCalled()
 
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'valid-name_2' } })
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'valid-name_2' } })
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
     expect(confirmButton()).toBeEnabled()
   })
 

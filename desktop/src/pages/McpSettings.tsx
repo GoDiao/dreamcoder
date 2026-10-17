@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../components/shared/Button'
-import { DirectoryPicker } from '../components/shared/DirectoryPicker'
 import { Input } from '../components/shared/Input'
 import { Modal } from '../components/shared/Modal'
 import { useTranslation } from '../i18n'
@@ -11,6 +10,7 @@ import { sessionsApi } from '../api/sessions'
 import { mcpApi } from '../api/mcp'
 import { McpCatalogBrowse } from '../components/mcp/McpCatalogBrowse'
 import { McpCatalogInstall } from '../components/mcp/McpCatalogInstall'
+import { McpEditorFields, McpEditorLayout, McpEditorSection } from '../components/mcp/McpServerEditor'
 import { catalogScopeIsShadowed } from '../lib/mcpCatalogInstall'
 import type { McpCatalogEntry, McpServerRecord, McpUpsertPayload, McpWritableScope } from '../types/mcp'
 
@@ -68,8 +68,6 @@ const MCP_GROUP_ORDER: McpGroupKey[] = [
   'claudeai',
   'dynamic',
 ]
-
-const WRITABLE_SCOPES: McpWritableScope[] = ['local', 'project', 'user']
 
 const STATUS_TONE: Record<McpServerRecord['status'], string> = {
   connected: 'bg-[var(--color-inspector-success-bg)] text-[var(--color-inspector-success)] border-[var(--color-border)]',
@@ -323,8 +321,7 @@ function ArraySection({
   addLabel: string
 }) {
   return (
-    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-      <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-4">{title}</div>
+    <McpEditorSection title={title}>
       <div className="space-y-3">
         {rows.map((row) => (
           <div key={row.id} className={`grid gap-3 ${singleValue ? 'grid-cols-[minmax(0,1fr)_32px]' : 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px]'}`}>
@@ -359,7 +356,7 @@ function ArraySection({
           {addLabel}
         </button>
       </div>
-    </section>
+    </McpEditorSection>
   )
 }
 
@@ -860,131 +857,52 @@ export function McpSettings() {
     const targetServer = editing ? view.server : null
     const transportLocked = editing
     const isBusy = isSaving || isDeleting
-    const targetProjectPath = draft.projectPath.trim()
-    const needsProjectTarget = scopeRequiresProject(draft.scope)
-    const targetProjectHint = draft.scope === 'local'
-      ? (targetProjectPath
-          ? t('settings.mcp.targetProject.localSelected', { path: targetProjectPath })
-          : currentWorkDir
-            ? t('settings.mcp.targetProject.emptyWithCurrent', { path: currentWorkDir })
-            : t('settings.mcp.targetProject.localEmpty'))
-      : draft.scope === 'project'
-        ? (targetProjectPath
-            ? t('settings.mcp.targetProject.projectSelected', { path: targetProjectPath })
-            : currentWorkDir
-              ? t('settings.mcp.targetProject.emptyWithCurrent', { path: currentWorkDir })
-              : t('settings.mcp.targetProject.projectEmpty'))
-        : t('settings.mcp.targetProject.globalHint')
 
     return (
       <>
-        <div className="max-w-5xl min-w-0">
-          <button
-            type="button"
-            onClick={() => setView({ type: 'list' })}
-            className="mb-5 inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            {t('settings.mcp.form.back')}
-          </button>
-
-          <div className="flex items-start justify-between gap-4 mb-8">
-            <div>
-              <h2 className="text-[2.2rem] font-semibold tracking-[-0.03em] text-[var(--color-text-primary)]">
-                {editing ? t('settings.mcp.form.editTitle', { name: targetServer!.name }) : t('settings.mcp.form.createTitle')}
-              </h2>
-              <p className="mt-3 text-base text-[var(--color-text-secondary)]">
-                {editing ? t('settings.mcp.form.editHint') : t('settings.mcp.form.createHint')}
-              </p>
-              {editing && targetServer && (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <StatusBadge server={targetServer} />
-                  {targetServer.statusDetail && (
-                    <span className="text-sm text-[var(--color-text-tertiary)]">{targetServer.statusDetail}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              {editing && targetServer?.canReconnect && (
-                <Button variant="secondary" onClick={() => handleReconnect(targetServer)} loading={busyServerKey === getServerIdentityKey(targetServer)}>
-                  <span className="material-symbols-outlined text-[16px]">sync</span>
-                  {t('settings.mcp.form.reconnect')}
-                </Button>
-              )}
-              {editing && targetServer?.canRemove && (
-                <Button
-                  variant="ghost"
-                  className="text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/8"
-                  onClick={() => handleDelete(targetServer)}
-                  loading={isDeleting}
-                >
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
-                  {t('settings.mcp.form.uninstall')}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-          <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-            <Input
-              label={t('settings.mcp.form.name')}
-              value={draft.name}
-              onChange={(event) => setDraftField('name', event.target.value)}
-              placeholder={t('settings.mcp.form.namePlaceholder')}
-              disabled={editing}
-              required
-            />
-          </section>
-
-          <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-            <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-              {t('settings.mcp.form.scope')}
-            </div>
-            <div className="grid gap-2 md:grid-cols-3">
-              {WRITABLE_SCOPES.map((scope) => {
-                const active = draft.scope === scope
-                return (
-                  <button
-                    key={scope}
-                    type="button"
-                    onClick={() => setDraftField('scope', scope)}
-                    className={`rounded-[var(--radius-md)] border p-3 text-left transition-colors ${
-                      active
-                        ? 'border-[var(--color-border-focus)] bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                        : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">{t(`settings.mcp.scope.${scope}`)}</span>
-                    <span className="mt-1 block text-xs leading-5 text-[var(--color-text-tertiary)]">
-                      {t(`settings.mcp.scopeDesc.${scope}`)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-
-          <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {needsProjectTarget ? t('settings.mcp.targetProject.title') : t('settings.mcp.targetProject.globalTitle')}
-                </div>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-tertiary)]">
-                  {targetProjectHint}
-                </p>
-              </div>
-              {needsProjectTarget && (
-                <DirectoryPicker
-                  value={draft.projectPath}
-                  onChange={(path) => setDraftField('projectPath', path)}
-                />
-              )}
-            </div>
-          </section>
+        <McpEditorLayout
+          title={editing ? t('settings.mcp.form.editTitle', { name: targetServer!.name }) : t('settings.mcp.form.createTitle')}
+          description={editing ? t('settings.mcp.form.editHint') : t('settings.mcp.form.createHint')}
+          onBack={() => setView({ type: 'list' })}
+          status={editing && targetServer && <>
+            <StatusBadge server={targetServer} />
+            {targetServer.statusDetail && <span className="text-sm text-[var(--color-text-tertiary)]">{targetServer.statusDetail}</span>}
+          </>}
+          headerActions={editing && targetServer && <>
+            {targetServer.canReconnect && (
+              <Button variant="secondary" onClick={() => handleReconnect(targetServer)} loading={busyServerKey === getServerIdentityKey(targetServer)}>
+                <span className="material-symbols-outlined text-[16px]">sync</span>
+                {t('settings.mcp.form.reconnect')}
+              </Button>
+            )}
+            {targetServer.canRemove && (
+              <Button
+                variant="ghost"
+                className="text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/8"
+                onClick={() => handleDelete(targetServer)}
+                loading={isDeleting}
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                {t('settings.mcp.form.uninstall')}
+              </Button>
+            )}
+          </>}
+          actions={
+            <Button onClick={handleSave} disabled={!isDraftValid(draft) || isBusy} loading={isSaving}>
+              {t('settings.mcp.form.save')}
+            </Button>
+          }
+        >
+          <McpEditorFields
+            name={draft.name}
+            onNameChange={(name) => setDraftField('name', name)}
+            nameDisabled={editing}
+            scope={draft.scope}
+            onScopeChange={(scope) => setDraftField('scope', scope)}
+            projectPath={draft.projectPath}
+            onProjectPathChange={(path) => setDraftField('projectPath', path)}
+            currentWorkDir={currentWorkDir}
+          />
 
           <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
             <div className="grid grid-cols-3">
@@ -1017,7 +935,7 @@ export function McpSettings() {
 
           {draft.transport === 'stdio' ? (
             <>
-              <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+              <McpEditorSection>
                 <Input
                   label={t('settings.mcp.form.command')}
                   value={draft.command}
@@ -1028,7 +946,7 @@ export function McpSettings() {
                 <p className="mt-2 text-xs leading-5 text-[var(--color-text-tertiary)]">
                   {t('settings.mcp.form.commandHostHint')}
                 </p>
-              </section>
+              </McpEditorSection>
 
               <ArraySection
                 title={t('settings.mcp.form.arguments')}
@@ -1054,7 +972,7 @@ export function McpSettings() {
             </>
           ) : (
             <>
-              <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+              <McpEditorSection>
                 <Input
                   label={draft.transport === 'http' ? t('settings.mcp.form.url') : t('settings.mcp.form.sseUrl')}
                   value={draft.url}
@@ -1062,7 +980,7 @@ export function McpSettings() {
                   placeholder={t('settings.mcp.form.urlPlaceholder')}
                   required
                 />
-              </section>
+              </McpEditorSection>
 
               <ArraySection
                 title={t('settings.mcp.form.headers')}
@@ -1075,7 +993,7 @@ export function McpSettings() {
                 addLabel={t('settings.mcp.form.addHeader')}
               />
 
-              <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+              <McpEditorSection>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input
                     label={t('settings.mcp.form.oauthClientId')}
@@ -1098,17 +1016,11 @@ export function McpSettings() {
                     placeholder={t('settings.mcp.form.headersHelperPlaceholder')}
                   />
                 </div>
-              </section>
+              </McpEditorSection>
             </>
           )}
 
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={!isDraftValid(draft) || isBusy} loading={isSaving}>
-              {t('settings.mcp.form.save')}
-            </Button>
-          </div>
-        </div>
-        </div>
+        </McpEditorLayout>
         {deleteModal}
       </>
     )
