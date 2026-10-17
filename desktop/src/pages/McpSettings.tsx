@@ -9,6 +9,7 @@ import { useMcpStore } from '../stores/mcpStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { sessionsApi } from '../api/sessions'
 import { mcpApi } from '../api/mcp'
+import { McpCatalogBrowse } from '../components/mcp/McpCatalogBrowse'
 import type { McpServerRecord, McpUpsertPayload, McpWritableScope } from '../types/mcp'
 
 type EditorMode =
@@ -448,6 +449,7 @@ export function McpSettings() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId)
   const t = useTranslation()
   const [view, setView] = useState<EditorMode>({ type: 'list' })
+  const [catalogVisible, setCatalogVisible] = useState(false)
   const [draft, setDraft] = useState<McpDraft>(createEmptyDraft)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -1075,13 +1077,19 @@ export function McpSettings() {
             {t('settings.mcp.description')}
           </p>
         </div>
-        <Button variant="secondary" size="lg" onClick={beginCreate}>
+        {!catalogVisible && <Button variant="secondary" size="lg" onClick={beginCreate}>
           <span className="material-symbols-outlined text-[18px]">add</span>
           {t('settings.mcp.addServer')}
-        </Button>
+        </Button>}
       </div>
 
-      {showListLoading ? (
+      <div className="mb-8 inline-flex overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <button type="button" aria-pressed={!catalogVisible} onClick={() => setCatalogVisible(false)} className={`h-10 px-4 text-sm font-semibold ${!catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.installed')}</button>
+        <button type="button" aria-pressed={catalogVisible} onClick={() => setCatalogVisible(true)} className={`h-10 px-4 text-sm font-semibold ${catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.browse')}</button>
+      </div>
+
+      {catalogVisible ? <McpCatalogBrowse installedNames={servers.map((server) => server.name)} /> : (
+      showListLoading ? (
         <LoadingState label={t('common.loading')} />
       ) : (
         <>
@@ -1141,7 +1149,7 @@ export function McpSettings() {
             </div>
           )}
         </>
-      )}
+      ))}
       {deleteModal}
     </div>
   )

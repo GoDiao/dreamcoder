@@ -30,6 +30,7 @@ import { enableConfigs, getGlobalConfig } from '../../utils/config.js'
 import { getCwd, runWithCwdOverride } from '../../utils/cwd.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { conversationService } from '../services/conversationService.js'
+import { loadCuratedMcpCatalog } from '../mcpRegistry/catalog.js'
 
 type McpEditableConfigDto =
   | {
@@ -445,6 +446,14 @@ function listProjectPathsWithPrivateMcp(): Response {
   return Response.json({ projectPaths })
 }
 
+function getCuratedCatalog(): Response {
+  const catalog = loadCuratedMcpCatalog()
+  if (!catalog.ok) {
+    throw ApiError.internal(`Curated MCP catalog is invalid: ${catalog.errors.map((error) => `${error.path} ${error.message}`).join('; ')}`)
+  }
+  return Response.json({ catalog: catalog.catalog })
+}
+
 async function getServerStatus(name: string): Promise<Response> {
   const existing = await resolveServerForRuntimeAction(name)
   if (!existing) {
@@ -638,6 +647,10 @@ export async function handleMcpApi(
     return await runWithCwdOverride(resolveRequestCwd(url, body), async () => {
       if (req.method === 'GET' && serverName === 'project-paths' && !action) {
         return listProjectPathsWithPrivateMcp()
+      }
+
+      if (req.method === 'GET' && serverName === 'catalog' && !action) {
+        return getCuratedCatalog()
       }
 
       if (req.method === 'GET' && !serverName) {

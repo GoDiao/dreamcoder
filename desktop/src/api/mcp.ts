@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { McpServerRecord, McpUpsertPayload } from '../types/mcp'
+import type { McpCatalog, McpServerRecord, McpUpsertPayload } from '../types/mcp'
 
 export const mcpApi = {
   list: (cwd?: string) => {
@@ -10,6 +10,8 @@ export const mcpApi = {
   projectPaths: () => {
     return api.get<{ projectPaths: string[] }>('/api/mcp/project-paths')
   },
+
+  catalog: () => api.get<{ catalog: McpCatalog }>('/api/mcp/catalog'),
 
   status: (name: string, cwd?: string) => {
     const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''
