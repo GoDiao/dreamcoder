@@ -89,8 +89,14 @@ export function normalizeModelMapping(models: SavedProvider['models']): SavedPro
 }
 
 export function normalizeSavedProvider(provider: SavedProvider): SavedProvider {
+  // Older Qwen presets included /v1, which the OpenAI chat transport adds itself.
+  // Repair only that preset's exact legacy endpoint; preserve custom URLs/formats.
+  const hasLegacyQwenBaseUrl = provider.presetId === 'qwen'
+    && provider.apiFormat === 'openai_chat'
+    && provider.baseUrl.replace(/\/+$/, '') === 'https://dashscope.aliyuncs.com/compatible-mode/v1'
   return {
     ...provider,
+    baseUrl: hasLegacyQwenBaseUrl ? 'https://dashscope.aliyuncs.com/compatible-mode' : provider.baseUrl,
     apiFormat: provider.apiFormat ?? 'anthropic',
     runtimeKind: provider.runtimeKind ?? 'anthropic_compatible',
     models: normalizeModelMapping(provider.models),
