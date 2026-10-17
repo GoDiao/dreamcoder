@@ -1256,15 +1256,15 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_notification',
-      data: {
-        task_id: 'agent-task-1',
-        tool_use_id: 'agent-tool-1',
+      type: 'background_task',
+      event: { taskId: 'agent-task-1', toolUseId: 'agent-tool-1', status: 'completed', summary: 'Agent "修复异常处理" completed', outputFile: '/tmp/agent-output.txt' },
+      notification: {
+        taskId: 'agent-task-1',
+        toolUseId: 'agent-tool-1',
         status: 'completed',
         summary: 'Agent "修复异常处理" completed',
         result: '修复了异常处理并补充了回归覆盖。',
-        output_file: '/tmp/agent-output.txt',
+        outputFile: '/tmp/agent-output.txt',
       },
     })
 
@@ -1297,15 +1297,8 @@ describe('chatStore history mapping', () => {
     vi.setSystemTime(new Date('2026-04-06T00:00:02.000Z'))
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_started',
-      data: {
-        task_id: 'agent-task-1',
-        tool_use_id: 'agent-tool-1',
-        description: 'Verify the todo app',
-        task_type: 'local_agent',
-        prompt: 'Run E2E verification',
-      },
+      type: 'background_task',
+      event: { taskId: 'agent-task-1', toolUseId: 'agent-tool-1', status: 'running', description: 'Verify the todo app', taskType: 'local_agent', prompt: 'Run E2E verification' },
     })
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.backgroundAgentTasks?.['agent-task-1']).toMatchObject({
@@ -1321,19 +1314,15 @@ describe('chatStore history mapping', () => {
     vi.setSystemTime(new Date('2026-04-06T00:00:03.000Z'))
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_progress',
-      data: {
-        task_id: 'agent-task-1',
-        tool_use_id: 'agent-tool-1',
+      type: 'background_task',
+      event: {
+        taskId: 'agent-task-1',
+        toolUseId: 'agent-tool-1',
+        status: 'running',
         description: 'Verify the todo app',
         summary: 'Running Playwright checks',
-        last_tool_name: 'Bash',
-        usage: {
-          total_tokens: 1200,
-          tool_uses: 4,
-          duration_ms: 45000,
-        },
+        lastToolName: 'Bash',
+        usage: { totalTokens: 1200, toolUses: 4, durationMs: 45000 },
       },
     })
 
@@ -1352,20 +1341,23 @@ describe('chatStore history mapping', () => {
     vi.setSystemTime(new Date('2026-04-06T00:00:04.000Z'))
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_notification',
-      data: {
-        task_id: 'agent-task-1',
-        tool_use_id: 'agent-tool-1',
+      type: 'background_task',
+      event: {
+        taskId: 'agent-task-1',
+        toolUseId: 'agent-tool-1',
+        status: 'completed',
+        summary: 'Found and fixed localStorage corruption.',
+        outputFile: '/tmp/agent-output.txt',
+        usage: { totalTokens: 2400, toolUses: 9, durationMs: 120000 },
+      },
+      notification: {
+        taskId: 'agent-task-1',
+        toolUseId: 'agent-tool-1',
         status: 'completed',
         summary: 'Found and fixed localStorage corruption.',
         result: 'Root cause was a stale session cache entry.',
-        output_file: '/tmp/agent-output.txt',
-        usage: {
-          total_tokens: 2400,
-          tool_uses: 9,
-          duration_ms: 120000,
-        },
+        outputFile: '/tmp/agent-output.txt',
+        usage: { totalTokens: 2400, toolUses: 9, durationMs: 120000 },
       },
     })
 
@@ -1400,14 +1392,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_started',
-      data: {
-        task_id: 'shell-task-1',
-        tool_use_id: 'shell-tool-1',
-        description: 'Run desktop checks',
-        task_type: 'local_bash',
-      },
+      type: 'background_task',
+      event: { taskId: 'shell-task-1', toolUseId: 'shell-tool-1', status: 'running', description: 'Run desktop checks', taskType: 'local_bash' },
     })
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
@@ -1427,15 +1413,15 @@ describe('chatStore history mapping', () => {
     vi.setSystemTime(new Date('2026-04-06T00:00:02.000Z'))
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_progress',
-      data: {
-        task_id: 'shell-task-1',
-        tool_use_id: 'shell-tool-1',
+      type: 'background_task',
+      event: {
+        taskId: 'shell-task-1',
+        toolUseId: 'shell-tool-1',
+        status: 'running',
         description: 'Run desktop checks',
         summary: 'Running Vitest',
-        last_tool_name: 'Bash',
-        task_type: 'local_bash',
+        lastToolName: 'Bash',
+        taskType: 'local_bash',
       },
     })
 
@@ -1465,14 +1451,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_started',
-      data: {
-        task_id: 'shell-task-1',
-        tool_use_id: 'shell-tool-1',
-        description: 'Start tap proxy',
-        task_type: 'local_bash',
-      },
+      type: 'background_task',
+      event: { taskId: 'shell-task-1', toolUseId: 'shell-tool-1', status: 'running', description: 'Start tap proxy', taskType: 'local_bash' },
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
@@ -1534,14 +1514,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'task_started',
-      data: {
-        task_id: 'new-agent-task',
-        tool_use_id: 'agent-tool-1',
-        task_type: 'local_agent',
-        description: 'Review app',
-      },
+      type: 'background_task',
+      event: { taskId: 'new-agent-task', toolUseId: 'agent-tool-1', status: 'running', taskType: 'local_agent', description: 'Review app' },
     })
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toHaveLength(0)
@@ -1650,10 +1624,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'compact_boundary',
-      message: 'Context compacted',
-      data: { trigger: 'auto', pre_tokens: 120000 },
+      type: 'transcript_item',
+      item: { id: 'compact-boundary', type: 'compact_summary', title: 'Context compacted', phase: 'complete', trigger: 'auto', preTokens: 120000, timestamp: 3 },
     })
 
     const messages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
@@ -1695,21 +1667,19 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'compact_boundary',
-      message: 'Context compacted',
-      data: { trigger: 'manual' },
+      type: 'transcript_item',
+      item: { id: 'compact-boundary', type: 'compact_summary', title: 'Context compacted', phase: 'complete', trigger: 'manual', timestamp: 3 },
     })
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'compact_summary',
-      message: [
-        'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
-        '',
-        'Implemented the billing report and verified export behavior.',
-        '',
-        'If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /tmp/session.jsonl',
-      ].join('\n'),
+      type: 'transcript_item',
+      item: {
+        id: 'compact-summary',
+        type: 'compact_summary',
+        title: 'Context compacted',
+        phase: 'complete',
+        summary: 'Implemented the billing report and verified export behavior.',
+        timestamp: 4,
+      },
     })
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState).toBe('thinking')
@@ -1925,15 +1895,18 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'memory_saved',
-      message: 'Saved 2 memories',
-      data: {
-        writtenPaths: [
-          '/Users/test/.claude/projects/example/memory/preferences.md',
-          '/Users/test/.claude/projects/example/memory/team/MEMORY.md',
+      type: 'transcript_item',
+      item: {
+        id: 'memory-1',
+        type: 'memory_event',
+        event: 'saved',
+        files: [
+          { path: '/Users/test/.claude/projects/example/memory/preferences.md', action: 'saved' },
+          { path: '/Users/test/.claude/projects/example/memory/team/MEMORY.md', action: 'saved' },
         ],
+        message: 'Saved 2 memories',
         teamCount: 1,
+        timestamp: 1,
       },
     })
 
@@ -1962,15 +1935,17 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'goal_event',
-      message: 'Goal set: ship the smoke test',
-      data: {
+      type: 'transcript_item',
+      item: {
+        id: 'goal-1',
+        type: 'goal_event',
         action: 'created',
         status: 'active',
         objective: 'ship the smoke test',
         budget: '0 / 2,000 tokens',
         continuations: '0',
+        message: 'Goal set: ship the smoke test',
+        timestamp: 1,
       },
     })
 
@@ -1993,15 +1968,17 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'goal_event',
-      message: 'Goal set: ship the replacement target',
-      data: {
+      type: 'transcript_item',
+      item: {
+        id: 'goal-2',
+        type: 'goal_event',
         action: 'created',
         status: 'active',
         objective: 'ship the replacement target',
         budget: '0 / unlimited tokens',
         continuations: '0',
+        message: 'Goal set: ship the replacement target',
+        timestamp: 2,
       },
     })
 
@@ -2032,12 +2009,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'goal_event',
-      data: {
-        action: 'paused',
-        status: 'paused',
-      },
+      type: 'transcript_item',
+      item: { id: 'goal-3', type: 'goal_event', action: 'paused', status: 'paused', timestamp: 3 },
     })
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeGoal).toMatchObject({
       action: 'paused',
@@ -2046,12 +2019,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'goal_event',
-      data: {
-        action: 'completed',
-        message: 'Goal marked complete.',
-      },
+      type: 'transcript_item',
+      item: { id: 'goal-4', type: 'goal_event', action: 'completed', message: 'Goal marked complete.', timestamp: 4 },
     })
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeGoal).toMatchObject({
       action: 'completed',
@@ -2060,12 +2029,8 @@ describe('chatStore history mapping', () => {
     })
 
     useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'system_notification',
-      subtype: 'goal_event',
-      data: {
-        action: 'cleared',
-        message: 'Goal cleared.',
-      },
+      type: 'transcript_item',
+      item: { id: 'goal-5', type: 'goal_event', action: 'cleared', message: 'Goal cleared.', timestamp: 5 },
     })
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeGoal).toBeNull()
   })
