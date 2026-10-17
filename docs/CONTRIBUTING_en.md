@@ -199,6 +199,34 @@ flow can express remote transports.
 | `runtime` | yes | `node`, `bun`, `python`, `uvx` or `binary`. |
 | `version` | conditional | **Required** for `runtime: binary`; recommended for `uvx`. |
 
+### Reviewed installation
+
+The catalog review translates supported package metadata into an executable and
+separate arguments. These command forms illustrate the resulting configuration:
+
+| Catalog runtime | Automatic configuration |
+| --- | --- |
+| `node` | `npx --yes -- <package>@<version>` |
+| `bun` | `bun x --bun <package>@<version>` |
+| `uvx` | `uvx --no-python-downloads <package>@<version>` |
+
+Only plain package identifiers and exact versions are supported: npm SemVer for
+Node/Bun and a conservative exact PEP 440 subset for uvx. Omitted versions remain
+unpinned and omit the suffix. Tags, ranges, `python`, `binary`, relative paths,
+and other ambiguous metadata require the manual editor. The host must already
+have the required runner/runtime. Opening review neither saves nor starts a
+server; after confirmation, the connection check may download the package into
+the runner's cache and start it.
+
+Users explicitly choose `local` (private to one selected project), `project`
+(shared `.mcp.json` in the selected project), or `user` (all projects).
+Both `user` and `system` environment declarations require explicit input;
+`optional` inputs are omitted when blank unless an argument references them.
+`{env:NAME}` substitution preserves each argument and the exact input value,
+while the review masks values. Confirmation stores values in the selected
+existing configuration file: project scope shares them through `.mcp.json`, so
+keep secrets out of committed configuration.
+
 ### Security rules
 
 - **Never commit a secret.** `env` entries describe *what* is needed

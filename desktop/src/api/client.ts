@@ -70,6 +70,7 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown, options?: { timeout?: number }): Promise<T> {
   const url = `${baseUrl}${path}`
   const headers = buildHeaders()
+  const sensitiveValues = getMcpEnvironmentValues(method, path, body)
 
   const controller = new AbortController()
   const timeoutMs = options?.timeout ?? 30_000
@@ -94,34 +95,45 @@ async function request<T>(method: string, path: string, body?: unknown, options?
     clearTimeout(timeout)
     if (controller.signal.aborted) {
       const timeoutError = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`)
-      reportApiFailure(method, path, timeoutError)
+      reportApiFailure(method, path, timeoutError, sensitiveValues)
       throw timeoutError
     }
-    reportApiFailure(method, path, err)
+    reportApiFailure(method, path, err, sensitiveValues)
     throw err
   }
 }
 
-function reportApiFailure(method: string, path: string, error: unknown) {
+function getMcpEnvironmentValues(method: string, path: string, body: unknown): string[] {
+  if (!['POST', 'PUT', 'PATCH'].includes(method) || !/^\/api\/mcp(?:\/|\?|$)/.test(path)) return []
+  if (!body || typeof body !== 'object' || !('config' in body)) return []
+  const config = body.config
+  if (!config || typeof config !== 'object' || !('env' in config)) return []
+  if (!config.env || typeof config.env !== 'object' || Array.isArray(config.env)) return []
+  return Object.values(config.env).filter((value): value is string => typeof value === 'string' && value.length > 0)
+}
+
+function reportApiFailure(method: string, path: string, error: unknown, sensitiveValues: string[]) {
   if (path.startsWith('/api/diagnostics')) return
 
+  const secrets = [...sensitiveValues, ...(authToken ? [authToken] : [])]
   const details: Record<string, unknown> = {
     method,
     path,
     errorName: error instanceof Error ? error.name : typeof error,
-    message: sanitizeDiagnosticValue(error instanceof Error ? error.message : String(error)),
+    message: error instanceof Error ? error.message : String(error),
   }
 
   if (error instanceof ApiError) {
     details.status = error.status
-    details.response = sanitizeDiagnosticValue(error.body)
+    details.response = error.body
   }
 
+  const safeDetails = sanitizeDiagnosticValue(details, secrets) as Record<string, unknown>
   void rawRecordDiagnosticEvent({
     type: 'client_api_request_failed',
     severity: 'warn',
-    summary: `${method} ${path} failed: ${details.message}`,
-    details,
+    summary: `${safeDetails.method} ${safeDetails.path} failed: ${safeDetails.message}`,
+    details: safeDetails,
   })
 }
 
@@ -151,20 +163,28 @@ function buildHeaders(): Record<string, string> {
   return headers
 }
 
-function sanitizeDiagnosticValue(value: unknown): unknown {
-  if (!authToken) return value
+function sanitizeDiagnosticValue(value: unknown, secrets: string[]): unknown {
+  if (secrets.length === 0) return value
 
   if (typeof value === 'string') {
-    return value.split(authToken).join('[redacted]')
+    // An error may embed JSON containing escaped environment values. Match both
+    // spellings, longest first, without treating user input as a regular expression.
+    const spellings = [...new Set(secrets.flatMap((secret) => [secret, JSON.stringify(secret).slice(1, -1)]))]
+      .sort((a, b) => b.length - a.length)
+      .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    return value.replace(new RegExp(spellings.join('|'), 'g'), '[redacted]')
   }
 
   if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeDiagnosticValue(entry))
+    return value.map((entry) => sanitizeDiagnosticValue(entry, secrets))
   }
 
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, sanitizeDiagnosticValue(entry)]),
+      Object.entries(value).map(([key, entry]) => [
+        sanitizeDiagnosticValue(key, secrets),
+        sanitizeDiagnosticValue(entry, secrets),
+      ]),
     )
   }
 

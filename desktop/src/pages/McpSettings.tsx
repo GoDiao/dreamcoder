@@ -10,7 +10,9 @@ import { useSessionStore } from '../stores/sessionStore'
 import { sessionsApi } from '../api/sessions'
 import { mcpApi } from '../api/mcp'
 import { McpCatalogBrowse } from '../components/mcp/McpCatalogBrowse'
-import type { McpServerRecord, McpUpsertPayload, McpWritableScope } from '../types/mcp'
+import { McpCatalogInstall } from '../components/mcp/McpCatalogInstall'
+import { catalogScopeIsShadowed } from '../lib/mcpCatalogInstall'
+import type { McpCatalogEntry, McpServerRecord, McpUpsertPayload, McpWritableScope } from '../types/mcp'
 
 type EditorMode =
   | { type: 'list' }
@@ -450,6 +452,7 @@ export function McpSettings() {
   const t = useTranslation()
   const [view, setView] = useState<EditorMode>({ type: 'list' })
   const [catalogVisible, setCatalogVisible] = useState(false)
+  const [catalogEntry, setCatalogEntry] = useState<McpCatalogEntry | null>(null)
   const [draft, setDraft] = useState<McpDraft>(createEmptyDraft)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -752,6 +755,51 @@ export function McpSettings() {
         [key]: next.length > 0 ? next : [key === 'args' ? createStringRow() : createKeyValueRow()],
       }
     })
+  }
+
+  if (catalogEntry) {
+    return (
+      <McpCatalogInstall
+        key={catalogEntry.id}
+        entry={catalogEntry}
+        servers={servers}
+        onCancel={() => setCatalogEntry(null)}
+        onManual={() => {
+          setDraft({ ...createEmptyDraft(), name: catalogEntry.id })
+          setCatalogEntry(null)
+          setView({ type: 'create' })
+        }}
+        onConfirm={async (name, payload, cwd) => {
+          const paths = Array.from(new Set([
+            ...(projectPathsForFetchRef.current ?? []),
+            ...(cwd ? [cwd] : []),
+          ]))
+          projectPathsForFetchRef.current = paths.length ? paths : undefined
+          try {
+            // A newly chosen project may not have been in the initial list.
+            // Check its effective names before saving a config it would hide.
+            const target = await mcpApi.list(cwd)
+            const existing = target.servers.find((server) => server.name === name)
+            if (existing && catalogScopeIsShadowed(payload.scope, existing.scope)) {
+              throw new Error(t('settings.mcp.install.shadowed'))
+            }
+            await createServer(name, payload, cwd)
+          } catch (error) {
+            // Reconcile an ambiguous timeout or concurrent creation before a retry.
+            await fetchServers(projectPathsForFetchRef.current, currentWorkDir)
+            throw error
+          }
+          selectServer(null)
+          setView({ type: 'list' })
+          setCatalogVisible(false)
+          setCatalogEntry(null)
+          addToast({ type: 'success', message: t('settings.mcp.toast.created', { name }) })
+          // The store has the saved record already. A refresh failure must not
+          // turn a successful save into another create attempt.
+          void fetchServers(projectPathsForFetchRef.current, currentWorkDir)
+        }}
+      />
+    )
   }
 
   if (view.type === 'details') {
@@ -1088,7 +1136,7 @@ export function McpSettings() {
         <button type="button" aria-pressed={catalogVisible} onClick={() => setCatalogVisible(true)} className={`h-10 px-4 text-sm font-semibold ${catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.browse')}</button>
       </div>
 
-      {catalogVisible ? <McpCatalogBrowse installedNames={servers.map((server) => server.name)} /> : (
+      {catalogVisible ? <McpCatalogBrowse installedNames={servers.map((server) => server.name)} onInstall={setCatalogEntry} /> : (
       showListLoading ? (
         <LoadingState label={t('common.loading')} />
       ) : (
@@ -1099,8 +1147,8 @@ export function McpSettings() {
             <StatCard label={t('settings.mcp.stats.attention')} value={stats.attention} icon="error" />
           </div>
 
-          {error ? (
-            <div className="text-center py-16 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
+          {error && (
+            <div role="alert" className="mb-6 text-center py-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
               <span className="material-symbols-outlined text-[40px] text-[var(--color-error)] mb-3 block">error</span>
               <p className="text-sm text-[var(--color-error)] mb-3">{error}</p>
               <button
@@ -1111,13 +1159,14 @@ export function McpSettings() {
                 {t('common.retry')}
               </button>
             </div>
-          ) : servers.length === 0 ? (
+          )}
+          {servers.length === 0 ? (!error && (
             <div className="text-center py-16 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
               <span className="material-symbols-outlined text-[40px] text-[var(--color-text-tertiary)] mb-3 block">dns</span>
               <p className="text-sm text-[var(--color-text-secondary)] mb-1">{t('settings.mcp.empty')}</p>
               <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.mcp.emptyHint')}</p>
             </div>
-          ) : (
+          )) : (
             <div className="flex flex-col gap-6">
               {MCP_GROUP_ORDER.map((group) => {
                 const groupServers = groupedServers[group]

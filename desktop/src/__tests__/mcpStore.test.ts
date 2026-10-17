@@ -7,6 +7,7 @@ vi.mock('../api/mcp', () => ({
   mcpApi: {
     list: vi.fn(),
     create: vi.fn(),
+    status: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
   },
@@ -209,4 +210,62 @@ describe('mcpStore', () => {
     expect(useMcpStore.getState().isLoading).toBe(false)
     expect(useMcpStore.getState().error).toBeNull()
   })
+
+  it.each([
+    { requestedScope: 'user', responseScope: 'local', responseName: 'filesystem' },
+    { requestedScope: 'project', responseScope: 'local', responseName: 'filesystem' },
+    { requestedScope: 'local', responseScope: 'user', responseName: 'filesystem' },
+    { requestedScope: 'local', responseScope: 'local', responseName: 'another-server' },
+  ])(
+    'ignores a status response for $responseScope/$responseName when refreshing $requestedScope/filesystem',
+    async ({ requestedScope, responseScope, responseName }) => {
+      const requested = server({ scope: requestedScope, projectPath: requestedScope === 'user' ? undefined : projectA })
+      const otherProject = server({ projectPath: projectB })
+      useMcpStore.setState({ servers: [requested, otherProject], selectedServer: requested })
+      const previousState = useMcpStore.getState()
+      mockedMcpApi.status.mockResolvedValue({
+        server: server({ name: responseName, scope: responseScope, status: 'connected', statusLabel: 'Connected' }),
+      })
+
+      const refreshed = await useMcpStore.getState().refreshServerStatus(requested, projectA)
+
+      expect(mockedMcpApi.status).toHaveBeenCalledExactlyOnceWith(requested.name, projectA)
+      expect(refreshed).toBe(requested)
+      expect(useMcpStore.getState()).toBe(previousState)
+    },
+  )
+
+  it('does not append a different-scope status response after a list refresh has removed the requested record', async () => {
+    const requested = server({ scope: 'user' })
+    const replacement = server({ scope: 'local', projectPath: projectA })
+    let resolveStatus!: (value: { server: McpServerRecord }) => void
+    mockedMcpApi.status.mockImplementation(() => new Promise((resolve) => { resolveStatus = resolve }))
+    useMcpStore.setState({ servers: [requested], selectedServer: requested })
+
+    const refresh = useMcpStore.getState().refreshServerStatus(requested, projectA)
+    mockedMcpApi.list.mockResolvedValue({ servers: [replacement] })
+    await useMcpStore.getState().fetchServers([projectA])
+    const stateAfterListRefresh = useMcpStore.getState()
+    resolveStatus({ server: replacement })
+
+    expect(await refresh).toBe(requested)
+    expect(useMcpStore.getState()).toBe(stateAfterListRefresh)
+    expect(useMcpStore.getState().servers).toEqual([replacement])
+  })
+
+  it.each(['local', 'project', 'user'] as const)(
+    'updates status for the same %s record while preserving its project identity',
+    async (scope) => {
+      const requested = server({ scope, projectPath: scope === 'user' ? undefined : projectA })
+      const responseServer = server({ scope, status: 'connected', statusLabel: 'Connected' })
+      useMcpStore.setState({ servers: [requested], selectedServer: requested })
+      mockedMcpApi.status.mockResolvedValue({ server: responseServer })
+
+      const refreshed = await useMcpStore.getState().refreshServerStatus(requested, projectA)
+
+      expect(refreshed).toEqual({ ...responseServer, projectPath: scope === 'user' ? undefined : projectA })
+      expect(useMcpStore.getState().servers).toEqual([refreshed])
+      expect(useMcpStore.getState().selectedServer).toBe(refreshed)
+    },
+  )
 })
