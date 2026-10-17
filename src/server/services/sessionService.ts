@@ -21,9 +21,10 @@ import {
   type PreparedSessionWorkspace,
 } from './repositoryLaunchService.js'
 import { registerFilesystemAccessRoot } from './filesystemAccessRoots.js'
+import { readJsonlFile } from './jsonlFile.js'
 import { normalizeDriveRootPathForPlatform } from './windowsDrivePath.js'
 import { cleanSessionTitleSource } from '../../utils/sessionTitleText.js'
-import { extractTextBlocks, parseLocalCommand, type TaskNotification } from '../transcript/classify.js'
+import { extractTextBlocks, parseLocalCommand } from '../transcript/classify.js'
 import {
   collectTaskNotifications,
   entriesToMessages,
@@ -77,8 +78,6 @@ export type TrimSessionResult = {
   removedCount: number
   removedMessageIds: string[]
 }
-
-export type SessionTaskNotification = TaskNotification
 
 export type TranscriptUsageSnapshot = {
   source: 'transcript'
@@ -212,27 +211,8 @@ export class SessionService {
     return sanitizePortablePath(dirPath)
   }
 
-  private async readJsonlFile(filePath: string): Promise<RawEntry[]> {
-    let content: string
-    try {
-      content = await fs.readFile(filePath, 'utf-8')
-    } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return []
-      }
-      throw err
-    }
-
-    const entries: RawEntry[] = []
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed) continue
-      try {
-        entries.push(JSON.parse(trimmed) as RawEntry)
-      } catch {
-      }
-    }
-    return entries
+  private readJsonlFile(filePath: string): Promise<RawEntry[]> {
+    return readJsonlFile<RawEntry>(filePath)
   }
 
   private scanSessionFileHead(
@@ -1421,18 +1401,6 @@ export class SessionService {
     }
 
     return [...snapshotsByMessageId.values()]
-  }
-
-  async getSessionTaskNotifications(
-    sessionId: string,
-  ): Promise<SessionTaskNotification[]> {
-    const found = await this.findSessionFile(sessionId)
-    if (!found) {
-      throw ApiError.notFound(`Session not found: ${sessionId}`)
-    }
-
-    const entries = await this.readJsonlFile(found.filePath)
-    return collectTaskNotifications(entries)
   }
 
   /** Reads the session file once and interprets it into display items. */

@@ -10,9 +10,7 @@ import { randomSpinnerVerb } from '../config/spinnerVerbs'
 import { notifyDesktop } from '../lib/desktopNotifications'
 import { t } from '../i18n'
 import { deriveSessionTitle, isPlaceholderSessionTitle } from '../lib/sessionTitle'
-import { AGENT_LIFECYCLE_TYPES } from '../types/team'
 import type { ComposerAttachment } from '../lib/composerAttachments'
-import type { MessageEntry } from '../types/session'
 import type { PermissionMode } from '../types/settings'
 import type { RuntimeSelection } from '../types/runtime'
 import type {
@@ -777,24 +775,17 @@ function mergeSlashCommandUpdates(
 
 async function fetchAndMapSessionHistory(sessionId: string) {
   const t0 = performance.now()
-  const { messages, taskNotifications } = await sessionsApi.getMessages(sessionId)
-  const t1 = performance.now()
-  console.log(`[mem] loadHistory:fetched ${messages.length} msgs in ${(t1-t0).toFixed(0)}ms`)
-  const uiMessages = mapHistoryMessagesToUiMessages(messages)
-  const t2 = performance.now()
-  console.log(`[mem] loadHistory:mapped ${uiMessages.length} uiMsgs in ${(t2-t1).toFixed(0)}ms (total ${(t2-t0).toFixed(0)}ms)`)
-  const restoredNotifications = {
-    ...reconstructAgentNotifications(messages),
-    ...agentNotificationRecordFromList(taskNotifications ?? []),
-  }
+  const transcript = await sessionsApi.getTranscript(sessionId)
+  console.log(`[mem] loadHistory:fetched ${transcript.items.length} items in ${(performance.now()-t0).toFixed(0)}ms`)
+  const uiMessages = transcript.items
+  const restoredNotifications = transcript.agentNotifications
   return {
-    rawMessages: messages,
     uiMessages,
     activeGoal: deriveActiveGoalFromMessages(uiMessages),
     restoredNotifications,
     restoredBackgroundTasks: backgroundTaskRecordFromNotifications(Object.values(restoredNotifications)),
-    lastTodos: extractLastTodoWriteFromHistory(messages),
-    hasMessagesAfterTaskCompletion: hasUserMessagesAfterTaskCompletion(messages),
+    lastTodos: transcript.lastTodos,
+    hasMessagesAfterTaskCompletion: transcript.hasMessagesAfterTaskCompletion,
   }
 }
 
@@ -1833,10 +1824,6 @@ function updateOptimisticSessionTitle(sessionId: string, content: string): void 
   useTabStore.getState().updateTabTitle(sessionId, title)
 }
 
-type AssistantHistoryBlock = { type: string; text?: string; thinking?: string; name?: string; id?: string; input?: unknown }
-type UserHistoryBlock = { type: string; text?: string; tool_use_id?: string; content?: unknown; is_error?: boolean; source?: { data?: string }; mimeType?: string; media_type?: string; name?: string }
-
-const TASK_NOTIFICATION_RE = /^<task-notification>\s*[\s\S]*<\/task-notification>$/i
 const GOAL_EVENT_ACTIONS = new Set<GoalEventAction>([
   'created',
   'replaced',
@@ -1847,51 +1834,6 @@ const GOAL_EVENT_ACTIONS = new Set<GoalEventAction>([
   'cleared',
   'message',
 ])
-
-function isTeammateMessage(text: string): boolean {
-  return text.includes('<teammate-message') && text.includes('</teammate-message>')
-}
-
-function extractHistoryTextBlocks(content: unknown): string[] {
-  if (typeof content === 'string') return [content]
-  if (!Array.isArray(content)) return []
-
-  return content
-    .flatMap((block) => {
-      if (!block || typeof block !== 'object') return []
-      const record = block as Record<string, unknown>
-      return record.type === 'text' && typeof record.text === 'string'
-        ? [record.text]
-        : []
-    })
-    .map((text) => text.trim())
-    .filter(Boolean)
-}
-
-function isTaskNotificationContent(content: unknown): boolean {
-  const textBlocks = extractHistoryTextBlocks(content)
-  return textBlocks.length > 0 && textBlocks.every((text) => extractTaskNotificationXml(text) !== null)
-}
-
-function extractTaskNotificationXml(text: string): string | null {
-  const trimmed = text.trim()
-  if (TASK_NOTIFICATION_RE.test(trimmed)) return trimmed
-  return trimmed.match(/<task-notification>\s*[\s\S]*?<\/task-notification>/i)?.[0] ?? null
-}
-
-function decodeXmlText(text: string): string {
-  return text
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-}
-
-function readXmlTag(xml: string, tag: string): string | undefined {
-  const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'))
-  return match?.[1] ? decodeXmlText(match[1].trim()) : undefined
-}
 
 function readNonEmptyString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -1904,16 +1846,6 @@ function readNonEmptyString(record: Record<string, unknown>, ...keys: string[]):
 function readRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
-}
-
-function normalizeHistoryToolResultContent(content: unknown, toolUseResult: unknown): unknown {
-  const result = readRecord(toolUseResult)
-  const answers = readRecord(result?.answers)
-  if (!result || !answers || !Array.isArray(result.questions)) return content
-  return {
-    questions: result.questions,
-    answers,
-  }
 }
 
 function parseJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -2107,99 +2039,6 @@ function deriveActiveGoalFromMessages(messages: UIMessage[]): ActiveGoalState | 
   }, null)
 }
 
-function extractLocalCommandText(content: unknown): string | null {
-  if (typeof content !== 'string') return null
-  return content.trim() || null
-}
-
-function parseGoalCommandFromLocalCommand(content: unknown): { name: string; args: string } | null {
-  const text = extractLocalCommandText(content)
-  if (!text) return null
-  const commandName = readXmlTag(text, 'command-name')
-  if (!commandName) return null
-  return {
-    name: commandName.replace(/^\//, ''),
-    args: readXmlTag(text, 'command-args') ?? '',
-  }
-}
-
-function formatVisibleLocalCommand(command: { name: string; args: string }): string {
-  const normalizedName = command.name.replace(/^\//, '')
-  const args = command.args.trim()
-  return `/${normalizedName}${args ? ` ${args}` : ''}`
-}
-
-function extractLocalCommandOutputText(content: unknown): string | null {
-  const text = extractLocalCommandText(content)
-  if (!text) return null
-  return readXmlTag(text, 'local-command-stdout') ?? readXmlTag(text, 'local-command-stderr') ?? null
-}
-
-function isCompactLocalCommandOutput(output: string): boolean {
-  return output.trim() === 'Compacted'
-}
-
-function parseGoalEventFromLocalCommandOutput(
-  output: string,
-  command: { name: string; args: string } | null,
-): Omit<Extract<UIMessage, { type: 'goal_event' }>, 'id' | 'type' | 'timestamp'> | null {
-  if (command && command.name !== 'goal') return null
-  const trimmed = output.trim()
-  if (!trimmed) return null
-
-  if (trimmed === 'Goal cleared.' || trimmed.startsWith('Goal cleared:')) return { action: 'cleared', message: trimmed }
-  if (trimmed === 'Goal marked complete.') return { action: 'completed', message: trimmed }
-  if (trimmed === 'No active goal.') return { action: 'message', message: trimmed }
-  if (trimmed.startsWith('Goal set:')) {
-    const objective = trimmed.slice('Goal set:'.length).trim()
-    return {
-      action: 'created',
-      status: 'active',
-      objective: objective || undefined,
-      message: trimmed,
-    }
-  }
-
-  return command?.name === 'goal' ? { action: 'message', message: trimmed } : null
-}
-
-function extractTaskNotification(content: unknown): AgentTaskNotification | null {
-  const xml = extractHistoryTextBlocks(content)
-    .map((text) => extractTaskNotificationXml(text))
-    .find((value): value is string => value !== null)
-  if (!xml) return null
-
-  const toolUseId = readXmlTag(xml, 'tool-use-id')
-  const status = readXmlTag(xml, 'status')
-  if (
-    !toolUseId ||
-    (status !== 'completed' && status !== 'failed' && status !== 'stopped')
-  ) {
-    return null
-  }
-
-  const taskId = readXmlTag(xml, 'task-id') || toolUseId
-  const summary = readXmlTag(xml, 'summary')
-  const result = readXmlTag(xml, 'result')
-  const outputFile = readXmlTag(xml, 'output-file')
-  return {
-    taskId,
-    toolUseId,
-    status,
-    ...(summary ? { summary } : {}),
-    ...(result ? { result } : {}),
-    ...(outputFile ? { outputFile } : {}),
-  }
-}
-
-function agentNotificationRecordFromList(
-  notifications: AgentTaskNotification[],
-): Record<string, AgentTaskNotification> {
-  return Object.fromEntries(
-    notifications.map((notification) => [notification.toolUseId, notification]),
-  )
-}
-
 function backgroundTaskRecordFromNotifications(
   notifications: AgentTaskNotification[],
 ): Record<string, BackgroundAgentTask> {
@@ -2227,71 +2066,6 @@ function mergeBackgroundAgentTaskRecords(
   )
 }
 
-const TEAMMATE_CONTENT_REGEX = /<teammate-message\s+teammate_id="([^"]+)"[^>]*>\n?([\s\S]*?)\n?<\/teammate-message>/g
-
-function extractVisibleTeammateMessageContents(text: string): string[] {
-  const contents: string[] = []
-
-  for (const match of text.matchAll(TEAMMATE_CONTENT_REGEX)) {
-    const content = match[2]?.trim()
-    if (!content) continue
-
-    if (content.startsWith('{') && content.endsWith('}')) {
-      try {
-        const parsed = JSON.parse(content) as Record<string, unknown>
-        if (typeof parsed.type === 'string' && AGENT_LIFECYCLE_TYPES.has(parsed.type)) {
-          continue
-        }
-      } catch {
-      }
-    }
-
-    contents.push(content)
-  }
-
-  return contents
-}
-
-function pushAssistantHistoryText(
-  messages: UIMessage[],
-  content: string,
-  timestamp: number,
-  model?: string,
-  transcriptMessageId?: string,
-): void {
-  if (!content.trim()) return
-
-  const last = messages[messages.length - 1]
-  const canMergeIntoLast =
-    last?.type === 'assistant_text' &&
-    (
-      transcriptMessageId
-        ? last.transcriptMessageId === transcriptMessageId
-        : !last.transcriptMessageId
-    )
-  if (canMergeIntoLast) {
-    last.content += content
-    if (model && !last.model) last.model = model
-    if (transcriptMessageId && !last.transcriptMessageId) {
-      last.transcriptMessageId = transcriptMessageId
-    }
-    return
-  }
-
-  messages.push({
-    id: nextId(),
-    type: 'assistant_text',
-    content,
-    timestamp,
-    ...(transcriptMessageId ? { transcriptMessageId } : {}),
-    ...(model ? { model } : {}),
-  })
-}
-
-type HistoryMappingOptions = {
-  includeTeammateMessages?: boolean
-}
-
 function buildModelContent(content: string, attachments?: AttachmentRef[]): string {
   const paths = attachments
     ?.map((attachment) => attachment.path)
@@ -2300,345 +2074,4 @@ function buildModelContent(content: string, attachments?: AttachmentRef[]): stri
   if (paths.length === 0) return trimmed
   const prefix = paths.map((path) => `@"${path}"`).join(' ')
   return `${prefix} ${trimmed || 'Please analyze the attached files.'}`.trim()
-}
-
-function getReferenceName(referencePath: string): string {
-  const normalized = referencePath.replace(/\\/g, '/').replace(/\/+$/, '')
-  const name = normalized.split('/').filter(Boolean).pop()
-  return name || referencePath
-}
-
-function extractLeadingFileReferences(text: string): {
-  content: string
-  attachments?: UIAttachment[]
-  modelContent?: string
-} {
-  const attachments: UIAttachment[] = []
-  let remaining = text
-
-  while (true) {
-    const match = remaining.match(/^@"([^"]+)"\s*/)
-    if (!match?.[1]) break
-
-    attachments.push({
-      type: 'file',
-      name: getReferenceName(match[1]),
-      path: match[1],
-    })
-    remaining = remaining.slice(match[0].length)
-  }
-
-  if (attachments.length === 0) {
-    return { content: text }
-  }
-
-  return {
-    content: remaining.trimStart(),
-    attachments,
-    modelContent: text,
-  }
-}
-
-export function reconstructAgentNotifications(messages: MessageEntry[]): Record<string, AgentTaskNotification> {
-  const taskNotifications = messages
-    .filter((message) => message.type === 'user')
-    .map((message) => extractTaskNotification(message.content))
-    .filter((notification): notification is AgentTaskNotification => notification !== null)
-
-  const agentNameToToolUseId = new Map<string, string>()
-
-  for (const msg of messages) {
-    if ((msg.type === 'assistant' || msg.type === 'tool_use') && Array.isArray(msg.content)) {
-      for (const block of msg.content as AssistantHistoryBlock[]) {
-        if (block.type === 'tool_use' && block.name === 'Agent' && block.id) {
-          const input = block.input as Record<string, unknown> | undefined
-          const name = input?.name as string | undefined
-          if (name && !agentNameToToolUseId.has(name)) agentNameToToolUseId.set(name, block.id)
-        }
-      }
-    }
-  }
-
-  if (agentNameToToolUseId.size === 0) {
-    return agentNotificationRecordFromList(taskNotifications)
-  }
-
-  const teammateContent = new Map<string, string>()
-  for (const msg of messages) {
-    if (msg.type !== 'user') continue
-    const text = typeof msg.content === 'string'
-      ? msg.content
-      : Array.isArray(msg.content)
-        ? (msg.content as Array<{ type?: string; text?: string }>).filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('\n')
-        : ''
-    if (!text.includes('<teammate-message')) continue
-    for (const match of text.matchAll(TEAMMATE_CONTENT_REGEX)) {
-      if (match[1] && match[2]) {
-        const content = match[2].trim()
-        if (content.startsWith('{') && content.endsWith('}')) {
-          try {
-            const parsed = JSON.parse(content) as Record<string, unknown>
-            if (typeof parsed.type === 'string' && AGENT_LIFECYCLE_TYPES.has(parsed.type)) continue
-          } catch { }
-        }
-        if (!teammateContent.has(match[1])) {
-          teammateContent.set(match[1], content)
-        }
-      }
-    }
-  }
-
-  const notifications: Record<string, AgentTaskNotification> = {}
-  for (const [name, toolUseId] of agentNameToToolUseId) {
-    const content = teammateContent.get(name)
-    if (content) {
-      notifications[toolUseId] = {
-        taskId: toolUseId,
-        toolUseId,
-        status: 'completed',
-        summary: content,
-      }
-    }
-  }
-
-  for (const notification of taskNotifications) {
-    notifications[notification.toolUseId] = notification
-  }
-
-  return notifications
-}
-
-export function mapHistoryMessagesToUiMessages(
-  messages: MessageEntry[],
-  options?: HistoryMappingOptions,
-): UIMessage[] {
-  const includeTeammateMessages = options?.includeTeammateMessages === true
-  const uiMessages: UIMessage[] = []
-  let suppressTaskNotificationResponse = false
-  let pendingGoalCommand: { name: string; args: string } | null = null
-
-  for (const msg of messages) {
-    if (msg.type === 'user' && isTaskNotificationContent(msg.content)) {
-      suppressTaskNotificationResponse = true
-      continue
-    }
-    if (msg.type === 'user') {
-      suppressTaskNotificationResponse = false
-    } else if (suppressTaskNotificationResponse) {
-      continue
-    }
-
-    const timestamp = new Date(msg.timestamp).getTime()
-    if (msg.type === 'system' && typeof msg.content === 'string') {
-      if (msg.content.trim() === 'Conversation compacted' || msg.content.trim() === 'Context compacted') {
-        const compactMessages = appendOrUpdateTailCompactSummary(
-          uiMessages,
-          { title: 'Context compacted', phase: 'complete' },
-          timestamp,
-        )
-        uiMessages.splice(0, uiMessages.length, ...compactMessages)
-        continue
-      }
-
-      const localCommand = parseGoalCommandFromLocalCommand(msg.content)
-      if (localCommand) {
-        pendingGoalCommand = localCommand
-        if (localCommand.name === 'goal') {
-          uiMessages.push({
-            id: msg.id || nextId(),
-            type: 'user_text',
-            content: formatVisibleLocalCommand(localCommand),
-            timestamp,
-          })
-        }
-        continue
-      }
-
-      const localCommandOutput = extractLocalCommandOutputText(msg.content)
-      if (localCommandOutput) {
-        const goalEvent = parseGoalEventFromLocalCommandOutput(localCommandOutput, pendingGoalCommand)
-        pendingGoalCommand = null
-        if (goalEvent) {
-          uiMessages.push({
-            id: msg.id || nextId(),
-            type: 'goal_event',
-            ...goalEvent,
-            timestamp,
-          })
-        }
-        continue
-      }
-    }
-    if (msg.type === 'user' && typeof msg.content === 'string') {
-      const localCommandOutput = extractLocalCommandOutputText(msg.content)
-      if (localCommandOutput && isCompactLocalCommandOutput(localCommandOutput)) {
-        continue
-      }
-
-      const compactSummary = extractCompactSummaryContent(msg.content)
-      if (compactSummary) {
-        const compactMessages = appendOrUpdateTailCompactSummary(
-          uiMessages,
-          {
-            title: 'Context compacted',
-            phase: 'complete',
-            summary: compactSummary,
-          },
-          timestamp,
-        )
-        uiMessages.splice(0, uiMessages.length, ...compactMessages)
-        continue
-      }
-
-      if (isTeammateMessage(msg.content)) {
-        if (!includeTeammateMessages) continue
-        const teammateContents = extractVisibleTeammateMessageContents(msg.content)
-        if (teammateContents.length === 0) continue
-        uiMessages.push({
-          id: msg.id || nextId(),
-          type: 'user_text',
-          content: teammateContents.join('\n\n'),
-          ...(msg.id ? { transcriptMessageId: msg.id } : {}),
-          timestamp,
-        })
-        continue
-      }
-      const parsed = extractLeadingFileReferences(msg.content)
-      uiMessages.push({
-        id: msg.id || nextId(),
-        type: 'user_text',
-        content: parsed.content,
-        ...(msg.id ? { transcriptMessageId: msg.id } : {}),
-        ...(parsed.modelContent ? { modelContent: parsed.modelContent } : {}),
-        ...(parsed.attachments ? { attachments: parsed.attachments } : {}),
-        timestamp,
-      })
-      continue
-    }
-    if (msg.type === 'assistant' && typeof msg.content === 'string') {
-      if (!msg.content.trim()) continue
-      uiMessages.push({
-        id: msg.id || nextId(),
-        type: 'assistant_text',
-        content: msg.content,
-        ...(msg.id ? { transcriptMessageId: msg.id } : {}),
-        timestamp,
-        model: msg.model,
-      })
-      continue
-    }
-    if ((msg.type === 'assistant' || msg.type === 'tool_use') && Array.isArray(msg.content)) {
-      for (const block of msg.content as AssistantHistoryBlock[]) {
-        if (block.type === 'thinking' && block.thinking) uiMessages.push({ id: nextId(), type: 'thinking', content: block.thinking, timestamp })
-        else if (block.type === 'text' && block.text) {
-          pushAssistantHistoryText(uiMessages, block.text, timestamp, msg.model, msg.id || undefined)
-        }
-        else if (block.type === 'tool_use') uiMessages.push({ id: nextId(), type: 'tool_use', toolName: block.name ?? 'unknown', toolUseId: block.id ?? '', input: block.input, timestamp, parentToolUseId: msg.parentToolUseId })
-      }
-      continue
-    }
-    if ((msg.type === 'user' || msg.type === 'tool_result') && Array.isArray(msg.content)) {
-      const textParts: string[] = []
-      const attachments: UIAttachment[] = []
-      for (const block of msg.content as UserHistoryBlock[]) {
-        if (block.type === 'text' && block.text && isTeammateMessage(block.text)) {
-          if (!includeTeammateMessages) continue
-          textParts.push(...extractVisibleTeammateMessageContents(block.text))
-        } else if (block.type === 'text' && block.text) {
-          textParts.push(block.text)
-        }
-        else if (block.type === 'image') attachments.push({ type: 'image', name: block.name || 'image', data: block.source?.data, mimeType: block.mimeType || block.media_type })
-        else if (block.type === 'file') attachments.push({ type: 'file', name: block.name || 'file' })
-        else if (block.type === 'tool_result') uiMessages.push({
-          id: nextId(),
-          type: 'tool_result',
-          toolUseId: block.tool_use_id ?? '',
-          content: normalizeHistoryToolResultContent(block.content, msg.toolUseResult),
-          isError: !!block.is_error,
-          timestamp,
-          parentToolUseId: msg.parentToolUseId,
-        })
-      }
-      if (textParts.length > 0 || attachments.length > 0) {
-        const parsed = extractLeadingFileReferences(textParts.join('\n'))
-        const allAttachments = [...(parsed.attachments ?? []), ...attachments]
-        uiMessages.push({
-          id: msg.id || nextId(),
-          type: 'user_text',
-          content: parsed.content,
-          ...(msg.id ? { transcriptMessageId: msg.id } : {}),
-          ...(parsed.modelContent ? { modelContent: parsed.modelContent } : {}),
-          attachments: allAttachments.length > 0 ? allAttachments : undefined,
-          timestamp,
-        })
-      }
-    }
-    if (msg.type === 'system' && msg.content && typeof msg.content === 'object') {
-      const subtype = (msg.content as { subtype?: unknown }).subtype
-      if (subtype === 'memory_saved') {
-        const files = normalizeMemoryEventFiles(msg.content)
-        if (files.length > 0) {
-          uiMessages.push({
-            id: msg.id || nextId(),
-            type: 'memory_event',
-            event: 'saved',
-            files,
-            message: typeof (msg.content as { message?: unknown }).message === 'string'
-              ? (msg.content as { message: string }).message
-              : undefined,
-            teamCount: normalizeMemoryTeamCount(msg.content),
-            timestamp,
-          })
-        }
-      }
-    }
-  }
-  return uiMessages
-}
-
-function extractLastTodoWriteFromHistory(messages: MessageEntry[]): Array<{ content: string; status: string; activeForm?: string }> | null {
-  let foundIndex = -1
-  let todos: Array<{ content: string; status: string; activeForm?: string }> | null = null
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]!
-    if ((msg.type === 'assistant' || msg.type === 'tool_use') && Array.isArray(msg.content)) {
-      const blocks = msg.content as AssistantHistoryBlock[]
-      for (let j = blocks.length - 1; j >= 0; j--) {
-        const block = blocks[j]!
-        if (block.type === 'tool_use' && block.name === 'TodoWrite') {
-          const input = block.input as { todos?: unknown } | undefined
-          if (input && Array.isArray(input.todos)) {
-            todos = input.todos as Array<{ content: string; status: string; activeForm?: string }>
-            foundIndex = i
-            break
-          }
-        }
-      }
-      if (todos) break
-    }
-  }
-  if (!todos) return null
-  const allDone = todos.every((t) => t.status === 'completed')
-  if (allDone) {
-    for (let i = foundIndex + 1; i < messages.length; i++) {
-      if (messages[i]!.type === 'user' && messages[i]!.content) return null
-    }
-  }
-  return todos
-}
-
-const TASK_RELATED_TOOL_NAMES = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList'])
-
-function hasUserMessagesAfterTaskCompletion(messages: MessageEntry[]): boolean {
-  let lastTaskIndex = -1
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]!
-    if ((msg.type === 'assistant' || msg.type === 'tool_use') && Array.isArray(msg.content)) {
-      const blocks = msg.content as AssistantHistoryBlock[]
-      if (blocks.some((b) => b.type === 'tool_use' && TASK_RELATED_TOOL_NAMES.has(b.name ?? ''))) { lastTaskIndex = i; break }
-    }
-  }
-  if (lastTaskIndex < 0) return false
-  for (let i = lastTaskIndex + 1; i < messages.length; i++) { if (messages[i]!.type === 'user') return true }
-  return false
 }

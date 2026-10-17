@@ -27,7 +27,7 @@ type UserBlock = {
   tool_use_id?: string
   content?: unknown
   is_error?: boolean
-  source?: { data?: string }
+  source?: { type?: string; data?: string; media_type?: string; url?: string }
   mimeType?: string
   media_type?: string
   name?: string
@@ -51,6 +51,20 @@ function createIdAllocator() {
     used.add(id)
     return id
   }
+}
+
+/**
+ * An image block's data as the desktop renders it: a data URL (or the source
+ * URL), like the attachments of messages sent from the composer.
+ */
+function imageData(block: UserBlock): { data?: string; mimeType?: string } {
+  const mimeType = block.source?.media_type || block.mimeType || block.media_type
+  const source = block.source?.type === 'url' ? block.source.url : block.source?.data
+  if (!source) return mimeType ? { mimeType } : {}
+  const data = source.startsWith('data:') || block.source?.type === 'url' || !mimeType
+    ? source
+    : `data:${mimeType};base64,${source}`
+  return { data, ...(mimeType ? { mimeType } : {}) }
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {
@@ -192,7 +206,11 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
 
       const summary = extractCompactSummary(msg.content)
       if (summary) {
-        upsertTailCompactSummary({ title: 'Context compacted', phase: 'complete', summary }, msg.id, timestamp)
+        upsertTailCompactSummary(
+          { title: 'Context compacted', phase: 'complete', summary, ...msg.compactMetadata },
+          msg.id,
+          timestamp,
+        )
         continue
       }
 
@@ -260,12 +278,7 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
         } else if (block.type === 'text' && block.text) {
           textParts.push(block.text)
         } else if (block.type === 'image') {
-          attachments.push({
-            type: 'image',
-            name: block.name || 'image',
-            data: block.source?.data,
-            mimeType: block.mimeType || block.media_type,
-          })
+          attachments.push({ type: 'image', name: block.name || 'image', ...imageData(block) })
         } else if (block.type === 'file') {
           attachments.push({ type: 'file', name: block.name || 'file' })
         } else if (block.type === 'tool_result') {

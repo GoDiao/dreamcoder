@@ -3,7 +3,7 @@ import { teamsApi } from '../api/teams'
 import type { TeamSummary, TeamDetail, TeamMember, AgentColor } from '../types/team'
 import { AGENT_COLORS } from '../types/team'
 import type { TeamMemberStatus, UIMessage } from '../types/chat'
-import { useChatStore, mapHistoryMessagesToUiMessages } from './chatStore'
+import { useChatStore } from './chatStore'
 import { useTabStore } from './tabStore'
 
 const MEMBER_POLL_INTERVAL_MS = 1500
@@ -188,19 +188,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     if (!team || !member) return
 
     try {
-      const { messages } = await teamsApi.getMemberTranscript(team.name, member.agentId)
-      const asEntries = messages.map((msg) => ({
-        id: msg.id,
-        type: msg.type,
-        content: msg.content,
-        timestamp: msg.timestamp,
-        model: msg.model,
-        parentToolUseId: msg.parentToolUseId,
-      }))
-      const transcriptMessages = mapHistoryMessagesToUiMessages(
-        asEntries as Parameters<typeof mapHistoryMessagesToUiMessages>[0],
-        { includeTeammateMessages: true },
-      )
+      const { items: transcriptMessages } = await teamsApi.getMemberTranscript(team.name, member.agentId)
       const existingMessages = useChatStore.getState().sessions[sessionId]?.messages ?? []
       const mergedMessages = mergeMemberTranscriptMessages(
         existingMessages,

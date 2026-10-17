@@ -264,14 +264,69 @@ describe('TeamService', () => {
       },
     ])
 
-    const messages = await service.getMemberTranscript(
+    const { items } = await service.getMemberTranscript(
       'transcript-team',
       'agent-lead',
     )
-    expect(messages).toHaveLength(2)
-    expect(messages[0]!.type).toBe('user')
-    expect(messages[0]!.id).toBe('msg-user-1')
-    expect(messages[1]!.type).toBe('assistant')
+    expect(items).toMatchObject([
+      { id: 'msg-user-1', type: 'user_text', content: 'Hello team' },
+      { id: 'msg-asst-1:0', type: 'assistant_text', content: 'Hi! Ready to help.' },
+    ])
+  })
+
+  it('should read a member transcript from the lead session subagents', async () => {
+    await writeTeamConfig(
+      'subagent-transcript-team',
+      makeTeamConfig({
+        name: 'subagent-transcript-team',
+        leadSessionId: 'lead-session-subagents',
+        members: [
+          {
+            agentId: 'reviewer@subagent-transcript-team',
+            name: 'reviewer',
+            joinedAt: 1700000000000,
+            tmuxPaneId: 'in-process',
+            cwd: '/tmp/project',
+          },
+        ],
+      }),
+    )
+
+    await writeSubagentTranscriptFile(
+      '-tmp-project',
+      'lead-session-subagents',
+      'agent-reviewer.jsonl',
+      [
+        {
+          type: 'user',
+          uuid: 'sub-u1',
+          isSidechain: true,
+          agentName: 'reviewer',
+          message: {
+            role: 'user',
+            content: '<teammate-message teammate_id="team-lead">\nReview the parser\n</teammate-message>',
+          },
+          timestamp: '2026-01-01T00:01:00.000Z',
+        },
+        {
+          type: 'assistant',
+          uuid: 'sub-a1',
+          isSidechain: true,
+          parentUuid: 'sub-u1',
+          message: { role: 'assistant', content: [{ type: 'text', text: 'The parser looks fine.' }] },
+          timestamp: '2026-01-01T00:02:00.000Z',
+        },
+      ],
+    )
+
+    const { items } = await service.getMemberTranscript(
+      'subagent-transcript-team',
+      'reviewer@subagent-transcript-team',
+    )
+    expect(items).toMatchObject([
+      { id: 'sub-u1', type: 'user_text', content: 'Review the parser' },
+      { id: 'sub-a1:0', type: 'assistant_text', content: 'The parser looks fine.' },
+    ])
   })
 
   it('should return empty array when member has no sessionId', async () => {
@@ -279,21 +334,21 @@ describe('TeamService', () => {
     delete (config.members[0] as Record<string, unknown>).sessionId
     await writeTeamConfig('no-session-team', config)
 
-    const messages = await service.getMemberTranscript(
+    const transcript = await service.getMemberTranscript(
       'no-session-team',
       'agent-lead',
     )
-    expect(messages).toEqual([])
+    expect(transcript.items).toEqual([])
   })
 
   it('should return empty array when transcript file not found', async () => {
     await writeTeamConfig('no-file-team', makeTeamConfig({ name: 'no-file-team' }))
 
-    const messages = await service.getMemberTranscript(
+    const transcript = await service.getMemberTranscript(
       'no-file-team',
       'agent-lead',
     )
-    expect(messages).toEqual([])
+    expect(transcript.items).toEqual([])
   })
 
   it('should throw 404 for unknown member', async () => {
@@ -323,9 +378,8 @@ describe('TeamService', () => {
       },
     ])
 
-    const messages = await service.getMemberTranscript('meta-team', 'agent-lead')
-    expect(messages).toHaveLength(1)
-    expect(messages[0]!.id).toBe('msg-real')
+    const { items } = await service.getMemberTranscript('meta-team', 'agent-lead')
+    expect(items).toMatchObject([{ id: 'msg-real', type: 'user_text', content: 'Real message' }])
   })
 
   it('should write member messages into the teammate inbox', async () => {
@@ -504,10 +558,9 @@ describe('Teams API', () => {
     expect(res.status).toBe(200)
 
     const body = (await res.json()) as {
-      messages: Array<{ id: string; type: string }>
+      items: Array<{ id: string; type: string; content: unknown }>
     }
-    expect(body.messages).toHaveLength(1)
-    expect(body.messages[0]!.type).toBe('user')
+    expect(body.items).toMatchObject([{ id: 'u1', type: 'user_text', content: 'Hello' }])
   })
 
   it('GET /api/teams/:name/members/:id/transcript should 404 for unknown member', async () => {

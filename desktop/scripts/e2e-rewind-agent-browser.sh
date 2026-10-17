@@ -165,7 +165,7 @@ if [[ "${PREFILL_VALUE}" != "${PROMPT}" ]]; then
   exit 1
 fi
 
-MESSAGE_COUNT="$(curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}/messages" \
+MESSAGE_COUNT="$(curl -fsS "${BASE_URL}/api/sessions/${SESSION_ID}" \
   | bun -e 'const input = await Bun.stdin.text(); const data = JSON.parse(input); console.log(data.messages.length);')"
 if [[ "${MESSAGE_COUNT}" != "0" ]]; then
   echo "Expected rewound session to have 0 transcript messages, got ${MESSAGE_COUNT}" >&2

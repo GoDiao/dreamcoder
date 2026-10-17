@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MessageEntry } from '../types/session'
+import type { UIMessage } from '../types/chat'
+import type { SessionTranscript } from '../types/session'
 import { useSessionRuntimeStore } from './sessionRuntimeStore'
 import { useSettingsStore } from './settingsStore'
 
@@ -73,7 +74,12 @@ vi.mock('../api/websocket', () => ({
 
 vi.mock('../api/sessions', () => ({
   sessionsApi: {
-    getMessages: vi.fn(async () => ({ messages: [] })),
+    getTranscript: vi.fn(async () => ({
+      items: [],
+      agentNotifications: {},
+      lastTodos: null,
+      hasMessagesAfterTaskCompletion: false,
+    })),
     getSlashCommands: vi.fn(async () => ({ commands: [] })),
   },
 }))
@@ -125,13 +131,15 @@ vi.mock('./cliTaskStore', () => ({
 
 import { sessionsApi } from '../api/sessions'
 import {
-  mapHistoryMessagesToUiMessages,
-  reconstructAgentNotifications,
   type PerSessionState,
   useChatStore,
 } from './chatStore'
 
 const TEST_SESSION_ID = 'test-session-1'
+
+function transcriptOf(items: UIMessage[], rest: Partial<SessionTranscript> = {}): SessionTranscript {
+  return { items, agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false, ...rest }
+}
 const initialState = useChatStore.getState()
 
 function makeSession(overrides: Partial<PerSessionState> = {}): PerSessionState {
@@ -174,8 +182,8 @@ describe('chatStore history mapping', () => {
     updateTabTitleMock.mockReset()
     updateTabStatusMock.mockReset()
     updateSessionTitleMock.mockReset()
-    vi.mocked(sessionsApi.getMessages).mockReset()
-    vi.mocked(sessionsApi.getMessages).mockResolvedValue({ messages: [] })
+    vi.mocked(sessionsApi.getTranscript).mockReset()
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValue(transcriptOf([]))
     sessionStoreSnapshot.sessions = []
     cliTaskStoreSnapshot.tasks = []
     cliTaskStoreSnapshot.sessionId = null
@@ -188,341 +196,22 @@ describe('chatStore history mapping', () => {
     })
   })
 
-  it('preserves thinking blocks when restoring transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'assistant-1',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        model: 'opus',
-        parentToolUseId: 'agent-1',
-        content: [
-          { type: 'thinking', thinking: 'internal reasoning' },
-          { type: 'text', text: '目录结构分析' },
-          { type: 'tool_use', name: 'Read', id: 'tool-1', input: { file_path: 'src/App.tsx' } },
-        ],
-      },
-      {
-        id: 'user-1',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        parentToolUseId: 'agent-1',
-        content: [
-          { type: 'tool_result', tool_use_id: 'tool-1', content: 'ok', is_error: false },
-        ],
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped.map((message) => message.type)).toEqual([
-      'thinking',
-      'assistant_text',
-      'tool_use',
-      'tool_result',
-    ])
-    expect(mapped[2]).toMatchObject({ parentToolUseId: 'agent-1' })
-    expect(mapped[3]).toMatchObject({ parentToolUseId: 'agent-1' })
-  })
-
-  it('maps AskUserQuestion transcript answers from toolUseResult metadata', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'assistant-ask',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: [
-          {
-            type: 'tool_use',
-            name: 'AskUserQuestion',
-            id: 'ask-1',
-            input: {
-              questions: [
-                {
-                  question: 'Pick one?',
-                  options: [{ label: 'A' }, { label: 'B' }],
-                },
-              ],
-            },
-          },
-        ],
-      },
-      {
-        id: 'user-answer',
-        type: 'tool_result',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 'ask-1',
-            content: 'User has answered your questions: "Pick one?"="A". You can now continue with the user\'s answers in mind.',
-          },
-        ],
-        toolUseResult: {
-          questions: [
-            {
-              question: 'Pick one?',
-              options: [{ label: 'A' }, { label: 'B' }],
-            },
-          ],
-          answers: { 'Pick one?': 'A' },
-        },
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toHaveLength(2)
-    expect(mapped[1]).toMatchObject({
-      type: 'tool_result',
-      toolUseId: 'ask-1',
-      content: {
-        answers: { 'Pick one?': 'A' },
-      },
-    })
-  })
-
-  it('maps compact boundary and summary history without hiding pre-compact messages', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'old-user',
-        type: 'user',
-        content: 'Build the billing import flow',
-        timestamp: '2026-05-19T09:59:58.000Z',
-      },
-      {
-        id: 'old-assistant',
-        type: 'assistant',
-        content: 'Implemented the flow.',
-        timestamp: '2026-05-19T09:59:59.000Z',
-      },
-      {
-        id: 'compact-boundary',
-        type: 'system',
-        content: 'Conversation compacted',
-        timestamp: '2026-05-19T10:00:00.000Z',
-      },
-      {
-        id: 'compact-summary',
-        type: 'user',
-        content: [
-          'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
-          '',
-          'Kept the billing import implementation details and next verification steps.',
-          '',
-          'If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /tmp/transcript.jsonl',
-        ].join('\n'),
-        timestamp: '2026-05-19T10:00:01.000Z',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toHaveLength(3)
-    expect(mapped).toMatchObject([
-      {
-        id: 'old-user',
-        type: 'user_text',
-        content: 'Build the billing import flow',
-      },
-      {
-        id: 'old-assistant',
-        type: 'assistant_text',
-        content: 'Implemented the flow.',
-      },
-      {
-        type: 'compact_summary',
-        title: 'Context compacted',
-        summary: 'Kept the billing import implementation details and next verification steps.',
-      },
-    ])
-  })
-
-  it('drops compact local command stdout after mapping compact history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'compact-summary',
-        type: 'user',
-        content: [
-          'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
-          '',
-          'Kept the billing import implementation details.',
-        ].join('\n'),
-        timestamp: '2026-05-19T10:00:01.000Z',
-      },
-      {
-        id: 'compact-stdout',
-        type: 'user',
-        content: '<local-command-stdout>Compacted </local-command-stdout>',
-        timestamp: '2026-05-19T10:00:02.000Z',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toHaveLength(1)
-    expect(mapped[0]).toMatchObject({
-      type: 'compact_summary',
-      summary: 'Kept the billing import implementation details.',
-    })
-  })
-
-  it('restores saved memory system events from transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'memory-1',
-        type: 'system',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: {
-          subtype: 'memory_saved',
-          writtenPaths: ['/Users/test/.claude/projects/example/memory/preferences.md'],
-          teamCount: 0,
-        },
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'memory-1',
-        type: 'memory_event',
-        event: 'saved',
-        files: [
-          {
-            path: '/Users/test/.claude/projects/example/memory/preferences.md',
-            action: 'saved',
-          },
-        ],
-      },
-    ])
-  })
-
-  it('preserves transcript message ids on natural-language history messages', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'transcript-user-1',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '请从这里继续',
-      },
-      {
-        id: 'transcript-assistant-1',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        model: 'opus',
-        content: [
-          { type: 'text', text: '这里是答复。' },
-          { type: 'tool_use', name: 'Read', id: 'tool-1', input: { file_path: 'src/App.tsx' } },
-        ],
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'transcript-user-1',
-        type: 'user_text',
-        transcriptMessageId: 'transcript-user-1',
-      },
-      {
-        type: 'assistant_text',
-        transcriptMessageId: 'transcript-assistant-1',
-      },
-      {
-        type: 'tool_use',
-      },
-    ])
-  })
-
-  it('restores /goal local command output from transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'goal-command',
-        type: 'system',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '<command-name>/goal</command-name>\n<command-args>ship the smoke test</command-args>',
-      },
-      {
-        id: 'goal-output',
-        type: 'system',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        content: '<local-command-stdout>Goal set: ship the smoke test</local-command-stdout>',
-      },
-    ]
-
-    expect(mapHistoryMessagesToUiMessages(messages)).toMatchObject([
-      {
-        id: 'goal-command',
-        type: 'user_text',
-        content: '/goal ship the smoke test',
-      },
-      {
-        id: 'goal-output',
-        type: 'goal_event',
-        action: 'created',
-        status: 'active',
-        objective: 'ship the smoke test',
-      },
-    ])
-  })
-
-  it('restores repeated /goal set output as the current created event', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'goal-command',
-        type: 'system',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '<command-name>/goal</command-name>\n<command-args>ship the replacement target</command-args>',
-      },
-      {
-        id: 'goal-output',
-        type: 'system',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        content: '<local-command-stdout>Goal set: ship the replacement target</local-command-stdout>',
-      },
-    ]
-
-    expect(mapHistoryMessagesToUiMessages(messages)).toMatchObject([
-      {
-        id: 'goal-command',
-        type: 'user_text',
-        content: '/goal ship the replacement target',
-      },
-      {
-        id: 'goal-output',
-        type: 'goal_event',
-        action: 'created',
-        status: 'active',
-        objective: 'ship the replacement target',
-      },
-    ])
-  })
-
   it('restores completed /goal state from transcript history after app restart', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'goal-command',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: '<command-name>/goal</command-name>\n<command-args>ship the smoke test</command-args>',
-        },
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
+      transcriptOf([
+        { id: 'goal-command', type: 'user_text', content: '/goal ship the smoke test', timestamp: 1775433600000 },
         {
           id: 'goal-output',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: '<local-command-stdout>Goal set: ship the smoke test</local-command-stdout>',
+          type: 'goal_event',
+          action: 'created',
+          status: 'active',
+          objective: 'ship the smoke test',
+          message: 'Goal set: ship the smoke test',
+          timestamp: 1775433601000,
         },
-        {
-          id: 'goal-complete',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:02.000Z',
-          content: '<local-command-stdout>Goal marked complete.</local-command-stdout>',
-        },
-      ],
-    })
+        { id: 'goal-complete', type: 'goal_event', action: 'completed', message: 'Goal marked complete.', timestamp: 1775433602000 },
+      ]),
+    )
 
     useChatStore.setState({
       sessions: {
@@ -558,38 +247,90 @@ describe('chatStore history mapping', () => {
     })
   })
 
-  it('uses transcript terminal events to repair stale live goal and background task state', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'goal-command',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: '<command-name>/goal</command-name>\n<command-args>ship the smoke test</command-args>',
-        },
-        {
-          id: 'goal-output',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: '<local-command-stdout>Goal set: ship the smoke test</local-command-stdout>',
-        },
-        {
-          id: 'goal-complete',
-          type: 'system',
-          timestamp: '2026-04-06T00:00:02.000Z',
-          content: '<local-command-stdout>Goal marked complete.</local-command-stdout>',
-        },
-      ],
-      taskNotifications: [
-        {
+  it('restores messages, goal, background tasks and todos from a session transcript', async () => {
+    const todos = [{ content: 'Write the summary', status: 'in_progress', activeForm: 'Writing the summary' }]
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([
+      { id: 'u1', type: 'user_text', content: 'Review the app', transcriptMessageId: 'u1', timestamp: 1 },
+      {
+        id: 'a1:0',
+        type: 'tool_use',
+        toolName: 'Agent',
+        toolUseId: 'agent-tool-1',
+        input: { description: 'Review app', prompt: 'Review the app', run_in_background: true },
+        timestamp: 2,
+      },
+      { id: 'g1', type: 'goal_event', action: 'created', status: 'active', objective: 'ship it', timestamp: 3 },
+      { id: 'a2:0', type: 'assistant_text', content: 'Started the review.', transcriptMessageId: 'a2', timestamp: 4 },
+    ], {
+      agentNotifications: {
+        'agent-tool-1': {
           taskId: 'agent-task-1',
           toolUseId: 'agent-tool-1',
           status: 'completed',
-          summary: 'Agent completed',
-          timestamp: '2026-04-06T00:00:03.000Z',
+          summary: 'Review finished',
         },
-      ],
+      },
+      lastTodos: todos,
+    }))
+    cliTaskStoreSnapshot.sessionId = TEST_SESSION_ID
+    cliTaskStoreSnapshot.tasks = []
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: makeSession({ messages: [] }),
+      },
     })
+
+    await useChatStore.getState().loadHistory(TEST_SESSION_ID)
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]
+    expect(sessionsApi.getTranscript).toHaveBeenCalledWith(TEST_SESSION_ID)
+    expect(session?.messages).toMatchObject([
+      { id: 'u1', type: 'user_text', content: 'Review the app' },
+      { id: 'a1:0', type: 'tool_use', toolUseId: 'agent-tool-1' },
+      { id: 'g1', type: 'goal_event', action: 'created' },
+      { id: 'a2:0', type: 'assistant_text', content: 'Started the review.' },
+      {
+        id: 'background-task-agent-task-1',
+        type: 'background_task',
+        task: { taskId: 'agent-task-1', status: 'completed', summary: 'Review finished' },
+      },
+    ])
+    expect(session?.activeGoal).toMatchObject({ status: 'active', objective: 'ship it' })
+    expect(session?.agentTaskNotifications['agent-tool-1']).toMatchObject({ status: 'completed' })
+    expect(session?.backgroundAgentTasks?.['agent-task-1']).toMatchObject({
+      toolUseId: 'agent-tool-1',
+      status: 'completed',
+      summary: 'Review finished',
+    })
+    expect(setTasksFromTodosMock).toHaveBeenCalledWith(todos, TEST_SESSION_ID)
+  })
+
+  it('uses transcript terminal events to repair stale live goal and background task state', async () => {
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
+      transcriptOf([
+        { id: 'goal-command', type: 'user_text', content: '/goal ship the smoke test', timestamp: 1775433600000 },
+        {
+          id: 'goal-output',
+          type: 'goal_event',
+          action: 'created',
+          status: 'active',
+          objective: 'ship the smoke test',
+          message: 'Goal set: ship the smoke test',
+          timestamp: 1775433601000,
+        },
+        { id: 'goal-complete', type: 'goal_event', action: 'completed', message: 'Goal marked complete.', timestamp: 1775433602000 },
+      ], {
+        agentNotifications: {
+          'agent-tool-1': {
+            taskId: 'agent-task-1',
+            toolUseId: 'agent-tool-1',
+            status: 'completed',
+            summary: 'Agent completed',
+            timestamp: '2026-04-06T00:00:03.000Z',
+          },
+        },
+      }),
+    )
 
     useChatStore.setState({
       sessions: {
@@ -644,22 +385,10 @@ describe('chatStore history mapping', () => {
   })
 
   it('hydrates transcript ids for a just-completed live turn', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'transcript-user-1',
-          type: 'user',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: 'live prompt',
-        },
-        {
-          id: 'transcript-assistant-1',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: 'live answer',
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([
+      { id: 'transcript-user-1', type: 'user_text', content: 'live prompt', transcriptMessageId: 'transcript-user-1', timestamp: 1775433600000 },
+      { id: 'transcript-assistant-1:0', type: 'assistant_text', content: 'live answer', transcriptMessageId: 'transcript-assistant-1', timestamp: 1775433601000 },
+    ]))
 
     useChatStore.setState({
       sessions: {
@@ -745,22 +474,10 @@ describe('chatStore history mapping', () => {
   })
 
   it('collapses duplicate assistant replies after transcript id hydration', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'transcript-user-1',
-          type: 'user',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: 'live prompt',
-        },
-        {
-          id: 'transcript-assistant-1',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: 'live answer',
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([
+      { id: 'transcript-user-1', type: 'user_text', content: 'live prompt', transcriptMessageId: 'transcript-user-1', timestamp: 1775433600000 },
+      { id: 'transcript-assistant-1:0', type: 'assistant_text', content: 'live answer', transcriptMessageId: 'transcript-assistant-1', timestamp: 1775433601000 },
+    ]))
 
     useChatStore.setState({
       sessions: {
@@ -810,33 +527,14 @@ describe('chatStore history mapping', () => {
 
   it('retries transcript id hydration after the assistant message is persisted', async () => {
     vi.useFakeTimers()
-    vi.mocked(sessionsApi.getMessages)
-      .mockResolvedValueOnce({
-        messages: [
-          {
-            id: 'transcript-user-1',
-            type: 'user',
-            timestamp: '2026-04-06T00:00:00.000Z',
-            content: 'live prompt',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        messages: [
-          {
-            id: 'transcript-user-1',
-            type: 'user',
-            timestamp: '2026-04-06T00:00:00.000Z',
-            content: 'live prompt',
-          },
-          {
-            id: 'transcript-assistant-1',
-            type: 'assistant',
-            timestamp: '2026-04-06T00:00:01.000Z',
-            content: 'live answer',
-          },
-        ],
-      })
+    vi.mocked(sessionsApi.getTranscript)
+      .mockResolvedValueOnce(transcriptOf([
+        { id: 'transcript-user-1', type: 'user_text', content: 'live prompt', transcriptMessageId: 'transcript-user-1', timestamp: 1775433600000 },
+      ]))
+      .mockResolvedValueOnce(transcriptOf([
+        { id: 'transcript-user-1', type: 'user_text', content: 'live prompt', transcriptMessageId: 'transcript-user-1', timestamp: 1775433600000 },
+        { id: 'transcript-assistant-1:0', type: 'assistant_text', content: 'live answer', transcriptMessageId: 'transcript-assistant-1', timestamp: 1775433601000 },
+      ]))
 
     useChatStore.setState({
       sessions: {
@@ -863,7 +561,7 @@ describe('chatStore history mapping', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(sessionsApi.getMessages).toHaveBeenCalledTimes(1)
+    expect(sessionsApi.getTranscript).toHaveBeenCalledTimes(1)
     const firstHydrationMessages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
     expect(firstHydrationMessages[0]).toMatchObject({
       type: 'user_text',
@@ -876,7 +574,7 @@ describe('chatStore history mapping', () => {
 
     await vi.advanceTimersByTimeAsync(750)
 
-    expect(sessionsApi.getMessages).toHaveBeenCalledTimes(2)
+    expect(sessionsApi.getTranscript).toHaveBeenCalledTimes(2)
     const secondHydrationMessages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
     expect(secondHydrationMessages[0]).toMatchObject({
       type: 'user_text',
@@ -889,211 +587,6 @@ describe('chatStore history mapping', () => {
 
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
-  })
-
-  it('merges consecutive assistant text blocks when restoring transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'assistant-merge-1',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        model: 'opus',
-        content: [
-          { type: 'text', text: '第一段：Windows 下的桌面端输出。' },
-          { type: 'text', text: '\r\n第二段：刷新后也不应该被拆开。' },
-        ],
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        type: 'assistant_text',
-        content: '第一段：Windows 下的桌面端输出。\r\n第二段：刷新后也不应该被拆开。',
-      },
-    ])
-  })
-
-  it('skips whitespace-only assistant transcript messages', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'assistant-empty',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        model: 'opus',
-        content: '\n\n  ',
-      },
-      {
-        id: 'assistant-real',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        model: 'opus',
-        content: '可见回复',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'assistant-real',
-        type: 'assistant_text',
-        content: '可见回复',
-      },
-    ])
-  })
-
-  it('filters task-notification turns and resumes at the next real user message', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'user-real-1',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '创建项目',
-      },
-      {
-        id: 'assistant-real-1',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:01.000Z',
-        content: [{ type: 'text', text: '项目创建好了' }],
-      },
-      {
-        id: 'task-notification',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:02.000Z',
-        content: '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>completed</status>\n<summary>Background command completed</summary>\n</task-notification>',
-      },
-      {
-        id: 'assistant-task-response',
-        type: 'assistant',
-        timestamp: '2026-04-06T00:00:03.000Z',
-        content: [{ type: 'text', text: '旧后台任务通知，无需处理' }],
-      },
-      {
-        id: 'user-real-2',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:04.000Z',
-        content: '继续真实问题',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'user-real-1',
-        type: 'user_text',
-        content: '创建项目',
-      },
-      {
-        type: 'assistant_text',
-        content: '项目创建好了',
-      },
-      {
-        id: 'user-real-2',
-        type: 'user_text',
-        content: '继续真实问题',
-      },
-    ])
-    expect(JSON.stringify(mapped)).not.toContain('<task-notification>')
-    expect(JSON.stringify(mapped)).not.toContain('旧后台任务通知')
-  })
-
-  it('reconstructs task notifications from transcript XML before filtering it from UI', () => {
-    const restored = reconstructAgentNotifications([
-      {
-        id: 'task-notification',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>completed</status>\n<summary>Background command &amp; agent done</summary>\n<result>Detailed result &amp; next step</result>\n<output-file>C:\\Temp\\bg.output</output-file>\n</task-notification>',
-      },
-    ])
-
-    expect(restored).toEqual({
-      toolu_bg: {
-        taskId: 'bg-1',
-        toolUseId: 'toolu_bg',
-        status: 'completed',
-        summary: 'Background command & agent done',
-        result: 'Detailed result & next step',
-        outputFile: 'C:\\Temp\\bg.output',
-      },
-    })
-  })
-
-  it('surfaces teammate prompt content when mapping member transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'user-1',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '<teammate-message teammate_id="security-reviewer">Review the auth diff and call out risks.</teammate-message>',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages, {
-      includeTeammateMessages: true,
-    })
-
-    expect(mapped).toMatchObject([
-      {
-        type: 'user_text',
-        content: 'Review the auth diff and call out risks.',
-      },
-    ])
-  })
-
-  it('preserves source user ids when restoring array-content user prompts', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'user-with-attachment',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: [
-          { type: 'text', text: '请看这个文件' },
-          { type: 'file', name: 'report.md' },
-        ],
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'user-with-attachment',
-        type: 'user_text',
-        content: '请看这个文件',
-        attachments: [{ type: 'file', name: 'report.md' }],
-      },
-    ])
-  })
-
-  it('restores CLI file mentions as visible attachment chips from transcript history', () => {
-    const messages: MessageEntry[] = [
-      {
-        id: 'user-with-file-mention',
-        type: 'user',
-        timestamp: '2026-04-06T00:00:00.000Z',
-        content: '@"/private/tmp/example/src/sentinel.ts" 这个常量是什么？',
-      },
-    ]
-
-    const mapped = mapHistoryMessagesToUiMessages(messages)
-
-    expect(mapped).toMatchObject([
-      {
-        id: 'user-with-file-mention',
-        type: 'user_text',
-        content: '这个常量是什么？',
-        modelContent: '@"/private/tmp/example/src/sentinel.ts" 这个常量是什么？',
-        attachments: [{
-          type: 'file',
-          name: 'sentinel.ts',
-          path: '/private/tmp/example/src/sentinel.ts',
-        }],
-      },
-    ])
   })
 
   it('keeps workspace reference chips visible while sending CLI attachment paths', () => {
@@ -1230,18 +723,7 @@ describe('chatStore history mapping', () => {
 
   it('hydrates TodoWrite history into the currently tracked task store only', async () => {
     const todos = [{ content: 'Session task', status: 'in_progress' }]
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'assistant-todo',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: [
-            { type: 'tool_use', name: 'TodoWrite', id: 'todo-1', input: { todos } },
-          ],
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([], { lastTodos: todos }))
     cliTaskStoreSnapshot.sessionId = TEST_SESSION_ID
     cliTaskStoreSnapshot.tasks = []
 
@@ -1257,24 +739,9 @@ describe('chatStore history mapping', () => {
   })
 
   it('marks history task completion dismissed when the user already continued', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'assistant-task',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: [
-            { type: 'tool_use', name: 'TaskCreate', id: 'task-1', input: { subject: 'Done' } },
-          ],
-        },
-        {
-          id: 'user-next',
-          type: 'user',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: '继续下一步',
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
+      transcriptOf([], { hasMessagesAfterTaskCompletion: true }),
+    )
 
     useChatStore.setState({
       sessions: {
@@ -1290,18 +757,7 @@ describe('chatStore history mapping', () => {
 
   it('reloads history task state for the requested session', async () => {
     const todos = [{ content: 'Reloaded task', status: 'pending' }]
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'assistant-todo',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: [
-            { type: 'tool_use', name: 'TodoWrite', id: 'todo-1', input: { todos } },
-          ],
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([], { lastTodos: todos }))
 
     useChatStore.setState({
       sessions: {
@@ -1315,24 +771,9 @@ describe('chatStore history mapping', () => {
   })
 
   it('clears reloaded task state after completed history is followed by a user turn', async () => {
-    vi.mocked(sessionsApi.getMessages).mockResolvedValueOnce({
-      messages: [
-        {
-          id: 'assistant-task',
-          type: 'assistant',
-          timestamp: '2026-04-06T00:00:00.000Z',
-          content: [
-            { type: 'tool_use', name: 'TaskUpdate', id: 'task-1', input: { subject: 'Done' } },
-          ],
-        },
-        {
-          id: 'user-next',
-          type: 'user',
-          timestamp: '2026-04-06T00:00:01.000Z',
-          content: '新的问题',
-        },
-      ],
-    })
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
+      transcriptOf([], { hasMessagesAfterTaskCompletion: true }),
+    )
 
     useChatStore.setState({
       sessions: {

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   listSessions: vi.fn(),
   getRepositoryContext: vi.fn(),
-  getMessages: vi.fn(),
+  getTranscript: vi.fn(),
   getSlashCommands: vi.fn(),
   listSkills: vi.fn(),
   search: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('../api/sessions', () => ({
     create: mocks.createSession,
     list: mocks.listSessions,
     getRepositoryContext: mocks.getRepositoryContext,
-    getMessages: mocks.getMessages,
+    getTranscript: mocks.getTranscript,
     getSlashCommands: mocks.getSlashCommands,
   },
 }))
@@ -201,7 +201,7 @@ describe('EmptySession', () => {
       }],
       total: 1,
     })
-    mocks.getMessages.mockResolvedValue({ messages: [] })
+    mocks.getTranscript.mockResolvedValue({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })
     mocks.getSlashCommands.mockResolvedValue({ commands: [] })
     mocks.listSkills.mockResolvedValue({ skills: [] })
     mocks.search.mockResolvedValue({

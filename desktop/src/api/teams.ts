@@ -1,20 +1,8 @@
 import { api } from './client'
 import type { TeamSummary, TeamDetail } from '../types/team'
+import type { SessionTranscript } from '../types/session'
 
 type TeamsResponse = { teams: TeamSummary[] }
-
-type TranscriptMessage = {
-  id: string
-  type: string
-  content: unknown
-  timestamp: string
-  model?: string
-  parentToolUseId?: string
-}
-
-type TranscriptResponse = { messages: TranscriptMessage[] }
-
-export type { TranscriptMessage }
 
 export const teamsApi = {
   list() {
@@ -26,7 +14,7 @@ export const teamsApi = {
   },
 
   getMemberTranscript(teamName: string, agentId: string) {
-    return api.get<TranscriptResponse>(
+    return api.get<SessionTranscript>(
       `/api/teams/${encodeURIComponent(teamName)}/members/${encodeURIComponent(agentId)}/transcript`,
     )
   },

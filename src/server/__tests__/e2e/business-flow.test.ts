@@ -510,12 +510,12 @@ describe('Business Flow: Sessions & CLI Interop', () => {
   })
 
   it('should read CLI-written messages via API', async () => {
-    const { status, data } = await api('GET', `/api/sessions/${sessionId}/messages`)
+    const { status, data } = await api('GET', `/api/sessions/${sessionId}/transcript`)
     expect(status).toBe(200)
-    expect(data.messages.length).toBe(2)
-    expect(data.messages[0].type).toBe('user')
-    expect(data.messages[0].content).toBeDefined()
-    expect(data.messages[1].type).toBe('assistant')
+    expect(data.items.length).toBe(2)
+    expect(data.items[0].type).toBe('user_text')
+    expect(data.items[0].content).toBeDefined()
+    expect(data.items[1].type).toBe('assistant_text')
   })
 
   it('should show CLI messages in session list', async () => {
