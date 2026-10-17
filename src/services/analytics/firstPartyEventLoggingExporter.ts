@@ -40,7 +40,7 @@ const BATCH_UUID = randomUUID()
 // File prefix for failed event storage
 const FILE_PREFIX = '1p_failed_events.'
 
-// Storage directory for failed events - evaluated at runtime to respect CLAUDE_CONFIG_DIR in tests
+// Storage directory for failed events - evaluated at runtime to respect DREAMCODER_CONFIG_DIR in tests
 function getStorageDir(): string {
   return path.join(getClaudeConfigHomeDir(), 'telemetry')
 }

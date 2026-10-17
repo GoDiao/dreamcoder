@@ -1,14 +1,15 @@
 import envPaths from 'env-paths'
 import { join } from 'path'
+import { getConfigDirOverride } from './envUtils.js'
 import { getFsImplementation } from './fsOperations.js'
 import { djb2Hash } from './hash.js'
 
-// When CLAUDE_CONFIG_DIR is set (portable mode), place cache under it
+// When DREAMCODER_CONFIG_DIR is set (portable mode), place cache under it
 // so the install is fully self-contained. Otherwise fall back to the
 // system default (%LOCALAPPDATA%\claude-cli-nodejs\Cache on Windows).
 function getCacheRoot() {
-  const claudeConfigDir = (process.env as Record<string, string | undefined>).CLAUDE_CONFIG_DIR
-  return claudeConfigDir ? join(claudeConfigDir, 'Cache') : envPaths('claude-cli').cache
+  const configDirOverride = getConfigDirOverride()
+  return configDirOverride ? join(configDirOverride, 'Cache') : envPaths('claude-cli').cache
 }
 
 // Local sanitizePath using djb2Hash — NOT the shared version from

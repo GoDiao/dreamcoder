@@ -1,7 +1,7 @@
 import * as fs from 'fs'
-import * as os from 'os'
 import * as path from 'path'
 import memoize from 'lodash-es/memoize.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { getSecureStorage } from '../../utils/secureStorage/index.js'
 import { errorMessage } from '../../utils/errors.js'
 import { logError } from '../../utils/log.js'
@@ -24,9 +24,7 @@ function getDesktopTokenFilePath(): string | null {
 }
 
 function getDreamcoderDir(): string {
-  const configDir =
-    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-  return path.join(configDir, 'dreamcoder')
+  return path.join(getClaudeConfigHomeDir(), 'dreamcoder')
 }
 
 function getFileBackedStorageMarkerPath(): string {
