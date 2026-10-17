@@ -22,13 +22,13 @@ async function listFiles(dir: string) {
 describe('persistent storage upgrade migrations', () => {
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-persistence-'))
-    process.env.CLAUDE_CONFIG_DIR = tempDir
+    process.env.DREAMCODER_CONFIG_DIR = tempDir
     resetPersistentStorageMigrationsForTests()
   })
 
   afterEach(async () => {
     resetPersistentStorageMigrationsForTests()
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
     await fs.rm(tempDir, { recursive: true, force: true })
   })
 

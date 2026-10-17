@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises'
-import * as os from 'os'
 import * as path from 'path'
 import {
   generateCodeVerifier,
@@ -19,6 +18,7 @@ import type {
   SubscriptionType,
 } from '../../services/oauth/types.js'
 import { getOauthConfig } from '../../constants/oauth.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type StoredOAuthTokens = {
   accessToken: string
@@ -58,8 +58,7 @@ export class ProviderOAuthService {
   }
 
   private getOAuthFilePath(): string {
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const configDir = getClaudeConfigHomeDir()
     return path.join(configDir, 'dreamcoder', 'oauth.json')
   }
 

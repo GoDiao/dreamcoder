@@ -39,8 +39,8 @@ function makeRequest(
 describe('Plugins API', () => {
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-plugins-api-'))
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     clearInstalledPluginsCache()
     clearPluginCache('plugins-api-test-setup')
     resetSettingsCache()
@@ -57,9 +57,9 @@ describe('Plugins API', () => {
     clearPluginCache('plugins-api-test-teardown')
     resetSettingsCache()
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     await fs.rm(tmpDir, { recursive: true, force: true })
   })

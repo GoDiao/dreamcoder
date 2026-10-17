@@ -33,16 +33,16 @@ async function setup() {
   projectRoot = path.join(tmpDir, 'project')
   await fs.mkdir(path.join(projectRoot, '.claude'), { recursive: true })
 
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   clearConfigPathCaches()
 }
 
 async function teardown() {
   if (originalConfigDir !== undefined) {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   }
 
   clearConfigPathCaches()

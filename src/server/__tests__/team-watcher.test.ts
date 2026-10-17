@@ -13,7 +13,7 @@ async function setupTmpConfigDir(): Promise<string> {
     `claude-watcher-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   )
   await fs.mkdir(path.join(tmpDir, 'teams'), { recursive: true })
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   return tmpDir
 }
 
@@ -21,7 +21,7 @@ async function cleanupTmpDir(): Promise<void> {
   if (tmpDir) {
     await fs.rm(tmpDir, { recursive: true, force: true })
   }
-  delete process.env.CLAUDE_CONFIG_DIR
+  delete process.env.DREAMCODER_CONFIG_DIR
 }
 
 async function writeTeamConfig(

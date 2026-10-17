@@ -14,16 +14,16 @@ describe('titleService', () => {
   let originalFetch: typeof globalThis.fetch
 
   beforeEach(async () => {
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalFetch = globalThis.fetch
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'title-service-test-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
   })
 
   afterEach(async () => {
     globalThis.fetch = originalFetch
     providerOpenAIOAuthService.dispose()
-    restoreEnv('CLAUDE_CONFIG_DIR', originalConfigDir)
+    restoreEnv('DREAMCODER_CONFIG_DIR', originalConfigDir)
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 

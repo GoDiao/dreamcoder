@@ -6,7 +6,7 @@ import { CronService } from '../services/cronService.js'
 import { SearchService } from '../services/searchService.js'
 
 let tmpDir: string
-const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
 
 async function createTmpDir(): Promise<string> {
   const dir = path.join(os.tmpdir(), `claude-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
@@ -26,15 +26,15 @@ describe('CronService', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     service = new CronService()
   })
 
   afterEach(async () => {
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })
@@ -173,7 +173,7 @@ describe('SearchService', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     service = new SearchService()
 
     searchDir = path.join(tmpDir, 'workspace')
@@ -190,9 +190,9 @@ describe('SearchService', () => {
 
   afterEach(async () => {
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })
@@ -242,7 +242,7 @@ describe('Scheduled Tasks API', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
 
     const mod = await import('../api/scheduled-tasks.js')
     handleScheduledTasksApi = mod.handleScheduledTasksApi
@@ -250,9 +250,9 @@ describe('Scheduled Tasks API', () => {
 
   afterEach(async () => {
     if (originalConfigDir) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     } else {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     }
     await cleanupTmpDir(tmpDir)
   })

@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises'
-import * as os from 'os'
 import * as path from 'path'
 import { AuthCodeListener } from '../../services/oauth/auth-code-listener.js'
 import {
@@ -15,6 +14,7 @@ import {
   OPENAI_CODEX_OAUTH_PORT,
 } from '../../services/openaiAuth/client.js'
 import type { OpenAIOAuthTokenResponse } from '../../services/openaiAuth/types.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type StoredOpenAIOAuthTokens = {
   accessToken: string
@@ -67,8 +67,7 @@ function escapeHtml(s: string): string {
 }
 
 export function getProviderOpenAIOAuthFilePath(): string {
-  const configDir =
-    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+  const configDir = getClaudeConfigHomeDir()
   return path.join(configDir, 'dreamcoder', 'openai-oauth.json')
 }
 

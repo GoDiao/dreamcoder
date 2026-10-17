@@ -26,11 +26,11 @@ describe('OpenAI OAuth desktop token file storage', () => {
     tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openai-oauth-storage-'))
     tokenPath = path.join(tmpDir, 'openai-oauth.json')
     originalTokenFile = process.env.OPENAI_CODEX_OAUTH_FILE
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalHome = process.env.HOME
     originalUserProfile = process.env.USERPROFILE
     originalCwd = process.cwd()
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     process.env.HOME = tmpDir
     process.env.USERPROFILE = tmpDir
     process.env.OPENAI_CODEX_OAUTH_FILE = tokenPath
@@ -45,9 +45,9 @@ describe('OpenAI OAuth desktop token file storage', () => {
       process.env.OPENAI_CODEX_OAUTH_FILE = originalTokenFile
     }
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     if (originalHome === undefined) {
       delete process.env.HOME

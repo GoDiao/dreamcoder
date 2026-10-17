@@ -26,7 +26,7 @@ describe('ConversationService', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-conversation-service-'))
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalApiKey = process.env.ANTHROPIC_API_KEY
     originalAuthToken = process.env.ANTHROPIC_AUTH_TOKEN
     originalBaseUrl = process.env.ANTHROPIC_BASE_URL
@@ -42,7 +42,7 @@ describe('ConversationService', () => {
     originalZdotdir = process.env.ZDOTDIR
     originalDisableTerminalShellEnv = process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV
 
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     process.env.ANTHROPIC_API_KEY = 'stale-parent-api-key'
     process.env.ANTHROPIC_AUTH_TOKEN = 'test-token'
     process.env.ANTHROPIC_BASE_URL = 'https://example.invalid/anthropic'
@@ -57,8 +57,8 @@ describe('ConversationService', () => {
   })
 
   afterEach(async () => {
-    if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-    else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+    else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
 
     if (originalApiKey === undefined) delete process.env.ANTHROPIC_API_KEY
     else process.env.ANTHROPIC_API_KEY = originalApiKey

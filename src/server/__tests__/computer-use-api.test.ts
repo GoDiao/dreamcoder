@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalClaudeConfigDir = process.env.DREAMCODER_CONFIG_DIR
 let configDir: string | null = null
 let computerUseApi: typeof import('../api/computer-use.js') | null = null
 
@@ -30,22 +30,22 @@ async function callAuthorizedApps(method: string, body?: unknown): Promise<Respo
 
 beforeAll(async () => {
   configDir = await mkdtemp(join(tmpdir(), 'dreamcoder-computer-use-api-'))
-  process.env.CLAUDE_CONFIG_DIR = configDir
+  process.env.DREAMCODER_CONFIG_DIR = configDir
   computerUseApi = await import('../api/computer-use.js')
 })
 
 beforeEach(async () => {
   if (!configDir) throw new Error('configDir was not initialized')
-  process.env.CLAUDE_CONFIG_DIR = configDir
+  process.env.DREAMCODER_CONFIG_DIR = configDir
   await rm(join(configDir, 'dreamcoder'), { recursive: true, force: true })
   await rm(join(configDir, '.runtime'), { recursive: true, force: true })
 })
 
 afterAll(async () => {
   if (originalClaudeConfigDir === undefined) {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   } else {
-    process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalClaudeConfigDir
   }
 
   if (configDir) {

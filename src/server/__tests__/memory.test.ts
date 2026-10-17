@@ -12,19 +12,19 @@ let originalUserProfile: string | undefined
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-memory-api-'))
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   originalHome = process.env.HOME
   originalUserProfile = process.env.USERPROFILE
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   process.env.HOME = tmpDir
   process.env.USERPROFILE = tmpDir
 })
 
 afterEach(async () => {
   if (originalConfigDir !== undefined) {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   }
   if (originalHome !== undefined) {
     process.env.HOME = originalHome

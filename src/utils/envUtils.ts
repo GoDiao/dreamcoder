@@ -2,15 +2,27 @@ import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import { join } from 'path'
 
-// Memoized: 150+ callers, many on hot paths. Keyed off CLAUDE_CONFIG_DIR so
+/**
+ * DreamCoder's own config directory variable. Claude Code's variable is
+ * deliberately not read: it belongs to Claude Code, and honoring it would put
+ * DreamCoder's data in Claude Code's directory.
+ */
+export const DREAMCODER_CONFIG_DIR_ENV = 'DREAMCODER_CONFIG_DIR'
+
+/** The explicitly configured config directory (portable mode or environment), if any. */
+export function getConfigDirOverride(): string | undefined {
+  return process.env[DREAMCODER_CONFIG_DIR_ENV] || undefined
+}
+
+// Memoized: 150+ callers, many on hot paths. Keyed off DREAMCODER_CONFIG_DIR so
 // tests that change the env var get a fresh value without explicit cache.clear.
 export const getClaudeConfigHomeDir = memoize(
   (): string => {
-    return (
-      process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
-    ).normalize('NFC')
+    return (getConfigDirOverride() ?? join(homedir(), '.claude')).normalize(
+      'NFC',
+    )
   },
-  () => process.env.CLAUDE_CONFIG_DIR,
+  () => getConfigDirOverride(),
 )
 
 export function getTeamsDir(): string {

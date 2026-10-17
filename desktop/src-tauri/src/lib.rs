@@ -228,6 +228,13 @@ const TRAY_QUIT_ID: &str = "tray_quit";
 const WINDOW_STATE_FILE: &str = "window-state.json";
 const TERMINAL_CONFIG_FILE: &str = "terminal-config.json";
 const APP_MODE_FILE: &str = "app-mode.json";
+/// DreamCoder's config directory variable. Claude Code's own variable is not used.
+pub const CONFIG_DIR_ENV: &str = "DREAMCODER_CONFIG_DIR";
+/// Name of the portable data folder next to the executable. It predates
+/// `DREAMCODER_CONFIG_DIR` and is kept so existing portable installs keep their data.
+pub const PORTABLE_DIR_NAME: &str = "CLAUDE_CONFIG_DIR";
+/// Set when the config directory came from portable mode rather than the launch environment.
+pub const PORTABLE_MARKER_ENV: &str = "DREAMCODER_APP_PORTABLE_DIR";
 const MIN_WINDOW_WIDTH: u32 = 960;
 const MIN_WINDOW_HEIGHT: u32 = 640;
 const MIN_VISIBLE_PIXELS: i64 = 64;
@@ -307,7 +314,7 @@ fn dir_has_portable_data(dir: &Path) -> bool {
 fn get_default_portable_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let mut dir = exe.parent()?.to_path_buf();
-    dir.push("CLAUDE_CONFIG_DIR");
+    dir.push(PORTABLE_DIR_NAME);
     Some(dir)
 }
 
@@ -352,7 +359,7 @@ impl TerminalConfig {
 }
 
 fn terminal_config_path(app: &AppHandle) -> Option<PathBuf> {
-    std::env::var("CLAUDE_CONFIG_DIR")
+    std::env::var(CONFIG_DIR_ENV)
         .ok()
         .map(|dir| PathBuf::from(&dir).join(TERMINAL_CONFIG_FILE))
         .or_else(|| match app.path().app_config_dir() {
@@ -486,6 +493,14 @@ fn prepare_for_app_mode_restart(app: AppHandle) -> Result<(), String> {
     mark_app_quitting(&app);
     stop_server_sidecar(&app);
 
+    // The relaunched process inherits this environment. Drop the directory that
+    // portable mode set so it reads app-mode.json again; a directory from the
+    // launch environment has no marker and stays.
+    if std::env::var_os(PORTABLE_MARKER_ENV).is_some() {
+        std::env::remove_var(CONFIG_DIR_ENV);
+        std::env::remove_var(PORTABLE_MARKER_ENV);
+    }
+
     #[cfg(target_os = "windows")]
     {
         kill_windows_sidecars();
@@ -503,12 +518,12 @@ fn cancel_update_install(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn get_app_mode(app: AppHandle) -> serde_json::Value {
-    let env_config_dir = std::env::var("CLAUDE_CONFIG_DIR").ok().map(PathBuf::from);
+    let env_config_dir = std::env::var(CONFIG_DIR_ENV).ok().map(PathBuf::from);
     let active_config_dir = env_config_dir
         .clone()
         .or_else(|| app.path().app_config_dir().ok());
     let config_dir_source = if env_config_dir.is_some() {
-        if std::env::var_os("DREAMCODER_APP_PORTABLE_DIR").is_some() {
+        if std::env::var_os(PORTABLE_MARKER_ENV).is_some() {
             "portable"
         } else {
             "environment"
@@ -533,7 +548,7 @@ fn set_app_mode(
     mode: String,
     portable_dir: Option<String>,
 ) -> Result<(), String> {
-    let active_config_dir = if let Ok(cd) = std::env::var("CLAUDE_CONFIG_DIR") {
+    let active_config_dir = if let Ok(cd) = std::env::var(CONFIG_DIR_ENV) {
         std::path::PathBuf::from(&cd)
     } else {
         app.path()
@@ -689,7 +704,7 @@ fn window_state_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn resolve_portable_state_path() -> Option<PathBuf> {
-    std::env::var("CLAUDE_CONFIG_DIR")
+    std::env::var(CONFIG_DIR_ENV)
         .ok()
         .map(|dir| PathBuf::from(&dir).join(WINDOW_STATE_FILE))
 }
@@ -1319,7 +1334,7 @@ fn resolve_terminal_cwd(cwd: Option<String>) -> Result<PathBuf, String> {
         }
     }) {
         Some(path) => path,
-        None => std::env::var_os("CLAUDE_CONFIG_DIR")
+        None => std::env::var_os(CONFIG_DIR_ENV)
             .map(PathBuf::from)
             .or_else(home_dir)
             .unwrap_or(
@@ -1342,7 +1357,7 @@ fn home_dir() -> Option<PathBuf> {
 }
 
 fn claude_config_dir() -> Option<PathBuf> {
-    std::env::var_os("CLAUDE_CONFIG_DIR")
+    std::env::var_os(CONFIG_DIR_ENV)
         .map(PathBuf::from)
         .or_else(|| home_dir().map(|path| path.join(".claude")))
 }
@@ -1578,13 +1593,13 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
     for (key, value) in terminal_environment(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
     }
-    if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+    if let Ok(config_dir) = std::env::var(CONFIG_DIR_ENV) {
         let cache_dir = PathBuf::from(&config_dir).join("Cache");
         if let Err(e) = fs::create_dir_all(&cache_dir) {
             eprintln!("[desktop] failed to create Cache dir: {e}");
         }
         sidecar = sidecar
-            .env("CLAUDE_CONFIG_DIR", &config_dir)
+            .env(CONFIG_DIR_ENV, &config_dir)
             .env("XDG_CACHE_HOME", cache_dir.to_string_lossy().to_string())
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
@@ -1872,22 +1887,22 @@ mod tests {
 
     #[test]
     fn terminal_cwd_defaults_to_portable_config_dir_when_present() {
-        let original = std::env::var_os("CLAUDE_CONFIG_DIR");
+        let original = std::env::var_os(super::CONFIG_DIR_ENV);
         let dir = std::env::temp_dir().join(format!(
             "dc-terminal-portable-cwd-{}",
             std::process::id()
         ));
         fs::create_dir_all(&dir).expect("create portable config dir");
-        std::env::set_var("CLAUDE_CONFIG_DIR", &dir);
+        std::env::set_var(super::CONFIG_DIR_ENV, &dir);
 
         let cwd = resolve_terminal_cwd(None).expect("portable cwd should resolve");
 
         assert_eq!(cwd, dir);
 
         if let Some(value) = original {
-            std::env::set_var("CLAUDE_CONFIG_DIR", value);
+            std::env::set_var(super::CONFIG_DIR_ENV, value);
         } else {
-            std::env::remove_var("CLAUDE_CONFIG_DIR");
+            std::env::remove_var(super::CONFIG_DIR_ENV);
         }
         fs::remove_dir_all(cwd).expect("remove portable config dir");
     }

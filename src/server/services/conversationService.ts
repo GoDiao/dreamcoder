@@ -1,5 +1,4 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { ProviderService } from './providerService.js'
 import {
@@ -1021,8 +1020,7 @@ export class ConversationService {
       return true
     }
 
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const configDir = getClaudeConfigHomeDir()
     const dreamcoderDir = path.join(configDir, 'dreamcoder')
     const providersIndexPath = path.join(dreamcoderDir, 'providers.json')
     const settingsPath = path.join(dreamcoderDir, 'settings.json')
@@ -1066,8 +1064,7 @@ export class ConversationService {
       return false
     }
 
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const configDir = getClaudeConfigHomeDir()
     const settingsPath = path.join(configDir, 'dreamcoder', 'settings.json')
     try {
       const raw = fs.readFileSync(settingsPath, 'utf-8')
@@ -1114,7 +1111,7 @@ export class ConversationService {
 
   private clearStaleLock(sessionId: string): boolean {
     const lockDir = path.join(
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
+      getClaudeConfigHomeDir(),
       '.lock',
     )
     const lockFile = path.join(lockDir, sessionId)
@@ -1384,7 +1381,7 @@ export class ConversationService {
     }
 
     const uploadDir = path.join(
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
+      getClaudeConfigHomeDir(),
       'uploads',
       sessionId,
     )

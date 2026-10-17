@@ -514,7 +514,7 @@ describe('Settings > General tab', () => {
     expect(await screen.findByText('Could not open the folder picker. Paste the folder path manually.')).toBeInTheDocument()
   })
 
-  it('treats external CLAUDE_CONFIG_DIR as the controlling data source', async () => {
+  it('treats external DREAMCODER_CONFIG_DIR as the controlling data source', async () => {
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
     useSettingsStore.setState({
@@ -530,7 +530,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    expect(screen.getByText(/The current directory is controlled by the CLAUDE_CONFIG_DIR environment variable/)).toBeInTheDocument()
+    expect(screen.getByText(/The current directory is controlled by the DREAMCODER_CONFIG_DIR environment variable/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Use system directory/ }))
     expect(screen.getByText(/Remove it from the launch environment before switching back/)).toBeInTheDocument()

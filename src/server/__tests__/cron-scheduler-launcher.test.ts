@@ -12,7 +12,7 @@ import { CronService } from '../services/cronService.js'
 import { ProviderService } from '../services/providerService.js'
 import { resetTerminalShellEnvironmentCacheForTests } from '../../utils/terminalShellEnvironment.js'
 
-const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
 const originalPath = process.env.PATH
 const originalClaudeCliPath = process.env.CLAUDE_CLI_PATH
 const originalClaudeAppRoot = process.env.CLAUDE_APP_ROOT
@@ -52,9 +52,9 @@ async function createSourceRoot(root: string): Promise<void> {
 
 function restoreEnv(): void {
   if (originalConfigDir) {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   }
   if (originalPath) {
     process.env.PATH = originalPath
@@ -114,7 +114,7 @@ describe('cron scheduler launcher resolution', () => {
 
   beforeEach(async () => {
     tmpDir = await createTmpDir()
-    process.env.CLAUDE_CONFIG_DIR = path.join(tmpDir, 'config')
+    process.env.DREAMCODER_CONFIG_DIR = path.join(tmpDir, 'config')
     process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV = '1'
     resetTerminalShellEnvironmentCacheForTests()
   })

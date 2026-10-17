@@ -23,16 +23,16 @@ function getManagedSettingsPath(): string {
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'h5-access-service-test-'))
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   originalH5PublicBaseUrl = process.env.CLAUDE_H5_PUBLIC_BASE_URL
   originalH5AutoPublicUrl = process.env.CLAUDE_H5_AUTO_PUBLIC_URL
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   delete process.env.CLAUDE_H5_AUTO_PUBLIC_URL
 })
 
 afterEach(async () => {
-  if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-  else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+  if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   if (originalH5PublicBaseUrl === undefined) delete process.env.CLAUDE_H5_PUBLIC_BASE_URL
   else process.env.CLAUDE_H5_PUBLIC_BASE_URL = originalH5PublicBaseUrl
   if (originalH5AutoPublicUrl === undefined) delete process.env.CLAUDE_H5_AUTO_PUBLIC_URL
