@@ -158,9 +158,65 @@ describe('McpSettings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     expect(await screen.findByText('Filesystem')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText('Read and write an explicitly allowed directory.')).toBeInTheDocument()
     expect(mcpApi.catalog).toHaveBeenCalledTimes(1)
     expect(useMcpStore.getState().createServer).not.toHaveBeenCalled()
+  })
+
+  it('shows the catalog error detail when loading fails', async () => {
+    vi.mocked(mcpApi.catalog).mockRejectedValue(new Error('Catalog schema version is unsupported'))
+    await renderLoadedMcpSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+
+    expect(await screen.findByText('The curated MCP catalog is unavailable.')).toBeInTheDocument()
+    expect(screen.getByText('Catalog schema version is unsupported')).toBeInTheDocument()
+  })
+
+  it('marks catalog entries that are already installed', async () => {
+    useMcpStore.setState({
+      servers: [{
+        name: 'filesystem', scope: 'user', transport: 'stdio', enabled: true,
+        status: 'connected', statusLabel: 'Connected', configLocation: '/tmp/config', summary: 'npx filesystem',
+        canEdit: true, canRemove: true, canReconnect: true, canToggle: true,
+        config: { type: 'stdio', command: 'npx', args: ['filesystem'], env: {} },
+      }],
+    })
+    await renderLoadedMcpSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+
+    const name = await screen.findByText('Filesystem')
+    expect(name).toBeInTheDocument()
+    expect(name.closest('article')).toHaveTextContent('Installed')
+  })
+
+  it('shows an empty state when a catalog search has no matches', async () => {
+    await renderLoadedMcpSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    await screen.findByText('Filesystem')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search servers' }), { target: { value: 'not-a-server' } })
+
+    expect(screen.getByText('No catalog servers match these filters.')).toBeInTheDocument()
+  })
+
+  it('filters catalog entries by tag', async () => {
+    vi.mocked(mcpApi.catalog).mockResolvedValue({
+      catalog: {
+        version: 1,
+        servers: [
+          { id: 'filesystem', name: 'Filesystem', description: 'Read and write an explicitly allowed directory.', transport: 'stdio', command: 'npx', args: [], env: [], homepage: 'https://example.com/filesystem', tags: ['files'], runtime: 'node' },
+          { id: 'time', name: 'Time', description: 'Read the current time and convert time zones.', transport: 'stdio', command: 'uvx', args: [], env: [], homepage: 'https://example.com/time', tags: ['utility'], runtime: 'uvx' },
+        ],
+      },
+    })
+    await renderLoadedMcpSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    await screen.findByText('Filesystem')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by tag' }), { target: { value: 'utility' } })
+
+    expect(screen.getByText('Time')).toBeInTheDocument()
+    expect(screen.queryByText('Filesystem')).not.toBeInTheDocument()
   })
 
   it('shows plugin and user MCP servers in grouped sections', async () => {

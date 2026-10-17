@@ -8,6 +8,7 @@ import {
   registryEntrySchema,
   REGISTRY_VERSION,
 } from '../mcpRegistry/schema.js'
+import { loadCuratedMcpCatalog } from '../mcpRegistry/catalog.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CATALOG_PATH = join(HERE, '..', '..', '..', 'mcp-registry.json')
@@ -45,6 +46,17 @@ describe('validateEntry — valid entries', () => {
       validEntry({ env: [{ name: 'OPTIONAL_KEY', source: 'optional' }] }),
     )
     expect(r.ok).toBe(true)
+  })
+})
+
+describe('loadCuratedMcpCatalog', () => {
+  it('fails closed and returns validation details for an invalid catalog', () => {
+    const result = loadCuratedMcpCatalog({ version: 1, servers: [{ id: 'Bad_ID' }] })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.errors.some((error) => error.path === 'servers.0.id')).toBe(true)
+      expect(result.errors.some((error) => error.path === 'servers.0.name')).toBe(true)
+    }
   })
 })
 

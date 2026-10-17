@@ -1084,8 +1084,8 @@ export function McpSettings() {
       </div>
 
       <div className="mb-8 inline-flex overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <button type="button" onClick={() => setCatalogVisible(false)} className={`h-10 px-4 text-sm font-semibold ${!catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.installed')}</button>
-        <button type="button" onClick={() => setCatalogVisible(true)} className={`h-10 px-4 text-sm font-semibold ${catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.browse')}</button>
+        <button type="button" aria-pressed={!catalogVisible} onClick={() => setCatalogVisible(false)} className={`h-10 px-4 text-sm font-semibold ${!catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.installed')}</button>
+        <button type="button" aria-pressed={catalogVisible} onClick={() => setCatalogVisible(true)} className={`h-10 px-4 text-sm font-semibold ${catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.browse')}</button>
       </div>
 
       {catalogVisible ? <McpCatalogBrowse installedNames={servers.map((server) => server.name)} /> : (
