@@ -108,7 +108,7 @@ DreamCoder 中，桌面服务负责创建会话文件和启动 CLI，CLI 负责�
 
 ### 第 1 步：创建会话文件并追加消息
 
-桌面端的 `createSession()` 生成 `sessionId`，在配置目录的 `projects/<以工作目录命名的子目录>/` 下创建 `<sessionId>.jsonl`，写入 `file-history-snapshot` 和 `session-meta` 两行。配置目录取 `CLAUDE_CONFIG_DIR`，未设置时为 `~/.claude`，与代码仓库无关。[`getConfigDir()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L243) CLI 通过 [`getTranscriptPath()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/sessionStorage.ts#L202) 定位同一个文件。
+桌面端的 `createSession()` 生成 `sessionId`，在配置目录的 `projects/<以工作目录命名的子目录>/` 下创建 `<sessionId>.jsonl`，写入 `file-history-snapshot` 和 `session-meta` 两行。配置目录取 `DREAMCODER_CONFIG_DIR`，未设置时为 `~/.claude`，与代码仓库无关。[`getConfigDir()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L243) CLI 通过 [`getTranscriptPath()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/sessionStorage.ts#L202) 定位同一个文件。
 
 CLI 产出消息时，`recordTranscript()` 不会原样追加整个内存数组。它先用 `cleanMessagesForLogging()` 处理记录，用已有 UUID 跳过已经写过的消息，再将新消息交给 `insertMessageChain()`：
 

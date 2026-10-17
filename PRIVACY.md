@@ -14,7 +14,7 @@ DreamCoder 的桌面应用和会话服务在本机运行，项目不提供托管
 
 ### API 密钥存储
 
-- 用户配置的 Provider 信息及 API 密钥默认写入本地 `~/.claude/dreamcoder/providers.json` 文件；若设置了 `CLAUDE_CONFIG_DIR`，则写入该目录下的 `dreamcoder/providers.json`。当前实现未使用操作系统 Keychain
+- 用户配置的 Provider 信息及 API 密钥默认写入本地 `~/.claude/dreamcoder/providers.json` 文件；若设置了 `DREAMCODER_CONFIG_DIR`，则写入该目录下的 `dreamcoder/providers.json`。当前实现未使用操作系统 Keychain
 - API 密钥仅用于与用户自行选择的 AI 服务商通信
 - 请按你的设备安全要求保护该文件和用户账户；不要将其提交到版本库
 
@@ -45,7 +45,7 @@ DreamCoder runs its desktop app and session service locally; the project does no
 
 ### API Key Storage
 
-- Provider settings and API keys are written to the local `~/.claude/dreamcoder/providers.json` file by default. If `CLAUDE_CONFIG_DIR` is set, they are written to `dreamcoder/providers.json` under that directory. The current implementation does not use the operating system Keychain
+- Provider settings and API keys are written to the local `~/.claude/dreamcoder/providers.json` file by default. If `DREAMCODER_CONFIG_DIR` is set, they are written to `dreamcoder/providers.json` under that directory. The current implementation does not use the operating system Keychain
 - API keys are used solely to communicate with AI service providers chosen by the user
 - Protect this file and your user account according to your device security needs; do not commit it to a repository
 
