@@ -3,7 +3,7 @@ import { execFile as execFileCallback } from 'node:child_process'
 import * as path from 'node:path'
 import { promisify } from 'node:util'
 import { diffLines } from 'diff'
-import type { MessageEntry } from './sessionService.js'
+import type { MessageEntry } from '../transcript/entries.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {

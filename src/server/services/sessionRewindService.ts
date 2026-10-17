@@ -8,7 +8,8 @@ import {
 } from '../../utils/fileHistory.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { conversationService } from './conversationService.js'
-import { sessionService, type MessageEntry } from './sessionService.js'
+import { sessionService } from './sessionService.js'
+import type { MessageEntry } from '../transcript/entries.js'
 
 type RewindTarget = {
   targetUserMessageId: string

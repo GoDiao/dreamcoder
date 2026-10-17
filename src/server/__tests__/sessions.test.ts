@@ -1936,6 +1936,33 @@ describe('Sessions API', () => {
     ])
   })
 
+  it('GET /api/sessions/:id/transcript should return display items and task notifications', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-ffffffffffff'
+    await writeSessionFile('-tmp-api-test', sessionId, [
+      makeSnapshotEntry(),
+      makeUserEntry('Hello'),
+      makeAssistantEntry('World'),
+      makeUserEntry(
+        '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>failed</status>\n</task-notification>',
+        crypto.randomUUID(),
+      ),
+      makeAssistantEntry('internal task response'),
+    ])
+
+    const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/transcript`)
+    expect(res.status).toBe(200)
+
+    const body = (await res.json()) as {
+      items: Array<{ type: string; content?: string }>
+      agentNotifications: Record<string, unknown>
+    }
+    expect(body.items.map((item) => [item.type, item.content])).toEqual([
+      ['user_text', 'Hello'],
+      ['assistant_text', 'World'],
+    ])
+    expect(body.agentNotifications.toolu_bg).toMatchObject({ taskId: 'bg-1', status: 'failed' })
+  })
+
   it('GET /api/sessions/:id/git-info should prefer the active CLI workDir', async () => {
     const workDir = await createCleanGitRepo(tmpDir)
     const activeWorktree = path.join(tmpDir, `active-feature-rail-${Date.now()}`)
