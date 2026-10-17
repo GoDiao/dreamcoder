@@ -16,16 +16,13 @@ import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 import {
+  extractLocalCommandOutput,
   isCompactCommandOutput,
   isCompactSummaryContent,
   isGoalCommandOutput,
   parseGoalEvent,
+  parseLocalCommand,
 } from '../transcript/classify.js'
-import {
-  COMMAND_NAME_TAG,
-  LOCAL_COMMAND_STDERR_TAG,
-  LOCAL_COMMAND_STDOUT_TAG,
-} from '../../constants/xml.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
 import {
   clearPrewarmState,
@@ -1193,7 +1190,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return []
       }
       if (subtype === 'local_command' || subtype === 'local_command_output') {
-        const localCommand = extractLocalCommand(cliMsg.content ?? cliMsg.message)
+        const localCommand = parseLocalCommand(cliMsg.content ?? cliMsg.message)
         if (localCommand) {
           streamState.pendingLocalCommand = localCommand
           return []
@@ -1422,7 +1419,7 @@ function isMatchingCurrentTurnLocalCommand(
   if (cliMsg?.type !== 'system' || cliMsg?.subtype !== 'local_command') {
     return false
   }
-  const localCommand = extractLocalCommand(cliMsg.content ?? cliMsg.message)
+  const localCommand = parseLocalCommand(cliMsg.content ?? cliMsg.message)
   if (!localCommand) return false
   return (
     localCommand.name === command.commandName &&
@@ -1442,64 +1439,6 @@ function isLocalCommandOutputMessage(cliMsg: any): boolean {
     cliMsg.content ?? cliMsg.message,
     { allowUntagged: cliMsg.subtype === 'local_command_output' },
   ) !== null
-}
-
-function extractLocalCommandOutput(
-  content: unknown,
-  options: { allowUntagged?: boolean } = {},
-): string | null {
-  const raw = typeof content === 'string'
-    ? content
-    : Array.isArray(content)
-      ? content
-        .flatMap((block) => {
-          if (!block || typeof block !== 'object') return []
-          const text = (block as { text?: unknown }).text
-          return typeof text === 'string' ? [text] : []
-        })
-        .join('\n')
-      : ''
-
-  if (!raw) return null
-
-  const stdout = extractTaggedContent(raw, LOCAL_COMMAND_STDOUT_TAG)
-  if (stdout !== null) return stdout
-
-  const stderr = extractTaggedContent(raw, LOCAL_COMMAND_STDERR_TAG)
-  if (stderr !== null) return stderr
-
-  if (options.allowUntagged) {
-    const normalized = raw.trim()
-    return normalized || null
-  }
-
-  return null
-}
-
-function extractTaggedContent(raw: string, tag: string): string | null {
-  const match = raw.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))
-  return match?.[1]?.trim() ?? null
-}
-
-function extractLocalCommand(content: unknown): { name: string; args: string } | null {
-  const raw = typeof content === 'string'
-    ? content
-    : Array.isArray(content)
-      ? content
-        .flatMap((block) => {
-          if (!block || typeof block !== 'object') return []
-          const text = (block as { text?: unknown }).text
-          return typeof text === 'string' ? [text] : []
-        })
-        .join('\n')
-      : ''
-
-  const name = extractTaggedContent(raw, COMMAND_NAME_TAG)
-  if (!name) return null
-  return {
-    name: name.replace(/^\//, ''),
-    args: extractTaggedContent(raw, 'command-args') ?? '',
-  }
 }
 
 function getCompactBoundaryMessage(cliMsg: any): string {

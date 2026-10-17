@@ -4,10 +4,9 @@
  * notifications, teammate messages and leading file references.
  *
  * History interpretation (`entries.ts`, `history.ts`) and the live WebSocket
- * translator share these rules. The live translator still reads local-command
- * tags with its own helpers in `ws/handler.ts`, which also accept content
- * arrays and untagged output.
+ * translator (`ws/handler.ts`) share these rules.
  */
+import type { MemoryEventFile } from './items.js'
 
 export const COMPACT_SUMMARY_PREFIX =
   'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.'
@@ -77,6 +76,17 @@ export type FileReference = {
   path: string
 }
 
+/**
+ * Local-command tags are read the way Claude Code displays them: only
+ * `&amp;`, `&lt;` and `&gt;` are decoded.
+ */
+function decodeLocalCommandText(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
 function decodeXmlText(text: string): string {
   return text
     .replace(/&lt;/g, '<')
@@ -86,10 +96,31 @@ function decodeXmlText(text: string): string {
     .replace(/&amp;/g, '&')
 }
 
-/** Returns the trimmed, entity-decoded body of the first `<tag>…</tag>`. */
-export function readXmlTag(xml: string, tag: string): string | undefined {
+/** Returns the trimmed, entity-decoded body of the first `<tag>…</tag>`; `''` for an empty tag. */
+export function readXmlTag(
+  xml: string,
+  tag: string,
+  decode: (text: string) => string = decodeXmlText,
+): string | undefined {
   const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'))
-  return match?.[1] ? decodeXmlText(match[1].trim()) : undefined
+  return match ? decode((match[1] ?? '').trim()) : undefined
+}
+
+function readLocalCommandTag(text: string, tag: string): string | undefined {
+  return readXmlTag(text, tag, decodeLocalCommandText)
+}
+
+/** A string, or the `text` of every block in a content array joined by newlines. */
+function contentText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .flatMap((block) => {
+      if (!block || typeof block !== 'object') return []
+      const text = (block as { text?: unknown }).text
+      return typeof text === 'string' ? [text] : []
+    })
+    .join('\n')
 }
 
 /** Non-empty, trimmed text of a string or of the `text` blocks in a content array. */
@@ -111,14 +142,13 @@ export function extractTextBlocks(content: unknown): string[] {
 
 /** Parses a `<command-name>` breadcrumb into a command name (without `/`) and args. */
 export function parseLocalCommand(content: unknown): LocalCommand | null {
-  if (typeof content !== 'string') return null
-  const text = content.trim()
+  const text = contentText(content).trim()
   if (!text) return null
-  const commandName = readXmlTag(text, 'command-name')
+  const commandName = readLocalCommandTag(text, 'command-name')
   if (!commandName) return null
   return {
     name: commandName.replace(/^\//, ''),
-    args: readXmlTag(text, 'command-args') ?? '',
+    args: readLocalCommandTag(text, 'command-args') ?? '',
   }
 }
 
@@ -128,12 +158,20 @@ export function formatLocalCommand(command: LocalCommand): string {
   return `/${normalizedName}${args ? ` ${args}` : ''}`
 }
 
-/** Returns the `<local-command-stdout>` (or stderr) body of a breadcrumb string. */
-export function extractLocalCommandOutput(content: unknown): string | null {
-  if (typeof content !== 'string') return null
-  const text = content.trim()
+/**
+ * Returns the `<local-command-stdout>` (or stderr) body of a breadcrumb.
+ * `allowUntagged` takes the whole text as output, for the CLI's
+ * `local_command_output` messages that carry it without tags.
+ */
+export function extractLocalCommandOutput(
+  content: unknown,
+  options: { allowUntagged?: boolean } = {},
+): string | null {
+  const text = contentText(content).trim()
   if (!text) return null
-  return readXmlTag(text, 'local-command-stdout') ?? readXmlTag(text, 'local-command-stderr') ?? null
+  const tagged = readLocalCommandTag(text, 'local-command-stdout') ?? readLocalCommandTag(text, 'local-command-stderr')
+  if (tagged !== undefined) return tagged || null
+  return options.allowUntagged ? text : null
 }
 
 /** `/compact` reports `Compacted`; the compaction card already covers it. */
@@ -183,6 +221,47 @@ export function parseGoalEvent(output: string, command?: LocalCommand | null): G
   }
 
   return command?.name === 'goal' ? { action: 'message', message: trimmed } : null
+}
+
+/** What the CLI records about a compaction (`compactMetadata` in a transcript, `compact_metadata` live). */
+export type CompactMetadata = {
+  trigger?: 'manual' | 'auto'
+  preTokens?: number
+  messagesSummarized?: number
+}
+
+/** Reads compaction metadata in either the transcript's camelCase or the stream's snake_case. */
+export function readCompactMetadata(raw: unknown): CompactMetadata {
+  if (!raw || typeof raw !== 'object') return {}
+  const record = raw as Record<string, unknown>
+  const trigger = record.trigger
+  const preTokens = record.preTokens ?? record.pre_tokens
+  const messagesSummarized = record.messagesSummarized ?? record.messages_summarized
+  return {
+    ...(trigger === 'manual' || trigger === 'auto' ? { trigger } : {}),
+    ...(typeof preTokens === 'number' ? { preTokens } : {}),
+    ...(typeof messagesSummarized === 'number' ? { messagesSummarized } : {}),
+  }
+}
+
+/** A CLI `memory_saved` event (`writtenPaths`, `teamCount`, `message`), or null when it saved nothing. */
+export function parseMemorySaved(
+  data: unknown,
+): { files: MemoryEventFile[]; message?: string; teamCount?: number } | null {
+  if (!data || typeof data !== 'object') return null
+  const record = data as Record<string, unknown>
+  const files = Array.isArray(record.writtenPaths)
+    ? record.writtenPaths
+      .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
+      .map((path) => ({ path, action: 'saved' as const }))
+    : []
+  if (files.length === 0) return null
+  const teamCount = record.teamCount
+  return {
+    files,
+    ...(typeof record.message === 'string' ? { message: record.message } : {}),
+    ...(typeof teamCount === 'number' && Number.isFinite(teamCount) ? { teamCount } : {}),
+  }
 }
 
 export function isCompactSummaryContent(content: unknown): content is string {

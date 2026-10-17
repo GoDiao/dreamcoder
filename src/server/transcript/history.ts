@@ -9,11 +9,11 @@ import {
   isTeammateMessage,
   parseGoalEvent,
   parseLocalCommand,
+  parseMemorySaved,
   type LocalCommand,
   type TaskNotification,
 } from './classify.js'
 import type {
-  MemoryEventFile,
   SessionTranscript,
   TodoItem,
   TranscriptAttachment,
@@ -78,19 +78,6 @@ function toolResultContent(content: unknown, toolUseResult: unknown): unknown {
   const answers = readRecord(result?.answers)
   if (!result || !answers || !Array.isArray(result.questions)) return content
   return { questions: result.questions, answers }
-}
-
-function memoryEventFiles(data: unknown): MemoryEventFile[] {
-  const writtenPaths = readRecord(data)?.writtenPaths
-  if (!Array.isArray(writtenPaths)) return []
-  return writtenPaths
-    .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
-    .map((path) => ({ path, action: 'saved' as const }))
-}
-
-function memoryTeamCount(data: unknown): number | undefined {
-  const teamCount = readRecord(data)?.teamCount
-  return typeof teamCount === 'number' && Number.isFinite(teamCount) ? teamCount : undefined
 }
 
 function teammateContents(text: string): string[] {
@@ -299,20 +286,10 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
     }
 
     if (msg.type === 'system' && msg.content && typeof msg.content === 'object') {
-      const record = msg.content as { subtype?: unknown; message?: unknown }
-      if (record.subtype === 'memory_saved') {
-        const files = memoryEventFiles(msg.content)
-        if (files.length > 0) {
-          items.push({
-            id: allocateId(msg.id),
-            type: 'memory_event',
-            event: 'saved',
-            files,
-            message: typeof record.message === 'string' ? record.message : undefined,
-            teamCount: memoryTeamCount(msg.content),
-            timestamp,
-          })
-        }
+      const record = msg.content as { subtype?: unknown }
+      const saved = record.subtype === 'memory_saved' ? parseMemorySaved(msg.content) : null
+      if (saved) {
+        items.push({ id: allocateId(msg.id), type: 'memory_event', event: 'saved', ...saved, timestamp })
       }
     }
   }

@@ -5,6 +5,8 @@ import {
   isTaskNotificationContent,
   parseLocalCommand,
   parseTaskNotification,
+  readCompactMetadata,
+  type CompactMetadata,
   type TaskNotification,
 } from './classify.js'
 
@@ -25,13 +27,6 @@ export type TranscriptEntry = {
     model?: string
   }
   [key: string]: unknown
-}
-
-/** What the CLI records about a compaction on its `compact_boundary` entry. */
-export type CompactMetadata = {
-  trigger?: 'manual' | 'auto'
-  preTokens?: number
-  messagesSummarized?: number
 }
 
 /** A visible conversation message, before it is split into display items. */
@@ -165,16 +160,10 @@ function goalLocalCommandEntryToMessage(entry: TranscriptEntry): MessageEntry | 
   }
 }
 
-function readCompactMetadata(entry: TranscriptEntry | undefined): CompactMetadata | undefined {
+function compactBoundaryMetadata(entry: TranscriptEntry | undefined): CompactMetadata | undefined {
   if (entry?.type !== 'system' || entry.subtype !== 'compact_boundary') return undefined
-  const raw = entry.compactMetadata
-  if (!raw || typeof raw !== 'object') return undefined
-  const { trigger, preTokens, messagesSummarized } = raw as Record<string, unknown>
-  return {
-    ...(trigger === 'manual' || trigger === 'auto' ? { trigger } : {}),
-    ...(typeof preTokens === 'number' ? { preTokens } : {}),
-    ...(typeof messagesSummarized === 'number' ? { messagesSummarized } : {}),
-  }
+  if (!entry.compactMetadata || typeof entry.compactMetadata !== 'object') return undefined
+  return readCompactMetadata(entry.compactMetadata)
 }
 
 function agentToolUseId(entry: TranscriptEntry): string | undefined {
@@ -283,7 +272,7 @@ export function entriesToMessages(entries: TranscriptEntry[]): MessageEntry[] {
     const parentToolUseId = resolveParentToolUseId(entry, entriesByUuid, parentToolUseIdCache)
     const msg = entryToMessage(entry, parentToolUseId)
     if (!msg) continue
-    const compactMetadata = entry.parentUuid ? readCompactMetadata(entriesByUuid.get(entry.parentUuid)) : undefined
+    const compactMetadata = entry.parentUuid ? compactBoundaryMetadata(entriesByUuid.get(entry.parentUuid)) : undefined
     messages.push(compactMetadata ? { ...msg, compactMetadata } : msg)
   }
   return messages
