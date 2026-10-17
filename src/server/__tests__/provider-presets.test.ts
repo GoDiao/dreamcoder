@@ -94,6 +94,22 @@ describe('provider presets API', () => {
     expect(kimi?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
   })
 
+  test('powertokens preset is a valid OpenAI-compatible provider entry', () => {
+    const powertokens = PROVIDER_PRESETS.find((preset) => preset.id === 'powertokens')
+
+    expect(powertokens).toBeDefined()
+    expect(powertokens?.name).toBe('PowerTokens')
+    expect(powertokens?.baseUrl).toBe('https://api.powertokens.ai')
+    expect(powertokens?.apiFormat).toBe('openai_chat')
+    expect(powertokens?.needsApiKey).toBe(true)
+    expect(powertokens?.authStrategy).toBe('api_key')
+    expect(powertokens?.apiKeyUrl).toContain('https://powertokens.ai')
+    expect(powertokens?.defaultModels.main).toBe('glm-5.2')
+    expect(powertokens?.defaultModels.haiku).toBe('glm-4.7-flash')
+    expect(powertokens?.defaultModels.sonnet).toBe('MiniMax-M3')
+    expect(powertokens?.defaultModels.opus).toBe('deepseek-v3-2-251201')
+  })
+
   test('configured presets can expose optional API key metadata', () => {
     const lmstudio = PROVIDER_PRESETS.find((preset) => preset.id === 'lmstudio')
     const ollama = PROVIDER_PRESETS.find((preset) => preset.id === 'ollama')
