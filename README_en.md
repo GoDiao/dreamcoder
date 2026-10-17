@@ -130,6 +130,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 - [x] **Phase 2.5**: Performance — bundle splitting, polling throttle, terminal LRU, sessionStore refactor
 - [x] **Phase 3**: H5 LAN Access (access desktop sessions from a phone/browser after enabling it)
 - [ ] **Phase 4**: Release Automation + Auto-update
+- [ ] **Phase 5**: Remote Agent Backend (run the agent on a remote host over SSH / WebSocket)
 
 See [ROADMAP](docs/ROADMAP_en.md)
 

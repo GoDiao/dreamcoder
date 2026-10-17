@@ -55,6 +55,12 @@
 - [ ] Release Notes 自动生成
 - [ ] 自动更新签名与分发
 
+## Phase 5 — 远程 Agent 后端
+
+- [ ] 通过 SSH / WebSocket 在远程主机上运行 Agent，本地桌面端作为界面
+
+参考: [RFC #24](https://github.com/GoDiao/dreamcoder/issues/24)
+
 ## 未来探索
 
 - Token 用量统计面板
