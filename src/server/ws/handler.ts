@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun'
-import type { ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
+import type { ClientMessage, LiveTranscriptItem, PermissionMode, ServerMessage } from './protocol.js'
 import { PERMISSION_MODES } from './protocol.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
@@ -16,12 +16,16 @@ import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 import {
+  extractCompactSummary,
   extractLocalCommandOutput,
   isCompactCommandOutput,
-  isCompactSummaryContent,
   isGoalCommandOutput,
+  parseBackgroundTaskMessage,
   parseGoalEvent,
   parseLocalCommand,
+  parseMemorySaved,
+  readCompactMetadata,
+  type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
 import {
@@ -913,15 +917,9 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
     case 'user': {
       const messages: ServerMessage[] = []
 
-      if (isCompactSummaryContent(cliMsg.message?.content)) {
-        messages.push({
-          type: 'system_notification',
-          subtype: 'compact_summary',
-          message: cliMsg.message.content,
-          data: {
-            isSynthetic: cliMsg.isSynthetic,
-          },
-        })
+      const compactSummary = extractCompactSummary(cliMsg.message?.content)
+      if (compactSummary) {
+        messages.push(liveItem({ type: 'compact_summary', title: 'Context compacted', phase: 'complete', summary: compactSummary }))
       }
 
       const localCommandOutput = extractLocalCommandOutput(
@@ -936,12 +934,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
             pendingLocalCommand,
           )
           if (goalEvent) {
-            messages.push({
-              type: 'system_notification',
-              subtype: 'goal_event',
-              message: goalEvent.message,
-              data: goalEvent,
-            })
+            messages.push(liveItem({ type: 'goal_event', ...goalEvent }))
           } else {
             messages.push({ type: 'content_start', blockType: 'text' })
             messages.push({ type: 'content_delta', text: localCommandOutput })
@@ -1162,16 +1155,8 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return messages
       }
       if (subtype === 'memory_saved') {
-        return [{
-          type: 'system_notification',
-          subtype: 'memory_saved',
-          message: cliMsg.message,
-          data: {
-            writtenPaths: Array.isArray(cliMsg.writtenPaths) ? cliMsg.writtenPaths : [],
-            teamCount: typeof cliMsg.teamCount === 'number' ? cliMsg.teamCount : undefined,
-            verb: typeof cliMsg.verb === 'string' ? cliMsg.verb : undefined,
-          },
-        }]
+        const saved = parseMemorySaved(cliMsg)
+        return saved ? [liveItem({ type: 'memory_event', event: 'saved', ...saved })] : []
       }
       if (subtype === 'status') {
         if (cliMsg.status === 'compacting') {
@@ -1207,12 +1192,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         )
         streamState.pendingLocalCommand = undefined
         if (goalEvent) {
-          return [{
-            type: 'system_notification',
-            subtype: 'goal_event',
-            message: goalEvent.message,
-            data: goalEvent,
-          }]
+          return [liveItem({ type: 'goal_event', ...goalEvent })]
         }
         return [
           { type: 'content_start', blockType: 'text' },
@@ -1220,21 +1200,11 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         ]
       }
       if (subtype === 'task_notification') {
-        return [{
-          type: 'system_notification',
-          subtype: 'task_notification',
-          message: cliMsg.message || cliMsg.title,
-          data: cliMsg,
-        }]
+        return backgroundTaskMessages(cliMsg, subtype)
       }
       if (subtype === 'task_started') {
         return [
-          {
-            type: 'system_notification',
-            subtype: 'task_started',
-            message: cliMsg.message || cliMsg.description || 'Task started',
-            data: cliMsg,
-          },
+          ...backgroundTaskMessages(cliMsg, subtype),
           {
             type: 'status',
             state: 'tool_executing',
@@ -1244,12 +1214,7 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
       }
       if (subtype === 'task_progress') {
         return [
-          {
-            type: 'system_notification',
-            subtype: 'task_progress',
-            message: cliMsg.message || cliMsg.summary || cliMsg.description || 'Task in progress',
-            data: cliMsg,
-          },
+          ...backgroundTaskMessages(cliMsg, subtype),
           {
             type: 'status',
             state: 'tool_executing',
@@ -1266,12 +1231,12 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         }]
       }
       if (subtype === 'compact_boundary') {
-        return [{
-          type: 'system_notification',
-          subtype: 'compact_boundary',
-          message: getCompactBoundaryMessage(cliMsg),
-          data: cliMsg.compact_metadata ?? cliMsg,
-        }]
+        return [liveItem({
+          type: 'compact_summary',
+          title: getCompactBoundaryMessage(cliMsg),
+          phase: 'complete',
+          ...readCompactMetadata(cliMsg.compact_metadata ?? cliMsg),
+        })]
       }
       return []
     }
@@ -1439,6 +1404,21 @@ function isLocalCommandOutputMessage(cliMsg: any): boolean {
     cliMsg.content ?? cliMsg.message,
     { allowUntagged: cliMsg.subtype === 'local_command_output' },
   ) !== null
+}
+
+type LiveItemContent<T = LiveTranscriptItem> = T extends LiveTranscriptItem ? Omit<T, 'id' | 'timestamp'> : never
+
+/** A transcript item recognized in the live stream, stamped like one read from history. */
+function liveItem(content: LiveItemContent): ServerMessage {
+  return {
+    type: 'transcript_item',
+    item: { ...content, id: crypto.randomUUID(), timestamp: Date.now() } as LiveTranscriptItem,
+  }
+}
+
+function backgroundTaskMessages(cliMsg: unknown, subtype: BackgroundTaskMessageSubtype): ServerMessage[] {
+  const parsed = parseBackgroundTaskMessage(cliMsg, subtype)
+  return parsed ? [{ type: 'background_task', ...parsed }] : []
 }
 
 function getCompactBoundaryMessage(cliMsg: any): string {

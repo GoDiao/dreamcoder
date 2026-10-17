@@ -3,9 +3,10 @@
  * imports this file type-only (`@protocol`), so it must not import anything
  * that needs Node or the SDK.
  */
-import type { TaskNotification, TaskUsage } from '../transcript/classify.js'
+import type { BackgroundTaskEvent, TaskNotification, TaskUsage } from '../transcript/classify.js'
+import type { TranscriptItem } from '../transcript/items.js'
 
-export type { TaskNotification, TaskUsage }
+export type { BackgroundTaskEvent, TaskNotification, TaskUsage }
 export type { GoalEventAction } from '../transcript/classify.js'
 export type { MemoryEventFile, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
 
@@ -47,6 +48,9 @@ export type AttachmentRef = {
   quote?: string
 }
 
+/** Transcript items the server recognizes in a live conversation and sends as they are. */
+export type LiveTranscriptItem = Extract<TranscriptItem, { type: 'goal_event' | 'compact_summary' | 'memory_event' }>
+
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }
   | { type: 'content_start'; blockType: 'text' | 'tool_use'; toolName?: string; toolUseId?: string; parentToolUseId?: string }
@@ -80,6 +84,8 @@ export type ServerMessage =
     }
   | { type: 'error'; message: string; code: string; retryable?: boolean }
   | { type: 'system_notification'; subtype: string; message?: string; data?: unknown }
+  | { type: 'transcript_item'; item: LiveTranscriptItem }
+  | { type: 'background_task'; event: BackgroundTaskEvent; notification?: TaskNotification }
   | { type: 'pong' }
   | { type: 'team_update'; teamName: string; members: TeamMemberStatus[] }
   | { type: 'team_created'; teamName: string }

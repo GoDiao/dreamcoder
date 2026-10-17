@@ -59,6 +59,21 @@ export type TaskUsage = {
   durationMs?: number
 }
 
+/** A background task's state as one CLI `task_started`, `task_progress` or `task_notification` message reports it. */
+export type BackgroundTaskEvent = {
+  taskId: string
+  toolUseId?: string
+  status: 'running' | 'completed' | 'failed' | 'stopped'
+  description?: string
+  taskType?: string
+  workflowName?: string
+  prompt?: string
+  summary?: string
+  lastToolName?: string
+  outputFile?: string
+  usage?: TaskUsage
+}
+
 export type TaskNotification = {
   taskId: string
   toolUseId: string
@@ -385,4 +400,91 @@ export function extractLeadingFileReferences(text: string): {
     attachments,
     modelContent: text,
   }
+}
+
+function readNonEmptyString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+function readTaskUsage(value: unknown): TaskUsage | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  const usage: TaskUsage = {}
+  const totalTokens = record.total_tokens ?? record.totalTokens
+  const toolUses = record.tool_uses ?? record.toolUses
+  const durationMs = record.duration_ms ?? record.durationMs
+  if (typeof totalTokens === 'number') usage.totalTokens = totalTokens
+  if (typeof toolUses === 'number') usage.toolUses = toolUses
+  if (typeof durationMs === 'number') usage.durationMs = durationMs
+  return Object.keys(usage).length > 0 ? usage : undefined
+}
+
+export type BackgroundTaskMessageSubtype = 'task_started' | 'task_progress' | 'task_notification'
+
+/**
+ * Reads a CLI background-task message. A `task_notification` is terminal
+ * and also yields the notification the task's tool card shows.
+ */
+export function parseBackgroundTaskMessage(
+  data: unknown,
+  subtype: BackgroundTaskMessageSubtype,
+): { event: BackgroundTaskEvent; notification?: TaskNotification } | null {
+  if (!data || typeof data !== 'object') return null
+  const record = data as Record<string, unknown>
+  const taskId = readNonEmptyString(record, 'task_id', 'taskId')
+  const toolUseId = readNonEmptyString(record, 'tool_use_id', 'toolUseId')
+  const id = taskId ?? toolUseId
+  if (!id) return null
+
+  const rawStatus = readNonEmptyString(record, 'status')
+  const status = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'stopped'
+    ? rawStatus
+    : rawStatus === 'killed'
+      ? 'stopped'
+      : subtype === 'task_notification'
+        ? 'completed'
+        : 'running'
+
+  const event: BackgroundTaskEvent = {
+    taskId: id,
+    status,
+    ...optional('toolUseId', toolUseId),
+    ...optional('description', readNonEmptyString(record, 'description', 'message', 'title')),
+    ...optional('taskType', readNonEmptyString(record, 'task_type', 'taskType')),
+    ...optional('workflowName', readNonEmptyString(record, 'workflow_name', 'workflowName')),
+    ...optional('prompt', readNonEmptyString(record, 'prompt')),
+    ...optional('summary', readNonEmptyString(record, 'summary')),
+    ...optional('lastToolName', readNonEmptyString(record, 'last_tool_name', 'lastToolName')),
+    ...optional('outputFile', readNonEmptyString(record, 'output_file', 'outputFile')),
+    ...optional('usage', readTaskUsage(record.usage)),
+  }
+
+  const notificationToolUseId = typeof record.tool_use_id === 'string' && record.tool_use_id.trim()
+    ? record.tool_use_id
+    : undefined
+  const terminal = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'stopped'
+    ? rawStatus
+    : undefined
+  if (subtype !== 'task_notification' || !notificationToolUseId || !terminal) return { event }
+
+  return {
+    event,
+    notification: {
+      taskId: event.taskId,
+      toolUseId: notificationToolUseId,
+      status: terminal,
+      ...optional('summary', event.summary),
+      ...optional('result', readNonEmptyString(record, 'result')),
+      ...optional('outputFile', event.outputFile),
+      ...optional('usage', event.usage),
+    },
+  }
+}
+
+function optional<K extends string, V>(key: K, value: V | undefined): { [P in K]?: V } {
+  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: V }
 }
