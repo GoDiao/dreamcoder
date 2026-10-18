@@ -42,6 +42,8 @@ jobs:
 
           - **macOS (Apple Silicon)**: open the `.dmg` and drag DreamCoder to Applications. On first launch macOS blocks the app; open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/DreamCoder.app` and open it again.
           - **Windows x64**: run the `-setup.exe`. If SmartScreen appears, click **More info → Run anyway**.
+
+          Both installers are installed, launched and checked automatically in CI before release. Reports from real machines are welcome in [issues](https://github.com/GoDiao/dreamcoder/issues).
           EOF
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; uploading assets to it."
@@ -109,3 +111,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" desktop/src-tauri/target/${{ matrix.target }}/release/${{ matrix.asset }} --clobber
+
+  smoke:
+    needs: build
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/smoke-test.yml
+    with:
+      tag: ${{ github.ref_name }}
