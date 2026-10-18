@@ -1,15 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 import { ModelSelector } from './ModelSelector'
 import { useChatStore } from '../../stores/chatStore'
-import { useProviderOAuthStore } from '../../stores/providerOAuthStore'
-import { useProviderOpenAIOAuthStore } from '../../stores/providerOpenAIOAuthStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { OPENAI_OFFICIAL_PROVIDER_ID } from '../../constants/openaiOfficialProvider'
 import type { ModelInfo } from '../../types/settings'
 
 const MODELS: ModelInfo[] = [
@@ -30,13 +27,6 @@ afterEach(() => {
   useProviderStore.setState(useProviderStore.getInitialState(), true)
   useSessionRuntimeStore.setState(useSessionRuntimeStore.getInitialState(), true)
   useChatStore.setState(useChatStore.getInitialState(), true)
-  useProviderOAuthStore.setState(useProviderOAuthStore.getInitialState(), true)
-  useProviderOpenAIOAuthStore.setState(useProviderOpenAIOAuthStore.getInitialState(), true)
-})
-
-beforeEach(() => {
-  useProviderOAuthStore.setState({ fetchStatus: async () => {} })
-  useProviderOpenAIOAuthStore.setState({ fetchStatus: async () => {} })
 })
 
 describe('ModelSelector', () => {
@@ -131,35 +121,30 @@ describe('ModelSelector', () => {
     })
   })
 
-  it('uses the ChatGPT Official catalog when that built-in provider is active', async () => {
-    const openAIModels: ModelInfo[] = [
-      {
-        id: 'gpt-5.3-codex',
-        name: 'GPT-5.3 Codex',
-        description: 'Best for coding and agentic work',
-        context: '',
-      },
-      {
-        id: 'gpt-5.5',
-        name: 'GPT-5.5',
-        description: 'Latest general-purpose model',
-        context: '',
-      },
-    ]
+  it('sets the effort per session from the composer menu and shows it in the trigger', async () => {
     const setSessionRuntime = vi.fn()
-    useProviderOpenAIOAuthStore.setState({
-      status: { loggedIn: true, expiresAt: null, email: null, accountId: null },
-      fetchStatus: async () => {},
-    })
+    const setEffort = vi.fn(async () => {})
     useSettingsStore.setState({
       locale: 'en',
-      availableModels: openAIModels,
-      currentModel: openAIModels[0],
-      activeProviderName: 'ChatGPT Official',
+      availableModels: [
+        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
+      ],
+      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
+      activeProviderName: 'Provider A',
+      effortLevel: 'medium',
+      setEffort,
     })
     useProviderStore.setState({
-      providers: [],
-      activeId: OPENAI_OFFICIAL_PROVIDER_ID,
+      providers: [{
+        id: 'provider-a',
+        presetId: 'custom',
+        name: 'Provider A',
+        apiKey: '***',
+        baseUrl: 'https://api.example.com',
+        apiFormat: 'anthropic',
+        models: { main: 'provider-main', haiku: '', sonnet: '', opus: '' },
+      }],
+      activeId: 'provider-a',
       hasLoadedProviders: true,
       isLoading: true,
     })
@@ -167,27 +152,73 @@ describe('ModelSelector', () => {
       setSessionRuntime,
     } as Partial<ReturnType<typeof useChatStore.getState>>)
 
-    render(<ModelSelector runtimeKey="session-openai" />)
+    render(<ModelSelector runtimeKey="session-1" />)
 
-    await clickByRole(/GPT-5\.3 Codex/i)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /GPT-5\.5/ }))
-      await Promise.resolve()
-    })
+    expect(screen.getByRole('button', { name: 'provider-main · Medium' })).toBeInTheDocument()
+    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
 
-    expect(useSessionRuntimeStore.getState().selections['session-openai']).toEqual({
-      providerId: OPENAI_OFFICIAL_PROVIDER_ID,
-      modelId: 'gpt-5.5',
+    await clickByRole('provider-main · Medium')
+    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
+    await clickByRole(/^High$/)
+
+    expect(setEffort).not.toHaveBeenCalled()
+    // No model was chosen for this session, so only the effort is pinned and
+    // the session keeps following the default provider and model.
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
+      providerId: null,
+      modelId: '',
+      effort: 'high',
     })
-    expect(setSessionRuntime).toHaveBeenCalledWith('session-openai', {
-      providerId: OPENAI_OFFICIAL_PROVIDER_ID,
-      modelId: 'gpt-5.5',
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
+      providerId: null,
+      modelId: '',
+      effort: 'high',
+    })
+    expect(screen.getByRole('button', { name: 'provider-main · High' })).toBeInTheDocument()
+  })
+
+  it('keeps an explicit model choice when only the effort changes', async () => {
+    const setSessionRuntime = vi.fn()
+    useSettingsStore.setState({
+      locale: 'en',
+      availableModels: [
+        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
+      ],
+      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
+      activeProviderName: 'Provider A',
+      effortLevel: 'medium',
+    })
+    useProviderStore.setState({
+      providers: [{
+        id: 'provider-a',
+        presetId: 'custom',
+        name: 'Provider A',
+        apiKey: '***',
+        baseUrl: 'https://api.example.com',
+        apiFormat: 'anthropic',
+        models: { main: 'provider-main', haiku: 'provider-fast', sonnet: '', opus: '' },
+      }],
+      activeId: 'provider-a',
+      hasLoadedProviders: true,
+      isLoading: true,
+    })
+    useChatStore.setState({
+      setSessionRuntime,
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+    useSessionRuntimeStore.getState().setSelection('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
+
+    render(<ModelSelector runtimeKey="session-2" />)
+    await clickByRole('provider-fast · Medium')
+    await clickByRole(/^Max$/)
+
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-2', {
+      providerId: 'provider-a',
+      modelId: 'provider-fast',
+      effort: 'max',
     })
   })
 
-  it('hides official provider sections when OAuth is not logged in', async () => {
-    useProviderOAuthStore.setState({ status: { loggedIn: false }, fetchStatus: async () => {} })
-    useProviderOpenAIOAuthStore.setState({ status: { loggedIn: false }, fetchStatus: async () => {} })
+  it('lists only the active provider without subscription sections', async () => {
     useSettingsStore.setState({
       locale: 'en',
       availableModels: MODELS,

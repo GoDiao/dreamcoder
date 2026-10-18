@@ -1,7 +1,6 @@
 import { useId, type ReactNode } from 'react'
 import { useTranslation } from '../../i18n'
 import type { McpWritableScope } from '../../types/mcp'
-import { Button } from '../shared/Button'
 import { DirectoryPicker } from '../shared/DirectoryPicker'
 import { Input } from '../shared/Input'
 
@@ -24,16 +23,16 @@ export function McpEditorLayout({
 }) {
   const t = useTranslation()
   return (
-    <div className="max-w-5xl min-w-0">
-      <Button variant="ghost" onClick={onBack} disabled={backDisabled} className="mb-5">
-        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_back</span>
+    <div className="min-w-0">
+      <button type="button" onClick={onBack} disabled={backDisabled} className="mb-5 inline-flex items-center gap-1.5 rounded-[6px] text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50">
+        <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
         {t('settings.mcp.form.back')}
-      </Button>
-      <div className="flex items-start justify-between gap-4 mb-8">
+      </button>
+      <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-[2.2rem] font-semibold tracking-[-0.03em] text-[var(--color-text-primary)]">{title}</h2>
-          <p className="mt-3 text-base text-[var(--color-text-secondary)]">{description}</p>
-          {notice && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{notice}</p>}
+          <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{title}</h2>
+          <p className="mt-1.5 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{description}</p>
+          {notice && <p className="mt-2 text-xs leading-[1.7] text-[var(--color-text-secondary)]">{notice}</p>}
           {status && <div className="mt-4 flex flex-wrap items-center gap-3">{status}</div>}
         </div>
         {headerActions && <div className="flex items-center gap-3">{headerActions}</div>}

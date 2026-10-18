@@ -17,8 +17,8 @@ beforeEach(async () => {
   homeDir = path.join(tmpDir, 'home')
   configDir = path.join(homeDir, '.claude')
   projectRoot = path.join(tmpDir, 'workspace', 'demo-project')
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
-  process.env.CLAUDE_CONFIG_DIR = configDir
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = configDir
 
   await fs.mkdir(path.join(configDir, 'projects', 'demo-project'), { recursive: true })
   await fs.mkdir(path.join(configDir, 'skills', 'alpha-skill'), { recursive: true })
@@ -50,8 +50,8 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-  else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+  if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   await fs.rm(tmpDir, { recursive: true, force: true })
 })
 

@@ -14,6 +14,7 @@ import { resolveClaudeCliLauncher } from '../../utils/desktopBundledCli.js'
 import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
 import { getShellConfigPaths } from '../../utils/shellConfig.js'
 import { getUserBinDir } from '../../utils/xdg.js'
+import { DREAMCODER_CONFIG_DIR_ENV, getConfigDirOverride } from '../../utils/envUtils.js'
 
 const DESKTOP_CLI_NAME = 'dreamcoder'
 const DESKTOP_CLI_WINDOWS_LEGACY_EXE = `${DESKTOP_CLI_NAME}.exe`
@@ -269,9 +270,9 @@ async function syncUnixLauncherWrapper(sourcePath: string, targetPath: string) {
 function buildUnixLauncherWrapper(sourcePath: string) {
   const quotedSource = shellSingleQuote(sourcePath)
   const quotedAppRoot = shellSingleQuote(dirname(sourcePath))
-  const portableConfigDir = process.env.CLAUDE_CONFIG_DIR
+  const portableConfigDir = getConfigDirOverride()
   const configExport = portableConfigDir
-    ? `export CLAUDE_CONFIG_DIR=${shellSingleQuote(portableConfigDir)}\n`
+    ? `export ${DREAMCODER_CONFIG_DIR_ENV}=${shellSingleQuote(portableConfigDir)}\n`
     : ''
 
   return `#!/usr/bin/env bash
@@ -318,9 +319,9 @@ async function syncWindowsLauncherWrapper(sourcePath: string, targetPath: string
 
 export function buildWindowsLauncherWrapper(sourcePath: string) {
   const appRoot = dirname(sourcePath)
-  const portableConfigDir = process.env.CLAUDE_CONFIG_DIR
+  const portableConfigDir = getConfigDirOverride()
   const configLine = portableConfigDir
-    ? `set "CLAUDE_CONFIG_DIR=${portableConfigDir}"\r\n`
+    ? `set "${DREAMCODER_CONFIG_DIR_ENV}=${portableConfigDir}"\r\n`
     : ''
 
   return [

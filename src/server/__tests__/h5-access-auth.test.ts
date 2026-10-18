@@ -175,13 +175,13 @@ const settingsSurfaceEndpoints = [
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'h5-access-auth-test-'))
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY
   originalH5DistDir = process.env.CLAUDE_H5_DIST_DIR
   originalClaudeAppRoot = process.env.CLAUDE_APP_ROOT
   originalServerAuthRequired = process.env.SERVER_AUTH_REQUIRED
   originalServerPort = ProviderService.getServerPort()
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   const h5DistDir = path.join(tmpDir, 'dist')
   process.env.CLAUDE_H5_DIST_DIR = h5DistDir
   delete process.env.ANTHROPIC_API_KEY
@@ -200,8 +200,8 @@ afterEach(async () => {
   server = undefined
   ProviderService.setServerPort(originalServerPort)
 
-  if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-  else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+  if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
 
   if (originalAnthropicApiKey === undefined) delete process.env.ANTHROPIC_API_KEY
   else process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey

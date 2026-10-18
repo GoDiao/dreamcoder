@@ -187,8 +187,3 @@
   --color-outline-a92: rgba(146, 166, 191, 0.92);
 }
 
-[data-theme="aurora"] .settings-zoom-control {
-  --settings-zoom-thumb-bg: var(--color-surface-bright);
-  --settings-zoom-thumb-border: var(--color-primary);
-  --settings-zoom-thumb-shadow: 0 0 0 3px rgba(104, 223, 208, 0.16), 0 10px 24px rgba(0, 0, 0, 0.5);
-}

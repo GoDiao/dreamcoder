@@ -2,13 +2,6 @@ import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
 import { attributionHeaderEnvForModel } from '../services/attributionHeaderPolicy.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { hasOpenAIAuthLogin } from '../../utils/auth.js'
-import { OPENAI_CODEX_MODEL_CATALOG } from '../../services/openaiAuth/models.js'
-import {
-  OPENAI_OFFICIAL_PROVIDER_ID,
-  OPENAI_OFFICIAL_PROVIDER_NAME,
-  isOpenAIOfficialProviderId,
-} from '../services/openaiOfficialProvider.js'
 
 const DEFAULT_MODELS = [
   {
@@ -31,7 +24,7 @@ const DEFAULT_MODELS = [
   },
 ] as const
 
-const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
 
 const DEFAULT_MODEL = 'claude-opus-4-7'
 const DEFAULT_EFFORT = 'medium'
@@ -103,15 +96,6 @@ function buildProviderModelList(models: {
   return modelList
 }
 
-function buildOpenAIModelList(): ApiModelInfo[] {
-  return OPENAI_CODEX_MODEL_CATALOG.map(model => ({
-    id: model.value,
-    name: model.label,
-    description: model.description,
-    context: '',
-  }))
-}
-
 function getEnvConfiguredAnthropicModels(): ApiModelInfo[] {
   return buildProviderModelList({
     main: process.env.ANTHROPIC_MODEL?.trim() || '',
@@ -121,23 +105,11 @@ function getEnvConfiguredAnthropicModels(): ApiModelInfo[] {
   })
 }
 
-function getOpenAIAuthModels(): ApiModelInfo[] {
-  if (!hasOpenAIAuthLogin()) {
-    return []
-  }
-
-  return buildOpenAIModelList()
-}
-
 function getStandaloneModelList(): ApiModelInfo[] {
   const models = [...getEnvConfiguredAnthropicModels()]
 
   if (models.length === 0) {
     models.push(...DEFAULT_MODELS)
-  }
-
-  for (const model of getOpenAIAuthModels()) {
-    addUniqueModel(models, model)
   }
 
   return models
@@ -180,16 +152,6 @@ export async function handleModelsApi(
 
 async function handleModelsList(): Promise<Response> {
   const { providers, activeId } = await providerService.listProviders()
-  if (isOpenAIOfficialProviderId(activeId)) {
-    return Response.json({
-      models: buildOpenAIModelList(),
-      provider: {
-        id: OPENAI_OFFICIAL_PROVIDER_ID,
-        name: OPENAI_OFFICIAL_PROVIDER_NAME,
-      },
-    })
-  }
-
   const activeProvider = activeId ? providers.find((p) => p.id === activeId) : null
   if (activeProvider) {
     const modelList = buildProviderModelList(activeProvider.models)
@@ -204,9 +166,8 @@ async function handleModelsList(): Promise<Response> {
 async function handleCurrentModel(req: Request): Promise<Response> {
   if (req.method === 'GET') {
     const { providers, activeId } = await providerService.listProviders()
-    const isOpenAIProviderActive = isOpenAIOfficialProviderId(activeId)
     const activeProvider = activeId ? providers.find((p) => p.id === activeId) : null
-    const settings = activeProvider || isOpenAIProviderActive
+    const settings = activeProvider
       ? await providerService.getManagedSettings()
       : await settingsService.getUserSettings()
     const explicitModel = (settings.model as string) || ''
@@ -217,10 +178,7 @@ async function handleCurrentModel(req: Request): Promise<Response> {
     let currentModelId: string
     let currentModelName: string
 
-    if (isOpenAIProviderActive) {
-      currentModelId = explicitModel || env.ANTHROPIC_MODEL || 'gpt-5.3-codex'
-      currentModelName = currentModelId
-    } else if (activeProvider) {
+    if (activeProvider) {
       const providerEnvModel = env.ANTHROPIC_MODEL
       if (providerEnvModel && !explicitModel) {
         currentModelId = providerEnvModel
@@ -236,11 +194,9 @@ async function handleCurrentModel(req: Request): Promise<Response> {
 
     const lookupId = contextTier ? `${currentModelId}:${contextTier}` : currentModelId
 
-    const availableModels = isOpenAIProviderActive
-      ? buildOpenAIModelList()
-      : activeProvider
-        ? buildProviderModelList(activeProvider.models)
-        : getStandaloneModelList()
+    const availableModels = activeProvider
+      ? buildProviderModelList(activeProvider.models)
+      : getStandaloneModelList()
 
     const modelEntry = availableModels.find((m) => m.id === lookupId)
       || availableModels.find((m) => m.id === currentModelId)

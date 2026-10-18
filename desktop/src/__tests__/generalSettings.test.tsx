@@ -6,6 +6,7 @@ import { Settings } from '../pages/Settings'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
 import { useUpdateStore } from '../stores/updateStore'
+import { useClaudeCodeImportStore } from '../stores/claudeCodeImportStore'
 import type { SavedProvider } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
 import type { AppMode, ThemeMode, UpdateProxySettings } from '../types/settings'
@@ -42,7 +43,6 @@ const providerStoreState = {
   fetchPresets: vi.fn(),
   deleteProvider: MOCK_DELETE_PROVIDER,
   activateProvider: vi.fn(),
-  activateOfficial: vi.fn(),
   testProvider: vi.fn(),
   createProvider: vi.fn(),
   updateProvider: vi.fn(),
@@ -75,14 +75,6 @@ vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
   },
-}))
-
-vi.mock('../components/settings/ClaudeOfficialLogin', () => ({
-  ClaudeOfficialLogin: () => <div data-testid="claude-official-login" />,
-}))
-
-vi.mock('../components/settings/ChatGPTOfficialLogin', () => ({
-  ChatGPTOfficialLogin: () => <div data-testid="chatgpt-official-login" />,
 }))
 
 vi.mock('../pages/ActivitySettings', () => ({
@@ -118,6 +110,20 @@ vi.mock('../components/chat/CodeViewer', () => ({
   CodeViewer: ({ code }: { code: string }) => <pre data-testid="code-viewer">{code}</pre>,
 }))
 
+function expandSection(title: string) {
+  const toggle = screen
+    .getAllByRole('button')
+    .find((button) => button.hasAttribute('aria-expanded') && button.textContent?.startsWith(title) && !button.hasAttribute('aria-haspopup'))
+  if (!toggle) throw new Error(`No collapsed section named ${title}`)
+  fireEvent.click(toggle)
+  return toggle
+}
+
+function chooseOption(trigger: string, option: string | RegExp) {
+  fireEvent.click(screen.getByRole('button', { name: trigger }))
+  fireEvent.click(screen.getByRole('menuitemradio', { name: option }))
+}
+
 describe('Settings > General tab', () => {
   beforeEach(() => {
     vi.useRealTimers()
@@ -150,7 +156,6 @@ describe('Settings > General tab', () => {
     providerStoreState.fetchProviders = vi.fn()
     providerStoreState.fetchPresets = vi.fn()
     providerStoreState.activateProvider = vi.fn()
-    providerStoreState.activateOfficial = vi.fn()
     providerStoreState.testProvider = vi.fn()
     providerStoreState.createProvider = vi.fn()
     providerStoreState.updateProvider = vi.fn()
@@ -163,7 +168,6 @@ describe('Settings > General tab', () => {
       skipWebFetchPreflight: true,
       desktopNotificationsEnabled: true,
       responseLanguage: '',
-      uiZoom: 1,
       webSearch: { mode: 'auto', tavilyApiKey: '', braveApiKey: '' },
       network: {
         aiRequestTimeoutMs: 120_000,
@@ -192,9 +196,7 @@ describe('Settings > General tab', () => {
       setResponseLanguage: vi.fn().mockImplementation(async (language: string) => {
         useSettingsStore.setState({ responseLanguage: language })
       }),
-      setUiZoom: vi.fn().mockImplementation((uiZoom: number) => {
-        useSettingsStore.setState({ uiZoom })
-      }),
+      setEffort: vi.fn(),
       setWebSearch: vi.fn().mockImplementation(async (webSearch) => {
         useSettingsStore.setState({ webSearch })
       }),
@@ -257,7 +259,7 @@ describe('Settings > General tab', () => {
       updateH5AccessSettings: vi.fn(),
     })
 
-    useUIStore.setState({ pendingSettingsTab: null, toasts: [] })
+    useUIStore.setState({ settingsTab: 'providers', toasts: [] })
     useUpdateStore.setState({
       status: 'idle',
       availableVersion: null,
@@ -283,8 +285,9 @@ describe('Settings > General tab', () => {
     })
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
+    expandSection('Default shell')
     fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
-    fireEvent.click(screen.getByRole('button', { name: 'bash' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'bash' }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
     expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'bash', customShellPath: '' })
   })
@@ -300,33 +303,28 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Web search & fetch')
 
-    const toggle = screen.getByLabelText('Skip WebFetch domain preflight')
+    const toggle = screen.getByRole('switch', { name: 'Skip WebFetch domain preflight' })
     expect(toggle).toBeChecked()
   })
 
-  it('offers the pure white appearance theme', () => {
+  it('offers all seven themes in a borderless dropdown and saves the choice', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    const pureWhite = screen.getByRole('button', { name: 'Pure White' })
-    const warmClassic = screen.getByRole('button', { name: 'Warm Classic' })
-    const dark = screen.getByRole('button', { name: 'Dark' })
+    const trigger = screen.getByRole('button', { name: 'Color theme' })
+    expect(trigger).toHaveTextContent('Warm Classic')
+    fireEvent.click(trigger)
 
-    expect((pureWhite.compareDocumentPosition(warmClassic) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
-    expect((warmClassic.compareDocumentPosition(dark) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Pure White' }))
-
-    expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('white')
-  })
-
-  it('offers Aurora, saves the selection, and marks it selected', async () => {
-    render(<Settings />)
-    fireEvent.click(screen.getByText('General'))
-    fireEvent.click(screen.getByRole('button', { name: 'Aurora' }))
+    const options = screen.getAllByRole('menuitemradio').map((option) => option.textContent)
+    expect(options).toEqual(['Pure White', 'Warm Classic', 'Dark', 'Midnight', 'DreamField Emerald', 'Autumn Amber', 'Aurora'])
+    expect(screen.getByRole('menuitemradio', { name: 'Warm Classic' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Aurora' }))
 
     expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('aurora')
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Aurora' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it('marks the pure white appearance theme as selected', () => {
@@ -334,33 +332,72 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    fireEvent.click(screen.getByRole('button', { name: 'Color theme' }))
 
-    expect(screen.getByRole('button', { name: 'Pure White' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Warm Classic' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('menuitemradio', { name: 'Pure White' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Warm Classic' })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('keeps UI zoom below system notifications because it is a secondary setting', () => {
+  it('closes a settings dropdown with Escape and on outside click', () => {
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+    const trigger = screen.getByRole('button', { name: 'Color theme' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('menu', { name: 'Color theme' })).toBeInTheDocument()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+
+    fireEvent.click(trigger)
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+  })
+
+  it('groups General settings and uses a segmented control for effort', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
 
-    const notificationsHeading = screen.getByRole('heading', { name: 'System Notifications' })
-    const uiZoomHeading = screen.getByRole('heading', { name: 'UI Zoom' })
-    const networkHeading = screen.getByRole('heading', { name: 'Network' })
-    const webFetchHeading = screen.getByRole('heading', { name: 'WebFetch Preflight' })
+    const headings = ['Appearance', 'Language & model', 'Notifications', 'Advanced'].map((name) =>
+      screen.getByRole('heading', { name }),
+    )
+    for (let index = 1; index < headings.length; index++) {
+      expect((headings[index - 1]!.compareDocumentPosition(headings[index]!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    }
+    expect(screen.queryByText('UI Zoom')).not.toBeInTheDocument()
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
 
-    expect((notificationsHeading.compareDocumentPosition(uiZoomHeading) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
-    expect((uiZoomHeading.compareDocumentPosition(networkHeading) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
-    expect((networkHeading.compareDocumentPosition(webFetchHeading) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    const effort = screen.getByRole('radiogroup', { name: 'Effort Level' })
+    expect(within(effort).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Low', 'Medium', 'High', 'Max'])
+    fireEvent.click(within(effort).getByRole('radio', { name: 'Max' }))
+    expect(useSettingsStore.getState().setEffort).toHaveBeenCalledWith('max')
+  })
+
+  it('keeps advanced sections collapsed until expanded', () => {
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+
+    expect(screen.queryByLabelText('AI request timeout')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Tavily API key')).not.toBeInTheDocument()
+    const network = expandSection('Network')
+    expect(network).toHaveAttribute('aria-expanded', 'true')
+    expect(network).toHaveTextContent('System proxy')
+    expect(screen.getByLabelText('AI request timeout')).toBeInTheDocument()
+    fireEvent.click(network)
+    expect(network).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('AI request timeout')).not.toBeInTheDocument()
   })
 
   it('saves provider network timeout and manual proxy from General settings', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    expect(screen.getByRole('button', { name: /System proxy/i })).toHaveAttribute('aria-pressed', 'true')
+    expandSection('Network')
+    expect(screen.getByRole('button', { name: 'Provider request proxy' })).toHaveTextContent('System proxy')
 
-    fireEvent.click(screen.getByRole('button', { name: /Manual proxy/i }))
+    chooseOption('Provider request proxy', 'Manual proxy')
     const proxyInput = screen.getByLabelText('Proxy URL')
     const saveButton = screen.getAllByRole('button', { name: 'Save' })[0]!
 
@@ -399,6 +436,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Network')
     const timeoutInput = screen.getByLabelText('AI request timeout')
     const saveButton = screen.getAllByRole('button', { name: 'Save' })[0]!
 
@@ -419,16 +457,33 @@ describe('Settings > General tab', () => {
   it('keeps data storage at the bottom of General settings', () => {
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
+    useClaudeCodeImportStore.setState({
+      status: {
+        claudeCodeDir: '/Users/test/.claude',
+        claudeCodeHasData: true,
+        dreamcoderHasData: true,
+        decided: true,
+        incomplete: false,
+        offer: false,
+        job: null,
+      },
+      job: null,
+      error: null,
+      fetchStatus: vi.fn().mockResolvedValue(undefined),
+    })
 
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
 
-    const webSearchHeading = screen.getByRole('heading', { name: 'WebSearch' })
-    const storageHeading = screen.getByRole('heading', { name: 'Data Storage Location' })
+    const webSearchRow = expandSection('Web search & fetch')
+    const storageRow = expandSection('Data Storage Location')
+    const importRow = screen.getByText('Import from Claude Code')
 
-    expect((webSearchHeading.compareDocumentPosition(storageHeading) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    expect((webSearchRow.compareDocumentPosition(storageRow) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    expect((storageRow.compareDocumentPosition(importRow) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
     expect(screen.getByText(/Switching directories does not migrate existing data/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument()
   })
 
   it('lets desktop users choose a portable data directory and relaunch immediately', async () => {
@@ -438,6 +493,8 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'Portable directory')
     fireEvent.click(screen.getByRole('button', { name: 'Choose Folder' }))
 
     await waitFor(() => {
@@ -471,7 +528,9 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    fireEvent.click(screen.getByRole('button', { name: /Use system directory/ }))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'System directory')
+    fireEvent.click(screen.getByRole('button', { name: 'Apply and restart' }))
 
     expect(screen.getByText(/Data in the portable directory is not deleted/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save and Restart' }))
@@ -490,6 +549,8 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'Portable directory')
     const input = screen.getByLabelText('Portable data directory')
 
     fireEvent.change(input, { target: { value: '' } })
@@ -509,12 +570,14 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'Portable directory')
     fireEvent.click(screen.getByRole('button', { name: 'Choose Folder' }))
 
     expect(await screen.findByText('Could not open the folder picker. Paste the folder path manually.')).toBeInTheDocument()
   })
 
-  it('treats external CLAUDE_CONFIG_DIR as the controlling data source', async () => {
+  it('treats external DREAMCODER_CONFIG_DIR as the controlling data source', async () => {
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
     useSettingsStore.setState({
@@ -530,11 +593,14 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    expect(screen.getByText(/The current directory is controlled by the CLAUDE_CONFIG_DIR environment variable/)).toBeInTheDocument()
+    expandSection('Data Storage Location')
+    expect(screen.getByText(/The current directory is controlled by the DREAMCODER_CONFIG_DIR environment variable/)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Use system directory/ }))
+    chooseOption('Storage mode', 'System directory')
+    fireEvent.click(screen.getByRole('button', { name: 'Apply and restart' }))
     expect(screen.getByText(/Remove it from the launch environment before switching back/)).toBeInTheDocument()
 
+    chooseOption('Storage mode', 'Portable directory')
     fireEvent.change(screen.getByLabelText('Portable data directory'), { target: { value: '/other/data' } })
     fireEvent.click(screen.getByRole('button', { name: 'Use This Folder and Restart' }))
     expect(screen.queryByText('Switch data storage location?')).not.toBeInTheDocument()
@@ -548,6 +614,8 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'Portable directory')
     fireEvent.click(screen.getByRole('button', { name: 'Use This Folder and Restart' }))
     expect(screen.getByText('Switch data storage location?')).toBeInTheDocument()
 
@@ -570,6 +638,8 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
+    chooseOption('Storage mode', 'Portable directory')
     fireEvent.click(screen.getByRole('button', { name: 'Use This Folder and Restart' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save and Restart' }))
 
@@ -585,65 +655,9 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Data Storage Location')
 
     expect(screen.getByText('The storage change has been saved. Restart the app for the new data directory to take effect.')).toBeInTheDocument()
-  })
-
-  it('previews UI zoom while dragging and applies it once on release', async () => {
-    render(<Settings />)
-
-    fireEvent.click(screen.getByText('General'))
-    expect(screen.getByText('Shortcuts are faster:')).toBeInTheDocument()
-    expect(screen.getByText('macOS')).toBeInTheDocument()
-    expect(screen.getByText('Windows / Linux')).toBeInTheDocument()
-    expect(screen.getByText('0 resets zoom to 100%.')).toBeInTheDocument()
-
-    const slider = screen.getByLabelText('UI Zoom')
-    expect(slider).toHaveAttribute('step', '0.01')
-
-    fireEvent.pointerDown(slider, { pointerId: 1 })
-    await act(async () => {
-      fireEvent.change(slider, {
-        target: { value: '1.25', valueAsNumber: 1.25 },
-      })
-    })
-
-    expect(screen.getAllByText('125%')).toHaveLength(2)
-    expect(useSettingsStore.getState().setUiZoom).not.toHaveBeenCalledWith(1.25)
-    expect(useSettingsStore.getState().uiZoom).toBe(1)
-    expect(slider).toHaveValue('1.25')
-    expect(slider).toHaveClass('settings-zoom-range')
-    expect(slider.closest('.settings-zoom-control')).toHaveClass('is-dragging')
-    expect(slider.closest('.settings-zoom-control')).toHaveStyle({ '--settings-zoom-range-progress': '50%' })
-
-    await act(async () => {
-      fireEvent.pointerUp(slider, { pointerId: 1 })
-    })
-
-    expect(useSettingsStore.getState().setUiZoom).toHaveBeenCalledWith(1.25)
-    expect(slider.closest('.settings-zoom-control')).not.toHaveClass('is-dragging')
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Reset UI zoom to 100%' }))
-    })
-
-    expect(useSettingsStore.getState().setUiZoom).toHaveBeenLastCalledWith(1)
-  })
-
-  it('updates the UI zoom slider when shortcut zoom changes the shared setting while Settings is open', async () => {
-    render(<Settings />)
-
-    fireEvent.click(screen.getByText('General'))
-
-    const slider = screen.getByLabelText('UI Zoom')
-
-    await act(async () => {
-      useSettingsStore.setState({ uiZoom: 1.1 })
-    })
-
-    expect(slider).toHaveValue('1.1')
-    expect(screen.getAllByText('110%')).toHaveLength(2)
-    expect(slider.closest('.settings-zoom-control')).toHaveStyle({ '--settings-zoom-range-progress': '40%' })
   })
 
   it('opens the Token usage tab from Settings navigation above Diagnostics', () => {
@@ -662,6 +676,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Web search & fetch')
 
     const toggle = screen.getByLabelText('Skip WebFetch domain preflight')
     fireEvent.click(toggle)
@@ -690,9 +705,9 @@ describe('Settings > General tab', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Response Language' })).not.toBeInTheDocument()
 
     const trigger = screen.getByRole('button', { name: 'Response Language' })
-    expect(trigger).toHaveTextContent('Default (English)')
+    expect(trigger).toHaveTextContent('Default (match conversation)')
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('button', { name: '中文 (Chinese)' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '中文 (Chinese)' }))
 
     expect(useSettingsStore.getState().setResponseLanguage).toHaveBeenCalledWith('chinese')
   })
@@ -1062,8 +1077,9 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Web search & fetch')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tavily' }))
+    chooseOption('Search mode', 'Tavily')
     fireEvent.change(screen.getByLabelText('Tavily API key'), {
       target: { value: 'tvly-test-key' },
     })
@@ -1081,6 +1097,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
+    expandSection('Web search & fetch')
 
     expect(screen.getByRole('link', { name: 'Get Tavily API key' })).toHaveAttribute(
       'href',
@@ -1130,50 +1147,6 @@ describe('Settings > Providers tab', () => {
     ]
     providerStoreState.activeId = null
     providerStoreState.hasLoadedProviders = true
-  })
-
-  it.skip('does not query official OAuth status before providers finish loading', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = null
-    providerStoreState.hasLoadedProviders = false
-
-    render(<Settings />)
-
-    expect(screen.queryByTestId('claude-official-login')).not.toBeInTheDocument()
-  })
-
-  it.skip('does not query ChatGPT OAuth status before providers finish loading', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = 'openai-official'
-    providerStoreState.hasLoadedProviders = false
-
-    render(<Settings />)
-
-    expect(screen.queryByTestId('chatgpt-official-login')).not.toBeInTheDocument()
-  })
-
-  it.skip('shows official OAuth status only after official provider is confirmed active', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = null
-    providerStoreState.hasLoadedProviders = true
-
-    render(<Settings />)
-
-    expect(screen.getByTestId('claude-official-login')).toBeInTheDocument()
-  })
-
-  it.skip('shows ChatGPT Official as the active built-in provider', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = 'openai-official'
-    providerStoreState.hasLoadedProviders = true
-
-    render(<Settings />)
-
-    const openAIProvider = screen.getByTestId('openai-official-provider')
-    expect(within(openAIProvider).getByText('ChatGPT Official')).toBeInTheDocument()
-    expect(within(openAIProvider).getByText('Default')).toBeInTheDocument()
-    expect(screen.getByTestId('chatgpt-official-login')).toBeInTheDocument()
-    expect(screen.queryByTestId('claude-official-login')).not.toBeInTheDocument()
   })
 
   it('requires confirmation before deleting a provider', async () => {
@@ -1317,7 +1290,7 @@ describe('Settings > Providers tab', () => {
 
 describe('Settings > About tab', () => {
   beforeEach(() => {
-    useUIStore.setState({ pendingSettingsTab: 'about' })
+    useUIStore.setState({ settingsTab: 'about' })
     useSettingsStore.setState({
       locale: 'en',
       updateProxy: { mode: 'system', url: '' },

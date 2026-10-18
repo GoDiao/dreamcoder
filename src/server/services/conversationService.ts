@@ -1,11 +1,6 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { ProviderService } from './providerService.js'
-import {
-  OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
-  OPENAI_OAUTH_PROVIDER_ENV_KEY,
-} from './openaiOfficialProvider.js'
 import { sessionService } from './sessionService.js'
 import { diagnosticsService } from './diagnosticsService.js'
 import {
@@ -92,6 +87,7 @@ export class ConversationStartupError extends Error {
       | 'CLI_SESSION_CONFLICT'
       | 'CLI_START_FAILED'
       | 'CLI_SPAWN_FAILED'
+      | 'PROVIDER_NOT_CONFIGURED'
       | 'SESSION_DELETED',
     readonly retryable = false,
   ) {
@@ -178,6 +174,8 @@ export class ConversationService {
         'WORKDIR_INVALID',
       )
     }
+
+    await this.assertProviderConfigured(options?.providerId)
 
     if (shouldReplacePlaceholder) {
       await sessionService.clearSessionTranscript(sessionId, workDir)
@@ -908,8 +906,8 @@ export class ConversationService {
       'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
       'CLAUDE_CODE_ATTRIBUTION_HEADER',
       'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
-      OPENAI_OAUTH_PROVIDER_ENV_KEY,
-      OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
+      'DREAMCODER_OPENAI_OAUTH_PROVIDER',
+      'OPENAI_CODEX_OAUTH_FILE',
     ] as const
 
     const cleanEnv = await getProcessEnvWithTerminalShellEnvironment()
@@ -976,9 +974,6 @@ export class ConversationService {
         : {}),
       ...(explicitProviderEnv ?? {}),
       ...networkEnv,
-      ...(this.shouldMarkManagedOAuth(options?.providerId)
-        ? await this.buildOfficialOAuthEnv()
-        : {}),
       ...attributionHeaderEnv,
     }
   }
@@ -997,23 +992,15 @@ export class ConversationService {
     ).normalize('NFC')
   }
 
-  private async buildOfficialOAuthEnv(): Promise<Record<string, string>> {
-    const env: Record<string, string> = {
-      CLAUDE_CODE_ENTRYPOINT: 'claude-desktop',
-    }
-    try {
-      const { providerOAuthService } = await import('./providerOAuthService.js')
-      const token = await providerOAuthService.ensureFreshAccessToken()
-      if (token) {
-        env.CLAUDE_CODE_OAUTH_TOKEN = token
-      }
-    } catch (err) {
-      console.error(
-        '[conversationService] ensureFreshAccessToken failed:',
-        err instanceof Error ? err.message : err,
+  private async assertProviderConfigured(providerId?: string | null): Promise<void> {
+    if (typeof providerId === 'string') return
+    const { activeId } = await this.providerService.listProviders()
+    if (!activeId) {
+      throw new ConversationStartupError(
+        'No provider configured. Add a provider in Settings → Providers.',
+        'PROVIDER_NOT_CONFIGURED',
       )
     }
-    return env
   }
 
   private shouldStripInheritedProviderEnv(providerId?: string | null): boolean {
@@ -1021,8 +1008,7 @@ export class ConversationService {
       return true
     }
 
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const configDir = getClaudeConfigHomeDir()
     const dreamcoderDir = path.join(configDir, 'dreamcoder')
     const providersIndexPath = path.join(dreamcoderDir, 'providers.json')
     const settingsPath = path.join(dreamcoderDir, 'settings.json')
@@ -1050,43 +1036,9 @@ export class ConversationService {
         'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
         'CLAUDE_CODE_ATTRIBUTION_HEADER',
         'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
-        OPENAI_OAUTH_PROVIDER_ENV_KEY,
-        OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
       ].some((key) => typeof env[key] === 'string' && env[key]!.trim().length > 0)
     } catch {
       return false
-    }
-  }
-
-  private shouldMarkManagedOAuth(providerId?: string | null): boolean {
-    if (providerId === null) {
-      return true
-    }
-    if (typeof providerId === 'string') {
-      return false
-    }
-
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
-    const settingsPath = path.join(configDir, 'dreamcoder', 'settings.json')
-    try {
-      const raw = fs.readFileSync(settingsPath, 'utf-8')
-      const parsed = JSON.parse(raw) as { env?: Record<string, string> }
-      const env = parsed.env ?? {}
-      if (env[OPENAI_OAUTH_PROVIDER_ENV_KEY] === '1') {
-        return false
-      }
-      const hasProviderEnv = [
-        'ANTHROPIC_API_KEY',
-        'ANTHROPIC_AUTH_TOKEN',
-        'ANTHROPIC_BASE_URL',
-      ].some(
-        (key) =>
-          typeof env[key] === 'string' && env[key]!.trim().length > 0,
-      )
-      return !hasProviderEnv
-    } catch {
-      return true
     }
   }
 
@@ -1114,7 +1066,7 @@ export class ConversationService {
 
   private clearStaleLock(sessionId: string): boolean {
     const lockDir = path.join(
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
+      getClaudeConfigHomeDir(),
       '.lock',
     )
     const lockFile = path.join(lockDir, sessionId)
@@ -1384,7 +1336,7 @@ export class ConversationService {
     }
 
     const uploadDir = path.join(
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
+      getClaudeConfigHomeDir(),
       'uploads',
       sessionId,
     )

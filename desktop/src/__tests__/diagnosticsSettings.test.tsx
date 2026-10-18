@@ -36,7 +36,6 @@ vi.mock('../stores/providerStore', () => ({
     fetchPresets: vi.fn(),
     deleteProvider: vi.fn(),
     activateProvider: vi.fn(),
-    activateOfficial: vi.fn(),
     testProvider: vi.fn(),
     createProvider: vi.fn(),
     updateProvider: vi.fn(),
@@ -49,10 +48,6 @@ vi.mock('../api/providers', () => ({
     getSettings: vi.fn().mockResolvedValue({}),
     updateSettings: vi.fn().mockResolvedValue({}),
   },
-}))
-
-vi.mock('../components/settings/ClaudeOfficialLogin', () => ({
-  ClaudeOfficialLogin: () => <div />,
 }))
 
 vi.mock('../stores/agentStore', () => ({
@@ -135,7 +130,7 @@ describe('Settings > Diagnostics tab', () => {
     })
 
     useSettingsStore.setState({ locale: 'en' })
-    useUIStore.setState({ pendingSettingsTab: null, toasts: [] })
+    useUIStore.setState({ settingsTab: 'providers', toasts: [] })
   })
 
   it('shows diagnostics status, actions, and recent events', async () => {

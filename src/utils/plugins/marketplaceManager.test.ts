@@ -17,9 +17,9 @@ describe('marketplace cache deletion safety', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'marketplace-cache-safe-'))
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalPluginCacheDir = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
-    process.env.CLAUDE_CONFIG_DIR = path.join(tempDir, '.claude')
+    process.env.DREAMCODER_CONFIG_DIR = path.join(tempDir, '.claude')
     delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
     clearMarketplacesCache()
   })
@@ -27,9 +27,9 @@ describe('marketplace cache deletion safety', () => {
   afterEach(async () => {
     clearMarketplacesCache()
     if (originalConfigDir === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+      process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
     }
     if (originalPluginCacheDir === undefined) {
       delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
@@ -53,7 +53,7 @@ describe('marketplace cache deletion safety', () => {
     await fs.writeFile(sentinel, 'keep', 'utf-8')
 
     await fs.writeFile(
-      path.join(process.env.CLAUDE_CONFIG_DIR!, 'plugins', 'known_marketplaces.json'),
+      path.join(process.env.DREAMCODER_CONFIG_DIR!, 'plugins', 'known_marketplaces.json'),
       JSON.stringify({
         'safe-marketplace': {
           source: { source: 'github', repo: 'owner/repo' },
@@ -89,7 +89,7 @@ describe('marketplace cache deletion safety', () => {
     await fs.writeFile(sentinel, 'keep', 'utf-8')
 
     await fs.writeFile(
-      path.join(process.env.CLAUDE_CONFIG_DIR!, 'plugins', 'known_marketplaces.json'),
+      path.join(process.env.DREAMCODER_CONFIG_DIR!, 'plugins', 'known_marketplaces.json'),
       JSON.stringify({
         unsafe: {
           source: { source: 'github', repo: 'owner/repo' },

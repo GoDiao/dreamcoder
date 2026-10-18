@@ -3,6 +3,7 @@ import { useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import { Button } from '../shared/Button'
+import { Check, MessageCircleQuestion } from 'lucide-react'
 
 type QuestionOption = {
   label: string
@@ -73,8 +74,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const composingRef = useRef(false)
 
-  if (questions.length === 0) return null
-  const safeActiveTab = Math.min(activeTab, questions.length - 1)
+  const safeActiveTab = Math.max(0, Math.min(activeTab, questions.length - 1))
   const activeQuestion = questions[safeActiveTab]
 
   const resultAnswers = useMemo(() => {
@@ -191,173 +191,205 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     })
   }
 
-  const allAnswered = questions.every((_, i) =>
-    Boolean(freeTexts[i]?.trim()) || (selections[i]?.length ?? 0) > 0,
-  )
+  const isAnswered = (index: number) =>
+    Boolean(freeTexts[index]?.trim()) || (selections[index]?.length ?? 0) > 0
+  const answeredCount = questions.filter((_, i) => isAnswered(i)).length
+  const allAnswered = answeredCount === questions.length
+  const isMultiQuestion = questions.length > 1
 
   if (!activeQuestion) return null
 
+  const questionLabel = (question: Question, index: number) => question.header || `Q${index + 1}`
+
+  if (submitted) {
+    const answerFor = (question: Question, index: number) => {
+      if (hasStructuredAnswers) return resultAnswers[question.question] ?? ''
+      return freeTexts[index]?.trim() || getSelectedAnswer(question, selections[index])
+    }
+    return (
+      <section
+        data-testid="ask-user-question-answered"
+        aria-label={t(terminalWithoutAnswers ? 'question.completed' : 'question.answered')}
+        className="mb-4 border-y border-[var(--color-border)] py-3 text-ui-body"
+      >
+        <div className="flex items-center gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
+          <Check size={14} aria-hidden="true" className={terminalWithoutAnswers ? '' : 'text-[var(--color-success)]'} />
+          <span className={terminalWithoutAnswers ? '' : 'text-[var(--color-success)]'}>
+            {t(terminalWithoutAnswers ? 'question.completed' : 'question.answered')}
+          </span>
+          <span className="flex-1" />
+          {isMultiQuestion && <span>{t('question.questionCount', { count: questions.length })}</span>}
+        </div>
+
+        {terminalWithoutAnswers ? (
+          <p className="mt-2 text-ui-body text-[var(--color-text-secondary)] [overflow-wrap:anywhere]">
+            {t('question.resultPrefix')}{answeredText}
+          </p>
+        ) : (
+          <dl className="mt-1">
+            {questions.map((question, index) => (
+              <div
+                key={index}
+                className="flex gap-4 border-b border-[var(--color-border)] py-1.5 text-[13px] last:border-b-0"
+              >
+                <dt className="min-w-[56px] shrink-0 text-[var(--color-text-tertiary)]">{questionLabel(question, index)}</dt>
+                <dd className="min-w-0 text-[var(--color-text-primary)] [overflow-wrap:anywhere]">{answerFor(question, index) || '—'}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        <details className="mt-2 text-[13px]">
+          <summary className="cursor-pointer text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]">
+            {t('question.viewOriginal')}
+          </summary>
+          <ul className="mt-1.5 space-y-1 text-[var(--color-text-secondary)]">
+            {questions.map((question, index) => (
+              <li key={index}>{question.question}</li>
+            ))}
+          </ul>
+        </details>
+      </section>
+    )
+  }
+
+  const activeIsMultiSelect = activeQuestion.multiSelect === true
+  const footHint = isMultiQuestion
+    ? t('question.submitHint', { total: questions.length })
+    : activeIsMultiSelect
+      ? t('question.selectedCount', { count: selections[safeActiveTab]?.length ?? 0 })
+      : ''
+
   return (
-    <div className={`mb-4 rounded-[var(--radius-lg)] border overflow-hidden ${
-      submitted
-        ? 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-low)] opacity-70'
-        : 'border-[var(--color-secondary)] bg-[var(--color-surface-container-lowest)]'
-    }`}>
-      <div className={`flex items-center gap-3 px-4 py-3 ${
-        submitted
-          ? 'bg-[var(--color-surface-container-low)]'
-          : 'bg-[var(--color-surface-container)]'
-      }`}>
-        <div className="flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] bg-[var(--color-secondary)]/10">
-          <span className="material-symbols-outlined text-[18px] text-[var(--color-secondary)]">
-            help
-          </span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {t('question.needsInput')}
-          </span>
-          {submitted && (
-            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]">
-              {t(terminalWithoutAnswers ? 'question.completed' : 'question.answered')}
-            </span>
-          )}
-        </div>
+    <section
+      data-testid="ask-user-question"
+      aria-label={t('question.needsInput')}
+      className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3.5"
+    >
+      <div className="flex items-center gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
+        <MessageCircleQuestion size={14} aria-hidden="true" />
+        <span>{t('question.needsInput')}</span>
+        <span className="flex-1" />
+        {isMultiQuestion ? (
+          <span aria-live="polite">{t('question.progress', { answered: answeredCount, total: questions.length })}</span>
+        ) : activeIsMultiSelect ? (
+          <span>{t('question.multiSelectHint')}</span>
+        ) : null}
       </div>
 
-      {questions.length > 1 && (
-        <div className="flex px-4 border-b border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)] overflow-x-auto">
-          {questions.map((q, i) => {
-            const isActive = safeActiveTab === i
-            const isAnswered = Boolean(freeTexts[i]?.trim()) || (selections[i]?.length ?? 0) > 0
-            const tabLabel = q.header || `Q${i + 1}`
+      {isMultiQuestion && (
+        <nav aria-label={t('question.steps')} className="mt-3 flex flex-wrap gap-1.5">
+          {questions.map((question, index) => {
+            const current = safeActiveTab === index
             return (
               <button
-                key={i}
-                onClick={() => setActiveTab(i)}
-                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'text-[var(--color-secondary)]'
-                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                key={index}
+                type="button"
+                aria-current={current ? 'step' : undefined}
+                onClick={() => setActiveTab(index)}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-ui-aux transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+                  current
+                    ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
+                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
                 }`}
               >
-                {isAnswered && (
-                  <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]">check_circle</span>
-                )}
-                {tabLabel}
-                {isActive && (
-                  <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-[var(--color-secondary)] rounded-t" />
-                )}
+                {isAnswered(index) && <Check size={12} aria-hidden="true" className="text-[var(--color-success)]" />}
+                <span>{index + 1} · {questionLabel(question, index)}</span>
+              </button>
+            )
+          })}
+        </nav>
+      )}
+
+      <h3 className="mb-2 mt-3 text-[15px] font-medium leading-snug text-[var(--color-text-primary)]">
+        {activeQuestion.question}
+        {isMultiQuestion && activeIsMultiSelect && (
+          <span className="ml-2 text-ui-aux font-normal text-[var(--color-text-tertiary)]">{t('question.multiSelectHint')}</span>
+        )}
+      </h3>
+
+      {activeQuestion.options && activeQuestion.options.length > 0 && (
+        <div className="space-y-0.5" role="group" aria-label={activeQuestion.question}>
+          {activeQuestion.options.map((opt, optIndex) => {
+            const isSelected = selections[safeActiveTab]?.includes(opt.label) ?? false
+            return (
+              <button
+                key={optIndex}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => handleSelect(safeActiveTab, opt.label)}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+                  isSelected ? 'bg-[var(--color-surface-selected)]' : 'hover:bg-[var(--color-surface-hover)]'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`mt-[3px] flex h-[15px] w-[15px] shrink-0 items-center justify-center border transition-colors ${
+                    activeIsMultiSelect ? 'rounded-[4px]' : 'rounded-full'
+                  } ${
+                    isSelected
+                      ? 'border-[var(--color-text-primary)] bg-[var(--color-text-primary)] text-[var(--color-surface)]'
+                      : 'border-[var(--color-outline)]'
+                  }`}
+                >
+                  {isSelected && (activeIsMultiSelect
+                    ? <Check size={11} strokeWidth={3} />
+                    : <span className="h-[5px] w-[5px] rounded-full bg-[var(--color-surface)]" />)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-ui-body text-[var(--color-text-primary)]">{opt.label}</span>
+                  {opt.description && (
+                    <span className="mt-0.5 block text-ui-aux text-[var(--color-text-tertiary)]">{opt.description}</span>
+                  )}
+                </span>
               </button>
             )
           })}
         </div>
       )}
 
-      <div className="px-4 py-3">
-        <p className="text-sm font-medium text-[var(--color-text-primary)] mb-3">
-          {activeQuestion.question}
-        </p>
-
-        {activeQuestion.options && activeQuestion.options.length > 0 && (
-          <div className="space-y-2 mb-3">
-            {activeQuestion.options.map((opt, optIndex) => {
-              const isSelected = selections[safeActiveTab]?.includes(opt.label) ?? false
-              const isMultiSelect = activeQuestion.multiSelect === true
-              return (
-                <button
-                  key={optIndex}
-                  onClick={() => handleSelect(safeActiveTab, opt.label)}
-                  disabled={submitted}
-                  className={`w-full text-left px-4 py-3 rounded-[var(--radius-md)] border transition-all duration-150 cursor-pointer ${
-                    isSelected
-                      ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/8 ring-1 ring-[var(--color-secondary)]/30'
-                      : 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface)] hover:border-[var(--color-outline-variant)] hover:bg-[var(--color-surface-container-low)]'
-                  } ${submitted ? 'cursor-default' : ''}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]'
-                        : 'border-[var(--color-outline)]'
-                    } ${isMultiSelect ? 'rounded-[var(--radius-xs)]' : 'rounded-full'}`}>
-                      {isSelected && (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-sm font-medium ${
-                        isSelected
-                          ? 'text-[var(--color-secondary)]'
-                          : 'text-[var(--color-text-primary)]'
-                      }`}>
-                        {opt.label}
-                      </span>
-                      {opt.description && (
-                        <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                          {opt.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {!submitted && (
-          <div>
-            <label className="text-xs text-[var(--color-text-tertiary)] mb-1.5 block">
-              {t('question.customResponse')}
-            </label>
-            <textarea
-              value={freeTexts[safeActiveTab] ?? ''}
-              onChange={(e) => handleFreeTextChange(safeActiveTab, e.target.value)}
-              onCompositionStart={() => { composingRef.current = true }}
-              onCompositionEnd={() => { composingRef.current = false }}
-              onKeyDown={(e) => {
-                if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && allAnswered) {
-                  e.preventDefault()
-                  handleSubmit()
-                }
-              }}
-              placeholder={t('question.typePlaceholder')}
-              rows={3}
-              wrap="soft"
-              className="max-h-48 min-h-[84px] w-full resize-y rounded-[var(--radius-md)] border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface)] px-3 py-2 text-sm leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-secondary)]/30"
-            />
-          </div>
-        )}
-
-        {submitted && (
-          <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-            <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]">check_circle</span>
-            <span>
-              {t(terminalWithoutAnswers ? 'question.resultPrefix' : 'question.answeredPrefix')}<strong>{answeredText}</strong>
-            </span>
-          </div>
-        )}
-      </div>
-
-      {!submitted && (
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)]">
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!allAnswered || !pendingRequest}
-            onClick={handleSubmit}
-            icon={
-              <span className="material-symbols-outlined text-[14px]">send</span>
+      <label className="mt-3 block text-ui-aux text-[var(--color-text-tertiary)]">
+        {t('question.customResponse')}
+        <textarea
+          value={freeTexts[safeActiveTab] ?? ''}
+          onChange={(e) => handleFreeTextChange(safeActiveTab, e.target.value)}
+          onCompositionStart={() => { composingRef.current = true }}
+          onCompositionEnd={() => { composingRef.current = false }}
+          onKeyDown={(e) => {
+            if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && allAnswered) {
+              e.preventDefault()
+              handleSubmit()
             }
-          >
-            {t('question.submit')}
+          }}
+          placeholder={t('question.typePlaceholder')}
+          rows={2}
+          wrap="soft"
+          className="mt-1.5 block max-h-48 min-h-[40px] w-full resize-y rounded-lg border border-[var(--color-border)] bg-transparent px-2.5 py-2 text-ui-body leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:outline-none"
+        />
+      </label>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
+        <span className="min-w-0 flex-1">{footHint}</span>
+        {isMultiQuestion && safeActiveTab > 0 && (
+          <Button variant="ghost" size="xs" onClick={() => setActiveTab(safeActiveTab - 1)}>
+            {t('question.prev')}
           </Button>
-        </div>
-      )}
-    </div>
+        )}
+        {isMultiQuestion && safeActiveTab < questions.length - 1 && (
+          <Button variant="ghost" size="xs" onClick={() => setActiveTab(safeActiveTab + 1)}>
+            {t('question.next')}
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          size="xs"
+          disabled={!allAnswered || !pendingRequest}
+          onClick={handleSubmit}
+        >
+          {t('question.submit')}
+        </Button>
+      </div>
+    </section>
   )
 }

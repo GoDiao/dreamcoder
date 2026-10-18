@@ -9,6 +9,9 @@ import {
   getDesktopCliCommandName,
 } from '../services/desktopCliLauncherService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 const isWindows = process.platform === 'win32'
 const unixOnly = isWindows ? it.skip : it
 
@@ -17,7 +20,7 @@ const ORIGINAL_USERPROFILE = process.env.USERPROFILE
 const ORIGINAL_SHELL = process.env.SHELL
 const ORIGINAL_PATH = process.env.PATH
 const ORIGINAL_CLAUDE_CLI_PATH = process.env.CLAUDE_CLI_PATH
-const ORIGINAL_CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
+const ORIGINAL_CLAUDE_CONFIG_DIR = process.env.DREAMCODER_CONFIG_DIR
 
 describe('ensureDesktopCliLauncherInstalled', () => {
   let tempHome = ''
@@ -30,7 +33,7 @@ describe('ensureDesktopCliLauncherInstalled', () => {
     process.env.USERPROFILE = tempHome
     process.env.SHELL = '/bin/zsh'
     process.env.PATH = ''
-    delete process.env.CLAUDE_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   afterEach(async () => {
@@ -65,9 +68,9 @@ describe('ensureDesktopCliLauncherInstalled', () => {
     }
 
     if (ORIGINAL_CLAUDE_CONFIG_DIR === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
+      delete process.env.DREAMCODER_CONFIG_DIR
     } else {
-      process.env.CLAUDE_CONFIG_DIR = ORIGINAL_CLAUDE_CONFIG_DIR
+      process.env.DREAMCODER_CONFIG_DIR = ORIGINAL_CLAUDE_CONFIG_DIR
     }
 
     await rm(tempHome, { recursive: true, force: true })
@@ -107,21 +110,21 @@ describe('ensureDesktopCliLauncherInstalled', () => {
     await writeFile(sourcePath, '#!/bin/sh\necho desktop-sidecar\n', 'utf8')
     await chmod(sourcePath, 0o755)
     process.env.CLAUDE_CLI_PATH = sourcePath
-    process.env.CLAUDE_CONFIG_DIR = portableDir
+    process.env.DREAMCODER_CONFIG_DIR = portableDir
 
     await ensureDesktopCliLauncherInstalled()
 
     const launcher = await readFile(join(tempHome, '.local', 'bin', 'dreamcoder'), 'utf8')
-    expect(launcher).toContain(`export CLAUDE_CONFIG_DIR='${portableDir}'`)
+    expect(launcher).toContain(`export DREAMCODER_CONFIG_DIR='${portableDir}'`)
   })
 
   it('uses a Windows cmd launcher so portable env can be injected', () => {
     expect(getDesktopCliCommandName('win32')).toBe('dreamcoder.cmd')
 
-    process.env.CLAUDE_CONFIG_DIR = 'C:\\Portable\\ClaudeConfig'
+    process.env.DREAMCODER_CONFIG_DIR = 'C:\\Portable\\ClaudeConfig'
     const wrapper = buildWindowsLauncherWrapper('C:\\Apps\\dreamcoder\\dreamcoder-sidecar.exe')
 
-    expect(wrapper).toContain('set "CLAUDE_CONFIG_DIR=C:\\Portable\\ClaudeConfig"')
+    expect(wrapper).toContain('set "DREAMCODER_CONFIG_DIR=C:\\Portable\\ClaudeConfig"')
     expect(wrapper).toContain(
       '"%SIDECAR%" cli --app-root "%APP_ROOT%" %*',
     )

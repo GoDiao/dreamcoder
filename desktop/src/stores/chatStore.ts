@@ -695,6 +695,15 @@ async function fetchAndMapSessionHistory(sessionId: string) {
   }
 }
 
+function runtimeConfigMessage(selection: RuntimeSelection) {
+  return {
+    type: 'set_runtime_config' as const,
+    providerId: selection.providerId,
+    modelId: selection.modelId,
+    ...(selection.effort ? { effort: selection.effort } : {}),
+  }
+}
+
 export const useChatStore = create<ChatStore>((set, get) => ({
   sessions: {},
 
@@ -730,7 +739,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     const runtimeSelection = useSessionRuntimeStore.getState().selections[sessionId]
     if (runtimeSelection) {
-      wsManager.send(sessionId, { type: 'set_runtime_config', ...runtimeSelection })
+      wsManager.send(sessionId, runtimeConfigMessage(runtimeSelection))
     }
     if (!sessionId.startsWith('__') && !useTeamStore.getState().getMemberBySessionId(sessionId)) {
       wsManager.send(sessionId, { type: 'prewarm_session' })
@@ -906,10 +915,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   setSessionRuntime: (sessionId, selection) => {
-    wsManager.send(sessionId, {
-      type: 'set_runtime_config',
-      ...selection,
-    })
+    wsManager.send(sessionId, runtimeConfigMessage(selection))
   },
 
   setSessionPermissionMode: (sessionId, mode) => {

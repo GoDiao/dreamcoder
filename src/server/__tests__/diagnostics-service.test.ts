@@ -12,14 +12,14 @@ let originalConfigDir: string | undefined
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-diagnostics-test-'))
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
 })
 
 afterEach(async () => {
   diagnosticsService.restoreConsoleCaptureForTests()
-  if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-  else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+  if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   await fs.rm(tmpDir, { recursive: true, force: true })
 })
 
@@ -141,7 +141,7 @@ describe('DiagnosticsService', () => {
     const serverArgs = ['bun', 'run', 'src/server/index.ts', '--host', '127.0.0.1', '--port', String(port)]
     const env = {
       ...process.env,
-      CLAUDE_CONFIG_DIR: tmpDir,
+      DREAMCODER_CONFIG_DIR: tmpDir,
     }
     const server = Bun.spawn(serverArgs, {
       cwd: process.cwd(),

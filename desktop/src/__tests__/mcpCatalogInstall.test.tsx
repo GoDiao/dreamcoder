@@ -92,7 +92,7 @@ function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
 async function openReview() {
   const result = render(<McpSettings />)
   await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
-  fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Install Filesystem' }))
   expect(screen.getByRole('heading', { name: 'Review Filesystem installation' })).toBeInTheDocument()
   return result
@@ -195,7 +195,7 @@ describe('MCP catalog installation flow', () => {
         { scope, config: expectedConfig },
         scope === 'user' ? undefined : newProject,
       ))
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
       expect(screen.getByRole('button', { name: 'Open filesystem' })).toBeInTheDocument()
       expect(useMcpStore.getState().servers).toEqual([
         record({ scope, projectPath: scope === 'user' ? undefined : newProject }),
@@ -259,7 +259,7 @@ describe('MCP catalog installation flow', () => {
       installedServers = [record()]
       resolveCreate({ server: record() })
     })
-    expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true')
     expect(mockedMcpApi.create).toHaveBeenCalledTimes(1)
   })
 
@@ -283,7 +283,7 @@ describe('MCP catalog installation flow', () => {
     expect(confirmButton()).toBeEnabled()
     fireEvent.click(confirmButton())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
     expect(mockedMcpApi.create).toHaveBeenCalledTimes(2)
     expect(mockedMcpApi.create.mock.calls[1]).toEqual(mockedMcpApi.create.mock.calls[0])
   })
@@ -313,7 +313,7 @@ describe('MCP catalog installation flow', () => {
     expect(confirmButton()).toBeEnabled()
     fireEvent.click(confirmButton())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
     expect(mockedMcpApi.create).toHaveBeenLastCalledWith('filesystem-personal', { scope: 'user', config: expectedConfig }, undefined)
     expect(useMcpStore.getState().servers.map((server) => server.name)).toEqual(['filesystem', 'filesystem-personal'])
   })
@@ -328,7 +328,7 @@ describe('MCP catalog installation flow', () => {
     expect(confirmButton()).toBeEnabled()
     fireEvent.click(confirmButton())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
     expect(mockedMcpApi.create).toHaveBeenCalledTimes(1)
     expect(useMcpStore.getState().servers.map(({ scope, projectPath }) => ({ scope, projectPath }))).toEqual([
       { scope: 'local', projectPath: currentProject },
@@ -414,7 +414,7 @@ describe('MCP catalog installation flow', () => {
     expect(confirmButton()).toBeEnabled()
     fireEvent.click(confirmButton())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
     expect(mockedMcpApi.create).toHaveBeenCalledExactlyOnceWith(entry.id, { scope: 'project', config: expectedConfig }, newProject)
   })
 
@@ -459,7 +459,7 @@ describe('MCP catalog installation flow', () => {
     })
     fireEvent.click(confirmButton())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'true'))
     expect(screen.queryByRole('button', { name: 'Confirm installation' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open filesystem' })).toBeInTheDocument()
     expect(useMcpStore.getState().servers).toEqual([record({ projectPath: undefined })])

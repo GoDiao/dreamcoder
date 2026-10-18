@@ -1,5 +1,29 @@
-import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  Bot,
+  Brain,
+  ChartNoAxesColumn,
+  Check,
+  FilePenLine,
+  Info,
+  Monitor,
+  Network,
+  NotebookPen,
+  Plug,
+  Puzzle,
+  ScrollText,
+  SettingsIcon,
+  ShieldCheck,
+  ShieldOff,
+  Smartphone,
+  TerminalIcon,
+  Wrench,
+  X,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react'
+import { useTranslation, type TranslationKey } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { PermissionMode } from '../types/settings'
 import { usePluginStore } from '../stores/pluginStore'
@@ -18,18 +42,132 @@ import { ProviderSettings } from '../components/settings/ProviderSettings'
 import { AgentsSettings } from '../components/settings/AgentsSettings'
 import { SkillSettings } from '../components/settings/SkillSettings'
 import { AboutSettings } from '../components/settings/AboutSettings'
+import { SearchField } from '../components/shared/SearchField'
+import { moveRovingFocus } from '../lib/rovingFocus'
+import { useEscapeLayer } from '../components/shared/Modal'
 
-export function Settings() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('providers')
-  const [tabContentVisible, setTabContentVisible] = useState(false)
-  const pendingSettingsTab = useUIStore((s) => s.pendingSettingsTab)
+type SettingsNavGroup = {
+  titleKey: TranslationKey | null
+  items: Array<{ tab: SettingsTab; Icon: LucideIcon }>
+}
+
+const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
+  {
+    titleKey: 'settings.group.settings',
+    items: [
+      { tab: 'providers', Icon: Network },
+      { tab: 'general', Icon: SettingsIcon },
+      { tab: 'permissions', Icon: ShieldCheck },
+      { tab: 'activity', Icon: ChartNoAxesColumn },
+    ],
+  },
+  {
+    titleKey: 'settings.group.local',
+    items: [
+      { tab: 'terminal', Icon: TerminalIcon },
+      { tab: 'h5Access', Icon: Smartphone },
+      { tab: 'computerUse', Icon: Monitor },
+      { tab: 'diagnostics', Icon: Wrench },
+    ],
+  },
+  {
+    titleKey: 'settings.group.customize',
+    items: [
+      { tab: 'mcp', Icon: Plug },
+      { tab: 'agents', Icon: Bot },
+      { tab: 'skills', Icon: ScrollText },
+      { tab: 'memory', Icon: Brain },
+      { tab: 'plugins', Icon: Puzzle },
+    ],
+  },
+  { titleKey: null, items: [{ tab: 'about', Icon: Info }] },
+]
+
+const MODAL_EXIT_MS = 180
+
+/** Settings window over the current page, driven by uiStore.settingsOpen / settingsTab. */
+export function SettingsModal() {
+  const settingsOpen = useUIStore((s) => s.settingsOpen)
+  const closeSettings = useUIStore((s) => s.closeSettings)
+  const [mounted, setMounted] = useState(settingsOpen)
+  const [visible, setVisible] = useState(false)
+  const panelRef = useRef<HTMLElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   const t = useTranslation()
 
+  useEscapeLayer(settingsOpen, closeSettings)
+
+  // Remember the opener synchronously, before the page behind the window turns inert.
+  useEffect(() => useUIStore.subscribe((state, prev) => {
+    if (!state.settingsOpen || prev.settingsOpen) return
+    const active = document.activeElement
+    returnFocusRef.current = active instanceof HTMLElement && active !== document.body ? active : null
+  }), [])
+
   useEffect(() => {
-    if (!pendingSettingsTab) return
-    setActiveTab(pendingSettingsTab)
-    useUIStore.getState().setPendingSettingsTab(null)
-  }, [pendingSettingsTab])
+    if (settingsOpen) {
+      setMounted(true)
+      const frame = window.requestAnimationFrame(() => setVisible(true))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    setVisible(false)
+    const opener = returnFocusRef.current
+    returnFocusRef.current = null
+    // The opener can unmount while the window is open (e.g. a menu item); fall back to the composer.
+    if (opener?.isConnected) opener.focus()
+    else if (opener) document.querySelector<HTMLElement>('textarea:not([disabled])')?.focus()
+    const timer = window.setTimeout(() => setMounted(false), MODAL_EXIT_MS)
+    return () => window.clearTimeout(timer)
+  }, [settingsOpen])
+
+  useEffect(() => {
+    if (settingsOpen && mounted) panelRef.current?.focus()
+  }, [mounted, settingsOpen])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <div
+      data-testid="settings-overlay"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-8 max-[700px]:p-2.5${settingsOpen ? '' : ' pointer-events-none'}`}
+    >
+      <div
+        aria-hidden="true"
+        className="motion-modal-backdrop absolute inset-0 bg-[var(--color-overlay-scrim)]"
+        data-state={visible ? 'open' : 'closed'}
+        onClick={closeSettings}
+      />
+      <section
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings.title')}
+        tabIndex={-1}
+        data-state={visible ? 'open' : 'closed'}
+        className="motion-modal-panel relative flex h-[min(700px,100%)] w-[min(1000px,100%)] overflow-hidden rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-dropdown)] outline-none"
+      >
+        <button
+          type="button"
+          onClick={closeSettings}
+          aria-label={t('settings.close')}
+          title={t('settings.close')}
+          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+        >
+          <X size={16} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+        <Settings />
+      </section>
+    </div>,
+    document.body,
+  )
+}
+
+export function Settings() {
+  const activeTab = useUIStore((s) => s.settingsTab)
+  const setActiveTab = useUIStore((s) => s.setSettingsTab)
+  const [navQuery, setNavQuery] = useState('')
+  const [tabContentVisible, setTabContentVisible] = useState(false)
+  const t = useTranslation()
 
   useEffect(() => {
     setTabContentVisible(false)
@@ -37,108 +175,154 @@ export function Settings() {
     return () => window.cancelAnimationFrame(frame)
   }, [activeTab])
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--color-surface)]">
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[180px] border-r border-[var(--color-border)] py-3 flex-shrink-0 flex flex-col">
-          <div className="flex-1">
-            <TabButton icon="dns" label={t('settings.tab.providers')} active={activeTab === 'providers'} onClick={() => setActiveTab('providers')} />
-            <TabButton icon="shield" label={t('settings.tab.permissions')} active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} />
-            <TabButton icon="tune" label={t('settings.tab.general')} active={activeTab === 'general'} onClick={() => setActiveTab('general')} />
-            <TabButton icon="qr_code_2" label={t('settings.tab.h5Access')} active={activeTab === 'h5Access'} onClick={() => setActiveTab('h5Access')} />
-            <TabButton icon="terminal" label={t('settings.tab.terminal')} active={activeTab === 'terminal'} onClick={() => setActiveTab('terminal')} />
-            <TabButton icon="dns" label={t('settings.tab.mcp')} active={activeTab === 'mcp'} onClick={() => setActiveTab('mcp')} />
-            <TabButton icon="smart_toy" label={t('settings.tab.agents')} active={activeTab === 'agents'} onClick={() => setActiveTab('agents')} />
-            <TabButton icon="auto_awesome" label={t('settings.tab.skills')} active={activeTab === 'skills'} onClick={() => setActiveTab('skills')} />
-            <TabButton icon="history_edu" label={t('settings.tab.memory')} active={activeTab === 'memory'} onClick={() => setActiveTab('memory')} />
-            <TabButton icon="extension" label={t('settings.tab.plugins')} active={activeTab === 'plugins'} onClick={() => setActiveTab('plugins')} />
-            <TabButton icon="mouse" label={t('settings.tab.computerUse')} active={activeTab === 'computerUse'} onClick={() => setActiveTab('computerUse')} />
-            <TabButton icon="monitoring" label={t('settings.tab.activity')} active={activeTab === 'activity'} onClick={() => setActiveTab('activity')} />
-            <TabButton icon="monitor_heart" label={t('settings.tab.diagnostics')} active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} />
-          </div>
-          <div className="border-t border-[var(--color-border)]/40 pt-1">
-            <TabButton icon="info" label={t('settings.tab.about')} active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
-          </div>
-        </div>
+  const query = navQuery.trim().toLowerCase()
+  const visibleGroups = useMemo(
+    () => SETTINGS_NAV_GROUPS
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(({ tab }) => !query || t(`settings.tab.${tab}` as const).toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.items.length > 0),
+    [query, t],
+  )
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          <div className={`motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
-            {activeTab === 'providers' && <ProviderSettings />}
-            {activeTab === 'permissions' && <PermissionSettings />}
-            {activeTab === 'activity' && <ActivitySettings />}
-            {activeTab === 'general' && <GeneralSettings />}
-            {activeTab === 'h5Access' && <H5AccessSettings />}
-            {activeTab === 'terminal' && <TerminalSettings showPreferences />}
-            {activeTab === 'mcp' && <McpSettings />}
-            {activeTab === 'agents' && <AgentsSettings />}
-            {activeTab === 'skills' && <SkillSettings />}
-            {activeTab === 'memory' && <MemorySettings />}
-            {activeTab === 'plugins' && <PluginSettings />}
-            {activeTab === 'computerUse' && <ComputerUseSettings />}
-            {activeTab === 'diagnostics' && <DiagnosticsSettings />}
-            {activeTab === 'about' && <AboutSettings />}
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 bg-[var(--color-surface)] max-[700px]:flex-col">
+      <nav
+        aria-label={t('settings.navLabel')}
+        className="flex w-[196px] flex-shrink-0 flex-col gap-px overflow-y-auto overscroll-contain border-r border-[var(--color-border)] bg-[var(--color-surface-sidebar)] px-2.5 py-3 max-[700px]:max-h-[150px] max-[700px]:w-auto max-[700px]:flex-row max-[700px]:flex-wrap max-[700px]:border-b max-[700px]:border-r-0"
+      >
+        <SearchField
+          value={navQuery}
+          onChange={setNavQuery}
+          placeholder={t('settings.navSearch')}
+          aria-label={t('settings.navSearch')}
+          className="mb-1.5 h-[30px] flex-shrink-0 max-[700px]:hidden"
+        />
+        {visibleGroups.map((group, index) => (
+          <div key={group.titleKey ?? `group-${index}`} className="contents">
+            {group.titleKey ? (
+              <span className="px-2.5 pb-1 pt-3 text-[11px] text-[var(--color-text-tertiary)] max-[700px]:hidden">
+                {t(group.titleKey)}
+              </span>
+            ) : (
+              <span aria-hidden="true" className="h-3 flex-shrink-0 max-[700px]:hidden" />
+            )}
+            {group.items.map(({ tab, Icon }) => (
+              <NavButton
+                key={tab}
+                Icon={Icon}
+                label={t(`settings.tab.${tab}` as const)}
+                active={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+              />
+            ))}
           </div>
+        ))}
+        {visibleGroups.length === 0 ? (
+          <p className="px-2.5 py-2 text-xs text-[var(--color-text-tertiary)]">{t('settings.navNoResults')}</p>
+        ) : null}
+      </nav>
+
+      <div
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-10 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
+      >
+        <div className={`max-w-[760px] motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
+          {activeTab === 'providers' && <ProviderSettings />}
+          {activeTab === 'permissions' && <PermissionSettings />}
+          {activeTab === 'activity' && <ActivitySettings />}
+          {activeTab === 'general' && <GeneralSettings />}
+          {activeTab === 'h5Access' && <H5AccessSettings />}
+          {activeTab === 'terminal' && <TerminalSettings showPreferences />}
+          {activeTab === 'mcp' && <McpSettings />}
+          {activeTab === 'agents' && <AgentsSettings />}
+          {activeTab === 'skills' && <SkillSettings />}
+          {activeTab === 'memory' && <MemorySettings />}
+          {activeTab === 'plugins' && <PluginSettings />}
+          {activeTab === 'computerUse' && <ComputerUseSettings />}
+          {activeTab === 'diagnostics' && <DiagnosticsSettings />}
+          {activeTab === 'about' && <AboutSettings />}
         </div>
       </div>
     </div>
   )
 }
 
-function TabButton({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
+function NavButton({ Icon, label, active, onClick }: { Icon: LucideIcon; label: string; active: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors border-l-2 ${
+      aria-current={active ? 'page' : undefined}
+      className={`flex w-full flex-shrink-0 items-center gap-[9px] rounded-[8px] px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] max-[700px]:w-auto ${
         active
-          ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)] font-medium border-l-[var(--color-brand)]'
-          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] border-l-transparent'
+          ? 'bg-[var(--color-surface-selected)] font-medium text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
       }`}
     >
-      <span className="material-symbols-outlined text-[18px]">{icon}</span>
-      {label}
+      <Icon
+        size={15}
+        strokeWidth={1.7}
+        aria-hidden="true"
+        className={`flex-shrink-0 ${active ? '' : 'text-[var(--color-text-secondary)]'}`}
+      />
+      <span className="whitespace-nowrap">{label}</span>
     </button>
   )
 }
+
+const PERMISSION_MODES: Array<{ mode: PermissionMode; Icon: LucideIcon; descKey: TranslationKey }> = [
+  { mode: 'default', Icon: ShieldCheck, descKey: 'permMode.askPermDesc' },
+  { mode: 'acceptEdits', Icon: FilePenLine, descKey: 'permMode.autoAcceptDesc' },
+  { mode: 'plan', Icon: NotebookPen, descKey: 'permMode.planModeDesc' },
+  { mode: 'bypassPermissions', Icon: Zap, descKey: 'permMode.bypassDesc' },
+  { mode: 'dontAsk', Icon: ShieldOff, descKey: 'settings.permissions.dontAskDesc' },
+]
 
 function PermissionSettings() {
   const { permissionMode, setPermissionMode } = useSettingsStore()
   const t = useTranslation()
 
-  const MODES: Array<{ mode: PermissionMode; icon: string; label: string; desc: string }> = [
-    { mode: 'default', icon: 'verified_user', label: t('settings.permissions.default'), desc: t('settings.permissions.defaultDesc') },
-    { mode: 'acceptEdits', icon: 'edit_note', label: t('settings.permissions.acceptEdits'), desc: t('settings.permissions.acceptEditsDesc') },
-    { mode: 'plan', icon: 'architecture', label: t('settings.permissions.plan'), desc: t('settings.permissions.planDesc') },
-    { mode: 'bypassPermissions', icon: 'bolt', label: t('settings.permissions.bypass'), desc: t('settings.permissions.bypassDesc') },
-  ]
-
   return (
-    <div className="max-w-xl">
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.permissions.title')}</h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-4">{t('settings.permissions.description')}</p>
+    <div>
+      <h2 className="mb-1.5 text-ui-title font-semibold text-[var(--color-text-primary)]">{t('settings.permissions.title')}</h2>
+      <p className="mb-6 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{t('settings.permissions.description')}</p>
 
-      <div className="flex flex-col gap-2">
-        {MODES.map(({ mode, icon, label, desc }) => {
+      <div
+        role="radiogroup"
+        aria-label={t('settings.permissions.title')}
+        className="flex flex-col"
+        onKeyDown={(event) => {
+          const mode = moveRovingFocus(event, '[role="radio"]')?.dataset.value as PermissionMode | undefined
+          if (mode && mode !== permissionMode) setPermissionMode(mode)
+        }}
+      >
+        {PERMISSION_MODES.map(({ mode, Icon, descKey }, index) => {
           const isSelected = permissionMode === mode
+          const tabbable = isSelected || (index === 0 && !PERMISSION_MODES.some((entry) => entry.mode === permissionMode))
           return (
             <button
               key={mode}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              tabIndex={tabbable ? 0 : -1}
+              data-value={mode}
               onClick={() => setPermissionMode(mode)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+              className={`flex w-full items-center gap-3.5 border-b border-[var(--color-border-separator)] px-3 py-4 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
                 isSelected
-                  ? 'border-[var(--color-brand)] bg-[var(--color-surface-container)] shadow-[var(--shadow-focus-ring)]'
-                  : 'border-[var(--color-border)] hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'rounded-[8px] bg-[var(--color-surface-hover)]'
+                  : 'hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              <span className="material-symbols-outlined text-[20px] text-[var(--color-text-secondary)]">{icon}</span>
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-[var(--color-text-primary)]">{label}</div>
-                <div className="text-xs text-[var(--color-text-tertiary)]">{desc}</div>
-              </div>
-              {isSelected && (
-                <span className="material-symbols-outlined text-[18px] text-[var(--color-brand)]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  check_circle
-                </span>
-              )}
+              <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="flex-shrink-0 text-[var(--color-text-secondary)]" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-[var(--color-text-primary)]">{t(`permMode.label.${mode}` as const)}</span>
+                <span className="mt-px block text-xs leading-[1.5] text-[var(--color-text-secondary)]">{t(descKey)}</span>
+              </span>
+              <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-brand)]">
+                {isSelected ? <Check size={16} strokeWidth={2} aria-hidden="true" /> : null}
+              </span>
             </button>
           )
         })}
@@ -146,8 +330,6 @@ function PermissionSettings() {
     </div>
   )
 }
-
-
 
 function PluginSettings() {
   const selectedPlugin = usePluginStore((s) => s.selectedPlugin)

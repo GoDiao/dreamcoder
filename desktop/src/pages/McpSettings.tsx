@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Settings2 } from 'lucide-react'
 import { Button } from '../components/shared/Button'
+import { Switch } from '../components/shared/Switch'
+import { SegmentedControl } from '../components/shared/SegmentedControl'
+import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
+import { SettingsSection, SettingsSummary } from '../components/settings/SettingsSummary'
 import { Input } from '../components/shared/Input'
 import { Modal } from '../components/shared/Modal'
 import { useTranslation } from '../i18n'
@@ -256,7 +261,7 @@ function scopeLabel(server: McpServerRecord, t: ReturnType<typeof useTranslation
 
 function StatusBadge({ server }: { server: McpServerRecord }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${STATUS_TONE[server.status]}`}>
+    <span className={`inline-flex flex-shrink-0 items-center rounded-full border px-1.5 py-px text-[11px] font-medium ${STATUS_TONE[server.status]}`}>
       {server.statusLabel}
     </span>
   )
@@ -268,35 +273,6 @@ function getServerIdentityKey(server: Pick<McpServerRecord, 'name' | 'scope' | '
   }
 
   return `${server.scope}:${server.name}`
-}
-
-function ToggleSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean
-  disabled?: boolean
-  onChange: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onChange}
-      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-        checked ? 'bg-[var(--color-switch-checked-bg)]' : 'bg-[var(--color-border)]'
-      } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span
-        className={`inline-block h-6 w-6 transform rounded-full bg-[var(--color-switch-thumb)] shadow-sm transition-transform ${
-          checked ? 'translate-x-7' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  )
 }
 
 function ArraySection({
@@ -360,24 +336,12 @@ function ArraySection({
   )
 }
 
-function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
-  return (
-    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-5 py-4">
-      <div className="flex items-center gap-2 text-[var(--color-text-tertiary)] mb-2">
-        <span className="material-symbols-outlined text-[18px]">{icon}</span>
-        <span className="text-xs uppercase tracking-[0.18em] font-semibold">{label}</span>
-      </div>
-      <div className="text-3xl font-semibold text-[var(--color-text-primary)]">{value}</div>
-    </div>
-  )
-}
-
 function LoadingState({ label }: { label: string }) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] text-center"
+      className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center"
     >
       <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
       <div className="text-sm font-medium text-[var(--color-text-secondary)]">{label}</div>
@@ -398,45 +362,48 @@ function ServerRow({
   onToggle: () => void
   t: ReturnType<typeof useTranslation>
 }) {
+  const details = [
+    transportLabel(server.transport, t),
+    scopeLabel(server, t),
+    serverHasProjectContext(server) ? server.projectPath : null,
+    server.summary,
+  ].filter((part): part is string => !!part)
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-6 py-5 border-t border-[var(--color-border)] first:border-t-0">
-      <div className="min-w-0">
-        <div className="flex items-center gap-3 mb-2 min-w-0">
-          <div className="text-[1.05rem] font-semibold text-[var(--color-text-primary)] truncate">{server.name}</div>
+    <div className="flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{server.name}</span>
           <StatusBadge server={server} />
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-          <span className="rounded-full bg-[var(--color-surface-hover)] px-2 py-1 font-medium text-[var(--color-text-secondary)]">
-            {transportLabel(server.transport, t)}
-          </span>
-          <span className="rounded-full bg-[var(--color-surface-hover)] px-2 py-1 font-medium text-[var(--color-text-secondary)]">
-            {scopeLabel(server, t)}
-          </span>
-          {serverHasProjectContext(server) && (
-            <span
-              className="max-w-full truncate rounded-full bg-[var(--color-surface-hover)] px-2 py-1 font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]"
-              title={server.projectPath}
-            >
-              {server.projectPath}
+        <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]" title={details.join(' · ')}>
+          {details.map((part, index) => (
+            <span key={index}>
+              {index > 0 ? ' · ' : null}
+              <span className={part === server.projectPath ? 'font-[var(--font-mono)]' : undefined}>{part}</span>
             </span>
-          )}
-          <span className="truncate">{server.summary}</span>
+          ))}
         </div>
         {server.statusDetail && (
-          <div className="mt-2 text-xs text-[var(--color-text-tertiary)] truncate">{server.statusDetail}</div>
+          <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-tertiary)]">{server.statusDetail}</div>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-        aria-label={`Open ${server.name}`}
-      >
-        <span className="material-symbols-outlined text-[20px]">settings</span>
-      </button>
-
-      <ToggleSwitch checked={server.enabled} disabled={isBusy || !server.canToggle} onChange={onToggle} />
+      <div className="flex flex-shrink-0 items-center gap-1.5">
+        <Switch
+          label={server.name}
+          checked={server.enabled}
+          disabled={isBusy || !server.canToggle}
+          onChange={onToggle}
+        />
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          aria-label={`Open ${server.name}`}
+        >
+          <Settings2 size={15} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -803,20 +770,20 @@ export function McpSettings() {
     const server = view.server
     return (
       <>
-        <div className="max-w-5xl min-w-0">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={() => setView({ type: 'list' })}
-            className="mb-5 inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+            className="mb-5 inline-flex items-center gap-1.5 rounded-[6px] text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             {t('settings.mcp.form.back')}
           </button>
 
-          <div className="flex items-start justify-between gap-4 mb-8">
+          <div className="flex items-start justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-[2.2rem] font-semibold tracking-[-0.03em] text-[var(--color-text-primary)]">{server.name}</h2>
-              <p className="mt-3 text-base text-[var(--color-text-secondary)]">{server.summary}</p>
+              <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{server.name}</h2>
+              <p className="mt-1.5 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{server.summary}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <StatusBadge server={server} />
                 {server.statusDetail && (
@@ -1027,87 +994,83 @@ export function McpSettings() {
   }
 
   return (
-    <div className="max-w-5xl min-w-0">
-      <div className="flex items-start justify-between gap-6 mb-8">
-        <div>
-          <h2 className="text-[2.2rem] font-semibold tracking-[-0.03em] text-[var(--color-text-primary)]">
-            {t('settings.mcp.title')}
-          </h2>
-          <p className="mt-3 text-base text-[var(--color-text-secondary)]">
-            {t('settings.mcp.description')}
-          </p>
-        </div>
-        {!catalogVisible && <Button variant="secondary" size="lg" onClick={beginCreate}>
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          {t('settings.mcp.addServer')}
-        </Button>}
-      </div>
+    <div className="min-w-0">
+      <SettingsPageHeader
+        className="mb-5"
+        title={t('settings.mcp.title')}
+        description={t('settings.mcp.description')}
+        actions={!catalogVisible ? (
+          <Button variant="secondary" size="xs" onClick={beginCreate} icon={<Plus size={13} aria-hidden="true" />}>
+            {t('settings.mcp.addServer')}
+          </Button>
+        ) : null}
+      />
 
-      <div className="mb-8 inline-flex overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <button type="button" aria-pressed={!catalogVisible} onClick={() => setCatalogVisible(false)} className={`h-10 px-4 text-sm font-semibold ${!catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.installed')}</button>
-        <button type="button" aria-pressed={catalogVisible} onClick={() => setCatalogVisible(true)} className={`h-10 px-4 text-sm font-semibold ${catalogVisible ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>{t('settings.mcp.browse')}</button>
-      </div>
+      <SegmentedControl<'installed' | 'browse'>
+        className="mb-5"
+        label={t('settings.mcp.viewLabel')}
+        value={catalogVisible ? 'browse' : 'installed'}
+        onChange={(value) => setCatalogVisible(value === 'browse')}
+        options={[
+          { value: 'installed', label: t('settings.mcp.installed') },
+          { value: 'browse', label: t('settings.mcp.browse') },
+        ]}
+      />
 
       {catalogVisible ? <McpCatalogBrowse installedNames={servers.map((server) => server.name)} onInstall={setCatalogEntry} /> : (
       showListLoading ? (
         <LoadingState label={t('common.loading')} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-3 mb-8">
-            <StatCard label={t('settings.mcp.stats.total')} value={stats.total} icon="dns" />
-            <StatCard label={t('settings.mcp.stats.connected')} value={stats.connected} icon="check_circle" />
-            <StatCard label={t('settings.mcp.stats.attention')} value={stats.attention} icon="error" />
-          </div>
+          <SettingsSummary
+            items={[
+              { label: t('settings.mcp.stats.total'), value: stats.total },
+              { label: t('settings.mcp.stats.connected'), value: stats.connected },
+              { label: t('settings.mcp.stats.attention'), value: stats.attention },
+            ]}
+          />
 
           {error && (
-            <div role="alert" className="mb-6 text-center py-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-              <span className="material-symbols-outlined text-[40px] text-[var(--color-error)] mb-3 block">error</span>
-              <p className="text-sm text-[var(--color-error)] mb-3">{error}</p>
+            <div role="alert" className="py-10 text-center">
+              <p className="mb-2 text-[13px] text-[var(--color-error)]">{error}</p>
               <button
                 type="button"
                 onClick={() => void fetchServers(projectPathsForFetchRef.current, currentWorkDir)}
-                className="text-sm text-[var(--color-text-accent)] hover:underline"
+                className="text-xs text-[var(--color-text-accent)] hover:underline"
               >
                 {t('common.retry')}
               </button>
             </div>
           )}
           {servers.length === 0 ? (!error && (
-            <div className="text-center py-16 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-              <span className="material-symbols-outlined text-[40px] text-[var(--color-text-tertiary)] mb-3 block">dns</span>
-              <p className="text-sm text-[var(--color-text-secondary)] mb-1">{t('settings.mcp.empty')}</p>
+            <div className="py-10 text-center">
+              <p className="mb-1 text-[13px] text-[var(--color-text-secondary)]">{t('settings.mcp.empty')}</p>
               <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.mcp.emptyHint')}</p>
             </div>
           )) : (
-            <div className="flex flex-col gap-6">
-              {MCP_GROUP_ORDER.map((group) => {
-                const groupServers = groupedServers[group]
-                if (!groupServers?.length) return null
+            MCP_GROUP_ORDER.map((group) => {
+              const groupServers = groupedServers[group]
+              if (!groupServers?.length) return null
 
-                return (
-                  <section key={group}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-[1.35rem] font-semibold text-[var(--color-text-primary)]">
-                        {group === 'plugin' ? t('settings.mcp.scope.plugin') : t(`settings.mcp.scope.${group}`)}
-                      </div>
-                      <div className="text-sm text-[var(--color-text-tertiary)]">{groupServers.length}</div>
-                    </div>
-                    <div className="rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-                      {groupServers.map((server) => (
-                        <ServerRow
-                          key={getServerIdentityKey(server)}
-                          server={server}
-                          isBusy={busyServerKey === getServerIdentityKey(server)}
-                          onOpen={() => beginEdit(server)}
-                          onToggle={() => void handleToggle(server)}
-                          t={t}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-            </div>
+              return (
+                <SettingsSection
+                  key={group}
+                  title={group === 'plugin' ? t('settings.mcp.scope.plugin') : t(`settings.mcp.scope.${group}`)}
+                  count={groupServers.length}
+                >
+                  {groupServers.map((server) => (
+                    <ServerRow
+                      key={getServerIdentityKey(server)}
+                      server={server}
+                      isBusy={busyServerKey === getServerIdentityKey(server)}
+                      onOpen={() => beginEdit(server)}
+                      onToggle={() => void handleToggle(server)}
+                      t={t}
+                    />
+                  ))}
+                </SettingsSection>
+              )
+            })
           )}
         </>
       ))}

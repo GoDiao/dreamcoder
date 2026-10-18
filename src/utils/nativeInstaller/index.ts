@@ -8,9 +8,7 @@
 // Re-export only the functions that are actually used
 export {
   checkInstall,
-  cleanupNpmInstallations,
   cleanupOldVersions,
-  cleanupShellAliases,
   installLatest,
   lockCurrentVersion,
   removeInstalledSymlink,

@@ -7,7 +7,7 @@ import { useAgentStore } from '../stores/agentStore'
 import { useSkillStore } from '../stores/skillStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSessionStore } from '../stores/sessionStore'
-import { SETTINGS_TAB_ID, useTabStore } from '../stores/tabStore'
+import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
 
 vi.mock('../api/agents', () => ({
@@ -29,7 +29,6 @@ vi.mock('../stores/providerStore', () => ({
     fetchPresets: vi.fn(),
     deleteProvider: vi.fn(),
     activateProvider: vi.fn(),
-    activateOfficial: vi.fn(),
     testProvider: vi.fn(),
     createProvider: vi.fn(),
     updateProvider: vi.fn(),
@@ -144,7 +143,7 @@ describe('Settings > Agents tab', () => {
       activeTabId: 'session-1',
       tabs: [{ sessionId: 'session-1', title: 'Test', type: 'session', status: 'idle' }],
     })
-    useUIStore.setState({ pendingSettingsTab: null })
+    useUIStore.setState({ settingsTab: 'providers' })
     useSessionStore.setState({
       sessions: [
         {
@@ -204,7 +203,7 @@ describe('Settings > Agents tab', () => {
     expect(spinner).toBeInTheDocument()
   })
 
-  it('uses the active session workDir even when settings tab is focused', async () => {
+  it('uses the active session workDir while the settings window is open', async () => {
     const fetchAgents = vi.fn()
     useAgentStore.setState({
       allAgents: [],
@@ -213,9 +212,10 @@ describe('Settings > Agents tab', () => {
       fetchAgents,
     })
     useTabStore.setState({
-      activeTabId: SETTINGS_TAB_ID,
-      tabs: [{ sessionId: SETTINGS_TAB_ID, title: 'Settings', type: 'settings', status: 'idle' }],
+      activeTabId: 'session-1',
+      tabs: [{ sessionId: 'session-1', title: 'Active session', type: 'session', status: 'idle' }],
     })
+    useUIStore.setState({ settingsOpen: true })
 
     render(<Settings />)
     switchToAgentsTab()
@@ -242,8 +242,9 @@ describe('Settings > Agents tab', () => {
     render(<Settings />)
     switchToAgentsTab()
 
-    expect(screen.getByText('Browse installed agents')).toBeInTheDocument()
-    expect(screen.getByText('Agent Browser')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Installed Agents' })).toBeInTheDocument()
+    expect(screen.getByText('Total agents')).toBeInTheDocument()
+    expect(screen.queryByText('Agent Browser')).not.toBeInTheDocument()
     expect(screen.getAllByText('User').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Built-in').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Project').length).toBeGreaterThan(0)

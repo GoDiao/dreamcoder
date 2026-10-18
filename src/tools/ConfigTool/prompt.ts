@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle'
+import { getConfigDirForDisplay } from '../../utils/envUtils.js'
 import { getModelOptions } from '../../utils/model/modelOptions.js'
 import { isVoiceGrowthBookEnabled } from '../../voice/voiceModeEnabled.js'
 import {
@@ -6,7 +7,7 @@ import {
   SUPPORTED_SETTINGS,
 } from './supportedSettings.js'
 
-export const DESCRIPTION = 'Get or set Claude Code configuration settings.'
+export const DESCRIPTION = 'Get or set DreamCoder configuration settings.'
 
 /**
  * Generate the prompt documentation from the registry
@@ -59,7 +60,7 @@ export function generatePrompt(): string {
 ## Configurable settings list
 The following settings are available for you to change:
 
-### Global Settings (stored in ~/.claude.json)
+### Global Settings (stored in ${getConfigDirForDisplay()}/.claude.json)
 ${globalSettings.join('\n')}
 
 ### Project Settings (stored in settings.json)

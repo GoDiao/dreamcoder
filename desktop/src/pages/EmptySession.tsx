@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError } from '../api/client'
-import { DreamCoderIcon } from '../components/shared/DreamCoderIcon'
 import { skillsApi } from '../api/skills'
 import { useTranslation } from '../i18n'
 import { useSessionStore } from '../stores/sessionStore'
@@ -8,12 +6,13 @@ import { useChatStore } from '../stores/chatStore'
 import { usePluginStore } from '../stores/pluginStore'
 import { useSessionRuntimeStore, DRAFT_RUNTIME_SELECTION_KEY } from '../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useProviderStore } from '../stores/providerStore'
 import { useUIStore } from '../stores/uiStore'
-import { SETTINGS_TAB_ID, useTabStore } from '../stores/tabStore'
-import { RepositoryLaunchControls } from '../components/shared/RepositoryLaunchControls'
+import { useTabStore } from '../stores/tabStore'
+import { RepositoryLaunchControls, type RepositoryLaunchError } from '../components/shared/RepositoryLaunchControls'
 import { PermissionModeSelector } from '../components/controls/PermissionModeSelector'
 import { ModelSelector } from '../components/controls/ModelSelector'
+import { ProviderGateCard, useProviderMissing } from '../components/chat/ProviderRequiredNotice'
+import { ComposerBox, ComposerControls, resizeComposerTextarea } from '../components/chat/ComposerShell'
 import { AttachmentGallery } from '../components/chat/AttachmentGallery'
 import { ComposerDropOverlay } from '../components/chat/ComposerDropOverlay'
 import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
@@ -34,6 +33,8 @@ import {
   insertSlashTrigger,
   mergeSlashCommands,
   replaceSlashCommand,
+  resolveCreateSessionErrorMessage,
+  resolveRepositoryLaunchError,
   resolveSlashUiAction,
 } from '../components/chat/composerUtils'
 import type { AttachmentRef } from '../types/chat'
@@ -41,47 +42,8 @@ import type { SlashCommandOption } from '../components/chat/composerUtils'
 
 type Attachment = ComposerAttachment
 
-type Translate = ReturnType<typeof useTranslation>
-
-function getApiErrorCode(error: unknown): string | null {
-  if (!(error instanceof ApiError)) return null
-  const body = error.body
-  if (!body || typeof body !== 'object' || !('error' in body)) return null
-  return typeof body.error === 'string' ? body.error : null
-}
-
-function resolveCreateSessionErrorMessage(error: unknown, t: Translate): string {
-  const code = getApiErrorCode(error)
-  switch (code) {
-    case 'WORKDIR_MISSING':
-    case 'WORKDIR_NOT_DIRECTORY':
-      return t('empty.createError.workdirMissing')
-    case 'REPOSITORY_NOT_GIT':
-      return t('empty.createError.notGit')
-    case 'REPOSITORY_BRANCH_NOT_FOUND':
-      return t('empty.createError.branchNotFound')
-    case 'REPOSITORY_DIRTY_WORKTREE':
-      return t('empty.createError.dirtyWorktree')
-    case 'REPOSITORY_BRANCH_CHECKED_OUT':
-      return t('empty.createError.branchCheckedOut')
-    case 'REPOSITORY_WORKTREE_CREATE_FAILED':
-      return t('empty.createError.worktreeCreateFailed', {
-        detail: error instanceof Error ? error.message : t('empty.failedToCreate'),
-      })
-    case 'REPOSITORY_SWITCH_FAILED':
-      return t('empty.createError.switchFailed', {
-        detail: error instanceof Error ? error.message : t('empty.failedToCreate'),
-      })
-    case 'REPOSITORY_CONTEXT_ERROR':
-      return t('empty.createError.contextFailed')
-    default:
-      return error instanceof Error ? error.message : t('empty.failedToCreate')
-  }
-}
-
 export function EmptySession() {
   const t = useTranslation()
-  const hasNoProviders = useProviderStore((s) => s.hasLoadedProviders && s.providers.length === 0)
   const [input, setInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [workDir, setWorkDir] = useState('')
@@ -98,6 +60,8 @@ export function EmptySession() {
   const [slashFilter, setSlashFilter] = useState('')
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0)
   const [slashCommands, setSlashCommands] = useState<SlashCommandOption[]>([])
+  const [launchError, setLaunchError] = useState<RepositoryLaunchError | null>(null)
+  const [noticeSlot, setNoticeSlot] = useState<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -108,20 +72,24 @@ export function EmptySession() {
   const createSession = useSessionStore((state) => state.createSession)
   const sendMessage = useChatStore((state) => state.sendMessage)
   const connectToSession = useChatStore((state) => state.connectToSession)
-  const setActiveView = useUIStore((state) => state.setActiveView)
   const addToast = useUIStore((state) => state.addToast)
   const currentModel = useSettingsStore((state) => state.currentModel)
   const lastPluginReloadSummary = usePluginStore((state) => state.lastReloadSummary)
   const draftRuntimeSelection = useSessionRuntimeStore((state) => state.selections[DRAFT_RUNTIME_SELECTION_KEY])
   const draftRuntimeSelectionKey = draftRuntimeSelection
-    ? `${draftRuntimeSelection.providerId ?? 'official'}:${draftRuntimeSelection.modelId}`
+    ? `${draftRuntimeSelection.providerId ?? 'none'}:${draftRuntimeSelection.modelId}`
     : undefined
+  const providerMissing = useProviderMissing(draftRuntimeSelection)
   const draftModelLabel = draftRuntimeSelection?.modelId ?? currentModel?.name ?? currentModel?.id
   const isMobileComposer = useMobileViewport() && !isTauriRuntime()
 
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    resizeComposerTextarea(textareaRef.current)
+  }, [input, providerMissing])
 
   useEffect(() => {
     if (!plusMenuOpen) return
@@ -219,6 +187,7 @@ export function EmptySession() {
     setSelectedBranch(null)
     setUseWorktree(false)
     setRepositoryLaunchReady(!newWorkDir)
+    setLaunchError(null)
   }
 
   const filteredCommands = useMemo(() => {
@@ -262,8 +231,7 @@ export function EmptySession() {
     }
 
     if (slashUiAction?.type === 'settings') {
-      useUIStore.getState().setPendingSettingsTab(slashUiAction.tab)
-      useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+      useUIStore.getState().openSettings(slashUiAction.tab)
       setInput('')
       setSlashMenuOpen(false)
       setFileSearchOpen(false)
@@ -271,7 +239,13 @@ export function EmptySession() {
       return
     }
 
+    if (providerMissing) {
+      addToast({ type: 'warning', message: t('chat.providerRequired.blocked') })
+      return
+    }
+
     setIsSubmitting(true)
+    setLaunchError(null)
     try {
       const explicitDraftSelection = useSessionRuntimeStore.getState().selections[DRAFT_RUNTIME_SELECTION_KEY]
       const sessionId = await createSession(
@@ -284,7 +258,6 @@ export function EmptySession() {
         useSessionRuntimeStore.getState().setSelection(sessionId, explicitDraftSelection)
         useSessionRuntimeStore.getState().clearSelection(DRAFT_RUNTIME_SELECTION_KEY)
       }
-      setActiveView('code')
       useTabStore.getState().openTab(sessionId, 'New Session')
       connectToSession(sessionId)
       const attachmentPayload: AttachmentRef[] = attachments.map((attachment) => ({
@@ -300,10 +273,15 @@ export function EmptySession() {
       setInput('')
       setAttachments([])
     } catch (error) {
-      addToast({
-        type: 'error',
-        message: resolveCreateSessionErrorMessage(error, t),
-      })
+      const repositoryError = resolveRepositoryLaunchError(error, t)
+      if (repositoryError) {
+        setLaunchError(repositoryError)
+      } else {
+        addToast({
+          type: 'error',
+          message: resolveCreateSessionErrorMessage(error, t),
+        })
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -522,278 +500,211 @@ export function EmptySession() {
     })
   }
 
+  const overlays = (
+    <>
+      {isDragActive && (
+        <ComposerDropOverlay
+          testId="empty-session-drop-overlay"
+          title={t('chat.dropFilesTitle')}
+          description={t('chat.dropFilesHint')}
+        />
+      )}
+
+      {fileSearchOpen && (
+        <FileSearchMenu
+          ref={fileSearchRef}
+          cwd={workDir || ''}
+          filter={atFilter}
+          onNavigate={(relativePath) => {
+            if (atCursorPos < 0) return
+            const replacement = `@${relativePath}`
+            const tokenEnd = atCursorPos + 1 + atFilter.length
+            const newValue = `${input.slice(0, atCursorPos)}${replacement}${input.slice(tokenEnd)}`
+            const newCursorPos = atCursorPos + replacement.length
+            setInput(newValue)
+            setAtFilter(relativePath)
+            requestAnimationFrame(() => {
+              textareaRef.current?.focus()
+              textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
+            })
+          }}
+          onSelect={(path, name) => {
+            if (atCursorPos >= 0) {
+              const attachmentName = name.split('/').filter(Boolean).pop() ?? name
+              const tokenEnd = atCursorPos + 1 + atFilter.length
+              const beforeToken = input.slice(0, atCursorPos)
+              const afterToken = beforeToken ? input.slice(tokenEnd) : input.slice(tokenEnd).replace(/^\s+/, '')
+              const spacer = beforeToken && afterToken && !/\s$/.test(beforeToken) && !/^\s/.test(afterToken) ? ' ' : ''
+              const newValue = `${beforeToken}${spacer}${afterToken}`
+              const newCursorPos = atCursorPos + spacer.length
+              setAttachments((prev) => [
+                ...prev,
+                {
+                  id: `att-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                  name: attachmentName,
+                  type: 'file',
+                  path,
+                },
+              ])
+              setInput(newValue)
+              setFileSearchOpen(false)
+              setAtFilter('')
+              setAtCursorPos(-1)
+              void textareaRef.current?.focus()
+              requestAnimationFrame(() => {
+                textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
+              })
+            }
+          }}
+        />
+      )}
+
+      {localSlashPanel && (
+        <div ref={slashMenuRef}>
+          <LocalSlashCommandPanel
+            command={localSlashPanel}
+            cwd={workDir || undefined}
+            commands={allSlashCommands}
+            onClose={() => setLocalSlashPanel(null)}
+          />
+        </div>
+      )}
+
+      {slashMenuOpen && filteredCommands.length > 0 && (
+        <div
+          ref={slashMenuRef}
+          className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]"
+        >
+          <div className="max-h-[260px] overflow-y-auto p-1">
+            {filteredCommands.map((command, index) => (
+              <button
+                key={command.name}
+                ref={(el) => { slashItemRefs.current[index] = el }}
+                onClick={() => selectSlashCommand(command.name)}
+                onMouseEnter={() => setSlashSelectedIndex(index)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                  index === slashSelectedIndex ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'
+                }`}
+              >
+                <span className="flex min-w-0 max-w-[52%] shrink-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-ui-body font-medium text-[var(--color-text-primary)]">/{command.name}</span>
+                  {command.argumentHint ? (
+                    <span className="min-w-0 truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">
+                      {command.argumentHint}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-ui-aux text-[var(--color-text-tertiary)]">{command.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
-      <div className={`flex flex-1 flex-col items-center justify-center ${
-        isMobileComposer ? 'px-6 pb-[230px] pt-10' : 'p-8 pb-32'
-      }`}>
-        <div className={`flex flex-col items-center text-center ${
-          isMobileComposer ? 'max-w-[300px]' : 'max-w-md'
-        }`}>
-          <DreamCoderIcon size={isMobileComposer ? 64 : 96} className={isMobileComposer ? 'mb-4' : 'mb-6'} />
-          <h1
-            className={`mb-2 font-extrabold tracking-tight text-[var(--color-text-primary)] ${
-              isMobileComposer ? 'text-2xl' : 'text-3xl'
-            }`}
-            style={{ fontFamily: 'var(--font-headline)' }}
-          >
+      <div className={`flex flex-1 flex-col overflow-y-auto ${isMobileComposer ? 'px-5 pt-10' : 'px-8 pt-12'}`}>
+        <div className="mx-auto w-full max-w-[760px]">
+          <h1 className="text-ui-title font-semibold tracking-[-0.01em] text-[var(--color-text-primary)]">
             {t('empty.title')}
           </h1>
-          <p
-            className={`mx-auto text-[var(--color-text-secondary)] ${
-              isMobileComposer ? 'max-w-[280px] text-sm leading-6' : 'max-w-xs'
-            }`}
-            style={{ fontFamily: 'var(--font-body)' }}
-          >
+          <p className="mt-1.5 text-ui-body text-[var(--color-text-secondary)]">
             {t('empty.subtitle')}
           </p>
-          {hasNoProviders && (
-            <p data-testid="empty-session-no-provider" className="mx-auto mt-4 max-w-xs text-sm text-[var(--color-text-tertiary)]">
-              {t('empty.noProvider')}{' '}
-              <button
-                type="button"
-                className="text-[var(--color-brand)] hover:underline"
-                onClick={() => {
-                  useUIStore.getState().setPendingSettingsTab('providers')
-                  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
-                }}
-              >
-                {t('settings.providers.addProvider')}
-              </button>
-            </p>
-          )}
         </div>
       </div>
 
       <div
         data-testid="empty-session-composer-shell"
-        className={`absolute left-0 right-0 z-30 flex justify-center ${
-        isMobileComposer
-          ? 'bottom-0 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)]'
-          : 'bottom-4 px-8'
-      }`}
+        className={`shrink-0 bg-[var(--color-surface)] ${
+          isMobileComposer ? 'px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2' : 'px-8 pb-5 pt-3'
+        }`}
       >
-        <div className={`flex w-full flex-col ${isMobileComposer ? 'max-w-none' : 'max-w-3xl'}`}>
-          <div
-            ref={panelRef}
-            data-testid="empty-session-composer-panel"
-            className={`glass-panel relative flex flex-col gap-3 overflow-visible ${
-              isMobileComposer ? 'rounded-2xl p-3 shadow-[0_-12px_36px_rgba(54,35,28,0.12)]' : 'rounded-xl p-0'
-            } ${isDragActive ? 'composer-drop-target-active' : ''}`}
-            {...dragHandlers}
-          >
-            {isDragActive && (
-              <ComposerDropOverlay
-                testId="empty-session-drop-overlay"
-                title={t('chat.dropFilesTitle')}
-                description={t('chat.dropFilesHint')}
-              />
-            )}
-
-            <div className={isMobileComposer ? 'contents' : 'flex flex-col gap-3 p-4'}>
-              {fileSearchOpen && (
-                <FileSearchMenu
-                  ref={fileSearchRef}
-                  cwd={workDir || ''}
-                  filter={atFilter}
-                  onNavigate={(relativePath) => {
-                    if (atCursorPos < 0) return
-                    const replacement = `@${relativePath}`
-                    const tokenEnd = atCursorPos + 1 + atFilter.length
-                    const newValue = `${input.slice(0, atCursorPos)}${replacement}${input.slice(tokenEnd)}`
-                    const newCursorPos = atCursorPos + replacement.length
-                    setInput(newValue)
-                    setAtFilter(relativePath)
-                    requestAnimationFrame(() => {
-                      textareaRef.current?.focus()
-                      textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
-                    })
-                  }}
-                  onSelect={(path, name) => {
-                    if (atCursorPos >= 0) {
-                      const attachmentName = name.split('/').filter(Boolean).pop() ?? name
-                      const tokenEnd = atCursorPos + 1 + atFilter.length
-                      const beforeToken = input.slice(0, atCursorPos)
-                      const afterToken = beforeToken ? input.slice(tokenEnd) : input.slice(tokenEnd).replace(/^\s+/, '')
-                      const spacer = beforeToken && afterToken && !/\s$/.test(beforeToken) && !/^\s/.test(afterToken) ? ' ' : ''
-                      const newValue = `${beforeToken}${spacer}${afterToken}`
-                      const newCursorPos = atCursorPos + spacer.length
-                      setAttachments((prev) => [
-                        ...prev,
-                        {
-                          id: `att-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                          name: attachmentName,
-                          type: 'file',
-                          path,
-                        },
-                      ])
-                      setInput(newValue)
-                      setFileSearchOpen(false)
-                      setAtFilter('')
-                      setAtCursorPos(-1)
-                      void textareaRef.current?.focus()
-                      requestAnimationFrame(() => {
-                        textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
-                      })
-                    }
-                  }}
-                />
-              )}
-
-              {localSlashPanel && (
-                <div ref={slashMenuRef}>
-                  <LocalSlashCommandPanel
-                    command={localSlashPanel}
-                    cwd={workDir || undefined}
-                    commands={allSlashCommands}
-                    onClose={() => setLocalSlashPanel(null)}
-                  />
-                </div>
-              )}
-
-              {slashMenuOpen && filteredCommands.length > 0 && (
-                <div
-                  ref={slashMenuRef}
-                  className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]"
-                >
-                  <div className="max-h-[260px] overflow-y-auto py-1">
-                    {filteredCommands.map((command, index) => (
-                      <button
-                        key={command.name}
-                        ref={(el) => { slashItemRefs.current[index] = el }}
-                        onClick={() => selectSlashCommand(command.name)}
-                        onMouseEnter={() => setSlashSelectedIndex(index)}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                          index === slashSelectedIndex ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'
-                        }`}
-                      >
-                        <span className="flex min-w-0 max-w-[52%] shrink-0 items-baseline gap-1.5">
-                          <span className="shrink-0 text-sm font-semibold text-[var(--color-text-primary)]">/{command.name}</span>
-                          {command.argumentHint ? (
-                            <span className="min-w-0 truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">
-                              {command.argumentHint}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-text-tertiary)]">{command.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+        <div className={`mx-auto flex w-full flex-col ${isMobileComposer ? 'max-w-none' : 'max-w-[760px]'}`}>
+          {providerMissing ? (
+            <ProviderGateCard testId="empty-session-no-provider" />
+          ) : (
+            <>
               {attachments.length > 0 && (
-                <AttachmentGallery attachments={attachments} variant="composer" onRemove={removeAttachment} />
+                <div className="mb-2">
+                  <AttachmentGallery attachments={attachments} variant="composer" onRemove={removeAttachment} />
+                </div>
               )}
 
-              <div className="flex items-start gap-3">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(event) => handleInputChange(event.target.value, event.target.selectionStart ?? event.target.value.length)}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  className={`flex-1 resize-none border-none bg-transparent leading-relaxed text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] ${
-                    isMobileComposer ? 'max-h-[132px] min-h-[72px] py-1.5 text-base' : 'py-2'
-                  }`}
-                  style={{ fontFamily: 'var(--font-body)' }}
-                  placeholder={t('empty.placeholder')}
-                  rows={2}
-                />
-              </div>
-
-              <div className={`border-t border-[var(--color-border-separator)] pt-3 ${
-                isMobileComposer ? 'flex flex-wrap items-center gap-2' : 'flex items-center justify-between'
-              }`}>
-                <div className="flex shrink-0 items-center gap-2">
-                  <div ref={plusMenuRef} className="relative">
-                    <button
-                      onClick={() => setPlusMenuOpen((prev) => !prev)}
-                      aria-label="Open composer tools"
-                      className={`text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] ${
-                        isMobileComposer ? 'inline-flex h-11 w-11 items-center justify-center rounded-xl' : 'rounded-lg p-1.5'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">add</span>
-                    </button>
-
-                    {plusMenuOpen && (
-                      <div className={`absolute bottom-full left-0 mb-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 shadow-[var(--shadow-dropdown)] ${
-                        isMobileComposer ? 'w-[min(240px,calc(100vw-32px))]' : 'w-[240px]'
-                      }`}>
-                        <button
-                          onClick={openAttachmentPicker}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-                        >
-                          <span className="material-symbols-outlined text-[18px] text-[var(--color-text-secondary)]">attach_file</span>
-                          {t('empty.addFiles')}
-                        </button>
-                        <button
-                          onClick={insertSlashCommand}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-                        >
-                          <span className="w-5 text-center text-[18px] font-bold text-[var(--color-text-secondary)]">/</span>
-                          {t('empty.slashCommands')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <PermissionModeSelector workDir={workDir} compact={isMobileComposer} />
-                </div>
-
-                <div className={`${isMobileComposer ? 'flex min-w-0 flex-1 items-center justify-end gap-2' : 'flex items-center gap-3'}`}>
-                  <ContextUsageIndicator
-                    chatState="idle"
-                    messageCount={0}
-                    runtimeSelectionKey={draftRuntimeSelectionKey}
-                    fallbackModelLabel={draftModelLabel}
-                    draft
-                    compact={isMobileComposer}
-                  />
-                  <ModelSelector runtimeKey={DRAFT_RUNTIME_SELECTION_KEY} disabled={isSubmitting} compact={isMobileComposer} />
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!canSubmit}
-                    aria-label={t('common.run')}
-                    title={isMobileComposer ? t('common.run') : undefined}
-                    className={`flex shrink-0 items-center justify-center gap-1 rounded-lg bg-[image:var(--gradient-btn-primary)] text-xs font-semibold text-[var(--color-btn-primary-fg)] shadow-[var(--shadow-button-primary)] transition-all hover:brightness-105 disabled:opacity-30 ${
-                      isMobileComposer ? 'h-11 w-11 rounded-xl px-0 py-0' : 'w-[112px] px-3 py-1.5'
-                    }`}
-                  >
-                    {!isMobileComposer && t('common.run')}
-                    <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {!isMobileComposer && (
-              <RepositoryLaunchControls
-                workDir={workDir}
-                onWorkDirChange={handleWorkDirChange}
-                branch={selectedBranch}
-                onBranchChange={setSelectedBranch}
-                useWorktree={useWorktree}
-                onUseWorktreeChange={setUseWorktree}
-                onLaunchReadyChange={setRepositoryLaunchReady}
-                disabled={isSubmitting}
-                placement="composer"
+              <ComposerBox
+                panelRef={panelRef}
+                testId="empty-session-composer-panel"
+                isDragActive={isDragActive}
+                dragHandlers={dragHandlers}
+                overlays={overlays}
+                mobile={isMobileComposer}
+                plusMenu={{
+                  open: plusMenuOpen,
+                  onToggle: () => setPlusMenuOpen((prev) => !prev),
+                  onClose: () => setPlusMenuOpen(false),
+                  onAddFiles: openAttachmentPicker,
+                  onSlashCommands: insertSlashCommand,
+                  addFilesLabel: t('empty.addFiles'),
+                  slashCommandsLabel: t('empty.slashCommands'),
+                  toggleLabel: t('chat.composerTools'),
+                  menuRef: plusMenuRef,
+                }}
+                textareaRef={textareaRef}
+                textareaProps={{
+                  value: input,
+                  onChange: (event) => handleInputChange(event.target.value, event.target.selectionStart ?? event.target.value.length),
+                  onKeyDown: handleKeyDown,
+                  onPaste: handlePaste,
+                  placeholder: t('empty.placeholder'),
+                  'aria-label': t('chat.inputLabel'),
+                }}
+                action={{
+                  mode: 'send',
+                  disabled: !canSubmit,
+                  onClick: () => { void handleSubmit() },
+                  label: t('common.run'),
+                }}
               />
-            )}
-          </div>
 
-          {isMobileComposer && (
-            <RepositoryLaunchControls
-              workDir={workDir}
-              onWorkDirChange={handleWorkDirChange}
-              branch={selectedBranch}
-              onBranchChange={setSelectedBranch}
-              useWorktree={useWorktree}
-              onUseWorktreeChange={setUseWorktree}
-              onLaunchReadyChange={setRepositoryLaunchReady}
-              disabled={isSubmitting}
-            />
+              <ComposerControls
+                testId="empty-session-controls"
+                left={(
+                  <>
+                    <RepositoryLaunchControls
+                      workDir={workDir}
+                      onWorkDirChange={handleWorkDirChange}
+                      branch={selectedBranch}
+                      onBranchChange={setSelectedBranch}
+                      useWorktree={useWorktree}
+                      onUseWorktreeChange={setUseWorktree}
+                      onLaunchReadyChange={setRepositoryLaunchReady}
+                      disabled={isSubmitting}
+                      placement="composer"
+                      launchError={launchError}
+                      onLaunchErrorDismiss={() => setLaunchError(null)}
+                      noticeSlot={noticeSlot}
+                    />
+                    <PermissionModeSelector workDir={workDir} compact={isMobileComposer} />
+                  </>
+                )}
+                right={(
+                  <>
+                    <ModelSelector runtimeKey={DRAFT_RUNTIME_SELECTION_KEY} disabled={isSubmitting} compact={isMobileComposer} />
+                    <ContextUsageIndicator
+                      chatState="idle"
+                      messageCount={0}
+                      runtimeSelectionKey={draftRuntimeSelectionKey}
+                      fallbackModelLabel={draftModelLabel}
+                      draft
+                      compact={isMobileComposer}
+                    />
+                  </>
+                )}
+              />
+              <div ref={setNoticeSlot} className="empty:hidden [&>*]:mt-2" />
+            </>
           )}
         </div>
       </div>

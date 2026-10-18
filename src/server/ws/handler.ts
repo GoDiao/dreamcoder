@@ -11,7 +11,6 @@ import { computerUseApprovalService } from '../services/computerUseApprovalServi
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
-import { isOpenAIOfficialProviderId } from '../services/openaiOfficialProvider.js'
 import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
@@ -28,6 +27,7 @@ import {
   type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
+import { EFFORT_LEVELS } from '../api/models.js'
 import {
   clearPrewarmState,
   createStreamState,
@@ -35,8 +35,10 @@ import {
   disposeSessionRuntime,
   getConnectedSessionIds,
   getSessionRuntime,
+  isSameRuntimeOverride,
   peekSessionRuntime,
   resetConversationState,
+  type RuntimeOverride,
   type SessionSlashCommand,
   type SessionStreamState,
 } from './sessionRuntime.js'
@@ -479,7 +481,14 @@ async function handleSetRuntimeConfig(
 ) {
   const { sessionId } = ws.data
   const modelId = typeof message.modelId === 'string' ? message.modelId.trim() : ''
-  if (!modelId) {
+  const effort =
+    typeof message.effort === 'string' &&
+    (EFFORT_LEVELS as readonly string[]).includes(message.effort)
+      ? message.effort
+      : undefined
+  // An empty model with an effort means "keep following the default provider
+  // and model, only change the effort".
+  if (!modelId && !effort) {
     sendMessage(ws, {
       type: 'error',
       message: 'Runtime model selection is invalid.',
@@ -488,19 +497,16 @@ async function handleSetRuntimeConfig(
     return
   }
 
-  const nextOverride = {
-    providerId: message.providerId ?? null,
+  const nextOverride: RuntimeOverride = {
+    providerId: modelId ? message.providerId ?? null : null,
     modelId,
+    ...(effort ? { effort } : {}),
   }
   const runtime = getSessionRuntime(sessionId)
   const prevOverride = runtime.runtimeOverride
   runtime.runtimeOverride = nextOverride
 
-  if (
-    prevOverride &&
-    prevOverride.providerId === nextOverride.providerId &&
-    prevOverride.modelId === nextOverride.modelId
-  ) {
+  if (prevOverride && isSameRuntimeOverride(prevOverride, nextOverride)) {
     return
   }
 
@@ -511,8 +517,8 @@ async function handleSetRuntimeConfig(
         await pendingStartup.catch(() => undefined)
         const currentOverride = peekSessionRuntime(sessionId)?.runtimeOverride
         if (
-          currentOverride?.providerId !== nextOverride.providerId ||
-          currentOverride.modelId !== nextOverride.modelId ||
+          !currentOverride ||
+          !isSameRuntimeOverride(currentOverride, nextOverride) ||
           !conversationService.hasSession(sessionId)
         ) {
           return
@@ -1507,14 +1513,23 @@ function isKnownRuntimeProviderId(
   providerId: string,
   providers: Array<{ id: string }>,
 ): boolean {
-  return (
-    isOpenAIOfficialProviderId(providerId) ||
-    providers.some((provider) => provider.id === providerId)
-  )
+  return providers.some((provider) => provider.id === providerId)
 }
 
 async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
+  const settings = await resolveRuntimeSettings(sessionId)
+  // A per-session effort chosen in the composer wins over the global default.
+  const overrideEffort = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride?.effort : undefined
+  return overrideEffort ? { ...settings, effort: overrideEffort } : settings
+}
+
+async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
   const runtimeOverride = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride : undefined
+  // A null provider used to mean the official sign-in, which is gone; such an
+  // override falls back to the default settings.
+  if (runtimeOverride?.providerId === null) {
+    return getDefaultRuntimeSettings()
+  }
   if (runtimeOverride) {
     if (typeof runtimeOverride.providerId === 'string') {
       const { providers } = await providerService.listProviders()
@@ -1550,12 +1565,8 @@ async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> 
 
 async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
   const { providers, activeId } = await providerService.listProviders()
-  let resolvedActiveId = activeId
-  if (activeId && !isKnownRuntimeProviderId(activeId, providers)) {
-    console.warn(`[WS] Active provider id is stale, falling back to official provider: ${activeId}`)
-    resolvedActiveId = null
-    await providerService.activateOfficial()
-  }
+  const resolvedActiveId =
+    activeId && isKnownRuntimeProviderId(activeId, providers) ? activeId : null
 
   const userSettings = await settingsService.getUserSettings()
   const providerSettings = resolvedActiveId
@@ -1629,15 +1640,16 @@ async function buildSessionStartupDiagnosticMessage(
 
   const runtimeOverride = peekSessionRuntime(sessionId)?.runtimeOverride
   if (runtimeOverride) {
-    lines.push(`- runtimeOverride.providerId: ${runtimeOverride.providerId ?? '(official)'}`)
+    lines.push(`- runtimeOverride.providerId: ${runtimeOverride.providerId ?? '(none)'}`)
     lines.push(`- runtimeOverride.modelId: ${runtimeOverride.modelId}`)
+    if (runtimeOverride.effort) lines.push(`- runtimeOverride.effort: ${runtimeOverride.effort}`)
   } else {
     lines.push('- runtimeOverride: (none)')
   }
 
   try {
     const { providers, activeId } = await providerService.listProviders()
-    lines.push(`- activeProviderId: ${activeId ?? '(official)'}`)
+    lines.push(`- activeProviderId: ${activeId ?? '(none)'}`)
     lines.push(`- configuredProviders: ${providers.length}`)
     if (providers.length > 0) {
       lines.push(

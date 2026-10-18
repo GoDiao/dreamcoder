@@ -46,6 +46,11 @@ vi.mock('../components/markdown/MarkdownRenderer', () => ({
   },
 }))
 
+async function showEditor() {
+  fireEvent.click(await screen.findByRole('radio', { name: 'Edit' }))
+  return screen.findByLabelText('Editor')
+}
+
 describe('MemorySettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -78,7 +83,7 @@ describe('MemorySettings', () => {
       error: null,
       lastSavedAt: null,
     })
-    useUIStore.setState({ pendingMemoryPath: null, pendingSettingsTab: null })
+    useUIStore.setState({ pendingMemoryPath: null, settingsTab: 'providers' })
 
     memoryApiMock.listProjects.mockResolvedValue({
       projects: [
@@ -136,16 +141,18 @@ describe('MemorySettings', () => {
     expect(screen.queryByPlaceholderText('MEMORY.md or notes/project.md')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create memory file/i })).not.toBeInTheDocument()
 
-    const editor = await screen.findByLabelText('Editor')
+    expect(await screen.findByTestId('markdown-preview')).toBeInTheDocument()
+    const editor = await showEditor()
     expect(editor).toHaveValue('# Project Memory\n')
 
     fireEvent.change(editor, {
       target: { value: '# Project Memory\n\n- Prefer small diffs.\n' },
     })
     expect(screen.getByText('Unsaved')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: 'Preview' }))
     expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Prefer small diffs')
 
-    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(memoryApiMock.saveFile).toHaveBeenCalledWith({
@@ -257,7 +264,7 @@ describe('MemorySettings', () => {
     await waitFor(() => {
       expect(memoryApiMock.readFile).toHaveBeenCalledWith('-workspace-demo', 'notes/manual.md')
     })
-    expect(await screen.findByLabelText('Editor')).toHaveValue('# Manual\n')
+    expect(await showEditor()).toHaveValue('# Manual\n')
   })
 
   it('opens linked memory markdown files from the rendered preview', async () => {
@@ -302,7 +309,7 @@ describe('MemorySettings', () => {
     await waitFor(() => {
       expect(memoryApiMock.readFile).toHaveBeenCalledWith('-workspace-demo', 'notes/manual.md')
     })
-    expect(await screen.findByLabelText('Editor')).toHaveValue('# Manual\n')
+    expect(await showEditor()).toHaveValue('# Manual\n')
   })
 
   it('keeps frontmatter editable but removes it from the rendered preview', async () => {
@@ -317,9 +324,11 @@ describe('MemorySettings', () => {
 
     render(<MemorySettings />)
 
-    const editor = await screen.findByLabelText('Editor')
+    expect(await screen.findByTestId('markdown-preview')).toHaveTextContent('Project Memory')
+    expect(screen.getByTestId('markdown-preview')).not.toHaveTextContent('type: project')
+    const editor = await showEditor()
     expect(editor).toHaveValue('---\ntype: project\n---\n\n# Project Memory\n')
-    expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Project Memory')
+    fireEvent.click(screen.getByRole('radio', { name: 'Preview' }))
     expect(screen.getByTestId('markdown-preview')).not.toHaveTextContent('type: project')
   })
 
@@ -373,10 +382,41 @@ describe('MemorySettings', () => {
 
     render(<MemorySettings />)
 
-    const editor = await screen.findByLabelText('Editor')
+    const editor = await showEditor()
     expect(editor).toHaveValue('# Preferences\n')
     expect(memoryApiMock.readFile).toHaveBeenCalledWith('-workspace-other', 'preferences.md')
     expect(useMemoryStore.getState().selectedProjectId).toBe('-workspace-other')
     expect(useUIStore.getState().pendingMemoryPath).toBeNull()
+  })
+
+  it('defaults to preview, switches to edit, and marks the edited file as unsaved', async () => {
+    render(<MemorySettings />)
+
+    expect(await screen.findByTestId('markdown-preview')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Editor')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Preview' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Saved')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revert' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('memory-dirty-dot')).not.toBeInTheDocument()
+
+    const editor = await showEditor()
+    expect(screen.queryByTestId('markdown-preview')).not.toBeInTheDocument()
+    fireEvent.change(editor, { target: { value: '# Changed\n' } })
+
+    expect(screen.getByText('Unsaved')).toBeInTheDocument()
+    expect(screen.getByTestId('memory-dirty-dot')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revert' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revert' }))
+    expect(editor).toHaveValue('# Project Memory\n')
+    expect(screen.queryByTestId('memory-dirty-dot')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty project with no memory files', async () => {
+    memoryApiMock.listFiles.mockResolvedValue({ files: [] })
+    render(<MemorySettings />)
+
+    expect(await screen.findByText('No memory files yet')).toBeInTheDocument()
   })
 })

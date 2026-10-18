@@ -9,7 +9,7 @@ let tmpDir: string
 
 async function startTestServer() {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-e2e-'))
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
 
   await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
 

@@ -1,12 +1,6 @@
 import { ProviderService } from './providerService.js'
 import { SettingsService } from './settingsService.js'
 import { sessionService } from './sessionService.js'
-import { providerOpenAIOAuthService } from './providerOpenAIOAuthService.js'
-import { isOpenAIOfficialProviderId } from './openaiOfficialProvider.js'
-import { OPENAI_CODEX_API_ENDPOINT } from '../../services/openaiAuth/client.js'
-import { resolveOpenAICodexModel } from '../../services/openaiAuth/models.js'
-import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenaiResponses.js'
-import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 import { cleanSessionTitleSource, hasSessionTitleMarkup } from '../../utils/sessionTitleText.js'
 import { resolveUpstreamTarget, sendToUpstream } from '../upstream/client.js'
 
@@ -55,17 +49,8 @@ export async function generateTitle(
     if (!resolvedProvider) {
       const { activeId, providers } = await providerService.listProviders()
       resolvedProvider = activeId
-        ? isOpenAIOfficialProviderId(activeId)
-          ? await providerService.getProvider(activeId)
-          : providers.find((provider) => provider.id === activeId) ?? null
+        ? providers.find((provider) => provider.id === activeId) ?? null
         : null
-    }
-
-    if (resolvedProvider && isOpenAIOfficialProviderId(resolvedProvider.id)) {
-      return await generateOpenAIOfficialTitle(
-        trimmed,
-        resolvedProvider.models.haiku || resolvedProvider.models.main,
-      )
     }
 
     if (!resolvedProvider) return null
@@ -90,51 +75,6 @@ export async function generateTitle(
   } catch {
     return null
   }
-}
-
-async function generateOpenAIOfficialTitle(
-  trimmed: string,
-  model: string,
-): Promise<string | null> {
-  const tokens = await providerOpenAIOAuthService.ensureFreshTokens()
-  if (!tokens?.accessToken) return null
-
-  const mappedModel = resolveOpenAICodexModel(model)
-  const requestBody = anthropicToOpenaiResponses({
-    model: mappedModel,
-    max_tokens: TITLE_MAX_OUTPUT_TOKENS,
-    system: TITLE_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],
-    stream: true,
-    thinking: { type: 'disabled' },
-  })
-  requestBody.stream = true
-  requestBody.max_output_tokens = TITLE_MAX_OUTPUT_TOKENS
-
-  const headers = new Headers()
-  headers.set('Content-Type', 'application/json')
-  headers.set('Authorization', `Bearer ${tokens.accessToken}`)
-  if (tokens.accountId) {
-    headers.set('ChatGPT-Account-Id', tokens.accountId)
-  }
-
-  const response = await fetch(OPENAI_CODEX_API_ENDPOINT, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout(15_000),
-  })
-
-  if (!response.ok || !response.body) return null
-
-  const body = await openaiResponsesStreamToAnthropicResponse(
-    response.body,
-    mappedModel,
-  )
-  const text = body.content.find((b) => b.type === 'text')?.text
-  if (!text) return null
-
-  return parseGeneratedTitleText(text)
 }
 
 export function parseGeneratedTitleText(text: string): string | null {

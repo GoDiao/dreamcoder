@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
+import { SettingsSummary } from '../components/settings/SettingsSummary'
 import { activityStatsApi, type ActivityStatsResponse, type DailyActivity } from '../api/activityStats'
 import { type Locale, useTranslation } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -293,31 +295,23 @@ export function ActivitySettings() {
   ]
 
   return (
-    <div className="w-full max-w-[1400px] min-w-0">
-      <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0 pt-1">
-          <h2 className="text-base font-semibold tracking-normal text-[var(--color-text-primary)]">{t('settings.activity.title')}</h2>
-          <div className="mt-1 text-sm leading-5 text-[var(--color-text-tertiary)]">
-            {dateRange && <div>{dateRange}</div>}
-            <div>{t('settings.activity.subtitleLoading')}</div>
-          </div>
-        </div>
+    <div className="w-full min-w-0">
+      <SettingsPageHeader
+        className="!mb-2"
+        title={t('settings.activity.title')}
+        description={
+          <>
+            {dateRange && <span className="block">{dateRange}</span>}
+            <span className="block">{t('settings.activity.subtitleLoading')}</span>
+          </>
+        }
+      />
 
-        <div
-          className="grid w-full gap-2 xl:max-w-[640px]"
-          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}
-        >
-          {metrics.map((metric) => (
-            <div key={metric.label} className="min-w-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-container)] px-3 py-2.5">
-              <div className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-tertiary)]">{metric.label}</div>
-              <div className="mt-1 truncate text-xl font-semibold tracking-normal text-[var(--color-text-primary)]">{metric.value}</div>
-              {metric.detail && <div className="mt-0.5 truncate text-xs text-[var(--color-text-tertiary)]">{metric.detail}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
+      <SettingsSummary
+        items={metrics.map((metric) => ({ label: metric.label, value: metric.value, hint: metric.detail }))}
+      />
 
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+      <div className="min-w-0">
         {isLoading ? (
           <div className="flex min-h-[190px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
             <span className="material-symbols-outlined mr-2 animate-spin text-[18px]">progress_activity</span>

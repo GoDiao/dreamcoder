@@ -2,11 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
-import { OPENAI_CODEX_API_ENDPOINT } from '../../services/openaiAuth/client.js'
 import { ProviderService } from '../services/providerService.js'
 import { deriveTitle, generateTitle, parseGeneratedTitleText, saveAiTitle } from '../services/titleService.js'
 import { sessionService } from '../services/sessionService.js'
-import { providerOpenAIOAuthService } from '../services/providerOpenAIOAuthService.js'
 
 describe('titleService', () => {
   let tmpDir: string
@@ -14,16 +12,15 @@ describe('titleService', () => {
   let originalFetch: typeof globalThis.fetch
 
   beforeEach(async () => {
-    originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalFetch = globalThis.fetch
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'title-service-test-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
   })
 
   afterEach(async () => {
     globalThis.fetch = originalFetch
-    providerOpenAIOAuthService.dispose()
-    restoreEnv('CLAUDE_CONFIG_DIR', originalConfigDir)
+    restoreEnv('DREAMCODER_CONFIG_DIR', originalConfigDir)
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
@@ -250,46 +247,6 @@ describe('titleService', () => {
     } finally {
       server.stop(true)
     }
-  })
-
-  test('generates titles when ChatGPT Official OAuth is active', async () => {
-    const providerService = new ProviderService()
-    await providerService.activateProvider('openai-official')
-    await providerOpenAIOAuthService.saveTokens({
-      accessToken: 'access-for-title',
-      refreshToken: 'refresh-for-title',
-      expiresAt: Date.now() + 60 * 60_000,
-      accountId: 'acct_title',
-      email: 'title@example.com',
-    })
-
-    const upstreamCalls: Array<{
-      url: string
-      headers: Record<string, string>
-      body: Record<string, unknown>
-    }> = []
-    globalThis.fetch = (async (input, init) => {
-      const headers = new Headers(init?.headers)
-      upstreamCalls.push({
-        url: String(input),
-        headers: Object.fromEntries(headers.entries()),
-        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
-      })
-      return new Response([
-        'event: response.completed',
-        'data: {"response":{"id":"resp_title","object":"response","created_at":1779118000,"model":"gpt-5.3-codex","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"{\\"title\\":\\"Trace ok\\"}"}]}],"usage":{"input_tokens":3,"output_tokens":2,"total_tokens":5}}}',
-        '',
-      ].join('\n'), {
-        headers: { 'Content-Type': 'text/event-stream' },
-      })
-    }) as typeof fetch
-
-    await expect(generateTitle('请只回复 trace-ok')).resolves.toBe('Trace ok')
-    expect(upstreamCalls).toHaveLength(1)
-    expect(upstreamCalls[0].url).toBe(OPENAI_CODEX_API_ENDPOINT)
-    expect(upstreamCalls[0].headers.authorization).toBe('Bearer access-for-title')
-    expect(upstreamCalls[0].headers['chatgpt-account-id']).toBe('acct_title')
-    expect(upstreamCalls[0].body.stream).toBe(true)
   })
 
   test('parses JSON title responses wrapped in markdown fences', () => {

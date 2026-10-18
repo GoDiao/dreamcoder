@@ -1,0 +1,1141 @@
+<style>
+#dc-study{--ds-bg:light-dark(#fbfaf7,#252522);--ds-sidebar:light-dark(#f1f0eb,#20201e);--ds-input:light-dark(#fffefa,#2d2d29);--ds-text:light-dark(#292a26,#eeeee7);--ds-secondary:light-dark(#74746a,#aaa99e);--ds-muted:light-dark(#89887d,#929184);--ds-line:light-dark(#e6e4dc,#3b3b34);--ds-hover:light-dark(#e9e7df,#2c2c27);--ds-selected:light-dark(#e4e2d9,#35352d);--ds-bubble:light-dark(#eeede6,#32322c);--ds-accent:light-dark(#ac583c,#d78b6b);--ds-accent-bg:light-dark(#f3e5dc,#3a2e26);--ds-send:light-dark(#b46245,#c77e5d);--ds-send-ink:#fffaf4;--ds-success:light-dark(#50745b,#91aa8b);--ds-shadow:light-dark(0 3px 14px #2a271808,0 3px 14px #00000014);--ds-body-size:16px;--ds-side-width:218px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.5;color:var(--ds-text);background:var(--ds-bg);border:1px solid var(--ds-line);border-radius:12px;overflow:hidden;display:grid;grid-template-columns:var(--ds-side-width) minmax(0,1fr);min-height:766px;width:100%;box-sizing:border-box}
+#dc-study *{box-sizing:border-box}
+#dc-study [hidden]{display:none!important}
+#dc-study button,#dc-study textarea,#dc-study input,#dc-study select{font-family:inherit;color:inherit}
+#dc-study button{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;padding:7px 8px;border-radius:6px;font-size:13px;line-height:1.5;cursor:pointer}
+#dc-study button:hover{background:var(--ds-hover)}
+#dc-study button:focus-visible,#dc-study summary:focus-visible,#dc-study select:focus-visible,#dc-study input:focus-visible{outline:2px solid var(--ds-accent);outline-offset:3px}
+#dc-study button:disabled{opacity:.45;cursor:default}
+#dc-study svg{width:16px;height:16px;stroke-width:1.6;flex:none}
+#dc-study .ds-side{background:var(--ds-sidebar);padding:0 12px 14px;display:flex;flex-direction:column;min-width:0}
+#dc-study .ds-brandrow{height:70px;display:flex;align-items:center;gap:9px;padding:0 7px;margin-bottom:5px}
+#dc-study .ds-brand-icon{color:var(--ds-accent);display:inline-flex}
+#dc-study .ds-brand-icon svg{width:22px;height:22px;stroke-width:1.8}
+#dc-study .ds-brand{font-size:15px;letter-spacing:-.3px;font-weight:600}
+#dc-study .ds-collapse{margin-left:auto;color:var(--ds-secondary);padding:4px}
+#dc-study .ds-nav{width:100%;min-height:36px;padding:7px 10px;font-size:13px;text-align:left;justify-content:flex-start;color:var(--ds-secondary)}
+#dc-study .ds-new{color:var(--ds-text);font-weight:500}
+#dc-study .ds-shortcut{font-size:11px;color:var(--ds-muted);margin-left:auto}
+#dc-study .ds-search{border:1px solid var(--ds-line);border-radius:6px;background:var(--ds-input);padding:8px 9px;width:100%;font-size:13px;margin:4px 0}
+#dc-study .ds-section{padding:0 10px;margin-top:28px;margin-bottom:8px;display:flex;align-items:center;gap:7px;color:var(--ds-secondary);font-size:11px;font-weight:500;letter-spacing:.3px}
+#dc-study .ds-section svg{width:13px;height:13px}
+#dc-study .ds-session{width:100%;justify-content:flex-start;min-width:0;padding:8px 11px;font-size:13px;color:var(--ds-secondary);margin-bottom:2px;gap:6px}
+#dc-study .ds-session span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dc-study .ds-session.is-current{background:var(--ds-selected);color:var(--ds-text);font-weight:500}
+#dc-study .ds-side-footer{position:relative;margin-top:auto;padding-top:50px}
+#dc-study .ds-footer-trigger{width:100%;height:36px;gap:9px;padding:7px 10px;color:var(--ds-secondary);text-align:left}
+#dc-study .ds-footer-trigger[aria-expanded="true"]{background:var(--ds-selected);color:var(--ds-text)}
+#dc-study .ds-footer-trigger .ds-footer-chevron{width:12px;height:12px;margin-left:auto}
+#dc-study .ds-side-footer .ds-footer-menu{left:0;bottom:44px;width:100%;max-width:none}
+#dc-study .ds-footer-menu button{width:100%;padding:9px 10px;gap:10px;color:var(--ds-text);text-align:left}
+#dc-study .ds-main{min-width:0;display:flex;flex-direction:column}
+#dc-study .ds-head{min-height:78px;padding:19px 104px 16px 30px;display:flex;align-items:center;justify-content:space-between;gap:18px;border-bottom:1px solid var(--ds-line)}
+#dc-study .ds-head-title{font-size:18px;line-height:1.4;font-weight:600;letter-spacing:-.35px;margin:0}
+#dc-study .ds-breadcrumb{font-size:11px;color:var(--ds-secondary);display:flex;gap:8px;align-items:center;margin-top:5px}
+#dc-study .ds-breadcrumb svg{width:12px;height:12px}
+#dc-study .ds-head-action{color:var(--ds-secondary);flex:none}
+#dc-study .ds-head-action svg{width:17px;height:17px}
+#dc-study .ds-reopen{display:none}
+#dc-study .ds-content{padding:27px 38px 18px;width:100%;max-width:760px;margin:0 auto;flex:1}
+#dc-study .ds-date{font-size:11px;text-align:center;color:var(--ds-muted);margin:0 0 21px;letter-spacing:.2px}
+#dc-study .ds-user{max-width:88%;margin-left:auto;padding:12px 16px;background:var(--ds-bubble);border-radius:13px 13px 4px 13px;font-size:14px;line-height:1.7}
+#dc-study .ds-tools{margin:24px 0 23px;color:var(--ds-secondary);font-size:12px}
+#dc-study .ds-tools summary{display:flex;gap:8px;align-items:center;cursor:pointer;list-style:none;min-height:28px}
+#dc-study .ds-tools summary::-webkit-details-marker{display:none}
+#dc-study .ds-tools .ds-chevron{width:13px;height:13px;transition:transform .15s}
+#dc-study .ds-tools[open] .ds-chevron{transform:rotate(90deg)}
+#dc-study .ds-tools .ds-check{color:var(--ds-success);width:14px;height:14px}
+#dc-study .ds-tool-duration{font-size:11px;color:var(--ds-muted);margin-left:4px}
+#dc-study .ds-tools-body{border-left:1px solid var(--ds-line);margin:11px 0 5px 6px;padding:1px 0 1px 18px}
+#dc-study .ds-tool-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:6px 0}
+#dc-study .ds-tool-row code{font-size:12px;background:none;padding:0}
+#dc-study .ds-reply{font-size:var(--ds-body-size);line-height:1.85}
+#dc-study .ds-reply h2{font-size:21px;font-weight:600;line-height:1.55;letter-spacing:-.45px;margin:0 0 15px;max-width:540px}
+#dc-study .ds-reply p{margin:0 0 18px}
+#dc-study .ds-reply h3{font-size:16px;line-height:1.5;font-weight:600;margin:27px 0 11px;letter-spacing:-.15px}
+#dc-study .ds-reply strong{font-weight:600}
+#dc-study .ds-reply ul{padding-left:20px;margin:0 0 20px}
+#dc-study .ds-reply li{padding-left:3px;margin:9px 0}
+#dc-study .ds-reply li::marker{color:var(--ds-secondary);font-size:12px}
+#dc-study code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;color:var(--ds-text);background:var(--ds-bubble);border-radius:4px;padding:2px 5px;overflow-wrap:anywhere}
+#dc-study .ds-reference{color:var(--ds-accent);font-size:14px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+#dc-study .ds-reference svg{width:13px;height:13px}
+#dc-study .ds-reply-actions{display:flex;align-items:center;gap:12px;color:var(--ds-muted);margin-top:22px;font-size:11px}
+#dc-study .ds-reply-actions button{color:var(--ds-secondary);padding:4px}
+#dc-study .ds-reply-actions svg{width:14px;height:14px}
+#dc-study .ds-composer-area{padding:12px 38px 21px;width:100%;max-width:760px;margin:0 auto}
+#dc-study .ds-composer{display:flex;align-items:flex-end;gap:8px;padding:9px 11px;border:1px solid light-dark(#d9d7cf,#4b4b43);background:var(--ds-input);border-radius:16px;transition:border-color .15s}
+#dc-study .ds-composer:focus-within{border-color:var(--ds-secondary)}
+#dc-study textarea{flex:1;min-width:0;width:100%;display:block;background:transparent;border:0;padding:3px 0;resize:none;height:28px;min-height:28px;font-size:16px;line-height:22px;outline:none;overflow-y:hidden}
+#dc-study textarea:focus-visible{outline:2px solid var(--ds-accent);outline-offset:3px;border-radius:10px}
+#dc-study textarea::placeholder{color:var(--ds-muted)}
+#dc-study .ds-compose-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;padding:8px 5px 0}
+#dc-study .ds-control-group{position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ds-secondary)}
+#dc-study .ds-control-group:first-child .ds-picker{position:static}
+#dc-study .ds-compose-controls>.ds-control-group:last-child{margin-left:auto}
+#dc-study .ds-project-label{display:inline-flex;align-items:center;gap:6px;padding:0 6px;font-size:12px;color:var(--ds-muted);height:28px}
+#dc-study .ds-control-group button{font-size:12px}
+#dc-study .ds-picker{position:relative}
+#dc-study .ds-picker-trigger{height:28px;padding:0 6px;gap:5px;border-radius:7px;color:var(--ds-secondary);white-space:nowrap}
+#dc-study .ds-picker-trigger:hover,#dc-study .ds-picker-trigger[aria-expanded="true"]{background:var(--ds-selected);color:var(--ds-text)}
+#dc-study .ds-picker-trigger .ds-picker-chevron{width:12px;height:12px;color:var(--ds-muted)}
+#dc-study .ds-icon-button{height:28px;width:28px;flex:none;justify-content:center;padding:0;border-radius:7px;color:var(--ds-secondary)}
+#dc-study .ds-icon-button svg{width:18px;height:18px}
+#dc-study .ds-popover{position:absolute;bottom:calc(100% + 9px);left:0;z-index:10;width:264px;max-width:calc(100vw - 80px);padding:6px;background:light-dark(#fffefa,#32322e);border:1px solid var(--ds-line);border-radius:12px;box-shadow:0 8px 28px light-dark(#24221a1f,#00000040);color:var(--ds-text)}
+#dc-study .ds-picker-model .ds-popover{left:auto;right:0;width:228px}
+#dc-study .ds-popover .ds-menu-option{display:flex;width:100%;align-items:flex-start;text-align:left;padding:10px 9px;border-radius:7px;gap:10px;color:var(--ds-text);background:transparent}
+#dc-study .ds-popover .ds-menu-option:hover{background:var(--ds-hover)}
+#dc-study .ds-menu-option>svg{margin-top:2px;color:var(--ds-secondary)}
+#dc-study .ds-menu-copy{flex:1;min-width:0}
+#dc-study .ds-menu-title{display:block;font-size:13px;font-weight:500;line-height:1.5}
+#dc-study .ds-menu-description{display:block;font-size:11px;font-weight:400;color:var(--ds-secondary);line-height:1.6;margin-top:3px}
+#dc-study .ds-menu-option .ds-option-check{visibility:hidden;color:var(--ds-accent)}
+#dc-study .ds-menu-option[aria-pressed="true"] .ds-option-check{visibility:visible}
+#dc-study .ds-attachment-status{padding:6px 14px 0;font-size:12px;color:var(--ds-secondary);overflow-wrap:anywhere}
+#dc-study .ds-control-group svg{width:14px;height:14px}
+#dc-study .ds-send{flex:none;justify-content:center;width:28px;height:28px;padding:0!important;background:var(--ds-send)!important;color:var(--ds-send-ink);border-radius:50%;margin-left:4px}
+#dc-study .ds-send:disabled{opacity:1;background:transparent!important;color:var(--ds-muted)}
+#dc-study .ds-send:not(:disabled):hover{filter:brightness(1.08)}
+#dc-study .ds-send svg{width:16px;height:16px;stroke-width:2}
+#dc-study .ds-compose-meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;padding:0 3px;color:var(--ds-muted);font-size:11px}
+#dc-study .ds-meta-left{display:flex;align-items:center;gap:6px}
+#dc-study .ds-meta-left svg{width:12px;height:12px}
+#dc-study .ds-status-dot{width:5px;height:5px;border-radius:50%;background:var(--ds-success);display:inline-block}
+#dc-study .ds-preview-label{font-size:11px;color:var(--ds-muted);margin-left:auto}
+#dc-study .ds-user-added{margin-top:24px;white-space:pre-wrap;overflow-wrap:anywhere}
+#dc-study .ds-permission{border:1px solid var(--ds-line);border-radius:10px;padding:18px;background:var(--ds-input);margin-top:22px}
+#dc-study .ds-permission-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:600}
+#dc-study .ds-permission-title svg{color:var(--ds-accent);width:18px;height:18px}
+#dc-study .ds-permission p{font-size:14px;line-height:1.7;color:var(--ds-secondary);margin:8px 0 14px}
+#dc-study .ds-permission-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:18px}
+#dc-study .ds-permission-actions button{border:1px solid var(--ds-line);padding:6px 12px}
+#dc-study .ds-permission-actions .ds-allow{color:var(--ds-send-ink);background:var(--ds-send);border-color:var(--ds-send)}
+#dc-study .ds-permission-result{font-size:12px;color:var(--ds-secondary);margin-top:12px}
+#dc-study .ds-running{font-size:15px;line-height:1.8;padding:5px 0 20px}
+#dc-study .ds-running-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ds-secondary);margin-top:18px}
+#dc-study.ds-hide-side{grid-template-columns:minmax(0,1fr)}
+#dc-study.ds-hide-side .ds-side{display:none}
+#dc-study.ds-hide-side .ds-reopen{display:inline-flex}
+#dc-study .ds-head-left{display:flex;align-items:center;gap:12px;min-width:0}
+@media(max-width:800px){#dc-study{--ds-side-width:184px}#dc-study .ds-content{padding:25px 26px 18px}#dc-study .ds-composer-area{padding:12px 26px 20px}#dc-study .ds-head{padding-left:26px}#dc-study .ds-shortcut{display:none}}
+@media(max-width:600px){#dc-study{grid-template-columns:minmax(0,1fr);min-height:0}#dc-study .ds-side{display:none}#dc-study.ds-mobile-side .ds-side{display:flex;border-bottom:1px solid var(--ds-line)}#dc-study .ds-side-footer{padding-top:16px}#dc-study .ds-reopen{display:inline-flex}#dc-study .ds-head{padding:18px 14px;min-height:80px;gap:8px;align-items:flex-start}#dc-study .ds-head-title{font-size:17px}#dc-study .ds-head-action{margin-top:30px;padding:4px}#dc-study .ds-content{padding:24px 19px 14px}#dc-study .ds-composer-area{padding:12px 16px 18px}#dc-study .ds-user{max-width:94%}#dc-study .ds-reply h2{font-size:20px}#dc-study .ds-breadcrumb{flex-wrap:wrap}#dc-study .ds-control-group{gap:3px}#dc-study .ds-control-group select{max-width:115px}#dc-study .ds-tools summary{flex-wrap:wrap}#dc-study .ds-preview-label{display:none}}
+@media(prefers-reduced-motion:reduce){#dc-study .ds-tools .ds-chevron,#dc-study .ds-composer{transition:none}}
+</style>
+<style>
+#dc-study{position:relative;--ds-side-width:200px;min-height:820px}
+#dc-study button{cursor:default}
+#dc-study button[aria-pressed=true]{background:var(--ds-selected)}
+#dc-study input:not([type=checkbox]),#dc-study select{border:1px solid var(--ds-line);border-radius:7px;padding:8px 10px;background:var(--ds-input);font-size:14px;min-width:0;max-width:100%}
+#dc-study textarea:focus-visible{outline:none}
+#dc-study .ds-composer:focus-within{border-color:var(--ds-secondary);box-shadow:0 0 0 1px var(--ds-secondary)}
+#dc-study .ds-brandrow{height:59px;margin-bottom:12px}
+#dc-study .ds-side{padding:0 10px 12px}
+#dc-study .ds-nav{font-size:13px}
+#dc-study .ds-section{margin:23px 0 7px;padding:0 8px;gap:4px}
+#dc-study .ds-section>span{flex:1}
+#dc-study .xs-icon{width:25px;height:25px;justify-content:center;padding:3px;color:var(--ds-muted);flex:none}
+#dc-study .xs-icon svg{width:14px;height:14px}
+#dc-study .project-head{display:flex;align-items:center;margin:6px 0;padding-right:4px;border-radius:7px;color:var(--ds-secondary)}
+#dc-study .project-head:hover,#dc-study .project-head:focus-within{background:var(--ds-hover)}
+#dc-study .project-head>button,#dc-study .project-head>button:hover{background:transparent}
+#dc-study .project-head [data-new-project]:hover{color:var(--ds-text)}
+#dc-study .project-head .project-name{flex:1;min-width:0;justify-content:flex-start;padding:7px 5px;font-size:12px;font-weight:500}
+#dc-study .project-name svg{width:13px;height:13px}
+#dc-study .project-name span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .task-strip .grow{text-align:left}
+#dc-study .file-row .grow{text-align:left}
+#dc-study .session-row{display:flex;align-items:center;border-radius:7px;gap:0;padding-right:4px;margin:2px 0}
+#dc-study .session-row:hover,#dc-study .session-row:focus-within{background:var(--ds-hover)}
+#dc-study .session-row.current,#dc-study .session-row:has(.session-more[aria-expanded="true"]){background:var(--ds-selected)}
+#dc-study .session-row .session-open,#dc-study .session-row .session-more{background:transparent}
+#dc-study .session-row .session-open:hover,#dc-study .session-row .session-more:hover{background:transparent}
+#dc-study .session-row .session-open{padding:6px 8px;min-width:0;flex:1;display:flex;align-items:center;gap:8px;text-align:left;font-size:13px;line-height:18px;color:var(--ds-secondary)}
+#dc-study .session-row.current .session-open{color:var(--ds-text)}
+#dc-study .session-row .session-more{opacity:0;width:36px;height:auto;align-self:stretch;min-height:30px;margin-right:-4px}
+#dc-study .session-row .session-more svg{pointer-events:none}
+@media(pointer:coarse){#dc-study .session-row .session-more{width:44px;min-height:44px}}
+#dc-study .session-row:hover .session-more,#dc-study .session-row:focus-within .session-more,#dc-study .session-row.current .session-more,#dc-study .session-row .session-more[aria-expanded="true"]{opacity:1}
+#dc-study .session-row .session-more:hover{color:var(--ds-text)}
+#dc-study .session-meta{display:flex;align-items:center;gap:4px;font-size:11px;line-height:18px;color:var(--ds-muted);margin:0;flex:none}
+#dc-study .session-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(pointer:coarse){#dc-study .session-row .session-open{min-height:44px}}
+#dc-study .session-meta svg{width:11px;height:11px}
+#dc-study .batchbar{display:flex;flex-wrap:wrap;gap:3px;font-size:11px;border-bottom:1px solid var(--ds-line);padding:5px 0}
+#dc-study .batchbar button{font-size:11px;padding:5px}
+#dc-study .ds-side-footer{padding-top:35px}
+#dc-study .ds-footer-trigger{font-size:12px}
+#dc-study .ds-head{min-height:77px;padding:17px 22px;border-bottom:0;gap:10px}
+#dc-study .ds-head-title{font-size:17px}
+#dc-study .head-tools{display:flex;gap:3px;align-items:center;flex:none}
+#dc-study .head-tools button{color:var(--ds-secondary);width:29px;height:29px;justify-content:center;padding:5px}
+#dc-study .workarea{display:grid;grid-template-columns:minmax(0,1fr);flex:1;min-width:0}
+#dc-study .workarea.with-files{grid-template-columns:minmax(0,1fr) var(--panel-w,380px)}
+#dc-study .chatpane{display:flex;flex-direction:column;min-width:0}
+#dc-study .ds-content{padding:15px 30px 15px;max-width:740px}
+#dc-study .ds-date{margin-bottom:20px}
+#dc-study .ds-user{font-size:14px}
+#dc-study .ds-tools{margin:21px 0 20px}
+#dc-study .ds-reply{line-height:1.8}
+#dc-study .ds-reply h2{font-size:20px;line-height:1.55;margin-bottom:15px}
+#dc-study .ds-reply h3{margin-top:21px}
+#dc-study .ds-reply p{margin-bottom:15px}
+#dc-study .ds-reply-actions{margin-top:15px;gap:9px}
+#dc-study .quiet{color:var(--ds-secondary);font-size:12px}
+#dc-study .muted{color:var(--ds-muted);font-size:11px}
+#dc-study .grow{flex:1;min-width:0}
+#dc-study .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#dc-study .space{justify-content:space-between}
+#dc-study .line{height:1px;background:var(--ds-line);margin:5px 0}
+#dc-study .soft-button{border:1px solid var(--ds-line);background:var(--ds-input);font-size:12px;padding:6px 10px}
+#dc-study .primary{background:var(--ds-send);color:var(--ds-send-ink)}
+#dc-study .danger{color:light-dark(#a64336,#e69d8e)}
+#dc-study .change-summary{margin-top:22px;border:1px solid var(--ds-line);border-radius:9px;overflow:hidden}
+#dc-study .change-summary>summary{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12px;list-style:none}
+#dc-study .change-summary>summary::-webkit-details-marker{display:none}
+#dc-study .change-body{border-top:1px solid var(--ds-line);padding:6px 10px 10px}
+#dc-study .file-row{display:flex;align-items:center;justify-content:space-between;width:100%;gap:6px;font-size:12px}
+#dc-study .file-row span:first-child{overflow-wrap:anywhere;min-width:0}
+#dc-study .delta{color:var(--ds-success);white-space:nowrap;font-size:11px}
+#dc-study .event-log{margin-top:15px;font-size:12px;color:var(--ds-secondary)}
+#dc-study .event-log>summary{list-style:none;display:flex;gap:7px;align-items:center}
+#dc-study .event-item{margin:12px 0;padding-left:12px;border-left:1px solid var(--ds-line);line-height:1.7}
+#dc-study .ds-composer-area{padding:16px 30px 20px;max-width:740px}
+#dc-study .ds-control-group{gap:3px}
+#dc-study .ds-compose-controls{gap:3px;padding:7px 0 0}
+#dc-study .ds-compose-controls button{font-size:11px;padding-left:4px;padding-right:4px}
+#dc-study .ds-composer .ds-send{font-size:13px}
+#dc-study .context-ring{width:14px;height:14px;display:inline-block;border-radius:50%;background:conic-gradient(var(--ds-secondary) 28%,var(--ds-line) 0);position:relative}
+#dc-study .context-ring:after{content:'';position:absolute;inset:2px;border-radius:50%;background:var(--ds-bg)}
+#dc-study .references{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#dc-study .ref-chip{display:flex;align-items:center;gap:6px;padding:3px 7px;border:1px solid var(--ds-line);border-radius:6px;font-size:11px;max-width:100%;overflow-wrap:anywhere}
+#dc-study .ref-chip button{padding:0;width:16px;height:20px;justify-content:center}
+#dc-study .task-strip{border-top:1px solid var(--ds-line);margin:0 30px;font-size:12px;color:var(--ds-secondary)}
+#dc-study .task-strip>button{width:100%;justify-content:flex-start;font-size:12px;padding:10px 0;gap:7px}
+#dc-study .task-detail{padding-bottom:12px;line-height:1.8}
+#dc-study .task-detail label{display:flex;align-items:center;gap:8px;margin:7px 0}
+#dc-study .goal-strip{display:flex;align-items:center;gap:8px;padding:10px 13px;margin:0 30px 6px;background:var(--ds-accent-bg);border-radius:8px;font-size:12px}
+#dc-study .goal-strip svg{width:14px;color:var(--ds-accent)}
+#dc-study .inline-state{border:1px solid var(--ds-line);background:var(--ds-input);border-radius:10px;padding:18px;font-size:14px;margin-top:20px}
+#dc-study .inline-state h3{font-size:16px;font-weight:500;margin:0 0 9px}
+#dc-study .inline-state p{font-size:13px;color:var(--ds-secondary);line-height:1.7;margin:8px 0 15px}
+#dc-study .inline-state label{display:flex;gap:8px;align-items:center;padding:8px 0;font-size:13px}
+#dc-study .workspace{background:var(--ds-sidebar);border-left:1px solid var(--ds-line);padding:0;min-width:0;position:relative;display:flex;flex-direction:column;min-height:0}
+#dc-study .workspace-head{display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:12px}
+#dc-study .workspace input{width:100%;font-size:12px!important;padding:7px 9px!important;margin-bottom:9px}
+#dc-study .workspace pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.9;padding:12px 8px;background:var(--ds-bg);border-radius:7px;margin:10px 0}
+#dc-study .code-line{display:block;white-space:pre-wrap}
+#dc-study .code-add{color:var(--ds-success)}
+#dc-study .code-remove{color:light-dark(#a64336,#c98d80)}
+#dc-study .preview-tools{display:flex;gap:3px;flex-wrap:wrap;margin:12px 0 0}
+#dc-study .preview-tools button{font-size:11px;padding:5px}
+#dc-study .workspace .file-row{font-size:11px;padding:8px 5px}
+#dc-study .preview-caption{font-size:11px;margin-top:15px;overflow-wrap:anywhere;color:var(--ds-secondary)}
+#dc-study .terminal{border-top:1px solid var(--ds-line);padding:12px 23px;background:var(--ds-sidebar)}
+#dc-study .terminal pre{font-family:ui-monospace,monospace;font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin:12px 0;color:var(--ds-secondary)}
+#dc-study .terminal .row button{padding:4px;font-size:11px}
+#dc-study .terminal input{flex:1;border:0!important;background:transparent!important;padding:3px!important;font-family:ui-monospace,monospace;font-size:12px!important}
+#dc-study .floating-menu{position:absolute;z-index:25;width:238px;max-width:calc(100% - 24px);padding:6px;border:1px solid var(--ds-line);border-radius:10px;box-shadow:0 8px 28px light-dark(#24221a20,#00000045);background:light-dark(#fffefa,#32322e)}
+#dc-study .floating-menu>button{width:100%;text-align:left;align-items:flex-start;gap:9px;padding:9px 10px;line-height:1.45;color:var(--ds-text);font-size:12px}
+#dc-study .floating-menu .menu-copy{flex:1;min-width:0}
+#dc-study .floating-menu .menu-copy small{display:block;font-size:11px;line-height:1.5;color:var(--ds-secondary);margin-top:4px}
+#dc-study .floating-menu .chosen{color:var(--ds-accent);margin-left:auto;width:13px}
+#dc-study .floating-menu input{width:100%;margin:3px 0 6px;font-size:13px!important}
+#dc-study .overlay{position:absolute;inset:0;z-index:30;background:light-dark(#28271f30,#00000065);padding:76px 16px 20px;display:flex;align-items:flex-start;justify-content:center}
+#dc-study .dialog{width:510px;max-width:100%;background:var(--ds-bg);border:1px solid var(--ds-line);border-radius:14px;box-shadow:0 12px 50px light-dark(#29251e20,#00000050);padding:21px}
+#dc-study .dialog-head{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+#dc-study .dialog h2{font-size:18px;font-weight:600;line-height:1.4;margin:0;flex:1}
+#dc-study .dialog p{font-size:13px;line-height:1.8;color:var(--ds-secondary)}
+#dc-study .dialog input:not([type=checkbox]):not([type=radio]),#dc-study .dialog select{width:100%;margin:6px 0 14px}
+#dc-study .dialog label{font-size:12px;color:var(--ds-secondary);display:block;margin-top:9px}
+#dc-study .dialog textarea{border:1px solid var(--ds-line);background:var(--ds-input);border-radius:8px;padding:10px;height:80px;margin:7px 0 14px;min-height:80px;resize:vertical}
+#dc-study .dialog textarea:focus-within{border-color:var(--ds-secondary)}
+#dc-study .dialog-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:18px}
+#dc-study .dialog .search-result{width:100%;text-align:left;display:block;padding:11px 9px;border-bottom:1px solid var(--ds-line)}
+#dc-study .search-result small{display:block;font-size:11px;margin-top:4px;color:var(--ds-muted)}
+#dc-study .metric-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--ds-line);font-size:13px}
+#dc-study .usage-track{height:5px;background:var(--ds-line);border-radius:3px;margin:14px 0}
+#dc-study .usage-track>span{display:block;width:28%;height:100%;background:var(--ds-accent);border-radius:3px}
+#dc-study .fullpage{padding:24px 28px;flex:1;min-width:0}
+#dc-study .fullpage h2{font-size:22px;margin:0 0 7px;font-weight:600}
+#dc-study .settings-layout{display:grid;grid-template-columns:135px minmax(0,1fr);gap:25px;margin-top:23px}
+#dc-study .settings-nav{display:flex;flex-direction:column;gap:2px}
+#dc-study .settings-nav button{font-size:12px;text-align:left;padding:7px 10px;gap:9px;align-items:center}
+#dc-study .settings-nav button svg{width:15px;height:15px;flex:none;stroke-width:1.7;color:var(--ds-secondary)}
+#dc-study .settings-nav button[aria-pressed="true"] svg{color:inherit}
+#dc-study .settings-nav button span{white-space:nowrap}
+#dc-study .settings-content h3{font-size:17px;font-weight:500;margin:3px 0 20px}
+#dc-study .settings-content{min-width:0;max-width:820px;padding-bottom:36px}
+/* The preview host sizes its iframe from this content: viewport height here creates a resize loop. */
+#dc-study.is-settings{height:820px;min-height:0;grid-template-rows:minmax(0,1fr)}
+#dc-study.is-settings .ds-main{min-height:0;overflow:hidden}
+#dc-study.is-settings .ds-head{flex-shrink:0}
+#dc-study.is-settings .fullpage{display:flex;min-height:0;overflow:hidden}
+#dc-study.is-settings .settings-layout{flex:1;min-width:0;min-height:0;grid-template-rows:minmax(0,1fr);overflow:hidden}
+#dc-study.is-settings .settings-content{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-right:12px}
+#dc-study.is-settings .settings-nav{min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
+#dc-study.is-settings .ds-side{min-height:0;overflow:hidden}
+#dc-study.is-settings .ds-side>*{flex-shrink:0}
+#dc-study.is-settings #project-list{min-height:0;flex:1;overflow-y:auto;overscroll-behavior-y:contain}
+#dc-study.is-settings .ds-side-footer{padding-top:16px}
+#dc-study.is-settings .overlay{overflow-y:auto;overscroll-behavior-y:contain}
+@media(max-width:600px){#dc-study.is-settings .settings-layout{grid-template-rows:auto minmax(0,1fr)}#dc-study.is-settings .settings-nav{max-height:160px}#dc-study.is-settings.ds-mobile-side .ds-side{position:absolute;inset:0 auto 0 0;width:200px;z-index:20}}
+#dc-study .skills-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+#dc-study .skills-title{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+#dc-study .skills-title h3{margin:0;font-size:22px;font-weight:600;letter-spacing:-.5px}
+#dc-study .skills-total{font-size:12px;color:var(--ds-secondary)}
+#dc-study .skills-search{display:flex;align-items:center;gap:9px;min-width:140px;width:230px;max-width:100%;padding:8px 11px;border:1px solid var(--ds-line);border-radius:9px;color:var(--ds-secondary);background:var(--ds-input)}
+#dc-study .skills-search:focus-within{border-color:var(--ds-secondary)}
+#dc-study .skills-search input{width:100%;min-width:0;padding:0;border:0;background:transparent;font-size:13px;line-height:20px}
+#dc-study .skills-search input:focus-visible{outline-offset:3px}
+#dc-study .settings-content .prefs-button{width:auto;min-width:0;min-height:32px;padding:6px 10px;border:1px solid transparent;border-radius:6px;font-size:12px;line-height:18px;gap:8px;white-space:nowrap;flex:none}
+#dc-study .settings-content .prefs-button.soft-button{border-color:var(--ds-line)}
+#dc-study .settings-content .prefs-button svg{width:16px;height:16px}
+#dc-study .skills-add{background:var(--ds-text);color:var(--ds-bg)}
+#dc-study .skills-add:hover{background:var(--ds-text);opacity:.9}
+#dc-study .skills-group{margin:0 0 22px}
+#dc-study .skills-group h4{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin:0 0 5px}
+#dc-study .skills-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;padding:1px 6px;border-radius:12px;background:var(--ds-hover);color:var(--ds-secondary);font-size:11px;font-weight:400}
+#dc-study .skill-row{position:relative;display:flex;align-items:center;gap:11px;width:100%;min-width:0;padding:10px 12px;text-align:left;border:0;border-radius:12px}
+#dc-study .skill-row::after{content:"";position:absolute;bottom:0;left:12px;right:12px;height:1px;background:var(--ds-line);pointer-events:none}
+#dc-study .skill-row:is(:hover,:focus-visible,:active){background:var(--ds-hover)}
+#dc-study .skill-row:is(:hover,:focus-visible,:active)::after,#dc-study .skill-row:has(+.skill-row:is(:hover,:focus-visible,:active))::after{opacity:0}
+#dc-study .skill-file-icon{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;border:1px solid var(--ds-line);border-radius:7px;color:var(--ds-secondary)}
+#dc-study .skill-file-icon svg{width:17px;height:17px}
+#dc-study .skill-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+#dc-study .skill-name{display:flex;align-items:center;gap:9px;min-width:0}
+#dc-study .skill-name strong{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .skill-description{display:block;font-size:12px;line-height:1.5;color:var(--ds-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .skill-row>.skill-chevron{color:var(--ds-muted);width:14px;margin-right:4px}
+@media(max-width:780px){#dc-study .skills-title{width:100%}#dc-study .skills-search{flex:1;width:auto}#dc-study .skill-row{gap:10px}#dc-study .skill-file-icon{width:32px;height:32px}}
+#dc-study .prefs-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 26px}
+#dc-study .prefs-head h3{font-size:21px;line-height:1.4;margin:0 0 7px;letter-spacing:-.3px}
+#dc-study .prefs-head p,#dc-study .prefs-help{font-size:12px;line-height:1.7;color:var(--ds-secondary);margin:0;max-width:60ch}
+#dc-study .prefs-section{margin:25px 0 0;min-width:0}
+#dc-study .prefs-section h4{font-size:13px;font-weight:500;margin:0 0 10px;color:var(--ds-secondary)}
+#dc-study .prefs-line{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid var(--ds-line);font-size:13px;min-width:0}
+#dc-study .prefs-copy{min-width:0;flex:1;overflow-wrap:anywhere}
+#dc-study .prefs-copy strong{display:block;font-weight:500}
+#dc-study .prefs-copy p{font-size:12px;line-height:1.5;margin:1px 0 0;color:var(--ds-secondary)}
+#dc-study .prefs-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0}
+#dc-study .prefs-actions button,#dc-study .prefs-head button{font-size:12px;white-space:nowrap}
+#dc-study .prefs-badge{font-size:11px;color:var(--ds-secondary);background:var(--ds-hover);border-radius:4px;padding:2px 6px;display:inline-flex;gap:4px;align-items:center}
+#dc-study .prefs-label{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:14px;font-weight:500}
+#dc-study .prefs-field{display:block;font-size:12px;color:var(--ds-secondary);min-width:0;margin:15px 0}
+#dc-study .prefs-field>span{display:block;margin-bottom:7px}
+#dc-study .settings-content input:not([type=checkbox]):not([type=radio]):not([type=range]),#dc-study .settings-content select,#dc-study .settings-content textarea{border:1px solid var(--ds-line);border-radius:7px;background:var(--ds-input);padding:9px 11px;width:100%;min-width:0;font-size:13px}
+#dc-study .settings-content textarea{resize:vertical;min-height:110px;line-height:1.8}
+#dc-study .settings-content input[type=checkbox],#dc-study .settings-content input[type=radio]{accent-color:var(--ds-accent);width:16px;height:16px;flex-shrink:0}
+#dc-study .settings-content input[type=range]{padding:0;border:0;background:transparent}
+#dc-study .prefs-toggle{display:inline-flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap}
+#dc-study .prefs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+#dc-study .prefs-choices{display:flex;flex-wrap:wrap;gap:6px}
+#dc-study .prefs-choices button{border:1px solid var(--ds-line);padding:7px 12px;font-size:12px}
+#dc-study .prefs-choices button[aria-pressed=true]{background:var(--ds-selected);color:var(--ds-text);border-color:var(--ds-secondary)}
+#dc-study .prefs-choice-row{display:flex;align-items:center;width:100%;text-align:left;gap:14px;padding:17px 12px;border-bottom:1px solid var(--ds-line);border-radius:0}
+#dc-study .prefs-choice-row[aria-pressed=true]{background:var(--ds-hover);border-radius:8px}
+#dc-study .prefs-choice-row .choice-mark{margin-left:auto;color:var(--ds-accent)}
+#dc-study .prefs-summary{display:flex;gap:28px;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--ds-line);margin-bottom:22px}
+#dc-study .prefs-summary small{display:block;font-size:11px;color:var(--ds-secondary);margin-bottom:5px}
+#dc-study .prefs-summary strong{display:block;font-size:21px;font-weight:500;letter-spacing:-.4px}
+#dc-study .prefs-summary span{font-size:11px;color:var(--ds-secondary)}
+#dc-study .prefs-note{border-left:2px solid var(--ds-line);padding:6px 0 6px 13px;font-size:12px;color:var(--ds-secondary);line-height:1.7;margin:18px 0}
+#dc-study .prefs-code{font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--ds-sidebar);padding:16px;border:1px solid var(--ds-line);border-radius:8px;margin:14px 0}
+#dc-study .prefs-disclosure{margin-top:18px;border-top:1px solid var(--ds-line);padding-top:12px;font-size:12px}
+#dc-study .prefs-disclosure summary{padding:6px 0;color:var(--ds-secondary);cursor:pointer}
+#dc-study .prefs-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:22px;flex-wrap:wrap}
+#dc-study .prefs-reader{display:grid;grid-template-columns:145px minmax(0,1fr);border:1px solid var(--ds-line);border-radius:8px;margin-top:16px;min-height:330px;overflow:hidden}
+#dc-study .prefs-tree{padding:10px;background:var(--ds-sidebar);border-right:1px solid var(--ds-line);min-width:0}
+#dc-study .prefs-tree button{display:flex;width:100%;font-size:11px;overflow-wrap:anywhere;text-align:left}
+#dc-study .prefs-tree button[aria-pressed=true]{background:var(--ds-selected)}
+#dc-study .prefs-document{padding:18px;min-width:0;font-size:13px;line-height:1.85}
+#dc-study .prefs-document h4{font-size:16px;margin:0 0 15px;font-weight:500}
+#dc-study .prefs-document textarea{min-height:280px;font-family:ui-monospace,monospace}
+#dc-study .prefs-term{margin-top:18px;border:1px solid var(--ds-line);border-radius:8px;background:var(--ds-sidebar);overflow:hidden}
+#dc-study .prefs-termbar{display:flex;gap:3px;align-items:center;flex-wrap:wrap;padding:6px;border-bottom:1px solid var(--ds-line)}
+#dc-study .prefs-termbar button{font-size:11px}
+#dc-study .prefs-termbar [aria-pressed=true]{background:var(--ds-selected)}
+#dc-study .prefs-term pre{min-height:215px;padding:16px;margin:0;font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+#dc-study .prefs-term .prefs-command{display:flex;align-items:center;padding:0 14px 12px;gap:9px}
+#dc-study .prefs-term .prefs-command input{border:0!important;background:transparent!important;font-family:ui-monospace,monospace}
+#dc-study .prefs-heatmap{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;grid-auto-columns:minmax(3px,1fr);gap:3px;margin:14px 0}
+#dc-study .prefs-heatmap button{padding:0;aspect-ratio:1;border-radius:2px;background:var(--ds-hover);min-width:0}
+#dc-study .prefs-heatmap button[data-level="1"]{background:color-mix(in srgb,var(--ds-success) 30%,var(--ds-bg))}
+#dc-study .prefs-heatmap button[data-level="2"]{background:color-mix(in srgb,var(--ds-success) 55%,var(--ds-bg))}
+#dc-study .prefs-heatmap button[data-level="3"]{background:var(--ds-success)}
+#dc-study .prefs-status{font-size:12px;color:var(--ds-secondary);min-height:22px;margin-top:14px;overflow-wrap:anywhere}
+#dc-study .prefs-empty{text-align:center;padding:34px 12px;color:var(--ds-secondary);font-size:13px}
+#dc-study .prefs-qr{display:grid;place-items:center;width:100px;height:100px;border:1px dashed var(--ds-line);border-radius:8px;flex:none;color:var(--ds-muted)}
+#dc-study .prefs-qr svg{width:32px;height:32px}
+#dc-study .general-settings{--general-line:color-mix(in srgb,var(--ds-line) 65%,var(--ds-bg));padding:0 2px 24px}
+#dc-study .general-group{margin:0 0 28px}
+#dc-study .general-group:last-child{margin-bottom:0}
+#dc-study .general-group h3{font-size:16px;font-weight:600;line-height:1.5;margin:0 0 4px;letter-spacing:0}
+#dc-study .general-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px;min-height:44px;padding:10px 0;border-bottom:1px solid var(--general-line)}
+#dc-study .general-row:last-child{border-bottom:0}
+#dc-study .general-name{display:block;font-size:14px;font-weight:400;line-height:1.6}
+#dc-study .general-description{font-size:12px;line-height:1.5;margin:1px 0 0;color:var(--ds-secondary);max-width:48ch}
+#dc-study .general-control{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;max-width:260px}
+#dc-study .general-select{display:inline-flex;position:relative;align-items:center;max-width:240px;min-width:85px}
+#dc-study .general-select button{border:0;background:transparent;border-radius:6px;padding:8px 5px 8px 8px;font-size:13px;line-height:1.5;text-align:right;justify-content:flex-end;width:100%;max-width:100%;gap:10px}
+#dc-study .general-select button:hover,#dc-study .general-select button[aria-expanded=true]{background:var(--ds-hover)}
+#dc-study .general-select button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .general-select svg{pointer-events:none;color:var(--ds-secondary);width:13px;height:13px}
+#dc-study .floating-menu.general-options{max-height:280px;overflow-y:auto;overscroll-behavior:contain;width:240px}
+#dc-study .floating-menu.general-options>button{align-items:center;min-height:34px}
+#dc-study .general-segment{display:inline-flex;padding:3px;gap:2px;background:var(--ds-hover);border-radius:8px;max-width:100%}
+#dc-study .general-segment button{justify-content:center;white-space:nowrap;min-width:42px;font-size:12px;padding:5px 10px;border-radius:6px;color:var(--ds-secondary)}
+#dc-study .general-segment button[aria-pressed=true]{background:var(--ds-input);color:var(--ds-text);box-shadow:0 1px 3px light-dark(#24221a18,#00000030)}
+#dc-study .general-switch{display:flex;align-items:center;justify-content:flex-end;min-width:44px;min-height:32px}
+#dc-study .general-switch input[type=checkbox]{appearance:none;position:relative;margin:0;width:34px;height:20px;border:0;border-radius:11px;background:color-mix(in srgb,var(--ds-secondary) 40%,var(--ds-bg));cursor:pointer}
+#dc-study .general-switch input[type=checkbox]::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--ds-input);box-shadow:0 1px 2px light-dark(#24221a22,#00000040);transition:transform .12s}
+#dc-study .general-switch input[type=checkbox]:checked{background:var(--ds-accent)}
+#dc-study .general-switch input[type=checkbox]:checked::after{transform:translateX(14px)}
+#dc-study .general-advanced{border-bottom:1px solid var(--general-line)}
+#dc-study .general-advanced:last-child{border-bottom:0}
+#dc-study .general-advanced>summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px;min-height:44px;padding:10px 0;cursor:pointer}
+#dc-study .general-advanced>summary::-webkit-details-marker{display:none}
+#dc-study .general-advanced>summary .general-current{display:flex;align-items:center;gap:10px;color:var(--ds-secondary);font-size:12px;text-align:right}
+#dc-study .general-advanced>summary svg{width:14px;height:14px}
+#dc-study .general-advanced[open]>summary svg{transform:rotate(90deg)}
+#dc-study .general-expanded{padding:0 0 14px}
+#dc-study .general-expanded .prefs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#dc-study .general-expanded .general-row{min-height:44px}
+#dc-study .general-expanded .prefs-footer{margin-top:16px}
+@media(max-width:780px){#dc-study .general-row,#dc-study .general-advanced>summary{gap:14px}#dc-study .general-control{max-width:205px}#dc-study .general-select{max-width:200px}#dc-study .general-segment button{min-width:34px;padding:5px 7px}}
+@media(max-width:450px){#dc-study .general-row{grid-template-columns:minmax(0,1fr);gap:10px}#dc-study .general-control{justify-self:end;max-width:100%}#dc-study .general-row:has(.general-switch){grid-template-columns:minmax(0,1fr) auto}#dc-study .general-expanded .prefs-grid{grid-template-columns:minmax(0,1fr)}#dc-study .general-group{margin-bottom:24px}}
+@media(pointer:coarse){#dc-study .general-switch{min-height:44px}#dc-study .general-select button,#dc-study .general-segment button,#dc-study .floating-menu.general-options>button{min-height:44px}}
+@media(prefers-reduced-motion:reduce){#dc-study .general-switch input[type=checkbox]::after{transition:none}}
+@media(max-width:1000px){#dc-study .prefs-line{align-items:flex-start;flex-wrap:wrap}#dc-study .prefs-grid{grid-template-columns:minmax(0,1fr)}#dc-study .prefs-reader{grid-template-columns:minmax(0,1fr)}#dc-study .prefs-tree{border-right:0;border-bottom:1px solid var(--ds-line)}#dc-study .prefs-tree button{width:auto;display:inline-flex}}
+@media(max-width:600px){#dc-study .prefs-head{flex-wrap:wrap}#dc-study .prefs-head h3{font-size:20px}#dc-study .prefs-summary{gap:20px}#dc-study .prefs-heatmap{gap:2px}#dc-study .prefs-choice-row{padding:15px 8px}}
+#dc-study .setting-row{padding:14px 0;border-bottom:1px solid var(--ds-line);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#dc-study .setting-row small{display:block;color:var(--ds-secondary);font-size:11px;margin-top:5px}
+#dc-study .setting-row button{font-size:12px}
+#dc-study .schedule-row{border-bottom:1px solid var(--ds-line);padding:20px 0;display:flex;align-items:center;gap:10px}
+#dc-study .schedule-row h3{font-size:15px;font-weight:500;margin:0 0 6px}
+#dc-study .schedule-row p{font-size:12px;color:var(--ds-secondary);margin:0}
+#dc-study .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:40;background:var(--ds-text);color:var(--ds-bg);font-size:12px;line-height:1.6;padding:8px 13px;border-radius:8px;max-width:calc(100% - 25px);box-shadow:var(--ds-shadow)}
+#dc-study .member-note{font-size:12px;color:var(--ds-secondary);margin:0 30px 13px;display:flex;align-items:center;justify-content:space-between}
+#dc-study .jump-row{display:flex;justify-content:flex-end;padding:4px 0}
+#dc-study .jump-row button{font-size:11px;color:var(--ds-secondary)}
+@media(max-width:850px){#dc-study{--ds-side-width:180px}#dc-study .workarea.with-files{grid-template-columns:minmax(0,1fr)}#dc-study .workspace{border-left:0;border-top:1px solid var(--ds-line)}#dc-study .ds-content,#dc-study .ds-composer-area{padding-left:22px;padding-right:22px}}
+@media(max-width:600px){#dc-study .ds-head{padding:15px 16px;flex-wrap:wrap}#dc-study .ds-head-title{font-size:16px}#dc-study .head-tools{margin-left:auto}#dc-study .ds-content{padding:10px 17px 15px}#dc-study .ds-composer-area{padding:14px 15px 18px}#dc-study .ds-content .ds-reply h2{font-size:19px}#dc-study .task-strip{margin:0 17px}#dc-study .goal-strip{margin-left:17px;margin-right:17px}#dc-study .overlay{padding:60px 10px 15px}#dc-study .dialog{padding:17px}#dc-study .fullpage{padding:20px 17px}#dc-study .settings-layout{grid-template-columns:minmax(0,1fr);gap:15px}#dc-study .settings-nav{flex-direction:row;flex-wrap:wrap}#dc-study .session-row .session-more{opacity:1}#dc-study .member-note{margin-left:17px;margin-right:17px}}
+#dc-study .provider-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;padding:8px 10px 8px 13px;border:1px solid light-dark(#e3c9a4,#5a4a33);background:light-dark(#fbf3e6,#2f2a22);border-radius:10px;font-size:13px;line-height:1.5;color:var(--ds-secondary)}
+#dc-study .ds-composer-area .provider-notice{margin:0;padding:14px 14px 14px 18px;border-color:light-dark(#d9d7cf,#4b4b43);background:var(--ds-input);border-radius:16px;gap:16px}
+#dc-study .provider-notice[hidden],#dc-study .ds-composer[hidden],#dc-study .ds-compose-controls[hidden]{display:none}
+#dc-study .provider-gate-copy{display:grid;gap:2px;min-width:0}
+#dc-study .provider-gate-copy strong{font-size:14px;font-weight:600;color:var(--ds-text)}
+#dc-study .provider-gate-copy span{font-size:12px;color:var(--ds-secondary)}
+#dc-study .provider-notice .primary{height:32px;padding:0 14px;border-radius:8px;font-size:13px}
+#dc-study .provider-notice button{flex-shrink:0}
+#dc-study .settings-content .provider-notice{margin:0 0 18px}
+#dc-study .launch-screen{position:absolute;inset:0;z-index:35;background:var(--ds-bg);display:flex;align-items:center;justify-content:center;padding:24px;border-radius:inherit}
+#dc-study .launch-card{width:400px;max-width:100%;text-align:center}
+#dc-study .launch-mark{display:inline-flex;width:56px;height:56px;align-items:center;justify-content:center;border-radius:14px;background:var(--ds-accent-bg);color:var(--ds-accent);margin-bottom:22px}
+#dc-study .launch-screen .launch-mark svg{width:28px!important;height:28px!important}
+#dc-study .launch-card h1{font-size:22px;font-weight:600;margin:0 0 10px;color:var(--ds-text)}
+#dc-study .launch-card>p{font-size:14px;line-height:1.7;color:var(--ds-secondary);margin:0 0 24px}
+#dc-study .launch-import{display:flex;align-items:center;gap:12px;text-align:left;border:1px solid var(--ds-line);border-radius:12px;padding:12px 12px 12px 14px;margin:0 0 18px;background:var(--ds-input)}
+#dc-study .launch-import-icon{display:inline-flex;color:var(--ds-secondary)}
+#dc-study .launch-import-copy{display:grid;gap:2px;flex:1;min-width:0}
+#dc-study .launch-import-copy strong{font-size:13px;font-weight:600}
+#dc-study .launch-import-copy span{font-size:12px;line-height:1.55;color:var(--ds-secondary)}
+#dc-study .launch-import-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ds-secondary);white-space:nowrap}
+#dc-study .launch-import-status.done{color:var(--ds-success)}
+#dc-study .launch-import-status svg{width:14px;height:14px}
+#dc-study .launch-actions{display:grid;gap:8px}
+#dc-study .launch-actions button{height:38px;border-radius:9px;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+#dc-study .launch-actions button svg{width:15px;height:15px}
+#dc-study .launch-actions button[disabled]{opacity:.55;cursor:default}
+#dc-study .launch-ghost{background:transparent;color:var(--ds-secondary)}
+#dc-study .launch-ghost:hover:not([disabled]){background:var(--ds-hover)}
+#dc-study .mcp-view{margin:-6px 0 20px}
+#dc-study .mcp-browse-tools{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+#dc-study .mcp-browse-tools .skills-search{flex:1}
+#dc-study .mcp-entry{padding:14px 12px;border-bottom:1px solid var(--ds-line)}
+#dc-study .mcp-entry-head{display:flex;align-items:center;gap:8px}
+#dc-study .mcp-entry-head strong{font-size:14px;font-weight:600}
+#dc-study .mcp-installed{color:var(--ds-success)}
+#dc-study .mcp-entry>p{font-size:12px;color:var(--ds-secondary);margin:4px 0 0;line-height:1.6}
+#dc-study .mcp-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+#dc-study .mcp-tags span{font-size:11px;color:var(--ds-secondary);background:var(--ds-hover);border-radius:999px;padding:1px 8px}
+#dc-study .mcp-entry .mcp-meta{font-size:11px;color:var(--ds-muted);margin-top:8px}
+#dc-study .mcp-meta code{font-size:11px}
+#dc-study .memory-layout{display:grid;grid-template-columns:184px minmax(0,1fr);border-top:1px solid var(--ds-line);min-height:440px}
+#dc-study .memory-list{padding:12px 12px 12px 0;border-right:1px solid var(--ds-line);min-width:0;display:flex;flex-direction:column;gap:1px}
+#dc-study .memory-search{display:flex;align-items:center;gap:6px;height:30px;padding:0 9px;border:1px solid var(--ds-line);border-radius:8px;background:var(--ds-input);margin:0 0 10px;color:var(--ds-muted)}
+#dc-study .memory-search svg{width:13px;height:13px}
+#dc-study .memory-search input{border:0!important;background:transparent!important;outline:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;height:28px;width:100%;font-size:12px}
+#dc-study .memory-row{width:100%;justify-content:flex-start;gap:6px;padding:5px 8px;font-size:13px;border-radius:7px;color:var(--ds-text);text-align:left;min-width:0}
+#dc-study .memory-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .memory-row svg{width:14px;height:14px;color:var(--ds-muted)}
+#dc-study .memory-row:hover{background:var(--ds-hover)}
+#dc-study .memory-file{padding-left:26px;font-size:12px;color:var(--ds-secondary)}
+#dc-study .memory-file[aria-pressed="true"]{background:var(--ds-selected);color:var(--ds-text)}
+#dc-study .memory-count{margin-left:auto;font-size:11px;color:var(--ds-muted)}
+#dc-study .memory-dirty-dot{width:6px;height:6px;border-radius:50%;background:var(--ds-accent);margin-left:auto;flex:none}
+#dc-study .memory-empty{font-size:12px;color:var(--ds-muted);padding:3px 8px 5px 28px;margin:0}
+#dc-study .memory-doc{display:flex;flex-direction:column;min-width:0}
+#dc-study .memory-doc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 12px 20px;border-bottom:1px solid var(--ds-line);flex-wrap:wrap}
+#dc-study .memory-doc-title{display:grid;gap:1px;min-width:0}
+#dc-study .memory-doc-name{display:flex;align-items:center;gap:10px;min-width:0}
+#dc-study .memory-doc-title strong{font-size:14px;font-weight:600}
+#dc-study .memory-doc-title>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dc-study .memory-doc-title span{font-size:11px;color:var(--ds-muted)}
+#dc-study .memory-doc-tools{display:flex;align-items:center;gap:8px}
+#dc-study .memory-doc-tools button[disabled]{opacity:.45;cursor:default}
+#dc-study .memory-state{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ds-secondary);white-space:nowrap}
+#dc-study .memory-state::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ds-success)}
+#dc-study .memory-state.dirty{color:var(--ds-accent)}
+#dc-study .memory-state.dirty::before{background:var(--ds-accent)}
+#dc-study .memory-doc-body{flex:1;display:flex;padding:16px 0 16px 20px;min-height:0}
+#dc-study .memory-doc-body textarea{flex:1;width:100%;min-height:360px;border:0!important;background:transparent!important;box-shadow:none!important;outline:0!important;resize:none;padding:0!important;font:13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ds-text)}
+#dc-study .memory-preview{font-size:14px;line-height:1.8;max-width:62ch}
+#dc-study .memory-preview h4{font-size:17px;font-weight:600;margin:0 0 10px}
+#dc-study .memory-preview p{margin:0 0 10px}
+#dc-study .memory-preview ul{margin:0 0 10px;padding-left:18px}
+@media(max-width:760px){#dc-study .memory-layout{grid-template-columns:minmax(0,1fr)}#dc-study .memory-list{border-right:0;border-bottom:1px solid var(--ds-line);padding-right:0}#dc-study .memory-doc-head,#dc-study .memory-doc-body{padding-left:0}}
+#dc-study .settings-overlay{position:absolute;inset:0;z-index:22;background:light-dark(#28271f38,#00000070);display:flex;align-items:center;justify-content:center;padding:32px}
+#dc-study .settings-overlay[hidden]{display:none}
+#dc-study .settings-modal{position:relative;width:min(1000px,100%);height:min(700px,100%);background:var(--ds-bg);border:1px solid var(--ds-line);border-radius:14px;box-shadow:0 18px 60px light-dark(#29251e30,#00000070);display:flex;overflow:hidden}
+#dc-study .settings-close{position:absolute;top:12px;right:12px;z-index:2}
+#dc-study #settings-modal-body{flex:1;display:flex;min-width:0;min-height:0}
+#dc-study .settings-modal .settings-layout{display:grid;grid-template-columns:196px minmax(0,1fr);gap:0;margin:0;flex:1;min-width:0;min-height:0}
+#dc-study .settings-modal .settings-nav{background:var(--ds-sidebar);border-right:1px solid var(--ds-line);padding:12px 10px;overflow-y:auto;overscroll-behavior-y:contain;gap:1px}
+#dc-study .settings-modal .settings-nav button{font-size:13px;padding:6px 10px;width:100%}
+#dc-study .settings-nav-search{display:flex;align-items:center;gap:6px;height:30px;padding:0 9px;border:1px solid var(--ds-line);border-radius:8px;background:var(--ds-input);margin:0 0 6px;color:var(--ds-muted)}
+#dc-study .settings-nav-search svg{width:13px;height:13px}
+#dc-study .settings-nav-search input{border:0;background:transparent;outline:0;padding:0;height:28px;width:100%;font-size:12px;min-width:0}
+#dc-study .settings-nav-group{font-size:11px;color:var(--ds-muted);padding:12px 10px 4px}
+#dc-study .settings-nav-gap{height:12px}
+#dc-study .settings-modal .settings-content{overflow-y:auto;overscroll-behavior-y:contain;padding:26px 40px 32px 36px;max-width:none;min-height:0}
+#dc-study .settings-modal .settings-content>*{max-width:760px}
+@media(max-width:700px){#dc-study .settings-overlay{padding:10px}#dc-study .settings-modal .settings-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}#dc-study .settings-modal .settings-nav{flex-direction:row;flex-wrap:wrap;max-height:150px;border-right:0;border-bottom:1px solid var(--ds-line)}#dc-study .settings-modal .settings-nav button{width:auto}#dc-study .settings-nav-group,#dc-study .settings-nav-gap,#dc-study .settings-nav-search{display:none}#dc-study .settings-modal .settings-content{padding:20px 18px}}
+#dc-study :is(.skills-search,.memory-search,.settings-nav-search) input{border:0!important;background:transparent!important;padding:0!important;border-radius:0!important;box-shadow:none!important}
+#dc-study :is(.skills-search,.memory-search,.settings-nav-search) input:focus-visible{outline:none}
+#dc-study :is(.skills-search,.memory-search,.settings-nav-search):focus-within{border-color:var(--ds-accent);box-shadow:0 0 0 3px light-dark(#ac583c1f,#d78b6b26)}
+#dc-study.panel-open{height:820px;min-height:0;grid-template-rows:minmax(0,1fr)}
+#dc-study.panel-open .ds-main{min-height:0;overflow:hidden}
+#dc-study.panel-open .workarea{min-height:0}
+#dc-study.panel-open .chatpane{min-height:0;overflow:hidden}
+#dc-study.panel-open .ds-content{overflow-y:auto;min-height:0;overscroll-behavior-y:contain}
+#dc-study.panel-open .ds-side{min-height:0;overflow:hidden}
+#dc-study.panel-open #project-list{min-height:0;flex:1;overflow-y:auto}
+#dc-study .workarea.panel-expanded{grid-template-columns:0 minmax(0,1fr)}
+#dc-study .workarea.panel-expanded .chatpane{visibility:hidden;overflow:hidden}
+#dc-study .workarea.panel-expanded .workspace{border-left:0}
+#dc-study .panel-resizer{position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:3}
+#dc-study .panel-resizer:hover,#dc-study.is-resizing .panel-resizer{background:light-dark(#ac583c33,#d78b6b40)}
+#dc-study.is-resizing{user-select:none;cursor:col-resize}
+#dc-study .workarea.panel-expanded .panel-resizer{display:none}
+#dc-study .panel-tabs{display:flex;align-items:center;gap:2px;padding:6px 8px 0 10px;border-bottom:1px solid var(--ds-line);flex:none}
+#dc-study .panel-tabs [role=tab]{font-size:12px;padding:6px 9px 8px;border-radius:6px 6px 0 0;color:var(--ds-secondary);gap:6px;border-bottom:2px solid transparent;margin-bottom:-1px}
+#dc-study .panel-tabs [role=tab] svg{width:14px;height:14px}
+#dc-study .panel-tabs [role=tab][aria-selected=true]{color:var(--ds-text);border-bottom-color:var(--ds-text)}
+#dc-study .panel-tabs .xs-icon svg{width:14px;height:14px}
+#dc-study .panel-body{padding:12px;min-height:0;flex:1;overflow:auto;display:flex;flex-direction:column}
+#dc-study .panel-files{display:block}
+#dc-study .term-bar{display:flex;align-items:center;gap:4px;flex:none}
+#dc-study .term-tabs{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto}
+#dc-study .term-tab{display:inline-flex;align-items:center;border-radius:6px;color:var(--ds-secondary)}
+#dc-study .term-tab button{font-size:11px;padding:4px 7px;gap:5px;color:inherit}
+#dc-study .term-tab button svg{width:12px;height:12px}
+#dc-study .term-tab .term-tab-close{padding:4px 5px 4px 0}
+#dc-study .term-tab.active{background:var(--ds-selected);color:var(--ds-text)}
+#dc-study .term-tab:hover{background:var(--ds-hover)}
+#dc-study .term-bar .xs-icon svg{width:14px;height:14px}
+#dc-study .term-meta{font-size:11px;color:var(--ds-muted);margin:10px 2px 0}
+#dc-study .term-output{flex:1;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;padding:10px 12px;background:var(--ds-bg);border:1px solid var(--ds-line);border-radius:8px 8px 0 0;border-bottom:0;color:var(--ds-secondary);min-height:120px;overflow:auto}
+#dc-study .term-input{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ds-bg);border:1px solid var(--ds-line);border-top:1px dashed var(--ds-line);border-radius:0 0 8px 8px;font-family:ui-monospace,monospace;font-size:12px;color:var(--ds-secondary)}
+#dc-study .term-input input{flex:1;border:0!important;background:transparent!important;padding:0!important;font-family:ui-monospace,monospace;font-size:12px!important;outline:0;box-shadow:none!important}
+#dc-study .term-input:focus-within{border-color:var(--ds-accent)}
+@media(max-width:850px){#dc-study .workarea.with-files{grid-template-columns:minmax(0,1fr)}#dc-study .workarea.with-files .workspace{position:absolute;inset:0 0 0 auto;width:min(380px,100%);z-index:6;box-shadow:-8px 0 30px light-dark(#29251e20,#00000050)}#dc-study .panel-resizer{display:none}#dc-study .workarea{position:relative}}
+#dc-study .workspace .file-item+.file-item{border-top:1px solid var(--ds-line)}
+#dc-study .workspace .file-row{width:100%;gap:6px;padding:7px 6px;font-size:12px;border-radius:6px;justify-content:flex-start}
+#dc-study .workspace .file-row svg{width:13px;height:13px;color:var(--ds-muted);flex:none}
+#dc-study .workspace .file-row:hover{background:var(--ds-hover)}
+#dc-study .file-delta{font-family:ui-monospace,monospace;font-size:11px;white-space:nowrap}
+#dc-study .file-diff{padding:0 2px 12px 25px}
+#dc-study .file-path{font-size:11px;color:var(--ds-muted);margin:0 0 6px;overflow-wrap:anywhere}
+#dc-study .file-diff pre{margin:0;padding:6px 0;background:var(--ds-bg);border:1px solid var(--ds-line);border-radius:7px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.75;overflow-x:auto;white-space:pre}
+#dc-study .file-diff .code-line{display:flex;padding:0 10px 0 0;white-space:pre}
+#dc-study .file-diff .code-line.code-add{background:light-dark(#50745b14,#91aa8b1f)}
+#dc-study .file-diff .code-line.code-remove{background:light-dark(#a6433612,#c98d801f)}
+#dc-study .code-num{width:34px;text-align:right;color:var(--ds-muted);flex:none}
+#dc-study .code-sign{width:18px;text-align:center;flex:none}
+#dc-study .file-empty{font-size:11px;color:var(--ds-muted);margin:0}
+#dc-study .file-diff .preview-tools{margin:6px 0 0}
+#dc-study .file-diff .preview-tools button{gap:4px}
+#dc-study .file-diff .preview-tools svg{width:13px;height:13px}
+.demo-states{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 2px 0;font:12px/1.4 system-ui,sans-serif;color:light-dark(#89887d,#929184)}
+.demo-states span{margin-right:4px}
+.demo-states button{font:inherit;border:1px dashed light-dark(#cfccc1,#4a4a42);background:transparent;color:inherit;border-radius:6px;padding:4px 9px;cursor:pointer}
+.demo-states button:hover{color:light-dark(#292a26,#eeeee7)}
+</style>
+<div id="dc-study" aria-label="DreamCoder 完整主页面样稿">
+  <aside class="ds-side" aria-label="会话导航">
+    <div class="ds-brandrow"><span class="ds-brand-icon"><i data-lucide="square-terminal" aria-hidden="true"></i></span><span class="ds-brand">DreamCoder</span><button class="ds-collapse" aria-label="收起侧栏" data-action="collapse"><i data-lucide="panel-left-close" aria-hidden="true"></i></button></div>
+    <button class="ds-nav ds-new" data-action="new"><i data-lucide="plus" aria-hidden="true"></i>新会话<span class="ds-shortcut">⌘ N</span></button>
+    <button class="ds-nav" data-action="search"><i data-lucide="search" aria-hidden="true"></i>搜索会话<span class="ds-shortcut">⌘ K</span></button>
+    <button class="ds-nav" data-action="scheduled"><i data-lucide="calendar-clock" aria-hidden="true"></i>定时任务</button>
+    <div class="ds-section"><span>项目</span><button class="xs-icon" data-menu="create-project" aria-label="添加项目"><i data-lucide="plus" aria-hidden="true"></i></button></div>
+    <div class="batchbar" id="batchbar" hidden><button data-action="select-all">全选</button><button class="danger" data-action="batch-delete">删除所选</button><button data-action="batch-exit">完成</button></div>
+    <div id="project-list"></div>
+    <div class="ds-side-footer"><button class="ds-footer-trigger" data-menu="footer" aria-expanded="false"><i data-lucide="ellipsis" aria-hidden="true"></i>更多</button></div>
+  </aside>
+  <main class="ds-main">
+    <header class="ds-head"><div class="ds-head-left"><button class="ds-reopen" data-action="expand" aria-label="展开侧栏"><i data-lucide="panel-left" aria-hidden="true"></i></button><div><h1 class="ds-head-title" id="page-title">会话恢复流程</h1><div class="ds-breadcrumb" id="breadcrumb"><span>dreamcoder</span><span>／</span><i data-lucide="git-branch" aria-hidden="true"></i><span>main</span><span>· 刚刚更新</span></div></div></div><div class="head-tools" id="head-tools"><button data-menu="open-project" aria-label="在外部应用中打开" data-tooltip="打开项目"><i data-lucide="external-link" aria-hidden="true"></i></button><button data-action="terminal" aria-label="终端" data-tooltip="终端"><i data-lucide="square-terminal" aria-hidden="true"></i></button><button data-action="files" aria-label="文件与差异" data-tooltip="文件与差异"><i data-lucide="panel-right" aria-hidden="true"></i></button><button data-menu="session" aria-label="会话操作"><i data-lucide="ellipsis" aria-hidden="true"></i></button></div></header>
+    <div id="chat-view" class="workarea">
+      <section class="chatpane" aria-label="当前会话">
+        <div id="member-note" class="member-note" hidden><span>审查助手 · 成员会话</span><button data-action="leader">返回主会话</button></div>
+        <div class="goal-strip" id="goal-strip" hidden><i data-lucide="target" aria-hidden="true"></i><span class="grow">统一会话恢复与实时事件处理</span><button class="xs-icon" data-action="goal-details" aria-label="目标详情"><i data-lucide="chevron-down" aria-hidden="true"></i></button></div>
+        <div class="ds-content">
+          <div id="conversation">
+            <div class="ds-date">今天</div>
+            <div class="ds-user">精简会话恢复流程，让历史记录和实时消息使用一致的数据结构。</div>
+            <details class="ds-tools"><summary><i class="ds-chevron" data-lucide="chevron-right" aria-hidden="true"></i><i class="ds-check" data-lucide="check" aria-hidden="true"></i><span id="tool-label">查看 3 个文件 · 修改 2 个文件</span></summary><div class="ds-tools-body"><details><summary>思考过程</summary><p>先检查恢复入口，再对齐实时事件的数据类型。</p></details><div class="ds-tool-row"><i data-lucide="file-code" aria-hidden="true"></i><code>sessionService.ts</code><span>读取完成</span></div><div class="ds-tool-row"><i data-lucide="file-code" aria-hidden="true"></i><code>chatStore.ts</code><span>更新完成</span></div><details><summary>类型检查 · 已通过</summary><pre>bun run lint:desktop<br>0 errors</pre></details></div></details>
+            <article class="ds-reply" id="answer"><h2>历史与实时消息，<br>使用统一的数据结构。</h2><p>桌面端直接接收已解析的事件，不再重复识别消息里的特殊标记。</p><ul><li><strong>服务端</strong>统一生成展示条目。</li><li><strong>桌面端</strong>负责恢复和更新界面状态。</li></ul><p>类型检查已通过，可以继续检查恢复后的任务与权限状态。</p><div class="ds-reply-actions"><button data-action="copy-answer" aria-label="复制回复" data-tooltip="复制"><i data-lucide="copy" aria-hidden="true"></i></button><button data-action="branch" aria-label="从此处分叉" data-tooltip="从此处分叉"><i data-lucide="git-fork" aria-hidden="true"></i></button><button data-action="quote" aria-label="引用选中文字" data-tooltip="引用选中文字"><i data-lucide="text-quote" aria-hidden="true"></i></button><span>回复已完成</span></div>
+            <details class="change-summary"><summary><i data-lucide="files" aria-hidden="true"></i><span class="grow">本轮修改 · 2 个文件</span><span class="delta">+32 −58</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary><div class="change-body"><button class="file-row" data-file="chatStore.ts"><span>chatStore.ts</span><span class="delta">+18 −42</span></button><button class="file-row" data-file="sessionService.ts"><span>sessionService.ts</span><span class="delta">+14 −16</span></button><div class="row space"><button data-action="files" class="quiet">查看全部差异</button><button data-action="undo" class="quiet">撤销本轮修改</button></div></div></details></article>
+            <div id="state-content"></div>
+            <details class="event-log"><summary><i data-lucide="history" aria-hidden="true"></i>过程记录 · 4 条<i data-lucide="chevron-down" aria-hidden="true"></i></summary><div class="event-item">上下文已压缩 · 86 条消息整理为摘要<button data-action="context">查看摘要</button></div><div class="event-item">已保存项目记忆 · architecture.md<button data-settings="记忆">查看记忆</button></div><div class="event-item">目标已完成 · 续跑 2 次<button data-action="goal-details">详情</button></div><div class="event-item">后台检查完成 · 类型检查<button data-action="tasks">查看任务</button></div></details>
+          </div>
+          <div id="empty" class="ds-reply" hidden><h2 style="margin-top:50px">开始一项新的工作</h2><p class="quiet">描述你想完成的事情。</p></div>
+          <div id="sent" aria-live="polite"></div>
+        </div>
+        <div class="task-strip" id="task-strip"><button data-action="tasks" aria-expanded="false"><i data-lucide="list-checks" aria-hidden="true"></i><span id="task-label" class="grow">任务 3 / 3</span><span class="muted">1 位助手</span><i data-lucide="chevron-down" aria-hidden="true"></i></button><div class="task-detail" id="task-detail" hidden></div></div>
+        <div class="ds-composer-area">
+          <div class="references" id="references"></div>
+          <div class="provider-notice" id="provider-notice" role="status" hidden></div>
+          <div class="ds-composer"><button class="ds-icon-button" data-menu="add" aria-label="添加文件或命令"><i data-lucide="plus" aria-hidden="true"></i></button><textarea id="prompt" aria-label="输入消息" rows="1" placeholder="描述任务，或提出问题…"></textarea><button class="ds-send" id="send" data-action="send" aria-label="发送消息" disabled><i data-lucide="arrow-up" aria-hidden="true"></i></button></div>
+          <input id="file-input" type="file" multiple hidden>
+          <div class="ds-compose-controls"><div class="ds-control-group"><button class="ds-picker-trigger" data-action="repository" aria-label="项目与分支"><i data-lucide="folder" aria-hidden="true"></i><span id="project-label">dreamcoder</span></button><button class="ds-picker-trigger" data-menu="permission" aria-label="权限模式"><i data-lucide="shield-check" aria-hidden="true"></i><span id="permission-label">Default</span><i data-lucide="chevron-down" aria-hidden="true"></i></button></div><div class="ds-control-group"><button class="ds-picker-trigger" data-menu="model" aria-label="模型与推理强度"><span id="model-label">Sonnet · Medium</span><i data-lucide="chevron-down" aria-hidden="true"></i></button><button class="ds-picker-trigger" data-action="context" aria-label="上下文用量 28%" data-tooltip="上下文用量"><span class="context-ring"></span></button></div></div>
+        </div>
+      </section>
+      <aside class="workspace" id="workspace" aria-label="文件与差异" hidden></aside>
+    </div>
+    <section class="terminal" id="terminal" aria-label="终端" hidden></section>
+    <section class="fullpage" id="other-page" hidden></section>
+  </main>
+  <div class="settings-overlay" id="settings-overlay" hidden><section class="settings-modal" role="dialog" aria-modal="true" aria-label="设置"><button class="xs-icon settings-close" data-action="close-settings" aria-label="关闭设置"><i data-lucide="x" aria-hidden="true"></i></button><div id="settings-modal-body"></div></section></div>
+  <div class="floating-menu" id="menu" hidden></div>
+  <div class="overlay" id="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title"></h2><button class="xs-icon" data-action="close-dialog" aria-label="关闭弹窗"><i data-lucide="x" aria-hidden="true"></i></button></div><div id="dialog-body"></div></section></div>
+  <section class="launch-screen" id="launch" aria-label="首次启动" hidden></section>
+  <div class="toast" id="toast" role="status" hidden></div>
+</div>
+<nav class="demo-states" aria-label="画板演示状态"><span>画板演示（不属于界面）</span><button data-demo-state="first-launch">首次启动</button><button data-demo-state="none">没有服务商</button><button data-demo-state="noDefault">没有默认服务商</button><button data-demo-state="sample">恢复样例</button></nav>
+<script>
+(() => {
+const root=document.getElementById('dc-study');
+const $=s=>root.querySelector(s), $$=s=>Array.from(root.querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
+const icons=()=>{if(globalThis.lucide) lucide.createIcons({attrs:{width:16,height:16}});};
+const settings=['模型服务商','权限','通用','H5 访问','终端','MCP','Agents','Skills','记忆','插件','Computer Use','活动','诊断','关于'];
+const settingsGroups=[['设置',['模型服务商','通用','权限','活动']],['本机',['终端','H5 访问','Computer Use','诊断']],['自定义',['MCP','Agents','Skills','记忆','插件']],['',['关于']]];
+const settingsIcons={'模型服务商':'network','权限':'shield-check','通用':'settings','H5 访问':'smartphone','终端':'terminal','MCP':'plug','Agents':'bot','Skills':'scroll-text','记忆':'brain','插件':'puzzle','Computer Use':'monitor','活动':'chart-no-axes-column','诊断':'wrench','关于':'info'};
+const permissionNames={'询问权限':'Default','自动接受编辑':'Accept edits','计划模式':'Plan','绕过权限':'Bypass permissions'};
+const state={openFiles:new Set(['chatStore.ts']),appearance:'跟随系统',bodySize:16,scene:'回复完成',active:'s1',page:'chat',settingsOpen:true,permission:'询问权限',model:'Sonnet',effort:'Medium',provider:'Anthropic API',launch:null,importProgress:0,files:false,terminal:false,fileView:'changed',file:'chatStore.ts',batch:false,selected:new Set(),refs:[],drafts:{},hiddenProjects:new Set(),collapsed:new Set(),pinned:new Set(),projectOrder:['dreamcoder','GoTrans','skillset-manager'],sort:'更新时间',organization:'按项目',settingsTab:'Skills',terminalLines:['~/dreamcoder  main','$ git status --short',' M desktop/src/stores/chatStore.ts',' M server/sessionService.ts'],tasks:[{name:'每日代码检查',when:'每天 09:00',on:true},{name:'整理开发进展',when:'每周五 18:00',on:false}]};
+let sessions=[{id:'s1',title:'会话恢复流程',project:'dreamcoder',meta:'刚刚',full:true},{id:'s2',title:'精简模型服务配置',project:'dreamcoder',meta:'昨天',full:false},{id:'s3',title:'桌面主题与排版',project:'dreamcoder',meta:'昨天 · worktree',full:false},{id:'s4',title:'整理安装说明',project:'dreamcoder',meta:'周三',full:false},{id:'s5',title:'长文本翻译',project:'GoTrans',meta:'周二',full:false},{id:'s6',title:'技能来源管理',project:'skillset-manager',meta:'周一',full:false}];
+const sampleNow=Date.now();
+sessions=sessions.map((s,i)=>({...s,createdAt:sampleNow-(sessions.length-i)*86400000,updatedAt:sampleNow-i*86400000}));
+let menuAnchor=null,menuActions=[],dialogReturn=null,toastTimer,dragProject=null;
+function notify(text){$('#toast').textContent=text;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,2400);}
+function closeMenu(){if(menuAnchor)menuAnchor.setAttribute('aria-expanded','false');$('#menu').hidden=true;menuAnchor=null;}
+function menu(anchor,items,up=false,kind=''){
+ closeMenu();menuAnchor=anchor;anchor.setAttribute('aria-expanded','true');menuActions=[];
+ $('#menu').classList.toggle('general-options',kind==='general');
+ if(kind==='general'){$('#menu').setAttribute('role','menu');$('#menu').setAttribute('aria-label',anchor.getAttribute('aria-label'));}else{$('#menu').removeAttribute('role');$('#menu').removeAttribute('aria-label');}
+ $('#menu').innerHTML=items.map(item=>{
+   if(item===null)return '<div class="line"></div>';
+   const idx=menuActions.push(item.run)-1;
+   return `<button data-menu-index="${idx}" ${kind==='general'?`role="menuitemradio" aria-checked="${!!item.checked}"`:''} ${item.disabled?'disabled':''}>${item.icon?icon(item.icon):''}<span class="menu-copy">${esc(item.label)}${item.desc?`<small>${esc(item.desc)}</small>`:''}</span>${item.checked?icon('check').replace('<i ','<i class="chosen" '):''}</button>`;
+ }).join('');
+ $('#menu').hidden=false;icons();
+ const r=root.getBoundingClientRect(),a=anchor.getBoundingClientRect(),m=$('#menu').getBoundingClientRect();
+ const left=Math.max(10,Math.min(a.left-r.left,r.width-m.width-12));
+ let top=up?a.top-r.top-m.height-8:a.bottom-r.top+7;
+ if(top+m.height>r.height-12)top=Math.max(10,a.top-r.top-m.height-8);
+ $('#menu').style.left=left+'px';$('#menu').style.top=Math.max(10,top)+'px';
+}
+function openDialog(title,html){closeMenu();dialogReturn=document.activeElement;$('#dialog-title').textContent=title;$('#dialog-body').innerHTML=html;$('#overlay').hidden=false;$('.ds-side').inert=true;$('.ds-main').inert=true;icons();$('#overlay button').focus();}
+function closeDialog(){if($('#overlay').hidden)return;$('#overlay').hidden=true;$('.ds-side').inert=false;$('.ds-main').inert=false;if(dialogReturn?.isConnected)dialogReturn.focus();}
+function confirmAction(title,text,run,label='确定'){openDialog(title,`<p>${esc(text)}</p><div class="dialog-actions"><button class="soft-button" data-action="close-dialog">取消</button><button class="primary" id="confirm-action">${esc(label)}</button></div>`);$('#confirm-action').onclick=()=>{closeDialog();run();};}
+function inputDialog(title,label,value,run){openDialog(title,`<label for="dialog-input">${esc(label)}</label><input id="dialog-input" value="${esc(value)}"><div class="dialog-actions"><button data-action="close-dialog">取消</button><button class="primary" id="save-input">保存</button></div>`);$('#save-input').onclick=()=>{const value=$('#dialog-input').value.trim();if(value){closeDialog();run(value);}};$('#dialog-input').focus();}
+function renderSidebar(){
+ $('#batchbar').hidden=!state.batch;
+ const visible=sessions.filter(s=>!state.hiddenProjects.has(s.project));
+ const keys=state.projectOrder.filter(p=>!state.hiddenProjects.has(p));
+ if(state.organization==='按最近项目')keys.sort((a,b)=>visible.findIndex(s=>s.project===a)-visible.findIndex(s=>s.project===b));
+ const groups=keys.map(key=>({key,items:visible.filter(s=>s.project===key)}));
+ $('#project-list').innerHTML=groups.map(group=>{
+ const p=group.key,collapsed=state.collapsed.has(p),list=[...group.items].sort((a,b)=>b[state.sort==='创建时间'?'createdAt':'updatedAt']-a[state.sort==='创建时间'?'createdAt':'updatedAt']);
+ return `<section data-project="${esc(p)}"><div class="project-head"><button class="project-name" draggable="true" data-collapse-project="${esc(p)}" aria-expanded="${!collapsed}">${icon(collapsed?'chevron-right':'chevron-down')}<span>${esc(p)}</span>${state.pinned.has(p)?icon('pin'):''}</button><button class="xs-icon" data-new-project="${esc(p)}" aria-label="在 ${esc(p)} 新建会话">${icon('plus')}</button></div><div ${collapsed?'hidden':''}>${list.map(s=>`<div class="session-row ${state.active===s.id&&state.page==='chat'?'current':''}">${state.batch?`<input type="checkbox" aria-label="选择 ${esc(s.title)}" data-select-session="${s.id}" ${state.selected.has(s.id)?'checked':''}>`:''}<button class="session-open" data-session="${s.id}" data-tooltip="${esc(s.title+' · '+s.project)}"><span class="session-title">${esc(s.title)}</span>${s.meta.includes('worktree')||s.id===state.active&&state.scene==='执行中'?`<span class="session-meta">${s.meta.includes('worktree')?icon('git-branch'):''}${s.id===state.active&&state.scene==='执行中'?'执行中':''}</span>`:''}</button><button class="xs-icon session-more" data-menu="session-row" data-session-id="${s.id}" aria-label="${esc(s.title)} 操作">${icon('ellipsis')}</button></div>`).join('')}</div></section>`;
+ }).join('');icons();
+}
+function projectManagement(){
+ openDialog('项目与会话管理',`<div class="setting-row"><label for="manage-group">组织方式</label><select id="manage-group">${['按项目','按最近项目'].map(v=>`<option ${state.organization===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="setting-row"><label for="manage-sort">会话排序</label><select id="manage-sort">${['创建时间','更新时间'].map(v=>`<option ${state.sort===v?'selected':''}>${v}</option>`).join('')}</select></div>${state.projectOrder.map((p,i)=>`<div class="setting-row"><span class="grow">${esc(p)}</span><button data-manage-pin="${i}" aria-pressed="${state.pinned.has(p)}">${state.pinned.has(p)?'取消置顶':'置顶'}</button><button data-manage-hide="${i}">${state.hiddenProjects.has(p)?'恢复显示':'隐藏'}</button></div>`).join('')}<div class="dialog-actions"><button id="manage-refresh">刷新会话</button><button id="manage-batch">批量管理会话</button><button class="primary" data-action="close-dialog">完成</button></div>`);
+ $('#manage-group').onchange=e=>{state.organization=e.target.value;renderSidebar();};
+ $('#manage-sort').onchange=e=>{state.sort=e.target.value;renderSidebar();};
+ $('#manage-refresh').onclick=()=>{renderSidebar();notify('会话列表已刷新');};
+ $('#manage-batch').onclick=()=>{closeDialog();state.batch=true;renderSidebar();};
+ root.querySelectorAll('[data-manage-pin]').forEach(b=>b.onclick=()=>{const p=state.projectOrder[Number(b.dataset.managePin)];if(state.pinned.has(p))state.pinned.delete(p);else{state.pinned.add(p);state.projectOrder=[p,...state.projectOrder.filter(v=>v!==p)];}renderSidebar();projectManagement();});
+ root.querySelectorAll('[data-manage-hide]').forEach(b=>b.onclick=()=>{const p=state.projectOrder[Number(b.dataset.manageHide)];if(state.hiddenProjects.has(p))state.hiddenProjects.delete(p);else state.hiddenProjects.add(p);renderSidebar();projectManagement();});
+}
+function pageTitle(id){return id==='settings'?'设置':id==='scheduled'?'定时任务':id==='terminal'?'终端':sessions.find(s=>s.id===id)?.title||'新会话';}
+function rememberDraft(){if(state.page==='chat'&&state.active)state.drafts[state.active]={text:$('#prompt').value,refs:[...state.refs]};}
+function openSession(id){rememberDraft();state.active=id;state.page='chat';const draft=state.drafts[id]||{text:'',refs:[]};$('#prompt').value=draft.text;state.refs=[...draft.refs];renderAll();}
+function newSession(project='dreamcoder'){rememberDraft();const id='new-'+Date.now();sessions.unshift({id,title:'新会话',project,meta:'刚刚',createdAt:Date.now(),updatedAt:Date.now(),full:false});openSession(id);state.scene='回复完成';renderScene();$('#prompt').focus();}
+function openSettings(){closeMenu();if(!state.settingsOpen)prefs.settingsReturn=document.activeElement;state.settingsOpen=true;renderSettings();}
+function closeSettings(){if(!state.settingsOpen)return;closeMenu();state.settingsOpen=false;prefs.navQuery='';renderSettings();if(prefs.settingsReturn?.isConnected)prefs.settingsReturn.focus();}
+function openPage(page){rememberDraft();state.page=page;renderAll();}
+function deleteSessions(ids){confirmAction('删除会话？',`将删除所选的 ${ids.length} 个会话。`,()=>{sessions=sessions.filter(s=>!ids.includes(s.id));state.selected.clear();state.batch=false;if(ids.includes(state.active)){const next=sessions[0];if(next)openSession(next.id);else newSession();}renderAll();notify('会话已删除');},'删除');}
+function renameSession(id){const s=sessions.find(s=>s.id===id);if(!s)return;inputDialog('重命名会话','会话名称',s.title,value=>{s.title=value;renderAll();});}
+function sessionMenu(anchor,id=state.active){menu(anchor,[{label:'重命名',icon:'pencil',run:()=>renameSession(id)},{label:'批量管理',icon:'list-checks',run:()=>{state.batch=true;renderSidebar();}},null,{label:'删除会话',icon:'trash-2',run:()=>deleteSessions([id])}]);}
+function searchDialog(){openDialog('搜索会话','<input id="quick-search" aria-label="搜索会话" placeholder="搜索标题或内容…"><div id="search-results"></div><p class="muted">Enter 打开首个结果 · Esc 关闭</p>');const render=()=>{const q=$('#quick-search').value.toLowerCase();$('#search-results').innerHTML=sessions.filter(s=>s.title.toLowerCase().includes(q)).map(s=>`<button class="search-result" data-search-session="${s.id}">${esc(s.title)}<small>${esc(s.project)}</small></button>`).join('')||'<p>没有匹配的会话</p>';};$('#quick-search').oninput=render;$('#quick-search').onkeydown=e=>{if(e.key==='Enter')$('#search-results button')?.click();};render();$('#quick-search').focus();}
+function addRef(name){state.refs.push(name);renderRefs();$('#prompt').focus();}
+function renderRefs(){$('#references').innerHTML=state.refs.map((ref,i)=>`<span class="ref-chip">${icon('file-text')}${esc(ref)}<button data-remove-ref="${i}" aria-label="移除 ${esc(ref)}">${icon('x')}</button></span>`).join('');icons();updateSend();}
+function resizePrompt(){const p=$('#prompt');p.style.height='28px';p.style.height=Math.max(28,Math.min(160,p.scrollHeight))+'px';p.style.overflowY=p.scrollHeight>160?'auto':'hidden';}
+function updateSend(){const running=state.scene==='执行中';$('#send').disabled=state.scene==='目录不可用'||(!running&&!!providerIssue())||(!running&&!$('#prompt').value.trim()&&!state.refs.length);$('#send').setAttribute('aria-label',running?'停止生成':'发送消息');$('#send').innerHTML=icon(running?'square':'arrow-up');icons();}
+function providerIssue(){if(!prefs.providers.length)return 'none';if(!prefs.providers.some(p=>p.active))return 'noDefault';return null;}
+function renderProviderNotice(){
+ const issue=providerIssue(),el=$('#provider-notice');el.hidden=!issue;
+ $('.ds-composer').hidden=!!issue;$('.ds-compose-controls').hidden=!!issue;$('#references').hidden=!!issue;
+ el.innerHTML=issue==='none'?`<div class="provider-gate-copy"><strong>添加模型服务商后即可开始对话</strong><span>DreamCoder 使用你自己的 API Key，支持 DeepSeek、Kimi、Ollama 等服务商。</span></div><button class="primary" data-action="provider-add">添加服务商</button>`:issue==='noDefault'?`<div class="provider-gate-copy"><strong>选择一个默认服务商后即可开始对话</strong><span>已有 ${prefs.providers.length} 个服务商，但还没有设为默认。</span></div><button class="primary" data-action="provider-settings">选择服务商</button>`:'';
+}
+function renderLaunch(){
+ const el=$('#launch'),step=state.launch;el.hidden=!step;$('.ds-side').inert=!!step;$('.ds-main').inert=!!step;if(!step){el.innerHTML='';return;}
+ const imp=state.launchImport,ready=prefs.providers.some(p=>p.active);
+ const importStatus=imp==='running'?`<span class="launch-import-status" role="status">${icon('loader')}${state.importProgress.toLocaleString()} / 9,800</span>`:imp==='done'?`<span class="launch-import-status done" role="status">${icon('check')}已导入</span>`:'<button class="soft-button" data-action="launch-import">导入</button>';
+ const importDesc=imp==='done'?'复制了 9,798 个文件，2 个已存在的文件保留原样。':'在 ~/.claude 发现了会话、记忆、定时任务、MCP 服务器和服务商。不会改动 Claude Code 的文件。';
+ el.innerHTML=`<div class="launch-card"><span class="launch-mark">${icon('square-terminal')}</span><h1>欢迎使用 DreamCoder</h1><p>本地运行、支持多服务商的 AI 编程工作台</p><div class="launch-import"><span class="launch-import-icon">${icon('download')}</span><div class="launch-import-copy"><strong>从 Claude Code 导入</strong><span>${importDesc}</span></div>${importStatus}</div><div class="launch-actions">${ready?'<button class="primary" data-action="launch-finish">开始使用</button>':`<button class="primary" data-action="launch-add-provider" ${imp==='running'?'disabled':''}>添加服务商</button><button class="launch-ghost" data-action="launch-later" ${imp==='running'?'disabled':''}>稍后设置</button>`}</div></div>`;
+ icons();
+}
+function setDemoProviders(kind){
+ prefs.sampleProviders??=prefs.providers.map(p=>({...p}));
+ if(kind==='sample')prefs.providers=prefs.sampleProviders.map(p=>({...p}));
+ else if(kind==='none')prefs.providers=[];
+ else if(kind==='noDefault')prefs.providers=prefs.sampleProviders.map(p=>({...p,active:false}));
+ state.provider=prefs.providers.find(p=>p.active)?.name||'未设置';
+}
+function finishLaunch(){state.launch=null;state.page='chat';renderAll();newSession();}
+function demoState(kind){
+ closeMenu();closeDialog();
+ if(kind==='first-launch'){setDemoProviders('none');state.importProgress=0;state.launchImport=null;state.launch='welcome';renderAll();return;}
+ state.launch=null;setDemoProviders(kind);state.page='chat';renderAll();
+}
+function renderScene(){
+ const scene=state.scene,full=sessions.find(s=>s.id===state.active)?.full;
+ root.style.colorScheme=state.appearance==='浅色'?'light':state.appearance==='深色'?'dark':'';
+ root.style.setProperty('--ds-body-size',state.bodySize+'px');
+ $('#conversation').hidden=!full;$('#empty').hidden=!!full;$('#answer').hidden=scene!=='回复完成'&&scene!=='成员会话';
+ $('#goal-strip').hidden=scene!=='执行中';$('#member-note').hidden=scene!=='成员会话';$('#prompt').disabled=scene==='目录不可用';$('#prompt').placeholder=scene==='目录不可用'?'工作目录不可用':scene==='成员会话'?'向成员发送消息…':'描述任务，或提出问题…';
+ $('#task-strip').hidden=!full;$('#task-label').textContent=scene==='执行中'?'任务 2 / 3 · 类型检查中':'任务 3 / 3';
+ $('#tool-label').textContent=scene==='执行中'?'读取完成 · 正在检查实时事件':'查看 3 个文件 · 修改 2 个文件';
+ const views={
+ '执行中':'<div class="ds-running"><p>我正在核对实时事件与历史记录的恢复结果。</p><div class="ds-running-meta">'+icon('loader')+'<span>正在运行类型检查…</span></div></div>',
+ '等待授权':'<section class="inline-state"><h3>允许执行类型检查？</h3><p>将在 dreamcoder 项目目录运行以下命令。</p><code>bun run lint:desktop</code><details class="event-log"><summary>完整参数</summary><pre>{ "command": "bun run lint:desktop" }</pre></details><div class="dialog-actions"><button data-permission-response="已拒绝">拒绝</button><button class="soft-button" data-permission-response="会话内允许">会话内允许</button><button class="primary" data-permission-response="已允许一次">允许一次</button></div></section>',
+ '需要回答':'<section class="inline-state"><h3>先处理哪部分？</h3><p>选择本轮优先检查的范围。</p><label><input type="radio" name="answer" value="恢复流程" checked>恢复流程</label><label><input type="radio" name="answer" value="实时事件">实时事件</label><label for="custom-answer">补充说明</label><input id="custom-answer" placeholder="也可以填写你的想法"><div class="dialog-actions"><button class="primary" data-action="answer-question">提交回答</button></div></section>',
+ '目录不可用':'<section class="inline-state"><h3>工作目录不可用</h3><p>原工作目录已移动或无法访问。历史消息仍可阅读。</p><button class="soft-button" data-action="repository">查看项目位置</button></section>'
+ };$('#state-content').innerHTML=views[scene]||'';
+ $('#permission-label').textContent=permissionNames[state.permission]||'Default';$('#model-label').textContent=state.model+' · '+state.effort;
+ renderProviderNotice();renderLaunch();renderTaskDetails();updateSend();icons();
+}
+function renderTaskDetails(){$('#task-detail').innerHTML=`<label>${icon('check')}梳理恢复入口</label><label>${icon('check')}统一事件类型</label><label>${icon(state.scene==='执行中'?'loader':'check')}验证恢复与实时更新</label><div class="line"></div><div class="row space"><span class="quiet">后台检查 · ${state.scene==='执行中'?'运行中':'已完成'}</span><button data-action="terminal" class="quiet">查看输出</button></div><div class="row space"><span class="quiet">审查助手 · ${state.scene==='执行中'?'处理中':'已完成'}</span><button data-action="member" class="quiet">查看成员</button></div><button data-action="dismiss-tasks" class="muted">清除已完成任务</button>`;icons();}
+const fileDiffs={'chatStore.ts':{path:'desktop/src/stores/chatStore.ts',add:18,del:42,lines:[[' ',24,'// Restore session events'],['-',25,'parseRawMessage(payload)'],['+',25,'applyEvent(event)'],[' ',26,'updateSessionState()']]},'sessionService.ts':{path:'src/server/services/sessionService.ts',add:14,del:16,lines:[[' ',88,'const items = await readTranscript(id)'],['-',89,'return items.map(toLegacyMessage)'],['+',89,'return interpretTranscript(items)'],[' ',90,'}']]}};
+function panelOpen(){return state.files||state.terminal;}
+function renderWorkspace(){
+ const open=panelOpen(),tab=state.terminal&&!state.files?'terminal':state.panelTab==='terminal'&&state.terminal?'terminal':'files';
+ $('#workspace').hidden=!open;$('#terminal').hidden=true;root.classList.toggle('panel-open',open);
+ $('#chat-view').classList.toggle('with-files',open);$('#chat-view').classList.toggle('panel-expanded',open&&!!state.panelExpanded);
+ $('[data-action="files"]').setAttribute('aria-pressed',String(open&&tab==='files'));$('[data-action="terminal"]').setAttribute('aria-pressed',String(open&&tab==='terminal'));
+ if(!open)return;
+ const list=state.fileView==='changed'?['chatStore.ts','sessionService.ts']:['desktop/','desktop/src/stores/','chatStore.ts','server/','sessionService.ts','README.md'];
+ const tabs=`<div class="panel-tabs" role="tablist" aria-label="辅助面板">${[['files','文件','files'],['terminal','终端','square-terminal']].map(([id,label,ic])=>`<button role="tab" data-panel-tab="${id}" aria-selected="${tab===id}">${icon(ic)}${label}</button>`).join('')}<span class="grow"></span><button class="xs-icon" data-action="panel-expand" title="${state.panelExpanded?'还原面板':'展开面板'}" aria-label="${state.panelExpanded?'还原面板':'展开面板'}">${icon(state.panelExpanded?'minimize-2':'maximize-2')}</button><button class="xs-icon" data-action="panel-close" title="关闭面板" aria-label="关闭面板">${icon('x')}</button></div>`;
+ const project=sessions.find(s=>s.id===state.active)?.project||'dreamcoder';
+ state.termTabs??=[{id:1,lines:state.terminalLines}];state.termActive??=1;
+ const term=state.termTabs.find(t=>t.id===state.termActive)||state.termTabs[0];
+ const termHtml=`<div class="term-bar"><div class="term-tabs" role="tablist" aria-label="终端">${state.termTabs.map((t,n)=>`<span class="term-tab${t.id===term?.id?' active':''}"><button role="tab" data-term-tab="${t.id}" aria-selected="${t.id===term?.id}">${icon('square-terminal')}zsh ${n+1}</button>${state.termTabs.length>1?`<button class="term-tab-close" data-term-close="${t.id}" title="关闭终端" aria-label="关闭终端 ${n+1}">${icon('x')}</button>`:''}</span>`).join('')}<button class="xs-icon" data-action="terminal-new" title="新建终端" aria-label="新建终端">${icon('plus')}</button></div><span class="grow"></span><button class="xs-icon" data-action="terminal-clear" title="清屏" aria-label="清屏">${icon('eraser')}</button><button class="xs-icon" data-action="terminal-restart" title="重启" aria-label="重启终端">${icon('rotate-ccw')}</button></div><div class="term-meta">${esc(project)} · main</div><pre id="terminal-output" class="term-output">${esc((term?.lines||[]).join('\n'))}</pre><label class="term-input"><span>$</span><input id="terminal-input" aria-label="终端命令" placeholder="输入命令…"></label>`;
+ $('#workspace').innerHTML=`<div class="panel-resizer" role="separator" aria-orientation="vertical" aria-label="调整面板宽度" title="拖动调整宽度"></div>${tabs}<div class="panel-body ${tab==='terminal'?'panel-terminal':'panel-files'}">${tab==='files'?`<div class="workspace-head"><button class="grow" data-menu="file-view">${state.fileView==='changed'?'变更文件':'全部文件'} ${icon('chevron-down')}</button><button class="xs-icon" data-action="refresh-files" aria-label="刷新文件">${icon('refresh-cw')}</button></div><input id="file-filter" aria-label="过滤文件" placeholder="过滤文件…"><div id="file-list">${list.map(f=>{const folder=f.endsWith('/'),open=!folder&&state.openFiles.has(f),d=fileDiffs[f];return `<div class="file-item" data-file-name="${esc(f.toLowerCase())}"><button class="file-row${open?' open':''}" data-file="${esc(f)}" ${folder?'':`aria-expanded="${open}"`}>${folder?icon('folder'):icon(open?'chevron-down':'chevron-right')}${folder?'':icon('file-code')}<span class="grow">${esc(f)}</span>${state.fileView==='changed'&&d?`<span class="file-delta"><span class="code-add">+${d.add}</span> <span class="code-remove">−${d.del}</span></span><span class="delta">M</span>`:''}</button>${open?`<div class="file-diff"><div class="file-path">${esc(d?.path||f)}</div>${d?`<pre aria-label="${esc(f)} 差异">${d.lines.map(([k,n,t])=>`<span class="code-line${k==='+'?' code-add':k==='-'?' code-remove':''}"><span class="code-num">${n}</span><span class="code-sign">${k==='+'?'+':k==='-'?'−':''}</span>${esc(t)}</span>`).join('')}</pre>`:'<p class="file-empty">示例文件，未显示内容。</p>'}<div class="preview-tools"><button data-action="add-file-ref">${icon('message-square-plus')}加入对话</button><button data-action="code-comment">${icon('message-square')}行评论</button><button data-menu="file-actions" aria-label="文件更多操作">${icon('ellipsis')}</button></div></div>`:''}</div>`;}).join('')}</div></div>`:termHtml}</div>`;
+ if(tab==='files')$('#file-filter').oninput=e=>$$('#file-list .file-item').forEach(b=>b.hidden=!b.dataset.fileName.includes(e.target.value.toLowerCase()));
+ else $('#terminal-input').onkeydown=e=>{if(e.key==='Enter'&&e.target.value.trim()){const cmd=e.target.value.trim();const result=cmd==='pwd'?'~/'+project:cmd==='git status'?'On branch main\nChanges not staged for commit:\n  modified: chatStore.ts':cmd==='clear'?'':'命令已输入';if(cmd==='clear')term.lines.length=0;else term.lines.push('$ '+cmd,result);renderWorkspace();$('#terminal-input').focus();}};
+ icons();
+}
+function openPanel(tab){if(panelOpen()&&state.panelTab===tab){state.files=false;state.terminal=false;state.panelExpanded=false;}else{state.panelTab=tab;state.files=tab==='files';state.terminal=tab==='terminal';}renderWorkspace();}
+function renderTerminal(){renderWorkspace();}
+function renderAll(){
+ root.classList.toggle('is-settings',state.settingsOpen);
+ const chat=state.page==='chat';$('#chat-view').hidden=!chat;$('#other-page').hidden=chat||state.page==='terminal';$('#head-tools').hidden=!chat;$('#breadcrumb').hidden=!chat;
+ $('#page-title').textContent=chat?(sessions.find(s=>s.id===state.active)?.title||'新会话'):pageTitle(state.page);
+ $('#project-label').textContent=sessions.find(s=>s.id===state.active)?.project||'dreamcoder';
+ renderSidebar();renderScene();renderRefs();renderWorkspace();renderTerminal();resizePrompt();
+ if(state.settingsOpen)renderSettings();if(state.page==='scheduled')renderScheduled();icons();
+}
+function contextDialog(){openDialog('上下文用量',`<div class="row space"><span>${esc(state.provider)} · ${esc(state.model)}</span><strong>28%</strong></div><div class="usage-track"><span></span></div><div class="metric-row"><span>已使用</span><span>56,000 tokens</span></div><div class="metric-row"><span>剩余空间</span><span>144,000 tokens</span></div><div class="metric-row"><span>上下文窗口</span><span>200,000 tokens</span></div><details class="event-log"><summary>查看组成与压缩摘要</summary><p>系统指令 12,000 · 工具定义 8,000 · 对话与文件 36,000</p><p>此前已完成恢复入口检查，当前在统一实时事件类型。</p></details><p class="muted">根据最近一次上下文快照估算</p>`);}
+function repositoryDialog(){const isNew=!sessions.find(s=>s.id===state.active)?.full;openDialog(isNew?'启动位置':'项目位置',`<label>工作目录<input id="repo-path" value="~/Projects/GoDiao/dreamcoder" ${isNew?'':'readonly'}></label><label>分支<select id="repo-branch" ${isNew?'':'disabled'}><option>main</option><option>refactor/typed-live-events</option></select></label>${isNew?'<label><input type="checkbox" id="repo-worktree"> 使用独立 worktree</label>':'<p>当前会话在原工作目录中运行。</p>'}<div class="dialog-actions"><button class="soft-button" id="repo-done">${isNew?'使用此位置':'完成'}</button></div>`);$('#repo-done').onclick=()=>{if(isNew){$('#project-label').textContent=$('#repo-worktree').checked?'dreamcoder · worktree':'dreamcoder';}closeDialog();};}
+function commandDialog(kind='commands'){
+ const fileMode=kind==='files';const commands=['/help','/status','/cost','/context','/mcp','/skills','/plugin','/memory','/doctor','/compact','/clear','/goal','/review','/commit','/pr','/init'];
+ openDialog(fileMode?'引用项目文件':'命令',`<input id="command-search" aria-label="过滤${fileMode?'文件':'命令'}" placeholder="搜索${fileMode?'文件或目录':'命令'}…"><div id="command-results"></div>`);
+ const draw=()=>{const q=$('#command-search').value.toLowerCase();const list=(fileMode?['desktop/src/stores/chatStore.ts','server/sessionService.ts','README.md','desktop/src/components/']:commands).filter(v=>v.toLowerCase().includes(q)).slice(0,7);$('#command-results').innerHTML=list.map(v=>`<button class="search-result" data-command="${esc(v)}" data-is-file="${fileMode}">${esc(v)}</button>`).join('')||'<p>没有匹配结果</p>';};$('#command-search').oninput=draw;draw();$('#command-search').focus();
+}
+function runCommand(cmd){
+ closeDialog();$('#prompt').value='';resizePrompt();
+ if(cmd==='/context'){contextDialog();return;}
+ if(cmd==='/memory'||cmd==='/plugin'||cmd==='/doctor'){state.settingsTab=cmd==='/memory'?'记忆':cmd==='/plugin'?'插件':'诊断';openSettings();return;}
+ const content={
+ '/status':'<div class="metric-row"><span>会话</span><span>空闲</span></div><div class="metric-row"><span>运行位置</span><span>dreamcoder / main</span></div><div class="metric-row"><span>模型</span><span>'+esc(state.model)+'</span></div>',
+ '/cost':'<div class="metric-row"><span>输入 tokens</span><span>42,180</span></div><div class="metric-row"><span>输出 tokens</span><span>5,326</span></div><div class="metric-row"><span>本次会话费用估算</span><span>$0.24</span></div>',
+ '/mcp':'<div class="metric-row"><span>filesystem</span><span>已连接 · 8 个工具</span></div><div class="metric-row"><span>github</span><span>已连接 · 12 个工具</span></div><button data-settings="MCP">管理 MCP</button>',
+ '/skills':'<button class="search-result" data-invoke-skill="code-review">code-review<small>检查代码变更</small></button><button class="search-result" data-invoke-skill="frontend-design">frontend-design<small>设计前端界面</small></button>',
+ '/help':'<p>输入 / 选择命令，输入 @ 引用项目文件。</p><div class="metric-row"><span>搜索会话</span><span>⌘ / Ctrl K</span></div><div class="metric-row"><span>新建会话</span><span>⌘ / Ctrl N</span></div><div class="metric-row"><span>停止生成</span><span>⌘ / Ctrl .</span></div><div class="metric-row"><span>换行</span><span>Shift Enter</span></div>'
+ };
+ if(content[cmd]){openDialog(cmd,content[cmd]);return;}
+ if(cmd==='/clear'){confirmAction('清空会话？','清空当前会话后开始新的对话。',()=>newSession());return;}
+ if(cmd==='/compact'){notify('上下文已压缩');return;}
+ $('#prompt').value=cmd+' ';updateSend();$('#prompt').focus();
+}
+const prefs={
+ detail:null,values:{theme:'经典暖色',language:'中文',response:'中文 (Chinese)',reasoning:'Medium',thinking:true,notifications:false,shell:'系统默认',proxy:'系统代理',timeout:'120',preflight:true,search:'自动',storage:'系统目录',h5:false,computer:false,vision:'截图视觉',transport:'STDIO',scope:'全局用户',mcpView:'已安装'},
+ providers:[{name:'Anthropic API',url:'https://api.anthropic.com',type:'自定义',active:true},{name:'DeepSeek',url:'https://api.deepseek.com/anthropic',type:'DeepSeek',active:false}],
+ sampleProviders:null,ccImport:null,
+ servers:[{name:'filesystem',scope:'全局用户',type:'STDIO',enabled:true},{name:'github',scope:'项目共享',type:'Streamable HTTP',enabled:true}],
+ plugins:[{name:'开发辅助',source:'用户',enabled:true},{name:'项目工具',source:'项目',enabled:false}],
+ terminalTabs:[{id:1,lines:['~/dreamcoder  main','$ pwd','~/dreamcoder']},{id:2,lines:['~/dreamcoder  main','$ git status --short',' M desktop/src/stores/chatStore.ts']}],terminalActive:1,terminalNext:3,
+ memoryFile:'MEMORY.md',memoryMode:'预览',memorySaved:{'MEMORY.md':'# 项目记忆\n\n- 历史记录与实时消息使用统一数据结构。\n- 修改 UI 时同步设计记录。','architecture.md':'# 架构约定\n\n服务端解析事件，桌面端负责展示与交互。'},memoryDraft:{},logsCleared:false,
+};
+const prefsAgents=[{name:'reviewer',source:'项目',desc:'检查代码变更，报告可验证的问题。',model:'Sonnet',tools:'Read · Grep · Glob',prompt:'阅读相关代码与变更，检查正确性和回归风险。只报告有证据的问题，并给出代码位置。'},{name:'Explore',source:'内置',desc:'快速查找文件，理解项目结构与相关实现。',model:'继承会话',tools:'Read · Grep · Glob',prompt:'搜索代码并整理相关实现，帮助主会话理解代码库。'},{name:'research-assistant',source:'用户',desc:'收集资料并整理来源。',model:'继承会话',tools:'Read · WebSearch · WebFetch',prompt:'围绕问题收集资料，区分事实与推测，保留来源。'},{name:'code-simplifier',source:'Claude Code',desc:'在不改变行为的前提下简化代码。',model:'继承会话',tools:'Read · Edit · Grep',prompt:'保持行为不变，减少重复和不必要的抽象。'}];
+const prefsSkills=[{name:'code-review',source:'用户',desc:'检查变更中的正确性、回归风险与遗漏。',tokens:1800},{name:'frontend-design',source:'用户',desc:'设计清晰、有层级的前端界面。',tokens:2400},{name:'pdf-tools',source:'Claude Code',desc:'读取、拆分与整理 PDF 文档。',tokens:1500},{name:'project-conventions',source:'项目',desc:'项目的开发约定与验证步骤。',tokens:900}];
+function prefButton(text,action,value='',primary=false){return `<button class="prefs-button ${primary?'primary':'soft-button'}" data-pref-action="${action}" ${action==='terminal-add'?'aria-label="新建终端"':''} data-value="${esc(String(value))}">${text}</button>`;}
+function prefHead(title,desc,actions=''){return `<div class="prefs-head"><div><h3>${title}</h3><p>${desc}</p></div><div class="prefs-actions">${actions}</div></div>`;}
+function prefSection(title,body){return `<section class="prefs-section"><h4>${title}</h4>${body}</section>`;}
+function prefLine(title,desc,control){return `<div class="prefs-line"><div class="prefs-copy"><strong>${title}</strong>${desc?`<p>${desc}</p>`:''}</div><div class="prefs-actions">${control}</div></div>`;}
+function prefInput(label,key,value='',type='text',extra=''){return `<label class="prefs-field"><span>${label}</span><input data-pref="${key}" type="${type}" value="${esc(String(prefs.values[key]??value))}" ${extra}></label>`;}
+function prefSelect(label,key,options){return `<label class="prefs-field"><span>${label}</span><select data-pref="${key}">${options.map(v=>`<option ${prefs.values[key]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;}
+function prefToggle(label,key,initial=false){return `<label class="prefs-toggle"><input type="checkbox" data-pref="${key}" ${prefs.values[key]??initial?'checked':''}>${label}</label>`;}
+function prefChoices(key,options){return `<div class="prefs-choices">${options.map(v=>`<button data-pref-choice="${key}" data-value="${esc(v)}" aria-pressed="${prefs.values[key]===v}">${esc(v)}</button>`).join('')}</div>`;}
+function prefSummary(rows){return `<div class="prefs-summary">${rows.map(r=>`<div><small>${r[0]}</small><strong>${r[1]}</strong>${r[2]?`<span>${r[2]}</span>`:''}</div>`).join('')}</div>`;}
+function prefSave(label='保存'){return `<div class="prefs-footer">${prefButton(label,'save','',true)}</div>`;}
+function prefBack(){return `<div style="margin-bottom:20px">${prefButton('← 返回列表','back')}</div>`;}
+function prefShell(){return prefSelect('默认 Shell','shell',['系统默认','zsh','bash','fish','自定义'])+(prefs.values.shell==='自定义'?prefInput('Shell 可执行文件（绝对路径）','shellPath','/usr/local/bin/fish'):'<p class="prefs-help">系统检测：/bin/zsh · 修改后对新建终端生效。</p>')+prefSave('保存 Shell');}
+function prefsProviderList(){return prefHead('模型服务商','管理连接方式、模型映射与上下文窗口。',prefButton(`${icon('plus')}添加服务商`,'provider-new'))+(providerIssue()==='noDefault'?'<div class="provider-notice" role="status"><span>还没有设置默认服务商。选择一个设为默认后才能开始对话。</span></div>':'')+(prefs.providers.length?'':'<p class="prefs-empty">还没有服务商。添加一个模型服务商即可开始使用。</p>')+prefs.providers.map((p,i)=>`<div class="prefs-line"><div class="prefs-copy"><div class="prefs-label">${esc(p.name)} ${p.active?'<span class="prefs-badge">默认</span>':''}</div><p>${esc(p.url)}</p>${p.tested?'<p style="color:var(--ds-success)">连接成功 · 248 ms（示例）</p>':''}</div><div class="prefs-actions">${!p.active?prefButton('设为默认','provider-default',i):''}${prefButton('测试','provider-test',i)}${prefButton('编辑','provider-edit',i)}${!p.active?prefButton('删除','provider-delete',i):''}</div></div>`).join('');}
+function prefsProviderForm(){const p=prefs.detail.index===null?null:prefs.providers[prefs.detail.index];return prefBack()+prefHead(p?'编辑服务商':'添加服务商','配置连接信息与使用的模型。')+prefSelect('预设','providerType',['DeepSeek','Qwen (Alibaba Cloud)','Kimi (Moonshot)','Zhipu GLM','DreamField','LM Studio','Ollama','自定义'])+prefInput('名称','providerName',p?.name||'')+prefInput('备注','providerNotes','')+prefInput('接口地址','providerUrl',p?.url||'','url','placeholder="https://api.example.com"')+prefSelect('API 格式','apiFormat',['Anthropic Messages（原生）','OpenAI Chat Completions（代理转换）','OpenAI Responses API（代理转换）'])+prefSelect('认证变量','authStrategy',['Bearer Token','Bearer + 清空 API_KEY','API Key','两个变量写同一个 Token','两个变量写 dummy'])+prefInput('API 密钥','providerKey','','password','placeholder="输入 API Key" autocomplete="off"')+prefSection('模型映射',`<div class="prefs-grid">${prefInput('主模型','mainModel','claude-sonnet')}${prefInput('Haiku 模型','haikuModel','','text','placeholder="与主模型相同"')}${prefInput('Sonnet 模型','sonnetModel','','text','placeholder="与主模型相同"')}${prefInput('Opus 模型','opusModel','','text','placeholder="与主模型相同"')}</div>`)+`<details class="prefs-disclosure"><summary>上下文与自动压缩 · 高级</summary><p class="prefs-help">按模型的实际限制填写，留空则自动识别。</p><div class="prefs-grid">${['主模型','Haiku','Sonnet','Opus'].map((v,i)=>prefInput(v+'上下文窗口','context'+i,'','number','min="1" placeholder="自动"')).join('')}</div>${prefInput('未知模型兜底窗口','fallbackContext','','number','min="1" placeholder="默认 200000"')}</details><details class="prefs-disclosure"><summary>设置 JSON</summary><label class="prefs-field"><span>直接编辑服务商配置</span><textarea data-pref="providerJson" spellcheck="false">${esc(prefs.values.providerJson||'{\n  "env": {}\n}')}</textarea></label></details><div class="prefs-footer">${prefButton('测试连接','provider-form-test')}${prefButton('取消','back')}${prefButton('保存','provider-save','',true)}</div>`;}
+function prefsPermissions(){return prefHead('默认权限','用于新会话的权限模式。会话中仍可单独调整。')+[['询问权限','shield-check','在执行需要授权的工具操作前询问。'],['自动接受编辑','file-pen-line','自动接受文件编辑，其他操作仍按权限请求确认。'],['计划模式','notebook-pen','分析与制定方案，暂不执行修改。'],['绕过权限','zap','跳过工具权限确认，仅用于信任的工作区。']].map(([mode,ic,desc])=>`<button class="prefs-choice-row" data-pref-action="permission" data-value="${mode}" aria-pressed="${state.permission===mode}">${icon(ic)}<span class="prefs-copy"><strong>${permissionNames[mode]}</strong><p>${desc}</p></span><span class="choice-mark">${state.permission===mode?icon('check'):''}</span></button>`).join('');}
+function generalRow(name,description,control){return `<div class="general-row"><div><span class="general-name">${name}</span>${description?`<p class="general-description">${description}</p>`:''}</div><div class="general-control">${control}</div></div>`;}
+function generalGroup(name,content){return `<section class="general-group"><h3>${name}</h3>${content}</section>`;}
+const interfaceLanguages=['中文','English'];
+const generalOptions=new Map();
+function generalSelect(label,key,options){
+ const choices=options.map(option=>Array.isArray(option)?option:[option,option]);generalOptions.set(key,choices);
+ const selected=choices.find(([value])=>prefs.values[key]===value)||choices[0];
+ return `<span class="general-select"><button type="button" aria-label="${esc(label)}" aria-haspopup="menu" aria-controls="menu" aria-expanded="false" data-menu="general-select" data-general-key="${key}"><span>${esc(selected[1])}</span>${icon('chevron-down')}</button></span>`;
+}
+function generalSwitch(label,key){return `<label class="general-switch"><input type="checkbox" role="switch" aria-label="${label}" data-pref="${key}" ${prefs.values[key]?'checked':''}></label>`;}
+function generalSegments(label,key,options){return `<div class="general-segment" role="group" aria-label="${label}">${options.map(value=>`<button data-pref-choice="${key}" data-value="${value}" aria-pressed="${prefs.values[key]===value}">${value}</button>`).join('')}</div>`;}
+function generalAdvanced(key,name,summary,body){return `<details class="general-advanced" data-general-section="${key}" ${prefs.generalOpen?.has(key)?'open':''}><summary><span class="general-name">${name}</span><span class="general-current">${summary}${icon('chevron-right')}</span></summary><div class="general-expanded">${body}</div></details>`;}
+function prefsGeneral(){
+ const languages=['默认（英语）','English',['中文 (Chinese)','中文'],'日本語 (Japanese)','한국어 (Korean)','Español (Spanish)','Français (French)','Deutsch (German)','Português (Portuguese)','Italiano (Italian)','Русский (Russian)','Nederlands (Dutch)','Polski (Polish)','Türkçe (Turkish)','हिन्दी (Hindi)','Bahasa Indonesia','Українська (Ukrainian)','Ελληνικά (Greek)','Čeština (Czech)','Dansk (Danish)','Svenska (Swedish)','Norsk (Norwegian)'];
+ const appearance=generalGroup('外观',
+  generalRow('配色主题','',generalSelect('配色主题','theme',['纯白','经典暖色','暗色','午夜','DreamField 翡翠','秋日琥珀','极光'])));
+ const language=generalGroup('语言与模型',
+  generalRow('界面语言','',generalSelect('界面语言','language',interfaceLanguages))+
+  generalRow('回复语言','指定助手默认使用的回复语言。',generalSelect('回复语言','response',languages))+
+  generalRow('推理强度','控制模型使用的计算量。',generalSegments('推理强度','reasoning',['Low','Medium','High','Max']))+
+  generalRow('思考模式','为新会话启用模型思考。',generalSwitch('思考模式','thinking')));
+ const notifications=generalGroup('通知',
+  generalRow('系统通知','提醒授权确认、回复完成与定时任务结果。',generalSwitch('系统通知','notifications'))+
+  (prefs.values.notifications?generalRow('通知权限','尚未请求系统授权。',prefButton('授权通知','notice','正式应用将请求系统通知权限。')):''));
+ const network=generalAdvanced('network','网络',esc(prefs.values.proxy),
+  generalRow('服务商请求代理','',generalSelect('服务商请求代理','proxy',['系统代理','手动代理']))+
+  (prefs.values.proxy==='手动代理'?prefInput('代理地址','proxyUrl','','url','placeholder="http://127.0.0.1:7890"'):'')+
+  prefInput('AI 请求超时（秒）','timeout','120','number','min="5" max="600"')+
+  '<p class="prefs-help">支持 5–600 秒，用于服务商请求、流式首个响应和连接测试。</p>'+prefSave('保存网络设置'));
+ const search=generalAdvanced('search','联网搜索与抓取',esc(prefs.values.search),
+  generalRow('搜索方式','自动模式优先使用 Claude 原生搜索，其余情况使用已配置的搜索服务。',generalSelect('搜索方式','search',['自动','Tavily','Brave','Claude','关闭']))+
+  `<div class="prefs-grid">${prefInput('Tavily API Key','tavilyKey','','password','placeholder="tvly-…" autocomplete="off"')}${prefInput('Brave Search API Key','braveKey','','password','placeholder="Brave Search token" autocomplete="off"')}</div>`+
+  '<div class="prefs-actions"><a href="https://app.tavily.com/home" target="_blank" rel="noopener">获取 Tavily Key ↗</a><a href="https://api-dashboard.search.brave.com/app/keys" target="_blank" rel="noopener">获取 Brave Key ↗</a></div>'+
+  generalRow('跳过 WebFetch 域名预检','避免兼容服务商或受限网络下的预检误报。',generalSwitch('跳过 WebFetch 域名预检','preflight'))+prefSave('保存搜索设置'));
+ const shell=generalAdvanced('shell','默认 Shell',esc(prefs.values.shell),
+  generalRow('Shell','修改后对新建终端生效。',generalSelect('默认 Shell','shell',['系统默认','zsh','bash','fish','自定义']))+
+  (prefs.values.shell==='自定义'?prefInput('Shell 可执行文件（绝对路径）','shellPath','/usr/local/bin/fish'):'<p class="prefs-help">系统检测：/bin/zsh</p>')+prefSave('保存 Shell'));
+ const storage=generalAdvanced('storage','数据存储位置',esc(prefs.values.storage),
+  generalRow('存储方式','',generalSelect('存储方式','storage',['系统目录','便携目录']))+
+  (prefs.values.storage==='便携目录'?prefInput('便携数据目录','storageDir','','text','placeholder="选择保存数据的文件夹"')+`<div class="prefs-actions">${prefButton('选择目录','notice','正式应用会打开目录选择器。')}${prefButton('使用默认便携目录','storage-default')}</div>`:'')+
+  '<p class="prefs-note">当前目录：~/.dreamcoder<br>切换需要重启，不会自动搬迁旧数据。</p>'+`<div class="prefs-footer">${prefButton('应用并重启','storage-apply')}</div>`);
+ const imp=prefs.ccImport;
+ const importRow=generalRow('从 Claude Code 导入','从 ~/.claude 复制会话、记忆、定时任务、MCP 服务器和服务商。DreamCoder 已有的文件保留不动，再次导入只会补上缺的。'+(imp==='running'?'<br><span role="status">正在复制文件：4,900 / 9,800</span>':imp==='done'?'<br><span role="status">导入完成：复制了 0 个文件，9,800 个文件已存在，保留原样。</span>':''),imp==='running'?'<button class="prefs-button soft-button" disabled>导入中…</button>':prefButton('导入','cc-import'));
+ return `<div class="general-settings">${appearance}${language}${notifications}${generalGroup('高级设置',network+search+shell+storage+importRow)}</div>`;
+}
+function prefsH5(){return prefHead('H5 访问','在手机或其他设备的浏览器中连接当前工作区。')+prefLine('浏览器访问',prefs.values.h5?'已开启':'尚未开启',prefToggle('启用','h5'))+prefSection('连接地址',`<div class="prefs-grid">${prefInput('访问 IP / 域名','h5host','192.168.1.12')}${prefInput('当前端口','h5port','3000','text','readonly')}</div>`+prefSave('保存地址'))+(prefs.values.h5?prefSection('扫码访问',`<div class="prefs-line"><div class="prefs-qr" aria-label="二维码位置，示例不包含访问凭证">${icon('qr-code')}</div><div class="prefs-copy"><strong>使用手机连接工作区</strong><p>http://${esc(prefs.values.h5host||'192.168.1.12')}:3000</p><p>生成访问凭证后，在此显示二维码。</p></div></div><div class="prefs-footer">${prefButton('复制地址','copy-h5')}${prefButton('生成访问凭证','h5-token')}</div>${prefs.values.h5token?prefLine('访问凭证','•••• •••• demo',prefButton('查看凭证','notice','这是演示凭证，不可用于连接。')+prefButton('重新生成','h5-token')):''}`):'<div class="prefs-note">开启后可生成访问凭证与二维码。仅分享给你信任的设备。</div>');}
+function prefsTerminal(){const active=prefs.terminalTabs.find(t=>t.id===prefs.terminalActive);return prefHead('终端','在工作区内运行命令，管理插件、Skills 和 MCP。')+prefShell()+`<div class="prefs-term"><div class="prefs-termbar">${prefs.terminalTabs.map(t=>`<button data-pref-action="terminal-select" data-value="${t.id}" aria-pressed="${t.id===prefs.terminalActive}">${icon('terminal')}终端 ${t.id}</button><button data-pref-action="terminal-close" data-value="${t.id}" aria-label="关闭终端 ${t.id}">${icon('x')}</button>`).join('')}${prefButton(icon('plus'),'terminal-add')}<span class="grow"></span>${prefButton('清屏','terminal-clear')}${prefButton('重启','terminal-restart')}</div>${active?`<pre>${esc(active.lines.join('\n'))}</pre><label class="prefs-command"><span>$</span><input data-pref-command aria-label="终端命令" placeholder="输入命令…"></label>`:'<div class="prefs-empty">没有打开的终端</div>'}</div><p class="prefs-note">桌面端内置 DreamCoder 运行时。命令示例：claude plugin install …、claude mcp add …</p><details class="prefs-disclosure"><summary>Windows · Bash 路径</summary>${prefInput('Bash 可执行文件','bashPath','','text','placeholder="C:\\Program Files\\Git\\bin\\bash.exe"')}<p class="prefs-help">Windows 默认使用 CMD；需要 grep、sed 等 Unix 命令时配置 Git Bash。</p>${prefSave('保存路径')}</details>`;}
+const mcpCatalog=[{name:'Filesystem',desc:'在你允许的目录中读写和搜索文件。',tags:['files','local','core'],command:'@modelcontextprotocol/server-filesystem {env:ALLOWED_DIR}',runtime:'node',env:'ALLOWED_DIR'},{name:'Git',desc:'查看历史、差异和分支，并暂存修改。',tags:['git','vcs','local','core'],command:'mcp-server-git --repository {env:REPO_PATH}',runtime:'uvx',env:'REPO_PATH'},{name:'Fetch',desc:'抓取网页并转换成 Markdown。',tags:['web','http','core'],command:'mcp-server-fetch',runtime:'uvx'},{name:'Brave Search',desc:'联网搜索，返回排序结果和摘要。',tags:['search','web','research'],command:'@brave/brave-search-mcp-server',runtime:'node',env:'BRAVE_API_KEY'},{name:'Time',desc:'当前时间与时区换算。',tags:['utility','time'],command:'mcp-server-time',runtime:'uvx'}];
+function prefsMcpCatalog(){
+ const tags=['全部标签',...new Set(mcpCatalog.flatMap(e=>e.tags))].map(v=>[v,v]);const tag=prefs.values.mcpTag||'全部标签';const installed=new Set(prefs.servers.map(s=>s.name.toLowerCase()));
+ return `<div class="mcp-browse-tools"><label class="skills-search">${icon('search')}<input type="search" data-pref-filter="mcp" aria-label="搜索服务" placeholder="搜索服务" value="${esc(prefs.mcpQuery||'')}"></label>${generalSelect('按标签筛选','mcpTag',tags)}</div>`+
+ mcpCatalog.filter(e=>tag==='全部标签'||e.tags.includes(tag)).map(e=>`<div class="mcp-entry" data-pref-filter-item="mcp" data-search="${esc(e.name+' '+e.desc+' '+e.tags.join(' '))}"><div class="mcp-entry-head"><strong>${esc(e.name)}</strong>${installed.has(e.name.toLowerCase())?'<span class="prefs-badge mcp-installed">已安装</span>':''}</div><p>${esc(e.desc)}</p><div class="mcp-tags">${e.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div><p class="mcp-meta">命令：<code>${esc(e.command)}</code> · 运行时：${e.runtime}${e.env?' · 所需环境变量：'+e.env:''} · <a href="https://github.com/modelcontextprotocol/servers" target="_blank" rel="noopener">主页 ↗</a></p></div>`).join('')+'<p class="prefs-empty" data-pref-filter-empty="mcp" hidden>没有符合这些筛选条件的 MCP 服务。</p>';
+}
+function prefsMcp(){const browse=prefs.values.mcpView==='浏览目录';return prefHead('MCP 服务','管理外部工具与数据源，配置用户或项目范围。',browse?'':prefButton(`${icon('plus')}添加服务`,'mcp-new'))+`<div class="mcp-view">${generalSegments('MCP 视图','mcpView',['已安装','浏览目录'])}</div>`+(browse?prefsMcpCatalog():prefsMcpInstalled());}
+function prefsMcpInstalled(){return prefSummary([['服务总数',prefs.servers.length],['已启用',prefs.servers.filter(s=>s.enabled).length],['需要处理','0']])+prefs.servers.map((s,i)=>prefLine(esc(s.name),`${s.scope} · ${s.type} · ${s.enabled?'已连接':'已禁用'}`,prefButton(s.enabled?'禁用':'启用','mcp-toggle',i)+prefButton('管理','mcp-edit',i))).join('');}
+function prefsMcpForm(){const server=prefs.detail.index===null?null:prefs.servers[prefs.detail.index];return prefBack()+prefHead(server?'更新 '+esc(server.name)+' MCP':'连接自定义 MCP','选择传输方式与配置范围。')+(server?prefLine('连接状态',server.enabled?'已连接':'已禁用',prefButton('重连','notice','演示：连接已恢复。')+prefButton('卸载','mcp-delete',prefs.detail.index)):'')+prefInput('名称','mcpName',server?.name||'')+`<div class="prefs-grid">${server?prefLine('传输方式',server.type,''):prefSelect('传输方式','transport',['STDIO','Streamable HTTP','SSE'])}${prefSelect('配置范围','scope',['全局用户','项目私有','项目共享'])}</div>`+(prefs.values.scope!=='全局用户'?prefSelect('目标项目','mcpProject',['dreamcoder','GoTrans','skillset-manager']):'<p class="prefs-help">全局用户配置对所有项目生效。</p>')+(prefs.values.transport==='STDIO'?prefInput('启动命令','mcpCommand','npx')+prefInput('参数（一行一个）','mcpArgs','@modelcontextprotocol/server-filesystem')+prefSection('环境变量',prefKeyRows('mcp-env'))+prefButton('添加环境变量','key-row','mcp-env'):prefInput(prefs.values.transport==='SSE'?'SSE 地址':'URL','mcpUrl','https://mcp.example.com/mcp','url')+prefSection('请求头',prefKeyRows('mcp-headers'))+prefButton('添加请求头','key-row','mcp-headers')+`<div class="prefs-grid">${prefInput('OAuth Client ID','mcpClient','')}${prefInput('OAuth 回调端口','mcpPort','','number')}</div>`+prefInput('Headers Helper 脚本','mcpHelper',''))+`<details class="prefs-disclosure"><summary>原始配置</summary><pre class="prefs-code">${esc(JSON.stringify({name:prefs.values.mcpName||server?.name||'',transport:prefs.values.transport,scope:prefs.values.scope},null,2))}</pre></details><div class="prefs-footer">${prefButton('取消','back')}${prefButton('保存','mcp-save','',true)}</div>`;}
+function prefKeyRows(key){return `<div id="${key}">${Array.from({length:prefs.values[key+'-count']||1},(_,i)=>`<div class="prefs-grid">${prefInput('键',key+i+'key','')}${prefInput('值',key+i+'value','')}</div>`).join('')}</div>`;}
+function prefsAgentsPage(){return prefHead('Agents','浏览已加载的代理，查看来源、工具与系统提示词。')+prefSummary([['代理总数',prefsAgents.length],['当前生效',prefsAgents.length],['来源',new Set(prefsAgents.map(a=>a.source)).size]])+['用户','Claude Code','项目','内置'].map(source=>prefSection(source,prefsAgents.map((a,i)=>a.source===source?prefLine(a.name,a.desc,prefButton('查看','agent-detail',i)):'').join(''))).join('');}
+function prefsAgentDetail(){const a=prefsAgents[prefs.detail.index];return prefBack()+prefHead(a.name,a.desc)+prefLine('来源',a.source,'<span class="prefs-badge">当前生效</span>')+prefLine('模型',a.model,'')+prefLine('可用工具',a.tools,'')+prefSection('系统提示词',`<div class="prefs-code">${a.prompt}</div>`);}
+function prefsSkillsPage(){
+ return `<div class="skills-toolbar"><div class="skills-title"><h3>Skills</h3><span class="skills-total">${prefsSkills.length} 项已安装</span></div><label class="skills-search">${icon('search')}<input type="search" data-pref-filter="skills" aria-label="搜索技能" placeholder="搜索技能…" value="${esc(prefs.skillsQuery||'')}"></label><button class="skills-add prefs-button" data-menu="skill-add" aria-haspopup="menu" aria-expanded="false">${icon('plus')}添加${icon('chevron-down')}</button></div>`+
+  ['用户','Claude Code','项目'].map(source=>{
+  const rows=prefsSkills.map((skill,index)=>({skill,index})).filter(({skill})=>skill.source===source);
+  return `<section class="skills-group" data-skill-group><h4>${source==='Claude Code'?'Claude Code 技能':source+'技能'}<span class="skills-count">${rows.length}</span></h4>${rows.map(({skill:s,index:i})=>`<button class="skill-row" data-pref-action="skill-detail" data-value="${i}" data-pref-filter-item="skills" data-search="${esc(s.name+' '+s.source+' '+s.desc)}" aria-label="查看 ${esc(s.name)}"><span class="skill-file-icon">${icon('scroll-text')}</span><span class="skill-copy"><span class="skill-name"><strong>${esc(s.name)}</strong>${source==='项目'?'<span class="prefs-badge">dreamcoder</span>':''}</span><span class="skill-description">${source==='用户'?'来自用户目录':source==='Claude Code'?'来自 ~/.claude':'来自 dreamcoder'} · ${esc(s.desc)}</span></span>${icon('chevron-right').replace('<i ','<i class="skill-chevron" ')}</button>`).join('')}</section>`;
+ }).join('')+'<p class="prefs-empty" data-pref-filter-empty="skills" hidden>没有匹配的技能</p>';
+}
+function filterMcp(){
+ const query=(prefs.mcpQuery||'').trim().toLowerCase();let total=0;
+ $$('[data-pref-filter-item="mcp"]').forEach(el=>{el.hidden=!el.dataset.search.toLowerCase().includes(query);if(!el.hidden)total++;});
+ const empty=$('[data-pref-filter-empty="mcp"]');if(empty)empty.hidden=total>0;
+}
+function filterSkills(){
+ const query=(prefs.skillsQuery||'').trim().toLowerCase();let total=0;
+ $$('[data-pref-filter-item="skills"]').forEach(el=>{el.hidden=!el.dataset.search.toLowerCase().includes(query);if(!el.hidden)total++;});
+ $$('[data-skill-group]').forEach(group=>{const count=[...group.querySelectorAll('[data-pref-filter-item="skills"]')].filter(el=>!el.hidden).length;group.hidden=count===0;group.querySelector('.skills-count').textContent=count;});
+ const empty=$('[data-pref-filter-empty="skills"]');if(empty)empty.hidden=total>0;
+}
+function prefsSkillDetail(){const s=prefsSkills[prefs.detail.index];const file=prefs.values.skillFile||'SKILL.md';return prefBack()+prefHead(s.name,s.desc)+prefSummary([['文件数','2'],['预估 tokens',s.tokens],['来源',s.source]])+prefLine('入口文件','SKILL.md','<span class="prefs-badge">/斜杠命令</span>')+`<div class="prefs-reader"><div class="prefs-tree">${['SKILL.md','references/guide.md'].map(f=>`<button data-pref-action="skill-file" data-value="${f}" aria-pressed="${file===f}">${icon('file-text')}${f}</button>`).join('')}</div><div class="prefs-document"><h4>${file==='SKILL.md'?s.name:'参考说明'}</h4><p>${file==='SKILL.md'?s.desc:'阅读相关源码，说明修改理由，并验证用户可观察的行为。'}</p><p class="prefs-help">${file} · 文档模式</p></div></div>`;}
+function prefsMemory(){
+ const file=prefs.memoryFile;const value=prefs.memoryDraft[file]??prefs.memorySaved[file];const dirty=value!==prefs.memorySaved[file];
+ prefs.memoryOpen??=new Set(['dreamcoder']);
+ const projects=[['dreamcoder',Object.keys(prefs.memorySaved)],['GoTrans',[]]];
+ const list=projects.map(([name,files])=>{const open=prefs.memoryOpen.has(name);return `<div class="memory-project"><button class="memory-row memory-project-row" data-pref-action="memory-project" data-value="${name}" aria-expanded="${open}">${icon(open?'chevron-down':'chevron-right')}<span>${name}</span><span class="memory-count">${files.length}</span></button>${open?(files.length?files.map(f=>`<button class="memory-row memory-file" data-pref-action="memory-file" data-value="${f}" aria-pressed="${f===file}" data-pref-filter-item="memory" data-search="${esc(name+' '+f)}">${icon('file-text')}<span>${esc(f)}</span>${prefs.memoryDraft[f]!==undefined&&prefs.memoryDraft[f]!==prefs.memorySaved[f]?'<span class="memory-dirty-dot" aria-label="未保存"></span>':''}</button>`).join(''):'<p class="memory-empty">还没有记忆文件</p>'):''}</div>`;}).join('');
+ const preview=`<div class="memory-preview">${value.split('\n').reduce((out,l)=>{if(l.startsWith('# '))out.push(`<h4>${esc(l.slice(2))}</h4>`);else if(l.startsWith('- '))out.push(`<li>${esc(l.slice(2))}</li>`);else if(l.trim())out.push(`<p>${esc(l)}</p>`);return out;},[]).join('').replace(/(<li>.*?<\/li>)+/g,m=>`<ul>${m}</ul>`)}</div>`;
+ const modes=`<div class="general-segment memory-modes" role="group" aria-label="显示方式">${['预览','编辑'].map(v=>`<button data-pref-action="memory-mode" data-value="${v}" aria-pressed="${prefs.memoryMode===v}">${v}</button>`).join('')}</div>`;
+ return prefHead('项目记忆','查看和编辑项目的 Markdown 记忆文件。',prefButton('刷新','notice','演示：记忆文件列表已刷新。'))+
+ `<div class="memory-layout"><aside class="memory-list" aria-label="记忆文件"><label class="memory-search">${icon('search')}<input type="search" data-pref-filter="memory" aria-label="搜索记忆文件" placeholder="搜索文件"></label>${list}<p class="memory-empty" data-pref-filter-empty="memory" hidden>没有匹配的文件</p></aside>`+
+ `<section class="memory-doc" aria-label="${esc(file)}"><header class="memory-doc-head"><div class="memory-doc-title"><div class="memory-doc-name"><strong>${esc(file)}</strong><span id="memory-state" class="memory-state${dirty?' dirty':''}">${dirty?'未保存':'已保存'}</span></div><span>dreamcoder · memory/${esc(file)}</span></div><div class="memory-doc-tools">${modes}<button class="prefs-button soft-button" data-pref-action="memory-revert" ${dirty?'':'disabled'}>还原</button><button class="prefs-button primary" data-pref-action="memory-save" ${dirty?'':'disabled'}>保存</button></div></header>`+
+ `<div class="memory-doc-body">${prefs.memoryMode==='编辑'?`<textarea data-memory-editor aria-label="编辑 ${esc(file)}" spellcheck="false">${esc(value)}</textarea>`:preview}</div></section></div>`;
+}
+function prefsPlugins(){return prefHead('插件','查看已安装插件、来源与运行状态。',prefButton('刷新','notice','演示：插件列表已刷新。')+prefButton('应用变更','notice','演示：插件变更已应用。'))+prefSummary([['插件总数',prefs.plugins.length],['已启用',prefs.plugins.filter(p=>p.enabled).length],['需关注','0']])+prefSection('已知插件市场',prefLine('claude-plugins-official','已安装 2 个 · 自动更新关','<span class="prefs-badge">GitHub</span>'))+prefSection('已安装',prefs.plugins.map((p,i)=>prefLine(esc(p.name),`${p.source} · ${p.enabled?'已启用':'已禁用'} · 1 个技能 · 1 个 Agent`,prefButton('查看','plugin-detail',i))).join(''));}
+function prefsPluginDetail(){const p=prefs.plugins[prefs.detail.index];return prefBack()+prefHead(esc(p.name),'项目开发与检查辅助工具。')+prefLine('状态',p.enabled?'已启用':'已禁用',prefButton(p.enabled?'禁用':'启用','plugin-toggle',prefs.detail.index)+prefButton('更新','notice','演示：插件已检查更新。')+prefButton('卸载','plugin-delete',prefs.detail.index))+prefLine('安装范围',p.source,'')+prefLine('安装位置','~/.claude/plugins/…','')+prefSummary([['技能','1'],['Agents','1'],['MCP','1'],['Hooks','0']])+prefSection('打包能力',prefLine('技能','code-review',prefButton('查看','plugin-skill'))+prefLine('Agents','reviewer',prefButton('查看','plugin-agent'))+prefLine('MCP 服务','filesystem',prefButton('查看','plugin-mcp'))+prefLine('命令 / Hooks','未暴露',''))+'<p class="prefs-note">启用、禁用或更新后，需要应用变更到当前运行时。</p>'+prefButton('应用变更','notice','演示：变更已应用。');}
+function prefsComputer(){return prefHead('Computer Use','允许助手截屏、点击、输入与操作应用。')+prefLine('计算机操作',prefs.values.computer?'已开启':'新会话不提供计算机操作工具。',prefToggle('启用','computer'))+prefSection('感知模式',prefChoices('vision',['截图视觉','Windows 无障碍树'])+`<p class="prefs-note">${prefs.values.vision==='截图视觉'?'通过截图理解界面，需要支持图像的模型。':'读取界面元素并按元素 ID 操作，支持纯文本模型；仅 Windows 可用。'}</p>`)+prefSection('运行环境',prefLine('Python 3','已检测到 · /usr/bin/python3','<span class="prefs-badge">示例</span>')+prefLine('虚拟环境','尚未创建','')+prefLine('依赖包','未安装','')+prefInput('Python 解释器路径','pythonPath','','text','placeholder="自动检测，或选择 Python 可执行文件"')+`<div class="prefs-actions">${prefButton('选择','notice','正式应用会打开文件选择器。')}${prefButton('应用','save')}${prefButton('自动','python-auto')}${prefButton('安装环境','notice','演示：正式应用将在确认后安装所需环境。')}${prefButton('重新检测','notice','演示：运行环境检测完成。')}</div>`)+prefSection('macOS 系统权限',prefLine('辅助功能','未授权',prefButton('打开设置','notice','正式应用会打开系统「辅助功能」设置。'))+prefLine('屏幕录制','未授权',prefButton('打开设置','notice','正式应用会打开系统「屏幕录制」设置。'))+'<p class="prefs-note">在系统设置中授权后，需要重新启动应用。</p>')+prefSection('已授权应用','<p class="prefs-help">预先授权后，操作这些应用时不再逐次请求确认。</p>'+`<label class="prefs-field"><span>搜索应用</span><input data-pref-filter="apps" placeholder="搜索 App…"></label>`+['Finder','Terminal','Safari'].map((a,i)=>`<div data-pref-filter-item="apps" data-search="${a}">${prefLine(a,'',prefToggle('授权','app'+i))}</div>`).join('')+prefLine('剪贴板访问','',prefToggle('允许','clipboard'))+prefLine('系统快捷键','',prefToggle('允许','systemKeys')));}
+function prefsActivity(){const cells=Array.from({length:364},(_,i)=>{const day=new Date(Date.UTC(2025,9,19+i));const date=day.toISOString().slice(0,10);const level=(i*17+3)%9<4?(i*17+3)%4:0;return `<button data-pref-action="usage-day" data-value="${date} · ${level*12400} tokens · ${level} 个会话" data-level="${level}" aria-label="${date}，${level*12400} tokens"></button>`;}).join('');return prefHead('Token 用量','2025 年 10 月 — 2026 年 10 月 · 示例数据')+prefSummary([['今天','37.2k','3 个会话'],['昨天','24.8k','2 个会话'],['30 天','812k','64 个会话']])+`<div class="row space prefs-help"><span>2025 · 10 月</span><span>1 月</span><span>4 月</span><span>7 月</span><span>10 月</span></div><div class="prefs-heatmap" aria-label="按天统计的 Token 用量">${cells}</div><div class="row space prefs-help"><span>点击日期查看用量</span><span>少 ··· 多</span></div><div id="prefs-day-detail" class="prefs-status" aria-live="polite">10 月 17 日 · 37,200 tokens · 3 个会话</div>`;}
+function prefsDiagnostics(){return prefHead('诊断','查看服务启动、服务商与会话运行错误。',prefButton('刷新','notice','演示：诊断事件已刷新。'))+prefSummary([['日志大小',prefs.logsCleared?'0 KB':'248 KB'],['事件数',prefs.logsCleared?'0':'3'],['保留策略','7 天','最多 20 MB']])+prefLine('日志目录','~/.claude/dreamcoder/logs',prefButton('打开','notice','正式应用会在文件管理器中打开日志目录。'))+`<div class="prefs-actions" style="margin-top:18px">${prefButton('导出诊断包','notice','演示：正式应用将导出脱敏后的诊断包。')}${prefButton('复制错误摘要','diagnostic-copy')}${prefButton('清理日志','diagnostic-clear')}</div>`+prefSection('最近事件',prefs.logsCleared?'<div class="prefs-empty">暂无诊断事件。</div>':[['14:28','会话运行完成','info','session.completed'],['14:26','服务商连接超时','error','provider.timeout'],['14:20','本地服务启动','info','server.started']].map(r=>`<details class="prefs-disclosure"><summary>${r[0]}　${r[1]}　<span class="prefs-badge">${r[2]}</span></summary><pre class="prefs-code">${r[3]}\nproject: dreamcoder\n${r[2]==='error'?'message: request timed out after 120s':'status: completed'}</pre></details>`).join(''))+'<p class="prefs-note">导出的诊断包会脱敏，不包含聊天内容、文件内容、完整环境变量或 API Key。</p>';}
+function prefsAbout(){return prefHead('DreamCoder','版本 0.4.5 · 桌面工作区')+prefLine('项目仓库','GoDiao / dreamcoder','<a href="https://github.com/GoDiao/dreamcoder" target="_blank" rel="noopener">GitHub ↗</a>')+prefLine('更新日志','查看发布说明','<a href="https://github.com/GoDiao/dreamcoder/releases" target="_blank" rel="noopener">查看 ↗</a>')+prefSection('应用更新','<p class="prefs-note">首个公开版本尚未发布，更新检查暂未开放。</p>')+prefLine('作者','GoDiao','<a href="https://github.com/GoDiao" target="_blank" rel="noopener">GitHub ↗</a>')+prefLine('反馈与建议','报告问题，或提出功能建议。','<a href="https://github.com/GoDiao/dreamcoder/issues" target="_blank" rel="noopener">提交反馈 ↗</a>');}
+const prefsPages={'模型服务商':prefsProviderList,'权限':prefsPermissions,'通用':prefsGeneral,'H5 访问':prefsH5,'终端':prefsTerminal,'MCP':prefsMcp,'Agents':prefsAgentsPage,'Skills':prefsSkillsPage,'记忆':prefsMemory,'插件':prefsPlugins,'Computer Use':prefsComputer,'活动':prefsActivity,'诊断':prefsDiagnostics,'关于':prefsAbout};
+const prefsDetails={provider:prefsProviderForm,mcp:prefsMcpForm,agent:prefsAgentDetail,skill:prefsSkillDetail,plugin:prefsPluginDetail};
+function renderSettings(){
+ $('#settings-overlay').hidden=!state.settingsOpen;$('.ds-side').inert=state.settingsOpen;$('.ds-main').inert=state.settingsOpen;if(!state.settingsOpen){$('#settings-modal-body').innerHTML='';return;}
+ const previousContent=$('.settings-content'),previousNav=$('.settings-nav');
+ prefs.scrollPositions??=new Map();
+ if(previousContent?.dataset.scrollKey)prefs.scrollPositions.set(previousContent.dataset.scrollKey,previousContent.scrollTop);
+ const navScroll=previousNav?.scrollTop||0;
+ const active=document.activeElement;
+ const restoreFocus=active?.closest?.('.general-settings')?{pref:active.dataset.pref,choice:active.dataset.prefChoice,value:active.dataset.value,action:active.dataset.prefAction}:null;
+ if($('.general-settings'))prefs.generalOpen=new Set($$('[data-general-section][open]').map(el=>el.dataset.generalSection));
+ if(prefs.detail?.tab!==state.settingsTab)prefs.detail=null;
+ const content=prefs.detail?prefsDetails[prefs.detail.kind]():prefsPages[state.settingsTab]();
+ const scrollKey=state.settingsTab+(prefs.detail?':'+prefs.detail.kind+':'+prefs.detail.index:':list');
+ const navQuery=(prefs.navQuery||'').trim().toLowerCase();
+ $('#settings-modal-body').innerHTML=`<div class="settings-layout"><nav class="settings-nav" aria-label="设置分类"><label class="settings-nav-search">${icon('search')}<input type="search" data-settings-search aria-label="搜索设置" placeholder="搜索" value="${esc(prefs.navQuery||'')}"></label>${settingsGroups.map(([group,items])=>{const shown=items.filter(s=>!navQuery||s.toLowerCase().includes(navQuery));return shown.length?`${group?`<span class="settings-nav-group">${group}</span>`:'<span class="settings-nav-gap"></span>'}${shown.map(s=>`<button data-settings="${s}" aria-pressed="${s===state.settingsTab}">${icon(settingsIcons[s])}<span>${s}</span></button>`).join('')}`:'';}).join('')}</nav><div class="settings-content" role="region" aria-label="${esc(state.settingsTab)}设置内容" data-scroll-key="${esc(scrollKey)}">${content}<div id="prefs-status" class="prefs-status" aria-live="polite"></div></div></div>`;
+ $('.settings-content').scrollTop=prefs.scrollPositions.get(scrollKey)||0;
+ $('.settings-nav').scrollTop=navScroll;
+ if(state.settingsTab==='Skills'&&!prefs.detail)filterSkills();
+ if(state.settingsTab==='MCP'&&!prefs.detail)filterMcp();
+ icons();
+ if(restoreFocus){const target=restoreFocus.pref?$$('[data-pref]').find(el=>el.dataset.pref===restoreFocus.pref):restoreFocus.choice?$$('[data-pref-choice]').find(el=>el.dataset.prefChoice===restoreFocus.choice&&el.dataset.value===restoreFocus.value):$$('[data-pref-action]').find(el=>el.dataset.prefAction===restoreFocus.action);target?.focus({preventScroll:true});}
+}
+function prefFeedback(message){const el=$('#prefs-status');if(el)el.textContent=message;else notify(message);}
+function openPrefDetail(kind,index){prefs.detail={kind,index,tab:state.settingsTab};renderSettings();}
+function prefClear(keys){for(const k of keys)delete prefs.values[k];}
+function prefHandle(action,value){
+ const i=Number(value);
+ if(action==='back'){prefs.detail=null;renderSettings();return;}
+ if(action==='save'){const bad=$('.settings-content :invalid');if(bad){bad.reportValidity();return;}prefFeedback('演示：设置已保存。');return;}
+ if(action==='notice'){prefFeedback(value);return;}
+ if(action==='permission'){setPermission(value);return;}
+ if(action==='provider-new'||action==='provider-edit'){
+  prefClear(['providerName','providerUrl','providerKey','providerNotes','mainModel','haikuModel','sonnetModel','opusModel','context0','context1','context2','context3','fallbackContext','providerJson']);
+  const p=action==='provider-edit'?prefs.providers[i]:null;
+  prefs.values.providerType=p?.type||'自定义';prefs.values.providerName=p?.name||'';prefs.values.providerUrl=p?.url||'';
+  prefs.values.apiFormat='Anthropic Messages（原生）';prefs.values.authStrategy='Bearer Token';openPrefDetail('provider',p?i:null);return;
+ }
+ if(action==='provider-default'){prefs.providers.forEach((p,n)=>p.active=n===i);state.provider=prefs.providers[i].name;renderSettings();return;}
+ if(action==='provider-test'){prefs.providers[i].tested=true;renderSettings();return;}
+ if(action==='provider-form-test'){prefFeedback('演示：连接成功 · 248 ms。未发送实际请求。');return;}
+ if(action==='provider-delete'){confirmAction('删除服务商？',prefs.providers[i].name,()=>{prefs.providers.splice(i,1);renderSettings();},'删除');return;}
+ if(action==='provider-save'){
+  if(!prefs.values.providerName?.trim()){prefFeedback('请填写服务商名称。');$('[data-pref="providerName"]').focus();return;}
+  if(prefs.values.providerJson){try{JSON.parse(prefs.values.providerJson);}catch{prefFeedback('设置 JSON 格式不正确。');return;}}
+  const p={name:prefs.values.providerName.trim(),url:prefs.values.providerUrl||'',type:prefs.values.providerType,active:prefs.detail.index===null?false:prefs.providers[prefs.detail.index].active};
+  if(prefs.detail.index===null)prefs.providers.push(p);else prefs.providers[prefs.detail.index]=p;prefs.detail=null;renderSettings();prefFeedback('演示：服务商已保存。');return;
+ }
+ if(action==='cc-import'){prefs.ccImport='running';renderSettings();setTimeout(()=>{prefs.ccImport='done';if(state.settingsOpen)renderSettings();},900);return;}
+ if(action==='storage-default'){prefs.values.storageDir='./dreamcoder-data';renderSettings();return;}
+ if(action==='storage-apply'){confirmAction('切换数据存储位置？','重启后从新目录读取数据；旧数据不会自动搬迁。',()=>prefFeedback('演示：切换请求已保存，实际应用未重启。'),'应用并重启');return;}
+ if(action==='copy-h5'){copyText('http://'+(prefs.values.h5host||'192.168.1.12')+':3000');return;}
+ if(action==='h5-token'){prefs.values.h5token=true;renderSettings();prefFeedback('演示凭证已生成，不可用于实际连接。');return;}
+ if(action==='terminal-select'){prefs.terminalActive=i;renderSettings();return;}
+ if(action==='terminal-add'){const id=prefs.terminalNext++;prefs.terminalTabs.push({id,lines:['~/dreamcoder  main']});prefs.terminalActive=id;renderSettings();return;}
+ if(action==='terminal-close'){prefs.terminalTabs=prefs.terminalTabs.filter(t=>t.id!==i);if(prefs.terminalActive===i)prefs.terminalActive=prefs.terminalTabs[0]?.id;renderSettings();return;}
+ if(action==='terminal-clear'||action==='terminal-restart'){const t=prefs.terminalTabs.find(t=>t.id===prefs.terminalActive);if(t)t.lines=action==='terminal-clear'?[]:['~/dreamcoder  main','Shell 已就绪'];renderSettings();return;}
+ if(action==='mcp-new'||action==='mcp-edit'){
+  const s=action==='mcp-edit'?prefs.servers[i]:null;prefClear(Object.keys(prefs.values).filter(k=>k.startsWith('mcp')));prefs.values.mcpName=s?.name||'';prefs.values.transport=s?.type||'STDIO';prefs.values.scope=s?.scope||'全局用户';openPrefDetail('mcp',s?i:null);return;
+ }
+ if(action==='mcp-toggle'){prefs.servers[i].enabled=!prefs.servers[i].enabled;renderSettings();return;}
+ if(action==='mcp-delete'){confirmAction('卸载 MCP 服务？',prefs.servers[i].name,()=>{prefs.servers.splice(i,1);prefs.detail=null;renderSettings();},'卸载');return;}
+ if(action==='mcp-save'){if(!prefs.values.mcpName?.trim()){prefFeedback('请填写服务名称。');return;}const s={name:prefs.values.mcpName,scope:prefs.values.scope,type:prefs.values.transport,enabled:true};if(prefs.detail.index===null)prefs.servers.push(s);else prefs.servers[prefs.detail.index]=s;prefs.detail=null;renderSettings();prefFeedback('演示：MCP 配置已保存。');return;}
+ if(action==='key-row'){prefs.values[value+'-count']=(prefs.values[value+'-count']||1)+1;renderSettings();return;}
+ if(action==='agent-detail'||action==='skill-detail'||action==='plugin-detail'){prefs.values.skillFile='SKILL.md';openPrefDetail(action.split('-')[0],i);return;}
+ if(action==='skill-file'){prefs.values.skillFile=value;renderSettings();return;}
+ if(action==='memory-project'){prefs.memoryOpen.has(value)?prefs.memoryOpen.delete(value):prefs.memoryOpen.add(value);renderSettings();return;}
+ if(action==='memory-file'){prefs.memoryFile=value;renderSettings();return;}
+ if(action==='memory-mode'){prefs.memoryMode=value;renderSettings();return;}
+ if(action==='memory-save'){prefs.memorySaved[prefs.memoryFile]=prefs.memoryDraft[prefs.memoryFile]??prefs.memorySaved[prefs.memoryFile];renderSettings();prefFeedback('演示：当前记忆已保存。');return;}
+ if(action==='memory-revert'){delete prefs.memoryDraft[prefs.memoryFile];renderSettings();return;}
+ if(action==='plugin-toggle'){prefs.plugins[i].enabled=!prefs.plugins[i].enabled;renderSettings();return;}
+ if(action==='plugin-delete'){confirmAction('卸载插件？',prefs.plugins[i].name,()=>{prefs.plugins.splice(i,1);prefs.detail=null;renderSettings();},'卸载');return;}
+ if(['plugin-skill','plugin-agent','plugin-mcp'].includes(action)){if(!prefs.plugins[prefs.detail.index].enabled){prefFeedback('先启用插件并应用变更，再查看关联能力。');return;}const tab=action==='plugin-skill'?'Skills':action==='plugin-agent'?'Agents':'MCP';state.settingsTab=tab;prefs.detail=null;renderSettings();return;}
+ if(action==='python-auto'){delete prefs.values.pythonPath;renderSettings();return;}
+ if(action==='usage-day'){$('#prefs-day-detail').textContent=value;return;}
+ if(action==='diagnostic-copy'){copyText(prefs.logsCleared?'暂无诊断事件。':'14:26 provider.timeout — request timed out after 120s（示例）');return;}
+ if(action==='diagnostic-clear'){confirmAction('清理诊断日志？','此处只清空演示事件。',()=>{prefs.logsCleared=true;renderSettings();},'清理');return;}
+}
+root.addEventListener('input',e=>{
+ if(e.target.dataset.pref){const key=e.target.dataset.pref;prefs.values[key]=e.target.type==='checkbox'?e.target.checked:e.target.value;}
+ if(e.target.matches('[data-settings-search]')){prefs.navQuery=e.target.value;renderSettings();const el=$('[data-settings-search]');el.focus();el.setSelectionRange(el.value.length,el.value.length);}
+ if(e.target.matches('[data-memory-editor]')){prefs.memoryDraft[prefs.memoryFile]=e.target.value;const dirty=e.target.value!==prefs.memorySaved[prefs.memoryFile];$('#memory-state').textContent=dirty?'未保存':'已保存';$('#memory-state').classList.toggle('dirty',dirty);$$('[data-pref-action="memory-save"],[data-pref-action="memory-revert"]').forEach(b=>b.disabled=!dirty);}
+ if(e.target.dataset.prefFilter==='skills'){prefs.skillsQuery=e.target.value;filterSkills();return;}if(e.target.dataset.prefFilter==='mcp'){prefs.mcpQuery=e.target.value;filterMcp();return;}
+ if(e.target.dataset.prefFilter){const group=e.target.dataset.prefFilter;const query=e.target.value.trim().toLowerCase();let count=0;$$(`[data-pref-filter-item="${group}"]`).forEach(el=>{el.hidden=!el.dataset.search.toLowerCase().includes(query);if(!el.hidden)count++;});const empty=$(`[data-pref-filter-empty="${group}"]`);if(empty)empty.hidden=!!count;}
+});
+root.addEventListener('change',e=>{if(e.target.dataset.pref){const key=e.target.dataset.pref;prefs.values[key]=e.target.type==='checkbox'?e.target.checked:e.target.value;if(e.target.closest('.general-settings')||['shell','proxy','storage','h5','notifications','computer','transport','scope','providerType'].includes(key))renderSettings();}});
+root.addEventListener('keydown',e=>{if(e.target.matches('[data-pref-command]')&&e.key==='Enter'&&!e.isComposing){e.preventDefault();const cmd=e.target.value.trim(),t=prefs.terminalTabs.find(t=>t.id===prefs.terminalActive);if(!cmd||!t)return;t.lines.push('$ '+cmd,cmd==='pwd'?'~/dreamcoder':'演示终端：命令未实际执行');renderSettings();$('[data-pref-command]')?.focus();}});
+function renderScheduled(){$('#other-page').innerHTML=`<div class="row space"><span class="quiet">计划与执行记录</span><button class="soft-button" data-action="create-schedule">${icon('plus')}新建任务</button></div><p class="quiet">按计划启动会话并执行任务。</p>${state.tasks.map((t,i)=>`<div class="schedule-row"><div class="grow"><h3>${esc(t.name)}</h3><p>${esc(t.when)} · ${t.on?'已启用':'已暂停'}</p></div><button class="xs-icon" data-toggle-task="${i}" aria-label="${t.on?'暂停':'启用'} ${esc(t.name)}">${icon(t.on?'pause':'play')}</button><button class="xs-icon" data-menu="schedule" data-task="${i}" aria-label="${esc(t.name)} 更多操作">${icon('ellipsis')}</button></div>`).join('')}`;icons();}
+function createSchedule(){openDialog('新建定时任务','<label>任务名称<input id="schedule-name" placeholder="例如：每日代码检查"></label><label>执行内容<textarea id="schedule-prompt" placeholder="描述任务…"></textarea></label><label>计划<select id="schedule-when"><option>每天 09:00</option><option>每周五 18:00</option></select></label><div class="dialog-actions"><button data-action="close-dialog">取消</button><button class="primary" id="save-schedule">创建任务</button></div>');$('#save-schedule').onclick=()=>{const name=$('#schedule-name').value.trim();if(!name){$('#schedule-name').focus();return;}state.tasks.push({name,when:$('#schedule-when').value,on:true});closeDialog();renderScheduled();};}
+function setPermission(value){if(value==='绕过权限'){confirmAction('绕过权限检查？','工具执行将不再逐项请求授权。仅在你信任当前工作区时使用。',()=>{state.permission=value;renderScene();if(state.settingsOpen)renderSettings();},'启用');}else{state.permission=value;renderScene();if(state.settingsOpen)renderSettings();}}
+function sendMessage(){
+ if(state.scene==='执行中'){state.scene='回复完成';renderScene();renderSidebar();notify('已停止生成');return;}
+ if(providerIssue())return;
+ const text=$('#prompt').value.trim();if(!text&&!state.refs.length)return;
+ if(text.startsWith('/')&&text.split(/\s/).length===1){runCommand(text);return;}
+ const s=sessions.find(s=>s.id===state.active);if(s)s.updatedAt=Date.now();if(s&&!s.full&&s.title==='新会话'){s.title=text.slice(0,18)||'文件讨论';}
+ const bubble=document.createElement('div');bubble.className='ds-user ds-user-added';bubble.textContent=text||state.refs.join('、');$('#sent').appendChild(bubble);$('#empty').hidden=true;
+ $('#prompt').value='';state.refs=[];renderRefs();resizePrompt();renderSidebar();$('#page-title').textContent=s?.title||'会话';updateSend();
+}
+function showMenu(type,anchor){
+ const item=(label,run,ico,checked=false,desc)=>({label,run,icon:ico,checked,desc});
+ if(type==='general-select'){
+  const key=anchor.dataset.generalKey;
+  menu(anchor,(generalOptions.get(key)||[]).map(([value,label])=>item(label,()=>{prefs.values[key]=value;renderSettings();$$('[data-general-key]').find(el=>el.dataset.generalKey===key)?.focus({preventScroll:true});},undefined,prefs.values[key]===value)),false,'general');
+  const selected=$('#menu [aria-checked="true"]')||$('#menu button');selected?.focus({preventScroll:true});
+  return;
+ }
+ if(type==='skill-add'){menu(anchor,[item('通过插件添加',()=>{state.settingsTab='插件';prefs.detail=null;renderSettings();},'blocks',false,'查看插件附带的技能'),item('在终端中安装',()=>{state.settingsTab='终端';prefs.detail=null;renderSettings();},'terminal',false,'打开内置终端')]);return;}
+ if(type==='interface-language'){
+  menu(anchor,[...interfaceLanguages.map(value=>item(value,()=>{prefs.values.language=value;if(state.settingsOpen)renderSettings();anchor.focus({preventScroll:true});notify('演示：界面语言已选择 '+value);},undefined,prefs.values.language===value)),null,item('返回更多',()=>showMenu('footer',anchor),'arrow-left')],true);
+  ($('#menu .chosen')?.closest('button')||$('#menu button'))?.focus({preventScroll:true});
+  return;
+ }
+ if(type==='footer'){menu(anchor,[item('项目与会话管理',projectManagement,'folders'),item('设置',()=>openSettings(),'settings-2'),item('Language · '+prefs.values.language,()=>showMenu('interface-language',anchor),'globe'),item('快捷键',()=>runCommand('/help'),'keyboard'),item('项目仓库',()=>openDialog('项目仓库','<a href="https://github.com/GoDiao/dreamcoder" target="_blank" rel="noopener">GoDiao / dreamcoder</a>'),'github')],true);return;}
+ if(type==='session'||type==='session-row'){sessionMenu(anchor,anchor.dataset.sessionId||state.active);return;}
+ if(type==='create-project'){menu(anchor,[item('新建空白项目',()=>inputDialog('新建项目','项目名称','',p=>{state.projectOrder.push(p);newSession(p);}), 'folder-plus'),item('使用已有文件夹',()=>inputDialog('选择项目目录','目录路径','~/Projects/',p=>{const name=p.split('/').filter(Boolean).pop();if(!state.projectOrder.includes(name))state.projectOrder.push(name);newSession(name);}), 'folder-open')]);return;}
+ if(type==='add'){menu(anchor,[item('添加文件',()=>$('#file-input').click(),'paperclip'),item('引用项目文件',()=>commandDialog('files'),'at-sign'),item('选择命令',()=>commandDialog(),'command')],true);return;}
+ if(type==='permission'){menu(anchor,[item('Default',()=>setPermission('询问权限'),'shield-check',state.permission==='询问权限','需要授权时先向你确认'),item('Accept edits',()=>setPermission('自动接受编辑'),'file-pen-line',state.permission==='自动接受编辑','编辑文件无需逐次确认'),item('Plan',()=>setPermission('计划模式'),'list-checks',state.permission==='计划模式','先分析规划，暂不修改'),item('Bypass permissions',()=>setPermission('绕过权限'),'shield-off',state.permission==='绕过权限','执行前不再逐项确认')],true);return;}
+ if(type==='model'){menu(anchor,[...['Sonnet','Opus','自定义模型'].map(v=>item(v,()=>{state.model=v;renderScene();},undefined,state.model===v)),null,item('服务商 · '+state.provider,()=>menu(anchor,prefs.providers.length?prefs.providers.map(p=>p.name).map(v=>item(v,()=>{state.provider=v;notify('服务商已切换为'+v);},undefined,state.provider===v)):[item('添加服务商',()=>actions['provider-add'](),'plus')],true)),item('推理强度 · '+state.effort,()=>menu(anchor,['Low','Medium','High','Max'].map(v=>item(v,()=>{state.effort=v;renderScene();},undefined,state.effort===v)),true))],true);return;}
+ if(type==='open-project'){menu(anchor,['Visual Studio Code','终端','文件管理器'].map(v=>item(v,()=>notify('已选择打开方式：'+v),'external-link')));return;}
+ if(type==='file-view'){menu(anchor,[item('变更文件',()=>{state.fileView='changed';renderWorkspace();},'file-diff',state.fileView==='changed'),item('全部文件',()=>{state.fileView='all';renderWorkspace();},'folder',state.fileView==='all')]);return;}
+ if(type==='file-actions'){menu(anchor,[item('引用选中文字',()=>addRef((window.getSelection()?.toString()||'applyEvent(event)').slice(0,150)),'text-quote'),item('复制相对路径',()=>copyText('desktop/src/stores/'+state.file),'copy'),item('复制绝对路径',()=>copyText('~/Projects/GoDiao/dreamcoder/desktop/src/stores/'+state.file),'copy'),item('关闭其他预览',()=>notify('已关闭其他预览'),'x')],true);return;}
+ if(type==='schedule'){const i=Number(anchor.dataset.task);menu(anchor,[item('查看运行会话',()=>openSession('s1'),'messages-square'),item('编辑任务',()=>inputDialog('编辑任务','任务名称',state.tasks[i].name,value=>{state.tasks[i].name=value;renderScheduled();}),'pencil'),item('删除任务',()=>confirmAction('删除定时任务？',state.tasks[i].name,()=>{state.tasks.splice(i,1);renderScheduled();},'删除'),'trash-2')]);}
+}
+async function copyText(text){try{await navigator.clipboard.writeText(text);notify('已复制');}catch{openDialog('复制内容',`<p>${esc(text)}</p>`);}}
+const actions={
+ 'close-settings':()=>closeSettings(),
+ 'provider-settings':()=>{state.settingsTab='模型服务商';prefs.detail=null;openSettings();},
+ 'provider-add':()=>{state.settingsTab='模型服务商';prefs.detail=null;openSettings();prefHandle('provider-new');},
+ 'launch-import':()=>{state.launchImport='running';state.importProgress=0;renderLaunch();const timer=setInterval(()=>{state.importProgress=Math.min(9800,state.importProgress+980);if(state.importProgress>=9800){clearInterval(timer);setDemoProviders('sample');state.launchImport='done';}renderLaunch();},120);},
+ 'launch-finish':()=>finishLaunch(),
+ 'launch-later':()=>finishLaunch(),
+ 'launch-add-provider':()=>{finishLaunch();actions['provider-add']();},
+ 'collapse':()=>{if(root.clientWidth<=600)root.classList.remove('ds-mobile-side');else root.classList.add('ds-hide-side');},
+ 'expand':()=>{if(root.clientWidth<=600)root.classList.toggle('ds-mobile-side');else root.classList.remove('ds-hide-side');},
+ 'new':()=>newSession(),'search':searchDialog,'scheduled':()=>openPage('scheduled'),
+ 'close-dialog':closeDialog,'files':()=>openPanel('files'),'terminal':()=>openPanel('terminal'),'panel-close':()=>{state.files=false;state.terminal=false;state.panelExpanded=false;renderWorkspace();},'panel-expand':()=>{state.panelExpanded=!state.panelExpanded;renderWorkspace();},
+ 'send':sendMessage,'context':contextDialog,'repository':repositoryDialog,
+ 'tasks':()=>{$('#task-detail').hidden=!$('#task-detail').hidden;$('[data-action="tasks"]').setAttribute('aria-expanded',String(!$('#task-detail').hidden));},
+ 'dismiss-tasks':()=>{$('#task-strip').hidden=true;},'member':()=>{state.scene='成员会话';renderScene();},'leader':()=>{state.scene='回复完成';renderScene();},
+ 'goal-details':()=>openDialog('当前目标','<p>统一会话恢复与实时事件处理。</p><div class="metric-row"><span>状态</span><span>'+esc(state.scene==='执行中'?'运行中':'已完成')+'</span></div><div class="metric-row"><span>预算</span><span>20,000 tokens</span></div><div class="metric-row"><span>耗时 / 续跑</span><span>4 分 12 秒 / 2 次</span></div>'),
+ 'copy-answer':()=>copyText($('#answer').innerText),'quote':()=>addRef((window.getSelection()?.toString()||'历史与实时消息使用统一的数据结构。').slice(0,150)),
+ 'branch':()=>confirmAction('从此处分叉？','保留此位置之前的对话，在新会话继续。',()=>{const source=sessions.find(s=>s.id===state.active);newSession(source?.project);sessions.find(s=>s.id===state.active).title=(source?.title||'会话')+' · 分支';renderAll();},'创建分支'),
+ 'undo':()=>confirmAction('撤销本轮修改？','将回退 chatStore.ts 与 sessionService.ts 在本轮产生的修改。',()=>{$('.change-summary').hidden=true;notify('本轮修改已撤销');},'撤销修改'),
+ 'batch-exit':()=>{state.batch=false;state.selected.clear();renderSidebar();},'select-all':()=>{state.selected=new Set(sessions.map(s=>s.id));renderSidebar();},'batch-delete':()=>{if(state.selected.size)deleteSessions([...state.selected]);else notify('请先选择会话');},
+ 'add-file-ref':()=>addRef(state.file),'refresh-files':()=>{renderWorkspace();notify('文件列表已刷新');},'close-preview':()=>{$('#file-preview').hidden=true;},
+ 'code-comment':()=>{openDialog('添加行评论',`<p>${esc(state.file)} · 第 25 行</p><textarea id="line-comment" aria-label="行评论" placeholder="描述这行代码需要调整的地方…"></textarea><div class="dialog-actions"><button data-action="close-dialog">取消</button><button class="primary" id="submit-comment">加入对话</button></div>`);$('#submit-comment').onclick=()=>{const text=$('#line-comment').value.trim();if(text){closeDialog();addRef(state.file+':25 · '+text);}};},
+ 'terminal-clear':()=>{const t=state.termTabs?.find(t=>t.id===state.termActive);if(t)t.lines.length=0;renderWorkspace();},'terminal-restart':()=>{const t=state.termTabs?.find(t=>t.id===state.termActive);if(t){t.lines.length=0;t.lines.push('~/'+(sessions.find(s=>s.id===state.active)?.project||'dreamcoder')+'  main','Shell 已就绪');}renderWorkspace();},'terminal-new':()=>{state.termTabs??=[{id:1,lines:state.terminalLines}];const id=Math.max(...state.termTabs.map(t=>t.id))+1;state.termTabs.push({id,lines:['~/'+(sessions.find(s=>s.id===state.active)?.project||'dreamcoder')+'  main']});state.termActive=id;state.panelTab='terminal';state.terminal=true;state.files=false;renderWorkspace();},'terminal-expand':()=>{closeDialog();state.panelTab='terminal';state.terminal=true;state.files=false;state.panelExpanded=true;if(state.page!=='chat')openSession(state.active);renderWorkspace();},'terminal-close':()=>{state.terminal=false;renderWorkspace();},
+ 'answer-question':()=>{const answer=$('#custom-answer').value.trim()||$('input[name=answer]:checked').value;state.scene='执行中';renderScene();notify('已提交：'+answer);},
+ 'save-setting':()=>{closeDialog();notify('设置已保存');},'diagnose':()=>notify('检查完成，未发现异常'),
+ 'computer-confirm':()=>confirmAction('允许操作计算机？','允许助手查看屏幕并操作当前应用。',()=>notify('已允许本次操作'),'允许一次'),
+ 'create-schedule':createSchedule
+};
+root.addEventListener('click',e=>{
+ const target=e.target.closest('button,a');if(!target)return;
+ if(target.dataset.menuIndex!==undefined){e.stopPropagation();const fn=menuActions[Number(target.dataset.menuIndex)];closeMenu();fn?.();return;}
+ if(target.dataset.menu){e.stopPropagation();if(menuAnchor===target){closeMenu();return;}showMenu(target.dataset.menu,target);return;}
+ if(target.dataset.action){closeMenu();actions[target.dataset.action]?.();return;}
+ if(target.dataset.session){openSession(target.dataset.session);return;}
+ if(target.dataset.collapseProject){const p=target.dataset.collapseProject;if(state.collapsed.has(p))state.collapsed.delete(p);else state.collapsed.add(p);renderSidebar();return;}
+ if(target.dataset.newProject){newSession(target.dataset.newProject);return;}
+ if(target.dataset.searchSession){const id=target.dataset.searchSession;closeDialog();openSession(id);return;}
+ if(target.dataset.settings){closeDialog();state.settingsTab=target.dataset.settings;openSettings();return;}
+ if(target.dataset.prefAction){prefHandle(target.dataset.prefAction,target.dataset.value||'');return;}
+ if(target.dataset.prefChoice){prefs.values[target.dataset.prefChoice]=target.dataset.value;renderSettings();return;}
+ if(target.dataset.removeRef!==undefined){state.refs.splice(Number(target.dataset.removeRef),1);renderRefs();return;}
+ if(target.dataset.file){if(target.dataset.file.endsWith('/')){notify('已展开 '+target.dataset.file);return;}const f=target.dataset.file;state.file=f;state.openFiles.has(f)?state.openFiles.delete(f):state.openFiles.add(f);state.files=true;renderWorkspace();return;}
+ if(target.dataset.command){const value=target.dataset.command,isFile=target.dataset.isFile==='true';closeDialog();if(isFile){$('#prompt').value=$('#prompt').value.replace(/@[^\s]*$/,'');addRef(value);}else runCommand(value);return;}
+ if(target.dataset.invokeSkill){const value=target.dataset.invokeSkill;closeDialog();openSession(state.active);$('#prompt').value='/'+value+' ';updateSend();$('#prompt').focus();return;}
+ if(target.dataset.permissionResponse){notify(target.dataset.permissionResponse);state.scene=target.dataset.permissionResponse==='已拒绝'?'回复完成':'执行中';renderScene();return;}
+ if(target.dataset.toggleTask!==undefined){state.tasks[Number(target.dataset.toggleTask)].on=!state.tasks[Number(target.dataset.toggleTask)].on;renderScheduled();}
+});
+root.addEventListener('change',e=>{if(e.target.dataset.selectSession){const id=e.target.dataset.selectSession;if(e.target.checked)state.selected.add(id);else state.selected.delete(id);}});
+root.addEventListener('scroll',e=>{if(e.target.matches?.('.settings-content,.settings-nav,#project-list'))closeMenu();},true);
+document.addEventListener('click',e=>{if(!$('#menu').hidden&&!$('#menu').contains(e.target)&&!menuAnchor?.contains(e.target))closeMenu();});
+$('#overlay').addEventListener('click',e=>{if(e.target===$('#overlay'))closeDialog();});
+$('#workspace').addEventListener('click',e=>{const t=e.target.closest('[data-panel-tab],[data-term-tab],[data-term-close]');if(!t)return;e.stopPropagation();
+ if(t.dataset.panelTab){state.panelTab=t.dataset.panelTab;state.files=t.dataset.panelTab==='files';state.terminal=t.dataset.panelTab==='terminal';}
+ else if(t.dataset.termTab)state.termActive=Number(t.dataset.termTab);
+ else{const id=Number(t.dataset.termClose);state.termTabs=state.termTabs.filter(x=>x.id!==id);if(state.termActive===id)state.termActive=state.termTabs[0]?.id;}
+ renderWorkspace();});
+$('#workspace').addEventListener('pointerdown',e=>{if(!e.target.closest('.panel-resizer'))return;e.preventDefault();const view=$('#chat-view'),box=view.getBoundingClientRect(),right=box.right,max=Math.min(680,box.width-320);
+ const move=ev=>{state.panelWidth=Math.max(280,Math.min(max,right-ev.clientX));view.style.setProperty('--panel-w',state.panelWidth+'px');};
+ const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);root.classList.remove('is-resizing');};
+ root.classList.add('is-resizing');document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);});
+$('#settings-overlay').addEventListener('click',e=>{if(e.target===$('#settings-overlay'))closeSettings();});
+root.addEventListener('contextmenu',e=>{const row=e.target.closest('.session-row');if(row){e.preventDefault();sessionMenu(row,row.querySelector('[data-session]').dataset.session);}});
+root.addEventListener('dragstart',e=>{const handle=e.target.closest('.project-name'),p=handle?.closest('[data-project]');if(p){dragProject=p.dataset.project;e.dataTransfer.setData('text/plain',dragProject);}else e.preventDefault();});
+root.addEventListener('dragover',e=>{if(dragProject&&e.target.closest('[data-project]'))e.preventDefault();});
+root.addEventListener('drop',e=>{const p=e.target.closest('[data-project]');if(dragProject&&p){e.preventDefault();const target=p.dataset.project;if(target!==dragProject){state.projectOrder=state.projectOrder.filter(v=>v!==dragProject);state.projectOrder.splice(Math.max(0,state.projectOrder.indexOf(target)),0,dragProject);renderSidebar();}}dragProject=null;});
+$('#prompt').addEventListener('input',()=>{resizePrompt();updateSend();const value=$('#prompt').value;if(value==='/')commandDialog();else if(value.endsWith('@'))commandDialog('files');});
+$('#prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();if(!$('#send').disabled)sendMessage();}});
+$('#prompt').addEventListener('paste',e=>{const files=Array.from(e.clipboardData?.files||[]);if(files.length){e.preventDefault();files.forEach(f=>addRef(f.name||'粘贴的图片'));}});
+$('#file-input').addEventListener('change',e=>{Array.from(e.target.files).forEach(f=>addRef(f.name));e.target.value='';});
+$('.ds-composer').addEventListener('dragover',e=>e.preventDefault());$('.ds-composer').addEventListener('drop',e=>{e.preventDefault();Array.from(e.dataTransfer.files).forEach(f=>addRef(f.name));});
+root.addEventListener('keydown',e=>{
+ if(e.key==='Escape'){if(!$('#overlay').hidden){closeDialog();e.preventDefault();}else if(!$('#menu').hidden){const anchor=menuAnchor;closeMenu();anchor?.focus();e.preventDefault();}else if(state.settingsOpen){closeSettings();e.preventDefault();}return;}
+ if(!$('#overlay').hidden&&e.key==='Tab'){const list=$$('#overlay button,#overlay input,#overlay textarea,#overlay select,#overlay a').filter(el=>!el.disabled);const first=list[0],last=list[list.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}return;}
+ if(!$('#menu').hidden&&['ArrowDown','ArrowUp'].includes(e.key)){const list=$$('#menu button:not(:disabled)');let i=list.indexOf(document.activeElement);i=(i+(e.key==='ArrowDown'?1:-1)+list.length)%list.length;list[i]?.focus();e.preventDefault();return;}
+ if(e.metaKey||e.ctrlKey){if(e.key.toLowerCase()==='k'){e.preventDefault();searchDialog();}if(e.key.toLowerCase()==='n'){e.preventDefault();newSession();}if(e.key==='.'&&state.scene==='执行中'){e.preventDefault();state.scene='回复完成';renderScene();}}
+});
+function restoreDesign(snapshot){
+ const saved=snapshot?.modelContent;if(!saved||saved.design!=='dreamcoder-complete')return false;
+ let changed=false;
+ const assign=(key,value)=>{if(state[key]!==value){state[key]=value;changed=true;}};
+ for(const key of ['appearance','scene','permission','model','effort'])if(typeof saved[key]==='string')assign(key,saved[key]);
+ const legacyEffort={'低':'Low','中':'Medium','高':'High','最高':'Max'};if(legacyEffort[state.effort])state.effort=legacyEffort[state.effort];
+ if(Number.isFinite(saved.bodySize))assign('bodySize',Math.max(15,Math.min(18,saved.bodySize)));
+ for(const key of ['files','terminal'])if(typeof snapshot.privateContent?.[key]==='boolean')assign(key,snapshot.privateContent[key]);
+ if(saved.previewRevision==='skills-list'&&settings.includes(saved.settingsTab))assign('settingsTab',saved.settingsTab);
+ return changed;
+}
+function saveDesign(){
+ if(!window.openai?.setWidgetState)return;
+ window.openai.setWidgetState({modelContent:{design:'dreamcoder-complete',appearance:state.appearance,bodySize:state.bodySize,scene:state.scene,permission:state.permission,model:state.model,effort:state.effort,settingsTab:state.settingsTab,previewRevision:'skills-list'},privateContent:{files:state.files,terminal:state.terminal}}).catch(()=>{});
+}
+restoreDesign(window.openai?.widgetState);renderAll();
+root.addEventListener('click',()=>{Promise.resolve().then(saveDesign);});
+window.addEventListener('openai:set_globals',event=>{if(restoreDesign(event.detail?.globals?.widgetState))renderAll();});
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=>{renderAll();saveDesign();}});tweak.addSelect(state,'appearance',{label:'外观',options:['跟随系统','浅色','深色']});tweak.addSlider(state,'bodySize',{label:'正文字号',min:15,max:18,step:1,unit:'px'});tweak.addSelect(state,'scene',{label:'会话状态',options:['回复完成','执行中','等待授权','需要回答','成员会话','目录不可用']});}
+document.querySelector('.demo-states')?.addEventListener('click',e=>{const b=e.target.closest('[data-demo-state]');if(b)demoState(b.dataset.demoState);});
+})();
+</script>

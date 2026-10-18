@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { OFFICIAL_DEFAULT_MODEL_ID, OFFICIAL_MODELS } from '../../constants/modelCatalog'
-import {
-  OPENAI_OFFICIAL_DEFAULT_MODEL_ID,
-  OPENAI_OFFICIAL_MODELS,
-  OPENAI_OFFICIAL_PROVIDER_ID,
-} from '../../constants/openaiOfficialProvider'
+import { OFFICIAL_DEFAULT_MODEL_ID } from '../../constants/modelCatalog'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chatStore'
 import { useProviderStore } from '../../stores/providerStore'
@@ -16,12 +11,12 @@ import type { RuntimeSelection } from '../../types/runtime'
 import type { EffortLevel, ModelInfo } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
-import { useProviderOAuthStore } from '../../stores/providerOAuthStore'
-import { useProviderOpenAIOAuthStore } from '../../stores/providerOpenAIOAuthStore'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
+import { ChevronDown } from 'lucide-react'
+import { PICKER_TRIGGER_CLASS, POPOVER_CLASS } from './controlStyles'
 
 type ProviderChoice = {
-  providerId: string | null
+  providerId: string
   providerName: string
   isDefault: boolean
   models: ModelInfo[]
@@ -50,20 +45,6 @@ const DROPDOWN_GAP = 8
 const VIEWPORT_MARGIN = 16
 const DROPDOWN_MAX_HEIGHT = 420
 const DROPDOWN_MIN_HEIGHT = 180
-
-function officialChoices(
-  providerId: string | null,
-  models: ModelInfo[],
-  isDefault: boolean,
-  officialName: string,
-): ProviderChoice {
-  return {
-    providerId,
-    providerName: officialName,
-    isDefault,
-    models,
-  }
-}
 
 function buildProviderModels(
   provider: SavedProvider,
@@ -101,57 +82,25 @@ function buildProviderChoices(
   providers: SavedProvider[],
   activeId: string | null,
   availableModels: ModelInfo[],
-  officialName: string,
-  openAIOfficialName: string,
   labels: Record<'main' | 'haiku' | 'sonnet' | 'opus', string>,
-  claudeOfficialLoggedIn: boolean,
-  openAIOfficialLoggedIn: boolean,
 ): ProviderChoice[] {
-  const claudeOfficialModels = activeId === null && availableModels.length > 0
-    ? availableModels
-    : OFFICIAL_MODELS
-  const openAIOfficialModels = activeId === OPENAI_OFFICIAL_PROVIDER_ID && availableModels.length > 0
-    ? availableModels
-    : OPENAI_OFFICIAL_MODELS
-
-  const choices: ProviderChoice[] = []
-
-  const showOfficialProviders = !activeId || activeId === OPENAI_OFFICIAL_PROVIDER_ID
-
-  if (showOfficialProviders && claudeOfficialLoggedIn) {
-    choices.push(officialChoices(null, claudeOfficialModels, activeId === null, officialName))
-  }
-  if (showOfficialProviders && openAIOfficialLoggedIn) {
-    choices.push(officialChoices(
-      OPENAI_OFFICIAL_PROVIDER_ID,
-      openAIOfficialModels,
-      activeId === OPENAI_OFFICIAL_PROVIDER_ID,
-      openAIOfficialName,
-    ))
-  }
-
-  if (activeId && activeId !== OPENAI_OFFICIAL_PROVIDER_ID) {
+  if (activeId) {
     const activeProvider = providers.find((p) => p.id === activeId)
-    if (activeProvider && availableModels.length > 0) {
-      choices.push({
-        providerId: activeProvider.id,
-        providerName: activeProvider.name,
-        isDefault: true,
-        models: availableModels,
-      })
-    }
-  } else if (!activeId) {
-    for (const provider of providers) {
-      choices.push({
-        providerId: provider.id,
-        providerName: provider.name,
-        isDefault: activeId === provider.id,
-        models: buildProviderModels(provider, labels),
-      })
-    }
+    if (!activeProvider || availableModels.length === 0) return []
+    return [{
+      providerId: activeProvider.id,
+      providerName: activeProvider.name,
+      isDefault: true,
+      models: availableModels,
+    }]
   }
 
-  return choices
+  return providers.map((provider) => ({
+    providerId: provider.id,
+    providerName: provider.name,
+    isDefault: false,
+    models: buildProviderModels(provider, labels),
+  }))
 }
 
 function resolveDefaultRuntimeSelection(
@@ -168,11 +117,7 @@ function resolveDefaultRuntimeSelection(
 
   return {
     providerId: inferredProviderId,
-    modelId: currentModelId ?? (
-      inferredProviderId === OPENAI_OFFICIAL_PROVIDER_ID
-        ? OPENAI_OFFICIAL_DEFAULT_MODEL_ID
-        : OFFICIAL_DEFAULT_MODEL_ID
-    ),
+    modelId: currentModelId ?? OFFICIAL_DEFAULT_MODEL_ID,
   }
 }
 
@@ -201,10 +146,6 @@ export function ModelSelector({
     isLoading: providersLoading,
     fetchProviders,
   } = useProviderStore()
-  const claudeOAuthStatus = useProviderOAuthStore((s) => s.status)
-  const fetchClaudeOAuthStatus = useProviderOAuthStore((s) => s.fetchStatus)
-  const openAIOAuthStatus = useProviderOpenAIOAuthStore((s) => s.status)
-  const fetchOpenAIOAuthStatus = useProviderOpenAIOAuthStore((s) => s.fetchStatus)
   const runtimeSelection = useSessionRuntimeStore((state) =>
     runtimeKey ? state.selections[runtimeKey] : undefined,
   )
@@ -213,6 +154,7 @@ export function ModelSelector({
   const ref = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const requestedProvidersRef = useRef(false)
+  const effortLabelId = useId()
 
   const EFFORT_OPTIONS: { value: EffortLevel; label: string }[] = [
     { value: 'low', label: t('settings.general.effort.low') },
@@ -233,11 +175,6 @@ export function ModelSelector({
   }, [fetchProviders, isRuntimeScoped, providersLoading])
 
   useEffect(() => {
-    void fetchClaudeOAuthStatus()
-    void fetchOpenAIOAuthStatus()
-  }, [fetchClaudeOAuthStatus, fetchOpenAIOAuthStatus])
-
-  useEffect(() => {
     if (!open) return
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node
@@ -250,7 +187,10 @@ export function ModelSelector({
       }
     }
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key !== 'Escape') return
+      // Mark handled so an enclosing dialog's Escape layer stays open.
+      e.preventDefault()
+      setOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('keydown', handleEsc)
@@ -323,26 +263,24 @@ export function ModelSelector({
       providers,
       activeId,
       availableModels,
-      t('settings.providers.officialName'),
-      t('settings.providers.openaiOfficialName'),
       roleLabels,
-      claudeOAuthStatus?.loggedIn === true,
-      openAIOAuthStatus?.loggedIn === true,
     ),
-    [activeId, availableModels, providers, roleLabels, t, claudeOAuthStatus, openAIOAuthStatus],
+    [activeId, availableModels, providers, roleLabels],
   )
 
   const selectedModel = isControlled
     ? availableModels.find((model) => model.id === value) || null
     : storeModel
 
+  // A stored selection without a model only overrides the effort.
+  const explicitRuntimeSelection = controlledRuntimeSelection ?? runtimeSelection
   const activeRuntimeSelection = isRuntimeScoped
-    ? controlledRuntimeSelection ?? runtimeSelection ?? resolveDefaultRuntimeSelection(
-      activeId,
-      activeProviderName,
-      providers,
-      storeModel?.id,
-    )
+    ? explicitRuntimeSelection?.modelId
+      ? explicitRuntimeSelection
+      : {
+          ...resolveDefaultRuntimeSelection(activeId, activeProviderName, providers, storeModel?.id),
+          ...(explicitRuntimeSelection?.effort ? { effort: explicitRuntimeSelection.effort } : {}),
+        }
     : null
 
   const selectedProviderChoice = activeRuntimeSelection
@@ -363,8 +301,15 @@ export function ModelSelector({
     ? selectedRuntimeModel?.name ?? storeModel?.name ?? t('model.selectModel')
     : selectedModel?.name ?? t('model.selectModel')
   const buttonProviderLabel = isRuntimeScoped
-    ? selectedProviderChoice?.providerName ?? activeProviderName ?? t('settings.providers.officialName')
+    ? selectedProviderChoice?.providerName ?? activeProviderName ?? t('model.noProvider')
     : null
+
+  const selectedEffort: EffortLevel = (isRuntimeScoped ? activeRuntimeSelection?.effort : undefined) ?? effortLevel
+  const selectedEffortLabel = EFFORT_OPTIONS.find((option) => option.value === selectedEffort)?.label
+  const triggerLabel = !isControlled && selectedEffortLabel
+    ? `${buttonModelLabel} · ${selectedEffortLabel}`
+    : buttonModelLabel
+  const triggerTitle = [triggerLabel, buttonProviderLabel].filter(Boolean).join('\n')
 
   const handleRuntimeSelect = (selection: RuntimeSelection) => {
     onRuntimeSelectionChange?.(selection)
@@ -379,17 +324,11 @@ export function ModelSelector({
 
   const dropdownContent = (
     <>
-      <div className={`overflow-y-auto ${isMobileBrowser ? 'p-1' : 'p-3'}`} style={{ maxHeight: isMobileBrowser ? undefined : dropdownPosition?.maxHeight }}>
-        {!isMobileBrowser && (
-          <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-widest text-[var(--color-outline)]">
-            {t('model.configuration')}
-          </div>
-        )}
-
+      <div className={`overflow-y-auto ${isMobileBrowser ? 'p-1' : 'p-1.5'}`} style={{ maxHeight: isMobileBrowser ? undefined : dropdownPosition?.maxHeight }}>
         {isRuntimeScoped ? (
           <div className="space-y-3">
             {providerChoices.map((choice) => (
-              <div key={choice.providerId ?? 'official'} className="space-y-1.5">
+              <div key={choice.providerId} className="space-y-1.5">
                 <div className="flex items-center justify-between px-2 pt-1">
                   <span className="truncate text-[11px] font-semibold tracking-[0.01em] text-[var(--color-text-secondary)]">
                     {choice.providerName}
@@ -408,11 +347,15 @@ export function ModelSelector({
                       activeRuntimeSelection.modelId === model.id
                     return (
                       <button
-                        key={`${choice.providerId ?? 'official'}:${model.id}`}
-                        onClick={() => handleRuntimeSelect({ providerId: choice.providerId, modelId: model.id })}
+                        key={`${choice.providerId}:${model.id}`}
+                        onClick={() => handleRuntimeSelect({
+                          providerId: choice.providerId,
+                          modelId: model.id,
+                          ...(activeRuntimeSelection?.effort ? { effort: activeRuntimeSelection.effort } : {}),
+                        })}
                         className={`
                           w-full rounded-lg border px-3 text-left transition-colors
-                          ${isMobileBrowser ? 'min-h-[56px] py-3' : 'py-2.5'}
+                          ${isMobileBrowser ? 'min-h-[56px] py-3' : 'py-2'}
                           ${isSelected
                             ? 'border-[var(--color-model-option-selected-border)] bg-[var(--color-model-option-selected-bg)]'
                             : 'border-transparent hover:bg-[var(--color-surface-hover)]'
@@ -429,7 +372,7 @@ export function ModelSelector({
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                            <div className="truncate text-ui-body font-medium text-[var(--color-text-primary)]">
                               {model.name}
                             </div>
                             {model.description && (
@@ -463,7 +406,7 @@ export function ModelSelector({
                   }}
                   className={`
                     w-full rounded-lg px-3 text-left transition-colors
-                    ${isMobileBrowser ? 'min-h-[56px] py-3' : 'py-2.5'}
+                    ${isMobileBrowser ? 'min-h-[56px] py-3' : 'py-2'}
                     ${isSelected
                       ? 'border border-[var(--color-model-option-selected-border)] bg-[var(--color-model-option-selected-bg)]'
                       : 'hover:bg-[var(--color-surface-hover)]'
@@ -480,7 +423,7 @@ export function ModelSelector({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-[var(--color-text-primary)]">{model.name}</div>
+                      <div className="text-ui-body font-medium text-[var(--color-text-primary)]">{model.name}</div>
                       {model.description && (
                         <div className="mt-0.5 truncate text-[10px] text-[var(--color-text-tertiary)]">
                           {model.description}
@@ -495,28 +438,36 @@ export function ModelSelector({
         )}
       </div>
 
-      {!isControlled && !isRuntimeScoped && (
-        <div className="border-t border-[var(--color-border)] p-3">
-          <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-widest text-[var(--color-outline)]">
+      {!isControlled && (
+        <div className="border-t border-[var(--color-border)] px-3 py-2.5">
+          <div id={effortLabelId} className="mb-1.5 text-ui-aux text-[var(--color-text-tertiary)]">
             {t('model.effort')}
           </div>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div role="group" aria-labelledby={effortLabelId} className="grid grid-cols-4 gap-0.5 rounded-[8px] bg-[var(--color-surface-container-high)] p-0.5">
             {EFFORT_OPTIONS.map((opt) => {
-              const isSelected = opt.value === effortLevel
+              const isSelected = opt.value === selectedEffort
               return (
                 <button
                   key={opt.value}
+                  type="button"
+                  aria-pressed={isSelected}
                   onClick={() => {
+                    if (isRuntimeScoped) {
+                      // Without an explicit model choice, keep following the
+                      // default provider and model; only the effort changes.
+                      handleRuntimeSelect(explicitRuntimeSelection?.modelId
+                        ? { ...explicitRuntimeSelection, effort: opt.value }
+                        : { providerId: null, modelId: '', effort: opt.value })
+                      return
+                    }
                     void setEffort(opt.value)
                     setOpen(false)
                   }}
-                  className={`
-                    rounded-lg py-2 text-center text-xs font-semibold transition-colors
-                    ${isSelected
-                      ? 'bg-[var(--color-brand)] text-white'
-                      : 'bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                    }
-                  `}
+                  className={`h-7 rounded-[6px] text-center text-ui-aux font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+                    isSelected
+                      ? 'bg-[var(--color-surface-container-lowest)] text-[var(--color-text-primary)] shadow-sm'
+                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
                 >
                   {opt.label}
                 </button>
@@ -546,7 +497,7 @@ export function ModelSelector({
       <div
         ref={dropdownRef}
         data-testid="model-selector-dropdown"
-        className="fixed z-[80] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]"
+        className={`fixed z-[80] ${POPOVER_CLASS}`}
         style={{
           top: dropdownPosition.top,
           bottom: dropdownPosition.bottom,
@@ -563,23 +514,16 @@ export function ModelSelector({
   return (
     <div ref={ref} className="relative min-w-0 shrink-0">
       <button
+        type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
-        className={`flex items-center gap-2 rounded-full bg-[var(--color-surface-container-low)] text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
-          compact ? 'max-w-[112px] px-2.5 py-1.5' : 'max-w-[280px] px-3 py-1.5'
-        }`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title={triggerTitle}
+        className={`${PICKER_TRIGGER_CLASS} ${compact ? 'max-w-[132px]' : 'max-w-[260px]'}`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className={`${compact ? 'text-xs' : 'text-sm'} min-w-0 flex-1 truncate font-semibold text-[var(--color-text-primary)]`}>
-            {buttonModelLabel}
-          </span>
-          {!compact && buttonProviderLabel && (
-            <span className="max-w-[108px] flex-shrink-0 truncate text-[11px] text-[var(--color-text-tertiary)]">
-              {buttonProviderLabel}
-            </span>
-          )}
-        </div>
-        <span className="material-symbols-outlined flex-shrink-0 text-[12px]">expand_more</span>
+        <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
+        <ChevronDown size={13} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
       </button>
       {dropdown}
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Code2, FolderOpen } from 'lucide-react'
+import { Code2, ExternalLink, FolderOpen } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useOpenTargetStore, type OpenTarget } from '../../stores/openTargetStore'
 
@@ -67,7 +67,9 @@ export function OpenProjectMenu({ path }: Props) {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
     }
 
     document.addEventListener('mousedown', handleDocumentMouseDown)
@@ -118,21 +120,20 @@ export function OpenProjectMenu({ path }: Props) {
           }
           void handleOpenTarget(primaryTarget.id)
         }}
-        className={`inline-flex h-8 items-center justify-center gap-1 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] text-[var(--color-text-tertiary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] ${
-          hasMenu
-            ? 'min-w-[2.75rem] px-2 hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
-            : 'w-8 hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
+        className={`inline-flex h-[29px] w-[29px] items-center justify-center rounded-[7px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+          open
+            ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
+            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
         }`}
       >
-        <TargetIcon target={primaryTarget} />
-        {hasMenu && <ChevronDown size={14} strokeWidth={1.9} />}
+        <ExternalLink size={16} strokeWidth={1.9} aria-hidden="true" />
       </button>
 
       {open && hasMenu && rect ? createPortal(
         <div
           ref={menuRef}
           role="menu"
-          className="motion-menu fixed z-50 min-w-[220px] overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-dropdown)]"
+          className="motion-menu fixed z-50 min-w-[200px] overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-[var(--shadow-dropdown)]"
           data-state="open"
           style={{ top: rect.bottom + 6, right: Math.max(12, window.innerWidth - rect.right) }}
         >
@@ -142,10 +143,10 @@ export function OpenProjectMenu({ path }: Props) {
               type="button"
               role="menuitem"
               onClick={() => void handleOpenTarget(target.id)}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)]"
+              className="flex w-full items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-ui-nav text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)]"
             >
-              <span className="flex h-7 w-7 items-center justify-center text-[var(--color-text-secondary)]">
-                <TargetIcon target={target} size={24} />
+              <span className="flex h-5 w-5 items-center justify-center text-[var(--color-text-secondary)]">
+                <TargetIcon target={target} size={18} />
               </span>
               <span className="min-w-0 truncate">{target.label}</span>
             </button>

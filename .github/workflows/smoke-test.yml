@@ -1,0 +1,103 @@
+name: Installer smoke test
+
+# Installs the installers attached to a (draft) release on clean runners,
+# launches the app and checks that its server sidecar answers. It does not
+# talk to a model, so chat still needs a manual check.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to test, e.g. v0.5.0
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: write # reading draft releases needs write access
+
+env:
+  TAG: ${{ inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - name: Install the DMG
+        run: |
+          gh release download "$TAG" --pattern '*.dmg' --dir dl
+          hdiutil attach -nobrowse -readonly -mountpoint /Volumes/DreamCoder dl/*.dmg
+          cp -R /Volumes/DreamCoder/DreamCoder.app "$RUNNER_TEMP/"
+          hdiutil detach /Volumes/DreamCoder
+          codesign --verify --deep --strict "$RUNNER_TEMP/DreamCoder.app"
+          codesign -d --entitlements - --xml "$RUNNER_TEMP/DreamCoder.app/Contents/MacOS/dreamcoder-sidecar" | grep -q allow-jit
+
+      - name: Launch and check the server
+        run: |
+          open "$RUNNER_TEMP/DreamCoder.app"
+          port=""
+          for _ in $(seq 1 60); do
+            port=$(lsof -nP -iTCP -sTCP:LISTEN -a -c dreamcoder | awk 'NR > 1 { n = split($9, a, ":"); print a[n]; exit }')
+            [ -n "$port" ] && break
+            sleep 2
+          done
+          [ -n "$port" ] || { echo "The sidecar never started listening" >&2; exit 1; }
+          echo "Sidecar listens on $port"
+          status=$(curl -sf --retry 10 --retry-connrefused --retry-delay 2 "http://127.0.0.1:$port/api/status")
+          echo "$status"
+          [ "$(echo "$status" | jq -r .version)" = "${TAG#v}" ]
+          curl -sf -m 30 "http://127.0.0.1:$port/api/sessions" | jq -e '.sessions | type == "array"'
+
+      - name: Quit
+        if: always()
+        run: |
+          osascript -e 'quit app "DreamCoder"' || true
+          pkill -f dreamcoder-sidecar || true
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Install the setup.exe
+        run: |
+          gh release download $env:TAG --pattern '*-setup.exe' --dir dl
+          $setup = Get-ChildItem dl -Filter '*-setup.exe' | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $sidecar = Get-ChildItem -Path "$env:LOCALAPPDATA", "$env:ProgramFiles" -Recurse -Filter 'dreamcoder-sidecar*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $sidecar) { throw 'DreamCoder is not installed' }
+          $app = Get-ChildItem $sidecar.DirectoryName -Filter '*.exe' | Where-Object { $_.Name -notmatch 'sidecar|uninstall' } | Select-Object -First 1
+          Write-Host "Installed $($app.FullName)"
+          "APP_EXE=$($app.FullName)" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Launch and check the server
+        run: |
+          Start-Process -FilePath $env:APP_EXE
+          $port = $null
+          for ($i = 0; $i -lt 60 -and -not $port; $i++) {
+            Start-Sleep -Seconds 2
+            $ids = (Get-Process -Name 'dreamcoder-sidecar*' -ErrorAction SilentlyContinue).Id
+            if ($ids) {
+              $port = (Get-NetTCPConnection -State Listen -OwningProcess $ids -ErrorAction SilentlyContinue | Select-Object -First 1).LocalPort
+            }
+          }
+          if (-not $port) { throw 'The sidecar never started listening' }
+          Write-Host "Sidecar listens on $port"
+          $status = $null
+          for ($i = 0; $i -lt 10 -and -not $status; $i++) {
+            try { $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" } catch { Start-Sleep -Seconds 2 }
+          }
+          $status | ConvertTo-Json
+          if ($status.version -ne $env:TAG.TrimStart('v')) { throw "Unexpected version $($status.version)" }
+          $sessions = Invoke-RestMethod "http://127.0.0.1:$port/api/sessions" -TimeoutSec 30
+          if ($null -eq $sessions.sessions) { throw 'No sessions field in /api/sessions' }
+
+      - name: Quit
+        if: always()
+        run: |
+          Get-Process -Name 'dreamcoder*' -ErrorAction SilentlyContinue | Stop-Process -Force

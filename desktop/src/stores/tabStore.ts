@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { sessionsApi } from '../api/sessions'
 import { dropSession as dropVirtualHeightSession } from '../components/chat/virtualHeightCache'
-import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
 const TAB_STORAGE_KEY = 'dreamcoder-open-tabs'
 
@@ -12,23 +11,21 @@ const memLog = (label: string) => {
   }
 }
 
-export const SETTINGS_TAB_ID = '__settings__'
 export const SCHEDULED_TAB_ID = '__scheduled__'
-export const TERMINAL_TAB_PREFIX = '__terminal__'
 
-export type TabType = 'session' | 'settings' | 'scheduled' | 'terminal'
+/** Tabs are the internal current-page router; there is no visible tab bar. */
+export type TabType = 'session' | 'scheduled'
 
 export type Tab = {
   sessionId: string
   title: string
   type: TabType
   status: 'idle' | 'running' | 'error'
-  terminalCwd?: string
-  terminalRuntimeId?: string
 }
 
 type TabPersistence = {
-  openTabs: Array<{ sessionId: string; title: string; type?: TabType }>
+  // Older builds also persisted 'settings' and 'terminal' tabs; restore drops them.
+  openTabs: Array<{ sessionId: string; title: string; type?: TabType | 'settings' | 'terminal' }>
   activeTabId: string | null
 }
 
@@ -37,16 +34,24 @@ type TabStore = {
   activeTabId: string | null
 
   openTab: (sessionId: string, title: string, type?: TabType) => void
-  openTerminalTab: (cwd?: string, terminalRuntimeId?: string) => string
   closeTab: (sessionId: string) => void
+  /** Drop tabs without changing the active page (used to release idle sessions). */
+  dropTabs: (sessionIds: string[]) => void
   setActiveTab: (sessionId: string) => void
   updateTabTitle: (sessionId: string, title: string) => void
   updateTabStatus: (sessionId: string, status: Tab['status']) => void
   replaceTabSession: (oldSessionId: string, newSessionId: string) => void
-  moveTab: (fromIndex: number, toIndex: number) => void
 
   saveTabs: () => void
   restoreTabs: () => Promise<void>
+}
+
+const RETIRED_TAB_IDS = new Set(['__settings__'])
+const RETIRED_TAB_PREFIXES = ['__terminal__']
+
+function isRetiredTab(tab: { sessionId: string; type?: string }) {
+  if (tab.type === 'settings' || tab.type === 'terminal') return true
+  return RETIRED_TAB_IDS.has(tab.sessionId) || RETIRED_TAB_PREFIXES.some((prefix) => tab.sessionId.startsWith(prefix))
 }
 
 export const useTabStore = create<TabStore>((set, get) => ({
@@ -57,16 +62,14 @@ export const useTabStore = create<TabStore>((set, get) => ({
     const { tabs } = get()
     const existing = tabs.find((t) => t.sessionId === sessionId)
     if (existing) {
+      // Move it to the end so tab order is most-recently-opened last.
+      const updated = {
+        ...existing,
+        title,
+        ...(!(existing as Partial<Tab>).type ? { type } : {}),
+      }
       set({
-        tabs: tabs.map((tab) =>
-          tab.sessionId === sessionId
-            ? {
-                ...tab,
-                title,
-                ...(!(tab as Partial<Tab>).type ? { type } : {}),
-              }
-            : tab,
-        ),
+        tabs: [...tabs.filter((tab) => tab.sessionId !== sessionId), updated],
         activeTabId: sessionId,
       })
     } else {
@@ -78,51 +81,30 @@ export const useTabStore = create<TabStore>((set, get) => ({
     get().saveTabs()
   },
 
-  openTerminalTab: (cwd, terminalRuntimeId) => {
-    const { tabs } = get()
-    const nextIndex = Math.max(
-      0,
-      ...tabs
-        .filter((tab) => tab.type === 'terminal')
-        .map((tab) => {
-          const match = /^Terminal (\d+)$/.exec(tab.title)
-          return match ? Number(match[1]) : 0
-        }),
-    ) + 1
-    const sessionId = `${TERMINAL_TAB_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    set({
-      tabs: [...tabs, { sessionId, title: `Terminal ${nextIndex}`, type: 'terminal', status: 'idle', terminalCwd: cwd, terminalRuntimeId }],
-      activeTabId: sessionId,
-    })
-    get().saveTabs()
-    return sessionId
-  },
-
   closeTab: (sessionId) => {
     const { tabs, activeTabId } = get()
     const index = tabs.findIndex((t) => t.sessionId === sessionId)
     if (index < 0) return
 
     const newTabs = tabs.filter((t) => t.sessionId !== sessionId)
-    let newActiveId = activeTabId
-
-    if (activeTabId === sessionId) {
-      if (newTabs.length === 0) {
-        newActiveId = null
-      } else if (index >= newTabs.length) {
-        newActiveId = newTabs[newTabs.length - 1]!.sessionId
-      } else {
-        newActiveId = newTabs[index]!.sessionId
-      }
-    }
+    // There is no visible tab bar, so a neighbouring tab means nothing to the
+    // user; closing the current page lands on the empty new-session page.
+    const newActiveId = activeTabId === sessionId ? null : activeTabId
 
     set({ tabs: newTabs, activeTabId: newActiveId })
     get().saveTabs()
-    const closedTab = tabs[index]
-    if (closedTab?.type === 'terminal') {
-      destroyTerminalRuntime(closedTab.terminalRuntimeId ?? closedTab.sessionId)
-    }
     dropVirtualHeightSession(sessionId)
+  },
+
+  dropTabs: (sessionIds) => {
+    if (sessionIds.length === 0) return
+    const drop = new Set(sessionIds)
+    const { activeTabId } = get()
+    set((s) => ({ tabs: s.tabs.filter((t) => !drop.has(t.sessionId) || t.sessionId === activeTabId) }))
+    get().saveTabs()
+    for (const id of drop) {
+      if (id !== activeTabId) dropVirtualHeightSession(id)
+    }
   },
 
   setActiveTab: (sessionId) => {
@@ -154,25 +136,13 @@ export const useTabStore = create<TabStore>((set, get) => ({
     get().saveTabs()
   },
 
-  moveTab: (fromIndex, toIndex) => {
-    if (fromIndex === toIndex) return
-    const { tabs } = get()
-    if (fromIndex < 0 || fromIndex >= tabs.length || toIndex < 0 || toIndex >= tabs.length) return
-    const newTabs = [...tabs]
-    const [moved] = newTabs.splice(fromIndex, 1)
-    newTabs.splice(toIndex, 0, moved!)
-    set({ tabs: newTabs })
-    get().saveTabs()
-  },
-
   saveTabs: () => {
     const { tabs, activeTabId } = get()
-    const persistableTabs = tabs.filter((tab) => tab.type !== 'terminal')
     const data: TabPersistence = {
-      openTabs: persistableTabs.map((t) => ({ sessionId: t.sessionId, title: t.title, type: t.type })),
-      activeTabId: activeTabId && persistableTabs.some((tab) => tab.sessionId === activeTabId)
+      openTabs: tabs.map((t) => ({ sessionId: t.sessionId, title: t.title, type: t.type })),
+      activeTabId: activeTabId && tabs.some((tab) => tab.sessionId === activeTabId)
         ? activeTabId
-        : (persistableTabs[0]?.sessionId ?? null),
+        : (tabs[0]?.sessionId ?? null),
     }
     try {
       localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(data))
@@ -192,8 +162,9 @@ export const useTabStore = create<TabStore>((set, get) => ({
       }
 
       memLog('restoreTabs:start')
-      const pendingSessionIds = new Set(data.openTabs
-        .filter((tab) => tab.type !== 'settings' && tab.type !== 'scheduled' && tab.type !== 'terminal')
+      const restorableTabs = data.openTabs.filter((tab) => !isRetiredTab(tab))
+      const pendingSessionIds = new Set(restorableTabs
+        .filter((tab) => tab.type !== 'scheduled')
         .map((tab) => tab.sessionId))
       const sessionTitles = new Map<string, string>()
       const pageSize = 200
@@ -208,15 +179,11 @@ export const useTabStore = create<TabStore>((set, get) => ({
       }
       memLog(`restoreTabs:after-list (resolved ${sessionTitles.size} sessions)`)
 
-      const validTabs: Tab[] = data.openTabs
-        .filter((t) => {
-          if (t.type === 'settings' || t.type === 'scheduled') return true
-          if (t.type === 'terminal') return false
-          return sessionTitles.has(t.sessionId)
-        })
+      const validTabs: Tab[] = restorableTabs
+        .filter((t) => t.type === 'scheduled' || sessionTitles.has(t.sessionId))
         .map((t) => {
-          if (t.type === 'settings' || t.type === 'scheduled') {
-            return { sessionId: t.sessionId, title: t.title, type: t.type, status: 'idle' as const }
+          if (t.type === 'scheduled') {
+            return { sessionId: t.sessionId, title: t.title, type: 'scheduled' as const, status: 'idle' as const }
           }
           return {
             sessionId: t.sessionId,

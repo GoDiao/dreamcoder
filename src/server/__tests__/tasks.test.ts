@@ -4,17 +4,20 @@ import * as path from 'path'
 import * as os from 'os'
 import { TaskService } from '../services/taskService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 describe('TaskService', () => {
   let tmpDir: string
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-tasks-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
   })
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
-    delete process.env.CLAUDE_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   async function writeTask(taskListId: string, task: Record<string, unknown> | string): Promise<void> {
@@ -92,7 +95,7 @@ describe('Tasks API', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-tasks-api-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
 
     const port = 15500 + Math.floor(Math.random() * 500)
@@ -104,7 +107,7 @@ describe('Tasks API', () => {
   afterEach(async () => {
     server?.stop()
     await fs.rm(tmpDir, { recursive: true, force: true })
-    delete process.env.CLAUDE_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   it('should return empty tasks list', async () => {

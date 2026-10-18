@@ -41,7 +41,7 @@ let originalAnthropicDefaultOpusModel: string | undefined
 async function setup() {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-test-'))
   resetSettingsCache()
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   originalHome = process.env.HOME
   originalUserProfile = process.env.USERPROFILE
   originalShell = process.env.SHELL
@@ -53,7 +53,7 @@ async function setup() {
   originalAnthropicDefaultHaikuModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL
   originalAnthropicDefaultSonnetModel = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL
   originalAnthropicDefaultOpusModel = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL
-  process.env.CLAUDE_CONFIG_DIR = tmpDir
+  process.env.DREAMCODER_CONFIG_DIR = tmpDir
   process.env.HOME = tmpDir
   process.env.USERPROFILE = tmpDir
   process.env.SHELL = '/bin/zsh'
@@ -76,9 +76,9 @@ async function teardown() {
   resetSettingsCache()
 
   if (originalConfigDir !== undefined) {
-    process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {
-    delete process.env.CLAUDE_CONFIG_DIR
+    delete process.env.DREAMCODER_CONFIG_DIR
   }
 
   if (originalHome !== undefined) {
@@ -470,34 +470,6 @@ describe('Models API', () => {
     expect(body.models[0].id).toContain('claude')
   })
 
-  it('GET /api/models should merge env-configured provider models with saved OpenAI OAuth models', async () => {
-    process.env.ANTHROPIC_API_KEY = 'deepseek-key'
-    process.env.ANTHROPIC_BASE_URL = 'https://api.deepseek.com/anthropic'
-    process.env.ANTHROPIC_MODEL = 'deepseek-v4-pro'
-    process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = 'deepseek-v4-flash'
-    process.env.ANTHROPIC_DEFAULT_SONNET_MODEL = 'deepseek-v4-pro'
-    process.env.ANTHROPIC_DEFAULT_OPUS_MODEL = 'deepseek-v4-pro'
-    saveTestOpenAIOAuthTokens({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
-      expiresAt: Date.now() + 60_000,
-    })
-
-    const { req, url, segments } = makeRequest('GET', '/api/models')
-    const res = await handleModelsApi(req, url, segments)
-
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    const ids = body.models.map((model: { id: string }) => model.id)
-
-    expect(ids).toContain('deepseek-v4-pro')
-    expect(ids).toContain('deepseek-v4-flash')
-    expect(ids).toContain('gpt-5.3-codex')
-    expect(ids).toContain('gpt-5.4')
-    expect(ids).toContain('gpt-5.4-mini')
-    expect(ids.filter((id: string) => id === 'deepseek-v4-pro')).toHaveLength(1)
-  })
-
   it('GET /api/models/current should return default model when not set', async () => {
     const { req, url, segments } = makeRequest('GET', '/api/models/current')
     const res = await handleModelsApi(req, url, segments)
@@ -600,65 +572,6 @@ describe('Models API', () => {
 
     const globalSettings = await settingsSvc.getUserSettings()
     expect(globalSettings.model).toBeUndefined()
-  })
-
-  it('GET /api/models should return the OpenAI model catalog when ChatGPT Official is active', async () => {
-    const providerSvc = new ProviderService()
-    await providerSvc.activateProvider('openai-official')
-
-    const { req, url, segments } = makeRequest('GET', '/api/models')
-    const res = await handleModelsApi(req, url, segments)
-
-    expect(res.status).toBe(200)
-    const body = await res.json() as {
-      models: Array<{ id: string; name: string }>
-      provider: { id: string; name: string } | null
-    }
-    expect(body.provider).toEqual({
-      id: 'openai-official',
-      name: 'ChatGPT Official',
-    })
-    expect(body.models.map((model) => model.id)).toEqual([
-      'gpt-5.3-codex',
-      'gpt-5.4',
-      'gpt-5.5',
-      'gpt-5.4-mini',
-    ])
-  })
-
-  it('PUT /api/models/current should persist GPT model to managed settings when ChatGPT Official is active', async () => {
-    const settingsSvc = new SettingsService()
-    const providerSvc = new ProviderService()
-    await settingsSvc.updateUserSettings({ model: 'claude-haiku-4-5' })
-    await providerSvc.activateProvider('openai-official')
-
-    const { req, url, segments } = makeRequest('PUT', '/api/models/current', {
-      modelId: 'gpt-5.5',
-    })
-    const res = await handleModelsApi(req, url, segments)
-
-    expect(res.status).toBe(200)
-    const managedSettings = await providerSvc.getManagedSettings()
-    expect(managedSettings.model).toBe('gpt-5.5')
-
-    const globalSettings = await settingsSvc.getUserSettings()
-    expect(globalSettings.model).toBe('claude-haiku-4-5')
-  })
-
-  it('GET /api/models/current should read current GPT model from managed settings when ChatGPT Official is active', async () => {
-    const providerSvc = new ProviderService()
-    await providerSvc.activateProvider('openai-official')
-    await providerSvc.updateManagedSettings({ model: 'gpt-5.5' })
-
-    const { req, url, segments } = makeRequest('GET', '/api/models/current')
-    const res = await handleModelsApi(req, url, segments)
-
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.model).toMatchObject({
-      id: 'gpt-5.5',
-      name: 'GPT-5.5',
-    })
   })
 
   it('GET /api/effort should return default effort level', async () => {

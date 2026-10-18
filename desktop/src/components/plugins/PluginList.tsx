@@ -4,6 +4,8 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { Button } from '../shared/Button'
+import { ChevronRight, RefreshCw, RotateCw } from 'lucide-react'
+import { SettingsListRow, SettingsSection, SettingsSummary } from '../settings/SettingsSummary'
 import type { PluginSummary } from '../../types/plugin'
 
 type PluginBucket = 'attention' | 'enabled' | 'disabled'
@@ -85,11 +87,8 @@ export function PluginList() {
 
   if (plugins.length === 0) {
     return (
-      <div className="text-center py-12 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-6">
-        <span className="material-symbols-outlined text-[40px] text-[var(--color-text-tertiary)] mb-2 block">
-          extension
-        </span>
-        <p className="text-sm text-[var(--color-text-tertiary)]">
+      <div className="py-10 text-center">
+        <p className="text-[13px] text-[var(--color-text-secondary)]">
           {t('settings.plugins.empty')}
         </p>
         <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
@@ -100,127 +99,68 @@ export function PluginList() {
   }
 
   return (
-    <div className="flex flex-col gap-6 min-w-0">
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] overflow-hidden">
-        <div className="flex flex-col gap-4 px-5 py-5 min-w-0">
-          <div className="flex flex-col gap-4 min-w-0 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 max-w-4xl">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--color-text-tertiary)] mb-2">
-                {t('settings.plugins.browserEyebrow')}
-              </div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="material-symbols-outlined text-[22px] text-[var(--color-brand)]">
-                  extension
-                </span>
-                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                  {t('settings.plugins.browserTitle')}
-                </h3>
-              </div>
-              <p className="text-sm leading-6 text-[var(--color-text-secondary)]">
-                {t('settings.plugins.browserDescription')}
-              </p>
-            </div>
+    <div className="min-w-0">
+      <div className="mb-1 flex flex-wrap items-center justify-end gap-1.5">
+        <Button
+          variant="secondary"
+          size="xs"
+          onClick={() => void fetchPlugins(currentWorkDir)}
+          icon={<RefreshCw size={13} aria-hidden="true" />}
+        >
+          {t('settings.plugins.refresh')}
+        </Button>
+        <Button
+          variant="secondary"
+          size="xs"
+          onClick={handleReload}
+          loading={isApplying}
+          icon={<RotateCw size={13} aria-hidden="true" />}
+        >
+          {t('settings.plugins.apply')}
+        </Button>
+      </div>
 
-            <div className="flex flex-wrap gap-2 xl:justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="min-h-9 flex-1 sm:flex-none"
-                onClick={() => void fetchPlugins(currentWorkDir)}
-              >
-                <span className="material-symbols-outlined text-[16px]">refresh</span>
-                {t('settings.plugins.refresh')}
-              </Button>
-              <Button
-                size="sm"
-                className="min-h-9 flex-1 sm:flex-none"
-                onClick={handleReload}
-                loading={isApplying}
-              >
-                <span className="material-symbols-outlined text-[16px]">sync</span>
-                {t('settings.plugins.apply')}
-              </Button>
-            </div>
-          </div>
+      <SettingsSummary
+        items={[
+          { label: t('settings.plugins.summary.total'), value: summary?.total ?? plugins.length },
+          { label: t('settings.plugins.summary.enabled'), value: summary?.enabled ?? plugins.filter((plugin) => plugin.enabled).length },
+          { label: t('settings.plugins.summary.attention'), value: grouped.attention.length },
+          { label: t('settings.plugins.summary.marketplaces'), value: summary?.marketplaceCount ?? marketplaces.length },
+        ]}
+      />
 
-          <div className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4">
-            <SummaryCard
-              label={t('settings.plugins.summary.total')}
-              value={String(summary?.total ?? plugins.length)}
-              icon="extension"
-            />
-            <SummaryCard
-              label={t('settings.plugins.summary.enabled')}
-              value={String(summary?.enabled ?? plugins.filter((plugin) => plugin.enabled).length)}
-              icon="check_circle"
-            />
-            <SummaryCard
-              label={t('settings.plugins.summary.attention')}
-              value={String(grouped.attention.length)}
-              icon="warning"
-            />
-            <SummaryCard
-              label={t('settings.plugins.summary.marketplaces')}
-              value={String(summary?.marketplaceCount ?? marketplaces.length)}
-              icon="storefront"
-            />
-          </div>
-
-          {lastReloadSummary && (
-            <p className="text-xs text-[var(--color-text-tertiary)]">
-              {t('settings.plugins.lastReload', {
-                enabled: String(lastReloadSummary.enabled),
-                skills: String(lastReloadSummary.skills),
-                errors: String(lastReloadSummary.errors),
-              })}
-            </p>
-          )}
-        </div>
-      </section>
+      {lastReloadSummary && (
+        <p className="-mt-3 mb-4 text-xs text-[var(--color-text-tertiary)]">
+          {t('settings.plugins.lastReload', {
+            enabled: String(lastReloadSummary.enabled),
+            skills: String(lastReloadSummary.skills),
+            errors: String(lastReloadSummary.errors),
+          })}
+        </p>
+      )}
 
       {marketplaces.length > 0 && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-            <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              {t('settings.plugins.marketplacesTitle')}
-            </h4>
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-              {t('settings.plugins.marketplacesHint')}
-            </p>
-          </div>
-          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
-            {marketplaces.map((marketplace) => (
-              <div
-                key={marketplace.name}
-                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {marketplace.name}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    marketplace.autoUpdate
-                      ? 'bg-[var(--color-success-container)] text-[var(--color-success)]'
-                      : 'bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]'
-                  }`}>
-                    {marketplace.autoUpdate
-                      ? t('settings.plugins.marketplaceAutoUpdateOn')
-                      : t('settings.plugins.marketplaceAutoUpdateOff')}
-                  </span>
-                </div>
-                <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">
-                  {marketplace.source}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
-                  <span>{t('settings.plugins.marketplaceInstalledCount', { count: String(marketplace.installedCount) })}</span>
-                  {marketplace.lastUpdated && (
-                    <span>{t('settings.plugins.marketplaceUpdatedAt', { value: new Date(marketplace.lastUpdated).toLocaleString() })}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <SettingsSection title={t('settings.plugins.marketplacesTitle')} count={marketplaces.length}>
+          <p className="-mt-1.5 mb-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+            {t('settings.plugins.marketplacesHint')}
+          </p>
+          {marketplaces.map((marketplace) => (
+            <SettingsListRow
+              key={marketplace.name}
+              title={marketplace.name}
+              description={[
+                marketplace.source,
+                t('settings.plugins.marketplaceInstalledCount', { count: String(marketplace.installedCount) }),
+                marketplace.autoUpdate
+                  ? t('settings.plugins.marketplaceAutoUpdateOn')
+                  : t('settings.plugins.marketplaceAutoUpdateOff'),
+                marketplace.lastUpdated
+                  ? t('settings.plugins.marketplaceUpdatedAt', { value: new Date(marketplace.lastUpdated).toLocaleString() })
+                  : null,
+              ].filter(Boolean).join(' · ')}
+            />
+          ))}
+        </SettingsSection>
       )}
 
       {renderGroup('attention', grouped.attention, fetchPluginDetail, currentWorkDir, t)}
@@ -247,98 +187,52 @@ function renderGroup(
         : 'settings.plugins.group.disabled'
 
   return (
-    <section
-      key={bucket}
-      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden"
-    >
-      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {t(titleKey)}
-          </h4>
-          <p className="text-xs leading-5 text-[var(--color-text-tertiary)] mt-1">
-            {t('settings.plugins.groupHint', { count: String(items.length) })}
-          </p>
-        </div>
-        <span className="text-xs text-[var(--color-text-tertiary)]">{items.length}</span>
-      </div>
-      <div className="flex flex-col p-2">
-        {items.map((plugin) => (
-          <button
-            key={plugin.id}
-            onClick={() => void fetchPluginDetail(plugin.id, cwd)}
-            className="group rounded-xl border border-transparent px-3 py-3 text-left transition-all hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
-          >
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">
-                {plugin.hasErrors ? 'warning' : plugin.enabled ? 'extension' : 'extension_off'}
+    <SettingsSection key={bucket} title={t(titleKey)} count={items.length}>
+      {items.map((plugin) => (
+        <button
+          key={plugin.id}
+          type="button"
+          onClick={() => void fetchPluginDetail(plugin.id, cwd)}
+          className="flex w-full min-w-0 items-center gap-3 border-b border-[var(--color-border-separator)] py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="break-all text-[13px] font-medium text-[var(--color-text-primary)]">
+                {plugin.name}
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)] break-all">
-                    {plugin.name}
-                  </span>
-                  <StatusPill plugin={plugin} />
-                  <ScopePill scope={plugin.scope} />
-                  {plugin.version && (
-                    <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-tertiary)]">
-                      v{plugin.version}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)] break-words">
-                  {plugin.description || t('settings.plugins.noDescription')}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
-                  <span>{plugin.marketplace}</span>
-                  {plugin.componentCounts.skills > 0 && (
-                    <span>{t('settings.plugins.capability.skills', { count: String(plugin.componentCounts.skills) })}</span>
-                  )}
-                  {plugin.componentCounts.agents > 0 && (
-                    <span>{t('settings.plugins.capability.agents', { count: String(plugin.componentCounts.agents) })}</span>
-                  )}
-                  {plugin.componentCounts.mcpServers > 0 && (
-                    <span>{t('settings.plugins.capability.mcpServers', { count: String(plugin.componentCounts.mcpServers) })}</span>
-                  )}
-                  {plugin.errors.length > 0 && (
-                    <span className="text-[var(--color-error)]">
-                      {t('settings.plugins.errorCount', { count: String(plugin.errors.length) })}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100">
-                chevron_right
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function SummaryCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: string
-}) {
-  return (
-    <div className="min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
-        <span className="material-symbols-outlined text-[14px] flex-shrink-0">{icon}</span>
-        <span className="min-w-0 truncate text-[10px] leading-4">
-          {label}
-        </span>
-      </div>
-      <div className="mt-1.5 truncate text-lg font-semibold text-[var(--color-text-primary)]">
-        {value}
-      </div>
-    </div>
+              <StatusPill plugin={plugin} />
+              <ScopePill scope={plugin.scope} />
+              {plugin.version && (
+                <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
+                  v{plugin.version}
+                </span>
+              )}
+            </span>
+            <span className="mt-px block break-words text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+              {plugin.description || t('settings.plugins.noDescription')}
+            </span>
+            <span className="mt-px flex flex-wrap items-center gap-x-3 text-[11px] text-[var(--color-text-tertiary)]">
+              <span>{plugin.marketplace}</span>
+              {plugin.componentCounts.skills > 0 && (
+                <span>{t('settings.plugins.capability.skills', { count: String(plugin.componentCounts.skills) })}</span>
+              )}
+              {plugin.componentCounts.agents > 0 && (
+                <span>{t('settings.plugins.capability.agents', { count: String(plugin.componentCounts.agents) })}</span>
+              )}
+              {plugin.componentCounts.mcpServers > 0 && (
+                <span>{t('settings.plugins.capability.mcpServers', { count: String(plugin.componentCounts.mcpServers) })}</span>
+              )}
+              {plugin.errors.length > 0 && (
+                <span className="text-[var(--color-error)]">
+                  {t('settings.plugins.errorCount', { count: String(plugin.errors.length) })}
+                </span>
+              )}
+            </span>
+          </span>
+          <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
+        </button>
+      ))}
+    </SettingsSection>
   )
 }
 
@@ -347,14 +241,14 @@ function StatusPill({ plugin }: { plugin: PluginSummary }) {
 
   if (plugin.hasErrors) {
     return (
-      <span className="rounded-full bg-[var(--color-error)]/12 px-2 py-0.5 text-[10px] font-medium text-[var(--color-error)]">
+      <span className="rounded-[4px] bg-[var(--color-error)]/12 px-1.5 py-0.5 text-[11px] text-[var(--color-error)]">
         {t('settings.plugins.status.attention')}
       </span>
     )
   }
 
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+    <span className={`rounded-[4px] px-1.5 py-0.5 text-[11px] ${
       plugin.enabled
         ? 'bg-[var(--color-success-container)] text-[var(--color-success)]'
         : 'bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]'
@@ -369,7 +263,7 @@ function StatusPill({ plugin }: { plugin: PluginSummary }) {
 function ScopePill({ scope }: { scope: PluginSummary['scope'] }) {
   const t = useTranslation()
   return (
-    <span className="rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-tertiary)]">
+    <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
       {t(`settings.plugins.scope.${scope}`)}
     </span>
   )

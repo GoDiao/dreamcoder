@@ -171,6 +171,8 @@ type ApiAgentDefinition = {
   color?: string
   source: SharedAgentDefinition['source']
   baseDir?: string
+  // Read-only, from Claude Code's user directory
+  inheritedFromClaudeCode?: boolean
   isActive: boolean
 }
 
@@ -192,6 +194,9 @@ function serializeActiveAgent(
     color: agent.color,
     source: agent.source,
     baseDir: agent.baseDir,
+    ...('inheritedFromClaudeCode' in agent && agent.inheritedFromClaudeCode
+      ? { inheritedFromClaudeCode: true }
+      : {}),
     isActive,
   }
 }

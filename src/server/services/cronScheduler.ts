@@ -13,6 +13,7 @@ import {
 } from '../../utils/desktopBundledCli.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type TaskRun = {
   id: string
@@ -135,8 +136,7 @@ export function cronMatches(cronExpr: string, date: Date): boolean {
 type RunsFile = { runs: TaskRun[] }
 
 function getLogFilePath(): string {
-  const configDir =
-    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+  const configDir = getClaudeConfigHomeDir()
   return path.join(configDir, 'scheduled_tasks_log.json')
 }
 
@@ -381,6 +381,29 @@ export class CronScheduler {
       }
     }
 
+    const providerError = await this.getProviderError(task)
+    if (providerError) {
+      const failedAt = new Date().toISOString()
+      const failedRun: TaskRun = {
+        id: crypto.randomBytes(6).toString('hex'),
+        taskId: task.id,
+        taskName: task.name || task.prompt.slice(0, 60),
+        startedAt: failedAt,
+        completedAt: failedAt,
+        status: 'failed',
+        prompt: task.prompt,
+        error: providerError,
+        durationMs: 0,
+      }
+      await this.cronService.updateLastFired(task.id, failedAt)
+      await appendRun(failedRun)
+      if (!task.recurring) {
+        await this.cronService.updateTask(task.id, { enabled: false }).catch(() => {
+        })
+      }
+      return failedRun
+    }
+
     const runId = crypto.randomBytes(6).toString('hex')
     const startedAt = new Date().toISOString()
     let workDir = task.folderPath || os.homedir()
@@ -584,15 +607,12 @@ export class CronScheduler {
           }
         : {}),
       ...(explicitProviderEnv ?? {}),
-      ...(this.shouldMarkManagedOAuth(task.providerId)
-        ? await this.buildOfficialOAuthEnv()
-        : {}),
       ...attributionHeaderEnv,
     }
   }
 
   private getConfigDir(): string {
-    return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    return getClaudeConfigHomeDir()
   }
 
   private shouldStripInheritedProviderEnv(providerId?: string | null): boolean {
@@ -620,52 +640,16 @@ export class CronScheduler {
     }
   }
 
-  private shouldMarkManagedOAuth(providerId?: string | null): boolean {
-    if (providerId === null) {
-      return true
+  private async getProviderError(task: CronTask): Promise<string | null> {
+    const { providers, activeId } = await this.providerService.listProviders()
+    if (typeof task.providerId === 'string') {
+      return providers.some((provider) => provider.id === task.providerId)
+        ? null
+        : `Provider not found: ${task.providerId}. Choose another provider for this task.`
     }
-    if (typeof providerId === 'string') {
-      return false
-    }
-
-    try {
-      const raw = readFileSync(
-        path.join(this.getConfigDir(), 'dreamcoder', 'settings.json'),
-        'utf-8',
-      )
-      const parsed = JSON.parse(raw) as { env?: Record<string, string> }
-      const env = parsed.env ?? {}
-      const hasProviderEnv = [
-        'ANTHROPIC_API_KEY',
-        'ANTHROPIC_AUTH_TOKEN',
-        'ANTHROPIC_BASE_URL',
-      ].some(
-        (key) =>
-          typeof env[key] === 'string' && env[key]!.trim().length > 0,
-      )
-      return !hasProviderEnv
-    } catch {
-      return true
-    }
-  }
-
-  private async buildOfficialOAuthEnv(): Promise<Record<string, string>> {
-    const env: Record<string, string> = {
-      CLAUDE_CODE_ENTRYPOINT: 'claude-desktop',
-    }
-    try {
-      const { providerOAuthService } = await import('./providerOAuthService.js')
-      const token = await providerOAuthService.ensureFreshAccessToken()
-      if (token) {
-        env.CLAUDE_CODE_OAUTH_TOKEN = token
-      }
-    } catch (err) {
-      console.error(
-        '[cronScheduler] ensureFreshAccessToken failed:',
-        err instanceof Error ? err.message : err,
-      )
-    }
-    return env
+    return activeId
+      ? null
+      : 'No provider configured. Add a provider in Settings → Providers.'
   }
 
   private async cleanupStaleRuns(): Promise<void> {

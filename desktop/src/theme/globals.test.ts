@@ -25,14 +25,6 @@ function getThemeBlock(selector: ':root,\n[data-theme="light"]' | '[data-theme="
   throw new Error(`Theme block not closed: ${selector}`)
 }
 
-function getCssBetween(startMarker: string, endMarker: string) {
-  const start = normalizedCss.indexOf(startMarker)
-  expect(start).toBeGreaterThanOrEqual(0)
-  const end = normalizedCss.indexOf(endMarker, start)
-  expect(end).toBeGreaterThan(start)
-  return normalizedCss.slice(start, end)
-}
-
 describe('desktop theme tokens', () => {
   const themes = [':root,\n[data-theme="light"]', '[data-theme="white"]', '[data-theme="dark"]'] as const
   const requiredTokens = [
@@ -74,6 +66,19 @@ describe('desktop theme tokens', () => {
     '--color-outline-a92',
   ]
 
+  it('lets only the base light block use a bare :root, so later blocks cannot override other themes', () => {
+    // A bare `:root` has the same specificity as `[data-theme="midnight"]`;
+    // declared later in the file it would repaint every theme.
+    const bareRootBlocks = normalizedCss.match(/^:root\s*[,{]/gm) ?? []
+    expect(bareRootBlocks).toHaveLength(1)
+  })
+
+  it('gives the dark theme its own error surface instead of the light default', () => {
+    const block = getThemeBlock('[data-theme="dark"]')
+    expect(block).toContain('--color-error-container:')
+    expect(block).toContain('--color-on-error-container:')
+  })
+
   it('defines activity and status tokens for every supported theme', () => {
     for (const theme of themes) {
       const block = getThemeBlock(theme)
@@ -89,19 +94,6 @@ describe('desktop theme tokens', () => {
     for (const token of requiredTokens) {
       expect(block, `Aurora should define ${token}`).toContain(`${token}:`)
     }
-  })
-
-  it('avoids color-mix in the startup-critical UI zoom shell chrome for Safari 15 WebView support', () => {
-    const zoomShellCss = getCssBetween('.settings-zoom-kbd {', '@theme {')
-
-    expect(zoomShellCss).not.toContain('color-mix(')
-  })
-
-  it('keeps the UI zoom slider thumb visible in dark mode', () => {
-    expect(css).toContain('[data-theme="dark"] .settings-zoom-control')
-    expect(css).toContain('--settings-zoom-thumb-bg: var(--color-surface-bright);')
-    expect(css).toContain('--settings-zoom-thumb-border: rgba(255, 181, 159, 0.78);')
-    expect(css).toContain('box-shadow: var(--settings-zoom-thumb-shadow);')
   })
 })
 

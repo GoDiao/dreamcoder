@@ -8,6 +8,9 @@ import { ConversationService, ConversationStartupError, conversationService } fr
 import { SessionService, sessionService } from '../services/sessionService.js'
 import { ProviderService } from '../services/providerService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 async function rmWithRetry(targetPath: string): Promise<void> {
   const attempts = process.platform === 'win32' ? 5 : 1
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -50,6 +53,26 @@ describe('ConversationService', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ConversationStartupError)
       expect((error as ConversationStartupError).code).toBe('SESSION_DELETED')
+    }
+  })
+
+  it('should refuse to start a session without an active provider', async () => {
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-no-provider-'))
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
+
+    try {
+      const svc = new ConversationService()
+      await expect(
+        svc.startSession(crypto.randomUUID(), process.cwd(), 'ws://127.0.0.1:1/sdk/test', { providerId: null }),
+      ).rejects.toMatchObject({ code: 'PROVIDER_NOT_CONFIGURED' })
+    } finally {
+      if (previousConfigDir === undefined) {
+        delete process.env.DREAMCODER_CONFIG_DIR
+      } else {
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
+      }
+      await fs.rm(tmpConfigDir, { recursive: true, force: true })
     }
   })
 
@@ -397,11 +420,11 @@ describe('ConversationService', () => {
   })
 
   it('should reconstruct usage and metadata from a persisted transcript', async () => {
-    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
     const previousAnthropicApiKey = process.env.ANTHROPIC_API_KEY
     const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-transcript-'))
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-workdir-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
     process.env.ANTHROPIC_API_KEY = 'test-key'
 
     try {
@@ -449,9 +472,9 @@ describe('ConversationService', () => {
       expect(usage?.models[0]?.model).toBe('mock-model')
     } finally {
       if (previousConfigDir === undefined) {
-        delete process.env.CLAUDE_CONFIG_DIR
+        delete process.env.DREAMCODER_CONFIG_DIR
       } else {
-        process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
       }
       if (previousAnthropicApiKey === undefined) {
         delete process.env.ANTHROPIC_API_KEY
@@ -464,11 +487,11 @@ describe('ConversationService', () => {
   })
 
   it('should reconstruct Sonnet 4.6 transcript usage before CLI config is initialized', async () => {
-    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
     const previousNodeEnv = process.env.NODE_ENV
     const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-transcript-sonnet-'))
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-workdir-sonnet-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
     process.env.NODE_ENV = 'development'
 
     try {
@@ -505,9 +528,9 @@ describe('ConversationService', () => {
       expect(contextEstimate?.categories.some((category) => category.name === 'Output tokens' && category.tokens === 20)).toBe(true)
     } finally {
       if (previousConfigDir === undefined) {
-        delete process.env.CLAUDE_CONFIG_DIR
+        delete process.env.DREAMCODER_CONFIG_DIR
       } else {
-        process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
       }
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV
@@ -525,6 +548,7 @@ describe('WebSocket Chat Integration', () => {
   let baseUrl: string
   let wsUrl: string
   let tmpDir: string
+  let defaultProviderId: string
 
   function git(cwd: string, ...args: string[]): string {
     return execFileSync('git', args, {
@@ -790,11 +814,29 @@ describe('WebSocket Chat Integration', () => {
 
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-conv-'))
-    process.env.CLAUDE_CONFIG_DIR = tmpDir
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
     process.env.CLAUDE_CLI_PATH = fileURLToPath(
       new URL('./fixtures/mock-sdk-cli.ts', import.meta.url)
     )
     await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
+
+    const defaultProviderService = new ProviderService()
+    const defaultProvider = await defaultProviderService.addProvider({
+      presetId: 'custom',
+      name: 'Default Test Provider',
+      apiKey: 'key-default',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      runtimeKind: 'anthropic_compatible',
+      models: {
+        main: 'default-main',
+        haiku: 'default-haiku',
+        sonnet: 'default-sonnet',
+        opus: 'default-opus',
+      },
+    })
+    defaultProviderId = defaultProvider.id
+    await defaultProviderService.activateProvider(defaultProviderId)
 
     const port = 15000 + Math.floor(Math.random() * 1000)
     const { startServer } = await import('../index.js')
@@ -813,7 +855,7 @@ describe('WebSocket Chat Integration', () => {
     } else {
       delete process.env.CLAUDE_CLI_PATH
     }
-    delete process.env.CLAUDE_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   it('should connect and receive connected event', async () => {
@@ -1163,7 +1205,7 @@ describe('WebSocket Chat Integration', () => {
       for (const sessionId of sessionIds) {
         conversationService.stopSession(sessionId)
       }
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
       await fs.writeFile(path.join(tmpDir, 'settings.json'), '{}\n', 'utf-8')
     }
   }, 20_000)
@@ -1761,7 +1803,7 @@ describe('WebSocket Chat Integration', () => {
     } finally {
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)
 
@@ -1983,7 +2025,7 @@ describe('WebSocket Chat Integration', () => {
       )
 
       expect(startCalls[0]).toMatchObject({ sessionId })
-      expect(startCalls[0]?.options?.providerId).toBeNull()
+      expect(startCalls[0]?.options?.providerId).toBe(defaultProviderId)
       expect(startCalls[1]).toMatchObject({
         sessionId,
         options: {
@@ -2107,7 +2149,7 @@ describe('WebSocket Chat Integration', () => {
 
       expect(startCalls).toHaveLength(2)
       expect(startCalls[0]).toMatchObject({ sessionId })
-      expect(startCalls[0]?.options?.providerId).toBeNull()
+      expect(startCalls[0]?.options?.providerId).toBe(defaultProviderId)
       expect(startCalls[1]).toMatchObject({
         sessionId,
         options: {
@@ -2442,56 +2484,7 @@ describe('WebSocket Chat Integration', () => {
       ws.close()
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
-    }
-  }, 20_000)
-
-  it('should preserve ChatGPT Official as the active default runtime after restart', async () => {
-    const providerService = new ProviderService()
-    await providerService.activateProvider('openai-official')
-
-    const createRes = await fetch(`${baseUrl}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workDir: process.cwd() }),
-    })
-    expect(createRes.status).toBe(201)
-    const { sessionId } = await createRes.json() as { sessionId: string }
-
-    const originalStartSession = conversationService.startSession.bind(conversationService)
-    const startCalls: Array<{
-      sessionId: string
-      options: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null } | undefined
-    }> = []
-
-    conversationService.startSession = (async function patchedStartSession(
-      sid: string,
-      workDir: string,
-      sdkUrl: string,
-      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
-    ) {
-      startCalls.push({ sessionId: sid, options })
-      return originalStartSession(sid, workDir, sdkUrl, options)
-    }) as typeof conversationService.startSession
-
-    try {
-      const messages = await runTurn(sessionId, 'default ChatGPT Official runtime')
-
-      expect(startCalls).toHaveLength(1)
-      expect(startCalls[0]).toMatchObject({
-        sessionId,
-        options: {
-          providerId: 'openai-official',
-        },
-      })
-      expect(messages.some((msg) => msg.type === 'message_complete')).toBe(true)
-      await expect(providerService.listProviders()).resolves.toMatchObject({
-        activeId: 'openai-official',
-      })
-    } finally {
-      conversationService.startSession = originalStartSession
-      conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)
 
@@ -2916,6 +2909,286 @@ describe('WebSocket Chat Integration', () => {
           model: 'restart-b-opus',
         },
       })
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+    }
+  }, 20_000)
+
+  it('should prefer the per-session effort and restart when only the effort changes', async () => {
+    const effortRes = await fetch(`${baseUrl}/api/effort`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: 'high' }),
+    })
+    expect(effortRes.status).toBe(200)
+
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Effort',
+      apiKey: 'key-effort',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'effort-main',
+        haiku: 'effort-haiku',
+        sonnet: 'effort-sonnet',
+        opus: 'effort-opus',
+      },
+    })
+
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{
+      sessionId: string
+      options: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null } | undefined
+    }> = []
+
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ sessionId: sid, options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      let phase: 'boot' | 'turn1' | 'switching' | 'turn2' | 'done' = 'boot'
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for effort override flow for session ${sessionId}`))
+        }, 15_000)
+
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+
+          if (msg.type === 'connected' && phase === 'boot') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-sonnet',
+              effort: 'low',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'first turn' }))
+            phase = 'turn1'
+            return
+          }
+
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn1') {
+            phase = 'switching'
+            // Same provider and model; only the effort changes.
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-sonnet',
+              effort: 'max',
+            }))
+            return
+          }
+
+          if (msg.type === 'status' && msg.state === 'idle' && phase === 'switching') {
+            ws.send(JSON.stringify({ type: 'user_message', content: 'second turn' }))
+            phase = 'turn2'
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn2') {
+            clearTimeout(timeout)
+            phase = 'done'
+            ws.close()
+            resolve()
+          }
+        }
+
+        ws.onerror = () => {
+          reject(new Error(`WebSocket error for effort override session ${sessionId}`))
+        }
+      })
+
+      expect(startCalls).toHaveLength(2)
+      expect(startCalls[0]).toMatchObject({
+        sessionId,
+        options: { providerId: provider.id, model: 'effort-sonnet', effort: 'low' },
+      })
+      expect(startCalls[1]).toMatchObject({
+        sessionId,
+        options: { providerId: provider.id, model: 'effort-sonnet', effort: 'max' },
+      })
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+      await fetch(`${baseUrl}/api/effort`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 'medium' }),
+      })
+    }
+  }, 20_000)
+
+  it('should ignore an invalid per-session effort and keep the global one', async () => {
+    const effortRes = await fetch(`${baseUrl}/api/effort`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: 'high' }),
+    })
+    expect(effortRes.status).toBe(200)
+
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Effort Invalid',
+      apiKey: 'key-effort-invalid',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'effort-invalid-main',
+        haiku: 'effort-invalid-haiku',
+        sonnet: 'effort-invalid-sonnet',
+        opus: 'effort-invalid-opus',
+      },
+    })
+
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{ options: { effort?: string } | undefined }> = []
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for invalid effort flow for session ${sessionId}`))
+        }, 15_000)
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type === 'connected') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-invalid-sonnet',
+              effort: 'turbo',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'only turn' }))
+            return
+          }
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+          if (msg.type === 'message_complete') {
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }
+        }
+        ws.onerror = () => reject(new Error(`WebSocket error for invalid effort session ${sessionId}`))
+      })
+
+      expect(startCalls).toHaveLength(1)
+      expect(startCalls[0]?.options?.effort).toBe('high')
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+      await fetch(`${baseUrl}/api/effort`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 'medium' }),
+      })
+    }
+  }, 20_000)
+
+  it('should apply an effort-only runtime config without pinning a provider or model', async () => {
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{ options: { effort?: string; model?: string; providerId?: string | null } | undefined }> = []
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for effort-only flow for session ${sessionId}`))
+        }, 15_000)
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type === 'connected') {
+            ws.send(JSON.stringify({ type: 'set_runtime_config', providerId: null, modelId: '', effort: 'max' }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'only turn' }))
+            return
+          }
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+          if (msg.type === 'message_complete') {
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }
+        }
+        ws.onerror = () => reject(new Error(`WebSocket error for effort-only session ${sessionId}`))
+      })
+
+      expect(startCalls).toHaveLength(1)
+      expect(startCalls[0]?.options?.effort).toBe('max')
+      // Provider and model come from the defaults, not from the empty override.
+      expect(startCalls[0]?.options?.model).not.toBe('')
     } finally {
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)

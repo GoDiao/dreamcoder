@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
+import { SettingsListRow, SettingsSection, SettingsSummary } from '../components/settings/SettingsSummary'
 import { diagnosticsApi, type DiagnosticEvent, type DiagnosticsStatus } from '../api/diagnostics'
 import { Button } from '../components/shared/Button'
 import { copyTextToClipboard } from '../components/chat/clipboard'
@@ -109,73 +112,67 @@ export function DiagnosticsSettings() {
   }
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{t('settings.diagnostics.title')}</h2>
-          <p className="text-sm text-[var(--color-text-tertiary)] mt-0.5">{t('settings.diagnostics.description')}</p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={load} loading={isLoading}>
-          <span className="material-symbols-outlined text-[16px]">refresh</span>
-          {t('settings.diagnostics.refresh')}
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <SettingsPageHeader
+        title={t('settings.diagnostics.title')}
+        description={t('settings.diagnostics.description')}
+        actions={
+          <Button variant="secondary" size="xs" onClick={load} loading={isLoading} icon={<RefreshCw size={13} aria-hidden="true" />}>
+            {t('settings.diagnostics.refresh')}
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Metric label={t('settings.diagnostics.totalSize')} value={status ? formatBytes(status.totalBytes) : '-'} />
-        <Metric label={t('settings.diagnostics.events')} value={status ? String(status.eventCount) : '-'} />
-        <Metric label={t('settings.diagnostics.recentErrors')} value={status ? String(status.recentErrorCount) : '-'} />
-        <Metric label={t('settings.diagnostics.retention')} value={status ? t('settings.diagnostics.retentionValue', { days: String(status.retentionDays), size: formatBytes(status.maxBytes) }) : '-'} />
-      </div>
+      <SettingsSummary
+        items={[
+          { label: t('settings.diagnostics.totalSize'), value: status ? formatBytes(status.totalBytes) : '-' },
+          { label: t('settings.diagnostics.events'), value: status ? String(status.eventCount) : '-' },
+          { label: t('settings.diagnostics.recentErrors'), value: status ? String(status.recentErrorCount) : '-' },
+          {
+            label: t('settings.diagnostics.retention'),
+            value: status ? t('settings.diagnostics.retentionValue', { days: String(status.retentionDays), size: formatBytes(status.maxBytes) }) : '-',
+          },
+        ]}
+      />
 
       <div className="mb-5">
         <DoctorPanel />
       </div>
 
-      <div className="border border-[var(--color-border)] rounded-lg mb-5">
-        <div className="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.diagnostics.logDirectory')}</div>
-            <div className="text-xs text-[var(--color-text-tertiary)] font-mono break-all mt-0.5">{status?.logDir ?? '-'}</div>
-          </div>
-          <Button variant="secondary" size="sm" onClick={handleOpenDir}>
-            <span className="material-symbols-outlined text-[16px]">folder_open</span>
+      <SettingsListRow
+        title={t('settings.diagnostics.logDirectory')}
+        description={<span className="break-all font-mono">{status?.logDir ?? '-'}</span>}
+        actions={
+          <Button variant="secondary" size="xs" onClick={handleOpenDir}>
             {t('settings.diagnostics.openDirectory')}
           </Button>
-        </div>
-        <div className="px-4 py-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={handleExport} loading={isExporting}>
-            <span className="material-symbols-outlined text-[16px]">archive</span>
-            {t('settings.diagnostics.exportBundle')}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleCopySummary}>
-            <span className="material-symbols-outlined text-[16px]">content_copy</span>
-            {t('settings.diagnostics.copySummary')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={handleClear} loading={isClearing}>
-            <span className="material-symbols-outlined text-[16px]">delete</span>
-            {t('settings.diagnostics.clearLogs')}
-          </Button>
-          {lastExportPath && (
-            <span className="text-xs text-[var(--color-text-tertiary)] font-mono break-all">
-              {lastExportPath}
-            </span>
-          )}
-        </div>
+        }
+      />
+      <div className="mt-[18px] flex flex-wrap items-center gap-1.5">
+        <Button variant="secondary" size="xs" onClick={handleExport} loading={isExporting}>
+          {t('settings.diagnostics.exportBundle')}
+        </Button>
+        <Button variant="secondary" size="xs" onClick={handleCopySummary}>
+          {t('settings.diagnostics.copySummary')}
+        </Button>
+        <Button variant="secondary" size="xs" onClick={handleClear} loading={isClearing} className="text-[var(--color-error)] hover:text-[var(--color-error)]">
+          {t('settings.diagnostics.clearLogs')}
+        </Button>
+        {lastExportPath && (
+          <span className="text-xs text-[var(--color-text-tertiary)] font-mono break-all">
+            {lastExportPath}
+          </span>
+        )}
       </div>
 
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.diagnostics.recentEvents')}</h3>
-        <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">{t('settings.diagnostics.privacyNote')}</p>
-      </div>
-
-      <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+      <SettingsSection title={t('settings.diagnostics.recentEvents')}>
+        <p className="-mt-1.5 mb-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">{t('settings.diagnostics.privacyNote')}</p>
         {events.length === 0 ? (
-          <div className="px-4 py-8 text-sm text-[var(--color-text-tertiary)] text-center">
+          <div className="py-6 text-center text-xs text-[var(--color-text-tertiary)]">
             {isLoading ? t('common.loading') : t('settings.diagnostics.noEvents')}
           </div>
         ) : (
-          <div className="divide-y divide-[var(--color-border)]">
+          <div>
             {events.map((event) => (
               <EventRow
                 key={event.id}
@@ -185,16 +182,7 @@ export function DiagnosticsSettings() {
             ))}
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-[var(--color-border)] rounded-lg px-3 py-2">
-      <div className="text-xs text-[var(--color-text-tertiary)]">{label}</div>
-      <div className="text-sm font-semibold text-[var(--color-text-primary)] mt-1">{value}</div>
+      </SettingsSection>
     </div>
   )
 }
@@ -215,19 +203,19 @@ function EventRow({
   const detailsText = formatDetails(event.details)
 
   return (
-    <div className="px-4 py-3 grid grid-cols-[120px_92px_1fr] gap-3 items-start">
+    <div className="grid grid-cols-[120px_64px_1fr] items-start gap-3 border-b border-[var(--color-border-separator)] py-2.5">
       <div className="text-xs text-[var(--color-text-tertiary)] font-mono">
         {new Date(event.timestamp).toLocaleString()}
       </div>
-      <div className={`text-xs font-semibold uppercase ${severityClass}`}>{event.severity}</div>
+      <div className={`text-xs font-medium ${severityClass}`}>{event.severity}</div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">{event.type}</span>
+          <span className="text-[13px] font-medium text-[var(--color-text-primary)] truncate">{event.type}</span>
           {event.sessionId && (
             <span className="text-[11px] text-[var(--color-text-tertiary)] font-mono truncate">{event.sessionId}</span>
           )}
         </div>
-        <div className="text-xs text-[var(--color-text-secondary)] mt-1 break-words">{event.summary}</div>
+        <div className="mt-px text-xs leading-[1.5] text-[var(--color-text-secondary)] break-words">{event.summary}</div>
         {detailsText && (
           <details className="mt-2">
             <summary className="cursor-pointer text-xs text-[var(--color-text-tertiary)] select-none">

@@ -1,4 +1,3 @@
-import { homedir } from 'os'
 import { join } from 'path'
 import { access, readFile, mkdir, writeFile, rm } from 'fs/promises'
 import { createHash } from 'crypto'
@@ -9,6 +8,7 @@ import { computerUseApprovalService } from '../services/computerUseApprovalServi
 import { detectPythonRuntime, isPythonVersionAtLeast } from './computer-use-python.js'
 import { buildPipInstallAttempts } from '../../utils/computerUse/pipInstall.js'
 import { setComputerUseMode } from '../../utils/computerUse/hostAdapter.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {
   DEFAULT_DESKTOP_GRANT_FLAGS,
   DEFAULT_COMPUTER_USE_MODE,
@@ -31,7 +31,7 @@ import REQUIREMENTS_WIN32 from '../../../runtime/requirements-win.txt' with { ty
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../../..')
 const devRuntimeRoot = join(projectRoot, 'runtime')
-const claudeHome = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
+const claudeHome = getClaudeConfigHomeDir()
 const runtimeStateRoot = join(claudeHome, '.runtime')
 const venvRoot = join(runtimeStateRoot, 'venv')
 const installStampPath = join(runtimeStateRoot, 'requirements.sha256')

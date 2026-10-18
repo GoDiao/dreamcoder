@@ -1,7 +1,7 @@
-import * as os from 'os'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 const startedAt = Date.now()
 
@@ -98,7 +98,7 @@ async function handleUser(): Promise<Response> {
 }
 
 function getConfigDir(): string {
-  return process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+  return getClaudeConfigHomeDir()
 }
 
 function getVersion(): string {

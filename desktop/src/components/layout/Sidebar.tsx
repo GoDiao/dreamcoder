@@ -1,15 +1,20 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, ChevronDown, Clock, Folder, FolderOpen, FolderPlus, GitBranch, LoaderCircle, MoreHorizontal, Pin, PinOff, RefreshCw, RotateCcw, SquarePen, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SessionListItem } from '../../types/session'
-import { useTabStore, SETTINGS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
+import { useTabStore, SCHEDULED_TAB_ID } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
+import { SidebarMoreMenu } from './SidebarMoreMenu'
+import { useMenuNavigation } from '../../hooks/useMenuNavigation'
+import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarProjectSortBy } from './ProjectManagementDialog'
+import { ShortcutsDialog } from './ShortcutsDialog'
+import { SearchField } from '../shared/SearchField'
 
 const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
@@ -22,10 +27,8 @@ const PROJECT_ORGANIZATION_STORAGE_KEY = 'dreamcoder-sidebar-project-organizatio
 const PROJECT_SORT_STORAGE_KEY = 'dreamcoder-sidebar-project-sort'
 const PROJECT_GROUP_VISIBLE_COUNT = 6
 const PROJECT_GROUP_SCROLL_COUNT = 12
+const SESSION_MENU_WIDTH = 180
 
-type SidebarProjectOrganization = 'project' | 'recentProject' | 'time'
-type SidebarProjectSortBy = 'createdAt' | 'updatedAt'
-type SidebarHeaderMenuType = 'main' | 'organize' | 'sort' | 'create'
 
 type ProjectGroup = {
   key: string
@@ -67,8 +70,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [projectContextMenu, setProjectContextMenu] = useState<{ key: string; x: number; y: number } | null>(null)
-  const [projectHeaderMenu, setProjectHeaderMenu] = useState<{ type: SidebarHeaderMenuType; x: number; y: number } | null>(null)
-  const [projectHeaderSubmenu, setProjectHeaderSubmenu] = useState<{ type: 'organize' | 'sort'; x: number; y: number } | null>(null)
+  const [createProjectMenu, setCreateProjectMenu] = useState<{ x: number; y: number } | null>(null)
+  const [projectManagementOpen, setProjectManagementOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null)
   const [pendingBatchDeleteSessionIds, setPendingBatchDeleteSessionIds] = useState<string[] | null>(null)
   const [isBatchDeleting, setIsBatchDeleting] = useState(false)
@@ -85,6 +89,29 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null)
   const [projectDropTarget, setProjectDropTarget] = useState<{ key: string; position: 'before' | 'after' } | null>(null)
   const suppressProjectClickRef = useRef<string | null>(null)
+  const sessionMenuRef = useRef<HTMLDivElement>(null)
+  const sessionMenuTriggerRef = useRef<HTMLElement | null>(null)
+  const projectMenuRef = useRef<HTMLDivElement>(null)
+  const createProjectMenuRef = useRef<HTMLDivElement>(null)
+  const closeSessionMenu = useCallback(() => setContextMenu(null), [])
+  const closeProjectMenu = useCallback(() => setProjectContextMenu(null), [])
+  const closeCreateProjectMenu = useCallback(() => setCreateProjectMenu(null), [])
+  const sessionMenuNav = useMenuNavigation({
+    openKey: contextMenu?.id,
+    menuRef: sessionMenuRef,
+    onClose: closeSessionMenu,
+    triggerRef: sessionMenuTriggerRef,
+  })
+  const projectMenuNav = useMenuNavigation({
+    openKey: projectContextMenu?.key,
+    menuRef: projectMenuRef,
+    onClose: closeProjectMenu,
+  })
+  const createProjectMenuNav = useMenuNavigation({
+    openKey: Boolean(createProjectMenu),
+    menuRef: createProjectMenuRef,
+    onClose: closeCreateProjectMenu,
+  })
   const sidebarPreferenceRevisionRef = useRef(0)
   const refreshSessionsNow = useSessionListAutoRefresh(fetchSessions)
 
@@ -94,16 +121,24 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [sidebarOpen])
 
   useEffect(() => {
-    if (!contextMenu && !projectContextMenu && !projectHeaderMenu && !projectHeaderSubmenu) return
+    if (!contextMenu && !projectContextMenu && !createProjectMenu) return
     const close = () => {
       setContextMenu(null)
       setProjectContextMenu(null)
-      setProjectHeaderMenu(null)
-      setProjectHeaderSubmenu(null)
+      setCreateProjectMenu(null)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      close()
     }
     document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [contextMenu, projectContextMenu, projectHeaderMenu, projectHeaderSubmenu])
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('click', close)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [contextMenu, projectContextMenu, createProjectMenu])
 
   const filteredSessions = useMemo(() => {
     let result = sessions
@@ -125,6 +160,21 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       !hiddenProjectKeys.has(project.key)
     ))
   }, [hiddenProjectKeys, orderedProjectGroups])
+  const managementProjectGroups = useMemo(
+    () => applyProjectOrder(groupByProject(sessions, projectSortBy), projectOrder, pinnedProjectKeys, projectOrganization, projectSortBy),
+    [pinnedProjectKeys, projectOrder, projectOrganization, projectSortBy, sessions],
+  )
+  const managedProjects = useMemo(
+    () => managementProjectGroups.map((project) => ({
+      key: project.key,
+      title: project.title,
+      subtitle: project.subtitle,
+      pinned: pinnedProjectKeys.has(project.key),
+      hidden: hiddenProjectKeys.has(project.key),
+      canOpen: Boolean(project.workDir),
+    })),
+    [hiddenProjectKeys, managementProjectGroups, pinnedProjectKeys],
+  )
   const showInitialLoading = isLoading && sessions.length === 0
   const filteredSessionIds = useMemo(() => filteredSessions.map((session) => session.id), [filteredSessions])
   const selectedCount = selectedSessionIds.size
@@ -214,7 +264,32 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const handleContextMenu = useCallback((e: React.MouseEvent, id: string) => {
     e.preventDefault()
     if (isBatchMode) return
+    setProjectContextMenu(null)
+    setCreateProjectMenu(null)
+    sessionMenuTriggerRef.current = null
     setContextMenu({ id, x: e.clientX, y: e.clientY })
+  }, [isBatchMode])
+
+  const toggleSessionMenu = useCallback((event: React.MouseEvent<HTMLElement>, id: string) => {
+    // The document-level click listener would otherwise close the menu in the same click.
+    event.stopPropagation()
+    setProjectContextMenu(null)
+    setCreateProjectMenu(null)
+    if (contextMenu?.id === id) {
+      setContextMenu(null)
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    sessionMenuTriggerRef.current = event.currentTarget
+    setContextMenu({ id, x: rect.right - SESSION_MENU_WIDTH, y: rect.bottom + 4 })
+  }, [contextMenu])
+
+  const handleProjectContextMenu = useCallback((event: React.MouseEvent, projectKey: string) => {
+    event.preventDefault()
+    if (isBatchMode) return
+    setContextMenu(null)
+    setCreateProjectMenu(null)
+    setProjectContextMenu({ key: projectKey, x: event.clientX, y: event.clientY })
   }, [isBatchMode])
 
   const handleProjectDragStart = useCallback((event: React.DragEvent, projectKey: string) => {
@@ -286,34 +361,23 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     }
   }, [addToast, closeMobileDrawer, restoreHiddenProjectForWorkDir, t])
 
-  const openProjectHeaderMenu = useCallback((event: React.MouseEvent, type: SidebarHeaderMenuType) => {
+  const toggleCreateProjectMenu = useCallback((event: React.MouseEvent) => {
     event.stopPropagation()
+    if (createProjectMenu) {
+      setCreateProjectMenu(null)
+      return
+    }
     const rect = event.currentTarget.getBoundingClientRect()
-    const width = type === 'create' ? 250 : 270
+    const width = 250
     setProjectContextMenu(null)
     setContextMenu(null)
-    setProjectHeaderSubmenu(null)
-    setProjectHeaderMenu({
-      type,
+    setCreateProjectMenu({
       x: Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10)),
       y: rect.bottom + 8,
     })
-  }, [])
-
-  const openProjectHeaderSubmenu = useCallback((event: React.MouseEvent, type: 'organize' | 'sort') => {
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const width = type === 'sort' ? 230 : 260
-    setProjectHeaderSubmenu({
-      type,
-      x: Math.max(10, Math.min(rect.right + 8, window.innerWidth - width - 10)),
-      y: Math.max(10, Math.min(rect.top - 8, window.innerHeight - 170)),
-    })
-  }, [])
+  }, [createProjectMenu])
 
   const updateProjectOrganization = useCallback((organization: SidebarProjectOrganization) => {
-    setProjectHeaderMenu(null)
-    setProjectHeaderSubmenu(null)
     setProjectOrganizationState(organization)
     const nextOrder = organization === 'project' || organization === 'time' ? [] : projectOrder
     if (nextOrder !== projectOrder) setProjectOrder(nextOrder)
@@ -327,8 +391,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [hiddenProjectKeys, persistSidebarProjectPreferences, pinnedProjectKeys, projectOrder, projectSortBy])
 
   const updateProjectSortBy = useCallback((sortBy: SidebarProjectSortBy) => {
-    setProjectHeaderMenu(null)
-    setProjectHeaderSubmenu(null)
     setProjectSortByState(sortBy)
     const nextOrder: string[] = []
     setProjectOrder(nextOrder)
@@ -342,8 +404,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [hiddenProjectKeys, persistSidebarProjectPreferences, pinnedProjectKeys, projectOrganization])
 
   const createSessionFromExistingFolder = useCallback(async () => {
-    setProjectHeaderMenu(null)
-    setProjectHeaderSubmenu(null)
+    setCreateProjectMenu(null)
     if (!isTauri) {
       addToast({
         type: 'error',
@@ -384,8 +445,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [hiddenProjectKeys, persistSidebarProjectPreferences, projectOrder, projectOrganization, projectSortBy])
 
   const restoreAllHiddenProjects = useCallback(() => {
-    setProjectHeaderMenu(null)
-    setProjectHeaderSubmenu(null)
     setHiddenProjectKeys((current) => {
       if (current.size === 0) return current
       const next = new Set<string>()
@@ -594,6 +653,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target?.closest('input, textarea, [contenteditable="true"]')) return
+      // The sidebar sits behind the settings window while it is open.
+      if (useUIStore.getState().settingsOpen) return
 
       if (event.key === 'Escape') {
         handleExitBatchMode()
@@ -682,7 +743,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               : null
             void createSessionForWorkDir(currentSession?.workDir || currentSession?.projectRoot || undefined)
           }}
-          icon={<PlusIcon />}
+          icon={<Plus className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />}
         >
           {t('sidebar.newSession')}
         </NavItem>
@@ -710,46 +771,14 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             className="sidebar-section sidebar-section--visible relative z-20 flex-none px-3 pb-2"
             style={{ overflow: 'visible' }}
           >
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-9 min-w-0 flex-1 items-center rounded-[14px] border border-[var(--color-sidebar-search-border)] bg-[var(--color-sidebar-search-bg)] pl-3 pr-3 transition-colors focus-within:border-[var(--color-border-focus)]">
-                <span className="pointer-events-none flex shrink-0 items-center text-[var(--color-text-tertiary)]">
-                  <SearchIcon />
-                </span>
-                <input
-                  id="sidebar-search"
-                  type="text"
-                  placeholder={t('sidebar.searchPlaceholder')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent pl-2 pr-0 text-[13px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => void refreshSessionsNow()}
-                disabled={isLoading}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] border border-[var(--color-sidebar-search-border)] bg-[var(--color-sidebar-search-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] disabled:cursor-default disabled:opacity-65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-                aria-label={t('sidebar.refreshSessions')}
-                title={t('sidebar.refreshSessions')}
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} strokeWidth={1.9} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={isBatchMode ? handleExitBatchMode : enterBatchMode}
-                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] ${
-                  isBatchMode
-                    ? 'border-[var(--color-brand)] bg-[var(--color-sidebar-item-active)] text-[var(--color-brand)]'
-                    : 'border-[var(--color-sidebar-search-border)] bg-[var(--color-sidebar-search-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]'
-                }`}
-                aria-label={isBatchMode ? t('sidebar.batchExit') : t('sidebar.batchManage')}
-                title={isBatchMode ? t('sidebar.batchExit') : t('sidebar.batchManage')}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {isBatchMode ? 'close' : 'delete_sweep'}
-                </span>
-              </button>
-            </div>
+            <SearchField
+              id="sidebar-search"
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder={t('sidebar.searchPlaceholder')}
+              aria-label={t('sidebar.searchPlaceholder')}
+              className={`w-full bg-[var(--color-sidebar-search-bg)] ${isMobile ? 'h-11' : ''}`}
+            />
           </div>
 
           <div
@@ -825,10 +854,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               {orderedProjectGroups.length > 0 && (
                 <ProjectHeaderActions
                   title={t('sidebar.projects')}
-                  menuLabel={t('sidebar.projectMenu')}
                   createLabel={t('sidebar.newProject')}
-                  onOpenMenu={(event) => openProjectHeaderMenu(event, 'main')}
-                  onOpenCreate={(event) => openProjectHeaderMenu(event, 'create')}
+                  createMenuOpen={createProjectMenu !== null}
+                  onOpenCreate={toggleCreateProjectMenu}
                 />
               )}
               {visibleProjectGroups.map((project) => {
@@ -859,75 +887,64 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                     {dropBefore && (
                       <div className="pointer-events-none absolute -top-1 left-1 right-1 z-10 h-0.5 rounded-full bg-[var(--color-brand)]" />
                     )}
-                    <div className="flex items-center gap-1">
+                    <div
+                      className={`sidebar-row group/project-row flex items-center ${isMobile ? 'sidebar-row--touch' : ''}`}
+                      data-testid={`sidebar-project-row-${domSafeProjectKey(project.key)}`}
+                      data-menu-open={projectContextMenu?.key === project.key ? 'true' : undefined}
+                      onContextMenu={(event) => handleProjectContextMenu(event, project.key)}
+                    >
                       <button
                         type="button"
                         draggable={!isBatchMode}
                         onDragStart={(event) => handleProjectDragStart(event, project.key)}
                         onDragEnd={clearProjectDragState}
                         onClick={() => toggleProjectCollapsed(project.key)}
-                        className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-xl px-1.5 py-2 text-left transition-colors active:cursor-grabbing hover:bg-[var(--color-sidebar-item-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+                        className={`flex min-w-0 flex-1 cursor-grab items-center gap-1.5 bg-transparent px-1.5 text-left active:cursor-grabbing focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                         aria-expanded={!projectCollapsed}
                         aria-label={t(projectCollapsed ? 'sidebar.expandProject' : 'sidebar.collapseProject', { project: project.title })}
                         title={project.subtitle || project.title}
                       >
-                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-[var(--color-text-primary)]">
-                          <Folder className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden="true" />
+                        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-text-tertiary)]">
+                          {projectCollapsed
+                            ? <ChevronRight className="h-[13px] w-[13px]" strokeWidth={2} aria-hidden="true" />
+                            : <ChevronDown className="h-[13px] w-[13px]" strokeWidth={2} aria-hidden="true" />}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-5 text-[var(--color-text-primary)]">
+                        <span className="min-w-0 flex-1 truncate text-ui-aux font-medium leading-5 text-[var(--color-text-secondary)]">
                           {project.title}
                         </span>
                         {isProjectPinned && (
-                          <Pin className="h-3.5 w-3.5 flex-shrink-0 text-[var(--color-text-tertiary)]" strokeWidth={1.8} aria-hidden="true" />
+                          <Pin className="h-3 w-3 flex-shrink-0 text-[var(--color-text-tertiary)]" strokeWidth={1.8} aria-hidden="true" />
                         )}
                       </button>
-                      <div className="flex flex-shrink-0 items-center gap-1">
-                        {isBatchMode && (
-                          <button
-                            type="button"
-                            onClick={() => toggleGroupSelection(groupIds)}
-                            className={`rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] ${
-                              groupSelectedCount > 0
-                                ? 'text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10'
-                                : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
-                            }`}
-                            aria-label={t('sidebar.batchSelectGroup', { group: project.title })}
-                          >
-                            {groupSelectedCount === groupIds.length
-                              ? t('sidebar.batchDeselectAll')
-                              : t('sidebar.batchSelectAll')}
-                          </button>
-                        )}
-                        {!isBatchMode && (
-                          <div className="pointer-events-none flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setContextMenu(null)
-                                setProjectContextMenu({ key: project.key, x: event.clientX, y: event.clientY })
-                              }}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-                              aria-label={t('sidebar.projectActions', { project: project.title })}
-                              title={t('sidebar.projectActions', { project: project.title })}
-                            >
-                              <MoreHorizontal className="h-[17px] w-[17px]" strokeWidth={2} aria-hidden="true" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                void createSessionForWorkDir(project.workDir)
-                              }}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-                              aria-label={t('sidebar.newSessionInProject', { project: project.title })}
-                              title={t('sidebar.newSessionInProject', { project: project.title })}
-                            >
-                              <SquarePen className="h-[16px] w-[16px]" strokeWidth={2} aria-hidden="true" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      {isBatchMode ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupSelection(groupIds)}
+                          className={`mr-1 flex-shrink-0 rounded-md bg-transparent px-1.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none ${
+                            groupSelectedCount > 0
+                              ? 'text-[var(--color-brand)]'
+                              : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                          }`}
+                          aria-label={t('sidebar.batchSelectGroup', { group: project.title })}
+                        >
+                          {groupSelectedCount === groupIds.length
+                            ? t('sidebar.batchDeselectAll')
+                            : t('sidebar.batchSelectAll')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void createSessionForWorkDir(project.workDir)
+                          }}
+                          className="sidebar-row-action"
+                          aria-label={t('sidebar.newSessionInProject', { project: project.title })}
+                          title={t('sidebar.newSessionInProject', { project: project.title })}
+                        >
+                          <Plus className="h-[14px] w-[14px]" strokeWidth={2} aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                     <div className="motion-collapse mt-0.5 pl-0" data-state={projectCollapsed ? 'closed' : 'open'}>
                       <div>
@@ -935,7 +952,12 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                           className={hasInternalScroll ? 'max-h-[420px] overflow-y-auto pr-1' : undefined}
                           data-testid={`sidebar-project-session-list-${domSafeProjectKey(project.key)}`}
                         >
-                          {visibleItems.map((session) => (
+                          {visibleItems.map((session) => {
+                            const isSelected = selectedSessionIds.has(session.id)
+                            const isCurrent = session.id === activeTabId
+                            const menuOpen = contextMenu?.id === session.id
+                            const title = session.title || 'Untitled'
+                            return (
                             <div key={session.id} className="relative mb-0.5 last:mb-0">
                               {renamingId === session.id ? (
                                 <input
@@ -950,47 +972,53 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                       setRenameValue('')
                                     }
                                   }}
-                                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-focus)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none"
+                                  aria-label={t('common.rename')}
+                                  className={`w-full rounded-lg border border-[var(--color-border-focus)] bg-[var(--color-surface)] px-2.5 text-ui-nav text-[var(--color-text-primary)] outline-none ${isMobile ? 'h-11' : 'h-[30px]'}`}
                                 />
                               ) : (
-                                <button
-                                  onClick={(event) => {
-                                    if (isBatchMode) {
-                                      handleBatchSessionClick(event, session.id)
-                                      return
-                                    }
-                                    useTabStore.getState().openTab(session.id, session.title)
-                                    useChatStore.getState().connectToSession(session.id)
-                                    closeMobileDrawer()
-                                  }}
+                                <div
+                                  data-testid={`sidebar-session-row-${session.id}`}
+                                  data-current={isSelected || isCurrent ? 'true' : undefined}
+                                  data-menu-open={menuOpen ? 'true' : undefined}
                                   onContextMenu={(e) => handleContextMenu(e, session.id)}
-                                  className={`
-                                    group/session w-full rounded-lg px-2.5 ${isMobile ? 'py-3' : 'py-1.5'} text-left text-[13px] transition-[background,filter,color] duration-200
-                                    ${selectedSessionIds.has(session.id)
-                                      ? 'sidebar-session-row--selected bg-[var(--color-sidebar-item-active)] text-[var(--color-text-primary)]'
-                                      : session.id === activeTabId
-                                      ? 'sidebar-session-row--active bg-[var(--color-sidebar-item-active)] text-[var(--color-text-primary)]'
-                                      : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]'
-                                    }
-                                  `}
-                                  aria-pressed={isBatchMode ? selectedSessionIds.has(session.id) : undefined}
+                                  className={`sidebar-row sidebar-session-row flex items-center ${isMobile ? 'sidebar-row--touch' : ''} ${
+                                    isSelected
+                                      ? 'sidebar-session-row--selected text-[var(--color-text-primary)]'
+                                      : isCurrent
+                                      ? 'sidebar-session-row--active text-[var(--color-text-primary)]'
+                                      : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                                  }`}
                                 >
-                                  <span className="flex min-w-0 items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      if (isBatchMode) {
+                                        handleBatchSessionClick(event, session.id)
+                                        return
+                                      }
+                                      useTabStore.getState().openTab(session.id, session.title)
+                                      useChatStore.getState().connectToSession(session.id)
+                                      closeMobileDrawer()
+                                    }}
+                                    title={title}
+                                    className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+                                    aria-pressed={isBatchMode ? isSelected : undefined}
+                                  >
                                     {isBatchMode ? (
                                       <span
                                         className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
-                                          selectedSessionIds.has(session.id)
+                                          isSelected
                                             ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
                                             : 'border-[var(--color-border)] bg-[var(--color-surface)]'
                                         }`}
                                         aria-hidden="true"
                                       >
-                                        {selectedSessionIds.has(session.id) && (
+                                        {isSelected && (
                                           <span className="material-symbols-outlined text-[12px]">check</span>
                                         )}
                                       </span>
                                     ) : null}
-                                    <span className="min-w-0 flex-1 truncate font-medium tracking-normal">{session.title || 'Untitled'}</span>
+                                    <span className="min-w-0 flex-1 truncate">{title}</span>
                                     {!session.workDirExists && (
                                       <span
                                         className="flex-shrink-0 text-[10px] text-[var(--color-warning)]"
@@ -1002,14 +1030,27 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                     <SessionRowMeta
                                       isRunning={runningSessionIds.has(session.id)}
                                       isWorktree={isWorktreeSession(session)}
-                                      modifiedAt={session.modifiedAt}
                                       t={t}
                                     />
-                                  </span>
-                                </button>
+                                  </button>
+                                  {!isBatchMode && (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => toggleSessionMenu(event, session.id)}
+                                      className="sidebar-row-action sidebar-session-more"
+                                      aria-label={t('sidebar.sessionActions', { title })}
+                                      title={t('sidebar.sessionActions', { title })}
+                                      aria-haspopup="menu"
+                                      aria-expanded={menuOpen}
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                         {(hiddenCount > 0 || sessionsExpanded) && (
                           <div className="mt-2 flex justify-start px-2.5">
@@ -1042,46 +1083,55 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
       {!isMobile && (
         <div
-          data-testid="sidebar-settings-dock"
-          className={`sidebar-settings-dock absolute bottom-0 left-0 right-0 border-t border-[var(--color-border)] p-3 ${expanded ? '' : 'flex justify-center'}`}
+          data-testid="sidebar-footer"
+          className={`sidebar-settings-dock absolute bottom-0 left-0 right-0 px-3 pb-3 pt-2 ${expanded ? '' : 'flex justify-center'}`}
         >
-          <NavItem
-            active={activeTabId === SETTINGS_TAB_ID}
+          <SidebarMoreMenu
             collapsed={!expanded}
-            label={t('sidebar.settings')}
-            touchFriendly={isMobile}
-            onClick={() => {
-              useTabStore.getState().openTab(SETTINGS_TAB_ID, t('sidebar.settings'), 'settings')
-              closeMobileDrawer()
-            }}
-            icon={<span className="material-symbols-outlined text-[18px]">settings</span>}
-          >
-            {t('sidebar.settings')}
-          </NavItem>
+            onOpenProjectManagement={() => setProjectManagementOpen(true)}
+            onOpenSettings={() => useUIStore.getState().openSettings()}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
+          />
         </div>
       )}
 
       {contextMenu && (
         <div
-          className="motion-menu fixed z-50 min-w-[140px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1"
+          ref={sessionMenuRef}
+          role="menu"
+          className="motion-menu fixed z-50 overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-[var(--shadow-dropdown)]"
           data-state="open"
-          style={{ left: contextMenu.x, top: contextMenu.y, boxShadow: 'var(--shadow-dropdown)' }}
+          data-testid="sidebar-session-menu"
+          style={{ ...positionFloatingMenu(contextMenu.x, contextMenu.y, SESSION_MENU_WIDTH, 130), width: SESSION_MENU_WIDTH }}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={sessionMenuNav.onKeyDown}
         >
-          <button
+          <SessionMenuItem
+            icon={<Pencil size={15} aria-hidden="true" />}
             onClick={() => {
               const session = sessions.find((s) => s.id === contextMenu.id)
               handleStartRename(contextMenu.id, session?.title || '')
             }}
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
           >
             {t('common.rename')}
-          </button>
-          <button
+          </SessionMenuItem>
+          <SessionMenuItem
+            icon={<ListChecks size={15} aria-hidden="true" />}
+            onClick={() => {
+              setContextMenu(null)
+              enterBatchMode()
+            }}
+          >
+            {t('sidebar.batchManage')}
+          </SessionMenuItem>
+          <div className="my-1 h-px bg-[var(--color-border-separator)]" role="separator" />
+          <SessionMenuItem
+            icon={<Trash2 size={15} aria-hidden="true" />}
+            danger
             onClick={() => handleDelete(contextMenu.id)}
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-error)] transition-colors hover:bg-[var(--color-surface-hover)]"
           >
             {t('common.delete')}
-          </button>
+          </SessionMenuItem>
         </div>
       )}
 
@@ -1092,11 +1142,13 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         const hidden = hiddenProjectKeys.has(project.key)
         return (
           <div
+            ref={projectMenuRef}
             role="menu"
             className="motion-menu fixed z-50 min-w-[230px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
             data-state="open"
-            style={positionProjectMenu(projectContextMenu.x, projectContextMenu.y)}
+            style={positionFloatingMenu(projectContextMenu.x, projectContextMenu.y, 230, 160)}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={projectMenuNav.onKeyDown}
           >
             <ProjectMenuItem
               icon={pinned ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
@@ -1121,41 +1173,60 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         )
       })()}
 
-      {projectHeaderMenu && (
-        <ProjectHeaderMenu
-          type={projectHeaderMenu.type}
-          x={projectHeaderMenu.x}
-          y={projectHeaderMenu.y}
-          organization={projectOrganization}
-          sortBy={projectSortBy}
-          onOpenSubmenu={openProjectHeaderSubmenu}
-          onSetOrganization={updateProjectOrganization}
-          onSetSortBy={updateProjectSortBy}
-          onCreateBlank={() => void createSessionForWorkDir()}
-          onUseExistingFolder={() => void createSessionFromExistingFolder()}
-          onRestoreHiddenProjects={restoreAllHiddenProjects}
-          hiddenProjectCount={hiddenProjectKeys.size}
-          t={t}
-        />
+      {createProjectMenu && (
+        <div
+          ref={createProjectMenuRef}
+          role="menu"
+          className="motion-menu fixed z-50 overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
+          data-state="open"
+          style={{ left: createProjectMenu.x, top: createProjectMenu.y, width: 250 }}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={createProjectMenuNav.onKeyDown}
+        >
+          <HeaderMenuItem
+            icon={<SquarePen size={18} aria-hidden="true" />}
+            onClick={() => {
+              setCreateProjectMenu(null)
+              void createSessionForWorkDir()
+            }}
+          >
+            {t('sidebar.newBlankProject')}
+          </HeaderMenuItem>
+          <HeaderMenuItem icon={<FolderOpen size={18} aria-hidden="true" />} onClick={() => void createSessionFromExistingFolder()}>
+            {t('sidebar.useExistingFolder')}
+          </HeaderMenuItem>
+        </div>
       )}
 
-      {projectHeaderSubmenu && (
-        <ProjectHeaderMenu
-          type={projectHeaderSubmenu.type}
-          x={projectHeaderSubmenu.x}
-          y={projectHeaderSubmenu.y}
-          organization={projectOrganization}
-          sortBy={projectSortBy}
-          onOpenSubmenu={openProjectHeaderSubmenu}
-          onSetOrganization={updateProjectOrganization}
-          onSetSortBy={updateProjectSortBy}
-          onCreateBlank={() => void createSessionForWorkDir()}
-          onUseExistingFolder={() => void createSessionFromExistingFolder()}
-          onRestoreHiddenProjects={restoreAllHiddenProjects}
-          hiddenProjectCount={hiddenProjectKeys.size}
-          t={t}
-        />
-      )}
+      <ProjectManagementDialog
+        open={projectManagementOpen}
+        onClose={() => setProjectManagementOpen(false)}
+        organization={projectOrganization}
+        sortBy={projectSortBy}
+        onSetOrganization={updateProjectOrganization}
+        onSetSortBy={updateProjectSortBy}
+        projects={managedProjects}
+        hiddenProjectCount={hiddenProjectKeys.size}
+        onTogglePinned={togglePinnedProject}
+        onToggleHidden={(projectKey) => {
+          const project = managementProjectGroups.find((group) => group.key === projectKey)
+          if (project) toggleHiddenProject(project)
+        }}
+        onOpenInFinder={(projectKey) => {
+          const project = managementProjectGroups.find((group) => group.key === projectKey)
+          if (project) void openProjectInFinder(project)
+        }}
+        onRestoreAllHidden={restoreAllHiddenProjects}
+        onRefresh={() => void refreshSessionsNow()}
+        isRefreshing={isLoading}
+        isBatchMode={isBatchMode}
+        onToggleBatchMode={() => {
+          setProjectManagementOpen(false)
+          if (isBatchMode) handleExitBatchMode()
+          else enterBatchMode()
+        }}
+      />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <ConfirmDialog
         open={pendingDeleteSessionId !== null}
@@ -1263,150 +1334,34 @@ function isDocumentVisible(): boolean {
 
 function ProjectHeaderActions({
   title,
-  menuLabel,
   createLabel,
-  onOpenMenu,
+  createMenuOpen,
   onOpenCreate,
 }: {
   title: string
-  menuLabel: string
   createLabel: string
-  onOpenMenu: (event: React.MouseEvent) => void
+  createMenuOpen: boolean
   onOpenCreate: (event: React.MouseEvent) => void
 }) {
   return (
     <div
       data-testid="sidebar-projects-header"
-      className="group/sidebar-projects flex items-center justify-between px-1.5 pb-2 pt-1"
+      className="flex items-center justify-between pb-1 pl-2 pr-1 pt-1"
     >
-      <div className="text-[12px] font-semibold tracking-normal text-[var(--color-text-primary)]">
+      <div className="text-ui-aux font-semibold tracking-normal text-[var(--color-text-tertiary)]">
         {title}
       </div>
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/sidebar-projects:opacity-100 focus-within:opacity-100">
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-          aria-label={menuLabel}
-          title={menuLabel}
-        >
-          <MoreHorizontal className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={onOpenCreate}
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-          aria-label={createLabel}
-          title={createLabel}
-        >
-          <FolderPlus className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function ProjectHeaderMenu({
-  type,
-  x,
-  y,
-  organization,
-  sortBy,
-  onOpenSubmenu,
-  onSetOrganization,
-  onSetSortBy,
-  onCreateBlank,
-  onUseExistingFolder,
-  onRestoreHiddenProjects,
-  hiddenProjectCount,
-  t,
-}: {
-  type: SidebarHeaderMenuType
-  x: number
-  y: number
-  organization: SidebarProjectOrganization
-  sortBy: SidebarProjectSortBy
-  onOpenSubmenu: (event: React.MouseEvent, type: 'organize' | 'sort') => void
-  onSetOrganization: (organization: SidebarProjectOrganization) => void
-  onSetSortBy: (sortBy: SidebarProjectSortBy) => void
-  onCreateBlank: () => void
-  onUseExistingFolder: () => void
-  onRestoreHiddenProjects: () => void
-  hiddenProjectCount: number
-  t: ReturnType<typeof useTranslation>
-}) {
-  const width = type === 'sort' ? 230 : type === 'create' ? 250 : 270
-  const style: React.CSSProperties = { left: x, top: y, width, boxShadow: 'var(--shadow-dropdown)' }
-  const className = 'motion-menu fixed z-50 overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]'
-
-  if (type === 'create') {
-    return (
-      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
-        <HeaderMenuItem icon={<SquarePen size={18} aria-hidden="true" />} onClick={onCreateBlank}>
-          {t('sidebar.newBlankProject')}
-        </HeaderMenuItem>
-        <HeaderMenuItem icon={<FolderOpen size={18} aria-hidden="true" />} onClick={onUseExistingFolder}>
-          {t('sidebar.useExistingFolder')}
-        </HeaderMenuItem>
-      </div>
-    )
-  }
-
-  if (type === 'organize') {
-    return (
-      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
-        <HeaderMenuItem icon={<Folder size={18} aria-hidden="true" />} checked={organization === 'project'} onClick={() => onSetOrganization('project')}>
-          {t('sidebar.organizeByProject')}
-        </HeaderMenuItem>
-        <HeaderMenuItem icon={<FolderOpen size={18} aria-hidden="true" />} checked={organization === 'recentProject'} onClick={() => onSetOrganization('recentProject')}>
-          {t('sidebar.organizeByRecentProject')}
-        </HeaderMenuItem>
-        <HeaderMenuItem icon={<Clock size={18} aria-hidden="true" />} checked={organization === 'time'} onClick={() => onSetOrganization('time')}>
-          {t('sidebar.organizeByTime')}
-        </HeaderMenuItem>
-      </div>
-    )
-  }
-
-  if (type === 'sort') {
-    return (
-      <div role="menu" className={className} data-state="open" style={style} onClick={(event) => event.stopPropagation()}>
-        <HeaderMenuItem icon={<Clock size={18} aria-hidden="true" />} checked={sortBy === 'createdAt'} onClick={() => onSetSortBy('createdAt')}>
-          {t('sidebar.sortByCreatedAt')}
-        </HeaderMenuItem>
-        <HeaderMenuItem icon={<RefreshCw size={18} aria-hidden="true" />} checked={sortBy === 'updatedAt'} onClick={() => onSetSortBy('updatedAt')}>
-          {t('sidebar.sortByUpdatedAt')}
-        </HeaderMenuItem>
-      </div>
-    )
-  }
-
-  return (
-    <div role="menu" className={className} style={style} onClick={(event) => event.stopPropagation()}>
-      <HeaderMenuItem
-        icon={<Folder size={18} aria-hidden="true" />}
-        trailing
-        onMouseEnter={(event) => onOpenSubmenu(event, 'organize')}
-        onClick={(event) => onOpenSubmenu(event, 'organize')}
+      <button
+        type="button"
+        onClick={onOpenCreate}
+        aria-haspopup="menu"
+        aria-expanded={createMenuOpen}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+        aria-label={createLabel}
+        title={createLabel}
       >
-        {t('sidebar.organizeSidebar')}
-      </HeaderMenuItem>
-      <HeaderMenuItem
-        icon={<Clock size={18} aria-hidden="true" />}
-        trailing
-        onMouseEnter={(event) => onOpenSubmenu(event, 'sort')}
-        onClick={(event) => onOpenSubmenu(event, 'sort')}
-      >
-        {t('sidebar.sortCondition')}
-      </HeaderMenuItem>
-      {hiddenProjectCount > 0 && (
-        <HeaderMenuItem
-          icon={<RotateCcw size={18} aria-hidden="true" />}
-          onClick={onRestoreHiddenProjects}
-        >
-          {t('sidebar.restoreHiddenProjects', { count: hiddenProjectCount })}
-        </HeaderMenuItem>
-      )}
+        <Plus className="h-[15px] w-[15px]" strokeWidth={2} aria-hidden="true" />
+      </button>
     </div>
   )
 }
@@ -1415,33 +1370,50 @@ function HeaderMenuItem({
   icon,
   children,
   onClick,
-  onMouseEnter,
-  checked = false,
-  trailing = false,
 }: {
   icon: React.ReactNode
   children: React.ReactNode
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
-  onMouseEnter?: (event: React.MouseEvent<HTMLButtonElement>) => void
-  checked?: boolean
-  trailing?: boolean
 }) {
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
-      onMouseEnter={onMouseEnter}
       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)]"
     >
       <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--color-text-secondary)]">
         {icon}
       </span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      {checked && <Check className="h-[17px] w-[17px] text-[var(--color-text-secondary)]" strokeWidth={2} aria-hidden="true" />}
-      {trailing && !checked && (
-        <ChevronDown className="-rotate-90 h-[17px] w-[17px] text-[var(--color-text-tertiary)]" strokeWidth={2} aria-hidden="true" />
-      )}
+    </button>
+  )
+}
+
+function SessionMenuItem({
+  icon,
+  children,
+  onClick,
+  danger = false,
+}: {
+  icon: React.ReactNode
+  children: React.ReactNode
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-left text-ui-nav transition-colors focus-visible:outline-none ${
+        danger
+          ? 'text-[var(--color-error)] hover:bg-[var(--color-error)]/10 focus-visible:bg-[var(--color-error)]/10'
+          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] focus-visible:bg-[var(--color-surface-hover)]'
+      }`}
+    >
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
     </button>
   )
 }
@@ -1762,10 +1734,8 @@ function domSafeProjectKey(projectKey: string): string {
   return projectKey.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown'
 }
 
-function positionProjectMenu(clientX: number, clientY: number): React.CSSProperties {
+function positionFloatingMenu(clientX: number, clientY: number, width: number, height: number): React.CSSProperties {
   if (typeof window === 'undefined') return { left: clientX, top: clientY }
-  const width = 230
-  const height = 280
   return {
     left: Math.max(8, Math.min(clientX, window.innerWidth - width - 8)),
     top: Math.max(8, Math.min(clientY, window.innerHeight - height - 8)),
@@ -1808,22 +1778,16 @@ function ProjectMenuItem({
 function SessionRowMeta({
   isRunning,
   isWorktree,
-  modifiedAt,
   t,
 }: {
   isRunning: boolean
   isWorktree: boolean
-  modifiedAt: string
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
-  const relativeTime = formatRelativeTime(modifiedAt, t)
-  const updatedLabel = t('session.lastUpdated', { time: relativeTime })
+  if (!isRunning && !isWorktree) return null
 
   return (
-    <span
-      className="ml-auto flex h-5 min-w-[78px] flex-shrink-0 items-center justify-end gap-1.5 text-[10px] font-medium tabular-nums text-[var(--color-text-tertiary)]"
-      title={updatedLabel}
-    >
+    <span className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
       {isRunning && (
         <span
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-success)]"
@@ -1835,16 +1799,13 @@ function SessionRowMeta({
       )}
       {isWorktree && (
         <span
-          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[5px] text-[var(--color-text-tertiary)]"
+          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
           title={t('sidebar.worktree')}
         >
-          <GitBranch className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          <GitBranch className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
           <span className="sr-only">{t('sidebar.worktree')}</span>
         </span>
       )}
-      <span className="inline-flex min-w-[42px] flex-shrink-0 items-center justify-end">
-        <span>{relativeTime}</span>
-      </span>
     </span>
   )
 }
@@ -1890,38 +1851,10 @@ function NavItem({
   )
 }
 
-function formatRelativeTime(
-  dateStr: string,
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
-): string {
-  const date = new Date(dateStr)
-  const timestamp = date.getTime()
-  if (!Number.isFinite(timestamp)) return ''
-
-  const diff = Date.now() - timestamp
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return t('session.timeJustNow')
-  if (min < 60) return t('session.timeMinutes', { n: min })
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return t('session.timeHours', { n: hr })
-  const day = Math.floor(hr / 24)
-  if (day < 30) return t('session.timeDays', { n: day })
-  return new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric' }).format(date)
-}
-
 function GitHubIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-    </svg>
-  )
-}
-
-function PlusIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   )
 }
@@ -1931,15 +1864,6 @@ function ClockIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   )
 }

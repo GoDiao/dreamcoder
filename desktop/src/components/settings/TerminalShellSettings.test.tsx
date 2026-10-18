@@ -29,10 +29,10 @@ describe('default shell preferences', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
     expect(screen.getByText('/usr/bin/fish')).toBeInTheDocument()
     for (const shell of ['zsh', 'bash', 'fish']) {
-      expect(screen.getByRole('button', { name: shell })).toBeInTheDocument()
+      expect(screen.getByRole('menuitemradio', { name: shell })).toBeInTheDocument()
     }
     expect(screen.queryByText('Command Prompt')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'fish' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'fish' }))
     await screen.findByRole('button', { name: 'Default shell' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
     expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'fish', customShellPath: '' })
@@ -43,8 +43,8 @@ describe('default shell preferences', () => {
     render(<TerminalShellSettings />)
     fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
     expect(screen.getByText('cmd.exe')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Command Prompt/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'fish' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitemradio', { name: 'fish' })).not.toBeInTheDocument()
   })
 
   it('validates custom Unix paths and persists a trimmed absolute path', async () => {
@@ -80,8 +80,8 @@ describe('default shell preferences', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Detecting the host shell')
     await act(async () => { resolveHost({ platform: 'windows', shell: 'cmd.exe' }) })
     fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
-    expect(screen.getByRole('button', { name: /^Command Prompt/ })).toBeInTheDocument()
-    expect(screen.getAllByText('Default shell')).toHaveLength(1)
+    expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Default shell' })).toHaveLength(1)
   })
 
   it('keeps controls unavailable when host detection fails', async () => {

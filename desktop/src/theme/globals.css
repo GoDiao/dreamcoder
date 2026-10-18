@@ -125,195 +125,6 @@
   outline: none;
 }
 
-.settings-zoom-kbd {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  background: var(--color-surface-container-lowest);
-  color: var(--color-text-secondary);
-  font-family: var(--font-label);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-  box-shadow: inset 0 -1px 0 rgba(27, 28, 26, 0.08);
-}
-
-.settings-zoom-control {
-  --settings-zoom-range-progress: 33.333%;
-  --settings-zoom-preview-scale: 0.88;
-  --settings-zoom-preview-opacity: 0;
-  --settings-zoom-track-empty: var(--color-surface-container-high);
-  --settings-zoom-thumb-bg: var(--color-surface-container-lowest);
-  --settings-zoom-thumb-border: var(--color-border);
-  --settings-zoom-thumb-shadow: 0 2px 8px rgba(27, 28, 26, 0.16);
-  padding-top: 22px;
-}
-
-[data-theme="dark"] .settings-zoom-control {
-  --settings-zoom-track-empty: var(--color-surface-container-highest);
-  --settings-zoom-thumb-bg: var(--color-surface-bright);
-  --settings-zoom-thumb-border: rgba(255, 181, 159, 0.78);
-  --settings-zoom-thumb-shadow: 0 0 0 3px rgba(255, 181, 159, 0.16), 0 10px 24px rgba(0, 0, 0, 0.5);
-}
-
-.settings-zoom-control.is-dragging {
-  --settings-zoom-preview-scale: 1;
-  --settings-zoom-preview-opacity: 1;
-}
-
-.settings-zoom-range-wrap {
-  position: relative;
-}
-
-.settings-zoom-preview {
-  position: absolute;
-  left: clamp(24px, var(--settings-zoom-range-progress), calc(100% - 24px));
-  top: -30px;
-  z-index: 1;
-  min-width: 52px;
-  transform: translateX(-50%) scale(var(--settings-zoom-preview-scale));
-  transform-origin: 50% 100%;
-  border: 1px solid var(--color-surface-glass-border);
-  border-radius: 999px;
-  background: var(--color-surface-glass);
-  padding: 4px 9px;
-  color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-  opacity: var(--settings-zoom-preview-opacity);
-  box-shadow: var(--shadow-dropdown);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  pointer-events: none;
-  transition:
-    left 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 160ms ease,
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.settings-zoom-preview::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -4px;
-  width: 8px;
-  height: 8px;
-  transform: translateX(-50%) rotate(45deg);
-  border-right: 1px solid var(--color-surface-glass-border);
-  border-bottom: 1px solid var(--color-surface-glass-border);
-  background: var(--color-surface-glass);
-}
-
-.settings-zoom-range {
-  appearance: none;
-  display: block;
-  height: 20px;
-  cursor: pointer;
-  background: transparent;
-  accent-color: var(--color-brand);
-  touch-action: none;
-}
-
-.settings-zoom-range:focus {
-  outline: none;
-}
-
-.settings-zoom-range:focus-visible {
-  outline: none;
-}
-
-.settings-zoom-range::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background:
-    linear-gradient(
-      90deg,
-      var(--color-brand) 0%,
-      var(--color-brand) var(--settings-zoom-range-progress),
-      var(--settings-zoom-track-empty) var(--settings-zoom-range-progress),
-      var(--settings-zoom-track-empty) 100%
-    );
-  transition: background 220ms ease, border-color 180ms ease;
-}
-
-.settings-zoom-range::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  margin-top: -7px;
-  border-radius: 999px;
-  border: 1px solid var(--settings-zoom-thumb-border);
-  background: var(--settings-zoom-thumb-bg);
-  box-shadow: var(--settings-zoom-thumb-shadow);
-  transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.settings-zoom-range:hover::-webkit-slider-thumb {
-  border-color: var(--color-border-focus);
-}
-
-.settings-zoom-control.is-dragging .settings-zoom-range::-webkit-slider-thumb {
-  transform: scale(1.18);
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-dropdown);
-}
-
-.settings-zoom-range:focus-visible::-webkit-slider-thumb {
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-focus-ring), 0 2px 8px rgba(27, 28, 26, 0.16);
-}
-
-.settings-zoom-range::-moz-range-track {
-  height: 6px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--settings-zoom-track-empty);
-  transition: background 220ms ease, border-color 180ms ease;
-}
-
-.settings-zoom-range::-moz-range-progress {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--color-brand);
-}
-
-.settings-zoom-range::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 1px solid var(--settings-zoom-thumb-border);
-  background: var(--settings-zoom-thumb-bg);
-  box-shadow: var(--settings-zoom-thumb-shadow);
-  transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.settings-zoom-control.is-dragging .settings-zoom-range::-moz-range-thumb {
-  transform: scale(1.18);
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-dropdown);
-}
-
-.settings-zoom-range:focus-visible::-moz-range-thumb {
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-focus-ring), 0 2px 8px rgba(27, 28, 26, 0.16);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .settings-zoom-preview,
-  .settings-zoom-range::-webkit-slider-runnable-track,
-  .settings-zoom-range::-webkit-slider-thumb,
-  .settings-zoom-range::-moz-range-track,
-  .settings-zoom-range::-moz-range-thumb {
-    transition-duration: 0.01ms !important;
-  }
-}
-
 @theme {
   --color-primary: #D97756;
   --color-primary-container: #B2533E;
@@ -754,6 +565,8 @@
 
   --color-success: #4ADE80;
   --color-error: #F87171;
+  --color-error-container: rgba(248, 113, 113, 0.12);
+  --color-on-error-container: #FCA5A5;
   --color-warning: #FBBF24;
 
   --color-surface-sidebar: var(--color-panel-sidebar);
@@ -1432,10 +1245,6 @@ button, input, textarea, select, a, [role="button"] {
 [draggable="true"] {
   -webkit-app-region: no-drag;
 }
-.tab-bar-hit-area,
-.tab-bar-hit-area * {
-  -webkit-app-region: no-drag;
-}
 
 .custom-shadow {
   box-shadow: var(--shadow-dropdown);
@@ -1831,6 +1640,89 @@ button, input, textarea, select, a, [role="button"] {
   background-position: left bottom;
 }
 
+/* Sidebar project / session rows: one rounded background for the whole row; child buttons stay transparent. */
+.sidebar-row {
+  position: relative;
+  border-radius: 8px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-row:hover,
+.sidebar-row:focus-within {
+  background-color: var(--color-sidebar-item-hover);
+}
+
+.sidebar-row[data-current="true"],
+.sidebar-row[data-menu-open="true"] {
+  background-color: var(--color-sidebar-item-active);
+}
+
+.sidebar-row:has(:focus-visible) {
+  box-shadow: var(--shadow-focus-ring);
+}
+
+.sidebar-row-action {
+  display: flex;
+  flex-shrink: 0;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  transition: color 150ms ease, opacity 150ms ease;
+}
+
+.sidebar-row-action:hover,
+.sidebar-row-action[aria-expanded="true"] {
+  color: var(--color-text-primary);
+}
+
+.sidebar-row-action:focus-visible {
+  outline: none;
+}
+
+.sidebar-row-action svg {
+  pointer-events: none;
+}
+
+.sidebar-session-more {
+  width: 36px;
+  opacity: 0;
+}
+
+.sidebar-row:hover .sidebar-session-more,
+.sidebar-row:focus-within .sidebar-session-more,
+.sidebar-row[data-current="true"] .sidebar-session-more,
+.sidebar-row--touch .sidebar-session-more,
+.sidebar-session-more[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.sidebar-row--touch .sidebar-row-action {
+  width: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 600px) {
+  .sidebar-session-more {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .sidebar-session-more {
+    opacity: 1;
+  }
+
+  .sidebar-row-action {
+    width: 44px;
+    min-height: 44px;
+  }
+}
+
 .sidebar-scroll-area::-webkit-scrollbar {
   width: 4px;
 }
@@ -1873,4 +1765,136 @@ button, input, textarea, select, a, [role="button"] {
 
 @keyframes progress-fill {
   from { width: 0%; }
+}
+
+/* UI refresh (docs/ui/design-log.zh.md): warm grey palette for the light and
+   dark themes, plus a font-size scale. Later blocks win over the theme blocks
+   above because they share the same selectors. */
+@theme {
+  --text-ui-aux: 12px;
+  --text-ui-nav: 13px;
+  --text-ui-body: 14px;
+  --text-ui-message: 16px;
+  --text-ui-title: 20px;
+}
+
+/* Only the light theme (or no theme set yet); a plain :root here would
+   override every other theme, since it has the same specificity. */
+:root:not([data-theme]),
+[data-theme="light"] {
+  --color-primary: #AC583C;
+  --color-primary-container: #A9583B;
+  --color-primary-fixed: #F3E5DC;
+  --color-primary-fixed-dim: #E2B9A6;
+  --color-on-surface: #292A26;
+  --color-on-surface-variant: #5F5F56;
+  --color-surface: #FBFAF7;
+  --color-surface-bright: #FBFAF7;
+  --color-surface-dim: #ECEBE4;
+  --color-surface-container: #F4F3EE;
+  --color-surface-container-low: #F8F7F3;
+  --color-surface-container-high: #EEEDE6;
+  --color-surface-container-highest: #E9E7DF;
+  --color-surface-container-lowest: #FFFEFA;
+  --color-surface-variant: #EEEDE6;
+  --color-background: #FBFAF7;
+  --color-outline: #6E6D63;
+  --color-outline-variant: #E6E4DC;
+  --color-success: #50745B;
+
+  --color-surface-sidebar: #F1F0EB;
+  --color-surface-hover: #E9E7DF;
+  --color-surface-selected: #E4E2D9;
+  --color-sidebar-item-hover: #E9E7DF;
+  --color-sidebar-item-active: #E4E2D9;
+  --color-sidebar-item-active-border: transparent;
+  --color-sidebar-search-bg: #FFFEFA;
+  --color-sidebar-search-border: #E6E4DC;
+  --color-border-focus: #AC583C;
+  --color-surface-user-msg: #EEEDE6;
+  --color-surface-glass: #FFFEFA;
+  --color-surface-glass-border: #E6E4DC;
+  --color-model-option-selected-bg: #F3E5DC;
+  --shadow-dropdown: 0 3px 14px rgba(42, 39, 24, 0.06), 0 12px 32px rgba(42, 39, 24, 0.08);
+  --shadow-focus-ring: 0 0 0 2px #AC583C, 0 0 0 5px rgba(172, 88, 60, 0.14);
+  --shadow-button-primary: none;
+  --gradient-btn-primary: linear-gradient(#A9583B, #A9583B);
+  --gradient-btn-primary-hover: linear-gradient(#9C4F34, #9C4F34);
+}
+
+[data-theme="dark"] {
+  --color-app-bg: #252522;
+  --color-surface: #252522;
+  --color-background: #252522;
+  --color-panel-sidebar: #20201E;
+  --color-surface-sidebar: #20201E;
+  --color-surface-container-lowest: #2D2D29;
+  --color-panel-main: #2A2A26;
+  --color-surface-container: #2A2A26;
+  --color-surface-container-low: #282825;
+  --color-surface-container-high: #32322C;
+  --color-panel-elevated: #2D2D29;
+  --color-surface-bright: #2D2D29;
+  --color-surface-container-highest: #35352D;
+  --color-border: #3B3B34;
+  --color-border-separator: #33332D;
+  --color-outline-variant: #3B3B34;
+  --color-on-surface: #EEEEE7;
+  --color-on-surface-variant: #AAA99E;
+  --color-text-primary: #EEEEE7;
+  --color-text-secondary: #AAA99E;
+  --color-text-tertiary: #929184;
+  --color-outline: #929184;
+  --color-primary: #D78B6B;
+  --color-primary-container: #C77E5D;
+  --color-brand: #D78B6B;
+  --color-accent: #D78B6B;
+  --color-accent-bg: #3A2E26;
+  --color-hover: #2C2C27;
+  --color-surface-hover: #2C2C27;
+  --color-surface-selected: #35352D;
+  --color-sidebar-item-hover: #2C2C27;
+  --color-sidebar-item-active: #35352D;
+  --color-sidebar-item-active-border: transparent;
+  --color-sidebar-search-bg: #2D2D29;
+  --color-success: #91AA8B;
+  --color-border-focus: #D78B6B;
+  --color-surface-user-msg: #32322C;
+  --color-surface-glass: #2D2D29;
+  --color-surface-glass-border: #3B3B34;
+  --color-code-bg: #20201E;
+  --color-terminal-bg: #1C1C1A;
+  --color-terminal-border: #3B3B34;
+  --shadow-dropdown: 0 3px 14px rgba(0, 0, 0, 0.2), 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-focus-ring: 0 0 0 2px #D78B6B, 0 0 0 5px rgba(215, 139, 107, 0.16);
+  --shadow-button-primary: none;
+  --gradient-btn-primary: linear-gradient(#A65A39, #A65A39);
+  --gradient-btn-primary-hover: linear-gradient(#9E5536, #9E5536);
+  --color-btn-primary-fg: #FFFAF4;
+}
+
+/* Glass panels (composer, dialogs) show focus on the outer box only. */
+.glass-panel:focus-within {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus-ring), var(--shadow-dropdown);
+}
+
+/* Typography plugin colours follow the theme, so quotes, captions, table
+   text and list markers stay readable in dark themes. */
+.markdown-prose {
+  --tw-prose-body: var(--color-text-primary);
+  --tw-prose-headings: var(--color-text-primary);
+  --tw-prose-lead: var(--color-text-secondary);
+  --tw-prose-links: var(--color-text-accent);
+  --tw-prose-bold: var(--color-text-primary);
+  --tw-prose-counters: var(--color-text-tertiary);
+  --tw-prose-bullets: var(--color-text-tertiary);
+  --tw-prose-hr: var(--color-border);
+  --tw-prose-quotes: var(--color-text-secondary);
+  --tw-prose-quote-borders: var(--color-border);
+  --tw-prose-captions: var(--color-text-tertiary);
+  --tw-prose-kbd: var(--color-text-secondary);
+  --tw-prose-code: var(--color-code-fg);
+  --tw-prose-th-borders: var(--color-border);
+  --tw-prose-td-borders: var(--color-border);
 }

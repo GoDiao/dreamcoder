@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-schema-v2.json",
   "productName": "DreamCoder",
-  "version": "0.4.5",
+  "version": "0.5.0",
   "identifier": "com.dreamcoder.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -59,6 +59,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "entitlements": "Entitlements.plist",
       "dmg": {
         "appPosition": {
           "x": 180,

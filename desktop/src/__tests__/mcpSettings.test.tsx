@@ -155,11 +155,12 @@ describe('McpSettings', () => {
 
   it('browses the read-only curated catalog without changing installed servers', async () => {
     await renderLoadedMcpSettings()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
 
     expect(await screen.findByText('Filesystem')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Installed' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('radio', { name: 'Browse' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Installed' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByRole('button', { name: /add server/i })).not.toBeInTheDocument()
     expect(screen.getByText('Read and write an explicitly allowed directory.')).toBeInTheDocument()
     expect(mcpApi.catalog).toHaveBeenCalledTimes(1)
     expect(useMcpStore.getState().createServer).not.toHaveBeenCalled()
@@ -168,7 +169,7 @@ describe('McpSettings', () => {
   it('shows the catalog error detail when loading fails', async () => {
     vi.mocked(mcpApi.catalog).mockRejectedValue(new Error('Catalog schema version is unsupported'))
     await renderLoadedMcpSettings()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
 
     expect(await screen.findByText('The curated MCP catalog is unavailable.')).toBeInTheDocument()
     expect(screen.getByText('Catalog schema version is unsupported')).toBeInTheDocument()
@@ -184,7 +185,7 @@ describe('McpSettings', () => {
       }],
     })
     await renderLoadedMcpSettings()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
 
     const name = await screen.findByText('Filesystem')
     expect(name).toBeInTheDocument()
@@ -193,9 +194,9 @@ describe('McpSettings', () => {
 
   it('shows an empty state when a catalog search has no matches', async () => {
     await renderLoadedMcpSettings()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
     await screen.findByText('Filesystem')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search servers' }), { target: { value: 'not-a-server' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search servers' }), { target: { value: 'not-a-server' } })
 
     expect(screen.getByText('No catalog servers match these filters.')).toBeInTheDocument()
   })
@@ -211,9 +212,10 @@ describe('McpSettings', () => {
       },
     })
     await renderLoadedMcpSettings()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
     await screen.findByText('Filesystem')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by tag' }), { target: { value: 'utility' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by tag' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'utility' }))
 
     expect(screen.getByText('Time')).toBeInTheDocument()
     expect(screen.queryByText('Filesystem')).not.toBeInTheDocument()

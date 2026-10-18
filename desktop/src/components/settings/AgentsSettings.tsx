@@ -4,6 +4,9 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
+import { ChevronRight } from 'lucide-react'
+import { SettingsPageHeader } from './SettingsPageHeader'
+import { SettingsSection, SettingsSummary } from './SettingsSummary'
 import type { AgentDefinition, AgentSource } from '../../api/agents'
 
 const AGENT_COLORS: Record<string, string> = {
@@ -19,6 +22,7 @@ const AGENT_COLORS: Record<string, string> = {
 
 const AGENT_SOURCE_ORDER: AgentSource[] = [
   'userSettings',
+  'claudeCode',
   'projectSettings',
   'localSettings',
   'policySettings',
@@ -31,73 +35,11 @@ function getAgentDotColor(color?: string) {
   return color && AGENT_COLORS[color] ? AGENT_COLORS[color] : 'var(--color-text-tertiary)'
 }
 
-function getAgentSourceIcon(source: AgentSource) {
-  switch (source) {
-    case 'userSettings':
-      return 'person'
-    case 'projectSettings':
-      return 'folder'
-    case 'localSettings':
-      return 'folder_lock'
-    case 'policySettings':
-      return 'shield'
-    case 'plugin':
-      return 'extension'
-    case 'flagSettings':
-      return 'terminal'
-    case 'built-in':
-      return 'inventory_2'
-  }
-}
-
-function getAgentSourceAccentClass(source: AgentSource) {
-  switch (source) {
-    case 'userSettings':
-      return 'bg-[var(--color-primary-fixed)] text-[var(--color-brand)]'
-    case 'projectSettings':
-      return 'bg-[var(--color-success-container)] text-[var(--color-success)]'
-    case 'localSettings':
-      return 'bg-[var(--color-info-container)] text-[var(--color-info)]'
-    case 'policySettings':
-      return 'bg-[var(--color-warning-container)] text-[var(--color-warning)]'
-    case 'plugin':
-      return 'bg-[var(--color-warning-container)] text-[var(--color-warning)]'
-    case 'flagSettings':
-      return 'bg-[var(--color-error)]/10 text-[var(--color-error)]'
-    case 'built-in':
-      return 'bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]'
-  }
-}
-
 function MetaPill({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
+    <span className="inline-flex items-center rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
       {children}
     </span>
-  )
-}
-
-function SummaryCard({
-  label,
-  value,
-  icon,
-  className = '',
-}: {
-  label: string
-  value: string
-  icon: string
-  className?: string
-}) {
-  return (
-    <div className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 min-w-0 ${className}`}>
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.12em] text-[var(--color-text-tertiary)] min-w-0">
-        <span className="material-symbols-outlined text-[14px] flex-shrink-0">{icon}</span>
-        <span className="truncate">{label}</span>
-      </div>
-      <div className="mt-2 text-lg font-semibold text-[var(--color-text-primary)] truncate">
-        {value}
-      </div>
-    </div>
   )
 }
 
@@ -308,7 +250,7 @@ export function AgentsSettings() {
     const returnTab = selectedAgentReturnTab
     selectAgent(null)
     if (returnTab === 'plugins') {
-      useUIStore.getState().setPendingSettingsTab('plugins')
+      useUIStore.getState().openSettings('plugins')
     }
   }
 
@@ -322,6 +264,7 @@ export function AgentsSettings() {
 
   return (
     <div className="w-full min-w-0">
+      <SettingsPageHeader title={t('settings.agents.title')} description={t('settings.agents.description')} />
       {isLoading && allAgents.length === 0 ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
@@ -338,152 +281,77 @@ export function AgentsSettings() {
           </button>
         </div>
       ) : allAgents.length === 0 ? (
-        <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-          <span className="material-symbols-outlined text-[40px] text-[var(--color-text-tertiary)] mb-3 block">smart_toy</span>
+        <div className="py-10 text-center">
           <p className="text-sm text-[var(--color-text-secondary)] mb-1">{t('settings.agents.empty')}</p>
           <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.agents.emptyHint')}</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6 min-w-0">
-          <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] overflow-hidden">
-            <div className="grid gap-4 px-5 py-5 min-w-0 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] xl:items-end">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--color-text-tertiary)] mb-2">
-                  {t('settings.agents.browserEyebrow')}
-                </div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="material-symbols-outlined text-[22px] text-[var(--color-brand)]">
-                    smart_toy
-                  </span>
-                  <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                    {t('settings.agents.browserTitle')}
-                  </h3>
-                </div>
-                <p className="text-sm leading-6 text-[var(--color-text-secondary)] max-w-3xl">
-                  {t('settings.agents.description')}
-                </p>
-              </div>
+        <>
+          <SettingsSummary
+            items={[
+              { label: t('settings.agents.summary.totalAgents'), value: allAgents.length },
+              { label: t('settings.agents.summary.activeAgents'), value: activeAgents.length },
+              { label: t('settings.agents.summary.sources'), value: sourceCount },
+            ]}
+          />
 
-              <div className="grid grid-cols-2 gap-3 min-w-0 sm:grid-cols-3">
-                <SummaryCard
-                  label={t('settings.agents.summary.totalAgents')}
-                  value={String(allAgents.length)}
-                  icon="smart_toy"
-                />
-                <SummaryCard
-                  label={t('settings.agents.summary.activeAgents')}
-                  value={String(activeAgents.length)}
-                  icon="bolt"
-                />
-                <SummaryCard
-                  label={t('settings.agents.summary.sources')}
-                  value={String(sourceCount)}
-                  icon="layers"
-                  className="col-span-2 sm:col-span-1"
-                />
-              </div>
-            </div>
-          </section>
+          {AGENT_SOURCE_ORDER.map((source) => {
+            const group = groupedAgents[source]
+            if (!group?.length) return null
 
-          <div className={`grid gap-4 ${sourceCount >= 2 ? 'xl:grid-cols-2' : ''}`}>
-            {AGENT_SOURCE_ORDER.map((source) => {
-              const group = groupedAgents[source]
-              if (!group?.length) return null
-
-              const sourceLabel = t(`settings.agents.source.${source}`)
-              return (
-                <section
-                  key={source}
-                  className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden min-w-0"
-                >
-                  <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${getAgentSourceAccentClass(source)}`}>
-                          <span className="material-symbols-outlined text-[16px]">
-                            {getAgentSourceIcon(source)}
-                          </span>
+            const sourceLabel = t(`settings.agents.source.${source}`)
+            return (
+              <SettingsSection key={source} title={sourceLabel} count={group.length}>
+                {group.map((agent) => (
+                  <button
+                    key={`${agent.source}-${agent.agentType}`}
+                    type="button"
+                    onClick={() => selectAgent(agent, 'agents')}
+                    className="group flex w-full min-w-0 items-center gap-3 border-b border-[var(--color-border-separator)] py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{ backgroundColor: getAgentDotColor(agent.color) }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="break-all text-[13px] font-medium text-[var(--color-text-primary)]">
+                          {agent.agentType}
                         </span>
-                        <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                          {sourceLabel}
-                        </h4>
-                        <span className="text-xs text-[var(--color-text-tertiary)]">
-                          {group.length}
-                        </span>
-                      </div>
-                      <p className="text-xs leading-5 text-[var(--color-text-tertiary)]">
-                        {t('settings.agents.groupHint', {
-                          source: sourceLabel,
-                          count: String(group.length),
-                        })}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col p-2">
-                    {group.map((agent) => (
-                      <button
-                        key={`${agent.source}-${agent.agentType}`}
-                        onClick={() => selectAgent(agent, 'agents')}
-                        className="group rounded-xl border border-transparent px-3 py-3 text-left transition-all hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span
-                            className="mt-0.5 flex-shrink-0 inline-flex items-center justify-center"
-                            style={{ color: getAgentDotColor(agent.color) }}
-                          >
-                            <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-[var(--color-text-primary)] break-all">
-                                {agent.agentType}
-                              </span>
-                              {agent.modelDisplay && (
-                                <MetaPill>{agent.modelDisplay}</MetaPill>
-                              )}
-                              <MetaPill>{sourceLabel}</MetaPill>
-                              <MetaPill>
-                                {agent.isActive
-                                  ? t('settings.agents.status.active')
-                                  : t('settings.agents.status.available')}
-                              </MetaPill>
-                              {agent.overriddenBy && (
-                                <MetaPill>
-                                  {t('settings.agents.overriddenBy', {
-                                    source: t(`settings.agents.source.${agent.overriddenBy}`),
-                                  })}
-                                </MetaPill>
-                              )}
-                            </div>
-                            <div className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)] break-words [&_.prose]:text-xs [&_.prose]:leading-5 [&_.prose]:text-[var(--color-text-secondary)]">
-                              <MarkdownRenderer
-                                content={agent.description || t('settings.agents.noDescription')}
-                              />
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
-                              <span>
-                                {agent.tools?.length
-                                  ? t('settings.agents.toolCount', { count: String(agent.tools.length) })
-                                  : t('settings.agents.noTools')}
-                              </span>
-                              {agent.baseDir && (
-                                <span className="break-all">{agent.baseDir}</span>
-                              )}
-                            </div>
-                          </div>
-                          <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100">
-                            chevron_right
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
-        </div>
+                        {agent.modelDisplay && <MetaPill>{agent.modelDisplay}</MetaPill>}
+                        <MetaPill>
+                          {agent.isActive
+                            ? t('settings.agents.status.active')
+                            : t('settings.agents.status.available')}
+                        </MetaPill>
+                        {agent.overriddenBy && (
+                          <MetaPill>
+                            {t('settings.agents.overriddenBy', {
+                              source: t(`settings.agents.source.${agent.overriddenBy}`),
+                            })}
+                          </MetaPill>
+                        )}
+                      </span>
+                      <span className="mt-px block break-words text-xs leading-[1.5] text-[var(--color-text-secondary)] [&_.prose]:text-xs [&_.prose]:leading-[1.5] [&_.prose]:text-[var(--color-text-secondary)] [&_p]:my-0">
+                        <MarkdownRenderer
+                          content={agent.description || t('settings.agents.noDescription')}
+                        />
+                      </span>
+                      <span className="mt-px block text-[11px] text-[var(--color-text-tertiary)]">
+                        {agent.tools?.length
+                          ? t('settings.agents.toolCount', { count: String(agent.tools.length) })
+                          : t('settings.agents.noTools')}
+                        {agent.baseDir ? <span className="break-all"> · {agent.baseDir}</span> : null}
+                      </span>
+                    </span>
+                    <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
+                  </button>
+                ))}
+              </SettingsSection>
+            )
+          })}
+        </>
       )}
     </div>
   )

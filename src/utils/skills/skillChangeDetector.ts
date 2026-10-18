@@ -17,6 +17,7 @@ import {
 import { resetSentSkillNames } from '../attachments.js'
 import { registerCleanup } from '../cleanupRegistry.js'
 import { logForDebugging } from '../debug.js'
+import { getInheritedClaudeCodeDir } from '../envUtils.js'
 import { getFsImplementation } from '../fsOperations.js'
 import { executeConfigChangeHooks, hasBlockingResult } from '../hooks.js'
 import { createSignal } from '../signal.js'
@@ -191,6 +192,20 @@ async function getWatchablePaths(): Promise<string[]> {
       paths.push(userCommandsPath)
     } catch {
       // Path doesn't exist, skip it
+    }
+  }
+
+  // Claude Code's skills and commands directories, which DreamCoder inherits
+  const claudeCodeDir = getInheritedClaudeCodeDir()
+  if (claudeCodeDir) {
+    for (const dir of ['skills', 'commands']) {
+      const inheritedPath = platformPath.join(claudeCodeDir, dir)
+      try {
+        await fs.stat(inheritedPath)
+        paths.push(inheritedPath)
+      } catch {
+        // Path doesn't exist, skip it
+      }
     }
   }
 

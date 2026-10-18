@@ -27,15 +27,15 @@ async function writeSession(entries: Record<string, unknown>[]) {
 }
 
 beforeEach(async () => {
-  originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   configDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-session-search-'))
-  process.env.CLAUDE_CONFIG_DIR = configDir
+  process.env.DREAMCODER_CONFIG_DIR = configDir
   service = new SessionService()
 })
 
 afterEach(async () => {
-  if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
-  else process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+  if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   await fs.rm(configDir, { recursive: true, force: true })
 })
 

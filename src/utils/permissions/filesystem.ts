@@ -9,7 +9,6 @@ import { isAgentMemoryPath } from 'src/tools/AgentTool/agentMemory.js'
 import {
   CLAUDE_FOLDER_PERMISSION_PATTERN,
   FILE_EDIT_TOOL_NAME,
-  GLOBAL_CLAUDE_FOLDER_PERMISSION_PATTERN,
 } from 'src/tools/FileEditTool/constants.js'
 import type { z } from 'zod/v4'
 import { getOriginalCwd, getSessionId } from '../../bootstrap/state.js'
@@ -76,6 +75,7 @@ export const DANGEROUS_DIRECTORIES = [
   '.vscode',
   '.idea',
   '.claude',
+  '.dreamcoder',
 ] as const
 
 /**
@@ -92,7 +92,39 @@ export function normalizeCaseForComparison(path: string): string {
 }
 
 /**
- * If filePath is inside a .claude/skills/{name}/ directory (project or global),
+ * Rule prefix for DreamCoder's own config folder, without the trailing `**`:
+ * `~/.dreamcoder/` when it is under the home directory, else an absolute
+ * `//path/` pattern (portable mode or DREAMCODER_CONFIG_DIR elsewhere).
+ */
+export function getConfigFolderRulePrefix(): string {
+  const configDir = getClaudeConfigHomeDir()
+  const fromHome = relativePath(homedir().normalize('NFC'), configDir)
+  if (fromHome && !fromHome.startsWith('..') && !posix.isAbsolute(fromHome)) {
+    return `~/${fromHome}/`
+  }
+  return `/${toPosixPath(configDir)}/`
+}
+
+/** Session-level permission pattern for DreamCoder's own config folder. */
+export function getConfigFolderPermissionPattern(): string {
+  return `${getConfigFolderRulePrefix()}**`
+}
+
+/** Whether a path is inside DreamCoder's own config folder. */
+export function isInConfigFolder(filePath: string): boolean {
+  const absolutePath = normalizeCaseForComparison(expandPath(filePath))
+  const configDir = normalizeCaseForComparison(
+    expandPath(getClaudeConfigHomeDir()),
+  )
+  return (
+    absolutePath.startsWith(configDir + sep.toLowerCase()) ||
+    absolutePath.startsWith(configDir + '/')
+  )
+}
+
+/**
+ * If filePath is inside a .claude/skills/{name}/ directory (project) or the
+ * skills/{name}/ directory of DreamCoder's config folder,
  * return the skill name and a session-allow pattern scoped to just that skill.
  * Used to offer a narrower "allow edits to this skill only" option in the
  * permission dialog and SDK suggestions, so iterating on one skill doesn't
@@ -110,8 +142,8 @@ export function getClaudeSkillScope(
       prefix: '/.claude/skills/',
     },
     {
-      dir: expandPath(join(homedir(), '.claude', 'skills')),
-      prefix: '~/.claude/skills/',
+      dir: expandPath(join(getClaudeConfigHomeDir(), 'skills')),
+      prefix: `${getConfigFolderRulePrefix()}skills/`,
     },
   ]
 
@@ -440,6 +472,12 @@ function isDangerousFilePathToAutoEdit(path: string): boolean {
   // Check for UNC paths (defense-in-depth to catch any patterns that might not be caught by containsVulnerableUncPath)
   // Block anything starting with \\ or // as these are potentially UNC paths that could access network resources
   if (path.startsWith('\\\\') || path.startsWith('//')) {
+    return true
+  }
+
+  // DreamCoder's config folder holds hooks, agents and provider keys wherever
+  // it is, including a portable folder not named after a dangerous directory.
+  if (isInConfigFolder(absolutePath)) {
     return true
   }
 
@@ -1271,8 +1309,9 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     'allow',
   )
   if (claudeFolderAllowRule) {
-    // Check if this rule is scoped under .claude/ (project or global).
-    // Accepts both the broad patterns ('/.claude/**', '~/.claude/**') and
+    // Check if this rule is scoped under the project's .claude/ or DreamCoder's
+    // config folder. Accepts both the broad patterns ('/.claude/**',
+    // '~/.dreamcoder/**') and
     // narrowed ones like '/.claude/skills/my-skill/**' so users can grant
     // session access to a single skill without also exposing settings.json
     // or hooks/. The rule already matched the path via matchingRuleForInput;
@@ -1282,9 +1321,7 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     if (
       ruleContent &&
       (ruleContent.startsWith(CLAUDE_FOLDER_PERMISSION_PATTERN.slice(0, -2)) ||
-        ruleContent.startsWith(
-          GLOBAL_CLAUDE_FOLDER_PERMISSION_PATTERN.slice(0, -2),
-        )) &&
+        ruleContent.startsWith(getConfigFolderRulePrefix())) &&
       !ruleContent.includes('..') &&
       ruleContent.endsWith('/**')
     ) {

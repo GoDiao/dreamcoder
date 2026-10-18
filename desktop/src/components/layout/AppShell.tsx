@@ -13,15 +13,18 @@ import {
   isH5ConnectionRequiredError,
   isTauriRuntime,
 } from '../../lib/desktopRuntime'
-import { TabBar } from './TabBar'
+import { WindowControls, showWindowControls } from './WindowControls'
+import { SettingsModal } from '../../pages/Settings'
 import { StartupErrorView } from './StartupErrorView'
-import { useTabStore, SETTINGS_TAB_ID } from '../../stores/tabStore'
+import { useTabStore } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { H5ConnectionView } from './H5ConnectionView'
-import { ProviderOnboarding } from '../onboarding/ProviderOnboarding'
-import { useProviderStore } from '../../stores/providerStore'
+import { FirstLaunch } from '../onboarding/FirstLaunch'
+import { firstLaunchWasShown, useFirstLaunchGate } from '../onboarding/useFirstLaunchGate'
+import { useReleaseIdleSessions } from '../../hooks/useReleaseIdleSessions'
+import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import type { Tab } from '../../stores/tabStore'
 
@@ -31,8 +34,6 @@ function isChatTab(tab: Tab | undefined) {
 
 export function AppShell() {
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
-  const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
-  const { providers, hasLoadedProviders } = useProviderStore()
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
@@ -69,12 +70,15 @@ export function AppShell() {
     if (diff < 86400000) return t('session.timeHours', { n: Math.floor(diff / 3600000) })
     return t('session.timeDays', { n: Math.floor(diff / 86400000) })
   })()
+  const settingsOpen = useUIStore((s) => s.settingsOpen)
+  // The settings window is modal: keep keyboard and screen readers out of the page behind it.
+  const behindSettingsProps: { inert?: '' } = settingsOpen ? { inert: '' } : {}
   const sidebarHiddenProps: HTMLAttributes<HTMLDivElement> & { inert?: '' } =
     isMobileShell && !effectiveSidebarOpen
       ? { 'aria-hidden': true, inert: '' }
-      : {}
+      : behindSettingsProps
 
-  const showOnboarding = ready && !startupError && !h5StartupError && hasLoadedProviders && providers.length === 0 && !onboardingCompleted
+  const firstLaunch = useFirstLaunchGate(ready && !startupError && !h5StartupError)
 
   useEffect(() => {
     let cancelled = false
@@ -92,6 +96,8 @@ export function AppShell() {
         console.log('[mem] AppShell:after-init-server')
         await fetchSettings()
         console.log('[mem] AppShell:after-fetch-settings')
+        // Decided before the shell renders, so a first launch goes straight to the import offer.
+        await useClaudeCodeImportStore.getState().fetchStatus({ openPrompt: true })
 
         if (!cancelled) {
           setReady(true)
@@ -102,6 +108,12 @@ export function AppShell() {
           await useTabStore.getState().restoreTabs()
           console.log('[mem] AppShell:restoreTabs:done')
           if (cancelled) return
+          // First launch lands on the empty new-session page even if the
+          // restore finishes after the user has left the welcome screen.
+          if (firstLaunchWasShown()) {
+            useTabStore.setState({ activeTabId: null })
+            return
+          }
           const { activeTabId: activeId, tabs } = useTabStore.getState()
           const activeTab = tabs.find((tab) => tab.sessionId === activeId)
           if (activeId && activeTab?.type === 'session') {
@@ -136,10 +148,7 @@ export function AppShell() {
       .then(({ listen }) =>
         listen<string>('native-menu-navigate', (event) => {
           const target = event.payload as SettingsTab | 'settings'
-          if (target === 'about') {
-            useUIStore.getState().setPendingSettingsTab('about')
-          }
-          useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+          useUIStore.getState().openSettings(target === 'about' ? 'about' : undefined)
         }),
       )
       .then((fn) => { unlisten = fn })
@@ -148,6 +157,7 @@ export function AppShell() {
   }, [])
 
   useKeyboardShortcuts()
+  useReleaseIdleSessions()
 
   useEffect(() => {
     if (isMobileShell && !wasMobileShellRef.current) {
@@ -218,7 +228,7 @@ export function AppShell() {
     return <StartupErrorView error={startupError} />
   }
 
-  if (!ready) {
+  if (!ready || firstLaunch.state === 'pending') {
     return (
       <div className="app-shell-viewport flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
         {t('app.launching')}
@@ -226,8 +236,8 @@ export function AppShell() {
     )
   }
 
-  if (showOnboarding) {
-    return <ProviderOnboarding />
+  if (firstLaunch.state === 'open') {
+    return <FirstLaunch onFinish={firstLaunch.finish} />
   }
 
   return (
@@ -256,13 +266,17 @@ export function AppShell() {
         ) : null}
       </div>
       {!isMobileShell && effectiveSidebarOpen ? (
-        <SidebarResizeHandle width={sidebarWidth} setWidth={setSidebarWidth} />
+        <SidebarResizeHandle width={sidebarWidth} setWidth={setSidebarWidth} inert={settingsOpen} />
       ) : null}
       <main
         id="content-area"
         data-sidebar-state={effectiveSidebarVisible ? 'open' : 'closed'}
         className={`min-w-0 flex-1 flex flex-col overflow-hidden${isMobileShell ? ' app-shell-main--mobile' : ''}`}
       >
+        {/* Kept outside the inert area and above the settings overlay so the
+            window can still be moved, minimised or closed while settings is open. */}
+        {tauriRuntime && !isMobileShell ? <WindowDragStrip /> : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" {...behindSettingsProps}>
         {isMobileShell ? (
           <div
             data-testid="mobile-session-header"
@@ -310,9 +324,10 @@ export function AppShell() {
             ) : null}
           </div>
         ) : null}
-        {!isMobileShell ? <TabBar /> : null}
         <ContentRouter />
+        </div>
       </main>
+      <SettingsModal />
       <ToastContainer />
       <CommandPalette />
       <UpdateChecker />
@@ -320,9 +335,26 @@ export function AppShell() {
   )
 }
 
+/**
+ * Window drag area above the page content (the tab bar used to provide it).
+ * macOS draws its traffic lights over the sidebar, so a slim strip is enough;
+ * Windows has no native frame and needs room for the window buttons.
+ */
+function WindowDragStrip() {
+  return (
+    <div
+      data-testid="window-drag-strip"
+      className={`relative z-[60] flex shrink-0 items-stretch select-none ${showWindowControls ? 'h-8' : 'h-3'}`}
+    >
+      <div data-tauri-drag-region aria-hidden="true" className="min-w-0 flex-1" />
+      <WindowControls />
+    </div>
+  )
+}
+
 const SIDEBAR_RESIZE_STEP = 10
 
-function SidebarResizeHandle({ width, setWidth }: { width: number; setWidth: (w: number) => void }) {
+function SidebarResizeHandle({ width, setWidth, inert = false }: { width: number; setWidth: (w: number) => void; inert?: boolean }) {
   const [dragState, setDragState] = useState<{ startX: number; startWidth: number } | null>(null)
   const dragStateRef = useRef(dragState)
 
@@ -365,7 +397,7 @@ function SidebarResizeHandle({ width, setWidth }: { width: number; setWidth: (w:
       aria-valuenow={width}
       aria-valuemin={SIDEBAR_MIN_WIDTH}
       aria-valuemax={SIDEBAR_MAX_WIDTH}
-      tabIndex={0}
+      tabIndex={inert ? -1 : 0}
       onPointerDown={(event) => {
         if (event.button !== 0) return
         event.preventDefault()

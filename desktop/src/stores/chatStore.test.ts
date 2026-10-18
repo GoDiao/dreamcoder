@@ -1122,6 +1122,36 @@ describe('chatStore history mapping', () => {
     })
   })
 
+  it('carries the per-session effort in runtime overrides and on reconnect', () => {
+    useChatStore.getState().setSessionRuntime(TEST_SESSION_ID, {
+      providerId: 'provider-1',
+      modelId: 'kimi-k2.6',
+      effort: 'high',
+    })
+
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, {
+      type: 'set_runtime_config',
+      providerId: 'provider-1',
+      modelId: 'kimi-k2.6',
+      effort: 'high',
+    })
+
+    sendMock.mockClear()
+    useSessionRuntimeStore.getState().setSelection(TEST_SESSION_ID, {
+      providerId: 'provider-1',
+      modelId: 'kimi-k2.6',
+      effort: 'max',
+    })
+    useChatStore.getState().connectToSession(TEST_SESSION_ID)
+
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, {
+      type: 'set_runtime_config',
+      providerId: 'provider-1',
+      modelId: 'kimi-k2.6',
+      effort: 'max',
+    })
+  })
+
   it('keeps AskUserQuestion permission requests out of the message list while tracking the pending request', () => {
     useChatStore.setState({
       sessions: {

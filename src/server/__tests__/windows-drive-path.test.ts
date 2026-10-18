@@ -36,13 +36,13 @@ describe('Windows drive root path handling', () => {
   it('keeps realpathed drive roots from resolving to the current drive directory', async () => {
     if (process.platform !== 'win32') return
 
-    const originalConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     const configDir = await fs.mkdtemp(path.join(os.tmpdir(), 'drive-root-session-'))
     const driveRoot = path.parse(process.cwd()).root
     const sessionId = crypto.randomUUID()
 
     try {
-      process.env.CLAUDE_CONFIG_DIR = configDir
+      process.env.DREAMCODER_CONFIG_DIR = configDir
       const projectDir = path.join(configDir, 'projects', sanitizePath(driveRoot))
       await fs.mkdir(projectDir, { recursive: true })
       await fs.writeFile(
@@ -67,9 +67,9 @@ describe('Windows drive root path handling', () => {
       expect(context.repoRoot).not.toBe(process.cwd())
     } finally {
       if (originalConfigDir === undefined) {
-        delete process.env.CLAUDE_CONFIG_DIR
+        delete process.env.DREAMCODER_CONFIG_DIR
       } else {
-        process.env.CLAUDE_CONFIG_DIR = originalConfigDir
+        process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
       }
       await fs.rm(configDir, { recursive: true, force: true })
     }

@@ -105,7 +105,7 @@ describe('MessageList nested tool calls', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     useSettingsStore.setState({ locale: 'en' })
-    useUIStore.setState({ pendingSettingsTab: null })
+    useUIStore.setState({ settingsOpen: false, settingsTab: 'providers' })
     useTabStore.setState({ activeTabId: ACTIVE_TAB, tabs: [{ sessionId: ACTIVE_TAB, title: 'Test', type: 'session' as const, status: 'idle' }] })
     useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
     useChatStore.setState({ sessions: { [ACTIVE_TAB]: makeSessionState() } })
@@ -925,9 +925,9 @@ describe('MessageList nested tool calls', () => {
     expect(openButton).toBeTruthy()
     fireEvent.click(openButton!)
 
-    expect(useUIStore.getState().pendingSettingsTab).toBe('memory')
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('memory')
     expect(useUIStore.getState().pendingMemoryPath).toBe('/Users/test/.claude/projects/example/memory/preferences.md')
-    expect(useTabStore.getState().activeTabId).toBe('__settings__')
   })
 
   it('promotes memory file writes from tool calls into a dedicated memory card', () => {
@@ -2691,6 +2691,9 @@ describe('MessageList nested tool calls', () => {
     expect(assistantShell).toBeTruthy()
     expect(assistantShell?.className).toContain('items-start')
     expect(assistantShell?.className).not.toContain('ml-10')
+    expect(assistantShell?.getAttribute('data-layout')).toBe('plain')
+    expect(assistantShell?.querySelector('[class*="shadow-[var(--shadow-dropdown)]"]')).toBeNull()
+    expect(assistantShell?.querySelector('[class*="rounded-[20px]"]')).toBeNull()
     expect(userActions?.getAttribute('data-align')).toBe('end')
     expect(assistantActions?.getAttribute('data-align')).toBe('start')
   })

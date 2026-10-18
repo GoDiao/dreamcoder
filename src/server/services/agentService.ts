@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import * as os from 'os'
 import YAML from 'yaml'
 import { ApiError } from '../middleware/errorHandler.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type AgentDefinition = {
   name: string
@@ -15,8 +15,7 @@ export type AgentDefinition = {
 
 export class AgentService {
   private getAgentsDir(): string {
-    const configDir =
-      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const configDir = getClaudeConfigHomeDir()
     return path.join(configDir, 'agents')
   }
 
