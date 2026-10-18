@@ -20,7 +20,6 @@ const {
     update: vi.fn(),
     delete: vi.fn(),
     activate: vi.fn(),
-    activateOfficial: vi.fn(),
     test: vi.fn(),
     testConfig: vi.fn(),
   },
@@ -150,20 +149,6 @@ describe('providerStore runtime refresh', () => {
 
     expect(setSelectionMock).not.toHaveBeenCalled()
     expect(setSessionRuntimeMock).not.toHaveBeenCalled()
-  })
-
-  it('sets the OpenAI default model when activating built-in ChatGPT Official', async () => {
-    providersApiMock.activate.mockResolvedValue({ ok: true })
-    providersApiMock.list.mockResolvedValue({
-      providers: [],
-      activeId: 'openai-official',
-    })
-
-    const { useProviderStore } = await import('./providerStore')
-    await useProviderStore.getState().activateProvider('openai-official')
-
-    expect(settingsSetModelMock).toHaveBeenCalledWith('gpt-5.3-codex')
-    expect(settingsFetchAllMock).toHaveBeenCalled()
   })
 
   it('sets the provider main model when activating a saved provider', async () => {

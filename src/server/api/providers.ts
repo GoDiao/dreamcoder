@@ -45,11 +45,6 @@ export async function handleProvidersApi(
       throw methodNotAllowed(req.method)
     }
 
-    if (id === 'official' && req.method === 'POST') {
-      await providerService.activateOfficial()
-      return Response.json({ ok: true })
-    }
-
     if (!id) {
       if (req.method === 'GET') {
         const { providers, activeId } = await providerService.listProviders()

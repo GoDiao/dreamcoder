@@ -230,6 +230,8 @@ const TERMINAL_CONFIG_FILE: &str = "terminal-config.json";
 const APP_MODE_FILE: &str = "app-mode.json";
 /// DreamCoder's config directory variable. Claude Code's own variable is not used.
 pub const CONFIG_DIR_ENV: &str = "DREAMCODER_CONFIG_DIR";
+/// DreamCoder's default config directory under the home directory, matching the CLI.
+pub const DEFAULT_CONFIG_DIR_NAME: &str = ".dreamcoder";
 /// Name of the portable data folder next to the executable. It predates
 /// `DREAMCODER_CONFIG_DIR` and is kept so existing portable installs keep their data.
 pub const PORTABLE_DIR_NAME: &str = "CLAUDE_CONFIG_DIR";
@@ -517,11 +519,9 @@ fn cancel_update_install(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_app_mode(app: AppHandle) -> serde_json::Value {
+fn get_app_mode(_app: AppHandle) -> serde_json::Value {
     let env_config_dir = std::env::var(CONFIG_DIR_ENV).ok().map(PathBuf::from);
-    let active_config_dir = env_config_dir
-        .clone()
-        .or_else(|| app.path().app_config_dir().ok());
+    let active_config_dir = env_config_dir.clone().or_else(claude_config_dir);
     let config_dir_source = if env_config_dir.is_some() {
         if std::env::var_os(PORTABLE_MARKER_ENV).is_some() {
             "portable"
@@ -538,6 +538,10 @@ fn get_app_mode(app: AppHandle) -> serde_json::Value {
         "portableDir": config_dir.as_ref().and_then(|p| p.to_str()),
         "defaultPortableDir": get_default_portable_dir().as_ref().and_then(|p| p.to_str()),
         "activeConfigDir": active_config_dir.as_ref().and_then(|p| p.to_str()),
+        "systemConfigDir": home_dir()
+            .map(|path| path.join(DEFAULT_CONFIG_DIR_NAME))
+            .as_ref()
+            .and_then(|p| p.to_str()),
         "configDirSource": config_dir_source,
     })
 }
@@ -1356,10 +1360,11 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// DreamCoder's config directory, as the sidecar resolves it.
 fn claude_config_dir() -> Option<PathBuf> {
     std::env::var_os(CONFIG_DIR_ENV)
         .map(PathBuf::from)
-        .or_else(|| home_dir().map(|path| path.join(".claude")))
+        .or_else(|| home_dir().map(|path| path.join(DEFAULT_CONFIG_DIR_NAME)))
 }
 
 fn desktop_terminal_settings_path() -> Option<PathBuf> {

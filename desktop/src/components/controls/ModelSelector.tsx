@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { OFFICIAL_DEFAULT_MODEL_ID, OFFICIAL_MODELS } from '../../constants/modelCatalog'
-import {
-  OPENAI_OFFICIAL_DEFAULT_MODEL_ID,
-  OPENAI_OFFICIAL_MODELS,
-  OPENAI_OFFICIAL_PROVIDER_ID,
-} from '../../constants/openaiOfficialProvider'
+import { OFFICIAL_DEFAULT_MODEL_ID } from '../../constants/modelCatalog'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chatStore'
 import { useProviderStore } from '../../stores/providerStore'
@@ -16,12 +11,10 @@ import type { RuntimeSelection } from '../../types/runtime'
 import type { EffortLevel, ModelInfo } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
-import { useProviderOAuthStore } from '../../stores/providerOAuthStore'
-import { useProviderOpenAIOAuthStore } from '../../stores/providerOpenAIOAuthStore'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
 
 type ProviderChoice = {
-  providerId: string | null
+  providerId: string
   providerName: string
   isDefault: boolean
   models: ModelInfo[]
@@ -50,20 +43,6 @@ const DROPDOWN_GAP = 8
 const VIEWPORT_MARGIN = 16
 const DROPDOWN_MAX_HEIGHT = 420
 const DROPDOWN_MIN_HEIGHT = 180
-
-function officialChoices(
-  providerId: string | null,
-  models: ModelInfo[],
-  isDefault: boolean,
-  officialName: string,
-): ProviderChoice {
-  return {
-    providerId,
-    providerName: officialName,
-    isDefault,
-    models,
-  }
-}
 
 function buildProviderModels(
   provider: SavedProvider,
@@ -101,57 +80,25 @@ function buildProviderChoices(
   providers: SavedProvider[],
   activeId: string | null,
   availableModels: ModelInfo[],
-  officialName: string,
-  openAIOfficialName: string,
   labels: Record<'main' | 'haiku' | 'sonnet' | 'opus', string>,
-  claudeOfficialLoggedIn: boolean,
-  openAIOfficialLoggedIn: boolean,
 ): ProviderChoice[] {
-  const claudeOfficialModels = activeId === null && availableModels.length > 0
-    ? availableModels
-    : OFFICIAL_MODELS
-  const openAIOfficialModels = activeId === OPENAI_OFFICIAL_PROVIDER_ID && availableModels.length > 0
-    ? availableModels
-    : OPENAI_OFFICIAL_MODELS
-
-  const choices: ProviderChoice[] = []
-
-  const showOfficialProviders = !activeId || activeId === OPENAI_OFFICIAL_PROVIDER_ID
-
-  if (showOfficialProviders && claudeOfficialLoggedIn) {
-    choices.push(officialChoices(null, claudeOfficialModels, activeId === null, officialName))
-  }
-  if (showOfficialProviders && openAIOfficialLoggedIn) {
-    choices.push(officialChoices(
-      OPENAI_OFFICIAL_PROVIDER_ID,
-      openAIOfficialModels,
-      activeId === OPENAI_OFFICIAL_PROVIDER_ID,
-      openAIOfficialName,
-    ))
-  }
-
-  if (activeId && activeId !== OPENAI_OFFICIAL_PROVIDER_ID) {
+  if (activeId) {
     const activeProvider = providers.find((p) => p.id === activeId)
-    if (activeProvider && availableModels.length > 0) {
-      choices.push({
-        providerId: activeProvider.id,
-        providerName: activeProvider.name,
-        isDefault: true,
-        models: availableModels,
-      })
-    }
-  } else if (!activeId) {
-    for (const provider of providers) {
-      choices.push({
-        providerId: provider.id,
-        providerName: provider.name,
-        isDefault: activeId === provider.id,
-        models: buildProviderModels(provider, labels),
-      })
-    }
+    if (!activeProvider || availableModels.length === 0) return []
+    return [{
+      providerId: activeProvider.id,
+      providerName: activeProvider.name,
+      isDefault: true,
+      models: availableModels,
+    }]
   }
 
-  return choices
+  return providers.map((provider) => ({
+    providerId: provider.id,
+    providerName: provider.name,
+    isDefault: false,
+    models: buildProviderModels(provider, labels),
+  }))
 }
 
 function resolveDefaultRuntimeSelection(
@@ -168,11 +115,7 @@ function resolveDefaultRuntimeSelection(
 
   return {
     providerId: inferredProviderId,
-    modelId: currentModelId ?? (
-      inferredProviderId === OPENAI_OFFICIAL_PROVIDER_ID
-        ? OPENAI_OFFICIAL_DEFAULT_MODEL_ID
-        : OFFICIAL_DEFAULT_MODEL_ID
-    ),
+    modelId: currentModelId ?? OFFICIAL_DEFAULT_MODEL_ID,
   }
 }
 
@@ -201,10 +144,6 @@ export function ModelSelector({
     isLoading: providersLoading,
     fetchProviders,
   } = useProviderStore()
-  const claudeOAuthStatus = useProviderOAuthStore((s) => s.status)
-  const fetchClaudeOAuthStatus = useProviderOAuthStore((s) => s.fetchStatus)
-  const openAIOAuthStatus = useProviderOpenAIOAuthStore((s) => s.status)
-  const fetchOpenAIOAuthStatus = useProviderOpenAIOAuthStore((s) => s.fetchStatus)
   const runtimeSelection = useSessionRuntimeStore((state) =>
     runtimeKey ? state.selections[runtimeKey] : undefined,
   )
@@ -231,11 +170,6 @@ export function ModelSelector({
     requestedProvidersRef.current = true
     void fetchProviders()
   }, [fetchProviders, isRuntimeScoped, providersLoading])
-
-  useEffect(() => {
-    void fetchClaudeOAuthStatus()
-    void fetchOpenAIOAuthStatus()
-  }, [fetchClaudeOAuthStatus, fetchOpenAIOAuthStatus])
 
   useEffect(() => {
     if (!open) return
@@ -323,13 +257,9 @@ export function ModelSelector({
       providers,
       activeId,
       availableModels,
-      t('settings.providers.officialName'),
-      t('settings.providers.openaiOfficialName'),
       roleLabels,
-      claudeOAuthStatus?.loggedIn === true,
-      openAIOAuthStatus?.loggedIn === true,
     ),
-    [activeId, availableModels, providers, roleLabels, t, claudeOAuthStatus, openAIOAuthStatus],
+    [activeId, availableModels, providers, roleLabels],
   )
 
   const selectedModel = isControlled
@@ -363,7 +293,7 @@ export function ModelSelector({
     ? selectedRuntimeModel?.name ?? storeModel?.name ?? t('model.selectModel')
     : selectedModel?.name ?? t('model.selectModel')
   const buttonProviderLabel = isRuntimeScoped
-    ? selectedProviderChoice?.providerName ?? activeProviderName ?? t('settings.providers.officialName')
+    ? selectedProviderChoice?.providerName ?? activeProviderName ?? t('model.noProvider')
     : null
 
   const handleRuntimeSelect = (selection: RuntimeSelection) => {
@@ -389,7 +319,7 @@ export function ModelSelector({
         {isRuntimeScoped ? (
           <div className="space-y-3">
             {providerChoices.map((choice) => (
-              <div key={choice.providerId ?? 'official'} className="space-y-1.5">
+              <div key={choice.providerId} className="space-y-1.5">
                 <div className="flex items-center justify-between px-2 pt-1">
                   <span className="truncate text-[11px] font-semibold tracking-[0.01em] text-[var(--color-text-secondary)]">
                     {choice.providerName}
@@ -408,7 +338,7 @@ export function ModelSelector({
                       activeRuntimeSelection.modelId === model.id
                     return (
                       <button
-                        key={`${choice.providerId ?? 'official'}:${model.id}`}
+                        key={`${choice.providerId}:${model.id}`}
                         onClick={() => handleRuntimeSelect({ providerId: choice.providerId, modelId: model.id })}
                         className={`
                           w-full rounded-lg border px-3 text-left transition-colors

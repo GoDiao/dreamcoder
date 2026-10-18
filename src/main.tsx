@@ -4456,16 +4456,6 @@ async function run(): Promise<CommanderCommand> {
     });
   }
 
-  // claude install
-  program.command('install [target]').description('Install Claude Code native build. Use [target] to specify version (stable, latest, or specific version)').option('--force', 'Force installation even if already installed').action(async (target: string | undefined, options: {
-    force?: boolean;
-  }) => {
-    const {
-      installHandler
-    } = await import('./cli/handlers/util.js');
-    await installHandler(target, options);
-  });
-
   // ant-only commands
   if ("external" === 'ant') {
     const validateLogId = (value: string) => {

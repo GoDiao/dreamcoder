@@ -8,12 +8,12 @@ import { useChatStore } from '../stores/chatStore'
 import { usePluginStore } from '../stores/pluginStore'
 import { useSessionRuntimeStore, DRAFT_RUNTIME_SELECTION_KEY } from '../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useProviderStore } from '../stores/providerStore'
 import { useUIStore } from '../stores/uiStore'
 import { SETTINGS_TAB_ID, useTabStore } from '../stores/tabStore'
 import { RepositoryLaunchControls } from '../components/shared/RepositoryLaunchControls'
 import { PermissionModeSelector } from '../components/controls/PermissionModeSelector'
 import { ModelSelector } from '../components/controls/ModelSelector'
+import { ProviderRequiredNotice, useProviderMissing } from '../components/chat/ProviderRequiredNotice'
 import { AttachmentGallery } from '../components/chat/AttachmentGallery'
 import { ComposerDropOverlay } from '../components/chat/ComposerDropOverlay'
 import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
@@ -81,7 +81,6 @@ function resolveCreateSessionErrorMessage(error: unknown, t: Translate): string 
 
 export function EmptySession() {
   const t = useTranslation()
-  const hasNoProviders = useProviderStore((s) => s.hasLoadedProviders && s.providers.length === 0)
   const [input, setInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [workDir, setWorkDir] = useState('')
@@ -114,8 +113,9 @@ export function EmptySession() {
   const lastPluginReloadSummary = usePluginStore((state) => state.lastReloadSummary)
   const draftRuntimeSelection = useSessionRuntimeStore((state) => state.selections[DRAFT_RUNTIME_SELECTION_KEY])
   const draftRuntimeSelectionKey = draftRuntimeSelection
-    ? `${draftRuntimeSelection.providerId ?? 'official'}:${draftRuntimeSelection.modelId}`
+    ? `${draftRuntimeSelection.providerId ?? 'none'}:${draftRuntimeSelection.modelId}`
     : undefined
+  const providerMissing = useProviderMissing(draftRuntimeSelection)
   const draftModelLabel = draftRuntimeSelection?.modelId ?? currentModel?.name ?? currentModel?.id
   const isMobileComposer = useMobileViewport() && !isTauriRuntime()
 
@@ -268,6 +268,11 @@ export function EmptySession() {
       setSlashMenuOpen(false)
       setFileSearchOpen(false)
       setPlusMenuOpen(false)
+      return
+    }
+
+    if (providerMissing) {
+      addToast({ type: 'warning', message: t('chat.providerRequired.blocked') })
       return
     }
 
@@ -547,20 +552,8 @@ export function EmptySession() {
           >
             {t('empty.subtitle')}
           </p>
-          {hasNoProviders && (
-            <p data-testid="empty-session-no-provider" className="mx-auto mt-4 max-w-xs text-sm text-[var(--color-text-tertiary)]">
-              {t('empty.noProvider')}{' '}
-              <button
-                type="button"
-                className="text-[var(--color-brand)] hover:underline"
-                onClick={() => {
-                  useUIStore.getState().setPendingSettingsTab('providers')
-                  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
-                }}
-              >
-                {t('settings.providers.addProvider')}
-              </button>
-            </p>
+          {providerMissing && (
+            <ProviderRequiredNotice className="mt-4 w-full" testId="empty-session-no-provider" />
           )}
         </div>
       </div>

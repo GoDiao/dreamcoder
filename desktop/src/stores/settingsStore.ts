@@ -468,7 +468,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         : null,
       activeConfigDir: mode === 'portable'
         ? portableDir ?? prev.defaultPortableDir ?? prev.portableDir
-        : null,
+        : prev.systemConfigDir ?? null,
       configDirSource: mode === 'portable' ? 'portable' : 'system',
     }
     set({ appMode: newMode, appModeRequiresRestart: true })

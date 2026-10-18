@@ -13,6 +13,7 @@ import { isTauriRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
 import { TerminalShellSettings } from './TerminalShellSettings'
 import { ProxyConfigForm } from './ProxyConfigForm'
+import { ClaudeCodeImportSettings } from './ClaudeCodeImportSettings'
 import {
   getDesktopNotificationPermission,
   notifyDesktop,
@@ -995,6 +996,8 @@ export function GeneralSettings() {
             <div className="mt-3 text-xs leading-5 text-[var(--color-text-tertiary)]">
               {t('settings.general.storageMoveHint')}
             </div>
+
+            <ClaudeCodeImportSettings />
 
             {modeError && (
               <div className="mt-3 text-xs text-[var(--color-error)]">

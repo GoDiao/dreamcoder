@@ -7,10 +7,12 @@ import type { ToolPermissionContext } from '../../../Tool.js'
 import {
   CLAUDE_FOLDER_PERMISSION_PATTERN,
   FILE_EDIT_TOOL_NAME,
-  GLOBAL_CLAUDE_FOLDER_PERMISSION_PATTERN,
 } from '../../../tools/FileEditTool/constants.js'
 import { env } from '../../../utils/env.js'
-import { generateSuggestions } from '../../../utils/permissions/filesystem.js'
+import {
+  generateSuggestions,
+  getConfigFolderPermissionPattern,
+} from '../../../utils/permissions/filesystem.js'
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js'
 import {
   type CompletionType,
@@ -108,7 +110,7 @@ function handleAcceptSession(
   ) {
     const pattern =
       options.scope === 'global-claude-folder'
-        ? GLOBAL_CLAUDE_FOLDER_PERMISSION_PATTERN
+        ? getConfigFolderPermissionPattern()
         : CLAUDE_FOLDER_PERMISSION_PATTERN
     const suggestions: PermissionUpdate[] = [
       {

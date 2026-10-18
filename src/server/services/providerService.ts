@@ -4,11 +4,6 @@ import { ApiError } from '../middleware/errorHandler.js'
 import { readRecoverableJsonFile } from './recoverableJsonFile.js'
 import { ManagedSettingsService } from './managedSettingsService.js'
 import {
-  OPENAI_OFFICIAL_PROVIDER,
-  isOpenAIOfficialProviderId,
-} from './openaiOfficialProvider.js'
-import { providerOpenAIOAuthService } from './providerOpenAIOAuthService.js'
-import {
   CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
   ensurePersistentStorageUpgraded,
 } from './persistentStorageMigrations.js'
@@ -109,10 +104,6 @@ export class ProviderService {
   }
 
   async getProvider(id: string): Promise<SavedProvider> {
-    if (isOpenAIOfficialProviderId(id)) {
-      return OPENAI_OFFICIAL_PROVIDER
-    }
-
     const index = await this.readIndex()
     const provider = index.providers.find((p) => p.id === id)
     if (!provider) throw ApiError.notFound(`Provider not found: ${id}`)
@@ -193,22 +184,13 @@ export class ProviderService {
 
   async activateProvider(id: string): Promise<void> {
     const index = await this.readIndex()
-    const provider = isOpenAIOfficialProviderId(id)
-      ? OPENAI_OFFICIAL_PROVIDER
-      : index.providers.find((p) => p.id === id)
+    const provider = index.providers.find((p) => p.id === id)
     if (!provider) throw ApiError.notFound(`Provider not found: ${id}`)
 
     index.activeId = id
     await this.writeIndex(index)
 
     await this.syncToSettings(provider)
-  }
-
-  async activateOfficial(): Promise<void> {
-    const index = await this.readIndex()
-    index.activeId = null
-    await this.writeIndex(index)
-    await this.clearProviderFromSettings()
   }
 
   private buildManagedEnv(
@@ -250,54 +232,13 @@ export class ProviderService {
     })
   }
 
-  private async clearProviderFromSettings(): Promise<void> {
-    await this.managedSettingsService.updateSettings((settings) => {
-      const env = { ...((settings.env as Record<string, string>) || {}) }
-
-      for (const key of getManagedEnvKeys()) {
-        delete env[key]
-      }
-
-      const nextSettings: Record<string, unknown> = {
-        ...settings,
-      }
-
-      if (Object.keys(env).length === 0) {
-        delete nextSettings.env
-      } else {
-        nextSettings.env = env
-      }
-
-      return {
-        settings: nextSettings,
-        result: undefined,
-      }
-    })
-  }
-
   async checkAuthStatus(): Promise<{
     hasAuth: boolean
-    source: 'dreamcoder-provider' | 'openai-oauth' | 'original-settings' | 'env' | 'none'
+    source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'
     activeProvider?: string
   }> {
     const index = await this.readIndex()
     if (index.activeId) {
-      if (isOpenAIOfficialProviderId(index.activeId)) {
-        const tokens = await providerOpenAIOAuthService.ensureFreshTokens()
-        if (tokens?.accessToken && tokens.refreshToken) {
-          return {
-            hasAuth: true,
-            source: 'openai-oauth',
-            activeProvider: OPENAI_OFFICIAL_PROVIDER.name,
-          }
-        }
-        return {
-          hasAuth: false,
-          source: 'none',
-          activeProvider: OPENAI_OFFICIAL_PROVIDER.name,
-        }
-      }
-
       const provider = index.providers.find(p => p.id === index.activeId)
       if (provider) {
         const presetDefaultEnv = getPresetDefaultEnv(provider.presetId)
@@ -329,12 +270,11 @@ export class ProviderService {
 
   async getProviderForProxy(providerId?: string): Promise<UpstreamTarget | null> {
     if (providerId) {
-      if (isOpenAIOfficialProviderId(providerId)) return null
       return resolveUpstreamTarget(await this.getProvider(providerId))
     }
 
     const index = await this.readIndex()
-    if (!index.activeId || isOpenAIOfficialProviderId(index.activeId)) return null
+    if (!index.activeId) return null
     const provider = await this.getProvider(index.activeId).catch(() => null)
     return provider ? resolveUpstreamTarget(provider) : null
   }

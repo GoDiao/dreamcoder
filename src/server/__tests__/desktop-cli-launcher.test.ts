@@ -9,6 +9,9 @@ import {
   getDesktopCliCommandName,
 } from '../services/desktopCliLauncherService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 const isWindows = process.platform === 'win32'
 const unixOnly = isWindows ? it.skip : it
 
@@ -30,7 +33,7 @@ describe('ensureDesktopCliLauncherInstalled', () => {
     process.env.USERPROFILE = tempHome
     process.env.SHELL = '/bin/zsh'
     process.env.PATH = ''
-    delete process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   afterEach(async () => {

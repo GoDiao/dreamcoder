@@ -16,10 +16,7 @@ export const ProviderAuthStrategySchema = z.enum([
 ])
 export type ProviderAuthStrategy = z.infer<typeof ProviderAuthStrategySchema>
 
-export const ProviderRuntimeKindSchema = z.enum([
-  'anthropic_compatible',
-  'openai_oauth',
-])
+export const ProviderRuntimeKindSchema = z.enum(['anthropic_compatible'])
 export type ProviderRuntimeKind = z.infer<typeof ProviderRuntimeKindSchema>
 
 export const ModelMappingSchema = z.object({

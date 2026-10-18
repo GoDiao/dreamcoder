@@ -4,6 +4,9 @@ import * as path from 'path'
 import * as os from 'os'
 import { TaskService } from '../services/taskService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 describe('TaskService', () => {
   let tmpDir: string
 
@@ -14,7 +17,7 @@ describe('TaskService', () => {
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
-    delete process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   async function writeTask(taskListId: string, task: Record<string, unknown> | string): Promise<void> {
@@ -104,7 +107,7 @@ describe('Tasks API', () => {
   afterEach(async () => {
     server?.stop()
     await fs.rm(tmpDir, { recursive: true, force: true })
-    delete process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   it('should return empty tasks list', async () => {

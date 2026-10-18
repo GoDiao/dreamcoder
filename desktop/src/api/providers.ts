@@ -14,7 +14,7 @@ type PresetsResponse = { presets: ProviderPreset[] }
 type TestResultResponse = { result: ProviderTestResult }
 type AuthStatusResponse = {
   hasAuth: boolean
-  source: 'dreamcoder-provider' | 'openai-oauth' | 'original-settings' | 'env' | 'none'
+  source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'
   activeProvider?: string
 }
 
@@ -53,10 +53,6 @@ export const providersApi = {
 
   activate(id: string) {
     return api.post<{ ok: true }>(`/api/providers/${id}/activate`)
-  },
-
-  activateOfficial() {
-    return api.post<{ ok: true }>('/api/providers/official')
   },
 
   test(id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) {

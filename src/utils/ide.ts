@@ -15,7 +15,11 @@ import type {
 } from '../services/mcp/types.js'
 import { getGlobalConfig, saveGlobalConfig } from './config.js'
 import { env } from './env.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
+import {
+  getClaudeConfigHomeDir,
+  getInheritedClaudeCodeDir,
+  isEnvTruthy,
+} from './envUtils.js'
 import {
   execFileNoThrow,
   execFileNoThrowWithCwd,
@@ -461,6 +465,11 @@ const getWindowsUserProfile = memoize(async (): Promise<string | undefined> => {
  */
 export async function getIdeLockfilesPaths(): Promise<string[]> {
   const paths: string[] = [join(getClaudeConfigHomeDir(), 'ide')]
+  // IDE extensions write their lock files to Claude Code's directory.
+  const claudeCodeDir = getInheritedClaudeCodeDir()
+  if (claudeCodeDir) {
+    paths.push(join(claudeCodeDir, 'ide'))
+  }
 
   if (getPlatform() !== 'wsl') {
     return paths
@@ -522,8 +531,15 @@ export async function getIdeLockfilesPaths(): Promise<string[]> {
 export async function cleanupStaleIdeLockfiles(): Promise<void> {
   try {
     const lockfiles = await getSortedIdeLockfiles()
+    // Claude Code's directory is read-only for DreamCoder: its lock files are
+    // read, never removed.
+    const claudeCodeDir = getInheritedClaudeCodeDir()
+    const claudeCodeIdeDir = claudeCodeDir ? join(claudeCodeDir, 'ide') : undefined
 
     for (const lockfilePath of lockfiles) {
+      if (claudeCodeIdeDir && lockfilePath.startsWith(claudeCodeIdeDir + pathSeparator)) {
+        continue
+      }
       const lockfileInfo = await readIdeLockfile(lockfilePath)
 
       if (!lockfileInfo) {
