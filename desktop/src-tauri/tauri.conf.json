@@ -59,6 +59,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "entitlements": "Entitlements.plist",
       "dmg": {
         "appPosition": {
           "x": 180,
