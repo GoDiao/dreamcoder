@@ -1,10 +1,8 @@
 import * as fs from 'node:fs/promises'
-import * as fsSync from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import * as readline from 'node:readline'
 import { ApiError } from '../middleware/errorHandler.js'
-import { sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
+import { LITE_READ_BUF_SIZE, sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { calculateUSDCost, MODEL_COSTS } from '../../utils/modelCost.js'
@@ -199,6 +197,124 @@ type PersistedWorktreeSession = {
   hookBased?: boolean
 }
 
+async function readWindow(handle: fs.FileHandle, position: number, length: number): Promise<Buffer> {
+  if (length <= 0) return Buffer.alloc(0)
+  const buf = Buffer.allocUnsafe(length)
+  const { bytesRead } = await handle.read(buf, 0, length, position)
+  return bytesRead === length ? buf : buf.subarray(0, bytesRead)
+}
+
+/**
+ * Complete JSONL lines inside a byte window.
+ * A window that begins or ends mid-line drops that partial record so a cut
+ * multi-byte character is never parsed.
+ */
+function completeWindowLines(
+  buf: Buffer,
+  dropLeadingPartial: boolean,
+  dropTrailingPartial: boolean,
+): string[] {
+  const byteLength = buf.length
+  if (byteLength === 0) return []
+
+  let start = 0
+  let end = byteLength
+  if (dropLeadingPartial) {
+    const newline = buf.indexOf(0x0a)
+    if (newline < 0) return []
+    start = newline + 1
+  }
+  if (dropTrailingPartial) {
+    const lastNewline = buf.lastIndexOf(0x0a, end - 1)
+    if (lastNewline < start) return []
+    end = lastNewline
+  }
+  if (end <= start) return []
+
+  const parts = buf.toString('utf8', start, end).split('\n')
+  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop()
+  return parts
+}
+
+/**
+ * Lines the session list can see without reading a transcript end to end.
+ * Files up to two windows are covered completely (the two reads overlap).
+ * Larger files contribute only their first and last LITE_READ_BUF_SIZE bytes,
+ * so messageCount and the last assistant message ignore the unread middle.
+ */
+async function readSessionListWindowLines(handle: fs.FileHandle, size: number): Promise<string[]> {
+  if (size <= 0) return []
+
+  const headLength = Math.min(LITE_READ_BUF_SIZE, size)
+  const head = await readWindow(handle, 0, headLength)
+  const tailOffset = Math.max(0, size - LITE_READ_BUF_SIZE)
+  if (tailOffset === 0) {
+    return completeWindowLines(head, false, false)
+  }
+
+  const tail = await readWindow(handle, tailOffset, size - tailOffset)
+  if (size <= LITE_READ_BUF_SIZE * 2) {
+    const suffix = tail.subarray(Math.max(0, head.length - tailOffset))
+    return completeWindowLines(Buffer.concat([head, suffix]), false, false)
+  }
+
+  const boundary = await readWindow(handle, tailOffset - 1, 1)
+  const tailStartsAtLineBoundary = boundary.length === 1 && boundary[0] === 0x0a
+  return [
+    ...completeWindowLines(head, false, true),
+    ...completeWindowLines(tail, !tailStartsAtLineBoundary, false),
+  ]
+}
+
+function summarizeSessionWindowLines(
+  lines: string[],
+  headLines: number,
+  tailLines: number,
+  includeLastAssistantMessage: boolean,
+): { entries: RawEntry[]; messageCount: number; lastAssistantMessage: string } {
+  const trimmedLines: string[] = []
+  let messageCount = 0
+  let lastAssistantMessage = ''
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    trimmedLines.push(trimmed)
+
+    if (
+      (trimmed.includes('"type":"user"') || trimmed.includes('"type":"assistant"')) &&
+      trimmed.includes('"role"')
+    ) {
+      messageCount++
+    }
+
+    if (includeLastAssistantMessage && trimmed.includes('"assistant"')) {
+      try {
+        const entry = JSON.parse(trimmed) as RawEntry
+        if (
+          entry?.type === 'assistant' &&
+          entry.message?.role === 'assistant' &&
+          !entry.isSidechain &&
+          !entry.isMeta &&
+          !entry.parent_tool_use_id &&
+          !shouldHideTranscriptEntry(entry)
+        ) {
+          const text = extractTextBlocks(entry.message.content).join('\n').trim()
+          if (text) lastAssistantMessage = text
+        }
+      } catch { }
+    }
+  }
+
+  const head = trimmedLines.slice(0, headLines)
+  const orderedTail = trimmedLines.slice(Math.max(0, trimmedLines.length - tailLines))
+  const entries: RawEntry[] = []
+  for (const line of [...head, ...orderedTail]) {
+    try { entries.push(JSON.parse(line) as RawEntry) } catch { }
+  }
+  return { entries, messageCount, lastAssistantMessage }
+}
+
 export class SessionService {
   private getConfigDir(): string {
     return getClaudeConfigHomeDir()
@@ -216,90 +332,31 @@ export class SessionService {
     return readJsonlFile<RawEntry>(filePath)
   }
 
-  private scanSessionFileHead(
+  private async scanSessionFileHead(
     filePath: string,
     headLines: number,
     tailLines: number,
     includeLastAssistantMessage = false,
   ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string }> {
-    return new Promise((resolve, reject) => {
-      const head: string[] = []
-      const tailRing: string[] = new Array(tailLines)
-      let lineCount = 0
-      let messageCount = 0
-      let lastAssistantMessage = ''
-      let settled = false
-
-      const stream = fsSync.createReadStream(filePath, { encoding: 'utf-8' })
-      const rl = readline.createInterface({ input: stream, crlfDelay: Infinity })
-
-      rl.on('line', (line) => {
-        const trimmed = line.trim()
-        if (!trimmed) return
-
-        if (lineCount < headLines) {
-          head.push(trimmed)
-        }
-        tailRing[lineCount % tailLines] = trimmed
-        lineCount++
-
-        if (
-          (trimmed.includes('"type":"user"') || trimmed.includes('"type":"assistant"')) &&
-          trimmed.includes('"role"')
-        ) {
-          messageCount++
-        }
-
-        if (includeLastAssistantMessage && trimmed.includes('"assistant"')) {
-          try {
-            const entry = JSON.parse(trimmed) as RawEntry
-            if (
-              entry?.type === 'assistant' &&
-              entry.message?.role === 'assistant' &&
-              !entry.isSidechain &&
-              !entry.isMeta &&
-              !entry.parent_tool_use_id &&
-              !shouldHideTranscriptEntry(entry)
-            ) {
-              const text = extractTextBlocks(entry.message.content).join('\n').trim()
-              if (text) lastAssistantMessage = text
-            }
-          } catch { }
-        }
-      })
-
-      rl.on('close', () => {
-        if (settled) return
-        settled = true
-        const tailStart = Math.max(0, lineCount - tailLines)
-        const orderedTail: string[] = []
-        for (let i = tailStart; i < lineCount; i++) {
-          const entry = tailRing[i % tailLines]
-          if (entry) orderedTail.push(entry)
-        }
-
-        const selected = [...head, ...orderedTail]
-        const entries: RawEntry[] = []
-        for (const line of selected) {
-          try { entries.push(JSON.parse(line) as RawEntry) } catch { }
-        }
-        resolve({ entries, messageCount, lastAssistantMessage })
-      })
-
-      const handleError = (err: Error) => {
-        if (settled) return
-        settled = true
-        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          resolve({ entries: [], messageCount: 0, lastAssistantMessage: '' })
-        } else {
-          reject(err)
-        }
-        rl.close()
-        stream.destroy()
+    let handle: fs.FileHandle | undefined
+    try {
+      handle = await fs.open(filePath, 'r')
+      const stat = await handle.stat()
+      if (!stat.isFile()) {
+        const error = new Error(`EISDIR: illegal operation on a directory, read '${filePath}'`) as NodeJS.ErrnoException
+        error.code = 'EISDIR'
+        throw error
       }
-      rl.on('error', handleError)
-      stream.on('error', handleError)
-    })
+      const lines = await readSessionListWindowLines(handle, stat.size)
+      return summarizeSessionWindowLines(lines, headLines, tailLines, includeLastAssistantMessage)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { entries: [], messageCount: 0, lastAssistantMessage: '' }
+      }
+      throw err
+    } finally {
+      await handle?.close()
+    }
   }
 
   private async appendJsonlEntry(filePath: string, entry: Record<string, unknown>): Promise<void> {

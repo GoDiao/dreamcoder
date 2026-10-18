@@ -832,13 +832,8 @@ async function getRecentProjects(url: URL): Promise<Response> {
 
   const realPathMap = new Map<string, { projectPath: string; modifiedAt: string; sessionCount: number; sessionId: string }>()
   for (const s of validSessions) {
-    let realPath: string
-    try {
-      const workDir = await sessionService.getSessionWorkDir(s.id)
-      realPath = s.projectRoot || workDir || sessionService.desanitizePath(s.projectPath)
-    } catch {
-      realPath = s.projectRoot || sessionService.desanitizePath(s.projectPath)
-    }
+    // workDir and projectRoot already come from the bounded head/tail scan.
+    const realPath = s.projectRoot || s.workDir || sessionService.desanitizePath(s.projectPath)
 
     const existing = realPathMap.get(realPath)
     if (!existing || s.modifiedAt > existing.modifiedAt) {
