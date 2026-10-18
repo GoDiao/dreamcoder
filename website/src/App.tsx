@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState, type MouseEvent } from 'react';
-import { ArrowRight, BookOpen, ExternalLink, Github, Laptop, LockKeyhole, Monitor, Smartphone, Terminal } from 'lucide-react';
+import { ArrowRight, BookOpen, Download, ExternalLink, Github, Laptop, LockKeyhole, Monitor, Smartphone, Terminal } from 'lucide-react';
 
 import { docIds, docTitles, docUrl, isDocId, type DocId, type DocTarget, type Lang } from './tutorial';
 
@@ -44,6 +44,8 @@ const copy = {
     macBody: '维护者日常使用。Releases 提供未签名的 .dmg 安装包。',
     linux: 'Linux x64',
     linuxBody: '尚未纳入日常实机验证，现有内存问题仍在调查。',
+    download: '下载',
+    buildFromSource: '从源码构建',
     privacyTitle: '本地运行与数据边界',
     privacyBody: 'Provider 配置和 API Key 写入本机文件。使用云端模型时，请求内容会发送给你选择的服务商。启用 H5 后，请妥善保管访问 Token。',
     privacyLink: '阅读隐私说明',
@@ -86,6 +88,8 @@ const copy = {
     macBody: 'Used daily by the maintainer. Releases has an unsigned .dmg installer.',
     linux: 'Linux x64',
     linuxBody: 'Not part of daily device validation; a memory issue remains under investigation.',
+    download: 'Download',
+    buildFromSource: 'Build from source',
     privacyTitle: 'Local runtime and data flow',
     privacyBody: 'Provider settings and API keys are written to local files. Requests to cloud models go to your chosen provider. Protect the access token when you enable H5.',
     privacyLink: 'Read the privacy notice',
@@ -97,6 +101,28 @@ const copy = {
 const github = 'https://github.com/GoDiao/dreamcoder';
 const atomgit = 'https://atomgit.com/GoDiao/DreamCoder';
 const base = import.meta.env.BASE_URL;
+const latestRelease = `${github}/releases/latest`;
+
+type Installers = { version: string; mac?: string; windows?: string };
+
+// Links the newest release's installers directly; until the GitHub API
+// answers (or if it fails), the buttons open the latest release page.
+function useLatestInstallers(): Installers | null {
+  const [installers, setInstallers] = useState<Installers | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('https://api.github.com/repos/GoDiao/dreamcoder/releases/latest', { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((release: { tag_name: string; assets: { name: string; browser_download_url: string }[] } | null) => {
+        if (!release) return;
+        const find = (suffix: string) => release.assets.find((asset) => asset.name.endsWith(suffix))?.browser_download_url;
+        setInstallers({ version: release.tag_name, mac: find('_aarch64.dmg'), windows: find('-setup.exe') });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return installers;
+}
 
 function readRoute(): { doc: DocId | null; lang: Language | null } {
   const params = new URLSearchParams(window.location.search);
@@ -106,9 +132,11 @@ function readRoute(): { doc: DocId | null; lang: Language | null } {
 }
 
 export default function App() {
+  const installers = useLatestInstallers();
   const [doc, setDoc] = useState<DocId | null>(() => readRoute().doc);
   const [lang, setLang] = useState<Language>(() => readRoute().lang ?? (window.localStorage.getItem('dreamcoder-site-language') === 'en' ? 'en' : 'zh'));
   const t = copy[lang];
+  const sourceGuide = `${github}/blob/main/${lang === 'zh' ? 'README_zh.md#-快速开始' : 'README.md#-getting-started'}`;
 
   useEffect(() => {
     function onPopState() {
@@ -190,7 +218,7 @@ export default function App() {
               <h1 className="max-w-xl font-serif text-5xl font-semibold leading-[1.08] tracking-tight text-brand-text-title md:text-6xl">{t.title}</h1>
               <p className="mt-7 max-w-xl text-base leading-8 text-brand-text-body">{t.intro}</p>
               <div className="mt-9 flex flex-wrap gap-3">
-                <a href={`${github}/blob/main/${lang === 'zh' ? 'README.md' : 'README_en.md'}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md bg-brand-text-title px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-caramel">{t.source}<ArrowRight size={16} /></a>
+                <a href={sourceGuide} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md bg-brand-text-title px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-caramel">{t.source}<ArrowRight size={16} /></a>
                 <a href={`${github}/releases`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md border border-brand-border px-5 py-3 text-sm font-semibold text-brand-text-title transition hover:bg-brand-bg-secondary">{t.releases}<ExternalLink size={15} /></a>
               </div>
               <p className="mt-5 max-w-md border-l-2 border-brand-caramel pl-3 text-xs leading-6 text-brand-text-muted">{t.releaseNote}</p>
@@ -262,16 +290,23 @@ export default function App() {
           <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.platformsTitle}</h2>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
-              { icon: Monitor, name: t.windows, detail: t.windowsBody },
-              { icon: Laptop, name: t.mac, detail: t.macBody },
-              { icon: Terminal, name: t.linux, detail: t.linuxBody },
-            ].map(({ icon: Icon, name, detail }) => (
-              <div key={name} className="rounded-lg border border-brand-border bg-white/70 p-6">
+              { icon: Monitor, name: t.windows, detail: t.windowsBody, installer: installers?.windows, label: `${t.download} .exe` },
+              { icon: Laptop, name: t.mac, detail: t.macBody, installer: installers?.mac, label: `${t.download} .dmg` },
+              { icon: Terminal, name: t.linux, detail: t.linuxBody, source: true, label: t.buildFromSource },
+            ].map(({ icon: Icon, name, detail, installer, source, label }) => {
+              const href = source ? sourceGuide : installer ?? latestRelease;
+              return (
+              <div key={name} className="flex flex-col rounded-lg border border-brand-border bg-white/70 p-6">
                 <Icon size={23} strokeWidth={1.5} className="text-brand-caramel" />
                 <h3 className="mt-5 font-serif text-2xl font-semibold">{name}</h3>
-                <p className="mt-2 text-sm leading-7 text-brand-text-muted">{detail}</p>
+                <p className="mt-2 flex-1 text-sm leading-7 text-brand-text-muted">{detail}</p>
+                <a href={href} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 self-start rounded-md border border-brand-border px-4 py-2 text-sm font-semibold text-brand-text-title transition hover:bg-brand-bg-secondary">
+                  {installer ? <Download size={15} /> : <ExternalLink size={15} />}
+                  {label}{installer ? ` · ${installers?.version}` : ''}
+                </a>
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
