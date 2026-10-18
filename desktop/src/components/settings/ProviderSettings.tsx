@@ -6,6 +6,8 @@ import { Button } from '../shared/Button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SavedProvider, ProviderTestResult } from '../../types/provider'
 import { ProviderFormModal } from './ProviderFormModal'
+import { SettingsPageHeader } from './SettingsPageHeader'
+import { Plus } from 'lucide-react'
 
 function ProviderSettings() {
   const {
@@ -75,22 +77,28 @@ function ProviderSettings() {
   const isProviderNotConfigured = hasLoadedProviders && activeId === null && providers.length > 0
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{t('settings.providers.title')}</h2>
-          <p className="text-sm text-[var(--color-text-tertiary)] mt-0.5">{t('settings.providers.description')}</p>
-        </div>
-        <Button size="sm" onClick={() => setShowCreateModal(true)} disabled={isPresetsLoading || presets.length === 0}>
-          <span className="material-symbols-outlined text-[16px]">add</span>
-          {t('settings.providers.addProvider')}
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <SettingsPageHeader
+        title={t('settings.providers.title')}
+        description={t('settings.providers.description')}
+        actions={
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => setShowCreateModal(true)}
+            disabled={isPresetsLoading || presets.length === 0}
+            icon={<Plus size={13} aria-hidden="true" />}
+          >
+            {t('settings.providers.addProvider')}
+          </Button>
+        }
+      />
 
       {isProviderNotConfigured && (
         <p
           data-testid="provider-settings-no-default"
-          className="mb-3 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]"
+          role="status"
+          className="mb-3 rounded-[8px] border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-xs leading-[1.5] text-[var(--color-text-secondary)]"
         >
           {t('chat.providerRequired.noDefault')}
         </p>
@@ -100,8 +108,10 @@ function ProviderSettings() {
         <div className="flex justify-center py-8">
           <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
         </div>
+      ) : hasLoadedProviders && providers.length === 0 ? (
+        <p className="py-6 text-xs text-[var(--color-text-tertiary)]">{t('settings.providers.empty')}</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
           {providers.map((provider) => {
             const isActive = activeId === provider.id
             const test = testResults[provider.id]
@@ -109,49 +119,44 @@ function ProviderSettings() {
             return (
               <div
                 key={provider.id}
-                className={`relative flex items-center gap-4 px-4 py-3.5 rounded-xl border transition-all group ${
-                  isActive
-                    ? 'border-[var(--color-brand)] bg-[var(--color-surface-container)] shadow-[var(--shadow-focus-ring)]'
-                    : 'border-[var(--color-border)] hover:border-[var(--color-border-focus)]'
-                }`}
+                className="flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5"
               >
-                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-tertiary)]'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-[var(--color-text-primary)] truncate">{provider.name}</span>
+                <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                  <div className="flex flex-wrap items-center gap-[9px]">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{provider.name}</span>
+                    {isActive && (
+                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{t('settings.providers.default')}</span>
+                    )}
                     {preset && preset.id !== 'custom' && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)] leading-none">{preset.name}</span>
+                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{preset.name}</span>
                     )}
                     {provider.apiFormat && provider.apiFormat !== 'anthropic' && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--color-surface-container-high)] text-[var(--color-warning)] leading-none">
+                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-warning)]">
                         {provider.apiFormat === 'openai_chat' ? 'OpenAI Chat' : 'OpenAI Responses'}
                       </span>
                     )}
-                    {isActive && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border border-[var(--color-brand)]/18 bg-[var(--color-brand)]/14 text-[var(--color-brand)] leading-none">{t('settings.providers.default')}</span>
-                    )}
                   </div>
-                  <div className="text-xs text-[var(--color-text-tertiary)] truncate mt-0.5">
+                  <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
                     {provider.baseUrl} &middot; {provider.models.main}
                   </div>
                   {test && !test.loading && test.result && (
-                    <div className="text-xs mt-1 flex flex-col gap-0.5">
-                      <span className={test.result.connectivity.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}>
-                        {test.result.connectivity.success
-                          ? t('settings.providers.connectivityOk', { latency: String(test.result.connectivity.latencyMs) })
-                          : t('settings.providers.connectivityFailed', { error: test.result.connectivity.error || '' })}
-                      </span>
+                    <div
+                      className={`mt-px text-xs leading-[1.5] ${test.result.connectivity.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}
+                    >
+                      {test.result.connectivity.success
+                        ? t('settings.providers.connectivityOk', { latency: String(test.result.connectivity.latencyMs) })
+                        : t('settings.providers.connectivityFailed', { error: test.result.connectivity.error || '' })}
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
                   {!isActive && (
-                    <Button variant="ghost" size="sm" onClick={() => handleActivate(provider.id)}>{t('settings.providers.setDefault')}</Button>
+                    <Button variant="secondary" size="xs" onClick={() => handleActivate(provider.id)}>{t('settings.providers.setDefault')}</Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setEditingProvider(provider)}>{t('settings.providers.edit')}</Button>
+                  <Button variant="secondary" size="xs" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
+                  <Button variant="secondary" size="xs" onClick={() => setEditingProvider(provider)}>{t('settings.providers.edit')}</Button>
                   {!isActive && (
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(provider)} className="text-[var(--color-error)] hover:text-[var(--color-error)]">{t('common.delete')}</Button>
+                    <Button variant="secondary" size="xs" onClick={() => handleDelete(provider)} className="text-[var(--color-error)] hover:text-[var(--color-error)]">{t('common.delete')}</Button>
                   )}
                 </div>
               </div>

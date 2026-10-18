@@ -1,13 +1,11 @@
 import { useTranslation } from '../../i18n'
 import { useProviderStore } from '../../stores/providerStore'
-import { SETTINGS_TAB_ID, useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { RuntimeSelection } from '../../types/runtime'
 import { Button } from '../shared/Button'
 
 export function openProviderSettings() {
-  useUIStore.getState().setPendingSettingsTab('providers')
-  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+  useUIStore.getState().openSettings('providers')
 }
 
 export function useProviderMissing(selection?: RuntimeSelection): boolean {
@@ -23,21 +21,30 @@ type Props = {
   testId?: string
 }
 
-export function ProviderRequiredNotice({ className = '', testId = 'provider-required-notice' }: Props) {
+/** Takes the place of the whole composer (input box, attachments, controls row) until a provider is usable. */
+export function ProviderGateCard({ className = '', testId = 'provider-required-notice' }: Props) {
   const t = useTranslation()
-  const hasProviders = useProviderStore((s) => s.providers.length > 0)
+  const providerCount = useProviderStore((s) => s.providers.length)
+  const hasProviders = providerCount > 0
 
   return (
     <div
       data-testid={testId}
       role="status"
-      className={`flex items-center justify-between gap-3 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-left text-sm text-[var(--color-text-secondary)] ${className}`}
+      className={`flex min-h-[78px] flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-3.5 pl-[18px] pr-3.5 ${className}`}
     >
-      <span className="min-w-0">
-        {hasProviders ? t('chat.providerRequired.noDefault') : t('empty.noProvider')}
-      </span>
-      <Button size="sm" variant="secondary" className="flex-shrink-0" onClick={openProviderSettings}>
-        {hasProviders ? t('chat.providerRequired.openSettings') : t('settings.providers.addProvider')}
+      <div className="grid min-w-0 flex-1 gap-0.5 text-left">
+        <strong className="text-ui-body font-semibold text-[var(--color-text-primary)]">
+          {hasProviders ? t('chat.providerGate.noDefaultTitle') : t('chat.providerGate.noneTitle')}
+        </strong>
+        <span className="text-ui-aux text-[var(--color-text-secondary)]">
+          {hasProviders
+            ? t('chat.providerGate.noDefaultBody', { count: providerCount })
+            : t('chat.providerGate.noneBody')}
+        </span>
+      </div>
+      <Button size="xs" variant="primary" className="h-8 shrink-0 px-3.5 text-[13px]" onClick={openProviderSettings}>
+        {hasProviders ? t('chat.providerGate.choose') : t('settings.providers.addProvider')}
       </Button>
     </div>
   )

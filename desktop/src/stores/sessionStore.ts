@@ -7,11 +7,20 @@ import {
 } from '../api/sessions'
 import { useSessionRuntimeStore } from './sessionRuntimeStore'
 import { useTabStore } from './tabStore'
+import { useTerminalPanelStore } from './terminalPanelStore'
+import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
 import { isPlaceholderSessionTitle } from '../lib/sessionTitle'
 
 type CreateSessionOptions = {
   repository?: CreateSessionRepositoryOptions
+}
+
+// The right-side panel keeps per-session state and terminal processes; drop
+// them when the session itself is deleted.
+function clearSessionPanels(sessionId: string) {
+  useWorkspacePanelStore.getState().clearSession(sessionId)
+  useTerminalPanelStore.getState().clearSession(sessionId)
 }
 
 type BranchSessionResult = Pick<BranchSessionResponse, 'sessionId' | 'title' | 'workDir'>
@@ -159,6 +168,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSession: async (id: string) => {
     await sessionsApi.delete(id)
     useSessionRuntimeStore.getState().clearSelection(id)
+    clearSessionPanels(id)
     set((s) => ({
       sessions: s.sessions.filter((session) => session.id !== id),
       activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
@@ -171,6 +181,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const result = await sessionsApi.batchDelete(sessionIds)
     for (const id of result.successes) {
       useSessionRuntimeStore.getState().clearSelection(id)
+      clearSessionPanels(id)
     }
     set((s) => ({
       sessions: s.sessions.filter((session) => !result.successes.includes(session.id)),

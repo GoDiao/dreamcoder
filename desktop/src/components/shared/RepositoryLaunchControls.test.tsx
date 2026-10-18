@@ -49,6 +49,11 @@ vi.mock('../../i18n', () => ({
     'repoLaunch.selectWorktree': 'Select worktree mode',
     'repoLaunch.worktreeCurrent': 'Current worktree',
     'repoLaunch.worktreeIsolated': 'Isolated worktree',
+    'repoLaunch.notice.branchTitle': 'Could not switch to the selected branch',
+    'repoLaunch.notice.dirtyTitle': 'Uncommitted changes',
+    'repoLaunch.notice.useWorktree': 'Use isolated worktree',
+    'repoLaunch.notice.pickBranch': 'Choose another branch',
+    'repoLaunch.notice.retry': 'Retry',
     'tabs.close': 'Close',
   }[key] ?? key),
 }))
@@ -127,8 +132,8 @@ describe('RepositoryLaunchControls', () => {
 
     const trigger = await screen.findByRole('button', { name: 'Select branch: main' })
     const bar = trigger.parentElement
-    expect(bar).toHaveClass('min-h-[44px]', 'bg-transparent')
-    expect(bar).not.toHaveClass('rounded-b-xl')
+    expect(bar).toHaveClass('bg-transparent')
+    expect(bar).not.toHaveClass('rounded-b-xl', 'border-t')
     expect(bar).not.toHaveClass('bg-[var(--color-surface-container-low)]')
   })
 
@@ -172,5 +177,43 @@ describe('RepositoryLaunchControls', () => {
     await waitFor(() => {
       expect(onBranchChange).toHaveBeenCalledWith('feature/h5')
     })
+  })
+
+  it('offers an isolated worktree when the working tree is dirty', async () => {
+    apiMocks.getRepositoryContext.mockResolvedValue({ ...okRepositoryContext, dirty: true })
+    const onUseWorktreeChange = vi.fn()
+    renderControls({ branch: 'feature/h5', onUseWorktreeChange, placement: 'composer' })
+
+    const notice = await screen.findByTestId('repo-launch-notice-dirty')
+    expect(notice).toHaveTextContent('Uncommitted changes')
+    expect(notice).toHaveTextContent('Dirty worktree')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use isolated worktree' }))
+    expect(onUseWorktreeChange).toHaveBeenCalledWith(true)
+  })
+
+  it('shows a launch branch failure in the notice slot and reopens the branch picker', async () => {
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+    const onLaunchErrorDismiss = vi.fn()
+    renderControls({
+      placement: 'composer',
+      noticeSlot: slot,
+      launchError: { kind: 'branch', message: 'Branch feature/gone no longer exists' },
+      onLaunchErrorDismiss,
+    })
+
+    await screen.findByRole('button', { name: 'Select branch: main' })
+    const notice = screen.getByTestId('repo-launch-notice-launch-branch')
+    expect(slot).toContainElement(notice)
+    expect(notice).toHaveTextContent('Could not switch to the selected branch')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another branch' }))
+    expect(await screen.findByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
+    expect(apiMocks.getRepositoryContext).toHaveBeenCalledTimes(2)
+
+    fireEvent.click(screen.getByRole('option', { name: /feature\/h5/ }))
+    expect(onLaunchErrorDismiss).toHaveBeenCalled()
+    slot.remove()
   })
 })

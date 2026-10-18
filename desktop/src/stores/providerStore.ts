@@ -52,13 +52,17 @@ function resolveRuntimeRefreshSelection(
       modelId: modelIds.has(currentSelection.modelId)
         ? currentSelection.modelId
         : provider.models.main,
+      ...(currentSelection.effort ? { effort: currentSelection.effort } : {}),
     }
   }
 
-  if (!currentSelection && activeId === provider.id) {
+  // No explicit model (none at all, or an effort-only choice) follows the
+  // default provider.
+  if (!currentSelection?.modelId && activeId === provider.id) {
     return {
       providerId: provider.id,
       modelId: provider.models.main,
+      ...(currentSelection?.effort ? { effort: currentSelection.effort } : {}),
     }
   }
 

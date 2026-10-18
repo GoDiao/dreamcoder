@@ -18,20 +18,15 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
     <div className="group mb-5 flex justify-start">
       <div
         data-message-shell="assistant"
-        data-layout={documentLayout ? 'document' : 'bubble'}
-        className={`flex min-w-0 flex-col items-start gap-2 ${
-          documentLayout
-            ? 'w-full max-w-full'
-            : 'w-full max-w-[88%] sm:max-w-[80%] lg:max-w-[72%]'
-        }`}
+        data-layout={documentLayout ? 'document' : 'plain'}
+        className="flex w-full min-w-0 max-w-full flex-col items-start gap-1.5"
       >
-        <div className={`rounded-[20px] rounded-tl-[8px] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-dropdown)] ${
-          documentLayout ? 'w-full' : 'max-w-full'
-        }`}>
+        <div className="w-full min-w-0 text-ui-message leading-[1.75] text-[var(--color-text-primary)]">
           <MarkdownRenderer
             content={content}
             variant={documentLayout ? 'document' : 'default'}
             streaming={isStreaming}
+            className={MESSAGE_PROSE_CLASSES}
           />
           {!isStreaming && <InlineImageGallery text={content} />}
           {isStreaming && (
@@ -49,6 +44,9 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
     </div>
   )
 })
+
+/** Replies read as plain text at message size, without a card around them. */
+const MESSAGE_PROSE_CLASSES = '!text-ui-message !leading-[1.75] prose-p:!text-ui-message prose-p:!leading-[1.75] prose-li:!text-ui-message'
 
 function shouldUseDocumentLayout(content: string) {
   const normalized = content.trim()

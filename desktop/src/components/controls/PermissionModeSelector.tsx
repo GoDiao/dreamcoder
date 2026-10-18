@@ -10,13 +10,15 @@ import type { PermissionMode } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
+import { Check, ChevronDown, FilePenLine, NotebookPen, ShieldCheck, Zap, type LucideIcon } from 'lucide-react'
+import { PICKER_TRIGGER_CLASS, POPOVER_CLASS } from './controlStyles'
 
-const MODE_ICONS: Record<PermissionMode, string> = {
-  default: 'verified_user',
-  acceptEdits: 'bolt',
-  plan: 'architecture',
-  bypassPermissions: 'gavel',
-  dontAsk: 'gavel',
+const MODE_ICONS: Record<PermissionMode, LucideIcon> = {
+  default: ShieldCheck,
+  acceptEdits: FilePenLine,
+  plan: NotebookPen,
+  bypassPermissions: Zap,
+  dontAsk: Zap,
 }
 
 type Props = {
@@ -47,33 +49,27 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
     value: PermissionMode
     label: string
     description: string
-    icon: string
     color?: string
   }> = [
     {
       value: 'default',
       label: t('permMode.askPermissions'),
       description: t('permMode.askPermDesc'),
-      icon: 'verified_user',
     },
     {
       value: 'acceptEdits',
       label: t('permMode.autoAccept'),
       description: t('permMode.autoAcceptDesc'),
-      icon: 'bolt',
     },
     {
       value: 'plan',
       label: t('permMode.planMode'),
       description: t('permMode.planModeDesc'),
-      icon: 'architecture',
-      color: 'text-[var(--color-text-tertiary)]',
     },
     {
       value: 'bypassPermissions',
       label: t('permMode.bypass'),
       description: t('permMode.bypassDesc'),
-      icon: 'gavel',
       color: 'text-[var(--color-error)]',
     },
   ]
@@ -93,8 +89,9 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const compactButtonClass = compact
     ? isMobile
       ? 'h-11 w-11 justify-center rounded-xl p-0'
-      : 'h-8 w-8 justify-center rounded-full p-0'
-    : 'gap-1.5 rounded-full px-2.5 py-1.5 text-xs'
+      : 'w-7 justify-center px-0'
+    : ''
+  const CurrentIcon = MODE_ICONS[currentMode]
   const menuId = 'permission-mode-menu'
 
   useEffect(() => {
@@ -110,7 +107,10 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
       }
     }
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key !== 'Escape') return
+      // Mark handled so an enclosing dialog's Escape layer stays open.
+      e.preventDefault()
+      setOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('keydown', handleEsc)
@@ -134,75 +134,62 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const closeConfirmDialog = useCallback(() => setConfirmDialog(false), [])
 
   const permissionOptions = (
-    <div id={menuId} ref={menuRef} role="menu">
-      {PERMISSION_ITEMS.map((item) => (
-        <button
-          key={item.value}
-          role="menuitem"
-          onClick={() => {
-            if (item.value === 'bypassPermissions') {
+    <div id={menuId} ref={menuRef} role="menu" aria-label={t('permMode.executionPermissions')}>
+      {PERMISSION_ITEMS.map((item) => {
+        const Icon = MODE_ICONS[item.value]
+        const selected = item.value === currentMode
+        return (
+          <button
+            key={item.value}
+            role="menuitemradio"
+            aria-checked={selected}
+            onClick={() => {
+              if (item.value === 'bypassPermissions') {
+                setOpen(false)
+                setConfirmDialog(true)
+                return
+              }
+              if (isControlled) {
+                onChange?.(item.value)
+              } else {
+                void setPermissionMode(item.value)
+                if (activeTabId) setSessionPermissionMode(activeTabId, item.value)
+              }
               setOpen(false)
-              setConfirmDialog(true)
-              return
-            }
-            if (isControlled) {
-              onChange?.(item.value)
-            } else {
-              void setPermissionMode(item.value)
-              if (activeTabId) setSessionPermissionMode(activeTabId, item.value)
-            }
-            setOpen(false)
-          }}
-          className={`
-            flex w-full items-start gap-3 px-4 py-3 text-left transition-colors
-            hover:bg-[var(--color-surface-hover)]
-            ${item.value === currentMode ? 'bg-[var(--color-surface-selected)]' : ''}
-          `}
-        >
-          <span className={`material-symbols-outlined mt-0.5 text-[20px] ${item.color || 'text-[var(--color-text-secondary)]'}`}>
-            {item.icon}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-[var(--color-text-primary)]">{item.label}</div>
-            <div className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">{item.description}</div>
-          </div>
-          {item.value === currentMode && (
-            <span className="material-symbols-outlined mt-0.5 text-[16px] text-[var(--color-brand)]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              check_circle
-            </span>
-          )}
-        </button>
-      ))}
+            }}
+            className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)] ${
+              selected ? 'bg-[var(--color-surface-selected)]' : ''
+            }`}
+          >
+            <Icon size={15} className={`mt-0.5 shrink-0 ${item.color || 'text-[var(--color-text-secondary)]'}`} aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <div className="text-ui-body font-medium text-[var(--color-text-primary)]">{item.label}</div>
+              <div className="mt-0.5 text-ui-aux text-[var(--color-text-tertiary)]">{item.description}</div>
+            </div>
+            {selected && <Check size={14} className="mt-1 shrink-0 text-[var(--color-text-primary)]" aria-hidden="true" />}
+          </button>
+        )
+      })}
     </div>
-  )
-
-  const menuContent = (
-    <>
-      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-outline)]">
-        {t('permMode.executionPermissions')}
-      </div>
-      {permissionOptions}
-    </>
   )
 
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         aria-label={MODE_LABELS[currentMode]}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title={compact ? MODE_LABELS[currentMode] : undefined}
-        className={`flex items-center bg-[var(--color-surface-container-low)] font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] ${
-          compactButtonClass
-        }`}
+        className={`${PICKER_TRIGGER_CLASS} ${compactButtonClass}`}
       >
-        <span className="material-symbols-outlined text-[14px]">{MODE_ICONS[currentMode]}</span>
+        <CurrentIcon size={14} className="shrink-0" aria-hidden="true" />
         {!compact && (
           <>
-            <span>{MODE_LABELS[currentMode]}</span>
-            <span className="material-symbols-outlined text-[12px]">expand_more</span>
+            <span className="truncate">{MODE_LABELS[currentMode]}</span>
+            <ChevronDown size={13} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
           </>
         )}
       </button>
@@ -215,13 +202,13 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
             title={t('permMode.executionPermissions')}
             closeLabel={t('tabs.close')}
             ariaLabel={t('permMode.executionPermissions')}
-            contentClassName="py-2"
+            contentClassName="p-2"
           >
             {permissionOptions}
           </MobileBottomSheet>
         ) : (
-          <div id={menuId} ref={menuRef} role="menu" className="motion-menu absolute left-0 bottom-full z-50 mb-2 w-[320px] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]" data-state="open">
-            {menuContent}
+          <div className={`motion-menu absolute bottom-full left-0 z-50 mb-2 w-[300px] p-1 ${POPOVER_CLASS}`} data-state="open">
+            {permissionOptions}
           </div>
         )
       )}

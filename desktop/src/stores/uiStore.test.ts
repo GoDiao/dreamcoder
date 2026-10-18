@@ -19,12 +19,12 @@ describe('uiStore theme handling', () => {
     document.documentElement.style.colorScheme = ''
   })
 
-  it('defaults new installs to the pure white theme', async () => {
+  it('defaults new installs to the warm light theme', async () => {
     const { initializeTheme, useUIStore } = await import('./uiStore')
 
-    expect(useUIStore.getState().theme).toBe('white')
+    expect(useUIStore.getState().theme).toBe('light')
     initializeTheme()
-    expect(document.documentElement.getAttribute('data-theme')).toBe('white')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
     expect(document.documentElement.style.colorScheme).toBe('light')
   })
 
@@ -60,6 +60,7 @@ describe('uiStore theme handling', () => {
   })
 
   it('cycles through all themes, persists Aurora, and wraps back to white', async () => {
+    window.localStorage.setItem('dreamcoder-theme', 'white')
     const { useUIStore } = await import('./uiStore')
 
     for (const theme of ['light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora', 'white']) {

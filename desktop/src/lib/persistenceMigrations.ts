@@ -48,11 +48,13 @@ function migrateTabs(storage: StorageLike, report: DesktopMigrationReport): void
     const openTabs = rawTabs
       .filter((tab): tab is Record<string, unknown> => isRecord(tab))
       .filter((tab) => typeof tab.sessionId === 'string' && typeof tab.title === 'string')
+      // Settings is a modal and terminals live in the session panel; drop their old tabs.
       .filter((tab) => tab.type !== 'terminal' && !String(tab.sessionId).startsWith('__terminal__'))
+      .filter((tab) => tab.type !== 'settings' && tab.sessionId !== '__settings__')
       .map((tab) => ({
         sessionId: tab.sessionId as string,
         title: tab.title as string,
-        type: tab.type === 'settings' || tab.type === 'scheduled' ? tab.type : 'session',
+        type: tab.type === 'scheduled' ? tab.type : 'session',
       }))
     const activeTabId =
       isRecord(parsed) &&

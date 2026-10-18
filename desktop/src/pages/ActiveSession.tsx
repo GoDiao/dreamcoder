@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Target } from 'lucide-react'
-import { DreamCoderIcon } from '../components/shared/DreamCoderIcon'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { GitBranch, PanelRight, SquareTerminal, Target } from 'lucide-react'
 import {
   SCHEDULED_TAB_ID,
-  SETTINGS_TAB_ID,
-  TERMINAL_TAB_PREFIX,
   useTabStore,
   type TabType,
 } from '../stores/tabStore'
@@ -12,21 +9,21 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
-import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import {
-  TERMINAL_PANEL_DEFAULT_HEIGHT,
-  TERMINAL_PANEL_MAX_HEIGHT,
-  TERMINAL_PANEL_MIN_HEIGHT,
-  useTerminalPanelStore,
-} from '../stores/terminalPanelStore'
+  WORKSPACE_PANEL_MAX_WIDTH,
+  WORKSPACE_PANEL_MIN_CHAT_WIDTH,
+  WORKSPACE_PANEL_MIN_WIDTH,
+  useWorkspacePanelStore,
+} from '../stores/workspacePanelStore'
 import { useTranslation } from '../i18n'
 import { MessageList } from '../components/chat/MessageList'
 import { ChatInput } from '../components/chat/ChatInput'
 import { ComputerUsePermissionModal } from '../components/chat/ComputerUsePermissionModal'
 import { SessionTaskBar } from '../components/chat/SessionTaskBar'
 import { WorkspacePanel } from '../components/workspace/WorkspacePanel'
+import { OpenProjectMenu } from '../components/layout/OpenProjectMenu'
+import { SessionHeaderMenu } from '../components/layout/SessionHeaderMenu'
 import { TeamStatusBar } from '../components/teams/TeamStatusBar'
-import { TerminalSettings } from './TerminalSettings'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
@@ -34,17 +31,23 @@ import { isTauriRuntime } from '../lib/desktopRuntime'
 
 const TASK_POLL_INTERVAL_MS = 1000
 const WORKSPACE_RESIZE_STEP = 32
-const TERMINAL_RESIZE_STEP = 24
-const CHAT_COLUMN_WITH_WORKSPACE_CLASS =
-  'min-w-[320px] flex-1 border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+const SIDE_PANEL_CLASS = [
+  'relative flex shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]',
+  'max-w-[calc(100%-320px)]',
+  'max-[850px]:absolute max-[850px]:inset-y-0 max-[850px]:right-0 max-[850px]:z-20',
+  'max-[850px]:w-[min(380px,100%)]! max-[850px]:max-w-full max-[850px]:shadow-[var(--shadow-dropdown)]',
+].join(' ')
 
 function isSessionTabState(activeTabId: string | null, activeTabType: TabType | null | undefined) {
   if (!activeTabId) return false
   if (activeTabType === 'session') return true
   if (activeTabType) return false
-  return activeTabId !== SETTINGS_TAB_ID &&
-    activeTabId !== SCHEDULED_TAB_ID &&
-    !activeTabId.startsWith(TERMINAL_TAB_PREFIX)
+  return activeTabId !== SCHEDULED_TAB_ID
+}
+
+function getPathName(path: string | null | undefined) {
+  if (!path) return undefined
+  return path.split(/[\\/]/).filter(Boolean).pop()
 }
 
 function getSessionTerminalCwd(session: SessionListItem | undefined) {
@@ -111,12 +114,19 @@ function WorkspaceResizeHandle() {
   const t = useTranslation()
   const width = useWorkspacePanelStore((state) => state.width)
   const setWidth = useWorkspacePanelStore((state) => state.setWidth)
-  const [dragState, setDragState] = useState<{ startX: number; startWidth: number } | null>(null)
+  const handleRef = useRef<HTMLDivElement>(null)
+  const [dragState, setDragState] = useState<{ startX: number; startWidth: number; maxWidth: number } | null>(null)
   const dragStateRef = useRef(dragState)
 
   useEffect(() => {
     dragStateRef.current = dragState
   }, [dragState])
+
+  const getMaxWidth = () => {
+    const row = handleRef.current?.parentElement?.parentElement
+    const rowWidth = row?.clientWidth ?? 0
+    return rowWidth > 0 ? rowWidth - WORKSPACE_PANEL_MIN_CHAT_WIDTH : Number.POSITIVE_INFINITY
+  }
 
   useEffect(() => {
     if (!dragState) return
@@ -124,7 +134,7 @@ function WorkspaceResizeHandle() {
     const handlePointerMove = (event: PointerEvent) => {
       const current = dragStateRef.current
       if (!current) return
-      setWidth(current.startWidth + current.startX - event.clientX)
+      setWidth(Math.min(current.startWidth + current.startX - event.clientX, current.maxWidth))
     }
 
     const handlePointerUp = () => {
@@ -148,112 +158,73 @@ function WorkspaceResizeHandle() {
 
   return (
     <div
+      ref={handleRef}
       role="separator"
       aria-label={t('workspace.resizePanel')}
       aria-orientation="vertical"
       aria-valuenow={width}
+      aria-valuemin={WORKSPACE_PANEL_MIN_WIDTH}
+      aria-valuemax={WORKSPACE_PANEL_MAX_WIDTH}
+      title={t('workspace.resizePanel')}
       tabIndex={0}
       data-testid="workspace-resize-handle"
       onPointerDown={(event) => {
         if (event.button !== 0) return
         event.preventDefault()
-        setDragState({ startX: event.clientX, startWidth: width })
+        setDragState({ startX: event.clientX, startWidth: width, maxWidth: getMaxWidth() })
       }}
       onKeyDown={(event) => {
         if (event.key === 'ArrowLeft') {
           event.preventDefault()
-          setWidth(width + WORKSPACE_RESIZE_STEP)
+          setWidth(Math.min(width + WORKSPACE_RESIZE_STEP, getMaxWidth()))
         }
         if (event.key === 'ArrowRight') {
           event.preventDefault()
           setWidth(width - WORKSPACE_RESIZE_STEP)
         }
       }}
-      className="group relative z-10 flex w-2 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-surface)] outline-none focus-visible:bg-[var(--color-surface-container)]"
-    >
-      <div className="my-3 w-px rounded-full bg-[var(--color-border)] transition-colors group-hover:bg-[var(--color-border-focus)] group-focus-visible:bg-[var(--color-border-focus)]" />
-    </div>
+      className={`absolute bottom-0 left-[-3px] top-0 z-10 w-[6px] cursor-col-resize outline-none transition-colors hover:bg-[var(--color-brand)]/20 focus-visible:bg-[var(--color-brand)]/30 max-[850px]:hidden ${
+        dragState ? 'bg-[var(--color-brand)]/20' : ''
+      }`}
+    />
   )
 }
 
-function TerminalResizeHandle() {
-  const t = useTranslation()
-  const height = useTerminalPanelStore((state) => state.height)
-  const setHeight = useTerminalPanelStore((state) => state.setHeight)
-  const [dragState, setDragState] = useState<{ startY: number; startHeight: number } | null>(null)
-  const dragStateRef = useRef(dragState)
-
-  useEffect(() => {
-    dragStateRef.current = dragState
-  }, [dragState])
-
-  useEffect(() => {
-    if (!dragState) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const current = dragStateRef.current
-      if (!current) return
-      setHeight(current.startHeight + current.startY - event.clientY)
-    }
-
-    const handlePointerUp = () => {
-      setDragState(null)
-    }
-
-    document.body.style.cursor = 'row-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerUp)
-
-    return () => {
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerUp)
-    }
-  }, [dragState, setHeight])
-
+function HeaderIconButton({
+  label,
+  pressed,
+  onClick,
+  children,
+}: {
+  label: string
+  pressed: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
-    <div
-      role="separator"
-      aria-label={t('terminal.resizePanel')}
-      aria-orientation="horizontal"
-      aria-valuemin={TERMINAL_PANEL_MIN_HEIGHT}
-      aria-valuemax={TERMINAL_PANEL_MAX_HEIGHT}
-      aria-valuenow={height}
-      tabIndex={0}
-      data-testid="terminal-resize-handle"
-      onPointerDown={(event) => {
-        if (event.button !== 0) return
-        event.preventDefault()
-        setDragState({ startY: event.clientY, startHeight: height })
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'ArrowUp') {
-          event.preventDefault()
-          setHeight(height + TERMINAL_RESIZE_STEP)
-        }
-        if (event.key === 'ArrowDown') {
-          event.preventDefault()
-          setHeight(height - TERMINAL_RESIZE_STEP)
-        }
-        if (event.key === 'Home') {
-          event.preventDefault()
-          setHeight(TERMINAL_PANEL_MIN_HEIGHT)
-        }
-        if (event.key === 'End') {
-          event.preventDefault()
-          setHeight(TERMINAL_PANEL_MAX_HEIGHT)
-        }
-      }}
-      onDoubleClick={() => setHeight(TERMINAL_PANEL_DEFAULT_HEIGHT)}
-      className="group flex h-2.5 shrink-0 cursor-row-resize items-center bg-[var(--color-surface)] outline-none focus-visible:bg-[var(--color-surface-container)]"
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      title={label}
+      onClick={onClick}
+      className={`inline-flex h-[29px] w-[29px] items-center justify-center rounded-[7px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+        pressed
+          ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
+      }`}
     >
-      <div className="mx-3 h-px flex-1 rounded-full bg-[var(--color-border)] transition-colors group-hover:bg-[var(--color-border-focus)] group-focus-visible:bg-[var(--color-border-focus)]" />
-    </div>
+      {children}
+    </button>
   )
+}
+
+function getSessionProjectName(session: SessionListItem | undefined, repoName: string | null | undefined) {
+  if (!session) return repoName ?? undefined
+  return getPathName(session.projectRoot)
+    ?? repoName
+    ?? getPathName(session.workDir)
+    ?? getPathName(session.projectPath)
 }
 
 export function ActiveSession() {
@@ -269,7 +240,6 @@ export function ActiveSession() {
   const hasIncompleteTasks = useCLITaskStore((s) => s.tasks.some((task) => task.status !== 'completed'))
   const hasRunningTasks = useCLITaskStore((s) => s.tasks.some((task) => task.status === 'in_progress'))
   const chatState = sessionState?.chatState ?? 'idle'
-  const tokenUsage = sessionState?.tokenUsage ?? { input_tokens: 0, output_tokens: 0 }
   const hasRunningBackgroundTasks = Object.values(sessionState?.backgroundAgentTasks ?? {})
     .some((task) => task.status === 'running')
 
@@ -277,28 +247,37 @@ export function ActiveSession() {
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const activeTeam = useTeamStore((s) => s.activeTeam)
   const isMemberSession = !!memberInfo
-  const showWorkspacePanel = useWorkspacePanelStore((state) =>
-    activeTabId && isSessionTabState(activeTabId, activeTabType) && !isMemberSession && !isMobileLayout
-      ? state.isPanelOpen(activeTabId)
-      : false,
+  const canUsePanel = Boolean(activeTabId) &&
+    isSessionTabState(activeTabId, activeTabType) &&
+    !isMemberSession &&
+    !isMobileLayout
+  const showPanel = useWorkspacePanelStore((state) =>
+    canUsePanel && activeTabId ? state.isPanelOpen(activeTabId) : false,
   )
-  const showTerminalPanel = useTerminalPanelStore((state) =>
-    activeTabId && isSessionTabState(activeTabId, activeTabType) && !isMemberSession && !isMobileLayout
-      ? state.isPanelOpen(activeTabId)
-      : false,
+  const panelTab = useWorkspacePanelStore((state) => activeTabId ? state.getPanelTab(activeTabId) : 'files')
+  const panelExpanded = useWorkspacePanelStore((state) =>
+    showPanel && activeTabId ? state.isPanelExpanded(activeTabId) : false,
   )
-  const terminalPanelRuntimeId = useTerminalPanelStore((state) =>
-    activeTabId && isSessionTabState(activeTabId, activeTabType) && !isMemberSession && !isMobileLayout
-      ? state.panelBySession[activeTabId]?.runtimeId
-      : undefined,
+  const panelWidth = useWorkspacePanelStore((state) => state.width)
+  const workspaceStatus = useWorkspacePanelStore((state) => activeTabId ? state.statusBySession[activeTabId] : undefined)
+  const workspaceStatusLoading = useWorkspacePanelStore((state) =>
+    activeTabId ? state.loading.statusBySession[activeTabId] ?? false : false,
   )
-  const terminalPanelHeight = useTerminalPanelStore((state) => state.height)
+  const workspaceStatusError = useWorkspacePanelStore((state) =>
+    activeTabId ? state.errors.statusBySession[activeTabId] ?? null : null,
+  )
 
   useEffect(() => {
     if (activeTabId && !isMemberSession) {
       connectToSession(activeTabId)
     }
   }, [activeTabId, isMemberSession, connectToSession])
+
+  useEffect(() => {
+    if (!canUsePanel || !activeTabId || !session) return
+    if (workspaceStatus || workspaceStatusLoading || workspaceStatusError) return
+    void useWorkspacePanelStore.getState().loadStatus(activeTabId)
+  }, [activeTabId, canUsePanel, session, workspaceStatus, workspaceStatusError, workspaceStatusLoading])
 
   useEffect(() => {
     if (!activeTabId || isMemberSession) return
@@ -330,12 +309,10 @@ export function ActiveSession() {
   const streamingText = sessionState?.streamingText ?? ''
   const activeGoal = sessionState?.activeGoal ?? null
   const isEmpty = messages.length === 0 && !streamingText && (session?.messageCount ?? 0) === 0
-  const visibleMessageCount = messages.length > 0 ? messages.length : session?.messageCount ?? 0
 
   const isActive = chatState !== 'idle' ||
     (trackedTaskSessionId === activeTabId && hasRunningTasks) ||
     hasRunningBackgroundTasks
-  const totalTokens = tokenUsage.input_tokens + tokenUsage.output_tokens
 
   const lastUpdated = useMemo(() => {
     if (!session?.modifiedAt) return ''
@@ -348,12 +325,93 @@ export function ActiveSession() {
 
   if (!activeTabId) return null
 
+  const projectName = getSessionProjectName(session, workspaceStatus?.repoName)
+  const branch = workspaceStatus?.branch ?? undefined
+  const contextLabel = [projectName, branch].filter(Boolean).join(' · ') || undefined
+  const openProjectPath = session?.workDirExists !== false ? session?.workDir ?? null : null
+  const showHeader = !isMemberSession && !isMobileLayout
+
   return (
-    <div className="flex-1 flex relative overflow-hidden bg-background text-on-surface">
-      <div data-testid="active-session-content-row" className="flex min-h-0 min-w-0 flex-1">
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
+      {showHeader && (
+        <header
+          data-tauri-drag-region
+          data-testid="session-header"
+          className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--color-border)] px-6 py-3.5"
+        >
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">
+              {session?.title || t('session.untitled')}
+            </h1>
+            <div
+              data-testid="session-header-meta"
+              className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-ui-aux text-[var(--color-text-secondary)]"
+            >
+              {isActive && (
+                <>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
+                    {t('session.active')}
+                  </span>
+                  {(projectName || branch || lastUpdated) && <span aria-hidden="true">·</span>}
+                </>
+              )}
+              {projectName && <span className="min-w-0 truncate">{projectName}</span>}
+              {branch && (
+                <>
+                  {projectName && <span aria-hidden="true" className="text-[var(--color-text-tertiary)]">/</span>}
+                  <GitBranch size={12} strokeWidth={1.9} aria-hidden="true" className="shrink-0" />
+                  <span className="min-w-0 truncate">{branch}</span>
+                </>
+              )}
+              {lastUpdated && (
+                <>
+                  {(projectName || branch) && <span aria-hidden="true">·</span>}
+                  <span className="truncate text-[var(--color-text-tertiary)]">{t('session.lastUpdated', { time: lastUpdated })}</span>
+                </>
+              )}
+            </div>
+            {session?.workDirExists === false && (
+              <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]">
+                <span className="material-symbols-outlined text-[14px]">warning</span>
+                <span className="truncate">
+                  {t('session.workspaceUnavailable', { dir: session.workDir || 'directory no longer exists' })}
+                </span>
+              </div>
+            )}
+            <ActiveGoalStrip
+              goal={activeGoal}
+              isRunning={isActive}
+              compact={showPanel}
+            />
+          </div>
+          {canUsePanel && (
+            <div className="flex shrink-0 items-center gap-[3px]">
+              {isTauriRuntime() && <OpenProjectMenu path={openProjectPath} />}
+              <HeaderIconButton
+                label={t('session.header.terminal')}
+                pressed={showPanel && panelTab === 'terminal'}
+                onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId, 'terminal')}
+              >
+                <SquareTerminal size={17} strokeWidth={1.9} aria-hidden="true" />
+              </HeaderIconButton>
+              <HeaderIconButton
+                label={t('session.header.files')}
+                pressed={showPanel && panelTab === 'files'}
+                onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId, 'files')}
+              >
+                <PanelRight size={17} strokeWidth={1.9} aria-hidden="true" />
+              </HeaderIconButton>
+              <SessionHeaderMenu sessionId={activeTabId} title={session?.title || ''} />
+            </div>
+          )}
+        </header>
+      )}
+
+      <div data-testid="active-session-content-row" className="relative flex min-h-0 min-w-0 flex-1">
         <div
           data-testid="active-session-chat-column"
-          className={`flex flex-col ${showWorkspacePanel ? CHAT_COLUMN_WITH_WORKSPACE_CLASS : isMobileLayout ? 'min-w-0 flex-1' : 'min-w-[360px] flex-1'}`}
+          className={panelExpanded ? 'hidden' : `flex min-w-0 flex-1 flex-col ${showPanel ? 'min-[850px]:min-w-[320px]' : ''}`}
         >
           {isMemberSession && (
             <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface-container)]">
@@ -414,11 +472,10 @@ export function ActiveSession() {
                   </>
                 ) : (
                   <>
-                    <DreamCoderIcon size={96} className="mb-6" />
-                    <h1 className="mb-2 text-3xl font-extrabold tracking-tight text-[var(--color-text-primary)]" style={{ fontFamily: 'var(--font-headline)' }}>
+                    <h2 className="text-ui-title font-semibold tracking-[-0.01em] text-[var(--color-text-primary)]">
                       {t('empty.title')}
-                    </h1>
-                    <p className="mx-auto max-w-xs text-[var(--color-text-secondary)]" style={{ fontFamily: 'var(--font-body)' }}>
+                    </h2>
+                    <p className="mt-1.5 text-ui-body text-[var(--color-text-secondary)]">
                       {t('empty.subtitle')}
                     </p>
                   </>
@@ -426,76 +483,7 @@ export function ActiveSession() {
               </div>
             </div>
           ) : (
-            <>
-              {!isMemberSession && !isMobileLayout && (
-                <div
-                  className={
-                    showWorkspacePanel
-                      ? 'flex w-full items-center border-b border-[var(--color-border)]/70 px-4 py-3'
-                      : 'w-full border-b border-outline-variant/10 px-4 py-3'
-                  }
-                >
-                  <div className={showWorkspacePanel ? 'min-w-0 flex-1' : 'mx-auto w-full max-w-[860px] min-w-0'}>
-                    <h1
-                      className={
-                        showWorkspacePanel
-                          ? 'truncate text-[15px] font-bold font-headline leading-tight text-on-surface'
-                          : 'text-lg font-bold font-headline text-on-surface leading-tight'
-                      }
-                    >
-                      {session?.title || t('session.untitled')}
-                    </h1>
-                    <div
-                      className={
-                        showWorkspacePanel
-                          ? 'mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-medium text-outline'
-                          : 'flex items-center gap-2 text-[10px] text-outline font-medium mt-1'
-                      }
-                    >
-                      {isActive && (
-                        <span className="flex shrink-0 items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
-                          {t('session.active')}
-                        </span>
-                      )}
-                      {totalTokens > 0 && (
-                        <>
-                          <span className="text-[var(--color-outline)]">·</span>
-                          <span>{totalTokens.toLocaleString()} t</span>
-                        </>
-                      )}
-                      {lastUpdated && (
-                        <>
-                          <span className="shrink-0 text-[var(--color-outline)]">·</span>
-                          <span className="truncate">{t('session.lastUpdated', { time: lastUpdated })}</span>
-                        </>
-                      )}
-                      {!showWorkspacePanel && visibleMessageCount > 0 && (
-                        <>
-                          <span className="text-[var(--color-outline)]">·</span>
-                          <span>{t('session.messages', { count: visibleMessageCount })}</span>
-                        </>
-                      )}
-                    </div>
-                    {session?.workDirExists === false && (
-                      <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]">
-                        <span className="material-symbols-outlined text-[14px]">warning</span>
-                        <span className="truncate">
-                          {t('session.workspaceUnavailable', { dir: session.workDir || 'directory no longer exists' })}
-                        </span>
-                      </div>
-                    )}
-                    <ActiveGoalStrip
-                      goal={activeGoal}
-                      isRunning={isActive}
-                      compact={showWorkspacePanel}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <MessageList compact={showWorkspacePanel} />
-            </>
+            <MessageList compact={showPanel} />
           )}
 
           {!isMemberSession && <SessionTaskBar />}
@@ -503,43 +491,24 @@ export function ActiveSession() {
           <TeamStatusBar />
 
           <ChatInput
-            variant={isEmpty && !isMemberSession && !showWorkspacePanel ? 'hero' : 'default'}
-            compact={showWorkspacePanel}
+            variant={isEmpty && !isMemberSession && !showPanel ? 'hero' : 'default'}
+            compact={showPanel}
           />
-
-          {terminalPanelRuntimeId && activeTabId ? (
-            <div
-              data-testid="session-terminal-panel"
-              className={[
-                'flex shrink-0 flex-col border-t border-[var(--color-border)] bg-[var(--color-surface-container-lowest)]',
-                showTerminalPanel ? '' : 'hidden',
-              ].join(' ')}
-              style={{ height: showTerminalPanel ? terminalPanelHeight : 0 }}
-            >
-              {showTerminalPanel && <TerminalResizeHandle />}
-              <TerminalSettings
-                active={showTerminalPanel}
-                docked
-                cwd={getSessionTerminalCwd(session)}
-                runtimeId={terminalPanelRuntimeId}
-                preserveOnUnmount
-                testId={`session-terminal-host-${activeTabId}`}
-                onOpenInTab={() => {
-                  useTerminalPanelStore.getState().closePanel(activeTabId)
-                  useTabStore.getState().openTerminalTab(getSessionTerminalCwd(session), terminalPanelRuntimeId)
-                  useTerminalPanelStore.getState().detachRuntime(activeTabId)
-                }}
-                onClose={() => useTerminalPanelStore.getState().closePanel(activeTabId)}
-              />
-            </div>
-          ) : null}
         </div>
 
-        {showWorkspacePanel ? (
-          <>
-            <WorkspaceResizeHandle />
-            <WorkspacePanel sessionId={activeTabId} />
-          </>
+        {showPanel ? (
+          <div
+            data-testid="session-side-panel"
+            className={panelExpanded ? 'flex min-w-0 flex-1' : SIDE_PANEL_CLASS}
+            style={panelExpanded ? undefined : { width: panelWidth }}
+          >
+            {!panelExpanded && <WorkspaceResizeHandle />}
+            <WorkspacePanel
+              sessionId={activeTabId}
+              terminalCwd={getSessionTerminalCwd(session)}
+              contextLabel={contextLabel}
+            />
+          </div>
         ) : null}
       </div>
 

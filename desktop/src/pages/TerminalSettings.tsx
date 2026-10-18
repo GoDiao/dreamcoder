@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState, type WheelEvent } from 'react'
-import { Info } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent } from 'react'
+import { Eraser, Info, RotateCcw } from 'lucide-react'
 import { useTranslation, type TranslationKey } from '../i18n'
 import { terminalApi } from '../api/terminal'
 import {
@@ -41,28 +41,32 @@ type TerminalSettingsProps = {
   active?: boolean
   cwd?: string
   onNewTerminal?: () => void
-  onOpenInTab?: () => void
-  onClose?: () => void
   testId?: string
   workspace?: boolean
   docked?: boolean
   showPreferences?: boolean
   runtimeId?: string
   preserveOnUnmount?: boolean
+  /** Docked only: content placed at the start of the toolbar (the panel's terminal tabs). */
+  toolbarLeading?: ReactNode
+  /** Docked only: a light line under the toolbar, e.g. "project · branch". */
+  meta?: ReactNode
+  onShellChange?: (shell: string) => void
 }
 
 export function TerminalSettings({
   active = true,
   cwd,
   onNewTerminal,
-  onOpenInTab,
-  onClose,
   testId = 'settings-terminal-host',
   workspace = false,
   docked = false,
   showPreferences = false,
   runtimeId,
   preserveOnUnmount = false,
+  toolbarLeading,
+  meta,
+  onShellChange,
 }: TerminalSettingsProps = {}) {
   const t = useTranslation()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -87,6 +91,10 @@ export function TerminalSettings({
   useEffect(() => {
     return subscribeTerminalRuntime(runtime, () => forceRuntimeUpdate((value) => value + 1))
   }, [runtime])
+
+  useEffect(() => {
+    if (shellInfo?.shell) onShellChange?.(shellInfo.shell)
+  }, [onShellChange, shellInfo?.shell])
 
   const resizeSession = useCallback(() => {
     const terminal = runtime.terminal
@@ -263,27 +271,102 @@ export function TerminalSettings({
     scroller.scrollBy({ top: event.deltaY, left: event.deltaX })
   }, [])
 
+  const notices = (
+    <>
+      {error && (
+        <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-error)]/20 bg-[var(--color-error)]/10 px-3 py-2 text-sm text-[var(--color-error)]">
+          {error}
+        </div>
+      )}
+
+      {warning && (
+        <div role="status" className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-terminal-warning)]/30 bg-[var(--color-terminal-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+          <p>{t('settings.terminal.shellFallback', { shell: shellInfo?.shell ?? '' })}</p>
+          <p className="mt-1 text-xs">{warning}</p>
+        </div>
+      )}
+    </>
+  )
+
+  const unavailableNotice = (
+    <div className="flex flex-1 items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-8 text-center">
+      <div>
+        <span className="material-symbols-outlined mb-3 block text-[32px] text-[var(--color-text-tertiary)]">
+          desktop_windows
+        </span>
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          {t('settings.terminal.unavailableTitle')}
+        </p>
+        <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
+          {t('settings.terminal.unavailableBody')}
+        </p>
+      </div>
+    </div>
+  )
+
+  if (docked) {
+    const statusLabel = status === 'running' ? null : t(STATUS_LABEL_KEYS[status])
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden p-3">
+        <div data-testid="settings-terminal-toolbar" className="flex min-w-0 shrink-0 items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center">{toolbarLeading}</div>
+          <DockedIconButton
+            label={t('settings.terminal.clear')}
+            onClick={clearTerminal}
+            disabled={!runtime.terminal}
+          >
+            <Eraser size={14} strokeWidth={2} aria-hidden="true" />
+          </DockedIconButton>
+          <DockedIconButton label={t('settings.terminal.restart')} onClick={() => void startTerminal()}>
+            <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
+          </DockedIconButton>
+        </div>
+        {(meta || statusLabel) && (
+          <div data-testid="terminal-meta" className="mx-0.5 mt-2.5 flex min-w-0 shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)]">
+            {meta && <span className="min-w-0 truncate">{meta}</span>}
+            {meta && statusLabel && <span aria-hidden="true">·</span>}
+            {statusLabel && <span className="shrink-0">{statusLabel}</span>}
+          </div>
+        )}
+        <div className="mt-1.5 flex min-h-0 flex-1 flex-col">
+          {notices}
+          {status === 'unavailable' ? unavailableNotice : (
+            <div
+              data-testid="settings-terminal-frame"
+              onWheelCapture={handleTerminalWheelCapture}
+              className="min-h-[120px] flex-1 overflow-hidden rounded-[8px] border border-[var(--color-terminal-border)] bg-[var(--color-terminal-bg)] transition-colors focus-within:border-[var(--color-brand)]"
+            >
+              <div
+                ref={hostRef}
+                data-testid={testId}
+                className="settings-terminal-host h-full w-full overflow-hidden px-2 pb-2 pt-1.5"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`flex h-full flex-col overflow-hidden ${
-      docked
-        ? 'min-h-0 bg-[var(--color-surface-container-lowest)] px-3 py-1.5'
-        : workspace
-          ? 'min-h-0 bg-[var(--color-surface)] px-5 py-4'
-          : 'min-h-[min(720px,calc(100vh-8rem))]'
+      workspace
+        ? 'min-h-0 bg-[var(--color-surface)] px-5 py-4'
+        : 'min-h-[min(720px,calc(100vh-8rem))]'
     }`}>
       <div
         data-testid="settings-terminal-toolbar"
-        className={`${docked ? 'mb-1.5 min-h-8' : 'mb-2 min-h-9'} flex min-w-0 flex-wrap items-center gap-2`}
+        className="mb-2 flex min-h-9 min-w-0 flex-wrap items-center gap-2"
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-terminal-danger)]" aria-hidden="true" />
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-terminal-warning)]" aria-hidden="true" />
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-terminal-accent)]" aria-hidden="true" />
-          <h2 className={`${docked ? 'text-[13px]' : 'text-sm'} shrink-0 font-semibold text-[var(--color-text-primary)]`}>
+          <h2 className="shrink-0 text-sm font-semibold text-[var(--color-text-primary)]">
             {t('settings.terminal.title')}
           </h2>
-          <TerminalHelpHint compact={docked} />
-          <StatusPill status={status} label={t(STATUS_LABEL_KEYS[status])} compact={docked} />
+          <TerminalHelpHint />
+          <StatusPill status={status} label={t(STATUS_LABEL_KEYS[status])} />
           {shellInfo && (
             <div className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]">
               <span className="shrink-0 font-mono">{shellInfo.shell}</span>
@@ -294,16 +377,6 @@ export function TerminalSettings({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {onOpenInTab && (
-            <button
-              type="button"
-              onClick={onOpenInTab}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-            >
-              <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              {t('terminal.openInTab')}
-            </button>
-          )}
           {onNewTerminal && (
             <button
               type="button"
@@ -331,51 +404,16 @@ export function TerminalSettings({
             <span className="material-symbols-outlined text-[16px]">restart_alt</span>
             {t('settings.terminal.restart')}
           </button>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('terminal.closePanel')}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-            >
-              <span className="material-symbols-outlined text-[17px]">close</span>
-            </button>
-          )}
         </div>
       </div>
 
-      {error && (
-        <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-error)]/20 bg-[var(--color-error)]/10 px-3 py-2 text-sm text-[var(--color-error)]">
-          {error}
-        </div>
-      )}
-
-      {warning && (
-        <div role="status" className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-terminal-warning)]/30 bg-[var(--color-terminal-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-          <p>{t('settings.terminal.shellFallback', { shell: shellInfo?.shell ?? '' })}</p>
-          <p className="mt-1 text-xs">{warning}</p>
-        </div>
-      )}
+      {notices}
 
       {showPreferences && isWindows && terminalApi.isAvailable() && (
         <BashPathSettings isTauri />
       )}
 
-      {status === 'unavailable' ? (
-        <div className="flex flex-1 items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-8 text-center">
-          <div>
-            <span className="material-symbols-outlined mb-3 block text-[32px] text-[var(--color-text-tertiary)]">
-              desktop_windows
-            </span>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">
-              {t('settings.terminal.unavailableTitle')}
-            </p>
-            <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
-              {t('settings.terminal.unavailableBody')}
-            </p>
-          </div>
-        </div>
-      ) : (
+      {status === 'unavailable' ? unavailableNotice : (
         <div
           data-testid="settings-terminal-frame"
           onWheelCapture={handleTerminalWheelCapture}
@@ -389,6 +427,31 @@ export function TerminalSettings({
         </div>
       )}
     </div>
+  )
+}
+
+function DockedIconButton({
+  label,
+  onClick,
+  disabled = false,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-45"
+    >
+      {children}
+    </button>
   )
 }
 

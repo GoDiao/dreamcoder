@@ -11,7 +11,6 @@ import { useSettingsStore } from '../stores/settingsStore'
 
 export function useKeyboardShortcuts() {
   const setActiveSession = useSessionStore((s) => s.setActiveSession)
-  const setActiveView = useUIStore((s) => s.setActiveView)
   const openModal = useUIStore((s) => s.openModal)
   const closeModal = useUIStore((s) => s.closeModal)
   const activeModal = useUIStore((s) => s.activeModal)
@@ -65,7 +64,6 @@ export function useKeyboardShortcuts() {
       if (meta && e.key === 'n') {
         e.preventDefault()
         setActiveSession(null)
-        setActiveView('code')
       }
 
       if (e.key === 'Escape') {
@@ -88,5 +86,5 @@ export function useKeyboardShortcuts() {
       document.removeEventListener('keydown', handleQuickSwitcher, true)
       document.removeEventListener('keydown', handler)
     }
-  }, [closeModal, openModal, setActiveSession, setActiveView, setUiZoom, stopGeneration])
+  }, [closeModal, openModal, setActiveSession, setUiZoom, stopGeneration])
 }

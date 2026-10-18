@@ -7,19 +7,20 @@ import {
   type WorkspaceTreeResult,
 } from '../api/sessions'
 
-export const WORKSPACE_PANEL_DEFAULT_WIDTH = 860
-export const WORKSPACE_PANEL_MIN_WIDTH = 640
-export const WORKSPACE_PANEL_MAX_WIDTH = 1120
+export const WORKSPACE_PANEL_DEFAULT_WIDTH = 380
+export const WORKSPACE_PANEL_MIN_WIDTH = 280
+export const WORKSPACE_PANEL_MAX_WIDTH = 680
+export const WORKSPACE_PANEL_MIN_CHAT_WIDTH = 320
 
+export type WorkspacePanelTab = 'files' | 'terminal'
 export type WorkspacePanelView = 'changed' | 'all'
 export type WorkspacePreviewKind = 'file' | 'diff'
-export type WorkspacePreviewCloseScope = 'current' | 'others' | 'left' | 'right' | 'all'
 export type WorkspacePreviewState =
   | 'loading'
   | WorkspaceReadFileResult['state']
   | WorkspaceDiffResult['state']
 
-export type WorkspacePreviewTab = {
+export type WorkspacePreviewEntry = {
   id: string
   path: string
   kind: WorkspacePreviewKind
@@ -37,6 +38,8 @@ export type WorkspacePreviewTab = {
 
 export type WorkspacePanelSessionState = {
   isOpen: boolean
+  tab: WorkspacePanelTab
+  expanded: boolean
   activeView: WorkspacePanelView
   hasUserSelectedView?: boolean
 }
@@ -44,13 +47,13 @@ export type WorkspacePanelSessionState = {
 type WorkspacePanelLoadingState = {
   statusBySession: Record<string, boolean | undefined>
   treeBySessionPath: Record<string, boolean | undefined>
-  previewByTabId: Record<string, boolean | undefined>
+  previewById: Record<string, boolean | undefined>
 }
 
 type WorkspacePanelErrorState = {
   statusBySession: Record<string, string | null | undefined>
   treeBySessionPath: Record<string, string | null | undefined>
-  previewByTabId: Record<string, string | null | undefined>
+  previewById: Record<string, string | null | undefined>
 }
 
 type WorkspacePanelStore = {
@@ -59,30 +62,37 @@ type WorkspacePanelStore = {
   statusBySession: Record<string, WorkspaceStatusResult | undefined>
   expandedPathsBySession: Record<string, string[] | undefined>
   treeBySessionPath: Record<string, Record<string, WorkspaceTreeResult | undefined> | undefined>
-  previewTabsBySession: Record<string, WorkspacePreviewTab[] | undefined>
-  activePreviewTabIdBySession: Record<string, string | null | undefined>
+  previewsBySession: Record<string, Record<string, WorkspacePreviewEntry | undefined> | undefined>
+  expandedPreviewIdsBySession: Record<string, string[] | undefined>
   loading: WorkspacePanelLoadingState
   errors: WorkspacePanelErrorState
 
   isPanelOpen: (sessionId: string) => boolean
+  getPanelTab: (sessionId: string) => WorkspacePanelTab
+  isPanelExpanded: (sessionId: string) => boolean
   getActiveView: (sessionId: string) => WorkspacePanelView
-  openPanel: (sessionId: string) => void
+  openPanel: (sessionId: string, tab?: WorkspacePanelTab) => void
   closePanel: (sessionId: string) => void
-  togglePanel: (sessionId: string) => void
+  togglePanel: (sessionId: string, tab?: WorkspacePanelTab) => void
+  setPanelTab: (sessionId: string, tab: WorkspacePanelTab) => void
+  toggleExpanded: (sessionId: string) => void
   setWidth: (width: number) => void
   setActiveView: (sessionId: string, view: WorkspacePanelView) => void
   loadStatus: (sessionId: string) => Promise<void>
   loadTree: (sessionId: string, path?: string) => Promise<void>
   toggleTreeNode: (sessionId: string, path: string) => Promise<void>
-  openPreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
-  closePreview: (sessionId: string, tabId: string) => void
-  closePreviewTabs: (sessionId: string, tabId: string, scope: WorkspacePreviewCloseScope) => void
+  expandPreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
+  collapsePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => void
+  togglePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
+  refreshPreviews: (sessionId: string) => Promise<void>
   clearSession: (sessionId: string) => void
   resetSessionUi: (sessionId: string) => void
 }
 
 const DEFAULT_PANEL_STATE: WorkspacePanelSessionState = {
   isOpen: false,
+  tab: 'files',
+  expanded: false,
   activeView: 'changed',
 }
 
@@ -121,7 +131,7 @@ function makeTreeKey(sessionId: string, path: string) {
   return `${sessionId}::${path}`
 }
 
-export function getWorkspacePreviewTabId(path: string, kind: WorkspacePreviewKind) {
+export function getWorkspacePreviewId(path: string, kind: WorkspacePreviewKind) {
   return `${kind}:${path}`
 }
 
@@ -148,14 +158,6 @@ function removeRecordKey<T>(record: Record<string, T>, key: string) {
   return rest
 }
 
-function removeRecordKeys<T>(record: Record<string, T>, keys: string[]) {
-  let next = record
-  for (const key of keys) {
-    next = removeRecordKey(next, key)
-  }
-  return next
-}
-
 function invalidateSessionScopedRequests(store: Map<string, number>, sessionId: string) {
   const prefix = `${sessionId}::`
   for (const key of store.keys()) {
@@ -165,19 +167,18 @@ function invalidateSessionScopedRequests(store: Map<string, number>, sessionId: 
   }
 }
 
-function upsertPreviewTab(
-  tabs: WorkspacePreviewTab[],
-  tabId: string,
-  update: WorkspacePreviewTab | ((current: WorkspacePreviewTab) => WorkspacePreviewTab),
+function patchSessionPanel(
+  panelBySession: Record<string, WorkspacePanelSessionState | undefined>,
+  sessionId: string,
+  patch: Partial<WorkspacePanelSessionState>,
 ) {
-  const index = tabs.findIndex((tab) => tab.id === tabId)
-  if (index < 0) return tabs
-
-  const current = tabs[index]!
-  const next = typeof update === 'function' ? update(current) : update
-  const nextTabs = [...tabs]
-  nextTabs[index] = next
-  return nextTabs
+  return {
+    ...panelBySession,
+    [sessionId]: {
+      ...getSessionPanelState(panelBySession, sessionId),
+      ...patch,
+    },
+  }
 }
 
 export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => ({
@@ -186,57 +187,63 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   statusBySession: {},
   expandedPathsBySession: {},
   treeBySessionPath: {},
-  previewTabsBySession: {},
-  activePreviewTabIdBySession: {},
+  previewsBySession: {},
+  expandedPreviewIdsBySession: {},
   loading: {
     statusBySession: {},
     treeBySessionPath: {},
-    previewByTabId: {},
+    previewById: {},
   },
   errors: {
     statusBySession: {},
     treeBySessionPath: {},
-    previewByTabId: {},
+    previewById: {},
   },
 
   isPanelOpen: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).isOpen,
+  getPanelTab: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).tab,
+  isPanelExpanded: (sessionId) => {
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    return panel.isOpen && panel.expanded
+  },
   getActiveView: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).activeView,
 
-  openPanel: (sessionId) =>
+  openPanel: (sessionId, tab) =>
     set((state) => ({
-      panelBySession: {
-        ...state.panelBySession,
-        [sessionId]: {
-          ...getSessionPanelState(state.panelBySession, sessionId),
-          isOpen: true,
-        },
-      },
+      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+        isOpen: true,
+        ...(tab ? { tab } : {}),
+      }),
     })),
 
   closePanel: (sessionId) =>
     set((state) => ({
-      panelBySession: {
-        ...state.panelBySession,
-        [sessionId]: {
-          ...getSessionPanelState(state.panelBySession, sessionId),
-          isOpen: false,
-        },
-      },
+      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+        isOpen: false,
+        expanded: false,
+      }),
     })),
 
-  togglePanel: (sessionId) =>
-    set((state) => {
-      const panel = getSessionPanelState(state.panelBySession, sessionId)
-      return {
-        panelBySession: {
-          ...state.panelBySession,
-          [sessionId]: {
-            ...panel,
-            isOpen: !panel.isOpen,
-          },
-        },
-      }
-    }),
+  togglePanel: (sessionId, tab = 'files') => {
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    if (panel.isOpen && panel.tab === tab) {
+      get().closePanel(sessionId)
+      return
+    }
+    get().openPanel(sessionId, tab)
+  },
+
+  setPanelTab: (sessionId, tab) =>
+    set((state) => ({
+      panelBySession: patchSessionPanel(state.panelBySession, sessionId, { tab }),
+    })),
+
+  toggleExpanded: (sessionId) =>
+    set((state) => ({
+      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+        expanded: !getSessionPanelState(state.panelBySession, sessionId).expanded,
+      }),
+    })),
 
   setWidth: (width) => set({ width: clampWorkspacePanelWidth(width) }),
 
@@ -430,258 +437,71 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     }
   },
 
-  openPreview: async (sessionId, path, kind) => {
-    const tabId = getWorkspacePreviewTabId(path, kind)
-    const requestKey = makePreviewKey(sessionId, tabId)
-    const existing = get().previewTabsBySession[sessionId]?.find((tab) => tab.id === tabId)
-
-    if (existing) {
-      set((state) => ({
-        activePreviewTabIdBySession: {
-          ...state.activePreviewTabIdBySession,
-          [sessionId]: tabId,
-        },
-      }))
-      return
-    }
-
-    const requestId = nextRequestId(previewRequestIds, requestKey)
-    const baseTab: WorkspacePreviewTab = {
-      id: tabId,
-      path,
-      kind,
-      title: getPathTitle(path),
-      state: 'loading',
-    }
-
-    set((state) => ({
-      previewTabsBySession: {
-        ...state.previewTabsBySession,
-        [sessionId]: [...(state.previewTabsBySession[sessionId] ?? []), baseTab],
-      },
-      activePreviewTabIdBySession: {
-        ...state.activePreviewTabIdBySession,
-        [sessionId]: tabId,
-      },
-      loading: {
-        ...state.loading,
-        previewByTabId: {
-          ...state.loading.previewByTabId,
-          [requestKey]: true,
-        },
-      },
-      errors: {
-        ...state.errors,
-        previewByTabId: {
-          ...state.errors.previewByTabId,
-          [requestKey]: null,
-        },
-      },
-    }))
-
-    try {
-      if (kind === 'diff') {
-        const result = await sessionsApi.getWorkspaceDiff(sessionId, path)
-        if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
-        if (!get().previewTabsBySession[sessionId]?.some((tab) => tab.id === tabId)) return
-
-        set((state) => {
-          const tabs = state.previewTabsBySession[sessionId] ?? []
-          return {
-            previewTabsBySession: {
-              ...state.previewTabsBySession,
-              [sessionId]: upsertPreviewTab(tabs, tabId, (current) => ({
-                ...current,
-                diff: result.diff ?? '',
-                content: undefined,
-                language: undefined,
-                size: undefined,
-                state: result.state,
-                error: result.error,
-              })),
-            },
-            loading: {
-              ...state.loading,
-              previewByTabId: {
-                ...state.loading.previewByTabId,
-                [requestKey]: false,
-              },
-            },
-            errors: {
-              ...state.errors,
-              previewByTabId: {
-                ...state.errors.previewByTabId,
-                [requestKey]: result.error ?? null,
-              },
-            },
-          }
-        })
-        return
-      }
-
-      const result = await sessionsApi.getWorkspaceFile(sessionId, path)
-      if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
-      if (!get().previewTabsBySession[sessionId]?.some((tab) => tab.id === tabId)) return
-
-      set((state) => {
-        const tabs = state.previewTabsBySession[sessionId] ?? []
-        return {
-          previewTabsBySession: {
-            ...state.previewTabsBySession,
-            [sessionId]: upsertPreviewTab(tabs, tabId, (current) => ({
-                ...current,
-                content: result.content,
-                dataUrl: result.dataUrl,
-                mimeType: result.mimeType,
-                previewType: result.previewType ?? 'text',
-                diff: undefined,
-                language: result.language,
-              size: result.size,
-              state: result.state,
-              error: result.error,
-            })),
-          },
-          loading: {
-            ...state.loading,
-            previewByTabId: {
-              ...state.loading.previewByTabId,
-              [requestKey]: false,
-            },
-          },
-          errors: {
-            ...state.errors,
-            previewByTabId: {
-              ...state.errors.previewByTabId,
-              [requestKey]: result.error ?? null,
-            },
-          },
-        }
-      })
-    } catch (error) {
-      if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
-      if (!get().previewTabsBySession[sessionId]?.some((tab) => tab.id === tabId)) return
-
-      set((state) => {
-        const tabs = state.previewTabsBySession[sessionId] ?? []
-        const message = error instanceof Error ? error.message : 'Failed to load workspace preview'
-
-        return {
-          previewTabsBySession: {
-            ...state.previewTabsBySession,
-            [sessionId]: upsertPreviewTab(tabs, tabId, (current) => ({
-              ...current,
-              state: 'error',
-              error: message,
-            })),
-          },
-          loading: {
-            ...state.loading,
-            previewByTabId: {
-              ...state.loading.previewByTabId,
-              [requestKey]: false,
-            },
-          },
-          errors: {
-            ...state.errors,
-            previewByTabId: {
-              ...state.errors.previewByTabId,
-              [requestKey]: message,
-            },
-          },
-        }
-      })
-    }
-  },
-
-  closePreview: (sessionId, tabId) => {
-    get().closePreviewTabs(sessionId, tabId, 'current')
-  },
-
-  closePreviewTabs: (sessionId, tabId, scope) => {
+  expandPreview: async (sessionId, path, kind) => {
+    const previewId = getWorkspacePreviewId(path, kind)
     set((state) => {
-      const tabs = state.previewTabsBySession[sessionId] ?? []
-      const index = tabs.findIndex((tab) => tab.id === tabId)
-      if (index < 0) {
-        const requestKey = makePreviewKey(sessionId, tabId)
-        invalidateRequest(previewRequestIds, requestKey)
-        return {
-          loading: {
-            ...state.loading,
-            previewByTabId: removeRecordKey(state.loading.previewByTabId, requestKey),
-          },
-          errors: {
-            ...state.errors,
-            previewByTabId: removeRecordKey(state.errors.previewByTabId, requestKey),
-          },
-        }
-      }
-
-      let nextTabs: WorkspacePreviewTab[]
-      switch (scope) {
-        case 'others':
-          nextTabs = [tabs[index]!]
-          break
-        case 'left':
-          nextTabs = tabs.slice(index)
-          break
-        case 'right':
-          nextTabs = tabs.slice(0, index + 1)
-          break
-        case 'all':
-          nextTabs = []
-          break
-        case 'current':
-        default:
-          nextTabs = tabs.filter((tab) => tab.id !== tabId)
-          break
-      }
-
-      const nextTabIds = new Set(nextTabs.map((tab) => tab.id))
-      const closingTabIds = tabs.map((tab) => tab.id).filter((id) => !nextTabIds.has(id))
-      const requestKeys = closingTabIds.map((id) => makePreviewKey(sessionId, id))
-      for (const key of requestKeys) {
-        invalidateRequest(previewRequestIds, key)
-      }
-
-      const activeTabId = state.activePreviewTabIdBySession[sessionId] ?? null
-
-      let nextActiveTabId = activeTabId
-      if (scope === 'all' || nextTabs.length === 0) {
-        nextActiveTabId = null
-      } else if (!activeTabId || !nextTabIds.has(activeTabId)) {
-        const targetTab = nextTabs.find((tab) => tab.id === tabId)
-        nextActiveTabId = targetTab?.id ?? nextTabs[Math.min(index, nextTabs.length - 1)]?.id ?? null
-      } else if (scope === 'others') {
-        nextActiveTabId = tabId
-      } else if (activeTabId === tabId && scope === 'current') {
-        if (nextTabs.length === 0) {
-          nextActiveTabId = null
-        } else if (index >= nextTabs.length) {
-          nextActiveTabId = nextTabs[nextTabs.length - 1]!.id
-        } else {
-          nextActiveTabId = nextTabs[index]!.id
-        }
-      }
-
+      const expanded = state.expandedPreviewIdsBySession[sessionId] ?? []
+      if (expanded.includes(previewId)) return state
       return {
-        previewTabsBySession: {
-          ...state.previewTabsBySession,
-          [sessionId]: nextTabs.length > 0 ? nextTabs : undefined,
-        },
-        activePreviewTabIdBySession: {
-          ...state.activePreviewTabIdBySession,
-          [sessionId]: nextActiveTabId,
-        },
-        loading: {
-          ...state.loading,
-          previewByTabId: removeRecordKeys(state.loading.previewByTabId, requestKeys),
-        },
-        errors: {
-          ...state.errors,
-          previewByTabId: removeRecordKeys(state.errors.previewByTabId, requestKeys),
+        expandedPreviewIdsBySession: {
+          ...state.expandedPreviewIdsBySession,
+          [sessionId]: [...expanded, previewId],
         },
       }
     })
+
+    const existing = get().previewsBySession[sessionId]?.[previewId]
+    if (existing && existing.state !== 'error') return
+    await loadPreview(sessionId, path, kind)
+  },
+
+  collapsePreview: (sessionId, path, kind) => {
+    const previewId = getWorkspacePreviewId(path, kind)
+    set((state) => {
+      const expanded = state.expandedPreviewIdsBySession[sessionId] ?? []
+      if (!expanded.includes(previewId)) return state
+      return {
+        expandedPreviewIdsBySession: {
+          ...state.expandedPreviewIdsBySession,
+          [sessionId]: expanded.filter((id) => id !== previewId),
+        },
+      }
+    })
+  },
+
+  togglePreview: async (sessionId, path, kind) => {
+    const previewId = getWorkspacePreviewId(path, kind)
+    if (get().expandedPreviewIdsBySession[sessionId]?.includes(previewId)) {
+      get().collapsePreview(sessionId, path, kind)
+      return
+    }
+    await get().expandPreview(sessionId, path, kind)
+  },
+
+  refreshPreviews: async (sessionId) => {
+    invalidateSessionScopedRequests(previewRequestIds, sessionId)
+    const cached = get().previewsBySession[sessionId] ?? {}
+    const expandedIds = new Set(get().expandedPreviewIdsBySession[sessionId] ?? [])
+    const kept = Object.fromEntries(
+      Object.entries(cached).filter(([id, entry]) => entry && expandedIds.has(id)),
+    ) as Record<string, WorkspacePreviewEntry>
+    // Keep expanded previews on screen while they refetch so open comment drafts survive.
+    set((state) => ({
+      previewsBySession: Object.keys(kept).length > 0
+        ? { ...state.previewsBySession, [sessionId]: kept }
+        : removeRecordKey(state.previewsBySession, sessionId),
+      loading: {
+        ...state.loading,
+        previewById: stripSessionKeys(state.loading.previewById, sessionId),
+      },
+      errors: {
+        ...state.errors,
+        previewById: stripSessionKeys(state.errors.previewById, sessionId),
+      },
+    }))
+    await Promise.all(
+      Object.values(kept).map((entry) => loadPreview(sessionId, entry.path, entry.kind, { background: true })),
+    )
   },
 
   clearSession: (sessionId) => {
@@ -694,17 +514,17 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       statusBySession: removeRecordKey(state.statusBySession, sessionId),
       expandedPathsBySession: removeRecordKey(state.expandedPathsBySession, sessionId),
       treeBySessionPath: removeRecordKey(state.treeBySessionPath, sessionId),
-      previewTabsBySession: removeRecordKey(state.previewTabsBySession, sessionId),
-      activePreviewTabIdBySession: removeRecordKey(state.activePreviewTabIdBySession, sessionId),
+      previewsBySession: removeRecordKey(state.previewsBySession, sessionId),
+      expandedPreviewIdsBySession: removeRecordKey(state.expandedPreviewIdsBySession, sessionId),
       loading: {
         statusBySession: removeRecordKey(state.loading.statusBySession, sessionId),
         treeBySessionPath: stripSessionKeys(state.loading.treeBySessionPath, sessionId),
-        previewByTabId: stripSessionKeys(state.loading.previewByTabId, sessionId),
+        previewById: stripSessionKeys(state.loading.previewById, sessionId),
       },
       errors: {
         statusBySession: removeRecordKey(state.errors.statusBySession, sessionId),
         treeBySessionPath: stripSessionKeys(state.errors.treeBySessionPath, sessionId),
-        previewByTabId: stripSessionKeys(state.errors.previewByTabId, sessionId),
+        previewById: stripSessionKeys(state.errors.previewById, sessionId),
       },
     }))
   },
@@ -713,3 +533,84 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     get().clearSession(sessionId)
   },
 }))
+
+function setPreviewEntry(
+  sessionId: string,
+  previewId: string,
+  entry: WorkspacePreviewEntry,
+  loading: boolean,
+  error: string | null,
+) {
+  const requestKey = makePreviewKey(sessionId, previewId)
+  useWorkspacePanelStore.setState((state) => ({
+    previewsBySession: {
+      ...state.previewsBySession,
+      [sessionId]: {
+        ...state.previewsBySession[sessionId],
+        [previewId]: entry,
+      },
+    },
+    loading: {
+      ...state.loading,
+      previewById: { ...state.loading.previewById, [requestKey]: loading },
+    },
+    errors: {
+      ...state.errors,
+      previewById: { ...state.errors.previewById, [requestKey]: error },
+    },
+  }))
+}
+
+async function loadPreview(
+  sessionId: string,
+  path: string,
+  kind: WorkspacePreviewKind,
+  { background = false }: { background?: boolean } = {},
+) {
+  const previewId = getWorkspacePreviewId(path, kind)
+  const requestKey = makePreviewKey(sessionId, previewId)
+  const requestId = nextRequestId(previewRequestIds, requestKey)
+  const baseEntry: WorkspacePreviewEntry = {
+    id: previewId,
+    path,
+    kind,
+    title: getPathTitle(path),
+    state: 'loading',
+  }
+  const existing = useWorkspacePanelStore.getState().previewsBySession[sessionId]?.[previewId]
+  if (!background || !existing || existing.state === 'loading') {
+    setPreviewEntry(sessionId, previewId, baseEntry, true, null)
+  }
+
+  try {
+    if (kind === 'diff') {
+      const result = await sessionsApi.getWorkspaceDiff(sessionId, path)
+      if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
+      setPreviewEntry(sessionId, previewId, {
+        ...baseEntry,
+        diff: result.diff ?? '',
+        state: result.state,
+        error: result.error,
+      }, false, result.error ?? null)
+      return
+    }
+
+    const result = await sessionsApi.getWorkspaceFile(sessionId, path)
+    if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
+    setPreviewEntry(sessionId, previewId, {
+      ...baseEntry,
+      content: result.content,
+      dataUrl: result.dataUrl,
+      mimeType: result.mimeType,
+      previewType: result.previewType ?? 'text',
+      language: result.language,
+      size: result.size,
+      state: result.state,
+      error: result.error,
+    }, false, result.error ?? null)
+  } catch (error) {
+    if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
+    const message = error instanceof Error ? error.message : 'Failed to load workspace preview'
+    setPreviewEntry(sessionId, previewId, { ...baseEntry, state: 'error', error: message }, false, message)
+  }
+}

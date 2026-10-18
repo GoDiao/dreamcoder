@@ -29,7 +29,7 @@ import {
   WORKSPACE_PANEL_DEFAULT_WIDTH,
   WORKSPACE_PANEL_MAX_WIDTH,
   WORKSPACE_PANEL_MIN_WIDTH,
-  getWorkspacePreviewTabId,
+  getWorkspacePreviewId,
   useWorkspacePanelStore,
 } from './workspacePanelStore'
 
@@ -63,12 +63,14 @@ describe('workspacePanelStore', () => {
     expect(sessionsApi.getWorkspaceDiff).toBe(mocks.getWorkspaceDiffMock)
   })
 
-  it('keeps panel open state and active view isolated per session', () => {
+  it('keeps panel open state, tab and active view isolated per session', () => {
     const store = useWorkspacePanelStore.getState()
 
     expect(store.isPanelOpen('session-a')).toBe(false)
+    expect(store.getPanelTab('session-a')).toBe('files')
     expect(store.getActiveView('session-a')).toBe('changed')
     expect(store.width).toBe(WORKSPACE_PANEL_DEFAULT_WIDTH)
+    expect(WORKSPACE_PANEL_DEFAULT_WIDTH).toBe(380)
 
     store.openPanel('session-a')
     store.setActiveView('session-a', 'all')
@@ -78,18 +80,61 @@ describe('workspacePanelStore', () => {
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-b')).toBe(false)
     expect(useWorkspacePanelStore.getState().getActiveView('session-b')).toBe('changed')
 
-    store.togglePanel('session-b')
+    store.togglePanel('session-b', 'terminal')
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-b')).toBe(true)
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
+    expect(useWorkspacePanelStore.getState().getPanelTab('session-b')).toBe('terminal')
+    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
 
     store.closePanel('session-a')
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(false)
     expect(useWorkspacePanelStore.getState().getActiveView('session-a')).toBe('all')
+  })
 
+  it('switches tabs when the other tab button is pressed and closes on the showing tab', () => {
+    const store = useWorkspacePanelStore.getState()
+
+    store.togglePanel('session-a', 'files')
+    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
+    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
+
+    store.togglePanel('session-a', 'terminal')
+    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
+    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('terminal')
+
+    store.togglePanel('session-a', 'terminal')
+    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(false)
+
+    store.setPanelTab('session-a', 'files')
+    store.openPanel('session-a')
+    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
+  })
+
+  it('expands and restores the panel and resets expansion on close', () => {
+    const store = useWorkspacePanelStore.getState()
+
+    store.openPanel('session-a', 'files')
+    store.toggleExpanded('session-a')
+    expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(true)
+    store.toggleExpanded('session-a')
+    expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(false)
+
+    store.toggleExpanded('session-a')
+    store.closePanel('session-a')
+    expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(false)
+    store.openPanel('session-a')
+    expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(false)
+  })
+
+  it('clamps the panel width to 280-680', () => {
+    const store = useWorkspacePanelStore.getState()
     store.setWidth(120)
     expect(useWorkspacePanelStore.getState().width).toBe(WORKSPACE_PANEL_MIN_WIDTH)
+    expect(WORKSPACE_PANEL_MIN_WIDTH).toBe(280)
     store.setWidth(1200)
     expect(useWorkspacePanelStore.getState().width).toBe(WORKSPACE_PANEL_MAX_WIDTH)
+    expect(WORKSPACE_PANEL_MAX_WIDTH).toBe(680)
+    store.setWidth(Number.NaN)
+    expect(useWorkspacePanelStore.getState().width).toBe(WORKSPACE_PANEL_DEFAULT_WIDTH)
   })
 
   it('loads workspace status successfully', async () => {
@@ -305,7 +350,7 @@ describe('workspacePanelStore', () => {
     ])
   })
 
-  it('opens preview tabs, supports multiple kinds, and reuses duplicates without persistence', async () => {
+  it('expands previews inline, caches them per path and kind, and fetches lazily', async () => {
     const storage = typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage
     const setItemSpy = storage ? vi.spyOn(storage, 'setItem') : null
 
@@ -322,158 +367,106 @@ describe('workspacePanelStore', () => {
       diff: '@@ -1 +1 @@',
     })
 
-    useWorkspacePanelStore.getState().openPanel('session-preview')
-    await useWorkspacePanelStore.getState().openPreview('session-preview', 'src/a.ts', 'file')
-    await useWorkspacePanelStore.getState().openPreview('session-preview', 'src/a.ts', 'diff')
-    await useWorkspacePanelStore.getState().openPreview('session-preview', 'src/a.ts', 'file')
+    const store = useWorkspacePanelStore.getState()
+    await store.expandPreview('session-preview', 'src/a.ts', 'file')
+    await store.expandPreview('session-preview', 'src/a.ts', 'diff')
+    await store.togglePreview('session-preview', 'src/a.ts', 'file')
+    await store.togglePreview('session-preview', 'src/a.ts', 'file')
 
     expect(mocks.getWorkspaceFileMock).toHaveBeenCalledTimes(1)
     expect(mocks.getWorkspaceDiffMock).toHaveBeenCalledTimes(1)
-
-    const tabs = useWorkspacePanelStore.getState().previewTabsBySession['session-preview']
-    expect(tabs).toBeDefined()
-    expect(tabs).toHaveLength(2)
-    expect(tabs![0]).toMatchObject({
-      id: 'file:src/a.ts',
-      kind: 'file',
-      path: 'src/a.ts',
-      content: 'export const a = 1',
-      language: 'typescript',
-    })
-    expect(tabs![1]).toMatchObject({
-      id: 'diff:src/a.ts',
-      kind: 'diff',
-      path: 'src/a.ts',
-      diff: '@@ -1 +1 @@',
-    })
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-preview']).toBe('file:src/a.ts')
-    if (setItemSpy) {
-      expect(setItemSpy).not.toHaveBeenCalled()
-    } else {
-      expect(storage).toBeNull()
-    }
-  })
-
-  it('closes exact tab id and preserves sibling preview for the same path', async () => {
-    mocks.getWorkspaceFileMock.mockResolvedValue({
-      state: 'ok',
-      path: 'src/a.ts',
-      content: 'export const a = 1',
-      language: 'typescript',
-      size: 18,
-    })
-    mocks.getWorkspaceDiffMock.mockResolvedValue({
-      state: 'ok',
-      path: 'src/a.ts',
-      diff: '@@ -1 +1 @@',
-    })
-
-    await useWorkspacePanelStore.getState().openPreview('session-close-path', 'src/a.ts', 'file')
-    await useWorkspacePanelStore.getState().openPreview('session-close-path', 'src/a.ts', 'diff')
-
-    useWorkspacePanelStore.getState().closePreview('session-close-path', 'diff:src/a.ts')
-
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-close-path']).toEqual([
-      expect.objectContaining({ id: 'file:src/a.ts' }),
+    expect(useWorkspacePanelStore.getState().expandedPreviewIdsBySession['session-preview']).toEqual([
+      'diff:src/a.ts',
+      'file:src/a.ts',
     ])
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-close-path']).toBe('file:src/a.ts')
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-preview']).toMatchObject({
+      'file:src/a.ts': { kind: 'file', content: 'export const a = 1', state: 'ok' },
+      'diff:src/a.ts': { kind: 'diff', diff: '@@ -1 +1 @@', state: 'ok' },
+    })
+    expect(getWorkspacePreviewId('src/a.ts', 'diff')).toBe('diff:src/a.ts')
+    expect(setItemSpy).not.toHaveBeenCalled()
   })
 
-  it('chooses the next sensible active preview when closing the current tab', async () => {
-    mocks.getWorkspaceFileMock
-      .mockResolvedValueOnce({
-        state: 'ok',
-        path: 'src/a.ts',
-        content: 'a',
-        language: 'typescript',
-        size: 1,
-      })
-      .mockResolvedValueOnce({
-        state: 'ok',
-        path: 'src/b.ts',
-        content: 'b',
-        language: 'typescript',
-        size: 1,
-      })
-      .mockResolvedValueOnce({
-        state: 'ok',
-        path: 'src/c.ts',
-        content: 'c',
-        language: 'typescript',
-        size: 1,
-      })
-
-    await useWorkspacePanelStore.getState().openPreview('session-close', 'src/a.ts', 'file')
-    await useWorkspacePanelStore.getState().openPreview('session-close', 'src/b.ts', 'file')
-    await useWorkspacePanelStore.getState().openPreview('session-close', 'src/c.ts', 'file')
-
-    useWorkspacePanelStore.getState().closePreview('session-close', 'file:src/b.ts')
-
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-close']).toMatchObject([
-      { id: 'file:src/a.ts' },
-      { id: 'file:src/c.ts' },
-    ])
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-close']).toBe('file:src/c.ts')
-
-    useWorkspacePanelStore.getState().closePreview('session-close', 'file:src/c.ts')
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-close']).toBe('file:src/a.ts')
-  })
-
-  it('closes preview tabs by context-menu scope', () => {
-    useWorkspacePanelStore.setState((state) => ({
-      ...state,
-      previewTabsBySession: {
-        ...state.previewTabsBySession,
-        'session-preview-scope': [
-          { id: 'file:a.ts', path: 'a.ts', kind: 'file', title: 'a.ts', state: 'ok', language: 'typescript', size: 1 },
-          { id: 'file:b.ts', path: 'b.ts', kind: 'file', title: 'b.ts', state: 'ok', language: 'typescript', size: 1 },
-          { id: 'file:c.ts', path: 'c.ts', kind: 'file', title: 'c.ts', state: 'ok', language: 'typescript', size: 1 },
-          { id: 'file:d.ts', path: 'd.ts', kind: 'file', title: 'd.ts', state: 'ok', language: 'typescript', size: 1 },
-        ],
-      },
-      activePreviewTabIdBySession: {
-        ...state.activePreviewTabIdBySession,
-        'session-preview-scope': 'file:d.ts',
-      },
-      loading: {
-        ...state.loading,
-        previewByTabId: {
-          ...state.loading.previewByTabId,
-          'session-preview-scope::file:c.ts': true,
-          'session-preview-scope::file:d.ts': true,
-        },
-      },
-      errors: {
-        ...state.errors,
-        previewByTabId: {
-          ...state.errors.previewByTabId,
-          'session-preview-scope::file:c.ts': 'loading',
-          'session-preview-scope::file:d.ts': 'loading',
-        },
-      },
+  it('keeps the cache when collapsing and allows several files open at once', async () => {
+    mocks.getWorkspaceDiffMock.mockImplementation(async (_sessionId: string, path: string) => ({
+      state: 'ok',
+      path,
+      diff: `diff for ${path}`,
     }))
 
-    useWorkspacePanelStore.getState().closePreviewTabs('session-preview-scope', 'file:b.ts', 'right')
-
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-preview-scope']).toMatchObject([
-      { id: 'file:a.ts' },
-      { id: 'file:b.ts' },
+    const store = useWorkspacePanelStore.getState()
+    await store.expandPreview('session-many', 'a.ts', 'diff')
+    await store.expandPreview('session-many', 'b.ts', 'diff')
+    expect(useWorkspacePanelStore.getState().expandedPreviewIdsBySession['session-many']).toEqual([
+      'diff:a.ts',
+      'diff:b.ts',
     ])
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-preview-scope']).toBe('file:b.ts')
-    expect(useWorkspacePanelStore.getState().loading.previewByTabId['session-preview-scope::file:c.ts']).toBeUndefined()
-    expect(useWorkspacePanelStore.getState().errors.previewByTabId['session-preview-scope::file:d.ts']).toBeUndefined()
 
-    useWorkspacePanelStore.getState().closePreviewTabs('session-preview-scope', 'file:b.ts', 'others')
+    store.collapsePreview('session-many', 'a.ts', 'diff')
+    expect(useWorkspacePanelStore.getState().expandedPreviewIdsBySession['session-many']).toEqual(['diff:b.ts'])
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-many']?.['diff:a.ts']?.diff).toBe('diff for a.ts')
 
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-preview-scope']).toMatchObject([
-      { id: 'file:b.ts' },
-    ])
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-preview-scope']).toBe('file:b.ts')
+    await store.expandPreview('session-many', 'a.ts', 'diff')
+    expect(mocks.getWorkspaceDiffMock).toHaveBeenCalledTimes(2)
+  })
 
-    useWorkspacePanelStore.getState().closePreviewTabs('session-preview-scope', 'file:b.ts', 'all')
+  it('refreshes expanded previews and drops collapsed cache entries', async () => {
+    let version = 1
+    mocks.getWorkspaceDiffMock.mockImplementation(async (_sessionId: string, path: string) => ({
+      state: 'ok',
+      path,
+      diff: `${path} v${version}`,
+    }))
 
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-preview-scope']).toBeUndefined()
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-preview-scope']).toBeNull()
+    const store = useWorkspacePanelStore.getState()
+    await store.expandPreview('session-refresh', 'a.ts', 'diff')
+    await store.expandPreview('session-refresh', 'b.ts', 'diff')
+    store.collapsePreview('session-refresh', 'b.ts', 'diff')
+
+    version = 2
+    await store.refreshPreviews('session-refresh')
+
+    const previews = useWorkspacePanelStore.getState().previewsBySession['session-refresh']
+    expect(previews?.['diff:a.ts']?.diff).toBe('a.ts v2')
+    expect(previews?.['diff:b.ts']).toBeUndefined()
+  })
+
+  it('keeps loaded previews visible without a loading state while they refresh', async () => {
+    mocks.getWorkspaceDiffMock.mockResolvedValueOnce({ state: 'ok', path: 'a.ts', diff: 'v1' })
+    const store = useWorkspacePanelStore.getState()
+    await store.expandPreview('session-swr', 'a.ts', 'diff')
+
+    const next = deferred<{ state: 'ok'; path: string; diff: string }>()
+    mocks.getWorkspaceDiffMock.mockReturnValueOnce(next.promise)
+    const refresh = store.refreshPreviews('session-swr')
+
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-swr']?.['diff:a.ts']).toMatchObject({
+      state: 'ok',
+      diff: 'v1',
+    })
+    expect(useWorkspacePanelStore.getState().loading.previewById['session-swr::diff:a.ts']).toBeFalsy()
+
+    next.resolve({ state: 'ok', path: 'a.ts', diff: 'v2' })
+    await refresh
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-swr']?.['diff:a.ts']?.diff).toBe('v2')
+  })
+
+  it('retries a preview that failed when it is expanded again', async () => {
+    mocks.getWorkspaceDiffMock
+      .mockRejectedValueOnce(new Error('diff failed'))
+      .mockResolvedValueOnce({ state: 'ok', path: 'a.ts', diff: 'ok' })
+
+    const store = useWorkspacePanelStore.getState()
+    await store.expandPreview('session-retry', 'a.ts', 'diff')
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-retry']?.['diff:a.ts']).toMatchObject({
+      state: 'error',
+      error: 'diff failed',
+    })
+    expect(useWorkspacePanelStore.getState().errors.previewById['session-retry::diff:a.ts']).toBe('diff failed')
+
+    store.collapsePreview('session-retry', 'a.ts', 'diff')
+    await store.expandPreview('session-retry', 'a.ts', 'diff')
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-retry']?.['diff:a.ts']?.diff).toBe('ok')
   })
 
   it('ignores stale status responses for the same session', async () => {
@@ -526,70 +519,28 @@ describe('workspacePanelStore', () => {
     expect(useWorkspacePanelStore.getState().statusBySession['session-race']?.branch).toBe('new')
   })
 
-  it('ignores stale preview responses after close and reopen', async () => {
-    const first = deferred<{ state: 'ok'; path: string; content: string; language: string; size: number }>()
-    const second = deferred<{ state: 'ok'; path: string; content: string; language: string; size: number }>()
-
-    mocks.getWorkspaceFileMock
+  it('ignores stale preview responses when the cache is refreshed mid-flight', async () => {
+    const first = deferred<{ state: 'ok'; path: string; diff: string }>()
+    mocks.getWorkspaceDiffMock
       .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise)
+      .mockResolvedValueOnce({ state: 'ok', path: 'a.ts', diff: 'fresh' })
 
-    const firstOpen = useWorkspacePanelStore.getState().openPreview('session-preview-race', 'src/a.ts', 'file')
-    useWorkspacePanelStore.getState().closePreview('session-preview-race', 'file:src/a.ts')
-    const secondOpen = useWorkspacePanelStore.getState().openPreview('session-preview-race', 'src/a.ts', 'file')
+    const store = useWorkspacePanelStore.getState()
+    const firstExpand = store.expandPreview('session-preview-race', 'a.ts', 'diff')
+    await Promise.resolve()
+    await store.refreshPreviews('session-preview-race')
+    first.resolve({ state: 'ok', path: 'a.ts', diff: 'stale' })
+    await firstExpand
 
-    second.resolve({
-      state: 'ok',
-      path: 'src/a.ts',
-      content: 'new',
-      language: 'typescript',
-      size: 3,
-    })
-    await secondOpen
-
-    first.resolve({
-      state: 'ok',
-      path: 'src/a.ts',
-      content: 'old',
-      language: 'typescript',
-      size: 3,
-    })
-    await firstOpen
-
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-preview-race']).toEqual([
-      expect.objectContaining({ id: 'file:src/a.ts', content: 'new' }),
-    ])
-  })
-
-  it('does not recreate loading or error state when a loading preview is closed before completion', async () => {
-    const pending = deferred<{ state: 'ok'; path: string; diff: string }>()
-    const tabId = getWorkspacePreviewTabId('src/a.ts', 'diff')
-    const previewKey = `session-preview-close::${tabId}`
-
-    mocks.getWorkspaceDiffMock.mockReturnValueOnce(pending.promise)
-
-    const openPromise = useWorkspacePanelStore.getState().openPreview('session-preview-close', 'src/a.ts', 'diff')
-    useWorkspacePanelStore.getState().closePreview('session-preview-close', tabId)
-
-    pending.resolve({
-      state: 'ok',
-      path: 'src/a.ts',
-      diff: '@@ -1 +1 @@',
-    })
-    await openPromise
-
-    expect(useWorkspacePanelStore.getState().previewTabsBySession['session-preview-close']).toBeUndefined()
-    expect(useWorkspacePanelStore.getState().activePreviewTabIdBySession['session-preview-close']).toBeNull()
-    expect(useWorkspacePanelStore.getState().loading.previewByTabId[previewKey]).toBeUndefined()
-    expect(useWorkspacePanelStore.getState().errors.previewByTabId[previewKey]).toBeUndefined()
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-preview-race']?.['diff:a.ts']?.diff).toBe('fresh')
   })
 
   it('clears session UI and cached data for clearSession and resetSessionUi', () => {
     useWorkspacePanelStore.setState((state) => ({
       ...state,
       panelBySession: {
-        'session-clear': { isOpen: true, activeView: 'all' },
-        'session-reset': { isOpen: true, activeView: 'all' },
+        'session-clear': { isOpen: true, tab: 'files', expanded: false, activeView: 'all' },
+        'session-reset': { isOpen: true, tab: 'terminal', expanded: true, activeView: 'all' },
       },
       statusBySession: {
         'session-clear': {
@@ -621,17 +572,17 @@ describe('workspacePanelStore', () => {
           src: { state: 'ok', path: 'src', entries: [] },
         },
       },
-      previewTabsBySession: {
-        'session-clear': [
-          { id: 'file:src/a.ts', path: 'src/a.ts', kind: 'file', title: 'a.ts' },
-        ],
-        'session-reset': [
-          { id: 'file:src/b.ts', path: 'src/b.ts', kind: 'file', title: 'b.ts' },
-        ],
+      previewsBySession: {
+        'session-clear': {
+          'file:src/a.ts': { id: 'file:src/a.ts', path: 'src/a.ts', kind: 'file', title: 'a.ts' },
+        },
+        'session-reset': {
+          'file:src/b.ts': { id: 'file:src/b.ts', path: 'src/b.ts', kind: 'file', title: 'b.ts' },
+        },
       },
-      activePreviewTabIdBySession: {
-        'session-clear': 'file:src/a.ts',
-        'session-reset': 'file:src/b.ts',
+      expandedPreviewIdsBySession: {
+        'session-clear': ['file:src/a.ts'],
+        'session-reset': ['file:src/b.ts'],
       },
       loading: {
         statusBySession: {
@@ -642,7 +593,7 @@ describe('workspacePanelStore', () => {
           'session-clear::src': true,
           'session-reset::src': true,
         },
-        previewByTabId: {
+        previewById: {
           'session-clear::file:src/a.ts': true,
           'session-reset::file:src/b.ts': true,
         },
@@ -656,7 +607,7 @@ describe('workspacePanelStore', () => {
           'session-clear::src': 'bad',
           'session-reset::src': 'bad',
         },
-        previewByTabId: {
+        previewById: {
           'session-clear::file:src/a.ts': 'bad',
           'session-reset::file:src/b.ts': 'bad',
         },
@@ -675,21 +626,21 @@ describe('workspacePanelStore', () => {
     expect(state.expandedPathsBySession['session-reset']).toBeUndefined()
     expect(state.treeBySessionPath['session-clear']).toBeUndefined()
     expect(state.treeBySessionPath['session-reset']).toBeUndefined()
-    expect(state.previewTabsBySession['session-clear']).toBeUndefined()
-    expect(state.previewTabsBySession['session-reset']).toBeUndefined()
-    expect(state.activePreviewTabIdBySession['session-clear']).toBeUndefined()
-    expect(state.activePreviewTabIdBySession['session-reset']).toBeUndefined()
+    expect(state.previewsBySession['session-clear']).toBeUndefined()
+    expect(state.previewsBySession['session-reset']).toBeUndefined()
+    expect(state.expandedPreviewIdsBySession['session-clear']).toBeUndefined()
+    expect(state.expandedPreviewIdsBySession['session-reset']).toBeUndefined()
     expect(state.loading.statusBySession['session-clear']).toBeUndefined()
     expect(state.loading.statusBySession['session-reset']).toBeUndefined()
     expect(state.loading.treeBySessionPath['session-clear::src']).toBeUndefined()
     expect(state.loading.treeBySessionPath['session-reset::src']).toBeUndefined()
-    expect(state.loading.previewByTabId['session-clear::file:src/a.ts']).toBeUndefined()
-    expect(state.loading.previewByTabId['session-reset::file:src/b.ts']).toBeUndefined()
+    expect(state.loading.previewById['session-clear::file:src/a.ts']).toBeUndefined()
+    expect(state.loading.previewById['session-reset::file:src/b.ts']).toBeUndefined()
     expect(state.errors.statusBySession['session-clear']).toBeUndefined()
     expect(state.errors.statusBySession['session-reset']).toBeUndefined()
     expect(state.errors.treeBySessionPath['session-clear::src']).toBeUndefined()
     expect(state.errors.treeBySessionPath['session-reset::src']).toBeUndefined()
-    expect(state.errors.previewByTabId['session-clear::file:src/a.ts']).toBeUndefined()
-    expect(state.errors.previewByTabId['session-reset::file:src/b.ts']).toBeUndefined()
+    expect(state.errors.previewById['session-clear::file:src/a.ts']).toBeUndefined()
+    expect(state.errors.previewById['session-reset::file:src/b.ts']).toBeUndefined()
   })
 })

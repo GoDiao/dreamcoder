@@ -20,7 +20,7 @@ vi.mock('../../api/sessions', async (importOriginal) => {
 
 import { LocalSlashCommandPanel } from './LocalSlashCommandPanel'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useTabStore, SETTINGS_TAB_ID } from '../../stores/tabStore'
+import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { SessionContextSnapshot, SessionInspectionResponse } from '../../api/sessions'
 
@@ -74,7 +74,8 @@ describe('LocalSlashCommandPanel memory context', () => {
     useTabStore.setState(useTabStore.getInitialState(), true)
     useUIStore.setState({
       pendingMemoryPath: null,
-      pendingSettingsTab: null,
+      settingsOpen: false,
+      settingsTab: 'providers',
     })
   })
 
@@ -112,9 +113,9 @@ describe('LocalSlashCommandPanel memory context', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Memory' }))
 
     await waitFor(() => {
-      expect(useUIStore.getState().pendingSettingsTab).toBe('memory')
+      expect(useUIStore.getState().settingsOpen).toBe(true)
+      expect(useUIStore.getState().settingsTab).toBe('memory')
       expect(useUIStore.getState().pendingMemoryPath).toBe('/Users/test/.claude/projects/demo/memory/MEMORY.md')
-      expect(useTabStore.getState().activeTabId).toBe(SETTINGS_TAB_ID)
     })
   })
 
@@ -137,9 +138,9 @@ describe('LocalSlashCommandPanel memory context', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Memory' }))
 
     await waitFor(() => {
-      expect(useUIStore.getState().pendingSettingsTab).toBe('memory')
+      expect(useUIStore.getState().settingsOpen).toBe(true)
+      expect(useUIStore.getState().settingsTab).toBe('memory')
       expect(useUIStore.getState().pendingMemoryPath).toBeNull()
-      expect(useTabStore.getState().activeTabId).toBe(SETTINGS_TAB_ID)
     })
   })
 })

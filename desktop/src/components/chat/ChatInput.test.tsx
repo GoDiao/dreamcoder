@@ -85,6 +85,8 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
+import { useProviderStore } from '../../stores/providerStore'
+import { useUIStore } from '../../stores/uiStore'
 
 function okRepositoryContext() {
   return {
@@ -356,14 +358,18 @@ describe('ChatInput file mentions', () => {
     render(<ChatInput variant="hero" />)
 
     const panel = screen.getByTestId('chat-input-panel')
-    expect(panel).toHaveClass('rounded-xl')
-    expect(panel).not.toHaveClass('rounded-b-none')
+    expect(panel).toHaveClass('rounded-2xl')
+    expect(screen.getByRole('textbox')).toHaveAttribute('rows', '1')
 
     expect(await screen.findByRole('button', { name: /Select branch: main/ })).toBeInTheDocument()
     expect(screen.getByText('Current worktree')).toBeInTheDocument()
     expect(screen.queryByText('Select a project...')).not.toBeInTheDocument()
     const branchButton = screen.getByRole('button', { name: /Select branch: main/ })
-    expect(panel).toContainElement(branchButton.parentElement)
+    const controls = screen.getByTestId('chat-input-controls')
+    expect(panel).not.toContainElement(branchButton)
+    expect(controls).toContainElement(branchButton)
+    expect(controls).toContainElement(screen.getByRole('button', { name: 'Permissions' }))
+    expect(controls).toContainElement(screen.getByRole('button', { name: 'Model' }))
     expect(branchButton.parentElement).toHaveClass('bg-transparent')
   })
 
@@ -888,6 +894,7 @@ describe('ChatInput file mentions', () => {
     expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('h-11', 'w-11')
     expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('h-11', 'w-11')
     expect(screen.queryByText('Run')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-input-toolbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input-shell')).toHaveClass('px-3')
     expect(screen.getByTestId('chat-input-shell').className).toContain('safe-area-inset-bottom')
     expect(screen.getByTestId('chat-input-panel')).toHaveClass('rounded-2xl')
@@ -904,7 +911,7 @@ describe('ChatInput file mentions', () => {
     expect(fileSearchMenu).not.toHaveTextContent('Navigate')
   })
 
-  it('keeps the active-session toolbar in flow so multiline caret cannot render behind controls', async () => {
+  it('keeps the controls row below the input box so a multiline caret cannot render behind it', async () => {
     render(<ChatInput />)
 
     await waitFor(() => {
@@ -912,12 +919,46 @@ describe('ChatInput file mentions', () => {
     })
 
     const input = screen.getByRole('textbox')
-    const toolbar = screen.getByTestId('chat-input-toolbar')
+    const panel = screen.getByTestId('chat-input-panel')
+    const controls = screen.getByTestId('chat-input-controls')
 
-    expect(toolbar).not.toHaveClass('absolute')
-    expect(toolbar).toHaveClass('mt-2')
+    expect(panel).toContainElement(input)
+    expect(panel).toContainElement(screen.getByRole('button', { name: 'Open composer tools' }))
+    expect(panel).toContainElement(screen.getByRole('button', { name: 'Run' }))
+    expect(panel).not.toContainElement(controls)
+    expect(controls).not.toHaveClass('absolute')
+    expect(input).toHaveAttribute('rows', '1')
     expect(input).not.toHaveClass('pb-12')
-    expect(input).not.toHaveClass('pb-14')
+  })
+
+  it('replaces the composer with the provider card and keeps the draft', async () => {
+    render(<ChatInput />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'unsent draft', selectionStart: 12 },
+    })
+
+    act(() => {
+      useProviderStore.setState({ hasLoadedProviders: true, activeId: null, providers: [] })
+    })
+
+    expect(screen.getByTestId('provider-required-notice')).toBeInTheDocument()
+    expect(screen.queryByTestId('chat-input-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-input-controls')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('providers')
+
+    act(() => {
+      useProviderStore.setState({ activeId: 'provider-1' })
+    })
+
+    expect(screen.getByRole('textbox')).toHaveValue('unsent draft')
+    act(() => {
+      useProviderStore.setState(useProviderStore.getInitialState(), true)
+      useUIStore.setState({ settingsOpen: false })
+    })
   })
 
   it('prioritizes active-session slash commands by command name when filtering', async () => {

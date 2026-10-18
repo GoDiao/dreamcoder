@@ -47,7 +47,7 @@ describe('CommandPalette', () => {
 
   beforeEach(() => {
     window.localStorage.clear()
-    useUIStore.setState({ activeModal: null, activeView: 'code' })
+    useUIStore.setState({ activeModal: null })
     useTabStore.setState({ tabs: [], activeTabId: null })
     useSessionStore.setState({ sessions: [] })
     useSettingsStore.setState({ locale: 'en' })
@@ -129,7 +129,8 @@ describe('CommandPalette', () => {
 
     expect(useTabStore.getState().tabs).toHaveLength(2)
     expect(useTabStore.getState().tabs.filter((tab) => tab.sessionId === 'newer')).toHaveLength(1)
-    expect(useTabStore.getState().tabs[0]?.title).toBe('Authentication flow')
+    // Reopened tabs move to the end (most recently opened last).
+    expect(useTabStore.getState().tabs.slice(-1)[0]?.title).toBe('Authentication flow')
     expect(useTabStore.getState().activeTabId).toBe('newer')
     expect(connectToSession).toHaveBeenCalledExactlyOnceWith('newer')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

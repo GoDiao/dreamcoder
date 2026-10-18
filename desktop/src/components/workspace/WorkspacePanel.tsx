@@ -1,5 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Ellipsis,
+  FileCode,
+  Files,
+  Folder,
+  Maximize2,
+  MessageCircle,
+  MessageSquare,
+  MessageSquarePlus,
+  Minimize2,
+  Plus,
+  RefreshCw,
+  SquareTerminal,
+  X,
+} from 'lucide-react'
 import { Highlight } from 'prism-react-renderer'
 import type {
   WorkspaceChangedFile,
@@ -7,46 +25,36 @@ import type {
   WorkspaceTreeEntry,
   WorkspaceTreeResult,
 } from '../../api/sessions'
+import { moveRovingFocus } from '../../lib/rovingFocus'
 import { useTranslation } from '../../i18n'
 import { useShallow } from 'zustand/react/shallow'
 import {
+  getWorkspacePreviewId,
   useWorkspacePanelStore,
-  type WorkspacePreviewCloseScope,
+  type WorkspacePreviewEntry,
   type WorkspacePreviewKind,
-  type WorkspacePreviewTab,
 } from '../../stores/workspacePanelStore'
+import {
+  getShellDisplayName,
+  useTerminalPanelStore,
+  type SessionTerminal,
+} from '../../stores/terminalPanelStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useUIStore } from '../../stores/uiStore'
+import { TerminalSettings } from '../../pages/TerminalSettings'
+import { SearchField } from '../shared/SearchField'
 import { copyTextToClipboard } from '../chat/clipboard'
 import { clearWindowSelection, getSelectionPopoverPosition, useSelectionPopoverDismiss } from '../../hooks/useSelectionPopoverDismiss'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import {
   getFileExtension,
+  LineCommentEditor,
   normalizePrismLanguage,
   WORKSPACE_PREVIEW_LINE_LIMIT,
   WorkspaceDiffSurface,
   workspacePrismTheme,
 } from './WorkspaceCodeSurface'
-
-type WorkspacePanelProps = {
-  sessionId: string
-}
-
-type TreeNodeProps = {
-  sessionId: string
-  entry: WorkspaceTreeEntry
-  depth: number
-  expandedPaths: Set<string>
-  treeByPath: Record<string, WorkspaceTreeResult | undefined>
-  treeLoadingByPath: Record<string, boolean | undefined>
-  treeErrorsByPath: Record<string, string | null | undefined>
-  filterQuery: string
-  onToggle: (path: string) => void
-  onOpenFile: (path: string) => void
-  onFileContextMenu: (event: MouseEvent, path: string, isDirectory: boolean) => void
-  activePath: string | null
-}
 
 type FileContextMenuState = {
   path: string
@@ -58,59 +66,44 @@ type FileContextMenuState = {
 const FILE_STATUS_META: Record<WorkspaceFileStatus, { label: string; className: string }> = {
   modified: {
     label: 'M',
-    className: 'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/12 text-[var(--color-warning)]',
+    className: 'text-[var(--color-warning)]',
   },
   added: {
     label: 'A',
-    className: 'border-[var(--color-success)]/35 bg-[var(--color-success)]/12 text-[var(--color-success)]',
+    className: 'text-[var(--color-success)]',
   },
   deleted: {
     label: 'D',
-    className: 'border-[var(--color-error)]/35 bg-[var(--color-error)]/12 text-[var(--color-error)]',
+    className: 'text-[var(--color-error)]',
   },
   renamed: {
     label: 'R',
-    className: 'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/12 text-[var(--color-brand)]',
+    className: 'text-[var(--color-brand)]',
   },
   untracked: {
     label: 'U',
-    className: 'border-[var(--color-tertiary)]/35 bg-[var(--color-tertiary)]/12 text-[var(--color-tertiary)]',
+    className: 'text-[var(--color-tertiary)]',
   },
   copied: {
     label: 'C',
-    className: 'border-[var(--color-secondary)]/35 bg-[var(--color-secondary)]/12 text-[var(--color-secondary)]',
+    className: 'text-[var(--color-secondary)]',
   },
   type_changed: {
     label: 'T',
-    className: 'border-[var(--color-outline)]/45 bg-[var(--color-outline)]/10 text-[var(--color-text-secondary)]',
+    className: 'text-[var(--color-text-secondary)]',
   },
   unknown: {
     label: '?',
-    className: 'border-[var(--color-outline)]/45 bg-[var(--color-outline)]/10 text-[var(--color-text-secondary)]',
+    className: 'text-[var(--color-text-secondary)]',
   },
 }
 
 const EMPTY_TREE_BY_PATH: Record<string, WorkspaceTreeResult | undefined> = {}
-const EMPTY_PREVIEW_TABS: WorkspacePreviewTab[] = []
-const EMPTY_EXPANDED_PATHS: string[] = []
+const EMPTY_PREVIEWS: Record<string, WorkspacePreviewEntry | undefined> = {}
+const EMPTY_IDS: string[] = []
 const SELECTION_MENU_OFFSET = 10
 const SELECTION_MENU_WIDTH = 158
 const SELECTION_MENU_HEIGHT = 44
-const FILE_BADGE_META: Record<string, { label: string; className: string }> = {
-  ts: { label: 'TS', className: 'bg-[var(--color-secondary)]/14 text-[var(--color-secondary)]' },
-  tsx: { label: 'TSX', className: 'bg-[var(--color-secondary)]/14 text-[var(--color-secondary)]' },
-  js: { label: 'JS', className: 'bg-[var(--color-warning)]/16 text-[var(--color-warning)]' },
-  jsx: { label: 'JSX', className: 'bg-[var(--color-warning)]/16 text-[var(--color-warning)]' },
-  json: { label: '{}', className: 'bg-[var(--color-tertiary)]/14 text-[var(--color-tertiary)]' },
-  md: { label: 'MD', className: 'bg-[var(--color-text-tertiary)]/14 text-[var(--color-text-secondary)]' },
-  css: { label: 'CSS', className: 'bg-[var(--color-secondary)]/14 text-[var(--color-secondary)]' },
-  html: { label: 'H', className: 'bg-[var(--color-brand)]/14 text-[var(--color-brand)]' },
-  png: { label: 'IMG', className: 'bg-[var(--color-success)]/14 text-[var(--color-success)]' },
-  jpg: { label: 'IMG', className: 'bg-[var(--color-success)]/14 text-[var(--color-success)]' },
-  jpeg: { label: 'IMG', className: 'bg-[var(--color-success)]/14 text-[var(--color-success)]' },
-  gif: { label: 'IMG', className: 'bg-[var(--color-success)]/14 text-[var(--color-success)]' },
-  svg: { label: 'SVG', className: 'bg-[var(--color-success)]/14 text-[var(--color-success)]' },
-}
 
 function makeTreeStateKey(sessionId: string, path: string) {
   return `${sessionId}::${path}`
@@ -130,21 +123,6 @@ function getSessionScopedRecord<T>(
   ) as Record<string, T>
 }
 
-function getPreviewKindLabel(
-  t: ReturnType<typeof useTranslation>,
-  kind: WorkspacePreviewKind,
-) {
-  return kind === 'diff' ? t('workspace.previewKind.diff') : t('workspace.previewKind.file')
-}
-
-function getFileBadgeMeta(name: string) {
-  const extension = getFileExtension(name)
-  return FILE_BADGE_META[extension] ?? {
-    label: extension ? extension.slice(0, 3).toUpperCase() : 'TXT',
-    className: 'bg-[var(--color-text-tertiary)]/12 text-[var(--color-text-secondary)]',
-  }
-}
-
 function resolveWorkspaceAttachmentPath(workDir: string | undefined, filePath: string) {
   if (!workDir || filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath)) return filePath
   return `${workDir.replace(/[\\/]+$/, '')}/${filePath.replace(/^[/\\]+/, '')}`
@@ -155,28 +133,16 @@ function getWorkspaceReferenceName(path: string, isDirectory = false) {
   return isDirectory && !name.endsWith('/') ? `${name}/` : name
 }
 
-function isMarkdownPreview(tab: WorkspacePreviewTab) {
+function isMarkdownPreview(tab: WorkspacePreviewEntry) {
   if (tab.kind !== 'file') return false
   const language = (tab.language ?? '').toLowerCase()
   const extension = getFileExtension(tab.path)
   return language === 'markdown' || language === 'md' || extension === 'md' || extension === 'markdown'
 }
 
-function FileTypeBadge({ name, subtle = false }: { name: string; subtle?: boolean }) {
-  const meta = getFileBadgeMeta(name)
-  return (
-    <span
-      className={`inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-[5px] px-1 font-[var(--font-label)] text-[9px] font-semibold leading-none ${meta.className} ${subtle ? 'opacity-55 grayscale' : ''}`}
-      aria-hidden="true"
-    >
-      {meta.label}
-    </span>
-  )
-}
-
 function getInlineStateMessage(
   t: ReturnType<typeof useTranslation>,
-  state: WorkspacePreviewTab['state'] | WorkspaceTreeResult['state'] | 'not_git_repo' | undefined,
+  state: WorkspacePreviewEntry['state'] | WorkspaceTreeResult['state'] | 'not_git_repo' | undefined,
   fallbackError?: string | null,
 ) {
   switch (state) {
@@ -366,93 +332,36 @@ function PanelMessage({
   )
 }
 
-function ToolbarIconButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: string
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35"
-    >
-      <span className="material-symbols-outlined text-[16px]">{icon}</span>
-    </button>
-  )
-}
-
-function WorkspaceFilterInput({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) {
-  const t = useTranslation()
-
-  return (
-    <div className="shrink-0 border-b border-[var(--color-border)] px-3 py-2">
-      <label className="flex h-8 items-center gap-2 rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-2.5 text-[var(--color-text-tertiary)] transition-colors focus-within:border-[var(--color-border-focus)] focus-within:ring-2 focus-within:ring-[var(--color-brand)]/10">
-        <span className="material-symbols-outlined shrink-0 text-[17px]">search</span>
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-label={t('workspace.filterPlaceholder')}
-          placeholder={t('workspace.filterPlaceholder')}
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
-        />
-        {value.length > 0 && (
-          <button
-            type="button"
-            aria-label={t('workspace.clearFilter')}
-            onClick={() => onChange('')}
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-          >
-            <span className="material-symbols-outlined text-[13px]">close</span>
-          </button>
-        )}
-      </label>
-    </div>
-  )
-}
-
-function FileStatusBadge({ status }: { status: WorkspaceFileStatus }) {
-  const meta = FILE_STATUS_META[status]
-  return (
-    <span
-      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-semibold ${meta.className}`}
-      aria-label={status}
-    >
-      {meta.label}
-    </span>
-  )
-}
-
 function CodeSurface({
+  path,
   value,
   language,
   onAddLineComment,
   onAddSelection,
+  commentRequest = 0,
+  className = 'min-h-0 flex-1 overflow-auto bg-[var(--color-code-bg)]',
 }: {
+  path: string
   value: string
   language: string
   onAddLineComment: (line: number, note: string, quote: string) => void
   onAddSelection: (selection: WorkspaceTextSelection) => void
+  /** Incremented by the parent to open the comment editor on the first line. */
+  commentRequest?: number
+  className?: string
 }) {
   const t = useTranslation()
   const surfaceRef = useRef<HTMLDivElement>(null)
   const selectionMenuRef = useRef<HTMLButtonElement>(null)
-  const [commentLine, setCommentLine] = useState<number | null>(null)
+  const [commentLine, setCommentLineState] = useState<number | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
   const [showAllLines, setShowAllLines] = useState(false)
   const [selectionMenu, setSelectionMenu] = useState<FloatingSelectionMenuState | null>(null)
   const lines = value.split('\n')
+  const setCommentLine = (line: number | null) => {
+    setCommentLineState(line)
+    setCommentDraft('')
+  }
   const visibleLines = showAllLines ? lines : lines.slice(0, WORKSPACE_PREVIEW_LINE_LIMIT)
   const activeQuote = commentLine ? visibleLines[commentLine - 1] ?? '' : ''
   const usePlainLargePreview = showAllLines && lines.length > WORKSPACE_PREVIEW_LINE_LIMIT
@@ -461,9 +370,20 @@ function CodeSurface({
   useEffect(() => {
     setShowAllLines(false)
     setCommentLine(null)
-    setCommentDraft('')
     setSelectionMenu(null)
-  }, [language, value])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, language])
+
+  // A refresh of the same file keeps the open editor while its line still exists.
+  useEffect(() => {
+    setSelectionMenu(null)
+    if (commentLine !== null && commentLine > lines.length) setCommentLine(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
+
+  useEffect(() => {
+    if (commentRequest > 0) setCommentLine(1)
+  }, [commentRequest])
 
   const dismissSelectionMenu = useCallback(() => {
     setSelectionMenu(null)
@@ -474,13 +394,6 @@ function CodeSurface({
     popoverRef: selectionMenuRef,
     onDismiss: dismissSelectionMenu,
   })
-
-  const submitLineComment = () => {
-    if (!commentLine || !commentDraft.trim()) return
-    onAddLineComment(commentLine, commentDraft.trim(), activeQuote)
-    setCommentLine(null)
-    setCommentDraft('')
-  }
 
   const handleSelectionMouseUp = (event: MouseEvent<HTMLDivElement>) => {
     const selection = getTextSelectionFromContainer(surfaceRef.current, undefined, event)
@@ -508,48 +421,17 @@ function CodeSurface({
 
   const renderLineCommentEditor = (lineNumber: number) => {
     if (commentLine !== lineNumber) return null
-
     return (
-      <div className="grid grid-cols-[48px_minmax(0,720px)] gap-3 bg-[var(--color-brand)]/10 px-3 py-2">
-        <span aria-hidden="true" />
-        <div className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2">
-            <span className="material-symbols-outlined text-[15px] text-[var(--color-text-tertiary)]">chat_bubble</span>
-            <span className="text-[12px] font-semibold text-[var(--color-text-primary)]">{t('workspace.localComment')}</span>
-            <span className="ml-auto text-[11px] text-[var(--color-text-tertiary)]">
-              {t('workspace.commentLineTarget', { line: lineNumber })}
-            </span>
-          </div>
-          <textarea
-            value={commentDraft}
-            onChange={(event) => setCommentDraft(event.target.value)}
-            autoFocus
-            rows={3}
-            placeholder={t('workspace.commentPlaceholder')}
-            className="block w-full resize-none bg-transparent px-3 py-3 text-[13px] leading-6 text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
-          />
-          <div className="flex justify-end gap-2 px-3 pb-3">
-            <button
-              type="button"
-              onClick={() => {
-                setCommentLine(null)
-                setCommentDraft('')
-              }}
-              className="rounded-[7px] px-2.5 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              onClick={submitLineComment}
-              disabled={!commentDraft.trim()}
-              className="rounded-[7px] bg-[var(--color-text-primary)] px-2.5 py-1 text-[12px] font-medium text-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {t('workspace.addCommentToChat')}
-            </button>
-          </div>
-        </div>
-      </div>
+      <LineCommentEditor
+        lineNumber={lineNumber}
+        draft={commentDraft}
+        onDraftChange={setCommentDraft}
+        onCancel={() => setCommentLine(null)}
+        onSubmit={(note) => {
+          onAddLineComment(lineNumber, note, activeQuote)
+          setCommentLine(null)
+        }}
+      />
     )
   }
 
@@ -557,10 +439,7 @@ function CodeSurface({
     <button
       type="button"
       aria-label={t('workspace.commentLine', { line: lineNumber })}
-      onClick={() => {
-        setCommentLine(lineNumber)
-        setCommentDraft('')
-      }}
+      onClick={() => setCommentLine(lineNumber)}
       className="select-none text-right text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-brand)] focus-visible:outline-none focus-visible:text-[var(--color-brand)]"
     >
       {lineNumber}
@@ -570,7 +449,7 @@ function CodeSurface({
   return (
     <div
       ref={surfaceRef}
-      className="min-h-0 flex-1 overflow-auto bg-[var(--color-code-bg)]"
+      className={className}
       onMouseUp={handleSelectionMouseUp}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setSelectionMenu(null)
@@ -664,9 +543,11 @@ function CodeSurface({
 function MarkdownSurface({
   value,
   onAddSelection,
+  className = 'min-h-0 flex-1 overflow-auto bg-[var(--color-surface)]',
 }: {
   value: string
   onAddSelection: (selection: WorkspaceTextSelection) => void
+  className?: string
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
   const selectionMenuRef = useRef<HTMLButtonElement>(null)
@@ -708,13 +589,13 @@ function MarkdownSurface({
   return (
     <div
       ref={surfaceRef}
-      className="min-h-0 flex-1 overflow-auto bg-[var(--color-surface)]"
+      className={className}
       onMouseUp={handleSelectionMouseUp}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setSelectionMenu(null)
       }}
     >
-      <div className="mx-auto w-full max-w-[860px] px-6 py-5">
+      <div className="mx-auto w-full max-w-[860px] px-4 py-3">
         <MarkdownRenderer
           content={value}
           variant="document"
@@ -726,7 +607,7 @@ function MarkdownSurface({
   )
 }
 
-function ImagePreview({ tab }: { tab: WorkspacePreviewTab }) {
+function ImagePreview({ tab }: { tab: WorkspacePreviewEntry }) {
   const t = useTranslation()
 
   if (!tab.dataUrl) {
@@ -739,8 +620,8 @@ function ImagePreview({ tab }: { tab: WorkspacePreviewTab }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-[var(--color-surface)] p-4">
-      <div className="flex min-h-full items-center justify-center">
+    <div className="overflow-auto rounded-[7px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+      <div className="flex items-center justify-center">
         <img
           src={tab.dataUrl}
           alt={tab.path}
@@ -751,37 +632,83 @@ function ImagePreview({ tab }: { tab: WorkspacePreviewTab }) {
   )
 }
 
-function ChangedFileRow({
+function getPathParts(path: string) {
+  const segments = path.split('/').filter(Boolean)
+  const name = segments.pop() ?? path
+  return { name, dir: segments.join('/') }
+}
+
+function FileStatusLetter({ status }: { status: WorkspaceFileStatus }) {
+  const meta = FILE_STATUS_META[status]
+  return (
+    <span
+      className={`w-4 shrink-0 text-center font-[var(--font-mono)] text-[11px] font-semibold ${meta.className}`}
+      aria-label={status}
+    >
+      {meta.label}
+    </span>
+  )
+}
+
+const FILE_ROW_CLASS =
+  'flex w-full items-center gap-1.5 rounded-[6px] py-[7px] pr-1.5 text-left text-[12px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]'
+
+function ChangedFileItem({
   file,
-  onClick,
+  expanded,
+  onToggle,
   onContextMenu,
+  children,
 }: {
   file: WorkspaceChangedFile
-  onClick: () => void
+  expanded: boolean
+  onToggle: () => void
   onContextMenu: (event: MouseEvent, path: string) => void
+  children?: ReactNode
 }) {
+  const { name, dir } = getPathParts(file.path)
+  const Chevron = expanded ? ChevronDown : ChevronRight
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onContextMenu={(event) => onContextMenu(event, file.path)}
-      className="mx-2 flex w-[calc(100%-16px)] items-center gap-3 rounded-[7px] px-2 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
-    >
-      <FileStatusBadge status={file.status} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{file.path}</div>
-        {file.oldPath && (
-          <div className="truncate text-[11px] text-[var(--color-text-tertiary)]">
-            {file.oldPath}
-          </div>
-        )}
-      </div>
-      <div className="shrink-0 text-right font-[var(--font-mono)] text-[11px] leading-4">
-        <div className="text-[var(--color-success)]">+{file.additions}</div>
-        <div className="text-[var(--color-error)]">-{file.deletions}</div>
-      </div>
-    </button>
+    <div data-testid="workspace-file-item" className="border-t border-[var(--color-border)] first:border-t-0">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        title={file.path}
+        onClick={onToggle}
+        onContextMenu={(event) => onContextMenu(event, file.path)}
+        className={`${FILE_ROW_CLASS} pl-1.5`}
+      >
+        <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+        <FileCode size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+        <span className="min-w-0 flex-1 truncate">
+          <span>{name}</span>
+          {dir && <span className="ml-1.5 text-[11px] text-[var(--color-text-tertiary)]">{dir}</span>}
+        </span>
+        <span className="shrink-0 whitespace-nowrap font-[var(--font-mono)] text-[11px]">
+          <span className="text-[var(--color-success)]">+{file.additions}</span>{' '}
+          <span className="text-[var(--color-error)]">−{file.deletions}</span>
+        </span>
+        <FileStatusLetter status={file.status} />
+      </button>
+      {expanded && children}
+    </div>
   )
+}
+
+type TreeNodeProps = {
+  sessionId: string
+  entry: WorkspaceTreeEntry
+  depth: number
+  expandedPaths: Set<string>
+  expandedFilePaths: Set<string>
+  treeByPath: Record<string, WorkspaceTreeResult | undefined>
+  treeLoadingByPath: Record<string, boolean | undefined>
+  treeErrorsByPath: Record<string, string | null | undefined>
+  filterQuery: string
+  onToggle: (path: string) => void
+  onToggleFile: (path: string) => void
+  onFileContextMenu: (event: MouseEvent, path: string, isDirectory: boolean) => void
+  renderFileBody: (path: string) => ReactNode
 }
 
 function TreeNode({
@@ -789,40 +716,44 @@ function TreeNode({
   entry,
   depth,
   expandedPaths,
+  expandedFilePaths,
   treeByPath,
   treeLoadingByPath,
   treeErrorsByPath,
   filterQuery,
   onToggle,
-  onOpenFile,
+  onToggleFile,
   onFileContextMenu,
-  activePath,
+  renderFileBody,
 }: TreeNodeProps) {
   const t = useTranslation()
   const childTree = treeByPath[entry.path]
   const childLoading = treeLoadingByPath[makeTreeStateKey(sessionId, entry.path)] ?? false
   const childError = treeErrorsByPath[makeTreeStateKey(sessionId, entry.path)] ?? null
-  const isExpanded = expandedPaths.has(entry.path)
-  const isVisuallyExpanded = isExpanded || filterQuery.length > 0
-  const indent = 14 + depth * 20
+  const isExpanded = entry.isDirectory
+    ? expandedPaths.has(entry.path) || filterQuery.length > 0
+    : expandedFilePaths.has(entry.path)
+  const indent = 6 + depth * 14
+  const Chevron = isExpanded ? ChevronDown : ChevronRight
 
   if (!entry.isDirectory) {
-    const isActive = entry.path === activePath
     return (
-      <button
-        type="button"
-        onClick={() => onOpenFile(entry.path)}
-        onContextMenu={(event) => onFileContextMenu(event, entry.path, false)}
-        className={`group mx-2 flex h-8 w-[calc(100%-16px)] items-center gap-2 rounded-[7px] pr-2 text-left transition-colors ${
-          isActive
-            ? 'bg-[var(--color-surface-selected)] shadow-[inset_0_0_0_1.5px_var(--color-border-focus)]'
-            : 'hover:bg-[var(--color-surface-hover)]'
-        }`}
-        style={{ paddingLeft: indent }}
-      >
-        <FileTypeBadge name={entry.name} subtle={!isActive} />
-        <span className="min-w-0 truncate text-[14px] font-medium text-[var(--color-text-primary)]">{entry.name}</span>
-      </button>
+      <div>
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          title={entry.path}
+          onClick={() => onToggleFile(entry.path)}
+          onContextMenu={(event) => onFileContextMenu(event, entry.path, false)}
+          className={FILE_ROW_CLASS}
+          style={{ paddingLeft: indent }}
+        >
+          <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+          <FileCode size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+          <span className="min-w-0 truncate">{entry.name}</span>
+        </button>
+        {isExpanded && <div style={{ paddingLeft: indent }}>{renderFileBody(entry.path)}</div>}
+      </div>
     )
   }
 
@@ -832,31 +763,19 @@ function TreeNode({
         type="button"
         onClick={() => onToggle(entry.path)}
         onContextMenu={(event) => onFileContextMenu(event, entry.path, true)}
-        aria-expanded={isVisuallyExpanded}
-        className="group mx-2 flex h-8 w-[calc(100%-16px)] items-center gap-2 rounded-[7px] pr-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
+        aria-expanded={isExpanded}
+        className={FILE_ROW_CLASS}
         style={{ paddingLeft: indent }}
       >
-        <span className="material-symbols-outlined shrink-0 text-[18px] text-[var(--color-text-tertiary)] transition-colors group-hover:text-[var(--color-text-primary)]">
-          {isVisuallyExpanded ? 'expand_more' : 'chevron_right'}
-        </span>
-        <span className="min-w-0 truncate text-[15px] font-medium text-[var(--color-text-primary)]">{entry.name}</span>
+        <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+        <Folder size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+        <span className="min-w-0 truncate">{entry.name}</span>
       </button>
 
-      {isVisuallyExpanded && (
-        <div className="relative">
-          {depth < 4 && (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-1 top-1 w-px bg-[var(--color-border)]"
-              style={{ left: 28 + depth * 20 }}
-            />
-          )}
+      {isExpanded && (
+        <div>
           {childLoading && !childTree && (
-            <PanelMessage
-              compact
-              icon="progress_activity"
-              message={t('common.loading')}
-            />
+            <PanelMessage compact icon="progress_activity" message={t('common.loading')} />
           )}
 
           {!childLoading && childError && (
@@ -889,14 +808,15 @@ function TreeNode({
                 entry={childEntry}
                 depth={depth + 1}
                 expandedPaths={expandedPaths}
+                expandedFilePaths={expandedFilePaths}
                 treeByPath={treeByPath}
                 treeLoadingByPath={treeLoadingByPath}
                 treeErrorsByPath={treeErrorsByPath}
                 filterQuery={filterQuery}
                 onToggle={onToggle}
-                onOpenFile={onOpenFile}
+                onToggleFile={onToggleFile}
                 onFileContextMenu={onFileContextMenu}
-                activePath={activePath}
+                renderFileBody={renderFileBody}
               />
             ))}
         </div>
@@ -905,24 +825,161 @@ function TreeNode({
   )
 }
 
-export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
+const EXPANDED_SURFACE_CLASS =
+  'max-h-[420px] overflow-auto rounded-[7px] border border-[var(--color-border)] bg-[var(--color-code-bg)]'
+
+function FileActionButton({
+  label,
+  onClick,
+  disabled = false,
+  children,
+  iconOnly = false,
+  ...rest
+}: {
+  label: string
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void
+  disabled?: boolean
+  children: ReactNode
+  iconOnly?: boolean
+  'aria-haspopup'?: 'menu'
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={iconOnly ? label : undefined}
+      title={iconOnly ? label : undefined}
+      className="inline-flex h-7 items-center gap-1 rounded-[6px] px-1.5 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-45"
+      {...rest}
+    >
+      {children}
+      {!iconOnly && <span>{label}</span>}
+    </button>
+  )
+}
+
+function FileExpandedBody({
+  path,
+  entry,
+  loading,
+  error,
+  onAddToChat,
+  onMore,
+  onAddLineComment,
+  onAddSelection,
+}: {
+  path: string
+  entry: WorkspacePreviewEntry | undefined
+  loading: boolean
+  error: string | null
+  onAddToChat: () => void
+  onMore: (event: MouseEvent<HTMLButtonElement>) => void
+  onAddLineComment: (line: number, note: string, quote: string) => void
+  onAddSelection: (selection: WorkspaceTextSelection) => void
+}) {
+  const t = useTranslation()
+  const [commentRequest, setCommentRequest] = useState(0)
+  const state = loading || !entry ? 'loading' : entry.state ?? 'loading'
+  const isDiff = entry?.kind === 'diff'
+  const isImage = state === 'ok' && entry?.previewType === 'image'
+  const isMarkdown = state === 'ok' && !isDiff && !isImage && entry ? isMarkdownPreview(entry) : false
+  const isEmptyDiff = state === 'ok' && isDiff && !(entry?.diff ?? '').trim()
+  const canComment = state === 'ok' && !isImage && !isMarkdown && !isEmptyDiff
+
+  let content: ReactNode
+  if (state === 'loading') {
+    content = <PanelMessage compact icon="progress_activity" message={t('workspace.previewState.loading')} />
+  } else if (isEmptyDiff) {
+    content = <PanelMessage compact icon="difference" message={t('workspace.emptyDiff')} />
+  } else if (state === 'ok' && isDiff) {
+    content = (
+      <WorkspaceDiffSurface
+        value={entry?.diff ?? ''}
+        path={path}
+        hideFileHeaders
+        className={EXPANDED_SURFACE_CLASS}
+        commentRequest={commentRequest}
+        onAddLineComment={onAddLineComment}
+      />
+    )
+  } else if (isImage && entry) {
+    content = <ImagePreview tab={entry} />
+  } else if (isMarkdown) {
+    content = (
+      <MarkdownSurface
+        value={entry?.content ?? ''}
+        onAddSelection={onAddSelection}
+        className="max-h-[420px] overflow-auto rounded-[7px] border border-[var(--color-border)] bg-[var(--color-surface)]"
+      />
+    )
+  } else if (state === 'ok') {
+    content = (
+      <CodeSurface
+        path={path}
+        value={entry?.content ?? ''}
+        language={entry?.language ?? 'text'}
+        onAddLineComment={onAddLineComment}
+        onAddSelection={onAddSelection}
+        commentRequest={commentRequest}
+        className={EXPANDED_SURFACE_CLASS}
+      />
+    )
+  } else {
+    content = (
+      <PanelMessage
+        compact
+        icon="error"
+        tone={state === 'error' ? 'error' : 'muted'}
+        message={getInlineStateMessage(t, state, error || entry?.error || null)}
+      />
+    )
+  }
+
+  return (
+    <div data-testid="workspace-file-body" className="pb-3 pl-[25px] pr-0.5">
+      <div className="mb-1.5 break-all text-[11px] text-[var(--color-text-tertiary)]">{path}</div>
+      {content}
+      <div className="mt-1.5 flex flex-wrap items-center gap-0.5">
+        <FileActionButton label={t('workspace.addToChat')} onClick={onAddToChat}>
+          <MessageSquarePlus size={13} strokeWidth={1.9} aria-hidden="true" />
+        </FileActionButton>
+        <FileActionButton
+          label={t('workspace.lineComment')}
+          onClick={() => setCommentRequest((value) => value + 1)}
+          disabled={!canComment}
+        >
+          <MessageSquare size={13} strokeWidth={1.9} aria-hidden="true" />
+        </FileActionButton>
+        <FileActionButton label={t('workspace.moreFileActions')} onClick={onMore} iconOnly aria-haspopup="menu">
+          <Ellipsis size={14} strokeWidth={1.9} aria-hidden="true" />
+        </FileActionButton>
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
   const t = useTranslation()
   const addToast = useUIStore((state) => state.addToast)
   const [filterQuery, setFilterQuery] = useState('')
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false)
-  const [previewTabContextMenu, setPreviewTabContextMenu] = useState<{ tabId: string; x: number; y: number } | null>(null)
   const [fileContextMenu, setFileContextMenu] = useState<FileContextMenuState | null>(null)
-  const width = useWorkspacePanelStore((state) => state.width)
-  const isOpen = useWorkspacePanelStore((state) => state.isPanelOpen(sessionId))
   const activeView = useWorkspacePanelStore((state) => state.getActiveView(sessionId))
   const status = useWorkspacePanelStore((state) => state.statusBySession[sessionId])
   const treeByPath = useWorkspacePanelStore((state) => state.treeBySessionPath[sessionId] ?? EMPTY_TREE_BY_PATH)
-  const previewTabs = useWorkspacePanelStore((state) => state.previewTabsBySession[sessionId] ?? EMPTY_PREVIEW_TABS)
-  const activePreviewTabId = useWorkspacePanelStore((state) => state.activePreviewTabIdBySession[sessionId] ?? null)
-  const expandedPaths = useWorkspacePanelStore((state) => state.expandedPathsBySession[sessionId] ?? EMPTY_EXPANDED_PATHS)
+  const previews = useWorkspacePanelStore((state) => state.previewsBySession[sessionId] ?? EMPTY_PREVIEWS)
+  const expandedPreviewIds = useWorkspacePanelStore((state) => state.expandedPreviewIdsBySession[sessionId] ?? EMPTY_IDS)
+  const expandedPaths = useWorkspacePanelStore((state) => state.expandedPathsBySession[sessionId] ?? EMPTY_IDS)
   const statusLoading = useWorkspacePanelStore((state) => state.loading.statusBySession[sessionId] ?? false)
   const treeLoadingByPath = useWorkspacePanelStore(
     useShallow((state) => getSessionScopedRecord(state.loading.treeBySessionPath, sessionId)),
+  )
+  const previewLoadingById = useWorkspacePanelStore(
+    useShallow((state) => getSessionScopedRecord(state.loading.previewById, sessionId)),
+  )
+  const previewErrorsById = useWorkspacePanelStore(
+    useShallow((state) => getSessionScopedRecord(state.errors.previewById, sessionId)),
   )
   const statusError = useWorkspacePanelStore((state) => state.errors.statusBySession[sessionId] ?? null)
   const treeErrorsByPath = useWorkspacePanelStore(
@@ -932,15 +989,12 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
   const loadStatus = useWorkspacePanelStore((state) => state.loadStatus)
   const loadTree = useWorkspacePanelStore((state) => state.loadTree)
   const toggleTreeNode = useWorkspacePanelStore((state) => state.toggleTreeNode)
-  const openPreview = useWorkspacePanelStore((state) => state.openPreview)
-  const closePreview = useWorkspacePanelStore((state) => state.closePreview)
-  const closePreviewTabs = useWorkspacePanelStore((state) => state.closePreviewTabs)
-  const closePanel = useWorkspacePanelStore((state) => state.closePanel)
+  const togglePreview = useWorkspacePanelStore((state) => state.togglePreview)
+  const refreshPreviews = useWorkspacePanelStore((state) => state.refreshPreviews)
   const addWorkspaceReference = useWorkspaceChatContextStore((state) => state.addReference)
   const chatState = useChatStore((state) => state.sessions[sessionId]?.chatState ?? 'idle')
-  const refreshLifecycleRef = useRef({
-    sessionId,
-    isOpen: false,
+  const refreshLifecycleRef = useRef<{ sessionId: string | null; chatState: string }>({
+    sessionId: null,
     chatState: 'idle',
   })
 
@@ -950,9 +1004,12 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
   const rootTreeError = treeErrorsByPath[rootTreeKey] ?? null
   const normalizedFilterQuery = normalizeFilterQuery(filterQuery)
   const expandedPathSet = new Set(expandedPaths)
-  const activePreviewTab =
-    previewTabs.find((tab) => tab.id === activePreviewTabId) ?? previewTabs[previewTabs.length - 1] ?? null
-  const activeTreePath = activePreviewTab?.kind === 'file' ? activePreviewTab.path : null
+  const expandedIdSet = new Set(expandedPreviewIds)
+  const expandedFilePaths = new Set(
+    expandedPreviewIds
+      .filter((id) => id.startsWith('file:'))
+      .map((id) => id.slice('file:'.length)),
+  )
   const filteredChangedFiles = useMemo(
     () => (status?.changedFiles ?? []).filter((file) => changedFileMatchesFilter(file, normalizedFilterQuery)),
     [normalizedFilterQuery, status?.changedFiles],
@@ -963,69 +1020,39 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
       : [],
     [normalizedFilterQuery, rootTree, treeByPath],
   )
-  const activePreviewRequestKey = activePreviewTab
-    ? makePreviewStateKey(sessionId, activePreviewTab.id)
-    : null
-  const activePreviewLoading = useWorkspacePanelStore((state) =>
-    activePreviewRequestKey ? state.loading.previewByTabId[activePreviewRequestKey] ?? false : false,
-  )
-  const activePreviewError = useWorkspacePanelStore((state) =>
-    activePreviewRequestKey ? state.errors.previewByTabId[activePreviewRequestKey] ?? null : null,
-  )
 
   useEffect(() => {
     const previous = refreshLifecycleRef.current
-    const sessionChanged = previous.sessionId !== sessionId
-    const opened = isOpen && (sessionChanged || !previous.isOpen)
-    const completedTurn =
-      isOpen &&
-      !sessionChanged &&
-      previous.chatState !== 'idle' &&
-      chatState === 'idle'
+    const opened = previous.sessionId !== sessionId
+    const completedTurn = !opened && previous.chatState !== 'idle' && chatState === 'idle'
+    refreshLifecycleRef.current = { sessionId, chatState }
 
-    refreshLifecycleRef.current = { sessionId, isOpen, chatState }
-
-    const shouldRefreshOnOpen = opened
-    const shouldRefreshAfterCompletedTurn = completedTurn && chatState === 'idle'
-    if ((!shouldRefreshOnOpen && !shouldRefreshAfterCompletedTurn) || statusLoading) return
+    if (completedTurn) void refreshPreviews(sessionId)
+    if ((!opened && !completedTurn) || statusLoading) return
     void loadStatus(sessionId)
-  }, [chatState, isOpen, loadStatus, sessionId, statusLoading])
+  }, [chatState, loadStatus, refreshPreviews, sessionId, statusLoading])
 
   useEffect(() => {
-    if (!isOpen || activeView !== 'all' || rootTree || rootTreeLoading || rootTreeError) return
+    if (activeView !== 'all' || rootTree || rootTreeLoading || rootTreeError) return
     void loadTree(sessionId, '')
-  }, [activeView, isOpen, loadTree, rootTree, rootTreeError, rootTreeLoading, sessionId])
+  }, [activeView, loadTree, rootTree, rootTreeError, rootTreeLoading, sessionId])
 
   useEffect(() => {
-    if (!previewTabContextMenu && !fileContextMenu) return
+    if (!fileContextMenu && !isViewMenuOpen) return
     const close = () => {
-      setPreviewTabContextMenu(null)
       setFileContextMenu(null)
+      setIsViewMenuOpen(false)
     }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
-  }, [fileContextMenu, previewTabContextMenu])
-
-  if (!isOpen) return null
-
-  const hasPreviewTabs = previewTabs.length > 0
-  const panelWidth = hasPreviewTabs ? width : Math.min(width, 520)
-  const panelMaxWidth = hasPreviewTabs ? 'min(62%, calc(100% - 328px))' : '36%'
-  const panelMinWidth = hasPreviewTabs ? 'min(420px, 54%)' : 'min(340px, 40%)'
+  }, [fileContextMenu, isViewMenuOpen])
 
   const handleRefresh = () => {
     void loadStatus(sessionId)
+    void refreshPreviews(sessionId)
     if (activeView === 'all') {
       void loadTree(sessionId, '')
     }
-  }
-
-  const handleOpenDiff = (path: string) => {
-    void openPreview(sessionId, path, 'diff')
-  }
-
-  const handleOpenFile = (path: string) => {
-    void openPreview(sessionId, path, 'file')
   }
 
   const addWorkspacePathToChat = (path: string, isDirectory = false) => {
@@ -1068,24 +1095,16 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
     setIsViewMenuOpen(false)
   }
 
-  const handlePreviewTabContextMenu = (event: MouseEvent, tabId: string) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setFileContextMenu(null)
-    setPreviewTabContextMenu({ tabId, x: event.clientX, y: event.clientY })
-  }
-
   const handleFileContextMenu = (event: MouseEvent, path: string, isDirectory = false) => {
     event.preventDefault()
     event.stopPropagation()
-    setPreviewTabContextMenu(null)
     setFileContextMenu({ path, isDirectory, x: event.clientX, y: event.clientY })
   }
 
-  const handleClosePreviewTabs = (scope: WorkspacePreviewCloseScope) => {
-    if (!previewTabContextMenu) return
-    closePreviewTabs(sessionId, previewTabContextMenu.tabId, scope)
-    setPreviewTabContextMenu(null)
+  const openFileActionsMenu = (event: MouseEvent<HTMLButtonElement>, path: string) => {
+    event.stopPropagation()
+    const rect = event.currentTarget.getBoundingClientRect()
+    setFileContextMenu({ path, isDirectory: false, x: rect.left, y: rect.bottom + 4 })
   }
 
   const copyWorkspacePath = async (path: string, mode: 'relative' | 'absolute' = 'relative') => {
@@ -1096,6 +1115,23 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
       type: copied ? 'success' : 'error',
       message: copied ? t('workspace.pathCopied') : t('common.copyFailed'),
     })
+  }
+
+  const renderFileBody = (path: string, kind: WorkspacePreviewKind) => {
+    const previewId = getWorkspacePreviewId(path, kind)
+    const requestKey = makePreviewStateKey(sessionId, previewId)
+    return (
+      <FileExpandedBody
+        path={path}
+        entry={previews[previewId]}
+        loading={previewLoadingById[requestKey] ?? false}
+        error={previewErrorsById[requestKey] ?? null}
+        onAddToChat={() => addWorkspacePathToChat(path)}
+        onMore={(event) => openFileActionsMenu(event, path)}
+        onAddLineComment={(line, note, quote) => addLineCommentToChat(path, line, note, quote)}
+        onAddSelection={(selection) => addSelectionToChat(path, selection)}
+      />
+    )
   }
 
   const renderChangedView = () => {
@@ -1136,12 +1172,15 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
     return (
       <div>
         {filteredChangedFiles.map((file) => (
-          <ChangedFileRow
+          <ChangedFileItem
             key={`${file.path}:${file.status}:${file.oldPath ?? ''}`}
             file={file}
-            onClick={() => handleOpenDiff(file.path)}
+            expanded={expandedIdSet.has(getWorkspacePreviewId(file.path, 'diff'))}
+            onToggle={() => void togglePreview(sessionId, file.path, 'diff')}
             onContextMenu={handleFileContextMenu}
-          />
+          >
+            {renderFileBody(file.path, 'diff')}
+          </ChangedFileItem>
         ))}
       </div>
     )
@@ -1177,7 +1216,7 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
     }
 
     return (
-      <div className="py-1">
+      <div>
         {filteredRootEntries.map((entry) => (
           <TreeNode
             key={entry.path}
@@ -1185,6 +1224,7 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
             entry={entry}
             depth={0}
             expandedPaths={expandedPathSet}
+            expandedFilePaths={expandedFilePaths}
             treeByPath={treeByPath}
             treeLoadingByPath={treeLoadingByPath}
             treeErrorsByPath={treeErrorsByPath}
@@ -1192,276 +1232,81 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
             onToggle={(path) => {
               void toggleTreeNode(sessionId, path)
             }}
-            onOpenFile={handleOpenFile}
+            onToggleFile={(path) => {
+              void togglePreview(sessionId, path, 'file')
+            }}
             onFileContextMenu={handleFileContextMenu}
-            activePath={activeTreePath}
+            renderFileBody={(path) => renderFileBody(path, 'file')}
           />
         ))}
       </div>
     )
   }
 
-  const renderPreviewContent = () => {
-    if (!activePreviewTab) {
-      return (
-        <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-xs text-[var(--color-text-tertiary)]">
-          {t('workspace.previewEmpty')}
-        </div>
-      )
-    }
-
-    const kindLabel = getPreviewKindLabel(t, activePreviewTab.kind)
-    const state = activePreviewTab.state ?? 'loading'
-
-    return (
-      <>
-        <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-3 text-[12px]">
-          <span className="truncate text-[var(--color-text-tertiary)]">{status?.repoName || 'workspace'}</span>
-          {activePreviewTab.path.split('/').map((segment, index, segments) => (
-            <span key={`${segment}:${index}`} className="flex min-w-0 items-center gap-1.5">
-              <span className="text-[var(--color-text-tertiary)]">›</span>
-              <span className={`truncate ${index === segments.length - 1 ? 'font-semibold text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
-                {segment}
-              </span>
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => addWorkspacePathToChat(activePreviewTab.path)}
-            className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-[6px] px-1.5 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[14px]">person_add</span>
-            <span>{t('workspace.addToChat')}</span>
-          </button>
-          <span className="shrink-0 rounded-[5px] border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-tertiary)]">
-            {kindLabel}
-          </span>
-        </div>
-
-        {activePreviewLoading || state === 'loading' ? (
-          <PanelMessage icon="progress_activity" message={t('workspace.previewState.loading')} />
-        ) : state === 'ok' && activePreviewTab.previewType === 'image' ? (
-          <ImagePreview tab={activePreviewTab} />
-        ) : state === 'ok' && activePreviewTab.kind === 'diff' ? (
-          <WorkspaceDiffSurface
-            value={activePreviewTab.diff ?? ''}
-            path={activePreviewTab.path}
-          />
-        ) : state === 'ok' && isMarkdownPreview(activePreviewTab) ? (
-          <MarkdownSurface
-            value={activePreviewTab.content ?? ''}
-            onAddSelection={(selection) => addSelectionToChat(activePreviewTab.path, selection)}
-          />
-        ) : state === 'ok' ? (
-          <CodeSurface
-            value={activePreviewTab.content ?? ''}
-            language={activePreviewTab.language ?? 'text'}
-            onAddLineComment={(line, note, quote) => addLineCommentToChat(activePreviewTab.path, line, note, quote)}
-            onAddSelection={(selection) => addSelectionToChat(activePreviewTab.path, selection)}
-          />
-        ) : (
-          <PanelMessage
-            icon="error"
-            tone={state === 'error' ? 'error' : 'muted'}
-            message={getInlineStateMessage(t, state, activePreviewError || activePreviewTab.error || null)}
-          />
-        )}
-      </>
-    )
-  }
-
-  const renderPreviewTabs = () => (
-    <>
-      <div
-        role="tablist"
-        aria-label={t('workspace.previewTabs')}
-        className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-3"
-      >
-        {previewTabs.length === 0 ? (
-          <div className="flex items-center gap-2 px-1.5 text-[12px] text-[var(--color-text-tertiary)]">
-            <span className="material-symbols-outlined text-[15px]">docs</span>
-            <span>{t('workspace.preview')}</span>
-          </div>
-        ) : (
-          previewTabs.map((tab) => {
-            const kindLabel = getPreviewKindLabel(t, tab.kind)
-            const isActive = tab.id === activePreviewTab?.id
-
-            return (
-              <div
-                key={tab.id}
-                onContextMenu={(event) => handlePreviewTabContextMenu(event, tab.id)}
-                className={`group flex h-8 min-w-[118px] max-w-[210px] shrink-0 items-center gap-2 rounded-[8px] px-2 text-left text-[13px] transition-colors ${
-                  isActive
-                    ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => {
-                    void openPreview(sessionId, tab.path, tab.kind)
-                  }}
-                  className="min-w-0 flex flex-1 items-center gap-2 text-left"
-                >
-                  {tab.kind === 'diff' ? (
-                    <span className="material-symbols-outlined shrink-0 text-[15px] text-[var(--color-text-tertiary)]">difference</span>
-                  ) : (
-                    <FileTypeBadge name={tab.title} subtle={!isActive} />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{tab.title}</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${t('workspace.closeTab')} ${tab.title} ${kindLabel}`}
-                  onClick={() => {
-                    closePreview(sessionId, tab.id)
-                  }}
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-[var(--color-text-tertiary)] opacity-0 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] group-hover:opacity-100 focus-visible:opacity-100"
-                >
-                  <span className="material-symbols-outlined text-[13px] leading-none">close</span>
-                </button>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {previewTabContextMenu && (
-        <div
-          role="menu"
-          className="fixed z-50 min-w-[156px] rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 text-[12px] shadow-[var(--shadow-dropdown)]"
-          style={{ left: previewTabContextMenu.x, top: previewTabContextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => handleClosePreviewTabs('current')}
-            className="block w-full px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            {t('tabs.close')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => handleClosePreviewTabs('others')}
-            className="block w-full px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            {t('tabs.closeOthers')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => handleClosePreviewTabs('left')}
-            className="block w-full px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            {t('tabs.closeLeft')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => handleClosePreviewTabs('right')}
-            className="block w-full px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            {t('tabs.closeRight')}
-          </button>
-          <div className="my-1 border-t border-[var(--color-border)]" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => handleClosePreviewTabs('all')}
-            className="block w-full px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            {t('tabs.closeAll')}
-          </button>
-        </div>
-      )}
-    </>
-  )
+  const viewLabel = activeView === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')
 
   return (
-    <aside
-      data-testid="workspace-panel"
-      className="flex h-full shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]"
-      style={{ width: panelWidth, maxWidth: panelMaxWidth, minWidth: panelMinWidth }}
-    >
-      {hasPreviewTabs && (
-        <div className="flex min-w-0 flex-1 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
-          {renderPreviewTabs()}
-          {renderPreviewContent()}
-        </div>
-      )}
-
-      <div
-        className={`${hasPreviewTabs ? 'basis-[32%] min-w-[220px] max-w-[320px]' : 'w-full'} flex h-full shrink-0 flex-col bg-[var(--color-surface)]`}
-      >
-        <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-[var(--color-border)] px-2.5">
-          <div className="relative min-w-0">
-            <button
-              type="button"
-              aria-label={activeView === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')}
-              aria-haspopup="menu"
-              aria-expanded={isViewMenuOpen}
-              onClick={() => setIsViewMenuOpen((open) => !open)}
-              className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-[7px] px-2 py-1 text-[14px] font-semibold leading-5 text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35"
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-1.5 px-3 pb-2 pt-3">
+        <div className="relative min-w-0 flex-1">
+          <button
+            type="button"
+            aria-label={viewLabel}
+            aria-haspopup="menu"
+            aria-expanded={isViewMenuOpen}
+            onClick={(event) => {
+              event.stopPropagation()
+              setIsViewMenuOpen((open) => !open)
+            }}
+            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-[6px] px-1.5 py-1 text-[12px] font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          >
+            <span className="truncate">{viewLabel}</span>
+            <ChevronDown size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+          </button>
+          {isViewMenuOpen && (
+            <div
+              role="menu"
+              onClick={(event) => event.stopPropagation()}
+              className="absolute left-0 top-[calc(100%+4px)] z-30 min-w-[132px] overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 shadow-[var(--shadow-dropdown)]"
             >
-              <span className="truncate">
-                {activeView === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')}
-              </span>
-              <span className="material-symbols-outlined shrink-0 text-[15px] font-normal text-[var(--color-text-tertiary)]">expand_more</span>
-            </button>
-            {isViewMenuOpen && (
-              <div
-                role="menu"
-                className="absolute left-0 top-[calc(100%+4px)] z-30 min-w-[124px] overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 shadow-[var(--shadow-dropdown)]"
-              >
-                {(['changed', 'all'] as const).map((view) => {
-                  const selected = activeView === view
-                  return (
-                    <button
-                      key={view}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleSetActiveView(view)}
-                      className={`flex h-7 w-full items-center gap-2 px-2.5 text-left text-[12px] transition-colors ${
-                        selected ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {view === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')}
-                      </span>
-                      {selected && (
-                        <span className="material-symbols-outlined text-[14px] text-[var(--color-brand)]">check</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <ToolbarIconButton
-              icon="refresh"
-              label={t('workspace.refresh')}
-              onClick={handleRefresh}
-            />
-            <ToolbarIconButton
-              icon="close"
-              label={t('workspace.closePanel')}
-              onClick={() => closePanel(sessionId)}
-            />
-          </div>
+              {(['changed', 'all'] as const).map((view) => {
+                const selected = activeView === view
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleSetActiveView(view)}
+                    className={`flex h-7 w-full items-center gap-2 px-2.5 text-left text-[12px] transition-colors ${
+                      selected ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {view === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')}
+                    </span>
+                    {selected && <Check size={13} strokeWidth={2} aria-hidden="true" className="text-[var(--color-brand)]" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
+        <PanelIconButton label={t('workspace.refresh')} onClick={handleRefresh}>
+          <RefreshCw size={14} strokeWidth={1.9} aria-hidden="true" />
+        </PanelIconButton>
+      </div>
 
-        <WorkspaceFilterInput value={filterQuery} onChange={setFilterQuery} />
+      <div className="shrink-0 px-3 pb-2">
+        <SearchField
+          value={filterQuery}
+          onChange={setFilterQuery}
+          aria-label={t('workspace.filterPlaceholder')}
+          placeholder={t('workspace.filterPlaceholder')}
+        />
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-auto py-2">
-          {activeView === 'changed' ? renderChangedView() : renderAllFilesView()}
-        </div>
+      <div className="min-h-0 flex-1 overflow-auto px-3 pb-3">
+        {activeView === 'changed' ? renderChangedView() : renderAllFilesView()}
       </div>
 
       {fileContextMenu && (
@@ -1480,7 +1325,7 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
             }}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">person_add</span>
+            <MessageSquarePlus size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
             <span>{t('workspace.addToChat')}</span>
           </button>
           <button
@@ -1489,7 +1334,7 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
             onClick={() => void copyWorkspacePath(fileContextMenu.path)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">content_copy</span>
+            <Copy size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
             <span>{t('workspace.copyPath')}</span>
           </button>
           <button
@@ -1498,9 +1343,258 @@ export function WorkspacePanel({ sessionId }: WorkspacePanelProps) {
             onClick={() => void copyWorkspacePath(fileContextMenu.path, 'absolute')}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">file_copy</span>
+            <Copy size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
             <span>{t('workspace.copyAbsolutePath')}</span>
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PanelIconButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+    >
+      {children}
+    </button>
+  )
+}
+
+function WorkspaceTerminalView({
+  sessionId,
+  active,
+  cwd,
+  contextLabel,
+}: {
+  sessionId: string
+  active: boolean
+  cwd?: string
+  contextLabel?: string
+}) {
+  const t = useTranslation()
+  const terminalState = useTerminalPanelStore((state) => state.terminalsBySession[sessionId])
+  const ensureSession = useTerminalPanelStore((state) => state.ensureSession)
+  const addTerminal = useTerminalPanelStore((state) => state.addTerminal)
+  const closeTerminal = useTerminalPanelStore((state) => state.closeTerminal)
+  const setActiveTerminal = useTerminalPanelStore((state) => state.setActiveTerminal)
+  const setTerminalShell = useTerminalPanelStore((state) => state.setTerminalShell)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const focusTabAfterSwitchRef = useRef(false)
+  const activeTerminalIdForFocus = terminalState?.activeTerminalId
+
+  useEffect(() => {
+    ensureSession(sessionId)
+  }, [ensureSession, sessionId])
+
+  // Each terminal renders its own copy of the tab strip, so keyboard switching moves focus to the visible copy.
+  useEffect(() => {
+    if (!focusTabAfterSwitchRef.current) return
+    focusTabAfterSwitchRef.current = false
+    containerRef.current
+      ?.querySelector<HTMLElement>('[data-testid="session-terminal-panel"]:not([hidden]) [role="tab"][aria-selected="true"]')
+      ?.focus()
+  }, [activeTerminalIdForFocus])
+
+  if (!terminalState) return null
+
+  const { terminals, activeTerminalId } = terminalState
+  const canClose = terminals.length > 1
+  const getTitle = (terminal: SessionTerminal) =>
+    `${terminal.shell ?? t('terminal.defaultName')} ${terminal.index}`
+
+  const tabs = (
+    <div
+      role="tablist"
+      aria-label={t('terminal.tabsLabel')}
+      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
+      onKeyDown={(event) => {
+        const id = moveRovingFocus(event, '[role="tab"]', 'horizontal')?.dataset.terminalId
+        if (id && id !== activeTerminalId) {
+          focusTabAfterSwitchRef.current = true
+          setActiveTerminal(sessionId, id)
+        }
+      }}
+    >
+      {terminals.map((terminal) => {
+        const selected = terminal.id === activeTerminalId
+        const title = getTitle(terminal)
+        return (
+          <span
+            key={terminal.id}
+            className={`inline-flex shrink-0 items-center rounded-[6px] ${
+              selected
+                ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              tabIndex={selected ? 0 : -1}
+              data-terminal-id={terminal.id}
+              onClick={() => setActiveTerminal(sessionId, terminal.id)}
+              className="inline-flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[11px] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+            >
+              <SquareTerminal size={12} strokeWidth={1.9} aria-hidden="true" />
+              {title}
+            </button>
+            {canClose && (
+              <button
+                type="button"
+                aria-label={t('terminal.closeTerminal', { name: title })}
+                title={t('terminal.closeTerminal', { name: title })}
+                onClick={() => closeTerminal(sessionId, terminal.id)}
+                className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded-[4px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+              >
+                <X size={11} strokeWidth={2} aria-hidden="true" />
+              </button>
+            )}
+          </span>
+        )
+      })}
+      <PanelIconButton label={t('terminal.newTab')} onClick={() => addTerminal(sessionId)}>
+        <Plus size={14} strokeWidth={1.9} aria-hidden="true" />
+      </PanelIconButton>
+    </div>
+  )
+
+  return (
+    <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">
+      {terminals.map((terminal) => {
+        const selected = terminal.id === activeTerminalId
+        return (
+          <div
+            key={terminal.id}
+            data-testid="session-terminal-panel"
+            hidden={!selected}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <TerminalSettings
+              active={active && selected}
+              docked
+              cwd={cwd}
+              runtimeId={terminal.id}
+              preserveOnUnmount
+              testId={`session-terminal-host-${terminal.id}`}
+              toolbarLeading={tabs}
+              meta={contextLabel}
+              onShellChange={(shell) => {
+                const name = getShellDisplayName(shell)
+                if (name) setTerminalShell(sessionId, terminal.id, name)
+              }}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+type WorkspacePanelProps = {
+  sessionId: string
+  /** Working directory for new terminals. */
+  terminalCwd?: string
+  /** Light context line shown above the terminal, e.g. "project · branch". */
+  contextLabel?: string
+}
+
+export function WorkspacePanel({ sessionId, terminalCwd, contextLabel }: WorkspacePanelProps) {
+  const t = useTranslation()
+  const isOpen = useWorkspacePanelStore((state) => state.isPanelOpen(sessionId))
+  const tab = useWorkspacePanelStore((state) => state.getPanelTab(sessionId))
+  const expanded = useWorkspacePanelStore((state) => state.isPanelExpanded(sessionId))
+  const setPanelTab = useWorkspacePanelStore((state) => state.setPanelTab)
+  const toggleExpanded = useWorkspacePanelStore((state) => state.toggleExpanded)
+  const closePanel = useWorkspacePanelStore((state) => state.closePanel)
+  const hasTerminals = useTerminalPanelStore((state) => Boolean(state.terminalsBySession[sessionId]))
+
+  if (!isOpen) return null
+
+  const panelTabs = [
+    { id: 'files' as const, label: t('workspace.tabFiles'), Icon: Files },
+    { id: 'terminal' as const, label: t('workspace.tabTerminal'), Icon: SquareTerminal },
+  ]
+  const expandLabel = expanded ? t('workspace.restorePanel') : t('workspace.expandPanel')
+
+  return (
+    <aside
+      data-testid="workspace-panel"
+      aria-label={t('workspace.panelTabs')}
+      className="flex h-full min-h-0 w-full min-w-0 flex-col bg-[var(--color-surface)]"
+    >
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--color-border)] pl-2.5 pr-2 pt-1.5">
+        <div
+          role="tablist"
+          aria-label={t('workspace.panelTabs')}
+          className="flex items-center gap-0.5"
+          onKeyDown={(event) => {
+            const id = moveRovingFocus(event, '[role="tab"]', 'horizontal')?.dataset.panelTab
+            const next = panelTabs.find((entry) => entry.id === id)
+            if (next && next.id !== tab) setPanelTab(sessionId, next.id)
+          }}
+        >
+          {panelTabs.map(({ id, label, Icon }) => {
+            const selected = tab === id
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                data-panel-tab={id}
+                onClick={() => setPanelTab(sessionId, id)}
+                className={`-mb-px inline-flex items-center gap-1.5 rounded-t-[6px] border-b-2 px-2.5 pb-2 pt-1.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+                  selected
+                    ? 'border-[var(--color-text-primary)] text-[var(--color-text-primary)]'
+                    : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                }`}
+              >
+                <Icon size={14} strokeWidth={1.9} aria-hidden="true" />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <span className="flex-1" />
+        <div className="flex items-center gap-0.5 pb-1">
+          <PanelIconButton label={expandLabel} onClick={() => toggleExpanded(sessionId)}>
+            {expanded
+              ? <Minimize2 size={14} strokeWidth={1.9} aria-hidden="true" />
+              : <Maximize2 size={14} strokeWidth={1.9} aria-hidden="true" />}
+          </PanelIconButton>
+          <PanelIconButton label={t('workspace.closeSidePanel')} onClick={() => closePanel(sessionId)}>
+            <X size={14} strokeWidth={1.9} aria-hidden="true" />
+          </PanelIconButton>
+        </div>
+      </div>
+
+      <div hidden={tab !== 'files'} className="flex min-h-0 flex-1 flex-col">
+        <WorkspaceFilesView sessionId={sessionId} />
+      </div>
+      {(tab === 'terminal' || hasTerminals) && (
+        <div hidden={tab !== 'terminal'} className="flex min-h-0 flex-1 flex-col">
+          <WorkspaceTerminalView
+            sessionId={sessionId}
+            active={tab === 'terminal'}
+            cwd={terminalCwd}
+            contextLabel={contextLabel}
+          />
         </div>
       )}
     </aside>

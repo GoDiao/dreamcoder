@@ -121,6 +121,103 @@ describe('ModelSelector', () => {
     })
   })
 
+  it('sets the effort per session from the composer menu and shows it in the trigger', async () => {
+    const setSessionRuntime = vi.fn()
+    const setEffort = vi.fn(async () => {})
+    useSettingsStore.setState({
+      locale: 'en',
+      availableModels: [
+        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
+      ],
+      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
+      activeProviderName: 'Provider A',
+      effortLevel: 'medium',
+      setEffort,
+    })
+    useProviderStore.setState({
+      providers: [{
+        id: 'provider-a',
+        presetId: 'custom',
+        name: 'Provider A',
+        apiKey: '***',
+        baseUrl: 'https://api.example.com',
+        apiFormat: 'anthropic',
+        models: { main: 'provider-main', haiku: '', sonnet: '', opus: '' },
+      }],
+      activeId: 'provider-a',
+      hasLoadedProviders: true,
+      isLoading: true,
+    })
+    useChatStore.setState({
+      setSessionRuntime,
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+    render(<ModelSelector runtimeKey="session-1" />)
+
+    expect(screen.getByRole('button', { name: 'provider-main · Medium' })).toBeInTheDocument()
+    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
+
+    await clickByRole('provider-main · Medium')
+    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
+    await clickByRole(/^High$/)
+
+    expect(setEffort).not.toHaveBeenCalled()
+    // No model was chosen for this session, so only the effort is pinned and
+    // the session keeps following the default provider and model.
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
+      providerId: null,
+      modelId: '',
+      effort: 'high',
+    })
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
+      providerId: null,
+      modelId: '',
+      effort: 'high',
+    })
+    expect(screen.getByRole('button', { name: 'provider-main · High' })).toBeInTheDocument()
+  })
+
+  it('keeps an explicit model choice when only the effort changes', async () => {
+    const setSessionRuntime = vi.fn()
+    useSettingsStore.setState({
+      locale: 'en',
+      availableModels: [
+        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
+      ],
+      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
+      activeProviderName: 'Provider A',
+      effortLevel: 'medium',
+    })
+    useProviderStore.setState({
+      providers: [{
+        id: 'provider-a',
+        presetId: 'custom',
+        name: 'Provider A',
+        apiKey: '***',
+        baseUrl: 'https://api.example.com',
+        apiFormat: 'anthropic',
+        models: { main: 'provider-main', haiku: 'provider-fast', sonnet: '', opus: '' },
+      }],
+      activeId: 'provider-a',
+      hasLoadedProviders: true,
+      isLoading: true,
+    })
+    useChatStore.setState({
+      setSessionRuntime,
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+    useSessionRuntimeStore.getState().setSelection('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
+
+    render(<ModelSelector runtimeKey="session-2" />)
+    await clickByRole('provider-fast · Medium')
+    await clickByRole(/^Max$/)
+
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-2', {
+      providerId: 'provider-a',
+      modelId: 'provider-fast',
+      effort: 'max',
+    })
+  })
+
   it('lists only the active provider without subscription sections', async () => {
     useSettingsStore.setState({
       locale: 'en',

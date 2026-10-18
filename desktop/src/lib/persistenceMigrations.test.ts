@@ -14,6 +14,7 @@ describe('desktop persistence migrations', () => {
     window.localStorage.setItem('dreamcoder-open-tabs', JSON.stringify([
       { sessionId: 'session-1', title: 'Old tab' },
       { sessionId: '__terminal__legacy', title: 'Terminal 1', type: 'terminal' },
+      { sessionId: '__settings__', title: 'Settings', type: 'settings' },
       { sessionId: 123, title: 'bad' },
     ]))
 

@@ -24,7 +24,7 @@ function getStoredTheme(): ThemeMode {
     const stored = localStorage.getItem(THEME_STORAGE_KEY)
     if (isThemeMode(stored)) return stored
   } catch { }
-  return 'white'
+  return 'light'
 }
 
 export function applyTheme(theme: ThemeMode) {
@@ -60,14 +60,13 @@ export type SettingsTab =
   | 'diagnostics'
   | 'about'
 
-type ActiveView = 'code' | 'scheduled' | 'terminal' | 'history' | 'settings'
-
 type UIStore = {
   theme: ThemeMode
   sidebarOpen: boolean
   sidebarWidth: number
-  activeView: ActiveView
-  pendingSettingsTab: SettingsTab | null
+  /** Settings opens as a modal over the current page. */
+  settingsOpen: boolean
+  settingsTab: SettingsTab
   pendingMemoryPath: string | null
   activeModal: string | null
   toasts: Toast[]
@@ -77,8 +76,9 @@ type UIStore = {
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   setSidebarWidth: (width: number) => void
-  setActiveView: (view: ActiveView) => void
-  setPendingSettingsTab: (tab: SettingsTab | null) => void
+  openSettings: (tab?: SettingsTab) => void
+  closeSettings: () => void
+  setSettingsTab: (tab: SettingsTab) => void
   setPendingMemoryPath: (path: string | null) => void
   openModal: (id: string) => void
   closeModal: () => void
@@ -92,8 +92,8 @@ export const useUIStore = create<UIStore>((set) => ({
   theme: getStoredTheme(),
   sidebarOpen: true,
   sidebarWidth: getStoredSidebarWidth(),
-  activeView: 'code',
-  pendingSettingsTab: null,
+  settingsOpen: false,
+  settingsTab: 'providers',
   pendingMemoryPath: null,
   activeModal: null,
   toasts: [],
@@ -121,8 +121,9 @@ export const useUIStore = create<UIStore>((set) => ({
     try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)) } catch { }
     set({ sidebarWidth: clamped })
   },
-  setActiveView: (view) => set({ activeView: view }),
-  setPendingSettingsTab: (tab) => set({ pendingSettingsTab: tab }),
+  openSettings: (tab) => set((s) => ({ settingsOpen: true, settingsTab: tab ?? s.settingsTab })),
+  closeSettings: () => set({ settingsOpen: false }),
+  setSettingsTab: (tab) => set({ settingsTab: tab }),
   setPendingMemoryPath: (path) => set({ pendingMemoryPath: path }),
   openModal: (id) => set({ activeModal: id }),
   closeModal: () => set({ activeModal: null }),

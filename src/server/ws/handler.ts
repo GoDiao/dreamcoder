@@ -27,6 +27,7 @@ import {
   type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
+import { EFFORT_LEVELS } from '../api/models.js'
 import {
   clearPrewarmState,
   createStreamState,
@@ -34,8 +35,10 @@ import {
   disposeSessionRuntime,
   getConnectedSessionIds,
   getSessionRuntime,
+  isSameRuntimeOverride,
   peekSessionRuntime,
   resetConversationState,
+  type RuntimeOverride,
   type SessionSlashCommand,
   type SessionStreamState,
 } from './sessionRuntime.js'
@@ -478,7 +481,14 @@ async function handleSetRuntimeConfig(
 ) {
   const { sessionId } = ws.data
   const modelId = typeof message.modelId === 'string' ? message.modelId.trim() : ''
-  if (!modelId) {
+  const effort =
+    typeof message.effort === 'string' &&
+    (EFFORT_LEVELS as readonly string[]).includes(message.effort)
+      ? message.effort
+      : undefined
+  // An empty model with an effort means "keep following the default provider
+  // and model, only change the effort".
+  if (!modelId && !effort) {
     sendMessage(ws, {
       type: 'error',
       message: 'Runtime model selection is invalid.',
@@ -487,19 +497,16 @@ async function handleSetRuntimeConfig(
     return
   }
 
-  const nextOverride = {
-    providerId: message.providerId ?? null,
+  const nextOverride: RuntimeOverride = {
+    providerId: modelId ? message.providerId ?? null : null,
     modelId,
+    ...(effort ? { effort } : {}),
   }
   const runtime = getSessionRuntime(sessionId)
   const prevOverride = runtime.runtimeOverride
   runtime.runtimeOverride = nextOverride
 
-  if (
-    prevOverride &&
-    prevOverride.providerId === nextOverride.providerId &&
-    prevOverride.modelId === nextOverride.modelId
-  ) {
+  if (prevOverride && isSameRuntimeOverride(prevOverride, nextOverride)) {
     return
   }
 
@@ -510,8 +517,8 @@ async function handleSetRuntimeConfig(
         await pendingStartup.catch(() => undefined)
         const currentOverride = peekSessionRuntime(sessionId)?.runtimeOverride
         if (
-          currentOverride?.providerId !== nextOverride.providerId ||
-          currentOverride.modelId !== nextOverride.modelId ||
+          !currentOverride ||
+          !isSameRuntimeOverride(currentOverride, nextOverride) ||
           !conversationService.hasSession(sessionId)
         ) {
           return
@@ -1510,6 +1517,13 @@ function isKnownRuntimeProviderId(
 }
 
 async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
+  const settings = await resolveRuntimeSettings(sessionId)
+  // A per-session effort chosen in the composer wins over the global default.
+  const overrideEffort = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride?.effort : undefined
+  return overrideEffort ? { ...settings, effort: overrideEffort } : settings
+}
+
+async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
   const runtimeOverride = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride : undefined
   // A null provider used to mean the official sign-in, which is gone; such an
   // override falls back to the default settings.
@@ -1628,6 +1642,7 @@ async function buildSessionStartupDiagnosticMessage(
   if (runtimeOverride) {
     lines.push(`- runtimeOverride.providerId: ${runtimeOverride.providerId ?? '(none)'}`)
     lines.push(`- runtimeOverride.modelId: ${runtimeOverride.modelId}`)
+    if (runtimeOverride.effort) lines.push(`- runtimeOverride.effort: ${runtimeOverride.effort}`)
   } else {
     lines.push('- runtimeOverride: (none)')
   }
