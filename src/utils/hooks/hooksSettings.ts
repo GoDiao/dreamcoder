@@ -170,7 +170,7 @@ export function getHooksForEvent(
 export function hookSourceDescriptionDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
-      return 'User settings (~/.claude/settings.json)'
+      return 'User settings (~/.dreamcoder/settings.json)'
     case 'projectSettings':
       return 'Project settings (.claude/settings.json)'
     case 'localSettings':
@@ -179,7 +179,7 @@ export function hookSourceDescriptionDisplayString(source: HookSource): string {
       // TODO: Get the actual plugin hook file paths instead of using glob pattern
       // We should capture the specific plugin paths during hook registration and display them here
       // e.g., "Plugin hooks (~/.claude/plugins/repos/source/example-plugin/example-plugin/hooks/hooks.json)"
-      return 'Plugin hooks (~/.claude/plugins/*/hooks/hooks.json)'
+      return 'Plugin hooks (~/.dreamcoder/plugins/*/hooks/hooks.json)'
     case 'sessionHook':
       return 'Session hooks (in-memory, temporary)'
     case 'builtinHook':

@@ -12,8 +12,6 @@ import { handleProvidersApi } from './api/providers.js'
 import { handlePluginsApi } from './api/plugins.js'
 import { handleSkillsApi } from './api/skills.js'
 import { handleComputerUseApi } from './api/computer-use.js'
-import { handleProviderOAuthApi } from './api/provider-oauth.js'
-import { handleProviderOpenAIOAuthApi } from './api/provider-openai-oauth.js'
 import { handleMcpApi } from './api/mcp.js'
 import { handleDiagnosticsApi } from './api/diagnostics.js'
 import { handleDoctorApi } from './api/doctor.js'
@@ -22,6 +20,7 @@ import { handleActivityStatsApi } from './api/activityStats.js'
 import { handleOpenTargetsApi } from './api/open-targets.js'
 import { handleMemoryApi } from './api/memory.js'
 import { handleDesktopUiApi } from './api/desktop-ui.js'
+import { handleClaudeCodeImportApi } from './api/claude-code-import.js'
 
 export async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -70,11 +69,8 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
     case 'providers':
       return handleProvidersApi(req, url, segments)
 
-    case 'provider-oauth':
-      return handleProviderOAuthApi(req, url, segments)
-
-    case 'provider-openai-oauth':
-      return handleProviderOpenAIOAuthApi(req, url, segments)
+    case 'claude-code-import':
+      return handleClaudeCodeImportApi(req, url, segments)
 
     case 'skills':
       return handleSkillsApi(req, url, segments)

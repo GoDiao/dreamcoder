@@ -6,9 +6,6 @@ import { Button } from '../shared/Button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SavedProvider, ProviderTestResult } from '../../types/provider'
 import { ProviderFormModal } from './ProviderFormModal'
-import { ClaudeOfficialLogin } from './ClaudeOfficialLogin'
-import { ChatGPTOfficialLogin } from './ChatGPTOfficialLogin'
-import { OPENAI_OFFICIAL_PROVIDER_ID } from '../../constants/openaiOfficialProvider'
 
 function ProviderSettings() {
   const {
@@ -22,7 +19,6 @@ function ProviderSettings() {
     fetchPresets,
     deleteProvider,
     activateProvider,
-    activateOfficial,
     testProvider,
   } = useProviderStore()
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
@@ -76,13 +72,7 @@ function ProviderSettings() {
     await fetchSettings()
   }
 
-  const handleActivateOfficial = async () => {
-    await activateOfficial()
-    await fetchSettings()
-  }
-
-  const isClaudeOfficialActive = hasLoadedProviders && activeId === null
-  const isOpenAIOfficialActive = hasLoadedProviders && activeId === OPENAI_OFFICIAL_PROVIDER_ID
+  const isProviderNotConfigured = hasLoadedProviders && activeId === null && providers.length > 0
 
   return (
     <div className="max-w-2xl">
@@ -96,6 +86,15 @@ function ProviderSettings() {
           {t('settings.providers.addProvider')}
         </Button>
       </div>
+
+      {isProviderNotConfigured && (
+        <p
+          data-testid="provider-settings-no-default"
+          className="mb-3 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]"
+        >
+          {t('chat.providerRequired.noDefault')}
+        </p>
+      )}
 
       {isLoading && providers.length === 0 ? (
         <div className="flex justify-center py-8">

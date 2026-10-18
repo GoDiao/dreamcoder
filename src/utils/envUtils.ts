@@ -1,7 +1,7 @@
 import { realpathSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
-import { join, resolve } from 'path'
+import { join, resolve, sep } from 'path'
 
 /**
  * DreamCoder's own config directory variable. Claude Code's variable is
@@ -15,13 +15,16 @@ export function getConfigDirOverride(): string | undefined {
   return process.env[DREAMCODER_CONFIG_DIR_ENV] || undefined
 }
 
+/** DreamCoder's default config directory name, under the home directory. */
+export const DREAMCODER_CONFIG_DIR_NAME = '.dreamcoder'
+
 // Memoized: 150+ callers, many on hot paths. Keyed off DREAMCODER_CONFIG_DIR so
 // tests that change the env var get a fresh value without explicit cache.clear.
 export const getClaudeConfigHomeDir = memoize(
   (): string => {
-    return (getConfigDirOverride() ?? join(homedir(), '.claude')).normalize(
-      'NFC',
-    )
+    return (
+      getConfigDirOverride() ?? join(homedir(), DREAMCODER_CONFIG_DIR_NAME)
+    ).normalize('NFC')
   },
   () => getConfigDirOverride(),
 )
@@ -46,9 +49,7 @@ function realPathOrResolved(path: string): string {
  */
 export const getInheritedClaudeCodeDir = memoize(
   (): string | undefined => {
-    const dir = (
-      process.env[CLAUDE_CODE_CONFIG_DIR_ENV] || join(homedir(), '.claude')
-    ).normalize('NFC')
+    const dir = getClaudeCodeConfigDir()
     if (realPathOrResolved(dir) === realPathOrResolved(getClaudeConfigHomeDir())) {
       return undefined
     }
@@ -57,6 +58,37 @@ export const getInheritedClaudeCodeDir = memoize(
   () =>
     `${getConfigDirOverride() ?? ''}\0${process.env[CLAUDE_CODE_CONFIG_DIR_ENV] ?? ''}\0${homedir()}`,
 )
+
+/** Claude Code's user config directory, whether or not it is DreamCoder's. */
+export function getClaudeCodeConfigDir(): string {
+  return (
+    process.env[CLAUDE_CODE_CONFIG_DIR_ENV] || join(homedir(), '.claude')
+  ).normalize('NFC')
+}
+
+/**
+ * Claude Code's global config file: in its config directory when its variable
+ * is set, else `~/.claude.json` in the home directory.
+ */
+export function getClaudeCodeGlobalConfigFile(): string {
+  return join(
+    process.env[CLAUDE_CODE_CONFIG_DIR_ENV] || homedir(),
+    '.claude.json',
+  )
+}
+
+/**
+ * DreamCoder's config directory as shown to the user or the model:
+ * `~/.dreamcoder` style when it is under the home directory, else absolute.
+ */
+export function getConfigDirForDisplay(): string {
+  const dir = getClaudeConfigHomeDir()
+  const home = homedir()
+  if (dir.startsWith(home + sep)) {
+    return `~/${dir.slice(home.length + 1).split(sep).join('/')}`
+  }
+  return dir
+}
 
 export function getTeamsDir(): string {
   return join(getClaudeConfigHomeDir(), 'teams')

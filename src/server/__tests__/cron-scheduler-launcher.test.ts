@@ -109,6 +109,25 @@ function restoreEnv(): void {
   resetTerminalShellEnvironmentCacheForTests()
 }
 
+async function activateTestProvider(): Promise<void> {
+  const providerService = new ProviderService()
+  const provider = await providerService.addProvider({
+    presetId: 'custom',
+    name: 'Default Provider',
+    apiKey: 'default-key',
+    baseUrl: 'https://api.default.example',
+    apiFormat: 'anthropic',
+    runtimeKind: 'anthropic_compatible',
+    models: {
+      main: 'default-main',
+      haiku: '',
+      sonnet: '',
+      opus: '',
+    },
+  })
+  await providerService.activateProvider(provider.id)
+}
+
 describe('cron scheduler launcher resolution', () => {
   let tmpDir: string
 
@@ -213,6 +232,7 @@ describe('cron scheduler launcher resolution', () => {
     process.env.CLAUDE_CLI_PATH = sidecarPath
     process.env.CLAUDE_APP_ROOT = appRoot
 
+    await activateTestProvider()
     const cronService = new CronService()
     const scheduler = new CronScheduler(cronService)
     const task = await cronService.createTask({
@@ -244,6 +264,26 @@ describe('cron scheduler launcher resolution', () => {
       .then(() => true)
       .catch(() => false)
     expect(bunWasCalled).toBe(false)
+  })
+
+  it('executeTask records a failed run without spawning when no provider is configured', async () => {
+    const sidecarPath = path.join(tmpDir, 'dreamcoder-sidecar')
+    process.env.CLAUDE_CLI_PATH = sidecarPath
+
+    const cronService = new CronService()
+    const scheduler = new CronScheduler(cronService)
+    const task = await cronService.createTask({
+      cron: '* * * * *',
+      prompt: 'cron no provider test',
+      name: 'No Provider Task',
+      recurring: true,
+      folderPath: tmpDir,
+    })
+
+    const run = await scheduler.executeTask(task)
+
+    expect(run.status).toBe('failed')
+    expect(run.error).toContain('No provider configured')
   })
 
   unixOnly('executeTask passes provider-scoped model runtime to the sidecar', async () => {
@@ -394,6 +434,7 @@ describe('cron scheduler launcher resolution', () => {
     process.env.CLAUDE_APP_ROOT = appRoot
     resetTerminalShellEnvironmentCacheForTests()
 
+    await activateTestProvider()
     const cronService = new CronService()
     const scheduler = new CronScheduler(cronService)
     const task = await cronService.createTask({

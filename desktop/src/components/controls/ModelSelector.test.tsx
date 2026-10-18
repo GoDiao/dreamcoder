@@ -1,15 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 import { ModelSelector } from './ModelSelector'
 import { useChatStore } from '../../stores/chatStore'
-import { useProviderOAuthStore } from '../../stores/providerOAuthStore'
-import { useProviderOpenAIOAuthStore } from '../../stores/providerOpenAIOAuthStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { OPENAI_OFFICIAL_PROVIDER_ID } from '../../constants/openaiOfficialProvider'
 import type { ModelInfo } from '../../types/settings'
 
 const MODELS: ModelInfo[] = [
@@ -30,13 +27,6 @@ afterEach(() => {
   useProviderStore.setState(useProviderStore.getInitialState(), true)
   useSessionRuntimeStore.setState(useSessionRuntimeStore.getInitialState(), true)
   useChatStore.setState(useChatStore.getInitialState(), true)
-  useProviderOAuthStore.setState(useProviderOAuthStore.getInitialState(), true)
-  useProviderOpenAIOAuthStore.setState(useProviderOpenAIOAuthStore.getInitialState(), true)
-})
-
-beforeEach(() => {
-  useProviderOAuthStore.setState({ fetchStatus: async () => {} })
-  useProviderOpenAIOAuthStore.setState({ fetchStatus: async () => {} })
 })
 
 describe('ModelSelector', () => {
@@ -131,63 +121,7 @@ describe('ModelSelector', () => {
     })
   })
 
-  it('uses the ChatGPT Official catalog when that built-in provider is active', async () => {
-    const openAIModels: ModelInfo[] = [
-      {
-        id: 'gpt-5.3-codex',
-        name: 'GPT-5.3 Codex',
-        description: 'Best for coding and agentic work',
-        context: '',
-      },
-      {
-        id: 'gpt-5.5',
-        name: 'GPT-5.5',
-        description: 'Latest general-purpose model',
-        context: '',
-      },
-    ]
-    const setSessionRuntime = vi.fn()
-    useProviderOpenAIOAuthStore.setState({
-      status: { loggedIn: true, expiresAt: null, email: null, accountId: null },
-      fetchStatus: async () => {},
-    })
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: openAIModels,
-      currentModel: openAIModels[0],
-      activeProviderName: 'ChatGPT Official',
-    })
-    useProviderStore.setState({
-      providers: [],
-      activeId: OPENAI_OFFICIAL_PROVIDER_ID,
-      hasLoadedProviders: true,
-      isLoading: true,
-    })
-    useChatStore.setState({
-      setSessionRuntime,
-    } as Partial<ReturnType<typeof useChatStore.getState>>)
-
-    render(<ModelSelector runtimeKey="session-openai" />)
-
-    await clickByRole(/GPT-5\.3 Codex/i)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /GPT-5\.5/ }))
-      await Promise.resolve()
-    })
-
-    expect(useSessionRuntimeStore.getState().selections['session-openai']).toEqual({
-      providerId: OPENAI_OFFICIAL_PROVIDER_ID,
-      modelId: 'gpt-5.5',
-    })
-    expect(setSessionRuntime).toHaveBeenCalledWith('session-openai', {
-      providerId: OPENAI_OFFICIAL_PROVIDER_ID,
-      modelId: 'gpt-5.5',
-    })
-  })
-
-  it('hides official provider sections when OAuth is not logged in', async () => {
-    useProviderOAuthStore.setState({ status: { loggedIn: false }, fetchStatus: async () => {} })
-    useProviderOpenAIOAuthStore.setState({ status: { loggedIn: false }, fetchStatus: async () => {} })
+  it('lists only the active provider without subscription sections', async () => {
     useSettingsStore.setState({
       locale: 'en',
       availableModels: MODELS,

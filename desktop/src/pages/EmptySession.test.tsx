@@ -247,6 +247,7 @@ describe('EmptySession', () => {
     act(() => {
       useProviderStore.setState({
         hasLoadedProviders: true,
+        activeId: 'provider-1',
         providers: [{
           id: 'provider-1',
           presetId: 'deepseek',

@@ -103,5 +103,7 @@ export type AppModeConfig = {
   portableDir: string | null
   defaultPortableDir: string | null
   activeConfigDir?: string | null
+  /** DreamCoder's default data directory, `~/.dreamcoder`. */
+  systemConfigDir?: string | null
   configDirSource?: 'system' | 'environment' | 'portable'
 }

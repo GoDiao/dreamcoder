@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Dirent } from 'node:fs'
-import { getClaudeConfigHomeDir, getConfigDirOverride } from '../../utils/envUtils.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { diagnosticsService } from './diagnosticsService.js'
 
 export type DoctorItemKind = 'json' | 'jsonl' | 'directory'
@@ -85,13 +85,16 @@ export class DoctorService {
   private readonly configDir: string
   private readonly homeDir: string
   private readonly projectRoot?: string
-  private readonly usesConfigDirOverride: boolean
+  private readonly configAlias: string
 
   constructor(options: DoctorServiceOptions = {}) {
     this.configDir = options.configDir || getClaudeConfigHomeDir()
     this.homeDir = options.homeDir || inferHomeDir(this.configDir)
     this.projectRoot = options.projectRoot
-    this.usesConfigDirOverride = Boolean(options.configDir || getConfigDirOverride())
+    this.configAlias =
+      path.dirname(this.configDir) === this.homeDir
+        ? `~/${path.basename(this.configDir)}`
+        : '<config>'
   }
 
   async getReport(): Promise<DoctorReport> {
@@ -369,7 +372,7 @@ export class DoctorService {
       return this.withAlias('<project>', filePath, this.projectRoot)
     }
     if (isWithinRoot(filePath, this.configDir)) {
-      return this.withAlias('~/.claude', filePath, this.configDir)
+      return this.withAlias(this.configAlias, filePath, this.configDir)
     }
     if (isWithinRoot(filePath, this.homeDir)) {
       return this.withAlias('~', filePath, this.homeDir)
@@ -381,7 +384,7 @@ export class DoctorService {
     let sanitized = diagnosticsService.sanitizeString(value)
     const replacements: Array<[string | undefined, string]> = [
       [this.projectRoot, '<project>'],
-      [this.configDir, '~/.claude'],
+      [this.configDir, this.configAlias],
       [this.homeDir, '~'],
     ]
 
@@ -393,10 +396,7 @@ export class DoctorService {
   }
 
   private getUserMcpConfigPath(): string {
-    if (this.usesConfigDirOverride) {
-      return path.join(this.configDir, '.claude.json')
-    }
-    return path.join(this.homeDir, '.claude.json')
+    return path.join(this.configDir, '.claude.json')
   }
 
   private async listJsonlFiles(rootDir: string): Promise<string[]> {
@@ -486,7 +486,8 @@ function countVisibleEntries(entries: Dirent[]): number {
 }
 
 function inferHomeDir(configDir: string): string {
-  if (path.basename(configDir) === '.claude') {
+  const name = path.basename(configDir)
+  if (name === '.claude' || name === '.dreamcoder') {
     return path.dirname(configDir)
   }
   return os.homedir()

@@ -8,6 +8,9 @@ import { ConversationService, ConversationStartupError, conversationService } fr
 import { SessionService, sessionService } from '../services/sessionService.js'
 import { ProviderService } from '../services/providerService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 async function rmWithRetry(targetPath: string): Promise<void> {
   const attempts = process.platform === 'win32' ? 5 : 1
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -50,6 +53,26 @@ describe('ConversationService', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ConversationStartupError)
       expect((error as ConversationStartupError).code).toBe('SESSION_DELETED')
+    }
+  })
+
+  it('should refuse to start a session without an active provider', async () => {
+    const previousConfigDir = process.env.DREAMCODER_CONFIG_DIR
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-no-provider-'))
+    process.env.DREAMCODER_CONFIG_DIR = tmpConfigDir
+
+    try {
+      const svc = new ConversationService()
+      await expect(
+        svc.startSession(crypto.randomUUID(), process.cwd(), 'ws://127.0.0.1:1/sdk/test', { providerId: null }),
+      ).rejects.toMatchObject({ code: 'PROVIDER_NOT_CONFIGURED' })
+    } finally {
+      if (previousConfigDir === undefined) {
+        delete process.env.DREAMCODER_CONFIG_DIR
+      } else {
+        process.env.DREAMCODER_CONFIG_DIR = previousConfigDir
+      }
+      await fs.rm(tmpConfigDir, { recursive: true, force: true })
     }
   })
 
@@ -525,6 +548,7 @@ describe('WebSocket Chat Integration', () => {
   let baseUrl: string
   let wsUrl: string
   let tmpDir: string
+  let defaultProviderId: string
 
   function git(cwd: string, ...args: string[]): string {
     return execFileSync('git', args, {
@@ -796,6 +820,24 @@ describe('WebSocket Chat Integration', () => {
     )
     await fs.mkdir(path.join(tmpDir, 'projects'), { recursive: true })
 
+    const defaultProviderService = new ProviderService()
+    const defaultProvider = await defaultProviderService.addProvider({
+      presetId: 'custom',
+      name: 'Default Test Provider',
+      apiKey: 'key-default',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      runtimeKind: 'anthropic_compatible',
+      models: {
+        main: 'default-main',
+        haiku: 'default-haiku',
+        sonnet: 'default-sonnet',
+        opus: 'default-opus',
+      },
+    })
+    defaultProviderId = defaultProvider.id
+    await defaultProviderService.activateProvider(defaultProviderId)
+
     const port = 15000 + Math.floor(Math.random() * 1000)
     const { startServer } = await import('../index.js')
     server = startServer(port, '127.0.0.1')
@@ -813,7 +855,7 @@ describe('WebSocket Chat Integration', () => {
     } else {
       delete process.env.CLAUDE_CLI_PATH
     }
-    delete process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   })
 
   it('should connect and receive connected event', async () => {
@@ -1163,7 +1205,7 @@ describe('WebSocket Chat Integration', () => {
       for (const sessionId of sessionIds) {
         conversationService.stopSession(sessionId)
       }
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
       await fs.writeFile(path.join(tmpDir, 'settings.json'), '{}\n', 'utf-8')
     }
   }, 20_000)
@@ -1761,7 +1803,7 @@ describe('WebSocket Chat Integration', () => {
     } finally {
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)
 
@@ -1983,7 +2025,7 @@ describe('WebSocket Chat Integration', () => {
       )
 
       expect(startCalls[0]).toMatchObject({ sessionId })
-      expect(startCalls[0]?.options?.providerId).toBeNull()
+      expect(startCalls[0]?.options?.providerId).toBe(defaultProviderId)
       expect(startCalls[1]).toMatchObject({
         sessionId,
         options: {
@@ -2107,7 +2149,7 @@ describe('WebSocket Chat Integration', () => {
 
       expect(startCalls).toHaveLength(2)
       expect(startCalls[0]).toMatchObject({ sessionId })
-      expect(startCalls[0]?.options?.providerId).toBeNull()
+      expect(startCalls[0]?.options?.providerId).toBe(defaultProviderId)
       expect(startCalls[1]).toMatchObject({
         sessionId,
         options: {
@@ -2442,56 +2484,7 @@ describe('WebSocket Chat Integration', () => {
       ws.close()
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
-    }
-  }, 20_000)
-
-  it('should preserve ChatGPT Official as the active default runtime after restart', async () => {
-    const providerService = new ProviderService()
-    await providerService.activateProvider('openai-official')
-
-    const createRes = await fetch(`${baseUrl}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workDir: process.cwd() }),
-    })
-    expect(createRes.status).toBe(201)
-    const { sessionId } = await createRes.json() as { sessionId: string }
-
-    const originalStartSession = conversationService.startSession.bind(conversationService)
-    const startCalls: Array<{
-      sessionId: string
-      options: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null } | undefined
-    }> = []
-
-    conversationService.startSession = (async function patchedStartSession(
-      sid: string,
-      workDir: string,
-      sdkUrl: string,
-      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
-    ) {
-      startCalls.push({ sessionId: sid, options })
-      return originalStartSession(sid, workDir, sdkUrl, options)
-    }) as typeof conversationService.startSession
-
-    try {
-      const messages = await runTurn(sessionId, 'default ChatGPT Official runtime')
-
-      expect(startCalls).toHaveLength(1)
-      expect(startCalls[0]).toMatchObject({
-        sessionId,
-        options: {
-          providerId: 'openai-official',
-        },
-      })
-      expect(messages.some((msg) => msg.type === 'message_complete')).toBe(true)
-      await expect(providerService.listProviders()).resolves.toMatchObject({
-        activeId: 'openai-official',
-      })
-    } finally {
-      conversationService.startSession = originalStartSession
-      conversationService.stopSession(sessionId)
-      await providerService.activateOfficial()
+      await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)
 

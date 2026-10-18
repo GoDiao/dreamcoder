@@ -293,147 +293,19 @@ describe('ProviderService', () => {
       expect(fetched.name).toBe(added.name)
     })
 
-    describe('ChatGPT Official provider metadata', () => {
-      test('normalizes the built-in ChatGPT provider as an active provider id', async () => {
-        await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
-        await fs.writeFile(
-          path.join(tmpDir, 'dreamcoder', 'providers.json'),
-          JSON.stringify({ activeId: 'openai-official', providers: [] }),
-          'utf-8',
-        )
+    test('treats a leftover ChatGPT Official active id as no active provider', async () => {
+      await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+      await fs.writeFile(
+        path.join(tmpDir, 'dreamcoder', 'providers.json'),
+        JSON.stringify({ activeId: 'openai-official', providers: [] }),
+        'utf-8',
+      )
 
-        const svc = new ProviderService()
-        const result = await svc.listProviders()
+      const svc = new ProviderService()
+      const result = await svc.listProviders()
 
-        expect(result.activeId).toBe('openai-official')
-        expect(result.providers).toEqual([])
-      })
-
-      test('returns built-in ChatGPT provider metadata without persisting secrets', async () => {
-        const svc = new ProviderService()
-        const provider = await svc.getProvider('openai-official')
-
-        expect(provider).toMatchObject({
-          id: 'openai-official',
-          presetId: 'openai-official',
-          name: 'ChatGPT Official',
-          apiKey: '',
-          apiFormat: 'openai_responses',
-          runtimeKind: 'openai_oauth',
-          models: {
-            main: 'gpt-5.3-codex',
-            haiku: 'gpt-5.4-mini',
-            sonnet: 'gpt-5.4',
-            opus: 'gpt-5.3-codex',
-          },
-        })
-      })
-
-      test('activating ChatGPT Official writes OpenAI OAuth runtime env without Anthropic auth or proxy env', async () => {
-        const svc = new ProviderService()
-
-        await svc.activateProvider('openai-official')
-
-        const config = await readProvidersConfig()
-        const settings = await readSettings()
-        expect(config.activeId).toBe('openai-official')
-        const env = settings.env as Record<string, string>
-        expect(env.DREAMCODER_OPENAI_OAUTH_PROVIDER).toBe('1')
-        expect(env.OPENAI_CODEX_OAUTH_FILE).toBe(
-          path.join(tmpDir, 'dreamcoder', 'openai-oauth.json'),
-        )
-        expect(env.ANTHROPIC_MODEL).toBe('gpt-5.3-codex')
-        expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('gpt-5.4-mini')
-        expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('gpt-5.4')
-        expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('gpt-5.3-codex')
-        expect(typeof env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBe('string')
-        expect(JSON.parse(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-          'gpt-5.3-codex': 258_400,
-          'gpt-5.4': 950_000,
-          'gpt-5.5': 258_400,
-          'gpt-5.4-mini': 258_400,
-        })
-        expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
-        expect(env.ANTHROPIC_API_KEY).toBeUndefined()
-        expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
-      })
-
-      test('activating ChatGPT Official clears stale managed provider env', async () => {
-        const svc = new ProviderService()
-        const provider = await svc.addProvider(sampleInput({
-          apiFormat: 'openai_responses',
-          baseUrl: 'https://api.example.com/openai',
-          models: {
-            main: 'provider-main',
-            haiku: 'provider-haiku',
-            sonnet: 'provider-sonnet',
-            opus: 'provider-opus',
-          },
-        }))
-        await svc.activateProvider(provider.id)
-        expect(((await readSettings()).env as Record<string, string>).ANTHROPIC_BASE_URL).toContain('/proxy')
-
-        await svc.activateProvider('openai-official')
-
-        const settings = await readSettings()
-        const env = settings.env as Record<string, string>
-        expect(env.DREAMCODER_OPENAI_OAUTH_PROVIDER).toBe('1')
-        expect(env.OPENAI_CODEX_OAUTH_FILE).toBe(
-          path.join(tmpDir, 'dreamcoder', 'openai-oauth.json'),
-        )
-        expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
-        expect(env.ANTHROPIC_API_KEY).toBeUndefined()
-        expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
-      })
-
-      test('auth status reports ChatGPT Official from the desktop OpenAI token file', async () => {
-        await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
-        await fs.writeFile(
-          path.join(tmpDir, 'dreamcoder', 'openai-oauth.json'),
-          JSON.stringify({
-            accessToken: 'openai-access',
-            refreshToken: 'openai-refresh',
-            expiresAt: Date.now() + 60 * 60_000,
-            email: 'user@example.com',
-            accountId: 'acct_123',
-          }),
-          'utf-8',
-        )
-
-        const svc = new ProviderService()
-        await svc.activateProvider('openai-official')
-
-        await expect(svc.checkAuthStatus()).resolves.toMatchObject({
-          hasAuth: true,
-          source: 'openai-oauth',
-          activeProvider: 'ChatGPT Official',
-        })
-      })
-
-      test('auth status reports ChatGPT Official as unauthenticated when the OpenAI token file is missing', async () => {
-        const svc = new ProviderService()
-        await svc.activateProvider('openai-official')
-
-        await expect(svc.checkAuthStatus()).resolves.toMatchObject({
-          hasAuth: false,
-          source: 'none',
-          activeProvider: 'ChatGPT Official',
-        })
-      })
-
-      test('activating another provider clears ChatGPT Official runtime markers', async () => {
-        const svc = new ProviderService()
-        const provider = await svc.addProvider(sampleInput())
-
-        await svc.activateProvider('openai-official')
-        await svc.activateProvider(provider.id)
-
-        const env = (await readSettings()).env as Record<string, string>
-        expect(env.DREAMCODER_OPENAI_OAUTH_PROVIDER).toBeUndefined()
-        expect(env.OPENAI_CODEX_OAUTH_FILE).toBeUndefined()
-        expect(env.ANTHROPIC_BASE_URL).toBe('https://api.example.com')
-        expect(env.ANTHROPIC_AUTH_TOKEN).toBe('sk-test-key-123')
-      })
+      expect(result.activeId).toBeNull()
+      expect(result.providers).toEqual([])
     })
 
     test('should throw 404 for non-existent id', async () => {
@@ -753,14 +625,6 @@ describe('ProviderService', () => {
         'kimi-k2.6': 262144,
         'kimi-k2.5': 262144,
       })
-
-      await svc.activateOfficial()
-      const clearedSettings = await readSettings()
-      const clearedEnv = (clearedSettings.env as Record<string, string> | undefined) ?? {}
-      expect(clearedEnv.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
-      expect(clearedEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
-      expect(clearedEnv.CLAUDE_CODE_ATTRIBUTION_HEADER).toBeUndefined()
-      expect(clearedEnv.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBeUndefined()
     })
 
     test('auth status treats preset default auth as active provider auth', async () => {
@@ -904,14 +768,6 @@ describe('ProviderService', () => {
       expect(active).toBeNull()
     })
 
-    test('should return null for explicit ChatGPT Official proxy lookup', async () => {
-      const svc = new ProviderService()
-
-      const active = await svc.getProviderForProxy('openai-official')
-
-      expect(active).toBeNull()
-    })
-
     test('should return the active provider proxy config', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput())
@@ -922,15 +778,6 @@ describe('ProviderService', () => {
       expect(active!.baseUrl).toBe(provider.baseUrl)
       expect(active!.apiKey).toBe(provider.apiKey)
       expect(active!.apiFormat).toBe('anthropic')
-    })
-
-    test('should return null when ChatGPT Official is the active provider', async () => {
-      const svc = new ProviderService()
-      await svc.activateProvider('openai-official')
-
-      const active = await svc.getProviderForProxy()
-
-      expect(active).toBeNull()
     })
   })
 

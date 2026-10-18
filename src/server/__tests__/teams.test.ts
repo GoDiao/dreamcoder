@@ -4,6 +4,9 @@ import * as path from 'node:path'
 import * as os from 'node:os'
 import { TeamService } from '../services/teamService.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 let tmpDir: string
 let service: TeamService
 
@@ -22,7 +25,7 @@ async function cleanupTmpDir(): Promise<void> {
   if (tmpDir) {
     await fs.rm(tmpDir, { recursive: true, force: true })
   }
-  delete process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
 }
 
 async function writeTeamConfig(

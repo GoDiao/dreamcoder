@@ -26,6 +26,8 @@ import type { SecureStorageData } from './types.js'
 // orphan existing stored credentials.
 export const CREDENTIALS_SERVICE_SUFFIX = '-credentials'
 
+const KEYCHAIN_SERVICE_PREFIX = 'DreamCoder'
+
 export function getMacOsKeychainStorageServiceName(
   serviceSuffix: string = '',
 ): string {
@@ -37,7 +39,9 @@ export function getMacOsKeychainStorageServiceName(
   const dirHash = isDefaultDir
     ? ''
     : `-${createHash('sha256').update(configDir).digest('hex').substring(0, 8)}`
-  return `Claude Code${getOauthConfig().OAUTH_FILE_SUFFIX}${serviceSuffix}${dirHash}`
+  // DreamCoder's own prefix: with Claude Code's, the default-mode entries are
+  // Claude Code's own, and DreamCoder would read and overwrite its sign-in.
+  return `${KEYCHAIN_SERVICE_PREFIX}${getOauthConfig().OAUTH_FILE_SUFFIX}${serviceSuffix}${dirHash}`
 }
 
 export function getUsername(): string {

@@ -3,7 +3,7 @@
  */
 
 import { access, chmod, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { join, sep } from 'path'
 import { type ReleaseChannel, saveGlobalConfig } from './config.js'
 import { getClaudeConfigHomeDir } from './envUtils.js'
 import { getErrnoCode } from './errors.js'
@@ -28,7 +28,7 @@ export function getLocalClaudePath(): string {
  */
 export function isRunningFromLocalInstallation(): boolean {
   const execPath = process.argv[1] || ''
-  return execPath.includes('/.claude/local/node_modules/')
+  return execPath.startsWith(join(getLocalInstallDir(), 'node_modules') + sep)
 }
 
 /**

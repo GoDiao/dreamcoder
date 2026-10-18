@@ -23,6 +23,7 @@ import { RepositoryLaunchControls } from '../shared/RepositoryLaunchControls'
 import { FileSearchMenu, type FileSearchMenuHandle } from './FileSearchMenu'
 import { LocalSlashCommandPanel, type LocalSlashCommandName } from './LocalSlashCommandPanel'
 import { ContextUsageIndicator } from './ContextUsageIndicator'
+import { ProviderRequiredNotice, useProviderMissing } from './ProviderRequiredNotice'
 import {
   FALLBACK_SLASH_COMMANDS,
   filterSlashCommands,
@@ -132,8 +133,9 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   )
   const currentModel = useSettingsStore((state) => state.currentModel)
   const runtimeSelectionKey = runtimeSelection
-    ? `${runtimeSelection.providerId ?? 'official'}:${runtimeSelection.modelId}`
+    ? `${runtimeSelection.providerId ?? 'none'}:${runtimeSelection.modelId}`
     : undefined
+  const providerMissing = useProviderMissing(runtimeSelection)
   const runtimeModelLabel = runtimeSelection?.modelId ?? currentModel?.name ?? currentModel?.id
   const activeSession = useSessionStore((state) => activeTabId ? state.sessions.find((session) => session.id === activeTabId) ?? null : null)
   const loadedMessageCount = sessionState?.messages?.length ?? 0
@@ -560,6 +562,11 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
 
     if (showLaunchControls && (!launchReady || launchTransitioning)) return
 
+    if (providerMissing) {
+      useUIStore.getState().addToast({ type: 'warning', message: t('chat.providerRequired.blocked') })
+      return
+    }
+
     const workspaceReferencePrompt = !isMemberSession
       ? formatWorkspaceReferencePrompt(workspaceReferences)
       : ''
@@ -860,6 +867,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               : `${isMobileComposer ? 'mx-0 max-w-none' : 'mx-auto max-w-[860px]'}`
         }
       >
+        {providerMissing && <ProviderRequiredNotice className="mb-2" />}
         <div
           ref={panelRef}
           data-testid="chat-input-panel"

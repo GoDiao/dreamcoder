@@ -2,7 +2,6 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { randomBytes } from 'node:crypto'
 import { normalizeLegacyDeepSeekManagedEnv } from '../../utils/providerManagedEnvCompat.js'
-import { isOpenAIOfficialProviderId } from './openaiOfficialProvider.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export const CURRENT_PROVIDER_INDEX_SCHEMA_VERSION = 1
@@ -137,10 +136,7 @@ function migrateProvidersIndex(value: unknown): JsonObject {
       : typeof _legacyActiveProviderId === 'string'
         ? _legacyActiveProviderId
         : null
-  const activeId = rawActiveId && (
-    providers.some((provider) => provider.id === rawActiveId) ||
-    isOpenAIOfficialProviderId(rawActiveId)
-  )
+  const activeId = rawActiveId && providers.some((provider) => provider.id === rawActiveId)
     ? rawActiveId
     : null
 
@@ -359,6 +355,12 @@ export function ensurePersistentStorageUpgraded(): Promise<MigrationReport> {
     migrationPromise = runPersistentStorageMigrations(configDir)
   }
   return migrationPromise
+}
+
+/** Runs the migrations again, for files copied in after startup (Import from Claude Code). */
+export function rerunPersistentStorageMigrations(): Promise<MigrationReport> {
+  migrationPromise = null
+  return ensurePersistentStorageUpgraded()
 }
 
 export function resetPersistentStorageMigrationsForTests(): void {

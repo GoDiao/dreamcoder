@@ -230,56 +230,6 @@ describe('ConversationService', () => {
     expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
   })
 
-  test('buildChildEnv injects CLAUDE_CODE_OAUTH_TOKEN when official mode + provider oauth token exists', async () => {
-    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(dreamcoderDir, { recursive: true })
-    await fs.writeFile(
-      path.join(dreamcoderDir, 'settings.json'),
-      JSON.stringify({ env: {} }),
-      'utf-8',
-    )
-
-    const { providerOAuthService } = await import('../services/providerOAuthService.js')
-    await providerOAuthService.saveTokens({
-      accessToken: 'fresh-token',
-      refreshToken: 'refresh-xxx',
-      expiresAt: Date.now() + 30 * 60_000,
-      scopes: ['user:inference'],
-      subscriptionType: 'max',
-    })
-
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
-
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBe('claude-desktop')
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('fresh-token')
-  })
-
-  test('buildChildEnv does NOT inject CLAUDE_CODE_OAUTH_TOKEN when not official mode', async () => {
-    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(dreamcoderDir, { recursive: true })
-    await fs.writeFile(
-      path.join(dreamcoderDir, 'settings.json'),
-      JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'custom-provider-token' } }),
-      'utf-8',
-    )
-
-    const { providerOAuthService } = await import('../services/providerOAuthService.js')
-    await providerOAuthService.saveTokens({
-      accessToken: 'token-should-not-be-used',
-      refreshToken: null,
-      expiresAt: null,
-      scopes: [],
-      subscriptionType: null,
-    })
-
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
-
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
-  })
-
   test('buildChildEnv injects explicit provider runtime env for session-scoped providers', async () => {
     const providerService = new ProviderService()
     const provider = await providerService.addProvider({
@@ -370,78 +320,7 @@ describe('ConversationService', () => {
   })
 
 
-  test('buildChildEnv can force official auth even when a custom default provider exists', async () => {
-    const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
-    await fs.mkdir(dreamcoderDir, { recursive: true })
-    await fs.writeFile(
-      path.join(dreamcoderDir, 'settings.json'),
-      JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'custom-provider-token' } }),
-      'utf-8',
-    )
-
-    const { providerOAuthService } = await import('../services/providerOAuthService.js')
-    await providerOAuthService.saveTokens({
-      accessToken: 'forced-official-token',
-      refreshToken: 'forced-official-refresh',
-      expiresAt: Date.now() + 30 * 60_000,
-      scopes: ['user:inference'],
-      subscriptionType: 'max',
-    })
-
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp', undefined, {
-      providerId: null,
-    })) as Record<string, string>
-
-    expect(env.ANTHROPIC_API_KEY).toBeUndefined()
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBe('claude-desktop')
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('forced-official-token')
-  })
-
-  test('buildChildEnv does not inject Claude OAuth when ChatGPT Official is active', async () => {
-    const providerService = new ProviderService()
-    await providerService.activateProvider('openai-official')
-
-    const { providerOAuthService } = await import('../services/providerOAuthService.js')
-    await providerOAuthService.saveTokens({
-      accessToken: 'claude-oauth-token-that-must-not-be-used',
-      refreshToken: 'claude-refresh-token',
-      expiresAt: Date.now() + 30 * 60_000,
-      scopes: ['user:inference'],
-      subscriptionType: 'max',
-    })
-
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
-
-    expect(env.ANTHROPIC_API_KEY).toBeUndefined()
-    expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
-    expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
-  })
-
-  test('buildChildEnv injects ChatGPT Official runtime env for session-scoped provider selection', async () => {
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp', undefined, {
-      providerId: 'openai-official',
-    })) as Record<string, string>
-
-    expect(env.DREAMCODER_OPENAI_OAUTH_PROVIDER).toBe('1')
-    expect(env.OPENAI_CODEX_OAUTH_FILE).toBe(
-      path.join(tmpDir, 'dreamcoder', 'openai-oauth.json'),
-    )
-    expect(env.ANTHROPIC_MODEL).toBe('gpt-5.3-codex')
-    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('gpt-5.4')
-    expect(env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST).toBe('1')
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
-    expect(env.ANTHROPIC_API_KEY).toBeUndefined()
-    expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
-    expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
-  })
-
-  test('buildChildEnv does not leak inherited CLAUDE_CODE_OAUTH_TOKEN when official token is unavailable', async () => {
+  test('buildChildEnv does not leak inherited CLAUDE_CODE_OAUTH_TOKEN', async () => {
     const dreamcoderDir = path.join(tmpDir, 'dreamcoder')
     await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
@@ -453,7 +332,7 @@ describe('ConversationService', () => {
     const service = new ConversationService() as any
     const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
 
-    expect(env.CLAUDE_CODE_ENTRYPOINT).toBe('claude-desktop')
+    expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
   })
 

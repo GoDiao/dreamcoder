@@ -21,7 +21,7 @@ async function cleanupTmpDir(): Promise<void> {
   if (tmpDir) {
     await fs.rm(tmpDir, { recursive: true, force: true })
   }
-  delete process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
 }
 
 async function writeTeamConfig(
@@ -84,6 +84,9 @@ const mockGetActiveSessionIds = mock(() => {
 })
 
 import { TeamWatcher } from '../services/teamWatcher.js'
+
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
 
 describe('TeamWatcher.extractMemberStatuses', () => {
   let watcher: TeamWatcher

@@ -3,11 +3,6 @@ import { providersApi } from '../api/providers'
 import { useChatStore } from './chatStore'
 import { useSessionRuntimeStore } from './sessionRuntimeStore'
 import { useSettingsStore } from './settingsStore'
-import { OFFICIAL_DEFAULT_MODEL_ID } from '../constants/modelCatalog'
-import {
-  OPENAI_OFFICIAL_DEFAULT_MODEL_ID,
-  OPENAI_OFFICIAL_PROVIDER_ID,
-} from '../constants/openaiOfficialProvider'
 import type {
   SavedProvider,
   CreateProviderInput,
@@ -33,7 +28,6 @@ type ProviderStore = {
   updateProvider: (id: string, input: UpdateProviderInput) => Promise<SavedProvider>
   deleteProvider: (id: string) => Promise<void>
   activateProvider: (id: string) => Promise<void>
-  activateOfficial: () => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
 }
@@ -146,23 +140,9 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     await providersApi.activate(id)
     await get().fetchProviders()
     const settings = useSettingsStore.getState()
-    if (id === OPENAI_OFFICIAL_PROVIDER_ID) {
-      await settings.setModel(OPENAI_OFFICIAL_DEFAULT_MODEL_ID)
-      await settings.fetchAll()
-      return
-    }
-
     const provider = get().providers.find((p) => p.id === id)
     if (!provider) return
     await settings.setModel(provider.models.main)
-    await settings.fetchAll()
-  },
-
-  activateOfficial: async () => {
-    await providersApi.activateOfficial()
-    await get().fetchProviders()
-    const settings = useSettingsStore.getState()
-    await settings.setModel(OFFICIAL_DEFAULT_MODEL_ID)
     await settings.fetchAll()
   },
 

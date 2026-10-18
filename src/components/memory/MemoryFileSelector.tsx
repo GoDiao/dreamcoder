@@ -94,7 +94,7 @@ export function MemoryFileSelector(t0) {
     if (file.type === "User" && !file.isNested && !file.exists && inheritsClaudeMd) {
       description = "Not created yet. Creating it replaces the CLAUDE.md inherited from Claude Code";
     } else if (file.type === "User" && !file.isNested) {
-      description = "Saved in ~/.claude/CLAUDE.md";
+      description = "Saved in ~/.dreamcoder/CLAUDE.md";
     } else {
       if (file.type === "Project" && !file.isNested && file.path === projectMemoryPath) {
         description = `${isGit ? "Checked in at" : "Saved in"} ./CLAUDE.md`;

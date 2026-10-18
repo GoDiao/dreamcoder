@@ -42,7 +42,6 @@ const providerStoreState = {
   fetchPresets: vi.fn(),
   deleteProvider: MOCK_DELETE_PROVIDER,
   activateProvider: vi.fn(),
-  activateOfficial: vi.fn(),
   testProvider: vi.fn(),
   createProvider: vi.fn(),
   updateProvider: vi.fn(),
@@ -75,14 +74,6 @@ vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
   },
-}))
-
-vi.mock('../components/settings/ClaudeOfficialLogin', () => ({
-  ClaudeOfficialLogin: () => <div data-testid="claude-official-login" />,
-}))
-
-vi.mock('../components/settings/ChatGPTOfficialLogin', () => ({
-  ChatGPTOfficialLogin: () => <div data-testid="chatgpt-official-login" />,
 }))
 
 vi.mock('../pages/ActivitySettings', () => ({
@@ -150,7 +141,6 @@ describe('Settings > General tab', () => {
     providerStoreState.fetchProviders = vi.fn()
     providerStoreState.fetchPresets = vi.fn()
     providerStoreState.activateProvider = vi.fn()
-    providerStoreState.activateOfficial = vi.fn()
     providerStoreState.testProvider = vi.fn()
     providerStoreState.createProvider = vi.fn()
     providerStoreState.updateProvider = vi.fn()
@@ -1130,50 +1120,6 @@ describe('Settings > Providers tab', () => {
     ]
     providerStoreState.activeId = null
     providerStoreState.hasLoadedProviders = true
-  })
-
-  it.skip('does not query official OAuth status before providers finish loading', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = null
-    providerStoreState.hasLoadedProviders = false
-
-    render(<Settings />)
-
-    expect(screen.queryByTestId('claude-official-login')).not.toBeInTheDocument()
-  })
-
-  it.skip('does not query ChatGPT OAuth status before providers finish loading', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = 'openai-official'
-    providerStoreState.hasLoadedProviders = false
-
-    render(<Settings />)
-
-    expect(screen.queryByTestId('chatgpt-official-login')).not.toBeInTheDocument()
-  })
-
-  it.skip('shows official OAuth status only after official provider is confirmed active', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = null
-    providerStoreState.hasLoadedProviders = true
-
-    render(<Settings />)
-
-    expect(screen.getByTestId('claude-official-login')).toBeInTheDocument()
-  })
-
-  it.skip('shows ChatGPT Official as the active built-in provider', () => {
-    providerStoreState.providers = []
-    providerStoreState.activeId = 'openai-official'
-    providerStoreState.hasLoadedProviders = true
-
-    render(<Settings />)
-
-    const openAIProvider = screen.getByTestId('openai-official-provider')
-    expect(within(openAIProvider).getByText('ChatGPT Official')).toBeInTheDocument()
-    expect(within(openAIProvider).getByText('Default')).toBeInTheDocument()
-    expect(screen.getByTestId('chatgpt-official-login')).toBeInTheDocument()
-    expect(screen.queryByTestId('claude-official-login')).not.toBeInTheDocument()
   })
 
   it('requires confirmation before deleting a provider', async () => {

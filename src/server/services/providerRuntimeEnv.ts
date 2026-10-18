@@ -14,12 +14,6 @@ import {
   ATTRIBUTION_HEADER_ENV_KEY,
   attributionHeaderEnvForModel,
 } from './attributionHeaderPolicy.js'
-import {
-  OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
-  OPENAI_OAUTH_PROVIDER_ENV_KEY,
-  buildOpenAIOfficialRuntimeEnv,
-  isOpenAIOfficialProviderId,
-} from './openaiOfficialProvider.js'
 
 export const MANAGED_PROVIDER_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
@@ -35,8 +29,8 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
   ATTRIBUTION_HEADER_ENV_KEY,
   MODEL_CONTEXT_WINDOWS_ENV_KEY,
-  OPENAI_OAUTH_PROVIDER_ENV_KEY,
-  OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
+  'DREAMCODER_OPENAI_OAUTH_PROVIDER',
+  'OPENAI_CODEX_OAUTH_FILE',
 ] as const
 
 const CUSTOM_PROVIDER_MODEL_CAPABILITIES = 'thinking,effort,adaptive_thinking,max_effort'
@@ -65,11 +59,7 @@ function isSavedProvider(value: unknown): value is SavedProvider {
     typeof value.name === 'string' &&
     typeof value.apiKey === 'string' &&
     typeof value.baseUrl === 'string' &&
-    (
-      runtimeKind === undefined ||
-      runtimeKind === 'anthropic_compatible' ||
-      runtimeKind === 'openai_oauth'
-    ) &&
+    (runtimeKind === undefined || runtimeKind === 'anthropic_compatible') &&
     isProviderModels(value.models)
   )
 }
@@ -112,10 +102,7 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
       : typeof legacyActiveProviderId === 'string'
         ? legacyActiveProviderId
         : null
-  const activeId = rawActiveId && (
-    providers.some((provider) => provider.id === rawActiveId) ||
-    isOpenAIOfficialProviderId(rawActiveId)
-  )
+  const activeId = rawActiveId && providers.some((provider) => provider.id === rawActiveId)
     ? rawActiveId
     : null
 
@@ -194,10 +181,6 @@ export function buildProviderManagedEnv(
   provider: SavedProvider,
   options?: { proxyPath?: string; serverPort?: number },
 ): Record<string, string> {
-  if (provider.runtimeKind === 'openai_oauth') {
-    return buildOpenAIOfficialRuntimeEnv()
-  }
-
   const apiFormat: ApiFormat = provider.apiFormat ?? 'anthropic'
   const needsProxy = apiFormat !== 'anthropic'
   const proxyPath = options?.proxyPath ?? '/proxy'
@@ -249,10 +232,6 @@ export function readActiveProviderManagedEnv(
     const raw = fs.readFileSync(path.join(configDir, 'dreamcoder', 'providers.json'), 'utf-8')
     const index = normalizeProvidersIndex(JSON.parse(raw))
     if (!index?.activeId) return null
-
-    if (isOpenAIOfficialProviderId(index.activeId)) {
-      return buildOpenAIOfficialRuntimeEnv()
-    }
 
     const provider = index.providers.find((entry) => entry.id === index.activeId)
     if (!provider) return null

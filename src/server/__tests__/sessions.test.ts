@@ -18,6 +18,9 @@ import { clearPluginCache } from '../../utils/plugins/pluginLoader.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import { updateSessionSlashCommands } from '../ws/handler.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 let tmpDir: string
 let service: SessionService
 
@@ -32,7 +35,7 @@ async function cleanupTmpDir(): Promise<void> {
   if (tmpDir) {
     await fs.rm(tmpDir, { recursive: true, force: true })
   }
-  delete process.env.DREAMCODER_CONFIG_DIR
+  process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
 }
 
 function git(cwd: string, ...args: string[]): string {

@@ -29,7 +29,7 @@ export function LocationStep() {
   let t1;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = [t0, {
-      label: "Personal (~/.claude/agents/)",
+      label: "Personal (~/.dreamcoder/agents/)",
       value: "userSettings" as SettingSource
     }];
     $[1] = t1;

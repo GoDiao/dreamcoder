@@ -9,6 +9,9 @@ import {
   resetPersistentStorageMigrationsForTests,
 } from '../services/persistentStorageMigrations.js'
 
+// The test run's own config directory (see testPreload.ts), restored after each test.
+const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+
 let tempDir: string
 
 async function listFiles(dir: string) {
@@ -28,7 +31,7 @@ describe('persistent storage upgrade migrations', () => {
 
   afterEach(async () => {
     resetPersistentStorageMigrationsForTests()
-    delete process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
     await fs.rm(tempDir, { recursive: true, force: true })
   })
 

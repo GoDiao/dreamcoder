@@ -21,6 +21,8 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { H5ConnectionView } from './H5ConnectionView'
 import { ProviderOnboarding } from '../onboarding/ProviderOnboarding'
+import { ClaudeCodeImport } from '../onboarding/ClaudeCodeImport'
+import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import type { Tab } from '../../stores/tabStore'
@@ -74,6 +76,7 @@ export function AppShell() {
       ? { 'aria-hidden': true, inert: '' }
       : {}
 
+  const claudeCodeImportPromptOpen = useClaudeCodeImportStore((s) => s.promptOpen)
   const showOnboarding = ready && !startupError && !h5StartupError && hasLoadedProviders && providers.length === 0 && !onboardingCompleted
 
   useEffect(() => {
@@ -92,6 +95,8 @@ export function AppShell() {
         console.log('[mem] AppShell:after-init-server')
         await fetchSettings()
         console.log('[mem] AppShell:after-fetch-settings')
+        // Decided before the shell renders, so a first launch goes straight to the import offer.
+        await useClaudeCodeImportStore.getState().fetchStatus({ openPrompt: true })
 
         if (!cancelled) {
           setReady(true)
@@ -224,6 +229,10 @@ export function AppShell() {
         {t('app.launching')}
       </div>
     )
+  }
+
+  if (claudeCodeImportPromptOpen) {
+    return <ClaudeCodeImport />
   }
 
   if (showOnboarding) {

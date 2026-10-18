@@ -26,7 +26,6 @@ vi.mock('../stores/providerStore', () => ({
     fetchPresets: vi.fn(),
     deleteProvider: vi.fn(),
     activateProvider: vi.fn(),
-    activateOfficial: vi.fn(),
     testProvider: vi.fn(),
     createProvider: vi.fn(),
     updateProvider: vi.fn(),
