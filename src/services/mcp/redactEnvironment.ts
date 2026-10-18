@@ -1,6 +1,10 @@
-/** Redact configured values from connection diagnostics, including JSON echoes. */
+/** Redact likely secrets from connection diagnostics, including JSON echoes. */
 export function createMcpEnvironmentRedactor(env?: Record<string, string>): (message: string) => string {
-  const values = Object.values(env ?? {}).filter(value => value.length > 0)
+  // Name-based selection keeps ordinary flags, modes and paths readable, even
+  // when their values are long. Keep this rule aligned with the desktop helper.
+  const values = Object.entries(env ?? {})
+    .filter(([name, value]) => /TOKEN|KEY|SECRET|PASSWORD|AUTH/i.test(name) && value.length > 0)
+    .map(([, value]) => value)
   if (values.length === 0) return message => message
 
   const spellings = [...new Set(values.flatMap(value => [value, JSON.stringify(value).slice(1, -1)]))]

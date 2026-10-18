@@ -28,8 +28,19 @@ describe('MCP connection environment redaction', () => {
   })
 
   it('matches overlapping values longest first and does not rewrite its replacement', () => {
-    const redact = createMcpEnvironmentRedactor({ SHORT: 'synthetic', LONG: 'synthetic-long', BRACKET: '[' })
+    const redact = createMcpEnvironmentRedactor({ SHORT_TOKEN: 'synthetic', LONG_TOKEN: 'synthetic-long', BRACKET_KEY: '[' })
     expect(redact('synthetic-long synthetic [')).toBe('[redacted] [redacted] [redacted]')
+  })
+
+  it('leaves DEBUG=1 and other ordinary environment values unchanged in errors', () => {
+    const env = { DEBUG: '1', NODE_ENV: 'production', READ_ONLY: 'true', DIRECTORY: '/workspace/long-directory' }
+    const message = 'pkg@1.2.1 failed with exit 1 in production: READ_ONLY=true at /workspace/long-directory'
+    expect(createMcpEnvironmentRedactor(env)(message)).toBe(message)
+  })
+
+  it('selects secret names case-insensitively, including short values', () => {
+    const redact = createMcpEnvironmentRedactor({ api_token: 'abc-long-secret', Password: 'act', DEBUG: '1' })
+    expect(redact('exit 1: abc-long-secret act')).toBe('exit 1: [redacted] [redacted]')
   })
 
   it('ignores empty values and leaves non-configured text unchanged', () => {

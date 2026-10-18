@@ -17,7 +17,6 @@ import {
   removeMcpConfig,
   setMcpServerEnabled,
 } from '../../services/mcp/config.js'
-import { createMcpEnvironmentRedactor } from '../../services/mcp/redactEnvironment.js'
 import { inspectMcpHostCommand } from '../services/mcpHostPreflight.js'
 import type {
   ConfigScope,
@@ -178,8 +177,7 @@ function serializeEditableConfig(config: ScopedMcpServerConfig): McpEditableConf
 function getSummary(config: ScopedMcpServerConfig): string {
   if (!config.type || config.type === 'stdio') {
     const stdioConfig = config as McpStdioServerConfig
-    const summary = [stdioConfig.command, ...(stdioConfig.args ?? [])].join(' ').trim()
-    return createMcpEnvironmentRedactor(stdioConfig.env)(summary)
+    return [stdioConfig.command, ...(stdioConfig.args ?? [])].join(' ').trim()
   }
 
   if ('url' in config && typeof config.url === 'string') {

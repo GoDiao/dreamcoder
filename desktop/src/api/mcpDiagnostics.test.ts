@@ -75,8 +75,19 @@ describe('MCP mutation diagnostics', () => {
 
   it('handles overlapping and empty values without masking the entire diagnostic', async () => {
     const fetchMock = mockFailure({ message: 'value synthetic-long and synthetic' })
-    await expect(api.post('/api/mcp', { config: { env: { SHORT: 'synthetic', LONG: 'synthetic-long', EMPTY: '' } } })).rejects.toBeInstanceOf(ApiError)
+    await expect(api.post('/api/mcp', { config: { env: { SHORT_TOKEN: 'synthetic', LONG_TOKEN: 'synthetic-long', EMPTY: '' } } })).rejects.toBeInstanceOf(ApiError)
     expect(JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)).details.message).toBe('value [redacted] and [redacted]')
+  })
+
+  it('keeps ordinary env values readable and never rewrites generated markers', async () => {
+    const message = 'exit 1 in production: true /workspace/project abc-long-secret act'
+    const fetchMock = mockFailure({ message })
+    await expect(api.post('/api/mcp', { config: { env: {
+      DEBUG: '1', NODE_ENV: 'production', READ_ONLY: 'true', DIRECTORY: '/workspace/project',
+      api_token: 'abc-long-secret', Password: 'act',
+    } } })).rejects.toThrow(message)
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)).details.message)
+      .toBe('exit 1 in production: true /workspace/project [redacted] [redacted]')
   })
 
   it('reports timeout context without persisting the submitted environment', async () => {

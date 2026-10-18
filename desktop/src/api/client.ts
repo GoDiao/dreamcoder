@@ -1,3 +1,5 @@
+import { getMcpSecretValues, redactMcpDiagnostic } from '../lib/mcpRedaction'
+
 const ENV_BASE_URL =
   typeof import.meta !== 'undefined' &&
   typeof import.meta.env?.VITE_DESKTOP_SERVER_URL === 'string' &&
@@ -109,7 +111,7 @@ function getMcpEnvironmentValues(method: string, path: string, body: unknown): s
   const config = body.config
   if (!config || typeof config !== 'object' || !('env' in config)) return []
   if (!config.env || typeof config.env !== 'object' || Array.isArray(config.env)) return []
-  return Object.values(config.env).filter((value): value is string => typeof value === 'string' && value.length > 0)
+  return getMcpSecretValues(config.env as Record<string, unknown>)
 }
 
 function reportApiFailure(method: string, path: string, error: unknown, sensitiveValues: string[]) {
@@ -128,7 +130,7 @@ function reportApiFailure(method: string, path: string, error: unknown, sensitiv
     details.response = error.body
   }
 
-  const safeDetails = sanitizeDiagnosticValue(details, secrets) as Record<string, unknown>
+  const safeDetails = redactMcpDiagnostic(details, secrets) as Record<string, unknown>
   void rawRecordDiagnosticEvent({
     type: 'client_api_request_failed',
     severity: 'warn',
@@ -161,34 +163,6 @@ function buildHeaders(): Record<string, string> {
   }
 
   return headers
-}
-
-function sanitizeDiagnosticValue(value: unknown, secrets: string[]): unknown {
-  if (secrets.length === 0) return value
-
-  if (typeof value === 'string') {
-    // An error may embed JSON containing escaped environment values. Match both
-    // spellings, longest first, without treating user input as a regular expression.
-    const spellings = [...new Set(secrets.flatMap((secret) => [secret, JSON.stringify(secret).slice(1, -1)]))]
-      .sort((a, b) => b.length - a.length)
-      .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    return value.replace(new RegExp(spellings.join('|'), 'g'), '[redacted]')
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeDiagnosticValue(entry, secrets))
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [
-        sanitizeDiagnosticValue(key, secrets),
-        sanitizeDiagnosticValue(entry, secrets),
-      ]),
-    )
-  }
-
-  return value
 }
 
 export const api = {

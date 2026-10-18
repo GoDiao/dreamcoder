@@ -4,6 +4,7 @@ import { Input } from '../shared/Input'
 import { McpEditorFields, McpEditorLayout, McpEditorSection } from './McpServerEditor'
 import { useTranslation } from '../../i18n'
 import { catalogScopeIsShadowed, prepareCatalogInstall } from '../../lib/mcpCatalogInstall'
+import { getMcpSecretValues, redactMcpDiagnostic } from '../../lib/mcpRedaction'
 import type { McpCatalogEntry, McpServerRecord, McpUpsertPayload, McpWritableScope } from '../../types/mcp'
 
 type Props = {
@@ -57,13 +58,8 @@ export function McpCatalogInstall({ entry, servers, onCancel, onManual, onConfir
     try {
       await onConfirm(name.trim(), { scope, config: prepared.config }, targetCwd)
     } catch (error) {
-      let message = error instanceof Error ? error.message : t('settings.mcp.toast.saveFailed')
-      for (const value of Object.values(values).filter(Boolean).sort((a, b) => b.length - a.length)) {
-        message = message.split(value).join('[redacted]')
-        const escaped = JSON.stringify(value).slice(1, -1)
-        if (escaped !== value) message = message.split(escaped).join('[redacted]')
-      }
-      setFailure(message)
+      const message = error instanceof Error ? error.message : t('settings.mcp.toast.saveFailed')
+      setFailure(redactMcpDiagnostic(message, getMcpSecretValues(values)))
     } finally {
       inFlight.current = false
       setPending(false)

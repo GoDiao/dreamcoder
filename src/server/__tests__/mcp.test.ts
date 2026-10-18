@@ -282,13 +282,12 @@ describe('MCP API', () => {
       expect(connectSpy).not.toHaveBeenCalled()
     })
 
-    it('redacts environment values in summaries while retaining the editor config', async () => {
-      const token = 'fixture-api-token'
-      const config = {
-        ...confirmedConfig(),
-        args: ['--token', token, `--token=${token}`],
-        env: { API_TOKEN: token },
-      }
+    it.each([
+      { args: ['-y', 'pkg@1.2.1'], env: { DEBUG: '1' } },
+      { args: ['--token', 'fixture-api-token'], env: { API_TOKEN: 'fixture-api-token' } },
+    ])('preserves the command summary and editor config for %j', async ({ args, env }) => {
+      const config = { ...confirmedConfig(), args, env }
+      const summary = ['npx', ...args].join(' ')
       const create = makeRequest('POST', '/api/mcp', {
         cwd: projectRoot, name: 'reviewed-server', scope: 'project', config,
       })
@@ -296,7 +295,7 @@ describe('MCP API', () => {
       const createdBody = await createRes.json()
 
       expect(createRes.status).toBe(201)
-      expect(createdBody.server.summary).toBe('npx --token [redacted] --token=[redacted]')
+      expect(createdBody.server.summary).toBe(summary)
       expect(createdBody.server.config).toEqual(config)
       expect(await readStoredServers('project')).toEqual({ 'reviewed-server': config })
 
@@ -304,7 +303,7 @@ describe('MCP API', () => {
       const listRes = await handleMcpApi(list.req, list.url, list.segments)
       const listBody = await listRes.json()
       expect(listRes.status).toBe(200)
-      expect(listBody.servers[0].summary).toBe('npx --token [redacted] --token=[redacted]')
+      expect(listBody.servers[0].summary).toBe(summary)
       expect(listBody.servers[0].config).toEqual(config)
       expect(connectSpy).not.toHaveBeenCalled()
     })

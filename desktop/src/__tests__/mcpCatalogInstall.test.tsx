@@ -263,6 +263,25 @@ describe('MCP catalog installation flow', () => {
     expect(mockedMcpApi.create).toHaveBeenCalledTimes(1)
   })
 
+  it('preserves DEBUG=1 error text and redacts secrets without corrupting markers', async () => {
+    mockedMcpApi.catalog.mockResolvedValue({ catalog: { version: 1, servers: [{
+      ...entry,
+      env: [...entry.env, { name: 'DEBUG', source: 'optional' }, { name: 'AUTH_PASSWORD', source: 'optional' }],
+    }] } })
+    mockedMcpApi.create.mockRejectedValueOnce(new Error(`exit 1 at ${allowedDirectory}: ${secret} act`))
+    await openReview()
+    fillEnvironment()
+    chooseScope('user')
+    fireEvent.change(screen.getByLabelText(/^DEBUG/), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText(/^AUTH_PASSWORD/), { target: { value: 'act' } })
+    fireEvent.click(confirmButton())
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(`exit 1 at ${allowedDirectory}: [redacted] [redacted]`)
+    expect(screen.getByLabelText(/^API_TOKEN/)).toHaveValue(secret)
+    expect(confirmButton()).toBeEnabled()
+  })
+
   it('retains the draft after host preflight rejection, redacts values in errors, and retries', async () => {
     mockedMcpApi.create.mockRejectedValueOnce(new ApiError(400, {
       message: `Host preflight failed for npx; supplied value ${secret}`,
