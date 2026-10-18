@@ -10,6 +10,7 @@ describe('resolveStoredComputerUseConfig', () => {
       enabled: true,
       authorizedApps: [],
       grantFlags: DEFAULT_DESKTOP_GRANT_FLAGS,
+      mode: 'vision',
       pythonPath: null,
     })
   })
@@ -36,6 +37,7 @@ describe('resolveStoredComputerUseConfig', () => {
         clipboardWrite: true,
         systemKeyCombos: true,
       },
+      mode: 'vision',
       pythonPath: null,
     })
   })

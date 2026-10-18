@@ -86,10 +86,12 @@ git checkout main && git checkout -b feat/your-feature
 
 4. **测试**。确保你的改动不会破坏现有功能：
    ```bash
+   bun test                  # 服务端/CLI 测试(需要 PATH 里有 ripgrep)
    cd desktop
-   bun run lint    # TypeScript 类型检查
-   bun run test    # 运行测试
+   bun run lint              # TypeScript 类型检查
+   bun run test -- --run     # 桌面端测试
    ```
+   每个提到 `main` 的 PR,CI 都会跑这三项检查。
 
 5. **提交 PR**。PR 目标分支为 `main`，描述清楚改了什么、为什么改。
 
