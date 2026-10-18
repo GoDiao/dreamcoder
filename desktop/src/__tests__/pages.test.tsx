@@ -14,9 +14,21 @@ vi.mock('../api/skills', () => ({
   },
 }))
 
+// The composer is replaced by the provider card when no provider is usable, so these
+// page tests run with one default provider configured.
+const TEST_PROVIDER = vi.hoisted(() => ({
+  id: 'test-provider',
+  presetId: 'custom',
+  name: 'Test Provider',
+  apiKey: '***',
+  baseUrl: 'https://example.invalid',
+  apiFormat: 'anthropic' as const,
+  models: { main: 'test-main', haiku: '', sonnet: '', opus: '' },
+}))
+
 vi.mock('../api/providers', () => ({
   providersApi: {
-    list: vi.fn(async () => ({ providers: [], activeId: null })),
+    list: vi.fn(async () => ({ providers: [TEST_PROVIDER], activeId: TEST_PROVIDER.id })),
   },
 }))
 
@@ -91,8 +103,8 @@ import { useTabStore } from '../stores/tabStore'
 beforeEach(() => {
   useSettingsStore.setState({ locale: 'en' })
   useProviderStore.setState({
-    providers: [],
-    activeId: null,
+    providers: [TEST_PROVIDER],
+    activeId: TEST_PROVIDER.id,
     hasLoadedProviders: true,
     isLoading: false,
   })
@@ -169,7 +181,7 @@ describe('Content-only pages render without errors', () => {
     expect(screen.queryByText('/goal --tokens')).not.toBeInTheDocument()
   })
 
-  it('EmptySession renders mascot and composer', async () => {
+  it('EmptySession renders the title and composer', async () => {
     let container!: HTMLElement
     await act(async () => {
       container = render(<EmptySession />).container
@@ -177,7 +189,7 @@ describe('Content-only pages render without errors', () => {
       await Promise.resolve()
     })
     expect(container.querySelector('textarea')).toBeInTheDocument()
-    expect(container.innerHTML).toContain('Start Your AI Coding Journey')
+    expect(container.innerHTML).toContain('Start a new task')
     expect(container.innerHTML).toContain('Ask anything')
   })
 
@@ -262,11 +274,11 @@ describe('Content-only pages render without errors', () => {
       },
     })
     const { container } = render(<ActiveSession />)
-    expect(container.innerHTML).toContain('Start Your AI Coding Journey')
+    expect(container.innerHTML).toContain('Start a new task')
     const textarea = container.querySelector('textarea')
     expect(textarea).toBeInTheDocument()
     expect(textarea).toHaveAttribute('placeholder', 'Ask anything...')
-    expect(textarea).toHaveAttribute('rows', '2')
+    expect(textarea).toHaveAttribute('rows', '1')
     expect(container.innerHTML).not.toContain('Preview')
     resetPageStores()
   })
@@ -427,8 +439,8 @@ describe('Content-only pages render without errors', () => {
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Available MCP tools')).toBeInTheDocument()
     fireEvent.click(screen.getByText('deepwiki'))
-    expect(useTabStore.getState().activeTabId).toBe('__settings__')
-    expect(useUIStore.getState().pendingSettingsTab).toBe('mcp')
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('mcp')
 
     resetPageStores()
   })
@@ -551,8 +563,8 @@ describe('Content-only pages render without errors', () => {
     fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
 
     expect(sendMessage).not.toHaveBeenCalled()
-    expect(useTabStore.getState().activeTabId).toBe('__settings__')
-    expect(useUIStore.getState().pendingSettingsTab).toBe('plugins')
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('plugins')
 
     resetPageStores()
   })
@@ -1271,7 +1283,7 @@ describe('AppShell layout renders chrome', () => {
     expect(container.innerHTML).toContain('New session')
     expect(container.innerHTML).toContain('Scheduled')
     expect(container.innerHTML).toContain('Search sessions')
-    expect(container.innerHTML).toContain('Settings')
+    expect(container.innerHTML).toContain('More')
   })
 })
 
@@ -1290,6 +1302,9 @@ describe('Design system compliance', () => {
     const pages = [EmptySession]
     for (const Page of pages) {
       const { container, unmount } = render(<Page />)
+      // The send button only takes the brand fill once there is something to send.
+      const textarea = container.querySelector('textarea')
+      if (textarea) fireEvent.change(textarea, { target: { value: 'hello' } })
       const html = container.innerHTML
       expect(
         html.includes('C47A5A') ||

@@ -16,20 +16,20 @@ vi.mock('../../lib/desktopRuntime', () => ({
 
 vi.mock('../../i18n', () => ({
   useTranslation: () => (key: string) => ({
-    'permMode.askPermissions': 'Ask permissions',
+    'permMode.askPermissions': 'Default',
     'permMode.askPermDesc': 'Ask before changing files or running commands',
-    'permMode.autoAccept': 'Auto accept edits',
+    'permMode.autoAccept': 'Accept edits',
     'permMode.autoAcceptDesc': 'Automatically accept edit operations',
-    'permMode.planMode': 'Plan mode',
+    'permMode.planMode': 'Plan',
     'permMode.planModeDesc': 'Plan before executing',
     'permMode.bypass': 'Bypass permissions',
     'permMode.bypassDesc': 'Run without permission prompts',
     'permMode.executionPermissions': 'Execution Permissions',
-    'permMode.label.default': 'Ask permissions',
-    'permMode.label.acceptEdits': 'Auto accept edits',
-    'permMode.label.plan': 'Plan mode',
+    'permMode.label.default': 'Default',
+    'permMode.label.acceptEdits': 'Accept edits',
+    'permMode.label.plan': 'Plan',
     'permMode.label.bypassPermissions': 'Bypass permissions',
-    'permMode.label.dontAsk': 'Bypass permissions',
+    'permMode.label.dontAsk': "Don't ask",
     'permMode.enableBypassTitle': 'Enable bypass mode',
     'permMode.enableBypassSubtitle': 'This is risky',
     'permMode.enableBypassBody': 'Bypass permissions for this workspace.',
@@ -60,7 +60,7 @@ describe('PermissionModeSelector', () => {
 
     render(<PermissionModeSelector compact workDir="/repo" />)
 
-    const trigger = screen.getByRole('button', { name: 'Ask permissions' })
+    const trigger = screen.getByRole('button', { name: 'Default' })
     expect(trigger).toHaveClass('h-11', 'w-11')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
@@ -71,7 +71,7 @@ describe('PermissionModeSelector', () => {
     expect(trigger).toHaveAttribute('aria-controls', 'permission-mode-menu')
     expect(screen.getByRole('dialog', { name: 'Execution Permissions' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /Auto accept edits/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitemradio', { name: /Accept edits/ })).toBeInTheDocument()
   })
 
   it('uses the active tab workspace when showing the bypass confirmation path', () => {
@@ -109,10 +109,36 @@ describe('PermissionModeSelector', () => {
 
     render(<PermissionModeSelector compact />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ask permissions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Bypass permissions/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Default' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
 
     expect(screen.getByText('C:\\Users\\LinTan\\MyScript\\test5')).toBeInTheDocument()
     expect(screen.queryByText('C:\\Users\\LinTan')).not.toBeInTheDocument()
+  })
+
+  it('lists the modes without a menu heading and marks the current one', () => {
+    useSettingsStore.setState({ permissionMode: 'plan' })
+
+    render(<PermissionModeSelector />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+
+    expect(screen.queryByText('Execution Permissions')).not.toBeInTheDocument()
+    const items = screen.getAllByRole('menuitemradio')
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Default'),
+      expect.stringContaining('Accept edits'),
+      expect.stringContaining('Plan'),
+      expect.stringContaining('Bypass permissions'),
+    ])
+    expect(screen.getByRole('menuitemradio', { name: /Plan/ })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('shows the dontAsk mode by its English name', () => {
+    useSettingsStore.setState({ permissionMode: 'dontAsk' })
+
+    render(<PermissionModeSelector />)
+
+    expect(screen.getByRole('button', { name: "Don't ask" })).toHaveTextContent("Don't ask")
   })
 })

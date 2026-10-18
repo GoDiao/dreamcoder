@@ -24,7 +24,7 @@ const DEFAULT_MODELS = [
   },
 ] as const
 
-const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
 
 const DEFAULT_MODEL = 'claude-opus-4-7'
 const DEFAULT_EFFORT = 'medium'

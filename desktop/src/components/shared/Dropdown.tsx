@@ -39,7 +39,10 @@ export function Dropdown<T extends string>({
       }
     }
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key !== 'Escape') return
+      // Claim the key so an enclosing modal or settings window stays open.
+      e.preventDefault()
+      setOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('keydown', handleEsc)

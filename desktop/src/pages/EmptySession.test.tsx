@@ -120,7 +120,6 @@ import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
 import { usePluginStore } from '../stores/pluginStore'
 import { useProviderStore } from '../stores/providerStore'
-import { SETTINGS_TAB_ID } from '../stores/tabStore'
 import type { RepositoryContextResult } from '../api/sessions'
 
 function okRepositoryContext(overrides: Partial<RepositoryContextResult> = {}): RepositoryContextResult {
@@ -230,13 +229,68 @@ describe('EmptySession', () => {
 
     render(<EmptySession />)
 
-    const hint = await screen.findByTestId('empty-session-no-provider')
-    expect(hint).toHaveTextContent('No model provider is configured yet.')
+    const card = await screen.findByTestId('empty-session-no-provider')
+    expect(card).toHaveTextContent('Add a model provider to start chatting')
+    expect(screen.queryByTestId('empty-session-composer-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('empty-session-controls')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
 
-    expect(useUIStore.getState().pendingSettingsTab).toBe('providers')
-    expect(useTabStore.getState().activeTabId).toBe(SETTINGS_TAB_ID)
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('providers')
+  })
+
+  it('asks to choose a default provider when providers exist without one', async () => {
+    useProviderStore.setState({
+      hasLoadedProviders: true,
+      activeId: null,
+      providers: [{
+        id: 'provider-1',
+        presetId: 'deepseek',
+        name: 'DeepSeek',
+        apiKey: 'key',
+        baseUrl: 'https://example.invalid',
+        apiFormat: 'anthropic',
+        models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+      }],
+    })
+
+    render(<EmptySession />)
+
+    const card = await screen.findByTestId('empty-session-no-provider')
+    expect(card).toHaveTextContent('Choose a default provider to start chatting')
+    fireEvent.click(screen.getByRole('button', { name: 'Choose provider' }))
+    expect(useUIStore.getState().settingsTab).toBe('providers')
+  })
+
+  it('keeps the draft when the provider card gives way to the composer', () => {
+    useProviderStore.setState({ hasLoadedProviders: false, providers: [] })
+    render(<EmptySession />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'unsent draft', selectionStart: 12 },
+    })
+
+    act(() => {
+      useProviderStore.setState({ hasLoadedProviders: true, activeId: null, providers: [] })
+    })
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    act(() => {
+      useProviderStore.setState({
+        activeId: 'provider-1',
+        providers: [{
+          id: 'provider-1',
+          presetId: 'deepseek',
+          name: 'DeepSeek',
+          apiKey: 'key',
+          baseUrl: 'https://example.invalid',
+          apiFormat: 'anthropic',
+          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+        }],
+      })
+    })
+    expect(screen.getByRole('textbox')).toHaveValue('unsent draft')
   })
 
   it('hides the provider hint until providers load and once one exists', () => {
@@ -359,8 +413,8 @@ describe('EmptySession', () => {
     render(<EmptySession />)
 
     const panel = screen.getByTestId('empty-session-composer-panel')
-    expect(panel).toHaveClass('rounded-xl', 'p-0')
-    expect(panel).not.toHaveClass('rounded-b-none')
+    expect(panel).toHaveClass('rounded-2xl')
+    expect(screen.getByRole('textbox')).toHaveAttribute('rows', '1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
 
@@ -369,7 +423,9 @@ describe('EmptySession', () => {
     expect(launchBar).toBeTruthy()
     expect(launchBar).toHaveClass('bg-transparent')
     expect(launchBar).not.toHaveClass('rounded-b-xl')
-    expect(panel).toContainElement(launchBar)
+    expect(panel).not.toContainElement(launchBar)
+    expect(screen.getByTestId('empty-session-controls')).toContainElement(launchBar)
+    expect(screen.getByTestId('empty-session-controls')).toContainElement(screen.getByTestId('permission-mode-selector'))
   })
 
   it('creates a session with the selected project and branch when submitted', async () => {
@@ -629,12 +685,12 @@ describe('EmptySession', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
-    await waitFor(() => {
-      const toasts = useUIStore.getState().toasts
-      expect(toasts[toasts.length - 1]?.message).toBe(
-        'Current project has uncommitted changes. Direct branch switching was blocked; enable "Isolated worktree" or commit/stash your changes first.',
-      )
-    })
+    const notice = await screen.findByTestId('repo-launch-notice-launch-dirty')
+    expect(notice).toHaveTextContent(
+      'Current project has uncommitted changes. Direct branch switching was blocked; enable "Isolated worktree" or commit/stash your changes first.',
+    )
+    expect(screen.getByRole('button', { name: 'Use isolated worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('draft question')
     expect(useTabStore.getState().activeTabId).toBeNull()
   })
 
@@ -746,7 +802,7 @@ describe('EmptySession', () => {
     const branchClasses = branchButton.className.split(/\s+/)
     expect(branchButton.parentElement?.className).toContain('flex-nowrap')
     expect(branchButton.parentElement?.className).not.toContain('flex-wrap')
-    expect(branchClasses).toContain('max-w-[260px]')
+    expect(branchClasses).toContain('max-w-[200px]')
     expect(branchClasses).not.toContain('max-w-full')
     expect(branchButton.querySelector('span')?.className).toContain('truncate')
   })

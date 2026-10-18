@@ -2915,6 +2915,286 @@ describe('WebSocket Chat Integration', () => {
     }
   }, 20_000)
 
+  it('should prefer the per-session effort and restart when only the effort changes', async () => {
+    const effortRes = await fetch(`${baseUrl}/api/effort`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: 'high' }),
+    })
+    expect(effortRes.status).toBe(200)
+
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Effort',
+      apiKey: 'key-effort',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'effort-main',
+        haiku: 'effort-haiku',
+        sonnet: 'effort-sonnet',
+        opus: 'effort-opus',
+      },
+    })
+
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{
+      sessionId: string
+      options: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null } | undefined
+    }> = []
+
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ sessionId: sid, options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      let phase: 'boot' | 'turn1' | 'switching' | 'turn2' | 'done' = 'boot'
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for effort override flow for session ${sessionId}`))
+        }, 15_000)
+
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+
+          if (msg.type === 'connected' && phase === 'boot') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-sonnet',
+              effort: 'low',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'first turn' }))
+            phase = 'turn1'
+            return
+          }
+
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn1') {
+            phase = 'switching'
+            // Same provider and model; only the effort changes.
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-sonnet',
+              effort: 'max',
+            }))
+            return
+          }
+
+          if (msg.type === 'status' && msg.state === 'idle' && phase === 'switching') {
+            ws.send(JSON.stringify({ type: 'user_message', content: 'second turn' }))
+            phase = 'turn2'
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn2') {
+            clearTimeout(timeout)
+            phase = 'done'
+            ws.close()
+            resolve()
+          }
+        }
+
+        ws.onerror = () => {
+          reject(new Error(`WebSocket error for effort override session ${sessionId}`))
+        }
+      })
+
+      expect(startCalls).toHaveLength(2)
+      expect(startCalls[0]).toMatchObject({
+        sessionId,
+        options: { providerId: provider.id, model: 'effort-sonnet', effort: 'low' },
+      })
+      expect(startCalls[1]).toMatchObject({
+        sessionId,
+        options: { providerId: provider.id, model: 'effort-sonnet', effort: 'max' },
+      })
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+      await fetch(`${baseUrl}/api/effort`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 'medium' }),
+      })
+    }
+  }, 20_000)
+
+  it('should ignore an invalid per-session effort and keep the global one', async () => {
+    const effortRes = await fetch(`${baseUrl}/api/effort`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: 'high' }),
+    })
+    expect(effortRes.status).toBe(200)
+
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Effort Invalid',
+      apiKey: 'key-effort-invalid',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'effort-invalid-main',
+        haiku: 'effort-invalid-haiku',
+        sonnet: 'effort-invalid-sonnet',
+        opus: 'effort-invalid-opus',
+      },
+    })
+
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{ options: { effort?: string } | undefined }> = []
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for invalid effort flow for session ${sessionId}`))
+        }, 15_000)
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type === 'connected') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: provider.id,
+              modelId: 'effort-invalid-sonnet',
+              effort: 'turbo',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'only turn' }))
+            return
+          }
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+          if (msg.type === 'message_complete') {
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }
+        }
+        ws.onerror = () => reject(new Error(`WebSocket error for invalid effort session ${sessionId}`))
+      })
+
+      expect(startCalls).toHaveLength(1)
+      expect(startCalls[0]?.options?.effort).toBe('high')
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+      await fetch(`${baseUrl}/api/effort`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 'medium' }),
+      })
+    }
+  }, 20_000)
+
+  it('should apply an effort-only runtime config without pinning a provider or model', async () => {
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{ options: { effort?: string; model?: string; providerId?: string | null } | undefined }> = []
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      startCalls.push({ options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for effort-only flow for session ${sessionId}`))
+        }, 15_000)
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type === 'connected') {
+            ws.send(JSON.stringify({ type: 'set_runtime_config', providerId: null, modelId: '', effort: 'max' }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'only turn' }))
+            return
+          }
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+          if (msg.type === 'message_complete') {
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }
+        }
+        ws.onerror = () => reject(new Error(`WebSocket error for effort-only session ${sessionId}`))
+      })
+
+      expect(startCalls).toHaveLength(1)
+      expect(startCalls[0]?.options?.effort).toBe('max')
+      // Provider and model come from the defaults, not from the empty override.
+      expect(startCalls[0]?.options?.model).not.toBe('')
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+    }
+  }, 20_000)
+
   it('should wait for an in-flight permission restart before sending the next user turn', async () => {
     await fetch(`${baseUrl}/api/permissions/mode`, {
       method: 'PUT',

@@ -6,7 +6,7 @@ import { Settings } from '../pages/Settings'
 import { useSkillStore } from '../stores/skillStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSessionStore } from '../stores/sessionStore'
-import { useTabStore, SETTINGS_TAB_ID } from '../stores/tabStore'
+import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
 
 vi.mock('../api/agents', () => ({
@@ -79,7 +79,7 @@ describe('Settings > Skills tab', () => {
       error: null,
     })
     useTabStore.setState({ tabs: [], activeTabId: null })
-    useUIStore.setState({ pendingSettingsTab: null })
+    useUIStore.setState({ settingsTab: 'providers' })
     useSkillStore.setState({
       skills: [],
       selectedSkill: null,
@@ -130,9 +130,14 @@ describe('Settings > Skills tab', () => {
     render(<Settings />)
     switchToSkillsTab()
 
-    expect(screen.getByText('Browse installed skills')).toBeInTheDocument()
-    expect(screen.getByText('Skill Browser')).toBeInTheDocument()
-    expect(screen.getByText('Total skills')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Skills' })).toBeInTheDocument()
+    expect(screen.getByText('3 installed')).toBeInTheDocument()
+    expect(screen.queryByText('Skill Browser')).not.toBeInTheDocument()
+    expect(screen.queryByText('Total skills')).not.toBeInTheDocument()
+    const groups = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    expect(groups).toEqual(['User skills1', 'Project skills1', 'Plugin skills1'])
+    expect(screen.getByRole('button', { name: /Alpha Skill/ })).toBeInTheDocument()
+    expect(screen.getByText('project')).toBeInTheDocument()
     expect(screen.getByText('Alpha Skill')).toBeInTheDocument()
     expect(screen.getByText('Second skill description')).toBeInTheDocument()
     expect(screen.getAllByText('Plugin').length).toBeGreaterThan(0)
@@ -172,15 +177,79 @@ describe('Settings > Skills tab', () => {
 
     expect(screen.getByText('Telegram Access')).toBeInTheDocument()
     expect(screen.queryByText('Alpha Skill')).not.toBeInTheDocument()
-    expect(screen.getByText('1 of 2 skills match')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /User skills/ })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByLabelText('Clear skill search'))
+    fireEvent.change(searchInput, { target: { value: 'nothing-matches' } })
+    expect(screen.getByText('No matching skills')).toBeInTheDocument()
+
+    fireEvent.change(searchInput, { target: { value: '' } })
 
     expect(screen.getByText('Telegram Access')).toBeInTheDocument()
     expect(screen.getByText('Alpha Skill')).toBeInTheDocument()
   })
 
-  it('uses the active session workDir even when settings tab is focused', () => {
+  it('keeps the search text after returning from a skill detail', () => {
+    useSkillStore.setState({
+      skills: [
+        {
+          name: 'alpha',
+          displayName: 'Alpha Skill',
+          description: 'First skill description',
+          source: 'user',
+          userInvocable: true,
+          contentLength: 400,
+          hasDirectory: true,
+        },
+      ],
+    })
+
+    render(<Settings />)
+    switchToSkillsTab()
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search skills' }), { target: { value: 'alpha' } })
+    fireEvent.click(screen.getByRole('button', { name: /Alpha Skill/ }))
+    expect(MOCK_FETCH_SKILL_DETAIL).toHaveBeenCalledWith('user', 'alpha', '/workspace/project', 'skills')
+
+    act(() => {
+      useSkillStore.setState({
+        selectedSkill: {
+          meta: useSkillStore.getState().skills[0]!,
+          tree: [{ name: 'SKILL.md', path: 'SKILL.md', type: 'file' }],
+          files: [{ path: 'SKILL.md', content: '# Alpha', body: '# Alpha', language: 'markdown', isEntry: true }],
+          skillRoot: '/tmp/alpha',
+        },
+      })
+    })
+    expect(screen.queryByRole('searchbox', { name: 'Search skills' })).not.toBeInTheDocument()
+    act(() => {
+      useSkillStore.setState({ selectedSkill: null })
+    })
+
+    expect(screen.getByRole('searchbox', { name: 'Search skills' })).toHaveValue('alpha')
+  })
+
+  it('offers plugin and terminal install paths from the Add menu', () => {
+    render(<Settings />)
+    switchToSkillsTab()
+
+    const add = screen.getByRole('button', { name: 'Add' })
+    fireEvent.click(add)
+    expect(add).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Install in terminal' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Install from plugins' }))
+
+    expect(useUIStore.getState().settingsTab).toBe('plugins')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    act(() => {
+      useUIStore.getState().openSettings('skills')
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Install in terminal' }))
+    expect(useUIStore.getState().settingsTab).toBe('terminal')
+  })
+
+  it('uses the active session workDir while the settings window is open', () => {
     const fetchSkills = vi.fn()
     useSkillStore.setState({
       skills: [],
@@ -193,9 +262,10 @@ describe('Settings > Skills tab', () => {
       clearSelection: MOCK_CLEAR_SELECTION,
     })
     useTabStore.setState({
-      activeTabId: SETTINGS_TAB_ID,
-      tabs: [{ sessionId: SETTINGS_TAB_ID, title: 'Settings', type: 'settings', status: 'idle' }],
+      activeTabId: 'session-1',
+      tabs: [{ sessionId: 'session-1', title: 'Active session', type: 'session', status: 'idle' }],
     })
+    useUIStore.setState({ settingsOpen: true })
 
     render(<Settings />)
     switchToSkillsTab()

@@ -31,7 +31,7 @@ export type ClientMessage =
       response: ComputerUsePermissionResponse
     }
   | { type: 'set_permission_mode'; mode: PermissionMode }
-  | { type: 'set_runtime_config'; providerId: string | null; modelId: string }
+  | { type: 'set_runtime_config'; providerId: string | null; modelId: string; effort?: string }
   | { type: 'stop_generation' }
   | { type: 'ping' }
 

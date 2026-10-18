@@ -19,10 +19,10 @@ export function Input({ label, error, required, className = '', id, ...props }: 
       <input
         id={inputId}
         className={`
-          h-10 px-3 rounded-[var(--radius-md)] border text-sm
-          bg-[var(--color-surface)] text-[var(--color-text-primary)]
+          h-10 px-3 rounded-[8px] border text-sm
+          bg-[var(--color-surface-container-lowest)] text-[var(--color-text-primary)]
           placeholder:text-[var(--color-text-tertiary)]
-          transition-colors duration-150
+          transition-[border-color,box-shadow] duration-150
           ${error
             ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
             : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]'

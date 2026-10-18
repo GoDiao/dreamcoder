@@ -132,7 +132,7 @@ describe('Settings > Plugins tab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useSettingsStore.setState({ locale: 'en' })
-    useUIStore.setState({ pendingSettingsTab: null })
+    useUIStore.setState({ settingsTab: 'providers' })
     useSessionStore.setState({
       sessions: [
         {
@@ -238,8 +238,8 @@ describe('Settings > Plugins tab', () => {
     render(<Settings />)
     switchToPluginsTab()
 
-    expect(screen.getByText('Browse installed plugins')).toBeInTheDocument()
-    expect(screen.getByText('Plugin Manager')).toBeInTheDocument()
+    expect(screen.queryByText('Plugin Manager')).not.toBeInTheDocument()
+    expect(screen.getByText('Total plugins')).toBeInTheDocument()
     expect(screen.getAllByText('Needs attention').length).toBeGreaterThan(0)
     expect(screen.getByText('github')).toBeInTheDocument()
     expect(screen.getByText('Python language tooling')).toBeInTheDocument()

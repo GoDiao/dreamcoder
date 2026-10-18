@@ -1,4 +1,7 @@
 import type { SettingsTab } from '../../stores/uiStore'
+import { ApiError } from '../../api/client'
+import type { TranslationKey } from '../../i18n'
+import type { RepositoryLaunchError } from '../shared/RepositoryLaunchControls'
 
 export const PANEL_SLASH_COMMANDS = [
   { name: 'mcp', description: 'Open available MCP tools for the current chat context' },
@@ -216,5 +219,65 @@ export function insertSlashTrigger(
   return {
     value: `${before}${token}${after}`,
     cursorPos: before.length + token.length,
+  }
+}
+
+type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string
+
+function getApiErrorCode(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null
+  const body = error.body
+  if (!body || typeof body !== 'object' || !('error' in body)) return null
+  return typeof body.error === 'string' ? body.error : null
+}
+
+export function resolveCreateSessionErrorMessage(error: unknown, t: Translate): string {
+  const code = getApiErrorCode(error)
+  switch (code) {
+    case 'WORKDIR_MISSING':
+    case 'WORKDIR_NOT_DIRECTORY':
+      return t('empty.createError.workdirMissing')
+    case 'REPOSITORY_NOT_GIT':
+      return t('empty.createError.notGit')
+    case 'REPOSITORY_BRANCH_NOT_FOUND':
+      return t('empty.createError.branchNotFound')
+    case 'REPOSITORY_DIRTY_WORKTREE':
+      return t('empty.createError.dirtyWorktree')
+    case 'REPOSITORY_BRANCH_CHECKED_OUT':
+      return t('empty.createError.branchCheckedOut')
+    case 'REPOSITORY_WORKTREE_CREATE_FAILED':
+      return t('empty.createError.worktreeCreateFailed', {
+        detail: error instanceof Error ? error.message : t('empty.failedToCreate'),
+      })
+    case 'REPOSITORY_SWITCH_FAILED':
+      return t('empty.createError.switchFailed', {
+        detail: error instanceof Error ? error.message : t('empty.failedToCreate'),
+      })
+    case 'REPOSITORY_CONTEXT_ERROR':
+      return t('empty.createError.contextFailed')
+    default:
+      return error instanceof Error ? error.message : t('empty.failedToCreate')
+  }
+}
+
+/**
+ * Repository launch failures that belong next to the project controls rather than in a toast.
+ * Returns null for errors that are not about the chosen branch or working tree.
+ */
+export function resolveRepositoryLaunchError(error: unknown, t: Translate): RepositoryLaunchError | null {
+  const code = getApiErrorCode(error)
+  const message = resolveCreateSessionErrorMessage(error, t)
+  switch (code) {
+    case 'REPOSITORY_BRANCH_NOT_FOUND':
+    case 'REPOSITORY_SWITCH_FAILED':
+    case 'REPOSITORY_BRANCH_CHECKED_OUT':
+      return { kind: 'branch', message }
+    case 'REPOSITORY_DIRTY_WORKTREE':
+      return { kind: 'dirty', message }
+    case 'REPOSITORY_WORKTREE_CREATE_FAILED':
+    case 'REPOSITORY_CONTEXT_ERROR':
+      return { kind: 'other', message }
+    default:
+      return null
   }
 }

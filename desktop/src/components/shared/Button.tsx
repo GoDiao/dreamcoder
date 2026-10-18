@@ -4,7 +4,7 @@ type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   loading?: boolean
   icon?: ReactNode
 }
@@ -21,6 +21,8 @@ const variantStyles: Record<ButtonVariant, string> = {
 }
 
 const sizeStyles = {
+  /** Settings action buttons: 12px text, 32px tall. */
+  xs: 'h-8 px-2.5 py-1.5 text-xs leading-[18px] rounded-[6px]',
   sm: 'px-2 py-1 text-xs',
   md: 'px-4 py-2 text-sm',
   lg: 'px-5 py-2.5 text-sm',

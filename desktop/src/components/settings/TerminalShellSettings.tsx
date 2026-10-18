@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { terminalApi, type TerminalShellDetection } from '../../api/terminal'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
-import { Dropdown } from '../shared/Dropdown'
+import { SettingsSelect } from './SettingsSelect'
+import { SettingsRow } from './SettingsRow'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
 import type { DesktopTerminalStartupShell } from '../../types/settings'
@@ -91,47 +92,33 @@ function DesktopTerminalShellSettings() {
   }
 
   return (
-    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
-      <div className="flex flex-col gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {t('settings.general.defaultShell')}
-          </h3>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {t('settings.terminal.preferencesBody')}
-          </p>
-        </div>
-
-        {!detection ? (
-          <p role={detectionError ? 'alert' : 'status'} className="text-sm text-[var(--color-text-secondary)]">
-            {detectionError ?? t('settings.terminal.detectingShell')}
-          </p>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2">
-              <Dropdown<DesktopTerminalStartupShell>
-                items={shellItems}
+    <div>
+      {!detection ? (
+        <p role={detectionError ? 'alert' : 'status'} className="py-2.5 text-xs text-[var(--color-text-secondary)]">
+          {detectionError ?? t('settings.terminal.detectingShell')}
+        </p>
+      ) : (
+        <>
+          <SettingsRow
+            title={t('settings.terminal.startupShell')}
+            description={t('settings.terminal.preferencesBody')}
+            control={
+              <SettingsSelect<DesktopTerminalStartupShell>
+                label={t('settings.general.defaultShell')}
+                options={shellItems}
                 value={startupShell}
+                menuWidth={280}
                 onChange={(value) => {
                   setStartupShell(value)
                   setPreferencesError(null)
                   setPreferencesSaved(false)
                 }}
-                width="100%"
-                trigger={
-                  <button
-                    type="button"
-                    aria-label={t('settings.general.defaultShell')}
-                    className="flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)]"
-                  >
-                    <span>{shellItems.find((item) => item.value === startupShell)?.label ?? startupShell}</span>
-                    <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">expand_more</span>
-                  </button>
-                }
               />
-            </div>
+            }
+          />
 
-            {startupShell === 'custom' && (
+          {startupShell === 'custom' && (
+            <div className="mt-2">
               <Input
                 label={t('settings.terminal.customPath')}
                 placeholder={isWindows ? t('settings.terminal.customPathPlaceholder') : '/usr/local/bin/fish'}
@@ -143,30 +130,30 @@ function DesktopTerminalShellSettings() {
                 }}
                 error={preferencesError ?? undefined}
               />
-            )}
-
-            {preferencesError && startupShell !== 'custom' && (
-              <p className="text-xs text-[var(--color-error)]">{preferencesError}</p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                size="sm"
-                loading={preferencesSaving}
-                onClick={() => void savePreferences()}
-              >
-                {t('settings.terminal.saveShell')}
-              </Button>
-              {preferencesSaved && (
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  {t('settings.terminal.saveShellSuccess')}
-                </span>
-              )}
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          {preferencesError && startupShell !== 'custom' && (
+            <p className="mt-2 text-xs text-[var(--color-error)]">{preferencesError}</p>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+            {preferencesSaved && (
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                {t('settings.terminal.saveShellSuccess')}
+              </span>
+            )}
+            <Button
+              type="button"
+              size="xs"
+              loading={preferencesSaving}
+              onClick={() => void savePreferences()}
+            >
+              {t('settings.terminal.saveShell')}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

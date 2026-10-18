@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   fetchAll: vi.fn(),
   restoreTabs: vi.fn(),
   connectToSession: vi.fn(),
+  listProviders: vi.fn(),
+  importStatus: vi.fn(),
   setActiveTab: vi.fn(),
   tabState: {
     activeTabId: null as string | null,
@@ -28,6 +30,18 @@ vi.mock('../../lib/desktopRuntime', () => ({
 vi.mock('../../stores/settingsStore', () => ({
   useSettingsStore: (selector: (state: { fetchAll: typeof mocks.fetchAll }) => unknown) =>
     selector({ fetchAll: mocks.fetchAll }),
+}))
+
+vi.mock('../../api/providers', () => ({
+  providersApi: { list: mocks.listProviders, presets: vi.fn() },
+}))
+
+vi.mock('../../api/claudeCodeImport', () => ({
+  claudeCodeImportApi: { getStatus: mocks.importStatus, start: vi.fn(), skip: vi.fn() },
+}))
+
+vi.mock('../onboarding/FirstLaunch', () => ({
+  FirstLaunch: () => <div>first launch</div>,
 }))
 
 vi.mock('../../hooks/useMobileViewport', () => ({
@@ -55,7 +69,6 @@ vi.mock('../../stores/tabStore', () => {
     if ('activeTabId' in next) mocks.tabState.activeTabId = next.activeTabId ?? null
   }
   return {
-    SETTINGS_TAB_ID: '__settings__',
     useTabStore,
   }
 })
@@ -84,8 +97,8 @@ vi.mock('./ContentRouter', () => ({
   ContentRouter: () => <section>content loaded</section>,
 }))
 
-vi.mock('./TabBar', () => ({
-  TabBar: () => <nav>tabs loaded</nav>,
+vi.mock('../../pages/Settings', () => ({
+  SettingsModal: () => <div>settings modal mounted</div>,
 }))
 
 vi.mock('./H5ConnectionView', () => ({
@@ -107,6 +120,8 @@ vi.mock('../shared/UpdateChecker', () => ({
 }))
 
 import { AppShell } from './AppShell'
+import { useProviderStore } from '../../stores/providerStore'
+import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 
 describe('AppShell boot flow', () => {
   beforeEach(() => {
@@ -116,13 +131,17 @@ describe('AppShell boot flow', () => {
     mocks.initializeDesktopServerUrl.mockResolvedValue('http://127.0.0.1:3456')
     mocks.fetchAll.mockResolvedValue(undefined)
     mocks.restoreTabs.mockResolvedValue(undefined)
+    mocks.listProviders.mockResolvedValue({ providers: [{ id: 'p1' }], activeId: 'p1' })
+    mocks.importStatus.mockResolvedValue({ offer: false, job: null })
+    useProviderStore.setState({ providers: [], activeId: null, hasLoadedProviders: false })
+    useClaudeCodeImportStore.setState({ status: null, job: null, error: null, promptOpen: false })
     mocks.setActiveTab.mockImplementation((sessionId: string) => {
       mocks.tabState.activeTabId = sessionId
     })
     mocks.tabState.activeTabId = null
     mocks.tabState.tabs = []
     useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
-    useUIStore.setState({ sidebarOpen: true })
+    useUIStore.setState({ sidebarOpen: true, settingsOpen: false })
   })
 
   it('renders the desktop chrome after server and settings bootstrap', async () => {
@@ -131,7 +150,7 @@ describe('AppShell boot flow', () => {
     expect(screen.getByText('app.launching')).toBeInTheDocument()
 
     expect(await screen.findByText('sidebar loaded')).toBeInTheDocument()
-    expect(screen.getByText('tabs loaded')).toBeInTheDocument()
+    expect(screen.getByText('settings modal mounted')).toBeInTheDocument()
     expect(screen.getByText('content loaded')).toBeInTheDocument()
     expect(screen.getByText('updates loaded')).toBeInTheDocument()
   })
@@ -308,20 +327,47 @@ describe('AppShell boot flow', () => {
     expect(screen.getByTestId('mobile-sidebar-toggle')).toHaveClass('h-10', 'w-10')
   })
 
-  it('keeps browser H5 mobile on chat tabs when settings was restored as active', async () => {
+  it('makes the page behind the settings window inert while it is open', async () => {
+    useUIStore.setState({ settingsOpen: true })
+
+    render(<AppShell />)
+
+    await screen.findByText('content loaded')
+    // The window drag strip stays usable; everything else in the main area is inert.
+    expect(document.querySelector('#content-area > [inert]')).not.toBeNull()
+    expect(screen.getByTestId('sidebar-shell')).toHaveAttribute('inert')
+  })
+
+  it('keeps browser H5 mobile on chat tabs when scheduled tasks was restored as active', async () => {
     mocks.isMobile = true
-    mocks.tabState.activeTabId = '__settings__'
+    mocks.tabState.activeTabId = '__scheduled__'
     mocks.tabState.tabs = [
-      { sessionId: '__settings__', title: 'Settings', type: 'settings', status: 'idle' },
+      { sessionId: '__scheduled__', title: 'Scheduled', type: 'scheduled', status: 'idle' },
       { sessionId: 'session-1', title: 'Existing session', type: 'session', status: 'idle' },
     ]
 
     render(<AppShell />)
 
     await screen.findByText('content loaded')
-    expect(screen.queryByText('tabs loaded')).not.toBeInTheDocument()
     await waitFor(() => {
       expect(mocks.setActiveTab).toHaveBeenCalledWith('session-1')
     })
+  })
+
+  it('shows the first-launch screen instead of the shell when no provider exists', async () => {
+    mocks.listProviders.mockResolvedValue({ providers: [], activeId: null })
+
+    render(<AppShell />)
+
+    expect(await screen.findByText('first launch')).toBeInTheDocument()
+    expect(screen.queryByText('sidebar loaded')).not.toBeInTheDocument()
+  })
+
+  it('shows the first-launch screen when the Claude Code import is offered', async () => {
+    mocks.importStatus.mockResolvedValue({ offer: true, job: null })
+
+    render(<AppShell />)
+
+    expect(await screen.findByText('first launch')).toBeInTheDocument()
   })
 })

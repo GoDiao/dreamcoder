@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import { RotateCw } from 'lucide-react'
-import { useSettingsStore, UI_ZOOM_DEFAULT, UI_ZOOM_MIN, UI_ZOOM_MAX, UI_ZOOM_STEP } from '../../stores/settingsStore'
+import { useState, useEffect } from 'react'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
-import { Dropdown } from '../shared/Dropdown'
+import { Switch } from '../shared/Switch'
+import { SegmentedControl } from '../shared/SegmentedControl'
+import { SettingsGroup, SettingsRow } from './SettingsRow'
+import { SettingsSelect } from './SettingsSelect'
+import { SettingsDisclosureRow } from './SettingsDisclosureRow'
+import { terminalApi } from '../../api/terminal'
 import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
@@ -25,23 +29,6 @@ import {
 const NETWORK_TIMEOUT_MIN_SECONDS = 5
 const NETWORK_TIMEOUT_MAX_SECONDS = 600
 const NETWORK_TIMEOUT_STEP_SECONDS = 30
-
-function SettingsCheckboxMark({ checked, disabled = false }: { checked: boolean; disabled?: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-brand)]/40 ${
-        checked
-          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] shadow-[var(--shadow-button-primary)]'
-          : 'border-[var(--color-border-focus)] bg-[var(--color-surface)] text-transparent'
-      } ${disabled ? 'opacity-50' : ''}`}
-    >
-      <span className="material-symbols-outlined text-[16px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
-        check
-      </span>
-    </span>
-  )
-}
 
 export function GeneralSettings() {
   const {
@@ -67,8 +54,7 @@ export function GeneralSettings() {
     appModeRequiresRestart,
     fetchAppMode,
     setAppMode: setAppModeAction,
-    uiZoom,
-    setUiZoom,
+    desktopTerminal,
   } = useSettingsStore()
   const t = useTranslation()
   const [webSearchDraft, setWebSearchDraft] = useState(webSearch)
@@ -84,13 +70,9 @@ export function GeneralSettings() {
   const [portableDirDraft, setPortableDirDraft] = useState('')
   const [modeActionRunning, setModeActionRunning] = useState(false)
   const [modeError, setModeError] = useState<string | null>(null)
-  const [uiZoomDraft, setUiZoomDraft] = useState(uiZoom)
-  const [isUiZoomDragging, setIsUiZoomDragging] = useState(false)
-  const isUiZoomDraggingRef = useRef(false)
+  const [storageChoice, setStorageChoice] = useState<AppMode>(appMode.mode)
   const addToast = useUIStore((s) => s.addToast)
   const webSearchDirty = JSON.stringify(webSearchDraft) !== JSON.stringify(webSearch)
-  const uiZoomPercent = Math.round(uiZoomDraft * 100)
-  const uiZoomRangeProgress = `${Math.round(((uiZoomDraft - UI_ZOOM_MIN) / (UI_ZOOM_MAX - UI_ZOOM_MIN)) * 1000) / 10}%`
   const activeConfigDir = appMode.activeConfigDir ?? (appMode.mode === 'portable' ? appMode.portableDir : null)
   const configDirSource = appMode.configDirSource ?? (appMode.mode === 'portable' ? 'portable' : 'system')
   const isEnvironmentConfigDir = configDirSource === 'environment'
@@ -106,10 +88,8 @@ export function GeneralSettings() {
   }, [network])
 
   useEffect(() => {
-    if (!isUiZoomDragging) {
-      setUiZoomDraft(uiZoom)
-    }
-  }, [isUiZoomDragging, uiZoom])
+    setStorageChoice(appMode.mode)
+  }, [appMode.mode])
 
   useEffect(() => {
     let cancelled = false
@@ -130,12 +110,12 @@ export function GeneralSettings() {
     setPortableDirDraft(appMode.portableDir ?? appMode.defaultPortableDir ?? '')
   }, [appMode.defaultPortableDir, appMode.portableDir])
 
-  const EFFORT_LABELS: Record<EffortLevel, string> = {
-    low: t('settings.general.effort.low'),
-    medium: t('settings.general.effort.medium'),
-    high: t('settings.general.effort.high'),
-    max: t('settings.general.effort.max'),
-  }
+  const EFFORT_OPTIONS: Array<{ value: EffortLevel; label: string }> = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'max', label: 'Max' },
+  ]
 
   const LANGUAGES: Array<{ value: Locale; label: string }> = [
     { value: 'en', label: 'English' },
@@ -166,8 +146,6 @@ export function GeneralSettings() {
     { value: 'swedish', label: 'Svenska (Swedish)' },
     { value: 'norwegian', label: 'Norsk (Norwegian)' },
   ]
-  const selectedResponseLanguageLabel =
-    RESPONSE_LANGUAGES.find(({ value }) => value === responseLanguage)?.label ?? RESPONSE_LANGUAGES[0]!.label
 
   const THEMES: Array<{ value: ThemeMode; label: string }> = [
     { value: 'white', label: t('settings.general.appearance.white') },
@@ -378,249 +356,115 @@ export function GeneralSettings() {
     }
   }
 
-  const setUiZoomDraggingState = (dragging: boolean) => {
-    isUiZoomDraggingRef.current = dragging
-    setIsUiZoomDragging(dragging)
-  }
-
-  const commitUiZoom = (value: number) => {
-    const nextZoom = Number.isFinite(value) ? value : UI_ZOOM_DEFAULT
-    setUiZoomDraggingState(false)
-    setUiZoomDraft(nextZoom)
-    setUiZoom(nextZoom)
-  }
-
-  const renderZoomShortcut = (modifier: string) => (
-    <span className="inline-flex items-center gap-1">
-      <kbd className="settings-zoom-kbd">{modifier}</kbd>
-      <kbd className="settings-zoom-kbd">+</kbd>
-      <span>/</span>
-      <kbd className="settings-zoom-kbd">{modifier}</kbd>
-      <kbd className="settings-zoom-kbd">-</kbd>
-      <span>/</span>
-      <kbd className="settings-zoom-kbd">{modifier}</kbd>
-      <kbd className="settings-zoom-kbd">0</kbd>
-    </span>
-  )
-
-  const uiZoomSection = (
-    <div className="mt-8">
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.uiZoom')}</h2>
-          <p className="text-sm text-[var(--color-text-tertiary)]">{t('settings.general.uiZoomDescription')}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--color-text-tertiary)]">
-            <span>{t('settings.general.uiZoomShortcutHint')}</span>
-            <span>{t('settings.general.uiZoomShortcutMac')}</span>
-            {renderZoomShortcut('⌘')}
-            <span>{t('settings.general.uiZoomShortcutWindows')}</span>
-            {renderZoomShortcut('Ctrl')}
-            <span>{t('settings.general.uiZoomShortcutResetHint')}</span>
-          </div>
-        </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <span className="min-w-[48px] rounded-md bg-[var(--color-surface-container-low)] px-2 py-1 text-center text-sm font-medium text-[var(--color-text-secondary)]">
-            {uiZoomPercent}%
-          </span>
-          <button
-            type="button"
-            aria-label={t('settings.general.uiZoomReset')}
-            title={t('settings.general.uiZoomReset')}
-            onClick={() => {
-              setIsUiZoomDragging(false)
-              setUiZoomDraft(UI_ZOOM_DEFAULT)
-              setUiZoom(UI_ZOOM_DEFAULT)
-            }}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] px-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-          >
-            <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
-            100%
-          </button>
-        </div>
-      </div>
-      <div
-        className={`settings-zoom-control flex items-center gap-3 ${isUiZoomDragging ? 'is-dragging' : ''}`}
-        style={{ '--settings-zoom-range-progress': uiZoomRangeProgress } as CSSProperties}
-      >
-        <span className="w-9 text-right text-xs text-[var(--color-text-tertiary)]">{Math.round(UI_ZOOM_MIN * 100)}%</span>
-        <div className="settings-zoom-range-wrap flex-1">
-          <div className="settings-zoom-preview" aria-hidden="true">
-            {uiZoomPercent}%
-          </div>
-          <input
-            type="range"
-            aria-label={t('settings.general.uiZoom')}
-            min={UI_ZOOM_MIN}
-            max={UI_ZOOM_MAX}
-            step={UI_ZOOM_STEP}
-            value={uiZoomDraft}
-            onPointerDown={() => {
-              setUiZoomDraggingState(true)
-            }}
-            onPointerUp={(e) => commitUiZoom(e.currentTarget.valueAsNumber)}
-            onPointerCancel={() => {
-              setUiZoomDraggingState(false)
-              setUiZoomDraft(uiZoom)
-            }}
-            onChange={(e) => {
-              const nextZoom = Number.isFinite(e.currentTarget.valueAsNumber)
-                ? e.currentTarget.valueAsNumber
-                : UI_ZOOM_DEFAULT
-              setUiZoomDraft(nextZoom)
-              if (!isUiZoomDraggingRef.current) {
-                setUiZoom(nextZoom)
-              }
-            }}
-            onBlur={(e) => {
-              if (uiZoomDraft !== uiZoom) {
-                commitUiZoom(e.currentTarget.valueAsNumber)
-              } else {
-                setUiZoomDraggingState(false)
-              }
-            }}
-            className="settings-zoom-range w-full"
-          />
-        </div>
-        <span className="w-9 text-xs text-[var(--color-text-tertiary)]">{Math.round(UI_ZOOM_MAX * 100)}%</span>
-      </div>
-    </div>
-  )
+  const proxyModeLabel = (mode: 'system' | 'manual') =>
+    mode === 'manual' ? t('settings.general.networkProxyModeManual') : t('settings.general.networkProxyModeSystem')
+  const webSearchModeLabel = (mode: WebSearchMode | undefined) =>
+    WEB_SEARCH_MODES.find((item) => item.value === (mode ?? 'auto'))?.label ?? WEB_SEARCH_MODES[0]!.label
+  const shellSummary = (() => {
+    const shell = desktopTerminal?.startupShell ?? 'system'
+    if (shell === 'system') return t('settings.terminal.shell.system')
+    if (shell === 'custom') return t('settings.terminal.shell.custom')
+    if (shell === 'pwsh' || shell === 'powershell' || shell === 'cmd') return t(`settings.terminal.shell.${shell}`)
+    return shell
+  })()
+  const storageSummary = isEnvironmentConfigDir
+    ? 'DREAMCODER_CONFIG_DIR'
+    : appMode.mode === 'portable'
+      ? t('settings.general.storagePortableShort')
+      : t('settings.general.storageSystemShort')
+  const storageApplyDisabled =
+    modeActionRunning ||
+    (storageChoice === appMode.mode &&
+      (storageChoice === 'default' || portableDirDraft.trim() === (appMode.portableDir ?? '')))
+  const showShellRow = isTauriRuntime() && terminalApi.isAvailable()
 
   return (
-    <div className="max-w-xl">
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.appearanceTitle')}</h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.appearanceDescription')}</p>
-      <div className="grid grid-cols-2 gap-2 mb-8 sm:grid-cols-3">
-        {THEMES.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => void setTheme(value)}
-            aria-pressed={theme === value}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
-              theme === value
-                ? 'bg-[image:var(--gradient-btn-primary)] text-[var(--color-btn-primary-fg)] border-transparent shadow-[var(--shadow-button-primary)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.languageTitle')}</h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.languageDescription')}</p>
-      <div className="flex gap-2 mb-8">
-        {LANGUAGES.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setLocale(value)}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
-              locale === value
-                ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.responseLangTitle')}</h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.responseLangDescription')}</p>
-      <Dropdown<string>
-        items={RESPONSE_LANGUAGES}
-        value={responseLanguage}
-        onChange={(value) => void setResponseLanguage(value)}
-        width="100%"
-        maxHeight={320}
-        className="mb-8 block w-full"
-        trigger={
-          <button
-            type="button"
-            aria-label={t('settings.general.responseLangTitle')}
-            className="flex h-10 w-full items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-left text-sm text-[var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-container-low)] focus-visible:border-[var(--color-border-focus)] focus-visible:shadow-[var(--shadow-focus-ring)]"
-          >
-            <span className="min-w-0 flex-1 truncate">{selectedResponseLanguageLabel}</span>
-            <span className="material-symbols-outlined flex-shrink-0 text-[18px] text-[var(--color-text-secondary)]">expand_more</span>
-          </button>
-        }
-      />
-
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.effortTitle')}</h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.effortDescription')}</p>
-      <div className="flex gap-2">
-        {(['low', 'medium', 'high', 'max'] as EffortLevel[]).map((level) => (
-          <button
-            key={level}
-            onClick={() => setEffort(level)}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
-              effortLevel === level
-                ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            {EFFORT_LABELS[level]}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.thinkingTitle')}</h2>
-        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.thinkingDescription')}</p>
-        <label className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3 cursor-pointer hover:border-[var(--color-border-focus)] transition-colors">
-          <input
-            type="checkbox"
-            aria-label={t('settings.general.thinkingEnabled')}
-            checked={thinkingEnabled}
-            onChange={(e) => void setThinkingEnabled(e.target.checked)}
-            className="peer sr-only"
-          />
-          <SettingsCheckboxMark checked={thinkingEnabled} />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-[var(--color-text-primary)]">
-              {t('settings.general.thinkingEnabled')}
-            </div>
-            <div className="text-xs text-[var(--color-text-tertiary)] mt-1 leading-5">
-              {t('settings.general.thinkingHint')}
-            </div>
-          </div>
-        </label>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.notificationsTitle')}</h2>
-        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.notificationsDescription')}</p>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              aria-label={t('settings.general.notificationsEnabled')}
-              checked={desktopNotificationsEnabled}
-              onChange={(e) => void handleDesktopNotificationsToggle(e.target.checked)}
-              className="peer sr-only"
+    <div>
+      <SettingsGroup title={t('settings.general.groupAppearance')}>
+        <SettingsRow
+          title={t('settings.general.colorTheme')}
+          control={
+            <SettingsSelect<ThemeMode>
+              label={t('settings.general.colorTheme')}
+              options={THEMES}
+              value={theme}
+              onChange={(value) => void setTheme(value)}
             />
-            <SettingsCheckboxMark checked={desktopNotificationsEnabled} />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-[var(--color-text-primary)]">
-                {t('settings.general.notificationsEnabled')}
-              </div>
-              <div className="text-xs text-[var(--color-text-tertiary)] mt-1 leading-5">
-                {desktopNotificationsEnabled
-                  ? t('settings.general.notificationsHintOn')
-                  : t('settings.general.notificationsHintOff')}
-              </div>
-            </div>
-          </label>
-          {desktopNotificationsEnabled && (
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--color-border)]/60 pt-3">
-              <div className="min-w-0 text-xs text-[var(--color-text-tertiary)]">
-                {t('settings.general.notificationsStatus')}: {notificationStatusLabel[notificationPermission]}
-              </div>
-              {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+          }
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={t('settings.general.groupLanguageModel')}>
+        <SettingsRow
+          title={t('settings.general.interfaceLanguage')}
+          control={
+            <SettingsSelect<Locale>
+              label={t('settings.general.interfaceLanguage')}
+              options={LANGUAGES}
+              value={locale}
+              onChange={(value) => setLocale(value)}
+            />
+          }
+        />
+        <SettingsRow
+          title={t('settings.general.responseLangTitle')}
+          description={t('settings.general.responseLangDescription')}
+          control={
+            <SettingsSelect<string>
+              label={t('settings.general.responseLangTitle')}
+              options={RESPONSE_LANGUAGES}
+              value={responseLanguage}
+              onChange={(value) => void setResponseLanguage(value)}
+            />
+          }
+        />
+        <SettingsRow
+          title={t('settings.general.effortTitle')}
+          description={t('settings.general.effortDescription')}
+          control={
+            <SegmentedControl<EffortLevel>
+              label={t('settings.general.effortTitle')}
+              options={EFFORT_OPTIONS}
+              value={effortLevel}
+              onChange={(level) => setEffort(level)}
+            />
+          }
+        />
+        <SettingsRow
+          title={t('settings.general.thinkingTitle')}
+          description={t('settings.general.thinkingDescription')}
+          control={
+            <Switch
+              label={t('settings.general.thinkingEnabled')}
+              checked={thinkingEnabled}
+              onChange={(checked) => void setThinkingEnabled(checked)}
+            />
+          }
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={t('settings.general.groupNotifications')}>
+        <SettingsRow
+          title={t('settings.general.notificationsTitle')}
+          description={t('settings.general.notificationsDescription')}
+          control={
+            <Switch
+              label={t('settings.general.notificationsEnabled')}
+              checked={desktopNotificationsEnabled}
+              onChange={(checked) => void handleDesktopNotificationsToggle(checked)}
+            />
+          }
+        />
+        {desktopNotificationsEnabled && (
+          <SettingsRow
+            title={t('settings.general.notificationsPermission')}
+            description={`${t('settings.general.notificationsStatus')}: ${notificationStatusLabel[notificationPermission]}`}
+            control={
+              notificationPermission !== 'granted' && notificationPermission !== 'unsupported' ? (
                 <Button
-                  size="sm"
+                  size="xs"
                   variant="secondary"
-                  className="px-3 whitespace-nowrap"
+                  className="whitespace-nowrap"
                   disabled={notificationActionRunning}
                   onClick={() => void handleNotificationPermissionAction()}
                 >
@@ -628,24 +472,14 @@ export function GeneralSettings() {
                     ? t('settings.general.notificationsOpenSettings')
                     : t('settings.general.notificationsAuthorize')}
                 </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+              ) : null
+            }
+          />
+        )}
+      </SettingsGroup>
 
-      {isTauriRuntime() && (
-        <div className="mt-8">
-          <TerminalShellSettings />
-        </div>
-      )}
-
-      {uiZoomSection}
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.networkTitle')}</h2>
-        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.networkDescription')}</p>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-4">
+      <SettingsGroup title={t('settings.general.groupAdvanced')}>
+        <SettingsDisclosureRow title={t('settings.general.networkTitle')} summary={proxyModeLabel(network.proxy.mode)}>
           <ProxyConfigForm
             mode={networkDraft.proxy.mode}
             url={networkDraft.proxy.url}
@@ -653,6 +487,7 @@ export function GeneralSettings() {
             isSaving={isSavingNetwork}
             error={networkSaveError}
             labels={{
+              modeTitle: t('settings.general.networkProxy'),
               modeSystemLabel: t('settings.general.networkProxyModeSystem'),
               modeSystemDesc: t('settings.general.networkProxyModeSystemDescription'),
               modeManualLabel: t('settings.general.networkProxyModeManual'),
@@ -680,252 +515,211 @@ export function GeneralSettings() {
               setNetworkSaveError(null)
             }}
             onSave={() => void saveNetworkSettings()}
-          />
-
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <label htmlFor="network-timeout-seconds" className="text-sm font-medium text-[var(--color-text-primary)]">
-                {t('settings.general.networkTimeout')}
-              </label>
-              <span className="rounded-md bg-[var(--color-surface)] px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
-                {t('settings.general.networkTimeoutValue', { seconds: String(timeoutSeconds) })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="h-10 w-10 px-0"
-                aria-label={t('settings.general.networkTimeoutDecrease')}
-                onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) - NETWORK_TIMEOUT_STEP_SECONDS)}
-              >
-                -30
-              </Button>
-              <div className="relative min-w-0 flex-1">
-                <input
-                  id="network-timeout-seconds"
-                  type="number"
-                  min={NETWORK_TIMEOUT_MIN_SECONDS}
-                  max={NETWORK_TIMEOUT_MAX_SECONDS}
-                  step={1}
-                  inputMode="numeric"
-                  value={networkTimeoutInput}
-                  aria-invalid={networkTimeoutError ? true : undefined}
-                  aria-describedby="network-timeout-help"
-                  onChange={(event) => {
-                    const nextValue = event.currentTarget.value
-                    if (!/^\d*$/.test(nextValue)) return
-                    setNetworkTimeoutInput(nextValue)
-                    const seconds = Number(nextValue)
-                    if (nextValue.length > 0 && seconds >= NETWORK_TIMEOUT_MIN_SECONDS && seconds <= NETWORK_TIMEOUT_MAX_SECONDS) {
-                      setNetworkDraft((current) => ({
-                        ...current,
-                        aiRequestTimeoutMs: seconds * 1000,
-                      }))
-                    }
-                    setNetworkSaveError(null)
-                  }}
-                  className={`h-10 w-full rounded-[var(--radius-md)] border bg-[var(--color-surface)] px-3 pr-12 text-sm text-[var(--color-text-primary)] outline-none transition-colors duration-150 placeholder:text-[var(--color-text-tertiary)] ${
-                    networkTimeoutError
-                      ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
-                      : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]'
-                  }`}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-tertiary)]">
-                  {t('settings.general.networkTimeoutUnit')}
+          >
+            <div className="mt-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label htmlFor="network-timeout-seconds" className="text-xs text-[var(--color-text-secondary)]">
+                  {t('settings.general.networkTimeout')}
+                </label>
+                <span className="text-xs text-[var(--color-text-tertiary)]">
+                  {t('settings.general.networkTimeoutValue', { seconds: String(timeoutSeconds) })}
                 </span>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="h-10 w-10 px-0"
-                aria-label={t('settings.general.networkTimeoutIncrease')}
-                onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) + NETWORK_TIMEOUT_STEP_SECONDS)}
-              >
-                +30
-              </Button>
-            </div>
-            <p
-              id="network-timeout-help"
-              className={`mt-2 text-xs leading-5 ${networkTimeoutError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}
-            >
-              {networkTimeoutError ?? t('settings.general.networkTimeoutHint')}
-            </p>
-          </div>
-
-          {networkSaveError && (
-            <p className="mt-2 text-[11px] leading-4 text-[var(--color-error)]">
-              {networkSaveError}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.webFetchPreflightTitle')}</h2>
-        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.webFetchPreflightDescription')}</p>
-        <label className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3 cursor-pointer hover:border-[var(--color-border-focus)] transition-colors">
-          <input
-            type="checkbox"
-            aria-label={t('settings.general.webFetchPreflightEnabled')}
-            checked={skipWebFetchPreflight}
-            onChange={(e) => void setSkipWebFetchPreflight(e.target.checked)}
-            className="peer sr-only"
-          />
-          <SettingsCheckboxMark checked={skipWebFetchPreflight} />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-[var(--color-text-primary)]">
-              {t('settings.general.webFetchPreflightEnabled')}
-            </div>
-            <div className="text-xs text-[var(--color-text-tertiary)] mt-1 leading-5">
-              {t('settings.general.webFetchPreflightHint')}
-            </div>
-          </div>
-        </label>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.webSearchTitle')}</h2>
-        <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.webSearchDescription')}</p>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-4">
-          <div className="grid grid-cols-5 gap-1.5 mb-4">
-            {WEB_SEARCH_MODES.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setWebSearchDraft({ ...webSearchDraft, mode: value })}
-                className={`h-9 px-2 text-xs font-semibold rounded-lg border transition-all truncate ${
-                  (webSearchDraft.mode ?? 'auto') === value
-                    ? 'bg-[var(--color-brand)] text-[var(--color-btn-primary-fg)] border-[var(--color-brand)]'
-                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                }`}
-                title={label}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            <Input
-              id="web-search-tavily-key"
-              type="password"
-              label={t('settings.general.webSearchTavilyKey')}
-              value={webSearchDraft.tavilyApiKey ?? ''}
-              placeholder="tvly-..."
-              autoComplete="off"
-              onChange={(event) =>
-                setWebSearchDraft({
-                  ...webSearchDraft,
-                  tavilyApiKey: event.target.value,
-                })
-              }
-            />
-            <div className="-mt-1 flex items-center justify-between gap-3 text-xs text-[var(--color-text-tertiary)]">
-              <span>{t('settings.general.webSearchTavilyFreeHint')}</span>
-              <a
-                href="https://app.tavily.com/home"
-                target="_blank"
-                rel="noreferrer"
-                aria-label={t('settings.general.webSearchTavilyApiKeyLink')}
-                className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
-              >
-                {t('settings.general.webSearchGetApiKey')}
-              </a>
-            </div>
-            <Input
-              id="web-search-brave-key"
-              type="password"
-              label={t('settings.general.webSearchBraveKey')}
-              value={webSearchDraft.braveApiKey ?? ''}
-              placeholder={t('settings.general.webSearchBravePlaceholder')}
-              autoComplete="off"
-              onChange={(event) =>
-                setWebSearchDraft({
-                  ...webSearchDraft,
-                  braveApiKey: event.target.value,
-                })
-              }
-            />
-            <div className="-mt-1 flex items-center justify-between gap-3 text-xs text-[var(--color-text-tertiary)]">
-              <span>{t('settings.general.webSearchBraveFreeHint')}</span>
-              <a
-                href="https://api-dashboard.search.brave.com/app/keys"
-                target="_blank"
-                rel="noreferrer"
-                aria-label={t('settings.general.webSearchBraveApiKeyLink')}
-                className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
-              >
-                {t('settings.general.webSearchGetApiKey')}
-              </a>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            <p className="text-xs text-[var(--color-text-tertiary)] leading-5">
-              {t('settings.general.webSearchHint')}
-            </p>
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="min-w-[72px] px-4 whitespace-nowrap"
-                disabled={!webSearchDirty}
-                onClick={() => void setWebSearch(webSearchDraft)}
-              >
-                {t('settings.general.webSearchSave')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {isTauriRuntime() && (
-        <div className="mt-8 border-t border-[var(--color-border)] pt-8">
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.general.storageTitle')}</h2>
-          <p className="text-sm text-[var(--color-text-tertiary)] mb-3">{t('settings.general.storageDescription')}</p>
-
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-4">
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isEnvironmentConfigDir) {
-                    setModeError(t('settings.general.storageEnvironmentSwitchBlocked'))
-                    return
-                  }
-                  if (appMode.mode !== 'default') {
-                    openModeSwitchConfirm('default')
-                  }
-                }}
-                aria-pressed={appMode.mode === 'default' && !isEnvironmentConfigDir}
-                className={`flex items-start gap-3 rounded-lg border px-3 py-3 text-left transition-all ${
-                  appMode.mode === 'default' && !isEnvironmentConfigDir
-                    ? 'border-[var(--color-brand)] bg-[var(--color-surface)] shadow-[var(--shadow-focus-ring)]'
-                    : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-focus)]'
-                }`}
-              >
-                <span className="material-symbols-outlined mt-0.5 text-[20px] text-[var(--color-text-secondary)]">settings_applications</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.general.storageSystemTitle')}</span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--color-text-tertiary)]">{t('settings.general.storageSystemDescription')}</span>
-                </span>
-              </button>
-
-              <div
-                className={`rounded-lg border px-3 py-3 transition-all ${
-                  appMode.mode === 'portable' && !isEnvironmentConfigDir
-                    ? 'border-[var(--color-brand)] bg-[var(--color-surface)] shadow-[var(--shadow-focus-ring)]'
-                    : 'border-[var(--color-border)] bg-[var(--color-surface)]'
-                }`}
-              >
-                <div className="mb-3 flex items-start gap-3">
-                  <span className="material-symbols-outlined mt-0.5 text-[20px] text-[var(--color-text-secondary)]">drive_file_move</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.general.storagePortableTitle')}</div>
-                    <div className="mt-1 text-xs leading-5 text-[var(--color-text-tertiary)]">{t('settings.general.storagePortableDescription')}</div>
-                  </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  className="w-12 px-0"
+                  aria-label={t('settings.general.networkTimeoutDecrease')}
+                  onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) - NETWORK_TIMEOUT_STEP_SECONDS)}
+                >
+                  -30
+                </Button>
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    id="network-timeout-seconds"
+                    type="number"
+                    min={NETWORK_TIMEOUT_MIN_SECONDS}
+                    max={NETWORK_TIMEOUT_MAX_SECONDS}
+                    step={1}
+                    inputMode="numeric"
+                    value={networkTimeoutInput}
+                    aria-invalid={networkTimeoutError ? true : undefined}
+                    aria-describedby="network-timeout-help"
+                    onChange={(event) => {
+                      const nextValue = event.currentTarget.value
+                      if (!/^\d*$/.test(nextValue)) return
+                      setNetworkTimeoutInput(nextValue)
+                      const seconds = Number(nextValue)
+                      if (nextValue.length > 0 && seconds >= NETWORK_TIMEOUT_MIN_SECONDS && seconds <= NETWORK_TIMEOUT_MAX_SECONDS) {
+                        setNetworkDraft((current) => ({
+                          ...current,
+                          aiRequestTimeoutMs: seconds * 1000,
+                        }))
+                      }
+                      setNetworkSaveError(null)
+                    }}
+                    className={`h-9 w-full rounded-[var(--radius-md)] border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
+                      networkTimeoutError
+                        ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
+                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]'
+                    }`}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-tertiary)]">
+                    {t('settings.general.networkTimeoutUnit')}
+                  </span>
                 </div>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  className="w-12 px-0"
+                  aria-label={t('settings.general.networkTimeoutIncrease')}
+                  onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) + NETWORK_TIMEOUT_STEP_SECONDS)}
+                >
+                  +30
+                </Button>
+              </div>
+              <p
+                id="network-timeout-help"
+                className={`mt-1.5 text-xs leading-[1.5] ${networkTimeoutError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}
+              >
+                {networkTimeoutError ?? t('settings.general.networkTimeoutHint')}
+              </p>
+            </div>
+          </ProxyConfigForm>
+        </SettingsDisclosureRow>
 
+        <SettingsDisclosureRow title={t('settings.general.webSearchFetchTitle')} summary={webSearchModeLabel(webSearch.mode)}>
+          <SettingsRow
+            title={t('settings.general.webSearchMode')}
+            description={t('settings.general.webSearchHint')}
+            control={
+              <SettingsSelect<WebSearchMode>
+                label={t('settings.general.webSearchMode')}
+                options={WEB_SEARCH_MODES}
+                value={webSearchDraft.mode ?? 'auto'}
+                onChange={(mode) => setWebSearchDraft({ ...webSearchDraft, mode })}
+              />
+            }
+          />
+          <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+            <div>
+              <Input
+                id="web-search-tavily-key"
+                type="password"
+                label={t('settings.general.webSearchTavilyKey')}
+                value={webSearchDraft.tavilyApiKey ?? ''}
+                placeholder="tvly-..."
+                autoComplete="off"
+                onChange={(event) =>
+                  setWebSearchDraft({
+                    ...webSearchDraft,
+                    tavilyApiKey: event.target.value,
+                  })
+                }
+              />
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+                <span>{t('settings.general.webSearchTavilyFreeHint')}</span>
+                <a
+                  href="https://app.tavily.com/home"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t('settings.general.webSearchTavilyApiKeyLink')}
+                  className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
+                >
+                  {t('settings.general.webSearchGetApiKey')}
+                </a>
+              </div>
+            </div>
+            <div>
+              <Input
+                id="web-search-brave-key"
+                type="password"
+                label={t('settings.general.webSearchBraveKey')}
+                value={webSearchDraft.braveApiKey ?? ''}
+                placeholder={t('settings.general.webSearchBravePlaceholder')}
+                autoComplete="off"
+                onChange={(event) =>
+                  setWebSearchDraft({
+                    ...webSearchDraft,
+                    braveApiKey: event.target.value,
+                  })
+                }
+              />
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+                <span>{t('settings.general.webSearchBraveFreeHint')}</span>
+                <a
+                  href="https://api-dashboard.search.brave.com/app/keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t('settings.general.webSearchBraveApiKeyLink')}
+                  className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
+                >
+                  {t('settings.general.webSearchGetApiKey')}
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              size="xs"
+              variant="secondary"
+              className="whitespace-nowrap"
+              disabled={!webSearchDirty}
+              onClick={() => void setWebSearch(webSearchDraft)}
+            >
+              {t('settings.general.webSearchSave')}
+            </Button>
+          </div>
+          <SettingsRow
+            className="mt-2 border-t border-[var(--color-border-separator)]"
+            title={t('settings.general.webFetchPreflightEnabled')}
+            description={t('settings.general.webFetchPreflightDescription')}
+            control={
+              <Switch
+                label={t('settings.general.webFetchPreflightEnabled')}
+                checked={skipWebFetchPreflight}
+                onChange={(checked) => void setSkipWebFetchPreflight(checked)}
+              />
+            }
+          />
+        </SettingsDisclosureRow>
+
+        {showShellRow && (
+          <SettingsDisclosureRow title={t('settings.general.defaultShell')} summary={shellSummary}>
+            <TerminalShellSettings />
+          </SettingsDisclosureRow>
+        )}
+
+        {isTauriRuntime() && (
+          <SettingsDisclosureRow title={t('settings.general.storageTitle')} summary={storageSummary}>
+            <SettingsRow
+              title={t('settings.general.storageMode')}
+              description={
+                storageChoice === 'portable'
+                  ? t('settings.general.storagePortableDescription')
+                  : t('settings.general.storageSystemDescription')
+              }
+              control={
+                <SettingsSelect<AppMode>
+                  label={t('settings.general.storageMode')}
+                  options={[
+                    { value: 'default', label: t('settings.general.storageSystemShort') },
+                    { value: 'portable', label: t('settings.general.storagePortableShort') },
+                  ]}
+                  value={storageChoice}
+                  onChange={(mode) => {
+                    setStorageChoice(mode)
+                    setModeError(null)
+                  }}
+                />
+              }
+            />
+
+            {storageChoice === 'portable' && (
+              <div className="mt-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Input
@@ -942,44 +736,35 @@ export function GeneralSettings() {
                   </div>
                   <Button
                     type="button"
+                    size="xs"
                     variant="secondary"
-                    className="h-10 flex-shrink-0 px-3 whitespace-nowrap"
+                    className="mb-1 flex-shrink-0 whitespace-nowrap"
                     onClick={() => void openPortableDirPicker()}
                   >
                     {t('settings.general.storageChooseDir')}
                   </Button>
                 </div>
-
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-[var(--color-brand)] hover:underline"
-                    onClick={() => {
-                      setPortableDirDraft(appMode.defaultPortableDir ?? '')
-                      setModeError(null)
-                    }}
-                  >
-                    {t('settings.general.storageUseDefaultPortableDir')}
-                  </button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={modeActionRunning || (appMode.mode === 'portable' && portableDirDraft.trim() === (appMode.portableDir ?? ''))}
-                    onClick={() => openModeSwitchConfirm('portable')}
-                  >
-                    {t('settings.general.storageApplyPortable')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {activeConfigDir && (
-              <div className="mt-3 rounded-lg border border-[var(--color-border)]/70 bg-[var(--color-surface)] px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-text-tertiary)]">{t('settings.general.storageActiveDir')}</div>
-                <div className="mt-1 break-all font-mono text-xs text-[var(--color-text-secondary)]">{activeConfigDir}</div>
+                <button
+                  type="button"
+                  className="mt-2 text-xs font-medium text-[var(--color-brand)] hover:underline"
+                  onClick={() => {
+                    setPortableDirDraft(appMode.defaultPortableDir ?? '')
+                    setModeError(null)
+                  }}
+                >
+                  {t('settings.general.storageUseDefaultPortableDir')}
+                </button>
               </div>
             )}
+
+            <div className="mt-4 border-l-2 border-[var(--color-border)] py-1 pl-3 text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+              {activeConfigDir && (
+                <div>
+                  {t('settings.general.storageActiveDir')}: <span className="break-all font-mono">{activeConfigDir}</span>
+                </div>
+              )}
+              <div>{t('settings.general.storageMoveHint')}</div>
+            </div>
 
             {isEnvironmentConfigDir && (
               <div className="mt-3 rounded-lg border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
@@ -993,20 +778,30 @@ export function GeneralSettings() {
               </div>
             )}
 
-            <div className="mt-3 text-xs leading-5 text-[var(--color-text-tertiary)]">
-              {t('settings.general.storageMoveHint')}
-            </div>
-
-            <ClaudeCodeImportSettings />
-
             {modeError && (
-              <div className="mt-3 text-xs text-[var(--color-error)]">
+              <div className="mt-3 text-xs text-[var(--color-error)]" role="alert">
                 {modeError}
               </div>
             )}
-          </div>
-        </div>
-      )}
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                size="xs"
+                variant="secondary"
+                disabled={storageApplyDisabled}
+                onClick={() => openModeSwitchConfirm(storageChoice)}
+              >
+                {storageChoice === 'portable'
+                  ? t('settings.general.storageApplyPortable')
+                  : t('settings.general.storageApply')}
+              </Button>
+            </div>
+          </SettingsDisclosureRow>
+        )}
+
+        {isTauriRuntime() && <ClaudeCodeImportSettings />}
+      </SettingsGroup>
 
       <ConfirmDialog
         open={modeSwitchConfirmOpen}

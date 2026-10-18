@@ -19,6 +19,32 @@ describe('tabStore', () => {
     }
   }
 
+  it('closing the current tab lands on the empty page, not a neighbour', () => {
+    const store = useTabStore.getState()
+    store.openTab('a', 'A')
+    store.openTab('b', 'B')
+    store.openTab('c', 'C')
+    store.setActiveTab('b')
+
+    useTabStore.getState().closeTab('b')
+
+    expect(useTabStore.getState().activeTabId).toBeNull()
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['a', 'c'])
+  })
+
+  it('reopening a tab moves it to the end and dropTabs keeps the active one', () => {
+    const store = useTabStore.getState()
+    store.openTab('a', 'A')
+    store.openTab('b', 'B')
+    store.openTab('a', 'A again')
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['b', 'a'])
+
+    useTabStore.getState().dropTabs(['a', 'b'])
+
+    expect(useTabStore.getState().activeTabId).toBe('a')
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['a'])
+  })
+
   it('restores a quick-switched tab beyond 200 sessions with its title and active selection', async () => {
     useTabStore.getState().openTab('session-2', 'Cached recent title')
     useTabStore.getState().openTab('session-204', 'Cached old title')
@@ -53,9 +79,10 @@ describe('tabStore', () => {
   })
 
   it('continues through empty pages, exhausts the server total, and removes only missing sessions', async () => {
-    useTabStore.getState().openTab('__settings__', 'Settings', 'settings')
+    useTabStore.getState().openTab('__scheduled__', 'Scheduled', 'scheduled')
     useTabStore.getState().openTab('old', 'Cached old title')
     useTabStore.getState().openTab('deleted', 'Missing session')
+    useTabStore.getState().setActiveTab('__scheduled__')
     useTabStore.setState({ tabs: [], activeTabId: null })
     const list = vi.spyOn(sessionsApi, 'list')
       .mockResolvedValueOnce({ sessions: [session('unrelated')], total: 401 })
@@ -65,12 +92,11 @@ describe('tabStore', () => {
     await useTabStore.getState().restoreTabs()
 
     expect(list.mock.calls.map(([params]) => params?.offset)).toEqual([0, 200, 400])
-    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__settings__', 'old'])
-    expect(useTabStore.getState().activeTabId).toBe('__settings__')
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__scheduled__', 'old'])
+    expect(useTabStore.getState().activeTabId).toBe('__scheduled__')
   })
 
   it('restores only special tabs without listing sessions', async () => {
-    useTabStore.getState().openTab('__settings__', 'Settings', 'settings')
     useTabStore.getState().openTab('__scheduled__', 'Scheduled', 'scheduled')
     useTabStore.setState({ tabs: [], activeTabId: null })
     const list = vi.spyOn(sessionsApi, 'list')
@@ -78,8 +104,25 @@ describe('tabStore', () => {
     await useTabStore.getState().restoreTabs()
 
     expect(list).not.toHaveBeenCalled()
-    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__settings__', '__scheduled__'])
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__scheduled__'])
     expect(useTabStore.getState().activeTabId).toBe('__scheduled__')
+  })
+
+  it('drops retired settings and terminal tabs from older persisted state', async () => {
+    localStorage.setItem('dreamcoder-open-tabs', JSON.stringify({
+      openTabs: [
+        { sessionId: '__settings__', title: 'Settings', type: 'settings' },
+        { sessionId: '__terminal__1-abc', title: 'Terminal 1', type: 'terminal' },
+        { sessionId: 'kept', title: 'Kept', type: 'session' },
+      ],
+      activeTabId: '__settings__',
+    }))
+    vi.spyOn(sessionsApi, 'list').mockResolvedValue({ sessions: [session('kept')], total: 1 })
+
+    await useTabStore.getState().restoreTabs()
+
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['kept'])
+    expect(useTabStore.getState().activeTabId).toBe('kept')
   })
 
   it('keeps persisted tabs intact when a later page fails so restore can be retried', async () => {
@@ -112,21 +155,5 @@ describe('tabStore', () => {
       type: 'session',
     })
     expect(useTabStore.getState().activeTabId).toBe('session-1')
-  })
-
-  it('stores a promoted terminal runtime id on new terminal tabs', () => {
-    const tabId = useTabStore.getState().openTerminalTab('/tmp/project', '__session_terminal__session-1')
-
-    expect(useTabStore.getState().tabs).toEqual([
-      {
-        sessionId: tabId,
-        title: 'Terminal 1',
-        type: 'terminal',
-        status: 'idle',
-        terminalCwd: '/tmp/project',
-        terminalRuntimeId: '__session_terminal__session-1',
-      },
-    ])
-    expect(useTabStore.getState().activeTabId).toBe(tabId)
   })
 })

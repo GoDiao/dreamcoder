@@ -73,6 +73,19 @@ describe('AskUserQuestion', () => {
     })
   })
 
+  it('renders nothing for empty input and then shows questions once they stream in', () => {
+    const view = render(<AskUserQuestion toolUseId="tool-1" input={{}} />)
+    expect(view.container.innerHTML).toBe('')
+
+    view.rerender(
+      <AskUserQuestion
+        toolUseId="tool-1"
+        input={{ questions: [{ question: 'Should we persist data?', options: [{ label: 'No' }, { label: 'Yes' }] }] }}
+      />,
+    )
+    expect(screen.getByText('Should we persist data?')).toBeTruthy()
+  })
+
   it('submits answers through permission_response updatedInput instead of sending a chat message', () => {
     render(
       <AskUserQuestion
@@ -336,7 +349,7 @@ describe('AskUserQuestion', () => {
 
     const textarea = screen.getByPlaceholderText('Type your answer...')
     expect(textarea.tagName).toBe('TEXTAREA')
-    expect(textarea.getAttribute('rows')).toBe('3')
+    expect(textarea.getAttribute('rows')).toBe('2')
 
     fireEvent.change(textarea, {
       target: { value: 'First restored context line\nSecond restored context line' },
@@ -394,5 +407,67 @@ describe('AskUserQuestion', () => {
     expect(screen.queryByPlaceholderText('Type your answer...')).toBeNull()
     expect(screen.queryByRole('button', { name: /submit/i })).toBeNull()
     expect(screen.getByText(/Tool permission request failed: AbortError/)).toBeTruthy()
+  })
+
+  it('steps through multiple questions with progress and submits once all are answered', () => {
+    render(
+      <AskUserQuestion
+        toolUseId="tool-1"
+        input={{
+          questions: [
+            { header: 'Scope', question: 'Which platforms?', options: [{ label: 'Desktop' }, { label: 'Both' }] },
+            { header: 'Plan', question: 'What first?', options: [{ label: 'Mockup' }, { label: 'Code' }] },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByText('0 / 2 answered')).toBeTruthy()
+    const submit = screen.getByRole('button', { name: /submit/i }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Previous' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Desktop$/ }))
+    expect(screen.getByText('1 / 2 answered')).toBeTruthy()
+    expect(submit.disabled).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('button', { name: /2 · Plan/ }).getAttribute('aria-current')).toBe('step')
+    fireEvent.click(screen.getByRole('button', { name: /^Code$/ }))
+
+    expect(screen.getByText('2 / 2 answered')).toBeTruthy()
+    expect(submit.disabled).toBe(false)
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeTruthy()
+  })
+
+  it('marks multi-select questions and shows the answered record without an edit action', () => {
+    const { rerender } = render(
+      <AskUserQuestion
+        toolUseId="tool-1"
+        input={{ questions: [{ question: 'Which checks?', multiSelect: true, options: [{ label: 'Lint' }, { label: 'Tests' }] }] }}
+      />,
+    )
+
+    expect(screen.getByText('Multiple choice')).toBeTruthy()
+
+    rerender(
+      <AskUserQuestion
+        toolUseId="tool-1"
+        input={{
+          questions: [
+            { header: 'Scope', question: 'Which platforms?', options: [{ label: 'Desktop' }] },
+            { header: 'Plan', question: 'What first?', options: [{ label: 'Mockup' }] },
+          ],
+        }}
+        result={{ answers: { 'Which platforms?': 'Desktop', 'What first?': 'Mockup' } }}
+      />,
+    )
+
+    const record = screen.getByTestId('ask-user-question-answered')
+    expect(record.textContent).toContain('Scope')
+    expect(record.textContent).toContain('Desktop')
+    expect(record.textContent).toContain('Mockup')
+    expect(screen.getByText('View original questions')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

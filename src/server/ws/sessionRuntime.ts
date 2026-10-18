@@ -18,6 +18,12 @@ export type SessionTitleState = {
 export type RuntimeOverride = {
   providerId: string | null
   modelId: string
+  /** Per-session reasoning effort; falls back to the global setting when absent. */
+  effort?: string
+}
+
+export function isSameRuntimeOverride(a: RuntimeOverride, b: RuntimeOverride): boolean {
+  return a.providerId === b.providerId && a.modelId === b.modelId && a.effort === b.effort
 }
 
 export type SessionStreamState = {

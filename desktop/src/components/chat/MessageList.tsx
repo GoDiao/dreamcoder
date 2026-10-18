@@ -5,7 +5,7 @@ import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
-import { SETTINGS_TAB_ID, useTabStore } from '../../stores/tabStore'
+import { useTabStore } from '../../stores/tabStore'
 import { useTeamStore } from '../../stores/teamStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
@@ -725,8 +725,7 @@ function memoryFileLabel(path: string) {
 function openMemorySettings(path?: string) {
   const ui = useUIStore.getState()
   if (path) ui.setPendingMemoryPath(path)
-  ui.setPendingSettingsTab('memory')
-  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+  ui.openSettings('memory')
 }
 
 function MemoryEventCard({ message }: { message: MemoryEvent }) {

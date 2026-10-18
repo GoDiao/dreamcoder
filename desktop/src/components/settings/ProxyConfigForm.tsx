@@ -1,9 +1,13 @@
+import type { ReactNode } from 'react'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
+import { SettingsRow } from './SettingsRow'
+import { SettingsSelect } from './SettingsSelect'
 
 type ProxyMode = 'system' | 'manual'
 
 type ProxyConfigFormLabels = {
+  modeTitle: string
   modeSystemLabel: string
   modeSystemDesc: string
   modeManualLabel: string
@@ -27,6 +31,8 @@ type ProxyConfigFormProps = {
   onModeChange: (mode: ProxyMode) => void
   onUrlChange: (url: string) => void
   onSave: () => void
+  /** Extra fields shown between the proxy URL and the save button. */
+  children?: ReactNode
 }
 
 export function ProxyConfigForm({
@@ -39,6 +45,7 @@ export function ProxyConfigForm({
   onModeChange,
   onUrlChange,
   onSave,
+  children,
 }: ProxyConfigFormProps) {
   const proxyUrl = url.trim()
   const proxyError =
@@ -50,32 +57,24 @@ export function ProxyConfigForm({
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2">
-        {([
-          { value: 'system' as const, label: labels.modeSystemLabel, description: labels.modeSystemDesc },
-          { value: 'manual' as const, label: labels.modeManualLabel, description: labels.modeManualDesc },
-        ]).map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => onModeChange(item.value)}
-            aria-pressed={mode === item.value}
-            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-              mode === item.value
-                ? 'border-[var(--color-brand)] bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            <div className="text-xs font-semibold">{item.label}</div>
-            <div className="mt-1 text-[11px] leading-4 text-[var(--color-text-tertiary)]">
-              {item.description}
-            </div>
-          </button>
-        ))}
-      </div>
+      <SettingsRow
+        title={labels.modeTitle}
+        description={mode === 'manual' ? labels.modeManualDesc : labels.modeSystemDesc}
+        control={
+          <SettingsSelect<ProxyMode>
+            label={labels.modeTitle}
+            options={[
+              { value: 'system', label: labels.modeSystemLabel },
+              { value: 'manual', label: labels.modeManualLabel },
+            ]}
+            value={mode}
+            onChange={onModeChange}
+          />
+        }
+      />
 
       {mode === 'manual' && (
-        <div className="mt-4">
+        <div className="mt-3">
           <Input
             label={labels.urlLabel}
             value={url}
@@ -85,21 +84,23 @@ export function ProxyConfigForm({
             onChange={(event) => onUrlChange(event.target.value)}
           />
           {!proxyError && (
-            <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-tertiary)]">
+            <p className="mt-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
               {labels.urlHint}
             </p>
           )}
         </div>
       )}
 
+      {children}
+
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="min-w-0 text-[11px] leading-4 text-[var(--color-text-tertiary)]">
+        <p className="min-w-0 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
           {labels.scopeHint}
         </p>
         <Button
-          size="sm"
+          size="xs"
           variant="secondary"
-          className="min-w-[72px] px-4 whitespace-nowrap"
+          className="whitespace-nowrap"
           disabled={!isDirty || !!proxyError || isSaving}
           loading={isSaving}
           onClick={onSave}
@@ -109,7 +110,7 @@ export function ProxyConfigForm({
       </div>
 
       {error && (
-        <p className="mt-2 text-[11px] leading-4 text-[var(--color-error)]">
+        <p className="mt-2 text-xs leading-[1.5] text-[var(--color-error)]">
           {error}
         </p>
       )}

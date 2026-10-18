@@ -1,11 +1,10 @@
 import { memo, useEffect, useState } from 'react'
-import { BookMarked, ChevronDown, ChevronRight, Settings } from 'lucide-react'
+import { BookMarked, Check, ChevronDown, ChevronRight, CircleAlert, CircleDot, Settings, Square } from 'lucide-react'
 import { ToolCallBlock } from './ToolCallBlock'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { Modal } from '../shared/Modal'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
-import { SETTINGS_TAB_ID, useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import { AGENT_LIFECYCLE_TYPES } from '../../types/team'
@@ -357,36 +356,26 @@ function AgentToolGroup({
     <div className="mb-2">
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-border)]/40 bg-[var(--color-surface-container-low)] px-3 py-1.5 text-left transition-colors hover:bg-[var(--color-surface-container-high)]"
+        className={TOOL_SUMMARY_CLASS}
       >
-        <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">
-          {expanded ? 'expand_less' : 'expand_more'}
-        </span>
-        <span className="flex-1 truncate text-[12px] text-[var(--color-text-secondary)]">
+        <ChevronRight size={13} aria-hidden="true" className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+        {isAnyRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
+        {!isAnyRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
+        {!isAnyRunning && !errorPresent && allComplete && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
+        {!isAnyRunning && !errorPresent && !allComplete && !anyStopped && <CircleDot size={13} aria-hidden="true" className="shrink-0" />}
+        {!isAnyRunning && !errorPresent && !allComplete && anyStopped && <Square size={12} aria-hidden="true" className="shrink-0" />}
+        <span className="min-w-0 truncate">
           {toolCalls.length === 1 ? t('toolGroup.agentOne') : t('toolGroup.agentMany', { count: toolCalls.length })}
         </span>
         {isAnyRunning && (
-          <span className="rounded-full bg-[var(--color-warning)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-warning)]">
-            {t('agentStatus.running')}
-          </span>
-        )}
-        {!isAnyRunning && errorPresent && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-error)]">error</span>
-        )}
-        {!isAnyRunning && !errorPresent && allComplete && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]">check_circle</span>
-        )}
-        {!isAnyRunning && !errorPresent && !allComplete && !anyStopped && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">pending</span>
-        )}
-        {!isAnyRunning && !errorPresent && !allComplete && anyStopped && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">stop_circle</span>
+          <span className="shrink-0 text-[var(--color-text-tertiary)] before:mr-1 before:content-['·']">{t('agentStatus.running')}</span>
         )}
       </button>
 
       {expanded && (
-        <div className="relative mt-3 pl-5">
+        <div className="relative mt-2 pl-5">
           <div className="absolute bottom-6 left-[11px] top-4 w-px rounded-full bg-[var(--color-border)]/45" />
           <div className="space-y-2">
             {toolCalls.map((toolCall) => (
@@ -430,28 +419,19 @@ function ToolCallGroupMulti({ toolCalls, resultMap, childToolCallsByParent, isSt
     <div className="mb-2">
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-border)]/40 bg-[var(--color-surface-container-low)] px-3 py-1.5 text-left transition-colors hover:bg-[var(--color-surface-container-high)]"
+        className={TOOL_SUMMARY_CLASS}
       >
-        <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)]">
-          {expanded ? 'expand_less' : 'expand_more'}
-        </span>
-        <span className="flex-1 truncate text-[12px] text-[var(--color-text-secondary)]">
-          {summary}
-        </span>
-        {!isRunning && !errorPresent && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]">check_circle</span>
-        )}
-        {!isRunning && errorPresent && (
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-error)]">error</span>
-        )}
-        {isRunning && (
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-brand)] animate-pulse-dot" />
-        )}
+        <ChevronRight size={13} aria-hidden="true" className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+        {!isRunning && !errorPresent && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
+        {!isRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
+        {isRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
+        <span className="min-w-0 truncate">{summary}</span>
       </button>
 
       {expanded && (
-        <div className="mt-1.5 space-y-1">
+        <div className="mb-1 ml-[6px] mt-1.5 space-y-1 border-l border-[var(--color-border)] pl-[18px]">
           {toolCalls.map((tc) => {
             return (
               <ToolCallTree
@@ -670,11 +650,13 @@ function ToolCallTree({
   )
 }
 
+const TOOL_SUMMARY_CLASS =
+  'flex min-h-7 w-full items-center gap-2 rounded-md text-left text-ui-aux text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]'
+
 function openMemorySettings(path?: string) {
   const ui = useUIStore.getState()
   if (path) ui.setPendingMemoryPath(path)
-  ui.setPendingSettingsTab('memory')
-  useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+  ui.openSettings('memory')
 }
 
 function getMemoryToolActivity(

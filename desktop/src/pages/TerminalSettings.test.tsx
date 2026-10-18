@@ -285,4 +285,38 @@ describe('TerminalSettings', () => {
 
     expect(await screen.findByText('Path does not exist. Select a valid Bash executable.')).toBeInTheDocument()
   })
+
+  it('renders the docked panel layout with icon actions, leading tabs and a meta line', async () => {
+    terminalMocks.available = true
+    const onShellChange = vi.fn()
+
+    render(
+      <TerminalSettings
+        docked
+        runtimeId="docked-runtime"
+        toolbarLeading={<span>tabs-slot</span>}
+        meta="dreamcoder · main"
+        onShellChange={onShellChange}
+      />,
+    )
+
+    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalled())
+    expect(screen.getByText('tabs-slot')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-meta')).toHaveTextContent('dreamcoder · main')
+    expect(screen.queryByText('Terminal')).not.toBeInTheDocument()
+    await waitFor(() => expect(onShellChange).toHaveBeenCalledWith('/bin/zsh'))
+
+    const clear = screen.getByRole('button', { name: 'Clear' })
+    expect(clear).toHaveAttribute('title', 'Clear')
+    fireEvent.click(clear)
+    expect(terminalMocks.terminalInstance.clear).toHaveBeenCalled()
+
+    const restart = screen.getByRole('button', { name: 'Restart' })
+    expect(restart).toHaveAttribute('title', 'Restart')
+    await act(async () => {
+      fireEvent.click(restart)
+    })
+    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalledTimes(2))
+    destroyTerminalRuntime('docked-runtime')
+  })
 })

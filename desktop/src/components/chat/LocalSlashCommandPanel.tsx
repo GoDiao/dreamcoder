@@ -9,7 +9,6 @@ import {
 } from '../../api/sessions'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { SETTINGS_TAB_ID, useTabStore } from '../../stores/tabStore'
 import { useMcpStore } from '../../stores/mcpStore'
 import { useSkillStore } from '../../stores/skillStore'
 import type { McpServerRecord } from '../../types/mcp'
@@ -412,12 +411,10 @@ function memoryContextFileLabel(path: string) {
 }
 
 function MemoryFilesBreakdown({ files, t }: { files: ContextMemoryFile[]; t: Translate }) {
-  const setPendingSettingsTab = useUIStore((state) => state.setPendingSettingsTab)
   const setPendingMemoryPath = useUIStore((state) => state.setPendingMemoryPath)
   const openSettings = (path?: string) => {
     if (path) setPendingMemoryPath(path)
-    setPendingSettingsTab('memory')
-    useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+    useUIStore.getState().openSettings('memory')
   }
 
   if (files.length === 0) {
@@ -843,7 +840,6 @@ function SessionInspectorPanel({
 
 function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
   const t = useTranslation()
-  const setPendingSettingsTab = useUIStore((s) => s.setPendingSettingsTab)
   const selectServer = useMcpStore((s) => s.selectServer)
   const [servers, setServers] = useState<McpServerRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -920,8 +916,7 @@ function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
                     key={`${server.scope}:${server.projectPath ?? 'global'}:${server.name}`}
                     onClick={() => {
                       selectServer(server)
-                      setPendingSettingsTab('mcp')
-                      useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+                      useUIStore.getState().openSettings('mcp')
                       onClose()
                     }}
                     className="block w-full border-t border-[var(--color-border)] px-4 py-4 text-left first:border-t-0 hover:bg-[var(--color-surface-hover)]"
@@ -954,7 +949,6 @@ function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
 
 function SkillsPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
   const t = useTranslation()
-  const setPendingSettingsTab = useUIStore((s) => s.setPendingSettingsTab)
   const fetchSkillDetail = useSkillStore((s) => s.fetchSkillDetail)
   const [skills, setSkills] = useState<SkillMeta[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -995,8 +989,7 @@ function SkillsPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
               key={`${skill.source}:${skill.name}`}
               onClick={async () => {
                 await fetchSkillDetail(skill.source, skill.name, cwd, 'skills')
-                setPendingSettingsTab('skills')
-                useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+                useUIStore.getState().openSettings('skills')
                 onClose()
               }}
               className="block w-full border-t border-[var(--color-border)] px-4 py-4 text-left first:border-t-0 hover:bg-[var(--color-surface-hover)]"

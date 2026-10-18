@@ -36,7 +36,7 @@ export function SkillDetail() {
     const returnTab = selectedSkillReturnTab
     clearSelection()
     if (returnTab === 'plugins') {
-      useUIStore.getState().setPendingSettingsTab('plugins')
+      useUIStore.getState().openSettings('plugins')
     }
   }
 

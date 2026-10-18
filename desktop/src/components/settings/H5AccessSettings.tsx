@@ -5,6 +5,9 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { Button } from '../shared/Button'
+import { Switch } from '../shared/Switch'
+import { SettingsRow } from './SettingsRow'
+import { SettingsPageHeader } from './SettingsPageHeader'
 import { Input } from '../shared/Input'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { copyTextToClipboard } from '../chat/clipboard'
@@ -212,61 +215,41 @@ export function H5AccessSettings() {
   }
 
   return (
-    <div className="max-w-3xl">
-      <section aria-labelledby="h5-access-title" role="region">
-        <div className="mb-5 flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] text-[var(--color-brand)]">
-            <QrCode className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <h2
-              id="h5-access-title"
-              className="text-base font-semibold text-[var(--color-text-primary)] mb-1"
-            >
-              {t('settings.general.h5AccessTitle')}
-            </h2>
-            <p className="text-sm text-[var(--color-text-tertiary)]">
-              {t('settings.general.h5AccessDescription')}
-            </p>
-          </div>
-        </div>
+    <div className="min-w-0">
+      <section aria-labelledby="h5-access-title">
+        <SettingsPageHeader
+          titleId="h5-access-title"
+          title={t('settings.general.h5AccessTitle')}
+          description={t('settings.general.h5AccessDescription')}
+        />
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <label className="flex min-w-0 items-start gap-3">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+        <div>
+          <SettingsRow
+            title={t('settings.general.h5AccessEnabled')}
+            description={
+              <>
+                <span className={h5Access.enabled ? 'text-[var(--color-success)]' : undefined}>
+                  {h5Access.enabled ? t('settings.general.h5AccessStatusEnabled') : t('settings.general.h5AccessDisabledValue')}
+                </span>
+                {' · '}
+                {t('settings.general.h5AccessEnabledHint')}
+              </>
+            }
+            control={
+              <Switch
+                label={t('settings.general.h5AccessEnabled')}
                 checked={h5Access.enabled}
                 disabled={h5ActionRunning}
-                aria-label={t('settings.general.h5AccessEnabled')}
-                onChange={(event) => {
-                  if (event.target.checked) {
+                onChange={(checked) => {
+                  if (checked) {
                     setH5EnableConfirmOpen(true)
                   } else {
                     void handleH5Disable()
                   }
                 }}
               />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-[var(--color-text-primary)]">
-                  {t('settings.general.h5AccessEnabled')}
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--color-text-tertiary)]">
-                  {t('settings.general.h5AccessEnabledHint')}
-                </span>
-              </span>
-            </label>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                h5Access.enabled
-                  ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
-                  : 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)] border border-[var(--color-border)]'
-              }`}
-            >
-              {h5Access.enabled ? t('settings.general.h5AccessStatusEnabled') : t('settings.general.h5AccessDisabledValue')}
-            </span>
-          </div>
+            }
+          />
 
           {h5AccessDiagnostics?.storedHostStaleness === 'unreachable' && h5AccessDiagnostics.storedPublicBaseUrl ? (
             <div
@@ -288,7 +271,7 @@ export function H5AccessSettings() {
               {h5AccessDiagnostics.suggestedHost && (
                 <div className="mt-2">
                   <Button
-                    size="sm"
+                    size="xs"
                     variant="primary"
                     loading={h5ActionRunning}
                     onClick={() => void handleH5SwitchToSuggestedHost()}
@@ -313,6 +296,7 @@ export function H5AccessSettings() {
           ) : null}
 
           <div className="mt-4 grid grid-cols-1 gap-3">
+            <h3 className="text-[13px] font-medium text-[var(--color-text-secondary)]">{t('settings.h5.addressTitle')}</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
               <Input
                 id="h5-access-public-url"
@@ -330,11 +314,11 @@ export function H5AccessSettings() {
               />
             </div>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-[var(--color-text-tertiary)]">
+              <p className="text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
                 {t('settings.general.h5AccessOpenHint')}
               </p>
               <Button
-                size="sm"
+                size="xs"
                 variant="secondary"
                 onClick={() => void handleH5SettingsSave()}
                 disabled={!h5AccessDirty || h5ActionRunning}
@@ -346,18 +330,18 @@ export function H5AccessSettings() {
           </div>
 
           {h5AccessUrl && (
-            <div className="mt-4 border-t border-[var(--color-border)]/60 pt-4">
+            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-4">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+                  <div className="text-xs text-[var(--color-text-secondary)]">
                     {t('settings.general.h5AccessUrl')}
                   </div>
-                  <div className="mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] break-all">
+                  <div className="mt-1 break-all font-mono text-xs text-[var(--color-text-primary)]">
                     {h5AccessUrl}
                   </div>
                 </div>
                 <Button
-                  size="sm"
+                  size="xs"
                   variant="secondary"
                   className="shrink-0"
                   icon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -371,7 +355,7 @@ export function H5AccessSettings() {
           )}
 
           {h5Access.enabled && h5AccessUrl && (
-            <div className="mt-4 border-t border-[var(--color-border)]/60 pt-4">
+            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-4">
               <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="flex h-48 w-48 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white p-3">
                   {h5QrDataUrl ? (
@@ -390,7 +374,7 @@ export function H5AccessSettings() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium uppercase text-[var(--color-text-tertiary)]">
+                  <div className="text-xs text-[var(--color-text-secondary)]">
                     {t('settings.general.h5AccessQrTitle')}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-[var(--color-text-tertiary)]">
@@ -399,13 +383,13 @@ export function H5AccessSettings() {
                       : t('settings.general.h5AccessQrRefreshHint')}
                   </p>
                   {h5LaunchUrl && (
-                    <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] break-all">
+                    <div className="mt-2 break-all font-mono text-xs text-[var(--color-text-primary)]">
                       {h5LaunchUrl}
                     </div>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
-                      size="sm"
+                      size="xs"
                       variant="secondary"
                       icon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
                       disabled={!h5LaunchUrl || !h5GeneratedToken}
@@ -414,7 +398,7 @@ export function H5AccessSettings() {
                       {t('settings.general.h5AccessCopyLaunchUrl')}
                     </Button>
                     <Button
-                      size="sm"
+                      size="xs"
                       variant={h5GeneratedToken ? 'secondary' : 'primary'}
                       icon={<RotateCw className="h-3.5 w-3.5" aria-hidden="true" />}
                       loading={h5ActionRunning}
@@ -429,13 +413,13 @@ export function H5AccessSettings() {
           )}
 
           {h5Access.enabled && (
-            <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
+            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-medium uppercase text-[var(--color-text-tertiary)]">
+                  <div className="text-xs text-[var(--color-text-secondary)]">
                     {t('settings.general.h5AccessTokenPreview')}
                   </div>
-                  <div className="mt-1 break-all text-sm text-[var(--color-text-primary)]">
+                  <div className="mt-px break-all text-[13px] text-[var(--color-text-primary)]">
                     {h5TokenVisible && h5GeneratedToken
                       ? h5GeneratedToken
                       : h5Access.tokenPreview || t('settings.general.h5AccessTokenNotAvailable')}
@@ -443,7 +427,7 @@ export function H5AccessSettings() {
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
                   <Button
-                    size="sm"
+                    size="xs"
                     variant="secondary"
                     icon={h5TokenVisible ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
                     disabled={!h5GeneratedToken}
@@ -452,7 +436,7 @@ export function H5AccessSettings() {
                     {h5TokenVisible ? t('settings.general.h5AccessHideToken') : t('settings.general.h5AccessShowToken')}
                   </Button>
                   <Button
-                    size="sm"
+                    size="xs"
                     variant="danger"
                     icon={<PowerOff className="h-3.5 w-3.5" aria-hidden="true" />}
                     loading={h5ActionRunning}
@@ -465,7 +449,7 @@ export function H5AccessSettings() {
             </div>
           )}
 
-          <p className="mt-4 text-xs text-[var(--color-text-tertiary)] leading-5">
+          <p className="mt-4 border-l-2 border-[var(--color-border)] py-1.5 pl-3 text-xs leading-[1.7] text-[var(--color-text-secondary)]">
             {t('settings.general.h5AccessSafetyNote')}
           </p>
           {h5AccessError && (

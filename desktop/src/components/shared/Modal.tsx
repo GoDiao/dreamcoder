@@ -1,6 +1,42 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
+type EscapeLayer = { onEscape: () => void }
+
+const escapeLayers: EscapeLayer[] = []
+
+/**
+ * Closes the topmost open layer (modal, settings window...) on Escape.
+ * Listens on window so menus and dropdowns, which listen on document or in
+ * React handlers, run first; a layer is skipped when they called
+ * preventDefault, and only the most recently opened layer reacts.
+ */
+export function useEscapeLayer(active: boolean, onEscape: () => void) {
+  const onEscapeRef = useRef(onEscape)
+
+  useEffect(() => {
+    onEscapeRef.current = onEscape
+  }, [onEscape])
+
+  useEffect(() => {
+    if (!active) return
+    const layer: EscapeLayer = { onEscape: () => onEscapeRef.current() }
+    escapeLayers.push(layer)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      if (escapeLayers[escapeLayers.length - 1] !== layer) return
+      event.preventDefault()
+      layer.onEscape()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      const index = escapeLayers.indexOf(layer)
+      if (index >= 0) escapeLayers.splice(index, 1)
+    }
+  }, [active])
+}
+
 type ModalProps = {
   open: boolean
   onClose: () => void
@@ -40,14 +76,7 @@ export function Modal({ open, onClose, title, children, width = 560, footer, onE
     onClose()
   }, [onClose, open])
 
-  useEffect(() => {
-    if (!open) return
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose()
-    }
-    document.addEventListener('keydown', handleEsc)
-    return () => document.removeEventListener('keydown', handleEsc)
-  }, [handleClose, open])
+  useEscapeLayer(open, handleClose)
 
   if (!mounted) return null
 

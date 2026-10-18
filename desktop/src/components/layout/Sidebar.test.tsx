@@ -96,6 +96,19 @@ vi.mock('../../i18n', () => ({
       'session.timeMinutes': '{n}m ago',
       'session.timeHours': '{n}h ago',
       'session.timeDays': '{n}d ago',
+      'sidebar.more': 'More',
+      'sidebar.language': 'Language',
+      'sidebar.projectManagement': 'Projects & sessions',
+      'sidebar.shortcuts': 'Keyboard shortcuts',
+      'sidebar.backToMore': 'Back',
+      'sidebar.sessionActions': 'Actions for {title}',
+      'sidebar.organizationMode': 'Organize by',
+      'sidebar.manageDone': 'Done',
+      'sidebar.pinnedBadge': 'Pinned',
+      'sidebar.hiddenBadge': 'Hidden',
+      'shortcuts.groupGeneral': 'General',
+      'shortcuts.commandPalette': 'Switch session',
+      'shortcuts.stopGeneration': 'Stop generating',
     }
 
     let text = translations[key] ?? key
@@ -111,6 +124,7 @@ import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import type { SessionListItem } from '../../types/session'
 
 const PROJECT_ORDER_STORAGE_KEY = 'dreamcoder-sidebar-project-order'
@@ -158,6 +172,11 @@ function projectGroupNames(): string[] {
       if (text.includes('gamma')) return 'gamma'
       return text
     })
+}
+
+function openProjectManagement() {
+  fireEvent.click(screen.getByRole('button', { name: 'More' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Projects & sessions' }))
 }
 
 describe('Sidebar', () => {
@@ -279,13 +298,13 @@ describe('Sidebar', () => {
     expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.queryByText('/workspace/alpha')).not.toBeInTheDocument()
     expect(screen.getByText('beta')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Alpha newest/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Alpha hidden/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Alpha newest/ }).closest('[class*="pl-0"]')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha newest/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Alpha hidden/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha newest/ }).closest('[class*="pl-0"]')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand display' }))
 
-    expect(screen.getByRole('button', { name: /Alpha hidden/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha hidden/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Collapse display' })).toBeInTheDocument()
   })
 
@@ -309,7 +328,7 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand display' }))
-    expect(screen.getByRole('button', { name: /Alpha hidden/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha hidden/ })).toBeInTheDocument()
     expect(projectGroupNames().slice(0, 3)).toEqual(['alpha', 'beta', 'gamma'])
 
     const dataTransfer = makeDataTransfer()
@@ -333,7 +352,7 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(projectGroupNames().slice(0, 3)).toEqual(['alpha', 'gamma', 'beta'])
     })
-    expect(screen.getByRole('button', { name: /Alpha hidden/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha hidden/ })).toBeInTheDocument()
     expect(JSON.parse(window.localStorage.getItem(PROJECT_ORDER_STORAGE_KEY) ?? '[]').slice(0, 3)).toEqual([
       '/workspace/alpha',
       '/workspace/gamma',
@@ -374,8 +393,8 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Collapse alpha' }))
 
     expect(screen.getByText('alpha')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Alpha Session/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Beta Session/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Alpha Session/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Beta Session/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Expand alpha' })).toBeInTheDocument()
   })
 
@@ -459,9 +478,8 @@ describe('Sidebar', () => {
 
     expect(projectGroupNames().slice(0, 2)).toEqual(['alpha', 'beta'])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project menu' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sort condition' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Created time' }))
+    openProjectManagement()
+    fireEvent.click(screen.getByRole('radio', { name: 'Created time' }))
 
     await waitFor(() => {
       expect(desktopUiPreferencesApiMock.updateSidebarPreferences).toHaveBeenCalledWith({
@@ -476,7 +494,7 @@ describe('Sidebar', () => {
     expect(window.localStorage.getItem(PROJECT_SORT_STORAGE_KEY)).toBe('createdAt')
   })
 
-  it('hides archive-all from the project header menu', () => {
+  it('keeps only the add-project plus in the projects header', () => {
     const now = new Date().toISOString()
     useSessionStore.setState({
       sessions: [
@@ -487,15 +505,14 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project menu' }))
-
+    const header = screen.getByTestId('sidebar-projects-header')
+    expect(within(header).getAllByRole('button')).toHaveLength(1)
+    expect(within(header).getByRole('button', { name: 'New project' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Project menu' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Archive all chats' })).not.toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Organize sidebar' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Sort condition' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('keeps project row actions hidden until project hover or focus', () => {
+  it('shows the project new-session plus without hover and no per-project menu button', () => {
     useSessionStore.setState({
       sessions: [
         makeSession('alpha-1', 'Alpha Session', '/workspace/alpha', new Date().toISOString()),
@@ -504,10 +521,12 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    const actionButton = screen.getByRole('button', { name: 'Project actions for alpha' })
-    expect(actionButton.parentElement).toHaveClass('opacity-0')
-    expect(actionButton.parentElement).toHaveClass('group-hover/project:opacity-100')
-    expect(actionButton.parentElement).toHaveClass('group-focus-within/project:opacity-100')
+    const row = screen.getByTestId('sidebar-project-row-workspace-alpha')
+    const plus = within(row).getByRole('button', { name: 'New session in alpha' })
+    expect(row).toHaveClass('sidebar-row')
+    expect(plus).toHaveClass('sidebar-row-action')
+    expect(plus.parentElement).toBe(row)
+    expect(screen.queryByRole('button', { name: 'Project actions for alpha' })).not.toBeInTheDocument()
   })
 
   it('shows the project action menu with pin and Finder actions', async () => {
@@ -520,7 +539,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project actions for alpha' }))
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Collapse alpha' }))
 
     expect(screen.getByRole('menuitem', { name: 'Pin Project' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Open in Finder' })).toBeInTheDocument()
@@ -550,7 +569,7 @@ describe('Sidebar', () => {
 
     expect(projectGroupNames().slice(0, 2)).toEqual(['alpha', 'beta'])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project actions for beta' }))
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Collapse beta' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Pin Project' }))
 
     await waitFor(() => {
@@ -570,7 +589,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project actions for beta' }))
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Collapse beta' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Hide from Sidebar' }))
 
     await waitFor(() => {
@@ -603,7 +622,7 @@ describe('Sidebar', () => {
     expect(screen.queryByTestId('project-filter')).not.toBeInTheDocument()
   })
 
-  it('restores hidden projects from the project header menu', async () => {
+  it('restores hidden projects from the project management dialog', async () => {
     window.localStorage.setItem(PROJECT_HIDDEN_STORAGE_KEY, JSON.stringify(['/workspace/beta']))
     const now = new Date().toISOString()
     useSessionStore.setState({
@@ -618,11 +637,11 @@ describe('Sidebar', () => {
     expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.queryByText('beta')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project menu' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore hidden projects (1)' }))
+    openProjectManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Restore hidden projects (1)' }))
 
     await waitFor(() => {
-      expect(screen.getByText('beta')).toBeInTheDocument()
+      expect(within(screen.getByRole('complementary')).getByText('beta')).toBeInTheDocument()
     })
     expect(JSON.parse(window.localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')).toEqual([])
     expect(desktopUiPreferencesApiMock.updateSidebarPreferences).toHaveBeenCalledWith({
@@ -754,7 +773,7 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     expect(screen.getByText('alpha')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Alpha Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Alpha Session/ })).toBeInTheDocument()
   })
 
   it('keeps persisted worktree sessions under the source project group', () => {
@@ -776,9 +795,9 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     expect(screen.getByText('repo')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Source Session/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Worktree Session/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Subdir Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Source Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Worktree Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Subdir Session/ })).toBeInTheDocument()
     expect(screen.getAllByText('worktree')).toHaveLength(1)
   })
 
@@ -795,8 +814,8 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('D:')).toBeInTheDocument()
     expect(screen.getByText('SomeProject')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Drive Root Session/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Drive Project Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Drive Root Session/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Drive Project Session/ })).toBeInTheDocument()
   })
 
   it('does not restore a hidden Windows drive root when creating a child project session', async () => {
@@ -826,7 +845,7 @@ describe('Sidebar', () => {
     expect(desktopUiPreferencesApiMock.updateSidebarPreferences).not.toHaveBeenCalled()
   })
 
-  it('right-aligns running status, worktree marker, and update time on session rows', () => {
+  it('shows running status and worktree marker on session rows without update time', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-19T12:00:00.000Z'))
 
@@ -849,14 +868,15 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    const runningRow = screen.getByRole('button', { name: /Running Worktree/ })
+    const runningRow = screen.getByRole('button', { name: /^Running Worktree/ })
     expect(within(runningRow).getByLabelText('Session running')).toBeInTheDocument()
     expect(within(runningRow).getByText('worktree')).toHaveClass('sr-only')
-    expect(within(runningRow).getByText('5h ago')).toBeInTheDocument()
+    expect(runningRow).toHaveAttribute('title', 'Running Worktree')
+    expect(screen.queryByText(/ago$/)).not.toBeInTheDocument()
 
-    const idleRow = screen.getByRole('button', { name: /Idle Source/ })
+    const idleRow = screen.getByRole('button', { name: /^Idle Source/ })
     expect(within(idleRow).queryByLabelText('Session running')).not.toBeInTheDocument()
-    expect(within(idleRow).getByText('20m ago')).toBeInTheDocument()
+    expect(idleRow).toHaveAttribute('title', 'Idle Source')
   })
 
   it('shows a toast when session creation fails', async () => {
@@ -901,9 +921,9 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: /Open Session/ }))
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Open Session/ }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(deleteSession).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog')
@@ -964,9 +984,10 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Batch manage' }))
-    fireEvent.click(screen.getByRole('button', { name: /First Session/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Second Session/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for First Session' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Batch manage' }))
+    fireEvent.click(screen.getByRole('button', { name: /^First Session/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Second Session/ }))
 
     expect(screen.getByText('2 selected')).toBeInTheDocument()
 
@@ -1035,13 +1056,15 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
+    openProjectManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Batch manage' }))
-    fireEvent.click(screen.getByRole('button', { name: /First Session/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^First Session/ }))
 
-    expect(screen.getByRole('button', { name: /First Session/ }).parentElement).toHaveClass('mb-0.5')
-    expect(screen.getByRole('button', { name: /First Session/ })).toHaveClass('sidebar-session-row--selected')
-    expect(screen.getByRole('button', { name: /Second Session/ })).toHaveClass('sidebar-session-row--active')
-    expect(screen.getByRole('button', { name: /Third Session/ })).toHaveClass('sidebar-session-row--idle')
+    expect(screen.getByTestId('sidebar-session-row-session-1').parentElement).toHaveClass('mb-0.5')
+    expect(screen.getByTestId('sidebar-session-row-session-1')).toHaveClass('sidebar-session-row--selected')
+    expect(screen.getByTestId('sidebar-session-row-session-2')).toHaveClass('sidebar-session-row--active')
+    expect(screen.getByTestId('sidebar-session-row-session-3')).toHaveClass('sidebar-session-row--idle')
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument()
   })
 
   it('collapses into an icon rail and expands back', async () => {
@@ -1071,7 +1094,7 @@ describe('Sidebar', () => {
     expect(screen.getByTestId('sidebar-search-controls-section')).toHaveStyle({ overflow: 'visible' })
     expect(screen.getByTestId('sidebar-search-controls-section')).toHaveClass('relative', 'z-20')
     expect(screen.getByPlaceholderText('Search sessions')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /All projects/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^All projects/i })).not.toBeInTheDocument()
     expect(screen.queryByTestId('project-filter')).not.toBeInTheDocument()
   })
 
@@ -1081,11 +1104,12 @@ describe('Sidebar', () => {
     expect(screen.getByTestId('sidebar-session-list-section')).toHaveClass('flex', 'flex-1', 'min-h-0', 'flex-col')
   })
 
-  it('keeps the settings dock opaque above the scrolling session list', () => {
+  it('keeps the footer dock opaque above the scrolling session list', () => {
     render(<Sidebar />)
 
-    expect(screen.getByTestId('sidebar-settings-dock')).toHaveClass('sidebar-settings-dock')
-    expect(screen.getByTestId('sidebar-settings-dock')).toHaveClass('absolute', 'bottom-0')
+    expect(screen.getByTestId('sidebar-footer')).toHaveClass('sidebar-settings-dock')
+    expect(screen.getByTestId('sidebar-footer')).toHaveClass('absolute', 'bottom-0')
+    expect(within(screen.getByTestId('sidebar-footer')).getByRole('button', { name: 'More' })).toBeInTheDocument()
   })
 
   it('keeps mobile navigation focused on chat sessions', async () => {
@@ -1110,8 +1134,10 @@ describe('Sidebar', () => {
 
     expect(screen.queryByRole('button', { name: 'Scheduled' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actions for Open Session' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Open Session/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Open Session/ }))
     expect(onRequestClose).toHaveBeenCalledTimes(1)
 
     await act(async () => {
@@ -1122,6 +1148,180 @@ describe('Sidebar', () => {
       expect(createSession).toHaveBeenCalled()
     })
     expect(onRequestClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens settings from the More menu', () => {
+    useUIStore.setState({ settingsOpen: false } as Partial<ReturnType<typeof useUIStore.getState>>)
+    render(<Sidebar />)
+
+    const trigger = screen.getByRole('button', { name: 'More' })
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Projects & sessions' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }))
+
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
+    // The trigger holds focus before settings opens, so the modal returns focus there.
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('moves focus into the More menu and between its main and language views', () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    render(<Sidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Projects & sessions' }))
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Language · 中文' }))
+    expect(screen.getByRole('menu', { name: 'Language' })).toBeInTheDocument()
+    expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: '中文' }))
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Back' }))
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Projects & sessions' }))
+  })
+
+  it('switches the interface language from the More menu', () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    render(<Sidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Language · 中文' }))
+
+    expect(screen.getByRole('menuitemradio', { name: '中文' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'false')
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Back' }))
+    expect(screen.getByRole('menuitem', { name: 'Language · 中文' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Language · 中文' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'English' }))
+
+    expect(useSettingsStore.getState().locale).toBe('en')
+    expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
+  })
+
+  it('closes the More menu on an outside click', () => {
+    render(<Sidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByTestId('sidebar-more-menu')).toBeInTheDocument()
+
+    fireEvent.click(document.body)
+    expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
+  })
+
+  it('lists the registered keyboard shortcuts', () => {
+    render(<Sidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Keyboard shortcuts' }))
+
+    const dialog = screen.getByTestId('shortcuts-dialog')
+    expect(within(dialog).getByText('Switch session')).toBeInTheDocument()
+    expect(within(dialog).getByText('Stop generating')).toBeInTheDocument()
+    expect(within(dialog).getByText('K')).toBeInTheDocument()
+  })
+
+  it('manages pinned and hidden projects from the project management dialog', async () => {
+    const base = new Date('2026-05-15T10:00:00.000Z').getTime()
+    useSessionStore.setState({
+      sessions: [
+        makeSession('alpha-1', 'Alpha Session', '/workspace/alpha', new Date(base).toISOString()),
+        makeSession('beta-1', 'Beta Session', '/workspace/beta', new Date(base - 20_000).toISOString()),
+      ],
+    })
+
+    render(<Sidebar />)
+    openProjectManagement()
+
+    expect(screen.getByRole('radio', { name: 'Recent projects' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'By time' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'By project' })).toBeInTheDocument()
+
+    const betaRow = screen.getByTestId('project-management-row-beta')
+    fireEvent.click(within(betaRow).getByRole('button', { name: 'Pin Project' }))
+    await waitFor(() => {
+      expect(projectGroupNames().slice(0, 2)).toEqual(['beta', 'alpha'])
+    })
+
+    fireEvent.click(within(screen.getByTestId('project-management-row-alpha')).getByRole('button', { name: 'Hide from Sidebar' }))
+    await waitFor(() => {
+      expect(within(screen.getByRole('complementary')).queryByText('alpha')).not.toBeInTheDocument()
+    })
+    expect(within(screen.getByTestId('project-management-row-alpha')).getByRole('button', { name: 'Restore to Sidebar' })).toBeInTheDocument()
+  })
+
+  it('opens the session row menu from the row button and keeps it open on the same click', () => {
+    useSessionStore.setState({
+      sessions: [makeSession('session-1', 'Open Session', '/workspace/project', new Date().toISOString())],
+    })
+
+    render(<Sidebar />)
+
+    const moreButton = screen.getByRole('button', { name: 'Actions for Open Session' })
+    expect(moreButton).toHaveClass('sidebar-session-more')
+    expect(moreButton.parentElement).toBe(screen.getByTestId('sidebar-session-row-session-1'))
+
+    fireEvent.click(moreButton)
+    expect(moreButton).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('sidebar-session-row-session-1')).toHaveAttribute('data-menu-open', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Batch manage' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+
+    fireEvent.click(moreButton)
+    expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
+
+    fireEvent.click(moreButton)
+    fireEvent.click(document.body)
+    expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
+
+    fireEvent.click(moreButton)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('textbox', { name: 'Rename' })).toHaveValue('Open Session')
+  })
+
+  it('supports keyboard navigation in the session row menu and returns focus to its button', () => {
+    useSessionStore.setState({
+      sessions: [makeSession('session-1', 'Open Session', '/workspace/project', new Date().toISOString())],
+    })
+    render(<Sidebar />)
+
+    const moreButton = screen.getByRole('button', { name: 'Actions for Open Session' })
+    moreButton.focus()
+    fireEvent.click(moreButton)
+    const menu = screen.getByTestId('sidebar-session-menu')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+
+    fireEvent.keyDown(menu, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Batch manage' }))
+    fireEvent.keyDown(menu, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    fireEvent.keyDown(menu, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    fireEvent.keyDown(menu, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(moreButton)
+  })
+
+  it('enters batch mode from the session row menu', () => {
+    useSessionStore.setState({
+      sessions: [makeSession('session-1', 'Open Session', '/workspace/project', new Date().toISOString())],
+    })
+
+    render(<Sidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Open Session' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Batch manage' }))
+
+    expect(useSessionStore.getState().isBatchMode).toBe(true)
+    expect(screen.getByText('0 selected')).toBeInTheDocument()
   })
 
   it('shows a loading state instead of an empty session list while initial fetch is pending', () => {
@@ -1143,6 +1343,7 @@ describe('Sidebar', () => {
 
     expect(fetchSessions).toHaveBeenCalledTimes(1)
 
+    openProjectManagement()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh sessions' }))
       await Promise.resolve()
