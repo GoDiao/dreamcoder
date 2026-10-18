@@ -1,0 +1,111 @@
+name: Release
+
+# Pushing a v* tag builds the installers and uploads them to a draft release
+# for review. Pull requests that touch this file run the same builds without
+# releasing, so the workflow can be checked before a tag is pushed.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          awk -v heading="## [${version}]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section for ${version}" >&2
+            exit 1
+          fi
+          cat >> notes.md <<'EOF'
+
+          ## Install
+
+          The installers are not code-signed yet.
+
+          - **macOS (Apple Silicon)**: open the `.dmg` and drag DreamCoder to Applications. On first launch macOS blocks the app; open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/DreamCoder.app` and open it again.
+          - **Windows x64**: run the `-setup.exe`. If SmartScreen appears, click **More info → Run anyway**.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; uploading assets to it."
+          else
+            gh release create "$TAG" --draft --verify-tag --title "DreamCoder $TAG" --notes-file notes.md
+          fi
+
+  build:
+    needs: draft
+    if: always() && (needs.draft.result == 'success' || needs.draft.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+            asset: bundle/dmg/*.dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            asset: bundle/nsis/*-setup.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd desktop && bun install --frozen-lockfile
+
+      # The updater has no endpoints yet, so skip its signed artifacts.
+      # macOS builds are ad-hoc signed until there is a Developer ID.
+      - name: Build installer
+        working-directory: desktop
+        run: >
+          bun x tauri build --ci
+          --target ${{ matrix.target }}
+          --bundles ${{ matrix.bundles }}
+          --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"-"}}}'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dreamcoder-${{ matrix.target }}
+          path: desktop/src-tauri/target/${{ matrix.target }}/release/${{ matrix.asset }}
+          if-no-files-found: error
+
+      - name: Upload to draft release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" desktop/src-tauri/target/${{ matrix.target }}/release/${{ matrix.asset }} --clobber

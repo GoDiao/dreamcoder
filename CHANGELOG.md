@@ -4,8 +4,41 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-18
+
+### Added
+- **Installers**: the first release with a macOS (Apple Silicon) `.dmg` and a Windows x64 `-setup.exe`, built by a new release workflow. They are not code-signed yet.
+- **Refreshed desktop UI** (#107): warm light palette, new type scale and a new logo (crescent moon and star on a terracotta tile).
+  - The tab bar is gone; the sidebar organizes sessions three ways, and the session header has a menu to rename, bulk-manage or delete.
+  - Each session has its own right-side panel for files, diffs and multiple terminals. Diffs show real line numbers and accept line comments.
+  - Settings open as a modal. The composer has per-session effort, and a provider card covers it until a provider is set up.
+  - Skills add menu and a keyboard shortcuts dialog.
+- **Own config directory** (#104): DreamCoder defaults to `~/.dreamcoder` (`DREAMCODER_CONFIG_DIR` still overrides). On first launch, or from Settings → Storage, it can import sessions, history and tasks from Claude Code without overwriting anything.
+- **Inherit Claude Code customizations** (#103): skills, agents, commands, `CLAUDE.md` and rules from Claude Code's directory load read-only, at lower priority than DreamCoder's own.
+- **Curated MCP catalog** (#56, #96): a searchable, tag-filterable catalog under Settings → MCP, backed by a validated registry.
+- **Aurora theme** (#60).
+- Provider-neutral first-run onboarding, localized in English and Chinese (#59).
+- The default terminal shell is detected and configurable (#65).
+
+### Changed
+- Session history is interpreted on the server and served by `GET /api/sessions/:id/transcript`; the desktop history and team views use it (#93, #94).
+- Typed live events and shared protocol types between server and desktop (#95).
+- All upstream provider requests go through one module (#83); leftover upstream presets removed (#78).
+- Per-session runtime state on the WebSocket server lives in one object (#86).
+- The English README is now the default; Chinese moved to `README_zh.md` (#109).
+- Credit cc-haha and include its MIT license notice (#72, #73).
+
 ### Removed
-- IM adapters (Feishu, DingTalk, Telegram, WeChat) are no longer planned. Removed the `adapters/` package, the `/api/adapters` API, the hidden IM settings page, the adapter sidecar processes the desktop app spawned on startup, and the Telegram/Feishu notification channels for scheduled tasks. Scheduled-task notifications are desktop-only; tasks saved with only an IM channel no longer notify.
+- IM adapters (Feishu, DingTalk, Telegram, WeChat) are no longer planned. Removed the `adapters/` package, the `/api/adapters` API, the hidden IM settings page, the adapter sidecar processes the desktop app spawned on startup, and the Telegram/Feishu notification channels for scheduled tasks. Scheduled-task notifications are desktop-only; tasks saved with only an IM channel no longer notify (#87).
+- The stale `sidecar/` copy (#84).
+
+### Fixed
+- Light, White, Midnight and other themes no longer get repainted by the warm light palette; dark mode has its own error surfaces and readable quotes (#107).
+- Midnight resolves to a dark color scheme (#69).
+- The server sidecar exits when the desktop process dies; no macOS notification crash outside an app bundle.
+- Dark theme tokens restored; Windows baseline Bun.
+- Dollar sequences preserved in translations (#64); localized scheduled-task notifications and Computer Use settings (#61, #62).
+- `bin/dreamcoder` exec bit, stale server tests and `/api/tasks` 404 (#85).
 
 ## [0.4.5] — 2026-06-25
 

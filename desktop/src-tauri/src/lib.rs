@@ -1613,7 +1613,9 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
     }
-    let sidecar = sidecar.env("DREAMCODER_PARENT_PID", std::process::id().to_string());
+    let sidecar = sidecar
+        .env("DREAMCODER_PARENT_PID", std::process::id().to_string())
+        .env("APP_VERSION", app.package_info().version.to_string());
     let sidecar = sidecar.args([
         "server",
         "--app-root",

@@ -113,12 +113,12 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 | 平台          | 状态                                          | 预编译安装包                                          |
 |---------------|-----------------------------------------------|-------------------------------------------------------|
-| Windows x64   | ✅ 维护者长期实测                              | v0.4.5 未附安装包；请查看 Releases 或按下文从源码运行     |
-| macOS arm64   | 🟡 从源码运行已实测，打包安装包未验证            | ❌ 欢迎社区共同补齐                                    |
+| Windows x64   | ✅ 维护者长期实测                              | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）  |
+| macOS arm64   | ✅ 维护者日常使用                              | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）        |
 | Linux x64     | ⚠️ 暂未日常验证                                | ❌ 欢迎社区共同补齐                                    |
 
 > DreamCoder 当前主要围绕 **Windows x64** 持续开发和验证。
-> **macOS（Apple Silicon）** 已可从源码运行（`bun run tauri dev`），维护者在开发中使用，但打包后的安装包尚未验证。
+> **macOS（Apple Silicon）** 已可从源码运行（`bun run tauri dev`），维护者在开发中使用，自 v0.5.0 起提供 `.dmg` 安装包。
 > **Linux** 代码中保留了 `#[cfg(target_os = "linux")]` 分支，但维护者并不日常使用，仍属于“代码已覆盖、体验待更多实机验证”的状态。
 > 如果你正在使用 macOS 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
@@ -148,7 +148,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 ### 安装与运行
 
-> v0.4.5 Release 没有预编译安装包。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**以下步骤建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制、前端构建产物或 Tauri CLI 缺失而无法启动。
+> macOS（Apple Silicon）和 Windows x64 的安装包在 [Releases](https://github.com/GoDiao/dreamcoder/releases/latest) 下载。安装包暂未签名，首次打开的方法见发布说明。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**以下步骤建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制、前端构建产物或 Tauri CLI 缺失而无法启动。
 
 ```bash
 # 0. 克隆仓库

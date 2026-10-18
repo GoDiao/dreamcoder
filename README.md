@@ -110,12 +110,12 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 
 | Platform     | Status                                  | Pre-built Installer                                      |
 |--------------|-----------------------------------------|----------------------------------------------------------|
-| Windows x64  | ✅ Maintainer-tested regularly           | No installer attached to v0.4.5; check Releases or run from source below |
-| macOS arm64  | 🟡 Runs from source; packaged builds not verified | ❌ Community help welcome                                 |
+| Windows x64  | ✅ Maintainer-tested regularly           | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned) |
+| macOS arm64  | ✅ Used daily by the maintainer          | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned)      |
 | Linux x64    | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
 
 > DreamCoder is developed and validated primarily on **Windows x64**.
-> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer during development, but packaged macOS builds are not verified yet.
+> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer during development, and ships as a `.dmg` from v0.5.0.
 > **Linux** has `#[cfg(target_os = "linux")]` branches in the codebase, but it is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
 > If you're running DreamCoder on macOS or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
@@ -145,7 +145,7 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Installation
 
-> Release v0.4.5 does not include a pre-built installer. These steps run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary, the frontend build output, or missing Tauri CLI pieces.
+> Installers for macOS (Apple Silicon) and Windows x64 are on [Releases](https://github.com/GoDiao/dreamcoder/releases/latest). They are not code-signed yet; the release notes explain how to open them the first time. The steps below run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary, the frontend build output, or missing Tauri CLI pieces.
 
 ```bash
 # 0. Clone the repo
