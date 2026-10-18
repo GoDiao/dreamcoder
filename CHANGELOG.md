@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Install from the MCP catalog** (#46, #102): catalog entries open a review screen where you pick the scope and project, fill in required environment values and check the command before saving. Thanks @harrisonoconnorhover.
+
 ## [0.5.0] — 2026-10-18
 
 ### Added
