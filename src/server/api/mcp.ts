@@ -12,6 +12,7 @@ import {
   getAllMcpConfigs,
   getClaudeCodeMcpConfigs,
   getMcpConfigByName,
+  getMcpConfigsByScope,
   isMcpServerDisabled,
   removeMcpConfig,
   setMcpServerEnabled,
@@ -85,6 +86,8 @@ type McpSessionSyncDto = {
 }
 
 const EDITABLE_SCOPES = new Set<ConfigScope>(['local', 'project', 'user'])
+// Serialize project creates in this sidecar; other processes remain independent.
+let projectCreateQueue: Promise<void> = Promise.resolve()
 
 function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   return req
@@ -480,24 +483,35 @@ async function createServer(body: Record<string, unknown>): Promise<Response> {
 
   const scope = ensureConfigScope(typeof body.scope === 'string' ? body.scope : undefined)
   const config = buildServerConfig(body.config)
-  await assertHostPrerequisites(config)
+  const create = async (): Promise<Response> => {
+    await assertHostPrerequisites(config)
 
-  try {
-    await addMcpConfig(name, config, scope)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (message.includes('already exists')) {
-      throw ApiError.conflict(message)
+    try {
+      await addMcpConfig(name, config, scope)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('already exists')) {
+        throw ApiError.conflict(message)
+      }
+      throw ApiError.badRequest(message)
     }
-    throw ApiError.badRequest(message)
+
+    // A server with the same name in another scope can shadow the new config.
+    const created = scope === 'local' || scope === 'project' || scope === 'user'
+      ? getMcpConfigsByScope(scope).servers[name]
+      : undefined
+    if (!created) {
+      throw ApiError.internal(`Created MCP server "${name}" could not be reloaded`)
+    }
+
+    return Response.json({ server: serializeServerSnapshot(name, created) }, { status: 201 })
   }
 
-  const created = getMcpConfigByName(name)
-  if (!created) {
-    throw ApiError.internal(`Created MCP server "${name}" could not be reloaded`)
-  }
+  if (scope !== 'project') return create()
 
-  return Response.json({ server: serializeServerSnapshot(name, created) }, { status: 201 })
+  const result = projectCreateQueue.then(create)
+  projectCreateQueue = result.then(() => undefined, () => undefined)
+  return result
 }
 
 async function updateServer(name: string, body: Record<string, unknown>): Promise<Response> {

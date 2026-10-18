@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mcpApi } from '../../api/mcp'
 import { useTranslation } from '../../i18n'
+import { Button } from '../shared/Button'
 import type { McpCatalogEntry } from '../../types/mcp'
 import { SearchField } from '../shared/SearchField'
 import { SettingsSelect } from '../settings/SettingsSelect'
 
-export function McpCatalogBrowse({ installedNames }: { installedNames: string[] }) {
+export function McpCatalogBrowse({ installedNames, onInstall }: {
+  installedNames: string[]
+  onInstall: (entry: McpCatalogEntry) => void
+}) {
   const t = useTranslation()
   const [entries, setEntries] = useState<McpCatalogEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +75,7 @@ export function McpCatalogBrowse({ installedNames }: { installedNames: string[] 
               key={entry.id}
               entry={entry}
               installed={installed.has(entry.id) || installed.has(entry.name.toLowerCase())}
+              onInstall={() => onInstall(entry)}
             />
           ))}
         </div>
@@ -79,7 +84,7 @@ export function McpCatalogBrowse({ installedNames }: { installedNames: string[] 
   )
 }
 
-function CatalogEntry({ entry, installed }: { entry: McpCatalogEntry; installed: boolean }) {
+function CatalogEntry({ entry, installed, onInstall }: { entry: McpCatalogEntry; installed: boolean; onInstall: () => void }) {
   const t = useTranslation()
   return (
     <article className="border-b border-[var(--color-border-separator)] px-3 py-3.5">
@@ -119,6 +124,11 @@ function CatalogEntry({ entry, installed }: { entry: McpCatalogEntry; installed:
           />
         )}
       </dl>
+      <div className="mt-3">
+        <Button variant="secondary" size="xs" onClick={onInstall} aria-label={t('settings.mcp.install.actionFor', { name: entry.name })}>
+          {t('settings.mcp.install.action')}
+        </Button>
+      </div>
     </article>
   )
 }

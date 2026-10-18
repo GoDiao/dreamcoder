@@ -1,3 +1,5 @@
+import { getMcpSecretValues, redactMcpDiagnostic } from '../lib/mcpRedaction'
+
 const ENV_BASE_URL =
   typeof import.meta !== 'undefined' &&
   typeof import.meta.env?.VITE_DESKTOP_SERVER_URL === 'string' &&
@@ -70,6 +72,7 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown, options?: { timeout?: number }): Promise<T> {
   const url = `${baseUrl}${path}`
   const headers = buildHeaders()
+  const sensitiveValues = getMcpEnvironmentValues(method, path, body)
 
   const controller = new AbortController()
   const timeoutMs = options?.timeout ?? 30_000
@@ -94,34 +97,45 @@ async function request<T>(method: string, path: string, body?: unknown, options?
     clearTimeout(timeout)
     if (controller.signal.aborted) {
       const timeoutError = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`)
-      reportApiFailure(method, path, timeoutError)
+      reportApiFailure(method, path, timeoutError, sensitiveValues)
       throw timeoutError
     }
-    reportApiFailure(method, path, err)
+    reportApiFailure(method, path, err, sensitiveValues)
     throw err
   }
 }
 
-function reportApiFailure(method: string, path: string, error: unknown) {
+function getMcpEnvironmentValues(method: string, path: string, body: unknown): string[] {
+  if (!['POST', 'PUT', 'PATCH'].includes(method) || !/^\/api\/mcp(?:\/|\?|$)/.test(path)) return []
+  if (!body || typeof body !== 'object' || !('config' in body)) return []
+  const config = body.config
+  if (!config || typeof config !== 'object' || !('env' in config)) return []
+  if (!config.env || typeof config.env !== 'object' || Array.isArray(config.env)) return []
+  return getMcpSecretValues(config.env as Record<string, unknown>)
+}
+
+function reportApiFailure(method: string, path: string, error: unknown, sensitiveValues: string[]) {
   if (path.startsWith('/api/diagnostics')) return
 
+  const secrets = [...sensitiveValues, ...(authToken ? [authToken] : [])]
   const details: Record<string, unknown> = {
     method,
     path,
     errorName: error instanceof Error ? error.name : typeof error,
-    message: sanitizeDiagnosticValue(error instanceof Error ? error.message : String(error)),
+    message: error instanceof Error ? error.message : String(error),
   }
 
   if (error instanceof ApiError) {
     details.status = error.status
-    details.response = sanitizeDiagnosticValue(error.body)
+    details.response = error.body
   }
 
+  const safeDetails = redactMcpDiagnostic(details, secrets) as Record<string, unknown>
   void rawRecordDiagnosticEvent({
     type: 'client_api_request_failed',
     severity: 'warn',
-    summary: `${method} ${path} failed: ${details.message}`,
-    details,
+    summary: `${safeDetails.method} ${safeDetails.path} failed: ${safeDetails.message}`,
+    details: safeDetails,
   })
 }
 
@@ -149,26 +163,6 @@ function buildHeaders(): Record<string, string> {
   }
 
   return headers
-}
-
-function sanitizeDiagnosticValue(value: unknown): unknown {
-  if (!authToken) return value
-
-  if (typeof value === 'string') {
-    return value.split(authToken).join('[redacted]')
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeDiagnosticValue(entry))
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, sanitizeDiagnosticValue(entry)]),
-    )
-  }
-
-  return value
 }
 
 export const api = {
