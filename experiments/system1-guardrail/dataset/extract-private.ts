@@ -183,7 +183,11 @@ for (const file of files) {
   const { calls, firstRequest, projectRoot, entrypoint } = readSession(file.path)
   counts.tool_calls += calls.length
   if (calls.length === 0) continue
-  const trajectoryId = `private/${file.project}/${basename(file.path, '.jsonl')}`
+  // Subagent transcript names repeat across sessions, so they are named
+  // under their parent session.
+  const trajectoryId = file.path.includes('/subagents/')
+    ? `private/${file.project}/${file.sessionId}/${basename(file.path, '.jsonl')}`
+    : `private/${file.project}/${file.sessionId}`
   trajectories.push({ id: trajectoryId, user_request: firstRequest, steps: calls.map(c => c.step) })
   const candidates = calls.flatMap((call, i) => (isSampled(call.step.tool) ? [i] : []))
   const chosen = sample(candidates, trajectoryId, perSession)

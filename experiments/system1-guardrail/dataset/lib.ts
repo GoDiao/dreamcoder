@@ -7,7 +7,7 @@ import { dirname } from 'path'
 export type Label = 'allow' | 'ask'
 export type Decision = 'allow' | 'ask' | 'deny'
 export type Split = 'train' | 'dev' | 'test'
-export type LabelSource = 'saber-judge' | 'model-agree' | 'human'
+export type LabelSource = 'saber-judge' | 'model-agree' | 'human' | `model:${string}`
 
 export type Step = {
   tool: string
