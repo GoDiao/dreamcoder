@@ -3,6 +3,7 @@ import {
   CUA_DRIVER_VERSION,
   CuaDriverService,
   compareVersions,
+  defaultDeps,
   getStandardCuaDriverPaths,
   parseCuaDriverVersion,
   parsePermissionsJson,
@@ -354,6 +355,36 @@ describe('CuaDriverService install', () => {
     expect(calls.find(c => c.command === 'bash')!.args).toContain('--require-signature')
   })
 
+  it('runs onInstalled before reporting done', async () => {
+    const { deps } = fakeDeps()
+    serveFixtures(deps)
+    const service = makeService(deps)
+    let called = 0
+    service.startInstall({ onInstalled: async () => { called++ } })
+    expect((await service.waitForInstall())?.phase).toBe('done')
+    expect(called).toBe(1)
+  })
+
+  it('fails the install when onInstalled fails', async () => {
+    const { deps } = fakeDeps()
+    serveFixtures(deps)
+    const service = makeService(deps)
+    service.startInstall({ onInstalled: async () => { throw new Error('disk full') } })
+    const progress = await service.waitForInstall()
+    expect(progress?.phase).toBe('failed')
+    expect(progress?.error).toContain('could not be turned on: disk full')
+  })
+
+  it('does not run onInstalled when the install fails', async () => {
+    const { deps } = fakeDeps({ installerCode: 1 })
+    serveFixtures(deps)
+    const service = makeService(deps)
+    let called = 0
+    service.startInstall({ onInstalled: async () => { called++ } })
+    await service.waitForInstall()
+    expect(called).toBe(0)
+  })
+
   it('fails when the installer exits non-zero', async () => {
     const { deps } = fakeDeps({ installerCode: 3 })
     serveFixtures(deps)
@@ -387,4 +418,17 @@ describe('CuaDriverService install', () => {
     expect(install.args).toContain('-NoAutoStart')
     expect(install.args).toContain('-NoPathUpdate')
   })
+})
+
+describe('default command runner', () => {
+  it.skipIf(process.platform === 'win32')(
+    'returns on timeout even when a grandchild keeps the output pipes open',
+    async () => {
+      const started = Date.now()
+      const result = await defaultDeps().run('sh', ['-c', 'sleep 30 & sleep 30'], { timeoutMs: 300 })
+      expect(result.code).toBe(-1)
+      expect(result.stderr).toContain('timed out')
+      expect(Date.now() - started).toBeLessThan(5_000)
+    },
+  )
 })

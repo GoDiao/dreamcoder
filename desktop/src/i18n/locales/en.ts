@@ -670,7 +670,7 @@ export const en = {
 
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',
-  'settings.computerUse.description': 'Let the model operate desktop apps and browsers in the background, powered by cua-driver (trycua/cua, MIT). Reading the screen and windows needs no confirmation once this is on; clicks, typing and other actions ask each time.',
+  'settings.computerUse.description': 'Let the model operate desktop apps and browsers in the background, powered by cua-driver (trycua/cua, MIT). Listing apps and windows and reading the accessibility tree need no confirmation once this is on; screenshots, clicks, typing and other actions ask each time.',
   'settings.computerUse.enableRow': 'Computer control',
   'settings.computerUse.enableRowDescription': 'Applies to new sessions. Turning it on downloads cua-driver if it is not installed.',
   'settings.computerUse.statusSection': 'Status',
@@ -695,6 +695,7 @@ export const en = {
   'settings.computerUse.source.dreamcoder': 'installed by DreamCoder',
   'settings.computerUse.outdated': 'v{version} is older than the verified v{verified}',
   'settings.computerUse.versionUnreadable': 'Found, but its version could not be read',
+  'settings.computerUse.customOutdated': 'This is your custom path. To use the verified version, install it and clear the custom path under Advanced.',
   'settings.computerUse.newerThanVerified': 'Newer than the verified version {verified}; tools added since then ask for confirmation.',
   'settings.computerUse.missingExecutable': 'Executable not found: {path}',
   'settings.computerUse.accessibility': 'Accessibility',

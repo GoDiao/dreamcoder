@@ -956,9 +956,6 @@ export class ConversationService {
       CLAUDE_COWORK_MEMORY_PATH_OVERRIDE: this.resolveDesktopAutoMemoryPath(workDir),
       CALLER_DIR: workDir,
       PWD: workDir,
-      ...(sdkUrl
-        ? { DREAMCODER_COMPUTER_USE_HOST_BUNDLE_ID: 'com.dreamcoder.desktop' }
-        : {}),
       ...(desktopServerUrl
         ? { DREAMCODER_DESKTOP_SERVER_URL: desktopServerUrl }
         : {}),

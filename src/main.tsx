@@ -1606,9 +1606,16 @@ async function run(): Promise<CommanderCommand> {
     // Placed AFTER the enterprise-MCP-config check: that check rejects any
     // dynamicMcpConfig entry with `type !== 'sdk'`, and our config is
     // `type: 'stdio'`.
-    if (process.platform === 'darwin' || process.platform === 'win32' || process.platform === 'linux') {
+    {
       try {
-        if (options.computerUse === false) {
+        const {
+          isCuaDriverSupportedPlatform,
+          resolveCuaDriverPath,
+          CUA_DRIVER_PRIVACY_ENV
+        } = await import('src/server/services/cuaDriverService.js');
+        if (!isCuaDriverSupportedPlatform(process.platform)) {
+          logForDebugging(`[Computer Use] Skipped: unsupported platform ${process.platform}`);
+        } else if (options.computerUse === false) {
           logForDebugging('[Computer Use] Skipped: disabled by --no-computer-use');
         } else {
           const {
@@ -1618,10 +1625,6 @@ async function run(): Promise<CommanderCommand> {
           if (!computerUseConfig.enabled) {
             logForDebugging('[Computer Use] Skipped: disabled in computer-use-config.json');
           } else {
-            const {
-              resolveCuaDriverPath,
-              CUA_DRIVER_PRIVACY_ENV
-            } = await import('src/server/services/cuaDriverService.js');
             const resolved = await resolveCuaDriverPath(computerUseConfig);
             if (!resolved) {
               logForDebugging('[Computer Use] Skipped: cua-driver not found');

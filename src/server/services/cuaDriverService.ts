@@ -24,6 +24,10 @@ export const CUA_DRIVER_RELEASE_TAG = `cua-driver-rs-v${CUA_DRIVER_VERSION}`
 /**
  * Installer files, pinned by SHA256 in code rather than checked against the
  * release's own SHA256SUMS, which would only catch a corrupt download.
+ * Only the scripts are pinned here: the installer then downloads the platform
+ * package and checks it against that release's SHA256SUMS (plus Sigstore when
+ * cosign is available), so a replaced release package is not caught without
+ * cosign.
  *
  * The installers load a shared helper (`_install-common.*`) from their own
  * directory and otherwise fetch an unpinned copy from cua.ai. We put the
@@ -426,15 +430,16 @@ export class CuaDriverService {
     return this.runDriver(path, ['doctor'], 60_000)
   }
 
-  getInstallProgress(): InstallProgress | null {
-    return this.install
-  }
-
   /**
    * Starts installing the pinned version and returns immediately. A second
    * call while one is running returns the running install's progress.
    */
-  startInstall(): InstallProgress {
+  /**
+   * `onInstalled` runs after a successful install, before the phase becomes
+   * `done`; a failure there fails the install. It is ignored when an install
+   * is already running.
+   */
+  startInstall(options: { onInstalled?: () => Promise<void> } = {}): InstallProgress {
     if (this.installPromise && this.install) return this.install
     if (!this.platformSupported) {
       throw new Error(`cua-driver is not supported on ${this.deps.platform}`)
@@ -445,10 +450,14 @@ export class CuaDriverService {
       output: [],
     }
     const progress = this.install
-    this.installPromise = this.runInstall(progress)
+    this.installPromise = this.runInstall(progress, options.onInstalled)
+      .then(() => {
+        console.log(`[cua-driver] Installed ${CUA_DRIVER_VERSION}`)
+      })
       .catch(error => {
         progress.phase = 'failed'
         progress.error = error instanceof Error ? error.message : String(error)
+        console.error(`[cua-driver] Install failed: ${progress.error}`)
       })
       .finally(() => {
         progress.finishedAt = new Date().toISOString()
@@ -463,7 +472,10 @@ export class CuaDriverService {
     return this.install
   }
 
-  private async runInstall(progress: InstallProgress): Promise<void> {
+  private async runInstall(
+    progress: InstallProgress,
+    onInstalled?: () => Promise<void>,
+  ): Promise<void> {
     const files = this.installerFiles(this.deps.platform)
     const dir = await this.deps.makeTempDir()
     try {
@@ -566,6 +578,17 @@ export class CuaDriverService {
         installedAt: new Date().toISOString(),
       }
       await this.deps.writeTextFile(this.markerPath(), JSON.stringify(marker, null, 2))
+      if (onInstalled) {
+        try {
+          await onInstalled()
+        } catch (error) {
+          throw new Error(
+            `cua-driver was installed, but Computer Use could not be turned on: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          )
+        }
+      }
       progress.phase = 'done'
     } finally {
       await this.deps.removeDir(dir).catch(() => {})
@@ -579,8 +602,14 @@ export class CuaDriverService {
     return false
   }
 
-  private runDriver(path: string, args: string[], timeoutMs = COMMAND_TIMEOUT_MS) {
-    return this.deps.run(path, args, { env: { ...CUA_DRIVER_PRIVACY_ENV }, timeoutMs })
+  private async runDriver(path: string, args: string[], timeoutMs = COMMAND_TIMEOUT_MS) {
+    const result = await this.deps.run(path, args, { env: { ...CUA_DRIVER_PRIVACY_ENV }, timeoutMs })
+    if (result.code !== 0) {
+      console.warn(
+        `[cua-driver] \`${args.join(' ')}\` exited with ${result.code}: ${result.stderr.slice(0, 300)}`,
+      )
+    }
+    return result
   }
 }
 
@@ -628,9 +657,17 @@ async function runCommand(
       stderr: `Failed to run ${command}: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
-  const timer = options.timeoutMs
-    ? setTimeout(() => proc.kill(), options.timeoutMs)
-    : null
+  // On timeout, stop waiting for output: grandchildren (e.g. the installer's
+  // download) can keep the pipes open after the direct child is killed.
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const timedOut = new Promise<CommandResult>(resolve => {
+    if (!options.timeoutMs) return
+    const timeoutMs = options.timeoutMs
+    timer = setTimeout(() => {
+      proc.kill()
+      resolve({ code: -1, stdout: '', stderr: `${command} timed out after ${Math.round(timeoutMs / 1000)}s` })
+    }, timeoutMs)
+  })
   const collect = async (stream: ReadableStream<Uint8Array>) => {
     const decoder = new TextDecoder()
     let all = ''
@@ -648,13 +685,16 @@ async function runCommand(
     if (options.onOutput && pending) options.onOutput(pending)
     return all
   }
-  try {
+  const finished = (async (): Promise<CommandResult> => {
     const [stdout, stderr] = await Promise.all([
       collect(proc.stdout as ReadableStream<Uint8Array>),
       collect(proc.stderr as ReadableStream<Uint8Array>),
     ])
     const code = await proc.exited
     return { code, stdout: stdout.trim(), stderr: stderr.trim() }
+  })()
+  try {
+    return await Promise.race([finished, timedOut])
   } finally {
     if (timer) clearTimeout(timer)
   }

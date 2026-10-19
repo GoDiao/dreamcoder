@@ -55,8 +55,9 @@ export const computerUseApi = {
   getStatus() {
     return api.get<ComputerUseStatus>('/api/computer-use/status', { timeout: 60_000 })
   },
-  install() {
-    return api.post<InstallProgress>('/api/computer-use/install')
+  /** `enableOnSuccess`: the server turns Computer Use on when the install succeeds. */
+  install(enableOnSuccess = false) {
+    return api.post<InstallProgress>('/api/computer-use/install', { enableOnSuccess })
   },
   getConfig() {
     return api.get<ComputerUseConfig>('/api/computer-use/config')

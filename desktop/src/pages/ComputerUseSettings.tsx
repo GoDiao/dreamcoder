@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   computerUseApi,
   type ComputerUseStatus,
@@ -80,16 +80,17 @@ export function ComputerUseSettings() {
   const [status, setStatus] = useState<ComputerUseStatus | null>(null)
   const [checkState, setCheckState] = useState<CheckState>('loading')
   const [checkError, setCheckError] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<'install' | 'upgrade' | 'cleanup' | null>(null)
+  // 'enable' comes from the switch: the server turns Computer Use on when that install succeeds.
+  const [confirm, setConfirm] = useState<'enable' | 'install' | 'upgrade' | 'cleanup' | null>(null)
+  const [lastInstall, setLastInstall] = useState<'enable' | 'install' | 'upgrade'>('install')
   const [actionError, setActionError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Turn Computer Use on once the install that the switch started succeeds.
-  const enableAfterInstallRef = useRef(false)
   const [permissionHint, setPermissionHint] = useState(false)
   const [doctorOutput, setDoctorOutput] = useState<string | null>(null)
   const [doctorRunning, setDoctorRunning] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [pathDraft, setPathDraft] = useState('')
+  const [pathEdited, setPathEdited] = useState(false)
 
   const fetchStatus = useCallback(async (quiet = false) => {
     if (!quiet) setCheckState('loading')
@@ -107,30 +108,20 @@ export function ComputerUseSettings() {
   }, [])
 
   useEffect(() => {
-    void fetchStatus().then(next => {
-      if (next) setPathDraft(next.driverPath ?? '')
-    })
+    void fetchStatus()
   }, [fetchStatus])
+
+  // Keep the path field in sync with the saved path until the user edits it.
+  const savedDriverPath = status?.driverPath ?? ''
+  useEffect(() => {
+    if (!pathEdited) setPathDraft(savedDriverPath)
+  }, [savedDriverPath, pathEdited])
 
   const installRunning = status?.state === 'installing' || isInstallRunning(status?.install)
 
-  // Poll while an install runs; enable afterwards when the switch asked for it.
   useEffect(() => {
     if (!installRunning) return
-    const timer = setInterval(async () => {
-      const next = await fetchStatus(true)
-      if (!next || isInstallRunning(next.install)) return
-      if (next.install?.phase === 'done' && enableAfterInstallRef.current) {
-        enableAfterInstallRef.current = false
-        try {
-          await computerUseApi.updateConfig({ enabled: true })
-        } finally {
-          await fetchStatus(true)
-        }
-      } else {
-        enableAfterInstallRef.current = false
-      }
-    }, INSTALL_POLL_MS)
+    const timer = setInterval(() => void fetchStatus(true), INSTALL_POLL_MS)
     return () => clearInterval(timer)
   }, [installRunning, fetchStatus])
 
@@ -147,10 +138,10 @@ export function ComputerUseSettings() {
     }
   }
 
-  const startInstall = (enableAfter: boolean) => {
+  const startInstall = (kind: 'enable' | 'install' | 'upgrade') => {
     setConfirm(null)
-    enableAfterInstallRef.current = enableAfter
-    void runAction(() => computerUseApi.install())
+    setLastInstall(kind)
+    void runAction(() => computerUseApi.install(kind === 'enable'))
   }
 
   const toggleEnabled = (value: boolean) => {
@@ -161,7 +152,7 @@ export function ComputerUseSettings() {
         setActionError(t('settings.computerUse.missingExecutable', { path: status.driverPath ?? '' }))
         return
       }
-      setConfirm('install')
+      setConfirm('enable')
       return
     }
     void runAction(() => computerUseApi.updateConfig({ enabled: value }))
@@ -195,13 +186,19 @@ export function ComputerUseSettings() {
       const { open } = await import('@tauri-apps/plugin-dialog')
       const selected = await open({ multiple: false, directory: false, title: t('settings.computerUse.pathDialogTitle') })
       const selectedPath = Array.isArray(selected) ? selected[0] : selected
-      if (typeof selectedPath === 'string' && selectedPath.trim()) setPathDraft(selectedPath)
+      if (typeof selectedPath === 'string' && selectedPath.trim()) {
+        setPathDraft(selectedPath)
+        setPathEdited(true)
+      }
     } catch {
       setActionError(t('settings.computerUse.pathDialogFailed'))
     }
   }
 
-  const savePath = (value: string) => runAction(() => computerUseApi.updateConfig({ driverPath: value.trim() || null }))
+  const savePath = (value: string) => {
+    setPathEdited(false)
+    return runAction(() => computerUseApi.updateConfig({ driverPath: value.trim() || null }))
+  }
 
   if (checkState === 'loading' && !status) {
     return (
@@ -245,7 +242,13 @@ export function ComputerUseSettings() {
   const controlsDisabled = busy || installRunning
   const isMac = status.platform === 'darwin'
   const install = status.install
-  const installFailed = install?.phase === 'failed'
+  // A failed install only matters while there is still no usable driver.
+  const installFailed =
+    install?.phase === 'failed' && (status.state === 'not_installed' || status.state === 'outdated')
+  const permissionsMissing =
+    !!status.permissions &&
+    (status.permissions.accessibility !== 'granted' || status.permissions.screenRecording !== 'granted')
+  const customOutdated = status.state === 'outdated' && status.source === 'custom'
 
   const driverLine = (() => {
     if (installRunning) {
@@ -331,7 +334,7 @@ export function ComputerUseSettings() {
           tone={driverLine.tone}
           label="cua-driver"
           detail={driverLine.detail}
-          action={!installRunning && (status.state === 'not_installed' || status.state === 'outdated') ? (
+          action={!installRunning && (status.state === 'not_installed' || (status.state === 'outdated' && !customOutdated)) ? (
             <Button
               size="xs"
               onClick={() => setConfirm(status.state === 'outdated' ? 'upgrade' : 'install')}
@@ -343,6 +346,11 @@ export function ComputerUseSettings() {
             </Button>
           ) : undefined}
         />
+        {customOutdated ? (
+          <div className="pb-2 pl-5 text-xs text-[var(--color-text-tertiary)]">
+            {t('settings.computerUse.customOutdated')}
+          </div>
+        ) : null}
         {status.newerThanVerified && status.state === 'installed' ? (
           <div className="pb-2 pl-5 text-xs text-[var(--color-text-tertiary)]">
             {t('settings.computerUse.newerThanVerified', { verified: status.verifiedVersion })}
@@ -387,7 +395,7 @@ export function ComputerUseSettings() {
             <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] [overflow-wrap:anywhere]">{install.output.join('\n')}</pre>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="xs" onClick={() => setConfirm(status.state === 'outdated' ? 'upgrade' : 'install')} disabled={controlsDisabled}>
+            <Button size="xs" onClick={() => setConfirm(lastInstall)} disabled={controlsDisabled}>
               {t('settings.computerUse.retry')}
             </Button>
             <Button size="xs" variant="secondary" onClick={() => setShowAdvanced(true)}>
@@ -399,7 +407,7 @@ export function ComputerUseSettings() {
 
       {actionError ? <Notice tone="error">{actionError}</Notice> : null}
 
-      {permissionHint && isMac ? (
+      {permissionHint && permissionsMissing && isMac ? (
         <Notice tone="warn">
           <div>{t('settings.computerUse.stillNotGranted')}</div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -449,7 +457,10 @@ export function ComputerUseSettings() {
             <div className="min-w-[200px] flex-1">
               <Input
                 value={pathDraft}
-                onChange={event => setPathDraft(event.target.value)}
+                onChange={event => {
+                  setPathDraft(event.target.value)
+                  setPathEdited(true)
+                }}
                 placeholder={status.path ?? '/Applications/CuaDriver.app/Contents/MacOS/cua-driver'}
                 aria-label={t('settings.computerUse.customPath')}
               />
@@ -500,9 +511,11 @@ export function ComputerUseSettings() {
       <p className="text-xs leading-[1.6] text-[var(--color-text-tertiary)]">{t('settings.computerUse.footer')}</p>
 
       <ConfirmDialog
-        open={confirm === 'install' || confirm === 'upgrade'}
+        open={confirm === 'enable' || confirm === 'install' || confirm === 'upgrade'}
         onClose={() => setConfirm(null)}
-        onConfirm={() => startInstall(confirm === 'install' && !status.enabled)}
+        onConfirm={() => {
+          if (confirm === 'enable' || confirm === 'install' || confirm === 'upgrade') startInstall(confirm)
+        }}
         title={confirm === 'upgrade'
           ? t('settings.computerUse.installVersion', { version: status.verifiedVersion })
           : t('settings.computerUse.confirmInstallTitle')}

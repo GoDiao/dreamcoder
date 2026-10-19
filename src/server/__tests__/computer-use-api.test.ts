@@ -179,6 +179,32 @@ describe('Computer Use actions', () => {
     expect(await res.json()).toMatchObject({ phase: 'downloading' })
   })
 
+  it('turns Computer Use on after an install that asked for it', async () => {
+    let onInstalled: (() => Promise<void>) | undefined
+    useService(fakeService({
+      startInstall: ((options: { onInstalled?: () => Promise<void> } = {}) => {
+        onInstalled = options.onInstalled
+        return { phase: 'downloading', startedAt: 'now', output: [] }
+      }) as CuaDriverService['startInstall'],
+    }))
+    await call('POST', 'install', { enableOnSuccess: true })
+    expect(onInstalled).toBeDefined()
+    await onInstalled!()
+    expect(await (await call('GET', 'config')).json()).toEqual({ enabled: true, driverPath: null })
+  })
+
+  it('leaves Computer Use alone after a plain install', async () => {
+    let onInstalled: (() => Promise<void>) | undefined = async () => {}
+    useService(fakeService({
+      startInstall: ((options: { onInstalled?: () => Promise<void> } = {}) => {
+        onInstalled = options.onInstalled
+        return { phase: 'downloading', startedAt: 'now', output: [] }
+      }) as CuaDriverService['startInstall'],
+    }))
+    await call('POST', 'install')
+    expect(onInstalled).toBeUndefined()
+  })
+
   it('refuses to install on unsupported platforms', async () => {
     useService(fakeService({ platformSupported: false } as Partial<CuaDriverService>))
     expect((await call('POST', 'install')).status).toBe(400)

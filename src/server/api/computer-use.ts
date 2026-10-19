@@ -237,7 +237,17 @@ export async function handleComputerUseApi(
         { status: 400 },
       )
     }
-    return Response.json(service.startInstall(), { status: 202 })
+    const body = (await readJson(req)) ?? {}
+    // The settings switch asks to turn Computer Use on once the install
+    // succeeds; doing it here survives the page being closed meanwhile.
+    const onInstalled =
+      body.enableOnSuccess === true
+        ? async () => {
+            const config = await loadStoredComputerUseConfig()
+            await saveStoredComputerUseConfig({ ...config, enabled: true })
+          }
+        : undefined
+    return Response.json(service.startInstall({ onInstalled }), { status: 202 })
   }
 
   if (action === 'config' && req.method === 'GET') {

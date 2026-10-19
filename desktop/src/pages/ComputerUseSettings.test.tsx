@@ -229,4 +229,81 @@ describe('ComputerUseSettings', () => {
     expect(await screen.findByText(/not available on this platform \(freebsd\)/)).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Computer control' })).toBeDisabled()
   })
+
+  it('asks the server to enable Computer Use after an install started by the switch', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(notInstalled)
+    computerUseApiMock.install.mockResolvedValue({ phase: 'downloading', startedAt: 'now', output: [] })
+    render(<ComputerUseSettings />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Computer control' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalledWith(true))
+    expect(computerUseApiMock.updateConfig).not.toHaveBeenCalled()
+  })
+
+  it('does not enable Computer Use after an install started from the status row', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(notInstalled)
+    computerUseApiMock.install.mockResolvedValue({ phase: 'downloading', startedAt: 'now', output: [] })
+    render(<ComputerUseSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalledWith(false))
+  })
+
+  it('shows an upgraded user with Computer Use on but no driver as on, not installed, with Install', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(makeStatus({ ...notInstalled, enabled: true }))
+    computerUseApiMock.install.mockResolvedValue({ phase: 'downloading', startedAt: 'now', output: [] })
+    render(<ComputerUseSettings />)
+    expect(await screen.findByRole('switch', { name: 'Computer control' })).toBeChecked()
+    expect(screen.getByText('Not installed')).toBeInTheDocument()
+    expect(screen.queryByText(/Takes effect in new sessions/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalled())
+    expect(computerUseApiMock.updateConfig).not.toHaveBeenCalled()
+  })
+
+  it('hides an old install failure once a driver is available', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(
+      makeStatus({ install: { phase: 'failed', startedAt: 'a', output: [], error: 'network' }, source: 'custom' }),
+    )
+    render(<ComputerUseSettings />)
+    await screen.findByText(/Installed v0\.34\.0/)
+    expect(screen.queryByText('Installation failed')).not.toBeInTheDocument()
+  })
+
+  it('does not offer an upgrade that cannot replace an outdated custom path', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(
+      makeStatus({ state: 'outdated', version: '0.30.0', source: 'custom', driverPath: '/opt/cua-driver' }),
+    )
+    render(<ComputerUseSettings />)
+    expect(await screen.findByText(/This is your custom path/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Install 0.34.0' })).not.toBeInTheDocument()
+  })
+
+  it('clears the "still not granted" hint once a recheck shows the permissions granted', async () => {
+    computerUseApiMock.getStatus.mockResolvedValue(
+      makeStatus({ permissions: { accessibility: 'granted', screenRecording: 'denied' } }),
+    )
+    computerUseApiMock.grantPermissions.mockResolvedValue({
+      ok: true,
+      output: '',
+      permissions: { accessibility: 'granted', screenRecording: 'denied' },
+    })
+    render(<ComputerUseSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Grant' }))
+    expect(await screen.findByText(/Still not granted/)).toBeInTheDocument()
+    computerUseApiMock.getStatus.mockResolvedValue(makeStatus())
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    await waitFor(() => expect(screen.queryByText(/Still not granted/)).not.toBeInTheDocument())
+  })
+
+  it('fills the custom path field from a recheck after a failed first load', async () => {
+    computerUseApiMock.getStatus.mockRejectedValueOnce(new Error('down'))
+    render(<ComputerUseSettings />)
+    await screen.findByText('Could not check Computer Use status')
+    computerUseApiMock.getStatus.mockResolvedValue(makeStatus({ source: 'custom', driverPath: '/opt/cua-driver' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Advanced' }))
+    expect(screen.getByRole('textbox', { name: 'Custom cua-driver path' })).toHaveValue('/opt/cua-driver')
+  })
 })
