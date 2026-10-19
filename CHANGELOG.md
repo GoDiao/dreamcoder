@@ -8,6 +8,14 @@ All notable changes to DreamCoder will be documented in this file.
 
 - **Install from the MCP catalog** (#46, #102): catalog entries open a review screen where you pick the scope and project, fill in required environment values and check the command before saving. Thanks @harrisonoconnorhover.
 
+### Fixed
+
+- **OpenAI-compatible providers** (#38):
+  - Cached prompt tokens are reported as cache reads, so cost estimates use the cached price. Non-streaming Chat requests no longer count them twice.
+  - Screenshots and images now reach providers that use the OpenAI Responses format.
+  - Images and other non-text content in tool results become short placeholders instead of being dropped silently.
+  - Reasoning from Responses providers that stream it, such as OpenRouter, shows as thinking.
+
 ## [0.5.0] — 2026-10-18
 
 ### Added
