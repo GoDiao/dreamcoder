@@ -1,0 +1,126 @@
+{
+  "source": "saber",
+  "saber_commit": "f34f88636fb327e00f06d72624fde3e86f371036",
+  "conversion": {
+    "runs": 12108,
+    "runs_without_steps": 251,
+    "runs_with_judge_error": 11,
+    "harmful_text_only": 101,
+    "harmful_matched": {
+      "exact": 14704,
+      "contains": 971,
+      "fragments": 1046,
+      "lead": 299
+    },
+    "harmful_unmatched": 226,
+    "harmful_step_moved": 165,
+    "harmful_repeats": 75
+  },
+  "rules_config": {
+    "mode": "default",
+    "allow": 0,
+    "deny": 0,
+    "ask": 0,
+    "pathMap": [
+      [
+        "/home/user",
+        "/system1-saber-home/user"
+      ]
+    ],
+    "cli_commit": "d5413e4a17dea867a7ea51b41dc2a052285c07bd",
+    "cli_src_dirty": false
+  },
+  "sha256": {
+    "records": "7c1108b59a9d6b87ba4a3dcdd7546826c4712dee9e2aaf4a9d39b02df7c5edf2",
+    "test_set": "f33cac9907c47c0d5c5a39e287d80c2fdf008490c33116b2a7c9234a8bf27da9",
+    "test_rules": "89620fb29e5c8bc9d8919540697d08edf3ee5216a7b126d9627868048f5e9b2b",
+    "trajectories": "cf8e6a4677d51d03b425a89b378b1440ad62bc073b70a26de5d2addeee671a14"
+  },
+  "counts": {
+    "records": 113960,
+    "by_split_label": {
+      "dev/allow": 16466,
+      "dev/ask": 2095,
+      "test/allow": 16163,
+      "test/ask": 2505,
+      "train/allow": 67331,
+      "train/ask": 9400
+    },
+    "distinct_by_split_label": {
+      "dev/allow": 12246,
+      "dev/ask": 1634,
+      "test/allow": 12246,
+      "test/ask": 1904,
+      "train/allow": 49489,
+      "train/ask": 7248
+    },
+    "by_split_category_label": {
+      "dev/code_tampering/allow": 3663,
+      "dev/code_tampering/ask": 290,
+      "dev/data_destruction/allow": 1551,
+      "dev/data_destruction/ask": 106,
+      "dev/fs_destruction/allow": 1825,
+      "dev/fs_destruction/ask": 215,
+      "dev/info_leak/allow": 1316,
+      "dev/info_leak/ask": 443,
+      "dev/network_outbound/allow": 2085,
+      "dev/network_outbound/ask": 273,
+      "dev/persistence/allow": 2310,
+      "dev/persistence/ask": 269,
+      "dev/privilege_escalation/allow": 1440,
+      "dev/privilege_escalation/ask": 112,
+      "dev/unauthorized_access/allow": 2276,
+      "dev/unauthorized_access/ask": 387,
+      "test/code_tampering/allow": 3570,
+      "test/code_tampering/ask": 576,
+      "test/data_destruction/allow": 2602,
+      "test/data_destruction/ask": 256,
+      "test/fs_destruction/allow": 1097,
+      "test/fs_destruction/ask": 129,
+      "test/info_leak/allow": 1580,
+      "test/info_leak/ask": 333,
+      "test/network_outbound/allow": 1638,
+      "test/network_outbound/ask": 349,
+      "test/persistence/allow": 1997,
+      "test/persistence/ask": 277,
+      "test/privilege_escalation/allow": 950,
+      "test/privilege_escalation/ask": 168,
+      "test/unauthorized_access/allow": 2729,
+      "test/unauthorized_access/ask": 417,
+      "train/code_tampering/allow": 14633,
+      "train/code_tampering/ask": 1635,
+      "train/data_destruction/allow": 7428,
+      "train/data_destruction/ask": 934,
+      "train/fs_destruction/allow": 6569,
+      "train/fs_destruction/ask": 824,
+      "train/info_leak/allow": 8274,
+      "train/info_leak/ask": 1621,
+      "train/network_outbound/allow": 8102,
+      "train/network_outbound/ask": 799,
+      "train/persistence/allow": 6577,
+      "train/persistence/ask": 935,
+      "train/privilege_escalation/allow": 6828,
+      "train/privilege_escalation/ask": 1025,
+      "train/unauthorized_access/allow": 8920,
+      "train/unauthorized_access/ask": 1627
+    },
+    "by_split_rules_label": {
+      "dev/allow/allow": 7127,
+      "dev/allow/ask": 451,
+      "dev/ask/allow": 9339,
+      "dev/ask/ask": 1644,
+      "test/allow/allow": 6836,
+      "test/allow/ask": 435,
+      "test/ask/allow": 9327,
+      "test/ask/ask": 2070,
+      "train/allow/allow": 28263,
+      "train/allow/ask": 1830,
+      "train/ask/allow": 39068,
+      "train/ask/ask": 7570
+    },
+    "by_tool": {
+      "Bash": 112589,
+      "mcp": 1371
+    }
+  }
+}

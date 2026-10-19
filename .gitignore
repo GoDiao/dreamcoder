@@ -80,3 +80,10 @@ runtime/__pycache__
 
 .worktrees/
 scripts/benchmark.ts
+
+# Experiments: downloaded data, environments, run outputs, private data
+experiments/**/.venv/
+experiments/system1-guardrail/dataset/.saber/
+experiments/system1-guardrail/dataset/private/
+experiments/system1-guardrail/**/runs/
+experiments/system1-guardrail/dataset/data/**/*.jsonl.gz
