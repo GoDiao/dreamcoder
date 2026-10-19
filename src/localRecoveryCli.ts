@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { version as packageVersion } from '../package.json'
 import { readFileSync } from 'fs'
 import { createInterface } from 'readline'
 
@@ -33,7 +34,7 @@ function printHelp(): void {
 }
 
 function printVersion(): void {
-  process.stdout.write('999.0.0-local (Claude Code local recovery)\n')
+  process.stdout.write(`${packageVersion} (DreamCoder local recovery)\n`)
 }
 
 function parseArgs(argv: string[]) {

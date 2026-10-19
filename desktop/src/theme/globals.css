@@ -1865,6 +1865,22 @@ button, input, textarea, select, a, [role="button"] {
   --color-code-bg: #20201E;
   --color-terminal-bg: #1C1C1A;
   --color-terminal-border: #3B3B34;
+  /* Without these, diffs keep the light theme's pale row colors under light text. */
+  --color-code-inserted: #91AA8B;
+  --color-code-deleted: #D9897A;
+  --color-diff-added-bg: rgba(145, 170, 139, 0.12);
+  --color-diff-added-word: rgba(145, 170, 139, 0.26);
+  --color-diff-added-gutter: rgba(145, 170, 139, 0.18);
+  --color-diff-added-text: #A9C2A3;
+  --color-diff-removed-bg: rgba(217, 137, 122, 0.12);
+  --color-diff-removed-word: rgba(217, 137, 122, 0.26);
+  --color-diff-removed-gutter: rgba(217, 137, 122, 0.18);
+  --color-diff-removed-text: #E3A396;
+  --color-diff-highlight-bg: rgba(215, 139, 107, 0.12);
+  --color-diff-highlight-gutter: rgba(215, 139, 107, 0.2);
+  --color-diff-title-bg: #2A2A26;
+  --color-diff-title-color: #AAA99E;
+  --color-diff-title-border: #3B3B34;
   --shadow-dropdown: 0 3px 14px rgba(0, 0, 0, 0.2), 0 12px 32px rgba(0, 0, 0, 0.28);
   --shadow-focus-ring: 0 0 0 2px #D78B6B, 0 0 0 5px rgba(215, 139, 107, 0.16);
   --shadow-button-primary: none;

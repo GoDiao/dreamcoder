@@ -14,21 +14,30 @@ const USAGE = 'Usage: bun run scripts/release.ts <patch|minor|major|x.y.z> [--dr
 
 const replaceJsonVersion = (content: string, version: string) =>
   content.replace(/"version":\s*"[^"]*"/, `"version": "${version}"`)
+const jsonVersionSet = (content: string, version: string) =>
+  content.match(/"version":\s*"([^"]*)"/)?.[1] === version
 
+// Each `updated` checks that the version landed where `update` writes it,
+// so a pattern that stops matching (a renamed crate, CRLF line endings) fails
+// loudly instead of being reported as updated.
 const VERSION_FILES = [
-  { path: 'package.json', update: replaceJsonVersion },
-  { path: 'desktop/package.json', update: replaceJsonVersion },
-  { path: 'desktop/src-tauri/tauri.conf.json', update: replaceJsonVersion },
+  { path: 'package.json', update: replaceJsonVersion, updated: jsonVersionSet },
+  { path: 'desktop/package.json', update: replaceJsonVersion, updated: jsonVersionSet },
+  { path: 'desktop/src-tauri/tauri.conf.json', update: replaceJsonVersion, updated: jsonVersionSet },
   {
     path: 'desktop/src-tauri/Cargo.toml',
     update: (content: string, version: string) =>
       content.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`),
+    updated: (content: string, version: string) =>
+      content.match(/^version\s*=\s*"([^"]*)"/m)?.[1] === version,
   },
   {
     // Only the app's own entry; the dependency versions stay as locked.
     path: 'desktop/src-tauri/Cargo.lock',
     update: (content: string, version: string) =>
-      content.replace(/(name = "dreamcoder-desktop"\nversion = )"[^"]*"/, `$1"${version}"`),
+      content.replace(/(name = "dreamcoder-desktop"\r?\nversion = )"[^"]*"/, `$1"${version}"`),
+    updated: (content: string, version: string) =>
+      content.match(/name = "dreamcoder-desktop"\r?\nversion = "([^"]*)"/)?.[1] === version,
   },
 ]
 
@@ -87,15 +96,19 @@ if (dryRun) {
   process.exit(0)
 }
 
-for (const file of VERSION_FILES) {
+// Compute and check every file before writing any, so a failure leaves nothing half-bumped.
+const updates = VERSION_FILES.map((file) => {
   const filePath = path.join(root, file.path)
-  const content = readFileSync(filePath, 'utf-8')
-  const updated = file.update(content, next)
-  if (updated === content && !content.includes(next)) {
-    console.error(`  No version field found in ${file.path}`)
+  const content = file.update(readFileSync(filePath, 'utf-8'), next)
+  if (!file.updated(content, next)) {
+    console.error(`  Could not set the version in ${file.path}; nothing was written.`)
     process.exit(1)
   }
-  writeFileSync(filePath, updated)
+  return { file, filePath, content }
+})
+
+for (const { file, filePath, content } of updates) {
+  writeFileSync(filePath, content)
   console.log(`  Updated: ${file.path}`)
 }
 
