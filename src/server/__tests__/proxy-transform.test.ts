@@ -226,6 +226,31 @@ describe('anthropicToOpenaiChat', () => {
     expect(content[0].type).toBe('image_url')
     expect(content[0].image_url!.url).toBe('data:image/png;base64,abc123')
   })
+
+  test('tool_result with image content becomes placeholder, not dropped', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tc_img',
+            content: [
+              { type: 'text', text: 'Screenshot below:' },
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'deadbeef' } },
+            ],
+          },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiChat(req)
+    expect(result.messages[0].role).toBe('tool')
+    expect(result.messages[0].tool_call_id).toBe('tc_img')
+    expect(result.messages[0].content).toBe('Screenshot below:\n[image omitted: image/png]')
+  })
+
 })
 
 describe('openaiChatToAnthropic', () => {
@@ -351,7 +376,7 @@ describe('openaiChatToAnthropic', () => {
       },
     }
     const result = openaiChatToAnthropic(res, 'gpt-4')
-    expect(result.usage.cache_read_input_tokens).toBe(80)
+    expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 50, cache_read_input_tokens: 80 })
   })
 })
 
@@ -414,6 +439,29 @@ describe('anthropicToOpenaiResponses', () => {
     }
   })
 
+  test('text around tool_use is flushed as separate messages, in order', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Let me check.' },
+          { type: 'text', text: 'Searching.' },
+          { type: 'tool_use', id: 'tc_1', name: 'search', input: { q: 'x' } },
+          { type: 'text', text: 'Done.' },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    expect(result.input.map((i) => i.type)).toEqual(['message', 'function_call', 'message'])
+    expect((result.input[0] as { content: unknown }).content).toEqual([
+      { type: 'output_text', text: 'Let me check.' },
+      { type: 'output_text', text: 'Searching.' },
+    ])
+    expect((result.input[2] as { content: unknown }).content).toBe('Done.')
+  })
+
   test('tool_result lifted to function_call_output', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4o',
@@ -456,6 +504,104 @@ describe('anthropicToOpenaiResponses', () => {
     expect((result as Record<string, unknown>).stop).toBeUndefined()
     expect((result as Record<string, unknown>).stop_sequences).toBeUndefined()
   })
+
+  test('image content uses input_image format (not Chat image_url)', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc123' } },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message')!
+    expect(msg).toBeDefined()
+    const content = msg.content as Array<{ type: string; image_url?: string }>
+    expect(content[0].type).toBe('input_image')
+    expect(content[0].image_url).toBe('data:image/png;base64,abc123')
+  })
+
+  test('text content uses input_text format in multi-part message', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is this?' },
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc123' } },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message')!
+    const content = msg.content as Array<{ type: string }>
+    expect(content[0].type).toBe('input_text')
+    expect(content[1].type).toBe('input_image')
+  })
+
+  test('assistant text uses output_text format in multi-part message', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [
+        { role: 'user', content: 'Hi' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Hello.' },
+            { type: 'text', text: 'Anything else?' },
+          ],
+        },
+      ],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message' && i.role === 'assistant')!
+    const content = msg.content as Array<{ type: string; text: string }>
+    expect(content).toEqual([
+      { type: 'output_text', text: 'Hello.' },
+      { type: 'output_text', text: 'Anything else?' },
+    ])
+  })
+
+  test('single assistant text part is flattened to a string', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const msg = result.input.find((i) => i.type === 'message')!
+    expect(msg.content).toBe('Done.')
+  })
+
+  test('tool_result with image content becomes placeholder, not dropped', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tc_img',
+            content: [
+              { type: 'text', text: 'Screenshot:' },
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'ff' } },
+            ],
+          },
+        ],
+      }],
+    }
+    const result = anthropicToOpenaiResponses(req)
+    const fco = result.input.find((i) => i.type === 'function_call_output')!
+    expect(fco).toBeDefined()
+    expect(fco.output).toBe('Screenshot:\n[image omitted: image/jpeg]')
+  })
+
 })
 
 describe('openaiResponsesToAnthropic', () => {
@@ -476,8 +622,21 @@ describe('openaiResponsesToAnthropic', () => {
     const result = openaiResponsesToAnthropic(res, 'gpt-4o')
     expect(result.content).toEqual([{ type: 'text', text: 'Hello!' }])
     expect(result.stop_reason).toBe('end_turn')
-    expect(result.usage.input_tokens).toBe(10)
-    expect(result.usage.output_tokens).toBe(5)
+    expect(result.usage).toEqual({ input_tokens: 10, output_tokens: 5 })
+  })
+
+  test('cached tokens are taken out of input_tokens', () => {
+    const res: OpenAIResponsesResponse = {
+      id: 'resp_cache',
+      object: 'response',
+      created_at: 0,
+      model: 'gpt-4o',
+      status: 'completed',
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
+      usage: { input_tokens: 100, output_tokens: 5, total_tokens: 105, input_tokens_details: { cached_tokens: 80 } },
+    }
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 5, cache_read_input_tokens: 80 })
   })
 
   test('function_call → tool_use', () => {

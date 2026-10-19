@@ -93,8 +93,13 @@ export type OpenAIChatStreamChunk = {
   usage?: OpenAIChatResponse['usage']
 }
 
+export type OpenAIResponsesContentPart =
+  | { type: 'input_text'; text: string }
+  | { type: 'output_text'; text: string }
+  | { type: 'input_image'; image_url: string }
+
 export type OpenAIResponsesInputItem =
-  | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | OpenAIChatContentPart[] }
+  | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | OpenAIResponsesContentPart[] }
   | { type: 'function_call'; call_id: string; name: string; arguments: unknown }
   | { type: 'function_call_output'; call_id: string; output: string }
 
@@ -129,11 +134,14 @@ export type OpenAIResponsesResponse = {
   model: string
   status: string
   output: OpenAIResponsesOutputItem[]
-  usage?: {
-    input_tokens: number
-    output_tokens: number
-    total_tokens: number
-  }
+  usage?: OpenAIResponsesUsage
+}
+
+export type OpenAIResponsesUsage = {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  input_tokens_details?: { cached_tokens?: number }
 }
 
 export type AnthropicContentBlock =

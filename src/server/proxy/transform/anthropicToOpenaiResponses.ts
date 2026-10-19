@@ -1,11 +1,11 @@
 import type {
   AnthropicRequest,
-  AnthropicContentBlock,
   AnthropicMessage,
   OpenAIResponsesRequest,
   OpenAIResponsesInputItem,
-  OpenAIChatContentPart,
+  OpenAIResponsesContentPart,
 } from './types.js'
+import { extractToolResultContent } from './toolArguments.js'
 
 export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
@@ -74,26 +74,20 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
     return
   }
 
-  const contentParts: (string | OpenAIChatContentPart)[] = []
+  const contentParts: OpenAIResponsesContentPart[] = []
+  // Earlier assistant turns are model output, which Responses expects as output_text.
+  const textType = msg.role === 'assistant' ? 'output_text' : 'input_text'
 
   for (const block of content) {
     if (block.type === 'text') {
-      contentParts.push(block.text)
+      contentParts.push({ type: textType, text: block.text })
     } else if (block.type === 'image') {
       contentParts.push({
-        type: 'image_url',
-        image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+        type: 'input_image',
+        image_url: `data:${block.source.media_type};base64,${block.source.data}`,
       })
     } else if (block.type === 'tool_use') {
-      if (contentParts.length > 0) {
-        const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-          ? contentParts[0]
-          : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-        if (flatContent) {
-          output.push({ type: 'message', role: msg.role, content: flatContent })
-        }
-        contentParts.length = 0
-      }
+      flushContentParts(contentParts, msg.role, textType, output)
       output.push({
         type: 'function_call',
         call_id: block.id,
@@ -101,11 +95,7 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         arguments: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
       })
     } else if (block.type === 'tool_result') {
-      const resultContent = typeof block.content === 'string'
-        ? block.content
-        : Array.isArray(block.content)
-          ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
-          : ''
+      const resultContent = extractToolResultContent(block.content)
       output.push({
         type: 'function_call_output',
         call_id: block.tool_use_id,
@@ -114,14 +104,21 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
     }
   }
 
-  if (contentParts.length > 0) {
-    const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-      ? contentParts[0]
-      : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-    if (flatContent) {
-      output.push({ type: 'message', role: msg.role, content: flatContent })
-    }
-  }
+  flushContentParts(contentParts, msg.role, textType, output)
+}
+
+// A lone text part is sent as a plain string; anything else as a parts array.
+function flushContentParts(
+  parts: OpenAIResponsesContentPart[],
+  role: AnthropicMessage['role'],
+  textType: 'input_text' | 'output_text',
+  output: OpenAIResponsesInputItem[],
+): void {
+  if (parts.length === 0) return
+  const only = parts[0]
+  const content = parts.length === 1 && only.type === textType ? only.text : [...parts]
+  if (content !== '') output.push({ type: 'message', role, content })
+  parts.length = 0
 }
 
 function convertToolChoice(choice: unknown): unknown {
