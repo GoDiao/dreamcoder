@@ -1131,9 +1131,14 @@ export const en = {
 
   'thinking.label': 'Thinking',
 
-  'tool.errorOutput': 'Error Output',
-  'tool.toolOutput': 'Tool Output',
-  'tool.toolInput': 'Tool Input',
+  'tool.copy': 'Copy',
+  'tool.copied': 'Copied',
+  'tool.showFullInput': 'Show full input',
+  'tool.hideFullInput': 'Hide full input',
+  'codeViewer.collapse': 'Collapse',
+  'codeViewer.showMore': 'Show {count} more lines',
+  'codeViewer.lines': '{count} lines',
+  'codeViewer.oneLine': '1 line',
   'tool.partialInput': 'Partial input',
   'tool.writerPreview': 'Writer',
   'tool.writerPreviewLatest': 'Showing latest {visible} of {total} lines',

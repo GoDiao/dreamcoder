@@ -42,11 +42,11 @@ describe('chat blocks', () => {
 
     fireEvent.click(screen.getByRole('button'))
 
-    expect(container.textContent).toContain('Tool Input')
+    expect(container.textContent).toContain('/tmp/example.ts')
     expect(container.textContent).not.toContain('const answer = 42')
   })
 
-  it('does not surface bash stdout in the transcript preview', () => {
+  it('shows the bash command and its output in one box once expanded', () => {
     const { container } = render(
       <ToolCallBlock
         toolName="Bash"
@@ -60,8 +60,50 @@ describe('chat blocks', () => {
 
     fireEvent.click(screen.getByRole('button'))
 
-    expect(container.textContent).toContain('ls -la')
-    expect(container.textContent).not.toContain('file-a')
+    expect(container.textContent).toContain('# List files')
+    expect(container.textContent).toContain('$ ls -la')
+    expect(container.textContent).toContain('file-a')
+    // The command is shown once, not again as raw input JSON.
+    expect(container.textContent).not.toContain('"command"')
+    expect(screen.getAllByRole('button', { name: 'Copy' })).toHaveLength(2)
+  })
+
+  it('does not turn image paths in tool output into an image gallery', () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolName="Bash"
+        input={{ command: 'ls /tmp/shots' }}
+        result={{ content: '/tmp/shots/a.png\n/tmp/shots/b.jpg', isError: false }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(container.textContent).toContain('/tmp/shots/a.png')
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('keeps tool chrome out of text selection', () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolName="Bash"
+        input={{ command: 'ls', timeout: 5000 }}
+        result={{ content: 'file-a', isError: false }}
+      />,
+    )
+
+    const row = screen.getByRole('button', { expanded: false })
+    expect(row.className).toContain('select-none')
+    fireEvent.click(row)
+
+    expect(screen.getByText('$').className).toContain('select-none')
+    for (const button of screen.getAllByRole('button', { name: 'Copy' })) {
+      expect(button.className).toContain('select-none')
+    }
+    const fullInput = screen.getByRole('button', { name: 'Show full input' })
+    expect(fullInput.className).toContain('select-none')
+    fireEvent.click(fullInput)
+    expect(container.textContent).toContain('"timeout": 5000')
   })
 
   it('shows pending Write tool calls while input is still streaming', () => {

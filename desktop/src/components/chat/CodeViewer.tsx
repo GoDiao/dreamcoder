@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import { Highlight, type PrismTheme } from 'prism-react-renderer'
 import { CopyButton } from '../shared/CopyButton'
+import { useTranslation } from '../../i18n'
 
 type Props = {
   code: string
@@ -260,6 +261,7 @@ function CodeArea({ code, language, showLineNumbers }: { code: string; language?
 
 export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = false }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const t = useTranslation()
 
   const allLines = code.split('\n')
   const isTruncated = !expanded && allLines.length > maxLines
@@ -267,12 +269,12 @@ export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = fa
 
   const effectiveShowLineNumbers = showLineNumbers && !!language && language !== 'text'
   const languageLabel = language || 'code'
-  const lineCountLabel = `${allLines.length} ${allLines.length === 1 ? 'line' : 'lines'}`
+  const lineCountLabel = allLines.length === 1 ? t('codeViewer.oneLine') : t('codeViewer.lines', { count: allLines.length })
   const showExpandToggle = allLines.length > maxLines
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5 text-[11px] text-[var(--color-text-tertiary)]">
+      <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5 text-[11px] select-none text-[var(--color-text-tertiary)]">
         <div className="flex items-center gap-3">
           <span className="font-semibold uppercase tracking-[0.14em]">{languageLabel}</span>
           <span>{lineCountLabel}</span>
@@ -292,9 +294,9 @@ export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = fa
       {showExpandToggle && (
         <button
           onClick={() => setExpanded((value) => !value)}
-          className="w-full border-t border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)]"
+          className="w-full select-none border-t border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)]"
         >
-          {expanded ? 'Collapse' : `Show ${allLines.length - maxLines} more lines`}
+          {expanded ? t('codeViewer.collapse') : t('codeViewer.showMore', { count: allLines.length - maxLines })}
         </button>
       )}
     </div>

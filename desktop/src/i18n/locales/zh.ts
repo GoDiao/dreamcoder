@@ -1133,9 +1133,14 @@ export const zh: Record<TranslationKey, string> = {
 
   'thinking.label': '思考中',
 
-  'tool.errorOutput': '错误输出',
-  'tool.toolOutput': '工具输出',
-  'tool.toolInput': '工具输入',
+  'tool.copy': '复制',
+  'tool.copied': '已复制',
+  'tool.showFullInput': '显示完整输入',
+  'tool.hideFullInput': '收起完整输入',
+  'codeViewer.collapse': '收起',
+  'codeViewer.showMore': '展开其余 {count} 行',
+  'codeViewer.lines': '{count} 行',
+  'codeViewer.oneLine': '1 行',
   'tool.partialInput': '部分输入',
   'tool.writerPreview': 'Writer',
   'tool.writerPreviewLatest': '正在显示最新 {visible} / {total} 行',

@@ -1,12 +1,10 @@
 import { memo, useMemo, useState } from 'react'
-import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronDown, ChevronUp, MousePointerClick, Keyboard, ScanEye, AppWindow, Clipboard, Monitor } from 'lucide-react'
+import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronRight, MousePointerClick, Keyboard, ScanEye, AppWindow, Clipboard, Monitor } from 'lucide-react'
 import { CodeViewer } from './CodeViewer'
 import { DiffViewer } from './DiffViewer'
-import { TerminalChrome } from './TerminalChrome'
 import { CopyButton } from '../shared/CopyButton'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
-import { InlineImageGallery } from './InlineImageGallery'
 import type { AgentTaskNotification } from '../../types/chat'
 import { getCuaToolDisplay, humanizeCuaResult, isCuaPermissionError, type CuaToolIcon } from '../../lib/cuaToolDisplay'
 import { useUIStore } from '../../stores/uiStore'
@@ -60,7 +58,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const IconComponent = cua ? CUA_TOOL_ICONS[cua.icon] : TOOL_ICONS[toolName] || Wrench
   const title = cua ? cua.title : toolName
   const filePath = !cua && typeof obj.file_path === 'string' ? obj.file_path : ''
-  const summary = cua ? cua.summary : getToolSummary(toolName, obj, t)
+  const summary = filePath ? filePath.split('/').pop() : cua ? cua.summary : getToolSummary(toolName, obj, t)
   const outputSummary = getToolResultSummary(
     toolName,
     result?.content,
@@ -71,45 +69,41 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
     ? getPendingSummary(toolName, t)
     : ''
 
-  const preview = useMemo(() => renderPreview(toolName, obj, result, t), [obj, result, toolName, t])
-  const details = useMemo(() => renderDetails(toolName, obj, t, isPending ? partialInput : undefined), [isPending, obj, partialInput, toolName, t])
   const resultImages = useMemo(() => extractToolResultImages(result?.content), [result?.content])
   const showCuaSettingsLink = useMemo(() => isCuaPermissionError(toolName, rawResult), [rawResult, toolName])
-  const hasResultDetails = Boolean(result && (extractTextContent(result.content) || resultImages.length > 0))
-  const hasEditPreview = toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string'
-  const hasWritePreview = toolName === 'Write' && typeof obj.content === 'string'
-  const expandable = hasEditPreview || hasWritePreview || hasResultDetails || Boolean(isPending && partialInput)
+  const streamingPreview = useMemo(
+    () => (isPending && partialInput ? renderStreamingInput(toolName, partialInput, t) : null),
+    [isPending, partialInput, toolName, t],
+  )
+  const diff = useMemo(() => renderDiff(toolName, obj), [obj, toolName])
+  const inputView = useMemo(() => (diff || streamingPreview ? null : getInputView(toolName, obj, cua !== null)), [cua, diff, obj, streamingPreview, toolName])
+  // Read results are whole files; the transcript shows the call, not the contents.
+  const outputText = toolName === 'Read' || diff ? null : stripAnsi(extractTextContent(result?.content) ?? '').trimEnd() || null
+  const expandable = Boolean(diff || streamingPreview || inputView || outputText || resultImages.length > 0)
 
   return (
-    <div className={`overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] ${
-      compact ? 'mb-0' : 'mb-2'
-    }`}>
+    <div className={compact ? 'mb-0' : 'mb-2'}>
       <button
         type="button"
+        aria-expanded={expandable ? expanded : undefined}
         onClick={() => {
           if (expandable) {
             setExpanded((value) => !value)
           }
         }}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
+        className={`flex min-h-7 w-full select-none items-center gap-2 rounded-md text-left text-ui-aux text-[var(--color-text-secondary)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+          expandable ? 'hover:text-[var(--color-text-primary)]' : 'cursor-default'
+        }`}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]">
-          <IconComponent size={16} />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col items-start">
-          <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-            {title}
-          </span>
-          {filePath ? (
-            <span className="mt-0.5 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
-              {filePath.split('/').pop()}
-            </span>
-          ) : summary ? (
-            <span className="mt-0.5 min-w-0 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+        <IconComponent size={14} aria-hidden="true" className="shrink-0" />
+        <span className="flex min-w-0 flex-1 items-baseline gap-2">
+          <span className="shrink-0 font-medium text-[var(--color-text-primary)]">{title}</span>
+          {summary ? (
+            <span title={summary} className="min-w-0 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
               {summary}
             </span>
           ) : null}
-        </div>
+        </span>
         {pendingSummary ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-outline)]">
             <LoaderCircle size={12} strokeWidth={2.4} className="animate-spin" aria-hidden="true" />
@@ -128,21 +122,19 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
           </span>
         ) : null}
         {result?.isError && (
-          <AlertCircle size={16} className="shrink-0 text-[var(--color-error)]" />
+          <AlertCircle size={14} className="shrink-0 text-[var(--color-error)]" />
         )}
         {expandable && (
-          <div className="text-[var(--color-text-tertiary)]">
-            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </div>
+          <ChevronRight size={13} aria-hidden="true" className={`shrink-0 text-[var(--color-text-tertiary)] transition-transform ${expanded ? 'rotate-90' : ''}`} />
         )}
       </button>
 
       {showCuaSettingsLink && (
-        <div className="border-t border-[var(--color-border)]/60 px-4 py-2 text-xs">
+        <div className="pb-1 pl-[22px] text-xs">
           <button
             type="button"
             onClick={() => useUIStore.getState().openSettings('computerUse')}
-            className="font-medium text-[var(--color-brand)] hover:underline"
+            className="select-none font-medium text-[var(--color-brand)] hover:underline"
           >
             {t('cuaTool.openSettings')}
           </button>
@@ -150,22 +142,123 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
       )}
 
       {expandable && expanded && (
-        <div className="space-y-2.5 border-t border-[var(--color-border)]/60 px-3 py-3">
+        <div className="mb-1 mt-1 space-y-2 pl-[22px]">
           <ToolResultImages images={resultImages} />
-          {preview}
-          {details}
+          {diff}
+          {streamingPreview}
+          {(inputView || outputText) && (
+            <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
+              {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
+              {outputText && (
+                <ToolSection
+                  copyText={outputText}
+                  t={t}
+                  className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
+                >
+                  <pre className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
+                    {outputText}
+                  </pre>
+                </ToolSection>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 })
 
-function renderPreview(
-  toolName: string,
-  obj: Record<string, unknown>,
-  result?: { content: unknown; isError: boolean } | null,
-  t?: (key: TranslationKey, params?: Record<string, string | number>) => string,
-) {
+type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string
+
+type InputView = {
+  /** Shown as `$ text` for shell commands, plain otherwise. */
+  kind: 'command' | 'text' | 'json'
+  text: string
+  note?: string
+  /** True when obj has fields the view leaves out, so the raw input is worth offering. */
+  hasMore: boolean
+}
+
+const SECTION_PRE_CLASS = 'overflow-auto whitespace-pre-wrap break-words py-2 pl-3 pr-14 font-[var(--font-mono)] text-[12px] leading-[1.45]'
+
+// The most useful input field per tool; anything else stays behind "Show full input".
+const PRIMARY_INPUT_FIELD: Record<string, string> = {
+  Read: 'file_path',
+  Glob: 'pattern',
+  Grep: 'pattern',
+  WebFetch: 'url',
+  WebSearch: 'query',
+  Skill: 'skill',
+}
+
+function getInputView(toolName: string, obj: Record<string, unknown>, isCua: boolean): InputView | null {
+  const keys = Object.keys(obj)
+  if (keys.length === 0) return null
+
+  if (toolName === 'Bash' && typeof obj.command === 'string') {
+    const note = typeof obj.description === 'string' ? obj.description : undefined
+    return { kind: 'command', text: obj.command, note, hasMore: keys.some((key) => key !== 'command' && key !== 'description') }
+  }
+
+  const field = isCua ? undefined : PRIMARY_INPUT_FIELD[toolName]
+  const value = field ? obj[field] : undefined
+  if (field && typeof value === 'string') {
+    return { kind: 'text', text: value, hasMore: keys.some((key) => key !== field) }
+  }
+
+  return { kind: 'json', text: JSON.stringify(obj, null, 2), hasMore: false }
+}
+
+function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<string, unknown>; t: Translate }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const rawText = JSON.stringify(obj, null, 2)
+
+  return (
+    <ToolSection copyText={showRaw ? rawText : view.text} t={t}>
+      <pre className={`${SECTION_PRE_CLASS} max-h-[240px] text-[var(--color-text-primary)]`}>
+        {view.note && (
+          <span className="block text-[var(--color-text-tertiary)]">{`# ${view.note}`}</span>
+        )}
+        {view.kind === 'command' && (
+          <span className="select-none text-[var(--color-brand)]">$ </span>
+        )}
+        {view.text}
+      </pre>
+      {view.hasMore && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowRaw((value) => !value)}
+            className="select-none px-3 pb-2 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]"
+          >
+            {showRaw ? t('tool.hideFullInput') : t('tool.showFullInput')}
+          </button>
+          {showRaw && (
+            <pre className={`${SECTION_PRE_CLASS} max-h-[240px] border-t border-dashed border-[var(--color-border)]/60 text-[var(--color-text-secondary)]`}>
+              {rawText}
+            </pre>
+          )}
+        </>
+      )}
+    </ToolSection>
+  )
+}
+
+function ToolSection({ copyText, t, className = '', children }: { copyText: string; t: Translate; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={`group/section relative ${className}`}>
+      {children}
+      <CopyButton
+        text={copyText}
+        label={t('tool.copy')}
+        copiedLabel={t('tool.copied')}
+        className="absolute right-2 top-1.5 select-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:text-[var(--color-text-primary)] focus-visible:opacity-100 group-hover/section:opacity-100"
+      />
+    </div>
+  )
+}
+
+function renderDiff(toolName: string, obj: Record<string, unknown>) {
   const filePath = typeof obj.file_path === 'string' ? obj.file_path : 'file'
 
   if (toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string') {
@@ -176,81 +269,17 @@ function renderPreview(
     return <DiffViewer filePath={filePath} oldString="" newString={obj.content} />
   }
 
-  if (toolName === 'Bash' && typeof obj.command === 'string') {
-    return (
-      <TerminalChrome title={typeof obj.description === 'string' ? obj.description : filePath}>
-        <div className="px-3 py-2.5 font-[var(--font-mono)] text-[11px] leading-[1.3] text-[var(--color-terminal-fg)]">
-          <span className="text-[var(--color-terminal-accent)]">$</span> {obj.command}
-        </div>
-      </TerminalChrome>
-    )
-  }
-
-  if (toolName === 'Read') {
-    return null
-  }
-
-  if (result) {
-    const text = extractTextContent(result.content)
-    if (text) {
-      return (
-        <>
-          <InlineImageGallery text={text} />
-          <div className={`overflow-hidden rounded-lg border ${
-            result.isError
-              ? 'border-[var(--color-error)]/20 bg-[var(--color-error-container)]/60'
-              : 'border-[var(--color-border)] bg-[var(--color-surface)]'
-          }`}>
-            <div className="flex items-center justify-between border-b border-[var(--color-border)]/60 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
-              <span>{result.isError ? t?.('tool.errorOutput') ?? 'Error Output' : t?.('tool.toolOutput') ?? 'Tool Output'}</span>
-              <CopyButton
-                text={text}
-                className="rounded-md border border-[var(--color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]"
-              />
-            </div>
-            <CodeViewer code={text} language="plaintext" maxLines={18} />
-          </div>
-        </>
-      )
-    }
-  }
-
   return null
 }
 
-function renderDetails(
-  toolName: string,
-  obj: Record<string, unknown>,
-  t?: (key: TranslationKey, params?: Record<string, string | number>) => string,
-  partialInput?: string,
-) {
-  if (partialInput) {
-    if (toolName === 'Write') {
-      const writerContent = extractPartialJsonStringField(partialInput, 'content')
-      if (writerContent) {
-        return renderWriterPreview(writerContent, t)
-      }
+function renderStreamingInput(toolName: string, partialInput: string, t: Translate) {
+  if (toolName === 'Write') {
+    const writerContent = extractPartialJsonStringField(partialInput, 'content')
+    if (writerContent) {
+      return renderWriterPreview(writerContent, t)
     }
-    return renderPartialInput(partialInput, t)
   }
-
-  if (toolName === 'Edit' || toolName === 'Write') {
-    return null
-  }
-
-  const text = JSON.stringify(obj, null, 2)
-  return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
-        <span>{t?.('tool.toolInput') ?? 'Tool Input'}</span>
-        <CopyButton
-          text={text}
-          className="rounded-md border border-[var(--color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]"
-        />
-      </div>
-      <CodeViewer code={text} language="json" maxLines={18} />
-    </div>
-  )
+  return renderPartialInput(partialInput, t)
 }
 
 function extractPartialJsonStringField(source: string, field: string): string | null {
@@ -342,7 +371,7 @@ function renderWriterPreview(
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] select-none px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
         <span>{t?.('tool.writerPreview') ?? 'Writer'}</span>
         {isWindowed ? (
           <span className="normal-case tracking-normal">
@@ -363,7 +392,7 @@ function renderPartialInput(
 ) {
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="border-b border-[var(--color-border)] px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
+      <div className="border-b border-[var(--color-border)] select-none px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
         {t?.('tool.partialInput') ?? 'Partial input'}
       </div>
       <CodeViewer code={partialInput} language="json" maxLines={8} />

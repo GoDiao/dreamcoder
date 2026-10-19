@@ -1795,11 +1795,15 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
       <div
         ref={scrollContainerRef}
         onScroll={updateAutoScrollState}
-        className={`${CHAT_SCROLL_AREA_CLASS} h-full overflow-y-auto ${compact ? 'px-3 py-3 pb-5' : 'px-4 py-4'}`}
+        className={`${CHAT_SCROLL_AREA_CLASS} flex h-full flex-col overflow-y-auto ${compact ? 'px-3 py-3 pb-5' : 'px-4 py-4'}`}
       >
+        {/* The column is a flex item on purpose: WebKit (the macOS app) fills the
+            "selection gaps" between fully selected blocks out to the nearest selection
+            root, and a flex item is one, so a highlight stays inside the column instead
+            of spanning the scroll area. Rows inside stay in block flow (margins collapse). */}
         <div
           ref={scrollContentRef}
-          className={compact ? 'mx-auto max-w-full' : 'mx-auto max-w-[860px]'}
+          className={`w-full shrink-0 ${compact ? 'mx-auto max-w-full' : 'mx-auto max-w-[860px]'}`}
         >
           {virtualTranscriptWindow.enabled ? (
             <VirtualSpacer height={virtualTranscriptWindow.beforeHeight} position="top" />
