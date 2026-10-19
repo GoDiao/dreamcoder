@@ -1,9 +1,12 @@
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
+import { mapResponsesUsage } from '../transform/openaiResponsesToAnthropic.js'
+import type { OpenAIResponsesUsage } from '../transform/types.js'
 
 type StreamState = {
   nextContentIndex: number
   indexByKey: Map<string, number>
   toolIndexByItemId: Map<string, number>
+  reasoningIndexByItemId: Map<string, number>
   model: string
   messageStarted: boolean
   messageStopped: boolean
@@ -25,6 +28,7 @@ export function openaiResponsesStreamToAnthropic(
     nextContentIndex: 0,
     indexByKey: new Map(),
     toolIndexByItemId: new Map(),
+    reasoningIndexByItemId: new Map(),
     model,
     messageStarted: false,
     messageStopped: false,
@@ -164,7 +168,7 @@ function processEvent(
     case 'response.content_part.added': {
       if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
       const part = data.part as Record<string, unknown> | undefined
-      if (!part) break
+      if (part?.type !== 'output_text' && part?.type !== 'refusal') break
 
       const contentIndex = (data.content_index as number) ?? 0
       const outputIndex = (data.output_index as number) ?? 0
@@ -253,6 +257,45 @@ function processEvent(
       break
     }
 
+    case 'response.reasoning_summary_text.delta':
+    case 'response.reasoning_text.delta': {
+      const itemId = (data.item_id as string) || ''
+      let index = state.reasoningIndexByItemId.get(itemId)
+      if (index === undefined) {
+        index = state.nextContentIndex++
+        state.reasoningIndexByItemId.set(itemId, index)
+        if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
+        controller.enqueue(encoder.encode(formatSse('content_block_start', {
+          type: 'content_block_start',
+          index,
+          content_block: { type: 'thinking', thinking: '' },
+        })))
+      }
+
+      const delta = (data.delta as string) || ''
+      controller.enqueue(encoder.encode(formatSse('content_block_delta', {
+        type: 'content_block_delta',
+        index,
+        delta: { type: 'thinking_delta', thinking: delta },
+      })))
+      break
+    }
+
+    case 'response.reasoning_summary_text.done':
+    case 'response.reasoning_text.done':
+    case 'response.reasoning_summary_part.done': {
+      const itemId = (data.item_id as string) || ''
+      const index = state.reasoningIndexByItemId.get(itemId)
+      if (index === undefined) break
+      state.reasoningIndexByItemId.delete(itemId)
+
+      controller.enqueue(encoder.encode(formatSse('content_block_stop', {
+        type: 'content_block_stop',
+        index,
+      })))
+      break
+    }
+
     case 'response.failed':
     case 'error': {
       const response = data.response as Record<string, unknown> | undefined
@@ -272,20 +315,25 @@ function processEvent(
     case 'response.completed': {
       const response = data.response as Record<string, unknown> | undefined
       const status = (response?.status as string) || 'completed'
-      const usage = response?.usage as Record<string, number> | undefined
+      const usage = response?.usage as OpenAIResponsesUsage | undefined
       const hasToolUse = state.toolIndexByItemId.size > 0
 
       const stopReason = status === 'completed'
         ? (hasToolUse ? 'tool_use' : 'end_turn')
         : status === 'incomplete' ? 'max_tokens' : 'end_turn'
 
+      for (const [, index] of state.reasoningIndexByItemId) {
+        controller.enqueue(encoder.encode(formatSse('content_block_stop', {
+          type: 'content_block_stop',
+          index,
+        })))
+      }
+      state.reasoningIndexByItemId.clear()
+
       controller.enqueue(encoder.encode(formatSse('message_delta', {
         type: 'message_delta',
         delta: { stop_reason: stopReason, stop_sequence: null },
-        usage: {
-          input_tokens: usage?.input_tokens ?? 0,
-          output_tokens: usage?.output_tokens ?? 0,
-        },
+        usage: mapResponsesUsage(usage),
       })))
       if (!state.messageStopped) {
         state.messageStopped = true

@@ -70,14 +70,16 @@ function mapFinishReason(reason: string | null): string {
   }
 }
 
-function mapUsage(usage?: OpenAIChatResponse['usage']): AnthropicResponse['usage'] {
+// OpenAI counts cached tokens inside prompt_tokens; Anthropic's input_tokens excludes cache reads.
+export function mapUsage(usage?: OpenAIChatResponse['usage']): AnthropicResponse['usage'] {
   if (!usage) {
     return { input_tokens: 0, output_tokens: 0 }
   }
+  const cached = usage.prompt_tokens_details?.cached_tokens || 0
   return {
-    input_tokens: usage.prompt_tokens || 0,
+    input_tokens: Math.max(0, (usage.prompt_tokens || 0) - cached),
     output_tokens: usage.completion_tokens || 0,
-    cache_read_input_tokens: usage.prompt_tokens_details?.cached_tokens || 0,
+    cache_read_input_tokens: cached,
   }
 }
 

@@ -1,5 +1,6 @@
 import type { OpenAIChatStreamChunk } from '../transform/types.js'
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
+import { mapUsage } from '../transform/openaiChatToAnthropic.js'
 
 type ContentBlockType = 'text' | 'thinking' | 'tool_use'
 
@@ -419,9 +420,7 @@ function handleFinishReason(
   closeAllOpenBlocks(state)
 
   const stopReason = mapFinishReason(finishReason)
-  const usage = chunk.usage
-    ? { output_tokens: chunk.usage.completion_tokens || 0 }
-    : { output_tokens: 0 }
+  const usage = mapUsage(chunk.usage)
 
   const messageDelta: SseEvent = {
     event: 'message_delta',
@@ -447,7 +446,7 @@ function mergeUsageIntoHeldDelta(
   if (!state.heldMessageDelta) return
 
   const data = state.heldMessageDelta.data as Record<string, unknown>
-  data.usage = { output_tokens: usage.completion_tokens || 0 }
+  data.usage = mapUsage(usage)
   state.messageDeltaSent = true
   state.queue.push(state.heldMessageDelta)
   state.heldMessageDelta = null

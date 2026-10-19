@@ -1,6 +1,7 @@
 import type {
   OpenAIResponsesResponse,
   OpenAIResponsesOutputItem,
+  OpenAIResponsesUsage,
   AnthropicResponse,
   AnthropicContentBlock,
 } from './types.js'
@@ -27,10 +28,18 @@ export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, mo
     model: response.model || model,
     stop_reason: mapStatus(response.status, hasToolUse),
     stop_sequence: null,
-    usage: {
-      input_tokens: response.usage?.input_tokens ?? response.usage?.prompt_tokens ?? 0,
-      output_tokens: response.usage?.output_tokens ?? response.usage?.completion_tokens ?? 0,
-    },
+    usage: mapResponsesUsage(response.usage),
+  }
+}
+
+// OpenAI counts cached tokens inside input_tokens; Anthropic's input_tokens excludes cache reads.
+export function mapResponsesUsage(usage?: OpenAIResponsesUsage): AnthropicResponse['usage'] {
+  const legacy = usage as { prompt_tokens?: number; completion_tokens?: number } | undefined
+  const cached = usage?.input_tokens_details?.cached_tokens ?? 0
+  return {
+    input_tokens: Math.max(0, (usage?.input_tokens ?? legacy?.prompt_tokens ?? 0) - cached),
+    output_tokens: usage?.output_tokens ?? legacy?.completion_tokens ?? 0,
+    ...(cached ? { cache_read_input_tokens: cached } : {}),
   }
 }
 

@@ -257,6 +257,37 @@ describe('openaiChatStreamToAnthropic', () => {
     )
     expect(firstBlockStop).toBeLessThan(toolBlockStart)
   })
+
+  test('message_delta usage includes input_tokens + cached tokens from final chunk', async () => {
+    const sseChunks = [
+      'data: {"id":"c-usage","object":"chat.completion.chunk","created":0,"model":"deepseek-chat","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}]}\n\n',
+      'data: {"id":"c-usage","object":"chat.completion.chunk","created":0,"model":"deepseek-chat","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1234,"completion_tokens":42,"total_tokens":1276,"prompt_tokens_details":{"cached_tokens":900}}}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'deepseek-chat'))
+    const msgDelta = events.find((e) => e.event === 'message_delta')!
+    // prompt_tokens includes the cached 900; Anthropic's input_tokens does not.
+    expect(msgDelta.data.usage).toEqual({
+      input_tokens: 334,
+      output_tokens: 42,
+      cache_read_input_tokens: 900,
+    })
+  })
+
+  test('held message_delta merges usage from separate chunk', async () => {
+    const sseChunks = [
+      'data: {"id":"c-split","object":"chat.completion.chunk","created":0,"model":"gpt-4","choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}\n\n',
+      'data: {"id":"c-split","object":"chat.completion.chunk","created":0,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: {"id":"c-split","object":"chat.completion.chunk","created":0,"model":"gpt-4","choices":[],"usage":{"prompt_tokens":500,"completion_tokens":10,"total_tokens":510}}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gpt-4'))
+    const msgDelta = events.find((e) => e.event === 'message_delta')!
+    expect((msgDelta.data.usage as Record<string, number>).input_tokens).toBe(500)
+    expect((msgDelta.data.usage as Record<string, number>).output_tokens).toBe(10)
+  })
 })
 
 describe('openaiResponsesStreamToAnthropic', () => {
@@ -354,6 +385,100 @@ describe('openaiResponsesStreamToAnthropic', () => {
     const delta = events.find((e) => e.event === 'message_delta')!
     expect((delta.data.delta as Record<string, unknown>).stop_reason).toBe('max_tokens')
     expect(events.at(-1)!.event).toBe('message_stop')
+  })
+
+  test('data-only events with reasoning_text parts (OpenRouter shape)', async () => {
+    const sseChunks = [
+      'data: {"type":"response.created","response":{"id":"r-or","model":"gpt-oss-20b","status":"in_progress"}}\n\n',
+      'data: {"type":"response.output_item.added","output_index":0,"item":{"type":"reasoning","id":"rs_empty"}}\n\n',
+      'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_empty"}}\n\n',
+      'data: {"type":"response.output_item.added","output_index":1,"item":{"type":"reasoning","id":"rs_1"}}\n\n',
+      'data: {"type":"response.content_part.added","output_index":1,"item_id":"rs_1","content_index":0,"part":{"type":"reasoning_text","text":""}}\n\n',
+      'data: {"type":"response.reasoning_text.delta","output_index":1,"item_id":"rs_1","content_index":0,"delta":"Compute 17*23."}\n\n',
+      'data: {"type":"response.reasoning_text.done","output_index":1,"item_id":"rs_1","content_index":0,"text":"Compute 17*23."}\n\n',
+      'data: {"type":"response.output_item.added","output_index":2,"item":{"type":"message","id":"msg_1","role":"assistant"}}\n\n',
+      'data: {"type":"response.content_part.added","output_index":2,"item_id":"msg_1","content_index":0,"part":{"type":"output_text","text":""}}\n\n',
+      'data: {"type":"response.output_text.delta","output_index":2,"item_id":"msg_1","content_index":0,"delta":"391"}\n\n',
+      'data: {"type":"response.output_text.done","output_index":2,"item_id":"msg_1","content_index":0,"text":"391"}\n\n',
+      'data: {"type":"response.completed","response":{"id":"r-or","model":"gpt-oss-20b","status":"completed","usage":{"input_tokens":81,"output_tokens":20}}}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-oss-20b'))
+
+    const blocks = events
+      .filter((e) => e.event === 'content_block_start' || e.event === 'content_block_stop')
+      .map((e) => e.event === 'content_block_start'
+        ? `start:${e.data.index}:${(e.data.content_block as Record<string, unknown>).type}`
+        : `stop:${e.data.index}`)
+    expect(blocks).toEqual(['start:0:thinking', 'stop:0', 'start:1:text', 'stop:1'])
+
+    const deltas = events
+      .filter((e) => e.event === 'content_block_delta')
+      .map((e) => e.data.delta as Record<string, unknown>)
+    expect(deltas).toEqual([
+      { type: 'thinking_delta', thinking: 'Compute 17*23.' },
+      { type: 'text_delta', text: '391' },
+    ])
+  })
+
+  test('reasoning summary streaming produces thinking block', async () => {
+    const sseChunks = [
+      'event: response.created\ndata: {"id":"r-reason","model":"o3","status":"in_progress"}\n\n',
+      'event: response.output_item.added\ndata: {"output_index":0,"item":{"type":"reasoning","id":"rsn_1"}}\n\n',
+      'event: response.reasoning_summary_text.delta\ndata: {"item_id":"rsn_1","delta":"Step 1: "}\n\n',
+      'event: response.reasoning_summary_text.delta\ndata: {"item_id":"rsn_1","delta":"analyze"}\n\n',
+      'event: response.reasoning_summary_text.done\ndata: {"item_id":"rsn_1","text":"Step 1: analyze"}\n\n',
+      'event: response.reasoning_summary_part.done\ndata: {"item_id":"rsn_1","part":{"type":"summary_text","text":"Step 1: analyze"}}\n\n',
+      'event: response.output_item.added\ndata: {"output_index":1,"item":{"type":"message","role":"assistant"}}\n\n',
+      'event: response.content_part.added\ndata: {"output_index":1,"content_index":0,"part":{"type":"output_text","text":""}}\n\n',
+      'event: response.output_text.delta\ndata: {"output_index":1,"content_index":0,"delta":"Answer"}\n\n',
+      'event: response.output_text.done\ndata: {"output_index":1,"content_index":0,"text":"Answer"}\n\n',
+      'event: response.completed\ndata: {"response":{"id":"r-reason","model":"o3","status":"completed","usage":{"input_tokens":50,"output_tokens":20}}}\n\n',
+    ]
+
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'o3'))
+
+    const thinkingStart = events.find(
+      (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'thinking',
+    )
+    expect(thinkingStart).toBeDefined()
+
+    const thinkingDeltas = events.filter(
+      (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'thinking_delta',
+    )
+    expect(thinkingDeltas.length).toBe(2)
+    const thinkingText = thinkingDeltas.map((e) => (e.data.delta as Record<string, unknown>).thinking).join('')
+    expect(thinkingText).toBe('Step 1: analyze')
+
+    const types = events.map((e) => e.event)
+    const lastBlockStopIdx = types.lastIndexOf('content_block_stop')
+    const msgDeltaIdx = types.indexOf('message_delta')
+    expect(lastBlockStopIdx).toBeLessThan(msgDeltaIdx)
+
+    const startIdx = events.filter((e) => e.event === 'content_block_start').map((e) => e.data.index)
+    const stopIdx = events.filter((e) => e.event === 'content_block_stop').map((e) => e.data.index)
+    expect([...stopIdx].sort()).toEqual([...startIdx].sort())
+  })
+
+  test('cached tokens surfaced in message_delta usage', async () => {
+    const sseChunks = [
+      'event: response.created\ndata: {"id":"r-cache","model":"gpt-4o","status":"in_progress"}\n\n',
+      'event: response.output_item.added\ndata: {"output_index":0,"item":{"type":"message","role":"assistant"}}\n\n',
+      'event: response.content_part.added\ndata: {"output_index":0,"content_index":0,"part":{"type":"output_text","text":""}}\n\n',
+      'event: response.output_text.delta\ndata: {"output_index":0,"content_index":0,"delta":"Hi"}\n\n',
+      'event: response.output_text.done\ndata: {"output_index":0,"content_index":0,"text":"Hi"}\n\n',
+      'event: response.completed\ndata: {"response":{"id":"r-cache","model":"gpt-4o","status":"completed","usage":{"input_tokens":100,"output_tokens":5,"total_tokens":105,"input_tokens_details":{"cached_tokens":80}}}}\n\n',
+    ]
+
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-4o'))
+    const msgDelta = events.find((e) => e.event === 'message_delta')!
+    // input_tokens includes the cached 80; Anthropic's input_tokens does not.
+    expect(msgDelta.data.usage).toEqual({
+      input_tokens: 20,
+      output_tokens: 5,
+      cache_read_input_tokens: 80,
+    })
   })
 })
 
