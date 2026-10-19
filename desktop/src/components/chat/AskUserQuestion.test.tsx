@@ -61,7 +61,6 @@ describe('AskUserQuestion', () => {
               ],
             },
           },
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',

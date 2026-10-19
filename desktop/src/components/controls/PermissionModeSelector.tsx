@@ -6,6 +6,7 @@ import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
+import { computerUseApi } from '../../api/computerUse'
 import type { PermissionMode } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
@@ -39,6 +40,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const [confirmDialog, setConfirmDialog] = useState(false)
   const [confirmMounted, setConfirmMounted] = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
+  const [computerUseEnabled, setComputerUseEnabled] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -129,6 +131,16 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
     setConfirmVisible(false)
     const timer = window.setTimeout(() => setConfirmMounted(false), 180)
     return () => window.clearTimeout(timer)
+  }, [confirmDialog])
+
+  // Bypass mode skips the per-call confirmation of Computer Use actions too.
+  useEffect(() => {
+    if (!confirmDialog) return
+    let cancelled = false
+    computerUseApi.getConfig()
+      .then(config => { if (!cancelled) setComputerUseEnabled(config.enabled) })
+      .catch(() => { if (!cancelled) setComputerUseEnabled(false) })
+    return () => { cancelled = true }
   }, [confirmDialog])
 
   const closeConfirmDialog = useCallback(() => setConfirmDialog(false), [])
@@ -250,6 +262,12 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
                   {t('permMode.permPackages')}
                 </li>
               </ul>
+              {computerUseEnabled ? (
+                <p role="note" className="mt-3 flex items-start gap-2 text-xs text-[var(--color-error)]">
+                  <span className="material-symbols-outlined text-[14px] mt-0.5">warning</span>
+                  {t('permMode.computerUseBypassWarning')}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-container-low)]">

@@ -1,83 +1,86 @@
 import { api } from './client'
 
+export type PermissionState = 'granted' | 'denied' | 'unknown'
+
+export type InstallPhase =
+  | 'downloading'
+  | 'verifying'
+  | 'installing'
+  | 'disabling_telemetry'
+  | 'checking_version'
+  | 'done'
+  | 'failed'
+
+export type InstallProgress = {
+  phase: InstallPhase
+  startedAt: string
+  finishedAt?: string
+  output: string[]
+  error?: string
+}
+
+export type CuaDriverInstallState =
+  | 'not_installed'
+  | 'installing'
+  | 'installed'
+  | 'outdated'
+  | 'missing_executable'
+
 export type ComputerUseStatus = {
   platform: string
-  supported: boolean
-  python: {
-    installed: boolean
-    version: string | null
-    path: string | null
-    source: 'custom' | 'system' | 'venv' | null
-    error: string | null
-  }
-  venv: {
-    created: boolean
-    path: string
-  }
-  dependencies: {
-    installed: boolean
-    requirementsFound: boolean
-  }
-  permissions: {
-    accessibility: boolean | null
-    screenRecording: boolean | null
-  }
+  platformSupported: boolean
+  state: CuaDriverInstallState
+  verifiedVersion: string
+  version: string | null
+  newerThanVerified: boolean
+  path: string | null
+  source: 'custom' | 'existing' | 'dreamcoder' | null
+  install: InstallProgress | null
+  permissions: { accessibility: PermissionState; screenRecording: PermissionState } | null
+  telemetry: 'enabled' | 'disabled' | 'unknown'
+  enabled: boolean
+  driverPath: string | null
+  conflicts: { reservedName: boolean; duplicates: string[] }
+  legacyRuntime: { present: boolean; path: string; bytes: number }
 }
-
-export type SetupStep = {
-  name: string
-  ok: boolean
-  message: string
-}
-
-export type SetupResult = {
-  success: boolean
-  steps: SetupStep[]
-}
-
-export type InstalledApp = {
-  bundleId: string
-  displayName: string
-  path: string
-}
-
-export type AuthorizedApp = {
-  bundleId: string
-  displayName: string
-  authorizedAt: string
-}
-
-export type ComputerUseMode = 'vision' | 'uia_tree'
 
 export type ComputerUseConfig = {
   enabled: boolean
-  mode: ComputerUseMode
-  authorizedApps: AuthorizedApp[]
-  grantFlags: {
-    clipboardRead: boolean
-    clipboardWrite: boolean
-    systemKeyCombos: boolean
-  }
-  pythonPath: string | null
+  driverPath: string | null
 }
+
+export type CommandOutput = { ok: boolean; output: string }
 
 export const computerUseApi = {
   getStatus() {
-    return api.get<ComputerUseStatus>('/api/computer-use/status')
+    return api.get<ComputerUseStatus>('/api/computer-use/status', { timeout: 60_000 })
   },
-  runSetup() {
-    return api.post<SetupResult>('/api/computer-use/setup', undefined, { timeout: 300_000 })
+  install() {
+    return api.post<InstallProgress>('/api/computer-use/install')
   },
-  getInstalledApps() {
-    return api.get<{ apps: InstalledApp[] }>('/api/computer-use/apps')
+  getConfig() {
+    return api.get<ComputerUseConfig>('/api/computer-use/config')
   },
-  getAuthorizedApps() {
-    return api.get<ComputerUseConfig>('/api/computer-use/authorized-apps')
+  updateConfig(config: Partial<ComputerUseConfig>) {
+    return api.put<ComputerUseConfig>('/api/computer-use/config', config)
   },
-  setAuthorizedApps(config: Partial<ComputerUseConfig>) {
-    return api.put<{ ok: true }>('/api/computer-use/authorized-apps', config)
+  grantPermissions() {
+    return api.post<CommandOutput & { permissions: ComputerUseStatus['permissions'] }>(
+      '/api/computer-use/permissions/grant',
+      undefined,
+      { timeout: 180_000 },
+    )
+  },
+  doctor() {
+    return api.get<CommandOutput>('/api/computer-use/doctor', { timeout: 90_000 })
+  },
+  disableTelemetry() {
+    return api.post<{ telemetry: ComputerUseStatus['telemetry'] }>('/api/computer-use/telemetry/disable')
   },
   openSettings(pane: 'Privacy_ScreenCapture' | 'Privacy_Accessibility') {
     return api.post<{ ok: true }>('/api/computer-use/open-settings', { pane })
+  },
+  cleanupLegacyRuntime() {
+    return api.post<ComputerUseStatus['legacyRuntime']>('/api/computer-use/legacy-runtime/cleanup')
   },
 }

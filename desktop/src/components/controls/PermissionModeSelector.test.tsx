@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 
@@ -12,6 +12,14 @@ vi.mock('../../hooks/useMobileViewport', () => ({
 
 vi.mock('../../lib/desktopRuntime', () => ({
   isTauriRuntime: () => false,
+}))
+
+const computerUseMocks = vi.hoisted(() => ({
+  getConfig: vi.fn(async () => ({ enabled: false, driverPath: null })),
+}))
+
+vi.mock('../../api/computerUse', () => ({
+  computerUseApi: computerUseMocks,
 }))
 
 vi.mock('../../i18n', () => ({
@@ -37,6 +45,7 @@ vi.mock('../../i18n', () => ({
     'permMode.permShell': 'Run shell commands',
     'permMode.permPackages': 'Install packages',
     'permMode.enableBypassBtn': 'Enable bypass',
+    'permMode.computerUseBypassWarning': 'Computer Use actions will no longer ask for confirmation.',
     'common.cancel': 'Cancel',
     'tabs.close': 'Close',
   }[key] ?? key),
@@ -50,6 +59,7 @@ import { useTabStore } from '../../stores/tabStore'
 describe('PermissionModeSelector', () => {
   beforeEach(() => {
     viewportMocks.isMobile = false
+    computerUseMocks.getConfig.mockResolvedValue({ enabled: false, driverPath: null })
     useSettingsStore.setState({ permissionMode: 'default' })
     useSessionStore.setState({ sessions: [], activeSessionId: null })
     useTabStore.setState({ activeTabId: null, tabs: [] })
@@ -140,5 +150,23 @@ describe('PermissionModeSelector', () => {
     render(<PermissionModeSelector />)
 
     expect(screen.getByRole('button', { name: "Don't ask" })).toHaveTextContent("Don't ask")
+  })
+
+  it('warns that Computer Use actions skip confirmation when bypass is enabled with Computer Use on', async () => {
+    computerUseMocks.getConfig.mockResolvedValue({ enabled: true, driverPath: null })
+    render(<PermissionModeSelector workDir="/repo" />)
+    fireEvent.click(screen.getByRole('button', { name: /Default/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      'Computer Use actions will no longer ask for confirmation.',
+    )
+  })
+
+  it('shows no Computer Use warning when Computer Use is off', async () => {
+    render(<PermissionModeSelector workDir="/repo" />)
+    fireEvent.click(screen.getByRole('button', { name: /Default/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
+    await waitFor(() => expect(computerUseMocks.getConfig).toHaveBeenCalled())
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
 })
