@@ -22,6 +22,7 @@ describe('ConversationService', () => {
   let originalPath: string | undefined
   let originalShell: string | undefined
   let originalZdotdir: string | undefined
+  let originalNvmDir: string | undefined
   let originalDisableTerminalShellEnv: string | undefined
 
   beforeEach(async () => {
@@ -40,6 +41,7 @@ describe('ConversationService', () => {
     originalPath = process.env.PATH
     originalShell = process.env.SHELL
     originalZdotdir = process.env.ZDOTDIR
+    originalNvmDir = process.env.NVM_DIR
     originalDisableTerminalShellEnv = process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV
 
     process.env.DREAMCODER_CONFIG_DIR = tmpDir
@@ -98,6 +100,9 @@ describe('ConversationService', () => {
 
     if (originalZdotdir === undefined) delete process.env.ZDOTDIR
     else process.env.ZDOTDIR = originalZdotdir
+
+    if (originalNvmDir === undefined) delete process.env.NVM_DIR
+    else process.env.NVM_DIR = originalNvmDir
 
     if (originalDisableTerminalShellEnv === undefined) delete process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV
     else process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV = originalDisableTerminalShellEnv
@@ -180,6 +185,7 @@ describe('ConversationService', () => {
     process.env.SHELL = shellPath
     process.env.PATH = '/usr/bin:/bin'
     delete process.env.ZDOTDIR
+    delete process.env.NVM_DIR
     resetTerminalShellEnvironmentCacheForTests()
 
     const service = new ConversationService() as any
