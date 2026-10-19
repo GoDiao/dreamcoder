@@ -1,28 +1,14 @@
 import { describe, expect, it } from 'bun:test'
+import { CUA_MCP_SERVER_NAME, isCuaMCPServer } from './common.js'
 
-import {
-  getCliComputerUseCapabilities,
-  isComputerUseSupportedPlatform,
-} from './common.js'
-
-describe('computer use platform helpers', () => {
-  it('recognizes supported platforms', () => {
-    expect(isComputerUseSupportedPlatform('darwin')).toBe(true)
-    expect(isComputerUseSupportedPlatform('win32')).toBe(true)
-    expect(isComputerUseSupportedPlatform('linux')).toBe(false)
+describe('cua reserved MCP name', () => {
+  it('is cua', () => {
+    expect(CUA_MCP_SERVER_NAME).toBe('cua')
   })
 
-  it('returns macOS capabilities with native screenshot filtering', () => {
-    expect(getCliComputerUseCapabilities('darwin')).toEqual({
-      screenshotFiltering: 'native',
-      platform: 'darwin',
-    })
-  })
-
-  it('returns Windows capabilities with unfiltered screenshots', () => {
-    expect(getCliComputerUseCapabilities('win32')).toEqual({
-      screenshotFiltering: 'none',
-      platform: 'win32',
-    })
+  it('matches the name after MCP normalization only', () => {
+    expect(isCuaMCPServer('cua')).toBe(true)
+    expect(isCuaMCPServer('computer-use')).toBe(false)
+    expect(isCuaMCPServer('cua-computer-use')).toBe(false)
   })
 })

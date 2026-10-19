@@ -1,57 +1,33 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  DEFAULT_DESKTOP_GRANT_FLAGS,
-  resolveStoredComputerUseConfig,
-} from './preauthorizedConfig.js'
+import { resolveStoredComputerUseConfig } from './preauthorizedConfig.js'
 
 describe('resolveStoredComputerUseConfig', () => {
-  test('keeps desktop grant flags enabled by default even without authorized apps', () => {
-    expect(resolveStoredComputerUseConfig()).toEqual({
+  test('is off by default', () => {
+    expect(resolveStoredComputerUseConfig()).toEqual({ enabled: false, driverPath: null })
+  })
+
+  test('keeps an explicit enabled state', () => {
+    expect(resolveStoredComputerUseConfig({ enabled: true })).toEqual({
       enabled: true,
-      authorizedApps: [],
-      grantFlags: DEFAULT_DESKTOP_GRANT_FLAGS,
-      mode: 'vision',
-      pythonPath: null,
+      driverPath: null,
     })
   })
 
-  test('preserves an explicit disabled state', () => {
-    expect(resolveStoredComputerUseConfig({ enabled: false })).toMatchObject({
-      enabled: false,
-      authorizedApps: [],
-    })
-  })
-
-  test('merges stored grant flags without discarding unspecified defaults', () => {
+  test('ignores fields of the Python-based implementation', () => {
     expect(
       resolveStoredComputerUseConfig({
-        grantFlags: {
-          clipboardRead: false,
-        },
-      }),
-    ).toEqual({
-      enabled: true,
-      authorizedApps: [],
-      grantFlags: {
-        clipboardRead: false,
-        clipboardWrite: true,
-        systemKeyCombos: true,
-      },
-      mode: 'vision',
-      pythonPath: null,
-    })
+        enabled: true,
+        mode: 'uia_tree',
+        authorizedApps: [{ bundleId: 'com.apple.Safari', displayName: 'Safari' }],
+        pythonPath: '/usr/bin/python3',
+      } as never),
+    ).toEqual({ enabled: true, driverPath: null })
   })
 
-  test('normalizes a stored custom Python interpreter path', () => {
-    expect(
-      resolveStoredComputerUseConfig({
-        pythonPath: '  C:\\Users\\me\\miniconda3\\envs\\cu\\python.exe  ',
-      }),
-    ).toMatchObject({
-      pythonPath: 'C:\\Users\\me\\miniconda3\\envs\\cu\\python.exe',
-    })
-    expect(resolveStoredComputerUseConfig({ pythonPath: '' })).toMatchObject({
-      pythonPath: null,
-    })
+  test('normalizes the custom driver path', () => {
+    expect(resolveStoredComputerUseConfig({ driverPath: '  /opt/cua-driver  ' }).driverPath).toBe(
+      '/opt/cua-driver',
+    )
+    expect(resolveStoredComputerUseConfig({ driverPath: '   ' }).driverPath).toBeNull()
   })
 })

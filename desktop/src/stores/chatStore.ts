@@ -20,8 +20,6 @@ import type {
   AttachmentRef,
   BackgroundAgentTask,
   ChatState,
-  ComputerUsePermissionRequest,
-  ComputerUsePermissionResponse,
   UIAttachment,
   UIMessage,
   ServerMessage,
@@ -65,10 +63,6 @@ export type PerSessionState = {
     input: unknown
     description?: string
   } | null
-  pendingComputerUsePermission: {
-    requestId: string
-    request: ComputerUsePermissionRequest
-  } | null
   tokenUsage: TokenUsage
   elapsedSeconds: number
   statusVerb: string
@@ -97,7 +91,6 @@ const DEFAULT_SESSION_STATE: PerSessionState = {
   activeToolName: null,
   activeThinkingId: null,
   pendingPermission: null,
-  pendingComputerUsePermission: null,
   tokenUsage: { input_tokens: 0, output_tokens: 0 },
   elapsedSeconds: 0,
   statusVerb: '',
@@ -136,11 +129,6 @@ type ChatStore = {
       rule?: string
       updatedInput?: Record<string, unknown>
     },
-  ) => void
-  respondToComputerUsePermission: (
-    sessionId: string,
-    requestId: string,
-    response: ComputerUsePermissionResponse,
   ) => void
   setSessionRuntime: (sessionId: string, selection: RuntimeSelection) => void
   setSessionPermissionMode: (sessionId: string, mode: PermissionMode) => void
@@ -900,20 +888,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({ pendingPermission: null, chatState: allowed ? 'tool_executing' : 'idle' })) }))
   },
 
-  respondToComputerUsePermission: (sessionId, requestId, response) => {
-    wsManager.send(sessionId, {
-      type: 'computer_use_permission_response',
-      requestId,
-      response,
-    })
-    set((s) => ({
-      sessions: updateSessionIn(s.sessions, sessionId, () => ({
-        pendingComputerUsePermission: null,
-        chatState: response.userConsented === false ? 'idle' : 'tool_executing',
-      })),
-    }))
-  },
-
   setSessionRuntime: (sessionId, selection) => {
     wsManager.send(sessionId, runtimeConfigMessage(selection))
   },
@@ -941,7 +915,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             ...session,
             chatState: 'idle',
             pendingPermission: null,
-            pendingComputerUsePermission: null,
             apiRetry: null,
             elapsedTimer: null,
           },
@@ -1028,7 +1001,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             streamingText: '',
             streamingToolInput: '',
             pendingPermission: null,
-            pendingComputerUsePermission: null,
             elapsedTimer: null,
             statusVerb: '',
             apiRetry: null,
@@ -1400,7 +1372,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             input: msg.input,
             description: msg.description,
           },
-          pendingComputerUsePermission: null,
           chatState: 'permission_pending',
           activeThinkingId: null,
           apiRetry: null,
@@ -1417,27 +1388,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                   description: msg.description,
                   timestamp: Date.now(),
                 }),
-        }))
-        break
-
-      case 'computer_use_permission_request':
-        notifyDesktop({
-          dedupeKey: `computer-use-permission:${msg.requestId}`,
-          cooldownScope: 'permission-prompt',
-          requestAttention: true,
-          title: t('notifications.permissionPrompt.title'),
-          body: msg.request.reason || t('notifications.permissionPrompt.computerUseBody'),
-          target: { type: 'session', sessionId },
-        })
-        update(() => ({
-          pendingComputerUsePermission: {
-            requestId: msg.requestId,
-            request: msg.request,
-          },
-          pendingPermission: null,
-          chatState: 'permission_pending',
-          activeThinkingId: null,
-          apiRetry: null,
         }))
         break
 
@@ -1462,7 +1412,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           chatState: 'idle',
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           elapsedTimer: null,
           apiRetry: null,
         }))
@@ -1500,7 +1449,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             streamingText: '',
             statusVerb: '',
             pendingPermission: null,
-            pendingComputerUsePermission: null,
             apiRetry: null,
           }
         })
@@ -1558,7 +1506,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             activeToolName: null,
             activeThinkingId: null,
             pendingPermission: null,
-            pendingComputerUsePermission: null,
             chatState: 'idle',
             elapsedTimer: null,
             elapsedSeconds: 0,

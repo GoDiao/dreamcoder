@@ -251,52 +251,6 @@ export type AppState = DeepImmutable<{
   bagelUrl?: string
   // WebBrowser tool: sticky panel visibility toggle
   bagelPanelVisible?: boolean
-  // chicago MCP session state. Types inlined (not imported from
-  // @ant/computer-use-mcp/types) so external typecheck passes without the
-  // ant-scoped dep resolved. Shapes match `AppGrant`/`CuGrantFlags`
-  // structurally — wrapper.tsx assigns via structural compatibility. Only
-  // populated when feature('CHICAGO_MCP') is active.
-  computerUseMcpState?: {
-    // Session-scoped app allowlist. NOT persisted across resume.
-    allowedApps?: readonly {
-      bundleId: string
-      displayName: string
-      grantedAt: number
-    }[]
-    // Clipboard/system-key grant flags (orthogonal to allowlist).
-    grantFlags?: {
-      clipboardRead: boolean
-      clipboardWrite: boolean
-      systemKeyCombos: boolean
-    }
-    // Dims-only (NOT the blob) for scaleCoord after compaction. The full
-    // `ScreenshotResult` including base64 is process-local in wrapper.tsx.
-    lastScreenshotDims?: {
-      width: number
-      height: number
-      displayWidth: number
-      displayHeight: number
-      displayId?: number
-      originX?: number
-      originY?: number
-    }
-    // Accumulated by onAppsHidden, cleared + unhidden at turn end.
-    hiddenDuringTurn?: ReadonlySet<string>
-    // Which display CU targets. Written back by the package's
-    // `autoTargetDisplay` resolver via `onResolvedDisplayUpdated`. Persisted
-    // across resume so clicks stay on the display the model last saw.
-    selectedDisplayId?: number
-    // True when the model explicitly picked a display via `switch_display`.
-    // Makes `handleScreenshot` skip the resolver chase chain and honor
-    // `selectedDisplayId` directly. Cleared on resolver writeback (pinned
-    // display unplugged → Swift fell back to main) and on
-    // `switch_display("auto")`.
-    displayPinnedByModel?: boolean
-    // Sorted comma-joined bundle-ID set the display was last auto-resolved
-    // for. `handleScreenshot` only re-resolves when the allowed set has
-    // changed since — keeps the resolver from yanking on every screenshot.
-    displayResolvedForApps?: string
-  }
   // REPL tool VM context - persists across REPL calls for state sharing
   replContext?: {
     vmContext: import('vm').Context

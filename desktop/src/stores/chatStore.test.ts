@@ -153,7 +153,6 @@ function makeSession(overrides: Partial<PerSessionState> = {}): PerSessionState 
     activeToolName: null,
     activeThinkingId: null,
     pendingPermission: null,
-    pendingComputerUsePermission: null,
     tokenUsage: { input_tokens: 0, output_tokens: 0 },
     elapsedSeconds: 0,
     statusVerb: '',
@@ -602,7 +601,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -686,7 +684,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -800,7 +797,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1181,7 +1177,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1244,7 +1239,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1275,7 +1269,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1570,7 +1563,6 @@ describe('chatStore history mapping', () => {
           activeToolName: 'Read',
           activeThinkingId: 'thinking-1',
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 12, output_tokens: 34 },
           elapsedSeconds: 5,
           statusVerb: 'Thinking',
@@ -1643,7 +1635,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1686,7 +1677,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: 'Compacting conversation',
@@ -1738,7 +1728,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1786,7 +1775,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -1840,7 +1828,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2079,7 +2066,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2124,7 +2110,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2218,74 +2203,6 @@ describe('chatStore history mapping', () => {
     expect(refreshTasksMock).toHaveBeenNthCalledWith(2, 'session-b')
   })
 
-  it('tracks Computer Use approval requests separately from generic tool permissions', () => {
-    useChatStore.setState({
-      sessions: {
-        [TEST_SESSION_ID]: {
-          messages: [],
-          chatState: 'idle',
-          connectionState: 'connected',
-          streamingText: '',
-          streamingToolInput: '',
-          activeToolUseId: null,
-          activeToolName: null,
-          activeThinkingId: null,
-          pendingPermission: null,
-          pendingComputerUsePermission: null,
-          tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
-          statusVerb: '',
-          slashCommands: [],
-          agentTaskNotifications: {},
-          elapsedTimer: null,
-        },
-      },
-    })
-
-    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
-      type: 'computer_use_permission_request',
-      requestId: 'cu-1',
-      request: {
-        requestId: 'cu-1',
-        reason: 'Open Finder and inspect a file',
-        apps: [
-          {
-            requestedName: 'Finder',
-            resolved: {
-              bundleId: 'com.apple.finder',
-              displayName: 'Finder',
-            },
-            isSentinel: false,
-            alreadyGranted: false,
-            proposedTier: 'full',
-          },
-        ],
-        requestedFlags: { clipboardRead: true },
-        screenshotFiltering: 'native',
-      },
-    })
-
-    expect(
-      useChatStore.getState().sessions[TEST_SESSION_ID]?.pendingComputerUsePermission,
-    ).toMatchObject({
-      requestId: 'cu-1',
-      request: {
-        reason: 'Open Finder and inspect a file',
-      },
-    })
-    expect(
-      useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState,
-    ).toBe('permission_pending')
-    expect(notifyDesktopMock).toHaveBeenCalledWith({
-      dedupeKey: 'computer-use-permission:cu-1',
-      cooldownScope: 'permission-prompt',
-      requestAttention: true,
-      title: 'DreamCoder 需要你的确认',
-      body: 'Open Finder and inspect a file',
-      target: { type: 'session', sessionId: TEST_SESSION_ID },
-    })
-  })
-
   it('keeps delayed text blocks from one streamed assistant turn in a single message', () => {
     vi.useFakeTimers()
 
@@ -2301,7 +2218,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2591,7 +2507,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2693,7 +2608,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2745,7 +2659,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2777,7 +2690,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2794,72 +2706,6 @@ describe('chatStore history mapping', () => {
     })
 
     expect(notifyDesktopMock).not.toHaveBeenCalled()
-  })
-
-  it('sends Computer Use approval payloads back over websocket', () => {
-    useChatStore.setState({
-      sessions: {
-        [TEST_SESSION_ID]: {
-          messages: [],
-          chatState: 'permission_pending',
-          connectionState: 'connected',
-          streamingText: '',
-          streamingToolInput: '',
-          activeToolUseId: null,
-          activeToolName: null,
-          activeThinkingId: null,
-          pendingPermission: null,
-          pendingComputerUsePermission: {
-            requestId: 'cu-1',
-            request: {
-              requestId: 'cu-1',
-              reason: 'Open Finder',
-              apps: [],
-              requestedFlags: {},
-              screenshotFiltering: 'native',
-            },
-          },
-          tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
-          statusVerb: '',
-          slashCommands: [],
-          agentTaskNotifications: {},
-          elapsedTimer: null,
-        },
-      },
-    })
-
-    useChatStore.getState().respondToComputerUsePermission(TEST_SESSION_ID, 'cu-1', {
-      granted: [],
-      denied: [],
-      flags: {
-        clipboardRead: true,
-        clipboardWrite: false,
-        systemKeyCombos: false,
-      },
-      userConsented: true,
-    })
-
-    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, {
-      type: 'computer_use_permission_response',
-      requestId: 'cu-1',
-      response: {
-        granted: [],
-        denied: [],
-        flags: {
-          clipboardRead: true,
-          clipboardWrite: false,
-          systemKeyCombos: false,
-        },
-        userConsented: true,
-      },
-    })
-    expect(
-      useChatStore.getState().sessions[TEST_SESSION_ID]?.pendingComputerUsePermission,
-    ).toBeNull()
-    expect(
-      useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState,
-    ).toBe('tool_executing')
   })
 
   it('routes member-session messages through team mailbox delivery instead of websocket', async () => {
@@ -2882,7 +2728,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',
@@ -2923,7 +2768,6 @@ describe('chatStore history mapping', () => {
           activeToolName: null,
           activeThinkingId: null,
           pendingPermission: null,
-          pendingComputerUsePermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
           elapsedSeconds: 0,
           statusVerb: '',

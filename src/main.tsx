@@ -1480,11 +1480,11 @@ async function run(): Promise<CommanderCommand> {
           reservedNameError = `Invalid MCP configuration: "${CLAUDE_IN_CHROME_MCP_SERVER_NAME}" is a reserved MCP name.`;
         } else {
           const {
-            isComputerUseMCPServer,
-            COMPUTER_USE_MCP_SERVER_NAME
+            isCuaMCPServer,
+            CUA_MCP_SERVER_NAME
           } = await import('src/utils/computerUse/common.js');
-          if (nonSdkConfigNames.some(isComputerUseMCPServer)) {
-            reservedNameError = `Invalid MCP configuration: "${COMPUTER_USE_MCP_SERVER_NAME}" is a reserved MCP name.`;
+          if (nonSdkConfigNames.some(isCuaMCPServer)) {
+            reservedNameError = `Invalid MCP configuration: "${CUA_MCP_SERVER_NAME}" is a reserved MCP name.`;
           }
         }
         if (reservedNameError) {
@@ -1598,49 +1598,55 @@ async function run(): Promise<CommanderCommand> {
       }
     }
 
-    // chicago MCP: guarded Computer Use (app allowlist + frontmost gate +
-    // SCContentFilter screenshots). Ant-only, GrowthBook-gated — failures
-    // are silent (this is dogfooding). Platform + interactive checks inline
-    // so non-macOS / print-mode ants skip the heavy @ant/computer-use-mcp
-    // import entirely. gates.js is light (type-only package import).
+    // Computer Use: cua-driver as the built-in `cua` stdio MCP server
+    // (docs/computer-use/cua-driver-tech-design.md). Only read-only tools are
+    // pre-allowed; actions go through the normal permission prompt. Path
+    // resolution is local file checks only — nothing is downloaded here.
     //
     // Placed AFTER the enterprise-MCP-config check: that check rejects any
     // dynamicMcpConfig entry with `type !== 'sdk'`, and our config is
-    // `type: 'stdio'`. An enterprise-config ant with the GB gate on would
-    // otherwise process.exit(1). Chrome has the same latent issue but has
-    // shipped without incident; chicago places itself correctly.
-    if (process.platform === 'darwin' || process.platform === 'win32') {
+    // `type: 'stdio'`.
+    {
       try {
         const {
-          getChicagoEnabled
-        } = await import('src/utils/computerUse/gates.js');
-        const computerUseCliEnabled = options.computerUse !== false;
-        if (getChicagoEnabled() && computerUseCliEnabled) {
+          isCuaDriverSupportedPlatform,
+          resolveCuaDriverPath,
+          CUA_DRIVER_PRIVACY_ENV
+        } = await import('src/server/services/cuaDriverService.js');
+        if (!isCuaDriverSupportedPlatform(process.platform)) {
+          logForDebugging(`[Computer Use] Skipped: unsupported platform ${process.platform}`);
+        } else if (options.computerUse === false) {
+          logForDebugging('[Computer Use] Skipped: disabled by --no-computer-use');
+        } else {
           const {
             loadStoredComputerUseConfig
           } = await import('src/utils/computerUse/preauthorizedConfig.js');
           const computerUseConfig = await loadStoredComputerUseConfig();
           if (!computerUseConfig.enabled) {
-            logForDebugging('[Computer Use MCP] Skipped: disabled in computer-use-config.json');
+            logForDebugging('[Computer Use] Skipped: disabled in computer-use-config.json');
           } else {
-            const {
-              setupComputerUseMCP
-            } = await import('src/utils/computerUse/setup.js');
-            const {
-              mcpConfig,
-              allowedTools: cuTools
-            } = setupComputerUseMCP();
-            dynamicMcpConfig = {
-              ...dynamicMcpConfig,
-              ...mcpConfig
-            };
-            allowedTools.push(...cuTools);
+            const resolved = await resolveCuaDriverPath(computerUseConfig);
+            if (!resolved) {
+              logForDebugging('[Computer Use] Skipped: cua-driver not found');
+            } else {
+              const {
+                setupCuaDriverMCP
+              } = await import('src/utils/computerUse/setup.js');
+              const {
+                mcpConfig,
+                allowedTools: cuaTools
+              } = setupCuaDriverMCP(resolved.path, CUA_DRIVER_PRIVACY_ENV);
+              dynamicMcpConfig = {
+                ...dynamicMcpConfig,
+                ...mcpConfig
+              };
+              allowedTools.push(...cuaTools);
+              logForDebugging(`[Computer Use] cua-driver at ${resolved.path}`);
+            }
           }
-        } else if (!computerUseCliEnabled) {
-          logForDebugging('[Computer Use MCP] Skipped: disabled by --no-computer-use');
         }
       } catch (error) {
-        logForDebugging(`[Computer Use MCP] Setup failed: ${errorMessage(error)}`);
+        logForDebugging(`[Computer Use] Setup failed: ${errorMessage(error)}`);
       }
     }
 

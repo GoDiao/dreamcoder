@@ -342,16 +342,14 @@ describe('ConversationService', () => {
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
   })
 
-  test('buildChildEnv injects desktop Computer Use host bundle id for sdk sessions', async () => {
+  test('buildChildEnv injects the desktop server URL for sdk sessions', async () => {
     const service = new ConversationService() as any
     const env = (await service.buildChildEnv(
       '/tmp',
       'ws://127.0.0.1:3456/sdk/test-session?token=test-token',
     )) as Record<string, string>
 
-    expect(env.DREAMCODER_COMPUTER_USE_HOST_BUNDLE_ID).toBe(
-      'com.dreamcoder.desktop',
-    )
+    expect(env.DREAMCODER_COMPUTER_USE_HOST_BUNDLE_ID).toBeUndefined()
     expect(env.DREAMCODER_DESKTOP_SERVER_URL).toBe('http://127.0.0.1:3456')
     expect(env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING).toBe('1')
   })

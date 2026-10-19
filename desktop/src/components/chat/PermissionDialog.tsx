@@ -5,6 +5,7 @@ import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { Button } from '../shared/Button'
 import { DiffViewer } from './DiffViewer'
+import { getCuaToolDisplay, type CuaToolIcon } from '../../lib/cuaToolDisplay'
 
 type Props = {
   sessionId?: string | null
@@ -26,6 +27,16 @@ const TOOL_META: Record<string, { icon: string; label: string; color: string }> 
   WebFetch: { icon: 'cloud_download', label: 'Web Fetch', color: 'var(--color-secondary)' },
   NotebookEdit: { icon: 'note', label: 'Notebook Edit', color: 'var(--color-brand)' },
   Skill: { icon: 'auto_awesome', label: 'Skill', color: 'var(--color-tertiary)' },
+}
+
+const CUA_MATERIAL_ICONS: Record<CuaToolIcon, string> = {
+  pointer: 'ads_click',
+  keyboard: 'keyboard',
+  screen: 'screenshot_monitor',
+  app: 'apps',
+  browser: 'language',
+  clipboard: 'content_paste',
+  other: 'computer',
 }
 
 function extractToolDetails(toolName: string, input: unknown, t: (key: TranslationKey, params?: Record<string, string | number>) => string): { primary: string; secondary?: string } {
@@ -114,11 +125,17 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
   const isPending = pendingPermission?.requestId === requestId
   const [showRaw, setShowRaw] = useState(false)
 
-  const meta = TOOL_META[toolName] || { icon: 'shield', label: toolName, color: 'var(--color-text-tertiary)' }
-  const details = extractToolDetails(toolName, input, t)
+  const cua = getCuaToolDisplay(toolName, input, t)
+  const meta = cua
+    ? { icon: CUA_MATERIAL_ICONS[cua.icon], label: cua.title, color: 'var(--color-tertiary)' }
+    : TOOL_META[toolName] || { icon: 'shield', label: toolName, color: 'var(--color-text-tertiary)' }
+  const details = cua ? { primary: cua.summary } : extractToolDetails(toolName, input, t)
   const rawInput = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
-  const preview = renderPermissionPreview(toolName, input)
-  const title = getPermissionTitle(toolName, input, t)
+  const preview = cua ? null : renderPermissionPreview(toolName, input)
+  const title = cua ? cua.permissionTitle : getPermissionTitle(toolName, input, t)
+  // CLI-supplied descriptions for MCP tools quote the raw `mcp__cua__…` name; hide those.
+  const shownDescription = cua && description && /mcp__|\bMCP\b/i.test(description) ? undefined : description
+  const detailIcon = cua ? meta.icon : toolName === 'Glob' || toolName === 'Grep' ? 'search' : 'folder_open'
   const allowRawToggle = !preview
 
   return (
@@ -160,8 +177,8 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
               </span>
             )}
           </div>
-          {description && (
-            <p className="mt-0.5 text-xs text-[var(--color-text-secondary)] truncate">{description}</p>
+          {shownDescription && (
+            <p className="mt-0.5 text-xs text-[var(--color-text-secondary)] truncate">{shownDescription}</p>
           )}
         </div>
       </div>
@@ -183,7 +200,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
           <div className="mb-2">
             <div className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
               <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)] flex-shrink-0">
-                {toolName === 'Glob' || toolName === 'Grep' ? 'search' : 'folder_open'}
+                {detailIcon}
               </span>
               <span className="truncate">{details.primary}</span>
             </div>

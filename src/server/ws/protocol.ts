@@ -25,11 +25,6 @@ export type ClientMessage =
       rule?: string
       updatedInput?: Record<string, unknown>
     }
-  | {
-      type: 'computer_use_permission_response'
-      requestId: string
-      response: ComputerUsePermissionResponse
-    }
   | { type: 'set_permission_mode'; mode: PermissionMode }
   | { type: 'set_runtime_config'; providerId: string | null; modelId: string; effort?: string }
   | { type: 'stop_generation' }
@@ -64,11 +59,6 @@ export type ServerMessage =
       toolUseId?: string
       input: unknown
       description?: string
-    }
-  | {
-      type: 'computer_use_permission_request'
-      requestId: string
-      request: ComputerUsePermissionRequest
     }
   | { type: 'message_complete'; usage: TokenUsage }
   | { type: 'thinking'; text: string }
@@ -107,54 +97,4 @@ export type TeamMemberStatus = {
   role: string
   status: 'running' | 'idle' | 'completed' | 'error'
   currentTask?: string
-}
-
-export type ComputerUseGrantFlags = {
-  clipboardRead: boolean
-  clipboardWrite: boolean
-  systemKeyCombos: boolean
-}
-
-export type ComputerUseResolvedApp = {
-  bundleId: string
-  displayName: string
-  path?: string
-  iconDataUrl?: string
-}
-
-export type ComputerUseResolvedAppRequest = {
-  requestedName: string
-  resolved?: ComputerUseResolvedApp
-  isSentinel: boolean
-  alreadyGranted: boolean
-  proposedTier: 'read' | 'click' | 'full'
-}
-
-export type ComputerUsePermissionRequest = {
-  requestId: string
-  reason: string
-  apps: ComputerUseResolvedAppRequest[]
-  requestedFlags: Partial<ComputerUseGrantFlags>
-  screenshotFiltering: 'native' | 'none'
-  tccState?: {
-    accessibility: boolean
-    screenRecording: boolean
-  }
-  willHide?: Array<{ bundleId: string; displayName: string }>
-  autoUnhideEnabled?: boolean
-}
-
-export type ComputerUsePermissionResponse = {
-  granted: Array<{
-    bundleId: string
-    displayName: string
-    grantedAt: number
-    tier?: 'read' | 'click' | 'full'
-  }>
-  denied: Array<{
-    bundleId: string
-    reason: 'user_denied' | 'not_installed'
-  }>
-  flags: ComputerUseGrantFlags
-  userConsented?: boolean
 }

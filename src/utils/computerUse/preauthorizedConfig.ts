@@ -1,71 +1,49 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { CuGrantFlags } from '../../vendor/computer-use-mcp/types.js'
 import { getClaudeConfigHomeDir } from '../envUtils.js'
 
-export type StoredAuthorizedApp = {
-  bundleId: string
-  displayName: string
-  authorizedAt?: string
-}
-
-export type ComputerUseMode = 'vision' | 'uia_tree'
-
+/**
+ * Computer Use settings, stored in `<config>/dreamcoder/computer-use-config.json`.
+ *
+ * Fields from the Python-based implementation (`mode`, `authorizedApps`,
+ * `grantFlags`, `pythonPath`) are ignored on read and dropped on the next save.
+ */
 export type StoredComputerUseConfig = {
   enabled?: boolean
-  mode?: ComputerUseMode
-  authorizedApps?: StoredAuthorizedApp[]
-  grantFlags?: Partial<CuGrantFlags>
-  pythonPath?: string | null
+  driverPath?: string | null
 }
 
-export const DEFAULT_COMPUTER_USE_ENABLED = true
-export const DEFAULT_COMPUTER_USE_MODE: ComputerUseMode = 'vision'
-
-export const DEFAULT_DESKTOP_GRANT_FLAGS: CuGrantFlags = {
-  clipboardRead: true,
-  clipboardWrite: true,
-  systemKeyCombos: true,
+export type ComputerUseConfig = {
+  enabled: boolean
+  driverPath: string | null
 }
+
+// Off by default: turning Computer Use on downloads cua-driver.
+export const DEFAULT_COMPUTER_USE_ENABLED = false
 
 export function getComputerUseConfigPath(): string {
-  return join(
-    getClaudeConfigHomeDir(),
-    'dreamcoder',
-    'computer-use-config.json',
-  )
+  return join(getClaudeConfigHomeDir(), 'dreamcoder', 'computer-use-config.json')
 }
 
-export function resolveStoredComputerUseConfig(
-  config?: StoredComputerUseConfig,
-): {
-  enabled: boolean
-  mode: ComputerUseMode
-  authorizedApps: StoredAuthorizedApp[]
-  grantFlags: CuGrantFlags
-  pythonPath: string | null
-} {
-  return {
-    enabled: config?.enabled ?? DEFAULT_COMPUTER_USE_ENABLED,
-    mode: config?.mode ?? DEFAULT_COMPUTER_USE_MODE,
-    authorizedApps: config?.authorizedApps ?? [],
-    grantFlags: {
-      ...DEFAULT_DESKTOP_GRANT_FLAGS,
-      ...(config?.grantFlags ?? {}),
-    },
-    pythonPath: normalizePythonPath(config?.pythonPath),
-  }
-}
-
-export function normalizePythonPath(value: unknown): string | null {
+export function normalizeDriverPath(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
 }
 
-export async function loadStoredComputerUseConfig(): Promise<
-  ReturnType<typeof resolveStoredComputerUseConfig>
-> {
+export function resolveStoredComputerUseConfig(
+  config?: StoredComputerUseConfig | null,
+): ComputerUseConfig {
+  return {
+    enabled:
+      typeof config?.enabled === 'boolean'
+        ? config.enabled
+        : DEFAULT_COMPUTER_USE_ENABLED,
+    driverPath: normalizeDriverPath(config?.driverPath),
+  }
+}
+
+export async function loadStoredComputerUseConfig(): Promise<ComputerUseConfig> {
   try {
     const raw = await readFile(getComputerUseConfigPath(), 'utf8')
     return resolveStoredComputerUseConfig(JSON.parse(raw))
@@ -75,9 +53,13 @@ export async function loadStoredComputerUseConfig(): Promise<
 }
 
 export async function saveStoredComputerUseConfig(
-  config: StoredComputerUseConfig,
+  config: ComputerUseConfig,
 ): Promise<void> {
   const configPath = getComputerUseConfigPath()
   await mkdir(dirname(configPath), { recursive: true })
-  await writeFile(configPath, JSON.stringify(config, null, 2), 'utf8')
+  const stored: StoredComputerUseConfig = {
+    enabled: config.enabled,
+    driverPath: normalizeDriverPath(config.driverPath),
+  }
+  await writeFile(configPath, JSON.stringify(stored, null, 2), 'utf8')
 }

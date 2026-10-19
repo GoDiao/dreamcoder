@@ -83,13 +83,6 @@ async function main(): Promise<void> {
     } = await import('../utils/claudeInChrome/chromeNativeHost.js');
     await runChromeNativeHost();
     return;
-  } else if (process.argv[2] === '--computer-use-mcp') {
-    profileCheckpoint('cli_computer_use_mcp_path');
-    const {
-      runComputerUseMcpServer
-    } = await import('../utils/computerUse/mcpServer.js');
-    await runComputerUseMcpServer();
-    return;
   }
 
   // Fast-path for `--daemon-worker=<kind>` (internal — supervisor spawns this).

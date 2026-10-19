@@ -236,15 +236,6 @@ import { isClaudeInChromeMCPServer } from '../../utils/claudeInChrome/common.js'
 const claudeInChromeToolRendering =
   (): typeof import('../../utils/claudeInChrome/toolRendering.js') =>
     require('../../utils/claudeInChrome/toolRendering.js')
-// Lazy: wrapper.tsx → hostAdapter.ts → executor.ts pulls both native modules
-// (@ant/computer-use-input + @ant/computer-use-swift). Runtime-gated by
-// GrowthBook tengu_malort_pedway (see gates.ts).
-const computerUseWrapper =
-  (): typeof import('../../utils/computerUse/wrapper.js') =>
-    require('../../utils/computerUse/wrapper.js')
-const isComputerUseMCPServer = (
-  require('../../utils/computerUse/common.js') as typeof import('../../utils/computerUse/common.js')
-).isComputerUseMCPServer
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
@@ -923,24 +914,6 @@ export const connectToServer = memoize(
         await inProcessServer.connect(serverTransport)
         transport = clientTransport
         logMCPDebug(name, `In-process Chrome MCP server started`)
-      } else if (
-        (serverRef.type === 'stdio' || !serverRef.type) &&
-        isComputerUseMCPServer(name)
-      ) {
-        // Run the Computer Use MCP server in-process — same rationale as
-        // Chrome above. The package's CallTool handler is a stub; real
-        // dispatch goes through wrapper.tsx's .call() override.
-        const { createComputerUseMcpServerForCli } = await import(
-          '../../utils/computerUse/mcpServer.js'
-        )
-        const { createLinkedTransportPair } = await import(
-          './InProcessTransport.js'
-        )
-        inProcessServer = await createComputerUseMcpServerForCli()
-        const [clientTransport, serverTransport] = createLinkedTransportPair()
-        await inProcessServer.connect(serverTransport)
-        transport = clientTransport
-        logMCPDebug(name, `In-process Computer Use MCP server started`)
       } else if (serverRef.type === 'stdio' || !serverRef.type) {
         const finalCommand =
           process.env.CLAUDE_CODE_SHELL_PREFIX || serverRef.command
@@ -1979,10 +1952,6 @@ export const fetchToolsForClient = memoizeWithLRU(
               ? claudeInChromeToolRendering().getClaudeInChromeMCPToolOverrides(
                   tool.name,
                 )
-              : {}),
-            ...((client.config.type === 'stdio' || !client.config.type) &&
-            isComputerUseMCPServer(client.name)
-              ? computerUseWrapper().getComputerUseMCPToolOverrides(tool.name)
               : {}),
           }
         })

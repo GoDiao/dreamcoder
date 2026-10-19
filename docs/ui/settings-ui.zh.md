@@ -28,7 +28,7 @@
 | Skills | 搜索、概况、来源、技能详情、文件列表和文档内容 | `components/skills/SkillList.tsx`、`SkillDetail.tsx` |
 | 记忆 | 项目/文件树、搜索、Markdown 编辑/预览、未保存提示、保存/还原 | `pages/MemorySettings.tsx` |
 | 插件 | 已知市场、已安装列表、概况、详情、启停/更新/卸载/应用变更、打包能力及关联入口 | `components/plugins/PluginList.tsx`、`PluginDetail.tsx` |
-| Computer Use | 总开关、两种感知模式、Python 路径、环境与依赖状态、系统权限、已授权应用搜索及勾选、剪贴板和系统快捷键 | `pages/ComputerUseSettings.tsx` |
+| Computer Use | 总开关；cua-driver 安装状态（版本、来源、安装进度和失败重试）；macOS 辅助功能和屏幕录制权限；cua 遥测；重新检测、自定义 cua-driver 路径、诊断信息；MCP 同名或重复配置提示；旧 Python 运行环境清理。样稿里的感知模式、Python 和已授权应用列表已随 cua-driver 改造删除 | `pages/ComputerUseSettings.tsx` |
 | 活动 | 今天/昨天/30 天 Token 用量、全年热力图、日期详情；纠正旧稿「工具调用记录」占位内容 | `pages/ActivitySettings.tsx` |
 | 诊断 | 日志大小、事件数、保留策略、目录入口、诊断包/摘要/清理、最近事件详情 | `pages/DiagnosticsSettings.tsx` |
 | 关于 | 版本、仓库、更新日志、当前更新不可用说明、作者及反馈 | `components/settings/AboutSettings.tsx` |

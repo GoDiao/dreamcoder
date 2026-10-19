@@ -8,6 +8,7 @@ import type { TranslationKey } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import { AGENT_LIFECYCLE_TYPES } from '../../types/team'
+import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
 
 type ToolCall = Extract<UIMessage, { type: 'tool_use' }>
 type ToolResult = Extract<UIMessage, { type: 'tool_result' }>
@@ -55,7 +56,8 @@ function generateSummary(toolCalls: ToolCall[], t: (key: TranslationKey, params?
   const parts: string[] = []
   for (const [name, count] of counts) {
     const verbFn = TOOL_VERBS[name]
-    parts.push(verbFn ? verbFn(count, t) : `${name} (${count})`)
+    const label = getCuaToolDisplay(name, undefined, t)?.title ?? name
+    parts.push(verbFn ? verbFn(count, t) : `${label} (${count})`)
   }
 
   return parts.join(', ')
@@ -525,7 +527,7 @@ function AgentCallCard({
                   key={recentToolCall.id}
                   className="truncate text-[11px] text-[var(--color-text-tertiary)]"
                 >
-                  {formatRecentToolUseSummary(recentToolCall, resultMap)}
+                  {formatRecentToolUseSummary(recentToolCall, resultMap, t)}
                 </div>
               ))}
             </div>
@@ -821,6 +823,7 @@ function getAgentStatusClassName(status: AgentStatus): string {
 function formatRecentToolUseSummary(
   toolCall: ToolCall,
   resultMap: Map<string, ToolResult>,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
 ): string {
   const input = toolCall.input && typeof toolCall.input === 'object'
     ? toolCall.input as Record<string, unknown>
@@ -839,8 +842,11 @@ function formatRecentToolUseSummary(
       return `Grep · ${typeof input.pattern === 'string' ? input.pattern : ''}${suffix}`
     case 'Agent':
       return `Agent · ${typeof input.description === 'string' ? input.description : ''}${suffix}`
-    default:
+    default: {
+      const cua = getCuaToolDisplay(toolCall.toolName, toolCall.input, t)
+      if (cua) return `${cua.title}${cua.summary ? ` · ${cua.summary}` : ''}${suffix}`
       return `${toolCall.toolName}${suffix}`
+    }
   }
 }
 

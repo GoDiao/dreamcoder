@@ -18,7 +18,6 @@ import {
 import { useTranslation } from '../i18n'
 import { MessageList } from '../components/chat/MessageList'
 import { ChatInput } from '../components/chat/ChatInput'
-import { ComputerUsePermissionModal } from '../components/chat/ComputerUsePermissionModal'
 import { SessionTaskBar } from '../components/chat/SessionTaskBar'
 import { WorkspacePanel } from '../components/workspace/WorkspacePanel'
 import { OpenProjectMenu } from '../components/layout/OpenProjectMenu'
@@ -234,7 +233,6 @@ export function ActiveSession() {
   const sessions = useSessionStore((s) => s.sessions)
   const connectToSession = useChatStore((s) => s.connectToSession)
   const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
-  const pendingComputerUsePermission = sessionState?.pendingComputerUsePermission ?? null
   const fetchSessionTasks = useCLITaskStore((s) => s.fetchSessionTasks)
   const trackedTaskSessionId = useCLITaskStore((s) => s.sessionId)
   const hasIncompleteTasks = useCLITaskStore((s) => s.tasks.some((task) => task.status !== 'completed'))
@@ -511,13 +509,6 @@ export function ActiveSession() {
           </div>
         ) : null}
       </div>
-
-      {!isMemberSession && activeTabId ? (
-        <ComputerUsePermissionModal
-          sessionId={activeTabId}
-          request={pendingComputerUsePermission?.request ?? null}
-        />
-      ) : null}
     </div>
   )
 }

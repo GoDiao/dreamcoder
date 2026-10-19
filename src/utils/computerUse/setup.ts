@@ -1,56 +1,63 @@
-import { buildComputerUseTools } from '../../vendor/computer-use-mcp/index.js'
-import { join } from 'path'
-import { fileURLToPath } from 'url'
 import { buildMcpToolName } from '../../services/mcp/mcpStringUtils.js'
 import type { ScopedMcpServerConfig } from '../../services/mcp/types.js'
-
-import { isInBundledMode } from '../bundledMode.js'
-import {
-  COMPUTER_USE_MCP_SERVER_NAME,
-  getCliComputerUseCapabilities,
-} from './common.js'
-import { getChicagoCoordinateMode } from './gates.js'
+import { CUA_MCP_SERVER_NAME } from './common.js'
 
 /**
- * Build the dynamic MCP config + allowed tool names. Mirror of
- * `setupClaudeInChrome`. The `mcp__computer-use__*` tools are added to
- * `allowedTools` so they bypass the normal permission prompt — the package's
- * `request_access` handles approval for the whole session.
+ * cua-driver 0.34.0 tools that only read state and are allowed without a
+ * prompt (ADR-0002). Every one is annotated `readOnlyHint: true` by cua.
  *
- * The MCP layer isn't ceremony: the API backend detects `mcp__computer-use__*`
- * tool names and emits a CU availability hint into the system prompt
- * (COMPUTER_USE_MCP_AVAILABILITY_HINT in the anthropic repo). Built-in tools
- * with different names wouldn't trigger it. Cowork uses the same names for the
- * same reason (apps/desktop/src/main/local-agent-mode/systemPrompt.ts:314).
+ * Deliberately left out, although annotated read-only:
+ * - `get_window_state`, `get_desktop_state`: `screenshot_out_file` writes a
+ *   PNG to any path the model names (checked against 0.34.0: a write to
+ *   ~/Library succeeded without any authorization).
+ * - `clipboard_read`: privacy.
+ * - `check_for_update`: network access.
+ * - `parse_visual_regions`: depends on the visual-region model (non-goal).
+ * Tools added by newer cua-driver versions are not listed, so they prompt.
  */
-export function setupComputerUseMCP(): {
+export const CUA_READONLY_TOOLS = [
+  'get_screen_size',
+  'get_cursor_position',
+  'list_apps',
+  'list_windows',
+  'get_accessibility_tree',
+  'zoom',
+  'get_browser_state',
+  'verify_state',
+  'health_report',
+  'get_config',
+  'get_session',
+  'list_sessions',
+  'get_session_state',
+  'get_recording_state',
+  'get_agent_cursor_state',
+] as const
+
+export type CuaDriverMcpSetup = {
   mcpConfig: Record<string, ScopedMcpServerConfig>
   allowedTools: string[]
-} {
-  const allowedTools = buildComputerUseTools(
-    getCliComputerUseCapabilities(),
-    getChicagoCoordinateMode(),
-  ).map(t => buildMcpToolName(COMPUTER_USE_MCP_SERVER_NAME, t.name))
+}
 
-  // command/args are never spawned — client.ts intercepts by name and
-  // uses the in-process server. The config just needs to exist with
-  // type 'stdio' to hit the right branch. Mirrors Chrome's setup.
-  const args = isInBundledMode()
-    ? ['--computer-use-mcp']
-    : [
-        join(fileURLToPath(import.meta.url), '..', 'cli.js'),
-        '--computer-use-mcp',
-      ]
-
+/**
+ * Builds the dynamic `cua` stdio MCP server entry for a resolved cua-driver
+ * path. A plain stdio server: the MCP client spawns `cua-driver mcp`.
+ */
+export function setupCuaDriverMCP(
+  driverPath: string,
+  env: Record<string, string>,
+): CuaDriverMcpSetup {
   return {
     mcpConfig: {
-      [COMPUTER_USE_MCP_SERVER_NAME]: {
+      [CUA_MCP_SERVER_NAME]: {
         type: 'stdio',
-        command: process.execPath,
-        args,
+        command: driverPath,
+        args: ['mcp'],
+        env: { ...env },
         scope: 'dynamic',
-      } as const,
+      },
     },
-    allowedTools,
+    allowedTools: CUA_READONLY_TOOLS.map(tool =>
+      buildMcpToolName(CUA_MCP_SERVER_NAME, tool),
+    ),
   }
 }

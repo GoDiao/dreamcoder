@@ -15,7 +15,7 @@
 ## Phase 2 — CLI 后端 + Computer Use ✅
 
 - [x] Sidecar 后端架构 (dreamcoder-sidecar.exe)
-- [x] Computer Use (视觉截图模式 + UIA Tree 文本模式)
+- [x] Computer Use（现由 cua-driver 驱动，取代了视觉截图模式和 UIA Tree 模式）
 - [x] MCP 协议支持 + 可视化管理
 - [x] Skills 技能系统
 - [x] Agent Teams 多代理协作

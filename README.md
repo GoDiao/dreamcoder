@@ -64,7 +64,7 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 </picture>
 
 ### 3. Claude Code Workflows
-*   **Dual Computer Use modes**: Supports visual screenshot control and **UIA Tree mode** (text-based accessibility).
+*   **Computer Use**: operates desktop apps and browsers in the background through UI elements, powered by [cua-driver](https://github.com/trycua/cua) (MIT). DreamCoder downloads it when you turn Computer Use on; no Python needed. Verified on macOS; Windows needs community testing, Linux is a preview.
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
 
@@ -110,14 +110,14 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 
 | Platform     | Status                                  | Pre-built Installer                                      |
 |--------------|-----------------------------------------|----------------------------------------------------------|
-| Windows x64  | ✅ Maintainer-tested regularly           | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned) |
-| macOS arm64  | ✅ Used daily by the maintainer          | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned)      |
+| Windows x64  | ✅ Long tested (the maintainer's former main platform) | ✅ [`-setup.exe`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned) |
+| macOS arm64  | ✅ Maintainer's daily platform           | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned)      |
 | Linux x64    | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
 
-> DreamCoder is developed and validated primarily on **Windows x64**.
-> **macOS (Apple Silicon)** runs from source (`bun run tauri dev`) and is used by the maintainer during development, and ships as a `.dmg` from v0.5.0.
+> The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source (`bun run tauri dev`); it ships as a `.dmg` from v0.5.0.
+> **Windows x64** was the main platform before and has been tested extensively, but the maintainer no longer develops on it day to day, so feedback on how new changes behave on Windows is especially welcome.
 > **Linux** has `#[cfg(target_os = "linux")]` branches in the codebase, but it is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
-> If you're running DreamCoder on macOS or Linux, issues and PRs are especially valuable;
+> If you're running DreamCoder on Windows or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
 > Check [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) for the actual assets available with each release.
 

@@ -30,7 +30,7 @@
 | 复制、引用、分叉 | 入口已有 | 样稿只展示一处固定回复的操作，未完整展示各条消息及失败 / 进行中状态。 | `desktop/src/components/chat/MessageList.tsx:1697`、`:1719` |
 | 撤销 / 回退 | 语义不完整 | 样稿写「撤销本轮文件修改」；真实流程还回退对话、恢复原输入及附件，有历史轮次确认和代码无法回退的分支。直接照样稿文案落地会误导用户。 | `desktop/src/components/chat/MessageList.tsx:1635`、`:1869` |
 | 任务、团队、目标、记忆事件 | 典型入口已有 | 只有固定任务及一个成员样例，尚未覆盖多成员独立状态、成员会话控件限制、各目标状态。 | `desktop/src/components/teams/TeamStatusBar.tsx`；`desktop/src/pages/ActiveSession.tsx:501` |
-| Computer Use 授权 | 只有简化入口 | 原版区分应用授权与系统权限缺失，列出请求应用、敏感应用提示和打开系统权限设置等；样稿只有泛化的允许确认。 | `desktop/src/components/chat/ComputerUsePermissionModal.tsx:125` |
+| Computer Use 授权 | 只有简化入口 | 按应用授权的弹窗已随 cua-driver 改造删除。cua 的操作走通用权限弹窗，标题和摘要来自 `cuaToolDisplay`（如“允许 Computer Use 点击？”）；系统权限在 Computer Use 设置页处理。 | `desktop/src/components/chat/PermissionDialog.tsx`、`desktop/src/lib/cuaToolDisplay.ts` |
 | 文件与差异 | 主要入口已有 | 缺真实目录树、多文件预览切换、Markdown / 图片预览、无变更 / 非 Git / 加载失败状态；关闭其他预览仅显示提示。 | `desktop/src/components/workspace/WorkspacePanel.tsx:1103`、`:1242`、`:1277` |
 | 终端 | 部分，且有失效入口 | 有展开、清屏、重启；没有多个终端实例的切换与保留状态。设置弹窗中的打开终端仍使用已删除的 `terminal-tab` 动作，不会执行。 | `desktop/src/components/layout/ContentRouter.tsx:40`；`desktop/src/pages/ActiveSession.tsx:523`；样稿 `settingDetail` / `actions` |
 | 面板尺寸 | 未覆盖 | 原版终端和文件工作区可拖动调整尺寸；样稿固定布局。 | `desktop/src/pages/ActiveSession.tsx:521`、`:540` |
