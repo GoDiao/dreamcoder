@@ -3,4 +3,5 @@ preload = ["./preload.ts"]
 [test]
 preload = ["./testPreload.ts"]
 # desktop/ has its own vitest suite (cd desktop && bun run test)
-pathIgnorePatterns = ["desktop/**"]
+# experiments/ holds validation code outside the product build
+pathIgnorePatterns = ["desktop/**", "experiments/**"]
