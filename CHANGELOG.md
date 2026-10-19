@@ -20,6 +20,7 @@ Computer Use was rebuilt on cua-driver. If you never saved its settings in 0.5, 
 - **Computer Use runs on cua-driver** (#74). Turning Computer Use on downloads [cua-driver](https://github.com/trycua/cua) 0.34.0 (MIT) through cua's official installer, or reuses an existing install of 0.34.0 or newer. It works in the background without taking the mouse or focus, targets UI elements, and drives browsers. Tools that only read state, such as listing apps and windows, run without asking. Clicks, typing, window screenshots, clipboard reads and other actions go through the permission prompt, unless the session is in Bypass permissions mode. cua telemetry is turned off. Verified on macOS; Windows needs community testing, Linux is a preview.
   - **Breaking:** the visual screenshot and UIA Tree modes, the Python runtime and the per-app approval dialog are removed. Computer Use is now off by default: if you never saved its settings, turn it on again under Settings → Computer Use. If you did, click Install on that page to download cua-driver. The old Python environment can be removed from that page.
 - **Compact tool calls in chat** (#129): each tool call is one row with the tool, its command or file and a result summary. Expanded, the input and the output share one box, and the output turns red on error. The full raw input is behind "Show full input". Image paths that appear in Bash, Glob or Grep output no longer load as images.
+- The terminal CLI's "What's new" panel and `/release-notes` show DreamCoder's own CHANGELOG, built into the app, instead of fetching Claude Code's. The terminal welcome, help and logo say DreamCoder.
 
 ### Fixed
 
@@ -34,10 +35,6 @@ Computer Use was rebuilt on cua-driver. If you never saved its settings in 0.5, 
   - Screenshots and images now reach providers that use the OpenAI Responses format.
   - Images and other non-text content in tool results become short placeholders instead of being dropped silently.
   - Reasoning from Responses providers that stream it, such as OpenRouter, shows as thinking.
-
-### Removed
-
-- The terminal CLI's "What's new" panel and `/release-notes` command, which showed Claude Code's release notes. The terminal welcome, help and logo now say DreamCoder.
 
 ## [0.5.0] — 2026-10-18
 
