@@ -87,6 +87,18 @@ describe('ProviderFormModal create mode', () => {
     expect(screen.getByDisplayValue(custom)).toBeInTheDocument()
   })
 
+  it('shows a preset logo and a fallback icon on the preset buttons', () => {
+    const customPreset: ProviderPreset = { ...deepseekPreset, id: 'custom', name: 'Custom Provider', baseUrl: '' }
+
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset, customPreset]} />)
+
+    const deepseekButton = screen.getByRole('button', { name: 'DeepSeek' })
+    const customButton = screen.getByRole('button', { name: 'Custom Provider' })
+    expect(deepseekButton.querySelector('[data-testid="provider-icon-deepseek"]')?.getAttribute('style'))
+      .toContain('/icons/providers/deepseek.svg')
+    expect(customButton.querySelector('[data-testid="provider-icon-fallback"]')).toBeInTheDocument()
+  })
+
   it('still closes normally when no onCreated callback is given', async () => {
     const onClose = vi.fn()
 

@@ -6,6 +6,7 @@ import { Modal } from '../shared/Modal'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
 import { getPresetDisplayName } from './presetDisplayName'
+import { ProviderIcon } from './ProviderIcon'
 import { Dropdown } from '../shared/Dropdown'
 import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
@@ -493,13 +494,14 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     <button
       key={preset.id}
       onClick={() => handlePresetChange(preset)}
-      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
+      className={`inline-flex max-w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs font-medium rounded-full border transition-all ${
         selectedPreset.id === preset.id
           ? 'border-[var(--color-brand)] bg-[var(--color-surface-container-high)] text-[var(--color-brand)] shadow-[var(--shadow-focus-ring)]'
           : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)]'
       }`}
     >
-      {getPresetDisplayName(preset, t)}
+      <ProviderIcon presetId={preset.id} />
+      <span className="min-w-0 [overflow-wrap:anywhere]">{getPresetDisplayName(preset, t)}</span>
     </button>
   )
 
