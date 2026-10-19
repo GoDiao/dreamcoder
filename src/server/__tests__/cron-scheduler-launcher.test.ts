@@ -22,6 +22,7 @@ const originalClaudeCodeEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
 const originalHome = process.env.HOME
 const originalShell = process.env.SHELL
 const originalZdotdir = process.env.ZDOTDIR
+const originalNvmDir = process.env.NVM_DIR
 const originalDisableTerminalShellEnv = process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV
 
 const isWindows = process.platform === 'win32'
@@ -100,6 +101,11 @@ function restoreEnv(): void {
     process.env.ZDOTDIR = originalZdotdir
   } else {
     delete process.env.ZDOTDIR
+  }
+  if (originalNvmDir) {
+    process.env.NVM_DIR = originalNvmDir
+  } else {
+    delete process.env.NVM_DIR
   }
   if (originalDisableTerminalShellEnv) {
     process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV = originalDisableTerminalShellEnv
@@ -430,6 +436,7 @@ describe('cron scheduler launcher resolution', () => {
     process.env.SHELL = shellPath
     process.env.PATH = '/usr/bin:/bin'
     delete process.env.ZDOTDIR
+    delete process.env.NVM_DIR
     process.env.CLAUDE_CLI_PATH = sidecarPath
     process.env.CLAUDE_APP_ROOT = appRoot
     resetTerminalShellEnvironmentCacheForTests()

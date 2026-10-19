@@ -86,10 +86,12 @@ git checkout main && git checkout -b feat/your-feature
 
 4. **Test**. Make sure your changes don't break existing functionality:
    ```bash
+   bun test                  # server/CLI tests (needs ripgrep on PATH)
    cd desktop
-   bun run lint    # TypeScript type checking
-   bun run test    # run tests
+   bun run lint              # TypeScript type checking
+   bun run test -- --run     # desktop tests
    ```
+   CI runs the same three checks on every PR to `main`.
 
 5. **Submit a PR**. Target the `main` branch. Describe what you changed and why.
 

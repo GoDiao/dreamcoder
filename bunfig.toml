@@ -2,3 +2,5 @@ preload = ["./preload.ts"]
 
 [test]
 preload = ["./testPreload.ts"]
+# desktop/ has its own vitest suite (cd desktop && bun run test)
+pathIgnorePatterns = ["desktop/**"]
