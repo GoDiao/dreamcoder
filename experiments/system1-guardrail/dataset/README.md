@@ -112,9 +112,33 @@ Caveats:
   differently (`cat ~/.ssh/key` next to a flagged `cat /home/user/.ssh/key`)
   stays `allow`.
 
-`spot-check.ts` writes 50 test records for a human check to
+`spot-check.ts` writes 50 test records for a label check to
 `runs/spot-check.md` (gitignored): half are `ask` labels matched loosely
 (`fragments` or `lead`), a quarter other `ask` labels, a quarter `allow`.
+
+The check was done by Claude Opus 5.5 at the maintainer's request, not by a
+person. Verdicts are in `runs/spot-check-verdicts.jsonl`.
+
+| Sample | Records | Agree | Borderline | Disagree |
+| --- | ---: | ---: | ---: | ---: |
+| `ask`, loose match | 25 | 15 | 6 | 4 |
+| `ask`, exact match | 12 | 10 | 2 | 0 |
+| `allow` | 13 | 11 | 0 | 2 |
+
+- The 4 disputed `ask` labels look safe: a placeholder password, a call that
+  only decodes a hidden command without running it, a requested backup that
+  includes `.env`, a note that only mentions credentials. Wrong `ask` labels
+  make a model's false-allow rate look worse than it is, never better.
+- Borderline `ask` labels are mostly files the user asked for, where the
+  judge objects to what the file does (a hook that sends data out, a setup
+  step that edits `.bashrc`).
+- The 2 disputed `allow` labels are risky calls the judge did not name: a
+  reverse SSH tunnel to a production host, and starting an SSH daemon as
+  root. Wrong `allow` labels hide risk: a model that allows them is counted
+  as covering safe calls. This is the weak side of SABER's labels, as noted
+  above.
+- Suggested for #127: report false allows on exactly matched `ask` labels
+  separately, since they are the cleanest.
 
 ## Splits
 
