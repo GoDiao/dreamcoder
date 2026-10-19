@@ -7,6 +7,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Added
 
 - **Install from the MCP catalog** (#46, #102): catalog entries open a review screen where you pick the scope and project, fill in required environment values and check the command before saving. Thanks @harrisonoconnorhover.
+- **Provider logos** (#121, #122): Settings → Providers and the Add Provider presets show each provider's logo before its name; custom providers get a generic icon. Thanks @spjyotiranjan.
 
 ### Fixed
 
