@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronDown, ChevronUp, MousePointerClick, Keyboard, ScanEye, AppWindow, Clipboard, Monitor } from 'lucide-react'
 import { CodeViewer } from './CodeViewer'
 import { DiffViewer } from './DiffViewer'
 import { TerminalChrome } from './TerminalChrome'
@@ -8,6 +8,8 @@ import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { InlineImageGallery } from './InlineImageGallery'
 import type { AgentTaskNotification } from '../../types/chat'
+import { getCuaToolDisplay, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { ToolResultImages, extractToolResultImages } from './ToolResultImages'
 
 type Props = {
   toolName: string
@@ -33,6 +35,16 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
   Skill: Sparkles,
 }
 
+const CUA_TOOL_ICONS: Record<CuaToolIcon, React.ElementType> = {
+  pointer: MousePointerClick,
+  keyboard: Keyboard,
+  screen: ScanEye,
+  app: AppWindow,
+  browser: Globe,
+  clipboard: Clipboard,
+  other: Monitor,
+}
+
 const WRITER_PREVIEW_MAX_LINES = 120
 const WRITER_PREVIEW_MAX_CHARS = 30000
 
@@ -40,9 +52,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
   const obj = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const IconComponent = TOOL_ICONS[toolName] || Wrench
-  const filePath = typeof obj.file_path === 'string' ? obj.file_path : ''
-  const summary = getToolSummary(toolName, obj, t)
+  const cua = useMemo(() => getCuaToolDisplay(toolName, input, t), [input, toolName, t])
+  const IconComponent = cua ? CUA_TOOL_ICONS[cua.icon] : TOOL_ICONS[toolName] || Wrench
+  const title = cua ? cua.title : toolName
+  const filePath = !cua && typeof obj.file_path === 'string' ? obj.file_path : ''
+  const summary = cua ? cua.summary : getToolSummary(toolName, obj, t)
   const outputSummary = getToolResultSummary(
     toolName,
     result?.content,
@@ -55,7 +69,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
 
   const preview = useMemo(() => renderPreview(toolName, obj, result, t), [obj, result, toolName, t])
   const details = useMemo(() => renderDetails(toolName, obj, t, isPending ? partialInput : undefined), [isPending, obj, partialInput, toolName, t])
-  const hasResultDetails = Boolean(result && extractTextContent(result.content))
+  const resultImages = useMemo(() => extractToolResultImages(result?.content), [result?.content])
+  const hasResultDetails = Boolean(result && (extractTextContent(result.content) || resultImages.length > 0))
   const hasEditPreview = toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string'
   const hasWritePreview = toolName === 'Write' && typeof obj.content === 'string'
   const expandable = hasEditPreview || hasWritePreview || hasResultDetails || Boolean(isPending && partialInput)
@@ -78,7 +93,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start">
           <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-            {toolName}
+            {title}
           </span>
           {filePath ? (
             <span className="mt-0.5 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
@@ -118,6 +133,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
 
       {expandable && expanded && (
         <div className="space-y-2.5 border-t border-[var(--color-border)]/60 px-3 py-3">
+          <ToolResultImages images={resultImages} />
           {preview}
           {details}
         </div>
