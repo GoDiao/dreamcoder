@@ -1,237 +1,671 @@
 {
-  "source": "cua-driver 0.34.0 tools/list (macOS), names and readOnlyHint only",
+  "source": "cua-driver 0.34.0 tools/list (macOS): names, readOnlyHint and parameter names",
   "tools": [
     {
       "name": "list_apps",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "list_windows",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "on_screen_only",
+        "pid",
+        "session"
+      ]
     },
     {
       "name": "get_window_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "capture_mode",
+        "include_accessibility_tree",
+        "include_screenshot",
+        "max_depth",
+        "max_dimension",
+        "max_elements",
+        "max_image_dimension",
+        "pid",
+        "query",
+        "screenshot_out_file",
+        "session",
+        "timeout_ms",
+        "window_id"
+      ]
     },
     {
       "name": "verify_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "expect",
+        "include_screenshot",
+        "pid",
+        "session",
+        "stable_samples",
+        "timeout_ms",
+        "window_id"
+      ]
     },
     {
       "name": "launch_app",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "additional_arguments",
+        "bundle_id",
+        "creates_new_application_instance",
+        "name",
+        "session",
+        "urls",
+        "webkit_inspector_port"
+      ]
     },
     {
       "name": "kill_app",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "pid",
+        "session"
+      ]
     },
     {
       "name": "bring_to_front",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "pid",
+        "session",
+        "window_id"
+      ]
     },
     {
       "name": "set_window_frame",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "height",
+        "pid",
+        "session",
+        "width",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "invoke_menu",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "path",
+        "pid",
+        "session",
+        "window_id"
+      ]
     },
     {
       "name": "click",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "action",
+        "button",
+        "capture_id",
+        "count",
+        "debug_image_out",
+        "delivery_mode",
+        "element_token",
+        "from_zoom",
+        "modifier",
+        "pid",
+        "scope",
+        "session",
+        "target",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "double_click",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delivery_mode",
+        "element_token",
+        "pid",
+        "session",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "right_click",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delivery_mode",
+        "element_token",
+        "modifier",
+        "pid",
+        "session",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "drag",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "button",
+        "delivery_mode",
+        "duration_ms",
+        "from_x",
+        "from_y",
+        "from_zoom",
+        "modifier",
+        "pid",
+        "scope",
+        "session",
+        "steps",
+        "target",
+        "to_x",
+        "to_y",
+        "window_id"
+      ]
     },
     {
       "name": "type_text",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delay_ms",
+        "delivery_mode",
+        "element_token",
+        "pid",
+        "scope",
+        "session",
+        "target",
+        "text",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "press_key",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delivery_mode",
+        "element_token",
+        "key",
+        "modifiers",
+        "pid",
+        "scope",
+        "session",
+        "target",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "hotkey",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delivery_mode",
+        "element_token",
+        "keys",
+        "pid",
+        "scope",
+        "session",
+        "target",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "set_value",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "element_token",
+        "pid",
+        "session",
+        "value",
+        "window_id"
+      ]
     },
     {
       "name": "scroll",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "amount",
+        "by",
+        "delivery_mode",
+        "direction",
+        "element_token",
+        "pid",
+        "scope",
+        "session",
+        "target",
+        "window_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "clipboard_read",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "include_text",
+        "session"
+      ]
     },
     {
       "name": "clipboard_write",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "file_path",
+        "image_path",
+        "session",
+        "text"
+      ]
     },
     {
       "name": "get_screen_size",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "get_desktop_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "max_image_dimension",
+        "screenshot_out_file",
+        "session"
+      ]
     },
     {
       "name": "get_cursor_position",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "move_cursor",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "cursor_id",
+        "scope",
+        "session",
+        "target",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "set_agent_cursor_enabled",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "enabled",
+        "session"
+      ]
     },
     {
       "name": "set_agent_cursor_motion",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "arc_flow",
+        "arc_size",
+        "dwell_after_click_ms",
+        "effects",
+        "end_handle",
+        "glide_duration_ms",
+        "idle_hide_ms",
+        "session",
+        "spring",
+        "start_handle",
+        "style",
+        "timing",
+        "turn_radius"
+      ]
     },
     {
       "name": "set_agent_cursor_theme",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "reduced_motion",
+        "session",
+        "theme_id"
+      ]
     },
     {
       "name": "get_agent_cursor_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "check_permissions",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "probe_direct_capture",
+        "prompt",
+        "session"
+      ]
     },
     {
       "name": "health_report",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "include",
+        "session",
+        "skip"
+      ]
     },
     {
       "name": "get_config",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "set_config",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "cursor.motion",
+        "cursor.motion.effects.glow",
+        "cursor.motion.effects.magnet",
+        "cursor.motion.effects.ripple",
+        "cursor.motion.effects.squish",
+        "cursor.motion.effects.trail",
+        "cursor.motion.style",
+        "cursor.motion.timing",
+        "experimental_pip",
+        "experimental_pip_geometry",
+        "key",
+        "max_image_dimension",
+        "session",
+        "value"
+      ]
     },
     {
       "name": "get_accessibility_tree",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "zoom",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "pid",
+        "session",
+        "window_id",
+        "x1",
+        "x2",
+        "y1",
+        "y2"
+      ]
     },
     {
       "name": "page",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "action",
+        "attributes",
+        "bundle_id",
+        "cdp_port",
+        "css_selector",
+        "javascript",
+        "pid",
+        "selector",
+        "session",
+        "target_url_contains",
+        "text",
+        "user_has_confirmed_enabling",
+        "window_id"
+      ]
     },
     {
       "name": "get_browser_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "continuation",
+        "include_screenshot",
+        "pid",
+        "query",
+        "scope_ref",
+        "session",
+        "snapshot_format",
+        "tab_id",
+        "target_id",
+        "window_id"
+      ]
     },
     {
       "name": "browser_prepare",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "allow_launch",
+        "pid",
+        "profile",
+        "session",
+        "strategy",
+        "window_id"
+      ]
     },
     {
       "name": "browser_navigate",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "session",
+        "tab_id",
+        "target_id",
+        "url"
+      ]
     },
     {
       "name": "browser_click",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delivery_mode",
+        "input_route",
+        "ref",
+        "session",
+        "tab_id",
+        "target_id",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "browser_type",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "mode",
+        "ref",
+        "replace",
+        "session",
+        "tab_id",
+        "target_id",
+        "text"
+      ]
     },
     {
       "name": "browser_dialog",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "action",
+        "delivery_mode",
+        "dialog_id",
+        "prompt_text",
+        "session",
+        "tab_id",
+        "target_id"
+      ]
     },
     {
       "name": "browser_set_input_files",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "files",
+        "ref",
+        "session",
+        "tab_id",
+        "target_id"
+      ]
     },
     {
       "name": "browser_download",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "destination_root",
+        "ref",
+        "session",
+        "tab_id",
+        "target_id"
+      ]
     },
     {
       "name": "browser_pointer",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "action",
+        "delivery_mode",
+        "delta_x",
+        "delta_y",
+        "destination_ref",
+        "input_route",
+        "ref",
+        "session",
+        "tab_id",
+        "target_id",
+        "to_x",
+        "to_y",
+        "x",
+        "y"
+      ]
     },
     {
       "name": "start_recording",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "include_accessibility_tree",
+        "output_dir",
+        "record_video",
+        "session",
+        "state_timeout_ms"
+      ]
     },
     {
       "name": "stop_recording",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "get_recording_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "replay_trajectory",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "delay_ms",
+        "dir",
+        "session",
+        "stop_on_error"
+      ]
     },
     {
       "name": "install_ffmpeg",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "confirm",
+        "session"
+      ]
     },
     {
       "name": "start_session",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "capture_scope",
+        "cursor_motion",
+        "cursor_theme",
+        "session"
+      ]
     },
     {
       "name": "escalate_session",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "detail",
+        "reason",
+        "session"
+      ]
     },
     {
       "name": "get_session",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "list_sessions",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "cursor",
+        "limit"
+      ]
     },
     {
       "name": "get_session_state",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "end_session",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "check_for_update",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "session"
+      ]
     },
     {
       "name": "install_extension",
-      "readOnlyHint": false
+      "readOnlyHint": false,
+      "params": [
+        "confirm",
+        "name",
+        "session"
+      ]
     },
     {
       "name": "parse_visual_regions",
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "params": [
+        "capture_id",
+        "options",
+        "session"
+      ]
     }
   ]
 }

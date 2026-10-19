@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useTranslation, type TranslationKey } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
+import { computerUseApi } from '../api/computerUse'
 import type { PermissionMode } from '../types/settings'
 import { usePluginStore } from '../stores/pluginStore'
 import { PluginList } from '../components/plugins/PluginList'
@@ -282,6 +283,16 @@ const PERMISSION_MODES: Array<{ mode: PermissionMode; Icon: LucideIcon; descKey:
 function PermissionSettings() {
   const { permissionMode, setPermissionMode } = useSettingsStore()
   const t = useTranslation()
+  const [computerUseEnabled, setComputerUseEnabled] = useState(false)
+
+  // Bypass mode also skips the per-call confirmation of Computer Use actions.
+  useEffect(() => {
+    let cancelled = false
+    computerUseApi.getConfig()
+      .then(config => { if (!cancelled) setComputerUseEnabled(config.enabled) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div>
@@ -319,6 +330,11 @@ function PermissionSettings() {
               <span className="min-w-0 flex-1">
                 <span className="block text-[13px] font-medium text-[var(--color-text-primary)]">{t(`permMode.label.${mode}` as const)}</span>
                 <span className="mt-px block text-xs leading-[1.5] text-[var(--color-text-secondary)]">{t(descKey)}</span>
+                {mode === 'bypassPermissions' && computerUseEnabled ? (
+                  <span role="note" className="mt-1 block text-xs leading-[1.5] text-[var(--color-error)]">
+                    {t('permMode.computerUseBypassWarning')}
+                  </span>
+                ) : null}
               </span>
               <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-brand)]">
                 {isSelected ? <Check size={16} strokeWidth={2} aria-hidden="true" /> : null}

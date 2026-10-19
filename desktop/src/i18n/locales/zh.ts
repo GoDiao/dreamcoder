@@ -672,7 +672,7 @@ export const zh: Record<TranslationKey, string> = {
 
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',
-  'settings.computerUse.description': '让模型在后台操作桌面应用和浏览器，由 cua-driver（trycua/cua，MIT）驱动。开启后，列出应用和窗口、读取界面元素树不再确认；截图、点击、输入等操作每次都会询问。',
+  'settings.computerUse.description': '让模型在后台操作桌面应用和浏览器，由 cua-driver（trycua/cua，MIT）驱动。开启后，读取应用、窗口、页面状态和窗口局部内容不再确认，其中一些会带截图；整个窗口或整个桌面的截图、点击、输入等操作每次都会询问。',
   'settings.computerUse.enableRow': '电脑操作',
   'settings.computerUse.enableRowDescription': '新会话生效。如果还没装 cua-driver，开启时会先下载安装。',
   'settings.computerUse.statusSection': '状态',

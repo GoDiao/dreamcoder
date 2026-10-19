@@ -422,13 +422,29 @@ describe('CuaDriverService install', () => {
 
 describe('default command runner', () => {
   it.skipIf(process.platform === 'win32')(
-    'returns on timeout even when a grandchild keeps the output pipes open',
+    'stops the whole process group on timeout',
     async () => {
+      const duration = `31.${process.pid % 1000}${Date.now() % 1000}`
       const started = Date.now()
-      const result = await defaultDeps().run('sh', ['-c', 'sleep 30 & sleep 30'], { timeoutMs: 300 })
+      const result = await defaultDeps().run('sh', ['-c', `sleep ${duration} & sleep ${duration}`], {
+        timeoutMs: 300,
+      })
       expect(result.code).toBe(-1)
       expect(result.stderr).toContain('timed out')
       expect(Date.now() - started).toBeLessThan(5_000)
+      await new Promise(resolve => setTimeout(resolve, 200))
+      // The backgrounded grandchild was stopped together with its group.
+      const ps = Bun.spawnSync(['pgrep', '-f', `sleep ${duration}`])
+      expect(new TextDecoder().decode(ps.stdout).trim()).toBe('')
     },
   )
+
+  it('collects output and exit code', async () => {
+    const lines: string[] = []
+    const result = await defaultDeps().run('sh', ['-c', 'echo one; echo two 1>&2; exit 3'], {
+      onOutput: line => lines.push(line),
+    })
+    expect(result).toEqual({ code: 3, stdout: 'one', stderr: 'two' })
+    expect(lines.sort()).toEqual(['one', 'two'])
+  })
 })

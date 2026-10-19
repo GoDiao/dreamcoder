@@ -6,6 +6,7 @@
  *
  * Design: docs/computer-use/cua-driver-tech-design.md, ADR-0001 to ADR-0004.
  */
+import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, constants, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
@@ -642,13 +643,16 @@ async function runCommand(
     onOutput?: (line: string) => void
   } = {},
 ): Promise<CommandResult> {
-  let proc: ReturnType<typeof Bun.spawn>
+  // Own process group (POSIX) so a timeout can stop the installer's children
+  // too, not just the direct child.
+  const isWindows = process.platform === 'win32'
+  let child: ChildProcess
   try {
-    proc = Bun.spawn([command, ...args], {
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
+    child = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, ...options.env },
+      detached: !isWindows,
+      windowsHide: true,
     })
   } catch (error) {
     return {
@@ -657,47 +661,69 @@ async function runCommand(
       stderr: `Failed to run ${command}: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
-  // On timeout, stop waiting for output: grandchildren (e.g. the installer's
-  // download) can keep the pipes open after the direct child is killed.
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const timedOut = new Promise<CommandResult>(resolve => {
-    if (!options.timeoutMs) return
-    const timeoutMs = options.timeoutMs
-    timer = setTimeout(() => {
-      proc.kill()
-      resolve({ code: -1, stdout: '', stderr: `${command} timed out after ${Math.round(timeoutMs / 1000)}s` })
-    }, timeoutMs)
+
+  let stdout = ''
+  let stderr = ''
+  const pending = { stdout: '', stderr: '' }
+  const onData = (key: 'stdout' | 'stderr') => (chunk: Buffer) => {
+    const text = chunk.toString('utf8')
+    if (key === 'stdout') stdout += text
+    else stderr += text
+    if (!options.onOutput) return
+    pending[key] += text
+    const lines = pending[key].split(/\r?\n/)
+    pending[key] = lines.pop() ?? ''
+    for (const line of lines) options.onOutput(line)
+  }
+  child.stdout?.on('data', onData('stdout'))
+  child.stderr?.on('data', onData('stderr'))
+
+  const exited = new Promise<number>(resolve => {
+    child.once('error', error => {
+      stderr += `Failed to run ${command}: ${error.message}`
+      resolve(-1)
+    })
+    child.once('exit', code => resolve(code ?? -1))
   })
-  const collect = async (stream: ReadableStream<Uint8Array>) => {
-    const decoder = new TextDecoder()
-    let all = ''
-    let pending = ''
-    for await (const chunk of stream) {
-      const text = decoder.decode(chunk, { stream: true })
-      all += text
-      if (options.onOutput) {
-        pending += text
-        const lines = pending.split(/\r?\n/)
-        pending = lines.pop() ?? ''
-        for (const line of lines) options.onOutput(line)
+
+  const killTree = (signal: NodeJS.Signals) => {
+    if (child.pid === undefined) return
+    try {
+      if (isWindows) {
+        spawn('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true })
+      } else {
+        process.kill(-child.pid, signal)
       }
+    } catch {}
+  }
+
+  let timedOut = false
+  const timer = options.timeoutMs
+    ? setTimeout(() => {
+        timedOut = true
+        killTree('SIGTERM')
+        setTimeout(() => killTree('SIGKILL'), 3_000).unref?.()
+      }, options.timeoutMs)
+    : null
+
+  // Grandchildren can keep the pipes open after the direct child exits, so the
+  // result is taken at exit (plus a short drain), not at end-of-stream.
+  const code = await exited
+  if (timer) clearTimeout(timer)
+  await new Promise(resolve => setTimeout(resolve, 50))
+  if (options.onOutput) {
+    if (pending.stdout) options.onOutput(pending.stdout)
+    if (pending.stderr) options.onOutput(pending.stderr)
+  }
+  if (timedOut) {
+    killTree('SIGKILL')
+    return {
+      code: -1,
+      stdout: stdout.trim(),
+      stderr: `${command} timed out after ${Math.round((options.timeoutMs ?? 0) / 1000)}s\n${stderr}`.trim(),
     }
-    if (options.onOutput && pending) options.onOutput(pending)
-    return all
   }
-  const finished = (async (): Promise<CommandResult> => {
-    const [stdout, stderr] = await Promise.all([
-      collect(proc.stdout as ReadableStream<Uint8Array>),
-      collect(proc.stderr as ReadableStream<Uint8Array>),
-    ])
-    const code = await proc.exited
-    return { code, stdout: stdout.trim(), stderr: stderr.trim() }
-  })()
-  try {
-    return await Promise.race([finished, timedOut])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
+  return { code, stdout: stdout.trim(), stderr: stderr.trim() }
 }
 
 async function downloadBytes(url: string): Promise<Uint8Array> {

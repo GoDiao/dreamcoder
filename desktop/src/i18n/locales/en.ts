@@ -670,7 +670,7 @@ export const en = {
 
   'settings.tab.computerUse': 'Computer Use',
   'settings.computerUse.title': 'Computer Use',
-  'settings.computerUse.description': 'Let the model operate desktop apps and browsers in the background, powered by cua-driver (trycua/cua, MIT). Listing apps and windows and reading the accessibility tree need no confirmation once this is on; screenshots, clicks, typing and other actions ask each time.',
+  'settings.computerUse.description': 'Let the model operate desktop apps and browsers in the background, powered by cua-driver (trycua/cua, MIT). Once this is on, reading apps, windows, page state and window regions needs no confirmation, and some of these readings include screenshots. Full window or desktop captures, clicks, typing and other actions ask each time.',
   'settings.computerUse.enableRow': 'Computer control',
   'settings.computerUse.enableRowDescription': 'Applies to new sessions. Turning it on downloads cua-driver if it is not installed.',
   'settings.computerUse.statusSection': 'Status',

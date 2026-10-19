@@ -167,7 +167,7 @@ DreamCoder 里唯一了解 cua-driver 的地方。对外提供以下能力：
   - 拿到路径，就往 `dynamicMcpConfig` 里加一项：服务名 `cua`、`type: 'stdio'`、`command` 为该路径、`args: ['mcp']`、`env`（见下文"环境变量"）、`scope: 'dynamic'`。`env` 会和进程环境合并（`src/utils/mcpStdioEnvironment.ts`）；
   - 拿不到路径，就跳过，并写一条调试日志。CLI 启动时不触发下载。
 - **工具权限**：只把只读工具加进 `allowedTools`，其余工具走普通 MCP 工具的权限确认，也就是现有的 `permission_request` 事件和 `PermissionDialog.tsx` 弹窗，确认时可以选"本会话内始终允许"。理由见 [ADR-0002](cua-driver-adr.md#adr-0002只读工具放行操作类工具逐次确认)。
-  - 只读名单是一个常量，名称为 `CUA_READONLY_TOOLS`，按 0.34.0 的工具名写：`get_screen_size`、`get_cursor_position`、`list_apps`、`list_windows`、`get_window_state`、`get_accessibility_tree`、`get_desktop_state`、`zoom`、`get_browser_state`、`verify_state`、`health_report`、`get_config`、`get_session`、`list_sessions`、`get_session_state`、`get_recording_state`、`get_agent_cursor_state`。这些工具在 cua 的 MCP 注解里都是 `readOnlyHint: true`。
+  - 只读名单是一个常量，名称为 `CUA_READONLY_TOOLS`，按 0.34.0 的工具名写：`get_screen_size`、`get_cursor_position`、`list_apps`、`list_windows`、`get_accessibility_tree`、`zoom`、`get_browser_state`、`verify_state`、`health_report`、`get_config`、`get_session`、`list_sessions`、`get_session_state`、`get_recording_state`、`get_agent_cursor_state`。这些工具在 cua 的 MCP 注解里都是 `readOnlyHint: true`。`get_window_state` 和 `get_desktop_state` 原本也在名单里，实现时核实后移出（见文末）。`zoom`、`verify_state`、`get_browser_state` 会在结果里带截图，但不写文件，按 ADR-0002 免确认，设置页说明写明了这一点。
   - 以下工具**不放行**：
     - `clipboard_read`：涉及隐私，虽然注解是只读；
     - `check_for_update`：会联网；

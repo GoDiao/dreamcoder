@@ -48,4 +48,12 @@ describe('CUA_READONLY_TOOLS against cua-driver 0.34.0 tools/list', () => {
       expect(byName.get(name)?.readOnlyHint).toBe(true)
     }
   })
+
+  it('includes no tool that writes to a path the model chooses', () => {
+    const fileParams = /(^|_)(file|path|dir|out)(_|$)|out_file|output_dir/
+    for (const name of CUA_READONLY_TOOLS) {
+      const params = byName.get(name)?.params ?? []
+      expect(params.filter(p => fileParams.test(p))).toEqual([])
+    }
+  })
 })
