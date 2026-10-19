@@ -6,6 +6,8 @@ import { extractToolResultImages } from './ToolResultImages'
 import { useChatStore } from '../../stores/chatStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTabStore } from '../../stores/tabStore'
+import { useUIStore } from '../../stores/uiStore'
+import { isCuaPermissionError } from '../../lib/cuaToolDisplay'
 
 const PNG_DATA = 'iVBORw0KGgo='
 
@@ -35,6 +37,30 @@ describe('cua tool display in chat blocks', () => {
     useSettingsStore.setState({ locale: 'zh' })
     const { container } = render(<ToolCallBlock toolName="mcp__cua__type_text" input={{ text: '你好' }} />)
     expect(container.textContent).toContain('Computer Use · 输入文本')
+  })
+
+  it('links to Computer Use settings when a cua tool fails on missing system permissions', () => {
+    useUIStore.setState({ settingsOpen: false, settingsTab: 'providers' })
+    render(
+      <ToolCallBlock
+        toolName="mcp__cua__get_window_state"
+        input={{ pid: 42, window_id: 7 }}
+        result={{ content: [{ type: 'text', text: 'Screen Recording is NOT granted for this process.' }], isError: true }}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Go to Computer Use settings' }))
+    expect(useUIStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: 'computerUse' })
+  })
+
+  it('shows no settings link for other failures', () => {
+    render(
+      <ToolCallBlock
+        toolName="mcp__cua__click"
+        input={{ pid: 42, x: 1, y: 1 }}
+        result={{ content: 'window_id_not_found', isError: true }}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Go to Computer Use settings' })).toBeNull()
   })
 
   it('renders image blocks in tool results as thumbnails that open a larger view', () => {
@@ -121,3 +147,24 @@ describe('extractToolResultImages', () => {
     expect(extractToolResultImages(undefined)).toEqual([])
   })
 })
+
+describe('isCuaPermissionError', () => {
+  const err = (text: string) => ({ content: [{ type: 'text', text }], isError: true })
+
+  it('recognizes cua-driver permission errors', () => {
+    expect(isCuaPermissionError('mcp__cua__click', err('Accessibility is not granted'))).toBe(true)
+    expect(isCuaPermissionError('mcp__cua__zoom', err('run `cua-driver permissions grant` first'))).toBe(true)
+  })
+
+  it('ignores successes, other tools and DreamCoder session rejections', () => {
+    expect(isCuaPermissionError('mcp__cua__click', { content: 'Accessibility', isError: false })).toBe(false)
+    expect(isCuaPermissionError('Bash', err('Accessibility is not granted'))).toBe(false)
+    expect(
+      isCuaPermissionError(
+        'mcp__cua__click',
+        err("Claude requested permissions to use mcp__cua__click, but you haven't granted it yet."),
+      ),
+    ).toBe(false)
+  })
+})
+

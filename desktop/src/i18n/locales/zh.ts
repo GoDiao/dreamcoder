@@ -1515,6 +1515,7 @@ export const zh: Record<TranslationKey, string> = {
   'question.selectedCount': '已选 {count} 项',
   'question.questionCount': '{count} 个问题',
   'question.viewOriginal': '查看原问题',
+  'cuaTool.openSettings': '去 Computer Use 设置',
   'cuaTool.title': 'Computer Use · {action}',
   'cuaTool.permission.allow': '允许 Computer Use {action}？',
   'cuaTool.permission.launchApp': '允许 Computer Use 启动 {app}？',

@@ -8,7 +8,8 @@ import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { InlineImageGallery } from './InlineImageGallery'
 import type { AgentTaskNotification } from '../../types/chat'
-import { getCuaToolDisplay, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { getCuaToolDisplay, isCuaPermissionError, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { useUIStore } from '../../stores/uiStore'
 import { ToolResultImages, extractToolResultImages } from './ToolResultImages'
 
 type Props = {
@@ -70,6 +71,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const preview = useMemo(() => renderPreview(toolName, obj, result, t), [obj, result, toolName, t])
   const details = useMemo(() => renderDetails(toolName, obj, t, isPending ? partialInput : undefined), [isPending, obj, partialInput, toolName, t])
   const resultImages = useMemo(() => extractToolResultImages(result?.content), [result?.content])
+  const showCuaSettingsLink = useMemo(() => isCuaPermissionError(toolName, result), [result, toolName])
   const hasResultDetails = Boolean(result && (extractTextContent(result.content) || resultImages.length > 0))
   const hasEditPreview = toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string'
   const hasWritePreview = toolName === 'Write' && typeof obj.content === 'string'
@@ -130,6 +132,18 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
           </div>
         )}
       </button>
+
+      {showCuaSettingsLink && (
+        <div className="border-t border-[var(--color-border)]/60 px-4 py-2 text-xs">
+          <button
+            type="button"
+            onClick={() => useUIStore.getState().openSettings('computerUse')}
+            className="font-medium text-[var(--color-brand)] hover:underline"
+          >
+            {t('cuaTool.openSettings')}
+          </button>
+        </div>
+      )}
 
       {expandable && expanded && (
         <div className="space-y-2.5 border-t border-[var(--color-border)]/60 px-3 py-3">

@@ -277,3 +277,31 @@ function safe(fn: () => string): string {
     return ''
   }
 }
+
+// cua-driver 0.34.0 reports missing macOS grants in its error text (e.g.
+// "Screen Recording is NOT granted", "run `cua-driver permissions grant`").
+const OS_PERMISSION_ERROR = /accessibility|screen recording|permissions grant|\btcc\b|not granted|permission_required/i
+// DreamCoder's own "you haven't granted it yet" rejection is a session prompt, not an OS grant.
+const SESSION_PERMISSION_REJECTION = /requested permissions? to use/i
+
+function resultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map(chunk => (typeof chunk === 'string' ? chunk : (chunk as { text?: unknown })?.text))
+      .filter((text): text is string => typeof text === 'string')
+      .join('\n')
+  }
+  return ''
+}
+
+/** True when a cua tool failed because the system permissions are missing. */
+export function isCuaPermissionError(
+  toolName: string,
+  result: { content: unknown; isError: boolean } | null | undefined,
+): boolean {
+  if (!isCuaTool(toolName) || !result?.isError) return false
+  const text = resultText(result.content)
+  return OS_PERMISSION_ERROR.test(text) && !SESSION_PERMISSION_REJECTION.test(text)
+}
+

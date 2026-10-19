@@ -1513,6 +1513,7 @@ export const en = {
   'question.selectedCount': '{count} selected',
   'question.questionCount': '{count} questions',
   'question.viewOriginal': 'View original questions',
+  'cuaTool.openSettings': 'Go to Computer Use settings',
   'cuaTool.title': 'Computer Use · {action}',
   'cuaTool.permission.allow': 'Allow Computer Use to {action}?',
   'cuaTool.permission.launchApp': 'Allow Computer Use to launch {app}?',
