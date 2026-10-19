@@ -7,7 +7,6 @@ import {
   ConversationStartupError,
   conversationService,
 } from '../services/conversationService.js'
-import { computerUseApprovalService } from '../services/computerUseApprovalService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
@@ -155,10 +154,6 @@ export const handleWebSocket = {
           handlePermissionResponse(ws, message)
           break
 
-        case 'computer_use_permission_response':
-          handleComputerUsePermissionResponse(ws, message)
-          break
-
         case 'set_permission_mode':
           handleSetPermissionMode(ws, message)
           break
@@ -206,8 +201,6 @@ export const handleWebSocket = {
     if (hasActiveClients(sessionId)) {
       return
     }
-
-    computerUseApprovalService.cancelSession(sessionId)
 
     const cleanupDelayMs = getDisconnectCleanupDelayMs(sessionId)
     const cleanupTimer = setTimeout(() => {
@@ -421,22 +414,6 @@ function handlePermissionResponse(
     message.updatedInput,
   )
   console.log(`[WS] Permission response for ${message.requestId}: ${message.allowed}`)
-}
-
-function handleComputerUsePermissionResponse(
-  ws: ServerWebSocket<WebSocketData>,
-  message: Extract<ClientMessage, { type: 'computer_use_permission_response' }>
-) {
-  const { sessionId } = ws.data
-  const ok = computerUseApprovalService.resolveApproval(
-    message.requestId,
-    message.response,
-  )
-  if (!ok) {
-    console.warn(
-      `[WS] Ignored Computer Use permission response for unknown request ${message.requestId} from ${sessionId}`
-    )
-  }
 }
 
 // The wire type mirrors the CLI's modes; fail to compile if they drift apart.
@@ -1782,7 +1759,6 @@ function normalizeSessionSlashCommand(command: unknown): SessionSlashCommand | n
 }
 
 export function closeSessionConnection(sessionId: string, reason = 'session closed'): boolean {
-  computerUseApprovalService.cancelSession(sessionId)
   conversationService.clearOutputCallbacks(sessionId)
   // Dispose before closing sockets so their close events find no session and are ignored.
   const clients = disposeSessionRuntime(sessionId)?.clients

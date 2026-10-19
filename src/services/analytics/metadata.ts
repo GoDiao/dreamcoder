@@ -129,7 +129,7 @@ export function isAnalyticsToolDetailsLoggingEnabled(
 const BUILTIN_MCP_SERVER_NAMES: ReadonlySet<string> = new Set([
   (
     require('../../utils/computerUse/common.js') as typeof import('../../utils/computerUse/common.js')
-  ).COMPUTER_USE_MCP_SERVER_NAME,
+  ).CUA_MCP_SERVER_NAME,
 ])
 /* eslint-enable @typescript-eslint/no-require-imports */
 

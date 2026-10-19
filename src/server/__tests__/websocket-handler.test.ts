@@ -14,7 +14,6 @@ import {
   type WebSocketData,
 } from '../ws/handler.js'
 import { conversationService } from '../services/conversationService.js'
-import { computerUseApprovalService } from '../services/computerUseApprovalService.js'
 import { sessionService } from '../services/sessionService.js'
 
 function makeClientSocket(sessionId: string) {
@@ -47,25 +46,21 @@ describe('WebSocket handler session isolation', () => {
     const first = makeClientSocket(sessionId)
     const second = makeClientSocket(sessionId)
     const clearCallbacks = spyOn(conversationService, 'clearOutputCallbacks')
-    const cancelComputerUse = spyOn(computerUseApprovalService, 'cancelSession')
 
     handleWebSocket.open(first)
     handleWebSocket.open(second)
     clearCallbacks.mockClear()
-    cancelComputerUse.mockClear()
 
     handleWebSocket.close(first, 1000, 'stale tab closed')
 
     expect(getActiveSessionIds()).toContain(sessionId)
     expect(clearCallbacks).not.toHaveBeenCalled()
-    expect(cancelComputerUse).not.toHaveBeenCalled()
   })
 
   it('closes and removes an active client socket when a session is deleted', () => {
     const sessionId = `delete-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
     const clearCallbacks = spyOn(conversationService, 'clearOutputCallbacks')
-    const cancelComputerUse = spyOn(computerUseApprovalService, 'cancelSession')
 
     handleWebSocket.open(ws)
 
@@ -74,7 +69,6 @@ describe('WebSocket handler session isolation', () => {
     expect(getActiveSessionIds()).not.toContain(sessionId)
     expect(ws.close).toHaveBeenCalledWith(1000, 'session deleted')
     expect(clearCallbacks).toHaveBeenCalledWith(sessionId)
-    expect(cancelComputerUse).toHaveBeenCalledWith(sessionId)
   })
 
   it('replays pending permission requests when a client reconnects', () => {

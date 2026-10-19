@@ -1,0 +1,237 @@
+{
+  "source": "cua-driver 0.34.0 tools/list (macOS), names and readOnlyHint only",
+  "tools": [
+    {
+      "name": "list_apps",
+      "readOnlyHint": true
+    },
+    {
+      "name": "list_windows",
+      "readOnlyHint": true
+    },
+    {
+      "name": "get_window_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "verify_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "launch_app",
+      "readOnlyHint": false
+    },
+    {
+      "name": "kill_app",
+      "readOnlyHint": false
+    },
+    {
+      "name": "bring_to_front",
+      "readOnlyHint": false
+    },
+    {
+      "name": "set_window_frame",
+      "readOnlyHint": false
+    },
+    {
+      "name": "invoke_menu",
+      "readOnlyHint": false
+    },
+    {
+      "name": "click",
+      "readOnlyHint": false
+    },
+    {
+      "name": "double_click",
+      "readOnlyHint": false
+    },
+    {
+      "name": "right_click",
+      "readOnlyHint": false
+    },
+    {
+      "name": "drag",
+      "readOnlyHint": false
+    },
+    {
+      "name": "type_text",
+      "readOnlyHint": false
+    },
+    {
+      "name": "press_key",
+      "readOnlyHint": false
+    },
+    {
+      "name": "hotkey",
+      "readOnlyHint": false
+    },
+    {
+      "name": "set_value",
+      "readOnlyHint": false
+    },
+    {
+      "name": "scroll",
+      "readOnlyHint": false
+    },
+    {
+      "name": "clipboard_read",
+      "readOnlyHint": true
+    },
+    {
+      "name": "clipboard_write",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_screen_size",
+      "readOnlyHint": true
+    },
+    {
+      "name": "get_desktop_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "get_cursor_position",
+      "readOnlyHint": true
+    },
+    {
+      "name": "move_cursor",
+      "readOnlyHint": false
+    },
+    {
+      "name": "set_agent_cursor_enabled",
+      "readOnlyHint": false
+    },
+    {
+      "name": "set_agent_cursor_motion",
+      "readOnlyHint": false
+    },
+    {
+      "name": "set_agent_cursor_theme",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_agent_cursor_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "check_permissions",
+      "readOnlyHint": false
+    },
+    {
+      "name": "health_report",
+      "readOnlyHint": true
+    },
+    {
+      "name": "get_config",
+      "readOnlyHint": true
+    },
+    {
+      "name": "set_config",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_accessibility_tree",
+      "readOnlyHint": true
+    },
+    {
+      "name": "zoom",
+      "readOnlyHint": true
+    },
+    {
+      "name": "page",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_browser_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "browser_prepare",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_navigate",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_click",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_type",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_dialog",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_set_input_files",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_download",
+      "readOnlyHint": false
+    },
+    {
+      "name": "browser_pointer",
+      "readOnlyHint": false
+    },
+    {
+      "name": "start_recording",
+      "readOnlyHint": false
+    },
+    {
+      "name": "stop_recording",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_recording_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "replay_trajectory",
+      "readOnlyHint": false
+    },
+    {
+      "name": "install_ffmpeg",
+      "readOnlyHint": false
+    },
+    {
+      "name": "start_session",
+      "readOnlyHint": false
+    },
+    {
+      "name": "escalate_session",
+      "readOnlyHint": false
+    },
+    {
+      "name": "get_session",
+      "readOnlyHint": true
+    },
+    {
+      "name": "list_sessions",
+      "readOnlyHint": true
+    },
+    {
+      "name": "get_session_state",
+      "readOnlyHint": true
+    },
+    {
+      "name": "end_session",
+      "readOnlyHint": false
+    },
+    {
+      "name": "check_for_update",
+      "readOnlyHint": true
+    },
+    {
+      "name": "install_extension",
+      "readOnlyHint": false
+    },
+    {
+      "name": "parse_visual_regions",
+      "readOnlyHint": true
+    }
+  ]
+}
