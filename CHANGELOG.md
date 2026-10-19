@@ -4,6 +4,12 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-19
+
+### Upgrading from 0.5
+
+Computer Use was rebuilt on cua-driver and is now **off by default**. If you used it in 0.5 but never saved its settings, turn it on again under Settings → Computer Use; the first time, that downloads cua-driver. The screenshot and UIA Tree modes, the Python runtime and the per-app approval dialog are gone. Instead, every click, keystroke or other action asks first, unless the session is in Bypass permissions mode. The old Python environment can be removed from the same page.
+
 ### Added
 
 - **Install from the MCP catalog** (#46, #102): catalog entries open a review screen where you pick the scope and project, fill in required environment values and check the command before saving. Thanks @harrisonoconnorhover.
@@ -19,6 +25,8 @@ All notable changes to DreamCoder will be documented in this file.
 
 - Expanded Bash tool calls now show their output (#129).
 - On macOS, selecting text across messages no longer paints the highlight across the whole window width (#129).
+- The CLI, `/status` and session metadata report the app version instead of `999.0.0-local`, and `--version` says DreamCoder instead of Claude Code.
+- The website links to the installers and the renamed READMEs (#115).
 - **OpenAI-compatible providers** (#38):
   - Cached prompt tokens are reported as cache reads, so cost estimates use the cached price. Non-streaming Chat requests no longer count them twice.
   - Screenshots and images now reach providers that use the OpenAI Responses format.
