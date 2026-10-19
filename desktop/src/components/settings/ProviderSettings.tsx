@@ -6,6 +6,7 @@ import { Button } from '../shared/Button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SavedProvider, ProviderTestResult } from '../../types/provider'
 import { ProviderFormModal } from './ProviderFormModal'
+import { ProviderIcon } from './ProviderIcon'
 import { SettingsPageHeader } from './SettingsPageHeader'
 import { Plus } from 'lucide-react'
 
@@ -123,7 +124,10 @@ function ProviderSettings() {
               >
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                   <div className="flex flex-wrap items-center gap-[9px]">
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{provider.name}</span>
+                    <span className="inline-flex min-w-0 max-w-full items-start gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+                      <ProviderIcon presetId={provider.presetId} className="mt-0.5" />
+                      <span className="min-w-0 [overflow-wrap:anywhere]">{provider.name}</span>
+                    </span>
                     {isActive && (
                       <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{t('settings.providers.default')}</span>
                     )}

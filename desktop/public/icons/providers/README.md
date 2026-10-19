@@ -1,0 +1,1 @@
+The six provider SVGs in this directory are from [Lobe Icons](https://github.com/lobehub/lobe-icons/tree/master/packages/static-svg/icons) and are licensed under the accompanying MIT license. They are used as CSS masks so the same monochrome artwork follows the text color in light and dark themes.
