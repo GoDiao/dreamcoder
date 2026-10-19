@@ -8,7 +8,7 @@ import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { InlineImageGallery } from './InlineImageGallery'
 import type { AgentTaskNotification } from '../../types/chat'
-import { getCuaToolDisplay, isCuaPermissionError, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { getCuaToolDisplay, humanizeCuaResult, isCuaPermissionError, type CuaToolIcon } from '../../lib/cuaToolDisplay'
 import { useUIStore } from '../../stores/uiStore'
 import { ToolResultImages, extractToolResultImages } from './ToolResultImages'
 
@@ -49,9 +49,12 @@ const CUA_TOOL_ICONS: Record<CuaToolIcon, React.ElementType> = {
 const WRITER_PREVIEW_MAX_LINES = 120
 const WRITER_PREVIEW_MAX_CHARS = 30000
 
-export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, result, compact = false, isPending = false, partialInput }: Props) {
+export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, result: rawResult, compact = false, isPending = false, partialInput }: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
+  const isCua = toolName.startsWith('mcp__cua__')
+  // cua results can quote internal tool names (e.g. permission rejections); show display titles instead.
+  const result = useMemo(() => (isCua ? humanizeCuaResult(rawResult, t) : rawResult), [isCua, rawResult, t])
   const obj = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const cua = useMemo(() => getCuaToolDisplay(toolName, input, t), [input, toolName, t])
   const IconComponent = cua ? CUA_TOOL_ICONS[cua.icon] : TOOL_ICONS[toolName] || Wrench
@@ -71,7 +74,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const preview = useMemo(() => renderPreview(toolName, obj, result, t), [obj, result, toolName, t])
   const details = useMemo(() => renderDetails(toolName, obj, t, isPending ? partialInput : undefined), [isPending, obj, partialInput, toolName, t])
   const resultImages = useMemo(() => extractToolResultImages(result?.content), [result?.content])
-  const showCuaSettingsLink = useMemo(() => isCuaPermissionError(toolName, result), [result, toolName])
+  const showCuaSettingsLink = useMemo(() => isCuaPermissionError(toolName, rawResult), [rawResult, toolName])
   const hasResultDetails = Boolean(result && (extractTextContent(result.content) || resultImages.length > 0))
   const hasEditPreview = toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string'
   const hasWritePreview = toolName === 'Write' && typeof obj.content === 'string'
@@ -114,7 +117,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
           </span>
         ) : result && outputSummary ? (
           <span
-            className={`shrink-0 text-[10px] ${
+            title={outputSummary}
+            className={`min-w-0 max-w-[45%] truncate text-[10px] ${
               result.isError
                 ? 'text-[var(--color-error)]'
                 : 'text-[var(--color-outline)]'

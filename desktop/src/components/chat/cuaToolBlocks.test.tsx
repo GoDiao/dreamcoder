@@ -63,6 +63,31 @@ describe('cua tool display in chat blocks', () => {
     expect(screen.queryByRole('button', { name: 'Go to Computer Use settings' })).toBeNull()
   })
 
+  it('replaces internal cua tool names quoted in results with display titles', () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolName="mcp__cua__click"
+        input={{ pid: 1, x: 1, y: 1 }}
+        result={{ content: "Claude requested permissions to use mcp__cua__click, but you haven't granted it yet.", isError: true }}
+      />,
+    )
+    expect(container.textContent).toContain('requested permissions to use Computer Use · Click')
+    expect(container.textContent).not.toContain('mcp__cua__')
+  })
+
+  it('truncates a long error summary instead of squeezing the title', () => {
+    render(
+      <ToolCallBlock
+        toolName="mcp__cua__get_window_state"
+        input={{ pid: 1, window_id: 2 }}
+        result={{ content: 'Screen Recording is NOT granted for this process. Run `cua-driver permissions grant`.', isError: true }}
+      />,
+    )
+    const summary = screen.getByTitle(/Screen Recording is NOT granted/)
+    expect(summary.className).toContain('truncate')
+    expect(summary.className).not.toContain('shrink-0')
+  })
+
   it('renders image blocks in tool results as thumbnails that open a larger view', () => {
     const { container } = render(
       <ToolCallBlock

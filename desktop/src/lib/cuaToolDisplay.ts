@@ -305,3 +305,29 @@ export function isCuaPermissionError(
   return OS_PERMISSION_ERROR.test(text) && !SESSION_PERMISSION_REJECTION.test(text)
 }
 
+/** Replaces internal `mcp__cua__<tool>` names in text with their display titles. */
+export function humanizeCuaToolNames(text: string, t: Translate): string {
+  return text.replace(/mcp__cua__([A-Za-z0-9_]+)/g, name => getCuaToolDisplay(name, {}, t)?.title ?? name)
+}
+
+/** Same as `humanizeCuaToolNames`, applied to the text parts of a tool result. */
+export function humanizeCuaResult<T extends { content: unknown; isError: boolean }>(
+  result: T | null | undefined,
+  t: Translate,
+): T | null | undefined {
+  if (!result) return result
+  const content = result.content
+  if (typeof content === 'string') return { ...result, content: humanizeCuaToolNames(content, t) }
+  if (Array.isArray(content)) {
+    return {
+      ...result,
+      content: content.map(chunk => {
+        if (typeof chunk === 'string') return humanizeCuaToolNames(chunk, t)
+        const text = (chunk as { text?: unknown })?.text
+        return typeof text === 'string' ? { ...(chunk as object), text: humanizeCuaToolNames(text, t) } : chunk
+      }),
+    }
+  }
+  return result
+}
+
