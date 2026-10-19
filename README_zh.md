@@ -64,7 +64,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 </picture>
 
 ### 3. Claude Code 工作流
-*   **Computer Use 双模式**：支持视觉截图模式和 **UIA Tree 模式**（文本辅助访问）。
+*   **Computer Use**：在后台按界面元素操作桌面应用和浏览器，由 [cua-driver](https://github.com/trycua/cua)（MIT）驱动。开启时 DreamCoder 自动下载，不需要 Python。macOS 已验证；Windows 有待社区实测，Linux 为预览。
 *   **工具调用全程可见**：AI 读写文件、执行终端命令的过程透明呈现，便于理解与审查。
 *   **MCP 扩展能力**：通过 Model Context Protocol 持续扩展 AI 的上下文与工具能力。
 

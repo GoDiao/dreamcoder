@@ -64,7 +64,7 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 </picture>
 
 ### 3. Claude Code Workflows
-*   **Dual Computer Use modes**: Supports visual screenshot control and **UIA Tree mode** (text-based accessibility).
+*   **Computer Use**: operates desktop apps and browsers in the background through UI elements, powered by [cua-driver](https://github.com/trycua/cua) (MIT). DreamCoder downloads it when you turn Computer Use on; no Python needed. Verified on macOS; Windows needs community testing, Linux is a preview.
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
 

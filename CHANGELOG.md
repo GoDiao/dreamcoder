@@ -9,6 +9,11 @@ All notable changes to DreamCoder will be documented in this file.
 - **Install from the MCP catalog** (#46, #102): catalog entries open a review screen where you pick the scope and project, fill in required environment values and check the command before saving. Thanks @harrisonoconnorhover.
 - **Provider logos** (#121, #122): Settings → Providers and the Add Provider presets show each provider's logo before its name; custom providers get a generic icon. Thanks @spjyotiranjan.
 
+### Changed
+
+- **Computer Use runs on cua-driver** (#74). Turning Computer Use on downloads [cua-driver](https://github.com/trycua/cua) 0.34.0 (MIT) through cua's official installer, or reuses an existing install of 0.34.0 or newer. It works in the background without taking the mouse or focus, targets UI elements, and drives browsers. Reading tools run without asking; clicks, typing and other actions ask each time, unless the session is in Bypass permissions mode. cua telemetry is turned off. Verified on macOS; Windows needs community testing, Linux is a preview.
+  - **Breaking:** the visual screenshot and UIA Tree modes, the Python runtime and the per-app approval dialog are removed. Computer Use is now off by default: if you never saved its settings, turn it on again under Settings → Computer Use. The old Python environment can be removed from that page.
+
 ### Fixed
 
 - **OpenAI-compatible providers** (#38):

@@ -15,7 +15,7 @@ English | [简体中文](./ROADMAP_zh.md)
 ## Phase 2 — CLI Backend + Computer Use ✅
 
 - [x] Sidecar backend architecture (dreamcoder-sidecar.exe)
-- [x] Computer Use (visual screenshot mode + UIA Tree text mode)
+- [x] Computer Use (now on cua-driver; the visual and UIA Tree modes were replaced)
 - [x] MCP protocol support + visual management
 - [x] Skills system
 - [x] Agent Teams multi-agent collaboration
