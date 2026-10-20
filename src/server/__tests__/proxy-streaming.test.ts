@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test'
 import { openaiChatStreamToAnthropic } from '../proxy/streaming/openaiChatStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiResponsesStreamToAnthropic.js'
+import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -534,6 +535,34 @@ describe('openaiResponsesStreamToAnthropic', () => {
       output_tokens: 5,
       cache_read_input_tokens: 80,
     })
+  })
+})
+
+describe('openaiResponsesStreamToAnthropicResponse', () => {
+  const output = [
+    { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'partial' }] },
+    { type: 'function_call', call_id: 'call_1', name: 'Read', arguments: '{"path":"a"}' },
+  ]
+
+  test.each([
+    ['response.completed', 'completed', 'tool_use'],
+    ['response.incomplete', 'incomplete', 'max_tokens'],
+  ])('keeps the final response of a %s event', async (event, status, stopReason) => {
+    const response = {
+      id: 'resp_1',
+      model: 'gpt-5.6-terra',
+      status,
+      output,
+      usage: { input_tokens: 12, output_tokens: 7 },
+    }
+    const result = await openaiResponsesStreamToAnthropicResponse(
+      makeStream([`event: ${event}\ndata: ${JSON.stringify({ type: event, response })}\n\n`]),
+      'm',
+    )
+
+    expect(result.stop_reason).toBe(stopReason)
+    expect(result.usage).toEqual({ input_tokens: 12, output_tokens: 7 })
+    expect(result.content.map(block => block.type)).toEqual(['text', 'tool_use'])
   })
 })
 

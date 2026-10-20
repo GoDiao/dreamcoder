@@ -22,6 +22,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Fixed
 
 - **Gemini and similar OpenAI-compatible providers** (#139): parallel tool calls streamed without an `index` run as separate calls instead of being merged into one. A turn that calls tools and ends with finish_reason `stop` now reports `tool_use`. Thanks @pcbeingused333.
+- **ChatGPT sign-in:** a reply that stops at the output limit (`response.incomplete`) is reported as `max_tokens` with its tool calls and token usage, instead of `end_turn` with plain text and zero usage.
 - **Agent teams:** opening a teammate from the team view shows its conversation instead of an empty page.
   - Each teammate now keeps one transcript. Before, every message it received started a new file with its whole history copied in.
   - Transcripts written before this update still open.
