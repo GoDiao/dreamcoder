@@ -120,6 +120,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 > 维护者目前主要在 **macOS（Apple Silicon）** 上开发，从源码运行（`bun run tauri dev`），自 v0.5.0 起提供 `.dmg` 安装包。
 > **Windows x64** 是此前的主力平台，经过长期实测；维护者现在不在 Windows 上日常开发，新改动在 Windows 上的表现尤其欢迎反馈。
 > **Linux** 代码中保留了 `#[cfg(target_os = "linux")]` 分支，但维护者并不日常使用，仍属于“代码已覆盖、体验待更多实机验证”的状态。
+> Ubuntu 浏览器版的验证范围、exFAT 依赖安装问题及本地 Ollama 调用结果见[Linux 验证报告](docs/LINUX_BROWSER_VALIDATION_zh.md)；启动、关闭和按 PID 终止进程的方法见[浏览器版使用指南](docs/WEB_USAGE_zh.md)。
 > 如果你正在使用 Windows 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
 > 安装包供应情况以 [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) 页面中的实际附件为准。

@@ -117,6 +117,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 > The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source (`bun run tauri dev`); it ships as a `.dmg` from v0.5.0.
 > **Windows x64** was the main platform before and has been tested extensively, but the maintainer no longer develops on it day to day, so feedback on how new changes behave on Windows is especially welcome.
 > **Linux** has `#[cfg(target_os = "linux")]` branches in the codebase, but it is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
+> For the validated Ubuntu browser workflow, exFAT installation workaround, and local Ollama results, see the [Linux validation report](docs/LINUX_BROWSER_VALIDATION.md). For startup, shutdown, and termination by PID, see the [browser usage guide](docs/WEB_USAGE.md).
 > If you're running DreamCoder on Windows or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
 > Check [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) for the actual assets available with each release.
