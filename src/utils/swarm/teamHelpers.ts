@@ -501,6 +501,8 @@ export async function setMemberActive(
   memberName: string,
   isActive: boolean,
 ): Promise<void> {
+  // Checked first because mutateTeamFileAsync creates the file, which would
+  // bring back a team that was deleted while the teammate was still running.
   const teamFile = await readTeamFileAsync(teamName)
   if (!teamFile) {
     logForDebugging(
@@ -508,22 +510,15 @@ export async function setMemberActive(
     )
     return
   }
-
   const member = teamFile.members.find(m => m.name === memberName)
-  if (!member) {
-    logForDebugging(
-      `[TeammateTool] Cannot set member active: member ${memberName} not found in team ${teamName}`,
-    )
-    return
-  }
+  if (!member || member.isActive === isActive) return
 
-  // Only write if the value is actually changing
-  if (member.isActive === isActive) {
-    return
-  }
-
-  member.isActive = isActive
-  await writeTeamFileAsync(teamName, teamFile)
+  // Locked: teammates of one team change this file at the same time, and an
+  // unlocked read-modify-write could drop a member the leader just added.
+  await mutateTeamFileAsync(teamName, current => {
+    const target = current.members.find(m => m.name === memberName)
+    if (target) target.isActive = isActive
+  })
   logForDebugging(
     `[TeammateTool] Set member ${memberName} in team ${teamName} to ${isActive ? 'active' : 'idle'}`,
   )

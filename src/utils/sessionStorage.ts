@@ -1481,12 +1481,14 @@ export async function recordSidechainTranscript(
   messages: Message[],
   agentId?: string,
   startingParentUuid?: UUID | null,
+  teamInfo?: { teamName?: string; agentName?: string },
 ) {
   await getProject().insertMessageChain(
     cleanMessagesForLogging(messages),
     true,
     agentId,
     startingParentUuid,
+    teamInfo,
   )
 }
 

@@ -79,6 +79,10 @@ import {
 } from '../../utils/telemetry/perfettoTracing.js'
 import type { ContentReplacementState } from '../../utils/toolResultStorage.js'
 import { createAgentId } from '../../utils/uuid.js'
+import {
+  type SharedSidechainTranscript,
+  unrecordedMessages,
+} from './sidechainTranscript.js'
 import { resolveAgentTools } from './agentToolUtils.js'
 import { type AgentDefinition, isBuiltInAgent } from './loadAgentsDir.js'
 
@@ -267,6 +271,7 @@ export async function* runAgent({
   description,
   transcriptSubdir,
   onQueryProgress,
+  sharedTranscript,
 }: {
   agentDefinition: AgentDefinition
   promptMessages: Message[]
@@ -326,6 +331,9 @@ export async function* runAgent({
    * during long single-block streams (e.g. thinking) where no assistant
    * message is yielded for >60s. */
   onQueryProgress?: () => void
+  /** Write into a transcript earlier calls already started (pass the same
+   * override.agentId): only messages it does not hold yet are written. */
+  sharedTranscript?: SharedSidechainTranscript
 }): AsyncGenerator<Message, void> {
   // Track subagent usage for feature discovery
 
@@ -732,7 +740,22 @@ export async function* runAgent({
   // Record initial messages before the query loop starts, plus the agentType
   // so resume can route correctly when subagent_type is omitted. Both writes
   // are fire-and-forget — persistence failure shouldn't block the agent.
-  void recordSidechainTranscript(initialMessages, agentId).catch(_err =>
+  const teamInfo = sharedTranscript && {
+    teamName: sharedTranscript.teamName,
+    agentName: sharedTranscript.agentName,
+  }
+  const initialRecord = sharedTranscript
+    ? unrecordedMessages(initialMessages, sharedTranscript.recordedUuids)
+    : { messages: initialMessages, parentUuid: null }
+  for (const message of initialRecord.messages) {
+    sharedTranscript?.recordedUuids.add(message.uuid)
+  }
+  void recordSidechainTranscript(
+    initialRecord.messages,
+    agentId,
+    initialRecord.parentUuid,
+    teamInfo,
+  ).catch(_err =>
     logForDebugging(`Failed to record sidechain transcript: ${_err}`),
   )
   void writeAgentMetadata(agentId, {
@@ -795,9 +818,11 @@ export async function* runAgent({
           [message],
           agentId,
           lastRecordedUuid,
+          teamInfo,
         ).catch(err =>
           logForDebugging(`Failed to record sidechain transcript: ${err}`),
         )
+        sharedTranscript?.recordedUuids.add(message.uuid)
         if (message.type !== 'progress') {
           lastRecordedUuid = message.uuid
         }

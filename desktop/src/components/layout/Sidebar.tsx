@@ -14,6 +14,7 @@ import { SidebarMoreMenu } from './SidebarMoreMenu'
 import { useMenuNavigation } from '../../hooks/useMenuNavigation'
 import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarProjectSortBy } from './ProjectManagementDialog'
 import { ShortcutsDialog } from './ShortcutsDialog'
+import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
 
 const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
@@ -73,6 +74,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [createProjectMenu, setCreateProjectMenu] = useState<{ x: number; y: number } | null>(null)
   const [projectManagementOpen, setProjectManagementOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [reportProblemOpen, setReportProblemOpen] = useState(false)
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null)
   const [pendingBatchDeleteSessionIds, setPendingBatchDeleteSessionIds] = useState<string[] | null>(null)
   const [isBatchDeleting, setIsBatchDeleting] = useState(false)
@@ -1091,6 +1093,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             onOpenProjectManagement={() => setProjectManagementOpen(true)}
             onOpenSettings={() => useUIStore.getState().openSettings()}
             onOpenShortcuts={() => setShortcutsOpen(true)}
+            onReportProblem={() => setReportProblemOpen(true)}
           />
         </div>
       )}
@@ -1227,6 +1230,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         }}
       />
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ReportProblemDialog open={reportProblemOpen} onClose={() => setReportProblemOpen(false)} />
 
       <ConfirmDialog
         open={pendingDeleteSessionId !== null}

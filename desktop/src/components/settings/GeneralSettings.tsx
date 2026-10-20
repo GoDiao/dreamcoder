@@ -44,6 +44,8 @@ export function GeneralSettings() {
     setSkipWebFetchPreflight,
     desktopNotificationsEnabled,
     setDesktopNotificationsEnabled,
+    agentTeamsEnabled,
+    setAgentTeamsEnabled,
     webSearch,
     setWebSearch,
     network,
@@ -476,6 +478,20 @@ export function GeneralSettings() {
             }
           />
         )}
+      </SettingsGroup>
+
+      <SettingsGroup title={t('settings.general.groupExperimental')}>
+        <SettingsRow
+          title={t('settings.general.agentTeamsTitle')}
+          description={t('settings.general.agentTeamsDescription')}
+          control={
+            <Switch
+              label={t('settings.general.agentTeamsTitle')}
+              checked={agentTeamsEnabled}
+              onChange={(checked) => void setAgentTeamsEnabled(checked)}
+            />
+          }
+        />
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.general.groupAdvanced')}>

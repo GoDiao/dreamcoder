@@ -37,7 +37,8 @@ export function TeamStatusBar() {
     (m) => !activeTeam.leadAgentId || m.agentId !== activeTeam.leadAgentId,
   )
   const runningCount = members.filter((m) => m.status === 'running').length
-  const completedCount = members.filter((m) => m.status === 'completed').length
+  // An idle teammate has finished its work and waits for messages.
+  const completedCount = members.filter((m) => m.status === 'completed' || m.status === 'idle').length
   const totalCount = members.length
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const allDone = runningCount === 0 && totalCount > 0

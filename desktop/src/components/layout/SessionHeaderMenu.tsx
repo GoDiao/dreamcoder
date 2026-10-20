@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Ellipsis, ListChecks, Pencil, Trash2 } from 'lucide-react'
+import { Download, Ellipsis, ListChecks, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -8,19 +8,21 @@ import { useUIStore } from '../../stores/uiStore'
 import { Button } from '../shared/Button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { Modal } from '../shared/Modal'
+import { ExportSessionDialog } from './ExportSessionDialog'
 
 type SessionHeaderMenuProps = {
   sessionId: string
   title: string
 }
 
-/** The "⋯" menu in the session header: rename, bulk manage, delete. */
+/** The "⋯" menu in the session header: rename, export, bulk manage, delete. */
 export function SessionHeaderMenu({ sessionId, title }: SessionHeaderMenuProps) {
   const t = useTranslation()
   const [open, setOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -104,6 +106,18 @@ export function SessionHeaderMenu({ sessionId, title }: SessionHeaderMenuProps) 
             className={`${itemClass} text-[var(--color-text-primary)]`}
             onClick={() => {
               setOpen(false)
+              setExporting(true)
+            }}
+          >
+            <Download size={15} aria-hidden="true" />
+            {t('exportSession.menuItem')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={`${itemClass} text-[var(--color-text-primary)]`}
+            onClick={() => {
+              setOpen(false)
               useUIStore.getState().setSidebarOpen(true)
               useSessionStore.getState().enterBatchMode()
             }}
@@ -126,6 +140,8 @@ export function SessionHeaderMenu({ sessionId, title }: SessionHeaderMenuProps) 
           </button>
         </div>
       )}
+
+      <ExportSessionDialog sessionId={sessionId} open={exporting} onClose={() => setExporting(false)} />
 
       <Modal
         open={renaming}

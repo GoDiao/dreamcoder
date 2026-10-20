@@ -1941,6 +1941,32 @@ describe('Sessions API', () => {
     })
   })
 
+  it('GET /api/sessions/:id/export renders Markdown or the JSON transcript without taking a path', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee1'
+    await writeSessionFile('-tmp-api-test', sessionId, [
+      makeSnapshotEntry(),
+      makeUserEntry('Hello'),
+      makeAssistantEntry('World'),
+    ])
+
+    const md = await fetch(`${baseUrl}/api/sessions/${sessionId}/export?format=markdown`)
+    expect(md.status).toBe(200)
+    const mdBody = (await md.json()) as { fileName: string; format: string; content: string }
+    expect(mdBody.format).toBe('markdown')
+    expect(mdBody.fileName).toMatch(/^\d{4}-\d{2}-\d{2}-Hello\.md$/)
+    expect(mdBody.content).toContain('## User\n\nHello')
+    expect(mdBody.content).toContain('## Assistant\n\nWorld')
+
+    const json = await fetch(`${baseUrl}/api/sessions/${sessionId}/export?format=json`)
+    const jsonBody = (await json.json()) as { fileName: string; content: string }
+    const transcript = await (await fetch(`${baseUrl}/api/sessions/${sessionId}/transcript`)).json()
+    expect(jsonBody.fileName.endsWith('.json')).toBe(true)
+    expect(JSON.parse(jsonBody.content)).toEqual(transcript)
+
+    const post = await fetch(`${baseUrl}/api/sessions/${sessionId}/export`, { method: 'POST', body: '{"path":"/tmp/x"}' })
+    expect(post.status).toBe(405)
+  })
+
   it('GET /api/sessions/:id/git-info should prefer the active CLI workDir', async () => {
     const workDir = await createCleanGitRepo(tmpDir)
     const activeWorktree = path.join(tmpDir, `active-feature-rail-${Date.now()}`)

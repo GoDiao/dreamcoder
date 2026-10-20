@@ -4,6 +4,25 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Report a problem** (#132): the sidebar's More menu opens a preview of what would be shared: app version, OS, provider type and recent errors, already redacted. Copy it, open a GitHub issue with the version filled in, or export the full diagnostics bundle. Nothing is sent until you click.
+- **Export a session** (#133): "Export…" in the session menu saves the conversation as Markdown or JSON. Thinking and full tool output are optional, and secrets and your home folder can be redacted.
+- **Agent teams switch** (#134): Settings → General → Experimental turns on agent teams for new sessions and scheduled tasks. It replaces setting `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` in your shell, which DreamCoder now ignores.
+
+### Changed
+
+- Diagnostics redaction also removes bare provider and GitHub keys (`sk-…`, `ghp_…`), and finds the home folder written with either slash or as `/c/Users/…`. It no longer touches a longer folder name such as `/Users/alice` when the home folder is `/Users/al`.
+- The bug report template lists the current provider presets.
+
+### Fixed
+
+- **Agent teams:** opening a teammate from the team view shows its conversation instead of an empty page.
+  - Each teammate now keeps one transcript. Before, every message it received started a new file with its whole history copied in.
+  - Transcripts written before this update still open.
+  - The team view no longer lists a tool name such as "Read" as a member.
+- **Agent teams:** the team card shows when teammates finish. Teammates that run inside DreamCoder never reported going idle, so the card kept counting them as running and none as done.
+
 ## [0.6.0] — 2026-10-19
 
 ### Upgrading from 0.5

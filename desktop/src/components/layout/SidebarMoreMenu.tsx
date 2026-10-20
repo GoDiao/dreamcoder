@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, ChevronRight, Ellipsis, Folders, Globe, Keyboard, Settings2 } from 'lucide-react'
+import { ArrowLeft, Bug, Check, ChevronRight, Ellipsis, Folders, Globe, Keyboard, Settings2 } from 'lucide-react'
 import { useTranslation, type Locale } from '../../i18n'
 import { useMenuNavigation } from '../../hooks/useMenuNavigation'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -16,6 +16,7 @@ type SidebarMoreMenuProps = {
   onOpenProjectManagement: () => void
   onOpenSettings: () => void
   onOpenShortcuts: () => void
+  onReportProblem: () => void
 }
 
 /** Bottom-left "More" trigger with an upward menu for low-frequency entries. */
@@ -24,6 +25,7 @@ export function SidebarMoreMenu({
   onOpenProjectManagement,
   onOpenSettings,
   onOpenShortcuts,
+  onReportProblem,
 }: SidebarMoreMenuProps) {
   const t = useTranslation()
   const locale = useSettingsStore((s) => s.locale)
@@ -138,6 +140,9 @@ export function SidebarMoreMenu({
               </MoreMenuItem>
               <MoreMenuItem icon={<Keyboard size={16} aria-hidden="true" />} onClick={() => run(onOpenShortcuts)}>
                 {t('sidebar.shortcuts')}
+              </MoreMenuItem>
+              <MoreMenuItem icon={<Bug size={16} aria-hidden="true" />} onClick={() => run(onReportProblem)}>
+                {t('reportProblem.menuItem')}
               </MoreMenuItem>
             </>
           ) : (

@@ -77,6 +77,7 @@ type SettingsStore = {
   theme: ThemeMode
   skipWebFetchPreflight: boolean
   desktopNotificationsEnabled: boolean
+  agentTeamsEnabled: boolean
   desktopTerminal: DesktopTerminalSettings
   webSearch: WebSearchSettings
   updateProxy: UpdateProxySettings
@@ -102,6 +103,7 @@ type SettingsStore = {
   setLocale: (locale: Locale) => void
   setTheme: (theme: ThemeMode) => Promise<void>
   setSkipWebFetchPreflight: (enabled: boolean) => Promise<void>
+  setAgentTeamsEnabled: (enabled: boolean) => Promise<void>
   setDesktopNotificationsEnabled: (enabled: boolean) => Promise<void>
   setDesktopTerminal: (settings: DesktopTerminalSettings) => Promise<void>
   setWebSearch: (settings: WebSearchSettings) => Promise<void>
@@ -161,6 +163,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   theme: useUIStore.getState().theme,
   skipWebFetchPreflight: true,
   desktopNotificationsEnabled: false,
+  agentTeamsEnabled: false,
   desktopTerminal: DEFAULT_DESKTOP_TERMINAL_SETTINGS,
   webSearch: { mode: 'auto', tavilyApiKey: '', braveApiKey: '' },
   updateProxy: DEFAULT_UPDATE_PROXY_SETTINGS,
@@ -217,6 +220,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         theme,
         skipWebFetchPreflight: userSettings.skipWebFetchPreflight !== false,
         desktopNotificationsEnabled: userSettings.desktopNotificationsEnabled === true,
+        agentTeamsEnabled: userSettings.agentTeamsEnabled === true,
         desktopTerminal: normalizeDesktopTerminalSettings(userSettings.desktopTerminal),
         webSearch: normalizeWebSearchSettings(userSettings.webSearch),
         updateProxy: normalizeUpdateProxySettings(userSettings.updateProxy),
@@ -305,6 +309,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       await settingsApi.updateUser({ skipWebFetchPreflight: enabled })
     } catch {
       set({ skipWebFetchPreflight: prev })
+    }
+  },
+
+  setAgentTeamsEnabled: async (enabled) => {
+    const prev = get().agentTeamsEnabled
+    set({ agentTeamsEnabled: enabled })
+    try {
+      await settingsApi.updateUser({ agentTeamsEnabled: enabled })
+    } catch {
+      set({ agentTeamsEnabled: prev })
     }
   },
 

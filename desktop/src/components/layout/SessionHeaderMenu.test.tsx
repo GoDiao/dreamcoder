@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   disconnectSession: vi.fn(),
   closeTab: vi.fn(),
   setSidebarOpen: vi.fn(),
+  addToast: vi.fn(),
+  exportSession: vi.fn(),
 }))
 
 vi.mock('../../stores/sessionStore', () => ({
@@ -28,8 +30,12 @@ vi.mock('../../stores/chatStore', () => ({
 vi.mock('../../stores/tabStore', () => ({
   useTabStore: { getState: () => ({ closeTab: mocks.closeTab }) },
 }))
-vi.mock('../../stores/uiStore', () => ({
-  useUIStore: { getState: () => ({ setSidebarOpen: mocks.setSidebarOpen }) },
+vi.mock('../../stores/uiStore', () => {
+  const state = () => ({ setSidebarOpen: mocks.setSidebarOpen, addToast: mocks.addToast })
+  return { useUIStore: Object.assign((select: (s: ReturnType<typeof state>) => unknown) => select(state()), { getState: state }) }
+})
+vi.mock('../../api/sessions', () => ({
+  sessionsApi: { exportSession: mocks.exportSession },
 }))
 
 import { SessionHeaderMenu } from './SessionHeaderMenu'
@@ -86,5 +92,42 @@ describe('SessionHeaderMenu', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('exports the session with the chosen options and downloads it outside the desktop app', async () => {
+    mocks.exportSession.mockResolvedValue({ fileName: '2026-10-20-T.md', format: 'markdown', content: '# T\n' })
+    const createObjectURL = vi.fn(() => 'blob:export')
+    const revokeObjectURL = vi.fn()
+    Object.assign(URL, { createObjectURL, revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    render(<SessionHeaderMenu sessionId="s1" title="T" />)
+    fireEvent.click(screen.getByRole('button', { name: 'session.header.actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'exportSession.menuItem' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'exportSession.includeThinking' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'exportSession.redact' }))
+    fireEvent.click(screen.getByRole('button', { name: 'exportSession.save' }))
+
+    await waitFor(() => expect(mocks.exportSession).toHaveBeenCalledWith('s1', {
+      format: 'markdown',
+      includeThinking: true,
+      fullToolOutput: false,
+      redact: true,
+    }))
+    await waitFor(() => expect(click).toHaveBeenCalled())
+    expect(createObjectURL).toHaveBeenCalled()
+    expect(mocks.addToast).toHaveBeenCalledWith({ type: 'success', message: 'exportSession.saved' })
+    click.mockRestore()
+  })
+
+  it('turns off the Markdown-only options for JSON', () => {
+    render(<SessionHeaderMenu sessionId="s1" title="T" />)
+    fireEvent.click(screen.getByRole('button', { name: 'session.header.actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'exportSession.menuItem' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'JSON' }))
+
+    expect(screen.getByRole('checkbox', { name: 'exportSession.includeThinking' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'exportSession.fullToolOutput' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'exportSession.redact' })).toBeEnabled()
   })
 })

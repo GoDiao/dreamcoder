@@ -24,7 +24,7 @@ body:
     attributes:
       label: DreamCoder version
       description: Settings → About, or the release tag you installed.
-      placeholder: "0.3.0"
+      placeholder: "0.6.0"
     validations:
       required: true
 
@@ -46,15 +46,20 @@ body:
     id: provider
     attributes:
       label: Active provider
+      description: Settings → Providers. "Report a problem" in the app's More menu shows it.
       options:
+        - OpenRouter
+        - DeepSeek
+        - Qwen (Alibaba Cloud)
+        - Kimi (Moonshot)
+        - Zhipu GLM
+        - DreamField
+        - LM Studio
+        - Ollama
         - Anthropic
         - OpenAI
-        - DeepSeek
-        - Moonshot (Kimi)
-        - MiniMax
-        - Azure OpenAI
-        - Google Vertex
-        - AWS Bedrock
+        - Custom (Anthropic-compatible)
+        - Custom (OpenAI-compatible)
         - Other / N/A
     validations:
       required: true

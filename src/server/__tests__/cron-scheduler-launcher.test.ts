@@ -138,6 +138,8 @@ describe('cron scheduler launcher resolution', () => {
   let tmpDir: string
 
   beforeEach(async () => {
+    // Server tests that run earlier may leave another port set on this static.
+    ProviderService.setServerPort(3456)
     tmpDir = await createTmpDir()
     process.env.DREAMCODER_CONFIG_DIR = path.join(tmpDir, 'config')
     process.env.DREAMCODER_DISABLE_TERMINAL_SHELL_ENV = '1'

@@ -5,7 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { handleDiagnosticsApi } from '../api/diagnostics.js'
-import { DiagnosticsService, diagnosticsService } from '../services/diagnosticsService.js'
+import { DiagnosticsService, diagnosticsService, redactHomePath } from '../services/diagnosticsService.js'
 
 let tmpDir: string
 let originalConfigDir: string | undefined
@@ -235,5 +235,31 @@ describe('diagnostics API', () => {
     const clearRes = await handleDiagnosticsApi(clearReq.req, clearReq.url, clearReq.segments)
     expect(clearRes.status).toBe(200)
     expect(await service.readRecentEvents()).toEqual([])
+  })
+})
+
+describe('redaction', () => {
+  test('removes bare provider and GitHub keys but not ordinary words', () => {
+    // Built at runtime so secret scanners don't flag fake keys in the source.
+    const providerKey = ['sk', 'or', 'v1', 'x'.repeat(20)].join('-')
+    const githubToken = `${'ghp'}_${'y'.repeat(30)}`
+    const githubPat = `${'github'}_${'pat'}_${'z'.repeat(30)}`
+    const text = diagnosticsService.sanitizeString(`keys ${providerKey} ${githubToken} ${githubPat} task-sk-1 sk-short`)
+    expect(text).not.toContain(providerKey)
+    expect(text).not.toContain(githubToken)
+    expect(text).not.toContain(githubPat)
+    expect(text).toContain('task-sk-1')
+    expect(text).toContain('sk-short')
+  })
+
+  test('replaces the home folder in its common spellings only at a path boundary', () => {
+    expect(redactHomePath('/Users/al/x and /Users/alice/y', '/Users/al', 'darwin')).toBe('~/x and /Users/alice/y')
+    expect(redactHomePath('at /Users/al. Then /Users/al.bak', '/Users/al', 'darwin')).toBe('at ~. Then /Users/al.bak')
+    expect(redactHomePath('"/Users/al"', '/Users/al', 'darwin')).toBe('"~"')
+    expect(redactHomePath(
+      'C:\\Users\\Bob\\a c:/users/bob/b /c/Users/Bob/c C:\\Users\\Bobby',
+      'C:\\Users\\Bob',
+      'win32',
+    )).toBe('~\\a ~/b ~/c C:\\Users\\Bobby')
   })
 })

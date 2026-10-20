@@ -1,5 +1,8 @@
 import * as path from 'node:path'
 import { sessionService } from '../services/sessionService.js'
+import { diagnosticsService } from '../services/diagnosticsService.js'
+import { exportFileName, renderSessionJson, renderSessionMarkdown } from '../transcript/export.js'
+import { version as packageVersion } from '../../../package.json'
 import { conversationService } from '../services/conversationService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { closeSessionConnection, getSlashCommands } from '../ws/handler.js'
@@ -80,6 +83,16 @@ export async function handleSessionsApi(
         )
       }
       return Response.json(await sessionService.getSessionTranscript(sessionId))
+    }
+
+    if (subResource === 'export') {
+      if (req.method !== 'GET') {
+        return Response.json(
+          { error: 'METHOD_NOT_ALLOWED', message: `Method ${req.method} not allowed` },
+          { status: 405 }
+        )
+      }
+      return await exportSession(sessionId, url)
     }
 
     if (subResource === 'git-info') {
@@ -890,4 +903,34 @@ async function getRecentProjects(url: URL): Promise<Response> {
 
   recentProjectsCache = { projects, timestamp: Date.now() }
   return Response.json({ projects: projects.slice(0, limit) })
+}
+
+/**
+ * Renders a session for "Export…" (#133). It returns the text and a suggested
+ * file name; it never takes a path, because H5 remote access reaches this API too.
+ */
+async function exportSession(sessionId: string, url: URL): Promise<Response> {
+  const format = url.searchParams.get('format') === 'json' ? 'json' : 'markdown'
+  const flag = (name: string) => url.searchParams.get(name) === '1'
+  const redact = flag('redact')
+    ? (text: string) => diagnosticsService.sanitizeString(text, Number.MAX_SAFE_INTEGER)
+    : undefined
+  const transcript = await sessionService.getSessionTranscript(sessionId)
+  const session = await sessionService.getSession(sessionId)
+  const title = session?.title ?? 'Untitled Session'
+  const exportedAt = new Date()
+  const content = format === 'json'
+    ? renderSessionJson(transcript, { redact })
+    : renderSessionMarkdown(
+        transcript,
+        {
+          title,
+          workDir: session?.workDir,
+          createdAt: session?.createdAt,
+          exportedAt,
+          appVersion: process.env.APP_VERSION || packageVersion,
+        },
+        { includeThinking: flag('thinking'), fullToolOutput: flag('fullOutput'), redact },
+      )
+  return Response.json({ fileName: exportFileName(title, exportedAt, format), format, content })
 }

@@ -40,7 +40,17 @@ export type DiagnosticsBundle = {
   bytes: number
 }
 
+/** What "Report a problem" shows; built and redacted by the server (#132). */
+export type ProblemReport = {
+  appVersion: string
+  os: { platform: string; label: string; release: string; arch: string }
+  provider: string
+  recentErrors: Array<{ timestamp: string; type: string; summary: string }>
+}
+
 export const diagnosticsApi = {
+  getProblemReport: () => api.get<ProblemReport>('/api/diagnostics/report'),
+  revealExport: (fileName: string) => api.post<{ ok: true }>('/api/diagnostics/reveal-export', { fileName }),
   getStatus: () => api.get<DiagnosticsStatus>('/api/diagnostics/status'),
   getEvents: (limit = 100) => api.get<{ events: DiagnosticEvent[] }>(`/api/diagnostics/events?limit=${limit}`),
   recordEvent: (event: DiagnosticEventInput) => api.post<{ ok: true }>('/api/diagnostics/events', event, { timeout: 5_000 }),

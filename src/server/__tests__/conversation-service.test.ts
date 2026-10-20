@@ -26,6 +26,8 @@ describe('ConversationService', () => {
   let originalDisableTerminalShellEnv: string | undefined
 
   beforeEach(async () => {
+    // Server tests that run earlier may leave another port set on this static.
+    ProviderService.setServerPort(3456)
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-conversation-service-'))
     originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     originalApiKey = process.env.ANTHROPIC_API_KEY
@@ -234,6 +236,29 @@ describe('ConversationService', () => {
     expect(env.API_TIMEOUT_MS).toBe('180000')
     expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
     expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+  })
+
+  test('buildChildEnv turns on agent teams only when the desktop setting is on', async () => {
+    const previous = process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+    process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1'
+    try {
+      const service = new ConversationService() as any
+
+      await fs.writeFile(path.join(tmpDir, 'settings.json'), JSON.stringify({}), 'utf-8')
+      let env = (await service.buildChildEnv('/tmp')) as Record<string, string>
+      expect(env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBeUndefined()
+
+      await fs.writeFile(path.join(tmpDir, 'settings.json'), JSON.stringify({ agentTeamsEnabled: true }), 'utf-8')
+      env = (await service.buildChildEnv('/tmp')) as Record<string, string>
+      expect(env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBe('1')
+
+      await fs.writeFile(path.join(tmpDir, 'settings.json'), JSON.stringify({ agentTeamsEnabled: false }), 'utf-8')
+      env = (await service.buildChildEnv('/tmp')) as Record<string, string>
+      expect(env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBeUndefined()
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+      else process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = previous
+    }
   })
 
   test('buildChildEnv injects explicit provider runtime env for session-scoped providers', async () => {

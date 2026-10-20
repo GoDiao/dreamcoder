@@ -302,6 +302,26 @@ describe('TeamWatcher polling', () => {
   })
 })
 
+describe('TeamWatcher subagent names', () => {
+  it('should not take a tool name in a transcript for a member', async () => {
+    await setupTmpConfigDir()
+    const file = path.join(tmpDir, 'agent-a.jsonl')
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        type: 'assistant',
+        agentId: 'a2222222222222222',
+        message: { content: [{ type: 'tool_use', name: 'Read', input: {} }] },
+      }) + '\n',
+    )
+    const watcher = new TeamWatcher() as unknown as {
+      extractSubagentName(filePath: string): string | null
+    }
+    expect(watcher.extractSubagentName(file)).toBeNull()
+    await cleanupTmpDir()
+  })
+})
+
 describe('TeamWatcher broadcast', () => {
   it('should call sendToSession for each active session', async () => {
     await setupTmpConfigDir()

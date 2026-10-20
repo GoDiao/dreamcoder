@@ -299,6 +299,15 @@ function buildWorkspacePath(
   return `/api/sessions/${sessionId}/workspace/${resource}${qs ? `?${qs}` : ''}`
 }
 
+export type SessionExportOptions = {
+  format: 'markdown' | 'json'
+  includeThinking: boolean
+  fullToolOutput: boolean
+  redact: boolean
+}
+
+export type SessionExport = { fileName: string; format: 'markdown' | 'json'; content: string }
+
 export const sessionsApi = {
   list(params?: { project?: string; limit?: number; offset?: number; includeLastAssistantMessage?: boolean }) {
     const query = new URLSearchParams()
@@ -312,6 +321,15 @@ export const sessionsApi = {
 
   getTranscript(sessionId: string) {
     return api.get<SessionTranscript>(`/api/sessions/${sessionId}/transcript`)
+  },
+
+  /** Renders the session as text; the caller saves it (#133). */
+  exportSession(sessionId: string, options: SessionExportOptions) {
+    const query = new URLSearchParams({ format: options.format })
+    if (options.includeThinking) query.set('thinking', '1')
+    if (options.fullToolOutput) query.set('fullOutput', '1')
+    if (options.redact) query.set('redact', '1')
+    return api.get<SessionExport>(`/api/sessions/${sessionId}/export?${query.toString()}`, { timeout: 60_000 })
   },
 
   create(input?: string | CreateSessionRequest) {

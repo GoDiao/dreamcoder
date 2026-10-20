@@ -46,6 +46,8 @@ import {
 } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
 import type { CustomAgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js'
 import { runAgent } from '../../tools/AgentTool/runAgent.js'
+import type { SharedSidechainTranscript } from '../../tools/AgentTool/sidechainTranscript.js'
+import { createAgentId } from '../uuid.js'
 import { awaitClassifierAutoApproval } from '../../tools/BashTool/bashPermissions.js'
 import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
 import { SEND_MESSAGE_TOOL_NAME } from '../../tools/SendMessageTool/constants.js'
@@ -85,6 +87,7 @@ import { sleep } from '../sleep.js'
 import { jsonStringify } from '../slowOperations.js'
 import { asSystemPrompt } from '../systemPromptType.js'
 import { claimTask, listTasks, type Task, updateTask } from '../tasks.js'
+import { setMemberActive } from './teamHelpers.js'
 import type { TeammateContext } from '../teammateContext.js'
 import { runWithTeammateContext } from '../teammateContext.js'
 import {
@@ -566,6 +569,22 @@ async function sendMessageToLeader(
  * Sends idle notification to the leader via file-based mailbox.
  * Uses agentName (not agentId) for consistency with process-based teammates.
  */
+/**
+ * Records in the team file whether the teammate is working, which is where the
+ * team view reads it. Process-based teammates do this from their own REPL.
+ */
+async function reportMemberActive(
+  identity: TeammateIdentity,
+  isActive: boolean,
+): Promise<void> {
+  await setMemberActive(identity.teamName, identity.agentName, isActive).catch(
+    err =>
+      logForDebugging(
+        `[inProcessRunner] ${identity.agentId} failed to record ${isActive ? 'active' : 'idle'}: ${err}`,
+      ),
+  )
+}
+
 async function sendIdleNotification(
   agentName: string,
   agentColor: string | undefined,
@@ -1044,6 +1063,16 @@ export async function runInProcessTeammate(
       ? createContentReplacementState()
       : undefined
 
+    // One transcript file for the teammate's whole life. Each runAgent call
+    // below gets the full history as context; without a fixed id every call
+    // started a new file and copied that history into it again.
+    const transcriptAgentId = createAgentId()
+    const sharedTranscript: SharedSidechainTranscript = {
+      recordedUuids: new Set(),
+      teamName: identity.teamName,
+      agentName: identity.agentName,
+    }
+
     // Main teammate loop - runs until abort or shutdown approved
     while (!abortController.signal.aborted && !shouldExit) {
       logForDebugging(
@@ -1165,6 +1194,7 @@ export async function runInProcessTeammate(
             task => ({ ...task, status: 'running', isIdle: false }),
             setAppState,
           )
+          void reportMemberActive(identity, true)
 
           // Run the normal agent loop - same runAgent() used by AgentTool/subagents.
           // This calls query() internally, so we share the core API infrastructure.
@@ -1194,7 +1224,11 @@ export async function runInProcessTeammate(
             canShowPermissionPrompts: allowPermissionPrompts ?? true,
             forkContextMessages,
             querySource: 'agent:custom',
-            override: { abortController: currentWorkAbortController },
+            override: {
+              abortController: currentWorkAbortController,
+              agentId: transcriptAgentId,
+            },
+            sharedTranscript,
             model: model as ModelAlias | undefined,
             preserveToolUseResults: true,
             availableTools: toolUseContext.options.tools,
@@ -1324,6 +1358,7 @@ export async function runInProcessTeammate(
         },
         setAppState,
       )
+      void reportMemberActive(identity, false)
 
       // Note: We do NOT automatically send the teammate's response to the leader.
       // Teammates should use the Teammate tool to communicate with the leader.
@@ -1469,6 +1504,7 @@ export async function runInProcessTeammate(
     logForDebugging(
       `[inProcessRunner] Agent ${identity.agentId} failed: ${errorMessage}`,
     )
+    void reportMemberActive(identity, false)
 
     // Mark task as failed and notify any waiters
     let alreadyTerminal = false
