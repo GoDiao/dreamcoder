@@ -108,6 +108,61 @@ describe('openaiChatStreamToAnthropic', () => {
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
   })
 
+  test('tool call finished with stop (Gemini) ends with tool_use', async () => {
+    const sseChunks = [
+      'data: {"id":"c3","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"NYC\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c3","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const msgDelta = events.find((e) => e.event === 'message_delta')!
+    expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
+  })
+
+  test('parallel tool calls without an index stay separate tool_use blocks', async () => {
+    const sseChunks = [
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"id":"call_paris","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"Paris\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_london","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const toolStarts = events.filter(
+      (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
+    )
+    expect(toolStarts.map((e) => (e.data.content_block as Record<string, unknown>).id)).toEqual(['call_paris', 'call_london'])
+
+    const args = events
+      .filter((e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta')
+      .map((e) => (e.data.delta as Record<string, unknown>).partial_json)
+    expect(args).toEqual(['{"city":"Paris"}', '{"city":"London"}'])
+  })
+
+  test('argument fragments without an index continue the latest tool call', async () => {
+    const sseChunks = [
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"function":{"arguments":"{\\"city\\""}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":\\"NYC\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const toolStarts = events.filter(
+      (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
+    )
+    expect(toolStarts).toHaveLength(1)
+    const args = events
+      .filter((e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta')
+      .map((e) => (e.data.delta as Record<string, unknown>).partial_json)
+    expect(args.join('')).toBe('{"city":"NYC"}')
+  })
+
   test('tool call streaming preserves object arguments from local proxies', async () => {
     const sseChunks = [
       'data: {"id":"c-write","object":"chat.completion.chunk","created":0,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_write","type":"function","function":{"name":"Write","arguments":{"file_path":"/tmp/issue-288.txt","content":"ok"}}}]},"finish_reason":null}]}\n\n',

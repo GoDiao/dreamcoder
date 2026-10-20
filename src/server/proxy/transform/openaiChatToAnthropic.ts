@@ -54,10 +54,17 @@ export function openaiChatToAnthropic(response: OpenAIChatResponse, model: strin
     role: 'assistant',
     content,
     model: response.model || model,
-    stop_reason: mapFinishReason(choice.finish_reason),
+    stop_reason: mapStopReason(choice.finish_reason, content.some((block) => block.type === 'tool_use')),
     stop_sequence: null,
     usage: mapUsage(response.usage),
   }
+}
+
+// Gemini ends a tool-calling turn with finish_reason "stop"; report tool_use whenever the
+// message carries tool_use blocks.
+function mapStopReason(reason: string | null, hasToolUse: boolean): string {
+  const stopReason = mapFinishReason(reason)
+  return hasToolUse && stopReason === 'end_turn' ? 'tool_use' : stopReason
 }
 
 function mapFinishReason(reason: string | null): string {

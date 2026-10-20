@@ -342,6 +342,23 @@ describe('openaiChatToAnthropic', () => {
     }
   })
 
+  test('tool_calls finished with stop (Gemini) still ends with tool_use', () => {
+    const res = {
+      id: 'x', object: 'chat.completion', created: 0, model: 'gemini',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"NYC"}' } }],
+        },
+        finish_reason: 'stop',
+      }],
+    } as OpenAIChatResponse
+
+    expect(openaiChatToAnthropic(res, 'gemini').stop_reason).toBe('tool_use')
+  })
+
   test('finish_reason mapping', () => {
     const make = (reason: string) => ({
       id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4',
