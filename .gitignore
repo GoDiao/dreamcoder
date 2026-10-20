@@ -83,6 +83,7 @@ scripts/benchmark.ts
 
 # Experiments: downloaded data, environments, run outputs, private data
 experiments/**/.venv/
+experiments/**/__pycache__/
 experiments/system1-guardrail/dataset/.saber/
 experiments/system1-guardrail/dataset/private/
 experiments/system1-guardrail/**/runs/
