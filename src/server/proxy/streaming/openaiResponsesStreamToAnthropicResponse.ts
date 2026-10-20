@@ -66,7 +66,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
         continue
       }
 
-      if (currentEvent === 'response.completed') {
+      if (currentEvent === 'response.completed' || currentEvent === 'response.incomplete') {
         const response = data.response
         if (isOpenAIResponsesResponse(response)) {
           completedResponse = response
