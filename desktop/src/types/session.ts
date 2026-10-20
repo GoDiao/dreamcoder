@@ -6,6 +6,8 @@ export type SessionListItem = {
   createdAt: string
   modifiedAt: string
   messageCount: number
+  /** False when messageCount skipped the unread middle of a large transcript. */
+  messageCountExact?: boolean
   projectPath: string
   projectRoot?: string | null
   workDir: string | null

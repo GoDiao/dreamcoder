@@ -310,7 +310,11 @@ export function AppShell() {
                   {activeSession?.messageCount !== undefined && activeSession.messageCount > 0 ? (
                     <>
                       {activeTab?.status === 'running' ? <span aria-hidden="true">·</span> : null}
-                      <span>{t('session.messages', { count: activeSession.messageCount })}</span>
+                      <span>
+                        {activeSession.messageCountExact === false
+                          ? t('session.messagesAtLeast', { count: activeSession.messageCount })
+                          : t('session.messages', { count: activeSession.messageCount })}
+                      </span>
                     </>
                   ) : null}
                   {mobileSessionUpdated ? (
