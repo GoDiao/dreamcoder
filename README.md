@@ -145,6 +145,8 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Installation
 
+For the validated Ubuntu browser workflow, exFAT installation workaround, and local Ollama results, see the [Linux validation report](docs/LINUX_BROWSER_VALIDATION.md). For startup, shutdown, and termination by PID, see the [browser usage guide](docs/WEB_USAGE.md).
+
 > Installers for macOS (Apple Silicon) and Windows x64 are on [Releases](https://github.com/GoDiao/dreamcoder/releases/latest). They are not code-signed yet; the release notes explain how to open them the first time. The steps below run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary, the frontend build output, or missing Tauri CLI pieces.
 
 ```bash

@@ -1,10 +1,12 @@
 # DreamCoder 浏览器版使用与进程终止指南
 
+[English](../WEB_USAGE.md) | 简体中文
+
 适用于 Ubuntu 24.04 本地开发环境：Bun 启动后端，Node.js 和 npm 启动 Vite 前端。日常使用无需重新安装依赖或构建，也无需编译 Tauri 和 sidecar。
 
 本机验证通过的版本为 Node.js `v24.22.0`、npm `11.19.1`、Bun `1.4.2`。下列命令中的 `/path/to/dreamcoder` 是占位路径，请替换为自己的仓库目录。运行时路径适用于通过 nvm 安装对应 Node 版本、通过默认安装器安装 Bun 的环境；安装位置或版本不同时，请相应调整。
 
-Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见[Linux 浏览器版验证报告](LINUX_BROWSER_VALIDATION_zh.md)。
+Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见[Linux 浏览器版验证报告](LINUX_BROWSER_VALIDATION.md)。
 
 ## 日常启动
 
