@@ -14,6 +14,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 - Diagnostics redaction also removes bare provider and GitHub keys (`sk-…`, `ghp_…`), and finds the home folder written with either slash or as `/c/Users/…`. It no longer touches a longer folder name such as `/Users/alice` when the home folder is `/Users/al`.
 - The bug report template lists the current provider presets.
+- **Faster session list and recent projects** (#111, #138): each transcript is scanned from its first 100 lines and last 64KB instead of end to end, so large imported sessions no longer slow the sidebar or the project picker. For a transcript too large to cover this way, the mobile session header shows the message count as "N+". Thanks @notlakshitha.
 
 ### Removed
 
