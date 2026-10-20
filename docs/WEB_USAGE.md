@@ -4,9 +4,21 @@ English | [Chinese](zh/WEB_USAGE.md)
 
 This guide covers local development on Ubuntu 24.04, with Bun running the backend and Node.js/npm running the Vite frontend. Daily use does not require reinstalling dependencies, rebuilding the frontend, or compiling Tauri and the sidecar.
 
-The tested versions were Node.js `v24.22.0`, npm `11.19.1`, and Bun `1.4.2`. Replace `/path/to/dreamcoder` with your checkout directory. The runtime paths below assume that the corresponding Node version was installed with nvm and Bun was installed in its default location. Adjust them if your versions or installation paths differ.
+Ensure `bun`, `node`, and `npm` are available on your `PATH`. Node.js 24 LTS is recommended; the tested versions were Node.js `v24.22.0`, npm `11.19.1`, and Bun `1.4.2`. Replace `/path/to/dreamcoder` with your checkout directory.
 
 For the validation scope, exFAT installation diagnosis, and Ollama results, see the [Linux browser validation report](LINUX_BROWSER_VALIDATION.md).
+
+## Standard Dependency Installation
+
+For the initial setup or after dependency changes, install dependencies separately in the repository root and `desktop/` using the project's standard Bun workflow:
+
+```bash
+cd /path/to/dreamcoder
+bun install
+(cd desktop && bun install)
+```
+
+These commands use the repository's Bun lockfiles. On a typical Linux filesystem with symbolic-link support, such as ext4, use this workflow. Daily startup does not require repeating installation. If link operations fail with `EPERM` on exFAT, see Known Issues below before considering the npm workaround.
 
 ## Daily Startup
 
@@ -16,8 +28,6 @@ If both services are already running, open <http://127.0.0.1:1420/>. After a reb
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 bun run src/server/index.ts --host 127.0.0.1 --port 3456
 ```
@@ -32,8 +42,6 @@ The following log confirms that the backend has started. Keep terminal A running
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
   npm --prefix desktop run dev -- \
@@ -76,7 +84,7 @@ Closing the browser page alone does not stop the services. If the original termi
 | Backend health check fails in the interface | Check terminal A and confirm that the frontend command includes `VITE_DESKTOP_SERVER_URL` |
 | A port is already in use | Try the existing page first; if a restart is needed, identify and stop the old service using the steps below |
 | No provider is configured | Check the provider and selected model in **Settings → Providers** |
-| `vite: not found` | Use the fallback startup command below |
+| `vite: not found` | Complete both standard installation steps; if using the exFAT workaround, see its Vite fallback below |
 
 ### Check the Backend
 
@@ -88,30 +96,16 @@ curl -fsS http://127.0.0.1:3456/health
 
 A healthy response contains `"status":"ok"`. Connection refusal means that no backend service can currently be reached at that address.
 
-### Fallback When the Vite Launcher Is Missing
+## Known Issues
 
-Dependencies were installed with `--bin-links=false`. The local Vite `.bin` launcher is a regular file created separately, and removing or reinstalling `node_modules` may remove it. In that case, run Vite's entry point directly in terminal B without changing application source:
+### exFAT Link Errors and the npm Workaround
 
-```bash
-cd /path/to/dreamcoder/desktop
+The validated checkout was on exFAT, where ordinary writes and renames worked but symbolic and hard links failed with `EPERM`. Standard npm installation also failed when creating executable links. The [validation report](LINUX_BROWSER_VALIDATION.md) records the probes and diagnosis. An `EPERM` error alone does not establish this cause: check ownership, permissions, filesystem type, and actual link support before applying a workaround.
 
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
-
-VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
-  node node_modules/vite/bin/vite.js \
-  --host 127.0.0.1 --port 1420 --strictPort
-```
-
-The backend in terminal A must still be running.
-
-## Reinstalling Dependencies After Dependency Changes
-
-Skip this section for daily startup. The validated repository is on exFAT. Actual probes showed that it does not support symbolic or hard links, and standard installation failed with `EPERM` when creating npm executable links. The local workaround is:
+Only for a checkout affected by this confirmed filesystem restriction, back up failed dependency directories before a clean retry and use the following local workaround:
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 npm install --include=dev --include=optional \
   --package-lock=false --bin-links=false
@@ -120,9 +114,23 @@ npm --prefix desktop install --include=dev --include=optional \
   --package-lock=false --bin-links=false
 ```
 
-These commands preserve existing lockfiles and do not generate an npm lockfile. npm resolves the version ranges in `package.json`, so installed versions can differ from the Bun lockfile. `--bin-links=false` skips executable links; use the fallback startup command if the Vite launcher is absent.
+This is not the standard installation workflow for ext4 or other filesystems supporting symbolic links. These commands preserve existing lockfiles and do not generate an npm lockfile, but npm resolves the version ranges in `package.json` rather than following `bun.lock`, so installed versions can differ. `--bin-links=false` skips executable links and does not remove the underlying filesystem restriction.
 
-Do not use `sudo npm install` or `chmod -R 777` to address this filesystem restriction. Reconsider the installation method after moving to a filesystem that supports symbolic links. If the repository later adopts a matching npm lockfile, use its corresponding installation workflow.
+Do not use `sudo npm install` or `chmod -R 777` to address this restriction. After moving to a filesystem that supports symbolic links, use the standard Bun installation workflow above.
+
+### Missing Vite Launcher After the exFAT Workaround
+
+If dependencies were installed with `--bin-links=false`, the Vite `.bin` launcher may be absent. The validated environment used a separately created regular-file launcher, which may also be lost when `node_modules` is removed or reinstalled. In this case, invoke Vite directly in terminal B:
+
+```bash
+cd /path/to/dreamcoder/desktop
+
+VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
+  node node_modules/vite/bin/vite.js \
+  --host 127.0.0.1 --port 1420 --strictPort
+```
+
+The backend in terminal A must still be running.
 
 ## Process Termination Guide
 

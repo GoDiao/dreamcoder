@@ -4,9 +4,21 @@
 
 适用于 Ubuntu 24.04 本地开发环境：Bun 启动后端，Node.js 和 npm 启动 Vite 前端。日常使用无需重新安装依赖或构建，也无需编译 Tauri 和 sidecar。
 
-本机验证通过的版本为 Node.js `v24.22.0`、npm `11.19.1`、Bun `1.4.2`。下列命令中的 `/path/to/dreamcoder` 是占位路径，请替换为自己的仓库目录。运行时路径适用于通过 nvm 安装对应 Node 版本、通过默认安装器安装 Bun 的环境；安装位置或版本不同时，请相应调整。
+请确保 `bun`、`node` 和 `npm` 已在 `PATH` 中。建议使用 Node.js 24 LTS；本次验证版本为 Node.js `v24.22.0`、npm `11.19.1` 和 Bun `1.4.2`。下列命令中的 `/path/to/dreamcoder` 是占位路径，请替换为自己的仓库目录。
 
 Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见[Linux 浏览器版验证报告](LINUX_BROWSER_VALIDATION.md)。
+
+## 标准依赖安装
+
+首次配置或依赖发生变化时，按照项目的标准 Bun 流程，分别安装根目录和 `desktop/` 的依赖：
+
+```bash
+cd /path/to/dreamcoder
+bun install
+(cd desktop && bun install)
+```
+
+这些命令使用仓库的 Bun 锁文件。ext4 等支持符号链接的常见 Linux 文件系统应使用此流程，日常启动无需重复安装。若在 exFAT 上出现链接操作的 `EPERM`，先查看下方“已知问题”，再考虑 npm 绕过方式。
 
 ## 日常启动
 
@@ -16,8 +28,6 @@ Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 bun run src/server/index.ts --host 127.0.0.1 --port 3456
 ```
@@ -32,8 +42,6 @@ bun run src/server/index.ts --host 127.0.0.1 --port 3456
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
   npm --prefix desktop run dev -- \
@@ -76,7 +84,7 @@ VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
 | 页面出现健康检查失败 | 检查终端 A，并确认前端启动命令包含 `VITE_DESKTOP_SERVER_URL` |
 | 提示端口已占用 | 先尝试使用现有页面；需要重启时，按本文末尾步骤确认并结束旧服务 |
 | 提示未配置服务商 | 在 **Settings → Providers** 检查服务商和当前模型 |
-| 提示 `vite: not found` | 使用下面的备用启动命令 |
+| 提示 `vite: not found` | 先完成两处标准依赖安装；若使用 exFAT 绕过方式，查看下方 Vite 备用命令 |
 
 ### 检查后端
 
@@ -88,30 +96,16 @@ curl -fsS http://127.0.0.1:3456/health
 
 正常响应包含 `"status":"ok"`。连接拒绝表示该地址当前没有可连接的后端服务。
 
-### Vite 启动器丢失时的备用命令
+## 已知问题
 
-当前依赖安装使用了 `--bin-links=false`，Vite 的 `.bin` 启动器是本地创建的普通文件。删除或重装 `node_modules` 后，该启动器可能丢失。此时可在终端 B 直接运行 Vite 入口，无需修改源码：
+### exFAT 链接错误与 npm 绕过方式
 
-```bash
-cd /path/to/dreamcoder/desktop
+本次验证的工作区位于 exFAT，普通文件写入和改名正常，但符号链接与硬链接操作返回 `EPERM`；标准 npm 安装也在创建命令链接时失败。[验证报告](LINUX_BROWSER_VALIDATION.md)记录了实际测试与定位过程。仅凭 `EPERM` 不能认定是这一原因，应先检查所属用户、权限、文件系统类型和实际链接能力。
 
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
-
-VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
-  node node_modules/vite/bin/vite.js \
-  --host 127.0.0.1 --port 1420 --strictPort
-```
-
-此备用方式也需要保留终端 A 的后端服务。
-
-## 依赖发生变化时重新安装
-
-日常启动无需执行本节。当前仓库位于 exFAT，实际测试表明该文件系统不支持符号链接和硬链接；普通安装会在创建 npm 命令链接时出现 `EPERM`。当前本地兼容性安装方式为：
+仅对已确认受到该文件系统限制的工作区，先备份失败的依赖目录，再使用以下本地绕过方式进行干净安装：
 
 ```bash
 cd /path/to/dreamcoder
-
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$HOME/.bun/bin:$PATH"
 
 npm install --include=dev --include=optional \
   --package-lock=false --bin-links=false
@@ -120,9 +114,23 @@ npm --prefix desktop install --include=dev --include=optional \
   --package-lock=false --bin-links=false
 ```
 
-以上方式保留原有锁文件，不生成 npm 锁文件。npm 按 `package.json` 的版本范围解析依赖，安装结果可能与 Bun 锁定的版本不同。`--bin-links=false` 会跳过包的命令链接；若 Vite 启动器缺失，使用上一节的备用启动命令。
+这不是 ext4 等支持符号链接的文件系统的标准安装流程。以上命令保留现有锁文件且不生成 npm 锁文件，但 npm 按 `package.json` 范围解析版本，不会使用 `bun.lock` 的锁定结果，因此实际依赖可能不同。`--bin-links=false` 跳过命令链接创建，不会消除底层文件系统限制。
 
-不要通过 `sudo npm install` 或 `chmod -R 777` 处理这个文件系统限制。若以后迁移到支持符号链接的文件系统，应重新检查安装方式；若仓库正式采用匹配的 npm 锁文件，应使用对应的锁文件安装流程。
+不要通过 `sudo npm install` 或 `chmod -R 777` 处理这一限制。迁移到支持符号链接的文件系统后，应使用上方的标准 Bun 安装流程。
+
+### exFAT 绕过后 Vite 启动器缺失
+
+使用 `--bin-links=false` 安装后，Vite 的 `.bin` 启动器可能不存在。本次验证环境曾单独创建普通文件启动器；删除或重装 `node_modules` 后，这个启动器也可能丢失。此时可在终端 B 直接运行 Vite：
+
+```bash
+cd /path/to/dreamcoder/desktop
+
+VITE_DESKTOP_SERVER_URL=http://127.0.0.1:3456 \
+  node node_modules/vite/bin/vite.js \
+  --host 127.0.0.1 --port 1420 --strictPort
+```
+
+此备用方式也需要保留终端 A 的后端服务。
 
 ## 进程终止指南
 
