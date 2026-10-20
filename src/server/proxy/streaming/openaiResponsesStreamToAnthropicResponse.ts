@@ -13,6 +13,9 @@ type StreamFallbackState = {
   usage: OpenAIResponsesResponse['usage']
 }
 
+/** The upstream Responses stream ended with `response.failed` or `error`. */
+export class OpenAIResponsesStreamError extends Error {}
+
 export async function openaiResponsesStreamToAnthropicResponse(
   upstream: ReadableStream<Uint8Array>,
   model: string,
@@ -22,6 +25,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
   let buffer = ''
   let currentEvent = ''
   let completedResponse: OpenAIResponsesResponse | null = null
+  let upstreamError: string | null = null
 
   const fallback: StreamFallbackState = {
     id: `resp_${Date.now()}`,
@@ -71,6 +75,8 @@ export async function openaiResponsesStreamToAnthropicResponse(
         if (isOpenAIResponsesResponse(response)) {
           completedResponse = response
         }
+      } else if (currentEvent === 'response.failed' || currentEvent === 'error') {
+        upstreamError = upstreamErrorMessage(data)
       } else {
         updateFallbackState(currentEvent, data, fallback)
       }
@@ -78,10 +84,23 @@ export async function openaiResponsesStreamToAnthropicResponse(
     }
   }
 
+  if (!completedResponse && upstreamError !== null) {
+    throw new OpenAIResponsesStreamError(upstreamError)
+  }
+
   return openaiResponsesToAnthropic(
     completedResponse ?? buildFallbackResponse(fallback),
     model,
   )
+}
+
+// Same message lookup as the streaming converter's `error` / `response.failed` case.
+function upstreamErrorMessage(data: Record<string, unknown>): string {
+  const response = data.response as Record<string, unknown> | undefined
+  const error = (response?.error ?? data.error ?? data) as Record<string, unknown> | undefined
+  return typeof error?.message === 'string' && error.message
+    ? error.message
+    : 'Upstream Responses stream failed'
 }
 
 function updateFallbackState(

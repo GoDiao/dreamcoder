@@ -1,7 +1,10 @@
 import { describe, test, expect } from 'bun:test'
 import { openaiChatStreamToAnthropic } from '../proxy/streaming/openaiChatStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiResponsesStreamToAnthropic.js'
-import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import {
+  OpenAIResponsesStreamError,
+  openaiResponsesStreamToAnthropicResponse,
+} from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -563,6 +566,47 @@ describe('openaiResponsesStreamToAnthropicResponse', () => {
     expect(result.stop_reason).toBe(stopReason)
     expect(result.usage).toEqual({ input_tokens: 12, output_tokens: 7 })
     expect(result.content.map(block => block.type)).toEqual(['text', 'tool_use'])
+  })
+})
+
+describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
+  test.each([
+    [
+      'response.failed',
+      { type: 'response.failed', response: { id: 'resp_1', status: 'failed', error: { message: 'model overloaded' } } },
+      'model overloaded',
+    ],
+    ['error', { type: 'error', error: { message: 'rate limited' } }, 'rate limited'],
+    ['error', { type: 'error' }, 'Upstream Responses stream failed'],
+  ])('rejects on a %s event instead of returning an empty reply', async (event, payload, message) => {
+    const result = openaiResponsesStreamToAnthropicResponse(
+      makeStream([
+        'event: response.created\ndata: {"type":"response.created","id":"resp_1","status":"in_progress"}\n\n',
+        `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
+      ]),
+      'm',
+    )
+
+    await expect(result).rejects.toBeInstanceOf(OpenAIResponsesStreamError)
+    await expect(result).rejects.toThrow(message)
+  })
+
+  test('keeps a completed response that follows an earlier error event', async () => {
+    const response = {
+      id: 'resp_1',
+      model: 'm',
+      status: 'completed',
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
+    }
+    const result = await openaiResponsesStreamToAnthropicResponse(
+      makeStream([
+        'event: error\ndata: {"type":"error","error":{"message":"transient"}}\n\n',
+        `event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response })}\n\n`,
+      ]),
+      'm',
+    )
+
+    expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
   })
 })
 

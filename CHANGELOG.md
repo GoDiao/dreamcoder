@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Proxy**: when the ChatGPT sign-in path streams a non-streaming request and the upstream ends with `response.failed` or `error`, the caller now gets an `api_error` (HTTP 502) with the upstream message, instead of an empty `end_turn` reply. Thanks @pcbeingused333.
+
 ## [0.6.1] — 2026-10-21
 
 ### Added
