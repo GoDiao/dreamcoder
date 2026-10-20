@@ -7,7 +7,7 @@ import {
   logEvent,
 } from 'src/services/analytics/index.js'
 import { getCwd } from 'src/utils/cwd.js'
-import { checkForReleaseNotes } from 'src/utils/releaseNotes.js'
+import { checkForReleaseNotesSync } from 'src/utils/releaseNotes.js'
 import { setCwd } from 'src/utils/Shell.js'
 import { initSinks } from 'src/utils/sinks.js'
 import {
@@ -396,16 +396,14 @@ export async function setup(
   void prefetchApiKeyFromApiKeyHelperIfSafe(getIsNonInteractiveSession()) // Prefetch safely - only executes if trust already confirmed
   profileCheckpoint('setup_after_prefetch')
 
-  // Pre-fetch data for Logo v2 - await to ensure it's ready before logo renders.
-  // --bare / SIMPLE: skip — release notes are interactive-UI display data,
-  // and getRecentActivity() reads up to 10 session JSONL files.
-  if (!isBareMode()) {
-    const { hasReleaseNotes } = await checkForReleaseNotes(
-      getGlobalConfig().lastReleaseNotesSeen,
-    )
-    if (hasReleaseNotes) {
-      await getRecentActivity()
-    }
+  // The full logo, with its activity and What's new feeds, shows once per new
+  // version; load the activity it lists before the first render.
+  // --bare / SIMPLE: skip — getRecentActivity() reads up to 10 session JSONL files.
+  if (
+    !isBareMode() &&
+    checkForReleaseNotesSync(getGlobalConfig().lastReleaseNotesSeen).hasReleaseNotes
+  ) {
+    await getRecentActivity()
   }
 
   // If permission mode is set to bypass, verify we're in a safe environment

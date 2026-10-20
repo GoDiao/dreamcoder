@@ -1,3 +1,4 @@
+import { version as packageVersion } from '../../../package.json'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -439,7 +440,7 @@ export class DiagnosticsService {
 
   private buildAppInfo(): Record<string, unknown> {
     return this.sanitizeValue({
-      appVersion: process.env.APP_VERSION || '999.0.0-local',
+      appVersion: process.env.APP_VERSION || packageVersion,
       platform: process.platform,
       arch: process.arch,
       node: process.version,

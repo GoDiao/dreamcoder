@@ -1,3 +1,4 @@
+import { version as packageVersion } from '../../../package.json'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
@@ -102,7 +103,7 @@ function getConfigDir(): string {
 }
 
 function getVersion(): string {
-  return process.env.APP_VERSION || '999.0.0-local'
+  return process.env.APP_VERSION || packageVersion
 }
 
 async function discoverProjects(configDir: string): Promise<string[]> {

@@ -9,8 +9,6 @@ import {
   truncateToWidth,
   truncateToWidthNoEllipsis,
 } from './format.js'
-import { getStoredChangelogFromMemory, parseChangelog } from './releaseNotes.js'
-import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
 
@@ -304,47 +302,3 @@ export function formatModelAndBilling(
   }
 }
 
-/**
- * Gets recent release notes for Logo v2 display
- * For ants, uses commits bundled at build time
- * For external users, uses public changelog
- */
-export function getRecentReleaseNotesSync(maxItems: number): string[] {
-  // For ants, use bundled changelog
-  if (process.env.USER_TYPE === 'ant') {
-    const changelog = MACRO.VERSION_CHANGELOG
-    if (changelog) {
-      const commits = changelog.trim().split('\n').filter(Boolean)
-      return commits.slice(0, maxItems)
-    }
-    return []
-  }
-
-  const changelog = getStoredChangelogFromMemory()
-  if (!changelog) {
-    return []
-  }
-
-  let parsed
-  try {
-    parsed = parseChangelog(changelog)
-  } catch {
-    return []
-  }
-
-  // Get notes from recent versions
-  const allNotes: string[] = []
-  const versions = Object.keys(parsed)
-    .sort((a, b) => (gt(a, b) ? -1 : 1))
-    .slice(0, 3) // Look at top 3 recent versions
-
-  for (const version of versions) {
-    const notes = parsed[version]
-    if (notes) {
-      allNotes.push(...notes)
-    }
-  }
-
-  // Return raw notes without filtering or premature truncation
-  return allNotes.slice(0, maxItems)
-}

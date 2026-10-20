@@ -1,4 +1,8 @@
-const version = process.env.DREAMCODER_LOCAL_VERSION ?? '999.0.0-local';
+// The app's own version. The JSON import is inlined when the desktop sidecar is
+// compiled, so a packaged build reports the version it was released as.
+import { version as packageVersion } from './package.json';
+
+const version = process.env.DREAMCODER_LOCAL_VERSION ?? packageVersion;
 const packageUrl = process.env.DREAMCODER_LOCAL_PACKAGE_URL ?? 'dreamcoder-local';
 const buildTime = process.env.DREAMCODER_LOCAL_BUILD_TIME ?? new Date().toISOString();
 

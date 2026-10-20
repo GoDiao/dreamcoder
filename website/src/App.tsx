@@ -24,7 +24,7 @@ const copy = {
     featureTitle: '模型、会话、工具，都在桌面上。',
     features: [
       { number: '01', title: '选择模型服务', description: '配置 Anthropic 或 OpenAI 兼容接口。提供 DeepSeek、通义千问、Kimi、智谱 GLM、LM Studio、Ollama 等预设，也支持自定义端点。实际可用模型取决于服务商和配置。', image: '/assets/setting_provider.png', alt: 'DreamCoder Provider 设置界面' },
-      { number: '02', title: '跟进编程过程', description: '在一个界面查看会话、终端、文件变更和工具调用。Computer Use 与 MCP 配置也有可视化入口。', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use 设置界面' },
+      { number: '02', title: '跟进编程过程', description: '在一个界面查看会话、终端、文件变更和工具调用。开启 Computer Use 后，DreamCoder 可以在后台按界面元素操作应用和浏览器，点击、输入之前会先问你。', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use 设置界面' },
       { number: '03', title: '管理 MCP 扩展', description: '在设置界面管理 MCP 服务器，按项目需要接入工具。', image: '/assets/setting_skills.png', alt: 'DreamCoder MCP 设置界面' },
     ],
     tutorialEyebrow: '源码导读',
@@ -68,7 +68,7 @@ const copy = {
     featureTitle: 'Models, sessions, and tools on your desktop.',
     features: [
       { number: '01', title: 'Choose a model provider', description: 'Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama, plus custom endpoints. Model availability depends on your provider and configuration.', image: '/assets/setting_provider.png', alt: 'DreamCoder Provider settings' },
-      { number: '02', title: 'Follow the coding process', description: 'Review sessions, terminal activity, file changes, and tool calls in one place. Computer Use and MCP also have visual settings.', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use settings' },
+      { number: '02', title: 'Follow the coding process', description: 'Review sessions, terminal activity, file changes, and tool calls in one place. With Computer Use on, DreamCoder can operate apps and browsers in the background through their UI elements, asking before it clicks or types.', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use settings' },
       { number: '03', title: 'Manage MCP extensions', description: 'Manage MCP servers in Settings and connect the tools your project needs.', image: '/assets/setting_skills.png', alt: 'DreamCoder MCP settings' },
     ],
     tutorialEyebrow: 'Source code walkthrough',

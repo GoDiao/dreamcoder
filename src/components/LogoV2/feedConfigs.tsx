@@ -25,26 +25,13 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
   };
 }
 export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
-  const lines: FeedLine[] = releaseNotes.map(note => {
-    if ("external" === 'ant') {
-      const match = note.match(/^(\d+\s+\w+\s+ago)\s+(.+)$/);
-      if (match) {
-        return {
-          timestamp: match[1],
-          text: match[2] || ''
-        };
-      }
-    }
-    return {
-      text: note
-    };
-  });
-  const emptyMessage = "external" === 'ant' ? 'Unable to fetch latest claude-cli-internal commits' : 'Check the Claude Code changelog for updates';
   return {
-    title: "external" === 'ant' ? "What's new [ANT-ONLY: Latest CC commits]" : "What's new",
-    lines,
-    footer: lines.length > 0 ? '/release-notes for more' : undefined,
-    emptyMessage
+    title: "What's new",
+    lines: releaseNotes.map(note => ({
+      text: note
+    })),
+    footer: releaseNotes.length > 0 ? '/release-notes for more' : undefined,
+    emptyMessage: 'See CHANGELOG.md for updates'
   };
 }
 export function createProjectOnboardingFeed(steps: Step[]): FeedConfig {

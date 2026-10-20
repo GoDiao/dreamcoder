@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to test, e.g. v0.5.0
+        description: Release tag to test, e.g. v0.6.0
         required: true
   workflow_call:
     inputs:

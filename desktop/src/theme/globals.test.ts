@@ -79,6 +79,18 @@ describe('desktop theme tokens', () => {
     expect(block).toContain('--color-on-error-container:')
   })
 
+  it('gives every dark theme its own diff colors instead of the light defaults', () => {
+    const diffTokens = ['--color-diff-added-bg', '--color-diff-removed-bg', '--color-diff-added-text', '--color-diff-removed-text']
+    const darkBlocks = normalizedCss.split('[data-theme="dark"] {').slice(1).map((rest) => rest.slice(0, rest.indexOf('\n}')))
+    for (const token of diffTokens) {
+      expect(darkBlocks.some((block) => block.includes(`${token}:`)), `dark should define ${token}`).toBe(true)
+    }
+    const aurora = getThemeBlock('[data-theme="aurora"]')
+    for (const token of diffTokens) {
+      expect(aurora, `Aurora should define ${token}`).toContain(`${token}:`)
+    }
+  })
+
   it('defines activity and status tokens for every supported theme', () => {
     for (const theme of themes) {
       const block = getThemeBlock(theme)
