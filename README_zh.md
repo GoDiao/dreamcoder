@@ -187,6 +187,10 @@ bun run tauri dev
 
 ---
 
+## 💝 赞助与合作
+
+DreamCoder 由个人利用业余时间维护。欢迎企业和个人赞助，支持项目持续开发。档位和规则见 [赞助政策](docs/SPONSORS_zh.md)，合作请发邮件到 diaoshengjia@gmail.com。
+
 ## 🤝 贡献指南
 
 欢迎提交 Issue 和 PR。若你准备参与改进 DreamCoder，建议先阅读 [贡献指南](docs/CONTRIBUTING_zh.md)，可以更快熟悉开发流程与协作方式。

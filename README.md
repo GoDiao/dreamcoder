@@ -184,6 +184,10 @@ On first launch, DreamCoder detects your system locale: Chinese systems (`zh-*`)
 
 ---
 
+## 💝 Sponsorship
+
+DreamCoder is maintained by one person in their spare time. Companies and individuals are welcome to sponsor its development. See the [sponsorship policy](docs/SPONSORS_en.md) for tiers and rules, and email diaoshengjia@gmail.com to get in touch.
+
 ## 🤝 Contributing
 
 Issues and pull requests are welcome. If you'd like to improve DreamCoder, start with the [Contributing Guide](docs/CONTRIBUTING_en.md) to get familiar with the workflow and collaboration style.
