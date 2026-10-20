@@ -1004,6 +1004,21 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               </div>
             )}
 
+            {isWorkspaceMissing && (
+              <div
+                data-testid="workspace-missing-notice"
+                role="status"
+                className="mb-2 flex items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]"
+              >
+                <span className="material-symbols-outlined shrink-0 text-[14px]" aria-hidden="true">warning</span>
+                <span className="min-w-0 truncate" title={activeSession?.workDir || undefined}>
+                  {activeSession?.workDir
+                    ? t('chat.workspaceMissing', { dir: activeSession.workDir })
+                    : t('chat.placeholderMissing')}
+                </span>
+              </div>
+            )}
+
             <ComposerBox
               panelRef={panelRef}
               testId="chat-input-panel"

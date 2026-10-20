@@ -7,6 +7,24 @@ const viewportMocks = vi.hoisted(() => ({
   isMobile: false,
 }))
 
+const windowMocks = vi.hoisted(() => ({
+  tauri: false,
+  startDragging: vi.fn(() => Promise.resolve()),
+  toggleMaximize: vi.fn(() => Promise.resolve()),
+}))
+
+vi.mock('../lib/desktopRuntime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/desktopRuntime')>()),
+  isTauriRuntime: () => windowMocks.tauri,
+}))
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    startDragging: windowMocks.startDragging,
+    toggleMaximize: windowMocks.toggleMaximize,
+  }),
+}))
+
 vi.mock('../hooks/useMobileViewport', () => ({
   useMobileViewport: () => viewportMocks.isMobile,
 }))
@@ -61,6 +79,9 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   viewportMocks.isMobile = false
+  windowMocks.tauri = false
+  windowMocks.startDragging.mockClear()
+  windowMocks.toggleMaximize.mockClear()
   useTabStore.setState({ tabs: [], activeTabId: null })
   useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
   useChatStore.setState({ sessions: {} })
@@ -120,7 +141,7 @@ describe('ActiveSession task polling', () => {
     expect(screen.getByTestId('chat-input')).toHaveAttribute('data-variant', 'default')
   })
 
-  it('renders the current goal as a lightweight header strip without a page-level panel', () => {
+  it('renders the current goal as a strip at the top of the chat column', () => {
     const sessionId = 'goal-visible-session'
 
     useSessionStore.setState({
@@ -186,6 +207,8 @@ describe('ActiveSession task polling', () => {
     expect(screen.queryByTestId('active-goal-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('active-goal-strip')).toBeInTheDocument()
     expect(screen.getByTestId('active-goal-strip')).toHaveTextContent('ship the smoke test')
+    expect(within(screen.getByTestId('active-session-chat-column')).getByTestId('active-goal-strip')).toBeInTheDocument()
+    expect(within(screen.getByTestId('session-header')).queryByTestId('active-goal-strip')).not.toBeInTheDocument()
     expect(screen.getByTestId('message-list')).toBeInTheDocument()
   })
 
@@ -838,10 +861,12 @@ describe('ActiveSession task polling', () => {
 
     render(<ActiveSession />)
 
-    const meta = screen.getByTestId('session-header-meta')
-    expect(meta).toHaveTextContent('project-root')
-    expect(meta).toHaveTextContent('feat/panel')
-    expect(meta).not.toHaveTextContent('messages')
+    // One row: the title and buttons; project and branch live under the input.
+    const header = screen.getByTestId('session-header')
+    expect(header).toHaveTextContent('Terminal Session')
+    expect(header).not.toHaveTextContent('project-root')
+    expect(header).not.toHaveTextContent('feat/panel')
+    expect(screen.queryByTestId('session-header-meta')).not.toBeInTheDocument()
 
     const terminalButton = screen.getByRole('button', { name: 'Terminal' })
     const filesButton = screen.getByRole('button', { name: 'Files and changes' })
@@ -868,6 +893,47 @@ describe('ActiveSession task polling', () => {
     })
     expect(useWorkspacePanelStore.getState().isPanelOpen(sessionId)).toBe(false)
     expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()
+  })
+
+  it('moves the window from anywhere on the header except its buttons', async () => {
+    windowMocks.tauri = true
+    const sessionId = 'drag-session'
+    useSessionStore.setState({
+      sessions: [{
+        id: sessionId,
+        title: 'Drag Session',
+        createdAt: '2026-04-10T00:00:00.000Z',
+        modifiedAt: '2026-04-10T00:00:00.000Z',
+        messageCount: 1,
+        projectPath: '',
+        workDir: null,
+        workDirExists: true,
+      }],
+      activeSessionId: sessionId,
+      isLoading: false,
+      error: null,
+    })
+    useTabStore.setState({
+      tabs: [{ sessionId, title: 'Drag Session', type: 'session', status: 'idle' }],
+      activeTabId: sessionId,
+    })
+
+    render(<ActiveSession />)
+    // The window module is loaded once on mount.
+    await act(async () => {
+      await import('@tauri-apps/api/window')
+    })
+
+    fireEvent.mouseDown(screen.getByRole('heading', { name: 'Drag Session' }), { button: 0, detail: 1 })
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Terminal' }), { button: 0, detail: 1 })
+    fireEvent.mouseDown(screen.getByTestId('session-header'), { button: 2, detail: 1 })
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
+
+    fireEvent.mouseDown(screen.getByTestId('session-header'), { button: 0, detail: 2 })
+    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1)
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
   })
 
   it('hides the chat column while the panel is expanded and restores side by side', () => {

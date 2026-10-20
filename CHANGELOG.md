@@ -15,6 +15,13 @@ All notable changes to DreamCoder will be documented in this file.
 - Diagnostics redaction also removes bare provider and GitHub keys (`sk-…`, `ghp_…`), and finds the home folder written with either slash or as `/c/Users/…`. It no longer touches a longer folder name such as `/Users/alice` when the home folder is `/Users/al`.
 - The bug report template lists the current provider presets.
 - **Faster session list and recent projects** (#111, #138): each transcript is scanned from its first 100 lines and last 64KB instead of end to end, so large imported sessions no longer slow the sidebar or the project picker. For a transcript too large to cover this way, the mobile session header shows the message count as "N+". Thanks @notlakshitha.
+- **Session header** (#140): one row with the title, the running indicator and the buttons. Drag anywhere on it to move the window, and double-click to maximize or restore; the buttons still click normally.
+  - The project and branch, already shown under the input, and "last updated" are gone from it.
+  - An active goal shows at the top of the chat instead.
+  - When a session's working directory has been deleted, the input box says which directory is missing.
+  - Pages without a session header, such as the new-session page and scheduled tasks, get a top strip as tall as the header to drag the window by.
+- **Title row** (#140): on macOS the traffic lights, the sidebar button and the session title share one row. The sidebar button stays in the same place whether the sidebar is open or not, and a collapsed sidebar now slides away completely instead of leaving a narrow rail.
+- **Message actions** (#140): copy and fork are icons, outlined only while the pointer is on them, and a user message shows when it was sent. A reply gets one set of actions under its last text: copy takes the whole reply and fork starts from its end.
 
 ### Removed
 

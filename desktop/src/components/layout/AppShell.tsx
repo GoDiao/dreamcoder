@@ -13,7 +13,9 @@ import {
   isH5ConnectionRequiredError,
   isTauriRuntime,
 } from '../../lib/desktopRuntime'
-import { WindowControls, showWindowControls } from './WindowControls'
+import { WindowControls } from './WindowControls'
+import { TitlebarSidebarToggle } from './TitlebarSidebarToggle'
+import { isMacOverlayTitlebar } from '../../lib/windowChrome'
 import { SettingsModal } from '../../pages/Settings'
 import { StartupErrorView } from './StartupErrorView'
 import { useTabStore } from '../../stores/tabStore'
@@ -26,6 +28,8 @@ import { firstLaunchWasShown, useFirstLaunchGate } from '../onboarding/useFirstL
 import { useReleaseIdleSessions } from '../../hooks/useReleaseIdleSessions'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
+import { useWindowDrag } from '../../hooks/useWindowDrag'
+import { useTeamStore } from '../../stores/teamStore'
 import type { Tab } from '../../stores/tabStore'
 
 function isChatTab(tab: Tab | undefined) {
@@ -61,6 +65,10 @@ export function AppShell() {
   const effectiveSidebarVisible = isMobileShell ? mobileSidebarVisible : sidebarOpen
   const activeTab = tabs.find((tab) => tab.sessionId === activeTabId)
   const isActiveChatTab = isChatTab(activeTab)
+  // Mirrors ContentRouter and ActiveSession: every tab but scheduled tasks is a
+  // session page, and a teammate's session has no header.
+  const isTeammateSession = useTeamStore((s) => activeTabId ? !!s.getMemberBySessionId(activeTabId) : false)
+  const pageHasSessionHeader = !!activeTab && activeTab.type !== 'scheduled' && !isTeammateSession
   const mobileSessionTitle = activeSession?.title || activeTab?.title || t('session.untitled')
   const mobileSessionUpdated = (() => {
     if (!activeSession?.modifiedAt) return ''
@@ -73,8 +81,11 @@ export function AppShell() {
   const settingsOpen = useUIStore((s) => s.settingsOpen)
   // The settings window is modal: keep keyboard and screen readers out of the page behind it.
   const behindSettingsProps: { inert?: '' } = settingsOpen ? { inert: '' } : {}
+  // The desktop app hides a collapsed sidebar and toggles it from the title row.
+  const titlebarToggle = tauriRuntime && !isMobileShell
+  const macTitlebar = titlebarToggle && isMacOverlayTitlebar()
   const sidebarHiddenProps: HTMLAttributes<HTMLDivElement> & { inert?: '' } =
-    isMobileShell && !effectiveSidebarOpen
+    (isMobileShell || titlebarToggle) && !effectiveSidebarOpen
       ? { 'aria-hidden': true, inert: '' }
       : behindSettingsProps
 
@@ -241,7 +252,13 @@ export function AppShell() {
   }
 
   return (
-    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}`}>
+    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
+      {macTitlebar ? (
+        <TitlebarSidebarToggle
+          className="fixed z-[60]"
+          style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
+        />
+      ) : null}
       {isMobileShell && effectiveSidebarMounted ? (
         <button
           type="button"
@@ -274,8 +291,17 @@ export function AppShell() {
         className={`min-w-0 flex-1 flex flex-col overflow-hidden${isMobileShell ? ' app-shell-main--mobile' : ''}`}
       >
         {/* Kept outside the inert area and above the settings overlay so the
-            window can still be moved, minimised or closed while settings is open. */}
-        {tauriRuntime && !isMobileShell ? <WindowDragStrip /> : null}
+            window can still be moved, minimised or closed while settings is open.
+            On macOS a session's header is the title row itself, so the strip is
+            only needed there while settings covers that header; it then floats
+            over the header instead of pushing the page down. */}
+        {titlebarToggle && (!(macTitlebar && pageHasSessionHeader) || settingsOpen) ? (
+          <WindowDragStrip
+            tall={!pageHasSessionHeader}
+            mac={macTitlebar}
+            floating={macTitlebar && pageHasSessionHeader}
+          />
+        ) : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" {...behindSettingsProps}>
         {isMobileShell ? (
           <div
@@ -341,16 +367,26 @@ export function AppShell() {
 
 /**
  * Window drag area above the page content (the tab bar used to provide it).
- * macOS draws its traffic lights over the sidebar, so a slim strip is enough;
- * Windows has no native frame and needs room for the window buttons.
+ * On macOS it is the title row of pages without a session header, lined up with
+ * the traffic lights; the sidebar toggle floats over it. Elsewhere it holds the
+ * sidebar toggle and, on Windows, the window buttons: slim above a session,
+ * whose header also moves the window, and as tall as that header otherwise.
  */
-function WindowDragStrip() {
+function WindowDragStrip({ tall, mac, floating = false }: { tall: boolean; mac: boolean; floating?: boolean }) {
+  const handleDrag = useWindowDrag()
   return (
     <div
       data-testid="window-drag-strip"
-      className={`relative z-[60] flex shrink-0 items-stretch select-none ${showWindowControls ? 'h-8' : 'h-3'}`}
+      onMouseDown={handleDrag}
+      style={mac ? { height: 'var(--titlebar-height)' } : undefined}
+      className={`${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
     >
-      <div data-tauri-drag-region aria-hidden="true" className="min-w-0 flex-1" />
+      {mac ? null : (
+        <div className="flex items-center pl-3">
+          <TitlebarSidebarToggle />
+        </div>
+      )}
+      <div aria-hidden="true" className="min-w-0 flex-1" />
       <WindowControls />
     </div>
   )

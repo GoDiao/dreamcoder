@@ -1540,7 +1540,7 @@ describe('MessageList nested tool calls', () => {
     expect(within(dialog).queryByText(/\{"results"/)).toBeNull()
   })
 
-  it('renders copy controls for user messages and scopes assistant copy to a single reply', async () => {
+  it('puts one copy control under a reply and copies all of its texts', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, {
       clipboard: {
@@ -1579,14 +1579,13 @@ describe('MessageList nested tool calls', () => {
 
     expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy reply' })[1]!)
+    const copyReplyButtons = screen.getAllByRole('button', { name: 'Copy reply' })
+    expect(copyReplyButtons).toHaveLength(1)
+    fireEvent.click(copyReplyButtons[0]!)
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('再看 desktop 前后端边界。')
+      expect(writeText).toHaveBeenCalledWith('先看 CLI 和服务端入口。\n\n再看 desktop 前后端边界。')
     })
-    expect(writeText).not.toHaveBeenCalledWith(
-      '先看 CLI 和服务端入口。\n再看 desktop 前后端边界。'
-    )
   })
 
   it('adds selected user message text to the composer context', async () => {

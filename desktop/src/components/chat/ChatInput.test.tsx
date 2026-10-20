@@ -413,6 +413,49 @@ describe('ChatInput file mentions', () => {
     expect(screen.queryByText('Current worktree')).not.toBeInTheDocument()
   })
 
+  it('names the missing working directory at the input and keeps sending disabled', async () => {
+    useSessionStore.setState({
+      sessions: [{
+        id: sessionId,
+        title: 'Project',
+        createdAt: '2026-05-01T00:00:00.000Z',
+        modifiedAt: '2026-05-01T00:00:00.000Z',
+        messageCount: 2,
+        projectPath: '/repo/deleted-app',
+        workDir: '/repo/deleted-app',
+        workDirExists: false,
+      }],
+      activeSessionId: sessionId,
+    })
+    useChatStore.setState({
+      sessions: {
+        [sessionId]: {
+          messages: [],
+          chatState: 'idle',
+          connectionState: 'connected',
+          streamingText: '',
+          streamingToolInput: '',
+          activeToolUseId: null,
+          activeToolName: null,
+          activeThinkingId: null,
+          pendingPermission: null,
+          tokenUsage: { input_tokens: 0, output_tokens: 0 },
+          elapsedSeconds: 0,
+          statusVerb: '',
+          slashCommands: [],
+          agentTaskNotifications: {},
+          elapsedTimer: null,
+        },
+      },
+    })
+
+    render(<ChatInput />)
+
+    const notice = await screen.findByTestId('workspace-missing-notice')
+    expect(notice).toHaveTextContent('/repo/deleted-app')
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled()
+  })
+
   it('starts an empty active session on the selected branch without an isolated worktree', async () => {
     mocks.create.mockResolvedValueOnce({ sessionId: 'created-direct', workDir: '/repo' })
     useSessionStore.setState({

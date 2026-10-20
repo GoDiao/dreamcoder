@@ -183,7 +183,10 @@
 
   --sidebar-width: 280px;
   --sidebar-rail-width: 72px;
-  --titlebar-height: 40px;
+  /* The window's title row and the end of the macOS traffic lights, in screen
+     points: app zoom scales the page but not the traffic lights. */
+  --titlebar-height: calc(44px / var(--app-zoom, 1));
+  --traffic-lights-end: calc(80px / var(--app-zoom, 1));
   --statusbar-height: 36px;
   --motion-sidebar-duration: 280ms;
   --motion-sidebar-easing: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1236,16 +1239,6 @@ html, body, #root {
   color: var(--color-selection-fg);
 }
 
-[data-tauri-drag-region] {
-  -webkit-app-region: drag;
-}
-button, input, textarea, select, a, [role="button"] {
-  -webkit-app-region: no-drag;
-}
-[draggable="true"] {
-  -webkit-app-region: no-drag;
-}
-
 .custom-shadow {
   box-shadow: var(--shadow-dropdown);
 }
@@ -1312,6 +1305,11 @@ button, input, textarea, select, a, [role="button"] {
 
 .sidebar-shell[data-state="closed"] {
   width: var(--sidebar-rail-width);
+}
+
+/* Desktop app: a collapsed sidebar is hidden; the title-row toggle brings it back. */
+.app-shell--titlebar-toggle .sidebar-shell[data-state="closed"] {
+  width: 0;
 }
 
 .app-shell--mobile .sidebar-shell {

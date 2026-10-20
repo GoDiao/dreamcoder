@@ -7,6 +7,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 const mocks = vi.hoisted(() => ({
   initializeDesktopServerUrl: vi.fn(),
   isTauriRuntime: false,
+  isMacTitlebar: false,
   isMobile: false,
   fetchAll: vi.fn(),
   restoreTabs: vi.fn(),
@@ -25,6 +26,10 @@ vi.mock('../../lib/desktopRuntime', () => ({
   isTauriRuntime: () => mocks.isTauriRuntime,
   isH5ConnectionRequiredError: (error: unknown) =>
     error instanceof Error && error.name === 'H5ConnectionRequiredError',
+}))
+
+vi.mock('../../lib/windowChrome', () => ({
+  isMacOverlayTitlebar: () => mocks.isTauriRuntime && mocks.isMacTitlebar,
 }))
 
 vi.mock('../../stores/settingsStore', () => ({
@@ -127,6 +132,7 @@ describe('AppShell boot flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.isTauriRuntime = false
+    mocks.isMacTitlebar = false
     mocks.isMobile = false
     mocks.initializeDesktopServerUrl.mockResolvedValue('http://127.0.0.1:3456')
     mocks.fetchAll.mockResolvedValue(undefined)
@@ -259,6 +265,64 @@ describe('AppShell boot flow', () => {
 
     expect(await screen.findByText('app.serverFailed')).toBeInTheDocument()
     expect(screen.queryByText('h5 connection view')).not.toBeInTheDocument()
+  })
+
+  it('gives pages without a session header a top strip as tall as that header', async () => {
+    mocks.isTauriRuntime = true
+
+    const { rerender } = render(<AppShell />)
+    expect(await screen.findByTestId('window-drag-strip')).toHaveClass('h-11')
+
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+    rerender(<AppShell />)
+    expect(screen.getByTestId('window-drag-strip')).not.toHaveClass('h-11')
+
+    mocks.tabState.tabs = [{ sessionId: 'scheduled', title: 'Scheduled', type: 'scheduled', status: 'idle' }]
+    mocks.tabState.activeTabId = 'scheduled'
+    rerender(<AppShell />)
+    expect(screen.getByTestId('window-drag-strip')).toHaveClass('h-11')
+  })
+
+  it('hides the whole sidebar from one titlebar toggle in the desktop app', async () => {
+    mocks.isTauriRuntime = true
+
+    render(<AppShell />)
+    const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
+    expect(screen.getByTestId('window-drag-strip')).toContainElement(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(toggle)
+
+    const sidebar = screen.getByTestId('sidebar-shell')
+    expect(sidebar).toHaveAttribute('data-state', 'closed')
+    expect(sidebar).toHaveAttribute('aria-hidden', 'true')
+    expect(sidebar).toHaveAttribute('inert')
+    expect(screen.getByTestId('titlebar-sidebar-toggle')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('puts the macOS toggle right of the traffic lights and drops the strip on session pages', async () => {
+    mocks.isTauriRuntime = true
+    mocks.isMacTitlebar = true
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+
+    render(<AppShell />)
+    const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
+    expect(toggle.style.left).toBe('var(--traffic-lights-end)')
+    expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
+  })
+
+  it('keeps the macOS window movable while settings covers a session header', async () => {
+    mocks.isTauriRuntime = true
+    mocks.isMacTitlebar = true
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+    useUIStore.setState({ settingsOpen: true })
+
+    render(<AppShell />)
+    expect(await screen.findByTestId('window-drag-strip')).toHaveClass('fixed')
+    expect(screen.getByTestId('titlebar-sidebar-toggle')).toBeDisabled()
   })
 
   it('renders a mobile drawer toggle and backdrop in browser H5 mode', async () => {

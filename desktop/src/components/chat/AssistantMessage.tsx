@@ -7,9 +7,11 @@ type Props = {
   content: string
   isStreaming?: boolean
   branchAction?: MessageBranchAction
+  /** The reply's actions, shown under its last text: copy takes the whole reply. Omitted on earlier texts. */
+  replyCopyText?: string
 }
 
-export const AssistantMessage = memo(function AssistantMessage({ content, isStreaming, branchAction }: Props) {
+export const AssistantMessage = memo(function AssistantMessage({ content, isStreaming, branchAction, replyCopyText }: Props) {
   if (!content.trim()) return null
 
   const documentLayout = shouldUseDocumentLayout(content)
@@ -34,12 +36,14 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
           )}
         </div>
 
-        <MessageActionBar
-          copyText={isStreaming ? undefined : content}
-          copyLabel="Copy reply"
-          branchAction={branchAction}
-          align="start"
-        />
+        {replyCopyText !== undefined ? (
+          <MessageActionBar
+            copyText={isStreaming ? undefined : replyCopyText}
+            copyLabel="Copy reply"
+            branchAction={branchAction}
+            align="start"
+          />
+        ) : null}
       </div>
     </div>
   )

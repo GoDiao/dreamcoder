@@ -12,6 +12,7 @@ import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
 import { SidebarMoreMenu } from './SidebarMoreMenu'
 import { useMenuNavigation } from '../../hooks/useMenuNavigation'
+import { useWindowDrag } from '../../hooks/useWindowDrag'
 import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarProjectSortBy } from './ProjectManagementDialog'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { ReportProblemDialog } from './ReportProblemDialog'
@@ -200,7 +201,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       .filter((session): session is SessionListItem => Boolean(session)),
     [pendingBatchDeleteSessionIds, sessionsById],
   )
-  const expanded = isMobile ? true : sidebarOpen
+  // The mobile drawer and the desktop app slide the whole sidebar out of view
+  // instead of narrowing it to the icon rail, so their layout stays expanded.
+  const expanded = isMobile || isTauri ? true : sidebarOpen
   const closeMobileDrawer = useCallback(() => {
     if (isMobile) onRequestClose?.()
   }, [isMobile, onRequestClose])
@@ -631,23 +634,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     setRenameValue('')
   }, [renamingId, renameValue, renameSession])
 
-  const startDraggingRef = useRef<(() => Promise<void>) | null>(null)
-
-  useEffect(() => {
-    if (!isTauri) return
-    import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => {
-        const win = getCurrentWindow()
-        startDraggingRef.current = () => win.startDragging()
-      })
-      .catch(() => {})
-  }, [])
-
-  const handleSidebarDrag = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [role="button"]')) return
-    startDraggingRef.current?.()
-  }, [])
+  const handleSidebarDrag = useWindowDrag()
 
   useEffect(() => {
     if (!isBatchMode) return
@@ -679,7 +666,11 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       data-state={expanded ? 'open' : 'closed'}
       aria-label="Sidebar"
     >
-      <div className={`px-3 pb-2 ${isTauri && !isWindows ? 'pt-[44px]' : 'pt-3'}`}>
+      {/* On macOS the top band is the title row: traffic lights and the sidebar toggle. */}
+      <div
+        className={`px-3 pb-2 ${isTauri && !isWindows ? '' : 'pt-3'}`}
+        style={isTauri && !isWindows ? { paddingTop: 'var(--titlebar-height)' } : undefined}
+      >
         <div className={`flex ${expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2'}`}>
           <div className={`flex min-w-0 items-center ${expanded ? 'gap-2.5' : 'justify-center'}`}>
             <DreamCoderIcon size={32} />
@@ -716,7 +707,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
-            ) : (
+            ) : isTauri ? null : (
+              // The desktop app's toggle is in the title row (TitlebarSidebarToggle).
               <button
                 type="button"
                 onClick={toggleSidebar}
