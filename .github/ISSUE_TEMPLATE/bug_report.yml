@@ -53,7 +53,6 @@ body:
         - Qwen (Alibaba Cloud)
         - Kimi (Moonshot)
         - Zhipu GLM
-        - DreamField
         - LM Studio
         - Ollama
         - Anthropic
