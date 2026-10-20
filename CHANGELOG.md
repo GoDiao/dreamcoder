@@ -4,6 +4,8 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-10-21
+
 ### Added
 
 - **Report a problem** (#132): the sidebar's More menu opens a preview of what would be shared: app version, OS, provider type and recent errors, already redacted. Copy it, open a GitHub issue with the version filled in, or export the full diagnostics bundle. Nothing is sent until you click.
