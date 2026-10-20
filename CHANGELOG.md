@@ -15,6 +15,10 @@ All notable changes to DreamCoder will be documented in this file.
 - Diagnostics redaction also removes bare provider and GitHub keys (`sk-…`, `ghp_…`), and finds the home folder written with either slash or as `/c/Users/…`. It no longer touches a longer folder name such as `/Users/alice` when the home folder is `/Users/al`.
 - The bug report template lists the current provider presets.
 
+### Removed
+
+- The DreamField provider preset. A saved DreamField provider keeps working, but its models now get the default 200K context window instead of the preset's 1M. The DreamField Emerald theme stays.
+
 ### Fixed
 
 - **Agent teams:** opening a teammate from the team view shows its conversation instead of an empty page.

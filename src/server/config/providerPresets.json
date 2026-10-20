@@ -88,26 +88,6 @@
     }
   },
   {
-    "id": "dreamfield",
-    "name": "DreamField",
-    "baseUrl": "https://www.dreamfield.top",
-    "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "deepseek-v4-pro",
-      "haiku": "DeepSeek-V4-Flash",
-      "sonnet": "deepseek-v4-pro",
-      "opus": "deepseek-v4-pro"
-    },
-    "needsApiKey": true,
-    "websiteUrl": "https://www.dreamfield.top",
-    "authStrategy": "auth_token",
-    "modelContextWindows": {
-      "deepseek-v4-pro": 1000000,
-      "DeepSeek-V4-Flash": 1000000,
-      "GLM-5.1": 200000
-    }
-  },
-  {
     "id": "lmstudio",
     "name": "LM Studio",
     "baseUrl": "http://localhost:1234",
