@@ -327,6 +327,38 @@ describe('AppShell boot flow', () => {
     expect(screen.getByTestId('mobile-sidebar-toggle')).toHaveClass('h-10', 'w-10')
   })
 
+  it('shows an estimated message count as a lower bound', async () => {
+    mocks.isMobile = true
+    mocks.tabState.activeTabId = 'session-mobile'
+    mocks.tabState.tabs = [
+      { sessionId: 'session-mobile', title: 'Fallback tab title', type: 'session', status: 'idle' },
+    ]
+    useSessionStore.setState({
+      sessions: [{
+        id: 'session-mobile',
+        title: 'Long imported session',
+        createdAt: '2026-05-10T00:00:00.000Z',
+        modifiedAt: new Date().toISOString(),
+        messageCount: 12,
+        messageCountExact: false,
+        projectPath: '/tmp/project',
+        workDir: '/tmp/project',
+        workDirExists: true,
+      }],
+      activeSessionId: 'session-mobile',
+      isLoading: false,
+      error: null,
+    })
+
+    render(<AppShell />)
+
+    await screen.findByText('content loaded')
+
+    const header = screen.getByTestId('mobile-session-header')
+    expect(header).toHaveTextContent('session.messagesAtLeast')
+    expect(header.textContent).not.toMatch(/session\.messages(?!AtLeast)/)
+  })
+
   it('makes the page behind the settings window inert while it is open', async () => {
     useUIStore.setState({ settingsOpen: true })
 

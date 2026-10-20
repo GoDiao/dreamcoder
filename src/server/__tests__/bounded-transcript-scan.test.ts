@@ -6,11 +6,6 @@ import { LITE_READ_BUF_SIZE } from '../../utils/sessionStoragePortable.js'
 import { handleSessionsApi } from '../api/sessions.js'
 import { sessionService, type SessionListItem } from '../services/sessionService.js'
 
-/**
- * Bytes actually read from a transcript. A bounded scan stays inside the
- * first and last LITE_READ_BUF_SIZE bytes (plus the one byte before the tail
- * that tells us whether that window starts on a line boundary).
- */
 type TranscriptRead = { filePath: string; position: number; length: number }
 
 let configDir: string
@@ -118,7 +113,7 @@ function expectReadsStayInsideWindows(reads: TranscriptRead[], filePath: string,
 }
 
 describe('bounded transcript scan', () => {
-  it('reads a transcript that fits in the two windows without dropping the overlap', async () => {
+  it('marks the count inexact when the 100-line head stops short of the tail', async () => {
     expect(LITE_READ_BUF_SIZE).toBe(64 * 1024)
     const workDir = await fs.mkdtemp(path.join(configDir, 'overlap-project-'))
     const sessionId = crypto.randomUUID()
@@ -166,6 +161,7 @@ describe('bounded transcript scan', () => {
     const tracked = await withTranscriptReads(() => sessionService.listSessions({ includeLastAssistantMessage: true }))
     const session = tracked.result.sessions.find((item) => item.id === sessionId)
     expect(session?.messageCount).toBe(messageCount)
+    expect(session?.messageCountExact).toBe(false)
     expect(session?.title).toBe('Overlap title')
     expect(session?.workDir).toBe(workDir)
     expect(session?.lastAssistantMessage).toBe('overlap tail answer')
@@ -202,6 +198,8 @@ describe('bounded transcript scan', () => {
       userLine('Head prompt that must not win', headWorkDir),
       assistantLine('Head answer'),
     ])
+    // Head stops after 100 non-empty lines, before the unread middle.
+    const filler = Array.from({ length: 96 }, () => progressLine(40)).join('')
     const middleEntries = [
       ...Array.from({ length: 8 }, (_, index) => userLine(`middle prompt ${index}`, middleWorkDir)),
       assistantLine('Decoy middle answer'),
@@ -216,9 +214,9 @@ describe('bounded transcript scan', () => {
     ])
     const pad1 = progressLine(LITE_READ_BUF_SIZE)
     const pad2 = progressLine(2 * 1024 * 1024)
-    const content = head + pad1 + middle + pad2 + tail
+    const content = head + filler + pad1 + middle + pad2 + tail
     const size = Buffer.byteLength(content)
-    const middleStart = Buffer.byteLength(head) + Buffer.byteLength(pad1)
+    const middleStart = Buffer.byteLength(head) + Buffer.byteLength(filler) + Buffer.byteLength(pad1)
     const middleEnd = middleStart + Buffer.byteLength(middle)
     expect(middleStart).toBeGreaterThanOrEqual(LITE_READ_BUF_SIZE)
     expect(middleEnd).toBeLessThanOrEqual(size - LITE_READ_BUF_SIZE)
@@ -248,6 +246,7 @@ describe('bounded transcript scan', () => {
       expect(listed.lastAssistantMessage).toBe('Tail answer')
       // Eight middle user lines and the decoy assistant sit in the unread gap.
       expect(listed.messageCount).toBe(4)
+      expect(listed.messageCountExact).toBe(false)
       expect(listed.projectRoot).toBeTruthy()
       const canonicalTail = await fs.realpath(tailWorkDir)
       const projectRoot = listed.projectRoot as string
@@ -275,4 +274,126 @@ describe('bounded transcript scan', () => {
       await fs.rm(tailWorkDir, { recursive: true, force: true })
     }
   }, 20_000)
+
+  it('reads the first timestamp and custom title past 64KB of snapshot lines', async () => {
+    const tailWorkDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-snapshot-tail-'))
+    const sessionId = crypto.randomUUID()
+    const createdAt = '2024-04-02T03:04:05.000Z'
+    const parts: string[] = []
+    const push = (chunk: string) => { parts.push(chunk) }
+
+    for (let index = 0; index < 11; index++) {
+      push(JSON.stringify({
+        type: 'file-history-snapshot',
+        snapshot: {
+          messageId: `snap-${index}`,
+          trackedFileBackups: { 'notes.txt': 'x'.repeat(8 * 1024) },
+          timestamp: '2024-04-01T00:00:00.000Z',
+        },
+      }) + '\n')
+    }
+    const titleOffset = Buffer.byteLength(parts.join(''))
+    push(JSON.stringify({
+      type: 'custom-title',
+      customTitle: 'Title past 64KB',
+      timestamp: createdAt,
+    }) + '\n')
+    push(jsonl([
+      userLine('Prompt that must not become the title', '/tmp/snapshot-head'),
+      assistantLine('Head answer'),
+    ]))
+    while (parts.length < 100) push(progressLine(40))
+    const headEnd = Buffer.byteLength(parts.join(''))
+    expect(titleOffset).toBeGreaterThan(LITE_READ_BUF_SIZE)
+    expect(headEnd).toBeGreaterThan(LITE_READ_BUF_SIZE)
+
+    push(progressLine(128 * 1024))
+    const middleStart = Buffer.byteLength(parts.join(''))
+    const middle = jsonl([
+      userLine('middle prompt that must not be counted', '/tmp/snapshot-middle'),
+      assistantLine('middle answer'),
+      { type: 'custom-title', customTitle: 'Middle title must not win', timestamp: '2024-05-01T00:00:00.000Z' },
+    ])
+    push(middle)
+    const middleEnd = Buffer.byteLength(parts.join(''))
+    push(progressLine(2 * 1024 * 1024))
+    push(jsonl([
+      userLine('Tail prompt', '/tmp/snapshot-cwd'),
+      assistantLine('Tail answer'),
+      { type: 'session-meta', isMeta: true, workDir: tailWorkDir, timestamp: '2024-08-01T00:00:00.000Z' },
+    ]))
+
+    const content = parts.join('')
+    const size = Buffer.byteLength(content)
+    expect(middleStart).toBeGreaterThan(headEnd + LITE_READ_BUF_SIZE)
+    expect(middleEnd).toBeLessThanOrEqual(size - LITE_READ_BUF_SIZE)
+    const filePath = await writeTranscript('-snapshot-head', sessionId, content)
+
+    try {
+      const tracked = await withTranscriptReads(() => sessionService.listSessions({ includeLastAssistantMessage: true }))
+      const session = tracked.result.sessions.find((item) => item.id === sessionId)
+      expect(session?.title).toBe('Title past 64KB')
+      expect(session?.createdAt).toBe(createdAt)
+      expect(session?.workDir).toBe(tailWorkDir)
+      expect(session?.lastAssistantMessage).toBe('Tail answer')
+      expect(session?.messageCount).toBe(4)
+      expect(session?.messageCountExact).toBe(false)
+
+      const transcriptReads = tracked.reads.filter((read) => read.filePath === filePath)
+      expect(transcriptReads.length).toBeGreaterThan(0)
+      expect(transcriptReads.some((read) => read.position + read.length > LITE_READ_BUF_SIZE)).toBe(true)
+      let total = 0
+      for (const read of transcriptReads) {
+        const readEnd = read.position + read.length
+        expect(read.position < middleEnd && readEnd > middleStart).toBe(false)
+        total += read.length
+      }
+      expect(total).toBeLessThan(size)
+    } finally {
+      await fs.rm(tailWorkDir, { recursive: true, force: true })
+    }
+  })
+
+  it('omits messageCountExact when the first 100 lines cover the file', async () => {
+    const sessionId = crypto.randomUUID()
+    const parts: string[] = []
+    for (let index = 0; index < 10; index++) {
+      parts.push(JSON.stringify({
+        type: 'file-history-snapshot',
+        snapshot: {
+          messageId: `snap-${index}`,
+          trackedFileBackups: { 'notes.txt': 'y'.repeat(8 * 1024) },
+          timestamp: '2024-03-01T00:00:00.000Z',
+        },
+      }) + '\n')
+    }
+    const createdAt = '2024-03-02T00:00:00.000Z'
+    const titleOffset = Buffer.byteLength(parts.join(''))
+    parts.push(JSON.stringify({
+      type: 'custom-title',
+      customTitle: 'Covered title',
+      timestamp: createdAt,
+    }) + '\n')
+    parts.push(jsonl([
+      userLine('covered prompt', '/tmp/covered'),
+      assistantLine('covered answer'),
+    ]))
+    expect(titleOffset).toBeGreaterThan(LITE_READ_BUF_SIZE)
+    expect(parts.length).toBeLessThan(100)
+
+    const filePath = await writeTranscript('-covered-head', sessionId, parts.join(''))
+    const tracked = await withTranscriptReads(() => sessionService.listSessions({ includeLastAssistantMessage: true }))
+    const session = tracked.result.sessions.find((item) => item.id === sessionId)
+    expect(session?.title).toBe('Covered title')
+    expect(session?.createdAt).toBe(createdAt)
+    expect(session?.messageCount).toBe(2)
+    expect(session?.messageCountExact).toBeUndefined()
+    expect(session?.lastAssistantMessage).toBe('covered answer')
+
+    const transcriptReads = tracked.reads.filter((read) => read.filePath === filePath)
+    const size = Buffer.byteLength(parts.join(''))
+    const covered = transcriptReads.some((read) => read.position + read.length > LITE_READ_BUF_SIZE)
+    expect(covered).toBe(true)
+    expect(size).toBeGreaterThan(LITE_READ_BUF_SIZE)
+  })
 })

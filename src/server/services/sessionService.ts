@@ -41,6 +41,8 @@ export type SessionListItem = {
   createdAt: string
   modifiedAt: string
   messageCount: number
+  /** False when messageCount skipped the unread middle of a large transcript. */
+  messageCountExact?: boolean
   projectPath: string
   projectRoot: string | null
   workDir: string | null
@@ -236,34 +238,69 @@ function completeWindowLines(
   return parts
 }
 
+const HEAD_READ_CHUNK = 64 * 1024
+
 /**
- * Lines the session list can see without reading a transcript end to end.
- * Files up to two windows are covered completely (the two reads overlap).
- * Larger files contribute only their first and last LITE_READ_BUF_SIZE bytes,
- * so messageCount and the last assistant message ignore the unread middle.
+ * First `limit` non-empty lines, then stop. A snapshot line can be larger
+ * than the tail window, so the head is bounded by line count rather than bytes.
  */
-async function readSessionListWindowLines(handle: fs.FileHandle, size: number): Promise<string[]> {
-  if (size <= 0) return []
+async function readHeadNonEmptyLines(
+  handle: fs.FileHandle,
+  size: number,
+  limit: number,
+): Promise<{ lines: string[]; endOffset: number }> {
+  const lines: string[] = []
+  if (limit <= 0 || size <= 0) return { lines, endOffset: 0 }
 
-  const headLength = Math.min(LITE_READ_BUF_SIZE, size)
-  const head = await readWindow(handle, 0, headLength)
-  const tailOffset = Math.max(0, size - LITE_READ_BUF_SIZE)
-  if (tailOffset === 0) {
-    return completeWindowLines(head, false, false)
+  let offset = 0
+  let pending = Buffer.alloc(0)
+  while (offset < size && lines.length < limit) {
+    const chunk = await readWindow(handle, offset, Math.min(HEAD_READ_CHUNK, size - offset))
+    if (chunk.length === 0) break
+    offset += chunk.length
+    const buf = pending.length === 0 ? chunk : Buffer.concat([pending, chunk])
+    let start = 0
+    for (let i = 0; i < buf.length; i++) {
+      if (buf[i] !== 0x0a) continue
+      const line = buf.toString('utf8', start, i).trim()
+      start = i + 1
+      if (!line) continue
+      lines.push(line)
+      if (lines.length >= limit) {
+        return { lines, endOffset: offset - (buf.length - start) }
+      }
+    }
+    pending = start === buf.length ? Buffer.alloc(0) : Buffer.from(buf.subarray(start))
   }
 
-  const tail = await readWindow(handle, tailOffset, size - tailOffset)
-  if (size <= LITE_READ_BUF_SIZE * 2) {
-    const suffix = tail.subarray(Math.max(0, head.length - tailOffset))
-    return completeWindowLines(Buffer.concat([head, suffix]), false, false)
+  if (pending.length > 0 && lines.length < limit) {
+    const line = pending.toString('utf8').trim()
+    if (line) lines.push(line)
+  }
+  return { lines, endOffset: offset }
+}
+
+/** Lines after the head. The last 64KB is enough once the head has stopped early. */
+async function readTailLines(
+  handle: fs.FileHandle,
+  size: number,
+  headEndOffset: number,
+): Promise<{ lines: string[]; exact: boolean }> {
+  if (headEndOffset >= size) return { lines: [], exact: true }
+
+  const tailStart = Math.max(0, size - LITE_READ_BUF_SIZE)
+  if (headEndOffset >= tailStart) {
+    const rest = await readWindow(handle, headEndOffset, size - headEndOffset)
+    return { lines: completeWindowLines(rest, false, false), exact: true }
   }
 
-  const boundary = await readWindow(handle, tailOffset - 1, 1)
-  const tailStartsAtLineBoundary = boundary.length === 1 && boundary[0] === 0x0a
-  return [
-    ...completeWindowLines(head, false, true),
-    ...completeWindowLines(tail, !tailStartsAtLineBoundary, false),
-  ]
+  const tail = await readWindow(handle, tailStart, size - tailStart)
+  let dropLeading = false
+  if (tailStart > 0) {
+    const boundary = await readWindow(handle, tailStart - 1, 1)
+    dropLeading = boundary.length !== 1 || boundary[0] !== 0x0a
+  }
+  return { lines: completeWindowLines(tail, dropLeading, false), exact: false }
 }
 
 function summarizeSessionWindowLines(
@@ -337,7 +374,7 @@ export class SessionService {
     headLines: number,
     tailLines: number,
     includeLastAssistantMessage = false,
-  ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string }> {
+  ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string; messageCountExact: boolean }> {
     let handle: fs.FileHandle | undefined
     try {
       handle = await fs.open(filePath, 'r')
@@ -347,11 +384,18 @@ export class SessionService {
         error.code = 'EISDIR'
         throw error
       }
-      const lines = await readSessionListWindowLines(handle, stat.size)
-      return summarizeSessionWindowLines(lines, headLines, tailLines, includeLastAssistantMessage)
+      const head = await readHeadNonEmptyLines(handle, stat.size, headLines)
+      const tail = await readTailLines(handle, stat.size, head.endOffset)
+      const summary = summarizeSessionWindowLines(
+        [...head.lines, ...tail.lines],
+        headLines,
+        tailLines,
+        includeLastAssistantMessage,
+      )
+      return { ...summary, messageCountExact: tail.exact }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { entries: [], messageCount: 0, lastAssistantMessage: '' }
+        return { entries: [], messageCount: 0, lastAssistantMessage: '', messageCountExact: true }
       }
       throw err
     } finally {
@@ -948,7 +992,7 @@ export class SessionService {
 
     const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
       try {
-        const { entries: headEntries, messageCount, lastAssistantMessage } = await this.scanSessionFileHead(
+        const { entries: headEntries, messageCount, lastAssistantMessage, messageCountExact } = await this.scanSessionFileHead(
           filePath,
           100,
           100,
@@ -974,6 +1018,7 @@ export class SessionService {
           createdAt,
           modifiedAt: stat.mtime.toISOString(),
           messageCount,
+          ...(messageCountExact ? {} : { messageCountExact: false }),
           projectPath: projectDir,
           projectRoot,
           workDir,
