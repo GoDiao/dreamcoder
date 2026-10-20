@@ -21,6 +21,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- **Tool calls from Gemini and similar OpenAI-compatible providers:** a turn that ends with finish_reason `stop` after calling tools now reaches Claude Code as `tool_use`, so the tools run. Parallel calls streamed without an `index` are no longer merged into one.
 - **Agent teams:** opening a teammate from the team view shows its conversation instead of an empty page.
   - Each teammate now keeps one transcript. Before, every message it received started a new file with its whole history copied in.
   - Transcripts written before this update still open.
