@@ -13,6 +13,8 @@ import {
 } from '../../utils/desktopBundledCli.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
+import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
+import { SettingsService } from './settingsService.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type TaskRun = {
@@ -571,6 +573,7 @@ export class CronScheduler {
   ): Promise<Record<string, string | undefined>> {
     const cleanEnv = await getProcessEnvWithTerminalShellEnvironment()
     delete cleanEnv.CLAUDE_CODE_OAUTH_TOKEN
+    applyAgentTeamsSetting(cleanEnv, await new SettingsService().getUserSettings())
 
     if (this.shouldStripInheritedProviderEnv(task.providerId)) {
       for (const key of Object.keys(cleanEnv)) {

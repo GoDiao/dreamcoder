@@ -452,13 +452,14 @@ export class TeamService {
         const filePath = path.join(subagentsDir, file)
 
         try {
-          const head = await this.readTranscriptHead(filePath)
-          if (
-            head.includes(`"${memberName}"`) ||
-            head.includes(`**${memberName}**`) ||
-            head.includes(`name":"${memberName}`) ||
-            (await this.extractSubagentName(filePath)) === memberName
-          ) {
+          // Teammate transcripts name their agent in every entry. Files written
+          // before that only say it in the .meta.json next to them; there a
+          // teammate left one file per prompt, each holding all earlier ones,
+          // so the newest is the whole conversation.
+          const name =
+            (await this.extractSubagentName(filePath)) ??
+            (await this.readMetaAgentType(filePath))
+          if (name === memberName) {
             const stat = await fs.stat(filePath)
             if (!bestMatch || stat.mtimeMs > bestMatch.mtime) {
               bestMatch = { path: filePath, mtime: stat.mtimeMs }
@@ -505,12 +506,19 @@ export class TeamService {
         }
       }
 
-      const nameMatch =
-        head.match(/"agentName"\s*:\s*"([^"]+)"/) ||
-        head.match(/"name"\s*:\s*"([^"]+)"/) ||
-        head.match(/\*\*([a-zA-Z0-9_-]+)\*\*/)
+      // The last line of the head may be cut off before JSON.parse can read it.
+      return head.match(/"agentName"\s*:\s*"([^"]+)"/)?.[1] ?? null
+    } catch {
+      return null
+    }
+  }
 
-      return nameMatch?.[1] ?? null
+  /** The agentType runAgent writes next to a subagent transcript; for a teammate it is its name. */
+  private async readMetaAgentType(filePath: string): Promise<string | null> {
+    try {
+      const raw = await fs.readFile(filePath.replace(/\.jsonl$/, '.meta.json'), 'utf-8')
+      const meta = JSON.parse(raw) as { agentType?: unknown }
+      return typeof meta.agentType === 'string' && meta.agentType ? meta.agentType : null
     } catch {
       return null
     }

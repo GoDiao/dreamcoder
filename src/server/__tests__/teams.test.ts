@@ -332,6 +332,78 @@ describe('TeamService', () => {
     ])
   })
 
+  it('should read an older teammate from the newest file its .meta.json names', async () => {
+    await writeTeamConfig(
+      'meta-team',
+      makeTeamConfig({
+        name: 'meta-team',
+        leadSessionId: 'lead-session-meta',
+        members: [
+          {
+            agentId: 'beta@meta-team',
+            name: 'beta',
+            joinedAt: 1700000000000,
+            tmuxPaneId: 'in-process',
+            cwd: '/tmp/project',
+          },
+        ],
+      }),
+    )
+    const prompt = {
+      type: 'user',
+      uuid: 'b-u1',
+      isSidechain: true,
+      agentId: 'a1111111111111111',
+      message: { role: 'user', content: 'Introduce yourself to alpha' },
+      timestamp: '2026-01-01T00:01:00.000Z',
+    }
+    const reply = {
+      type: 'assistant',
+      uuid: 'b-a1',
+      isSidechain: true,
+      parentUuid: 'b-u1',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'Hi alpha, I am beta.' }] },
+      timestamp: '2026-01-01T00:02:00.000Z',
+    }
+    const writeOld = async (id: string, entries: Record<string, unknown>[], agentType: string, mtime: number) => {
+      const file = await writeSubagentTranscriptFile('-tmp-project', 'lead-session-meta', `agent-${id}.jsonl`, entries)
+      await fs.writeFile(file.replace(/\.jsonl$/, '.meta.json'), JSON.stringify({ agentType }))
+      await fs.utimes(file, mtime, mtime)
+    }
+    await writeOld('first', [prompt], 'beta', 1000)
+    await writeOld('second', [prompt, reply], 'beta', 2000)
+    await writeOld('other', [prompt, reply, reply], 'alpha', 3000)
+
+    const { items } = await service.getMemberTranscript('meta-team', 'beta@meta-team')
+    expect(items).toMatchObject([
+      { id: 'b-u1', type: 'user_text', content: 'Introduce yourself to alpha' },
+      { id: 'b-a1:0', type: 'assistant_text', content: 'Hi alpha, I am beta.' },
+    ])
+  })
+
+  it('should not take a tool name in a transcript for a team member', async () => {
+    await writeTeamConfig(
+      'tool-name-team',
+      makeTeamConfig({ name: 'tool-name-team', leadSessionId: 'lead-session-tools' }),
+    )
+    await writeSubagentTranscriptFile('-tmp-project', 'lead-session-tools', 'agent-a2.jsonl', [
+      {
+        type: 'assistant',
+        uuid: 'r-a1',
+        isSidechain: true,
+        agentId: 'a2222222222222222',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: '/tmp/x' } }],
+        },
+        timestamp: '2026-01-01T00:01:00.000Z',
+      },
+    ])
+
+    const detail = await service.getTeam('tool-name-team')
+    expect(detail.members.map((member) => member.name)).not.toContain('Read')
+  })
+
   it('should return empty array when member has no sessionId', async () => {
     const config = makeTeamConfig({ name: 'no-session-team' })
     delete (config.members[0] as Record<string, unknown>).sessionId

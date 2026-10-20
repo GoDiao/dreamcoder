@@ -85,6 +85,8 @@ export type UserSettings = {
   theme?: ThemeMode
   skipWebFetchPreflight?: boolean
   desktopNotificationsEnabled?: boolean
+  /** Sets CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS for sessions started afterwards. */
+  agentTeamsEnabled?: boolean
   webSearch?: WebSearchSettings
   updateProxy?: Partial<UpdateProxySettings>
   network?: {

@@ -166,6 +166,7 @@ describe('Settings > General tab', () => {
       theme: 'light',
       thinkingEnabled: true,
       skipWebFetchPreflight: true,
+      agentTeamsEnabled: false,
       desktopNotificationsEnabled: true,
       responseLanguage: '',
       webSearch: { mode: 'auto', tavilyApiKey: '', braveApiKey: '' },
@@ -197,6 +198,7 @@ describe('Settings > General tab', () => {
         useSettingsStore.setState({ responseLanguage: language })
       }),
       setEffort: vi.fn(),
+      setAgentTeamsEnabled: vi.fn(),
       setWebSearch: vi.fn().mockImplementation(async (webSearch) => {
         useSettingsStore.setState({ webSearch })
       }),
@@ -372,6 +374,17 @@ describe('Settings > General tab', () => {
     expect(within(effort).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Low', 'Medium', 'High', 'Max'])
     fireEvent.click(within(effort).getByRole('radio', { name: 'Max' }))
     expect(useSettingsStore.getState().setEffort).toHaveBeenCalledWith('max')
+  })
+
+  it('offers agent teams as an experimental switch that is off by default', () => {
+    render(<Settings />)
+    fireEvent.click(screen.getByText('General'))
+
+    expect(screen.getByRole('heading', { name: 'Experimental' })).toBeInTheDocument()
+    const toggle = screen.getByRole('switch', { name: 'Agent teams (experimental)' })
+    expect(toggle).not.toBeChecked()
+    fireEvent.click(toggle)
+    expect(useSettingsStore.getState().setAgentTeamsEnabled).toHaveBeenCalledWith(true)
   })
 
   it('keeps advanced sections collapsed until expanded', () => {

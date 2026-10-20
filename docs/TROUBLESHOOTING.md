@@ -6,6 +6,7 @@ Common issues when building or running DreamCoder, and how to fix them.
 
 > **Want to contribute a fix?** See [CONTRIBUTING_en.md](CONTRIBUTING_en.md) for the PR workflow.
 > Issues are tracked at [github.com/GoDiao/dreamcoder/issues](https://github.com/GoDiao/dreamcoder/issues).
+> To report a bug from the app, use **More → Report a problem** in the sidebar. It shows your version, OS, provider type and recent errors, with keys and your home folder removed, and opens a new issue with the version filled in.
 
 ---
 

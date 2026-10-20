@@ -18,7 +18,9 @@ import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
-import { buildNetworkEnvironment, loadNetworkSettings } from './networkSettings.js'
+import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
+import { SettingsService } from './settingsService.js'
+import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 
 const MAX_CAPTURED_PROCESS_LINES = 80
 const MAX_CAPTURED_SDK_MESSAGES = 40
@@ -932,7 +934,9 @@ export class ConversationService {
       typeof options?.providerId === 'string'
         ? await this.providerService.getProviderRuntimeEnv(options.providerId)
         : null
-    const networkEnv = buildNetworkEnvironment(await loadNetworkSettings())
+    const userSettings = await new SettingsService().getUserSettings()
+    const networkEnv = buildNetworkEnvironment(normalizeNetworkSettings(userSettings))
+    applyAgentTeamsSetting(cleanEnv, userSettings)
     if (explicitProviderEnv && options?.model?.trim()) {
       explicitProviderEnv.ANTHROPIC_MODEL = options.model.trim()
     }

@@ -512,6 +512,29 @@ fn prepare_for_app_mode_restart(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Session exports (#133) are rendered by the server and written here, to the
+/// path the user picked in the native save dialog. Only .md and .json files.
+fn validate_export_path(path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(path);
+    if !path.is_absolute() {
+        return Err("Export path must be absolute".to_string());
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase());
+    match extension.as_deref() {
+        Some("md") | Some("markdown") | Some("json") => Ok(path),
+        _ => Err("Exports must be .md or .json files".to_string()),
+    }
+}
+
+#[tauri::command]
+fn write_session_export(path: String, contents: String) -> Result<(), String> {
+    let path = validate_export_path(&path)?;
+    fs::write(&path, contents).map_err(|err| format!("Could not write {}: {err}", path.display()))
+}
+
 #[tauri::command]
 fn cancel_update_install(app: AppHandle) -> Result<(), String> {
     clear_app_quitting(&app);
@@ -1706,9 +1729,19 @@ mod tests {
         normalize_terminal_bash_path, parse_env_block, resolve_desktop_terminal_shell,
         resolve_terminal_cwd, run_notification_bridge,
         select_h5_dist_dir, DesktopTerminalConfig, StoredWindowState, TerminalHostPlatform,
-        SERVER_BIND_HOST, SERVER_CONTROL_HOST,
+        validate_export_path, SERVER_BIND_HOST, SERVER_CONTROL_HOST,
     };
     use std::{collections::HashMap, fs, path::Path};
+
+    #[test]
+    fn export_paths_must_be_absolute_markdown_or_json() {
+        let base = std::env::temp_dir();
+        assert!(validate_export_path(base.join("a.md").to_str().unwrap()).is_ok());
+        assert!(validate_export_path(base.join("a.JSON").to_str().unwrap()).is_ok());
+        assert!(validate_export_path(base.join("a.sh").to_str().unwrap()).is_err());
+        assert!(validate_export_path(base.join("noext").to_str().unwrap()).is_err());
+        assert!(validate_export_path("relative.md").is_err());
+    }
 
     #[cfg(unix)]
     #[test]
@@ -2045,6 +2078,7 @@ pub fn run() {
             prepare_for_update_install,
             prepare_for_app_mode_restart,
             cancel_update_install,
+            write_session_export,
             terminal_spawn,
             terminal_write,
             terminal_resize,

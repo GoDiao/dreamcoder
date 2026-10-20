@@ -1,4 +1,5 @@
 import { diagnosticsService } from '../services/diagnosticsService.js'
+import { buildProblemReport } from '../services/problemReport.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 export async function handleDiagnosticsApi(
@@ -44,8 +45,23 @@ export async function handleDiagnosticsApi(
       return Response.json({ ok: true })
     }
 
+    if (action === 'report' && req.method === 'GET') {
+      return Response.json(await buildProblemReport())
+    }
+
     if (action === 'export' && req.method === 'POST') {
       return Response.json({ bundle: await diagnosticsService.exportBundle() })
+    }
+
+    if (action === 'reveal-export' && req.method === 'POST') {
+      const body = await parseJsonBody(req)
+      const fileName = typeof body.fileName === 'string' ? body.fileName : ''
+      try {
+        await diagnosticsService.revealExport(fileName)
+      } catch {
+        throw ApiError.badRequest('Unknown export file')
+      }
+      return Response.json({ ok: true })
     }
 
     if (action === 'open-log-dir' && req.method === 'POST') {

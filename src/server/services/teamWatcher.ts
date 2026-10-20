@@ -258,12 +258,8 @@ export class TeamWatcher {
         }
       }
 
-      const match =
-        head.match(/"agentName"\s*:\s*"([^"]+)"/) ||
-        head.match(/"name"\s*:\s*"([^"]+)"/) ||
-        head.match(/\*\*([a-zA-Z0-9_-]+)\*\*/)
-
-      return match?.[1] ?? null
+      // The last line of the head may be cut off before JSON.parse can read it.
+      return head.match(/"agentName"\s*:\s*"([^"]+)"/)?.[1] ?? null
     } catch {
       return null
     }

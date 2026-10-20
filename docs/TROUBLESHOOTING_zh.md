@@ -6,6 +6,7 @@
 
 > **想贡献解决方案？** 先看 [CONTRIBUTING_zh.md](CONTRIBUTING_zh.md) 了解 PR 流程。
 > 问题跟踪在 [github.com/GoDiao/dreamcoder/issues](https://github.com/GoDiao/dreamcoder/issues)。
+> 在 app 里反馈问题：侧边栏 **更多 → 报告问题**。它会列出版本、系统、服务商类型和最近的错误（已去掉密钥和用户目录），并打开一个已填好版本号的新 issue。
 
 ---
 

@@ -272,6 +272,24 @@ export class DiagnosticsService {
     Bun.spawn(['xdg-open', dir], { stdout: 'ignore', stderr: 'ignore' })
   }
 
+  /** Shows an exported bundle in Finder or Explorer. Only names a file inside the export folder. */
+  async revealExport(fileName: string): Promise<void> {
+    if (!fileName || fileName === '.' || fileName === '..' || path.basename(fileName) !== fileName) {
+      throw new Error('Invalid export file name')
+    }
+    const file = path.join(this.getExportDir(), fileName)
+    await fs.access(file)
+    if (process.platform === 'darwin') {
+      Bun.spawn(['open', '-R', file], { stdout: 'ignore', stderr: 'ignore' })
+      return
+    }
+    if (process.platform === 'win32') {
+      Bun.spawn(['explorer', `/select,${file}`], { stdout: 'ignore', stderr: 'ignore' })
+      return
+    }
+    Bun.spawn(['xdg-open', this.getExportDir()], { stdout: 'ignore', stderr: 'ignore' })
+  }
+
   async clear(): Promise<void> {
     await fs.rm(this.getLogDir(), { recursive: true, force: true })
     await this.ensureLogDir()
@@ -317,11 +335,10 @@ export class DiagnosticsService {
       .replace(/((?:api[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|session[_-]?token|token|secret|password)\s*[:=]\s*)[^\s,;"'}]+/gi, '$1[REDACTED]')
       .replace(/(ANTHROPIC_(?:API_KEY|AUTH_TOKEN)\s*[:=]\s*)[^\s,;"'}]+/gi, '$1[REDACTED]')
       .replace(/([?&](?:api[_-]?key|token|auth|access_token|refresh_token|key)=)[^&\s]+/gi, '$1[REDACTED]')
+      // Bare provider and GitHub keys, e.g. pasted into a message or printed by a tool.
+      .replace(/\b(?:sk-(?:ant-|or-|proj-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '[REDACTED]')
 
-    const home = os.homedir()
-    if (home && sanitized.includes(home)) {
-      sanitized = sanitized.split(home).join('~')
-    }
+    sanitized = redactHomePath(sanitized, os.homedir())
 
     if (sanitized.length > maxLength) {
       return `${sanitized.slice(0, maxLength)}...[TRUNCATED ${sanitized.length - maxLength} chars]`
@@ -622,3 +639,27 @@ export class DiagnosticsService {
 }
 
 export const diagnosticsService = new DiagnosticsService()
+
+/**
+ * Replaces the home folder with `~`, also when it is written with the other
+ * slash, as `/c/Users/...` (Git Bash) or in another case on Windows. A match
+ * must end at a path separator, so `/Users/al` does not touch `/Users/alice`.
+ */
+export function redactHomePath(text: string, home: string, platform: NodeJS.Platform = process.platform): string {
+  if (!home || home.length < 2) return text
+  const parts = home.split(/[\\/]+/).filter(Boolean)
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const separator = '[\\\\/]+'
+  const variants = new Set<string>()
+  const drive = /^[A-Za-z]:$/.test(parts[0] ?? '') ? parts[0]! : null
+  if (drive) {
+    const rest = parts.slice(1).map(escape).join(separator)
+    variants.add(`${escape(drive)}${separator}${rest}`)
+    variants.add(`/${drive[0]}/${parts.slice(1).map(escape).join('/')}`)
+  } else {
+    variants.add(`${home.startsWith('/') ? '/' : ''}${parts.map(escape).join(separator)}`)
+  }
+  const flags = platform === 'win32' || drive ? 'gi' : 'g'
+  const pattern = new RegExp(`(?:${[...variants].join('|')})(?=$|[\\\\/\\s"'\`)\\],;:]|\\.(?:\\s|$))`, flags)
+  return text.replace(pattern, '~')
+}
