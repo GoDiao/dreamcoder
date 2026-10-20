@@ -568,6 +568,27 @@ function isTurnResponseMessage(message: UIMessage) {
   )
 }
 
+/**
+ * A reply can be several texts with tool calls between them. Its copy and
+ * branch buttons go under the last text only, and copy takes every text of the
+ * reply. Maps that last text's id to the reply's full text.
+ */
+export function getReplyCopyTexts(messages: UIMessage[]): Map<string, string> {
+  const result = new Map<string, string>()
+  let texts: Array<Extract<UIMessage, { type: 'assistant_text' }>> = []
+  const finishReply = () => {
+    const last = texts[texts.length - 1]
+    if (last) result.set(last.id, texts.map((text) => text.content.trim()).filter(Boolean).join('\n\n'))
+    texts = []
+  }
+  for (const message of messages) {
+    if (message.type === 'user_text') finishReply()
+    else if (message.type === 'assistant_text' && message.content.trim()) texts.push(message)
+  }
+  finishReply()
+  return result
+}
+
 function getBranchableMessageTargets(messages: UIMessage[]): Map<string, BranchableMessageTarget> {
   const branchableTargets = new Map<string, BranchableMessageTarget>()
   let currentTurnCandidates: Array<Extract<UIMessage, { type: 'user_text' | 'assistant_text' }>> = []
@@ -1731,6 +1752,8 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     return result
   }, [branchableMessageTargets, branchingMessageId, handleBranchMessage, t])
 
+  const replyCopyTextByMessageId = useMemo(() => getReplyCopyTexts(deferredMessages), [deferredMessages])
+
   const toolResultByToolUseId = useMemo(() => {
     if (toolResultMap.size === 0) return new Map<string, { content: unknown; isError: boolean }>()
     const result = new Map<string, { content: unknown; isError: boolean }>()
@@ -1768,6 +1791,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
                 : null
             }
             branchAction={branchActionByMessageId.get(item.message.id)}
+            replyCopyText={replyCopyTextByMessageId.get(item.message.id)}
           />
         )}
 
@@ -1899,6 +1923,7 @@ export const MessageBlock = memo(function MessageBlock({
   agentTaskNotifications,
   toolResult,
   branchAction,
+  replyCopyText,
 }: {
   sessionId?: string | null
   message: UIMessage
@@ -1910,6 +1935,7 @@ export const MessageBlock = memo(function MessageBlock({
     loading?: boolean
     onBranch: () => void
   }
+  replyCopyText?: string
 }) {
   const t = useTranslation()
 
@@ -1926,6 +1952,7 @@ export const MessageBlock = memo(function MessageBlock({
             content={message.content}
             attachments={message.attachments}
             branchAction={branchAction}
+            timestamp={message.timestamp}
           />
         </SelectableChatMessage>
       )
@@ -1937,7 +1964,11 @@ export const MessageBlock = memo(function MessageBlock({
           role="assistant"
           content={message.content}
         >
-          <AssistantMessage content={message.content} branchAction={branchAction} />
+          <AssistantMessage
+            content={message.content}
+            branchAction={replyCopyText !== undefined ? branchAction : undefined}
+            replyCopyText={replyCopyText}
+          />
         </SelectableChatMessage>
       )
     case 'thinking':

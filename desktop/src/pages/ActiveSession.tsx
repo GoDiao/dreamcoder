@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { GitBranch, PanelRight, SquareTerminal, Target } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { PanelRight, SquareTerminal, Target } from 'lucide-react'
 import {
   SCHEDULED_TAB_ID,
   useTabStore,
@@ -9,6 +9,7 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
+import { useUIStore } from '../stores/uiStore'
 import {
   WORKSPACE_PANEL_MAX_WIDTH,
   WORKSPACE_PANEL_MIN_CHAT_WIDTH,
@@ -26,6 +27,8 @@ import { TeamStatusBar } from '../components/teams/TeamStatusBar'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
+import { useWindowDrag } from '../hooks/useWindowDrag'
+import { isMacOverlayTitlebar } from '../lib/windowChrome'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
 const TASK_POLL_INTERVAL_MS = 1000
@@ -82,29 +85,31 @@ function ActiveGoalStrip({
   ].filter((value): value is string => value !== null)
 
   return (
-    <div
-      data-testid="active-goal-strip"
-      className={[
-        'mt-2 flex max-w-full items-center gap-2 rounded-[8px] border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)] px-2.5 py-1.5',
-        compact ? 'text-[11px]' : 'text-[12px]',
-      ].join(' ')}
-    >
-      <Target size={compact ? 13 : 14} className="shrink-0 text-[var(--color-memory-accent)]" strokeWidth={2.25} aria-hidden="true" />
-      <span className="shrink-0 font-semibold text-[var(--color-text-primary)]">
-        {t('chat.activeGoal.title')}
-      </span>
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-memory-accent)]" aria-hidden="true" />
-      <span className="shrink-0 text-[var(--color-text-tertiary)]">{statusLabel}</span>
-      <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]" title={objective}>
-        {objective}
-      </span>
-      {meta.length > 0 ? (
-        <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)] lg:flex">
-          {meta.map((item) => (
-            <span key={item} className="max-w-[140px] truncate">{item}</span>
-          ))}
+    <div className="mx-auto w-full max-w-[860px] shrink-0 px-8 pt-2">
+      <div
+        data-testid="active-goal-strip"
+        className={[
+          'flex max-w-full items-center gap-2 rounded-[8px] border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)] px-2.5 py-1.5',
+          compact ? 'text-[11px]' : 'text-[12px]',
+        ].join(' ')}
+      >
+        <Target size={compact ? 13 : 14} className="shrink-0 text-[var(--color-memory-accent)]" strokeWidth={2.25} aria-hidden="true" />
+        <span className="shrink-0 font-semibold text-[var(--color-text-primary)]">
+          {t('chat.activeGoal.title')}
         </span>
-      ) : null}
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-memory-accent)]" aria-hidden="true" />
+        <span className="shrink-0 text-[var(--color-text-tertiary)]">{statusLabel}</span>
+        <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]" title={objective}>
+          {objective}
+        </span>
+        {meta.length > 0 ? (
+          <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)] lg:flex">
+            {meta.map((item) => (
+              <span key={item} className="max-w-[140px] truncate">{item}</span>
+            ))}
+          </span>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -245,6 +250,17 @@ export function ActiveSession() {
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const activeTeam = useTeamStore((s) => s.activeTeam)
   const isMemberSession = !!memberInfo
+  const handleHeaderDrag = useWindowDrag()
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen)
+  // On macOS the header is the window's title row. With the sidebar hidden it
+  // starts at the window's edge, under the traffic lights and the sidebar toggle.
+  const macTitlebar = isMacOverlayTitlebar()
+  const headerStyle = macTitlebar
+    ? {
+        height: 'var(--titlebar-height)',
+        ...(sidebarOpen ? {} : { paddingLeft: 'calc(var(--traffic-lights-end) + 1.75rem + 12px)' }),
+      }
+    : undefined
   const canUsePanel = Boolean(activeTabId) &&
     isSessionTabState(activeTabId, activeTabType) &&
     !isMemberSession &&
@@ -312,15 +328,6 @@ export function ActiveSession() {
     (trackedTaskSessionId === activeTabId && hasRunningTasks) ||
     hasRunningBackgroundTasks
 
-  const lastUpdated = useMemo(() => {
-    if (!session?.modifiedAt) return ''
-    const diff = Date.now() - new Date(session.modifiedAt).getTime()
-    if (diff < 60000) return t('session.timeJustNow')
-    if (diff < 3600000) return t('session.timeMinutes', { n: Math.floor(diff / 60000) })
-    if (diff < 86400000) return t('session.timeHours', { n: Math.floor(diff / 3600000) })
-    return t('session.timeDays', { n: Math.floor(diff / 86400000) })
-  }, [session?.modifiedAt, t])
-
   if (!activeTabId) return null
 
   const projectName = getSessionProjectName(session, workspaceStatus?.repoName)
@@ -333,55 +340,24 @@ export function ActiveSession() {
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
       {showHeader && (
         <header
-          data-tauri-drag-region
           data-testid="session-header"
-          className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--color-border)] px-6 py-3.5"
+          onMouseDown={handleHeaderDrag}
+          style={headerStyle}
+          className={`flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${macTitlebar ? '' : 'h-11'}`}
         >
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">
               {session?.title || t('session.untitled')}
             </h1>
-            <div
-              data-testid="session-header-meta"
-              className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-ui-aux text-[var(--color-text-secondary)]"
-            >
-              {isActive && (
-                <>
-                  <span className="flex shrink-0 items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
-                    {t('session.active')}
-                  </span>
-                  {(projectName || branch || lastUpdated) && <span aria-hidden="true">·</span>}
-                </>
-              )}
-              {projectName && <span className="min-w-0 truncate">{projectName}</span>}
-              {branch && (
-                <>
-                  {projectName && <span aria-hidden="true" className="text-[var(--color-text-tertiary)]">/</span>}
-                  <GitBranch size={12} strokeWidth={1.9} aria-hidden="true" className="shrink-0" />
-                  <span className="min-w-0 truncate">{branch}</span>
-                </>
-              )}
-              {lastUpdated && (
-                <>
-                  {(projectName || branch) && <span aria-hidden="true">·</span>}
-                  <span className="truncate text-[var(--color-text-tertiary)]">{t('session.lastUpdated', { time: lastUpdated })}</span>
-                </>
-              )}
-            </div>
-            {session?.workDirExists === false && (
-              <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]">
-                <span className="material-symbols-outlined text-[14px]">warning</span>
-                <span className="truncate">
-                  {t('session.workspaceUnavailable', { dir: session.workDir || 'directory no longer exists' })}
-                </span>
-              </div>
+            {isActive && (
+              <span
+                data-testid="session-header-running"
+                className="flex shrink-0 items-center gap-1 text-ui-aux text-[var(--color-text-secondary)]"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
+                {t('session.active')}
+              </span>
             )}
-            <ActiveGoalStrip
-              goal={activeGoal}
-              isRunning={isActive}
-              compact={showPanel}
-            />
           </div>
           {canUsePanel && (
             <div className="flex shrink-0 items-center gap-[3px]">
@@ -455,6 +431,12 @@ export function ActiveSession() {
               </div>
             </div>
           )}
+
+          <ActiveGoalStrip
+            goal={activeGoal}
+            isRunning={isActive}
+            compact={showPanel}
+          />
 
           {isEmpty ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 pb-32">
