@@ -1,6 +1,6 @@
 # DreamCoder Browser Usage and Process Termination Guide
 
-English | [Chinese](zh/WEB_USAGE.md)
+English | [Chinese](WEB_USAGE_zh.md)
 
 This guide covers local development on Ubuntu 24.04, with Bun running the backend and Node.js/npm running the Vite frontend. Daily use does not require reinstalling dependencies, rebuilding the frontend, or compiling Tauri and the sidecar.
 

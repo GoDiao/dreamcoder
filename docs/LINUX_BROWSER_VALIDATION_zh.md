@@ -1,10 +1,10 @@
 # Linux 浏览器版验证报告
 
-[English](../LINUX_BROWSER_VALIDATION.md) | 简体中文
+[English](LINUX_BROWSER_VALIDATION.md) | 简体中文
 
 Ubuntu 24.04 下已完成 DreamCoder 浏览器界面、Bun 后端和本地 Ollama 模型调用的验证。依赖安装通过 exFAT 兼容方式完成，前端构建及前后端连接正常。**本次验证对象是浏览器版，不是完整的 Linux Tauri 原生客户端；Anthropic Claude 和 OpenAI 官方 API 调用仍待验证。**
 
-日常启动、数据保存、依赖重装、正常关闭和按 PID 终止进程的操作见[浏览器版使用与进程终止指南](WEB_USAGE.md)。
+日常启动、数据保存、依赖重装、正常关闭和按 PID 终止进程的操作见[浏览器版使用与进程终止指南](WEB_USAGE_zh.md)。
 
 ## 环境与验证基线
 
@@ -122,7 +122,7 @@ npm 11 默认跳过了未批准的 sharp、protobufjs、esbuild 安装脚本；�
 
 ## 运行与关闭说明
 
-[使用与进程终止指南](WEB_USAGE.md)随本报告一并提交，包含以下操作：
+[使用与进程终止指南](WEB_USAGE_zh.md)随本报告一并提交，包含以下操作：
 
 1. 分别在两个终端启动 Bun 后端和 Vite 前端，显式设置后端地址。
 2. 打开浏览器页面，选择模型服务商，确认会话的项目工作目录。

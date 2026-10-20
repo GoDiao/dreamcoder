@@ -1,6 +1,6 @@
 # Linux Browser Validation Report
 
-English | [Chinese](zh/LINUX_BROWSER_VALIDATION.md)
+English | [Chinese](LINUX_BROWSER_VALIDATION_zh.md)
 
 DreamCoder's browser interface, Bun backend, and local Ollama model integration have been validated on Ubuntu 24.04. Dependency installation succeeded with an exFAT workaround, and the frontend build and frontend/backend connection passed. **This validation covers the browser version. The complete Linux Tauri desktop client, Anthropic Claude's official API, and OpenAI's official API remain unverified.**
 

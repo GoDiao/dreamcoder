@@ -1,12 +1,12 @@
 # DreamCoder 浏览器版使用与进程终止指南
 
-[English](../WEB_USAGE.md) | 简体中文
+[English](WEB_USAGE.md) | 简体中文
 
 适用于 Ubuntu 24.04 本地开发环境：Bun 启动后端，Node.js 和 npm 启动 Vite 前端。日常使用无需重新安装依赖或构建，也无需编译 Tauri 和 sidecar。
 
 请确保 `bun`、`node` 和 `npm` 已在 `PATH` 中。建议使用 Node.js 24 LTS；本次验证版本为 Node.js `v24.22.0`、npm `11.19.1` 和 Bun `1.4.2`。下列命令中的 `/path/to/dreamcoder` 是占位路径，请替换为自己的仓库目录。
 
-Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见[Linux 浏览器版验证报告](LINUX_BROWSER_VALIDATION.md)。
+Linux 验证范围、exFAT 安装问题的定位过程和 Ollama 调用结果见[Linux 浏览器版验证报告](LINUX_BROWSER_VALIDATION_zh.md)。
 
 ## 标准依赖安装
 
@@ -100,7 +100,7 @@ curl -fsS http://127.0.0.1:3456/health
 
 ### exFAT 链接错误与 npm 绕过方式
 
-本次验证的工作区位于 exFAT，普通文件写入和改名正常，但符号链接与硬链接操作返回 `EPERM`；标准 npm 安装也在创建命令链接时失败。[验证报告](LINUX_BROWSER_VALIDATION.md)记录了实际测试与定位过程。仅凭 `EPERM` 不能认定是这一原因，应先检查所属用户、权限、文件系统类型和实际链接能力。
+本次验证的工作区位于 exFAT，普通文件写入和改名正常，但符号链接与硬链接操作返回 `EPERM`；标准 npm 安装也在创建命令链接时失败。[验证报告](LINUX_BROWSER_VALIDATION_zh.md)记录了实际测试与定位过程。仅凭 `EPERM` 不能认定是这一原因，应先检查所属用户、权限、文件系统类型和实际链接能力。
 
 仅对已确认受到该文件系统限制的工作区，先备份失败的依赖目录，再使用以下本地绕过方式进行干净安装：
 
