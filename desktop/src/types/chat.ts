@@ -6,11 +6,20 @@ export type {
   ClientMessage,
   GoalEventAction,
   MemoryEventFile,
+  PendingPermission,
   ServerMessage,
+  SessionState,
+  SessionStatePatch,
   TeamMemberStatus,
   TokenUsage,
 } from '@protocol'
-import type { GoalEventAction } from '@protocol'
+import type { ClientKind, GoalEventAction } from '@protocol'
+
+export type PermissionResolution = {
+  outcome: 'allowed' | 'denied' | 'withdrawn'
+  remote: boolean
+  by?: ClientKind
+}
 
 export type AgentTaskNotification = TaskNotification
 export type BackgroundAgentTaskUsage = TaskUsage
@@ -105,6 +114,7 @@ export type UIMessage =
       input: unknown
       description?: string
       timestamp: number
+      resolution?: PermissionResolution
     }
   | { id: string; type: 'error'; message: string; code: string; timestamp: number }
   | { id: string; type: 'task_summary'; tasks: TaskSummaryItem[]; timestamp: number }

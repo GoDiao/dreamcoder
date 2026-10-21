@@ -1125,30 +1125,87 @@ describe('SessionService', () => {
     })
   })
 
-  it('should remove stale placeholder files after native CLI worktree startup', async () => {
+  it('merges newer metadata from a metadata-only duplicate into the transcript file and deletes it', async () => {
     const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     const sourceFile = await writeSessionFile('-tmp-source', sessionId, [
       makeSnapshotEntry(),
       { type: 'session-meta', isMeta: true, workDir: '/tmp/source', timestamp: '2026-01-01T00:00:00.000Z' },
       { type: 'session-meta', isMeta: true, workDir: '/tmp/source/.claude/worktrees/desktop-agent', timestamp: '2026-01-01T00:00:02.000Z' },
+      { type: 'permission-mode', permissionMode: 'plan', sessionId, timestamp: '2026-01-01T00:00:02.000Z' },
+      { type: 'custom-title', customTitle: 'Old title', timestamp: '2025-12-31T00:00:00.000Z' },
     ])
     const worktreeFile = await writeSessionFile('-tmp-source--claude-worktrees-desktop-agent', sessionId, [
       makeSnapshotEntry(),
       { type: 'session-meta', isMeta: true, workDir: '/tmp/source/.claude/worktrees/desktop-agent', timestamp: '2026-01-01T00:00:01.000Z' },
       makeUserEntry('Hello from worktree'),
+      { type: 'custom-title', customTitle: 'New title', timestamp: '2026-01-01T00:00:03.000Z' },
     ])
 
-    const removed = await service.deletePlaceholderSessionFiles(
-      sessionId,
-      '/tmp/source/.claude/worktrees/desktop-agent',
-    )
+    await service.appendAiTitle(sessionId, 'AI title')
 
-    expect(removed).toBe(1)
     await expect(fs.access(sourceFile)).rejects.toThrow()
+    const entries = (await fs.readFile(worktreeFile, 'utf-8')).trim().split('\n').map((line) => JSON.parse(line))
+    expect(entries.slice(-3).map((entry) => entry.type)).toEqual(['session-meta', 'permission-mode', 'ai-title'])
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('plan')
+    expect(await service.getCustomTitle(sessionId)).toBe('New title')
+    expect(await service.getSessionWorkDir(sessionId)).toBe('/tmp/source/.claude/worktrees/desktop-agent')
+  })
+
+  it('deletes no file when neither copy of a session has conversation content', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const sourceFile = await writeSessionFile('-tmp-source', sessionId, [
+      makeSnapshotEntry(),
+      { type: 'session-meta', isMeta: true, workDir: '/tmp/source', timestamp: '2026-01-01T00:00:00.000Z' },
+    ])
+    const worktreeFile = await writeSessionFile('-tmp-source--claude-worktrees-desktop-agent', sessionId, [
+      makeSnapshotEntry(),
+      { type: 'worktree-state', worktreeSession: { worktreePath: '/tmp/wt', worktreeName: 'wt' }, sessionId },
+    ])
+
+    await service.appendAiTitle(sessionId, 'AI title')
+
+    await expect(fs.access(sourceFile)).resolves.toBeNull()
     await expect(fs.access(worktreeFile)).resolves.toBeNull()
   })
 
-  it('should move repository metadata to the CLI worktree transcript before deleting placeholders', async () => {
+  it('treats a file with only local command output as the conversation', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const commandFile = await writeSessionFile('-tmp-command', sessionId, [
+      makeSnapshotEntry(),
+      { type: 'system', subtype: 'local_command', content: '<command-name>/context</command-name>', timestamp: '2026-01-01T00:00:00.000Z' },
+    ])
+    const metaFile = await writeSessionFile('-tmp-command-meta', sessionId, [
+      makeSnapshotEntry(),
+      { type: 'session-meta', isMeta: true, workDir: '/tmp/command', timestamp: '2026-01-01T00:00:01.000Z' },
+    ])
+    const later = new Date(Date.now() + 60_000)
+    await fs.utimes(metaFile, later, later)
+
+    await service.appendAiTitle(sessionId, 'AI title')
+
+    await expect(fs.access(commandFile)).resolves.toBeNull()
+    await expect(fs.access(metaFile)).rejects.toThrow()
+    expect((await service.findSessionFile(sessionId))?.filePath).toBe(commandFile)
+  })
+
+  it('keeps writing to the session file after the CLI moves into a worktree', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const sessionFile = await writeSessionFile('-tmp-source', sessionId, [
+      makeSnapshotEntry(),
+      { type: 'session-meta', isMeta: true, workDir: '/tmp/source', timestamp: '2026-01-01T00:00:00.000Z' },
+      makeUserEntry('Hello'),
+    ])
+
+    await service.appendSessionMetadata(sessionId, { workDir: '/tmp/source/.claude/worktrees/desktop-agent' })
+    await service.appendSessionMetadata(sessionId, { workDir: '/tmp/source/.claude/worktrees/desktop-agent' })
+
+    const projectDirs = await fs.readdir(path.join(tmpDir, 'projects'))
+    expect(projectDirs.filter((dir) => dir.includes('worktrees'))).toEqual([])
+    const entries = (await fs.readFile(sessionFile, 'utf-8')).trim().split('\n').map((line) => JSON.parse(line))
+    expect(entries.filter((entry) => entry.type === 'session-meta')).toHaveLength(2)
+  })
+
+  it('should move repository metadata into the CLI worktree transcript', async () => {
     const workDir = await createCleanGitRepo(tmpDir)
     const { sessionId } = await service.createSession(
       workDir,
@@ -1172,11 +1229,10 @@ describe('SessionService', () => {
     await service.appendSessionMetadata(sessionId, {
       workDir: worktreePath!,
     })
-    const removed = await service.deletePlaceholderSessionFiles(sessionId, worktreePath!)
     const launchInfo = await service.getSessionLaunchInfo(sessionId)
 
-    expect(removed).toBe(1)
     await expect(fs.access(worktreeFile)).resolves.toBeNull()
+    expect(launchInfo?.filePath).toBe(worktreeFile)
     expect(launchInfo?.workDir).toBe(worktreePath)
     expect(launchInfo?.repository).toMatchObject({
       requestedWorkDir: await fs.realpath(workDir),
@@ -1235,6 +1291,33 @@ describe('SessionService', () => {
     expect(await service.getSessionPermissionMode(sessionId)).toBe('acceptEdits')
   })
 
+  it('keeps the title and worktree state through /clear', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'clear-keeps')
+    await fs.mkdir(workDir, { recursive: true })
+    const { sessionId, workDir: sessionWorkDir } = await service.createSession(workDir)
+    await service.renameSession(sessionId, 'Kept title')
+    const found = await service.findSessionFile(sessionId)
+    await fs.appendFile(found!.filePath, JSON.stringify(makeWorktreeStateEntry(sessionId, path.join(workDir, 'wt'))) + '\n')
+
+    await service.clearSessionTranscript(sessionId, sessionWorkDir)
+
+    expect(await service.getCustomTitle(sessionId)).toBe('Kept title')
+    expect((await service.getSessionLaunchInfo(sessionId))?.worktreeSession).toMatchObject({ worktreePath: path.join(workDir, 'wt') })
+  })
+
+  it('appends the custom title again only when the file ends with a different one', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'title-restore')
+    await fs.mkdir(workDir, { recursive: true })
+    const { sessionId } = await service.createSession(workDir)
+    await service.renameSession(sessionId, 'Mine')
+
+    expect(await service.restoreCustomTitle(sessionId, 'Mine')).toBe(false)
+    const found = await service.findSessionFile(sessionId)
+    await fs.appendFile(found!.filePath, JSON.stringify({ type: 'custom-title', customTitle: 'Stale' }) + '\n')
+    expect(await service.restoreCustomTitle(sessionId, 'Mine')).toBe(true)
+    expect(await service.getCustomTitle(sessionId)).toBe('Mine')
+  })
+
   it('writes permission modes for one session in call order', async () => {
     const workDir = path.join(tmpDir, 'workspace', 'mode-order')
     await fs.mkdir(workDir, { recursive: true })
@@ -1248,6 +1331,35 @@ describe('SessionService', () => {
     ])
 
     expect(await service.getSessionPermissionMode(sessionId)).toBe('default')
+  })
+
+  it('records the model a new session is created with, and keeps it through /clear', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'runtime-project')
+    await fs.mkdir(workDir, { recursive: true })
+    const runtime = { providerId: 'provider-a', modelId: 'model-a', effort: 'high' }
+    const { sessionId, workDir: sessionWorkDir } = await service.createSession(workDir, undefined, undefined, runtime)
+
+    expect((await service.getSessionRestoreInfo(sessionId))?.runtime).toEqual(runtime)
+
+    await Promise.all([
+      service.appendSessionRuntimeConfig(sessionId, { providerId: 'provider-b', modelId: 'model-b' }),
+      service.appendSessionPermissionMode(sessionId, 'plan'),
+      service.appendSessionRuntimeConfig(sessionId, null),
+    ])
+    expect((await service.getSessionRestoreInfo(sessionId))?.runtime).toBeNull()
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('plan')
+
+    await service.appendSessionRuntimeConfig(sessionId, { providerId: 'provider-c', modelId: 'model-c' })
+    await service.clearSessionTranscript(sessionId, sessionWorkDir)
+    expect((await service.getSessionRestoreInfo(sessionId))?.runtime).toEqual({ providerId: 'provider-c', modelId: 'model-c' })
+  })
+
+  it('reports no runtime entry for sessions that never recorded one', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'runtime-none')
+    await fs.mkdir(workDir, { recursive: true })
+    const { sessionId } = await service.createSession(workDir)
+
+    expect((await service.getSessionRestoreInfo(sessionId))?.runtime).toBeUndefined()
   })
 
   it('should defer isolated worktree creation until CLI startup', async () => {
@@ -1338,28 +1450,42 @@ describe('SessionService', () => {
     ))).toBe(true)
   })
 
-  it('should let git carry compatible dirty changes during direct branch launch', async () => {
+  it('should refuse a direct branch launch from a checkout with uncommitted changes', async () => {
+    const workDir = await createCleanGitRepo(tmpDir)
+    await fs.writeFile(path.join(workDir, 'README.md'), 'main\nlocal-pricing-edit\n')
+
+    await expect(service.createSession(
+      workDir,
+      { branch: 'feature/rail', worktree: false },
+    )).rejects.toMatchObject({ code: 'REPOSITORY_DIRTY_WORKTREE' })
+
+    await expect(prepareSessionWorkspace(
+      workDir,
+      { branch: 'feature/rail', worktree: false },
+      'dirty-session',
+    )).rejects.toMatchObject({ code: 'REPOSITORY_DIRTY_WORKTREE' })
+
+    expect(git(workDir, 'branch', '--show-current')).toBe('main\n')
+    expect(await fs.readFile(path.join(workDir, 'README.md'), 'utf-8'))
+      .toContain('local-pricing-edit')
+  })
+
+  it('should keep the current branch launch available from a checkout with uncommitted changes', async () => {
     const workDir = await createCleanGitRepo(tmpDir)
     await fs.writeFile(path.join(workDir, 'README.md'), 'main\nlocal-pricing-edit\n')
 
     const { sessionId } = await service.createSession(
       workDir,
-      { branch: 'feature/rail', worktree: false },
+      { branch: 'main', worktree: false },
     )
-
-    expect(git(workDir, 'branch', '--show-current')).toBe('main\n')
-    expect(await fs.readFile(path.join(workDir, 'README.md'), 'utf-8'))
-      .toContain('local-pricing-edit')
     const prepared = await prepareSessionWorkspace(
       workDir,
-      { branch: 'feature/rail', worktree: false },
+      { branch: 'main', worktree: false },
       sessionId,
     )
 
     expect(prepared.workDir).toBe(await fs.realpath(workDir))
-    expect(git(workDir, 'branch', '--show-current')).toBe('feature/rail\n')
-    expect(await fs.readFile(path.join(workDir, 'README.md'), 'utf-8'))
-      .toContain('local-pricing-edit')
+    expect(git(workDir, 'branch', '--show-current')).toBe('main\n')
   })
 
   it('should plan isolated worktrees from dirty source checkouts without switching branches', async () => {
@@ -1847,6 +1973,25 @@ describe('Sessions API', () => {
     expect(body.sessionId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     )
+  })
+
+  it('POST /api/sessions should record the runtime it is given and reject an empty one', async () => {
+    const workDir = await fs.mkdtemp(path.join(tmpDir, 'api-session-runtime-'))
+    const res = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir, runtime: { providerId: 'provider-a', modelId: 'model-a', effort: 'bogus' } }),
+    })
+    expect(res.status).toBe(201)
+    const { sessionId } = (await res.json()) as { sessionId: string }
+    expect((await service.getSessionRestoreInfo(sessionId))?.runtime).toEqual({ providerId: 'provider-a', modelId: 'model-a' })
+
+    const invalid = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir, runtime: { modelId: '' } }),
+    })
+    expect(invalid.status).toBe(400)
   })
 
   it('POST /api/sessions should create a session when workDir is omitted', async () => {
@@ -2972,7 +3117,7 @@ describe('Sessions API', () => {
     ])
   })
 
-  it('POST /api/sessions/:id/branch should start the fork in the source session\'s permission mode', async () => {
+  it('POST /api/sessions/:id/branch should start the fork in the source session\'s permission mode and model', async () => {
     const sessionId = '55555555-5555-4555-8555-555555555555'
     const workDir = path.join(tmpDir, 'branch-mode-workdir')
     const userId = crypto.randomUUID()
@@ -2983,6 +3128,7 @@ describe('Sessions API', () => {
       { ...makeUserEntry('prompt', userId), cwd: workDir, sessionId },
       { ...makeAssistantEntry('reply', userId), uuid: assistantId, cwd: workDir, sessionId },
       { type: 'permission-mode', permissionMode: 'plan', sessionId },
+      { type: 'runtime-config', runtime: { providerId: 'provider-a', modelId: 'model-a' }, sessionId },
     ])
 
     const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/branch`, {
@@ -2994,6 +3140,7 @@ describe('Sessions API', () => {
 
     const body = await res.json() as { sessionId: string }
     expect(await service.getSessionPermissionMode(body.sessionId)).toBe('plan')
+    expect((await service.getSessionRestoreInfo(body.sessionId))?.runtime).toEqual({ providerId: 'provider-a', modelId: 'model-a' })
   })
 
   it('POST /api/sessions/:id/branch should reject sidechain targets', async () => {

@@ -518,7 +518,7 @@ describe('Models API', () => {
     expect(res.status).toBe(400)
   })
 
-  it('GET /api/models/current should prefer dreamcoder managed model over global user model when provider is active', async () => {
+  it('GET /api/models/current should use the active provider main model over stale saved model keys', async () => {
     const settingsSvc = new SettingsService()
     await settingsSvc.updateUserSettings({ model: 'kimi-k2.6' })
 
@@ -537,17 +537,25 @@ describe('Models API', () => {
       },
     })
     await providerSvc.activateProvider(provider.id)
-    await providerSvc.updateManagedSettings({ model: 'glm-5-turbo' })
+    await providerSvc.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
 
     const { req, url, segments } = makeRequest('GET', '/api/models/current')
     const res = await handleModelsApi(req, url, segments)
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.model.id).toBe('glm-5-turbo')
+    expect(body.model.id).toBe('glm-5.1')
+    expect(body.model.context).toBe('')
+
+    await providerSvc.updateProvider(provider.id, {
+      models: { main: 'glm-5-turbo', haiku: 'glm-4.5-air', sonnet: 'glm-5-turbo', opus: 'glm-5.1' },
+    })
+    const after = makeRequest('GET', '/api/models/current')
+    const afterBody = await (await handleModelsApi(after.req, after.url, after.segments)).json()
+    expect(afterBody.model.id).toBe('glm-5-turbo')
   })
 
-  it('PUT /api/models/current should persist to dreamcoder managed settings when provider is active', async () => {
+  it('PUT /api/models/current should not write a global model key when provider is active', async () => {
     const settingsSvc = new SettingsService()
     const providerSvc = new ProviderService()
     const provider = await providerSvc.addProvider({
@@ -572,8 +580,8 @@ describe('Models API', () => {
     expect(putRes.status).toBe(200)
 
     const managedSettings = await providerSvc.getManagedSettings()
-    expect(managedSettings.model).toBe('glm-5-turbo')
-    expect((managedSettings.env as Record<string, string>).CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
+    expect(managedSettings.model).toBeUndefined()
+    expect(managedSettings.modelContext).toBeUndefined()
 
     const globalSettings = await settingsSvc.getUserSettings()
     expect(globalSettings.model).toBeUndefined()

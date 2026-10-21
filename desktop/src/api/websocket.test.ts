@@ -103,7 +103,7 @@ describe('wsManager reconnect buffering', () => {
     clientMocks.authToken = 'h5 token/with?chars'
 
     expect(buildSessionWebSocketUrl('session-reconnect')).toBe(
-      'ws://10.0.0.2:3456/ws/session-reconnect?token=h5+token%2Fwith%3Fchars',
+      'ws://10.0.0.2:3456/ws/session-reconnect?token=h5+token%2Fwith%3Fchars&client=h5',
     )
   })
 
@@ -111,7 +111,7 @@ describe('wsManager reconnect buffering', () => {
     clientMocks.baseUrl = 'https://remote.example.com'
 
     expect(buildSessionWebSocketUrl('secure-session')).toBe(
-      'wss://remote.example.com/ws/secure-session',
+      'wss://remote.example.com/ws/secure-session?client=h5',
     )
   })
 
@@ -119,7 +119,18 @@ describe('wsManager reconnect buffering', () => {
     clientMocks.baseUrl = 'https://public.example.com/app'
 
     expect(buildSessionWebSocketUrl('s1')).toBe(
-      'wss://public.example.com/app/ws/s1',
+      'wss://public.example.com/app/ws/s1?client=h5',
     )
+  })
+
+  it('leaves the client kind off inside the desktop app', () => {
+    clientMocks.baseUrl = 'http://127.0.0.1:3456'
+    clientMocks.authToken = null
+    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
+    try {
+      expect(buildSessionWebSocketUrl('desktop-session')).toBe('ws://127.0.0.1:3456/ws/desktop-session')
+    } finally {
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+    }
   })
 })

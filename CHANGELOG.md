@@ -14,11 +14,26 @@ All notable changes to DreamCoder will be documented in this file.
   - Settings → Permissions now sets only the default for new sessions, which the selector marks with a "default" tag. A forked session starts in the mode of the session it came from.
   - "Default" is renamed "Manual". The Chinese interface uses the English mode names too.
 - **Scheduled tasks run in the permission mode chosen for them.** A new task starts with the default for new sessions, and the mode can be changed in the task.
+- **A session looks the same in every window.** The server now keeps each session's state in one place, and every desktop window and phone browser connected to the session sees the same mode, model, title, running status and permission requests.
+  - A permission request answered on one device closes on the others, which say it was allowed or denied elsewhere. A second answer is ignored.
+  - Messages typed on one device show up on the others, and refreshing during a reply no longer loses or duplicates history.
+  - Switching the mode or model while a reply is running waits until the reply ends instead of restarting the CLI mid-reply. The permission selector shows the new mode at once, with a dot that means it takes effect after this reply finishes; switching back before then removes the dot. Opening a session no longer restarts it.
+- **Each session keeps its own model.** The model and effort are saved in the session's transcript, so they survive a restart and are the same on every device. A fork starts with the model of its source. A choice saved on this device by an earlier version moves to the session the first time it is opened.
+- A session that moved into a worktree no longer splits into two files. Its title, mode and worktree survive `/clear`, and a rename is no longer undone when the CLI exits.
+- Agent team updates go only to the sessions of that team.
+- **The worktree choice for a new session is in the branch menu.** "Run in a new worktree" is a switch at the bottom of the branch menu, and the branch button shows a fork icon when it is on. The separate worktree button is gone, so the controls under the input fit on one row, as they do in an existing session.
+- **Starting on another branch is refused when the current checkout has uncommitted changes.** Before, DreamCoder switched the branch and Git carried the changes over. Now the error appears next to the project controls, with a button to run in a new worktree instead.
+- Groups of tool calls, such as "Read 3 files", are collapsed by default, also while they run. A group with a failed call opens by itself.
 
 ### Removed
 
 - "Don't ask" is no longer offered as the default for new sessions; a session can still be in "Don't ask" when the CLI switches to it.
 - Unused design mockup pages and their mock data.
+
+### Fixed
+
+- New sessions start on the active provider's main model. Before, activating a provider saved its main model in a hidden setting, and that saved value kept overriding the provider after its main model was edited.
+- The selected model card in the dark theme had light pink colors with text that was hard to read.
 
 ## [0.6.1] — 2026-10-21
 

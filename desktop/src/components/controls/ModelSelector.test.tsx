@@ -8,6 +8,7 @@ import { useProviderStore } from '../../stores/providerStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { ModelInfo } from '../../types/settings'
+import type { RuntimeSelection } from '../../types/runtime'
 
 const MODELS: ModelInfo[] = [
   { id: 'alpha', name: 'Alpha', description: 'Fast model', context: '128k' },
@@ -19,6 +20,33 @@ async function clickByRole(name: RegExp | string) {
     fireEvent.click(screen.getByRole('button', { name }))
     await Promise.resolve()
   })
+}
+
+function mirrorRuntime(sessionId: string, selection: RuntimeSelection) {
+  useChatStore.setState((state) => ({
+    sessions: {
+      ...state.sessions,
+      [sessionId]: {
+        ...state.getSession(sessionId),
+        mirror: {
+          id: sessionId,
+          version: 1,
+          permission: { desired: 'default', effective: 'default' },
+          runtime: { desired: selection, effective: null },
+          title: { text: null, source: null },
+          workspace: { workDir: '/workspace/project', projectRoot: null, workDirExists: true },
+          process: { phase: 'running', generation: 1 },
+          turn: { phase: 'idle' },
+          pendingPermissions: [],
+          slashCommands: [],
+          activeGoal: null,
+          backgroundTasks: [],
+          team: null,
+          clientCount: 1,
+        },
+      },
+    },
+  }))
 }
 
 afterEach(() => {
@@ -111,10 +139,7 @@ describe('ModelSelector', () => {
       await Promise.resolve()
     })
 
-    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
-      providerId: 'provider-a',
-      modelId: 'provider-fast',
-    })
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toBeUndefined()
     expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
       providerId: 'provider-a',
       modelId: 'provider-fast',
@@ -122,7 +147,9 @@ describe('ModelSelector', () => {
   })
 
   it('sets the effort per session from the composer menu and shows it in the trigger', async () => {
-    const setSessionRuntime = vi.fn()
+    const setSessionRuntime = vi.fn((sessionId: string, selection: RuntimeSelection) => {
+      mirrorRuntime(sessionId, selection)
+    })
     const setEffort = vi.fn(async () => {})
     useSettingsStore.setState({
       locale: 'en',
@@ -162,13 +189,7 @@ describe('ModelSelector', () => {
     await clickByRole(/^High$/)
 
     expect(setEffort).not.toHaveBeenCalled()
-    // No model was chosen for this session, so only the effort is pinned and
-    // the session keeps following the default provider and model.
-    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
-      providerId: null,
-      modelId: '',
-      effort: 'high',
-    })
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toBeUndefined()
     expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
       providerId: null,
       modelId: '',
@@ -205,7 +226,7 @@ describe('ModelSelector', () => {
     useChatStore.setState({
       setSessionRuntime,
     } as Partial<ReturnType<typeof useChatStore.getState>>)
-    useSessionRuntimeStore.getState().setSelection('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
+    mirrorRuntime('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
 
     render(<ModelSelector runtimeKey="session-2" />)
     await clickByRole('provider-fast · Medium')

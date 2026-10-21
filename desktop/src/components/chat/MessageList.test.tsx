@@ -875,6 +875,8 @@ describe('MessageList nested tool calls', () => {
     const groupSummary = screen.getByText('TaskUpdate (1), ran a command')
     const groupButton = groupSummary.closest('button')
     expect(groupButton?.textContent).not.toContain('check_circle')
+    expect(groupButton?.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(groupButton!)
     expect(screen.getByText('local_bash')).toBeTruthy()
   })
 

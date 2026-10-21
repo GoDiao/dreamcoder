@@ -2014,6 +2014,7 @@ export const MessageBlock = memo(function MessageBlock({
           toolName={message.toolName}
           input={message.input}
           description={message.description}
+          resolution={message.resolution}
         />
       )
     case 'error': {

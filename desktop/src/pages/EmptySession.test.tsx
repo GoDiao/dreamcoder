@@ -478,6 +478,7 @@ describe('EmptySession', () => {
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'draft question',
       attachments: [],
     })
@@ -508,7 +509,7 @@ describe('EmptySession', () => {
     useSettingsStore.setState({ permissionMode, setPermissionMode })
   })
 
-  it('stores and replays a draft runtime only when the user explicitly selected one', async () => {
+  it('creates the session with the draft runtime only when the user explicitly selected one', async () => {
     useSessionRuntimeStore.getState().setSelection('__draft__', {
       providerId: 'provider-explicit',
       modelId: 'model-explicit',
@@ -523,25 +524,14 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
+      expect(mocks.createSession).toHaveBeenCalledWith({
+        permissionMode: 'default',
+        runtime: { providerId: 'provider-explicit', modelId: 'model-explicit' },
+      })
     })
 
-    expect(useSessionRuntimeStore.getState().selections['draft-session']).toEqual({
-      providerId: 'provider-explicit',
-      modelId: 'model-explicit',
-    })
-    expect(useSessionRuntimeStore.getState().selections['__draft__']).toBeUndefined()
-    expect(mocks.wsSend.mock.calls.slice(0, 2)).toEqual([
-      [
-        'draft-session',
-        {
-          type: 'set_runtime_config',
-          providerId: 'provider-explicit',
-          modelId: 'model-explicit',
-        },
-      ],
-      ['draft-session', { type: 'prewarm_session' }],
-    ])
+    expect(useSessionRuntimeStore.getState().selections).toEqual({})
+    expect(mocks.wsSend).not.toHaveBeenCalledWith('draft-session', expect.objectContaining({ type: 'set_runtime_config' }))
   })
 
   it('uses native desktop file paths for draft attachments', async () => {
@@ -569,6 +559,7 @@ describe('EmptySession', () => {
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'check these files',
       attachments: [
         expect.objectContaining({
@@ -621,6 +612,7 @@ describe('EmptySession', () => {
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'use this context',
       attachments: [
         expect.objectContaining({
@@ -685,7 +677,7 @@ describe('EmptySession', () => {
 
     expect(screen.queryByText('Current project is not a Git repository.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Select branch:/ })).not.toBeInTheDocument()
-    expect(screen.queryByText('Current worktree')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run in a new worktree')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
@@ -718,9 +710,9 @@ describe('EmptySession', () => {
 
     const notice = await screen.findByTestId('repo-launch-notice-launch-dirty')
     expect(notice).toHaveTextContent(
-      'Current project has uncommitted changes. Direct branch switching was blocked; enable "Isolated worktree" or commit/stash your changes first.',
+      'Current project has uncommitted changes. Direct branch switching was blocked; turn on "Run in a new worktree" in the branch menu, or commit/stash your changes first.',
     )
-    expect(screen.getByRole('button', { name: 'Use isolated worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use a new worktree' })).toBeInTheDocument()
     expect(screen.getByRole('textbox')).toHaveValue('draft question')
     expect(useTabStore.getState().activeTabId).toBeNull()
   })
@@ -875,14 +867,16 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
 
     await waitFor(() => {
-      expect(screen.getByText('main')).toBeInTheDocument()
-      expect(screen.getByText('Current worktree')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Select branch: main' })).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Selected branch is already checked out in another worktree. Direct launch may be blocked by Git; use "Isolated worktree" to avoid changing directories.')).toBeInTheDocument()
+    expect(screen.getByText('Selected branch is already checked out in another worktree. Direct launch may be blocked by Git; run in a new worktree to avoid changing directories.')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Select worktree mode: Current worktree/ }))
-    expect(await screen.findByRole('option', { name: 'Current worktree' })).not.toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Select branch: main' }))
+    const worktreeSwitch = await screen.findByRole('switch', { name: 'Run in a new worktree' })
+    expect(worktreeSwitch).not.toBeDisabled()
+    expect(worktreeSwitch).toHaveAttribute('aria-checked', 'false')
+    fireEvent.keyDown(document, { key: 'Escape' })
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 

@@ -4,7 +4,8 @@ import { sessionsApi } from '../api/sessions'
 import { useTeamStore } from './teamStore'
 import { useSessionStore } from './sessionStore'
 import { useCLITaskStore } from './cliTaskStore'
-import { useSessionRuntimeStore } from './sessionRuntimeStore'
+import { isEffortLevel, useSessionRuntimeStore } from './sessionRuntimeStore'
+import { randomUUID } from '../lib/uuid'
 import { useTabStore } from './tabStore'
 import { randomSpinnerVerb } from '../config/spinnerVerbs'
 import { notifyDesktop } from '../lib/desktopNotifications'
@@ -22,7 +23,9 @@ import type {
   ChatState,
   UIAttachment,
   UIMessage,
+  PermissionResolution,
   ServerMessage,
+  SessionState,
   TokenUsage,
 } from '../types/chat'
 
@@ -80,6 +83,7 @@ export type PerSessionState = {
   composerInsertion?: ComposerReferenceInsertion | null
   composerDraft?: ComposerDraftState | null
   permissionMode?: PermissionMode
+  mirror?: SessionState | null
 }
 
 const DEFAULT_SESSION_STATE: PerSessionState = {
@@ -463,136 +467,94 @@ function isAgentBackgroundTask(task: Pick<BackgroundAgentTask, 'taskType' | 'sum
   )
 }
 
-function mergeRestoredTerminalGoalEvents(
-  messages: UIMessage[],
-  restoredMessages: UIMessage[],
-): UIMessage[] {
-  const existingKeys = new Set(messages
-    .filter((message): message is Extract<UIMessage, { type: 'goal_event' }> =>
-      message.type === 'goal_event')
-    .map((message) => `${message.action}:${message.message ?? ''}:${message.objective ?? ''}`))
+type HistoryKey = string
 
-  const missingTerminalEvents = restoredMessages.filter((
-    message,
-  ): message is Extract<UIMessage, { type: 'goal_event' }> =>
-    message.type === 'goal_event' &&
-    (message.action === 'completed' || message.action === 'cleared') &&
-    !existingKeys.has(`${message.action}:${message.message ?? ''}:${message.objective ?? ''}`))
-
-  return missingTerminalEvents.length > 0
-    ? [...messages, ...missingTerminalEvents]
-    : messages
-}
-
-function mergeRestoredTranscriptMessageIds(
-  messages: UIMessage[],
-  restoredMessages: UIMessage[],
-): UIMessage[] {
-  const restoredCandidates = restoredMessages.filter((
-    message,
-  ): message is Extract<UIMessage, { type: 'user_text' | 'assistant_text' }> =>
-    (message.type === 'user_text' || message.type === 'assistant_text') &&
-    typeof message.transcriptMessageId === 'string' &&
-    message.transcriptMessageId.length > 0)
-
-  if (restoredCandidates.length === 0) return messages
-
-  let restoredCursor = 0
-  let changed = false
-  const merged = messages.map((message) => {
-    if (
-      (message.type !== 'user_text' && message.type !== 'assistant_text') ||
-      message.transcriptMessageId
-    ) {
-      return message
-    }
-
-    const matchIndex = restoredCandidates.findIndex((candidate, index) =>
-      index >= restoredCursor &&
-      candidate.type === message.type &&
-      candidate.content.trim() === message.content.trim())
-
-    if (matchIndex === -1) return message
-
-    restoredCursor = matchIndex + 1
-    changed = true
-    return {
-      ...message,
-      transcriptMessageId: restoredCandidates[matchIndex]!.transcriptMessageId,
-    }
-  })
-
-  return changed ? merged : messages
-}
-
-function dropDuplicateTranscriptTextMessages(messages: UIMessage[]): UIMessage[] {
-  const seen = new Set<string>()
-  const deduped: UIMessage[] = []
-  let changed = false
-
-  for (const message of messages) {
-    if (
-      (message.type === 'user_text' || message.type === 'assistant_text') &&
-      message.transcriptMessageId
-    ) {
-      const key = `${message.type}:${message.transcriptMessageId}:${message.content.trim()}`
-      if (seen.has(key)) {
-        changed = true
-        continue
-      }
-      seen.add(key)
-    }
-
-    deduped.push(message)
+function historyKeys(message: UIMessage): HistoryKey[] {
+  switch (message.type) {
+    case 'user_text':
+    case 'assistant_text':
+      return message.transcriptMessageId ? [`${message.type}:${message.transcriptMessageId}`] : []
+    case 'tool_use':
+      return message.toolUseId ? [`tool_use:${message.toolUseId}`] : []
+    case 'tool_result':
+      return message.toolUseId ? [`tool_result:${message.toolUseId}`] : []
+    case 'permission_request':
+      return [`permission_request:${message.requestId}`]
+    default:
+      return [`id:${message.id}`]
   }
-
-  return changed ? deduped : messages
 }
 
-function mergeRestoredHistoryIntoLiveMessages(
-  messages: UIMessage[],
-  restoredMessages: UIMessage[],
-): UIMessage[] {
-  return mergeRestoredTerminalGoalEvents(
-    dropDuplicateTranscriptTextMessages(
-      mergeRestoredTranscriptMessageIds(messages, restoredMessages),
-    ),
-    restoredMessages,
-  )
+function mergeHistoryWithLiveMessages(history: UIMessage[], live: UIMessage[]): UIMessage[] {
+  const known = new Set(history.flatMap(historyKeys))
+  const additions = live.filter((message) => {
+    const keys = historyKeys(message)
+    if (keys.some((key) => known.has(key))) return false
+    for (const key of keys) known.add(key)
+    return true
+  })
+  return additions.length > 0 ? [...history, ...additions] : history
 }
 
-function needsTranscriptIdHydrationRetry(session: PerSessionState | undefined): boolean {
-  if (!session || session.chatState !== 'idle') return false
+const liveStartBySession = new Map<string, number>()
 
-  let currentTurnHasHydratedUser = false
-  for (const message of session.messages) {
-    if (message.type === 'user_text') {
-      currentTurnHasHydratedUser = Boolean(message.transcriptMessageId)
-      continue
+function tagLatestAssistantText(messages: UIMessage[], pendingText: string, id: string, timestamp: number): UIMessage[] {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!
+    if (message.type === 'user_text') break
+    if (message.type === 'assistant_text' && message.transcriptMessageId === id) {
+      if (!pendingText) return messages
+      const next = [...messages]
+      next[index] = { ...message, content: message.content + pendingText }
+      return next
     }
-    if (
-      currentTurnHasHydratedUser &&
-      message.type === 'assistant_text' &&
-      !message.transcriptMessageId
-    ) {
-      return true
+    if (message.type === 'assistant_text' && !message.transcriptMessageId) {
+      const next = [...messages]
+      next[index] = { ...message, content: message.content + pendingText, transcriptMessageId: id }
+      return next
     }
   }
-
-  return false
+  if (!pendingText.trim()) return messages
+  return appendMessage(messages, { id: nextId(), type: 'assistant_text', content: pendingText, timestamp, transcriptMessageId: id })
 }
 
-function refreshCompletedTranscriptHistory(
-  get: () => ChatStore,
-  sessionId: string,
-): void {
-  void get().loadHistory(sessionId).then(() => {
-    if (!needsTranscriptIdHydrationRetry(get().sessions[sessionId])) return
-    setTimeout(() => {
-      if (!needsTranscriptIdHydrationRetry(get().sessions[sessionId])) return
-      void get().loadHistory(sessionId)
-    }, 750)
-  })
+function displayedPermissionMode(state: SessionState): PermissionMode {
+  return state.permission.desired as PermissionMode
+}
+
+function chatStateFromMirror(state: SessionState): ChatState {
+  if (state.turn.phase === 'idle') return 'idle'
+  if (state.turn.phase === 'awaiting_permission') return 'permission_pending'
+  switch (state.turn.activity) {
+    case 'streaming':
+      return 'streaming'
+    case 'tool':
+      return 'tool_executing'
+    case 'compacting':
+      return 'compacting'
+    default:
+      return 'thinking'
+  }
+}
+
+function specialStatusVerb(state: SessionState | null | undefined): string {
+  if (!state) return ''
+  if (state.process.detail === 'creating_worktree') return 'Creating worktree'
+  if (state.turn.phase !== 'idle' && state.turn.activity === 'compacting') return 'Compacting conversation'
+  if (state.turn.phase !== 'idle' && state.turn.activity === 'tool') return backgroundTaskVerb(state)
+  return ''
+}
+
+function backgroundTaskVerb(state: SessionState): string {
+  const startedAt = state.turn.phase === 'idle' ? undefined : state.turn.startedAt
+  let latest: SessionState['backgroundTasks'][number] | undefined
+  for (const task of state.backgroundTasks) {
+    if (task.status !== 'running') continue
+    if (startedAt !== undefined && task.updatedAt < startedAt) continue
+    if (!latest || task.updatedAt >= latest.updatedAt) latest = task
+  }
+  if (!latest) return ''
+  return latest.description || latest.summary || 'Task in progress'
 }
 
 function normalizeNotificationPreview(content: string): string {
@@ -621,6 +583,30 @@ function buildAgentCompletionNotification(
     body: preview.slice(0, AGENT_COMPLETION_NOTIFICATION_PREVIEW_CHARS) + suffix,
     dedupeKey: `agent-completion:${sessionId}:${lastAssistant?.id ?? Date.now()}`,
   }
+}
+
+const SILENT_PERMISSION_ERROR_CODES = new Set(['PERMISSION_ALREADY_RESOLVED', 'PERMISSION_REQUEST_EXPIRED'])
+
+function hasPermissionRequestMessage(messages: UIMessage[], requestId: string): boolean {
+  return messages.some((message) => message.type === 'permission_request' && message.requestId === requestId)
+}
+
+function resolvePermissionRequestMessage(
+  messages: UIMessage[],
+  requestId: string,
+  resolution: PermissionResolution,
+  authoritative = false,
+): UIMessage[] {
+  let changed = false
+  const next = messages.map((message) => {
+    if (message.type !== 'permission_request' || message.requestId !== requestId) return message
+    if (message.resolution && (!authoritative || message.resolution.outcome === resolution.outcome)) {
+      return message
+    }
+    changed = true
+    return { ...message, resolution }
+  })
+  return changed ? next : messages
 }
 
 function updateSessionIn(
@@ -684,6 +670,33 @@ async function fetchAndMapSessionHistory(sessionId: string) {
   }
 }
 
+const prewarmPending = new Set<string>()
+const reconnectingSessions = new Set<string>()
+const reloadAtTurnEnd = new Set<string>()
+
+function reloadHistoryFromHere(sessionId: string) {
+  liveStartBySession.set(sessionId, useChatStore.getState().sessions[sessionId]?.messages.length ?? 0)
+  void useChatStore.getState().loadHistory(sessionId)
+}
+
+function migrateLocalRuntimeSelection(sessionId: string, state: SessionState) {
+  const runtimeStore = useSessionRuntimeStore.getState()
+  const local = runtimeStore.selections[sessionId]
+  if (!local) return
+  runtimeStore.clearSelection(sessionId)
+  if (state.runtime.desired === null) wsManager.send(sessionId, runtimeConfigMessage(local))
+}
+
+export function sessionRuntimeSelection(session: PerSessionState | undefined): RuntimeSelection | undefined {
+  const desired = session?.mirror?.runtime.desired
+  if (!desired) return undefined
+  return {
+    providerId: desired.providerId,
+    modelId: desired.modelId,
+    ...(isEffortLevel(desired.effort) ? { effort: desired.effort } : {}),
+  }
+}
+
 function runtimeConfigMessage(selection: RuntimeSelection) {
   return {
     type: 'set_runtime_config' as const,
@@ -714,9 +727,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           activeGoal: existing?.activeGoal ?? null,
           composerDraft: existing?.composerDraft ?? null,
           permissionMode: existing?.permissionMode,
+          mirror: null,
         },
       },
     }))
+    liveStartBySession.set(sessionId, existing?.messages.length ?? 0)
 
     wsManager.clearHandlers(sessionId)
     wsManager.connect(sessionId)
@@ -727,13 +742,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       get().handleServerMessage(sessionId, msg)
     })
 
-    const runtimeSelection = useSessionRuntimeStore.getState().selections[sessionId]
-    if (runtimeSelection) {
-      wsManager.send(sessionId, runtimeConfigMessage(runtimeSelection))
-    }
-    if (!sessionId.startsWith('__') && !useTeamStore.getState().getMemberBySessionId(sessionId)) {
-      wsManager.send(sessionId, { type: 'prewarm_session' })
-    }
+    prewarmPending.add(sessionId)
 
     get().loadHistory(sessionId)
     console.log('[mem] connectToSession:loadHistory-called')
@@ -751,6 +760,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   disconnectSession: (sessionId) => {
+    prewarmPending.delete(sessionId)
+    reconnectingSessions.delete(sessionId)
+    reloadAtTurnEnd.delete(sessionId)
     const session = get().sessions[sessionId]
     if (session?.elapsedTimer) clearInterval(session.elapsedTimer)
     if (pendingDeltaBySession.has(sessionId)) {
@@ -802,6 +814,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       updateOptimisticSessionTitle(sessionId, userFacingContent)
     }
 
+    const messageId = isMemberSession ? undefined : randomUUID()
+
     set((s) => {
       const session = s.sessions[sessionId] ?? createDefaultSessionState()
       const bufferedDelta = consumePendingDelta(sessionId)
@@ -823,6 +837,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         type: 'user_text',
         content: userFacingContent,
         ...(userFacingContent !== modelFacingContent ? { modelContent: modelFacingContent } : {}),
+        ...(messageId ? { transcriptMessageId: messageId } : {}),
         attachments: isMemberSession ? undefined : uiAttachments,
         timestamp: Date.now(),
         ...(isMemberSession ? { pending: true } : {}),
@@ -876,7 +891,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return
     }
 
-    wsManager.send(sessionId, { type: 'user_message', content, attachments })
+    wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId })
   },
 
   respondToPermission: (sessionId, requestId, allowed, options) => {
@@ -887,7 +902,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       ...(options?.rule ? { rule: options.rule } : {}),
       ...(options?.updatedInput ? { updatedInput: options.updatedInput } : {}),
     })
-    set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({ pendingPermission: null, chatState: allowed ? 'tool_executing' : 'idle' })) }))
+    set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, (session) => ({
+      pendingPermission: null,
+      chatState: allowed ? 'tool_executing' : 'idle',
+      messages: resolvePermissionRequestMessage(session.messages, requestId, {
+        outcome: allowed ? 'allowed' : 'denied',
+        remote: false,
+      }),
+    })) }))
   },
 
   setSessionRuntime: (sessionId, selection) => {
@@ -936,6 +958,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         lastTodos,
         hasMessagesAfterTaskCompletion,
       } = await fetchAndMapSessionHistory(sessionId)
+      const liveStart = liveStartBySession.get(sessionId) ?? 0
+      liveStartBySession.delete(sessionId)
       set((state) => {
         const session = state.sessions[sessionId]
         if (!session) return state
@@ -947,9 +971,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               s.backgroundAgentTasks ?? {},
               restoredBackgroundTasks,
             ),
-            messages: mergeRestoredHistoryIntoLiveMessages(
-              mergeBackgroundTaskMessages(s.messages, restoredBackgroundTasks),
-              uiMessages,
+            messages: mergeBackgroundTaskMessages(
+              mergeHistoryWithLiveMessages(uiMessages, s.messages.slice(liveStart)),
+              restoredBackgroundTasks,
             ),
           })) }
         }
@@ -1097,55 +1121,65 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     switch (msg.type) {
       case 'connected':
+        if (get().sessions[sessionId]?.mirror) {
+          update(() => ({ mirror: null }))
+          reconnectingSessions.add(sessionId)
+        }
         break
 
-      case 'status':
-        update((session) => {
-          const pendingText = `${session.streamingText}${consumePendingDelta(sessionId)}`
-          const hasPendingStreamText =
-            session.chatState === 'streaming' && pendingText.trim().length > 0
-          const preserveStreamingTurn = hasPendingStreamText && msg.state !== 'idle' && msg.state !== 'compacting'
-          const shouldFlush = hasPendingStreamText && (msg.state === 'idle' || msg.state === 'compacting')
-          let nextMessages = session.messages
-          if (shouldFlush) {
-            nextMessages = appendAssistantTextMessage(nextMessages, pendingText, Date.now())
-          }
-          if (msg.state === 'compacting') {
-            nextMessages = appendOrUpdateTailCompactSummary(
-              nextMessages,
-              {
-                title: 'Context compacted',
-                phase: 'compacting',
-              },
-              Date.now(),
-            )
-          } else {
-            nextMessages = dropTailCompactingCompactSummary(nextMessages)
-          }
+      case 'session_snapshot':
+        applyMirror(sessionId, msg.state)
+        if (reconnectingSessions.delete(sessionId)) reloadHistoryFromHere(sessionId)
+        if (msg.state.turn.phase !== 'idle') reloadAtTurnEnd.add(sessionId)
+        migrateLocalRuntimeSelection(sessionId, msg.state)
+        if (prewarmPending.delete(sessionId) && !sessionId.startsWith('__') && !useTeamStore.getState().getMemberBySessionId(sessionId)) {
+          wsManager.send(sessionId, { type: 'prewarm_session' })
+        }
+        break
+
+      case 'session_patch': {
+        const mirror = get().sessions[sessionId]?.mirror
+        if (!mirror || msg.version <= mirror.version) break
+        if (msg.version !== mirror.version + 1) {
+          wsManager.send(sessionId, { type: 'request_snapshot' })
+          break
+        }
+        applyMirror(sessionId, { ...mirror, ...msg.changes, version: msg.version })
+        if (mirror.turn.phase !== 'idle' && msg.changes.turn?.phase === 'idle' && reloadAtTurnEnd.delete(sessionId)) {
+          reloadHistoryFromHere(sessionId)
+        }
+        break
+      }
+
+      case 'user_message': {
+        const session = get().sessions[sessionId]
+        if (!session) break
+        if (session.messages.some((message) => message.type === 'user_text' && message.transcriptMessageId === msg.id)) break
+        update((s) => {
+          const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
+          const base = pendingText.trim() ? appendAssistantTextMessage(s.messages, pendingText, Date.now()) : s.messages
           return {
-            chatState: preserveStreamingTurn ? 'streaming' : msg.state,
-            statusVerb: msg.state === 'idle'
-              ? ''
-              : msg.verb && msg.verb !== 'Thinking'
-                ? msg.verb
-                : '',
-            ...(msg.tokens ? { tokenUsage: { ...session.tokenUsage, output_tokens: msg.tokens } } : {}),
-            ...(msg.state === 'idle' ? { activeThinkingId: null } : {}),
-            ...(msg.state === 'idle' ? { apiRetry: null } : {}),
-            ...(nextMessages !== session.messages ? { messages: nextMessages } : {}),
-            ...(shouldFlush ? {
-              streamingText: '',
-            } : pendingText !== session.streamingText ? { streamingText: pendingText } : {}),
+            streamingText: '',
+            messages: appendMessage(base, {
+              id: nextId(),
+              type: 'user_text',
+              content: msg.content,
+              transcriptMessageId: msg.id,
+              timestamp: Date.now(),
+            }),
           }
         })
-        if (msg.state === 'idle') {
-          const session = get().sessions[sessionId]
-          if (session?.elapsedTimer) {
-            clearInterval(session.elapsedTimer)
-            update(() => ({ elapsedTimer: null }))
+        break
+      }
+
+      case 'message_id':
+        update((s) => {
+          const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
+          return {
+            streamingText: '',
+            messages: tagLatestAssistantText(s.messages, pendingText, msg.id, Date.now()),
           }
-        }
-        useTabStore.getState().updateTabStatus(sessionId, msg.state === 'idle' ? 'idle' : 'running')
+        })
         break
 
       case 'content_start': {
@@ -1356,43 +1390,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         break
       }
 
-      case 'permission_request':
-        notifyDesktop({
-          dedupeKey: `permission:${msg.requestId}`,
-          cooldownScope: 'permission-prompt',
-          requestAttention: true,
-          title: t('notifications.permissionPrompt.title'),
-          body: msg.toolName
-            ? t('notifications.permissionPrompt.toolBody', { toolName: msg.toolName })
-            : t('notifications.permissionPrompt.toolBody', { toolName: 'A tool' }),
-          target: { type: 'session', sessionId },
-        })
-        update((s) => ({
-          pendingPermission: {
-            requestId: msg.requestId,
-            toolName: msg.toolName,
-            toolUseId: msg.toolUseId,
-            input: msg.input,
-            description: msg.description,
-          },
-          chatState: 'permission_pending',
-          activeThinkingId: null,
-          apiRetry: null,
-          messages:
-            msg.toolName === 'AskUserQuestion'
-              ? s.messages
-              : appendMessage(s.messages, {
-                  id: nextId(),
-                  type: 'permission_request',
-                  requestId: msg.requestId,
-                  toolName: msg.toolName,
-                  toolUseId: msg.toolUseId,
-                  input: msg.input,
-                  description: msg.description,
-                  timestamp: Date.now(),
-                }),
+      case 'permission_resolved': {
+        const resolution: PermissionResolution = { outcome: msg.allowed ? 'allowed' : 'denied', remote: true, by: msg.by }
+        update((session) => ({
+          messages: resolvePermissionRequestMessage(session.messages, msg.requestId, resolution, true),
+          ...(session.pendingPermission?.requestId === msg.requestId ? { pendingPermission: null } : {}),
         }))
         break
+      }
 
       case 'message_complete': {
         const session = get().sessions[sessionId]
@@ -1432,11 +1437,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             target: { type: 'session', sessionId },
           })
         }
-        refreshCompletedTranscriptHistory(get, sessionId)
         break
       }
 
       case 'error':
+        if (SILENT_PERMISSION_ERROR_CODES.has(msg.code)) break
         update((s) => {
           const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
           let newMessages = s.messages
@@ -1475,13 +1480,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         useTeamStore.getState().handleTeamDeleted(msg.teamName)
         break
       case 'task_update':
-        break
-      case 'permission_mode':
-        update(() => ({ permissionMode: msg.mode }))
-        break
-      case 'session_title_updated':
-        useSessionStore.getState().updateSessionTitle(msg.sessionId, msg.title)
-        useTabStore.getState().updateTabTitle(msg.sessionId, msg.title)
         break
       case 'system_notification':
         if (msg.subtype === 'slash_commands' && Array.isArray(msg.data)) {
@@ -1746,4 +1744,124 @@ function buildModelContent(content: string, attachments?: AttachmentRef[]): stri
   if (paths.length === 0) return trimmed
   const prefix = paths.map((path) => `@"${path}"`).join(' ')
   return `${prefix} ${trimmed || 'Please analyze the attached files.'}`.trim()
+}
+
+function pendingPermissionFromMirror(state: SessionState): PerSessionState['pendingPermission'] {
+  const request = state.pendingPermissions[0]
+  if (!request) return null
+  return {
+    requestId: request.requestId,
+    toolName: request.toolName,
+    toolUseId: request.toolUseId,
+    input: request.input,
+    description: request.description,
+  }
+}
+
+function applyMirror(sessionId: string, next: SessionState): void {
+  const session = useChatStore.getState().sessions[sessionId]
+  if (!session) return
+  const previous = session.mirror ?? null
+  const previousRequests = new Set(previous?.pendingPermissions.map((request) => request.requestId) ?? [])
+  const nextRequests = new Set(next.pendingPermissions.map((request) => request.requestId))
+  const openedRequests = next.pendingPermissions.filter((request) => !previousRequests.has(request.requestId))
+  const closedRequestIds = [...previousRequests].filter((requestId) => !nextRequests.has(requestId))
+  const wasRunning = previous ? previous.turn.phase !== 'idle' : session.chatState !== 'idle'
+  const isRunning = next.turn.phase !== 'idle'
+  const now = Date.now()
+
+  useChatStore.setState((store) => {
+    const current = store.sessions[sessionId]
+    if (!current) return store
+    let messages = current.messages
+    let streamingText = current.streamingText
+
+    for (const request of openedRequests) {
+      if (request.toolName === 'AskUserQuestion' || hasPermissionRequestMessage(messages, request.requestId)) continue
+      messages = appendMessage(messages, {
+        id: nextId(),
+        type: 'permission_request',
+        requestId: request.requestId,
+        toolName: request.toolName,
+        toolUseId: request.toolUseId,
+        input: request.input,
+        description: request.description,
+        timestamp: now,
+      })
+    }
+    for (const requestId of closedRequestIds) {
+      messages = resolvePermissionRequestMessage(messages, requestId, { outcome: 'withdrawn', remote: true })
+    }
+
+    const enteringCompaction = next.turn.activity === 'compacting' && isRunning &&
+      !(previous?.turn.activity === 'compacting' && previous.turn.phase !== 'idle')
+    if (enteringCompaction) {
+      messages = appendOrUpdateTailCompactSummary(messages, { title: 'Context compacted', phase: 'compacting' }, now)
+    } else if (!isRunning || next.turn.activity !== 'compacting') {
+      messages = dropTailCompactingCompactSummary(messages)
+    }
+
+    let elapsedTimer = current.elapsedTimer
+    let elapsedSeconds = current.elapsedSeconds
+    if (!isRunning) {
+      const pendingText = `${streamingText}${consumePendingDelta(sessionId)}`
+      if (wasRunning && pendingText.trim()) {
+        messages = appendAssistantTextMessage(messages, pendingText, now)
+        streamingText = ''
+      } else {
+        streamingText = pendingText
+      }
+      if (elapsedTimer) clearInterval(elapsedTimer)
+      elapsedTimer = null
+    } else if (!elapsedTimer) {
+      elapsedSeconds = next.turn.startedAt ? Math.max(0, Math.floor((now - next.turn.startedAt) / 1000)) : 0
+      elapsedTimer = setInterval(() => {
+        useChatStore.setState((st) => ({
+          sessions: updateSessionIn(st.sessions, sessionId, (sess) => ({ elapsedSeconds: sess.elapsedSeconds + 1 })),
+        }))
+      }, 1000)
+    }
+
+    const previousVerb = specialStatusVerb(previous)
+    const nextVerb = specialStatusVerb(next)
+
+    return {
+      sessions: {
+        ...store.sessions,
+        [sessionId]: {
+          ...current,
+          mirror: next,
+          messages,
+          streamingText,
+          permissionMode: displayedPermissionMode(next),
+          pendingPermission: pendingPermissionFromMirror(next),
+          chatState: chatStateFromMirror(next),
+          elapsedTimer,
+          elapsedSeconds,
+          ...(nextVerb ? { statusVerb: nextVerb } : previousVerb ? { statusVerb: '' } : {}),
+          ...(!isRunning ? { activeThinkingId: null, apiRetry: null, statusVerb: nextVerb } : {}),
+        },
+      },
+    }
+  })
+
+  for (const request of openedRequests) {
+    notifyDesktop({
+      dedupeKey: `permission:${request.requestId}`,
+      cooldownScope: 'permission-prompt',
+      requestAttention: true,
+      title: t('notifications.permissionPrompt.title'),
+      body: t('notifications.permissionPrompt.toolBody', { toolName: request.toolName || 'A tool' }),
+      target: { type: 'session', sessionId },
+    })
+  }
+
+  if (wasRunning !== isRunning) {
+    useTabStore.getState().updateTabStatus(sessionId, isRunning ? 'running' : 'idle')
+  }
+
+  if (next.title.text && previous?.title.text !== next.title.text && next.title.source !== 'first-message') {
+    useSessionStore.getState().updateSessionTitle(sessionId, next.title.text)
+    useTabStore.getState().updateTabTitle(sessionId, next.title.text)
+  }
 }

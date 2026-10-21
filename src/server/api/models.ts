@@ -1,6 +1,6 @@
 import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
-import { attributionHeaderEnvForModel } from '../services/attributionHeaderPolicy.js'
+import { resolveProviderDefaultModel } from '../services/providerRuntimeEnv.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 const DEFAULT_MODELS = [
@@ -167,30 +167,21 @@ async function handleCurrentModel(req: Request): Promise<Response> {
   if (req.method === 'GET') {
     const { providers, activeId } = await providerService.listProviders()
     const activeProvider = activeId ? providers.find((p) => p.id === activeId) : null
-    const settings = activeProvider
-      ? await providerService.getManagedSettings()
-      : await settingsService.getUserSettings()
-    const explicitModel = (settings.model as string) || ''
-    const contextTier = (settings.modelContext as string) || undefined
-    const env = (settings.env as Record<string, string>) || {}
-    const envModel = process.env.ANTHROPIC_MODEL?.trim() || ''
-
     let currentModelId: string
-    let currentModelName: string
+    let contextTier: string | undefined
 
     if (activeProvider) {
-      const providerEnvModel = env.ANTHROPIC_MODEL
-      if (providerEnvModel && !explicitModel) {
-        currentModelId = providerEnvModel
-        currentModelName = providerEnvModel
-      } else {
-        currentModelId = explicitModel || providerEnvModel || activeProvider.models.main
-        currentModelName = currentModelId
-      }
+      currentModelId = resolveProviderDefaultModel(
+        activeProvider,
+        await providerService.getManagedSettings(),
+      )
     } else {
-      currentModelId = explicitModel || envModel || DEFAULT_MODEL
-      currentModelName = currentModelId
+      const settings = await settingsService.getUserSettings()
+      const envModel = process.env.ANTHROPIC_MODEL?.trim() || ''
+      currentModelId = (settings.model as string) || envModel || DEFAULT_MODEL
+      contextTier = (settings.modelContext as string) || undefined
     }
+    const currentModelName = currentModelId
 
     const lookupId = contextTier ? `${currentModelId}:${contextTier}` : currentModelId
 
@@ -217,31 +208,18 @@ async function handleCurrentModel(req: Request): Promise<Response> {
       throw ApiError.badRequest('Missing or invalid "modelId" in request body')
     }
 
+    const { activeId } = await providerService.listProviders()
+    if (activeId) {
+      return Response.json({ ok: true, model: modelId })
+    }
+
     const colonIdx = modelId.indexOf(':')
     const baseId = colonIdx !== -1 ? modelId.slice(0, colonIdx) : modelId
     const contextTier = colonIdx !== -1 ? modelId.slice(colonIdx + 1) : undefined
-
-    const updates: Record<string, unknown> = { model: baseId }
-    if (contextTier) {
-      updates.modelContext = contextTier
-    } else {
-      updates.modelContext = undefined
-    }
-    const { activeId } = await providerService.listProviders()
-    if (activeId) {
-      const currentManagedSettings = await providerService.getManagedSettings()
-      const currentEnv =
-        (currentManagedSettings.env as Record<string, string> | undefined) ?? {}
-      await providerService.updateManagedSettings({
-        ...updates,
-        env: {
-          ...currentEnv,
-          ...attributionHeaderEnvForModel(baseId),
-        },
-      })
-    } else {
-      await settingsService.updateUserSettings(updates)
-    }
+    await settingsService.updateUserSettings({
+      model: baseId,
+      modelContext: contextTier || undefined,
+    })
     return Response.json({ ok: true, model: modelId })
   }
 

@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { providersApi } from '../api/providers'
-import { useChatStore } from './chatStore'
-import { useSessionRuntimeStore } from './sessionRuntimeStore'
+import { sessionRuntimeSelection, useChatStore } from './chatStore'
 import { useSettingsStore } from './settingsStore'
 import type {
   SavedProvider,
@@ -71,7 +70,6 @@ function resolveRuntimeRefreshSelection(
 
 function refreshConnectedSessionsForProvider(provider: SavedProvider, activeId: string | null) {
   const chatStore = useChatStore.getState()
-  const runtimeStore = useSessionRuntimeStore.getState()
 
   for (const [sessionId, session] of Object.entries(chatStore.sessions)) {
     if (session.connectionState !== 'connected' || session.chatState !== 'idle') {
@@ -81,11 +79,10 @@ function refreshConnectedSessionsForProvider(provider: SavedProvider, activeId: 
     const selection = resolveRuntimeRefreshSelection(
       provider,
       activeId,
-      runtimeStore.selections[sessionId],
+      sessionRuntimeSelection(session),
     )
     if (!selection) continue
 
-    runtimeStore.setSelection(sessionId, selection)
     chatStore.setSessionRuntime(sessionId, selection)
   }
 }
@@ -132,6 +129,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     const { provider } = await providersApi.update(id, input)
     await get().fetchProviders()
     refreshConnectedSessionsForProvider(provider, get().activeId)
+    if (provider.id === get().activeId) await useSettingsStore.getState().fetchAll()
     return provider
   },
 
@@ -143,11 +141,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   activateProvider: async (id) => {
     await providersApi.activate(id)
     await get().fetchProviders()
-    const settings = useSettingsStore.getState()
-    const provider = get().providers.find((p) => p.id === id)
-    if (!provider) return
-    await settings.setModel(provider.models.main)
-    await settings.fetchAll()
+    await useSettingsStore.getState().fetchAll()
   },
 
   testProvider: async (id, overrides?) => {

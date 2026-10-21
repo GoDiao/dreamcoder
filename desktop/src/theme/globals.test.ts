@@ -91,6 +91,20 @@ describe('desktop theme tokens', () => {
     }
   })
 
+  it('gives every theme its own selected model option colors instead of the light defaults', () => {
+    const tokens = ['--color-model-option-selected-bg', '--color-model-option-selected-border']
+    const darkBlocks = normalizedCss.split('[data-theme="dark"] {').slice(1).map((rest) => rest.slice(0, rest.indexOf('\n}')))
+    for (const token of tokens) {
+      expect(darkBlocks.some((block) => block.includes(`${token}:`)), `dark should define ${token}`).toBe(true)
+    }
+    for (const theme of ['white', 'dreamfield', 'amber', 'midnight', 'aurora']) {
+      const block = normalizedCss.split(`[data-theme="${theme}"] {`)[1]!.split('\n}')[0]!
+      for (const token of tokens) {
+        expect(block, `${theme} should define ${token}`).toContain(`${token}:`)
+      }
+    }
+  })
+
   it('defines activity and status tokens for every supported theme', () => {
     for (const theme of themes) {
       const block = getThemeBlock(theme)

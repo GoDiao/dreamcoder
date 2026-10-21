@@ -255,9 +255,9 @@ export function EmptySession() {
       const sessionId = await createSession(workDir || undefined, {
         ...(selectedBranch ? { repository: { branch: selectedBranch, worktree: useWorktree } } : {}),
         permissionMode,
+        ...(explicitDraftSelection ? { runtime: explicitDraftSelection } : {}),
       })
       if (explicitDraftSelection) {
-        useSessionRuntimeStore.getState().setSelection(sessionId, explicitDraftSelection)
         useSessionRuntimeStore.getState().clearSelection(DRAFT_RUNTIME_SELECTION_KEY)
       }
       useTabStore.getState().openTab(sessionId, 'New Session')

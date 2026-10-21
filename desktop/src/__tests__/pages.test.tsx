@@ -97,6 +97,27 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useProviderStore } from '../stores/providerStore'
 import { useSessionRuntimeStore } from '../stores/sessionRuntimeStore'
 import { useTabStore } from '../stores/tabStore'
+import type { RuntimeSelection } from '../types/runtime'
+import type { SessionState } from '../types/chat'
+
+function runtimeMirror(selection: RuntimeSelection): SessionState {
+  return {
+    id: '',
+    version: 1,
+    permission: { desired: 'default', effective: 'default' },
+    runtime: { desired: selection, effective: null },
+    title: { text: null, source: null },
+    workspace: { workDir: '/workspace/project', projectRoot: null, workDirExists: true },
+    process: { phase: 'running', generation: 1 },
+    turn: { phase: 'idle' },
+    pendingPermissions: [],
+    slashCommands: [],
+    activeGoal: null,
+    backgroundTasks: [],
+    team: null,
+    clientCount: 1,
+  } satisfies SessionState
+}
 
 beforeEach(() => {
   useSettingsStore.setState({ locale: 'en' })
@@ -1070,13 +1091,10 @@ describe('Content-only pages render without errors', () => {
       isLoading: false,
       error: null,
     })
-    useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-      providerId: 'volcengine-provider',
-      modelId: 'kimi-k2.6',
-    })
     useChatStore.setState({
       sessions: {
         [SESSION_ID]: {
+          mirror: runtimeMirror({ providerId: 'volcengine-provider', modelId: 'kimi-k2.6' }),
           messages: [{ id: 'm-1', type: 'assistant_text', content: 'ready', timestamp: Date.now() }],
           chatState: 'idle',
           connectionState: 'connected',
@@ -1198,10 +1216,15 @@ describe('Content-only pages render without errors', () => {
     expect(await screen.findByLabelText('Context usage 10%')).toBeInTheDocument()
 
     act(() => {
-      useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-        providerId: 'zhipu-provider',
-        modelId: 'glm-4.5-air',
-      })
+      useChatStore.setState((state) => ({
+        sessions: {
+          ...state.sessions,
+          [SESSION_ID]: {
+            ...state.sessions[SESSION_ID]!,
+            mirror: runtimeMirror({ providerId: 'zhipu-provider', modelId: 'glm-4.5-air' }),
+          },
+        },
+      }))
     })
 
     expect(await screen.findByLabelText('Context usage 20%')).toBeInTheDocument()

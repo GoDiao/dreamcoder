@@ -358,7 +358,7 @@ describe('ChatInput file mentions', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('rows', '1')
 
     expect(await screen.findByRole('button', { name: /Select branch: main/ })).toBeInTheDocument()
-    expect(screen.getByText('Current worktree')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /worktree/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Select a project...')).not.toBeInTheDocument()
     const branchButton = screen.getByRole('button', { name: /Select branch: main/ })
     const controls = screen.getByTestId('chat-input-controls')
@@ -410,7 +410,7 @@ describe('ChatInput file mentions', () => {
     expect(await screen.findByText('repo')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Select branch:/ })).not.toBeInTheDocument()
-    expect(screen.queryByText('Current worktree')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run in a new worktree')).not.toBeInTheDocument()
   })
 
   it('names the missing working directory at the input and keeps sending disabled', async () => {
@@ -512,12 +512,14 @@ describe('ChatInput file mentions', () => {
     expect(mocks.delete).toHaveBeenCalledWith(sessionId)
     expect(mocks.wsSend).toHaveBeenCalledWith('created-direct', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'run on feature branch',
       attachments: [],
     })
   })
 
   it('starts an empty active session on the selected branch inside an isolated worktree', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
     mocks.create.mockResolvedValueOnce({
       sessionId: 'created-worktree',
       workDir: '/repo/.claude/worktrees/desktop-feature-a-12345678',
@@ -562,9 +564,10 @@ describe('ChatInput file mentions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Select branch: main/ }))
     fireEvent.click(await screen.findByRole('option', { name: /feature\/a/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Select worktree mode: Current worktree/ }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Isolated worktree' }))
-    expect(screen.getByText('Isolated worktree')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Select branch: feature/a' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Run in a new worktree' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Select branch: feature/a · Run in a new worktree' })).toBeInTheDocument()
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'run in a worktree', selectionStart: 17 } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -578,6 +581,7 @@ describe('ChatInput file mentions', () => {
     expect(mocks.delete).toHaveBeenCalledWith(sessionId)
     expect(mocks.wsSend).toHaveBeenCalledWith('created-worktree', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'run in a worktree',
       attachments: [],
     })
@@ -617,6 +621,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '记一下这个文件讲了什么东西。',
       attachments: [{
         type: 'file',
@@ -680,6 +685,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '请看 @"src/App.tsx" 实现',
       attachments: [{
         type: 'file',
@@ -733,6 +739,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '讲一下这个目录。',
       attachments: [{
         type: 'file',
@@ -783,6 +790,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: 'analyze these',
       attachments: [
         expect.objectContaining({
@@ -860,6 +868,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: 'analyze dropped file',
       attachments: [
         expect.objectContaining({
