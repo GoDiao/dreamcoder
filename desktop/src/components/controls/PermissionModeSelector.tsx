@@ -25,10 +25,11 @@ type Props = {
   workDir?: string
   compact?: boolean
   value: PermissionMode
+  effectiveValue?: PermissionMode
   onChange: (mode: PermissionMode) => void
 }
 
-export function PermissionModeSelector({ workDir: workDirProp, compact = false, value: currentMode, onChange }: Props) {
+export function PermissionModeSelector({ workDir: workDirProp, compact = false, value: currentMode, effectiveValue, onChange }: Props) {
   const t = useTranslation()
   const isMobile = useMobileViewport() && !isTauriRuntime()
   const defaultMode = useSettingsStore((s) => s.permissionMode)
@@ -183,6 +184,10 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
     </div>
   )
 
+  const pendingNote = effectiveValue && effectiveValue !== currentMode
+    ? t('permMode.pendingSwitch', { mode: MODE_LABELS[currentMode] })
+    : undefined
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -192,10 +197,17 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        title={compact ? MODE_LABELS[currentMode] : undefined}
+        title={pendingNote ?? (compact ? MODE_LABELS[currentMode] : undefined)}
         className={`${PICKER_TRIGGER_CLASS} ${compactButtonClass}`}
       >
         <CurrentIcon size={14} className="shrink-0" aria-hidden="true" />
+        {pendingNote && (
+          <span
+            data-testid="permission-mode-pending"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-warning)] animate-pulse-dot"
+            aria-hidden="true"
+          />
+        )}
         {!compact && (
           <>
             <span className="truncate">{MODE_LABELS[currentMode]}</span>

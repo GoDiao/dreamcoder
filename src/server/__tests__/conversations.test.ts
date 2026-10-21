@@ -7,6 +7,26 @@ import { fileURLToPath } from 'node:url'
 import { ConversationService, ConversationStartupError, conversationService } from '../services/conversationService.js'
 import { SessionService, sessionService } from '../services/sessionService.js'
 import { ProviderService } from '../services/providerService.js'
+import { getSessionState } from '../ws/handler.js'
+
+function turnPhaseOf(msg: any): string | undefined {
+  return msg?.type === 'session_patch' ? msg.changes?.turn?.phase : undefined
+}
+
+function runningGenerationOf(msg: any): number | undefined {
+  const process = msg?.type === 'session_patch' ? msg.changes?.process : undefined
+  return process?.phase === 'running' ? process.generation : undefined
+}
+
+function processDetailsOf(messages: any[]): Array<string | undefined> {
+  return messages
+    .filter((msg) => msg.type === 'session_patch' && msg.changes?.process)
+    .map((msg) => msg.changes.process.detail)
+}
+
+function titleOf(msg: any): string | undefined {
+  return msg?.type === 'session_patch' ? msg.changes?.title?.text ?? undefined : undefined
+}
 
 // The test run's own config directory (see testPreload.ts), restored after each test.
 const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
@@ -107,7 +127,6 @@ describe('ConversationService', () => {
       outputDrain: Promise.resolve(),
       sdkMessages: [],
       initMessage: null,
-      pendingPermissionRequests: new Map(),
     }
     ;(svc as any).sessions.set(sid, session)
 
@@ -159,23 +178,19 @@ describe('ConversationService', () => {
       pendingOutbound: [],
       stderrLines: [],
       sdkMessages: [],
-      pendingPermissionRequests: new Map([
-        ['req-1', {
-          toolName: 'Bash',
-          input: { command: 'ls src' },
-          permissionSuggestions: [
-            {
-              type: 'addRules',
-              rules: [{ toolName: 'Bash', ruleContent: 'ls src' }],
-              behavior: 'allow',
-              destination: 'localSettings',
-            },
-          ],
-        }],
-      ]),
     })
 
-    const result = svc.respondToPermission('session-1', 'req-1', true, 'always')
+    const result = svc.respondToPermission('session-1', 'req-1', true, 'always', undefined, {
+      toolName: 'Bash',
+      suggestions: [
+        {
+          type: 'addRules',
+          rules: [{ toolName: 'Bash', ruleContent: 'ls src' }],
+          behavior: 'allow',
+          destination: 'localSettings',
+        },
+      ],
+    })
 
     expect(result).toBe(true)
     expect(sent).toHaveLength(1)
@@ -214,12 +229,11 @@ describe('ConversationService', () => {
       pendingOutbound: [],
       stderrLines: [],
       sdkMessages: [],
-      pendingPermissionRequests: new Map(),
     })
 
     const result = svc.setPermissionMode('session-2', 'acceptEdits')
 
-    expect(result).toBe(true)
+    expect(result).toEqual(expect.any(String))
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({
       type: 'control_request',
@@ -298,6 +312,38 @@ describe('ConversationService', () => {
     expect(() => svc.onOutput('no-such-session', () => {})).not.toThrow()
   })
 
+  it('keeps a session that replaced the exited process while its output drained', async () => {
+    const svc = new ConversationService()
+    const oldProc = { pid: 1 } as any
+    const oldSession = {
+      proc: oldProc,
+      outputCallbacks: [] as Array<(msg: any) => void>,
+      workDir: process.cwd(),
+      permissionMode: 'default',
+      sdkToken: 'old-token',
+      sdkSocket: null,
+      pendingOutbound: [],
+      stderrLines: [],
+      sdkMessages: [],
+      generation: 1,
+    }
+    const newSession = { ...oldSession, proc: { pid: 2 }, sdkToken: 'new-token', generation: 2 }
+    const results: any[] = []
+    oldSession.outputCallbacks.push((msg) => results.push(msg))
+    ;(svc as any).sessions.set('session-drain', oldSession)
+    ;(svc as any).waitForProcessOutputDrain = async () => {
+      ;(svc as any).sessions.set('session-drain', newSession)
+    }
+    const phases: string[] = []
+    svc.onProcessEvent((event) => phases.push(`${event.phase}:${event.generation}`))
+
+    await (svc as any).handleProcessExit('session-drain', oldProc, 143)
+
+    expect((svc as any).sessions.get('session-drain')).toBe(newSession)
+    expect(phases).toEqual([])
+    expect(results).toEqual([])
+  })
+
   it('should ignore stale process exits after a session restarts', async () => {
     const svc = new ConversationService()
     const oldProc = { pid: 1 } as any
@@ -313,7 +359,6 @@ describe('ConversationService', () => {
       pendingOutbound: [],
       stderrLines: [],
       sdkMessages: [],
-      pendingPermissionRequests: new Map(),
     })
 
     await (svc as any).handleProcessExit('session-restart', oldProc, 143)
@@ -321,6 +366,36 @@ describe('ConversationService', () => {
 
     await (svc as any).handleProcessExit('session-restart', newProc, 0)
     expect(svc.hasSession('session-restart')).toBe(false)
+  })
+
+  it('ignores the socket and output of a CLI process that was replaced', () => {
+    const svc = new ConversationService()
+    const received: any[] = []
+    const newSocket = { send: () => {} }
+    ;(svc as any).sessions.set('session-replaced', {
+      proc: { pid: 2 },
+      outputCallbacks: [(msg: any) => received.push(msg)],
+      workDir: process.cwd(),
+      permissionMode: 'default',
+      sdkToken: 'new-token',
+      sdkSocket: newSocket,
+      pendingOutbound: [],
+      stderrLines: [],
+      sdkMessages: [],
+      initMessage: null,
+    })
+
+    svc.detachSdkConnection('session-replaced', 'old-token')
+    svc.handleSdkPayload('session-replaced', JSON.stringify({ type: 'system', subtype: 'session_state_changed', state: 'idle' }), 'old-token')
+
+    expect((svc as any).sessions.get('session-replaced').sdkSocket).toBe(newSocket)
+    expect(received).toEqual([])
+
+    svc.handleSdkPayload('session-replaced', JSON.stringify({ type: 'keep_alive' }), 'new-token')
+    svc.detachSdkConnection('session-replaced', 'new-token')
+
+    expect(received).toEqual([{ type: 'keep_alive' }])
+    expect((svc as any).sessions.get('session-replaced').sdkSocket).toBeNull()
   })
 
   it('should retain SDK init metadata after recent message trimming', () => {
@@ -337,7 +412,6 @@ describe('ConversationService', () => {
       stderrLines: [],
       sdkMessages: [],
       initMessage: null,
-      pendingPermissionRequests: new Map(),
     })
 
     ;(svc as any).handleSdkPayload('session-init-retention', JSON.stringify({
@@ -346,13 +420,13 @@ describe('ConversationService', () => {
       model: 'mock-opus',
       claude_code_version: 'test-version',
       slash_commands: ['help', 'context'],
-    }))
+    }), 'token')
 
     for (let i = 0; i < 45; i++) {
       ;(svc as any).handleSdkPayload('session-init-retention', JSON.stringify({
         type: 'stream_event',
         event: { type: 'message_delta', index: i },
-      }))
+      }), 'token')
     }
 
     expect(svc.getRecentSdkMessages('session-init-retention').some((message) => message.subtype === 'init')).toBe(false)
@@ -361,62 +435,6 @@ describe('ConversationService', () => {
       claude_code_version: 'test-version',
       slash_commands: ['help', 'context'],
     })
-  })
-
-  it('should expose live SDK permission requests for reconnecting clients', () => {
-    const svc = new ConversationService()
-
-    ;(svc as any).sessions.set('session-pending-permission', {
-      proc: { pid: 1 },
-      outputCallbacks: [],
-      workDir: process.cwd(),
-      permissionMode: 'default',
-      sdkToken: 'token',
-      sdkSocket: null,
-      pendingOutbound: [],
-      stderrLines: [],
-      sdkMessages: [],
-      initMessage: null,
-      pendingPermissionRequests: new Map(),
-    })
-
-    ;(svc as any).handleSdkPayload('session-pending-permission', JSON.stringify({
-      type: 'control_request',
-      request_id: 'request-ask-1',
-      request: {
-        subtype: 'can_use_tool',
-        tool_name: 'AskUserQuestion',
-        tool_use_id: 'tool-ask-1',
-        input: {
-          questions: [
-            {
-              header: 'Scope',
-              question: 'Which scope?',
-              options: [{ label: 'A', description: 'First' }, { label: 'B', description: 'Second' }],
-            },
-          ],
-        },
-        description: 'Answer questions?',
-      },
-    }))
-
-    expect(svc.getPendingPermissionRequests('session-pending-permission')).toEqual([
-      {
-        requestId: 'request-ask-1',
-        toolName: 'AskUserQuestion',
-        toolUseId: 'tool-ask-1',
-        input: {
-          questions: [
-            {
-              header: 'Scope',
-              question: 'Which scope?',
-              options: [{ label: 'A', description: 'First' }, { label: 'B', description: 'Second' }],
-            },
-          ],
-        },
-        description: 'Answer questions?',
-      },
-    ])
   })
 
   it('should reconstruct usage and metadata from a persisted transcript', async () => {
@@ -884,7 +902,7 @@ describe('WebSocket Chat Integration', () => {
     expect(messages[0].sessionId).toBe('chat-test-1')
   })
 
-  it('should handle stop_generation and return idle status', async () => {
+  it('should handle stop_generation and keep the session idle', async () => {
     const messages: any[] = []
     const ws = new WebSocket(`${wsUrl}/ws/chat-test-2`)
 
@@ -892,12 +910,12 @@ describe('WebSocket Chat Integration', () => {
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data as string)
         messages.push(msg)
-        if (msg.type === 'connected') {
+        if (msg.type === 'session_snapshot') {
           ws.send(JSON.stringify({ type: 'stop_generation' }))
-        }
-        if (msg.type === 'status' && msg.state === 'idle') {
-          ws.close()
-          resolve()
+          setTimeout(() => {
+            ws.close()
+            resolve()
+          }, 200)
         }
       }
       ws.onerror = () => {
@@ -910,7 +928,9 @@ describe('WebSocket Chat Integration', () => {
       }, 3000)
     })
 
-    expect(messages.some((m) => m.type === 'status' && m.state === 'idle')).toBe(true)
+    expect(messages.find((m) => m.type === 'session_snapshot')?.state.turn).toEqual({ phase: 'idle' })
+    expect(messages.some((m) => m.type === 'error')).toBe(false)
+    expect(messages.some((m) => turnPhaseOf(m) === 'running')).toBe(false)
   })
 
   it('should send user_message and receive streamed SDK response', async () => {
@@ -946,14 +966,14 @@ describe('WebSocket Chat Integration', () => {
 
     const types = messages.map((m) => m.type)
     expect(types).toContain('connected')
-    expect(types).toContain('status')
+    expect(types).toContain('session_snapshot')
     expect(types).toContain('content_start')
     expect(types).toContain('content_delta')
     expect(types).toContain('thinking')
     expect(types).toContain('message_complete')
 
-    const statusMsgs = messages.filter((m) => m.type === 'status')
-    expect(statusMsgs[0].state).toBe('thinking')
+    const turnPhases = messages.map(turnPhaseOf).filter(Boolean)
+    expect(turnPhases[0]).toBe('running')
   })
 
   it('emits a worktree startup status before launching a repository session', async () => {
@@ -964,11 +984,8 @@ describe('WebSocket Chat Integration', () => {
     })
 
     const messages = await runTurn(sessionId, 'Hello from repository launch test')
-    const statusVerbs = messages
-      .filter((msg) => msg.type === 'status')
-      .map((msg) => msg.verb)
 
-    expect(statusVerbs).toContain('Creating worktree')
+    expect(processDetailsOf(messages)).toContain('creating_worktree')
   })
 
   it('does not emit worktree startup status for an already materialized worktree session', async () => {
@@ -986,15 +1003,11 @@ describe('WebSocket Chat Integration', () => {
       workDir: worktreePath!,
       repository: launchInfo!.repository,
     })
-    await sessionService.deletePlaceholderSessionFiles(sessionId, worktreePath!)
 
     const messages = await runTurn(sessionId, 'Continue in the existing worktree')
-    const statusVerbs = messages
-      .filter((msg) => msg.type === 'status')
-      .map((msg) => msg.verb)
 
-    expect(statusVerbs).toContain('Thinking')
-    expect(statusVerbs).not.toContain('Creating worktree')
+    expect(messages.some((msg) => turnPhaseOf(msg) === 'running')).toBe(true)
+    expect(processDetailsOf(messages)).not.toContain('creating_worktree')
   })
 
   it('keeps the default startup status for current-worktree repository sessions', async () => {
@@ -1005,12 +1018,9 @@ describe('WebSocket Chat Integration', () => {
     })
 
     const messages = await runTurn(sessionId, 'Hello from current worktree launch test')
-    const statusVerbs = messages
-      .filter((msg) => msg.type === 'status')
-      .map((msg) => msg.verb)
 
-    expect(statusVerbs).toContain('Thinking')
-    expect(statusVerbs).not.toContain('Creating worktree')
+    expect(messages.some((msg) => turnPhaseOf(msg) === 'running')).toBe(true)
+    expect(processDetailsOf(messages)).not.toContain('creating_worktree')
   })
 
   it('emits the derived session title before the first response completes', async () => {
@@ -1046,11 +1056,11 @@ describe('WebSocket Chat Integration', () => {
       }
     })
 
-    const titleIndex = messages.findIndex((msg) => msg.type === 'session_title_updated')
+    const titleIndex = messages.findIndex((msg) => titleOf(msg))
     const completionIndex = messages.findIndex((msg) => msg.type === 'message_complete')
     expect(titleIndex).toBeGreaterThan(-1)
     expect(completionIndex).toBeGreaterThan(-1)
-    expect(messages[titleIndex].title).toBe('开始优化UI')
+    expect(titleOf(messages[titleIndex])).toBe('开始优化UI')
     expect(titleIndex).toBeLessThan(completionIndex)
   })
 
@@ -1075,7 +1085,7 @@ describe('WebSocket Chat Integration', () => {
           }))
           return
         }
-        if (msg.type === 'session_title_updated') {
+        if (titleOf(msg)) {
           clearTimeout(timeout)
           ws.close()
           resolve()
@@ -1087,7 +1097,7 @@ describe('WebSocket Chat Integration', () => {
       }
     })
 
-    const title = messages.find((msg) => msg.type === 'session_title_updated')?.title
+    const title = titleOf(messages.find((msg) => titleOf(msg)))
     expect(title).toBe('ship the desktop goal card')
   })
 
@@ -1118,7 +1128,7 @@ describe('WebSocket Chat Integration', () => {
       const messages = await runTurn(sessionId, 'Hello without thinking')
 
       expect(messages.some((m) => m.type === 'message_complete')).toBe(true)
-      expect(startOptions).toEqual([{ thinking: 'disabled', model: undefined }])
+      expect(startOptions).toEqual([{ thinking: 'disabled', model: 'default-main' }])
     } finally {
       conversationService.startSession = originalStartSession as typeof conversationService.startSession
       conversationService.stopSession(sessionId)
@@ -1207,6 +1217,52 @@ describe('WebSocket Chat Integration', () => {
       }
       await providerService.activateProvider(defaultProviderId)
       await fs.writeFile(path.join(tmpDir, 'settings.json'), '{}\n', 'utf-8')
+    }
+  }, 20_000)
+
+  it('should start default sessions on the active provider main model, ignoring a stale saved model key', async () => {
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Stale Model Provider',
+      apiKey: 'key-stale-model',
+      baseUrl: 'https://example.invalid/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'minimax-m2',
+        haiku: 'minimax-m2',
+        sonnet: 'minimax-m2',
+        opus: 'minimax-m2',
+      },
+    })
+    await providerService.activateProvider(provider.id)
+    await providerService.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startOptions: Array<{ model?: string; providerId?: string | null }> = []
+    const sessionId = `stale-model-${crypto.randomUUID()}`
+
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; thinking?: 'enabled' | 'adaptive' | 'disabled'; providerId?: string | null },
+    ) {
+      if (sid === sessionId) {
+        startOptions.push({ model: options?.model, providerId: options?.providerId })
+      }
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const messages = await runTurn(sessionId, 'Default model after a provider edit')
+      expect(messages.some((m) => m.type === 'message_complete')).toBe(true)
+      expect(startOptions).toEqual([{ model: 'minimax-m2', providerId: provider.id }])
+    } finally {
+      conversationService.startSession = originalStartSession as typeof conversationService.startSession
+      conversationService.stopSession(sessionId)
+      await providerService.updateManagedSettings({ model: undefined, modelContext: undefined })
+      await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)
 
@@ -1404,7 +1460,7 @@ describe('WebSocket Chat Integration', () => {
     expect(messages.at(-1)?.type).toBe('message_complete')
   }, 15_000)
 
-  it('should handle permission_response without error', async () => {
+  it('rejects a permission_response for a request that is no longer pending', async () => {
     const messages: any[] = []
     const ws = new WebSocket(`${wsUrl}/ws/chat-test-4`)
 
@@ -1437,7 +1493,7 @@ describe('WebSocket Chat Integration', () => {
     })
 
     expect(messages[0].type).toBe('connected')
-    expect(messages.some((m) => m.type === 'error')).toBe(false)
+    expect(messages).toContainEqual(expect.objectContaining({ type: 'error', code: 'PERMISSION_REQUEST_EXPIRED' }))
   })
 
   it('should handle ping/pong', async () => {
@@ -2020,8 +2076,8 @@ describe('WebSocket Chat Integration', () => {
 
       await waitUntil(async () => startCalls.length >= 2, `runtime restart for ${sessionId}`)
       await waitUntil(
-        async () => messages.some((msg) => msg.type === 'status' && msg.state === 'idle'),
-        `runtime restart idle status for ${sessionId}`,
+        async () => messages.some((msg) => (runningGenerationOf(msg) ?? 0) >= 2),
+        `runtime restart completion for ${sessionId}`,
       )
 
       expect(startCalls[0]).toMatchObject({ sessionId })
@@ -2255,7 +2311,7 @@ describe('WebSocket Chat Integration', () => {
       }))
 
       await waitUntil(
-        async () => messages.slice(switchStartIndex).some((msg) => msg.type === 'status' && msg.state === 'idle'),
+        async () => messages.slice(switchStartIndex).some((msg) => runningGenerationOf(msg) !== undefined),
         `idle runtime switch completion for ${sessionId}`,
       )
 
@@ -2270,9 +2326,9 @@ describe('WebSocket Chat Integration', () => {
       expect(
         messages
           .slice(switchStartIndex)
-          .filter((msg) => msg.type === 'status')
-          .map((msg) => msg.state),
-      ).toEqual(['idle'])
+          .map(turnPhaseOf)
+          .filter((phase) => phase && phase !== 'idle'),
+      ).toEqual([])
       expect(messages.slice(switchStartIndex).some((msg) => msg.type === 'error')).toBe(false)
     } finally {
       ws.close()
@@ -2356,7 +2412,7 @@ describe('WebSocket Chat Integration', () => {
       }))
 
       await waitUntil(
-        async () => messages.slice(switchStartIndex).some((msg) => msg.type === 'status' && msg.state === 'idle'),
+        async () => messages.slice(switchStartIndex).some((msg) => runningGenerationOf(msg) !== undefined),
         `idle permission switch completion for ${sessionId}`,
       )
 
@@ -2370,9 +2426,9 @@ describe('WebSocket Chat Integration', () => {
       expect(
         messages
           .slice(switchStartIndex)
-          .filter((msg) => msg.type === 'status')
-          .map((msg) => msg.state),
-      ).toEqual(['idle'])
+          .map(turnPhaseOf)
+          .filter((phase) => phase && phase !== 'idle'),
+      ).toEqual([])
       expect(messages.slice(switchStartIndex).some((msg) => msg.type === 'error')).toBe(false)
     } finally {
       ws.close()
@@ -2731,8 +2787,7 @@ describe('WebSocket Chat Integration', () => {
           }
 
           if (
-            msg.type === 'status' &&
-            msg.state === 'idle' &&
+            (runningGenerationOf(msg) ?? 0) >= 2 &&
             phase === 'switching'
           ) {
             ws.send(JSON.stringify({ type: 'user_message', content: 'second turn' }))
@@ -3006,7 +3061,7 @@ describe('WebSocket Chat Integration', () => {
             return
           }
 
-          if (msg.type === 'status' && msg.state === 'idle' && phase === 'switching') {
+          if ((runningGenerationOf(msg) ?? 0) >= 2 && phase === 'switching') {
             ws.send(JSON.stringify({ type: 'user_message', content: 'second turn' }))
             phase = 'turn2'
             return
@@ -3240,7 +3295,7 @@ describe('WebSocket Chat Integration', () => {
       sendCalls.push({
         content,
         startCallCount: startCalls.length,
-        permissionMode: conversationService.getSessionPermissionMode(sid) ?? '',
+        permissionMode: getSessionState(sid)?.permission.effective ?? '',
       })
       return originalSendMessage(sid, content, attachments)
     }) as typeof conversationService.sendMessage

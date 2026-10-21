@@ -4,6 +4,7 @@ import {
   translateCliMessage,
 } from '../ws/handler.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
+import { createStreamState, translateCliOutput } from '../session/translate.js'
 import { extractLocalCommandOutput } from '../transcript/classify.js'
 import type { ServerMessage } from '../ws/protocol.js'
 
@@ -83,30 +84,24 @@ describe('WebSocket AskUserQuestion events', () => {
 })
 
 describe('WebSocket compact events', () => {
-  it('forwards CLI compacting status to the desktop client', () => {
-    expect(translateCliMessage({
+  it('reports CLI compacting status as turn activity instead of a stream message', () => {
+    expect(translateCliOutput({
       type: 'system',
       subtype: 'status',
       status: 'compacting',
-    }, 'session-1')).toEqual([
-      {
-        type: 'status',
-        state: 'compacting',
-        verb: 'Compacting conversation',
-      },
-    ])
+    }, createStreamState())).toEqual({
+      messages: [],
+      events: [{ type: 'turn_activity_reported', activity: 'compacting' }],
+    })
 
-    expect(translateCliMessage({
+    expect(translateCliOutput({
       type: 'system',
       subtype: 'status',
       status: null,
-    }, 'session-1')).toEqual([
-      {
-        type: 'status',
-        state: 'thinking',
-        verb: 'Thinking',
-      },
-    ])
+    }, createStreamState())).toEqual({
+      messages: [],
+      events: [{ type: 'turn_activity_reported', activity: 'thinking' }],
+    })
 
     expect(translateCliMessage({
       type: 'system',
@@ -224,11 +219,6 @@ describe('WebSocket background task events', () => {
           prompt: 'Run E2E checks',
         },
       },
-      {
-        type: 'status',
-        state: 'tool_executing',
-        verb: 'Verify the todo app',
-      },
     ])
 
     const progress = {
@@ -258,11 +248,6 @@ describe('WebSocket background task events', () => {
           lastToolName: 'Bash',
           usage: { totalTokens: 1200, toolUses: 4, durationMs: 45000 },
         },
-      },
-      {
-        type: 'status',
-        state: 'tool_executing',
-        verb: 'Running Playwright checks',
       },
     ])
   })
@@ -601,9 +586,7 @@ describe('WebSocket stream event translation', () => {
     expect(translateCliMessage({
       type: 'stream_event',
       event: { type: 'message_start' },
-    }, sessionId)).toEqual([
-      { type: 'status', state: 'thinking' },
-    ])
+    }, sessionId)).toEqual([])
 
     expect(translateCliMessage({
       type: 'stream_event',
@@ -612,9 +595,7 @@ describe('WebSocket stream event translation', () => {
         index: 0,
         content_block: { type: 'thinking', thinking: '' },
       },
-    }, sessionId)).toEqual([
-      { type: 'status', state: 'thinking', verb: 'Thinking' },
-    ])
+    }, sessionId)).toEqual([])
 
     expect(translateCliMessage({
       type: 'stream_event',

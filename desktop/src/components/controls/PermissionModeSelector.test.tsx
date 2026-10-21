@@ -209,4 +209,23 @@ describe('PermissionModeSelector', () => {
     await waitFor(() => expect(computerUseMocks.getConfig).toHaveBeenCalled())
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
+
+  it('shows the chosen mode at once and marks it until the CLI applies it', () => {
+    renderSelector({ value: 'bypassPermissions', effectiveValue: 'default' })
+
+    expect(screen.getByTestId('permission-mode-pending')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bypass permissions' })).toHaveAttribute('title', 'permMode.pendingSwitch')
+  })
+
+  it('shows no pending mark when the CLI runs the chosen mode', () => {
+    renderSelector({ value: 'plan', effectiveValue: 'plan' })
+
+    expect(screen.queryByTestId('permission-mode-pending')).not.toBeInTheDocument()
+  })
+
+  it('shows no pending mark before the CLI has reported a mode', () => {
+    renderSelector({ value: 'plan' })
+
+    expect(screen.queryByTestId('permission-mode-pending')).not.toBeInTheDocument()
+  })
 })

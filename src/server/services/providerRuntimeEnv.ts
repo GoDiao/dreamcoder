@@ -68,6 +68,16 @@ export function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }
 
+export function resolveProviderDefaultModel(
+  provider: Pick<SavedProvider, 'models'>,
+  managedSettings: Record<string, unknown>,
+): string {
+  const env = (managedSettings.env as Record<string, string> | undefined) ?? {}
+  const envModel = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
+  if (envModel && envModel !== stripContextSuffix(provider.models.main)) return envModel
+  return provider.models.main
+}
+
 export function normalizeModelMapping(models: SavedProvider['models']): SavedProvider['models'] {
   const main = models.main.trim()
   return {

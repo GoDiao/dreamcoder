@@ -11,11 +11,13 @@ import { useTerminalPanelStore } from './terminalPanelStore'
 import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
 import type { PermissionMode } from '../types/settings'
+import type { RuntimeSelection } from '../types/runtime'
 import { isPlaceholderSessionTitle } from '../lib/sessionTitle'
 
 type CreateSessionOptions = {
   repository?: CreateSessionRepositoryOptions
   permissionMode?: PermissionMode
+  runtime?: RuntimeSelection
 }
 
 // The right-side panel keeps per-session state and terminal processes; drop
@@ -106,6 +108,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       ...(workDir ? { workDir } : {}),
       ...(options?.repository ? { repository: options.repository } : {}),
       ...(options?.permissionMode ? { permissionMode: options.permissionMode } : {}),
+      ...(options?.runtime ? { runtime: options.runtime } : {}),
     })
     const now = new Date().toISOString()
     const optimisticSession: SessionListItem = {

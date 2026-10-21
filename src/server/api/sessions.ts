@@ -5,8 +5,15 @@ import { exportFileName, renderSessionJson, renderSessionMarkdown } from '../tra
 import { version as packageVersion } from '../../../package.json'
 import { conversationService } from '../services/conversationService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { closeSessionConnection, getSlashCommands, resolveSessionPermissionMode } from '../ws/handler.js'
+import {
+  closeSessionConnection,
+  getSlashCommands,
+  noteSessionRenamed,
+  resolveSessionPermissionMode,
+  resolveSessionRuntimeSelection,
+} from '../ws/handler.js'
 import { isPermissionMode } from '../services/permissionModes.js'
+import { normalizeRuntimeSelection } from '../services/runtimeSelection.js'
 import { listSkillSlashCommands, type SkillSlashCommand } from './skills.js'
 import { WorkspaceService } from '../services/workspaceService.js'
 import {
@@ -249,7 +256,7 @@ async function handleSessionWorkspaceRoute(
 }
 
 async function createSession(req: Request): Promise<Response> {
-  let body: { workDir?: string; repository?: CreateSessionRepositoryOptions; permissionMode?: unknown }
+  let body: { workDir?: string; repository?: CreateSessionRepositoryOptions; permissionMode?: unknown; runtime?: unknown }
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -276,7 +283,17 @@ async function createSession(req: Request): Promise<Response> {
     throw ApiError.badRequest(`Unknown permission mode: ${String(body.permissionMode)}`)
   }
 
-  const result = await sessionService.createSession(body.workDir, body.repository, body.permissionMode)
+  const runtime = body.runtime === undefined || body.runtime === null ? null : normalizeRuntimeSelection(body.runtime)
+  if (body.runtime !== undefined && body.runtime !== null && !runtime) {
+    throw ApiError.badRequest('runtime must name a model or an effort level')
+  }
+
+  const result = await sessionService.createSession(
+    body.workDir,
+    body.repository,
+    body.permissionMode,
+    runtime ?? undefined,
+  )
   recentProjectsCache = null
   return Response.json(result, { status: 201 })
 }
@@ -732,6 +749,8 @@ async function branchSession(req: Request, sessionId: string): Promise<Response>
       result.sessionId,
       await resolveSessionPermissionMode(sessionId),
     )
+    const runtime = await resolveSessionRuntimeSelection(sessionId)
+    if (runtime) await sessionService.appendSessionRuntimeConfig(result.sessionId, runtime)
 
     return Response.json({
       sessionId: result.sessionId,
@@ -799,6 +818,7 @@ async function patchSession(req: Request, sessionId: string): Promise<Response> 
   }
 
   await sessionService.renameSession(sessionId, body.title)
+  noteSessionRenamed(sessionId, body.title)
   return Response.json({ ok: true })
 }
 

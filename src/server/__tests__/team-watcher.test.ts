@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as fsSyn from 'node:fs'
 import * as path from 'node:path'
@@ -71,19 +71,15 @@ function makeTeamConfig(overrides?: Record<string, unknown>) {
   }
 }
 
-let broadcastedMessages: Array<{ sessionId: string; message: unknown }> = []
-let mockActiveSessionIds: string[] = []
-
-const mockSendToSession = mock((sessionId: string, message: unknown) => {
-  broadcastedMessages.push({ sessionId, message })
-  return true
-})
-
-const mockGetActiveSessionIds = mock(() => {
-  return mockActiveSessionIds
-})
-
+import type { ServerWebSocket } from 'bun'
 import { TeamWatcher } from '../services/teamWatcher.js'
+import { sessionService } from '../services/sessionService.js'
+import {
+  __resetWebSocketHandlerStateForTests,
+  getSessionState,
+  handleWebSocket,
+  type WebSocketData,
+} from '../ws/handler.js'
 
 // The test run's own config directory (see testPreload.ts), restored after each test.
 const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
@@ -322,17 +318,59 @@ describe('TeamWatcher subagent names', () => {
   })
 })
 
-describe('TeamWatcher broadcast', () => {
-  it('should call sendToSession for each active session', async () => {
+describe('TeamWatcher delivery', () => {
+  afterEach(() => {
+    __resetWebSocketHandlerStateForTests()
+    mock.restore()
+  })
+
+  function clientSocket(sessionId: string) {
+    const sent: Array<{ type: string }> = []
+    const ws = {
+      data: {
+        sessionId,
+        connectedAt: Date.now(),
+        channel: 'client',
+        clientKind: 'desktop',
+        sdkToken: null,
+        serverPort: 0,
+        serverHost: '127.0.0.1',
+      },
+      send: (payload: string) => {
+        sent.push(JSON.parse(payload))
+      },
+      close: () => {},
+    } as unknown as ServerWebSocket<WebSocketData>
+    handleWebSocket.open(ws)
+    return sent
+  }
+
+  it('sends team events only to the sessions of that team and records their role', async () => {
     await setupTmpConfigDir()
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue(null)
+    const lead = clientSocket('session-lead-001')
+    const worker = clientSocket('session-worker-001')
+    const outsider = clientSocket('session-outsider-001')
     const watcher = new TeamWatcher()
 
-    await writeTeamConfig('broadcast-team', makeTeamConfig({ name: 'broadcast-team' }))
-
+    await writeTeamConfig('delivery-team', makeTeamConfig({ name: 'delivery-team', leadSessionId: 'session-lead-001' }))
     watcher.checkNow()
 
+    expect(lead.map((message) => message.type)).toContain('team_created')
+    expect(worker.map((message) => message.type)).toContain('team_created')
+    expect(outsider.map((message) => message.type)).not.toContain('team_created')
+    expect(getSessionState('session-lead-001')?.team).toEqual({ name: 'delivery-team', role: 'lead' })
+    expect(getSessionState('session-worker-001')?.team).toEqual({ name: 'delivery-team', role: 'member' })
+    expect(getSessionState('session-outsider-001')?.team).toBeNull()
+
+    await fs.rm(path.join(tmpDir, 'teams', 'delivery-team'), { recursive: true, force: true })
+    watcher.checkNow()
+
+    expect(lead.map((message) => message.type)).toContain('team_deleted')
+    expect(outsider.map((message) => message.type)).not.toContain('team_deleted')
+    expect(getSessionState('session-lead-001')?.team).toBeNull()
+
     watcher.stop()
-    watcher.reset()
     await cleanupTmpDir()
   })
 })

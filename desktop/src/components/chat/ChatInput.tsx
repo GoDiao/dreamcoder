@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from '../../i18n'
-import { useChatStore } from '../../stores/chatStore'
+import { sessionRuntimeSelection, useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useSessionStore } from '../../stores/sessionStore'
-import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useTeamStore } from '../../stores/teamStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import {
@@ -134,9 +133,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   const composerInsertion = sessionState?.composerInsertion ?? null
   const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
   const permissionMode = sessionState?.permissionMode ?? defaultPermissionMode
-  const runtimeSelection = useSessionRuntimeStore((state) =>
-    activeTabId ? state.selections[activeTabId] : undefined,
-  )
+  const runtimeSelection = sessionRuntimeSelection(sessionState)
   const currentModel = useSettingsStore((state) => state.currentModel)
   const runtimeSelectionKey = runtimeSelection
     ? `${runtimeSelection.providerId ?? 'none'}:${runtimeSelection.modelId}`
@@ -508,11 +505,12 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     const { replaceTabSession } = useTabStore.getState()
     const { disconnectSession, connectToSession, sessions } = useChatStore.getState()
     const permissionMode = sessions[oldId]?.permissionMode
+    const runtime = sessionRuntimeSelection(sessions[oldId])
     const newId = await createSession(workDir || undefined, {
       ...(repository ? { repository } : {}),
       ...(permissionMode ? { permissionMode } : {}),
+      ...(runtime ? { runtime } : {}),
     })
-    useSessionRuntimeStore.getState().moveSelection(oldId, newId)
     disconnectSession(oldId)
     replaceTabSession(oldId, newId)
     connectToSession(newId)
@@ -1095,6 +1093,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                     <PermissionModeSelector
                       compact={useCompactControls}
                       value={permissionMode}
+                      effectiveValue={(sessionState?.mirror?.permission.effective ?? undefined) as typeof permissionMode | undefined}
                       onChange={(mode) => {
                         if (activeTabId) setSessionPermissionMode(activeTabId, mode)
                       }}

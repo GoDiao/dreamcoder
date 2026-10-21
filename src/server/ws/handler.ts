@@ -1,11 +1,12 @@
 import type { ServerWebSocket } from 'bun'
-import type { ClientMessage, LiveTranscriptItem, PermissionMode, ServerMessage } from './protocol.js'
+import type { ClientKind, ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
 import {
   ConversationStartupError,
   conversationService,
+  type ProcessLifecycleEvent,
 } from '../services/conversationService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
@@ -14,45 +15,46 @@ import { diagnosticsService } from '../services/diagnosticsService.js'
 import { deriveTitle, generateTitle, saveAiTitle } from '../services/titleService.js'
 import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 import {
-  extractCompactSummary,
   extractLocalCommandOutput,
-  isCompactCommandOutput,
   isGoalCommandOutput,
-  parseBackgroundTaskMessage,
-  parseGoalEvent,
   parseLocalCommand,
-  parseMemorySaved,
-  readCompactMetadata,
-  type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
 import { EFFORT_LEVELS } from '../api/models.js'
+import { resolveProviderDefaultModel } from '../services/providerRuntimeEnv.js'
 import {
   clearPrewarmState,
-  createStreamState,
   disposeAllSessionRuntimes,
   disposeSessionRuntime,
   getConnectedSessionIds,
   getSessionRuntime,
-  isSameRuntimeOverride,
   peekSessionRuntime,
   resetConversationState,
-  type RuntimeOverride,
+  type SessionEndpoint,
   type SessionSlashCommand,
-  type SessionStreamState,
 } from './sessionRuntime.js'
+import { sessionStateStore, type SessionStateChange } from '../session/state/store.js'
+import type { RestartReason, RuntimeSelection, SessionState } from '../session/state/types.js'
+import { installSessionPersistence } from '../session/persistence.js'
+import { OutputPipeline } from '../session/outputPipeline.js'
+import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
+const store = sessionStateStore
 
 export type { SessionSlashCommand } from './sessionRuntime.js'
 
 const CLIENT_DISCONNECT_CLEANUP_MS = 30_000
 const PENDING_PERMISSION_DISCONNECT_CLEANUP_MS = 30 * 60_000
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 5 * 60_000
+const MESSAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+installSessionPersistence(store)
+store.subscribe(relayStateChange)
+conversationService.onProcessEvent(handleProcessEvent)
 
 async function sendRepositoryStartupStatus(
-  ws: ServerWebSocket<WebSocketData>,
   sessionId: string,
   reason: 'user_message' | 'prewarm_session',
 ): Promise<void> {
@@ -63,30 +65,34 @@ async function sendRepositoryStartupStatus(
   if (!repository) return
 
   if (shouldCreateWorktreeForSessionLaunch(launchInfo)) {
-    sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Creating worktree' })
+    store.apply(sessionId, { type: 'process_detail_reported', detail: 'creating_worktree' })
   }
 }
 
 export function getSlashCommands(sessionId: string): SessionSlashCommand[] {
-  return peekSessionRuntime(sessionId)?.slashCommands || []
+  return store.peek(sessionId)?.slashCommands ?? []
+}
+
+export function noteSessionRenamed(sessionId: string, title: string): void {
+  const runtime = peekSessionRuntime(sessionId)
+  if (runtime?.title) runtime.title.hasCustomTitle = true
+  if (!store.peek(sessionId)) return
+  store.apply(sessionId, { type: 'title_changed', text: title, source: 'custom' })
+}
+
+export function getSessionState(sessionId: string): SessionState | undefined {
+  return store.peek(sessionId)
 }
 
 export type WebSocketData = {
   sessionId: string
   connectedAt: number
   channel: 'client' | 'sdk'
+  clientKind: ClientKind
   sdkToken: string | null
   serverPort: number
   serverHost: string
 }
-
-const clientOutputCallbacks = new Map<
-  ServerWebSocket<WebSocketData>,
-  {
-    sessionId: string
-    callback: (cliMsg: any) => void
-  }
->()
 
 export const handleWebSocket = {
   open(ws: ServerWebSocket<WebSocketData>) {
@@ -112,26 +118,18 @@ export const handleWebSocket = {
       runtime.disconnectCleanupTimer = undefined
     }
 
+    sendMessage(ws, { type: 'connected', sessionId })
     runtime.clients.add(ws)
-    if (runtime.prewarm.done) {
-      bindPrewarmMetadataCapture(sessionId)
-    } else {
-      bindClientSessionOutput(sessionId, ws)
-    }
-
-    const msg: ServerMessage = { type: 'connected', sessionId }
-    ws.send(JSON.stringify(msg))
-    replayPendingPermissionRequests(ws, sessionId)
-    void resolveSessionPermissionMode(sessionId).then((resolved) => {
-      const mode = peekSessionRuntime(sessionId)?.permissionMode ?? resolved
-      sendMessage(ws, { type: 'permission_mode', mode })
-    })
+    runtime.endpoint = { serverHost: ws.data.serverHost, serverPort: ws.data.serverPort }
+    store.apply(sessionId, { type: 'clients_changed', count: runtime.clients.size })
+    ensurePipelineAttached(sessionId)
+    void sendSnapshot(ws)
   },
 
   message(ws: ServerWebSocket<WebSocketData>, rawMessage: string | Buffer) {
     if (ws.data.channel === 'sdk') {
       const payload = typeof rawMessage === 'string' ? rawMessage : rawMessage.toString()
-      conversationService.handleSdkPayload(ws.data.sessionId, payload)
+      conversationService.handleSdkPayload(ws.data.sessionId, payload, ws.data.sdkToken)
       return
     }
 
@@ -166,6 +164,10 @@ export const handleWebSocket = {
           void handleSetRuntimeConfig(ws, message)
           break
 
+        case 'request_snapshot':
+          void sendSnapshot(ws)
+          break
+
         case 'prewarm_session':
           void handlePrewarmSession(ws)
           break
@@ -191,7 +193,7 @@ export const handleWebSocket = {
 
     if (channel === 'sdk') {
       console.log(`[WS] SDK disconnected from session: ${sessionId} (${code}: ${reason})`)
-      conversationService.detachSdkConnection(sessionId)
+      conversationService.detachSdkConnection(sessionId, ws.data.sdkToken)
       return
     }
 
@@ -200,7 +202,7 @@ export const handleWebSocket = {
       console.log(`[WS] Ignoring stale client disconnect for session: ${sessionId}`)
       return
     }
-    removeClientOutputCallback(ws)
+    store.apply(sessionId, { type: 'clients_changed', count: peekSessionRuntime(sessionId)?.clients.size ?? 0 })
 
     if (hasActiveClients(sessionId)) {
       return
@@ -214,6 +216,8 @@ export const handleWebSocket = {
         console.log(`[WS] Session ${sessionId} not reconnected after ${cleanupDelayMs}ms, stopping CLI subprocess`)
         conversationService.stopSession(sessionId)
         disposeSessionRuntime(sessionId)
+        store.dispose(sessionId)
+        conversationService.forgetSession(sessionId)
       }
     }, cleanupDelayMs)
     getSessionRuntime(sessionId).disconnectCleanupTimer = cleanupTimer
@@ -221,6 +225,101 @@ export const handleWebSocket = {
 
   drain(ws: ServerWebSocket<WebSocketData>) {
   },
+}
+
+function getPipeline(sessionId: string): OutputPipeline {
+  const runtime = getSessionRuntime(sessionId)
+  runtime.pipeline ??= new OutputPipeline(sessionId, conversationService, {
+    broadcast: broadcastToSession,
+    apply: (id, event) => {
+      store.apply(id, event)
+    },
+    onRawMessage: handleRawCliMessage,
+    onTurnResult: triggerTitleGeneration,
+  })
+  return runtime.pipeline
+}
+
+function ensurePipelineAttached(sessionId: string): void {
+  if (!conversationService.hasSession(sessionId)) return
+  const generation = conversationService.getGeneration(sessionId)
+  const pipeline = getPipeline(sessionId)
+  if (pipeline.isAttached(generation)) return
+  pipeline.attach(generation)
+  if (!peekSessionRuntime(sessionId)?.prewarm.done) pipeline.gate = undefined
+}
+
+function handleProcessEvent(event: ProcessLifecycleEvent): void {
+  const { sessionId, generation, phase } = event
+  if (phase === 'starting') getPipeline(sessionId).attach(generation)
+  const apply = phase === 'stopped' || phase === 'failed' ? store.applyIfPresent.bind(store) : store.apply.bind(store)
+  apply(sessionId, {
+    type: 'process_phase_changed',
+    phase,
+    generation,
+    ...(event.error ? { error: event.error } : {}),
+  })
+  if ((phase === 'starting' || phase === 'running') && isPermissionMode(event.permissionMode)) {
+    store.apply(sessionId, { type: 'permission_effective_reported', mode: event.permissionMode })
+  }
+  if (phase === 'stopped' || phase === 'failed') {
+    peekSessionRuntime(sessionId)?.pendingModeRequests.clear()
+  }
+}
+
+function handleRawCliMessage(sessionId: string, cliMsg: any): void {
+  if (cliMsg.type === 'system' && cliMsg.subtype === 'init') {
+    recordInitMetadata(sessionId, cliMsg)
+    return
+  }
+  if (cliMsg.type !== 'control_response') return
+  const requestId = cliMsg.response?.request_id
+  const runtime = peekSessionRuntime(sessionId)
+  const mode = typeof requestId === 'string' ? runtime?.pendingModeRequests.get(requestId) : undefined
+  if (!runtime || !mode) return
+  runtime.pendingModeRequests.delete(requestId)
+  if (cliMsg.response?.subtype === 'error') {
+    const message = String(cliMsg.response.error || `The CLI did not switch to ${mode}`)
+    store.apply(sessionId, { type: 'permission_change_rejected', mode, message })
+    void diagnosticsService.recordEvent({
+      type: 'permission_mode_rejected',
+      severity: 'warn',
+      sessionId,
+      summary: message,
+      details: { mode },
+    })
+  }
+}
+
+function recordInitMetadata(sessionId: string, cliMsg: any): void {
+  if (typeof cliMsg.cwd !== 'string' || !cliMsg.cwd.trim()) return
+  conversationService.updateSessionWorkDir(sessionId, cliMsg.cwd)
+  void sessionService.appendSessionMetadata(sessionId, { workDir: cliMsg.cwd }).catch(() => {})
+}
+
+async function sendSnapshot(ws: ServerWebSocket<WebSocketData>): Promise<void> {
+  const { sessionId } = ws.data
+  const state = await store.ensure(sessionId)
+  if (!peekSessionRuntime(sessionId)?.clients.has(ws)) return
+  sendMessage(ws, { type: 'session_snapshot', state: store.peek(sessionId) ?? state })
+}
+
+function relayStateChange({ sessionId, event, patch, previous, state }: SessionStateChange): void {
+  if (event.type === 'permission_request_resolved' && patch.pendingPermissions) {
+    broadcastToSession(sessionId, {
+      type: 'permission_resolved',
+      requestId: event.requestId,
+      allowed: event.allowed,
+      by: event.by,
+    })
+  }
+
+  broadcastToSession(sessionId, { type: 'session_patch', version: state.version, changes: patch })
+
+  if (patch.turn && previous.turn.phase !== 'idle' && state.turn.phase === 'idle') {
+    peekSessionRuntime(sessionId)?.answeredPermissions.clear()
+    runQueuedRestart(sessionId)
+  }
 }
 
 async function handleUserMessage(
@@ -231,7 +330,7 @@ async function handleUserMessage(
 
   const runtime = peekSessionRuntime(sessionId)
   if (runtime) {
-    runtime.stopRequested = false
+    if (runtime.pipeline) runtime.pipeline.stream.stopRequested = false
     clearPrewarmState(runtime)
   }
 
@@ -242,7 +341,6 @@ async function handleUserMessage(
       message: 'The /clear command does not accept arguments.',
       code: 'INVALID_SLASH_COMMAND_ARGS',
     })
-    sendMessage(ws, { type: 'status', state: 'idle' })
     return
   }
 
@@ -251,19 +349,15 @@ async function handleUserMessage(
     return
   }
 
-  sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
-
-  const initialRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(ws, sessionId)
+  const initialRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(sessionId)
   if (!initialRuntimeTransition.ok) return
-  if (initialRuntimeTransition.waited) {
-    sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
-  }
 
   let titleState = peekSessionRuntime(sessionId)?.title
   if (!titleState) {
+    const restored = await store.ensure(sessionId)
     titleState = {
       userMessageCount: 0,
-      hasCustomTitle: !!(await sessionService.getCustomTitle(sessionId)),
+      hasCustomTitle: restored.title.source === 'custom',
       firstUserMessage: '',
       allUserMessages: [],
       startedGenerationCounts: new Set<number>(),
@@ -277,65 +371,54 @@ async function handleUserMessage(
     if (titleState.userMessageCount === 1) {
       titleState.firstUserMessage = titleInput
     }
-    triggerTitleGeneration(ws, sessionId)
+    triggerTitleGeneration(sessionId)
   }
 
   try {
-    await ensureCliSessionStarted(ws, sessionId, 'user_message')
+    await ensureCliSessionStarted(ws.data, sessionId, 'user_message')
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     const code =
       err instanceof ConversationStartupError ? err.code : 'CLI_START_FAILED'
     console.error(`[WS] CLI start failed for ${sessionId}: ${errMsg}`)
-    sendMessage(ws, {
+    broadcastToSession(sessionId, {
       type: 'error',
       message: await buildSessionStartupDiagnosticMessage(sessionId, errMsg),
       code,
       retryable:
         err instanceof ConversationStartupError ? err.retryable : false,
     })
-    sendMessage(ws, { type: 'status', state: 'idle' })
     return
   }
 
-  const startupRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(ws, sessionId)
-  if (startupRuntimeTransition.ok) {
-    if (startupRuntimeTransition.waited) {
-      sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
-    }
-  } else {
-    return
-  }
+  const startupRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(sessionId)
+  if (!startupRuntimeTransition.ok) return
 
-  let userMessageSent = false
   const shouldForwardCurrentTurnLocalCommand =
     createCurrentTurnLocalCommandForwarder(desktopSlashCommand)
 
-  bindAllClientSessionOutputs(sessionId, {
-    shouldForward: (cliMsg) => {
-      if (userMessageSent || (cliMsg.type === 'result' && cliMsg.is_error)) {
-        return true
-      }
-      return shouldForwardCurrentTurnLocalCommand(cliMsg)
-    },
-  })
+  ensurePipelineAttached(sessionId)
+  const pipeline = getPipeline(sessionId)
+  pipeline.gate = (cliMsg) =>
+    (cliMsg.type === 'result' && cliMsg.is_error) || shouldForwardCurrentTurnLocalCommand(cliMsg)
 
   const sent = conversationService.sendMessage(
     sessionId,
     message.content,
-    message.attachments
+    message.attachments,
+    typeof message.id === 'string' && MESSAGE_ID_PATTERN.test(message.id) ? message.id : undefined,
   )
   if (!sent) {
-    sendMessage(ws, {
+    broadcastToSession(sessionId, {
       type: 'error',
       message: 'CLI process is not running. The session may have ended or the process crashed.',
       code: 'CLI_NOT_RUNNING',
     })
-    sendMessage(ws, { type: 'status', state: 'idle' })
     return
   }
 
-  userMessageSent = true
+  pipeline.gate = undefined
+  store.apply(sessionId, { type: 'turn_started', at: Date.now() })
 }
 
 async function handleDesktopClearCommand(
@@ -345,29 +428,28 @@ async function handleDesktopClearCommand(
 
   const workDir = conversationService.getSessionWorkDir(sessionId)
   conversationService.stopSession(sessionId)
-  conversationService.clearOutputCallbacks(sessionId)
   const runtime = peekSessionRuntime(sessionId)
   if (runtime) resetConversationState(runtime)
+  store.apply(sessionId, { type: 'conversation_cleared' })
 
   try {
     await sessionService.clearSessionTranscript(sessionId, workDir || undefined)
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
-    sendMessage(ws, {
+    broadcastToSession(sessionId, {
       type: 'error',
       message: errMsg,
       code: 'SESSION_CLEAR_FAILED',
     })
-    sendMessage(ws, { type: 'status', state: 'idle' })
     return
   }
 
-  sendMessage(ws, {
+  broadcastToSession(sessionId, {
     type: 'system_notification',
     subtype: 'session_cleared',
     message: 'Conversation cleared',
   })
-  sendMessage(ws, {
+  broadcastToSession(sessionId, {
     type: 'message_complete',
     usage: { input_tokens: 0, output_tokens: 0 },
   })
@@ -386,12 +468,11 @@ async function handlePrewarmSession(ws: ServerWebSocket<WebSocketData>) {
   }
 
   getSessionRuntime(sessionId).prewarm.pending = true
-  void ensureCliSessionStarted(ws, sessionId, 'prewarm_session')
+  void ensureCliSessionStarted(ws.data, sessionId, 'prewarm_session')
     .then(() => {
       const runtime = peekSessionRuntime(sessionId)
       if (!runtime?.prewarm.pending) return
       runtime.prewarm.pending = false
-      bindPrewarmMetadataCapture(sessionId)
       markPrewarmed(sessionId)
     })
     .catch((err) => {
@@ -410,13 +491,34 @@ function handlePermissionResponse(
   message: Extract<ClientMessage, { type: 'permission_response' }>
 ) {
   const { sessionId } = ws.data
+  const runtime = getSessionRuntime(sessionId)
+  const pending = store.peek(sessionId)?.pendingPermissions.find((request) => request.requestId === message.requestId)
+  if (!pending) {
+    const answered = runtime.answeredPermissions.has(message.requestId)
+    sendMessage(ws, {
+      type: 'error',
+      message: answered
+        ? 'This permission request was already answered.'
+        : 'This permission request is no longer active.',
+      code: answered ? 'PERMISSION_ALREADY_RESOLVED' : 'PERMISSION_REQUEST_EXPIRED',
+    })
+    return
+  }
   conversationService.respondToPermission(
     sessionId,
     message.requestId,
     message.allowed,
     message.rule,
     message.updatedInput,
+    { toolName: pending.toolName, suggestions: pending.suggestions },
   )
+  runtime.answeredPermissions.add(message.requestId)
+  store.apply(sessionId, {
+    type: 'permission_request_resolved',
+    requestId: message.requestId,
+    allowed: message.allowed,
+    by: ws.data.clientKind,
+  })
   console.log(`[WS] Permission response for ${message.requestId}: ${message.allowed}`)
 }
 
@@ -426,23 +528,11 @@ const permissionModesMatchCli: SameModes<PermissionMode, ExternalPermissionMode>
 void permissionModesMatchCli
 
 export async function resolveSessionPermissionMode(sessionId: string): Promise<PermissionMode> {
-  const cached = peekSessionRuntime(sessionId)?.permissionMode
-  if (cached) return cached
-  const recorded = await sessionService.getSessionPermissionMode(sessionId).catch(() => null)
-  const runtime = peekSessionRuntime(sessionId)
-  if (runtime?.permissionMode) return runtime.permissionMode
-  if (recorded) {
-    if (runtime) runtime.permissionMode = recorded
-    return recorded
-  }
-  const fallback = await settingsService.getPermissionMode().catch(() => 'default' as const)
-  return peekSessionRuntime(sessionId)?.permissionMode ?? fallback
+  return (await store.read(sessionId)).permission.desired
 }
 
-function broadcastPermissionMode(sessionId: string, mode: PermissionMode): void {
-  for (const client of peekSessionRuntime(sessionId)?.clients ?? []) {
-    sendMessage(client, { type: 'permission_mode', mode })
-  }
+export async function resolveSessionRuntimeSelection(sessionId: string): Promise<RuntimeSelection | null> {
+  return (await store.read(sessionId)).runtime.desired
 }
 
 function handleSetPermissionMode(
@@ -461,44 +551,86 @@ function handleSetPermissionMode(
   }
 
   const runtime = getSessionRuntime(sessionId)
-  runtime.permissionMode = mode
-  broadcastPermissionMode(sessionId, mode)
+  store.apply(sessionId, { type: 'permission_desired_changed', mode })
 
   const pendingStartup = runtime.startup
   if (!conversationService.hasSession(sessionId) && (pendingStartup || runtime.runtimeTransition)) {
     void enqueueRuntimeTransition(sessionId, async () => {
       await pendingStartup?.catch(() => undefined)
-      await applyPermissionModeToCli(ws, sessionId, { inTransition: true })
+      await applyPermissionModeToCli(ws.data, sessionId, { inTransition: true })
     })
   } else {
-    void applyPermissionModeToCli(ws, sessionId)
+    void applyPermissionModeToCli(ws.data, sessionId)
   }
-
-  void sessionService.appendSessionPermissionMode(sessionId, mode).catch((err) => {
-    console.warn(`[WS] Failed to save permission mode for ${sessionId}:`, err)
-  })
 }
 
 async function applyPermissionModeToCli(
-  ws: ServerWebSocket<WebSocketData>,
+  endpoint: SessionEndpoint,
   sessionId: string,
   { inTransition = false } = {},
 ): Promise<void> {
-  const mode = peekSessionRuntime(sessionId)?.permissionMode
-  const cliMode = conversationService.getSessionPermissionMode(sessionId)
-  if (!mode || !cliMode || cliMode === mode) return
+  if (!conversationService.hasSession(sessionId)) return
+  const { desired: mode, effective: cliMode } = store.get(sessionId).permission
+  if (!cliMode || cliMode === mode) return
 
   if (mode === 'bypassPermissions' || cliMode === 'bypassPermissions') {
+    if (deferRestartUntilTurnEnds(endpoint, sessionId, 'permission')) return
     if (inTransition) {
-      await restartSessionWithPermissionMode(ws, sessionId, mode)
+      await restartSession(endpoint, sessionId, 'permission')
     } else {
       await enqueueRuntimeTransition(sessionId, () =>
-        applyPermissionModeToCli(ws, sessionId, { inTransition: true }),
+        applyPermissionModeToCli(endpoint, sessionId, { inTransition: true }),
       )
     }
     return
   }
-  conversationService.setPermissionMode(sessionId, mode)
+  const requestId = conversationService.setPermissionMode(sessionId, mode)
+  if (requestId) getSessionRuntime(sessionId).pendingModeRequests.set(requestId, mode)
+}
+
+function deferRestartUntilTurnEnds(endpoint: SessionEndpoint, sessionId: string, reason: RestartReason): boolean {
+  if (store.get(sessionId).turn.phase === 'idle' || !conversationService.hasSession(sessionId)) return false
+  getSessionRuntime(sessionId).endpoint = endpoint
+  store.apply(sessionId, { type: 'restart_queued', reason })
+  console.log(`[WS] Deferring CLI restart for ${sessionId} until the current turn ends`)
+  return true
+}
+
+function runQueuedRestart(sessionId: string): void {
+  const reason = store.peek(sessionId)?.process.pendingRestart
+  const endpoint = peekSessionRuntime(sessionId)?.endpoint
+  if (!reason || !endpoint) return
+  void enqueueRuntimeTransition(sessionId, async () => {
+    if (!store.peek(sessionId)?.process.pendingRestart) return
+    const runtime = peekSessionRuntime(sessionId)
+    const needed = queuedRestartStillNeeded(sessionId)
+    if (runtime) runtime.queuedFromRuntime = undefined
+    if (!needed) {
+      store.apply(sessionId, { type: 'restart_cancelled' })
+      return
+    }
+    await restartSession(endpoint, sessionId, reason)
+  })
+}
+
+function queuedRestartStillNeeded(sessionId: string): boolean {
+  const state = store.peek(sessionId)
+  if (!state) return false
+  const { desired, effective } = state.permission
+  const permissionNeedsRestart = !!effective && desired !== effective &&
+    (desired === 'bypassPermissions' || effective === 'bypassPermissions')
+  const baseline = peekSessionRuntime(sessionId)?.queuedFromRuntime
+  const runtimeNeedsRestart = !!baseline && !isSameOptionalRuntimeSelection(baseline.selection, state.runtime.desired)
+  return permissionNeedsRestart || runtimeNeedsRestart
+}
+
+function isSameRuntimeSelection(a: RuntimeSelection, b: RuntimeSelection): boolean {
+  return a.providerId === b.providerId && a.modelId === b.modelId && a.effort === b.effort
+}
+
+function isSameOptionalRuntimeSelection(a: RuntimeSelection | null, b: RuntimeSelection | null): boolean {
+  if (!a || !b) return a === b
+  return isSameRuntimeSelection(a, b)
 }
 
 async function handleSetRuntimeConfig(
@@ -523,16 +655,16 @@ async function handleSetRuntimeConfig(
     return
   }
 
-  const nextOverride: RuntimeOverride = {
+  const nextSelection: RuntimeSelection = {
     providerId: modelId ? message.providerId ?? null : null,
     modelId,
     ...(effort ? { effort } : {}),
   }
   const runtime = getSessionRuntime(sessionId)
-  const prevOverride = runtime.runtimeOverride
-  runtime.runtimeOverride = nextOverride
+  const previousSelection = store.get(sessionId).runtime.desired
+  store.apply(sessionId, { type: 'runtime_desired_changed', selection: nextSelection })
 
-  if (prevOverride && isSameRuntimeOverride(prevOverride, nextOverride)) {
+  if (previousSelection && isSameRuntimeSelection(previousSelection, nextSelection)) {
     return
   }
 
@@ -541,123 +673,101 @@ async function handleSetRuntimeConfig(
     if (pendingStartup) {
       await enqueueRuntimeTransition(sessionId, async () => {
         await pendingStartup.catch(() => undefined)
-        const currentOverride = peekSessionRuntime(sessionId)?.runtimeOverride
+        const current = store.peek(sessionId)?.runtime.desired
         if (
-          !currentOverride ||
-          !isSameRuntimeOverride(currentOverride, nextOverride) ||
+          !current ||
+          !isSameRuntimeSelection(current, nextSelection) ||
           !conversationService.hasSession(sessionId)
         ) {
           return
         }
-        await restartSessionWithRuntimeConfig(ws, sessionId)
+        await restartSession(ws.data, sessionId, 'runtime')
       })
     }
     return
   }
 
+  if (store.get(sessionId).turn.phase !== 'idle' && !runtime.queuedFromRuntime) {
+    runtime.queuedFromRuntime = { selection: previousSelection }
+  }
+  if (deferRestartUntilTurnEnds(ws.data, sessionId, 'runtime')) return
+
   await enqueueRuntimeTransition(sessionId, () =>
-    restartSessionWithRuntimeConfig(ws, sessionId),
+    restartSession(ws.data, sessionId, 'runtime'),
   )
 }
 
-async function restartSessionWithPermissionMode(
-  ws: ServerWebSocket<WebSocketData>,
+async function restartSession(
+  endpoint: SessionEndpoint,
   sessionId: string,
-  mode: string,
+  reason: RestartReason,
 ): Promise<void> {
   try {
-    const workDir = conversationService.getSessionWorkDir(sessionId)
+    const workDir = conversationService.getSessionWorkDir(sessionId) || store.get(sessionId).workspace.workDir
+    const generation = conversationService.getGeneration(sessionId)
     conversationService.stopSession(sessionId)
+    store.apply(sessionId, { type: 'process_phase_changed', phase: 'restarting', generation })
 
     const runtimeSettings = await getRuntimeSettings(sessionId)
-    const sdkUrl =
-      `ws://${ws.data.serverHost}:${ws.data.serverPort}/sdk/${sessionId}` +
-      `?token=${encodeURIComponent(crypto.randomUUID())}`
-    await conversationService.startSession(sessionId, workDir, sdkUrl, runtimeSettings)
-
-    sendMessage(ws, { type: 'status', state: 'idle' })
-    console.log(`[WS] Restarted CLI for ${sessionId} with permission mode: ${mode}`)
+    await conversationService.startSession(sessionId, workDir, buildSdkUrl(endpoint, sessionId), runtimeSettings)
+    console.log(`[WS] Restarted CLI for ${sessionId} (${reason})`)
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
+    const state = store.peek(sessionId)
     void diagnosticsService.recordEvent({
-      type: 'permission_restart_failed',
+      type: reason === 'permission' ? 'permission_restart_failed' : 'runtime_config_restart_failed',
       severity: 'error',
       sessionId,
       summary: errMsg,
-      details: { mode, error: err },
+      details: {
+        reason,
+        permissionMode: state?.permission.desired,
+        runtimeSelection: state?.runtime.desired,
+        error: err,
+      },
     })
-    console.error(`[WS] Failed to restart CLI for ${sessionId}: ${errMsg}`)
-    sendMessage(ws, {
+    console.error(`[WS] Failed to restart CLI for ${sessionId} (${reason}): ${errMsg}`)
+    broadcastToSession(sessionId, {
       type: 'error',
       message: await buildSessionStartupDiagnosticMessage(
         sessionId,
-        `Failed to restart session with new permission mode: ${errMsg}`,
+        reason === 'permission'
+          ? `Failed to restart session with new permission mode: ${errMsg}`
+          : `Failed to switch provider/model: ${errMsg}`,
       ),
       code: 'CLI_RESTART_FAILED',
     })
-    sendMessage(ws, { type: 'status', state: 'idle' })
   }
 }
 
-async function restartSessionWithRuntimeConfig(
-  ws: ServerWebSocket<WebSocketData>,
-  sessionId: string,
-): Promise<void> {
-  try {
-    const workDir = conversationService.getSessionWorkDir(sessionId)
-    conversationService.stopSession(sessionId)
-
-    const runtimeSettings = await getRuntimeSettings(sessionId)
-    const sdkUrl =
-      `ws://${ws.data.serverHost}:${ws.data.serverPort}/sdk/${sessionId}` +
-      `?token=${encodeURIComponent(crypto.randomUUID())}`
-    await conversationService.startSession(sessionId, workDir, sdkUrl, runtimeSettings)
-
-    sendMessage(ws, { type: 'status', state: 'idle' })
-    console.log(`[WS] Restarted CLI for ${sessionId} with runtime override`)
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err)
-    void diagnosticsService.recordEvent({
-      type: 'runtime_config_restart_failed',
-      severity: 'error',
-      sessionId,
-      summary: errMsg,
-      details: { runtimeOverride: peekSessionRuntime(sessionId)?.runtimeOverride, error: err },
-    })
-    console.error(`[WS] Failed to restart CLI for ${sessionId} after runtime override: ${errMsg}`)
-    sendMessage(ws, {
-      type: 'error',
-      message: await buildSessionStartupDiagnosticMessage(
-        sessionId,
-        `Failed to switch provider/model: ${errMsg}`,
-      ),
-      code: 'CLI_RESTART_FAILED',
-    })
-    sendMessage(ws, { type: 'status', state: 'idle' })
-  }
+function buildSdkUrl(endpoint: SessionEndpoint, sessionId: string): string {
+  return `ws://${endpoint.serverHost}:${endpoint.serverPort}/sdk/${sessionId}` +
+    `?token=${encodeURIComponent(crypto.randomUUID())}`
 }
 
 function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
   console.log(`[WS] Stop generation requested for session: ${sessionId}`)
 
-  getSessionRuntime(sessionId).stopRequested = true
+  getPipeline(sessionId).stream.stopRequested = true
 
   if (conversationService.hasSession(sessionId)) {
+    const generation = conversationService.getGeneration(sessionId)
     conversationService.sendInterrupt(sessionId)
+    store.apply(sessionId, { type: 'process_phase_changed', phase: 'stopping', generation })
 
     setTimeout(() => {
-      if (conversationService.hasSession(sessionId)) {
+      if (conversationService.getGeneration(sessionId) === generation && conversationService.hasSession(sessionId)) {
         console.log(`[WS] Force-killing CLI subprocess for session: ${sessionId}`)
-        conversationService.stopSession(sessionId)
+        conversationService.stopSession(sessionId, generation)
       }
     }, 3_000)
   }
 
-  sendMessage(ws, { type: 'status', state: 'idle' })
+  store.apply(sessionId, { type: 'turn_ended' })
 }
 
-function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: string): void {
+function triggerTitleGeneration(sessionId: string): void {
   const runtime = peekSessionRuntime(sessionId)
   const state = runtime?.title
   if (!runtime || !state || state.hasCustomTitle) return
@@ -671,7 +781,7 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
   const text = count === 1
     ? state.firstUserMessage
     : state.allUserMessages.join('\n')
-  const runtimeProviderId = runtime.runtimeOverride?.providerId
+  const runtimeProviderId = store.peek(sessionId)?.runtime.desired?.providerId
 
   void (async () => {
     try {
@@ -683,7 +793,7 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
             state.hasCustomTitle = true
             return
           }
-          sendMessage(ws, { type: 'session_title_updated', sessionId, title: placeholder })
+          store.applyIfPresent(sessionId, { type: 'title_changed', text: placeholder, source: 'ai' })
         }
       }
 
@@ -694,43 +804,12 @@ function triggerTitleGeneration(ws: ServerWebSocket<WebSocketData>, sessionId: s
           state.hasCustomTitle = true
           return
         }
-        sendMessage(ws, { type: 'session_title_updated', sessionId, title: aiTitle })
+        store.applyIfPresent(sessionId, { type: 'title_changed', text: aiTitle, source: 'ai' })
       }
     } catch (err) {
       console.error(`[Title] Failed to generate title for ${sessionId}:`, err)
     }
   })()
-}
-
-function getStreamState(sessionId: string): SessionStreamState {
-  const runtime = getSessionRuntime(sessionId)
-  runtime.stream ??= createStreamState()
-  return runtime.stream
-}
-
-function cliParentToolUseId(cliMsg: any): string | undefined {
-  return typeof cliMsg.parent_tool_use_id === 'string' && cliMsg.parent_tool_use_id.length > 0
-    ? cliMsg.parent_tool_use_id
-    : undefined
-}
-
-function rememberToolParentUseId(
-  streamState: SessionStreamState,
-  toolUseId: string | undefined,
-  parentToolUseId: string | undefined,
-): void {
-  if (!toolUseId || !parentToolUseId) return
-  streamState.toolParentUseIds.set(toolUseId, parentToolUseId)
-}
-
-function consumeToolParentUseId(
-  streamState: SessionStreamState,
-  toolUseId: string | undefined,
-): string | undefined {
-  if (!toolUseId) return undefined
-  const parentToolUseId = streamState.toolParentUseIds.get(toolUseId)
-  streamState.toolParentUseIds.delete(toolUseId)
-  return parentToolUseId
 }
 
 function getPrewarmIdleTimeoutMs(): number {
@@ -745,6 +824,10 @@ function getPrewarmIdleTimeoutMs(): number {
 function markPrewarmed(sessionId: string) {
   const runtime = getSessionRuntime(sessionId)
   runtime.prewarm.done = true
+  const generation = conversationService.getGeneration(sessionId)
+  if (generation > 0) {
+    store.apply(sessionId, { type: 'process_phase_changed', phase: 'prewarmed', generation })
+  }
   const timeoutMs = getPrewarmIdleTimeoutMs()
   if (timeoutMs === 0) return
 
@@ -756,77 +839,9 @@ function markPrewarmed(sessionId: string) {
     current.prewarm.idleTimer = undefined
     if (!current.prewarm.done) return
     console.log(`[WS] Prewarmed session ${sessionId} idle for ${timeoutMs}ms, stopping CLI subprocess`)
-    conversationService.stopSession(sessionId)
+    conversationService.stopSession(sessionId, generation)
     current.prewarm.done = false
   }, timeoutMs)
-}
-
-function cacheSessionInitMetadata(sessionId: string, cliMsg: any) {
-  if (cliMsg?.type !== 'system' || cliMsg.subtype !== 'init') return
-  if (typeof cliMsg.cwd === 'string' && cliMsg.cwd.trim()) {
-    conversationService.updateSessionWorkDir(sessionId, cliMsg.cwd)
-    void (async () => {
-      await sessionService.appendSessionMetadata(sessionId, {
-        workDir: cliMsg.cwd,
-      })
-      await sessionService.deletePlaceholderSessionFiles(sessionId, cliMsg.cwd)
-    })()
-  }
-  if (cliMsg.slash_commands && Array.isArray(cliMsg.slash_commands)) {
-    updateSessionSlashCommands(sessionId, cliMsg.slash_commands, { notifyClient: false })
-  }
-}
-
-function extractAssistantText(cliMsg: any): string {
-  const content = cliMsg?.message?.content
-  if (!Array.isArray(content)) return ''
-  const textBlock = content.find(
-    (block: unknown): block is { type: string; text: string } =>
-      !!block &&
-      typeof block === 'object' &&
-      (block as { type?: unknown }).type === 'text' &&
-      typeof (block as { text?: unknown }).text === 'string',
-  )
-  return textBlock?.text || ''
-}
-
-function readObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function normalizeAskUserQuestionToolResult(content: unknown, toolUseResult: unknown): unknown {
-  const result = readObject(toolUseResult)
-  const answers = readObject(result?.answers)
-  if (!result || !answers || !Array.isArray(result.questions)) return content
-  return {
-    questions: result.questions,
-    answers,
-  }
-}
-
-function isDuplicateOfLastApiError(
-  lastApiError: SessionStreamState['lastApiError'],
-  resultMessage: string,
-): boolean {
-  if (!lastApiError?.message) return false
-  if (resultMessage === lastApiError.message) return true
-  return (
-    resultMessage.includes(lastApiError.message) &&
-    /CLI (?:process exited unexpectedly|exited during startup)/i.test(resultMessage)
-  )
-}
-
-function bindPrewarmMetadataCapture(sessionId: string) {
-  for (const msg of conversationService.getRecentSdkMessages(sessionId)) {
-    cacheSessionInitMetadata(sessionId, msg)
-  }
-  if (!conversationService.hasSession(sessionId)) return
-
-  conversationService.clearOutputCallbacks(sessionId)
-  conversationService.onOutput(sessionId, (cliMsg) => {
-    cacheSessionInitMetadata(sessionId, cliMsg)
-  })
 }
 
 async function resolveSessionWorkDir(sessionId: string, fallback = os.homedir()): Promise<string> {
@@ -850,7 +865,7 @@ async function resolveSessionWorkDir(sessionId: string, fallback = os.homedir())
 }
 
 async function ensureCliSessionStarted(
-  ws: ServerWebSocket<WebSocketData>,
+  endpoint: SessionEndpoint,
   sessionId: string,
   reason: 'user_message' | 'prewarm_session',
 ): Promise<void> {
@@ -864,14 +879,11 @@ async function ensureCliSessionStarted(
 
   const startup = (async () => {
     const workDir = await resolveSessionWorkDir(sessionId)
-    getSessionRuntime(sessionId).lastStartupWorkDir = workDir
+    store.apply(sessionId, { type: 'workspace_reported', workspace: { workDir } })
     const runtimeSettings = await getRuntimeSettings(sessionId)
-    const sdkUrl =
-      `ws://${ws.data.serverHost}:${ws.data.serverPort}/sdk/${sessionId}` +
-      `?token=${encodeURIComponent(crypto.randomUUID())}`
-    await sendRepositoryStartupStatus(ws, sessionId, reason)
+    await sendRepositoryStartupStatus(sessionId, reason)
     console.log(`[WS] Starting CLI for ${sessionId} due to ${reason}`)
-    await conversationService.startSession(sessionId, workDir, sdkUrl, runtimeSettings)
+    await conversationService.startSession(sessionId, workDir, buildSdkUrl(endpoint, sessionId), runtimeSettings)
   })()
 
   getSessionRuntime(sessionId).startup = startup
@@ -886,452 +898,9 @@ async function ensureCliSessionStarted(
 }
 
 export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessage[] {
-  const streamState = getStreamState(sessionId)
-  switch (cliMsg.type) {
-    case 'assistant': {
-      if (cliMsg.error || cliMsg.isApiErrorMessage) {
-        const message = extractAssistantText(cliMsg) || cliMsg.error || 'Unknown API error'
-        const code = typeof cliMsg.error === 'string' ? cliMsg.error : 'API_ERROR'
-        streamState.lastApiError = { message, code }
-        return [{
-          type: 'error',
-          message,
-          code,
-        }]
-      }
-
-      if (cliMsg.message?.content && Array.isArray(cliMsg.message.content)) {
-        const messages: ServerMessage[] = []
-
-        for (const block of cliMsg.message.content) {
-          if (streamState.hasReceivedStreamEvents) {
-            if (block.type === 'tool_use' && streamState.pendingToolBlocks.has(block.id)) {
-              const pending = streamState.pendingToolBlocks.get(block.id)!
-              streamState.pendingToolBlocks.delete(block.id)
-              rememberToolParentUseId(streamState, block.id, pending.parentToolUseId)
-              messages.push({
-                type: 'tool_use_complete',
-                toolName: pending.toolName || block.name,
-                toolUseId: block.id,
-                input: block.input,
-                parentToolUseId: pending.parentToolUseId,
-              })
-            }
-          } else {
-            if (block.type === 'thinking' && block.thinking) {
-              messages.push({ type: 'thinking', text: block.thinking })
-            } else if (block.type === 'text' && block.text) {
-              messages.push({ type: 'content_start', blockType: 'text' })
-              messages.push({ type: 'content_delta', text: block.text })
-            } else if (block.type === 'tool_use') {
-              const parentToolUseId = cliParentToolUseId(cliMsg)
-              rememberToolParentUseId(streamState, block.id, parentToolUseId)
-              messages.push({
-                type: 'tool_use_complete',
-                toolName: block.name,
-                toolUseId: block.id,
-                input: block.input,
-                parentToolUseId,
-              })
-            }
-          }
-        }
-
-        streamState.hasReceivedStreamEvents = false
-        streamState.pendingToolBlocks.clear()
-        return messages
-      }
-      return []
-    }
-
-    case 'user': {
-      const messages: ServerMessage[] = []
-
-      const compactSummary = extractCompactSummary(cliMsg.message?.content)
-      if (compactSummary) {
-        messages.push(liveItem({ type: 'compact_summary', title: 'Context compacted', phase: 'complete', summary: compactSummary }))
-      }
-
-      const localCommandOutput = extractLocalCommandOutput(
-        cliMsg.message?.content,
-      )
-      if (localCommandOutput) {
-        const pendingLocalCommand = streamState.pendingLocalCommand
-        streamState.pendingLocalCommand = undefined
-        if (!isCompactCommandOutput(localCommandOutput)) {
-          const goalEvent = parseGoalEvent(
-            localCommandOutput,
-            pendingLocalCommand,
-          )
-          if (goalEvent) {
-            messages.push(liveItem({ type: 'goal_event', ...goalEvent }))
-          } else {
-            messages.push({ type: 'content_start', blockType: 'text' })
-            messages.push({ type: 'content_delta', text: localCommandOutput })
-          }
-        }
-      }
-
-      if (cliMsg.message?.content && Array.isArray(cliMsg.message.content)) {
-        for (const block of cliMsg.message.content) {
-          if (block.type === 'tool_result') {
-            const rememberedParentToolUseId = consumeToolParentUseId(streamState, block.tool_use_id)
-            const parentToolUseId =
-              cliParentToolUseId(cliMsg) ?? rememberedParentToolUseId
-            messages.push({
-              type: 'tool_result',
-              toolUseId: block.tool_use_id,
-              content: normalizeAskUserQuestionToolResult(block.content, cliMsg.toolUseResult),
-              isError: !!block.is_error,
-              parentToolUseId,
-            })
-          }
-        }
-      }
-
-      return messages
-    }
-
-    case 'stream_event': {
-      streamState.hasReceivedStreamEvents = true
-      const event = cliMsg.event
-      if (!event) return []
-
-      switch (event.type) {
-        case 'message_start': {
-          return [{ type: 'status', state: 'thinking' }]
-        }
-
-        case 'content_block_start': {
-          const contentBlock = event.content_block
-          if (!contentBlock) return []
-
-          const index = event.index ?? 0
-
-          if (contentBlock.type === 'tool_use') {
-            const parentToolUseId = cliParentToolUseId(cliMsg)
-            streamState.activeBlockTypes.set(index, 'tool_use')
-            streamState.activeToolBlocks.set(index, {
-              toolName: contentBlock.name || '',
-              toolUseId: contentBlock.id || '',
-              inputJson: '',
-              parentToolUseId,
-            })
-            return [{
-              type: 'content_start',
-              blockType: 'tool_use',
-              toolName: contentBlock.name,
-              toolUseId: contentBlock.id,
-              parentToolUseId,
-            }]
-          }
-
-          if (contentBlock.type === 'thinking' || contentBlock.type === 'redacted_thinking') {
-            streamState.activeBlockTypes.set(index, 'thinking')
-            return [{ type: 'status', state: 'thinking', verb: 'Thinking' }]
-          }
-
-          streamState.activeBlockTypes.set(index, 'text')
-          return [{ type: 'content_start', blockType: 'text' }]
-        }
-
-        case 'content_block_delta': {
-          const delta = event.delta
-          if (!delta) return []
-
-          if (delta.type === 'text_delta' && delta.text) {
-            return [{ type: 'content_delta', text: delta.text }]
-          }
-          if (delta.type === 'input_json_delta' && delta.partial_json) {
-            const index = event.index ?? 0
-            const toolBlock = streamState.activeToolBlocks.get(index)
-            if (toolBlock) toolBlock.inputJson += delta.partial_json
-            return [{ type: 'content_delta', toolInput: delta.partial_json }]
-          }
-          if (delta.type === 'thinking_delta' && delta.thinking) {
-            return [{ type: 'thinking', text: delta.thinking }]
-          }
-          return []
-        }
-
-        case 'content_block_stop': {
-          const index = event.index ?? 0
-          const blockType = streamState.activeBlockTypes.get(index)
-          streamState.activeBlockTypes.delete(index)
-
-          if (blockType === 'tool_use') {
-            const toolBlock = streamState.activeToolBlocks.get(index)
-            streamState.activeToolBlocks.delete(index)
-            if (toolBlock) {
-              const parentToolUseId =
-                cliParentToolUseId(cliMsg) ?? toolBlock.parentToolUseId
-              let parsedInput = null
-              try { parsedInput = JSON.parse(toolBlock.inputJson) } catch {}
-
-              if (parsedInput !== null) {
-                rememberToolParentUseId(streamState, toolBlock.toolUseId, parentToolUseId)
-                return [{
-                  type: 'tool_use_complete',
-                  toolName: toolBlock.toolName,
-                  toolUseId: toolBlock.toolUseId,
-                  input: parsedInput,
-                  parentToolUseId,
-                }]
-              }
-
-              console.warn(
-                `[WS] Tool input JSON parse failed for ${toolBlock.toolName} (${toolBlock.toolUseId}), deferring to assistant message`,
-              )
-              streamState.pendingToolBlocks.set(toolBlock.toolUseId, {
-                toolName: toolBlock.toolName,
-                toolUseId: toolBlock.toolUseId,
-                parentToolUseId,
-              })
-            }
-          }
-          return []
-        }
-
-        case 'message_stop': {
-          return []
-        }
-
-        case 'message_delta': {
-          return []
-        }
-
-        default:
-          return []
-      }
-    }
-
-    case 'control_request': {
-      if (cliMsg.request?.subtype === 'can_use_tool') {
-        return [{
-          type: 'permission_request',
-          requestId: cliMsg.request_id,
-          toolName: cliMsg.request.tool_name || 'Unknown',
-          toolUseId:
-            typeof cliMsg.request.tool_use_id === 'string'
-              ? cliMsg.request.tool_use_id
-              : undefined,
-          input: cliMsg.request.input || {},
-          description: cliMsg.request.description,
-        }]
-      }
-      return []
-    }
-
-    case 'control_response':
-      return []
-
-    case 'result': {
-      const usage = {
-        input_tokens: cliMsg.usage?.input_tokens || 0,
-        output_tokens: cliMsg.usage?.output_tokens || 0,
-      }
-
-      if (cliMsg.is_error) {
-        const runtime = peekSessionRuntime(sessionId)
-        if (runtime?.stopRequested) {
-          runtime.stopRequested = false
-          return [{ type: 'message_complete', usage }]
-        }
-
-        const resultMessage =
-          (typeof cliMsg.result === 'string' && cliMsg.result) ||
-          (Array.isArray(cliMsg.errors) && cliMsg.errors.length > 0
-            ? cliMsg.errors.join('\n')
-            : 'Unknown error')
-        if (isDuplicateOfLastApiError(streamState.lastApiError, resultMessage)) {
-          streamState.lastApiError = undefined
-          return [{ type: 'message_complete', usage }]
-        }
-        return [
-          {
-            type: 'error',
-            message: resultMessage,
-            code: 'CLI_ERROR',
-          },
-          { type: 'message_complete', usage },
-        ]
-      }
-
-      const runtime = peekSessionRuntime(sessionId)
-      if (runtime) runtime.stopRequested = false
-      streamState.lastApiError = undefined
-      return [{ type: 'message_complete', usage }]
-    }
-
-    case 'system': {
-      const subtype = cliMsg.subtype
-      if (subtype === 'api_retry') {
-        const apiRetryMessage = toApiRetryServerMessage(cliMsg)
-        return apiRetryMessage ? [apiRetryMessage] : []
-      }
-      if (subtype === 'init') {
-        cacheSessionInitMetadata(sessionId, cliMsg)
-        const messages: ServerMessage[] = [
-          { type: 'system_notification', subtype: 'init', message: `Model: ${cliMsg.model || 'unknown'}`, data: { model: cliMsg.model } },
-        ]
-        const cmds = peekSessionRuntime(sessionId)?.slashCommands
-        if (cmds && cmds.length > 0) {
-          messages.push({
-            type: 'system_notification',
-            subtype: 'slash_commands',
-            data: cmds,
-          })
-        }
-        return messages
-      }
-      if (subtype === 'memory_saved') {
-        const saved = parseMemorySaved(cliMsg)
-        return saved ? [liveItem({ type: 'memory_event', event: 'saved', ...saved })] : []
-      }
-      if (subtype === 'status') {
-        if (isPermissionMode(cliMsg.permissionMode)) {
-          getSessionRuntime(sessionId).permissionMode = cliMsg.permissionMode
-          conversationService.notePermissionMode(sessionId, cliMsg.permissionMode)
-          return [{ type: 'permission_mode', mode: cliMsg.permissionMode }]
-        }
-        if (cliMsg.status === 'compacting') {
-          return [{
-            type: 'status',
-            state: 'compacting',
-            verb: 'Compacting conversation',
-          }]
-        }
-        if (cliMsg.status == null) {
-          return [{ type: 'status', state: 'thinking', verb: 'Thinking' }]
-        }
-        return []
-      }
-      if (subtype === 'hook_started' || subtype === 'hook_response') {
-        return []
-      }
-      if (subtype === 'local_command' || subtype === 'local_command_output') {
-        const localCommand = parseLocalCommand(cliMsg.content ?? cliMsg.message)
-        if (localCommand) {
-          streamState.pendingLocalCommand = localCommand
-          return []
-        }
-
-        const localCommandOutput = extractLocalCommandOutput(
-          cliMsg.content ?? cliMsg.message,
-          { allowUntagged: subtype === 'local_command_output' },
-        )
-        if (!localCommandOutput) return []
-        const goalEvent = parseGoalEvent(
-          localCommandOutput,
-          streamState.pendingLocalCommand,
-        )
-        streamState.pendingLocalCommand = undefined
-        if (goalEvent) {
-          return [liveItem({ type: 'goal_event', ...goalEvent })]
-        }
-        return [
-          { type: 'content_start', blockType: 'text' },
-          { type: 'content_delta', text: localCommandOutput },
-        ]
-      }
-      if (subtype === 'task_notification') {
-        return backgroundTaskMessages(cliMsg, subtype)
-      }
-      if (subtype === 'task_started') {
-        return [
-          ...backgroundTaskMessages(cliMsg, subtype),
-          {
-            type: 'status',
-            state: 'tool_executing',
-            verb: cliMsg.message || cliMsg.description || 'Task started',
-          },
-        ]
-      }
-      if (subtype === 'task_progress') {
-        return [
-          ...backgroundTaskMessages(cliMsg, subtype),
-          {
-            type: 'status',
-            state: 'tool_executing',
-            verb: cliMsg.message || cliMsg.summary || cliMsg.description || 'Task in progress',
-          },
-        ]
-      }
-      if (subtype === 'session_state_changed') {
-        return [{
-          type: 'system_notification',
-          subtype: 'session_state_changed',
-          message: cliMsg.message,
-          data: cliMsg,
-        }]
-      }
-      if (subtype === 'compact_boundary') {
-        return [liveItem({
-          type: 'compact_summary',
-          title: getCompactBoundaryMessage(cliMsg),
-          phase: 'complete',
-          ...readCompactMetadata(cliMsg.compact_metadata ?? cliMsg),
-        })]
-      }
-      return []
-    }
-
-    default:
-      console.log(`[WS] Unknown CLI message type: ${cliMsg.type}`, JSON.stringify(cliMsg).substring(0, 200))
-      return []
-  }
-}
-
-function finiteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function normalizeRetryCount(value: unknown): number | null {
-  const numeric = finiteNumber(value)
-  if (numeric === null) return null
-  return Math.max(0, Math.trunc(numeric))
-}
-
-function readRetryErrorRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function readRetryErrorString(value: unknown, keys: string[]): string | undefined {
-  const record = readRetryErrorRecord(value)
-  if (!record) return undefined
-  for (const key of keys) {
-    const candidate = record[key]
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
-  }
-  return undefined
-}
-
-function toApiRetryServerMessage(cliMsg: any): ServerMessage | null {
-  const attempt = normalizeRetryCount(cliMsg.attempt)
-  const maxRetries = normalizeRetryCount(cliMsg.max_retries)
-  const retryDelayMs = normalizeRetryCount(cliMsg.retry_delay_ms)
-  if (attempt === null || maxRetries === null || retryDelayMs === null) return null
-
-  const embeddedError = readRetryErrorRecord(cliMsg.error)
-  const embeddedStatus = embeddedError ? finiteNumber(embeddedError.status) : null
-  const rawStatus = cliMsg.error_status === null
-    ? null
-    : finiteNumber(cliMsg.error_status) ?? embeddedStatus
-  const errorType = typeof cliMsg.error === 'string' && cliMsg.error.trim()
-    ? cliMsg.error.trim()
-    : readRetryErrorString(cliMsg.error, ['type', 'code', 'name'])
-  const errorMessage = readRetryErrorString(cliMsg.error, ['message', 'error'])
-
-  return {
-    type: 'api_retry',
-    attempt,
-    maxRetries,
-    retryDelayMs,
-    errorStatus: rawStatus === null ? null : Math.trunc(rawStatus),
-    ...(errorType ? { errorType } : {}),
-    ...(errorMessage ? { errorMessage } : {}),
-  }
+  const { messages, events } = translateCliOutput(cliMsg, getPipeline(sessionId).stream)
+  for (const event of events) store.apply(sessionId, event)
+  return messages
 }
 
 function sendMessage(ws: ServerWebSocket<WebSocketData>, message: ServerMessage) {
@@ -1343,25 +912,9 @@ function sendError(ws: ServerWebSocket<WebSocketData>, message: string, code: st
 }
 
 function getDisconnectCleanupDelayMs(sessionId: string): number {
-  return conversationService.getPendingPermissionRequests(sessionId).length > 0
+  return (store.peek(sessionId)?.pendingPermissions.length ?? 0) > 0
     ? PENDING_PERMISSION_DISCONNECT_CLEANUP_MS
     : CLIENT_DISCONNECT_CLEANUP_MS
-}
-
-function replayPendingPermissionRequests(
-  ws: ServerWebSocket<WebSocketData>,
-  sessionId: string,
-): void {
-  for (const request of conversationService.getPendingPermissionRequests(sessionId)) {
-    sendMessage(ws, {
-      type: 'permission_request',
-      requestId: request.requestId,
-      toolName: request.toolName,
-      ...(request.toolUseId ? { toolUseId: request.toolUseId } : {}),
-      input: request.input,
-      ...(request.description ? { description: request.description } : {}),
-    })
-  }
 }
 
 function getDesktopSlashCommand(content: string): ReturnType<typeof parseSlashCommand> {
@@ -1441,31 +994,6 @@ function isLocalCommandOutputMessage(cliMsg: any): boolean {
   ) !== null
 }
 
-type LiveItemContent<T = LiveTranscriptItem> = T extends LiveTranscriptItem ? Omit<T, 'id' | 'timestamp'> : never
-
-/** A transcript item recognized in the live stream, stamped like one read from history. */
-function liveItem(content: LiveItemContent): ServerMessage {
-  return {
-    type: 'transcript_item',
-    item: { ...content, id: crypto.randomUUID(), timestamp: Date.now() } as LiveTranscriptItem,
-  }
-}
-
-function backgroundTaskMessages(cliMsg: unknown, subtype: BackgroundTaskMessageSubtype): ServerMessage[] {
-  const parsed = parseBackgroundTaskMessage(cliMsg, subtype)
-  return parsed ? [{ type: 'background_task', ...parsed }] : []
-}
-
-function getCompactBoundaryMessage(cliMsg: any): string {
-  const message = typeof cliMsg?.message === 'string' ? cliMsg.message.trim() : ''
-  if (message) return message
-
-  const content = typeof cliMsg?.content === 'string' ? cliMsg.content.trim() : ''
-  if (content) return content
-
-  return 'Context compacted'
-}
-
 function removeActiveClient(
   sessionId: string,
   ws: ServerWebSocket<WebSocketData>,
@@ -1478,56 +1006,6 @@ function removeActiveClient(
 
 function hasActiveClients(sessionId: string): boolean {
   return (peekSessionRuntime(sessionId)?.clients.size ?? 0) > 0
-}
-
-function removeClientOutputCallback(ws: ServerWebSocket<WebSocketData>): void {
-  const entry = clientOutputCallbacks.get(ws)
-  if (!entry) return
-  conversationService.removeOutputCallback(entry.sessionId, entry.callback)
-  clientOutputCallbacks.delete(ws)
-}
-
-function bindAllClientSessionOutputs(
-  sessionId: string,
-  options?: {
-    shouldForward?: (cliMsg: any) => boolean
-  },
-): void {
-  const clients = peekSessionRuntime(sessionId)?.clients
-  if (!clients) return
-  for (const ws of clients) {
-    bindClientSessionOutput(sessionId, ws, options)
-  }
-}
-
-function bindClientSessionOutput(
-  sessionId: string,
-  ws: ServerWebSocket<WebSocketData>,
-  options?: {
-    shouldForward?: (cliMsg: any) => boolean
-  },
-) {
-  if (!conversationService.hasSession(sessionId)) return
-
-  removeClientOutputCallback(ws)
-
-  const callback = (cliMsg: any) => {
-    if (options?.shouldForward && !options.shouldForward(cliMsg)) {
-      return
-    }
-
-    const serverMsgs = translateCliMessage(cliMsg, sessionId)
-    for (const msg of serverMsgs) {
-      sendMessage(ws, msg)
-    }
-
-    if (cliMsg.type === 'result') {
-      triggerTitleGeneration(ws, sessionId)
-    }
-  }
-
-  clientOutputCallbacks.set(ws, { sessionId, callback })
-  conversationService.onOutput(sessionId, callback)
 }
 
 type RuntimeSettings = {
@@ -1546,22 +1024,20 @@ function isKnownRuntimeProviderId(
 }
 
 async function getRuntimeSettings(sessionId: string): Promise<RuntimeSettings> {
+  await store.ensure(sessionId)
   const settings = await resolveRuntimeSettings(sessionId)
-  const resolvedPermissionMode = await resolveSessionPermissionMode(sessionId)
-  const runtime = getSessionRuntime(sessionId)
-  runtime.permissionMode ??= resolvedPermissionMode
-  const permissionMode = runtime.permissionMode
+  const state = store.get(sessionId)
   // A per-session effort chosen in the composer wins over the global default.
-  const overrideEffort = peekSessionRuntime(sessionId)?.runtimeOverride?.effort
+  const overrideEffort = state.runtime.desired?.effort
   return {
     ...settings,
-    permissionMode,
+    permissionMode: state.permission.desired,
     ...(overrideEffort ? { effort: overrideEffort } : {}),
   }
 }
 
 async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
-  const runtimeOverride = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride : undefined
+  const runtimeOverride = sessionId ? store.peek(sessionId)?.runtime.desired : undefined
   // A null provider used to mean the official sign-in, which is gone; such an
   // override falls back to the default settings.
   if (runtimeOverride?.providerId === null) {
@@ -1575,8 +1051,7 @@ async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettin
         console.warn(
           `[WS] Ignoring stale runtime provider id for ${sessionId}: ${runtimeOverride.providerId}`,
         )
-        const runtime = peekSessionRuntime(sessionId!)
-        if (runtime) runtime.runtimeOverride = undefined
+        store.apply(sessionId!, { type: 'runtime_desired_changed', selection: null })
         return getDefaultRuntimeSettings()
       }
     }
@@ -1605,14 +1080,6 @@ async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
     activeId && isKnownRuntimeProviderId(activeId, providers) ? activeId : null
 
   const userSettings = await settingsService.getUserSettings()
-  const providerSettings = resolvedActiveId
-    ? await providerService.getManagedSettings()
-    : undefined
-  const modelSettings = providerSettings ?? userSettings
-  const modelContext =
-    typeof modelSettings.modelContext === 'string' && modelSettings.modelContext.trim()
-      ? modelSettings.modelContext
-      : undefined
   const effort =
     typeof userSettings.effort === 'string' && userSettings.effort.trim()
       ? userSettings.effort
@@ -1620,16 +1087,16 @@ async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
   const thinking = resolveDesktopThinkingMode(userSettings)
 
   let model: string | undefined
-  if (resolvedActiveId) {
-    const baseModel =
-      typeof modelSettings.model === 'string' && modelSettings.model.trim()
-        ? modelSettings.model
-        : ''
-    if (baseModel) {
-      model = baseModel
-      if (modelContext) model += `:${modelContext}`
-    }
+  const activeProvider = resolvedActiveId
+    ? providers.find((provider) => provider.id === resolvedActiveId)
+    : undefined
+  if (activeProvider) {
+    model = resolveProviderDefaultModel(activeProvider, await providerService.getManagedSettings())
   } else {
+    const modelContext =
+      typeof userSettings.modelContext === 'string' && userSettings.modelContext.trim()
+        ? userSettings.modelContext
+        : undefined
     const baseModel =
       typeof userSettings.model === 'string' && userSettings.model.trim()
         ? userSettings.model
@@ -1663,9 +1130,8 @@ async function buildSessionStartupDiagnosticMessage(
   ]
 
   try {
-    const recentWorkDir = peekSessionRuntime(sessionId)?.lastStartupWorkDir
     const workDir =
-      recentWorkDir ||
+      store.peek(sessionId)?.workspace.workDir ||
       conversationService.getSessionWorkDir(sessionId) ||
       await sessionService.getSessionWorkDir(sessionId)
     lines.push(`- workDir: ${workDir ?? '(unknown)'}`)
@@ -1673,7 +1139,7 @@ async function buildSessionStartupDiagnosticMessage(
     lines.push(`- workDir: failed to resolve (${err instanceof Error ? err.message : String(err)})`)
   }
 
-  const runtimeOverride = peekSessionRuntime(sessionId)?.runtimeOverride
+  const runtimeOverride = store.peek(sessionId)?.runtime.desired
   if (runtimeOverride) {
     lines.push(`- runtimeOverride.providerId: ${runtimeOverride.providerId ?? '(none)'}`)
     lines.push(`- runtimeOverride.modelId: ${runtimeOverride.modelId}`)
@@ -1719,7 +1185,6 @@ function enqueueRuntimeTransition(
 }
 
 async function waitForRuntimeTransitionBeforeUserTurn(
-  ws: ServerWebSocket<WebSocketData>,
   sessionId: string,
 ): Promise<{ ok: boolean; waited: boolean }> {
   let waited = false
@@ -1738,12 +1203,11 @@ async function waitForRuntimeTransitionBeforeUserTurn(
         details: err,
       })
       console.error(`[WS] Runtime transition failed before handling user message for ${sessionId}: ${errMsg}`)
-      sendMessage(ws, {
+      broadcastToSession(sessionId, {
         type: 'error',
         message: `Failed to switch provider/model: ${errMsg}`,
         code: 'CLI_RESTART_FAILED',
       })
-      sendMessage(ws, { type: 'status', state: 'idle' })
       return { ok: false, waited }
     }
 
@@ -1755,6 +1219,10 @@ async function waitForRuntimeTransitionBeforeUserTurn(
   }
 
   return { ok: true, waited }
+}
+
+function broadcastToSession(sessionId: string, message: ServerMessage): void {
+  sendToSession(sessionId, message)
 }
 
 export function sendToSession(sessionId: string, message: ServerMessage): boolean {
@@ -1772,11 +1240,9 @@ export function updateSessionSlashCommands(
   commands: unknown[],
   options: { notifyClient?: boolean } = {},
 ): SessionSlashCommand[] {
-  const normalized = commands
-    .map(normalizeSessionSlashCommand)
-    .filter((command): command is SessionSlashCommand => command !== null)
+  const normalized = normalizeSessionSlashCommands(commands)
 
-  getSessionRuntime(sessionId).slashCommands = normalized
+  store.apply(sessionId, { type: 'slash_commands_reported', commands: normalized })
 
   if (options.notifyClient !== false) {
     sendToSession(sessionId, {
@@ -1789,44 +1255,37 @@ export function updateSessionSlashCommands(
   return normalized
 }
 
-function normalizeSessionSlashCommand(command: unknown): SessionSlashCommand | null {
-  if (typeof command === 'string') {
-    return command.trim() ? { name: command, description: '' } : null
-  }
-  if (!command || typeof command !== 'object') return null
-
-  const record = command as {
-    name?: unknown
-    command?: unknown
-    description?: unknown
-    argumentHint?: unknown
-  }
-  const name =
-    typeof record.name === 'string'
-      ? record.name
-      : typeof record.command === 'string'
-        ? record.command
-        : ''
-  if (!name.trim()) return null
-
-  return {
-    name,
-    description: typeof record.description === 'string' ? record.description : '',
-    ...(typeof record.argumentHint === 'string' ? { argumentHint: record.argumentHint } : {}),
-  }
-}
-
 export function closeSessionConnection(sessionId: string, reason = 'session closed'): boolean {
-  conversationService.clearOutputCallbacks(sessionId)
   // Dispose before closing sockets so their close events find no session and are ignored.
   const clients = disposeSessionRuntime(sessionId)?.clients
+  store.dispose(sessionId)
+  conversationService.forgetSession(sessionId)
   if (!clients || clients.size === 0) return false
 
   for (const ws of clients) {
-    clientOutputCallbacks.delete(ws)
     ws.close(1000, reason)
   }
   return true
+}
+
+export type TeamRole = 'lead' | 'member'
+
+export function setTeamMembership(teamName: string, roles: ReadonlyMap<string, TeamRole>): void {
+  const known = [...roles.keys()].filter((sessionId) => store.peek(sessionId))
+  for (const sessionId of new Set([...getConnectedSessionIds(), ...known])) {
+    const role = roles.get(sessionId)
+    if (role) {
+      store.apply(sessionId, { type: 'team_changed', team: { name: teamName, role } })
+    } else if (store.peek(sessionId)?.team?.name === teamName) {
+      store.apply(sessionId, { type: 'team_changed', team: null })
+    }
+  }
+}
+
+export function sendToTeam(teamName: string, message: ServerMessage): void {
+  for (const sessionId of getConnectedSessionIds()) {
+    if (store.peek(sessionId)?.team?.name === teamName) sendToSession(sessionId, message)
+  }
 }
 
 export function getActiveSessionIds(): string[] {
@@ -1835,5 +1294,5 @@ export function getActiveSessionIds(): string[] {
 
 export function __resetWebSocketHandlerStateForTests(): void {
   disposeAllSessionRuntimes()
-  clientOutputCallbacks.clear()
+  store.clear()
 }
