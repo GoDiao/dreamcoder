@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import type { WebSocketData } from './handler.js'
+import type { PermissionMode } from './protocol.js'
 
 export type SessionSlashCommand = {
   name: string
@@ -56,6 +57,7 @@ export type SessionRuntime = {
   title?: SessionTitleState
   stream?: SessionStreamState
   runtimeOverride?: RuntimeOverride
+  permissionMode?: PermissionMode
   runtimeTransition?: Promise<void>
   startup?: Promise<void>
   lastStartupWorkDir?: string

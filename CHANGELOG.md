@@ -4,6 +4,22 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Each session keeps its own permission mode.** The selector under the input shows and changes only that session's mode. Before, it showed and wrote one mode shared by every session, so switching one session changed what the others displayed and the mode every later session started in.
+  - The mode is saved in the session's transcript, as Claude Code saves it, so a session resumes in its own mode after a restart. A session imported from Claude Code resumes in the mode it last ran in.
+  - Switching a session that is not running is no longer dropped; it applies when the session next starts.
+  - Turning Bypass permissions on or off in one session no longer makes it the default for new sessions.
+  - When the CLI changes mode by itself, for example after you approve a plan, the selector follows. Before, the change was shown as "thinking".
+  - Settings → Permissions now sets only the default for new sessions, which the selector marks with a "default" tag. A forked session starts in the mode of the session it came from.
+  - "Default" is renamed "Manual". The Chinese interface uses the English mode names too.
+- **Scheduled tasks run in the permission mode chosen for them.** A new task starts with the default for new sessions, and the mode can be changed in the task.
+
+### Removed
+
+- "Don't ask" is no longer offered as the default for new sessions; a session can still be in "Don't ask" when the CLI switches to it.
+- Unused design mockup pages and their mock data.
+
 ## [0.6.1] — 2026-10-21
 
 ### Added

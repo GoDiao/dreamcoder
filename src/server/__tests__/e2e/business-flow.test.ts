@@ -153,11 +153,16 @@ describe('Business Flow: Permission Modes', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions', 'dontAsk']
+  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
 
   it('should default to "default" mode', async () => {
     const { data } = await api('GET', '/api/permissions/mode')
     expect(data.mode).toBe('default')
+  })
+
+  it('should not offer "dontAsk" as the default for new sessions', async () => {
+    const { status } = await api('PUT', '/api/permissions/mode', { mode: 'dontAsk' })
+    expect(status).toBe(400)
   })
 
   for (const mode of VALID_MODES) {

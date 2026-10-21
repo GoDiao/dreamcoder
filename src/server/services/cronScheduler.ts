@@ -15,6 +15,7 @@ import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalS
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { SettingsService } from './settingsService.js'
+import { isPermissionMode, permissionModeCliArgs } from './permissionModes.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type TaskRun = {
@@ -564,7 +565,10 @@ export class CronScheduler {
 
   private getRuntimeArgs(task: CronTask): string[] {
     const model = task.model?.trim()
-    return model ? ['--model', model] : []
+    return [
+      ...(model ? ['--model', model] : []),
+      ...(isPermissionMode(task.permissionMode) ? permissionModeCliArgs(task.permissionMode) : []),
+    ]
   }
 
   private async buildTaskChildEnv(

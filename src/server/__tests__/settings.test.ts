@@ -305,6 +305,11 @@ describe('SettingsService', () => {
     await expect(svc.setPermissionMode('invalid')).rejects.toThrow('Invalid permission mode')
   })
 
+  it('does not offer dontAsk as the default for new sessions', async () => {
+    const svc = new SettingsService()
+    await expect(svc.setPermissionMode('dontAsk')).rejects.toThrow('Invalid permission mode')
+  })
+
   it('should preserve other settings when updating permission mode', async () => {
     const svc = new SettingsService()
     await svc.updateUserSettings({ theme: 'dark' })

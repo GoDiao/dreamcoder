@@ -366,7 +366,7 @@ export const zh: Record<TranslationKey, string> = {
   'settings.providers.authStrategyDualDummyDesc': 'vLLM 等本地兼容服务，只需要占位认证值。',
 
   'settings.permissions.title': '权限模式',
-  'settings.permissions.description': '控制工具执行权限的处理方式。',
+  'settings.permissions.description': '新会话开始时使用的模式。每个会话可以在输入框旁切换自己的模式。',
 
 
   'settings.mcp.title': 'MCP 服务',
@@ -1281,24 +1281,20 @@ export const zh: Record<TranslationKey, string> = {
   'promptEditor.selectFolder': '— 选择文件夹以限制范围',
 
   'permMode.executionPermissions': '执行权限',
-  'permMode.askPermissions': 'Default',
   'permMode.askPermDesc': 'CLI 请求时确认文件编辑和高风险命令',
-  'permMode.autoAccept': 'Accept edits',
   'permMode.autoAcceptDesc': 'Claude 无需询问即可写入磁盘',
-  'permMode.planMode': 'Plan',
   'permMode.planModeDesc': '仅架构和推理，不操作文件',
-  'permMode.bypass': 'Bypass permissions',
   'permMode.bypassDesc': '对 Shell 和文件系统的完整工具访问',
-  'permMode.dontAsk': "Don't ask",
-  'permMode.enableBypassTitle': '启用跳过权限？',
+  'permMode.enableBypassTitle': '启用 Bypass permissions？',
   'permMode.enableBypassSubtitle': '这将授予对系统的完全访问权限',
   'permMode.enableBypassBody': 'Claude 将拥有<strong>不受限制的</strong>权限来执行 Shell 命令和修改以下目录中的文件:',
   'permMode.permReadWrite': '读取、写入和删除任何文件',
   'permMode.permShell': '执行任意 Shell 命令',
   'permMode.permPackages': '安装或移除软件包',
-  'permMode.enableBypassBtn': '启用跳过',
+  'permMode.enableBypassBtn': '启用 Bypass',
 
-  'permMode.label.default': 'Default',
+  'permMode.label.default': 'Manual',
+  'permMode.defaultTag': '默认',
   'permMode.label.acceptEdits': 'Accept edits',
   'permMode.label.plan': 'Plan',
   'permMode.label.bypassPermissions': 'Bypass permissions',
@@ -1490,7 +1486,6 @@ export const zh: Record<TranslationKey, string> = {
   'settings.group.settings': '设置',
   'settings.group.local': '本机',
   'settings.group.customize': '自定义',
-  'settings.permissions.dontAskDesc': '不再询问；未预先允许的工具直接拒绝。',
   // Settings pages refresh
   'settings.general.groupAppearance': '外观',
   'settings.general.groupLanguageModel': '语言与模型',

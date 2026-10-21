@@ -15,7 +15,6 @@ import {
   ScrollText,
   SettingsIcon,
   ShieldCheck,
-  ShieldOff,
   Smartphone,
   TerminalIcon,
   Wrench,
@@ -26,7 +25,7 @@ import {
 import { useTranslation, type TranslationKey } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { computerUseApi } from '../api/computerUse'
-import type { PermissionMode } from '../types/settings'
+import type { DefaultPermissionMode } from '../types/settings'
 import { usePluginStore } from '../stores/pluginStore'
 import { PluginList } from '../components/plugins/PluginList'
 import { PluginDetail } from '../components/plugins/PluginDetail'
@@ -272,12 +271,11 @@ function NavButton({ Icon, label, active, onClick }: { Icon: LucideIcon; label: 
   )
 }
 
-const PERMISSION_MODES: Array<{ mode: PermissionMode; Icon: LucideIcon; descKey: TranslationKey }> = [
+const PERMISSION_MODES: Array<{ mode: DefaultPermissionMode; Icon: LucideIcon; descKey: TranslationKey }> = [
   { mode: 'default', Icon: ShieldCheck, descKey: 'permMode.askPermDesc' },
   { mode: 'acceptEdits', Icon: FilePenLine, descKey: 'permMode.autoAcceptDesc' },
   { mode: 'plan', Icon: NotebookPen, descKey: 'permMode.planModeDesc' },
   { mode: 'bypassPermissions', Icon: Zap, descKey: 'permMode.bypassDesc' },
-  { mode: 'dontAsk', Icon: ShieldOff, descKey: 'settings.permissions.dontAskDesc' },
 ]
 
 function PermissionSettings() {
@@ -304,7 +302,7 @@ function PermissionSettings() {
         aria-label={t('settings.permissions.title')}
         className="flex flex-col"
         onKeyDown={(event) => {
-          const mode = moveRovingFocus(event, '[role="radio"]')?.dataset.value as PermissionMode | undefined
+          const mode = moveRovingFocus(event, '[role="radio"]')?.dataset.value as DefaultPermissionMode | undefined
           if (mode && mode !== permissionMode) setPermissionMode(mode)
         }}
       >

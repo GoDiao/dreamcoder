@@ -1220,6 +1220,36 @@ describe('SessionService', () => {
     expect(entry.type).toBe('file-history-snapshot')
   })
 
+  it('records the permission mode a new session is created in, and keeps it through /clear', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'mode-project')
+    await fs.mkdir(workDir, { recursive: true })
+    const { sessionId, workDir: sessionWorkDir } = await service.createSession(workDir, undefined, 'plan')
+
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('plan')
+    expect((await service.getSessionLaunchInfo(sessionId))?.transcriptMessageCount).toBe(0)
+
+    await service.appendSessionPermissionMode(sessionId, 'acceptEdits')
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('acceptEdits')
+
+    await service.clearSessionTranscript(sessionId, sessionWorkDir)
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('acceptEdits')
+  })
+
+  it('writes permission modes for one session in call order', async () => {
+    const workDir = path.join(tmpDir, 'workspace', 'mode-order')
+    await fs.mkdir(workDir, { recursive: true })
+    const { sessionId } = await service.createSession(workDir)
+    expect(await service.getSessionPermissionMode(sessionId)).toBeNull()
+
+    await Promise.all([
+      service.appendSessionPermissionMode(sessionId, 'plan'),
+      service.appendSessionPermissionMode(sessionId, 'bypassPermissions'),
+      service.appendSessionPermissionMode(sessionId, 'default'),
+    ])
+
+    expect(await service.getSessionPermissionMode(sessionId)).toBe('default')
+  })
+
   it('should defer isolated worktree creation until CLI startup', async () => {
     const workDir = await createCleanGitRepo(tmpDir)
     const { sessionId, workDir: sessionWorkDir } = await service.createSession(
@@ -2940,6 +2970,30 @@ describe('Sessions API', () => {
       firstUserId,
       firstAssistantId,
     ])
+  })
+
+  it('POST /api/sessions/:id/branch should start the fork in the source session\'s permission mode', async () => {
+    const sessionId = '55555555-5555-4555-8555-555555555555'
+    const workDir = path.join(tmpDir, 'branch-mode-workdir')
+    const userId = crypto.randomUUID()
+    const assistantId = crypto.randomUUID()
+
+    await writeSessionFile(sanitizePath(workDir), sessionId, [
+      { type: 'session-meta', isMeta: true, workDir, timestamp: '2026-01-01T00:00:00.000Z' },
+      { ...makeUserEntry('prompt', userId), cwd: workDir, sessionId },
+      { ...makeAssistantEntry('reply', userId), uuid: assistantId, cwd: workDir, sessionId },
+      { type: 'permission-mode', permissionMode: 'plan', sessionId },
+    ])
+
+    const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/branch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetMessageId: assistantId }),
+    })
+    expect(res.status).toBe(201)
+
+    const body = await res.json() as { sessionId: string }
+    expect(await service.getSessionPermissionMode(body.sessionId)).toBe('plan')
   })
 
   it('POST /api/sessions/:id/branch should reject sidechain targets', async () => {

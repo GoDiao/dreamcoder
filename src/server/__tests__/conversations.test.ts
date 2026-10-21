@@ -3240,7 +3240,7 @@ describe('WebSocket Chat Integration', () => {
       sendCalls.push({
         content,
         startCallCount: startCalls.length,
-        permissionMode: conversationService.getSessionPermissionMode(sid),
+        permissionMode: conversationService.getSessionPermissionMode(sid) ?? '',
       })
       return originalSendMessage(sid, content, attachments)
     }) as typeof conversationService.sendMessage
@@ -3319,6 +3319,8 @@ describe('WebSocket Chat Integration', () => {
           permissionMode: 'bypassPermissions',
         },
       ])
+      const defaultRes = await fetch(`${baseUrl}/api/permissions/mode`)
+      expect(await defaultRes.json()).toEqual({ mode: 'default' })
     } finally {
       conversationService.startSession = originalStartSession
       conversationService.sendMessage = originalSendMessage

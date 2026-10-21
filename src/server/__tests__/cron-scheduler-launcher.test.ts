@@ -294,6 +294,22 @@ describe('cron scheduler launcher resolution', () => {
     expect(run.error).toContain('No provider configured')
   })
 
+  it('starts a task in its own permission mode', () => {
+    const scheduler = new CronScheduler(new CronService()) as any
+    const task = { id: 't', cron: '* * * * *', prompt: 'p', createdAt: 0 }
+
+    expect(scheduler.getRuntimeArgs({ ...task, permissionMode: 'bypassPermissions', model: 'm' })).toEqual([
+      '--model',
+      'm',
+      '--dangerously-skip-permissions',
+    ])
+    expect(scheduler.getRuntimeArgs({ ...task, permissionMode: 'acceptEdits' })).toEqual([
+      '--permission-mode',
+      'acceptEdits',
+    ])
+  })
+
+
   unixOnly('executeTask passes provider-scoped model runtime to the sidecar', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
     const sidecarPath = path.join(tmpDir, 'dreamcoder-sidecar')
