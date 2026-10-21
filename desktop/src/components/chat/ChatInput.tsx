@@ -125,13 +125,15 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       return next
     })
   }, [])
-  const { sendMessage, stopGeneration, clearComposerInsertion } = useChatStore()
+  const { sendMessage, stopGeneration, clearComposerInsertion, setSessionPermissionMode } = useChatStore()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
   const chatState = sessionState?.chatState ?? 'idle'
   const slashCommands = sessionState?.slashCommands ?? []
   const composerPrefill = sessionState?.composerPrefill ?? null
   const composerInsertion = sessionState?.composerInsertion ?? null
+  const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
+  const permissionMode = sessionState?.permissionMode ?? defaultPermissionMode
   const runtimeSelection = useSessionRuntimeStore((state) =>
     activeTabId ? state.selections[activeTabId] : undefined,
   )
@@ -504,11 +506,12 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     const oldId = activeTabId
     const { createSession, deleteSession } = useSessionStore.getState()
     const { replaceTabSession } = useTabStore.getState()
-    const { disconnectSession, connectToSession } = useChatStore.getState()
-    const newId = await createSession(
-      workDir || undefined,
-      repository ? { repository } : undefined,
-    )
+    const { disconnectSession, connectToSession, sessions } = useChatStore.getState()
+    const permissionMode = sessions[oldId]?.permissionMode
+    const newId = await createSession(workDir || undefined, {
+      ...(repository ? { repository } : {}),
+      ...(permissionMode ? { permissionMode } : {}),
+    })
     useSessionRuntimeStore.getState().moveSelection(oldId, newId)
     disconnectSession(oldId)
     replaceTabSession(oldId, newId)
@@ -1089,7 +1092,13 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                         worktreePath={gitInfo?.worktree?.path || gitInfo?.worktree?.plannedPath || null}
                       />
                     )}
-                    <PermissionModeSelector compact={useCompactControls} />
+                    <PermissionModeSelector
+                      compact={useCompactControls}
+                      value={permissionMode}
+                      onChange={(mode) => {
+                        if (activeTabId) setSessionPermissionMode(activeTabId, mode)
+                      }}
+                    />
                   </>
                 )}
                 right={activeTabId ? (

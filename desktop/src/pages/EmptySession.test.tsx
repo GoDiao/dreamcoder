@@ -95,8 +95,14 @@ vi.mock('../components/shared/DirectoryPicker', () => ({
 }))
 
 vi.mock('../components/controls/PermissionModeSelector', () => ({
-  PermissionModeSelector: ({ compact }: { compact?: boolean }) => (
-    <button type="button" data-testid="permission-mode-selector" data-compact={compact ? 'true' : 'false'}>
+  PermissionModeSelector: ({ compact, value, onChange }: { compact?: boolean; value: string; onChange: (mode: string) => void }) => (
+    <button
+      type="button"
+      data-testid="permission-mode-selector"
+      data-compact={compact ? 'true' : 'false'}
+      data-value={value}
+      onClick={() => onChange('plan')}
+    >
       Bypass
     </button>
   ),
@@ -453,6 +459,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
 
@@ -478,6 +485,29 @@ describe('EmptySession', () => {
     expect(useSessionRuntimeStore.getState().selections['draft-session']).toBeUndefined()
   })
 
+  it('creates the session in the mode picked for it, without changing the default for new sessions', async () => {
+    const setDefault = vi.fn(async () => {})
+    const { permissionMode, setPermissionMode } = useSettingsStore.getState()
+    useSettingsStore.setState({ permissionMode: 'acceptEdits', setPermissionMode: setDefault })
+
+    render(<EmptySession />)
+
+    const selector = screen.getByTestId('permission-mode-selector')
+    expect(selector).toHaveAttribute('data-value', 'acceptEdits')
+    fireEvent.click(selector)
+    expect(selector).toHaveAttribute('data-value', 'plan')
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'draft question', selectionStart: 14 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Run/i }))
+
+    await waitFor(() => {
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'plan' })
+    })
+    expect(setDefault).not.toHaveBeenCalled()
+    useSettingsStore.setState({ permissionMode, setPermissionMode })
+  })
+
   it('stores and replays a draft runtime only when the user explicitly selected one', async () => {
     useSessionRuntimeStore.getState().setSelection('__draft__', {
       providerId: 'provider-explicit',
@@ -493,7 +523,7 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
     })
 
     expect(useSessionRuntimeStore.getState().selections['draft-session']).toEqual({
@@ -535,7 +565,7 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
@@ -587,7 +617,7 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
@@ -662,6 +692,7 @@ describe('EmptySession', () => {
     await waitFor(() => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
+        permissionMode: 'default',
       })
     })
   })
@@ -767,6 +798,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
   })
@@ -858,6 +890,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
   })

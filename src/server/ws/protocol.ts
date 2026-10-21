@@ -15,6 +15,10 @@ export type PermissionMode = 'acceptEdits' | 'bypassPermissions' | 'default' | '
 
 export const PERMISSION_MODES: readonly PermissionMode[] = ['acceptEdits', 'bypassPermissions', 'default', 'dontAsk', 'plan']
 
+export type DefaultPermissionMode = Exclude<PermissionMode, 'dontAsk'>
+
+export const DEFAULT_PERMISSION_MODES: readonly DefaultPermissionMode[] = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
+
 export type ClientMessage =
   | { type: 'prewarm_session' }
   | { type: 'user_message'; content: string; attachments?: AttachmentRef[] }
@@ -48,6 +52,7 @@ export type LiveTranscriptItem = Extract<TranscriptItem, { type: 'goal_event' | 
 
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }
+  | { type: 'permission_mode'; mode: PermissionMode }
   | { type: 'content_start'; blockType: 'text' | 'tool_use'; toolName?: string; toolUseId?: string; parentToolUseId?: string }
   | { type: 'content_delta'; text?: string; toolInput?: string }
   | { type: 'tool_use_complete'; toolName: string; toolUseId: string; input: unknown; parentToolUseId?: string }

@@ -489,6 +489,7 @@ describe('ChatInput file mentions', () => {
           slashCommands: [],
           agentTaskNotifications: {},
           elapsedTimer: null,
+          permissionMode: 'plan',
         },
       },
     })
@@ -505,6 +506,7 @@ describe('ChatInput file mentions', () => {
       expect(mocks.create).toHaveBeenCalledWith({
         workDir: '/repo',
         repository: { branch: 'feature/a', worktree: false },
+        permissionMode: 'plan',
       })
     })
     expect(mocks.delete).toHaveBeenCalledWith(sessionId)

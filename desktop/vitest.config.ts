@@ -20,7 +20,6 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/**/*.d.ts',
         'src/types/**',
-        'src/mocks/**',
         'src/vite-env.d.ts',
       ],
     },

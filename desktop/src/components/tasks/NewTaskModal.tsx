@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
 import { useSessionStore } from '../../stores/sessionStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { Modal } from '../shared/Modal'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
@@ -79,7 +80,10 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
   const [time, setTime] = useState(parsed?.time || '09:00')
   const [model, setModel] = useState(editTask?.model || '')
   const [providerId, setProviderId] = useState<string | null | undefined>(editTask?.providerId)
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>((editTask?.permissionMode as PermissionMode) || 'default')
+  const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
+    (editTask?.permissionMode as PermissionMode | undefined) ?? defaultPermissionMode,
+  )
   const [folderPath, setFolderPath] = useState(editTask?.folderPath || defaultWorkDir)
   const [useWorktree, setUseWorktree] = useState(editTask?.useWorktree || false)
   const [notifyEnabled, setNotifyEnabled] = useState(
@@ -118,7 +122,7 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         prompt: prompt.trim(),
         model: model || undefined,
         providerId,
-        permissionMode: permissionMode !== 'default' ? permissionMode : undefined,
+        permissionMode,
         folderPath: folderPath.trim() || undefined,
         useWorktree: useWorktree || undefined,
         notification: notifyEnabled

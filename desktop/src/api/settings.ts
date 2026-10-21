@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { PermissionMode, UserSettings } from '../types/settings'
+import type { DefaultPermissionMode, UserSettings } from '../types/settings'
 
 export type CliLauncherStatus = {
   supported: boolean
@@ -25,11 +25,11 @@ export const settingsApi = {
   },
 
   getPermissionMode() {
-    return api.get<{ mode: PermissionMode }>('/api/permissions/mode')
+    return api.get<{ mode: DefaultPermissionMode }>('/api/permissions/mode')
   },
 
-  setPermissionMode(mode: PermissionMode) {
-    return api.put<{ ok: true; mode: PermissionMode }>('/api/permissions/mode', { mode })
+  setPermissionMode(mode: DefaultPermissionMode) {
+    return api.put<{ ok: true; mode: DefaultPermissionMode }>('/api/permissions/mode', { mode })
   },
 
   getCliLauncherStatus() {

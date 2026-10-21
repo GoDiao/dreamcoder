@@ -195,6 +195,28 @@ describe('chatStore history mapping', () => {
     })
   })
 
+  it('keeps each session\'s own permission mode, as the server reports it', () => {
+    useChatStore.setState({
+      sessions: { [TEST_SESSION_ID]: makeSession(), other: makeSession() },
+    })
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'permission_mode', mode: 'plan' })
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.permissionMode).toBe('plan')
+    expect(useChatStore.getState().sessions.other?.permissionMode).toBeUndefined()
+  })
+
+  it('shows a picked permission mode at once and sends it for that session only', () => {
+    useChatStore.setState({
+      sessions: { [TEST_SESSION_ID]: makeSession({ permissionMode: 'default' }) },
+    })
+
+    useChatStore.getState().setSessionPermissionMode(TEST_SESSION_ID, 'acceptEdits')
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.permissionMode).toBe('acceptEdits')
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, { type: 'set_permission_mode', mode: 'acceptEdits' })
+  })
+
   it('restores completed /goal state from transcript history after app restart', async () => {
     vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
       transcriptOf([

@@ -364,7 +364,7 @@ export const en = {
   'settings.providers.authStrategyDualDummyDesc': 'Local vLLM-compatible services that only need placeholder auth values.',
 
   'settings.permissions.title': 'Permission Mode',
-  'settings.permissions.description': 'Controls how tool execution permissions are handled.',
+  'settings.permissions.description': 'The mode new sessions start in. Each session can switch its own mode next to the message box.',
 
 
   'settings.mcp.title': 'MCP servers',
@@ -1279,15 +1279,10 @@ export const en = {
   'promptEditor.selectFolder': '— select a folder to limit scope',
 
   'permMode.executionPermissions': 'Execution Permissions',
-  'permMode.askPermissions': 'Default',
   'permMode.askPermDesc': 'Confirm file edits and higher-risk commands when CLI asks',
-  'permMode.autoAccept': 'Accept edits',
   'permMode.autoAcceptDesc': 'Claude writes to disk without asking',
-  'permMode.planMode': 'Plan',
   'permMode.planModeDesc': 'Architecture & reasoning only, no files',
-  'permMode.bypass': 'Bypass permissions',
   'permMode.bypassDesc': 'Full tool access for shell and file system',
-  'permMode.dontAsk': "Don't ask",
   'permMode.enableBypassTitle': 'Enable bypass permissions?',
   'permMode.enableBypassSubtitle': 'This grants full access to your system',
   'permMode.enableBypassBody': 'Claude will have <strong>unrestricted</strong> access to execute shell commands and modify files within:',
@@ -1296,7 +1291,8 @@ export const en = {
   'permMode.permPackages': 'Install or remove packages',
   'permMode.enableBypassBtn': 'Enable bypass',
 
-  'permMode.label.default': 'Default',
+  'permMode.label.default': 'Manual',
+  'permMode.defaultTag': 'default',
   'permMode.label.acceptEdits': 'Accept edits',
   'permMode.label.plan': 'Plan',
   'permMode.label.bypassPermissions': 'Bypass permissions',
@@ -1488,7 +1484,6 @@ export const en = {
   'settings.group.settings': 'Settings',
   'settings.group.local': 'This computer',
   'settings.group.customize': 'Customize',
-  'settings.permissions.dontAskDesc': 'Never prompt; tools that are not pre-approved are denied',
   // Settings pages refresh
   'settings.general.groupAppearance': 'Appearance',
   'settings.general.groupLanguageModel': 'Language & model',

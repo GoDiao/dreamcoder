@@ -21,6 +21,7 @@ import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
 import { SettingsService } from './settingsService.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
+import { permissionModeCliArgs } from './permissionModes.js'
 
 const MAX_CAPTURED_PROCESS_LINES = 80
 const MAX_CAPTURED_SDK_MESSAGES = 40
@@ -427,7 +428,7 @@ export class ConversationService {
   }
 
   setPermissionMode(sessionId: string, mode: string): boolean {
-    return this.sendSdkMessage(sessionId, {
+    const sent = this.sendSdkMessage(sessionId, {
       type: 'control_request',
       request_id: crypto.randomUUID(),
       request: {
@@ -435,6 +436,17 @@ export class ConversationService {
         mode,
       },
     })
+    if (sent) this.notePermissionMode(sessionId, mode)
+    return sent
+  }
+
+  getSessionPermissionMode(sessionId: string): string | undefined {
+    return this.sessions.get(sessionId)?.permissionMode
+  }
+
+  notePermissionMode(sessionId: string, mode: string): void {
+    const session = this.sessions.get(sessionId)
+    if (session) session.permissionMode = mode
   }
 
   setMaxThinkingTokens(sessionId: string, maxThinkingTokens: number | null): boolean {
@@ -560,11 +572,6 @@ export class ConversationService {
     const session = this.sessions.get(sessionId)
     if (!session || !workDir.trim()) return
     session.workDir = workDir
-  }
-
-  getSessionPermissionMode(sessionId: string): string {
-    const session = this.sessions.get(sessionId)
-    return session?.permissionMode || 'default'
   }
 
   getPendingPermissionRequests(sessionId: string): PendingPermissionRequest[] {
@@ -857,17 +864,7 @@ export class ConversationService {
     mode: string | undefined,
     dangerousMode: boolean,
   ): string[] {
-    if (dangerousMode) {
-      return ['--dangerously-skip-permissions']
-    }
-
-    const resolvedMode = mode || 'default'
-    if (resolvedMode === 'bypassPermissions') {
-      return ['--dangerously-skip-permissions']
-    }
-
-    const args = ['--permission-mode', resolvedMode]
-    return args
+    return permissionModeCliArgs(dangerousMode ? 'bypassPermissions' : mode)
   }
 
   private getRuntimeArgs(options: SessionStartOptions | undefined): string[] {

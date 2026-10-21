@@ -34,6 +34,8 @@ import {
 import { buildSessionTranscript } from '../transcript/history.js'
 import type { SessionTranscript } from '../transcript/items.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import type { PermissionMode } from '../ws/protocol.js'
+import { permissionModeFromTranscriptEntries } from './permissionModes.js'
 
 export type SessionListItem = {
   id: string
@@ -353,6 +355,8 @@ function summarizeSessionWindowLines(
 }
 
 export class SessionService {
+  private permissionModeWrites = new Map<string, Promise<void>>()
+
   private getConfigDir(): string {
     return getClaudeConfigHomeDir()
   }
@@ -1096,6 +1100,7 @@ export class SessionService {
   async createSession(
     workDir?: string,
     repositoryOptions?: CreateSessionRepositoryOptions,
+    permissionMode?: PermissionMode,
   ): Promise<{ sessionId: string; workDir: string }> {
     const resolvedWorkDir = workDir || os.homedir()
     const sessionId = crypto.randomUUID()
@@ -1142,7 +1147,14 @@ export class SessionService {
       timestamp: now,
     }
 
-    await fs.writeFile(filePath, JSON.stringify(initialEntry) + '\n' + JSON.stringify(metaEntry) + '\n', 'utf-8')
+    const modeEntry = permissionMode
+      ? JSON.stringify(this.permissionModeEntry(sessionId, permissionMode)) + '\n'
+      : ''
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(initialEntry) + '\n' + JSON.stringify(metaEntry) + '\n' + modeEntry,
+      'utf-8',
+    )
 
     return { sessionId, workDir: absWorkDir }
   }
@@ -1306,6 +1318,7 @@ export class SessionService {
     const entries = await this.readJsonlFile(found.filePath)
     const workDir = this.resolveWorkDirFromEntries(entries, found.projectDir) || fallbackWorkDir || process.cwd()
     const repository = this.resolveRepositoryFromEntries(entries)
+    const permissionMode = permissionModeFromTranscriptEntries(entries)
     const now = new Date().toISOString()
 
     const initialEntry = {
@@ -1327,11 +1340,38 @@ export class SessionService {
       timestamp: now,
     }
 
+    const modeEntry = permissionMode
+      ? `${JSON.stringify(this.permissionModeEntry(sessionId, permissionMode))}\n`
+      : ''
     await fs.writeFile(
       found.filePath,
-      `${JSON.stringify(initialEntry)}\n${JSON.stringify(metaEntry)}\n`,
+      `${JSON.stringify(initialEntry)}\n${JSON.stringify(metaEntry)}\n${modeEntry}`,
       'utf-8',
     )
+  }
+
+  async getSessionPermissionMode(sessionId: string): Promise<PermissionMode | null> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) return null
+    return permissionModeFromTranscriptEntries(await this.readJsonlFile(found.filePath))
+  }
+
+  appendSessionPermissionMode(sessionId: string, permissionMode: PermissionMode): Promise<void> {
+    const previous = this.permissionModeWrites.get(sessionId) ?? Promise.resolve()
+    const next = previous.catch(() => {}).then(async () => {
+      const found = await this.findSessionFile(sessionId)
+      if (!found) return
+      await this.appendJsonlEntry(found.filePath, this.permissionModeEntry(sessionId, permissionMode))
+    })
+    this.permissionModeWrites.set(sessionId, next)
+    void next.catch(() => {}).finally(() => {
+      if (this.permissionModeWrites.get(sessionId) === next) this.permissionModeWrites.delete(sessionId)
+    })
+    return next
+  }
+
+  private permissionModeEntry(sessionId: string, permissionMode: PermissionMode): Record<string, unknown> {
+    return { type: 'permission-mode', permissionMode, sessionId }
   }
 
   async appendSessionMetadata(

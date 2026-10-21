@@ -79,6 +79,7 @@ export type PerSessionState = {
   } | null
   composerInsertion?: ComposerReferenceInsertion | null
   composerDraft?: ComposerDraftState | null
+  permissionMode?: PermissionMode
 }
 
 const DEFAULT_SESSION_STATE: PerSessionState = {
@@ -712,6 +713,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           messages: existing?.messages ?? [],
           activeGoal: existing?.activeGoal ?? null,
           composerDraft: existing?.composerDraft ?? null,
+          permissionMode: existing?.permissionMode,
         },
       },
     }))
@@ -894,6 +896,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setSessionPermissionMode: (sessionId, mode) => {
     if (!get().sessions[sessionId]) return
+    set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({ permissionMode: mode })) }))
     wsManager.send(sessionId, { type: 'set_permission_mode', mode })
   },
 
@@ -1472,6 +1475,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         useTeamStore.getState().handleTeamDeleted(msg.teamName)
         break
       case 'task_update':
+        break
+      case 'permission_mode':
+        update(() => ({ permissionMode: msg.mode }))
         break
       case 'session_title_updated':
         useSessionStore.getState().updateSessionTitle(msg.sessionId, msg.title)

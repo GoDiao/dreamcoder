@@ -38,6 +38,7 @@ import {
   resolveSlashUiAction,
 } from '../components/chat/composerUtils'
 import type { AttachmentRef } from '../types/chat'
+import type { PermissionMode } from '../types/settings'
 import type { SlashCommandOption } from '../components/chat/composerUtils'
 
 type Attachment = ComposerAttachment
@@ -74,6 +75,9 @@ export function EmptySession() {
   const connectToSession = useChatStore((state) => state.connectToSession)
   const addToast = useUIStore((state) => state.addToast)
   const currentModel = useSettingsStore((state) => state.currentModel)
+  const defaultPermissionMode = useSettingsStore((state) => state.permissionMode)
+  const [draftPermissionMode, setDraftPermissionMode] = useState<PermissionMode | null>(null)
+  const permissionMode = draftPermissionMode ?? defaultPermissionMode
   const lastPluginReloadSummary = usePluginStore((state) => state.lastReloadSummary)
   const draftRuntimeSelection = useSessionRuntimeStore((state) => state.selections[DRAFT_RUNTIME_SELECTION_KEY])
   const draftRuntimeSelectionKey = draftRuntimeSelection
@@ -248,12 +252,10 @@ export function EmptySession() {
     setLaunchError(null)
     try {
       const explicitDraftSelection = useSessionRuntimeStore.getState().selections[DRAFT_RUNTIME_SELECTION_KEY]
-      const sessionId = await createSession(
-        workDir || undefined,
-        selectedBranch
-          ? { repository: { branch: selectedBranch, worktree: useWorktree } }
-          : undefined,
-      )
+      const sessionId = await createSession(workDir || undefined, {
+        ...(selectedBranch ? { repository: { branch: selectedBranch, worktree: useWorktree } } : {}),
+        permissionMode,
+      })
       if (explicitDraftSelection) {
         useSessionRuntimeStore.getState().setSelection(sessionId, explicitDraftSelection)
         useSessionRuntimeStore.getState().clearSelection(DRAFT_RUNTIME_SELECTION_KEY)
@@ -686,7 +688,12 @@ export function EmptySession() {
                       onLaunchErrorDismiss={() => setLaunchError(null)}
                       noticeSlot={noticeSlot}
                     />
-                    <PermissionModeSelector workDir={workDir} compact={isMobileComposer} />
+                    <PermissionModeSelector
+                      workDir={workDir}
+                      compact={isMobileComposer}
+                      value={permissionMode}
+                      onChange={setDraftPermissionMode}
+                    />
                   </>
                 )}
                 right={(

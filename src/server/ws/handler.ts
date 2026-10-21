@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import type { ClientMessage, LiveTranscriptItem, PermissionMode, ServerMessage } from './protocol.js'
-import { PERMISSION_MODES } from './protocol.js'
+import { isPermissionMode } from '../services/permissionModes.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
 import {
@@ -122,6 +122,10 @@ export const handleWebSocket = {
     const msg: ServerMessage = { type: 'connected', sessionId }
     ws.send(JSON.stringify(msg))
     replayPendingPermissionRequests(ws, sessionId)
+    void resolveSessionPermissionMode(sessionId).then((resolved) => {
+      const mode = peekSessionRuntime(sessionId)?.permissionMode ?? resolved
+      sendMessage(ws, { type: 'permission_mode', mode })
+    })
   },
 
   message(ws: ServerWebSocket<WebSocketData>, rawMessage: string | Buffer) {
@@ -421,35 +425,80 @@ type SameModes<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : fals
 const permissionModesMatchCli: SameModes<PermissionMode, ExternalPermissionMode> = true
 void permissionModesMatchCli
 
+export async function resolveSessionPermissionMode(sessionId: string): Promise<PermissionMode> {
+  const cached = peekSessionRuntime(sessionId)?.permissionMode
+  if (cached) return cached
+  const recorded = await sessionService.getSessionPermissionMode(sessionId).catch(() => null)
+  const runtime = peekSessionRuntime(sessionId)
+  if (runtime?.permissionMode) return runtime.permissionMode
+  if (recorded) {
+    if (runtime) runtime.permissionMode = recorded
+    return recorded
+  }
+  const fallback = await settingsService.getPermissionMode().catch(() => 'default' as const)
+  return peekSessionRuntime(sessionId)?.permissionMode ?? fallback
+}
+
+function broadcastPermissionMode(sessionId: string, mode: PermissionMode): void {
+  for (const client of peekSessionRuntime(sessionId)?.clients ?? []) {
+    sendMessage(client, { type: 'permission_mode', mode })
+  }
+}
+
 function handleSetPermissionMode(
   ws: ServerWebSocket<WebSocketData>,
   message: Extract<ClientMessage, { type: 'set_permission_mode' }>
 ) {
   const { sessionId } = ws.data
-  if (!PERMISSION_MODES.includes(message.mode)) {
+  const mode = message.mode
+  if (!isPermissionMode(mode)) {
     sendMessage(ws, {
       type: 'error',
-      message: `Unknown permission mode: ${String(message.mode)}`,
+      message: `Unknown permission mode: ${String(mode)}`,
       code: 'INVALID_PERMISSION_MODE',
     })
     return
   }
 
-  const needsRestart =
-    conversationService.hasSession(sessionId) &&
-    (message.mode === 'bypassPermissions' || conversationService.getSessionPermissionMode(sessionId) === 'bypassPermissions')
+  const runtime = getSessionRuntime(sessionId)
+  runtime.permissionMode = mode
+  broadcastPermissionMode(sessionId, mode)
 
-  if (needsRestart) {
-    void enqueueRuntimeTransition(sessionId, () =>
-      restartSessionWithPermissionMode(ws, sessionId, message.mode),
-    )
+  const pendingStartup = runtime.startup
+  if (!conversationService.hasSession(sessionId) && (pendingStartup || runtime.runtimeTransition)) {
+    void enqueueRuntimeTransition(sessionId, async () => {
+      await pendingStartup?.catch(() => undefined)
+      await applyPermissionModeToCli(ws, sessionId, { inTransition: true })
+    })
+  } else {
+    void applyPermissionModeToCli(ws, sessionId)
+  }
+
+  void sessionService.appendSessionPermissionMode(sessionId, mode).catch((err) => {
+    console.warn(`[WS] Failed to save permission mode for ${sessionId}:`, err)
+  })
+}
+
+async function applyPermissionModeToCli(
+  ws: ServerWebSocket<WebSocketData>,
+  sessionId: string,
+  { inTransition = false } = {},
+): Promise<void> {
+  const mode = peekSessionRuntime(sessionId)?.permissionMode
+  const cliMode = conversationService.getSessionPermissionMode(sessionId)
+  if (!mode || !cliMode || cliMode === mode) return
+
+  if (mode === 'bypassPermissions' || cliMode === 'bypassPermissions') {
+    if (inTransition) {
+      await restartSessionWithPermissionMode(ws, sessionId, mode)
+    } else {
+      await enqueueRuntimeTransition(sessionId, () =>
+        applyPermissionModeToCli(ws, sessionId, { inTransition: true }),
+      )
+    }
     return
   }
-
-  const ok = conversationService.setPermissionMode(sessionId, message.mode)
-  if (!ok) {
-    console.warn(`[WS] Ignored permission mode update for inactive session ${sessionId}`)
-  }
+  conversationService.setPermissionMode(sessionId, mode)
 }
 
 async function handleSetRuntimeConfig(
@@ -517,8 +566,6 @@ async function restartSessionWithPermissionMode(
   mode: string,
 ): Promise<void> {
   try {
-    await settingsService.setPermissionMode(mode)
-
     const workDir = conversationService.getSessionWorkDir(sessionId)
     conversationService.stopSession(sessionId)
 
@@ -1142,6 +1189,11 @@ export function translateCliMessage(cliMsg: any, sessionId: string): ServerMessa
         return saved ? [liveItem({ type: 'memory_event', event: 'saved', ...saved })] : []
       }
       if (subtype === 'status') {
+        if (isPermissionMode(cliMsg.permissionMode)) {
+          getSessionRuntime(sessionId).permissionMode = cliMsg.permissionMode
+          conversationService.notePermissionMode(sessionId, cliMsg.permissionMode)
+          return [{ type: 'permission_mode', mode: cliMsg.permissionMode }]
+        }
         if (cliMsg.status === 'compacting') {
           return [{
             type: 'status',
@@ -1493,11 +1545,19 @@ function isKnownRuntimeProviderId(
   return providers.some((provider) => provider.id === providerId)
 }
 
-async function getRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
+async function getRuntimeSettings(sessionId: string): Promise<RuntimeSettings> {
   const settings = await resolveRuntimeSettings(sessionId)
+  const resolvedPermissionMode = await resolveSessionPermissionMode(sessionId)
+  const runtime = getSessionRuntime(sessionId)
+  runtime.permissionMode ??= resolvedPermissionMode
+  const permissionMode = runtime.permissionMode
   // A per-session effort chosen in the composer wins over the global default.
-  const overrideEffort = sessionId ? peekSessionRuntime(sessionId)?.runtimeOverride?.effort : undefined
-  return overrideEffort ? { ...settings, effort: overrideEffort } : settings
+  const overrideEffort = peekSessionRuntime(sessionId)?.runtimeOverride?.effort
+  return {
+    ...settings,
+    permissionMode,
+    ...(overrideEffort ? { effort: overrideEffort } : {}),
+  }
 }
 
 async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
@@ -1529,7 +1589,6 @@ async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettin
     const thinking = resolveDesktopThinkingMode(userSettings)
 
     return {
-      permissionMode: await settingsService.getPermissionMode().catch(() => undefined),
       model: runtimeOverride.modelId,
       effort,
       thinking,
@@ -1579,7 +1638,6 @@ async function getDefaultRuntimeSettings(): Promise<RuntimeSettings> {
   }
 
   return {
-    permissionMode: await settingsService.getPermissionMode().catch(() => undefined),
     model,
     effort,
     thinking,

@@ -10,10 +10,12 @@ import { useTabStore } from './tabStore'
 import { useTerminalPanelStore } from './terminalPanelStore'
 import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
+import type { PermissionMode } from '../types/settings'
 import { isPlaceholderSessionTitle } from '../lib/sessionTitle'
 
 type CreateSessionOptions = {
   repository?: CreateSessionRepositoryOptions
+  permissionMode?: PermissionMode
 }
 
 // The right-side panel keeps per-session state and terminal processes; drop
@@ -103,6 +105,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const { sessionId: id, workDir: resolvedWorkDir } = await sessionsApi.create({
       ...(workDir ? { workDir } : {}),
       ...(options?.repository ? { repository: options.repository } : {}),
+      ...(options?.permissionMode ? { permissionMode: options.permissionMode } : {}),
     })
     const now = new Date().toISOString()
     const optimisticSession: SessionListItem = {
