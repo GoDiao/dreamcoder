@@ -155,13 +155,11 @@ function makeSession(overrides: Partial<PerSessionState> = {}): PerSessionState 
     activeThinkingId: null,
     pendingPermission: null,
     tokenUsage: { input_tokens: 0, output_tokens: 0 },
-    elapsedSeconds: 0,
     statusVerb: '',
     apiRetry: null,
     slashCommands: [],
     agentTaskNotifications: {},
     backgroundAgentTasks: {},
-    elapsedTimer: null,
     ...overrides,
   }
 }
@@ -623,11 +621,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -707,11 +703,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -820,11 +814,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [{ name: 'old-command', description: 'Old command' }],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1234,11 +1226,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1298,11 +1288,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1328,11 +1316,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1622,11 +1608,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: 'thinking-1',
           pendingPermission: null,
           tokenUsage: { input_tokens: 12, output_tokens: 34 },
-          elapsedSeconds: 5,
           statusVerb: 'Thinking',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1694,11 +1678,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1736,11 +1718,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: 'Compacting conversation',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1787,11 +1767,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1831,11 +1809,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1881,11 +1857,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2112,11 +2086,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2156,11 +2128,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2264,11 +2234,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2553,11 +2521,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2595,6 +2561,21 @@ describe('chatStore history mapping', () => {
     ])
 
     vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
+  it('leaves the store unchanged while a turn runs', () => {
+    vi.useFakeTimers()
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
+    sendSnapshot(mirrorState())
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'hello')
+    sendPatch(2, { turn: { phase: 'running', startedAt: Date.now(), activity: 'thinking' } })
+    const sessions = useChatStore.getState().sessions
+
+    vi.advanceTimersByTime(5000)
+
+    expect(useChatStore.getState().sessions).toBe(sessions)
     vi.useRealTimers()
   })
 
@@ -2661,11 +2642,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2712,11 +2691,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2743,11 +2720,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2781,11 +2756,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -2821,11 +2794,9 @@ describe('chatStore history mapping', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
