@@ -2,7 +2,7 @@ import React from 'react'
 import { t } from '../i18n'
 import { reportReactError } from '../lib/diagnosticsCapture'
 import { Button } from './shared/Button'
-import { DoctorPanel } from './doctor/DoctorPanel'
+import { LazyDoctorPanel } from './doctor/LazyDoctorPanel'
 
 type Props = {
   children: React.ReactNode
@@ -46,7 +46,7 @@ function ErrorBoundaryFallback() {
           </Button>
         </div>
         <div className="mt-4 text-left">
-          <DoctorPanel compact />
+          <LazyDoctorPanel compact />
         </div>
       </div>
     </div>

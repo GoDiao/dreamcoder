@@ -551,7 +551,7 @@ describe('ActiveSession task polling', () => {
     useCLITaskStore.setState(originalCliTaskState)
   })
 
-  it('renders the workspace panel to the right of chat and supports resizing', () => {
+  it('renders the workspace panel to the right of chat and supports resizing', async () => {
     const sessionId = 'workspace-session'
 
     useSessionStore.setState({
@@ -597,6 +597,7 @@ describe('ActiveSession task polling', () => {
     useWorkspacePanelStore.getState().openPanel(sessionId)
 
     render(<ActiveSession />)
+    await screen.findByTestId('workspace-panel')
 
     const contentRow = screen.getByTestId('active-session-content-row')
     const chatColumn = screen.getByTestId('active-session-chat-column')
