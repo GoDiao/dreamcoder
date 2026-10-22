@@ -7,9 +7,11 @@ import type { SavedProvider } from '../../types/provider'
 const providersApiMock = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
+  discoverModels: vi.fn(),
+  discoverProviderModels: vi.fn(),
 }))
 
-vi.mock('../../api/providers', () => ({
+vi.mock('../../api/providers.ts', () => ({
   providersApi: providersApiMock,
 }))
 
@@ -22,7 +24,7 @@ const deepseekPreset: ProviderPreset = {
   name: 'DeepSeek',
   baseUrl: 'https://example.invalid/anthropic',
   apiFormat: 'anthropic',
-  defaultModels: { main: 'model-main', haiku: 'model-main', sonnet: 'model-main', opus: 'model-main' },
+  defaultModels: [{ id: 'model-main' }],
   needsApiKey: true,
   websiteUrl: 'https://example.invalid',
 }
@@ -34,10 +36,11 @@ const createdProvider: SavedProvider = {
   apiKey: 'test-key',
   baseUrl: 'https://example.invalid/anthropic',
   apiFormat: 'anthropic',
-  models: { main: 'model-main', haiku: 'model-main', sonnet: 'model-main', opus: 'model-main' },
+  models: [{ id: 'model-main' }],
 }
 
 const createProviderMock = vi.fn()
+const discoverModelsMock = vi.fn()
 const fetchAllMock = vi.fn()
 
 describe('ProviderFormModal create mode', () => {
@@ -45,15 +48,21 @@ describe('ProviderFormModal create mode', () => {
     vi.clearAllMocks()
     providersApiMock.getSettings.mockRejectedValue(new Error('no settings'))
     providersApiMock.updateSettings.mockResolvedValue(undefined)
+    providersApiMock.discoverModels.mockResolvedValue({
+      models: [{ id: 'model-new', name: 'New Model' }],
+    })
     createProviderMock.mockResolvedValue(createdProvider)
+    discoverModelsMock.mockResolvedValue([{ id: 'model-new', name: 'New Model' }])
     fetchAllMock.mockResolvedValue(undefined)
     useSettingsStore.setState({ locale: 'en', fetchAll: fetchAllMock })
-    useProviderStore.setState({ createProvider: createProviderMock })
+    useProviderStore.setState(useProviderStore.getInitialState(), true)
+    useProviderStore.setState({ createProvider: createProviderMock, discoverModels: discoverModelsMock })
   })
 
   async function fillAndSubmit() {
     fireEvent.change(screen.getByPlaceholderText(/sk-/i), { target: { value: 'test-key' } })
-    const add = screen.getByRole('button', { name: 'Add' })
+    const addButtons = screen.getAllByRole('button', { name: 'Add' })
+    const add = addButtons[addButtons.length - 1]!
     await waitFor(() => expect(add).toBeEnabled())
     await act(async () => {
       fireEvent.click(add)
@@ -107,5 +116,23 @@ describe('ProviderFormModal create mode', () => {
 
     expect(createProviderMock).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('discovers a model, suggests its name, and saves the added entry', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+    fireEvent.change(screen.getByPlaceholderText(/sk-/i), { target: { value: 'test-key' } })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'model-new' } })
+    await waitFor(() => expect(screen.getByDisplayValue('New Model')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]!)
+    await fillAndSubmit()
+
+    expect(createProviderMock).toHaveBeenCalledWith(expect.objectContaining({
+      models: [{ id: 'model-main' }, { id: 'model-new', name: 'New Model' }],
+    }))
   })
 })

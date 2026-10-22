@@ -8,6 +8,8 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
+  ProviderModel,
+  DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
 import type { RuntimeSelection } from '../types/runtime'
@@ -29,12 +31,14 @@ type ProviderStore = {
   activateProvider: (id: string) => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
+  discoverModels: (input: DiscoverProviderModelsInput) => Promise<ProviderModel[]>
+  discoverProviderModels: (id: string) => Promise<ProviderModel[]>
 }
 
 function providerModelIds(provider: SavedProvider): Set<string> {
   return new Set(
-    Object.values(provider.models)
-      .map((modelId) => modelId.trim())
+    provider.models
+      .map((model) => model.id.trim())
       .filter(Boolean),
   )
 }
@@ -50,7 +54,7 @@ function resolveRuntimeRefreshSelection(
       providerId: provider.id,
       modelId: modelIds.has(currentSelection.modelId)
         ? currentSelection.modelId
-        : provider.models.main,
+        : provider.models[0]?.id ?? '',
       ...(currentSelection.effort ? { effort: currentSelection.effort } : {}),
     }
   }
@@ -60,7 +64,7 @@ function resolveRuntimeRefreshSelection(
   if (!currentSelection?.modelId && activeId === provider.id) {
     return {
       providerId: provider.id,
-      modelId: provider.models.main,
+      modelId: provider.models[0]?.id ?? '',
       ...(currentSelection?.effort ? { effort: currentSelection.effort } : {}),
     }
   }
@@ -152,5 +156,15 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   testConfig: async (input) => {
     const { result } = await providersApi.testConfig(input)
     return result
+  },
+
+  discoverModels: async (input) => {
+    const { models } = await providersApi.discoverModels(input)
+    return models
+  },
+
+  discoverProviderModels: async (id) => {
+    const { models } = await providersApi.discoverProviderModels(id)
+    return models
   },
 }))

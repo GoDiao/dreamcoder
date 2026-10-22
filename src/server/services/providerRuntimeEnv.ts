@@ -5,6 +5,7 @@ import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWin
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
 import type {
   ApiFormat,
+  ProviderModel,
   ProviderAuthStrategy,
   ProvidersIndex,
   SavedProvider,
@@ -21,6 +22,7 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
@@ -41,13 +43,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isProviderModels(value: unknown): value is SavedProvider['models'] {
-  return (
-    isRecord(value) &&
-    typeof value.main === 'string' &&
-    typeof value.haiku === 'string' &&
-    typeof value.sonnet === 'string' &&
-    typeof value.opus === 'string'
-  )
+  return Array.isArray(value) && value.every((model) => (
+    isRecord(model) &&
+    typeof model.id === 'string' &&
+    (model.name === undefined || typeof model.name === 'string')
+  ))
 }
 
 function isSavedProvider(value: unknown): value is SavedProvider {
@@ -68,32 +68,55 @@ export function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }
 
-export function resolveProviderDefaultModel(
-  provider: Pick<SavedProvider, 'models'>,
-  managedSettings: Record<string, unknown>,
-): string {
-  const env = (managedSettings.env as Record<string, string> | undefined) ?? {}
-  const envModel = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
-  if (envModel && envModel !== stripContextSuffix(provider.models.main)) return envModel
-  return provider.models.main
+export function normalizeProviderModels(models: SavedProvider['models']): ProviderModel[] {
+  const seen = new Set<string>()
+  const normalized: ProviderModel[] = []
+  for (const model of models) {
+    const id = model.id.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const name = model.name?.trim()
+    normalized.push({ id, ...(name ? { name } : {}) })
+  }
+  return normalized
 }
 
-export function normalizeModelMapping(models: SavedProvider['models']): SavedProvider['models'] {
-  const main = models.main.trim()
-  return {
-    main,
-    haiku: models.haiku.trim() || main,
-    sonnet: models.sonnet.trim() || main,
-    opus: models.opus.trim() || main,
+export function getProviderDefaultModel(provider: SavedProvider): string {
+  return normalizeProviderModels(provider.models)[0]?.id ?? ''
+}
+
+export function resolveProviderDefaultModel(
+  provider: SavedProvider,
+  managedSettings: Record<string, unknown>,
+): string {
+  const models = normalizeProviderModels(provider.models)
+  const modelIds = new Set(models.map((model) => model.id))
+  const explicitModel = typeof managedSettings.model === 'string'
+    ? managedSettings.model.trim()
+    : ''
+  if (explicitModel && modelIds.has(stripContextSuffix(explicitModel))) {
+    return explicitModel
   }
+
+  const env = (managedSettings.env as Record<string, string> | undefined) ?? {}
+  const envModel = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
+  if (envModel && modelIds.has(stripContextSuffix(envModel))) {
+    return envModel
+  }
+  return models[0]?.id ?? ''
 }
 
 export function normalizeSavedProvider(provider: SavedProvider): SavedProvider {
+  const models = normalizeProviderModels(provider.models)
+  const fastModel = provider.fastModel?.trim()
   return {
     ...provider,
     apiFormat: provider.apiFormat ?? 'anthropic',
     runtimeKind: provider.runtimeKind ?? 'anthropic_compatible',
-    models: normalizeModelMapping(provider.models),
+    models,
+    fastModel: fastModel && models.some((model) => model.id === fastModel)
+      ? fastModel
+      : undefined,
   }
 }
 
@@ -189,7 +212,7 @@ export function getManagedEnvKeys(): string[] {
 
 export function buildProviderManagedEnv(
   provider: SavedProvider,
-  options?: { proxyPath?: string; serverPort?: number },
+  options?: { proxyPath?: string; serverPort?: number; modelId?: string },
 ): Record<string, string> {
   const apiFormat: ApiFormat = provider.apiFormat ?? 'anthropic'
   const needsProxy = apiFormat !== 'anthropic'
@@ -199,7 +222,11 @@ export function buildProviderManagedEnv(
     ? `http://127.0.0.1:${serverPort}${proxyPath}`
     : normalizeUpstreamBaseUrl(provider.baseUrl)
 
-  const models = normalizeModelMapping(provider.models)
+  const models = normalizeProviderModels(provider.models)
+  const selectedModel = options?.modelId?.trim() || models[0]?.id || ''
+  const fastModel = provider.fastModel && models.some((model) => model.id === provider.fastModel)
+    ? provider.fastModel
+    : selectedModel
   const modelContextWindows = {
     ...getPresetModelContextWindows(provider.presetId),
     ...(provider.modelContextWindows ?? {}),
@@ -226,11 +253,12 @@ export function buildProviderManagedEnv(
     }),
     ANTHROPIC_BASE_URL: baseUrl,
     ...buildProviderAuthEnv(provider, presetDefaultEnv, needsProxy),
-    ANTHROPIC_MODEL: stripContextSuffix(models.main),
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: stripContextSuffix(models.haiku),
-    ANTHROPIC_DEFAULT_SONNET_MODEL: stripContextSuffix(models.sonnet),
-    ANTHROPIC_DEFAULT_OPUS_MODEL: stripContextSuffix(models.opus),
-    ...attributionHeaderEnvForModel(models.main),
+    ANTHROPIC_MODEL: stripContextSuffix(selectedModel),
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: stripContextSuffix(fastModel),
+    ANTHROPIC_SMALL_FAST_MODEL: stripContextSuffix(fastModel),
+    ANTHROPIC_DEFAULT_SONNET_MODEL: stripContextSuffix(selectedModel),
+    ANTHROPIC_DEFAULT_OPUS_MODEL: stripContextSuffix(selectedModel),
+    ...attributionHeaderEnvForModel(selectedModel),
   }
 }
 

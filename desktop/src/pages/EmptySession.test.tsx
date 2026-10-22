@@ -257,7 +257,7 @@ describe('EmptySession', () => {
         apiKey: 'key',
         baseUrl: 'https://example.invalid',
         apiFormat: 'anthropic',
-        models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+        models: [{ id: 'm' }],
       }],
     })
 
@@ -292,7 +292,7 @@ describe('EmptySession', () => {
           apiKey: 'key',
           baseUrl: 'https://example.invalid',
           apiFormat: 'anthropic',
-          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+          models: [{ id: 'm' }],
         }],
       })
     })
@@ -315,7 +315,7 @@ describe('EmptySession', () => {
           apiKey: 'key',
           baseUrl: 'https://example.invalid',
           apiFormat: 'anthropic',
-          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+          models: [{ id: 'm' }],
         }],
       })
     })

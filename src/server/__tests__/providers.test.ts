@@ -48,12 +48,13 @@ function sampleInput(overrides?: Partial<CreateProviderInput>): CreateProviderIn
     baseUrl: 'https://api.example.com',
     apiKey: 'sk-test-key-123',
     apiFormat: 'anthropic',
-    models: {
-      main: 'model-main',
-      haiku: 'model-haiku',
-      sonnet: 'model-sonnet',
-      opus: 'model-opus',
-    },
+    models: [
+      { id: 'model-main' },
+      { id: 'model-sonnet' },
+      { id: 'model-opus' },
+      { id: 'model-haiku' },
+    ],
+    fastModel: 'model-haiku',
     ...overrides,
   }
 }
@@ -145,29 +146,27 @@ describe('ProviderService', () => {
       expect(provider.name).toBe('Test Provider')
       expect(provider.baseUrl).toBe('https://api.example.com')
       expect(provider.apiKey).toBe('sk-test-key-123')
-      expect(provider.models.main).toBe('model-main')
+      expect(provider.models[0]?.id).toBe('model-main')
     })
 
-    test('should normalize empty model mappings to the main model when adding a provider', async () => {
+    test('should normalize and de-duplicate model IDs when adding a provider', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
-        models: {
-          main: 'gpt-5.5',
-          haiku: '',
-          sonnet: '   ',
-          opus: '',
-        },
+        models: [{ id: ' gpt-5.5 ' }, { id: 'gpt-5.5' }],
+        fastModel: undefined,
       }))
 
-      expect(provider.models).toEqual({
-        main: 'gpt-5.5',
-        haiku: 'gpt-5.5',
-        sonnet: 'gpt-5.5',
-        opus: 'gpt-5.5',
-      })
+      expect(provider.models).toEqual([{ id: 'gpt-5.5' }])
 
       const config = await readProvidersConfig()
       expect((config.providers as Array<{ models: unknown }>)[0]?.models).toEqual(provider.models)
+    })
+
+    test('should reject a fast model outside the provider model list', async () => {
+      const svc = new ProviderService()
+      await expect(svc.addProvider(sampleInput({ fastModel: 'missing-model' }))).rejects.toThrow(
+        'Fast model must be one of the provider models',
+      )
     })
 
     test('new providers should not be auto-activated', async () => {
@@ -189,12 +188,8 @@ describe('ProviderService', () => {
     test('custom providers declare thinking and effort capability passthrough for user-defined models', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
-        models: {
-          main: 'deepseek-ai/DeepSeek-V4-Pro',
-          haiku: 'deepseek-ai/DeepSeek-V4-Pro',
-          sonnet: 'deepseek-ai/DeepSeek-V4-Pro',
-          opus: 'deepseek-ai/DeepSeek-V4-Pro',
-        },
+        models: [{ id: 'deepseek-ai/DeepSeek-V4-Pro' }],
+        fastModel: undefined,
       }))
 
       await svc.activateProvider(provider.id)
@@ -219,12 +214,8 @@ describe('ProviderService', () => {
         presetId: 'deepseek',
         name: 'DeepSeek',
         baseUrl: 'https://api.deepseek.com/anthropic',
-        models: {
-          main: 'deepseek-v4-pro',
-          haiku: 'deepseek-v4-flash',
-          sonnet: 'deepseek-v4-pro',
-          opus: 'deepseek-v4-pro',
-        },
+        models: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-v4-flash' }],
+        fastModel: 'deepseek-v4-flash',
       }))
 
       await svc.activateProvider(provider.id)
@@ -388,15 +379,11 @@ describe('ProviderService', () => {
       expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
     })
 
-    test('should normalize empty model mappings before syncing settings', async () => {
+    test('should use the selected model for all primary runtime roles', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
-        models: {
-          main: 'gpt-5.5',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        models: [{ id: 'gpt-5.5' }],
+        fastModel: undefined,
       }))
 
       await svc.activateProvider(provider.id)
@@ -520,21 +507,29 @@ describe('ProviderService', () => {
       expect(env.ANTHROPIC_API_KEY).toBe('')
       expect(env.ANTHROPIC_MODEL).toBe('model-main')
       expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('model-haiku')
-      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('model-sonnet')
-      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('model-opus')
+      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('model-main')
+      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('model-main')
+      expect(env.ANTHROPIC_SMALL_FAST_MODEL).toBe('model-haiku')
       expect(env.CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
       expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
+
+      const selectedEnv = await svc.getProviderRuntimeEnv(second.id, 'model-opus')
+      expect(selectedEnv.ANTHROPIC_MODEL).toBe('model-opus')
+      expect(selectedEnv.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('model-opus')
+      expect(selectedEnv.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('model-opus')
+      expect(selectedEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('model-haiku')
+      expect(selectedEnv.ANTHROPIC_SMALL_FAST_MODEL).toBe('model-haiku')
     })
 
     test('should preserve attribution header for Claude-prefixed provider models', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
-        models: {
-          main: 'Claude Sonnet 4.6',
-          haiku: 'Claude Haiku 4.5',
-          sonnet: 'Claude Sonnet 4.6',
-          opus: 'Claude Opus 4.7',
-        },
+        models: [
+          { id: 'Claude Sonnet 4.6' },
+          { id: 'Claude Haiku 4.5' },
+          { id: 'Claude Opus 4.7' },
+        ],
+        fastModel: 'Claude Haiku 4.5',
       }))
 
       await svc.activateProvider(provider.id)
@@ -633,12 +628,8 @@ describe('ProviderService', () => {
         presetId: 'lmstudio',
         apiKey: '',
         authStrategy: 'auth_token_empty_api_key',
-        models: {
-          main: 'lmstudio-model',
-          haiku: 'lmstudio-model',
-          sonnet: 'lmstudio-model',
-          opus: 'lmstudio-model',
-        },
+        models: [{ id: 'lmstudio-model' }],
+        fastModel: undefined,
       }))
       await svc.activateProvider(provider.id)
 
@@ -833,6 +824,94 @@ describe('ProviderService', () => {
     })
   })
 
+  describe('discoverModels', () => {
+    test('fetches, names, and de-duplicates OpenAI-compatible models', async () => {
+      let requestPath = ''
+      let authorization = ''
+      const server = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch(req) {
+          requestPath = new URL(req.url).pathname
+          authorization = req.headers.get('authorization') ?? ''
+          return Response.json({
+            data: [
+              { id: 'gpt-main', name: 'GPT Main' },
+              { id: 'gpt-main', name: 'Duplicate' },
+              { id: 'gpt-fast', display_name: 'GPT Fast' },
+            ],
+          })
+        },
+      })
+
+      try {
+        const models = await new ProviderService().discoverModels({
+          baseUrl: `http://127.0.0.1:${server.port}/v1`,
+          apiKey: 'secret',
+          apiFormat: 'openai_chat',
+          authStrategy: 'api_key',
+        })
+        expect(requestPath).toBe('/v1/models')
+        expect(authorization).toBe('Bearer secret')
+        expect(models).toEqual([
+          { id: 'gpt-main', name: 'GPT Main' },
+          { id: 'gpt-fast', name: 'GPT Fast' },
+        ])
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test('uses Anthropic model-list headers without exposing discovery to browser CORS', async () => {
+      let apiKey = ''
+      let anthropicVersion = ''
+      const server = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch(req) {
+          apiKey = req.headers.get('x-api-key') ?? ''
+          anthropicVersion = req.headers.get('anthropic-version') ?? ''
+          return Response.json({ data: [{ id: 'claude-test', display_name: 'Claude Test' }] })
+        },
+      })
+
+      try {
+        const models = await new ProviderService().discoverModels({
+          baseUrl: `http://127.0.0.1:${server.port}`,
+          apiKey: 'anthropic-secret',
+          apiFormat: 'anthropic',
+          authStrategy: 'api_key',
+        })
+        expect(apiKey).toBe('anthropic-secret')
+        expect(anthropicVersion).toBe('2023-06-01')
+        expect(models).toEqual([{ id: 'claude-test', name: 'Claude Test' }])
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test('reports an unsupported model endpoint without changing provider data', async () => {
+      const server = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch() {
+          return new Response('not found', { status: 404 })
+        },
+      })
+
+      try {
+        const service = new ProviderService()
+        const provider = await service.addProvider(sampleInput({
+          baseUrl: `http://127.0.0.1:${server.port}`,
+        }))
+        await expect(service.discoverProviderModels(provider.id)).rejects.toThrow('HTTP 404')
+        expect((await service.getProvider(provider.id)).models).toEqual(provider.models)
+      } finally {
+        server.stop(true)
+      }
+    })
+  })
+
   describe('testProvider', () => {
     test('should use preset default auth for saved no-key Anthropic-compatible providers', async () => {
       const originalFetch = globalThis.fetch
@@ -848,12 +927,8 @@ describe('ProviderService', () => {
           presetId: 'lmstudio',
           apiKey: '',
           authStrategy: 'auth_token_empty_api_key',
-          models: {
-            main: 'lmstudio-model',
-            haiku: 'lmstudio-model',
-            sonnet: 'lmstudio-model',
-            opus: 'lmstudio-model',
-          },
+          models: [{ id: 'lmstudio-model' }],
+          fastModel: undefined,
         }))
 
         const result = await svc.testProvider(provider.id)
@@ -1120,19 +1195,15 @@ describe('Providers API', () => {
       apiKey: 'sk-test',
       apiFormat: 'anthropic',
       autoCompactWindow: 64000,
-      models: {
-        main: 'gpt-4',
-        haiku: 'gpt-4-haiku',
-        sonnet: 'gpt-4-sonnet',
-        opus: 'gpt-4-opus',
-      },
+      models: [{ id: 'gpt-4' }, { id: 'gpt-4-haiku' }],
+      fastModel: 'gpt-4-haiku',
     })
     const res = await handleProvidersApi(req, url, segments)
 
     expect(res.status).toBe(201)
-    const body = (await res.json()) as { provider: { name: string; models: { main: string }; autoCompactWindow: number } }
+    const body = (await res.json()) as { provider: { name: string; models: Array<{ id: string }>; autoCompactWindow: number } }
     expect(body.provider.name).toBe('New Provider')
-    expect(body.provider.models.main).toBe('gpt-4')
+    expect(body.provider.models[0]?.id).toBe('gpt-4')
     expect(body.provider.autoCompactWindow).toBe(64000)
   })
 
@@ -1153,12 +1224,21 @@ describe('Providers API', () => {
       apiKey: 'sk-test',
       apiFormat: 'anthropic',
       autoCompactWindow: 8000,
-      models: {
-        main: 'gpt-4',
-        haiku: 'gpt-4-haiku',
-        sonnet: 'gpt-4-sonnet',
-        opus: 'gpt-4-opus',
-      },
+      models: [{ id: 'gpt-4' }],
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(400)
+  })
+
+  test('POST /api/providers should reject duplicate model IDs', async () => {
+    const { req, url, segments } = makeRequest('POST', '/api/providers', {
+      presetId: 'custom',
+      name: 'Duplicate Models',
+      baseUrl: 'https://api.example.com',
+      apiKey: 'sk-test',
+      apiFormat: 'anthropic',
+      models: [{ id: 'gpt-4' }, { id: 'gpt-4' }],
     })
     const res = await handleProvidersApi(req, url, segments)
 

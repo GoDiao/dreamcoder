@@ -57,12 +57,8 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'glm-5.1',
-                haiku: 'glm-4.5-air',
-                sonnet: 'glm-5-turbo',
-                opus: 'glm-5.1',
-              },
+              models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+              fastModel: 'glm-4.5-air',
             },
           ],
         }, null, 2),
@@ -70,6 +66,7 @@ describe('titleService', () => {
 
       await expect(generateTitle('请只回复 trace-ok')).resolves.toBe('Trace ok')
       expect(requestBody?.thinking).toEqual({ type: 'disabled' })
+      expect(requestBody?.model).toBe('glm-4.5-air')
     } finally {
       server.stop(true)
     }
@@ -108,12 +105,7 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'deepseek-v4-pro',
-                haiku: 'deepseek-v4-pro',
-                sonnet: 'deepseek-v4-pro',
-                opus: 'deepseek-v4-pro',
-              },
+              models: [{ id: 'deepseek-v4-pro' }],
             },
           ],
         }, null, 2),
@@ -164,12 +156,8 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/v1`,
               apiFormat: 'openai_chat',
-              models: {
-                main: 'gpt-main',
-                haiku: 'gpt-mini',
-                sonnet: 'gpt-main',
-                opus: 'gpt-main',
-              },
+              models: [{ id: 'gpt-main' }, { id: 'gpt-mini' }],
+              fastModel: 'gpt-mini',
             },
           ],
         }, null, 2),
@@ -226,12 +214,12 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'claude-sonnet-4-7',
-                haiku: 'claude-haiku-4-5',
-                sonnet: 'claude-sonnet-4-7',
-                opus: 'claude-opus-4-7',
-              },
+              models: [
+                { id: 'claude-sonnet-4-7' },
+                { id: 'claude-haiku-4-5' },
+                { id: 'claude-opus-4-7' },
+              ],
+              fastModel: 'claude-haiku-4-5',
             },
           ],
         }, null, 2),

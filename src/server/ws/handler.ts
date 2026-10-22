@@ -782,6 +782,7 @@ function triggerTitleGeneration(sessionId: string): void {
     ? state.firstUserMessage
     : state.allUserMessages.join('\n')
   const runtimeProviderId = store.peek(sessionId)?.runtime.desired?.providerId
+  const runtimeModel = store.peek(sessionId)?.runtime.desired?.modelId
 
   void (async () => {
     try {
@@ -797,7 +798,7 @@ function triggerTitleGeneration(sessionId: string): void {
         }
       }
 
-      const aiTitle = await generateTitle(text, runtimeProviderId)
+      const aiTitle = await generateTitle(text, runtimeProviderId, runtimeModel)
       if (aiTitle) {
         const saved = await saveAiTitle(sessionId, aiTitle)
         if (!saved) {

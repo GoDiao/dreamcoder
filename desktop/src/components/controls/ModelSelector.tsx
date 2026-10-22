@@ -48,32 +48,11 @@ const DROPDOWN_MIN_HEIGHT = 180
 
 function buildProviderModels(
   provider: SavedProvider,
-  labels: Record<'main' | 'haiku' | 'sonnet' | 'opus', string>,
 ): ModelInfo[] {
-  const entries: Array<{ id: string; label: string }> = [
-    { id: provider.models.main.trim(), label: labels.main },
-    { id: provider.models.haiku.trim(), label: labels.haiku },
-    { id: provider.models.sonnet.trim(), label: labels.sonnet },
-    { id: provider.models.opus.trim(), label: labels.opus },
-  ]
-
-  const byId = new Map<string, { id: string; labels: string[] }>()
-  for (const entry of entries) {
-    if (!entry.id) continue
-    const existing = byId.get(entry.id)
-    if (existing) {
-      if (!existing.labels.includes(entry.label)) {
-        existing.labels.push(entry.label)
-      }
-      continue
-    }
-    byId.set(entry.id, { id: entry.id, labels: [entry.label] })
-  }
-
-  return [...byId.values()].map((entry) => ({
-    id: entry.id,
-    name: entry.id,
-    description: entry.labels.join(' · '),
+  return provider.models.map((model) => ({
+    id: model.id,
+    name: model.name || model.id,
+    description: model.name ? model.id : '',
     context: '',
   }))
 }
@@ -81,25 +60,13 @@ function buildProviderModels(
 function buildProviderChoices(
   providers: SavedProvider[],
   activeId: string | null,
-  availableModels: ModelInfo[],
-  labels: Record<'main' | 'haiku' | 'sonnet' | 'opus', string>,
+  _availableModels: ModelInfo[],
 ): ProviderChoice[] {
-  if (activeId) {
-    const activeProvider = providers.find((p) => p.id === activeId)
-    if (!activeProvider || availableModels.length === 0) return []
-    return [{
-      providerId: activeProvider.id,
-      providerName: activeProvider.name,
-      isDefault: true,
-      models: availableModels,
-    }]
-  }
-
   return providers.map((provider) => ({
     providerId: provider.id,
     providerName: provider.name,
-    isDefault: false,
-    models: buildProviderModels(provider, labels),
+    isDefault: provider.id === activeId,
+    models: buildProviderModels(provider),
   }))
 }
 
@@ -252,24 +219,13 @@ export function ModelSelector({
     }
   }, [open, updateDropdownPosition])
 
-  const roleLabels = useMemo(
-    () => ({
-      main: t('settings.providers.mainModel'),
-      haiku: t('settings.providers.haikuModel'),
-      sonnet: t('settings.providers.sonnetModel'),
-      opus: t('settings.providers.opusModel'),
-    }),
-    [t],
-  )
-
   const providerChoices = useMemo(
     () => buildProviderChoices(
       providers,
       activeId,
       availableModels,
-      roleLabels,
     ),
-    [activeId, availableModels, providers, roleLabels],
+    [activeId, availableModels, providers],
   )
 
   const selectedModel = isControlled

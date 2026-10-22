@@ -8,7 +8,7 @@ import { Button } from '../shared/Button'
 import { getPresetDisplayName } from './presetDisplayName'
 import { ProviderIcon } from './ProviderIcon'
 import { Dropdown } from '../shared/Dropdown'
-import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ModelMapping, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
+import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
 import {
   API_KEY_JSON_PLACEHOLDER,
@@ -38,11 +38,9 @@ const AUTO_COMPACT_WINDOW_ENV_KEY = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW'
 const MODEL_CONTEXT_WINDOWS_ENV_KEY = 'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS'
 const MODEL_CONTEXT_WINDOW_MIN = 16000
 const MODEL_CONTEXT_WINDOW_MAX = 10000000
-const MODEL_SLOTS = ['main', 'haiku', 'sonnet', 'opus'] as const
 const DEFAULT_PROVIDER_AUTH_STRATEGY: ProviderAuthStrategy = 'auth_token'
 const AUTH_ENV_KEYS = new Set(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])
-type ModelSlot = typeof MODEL_SLOTS[number]
-type ModelContextInputs = Record<ModelSlot, string>
+type ModelContextInputs = Record<string, string>
 
 function formatContextWindow(value: number): string {
   return value.toLocaleString('en-US')
@@ -142,39 +140,50 @@ function getModelContextInputValue(
 }
 
 function getModelContextInputs(
-  models: ModelMapping,
+  models: ProviderModel[],
   preset: ProviderPreset,
   provider?: SavedProvider,
 ): ModelContextInputs {
-  const inputs = {} as ModelContextInputs
-  for (const slot of MODEL_SLOTS) {
-    inputs[slot] = getModelContextInputValue(models[slot], preset, provider)
-  }
-  return inputs
+  return Object.fromEntries(models.map((model) => [
+    model.id,
+    getModelContextInputValue(model.id, preset, provider),
+  ]))
 }
 
 function buildModelContextWindows(
-  models: ModelMapping,
+  models: ProviderModel[],
   inputs: ModelContextInputs,
 ): Record<string, number> {
   const windows: Record<string, number> = {}
-  for (const slot of MODEL_SLOTS) {
-    const model = models[slot]?.trim()
-    const parsed = parseModelContextWindowsInput(inputs[slot])
-    if (model && parsed !== undefined) {
-      windows[model] = parsed
+  for (const model of models) {
+    const id = model.id.trim()
+    const parsed = parseModelContextWindowsInput(inputs[id] ?? '')
+    if (id && parsed !== undefined) {
+      windows[id] = parsed
     }
   }
   return windows
 }
 
-function normalizeModelMapping(models: ModelMapping): ModelMapping {
-  const main = models.main.trim()
+function normalizeModels(models: ProviderModel[]): ProviderModel[] {
+  const seen = new Set<string>()
+  return models.flatMap((model) => {
+    const id = model.id.trim()
+    if (!id || seen.has(id)) return []
+    seen.add(id)
+    const name = model.name?.trim()
+    return [{ id, ...(name ? { name } : {}) }]
+  })
+}
+
+function runtimeModelMapping(models: ProviderModel[], fastModel?: string): {
+  main: string
+  fast: string
+} {
+  const main = models[0]?.id ?? ''
   return {
     main,
-    haiku: models.haiku.trim() || main,
-    sonnet: models.sonnet.trim() || main,
-    opus: models.opus.trim() || main,
+    fast: fastModel && models.some((model) => model.id === fastModel) ? fastModel : main,
   }
 }
 
@@ -220,18 +229,20 @@ function updateSettingsJsonModelContextWindows(
   }
 }
 
-function updateSettingsJsonModels(raw: string, models: ModelMapping): string {
+function updateSettingsJsonModels(raw: string, models: ProviderModel[], fastModel?: string): string {
   try {
     const parsed = JSON.parse(raw || '{}') as { env?: Record<string, unknown> }
     const existingEnv = parsed.env && typeof parsed.env === 'object' && !Array.isArray(parsed.env)
       ? parsed.env
       : {}
+    const runtime = runtimeModelMapping(models, fastModel)
     parsed.env = {
       ...existingEnv,
-      ANTHROPIC_MODEL: models.main,
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: models.haiku,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: models.sonnet,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: models.opus,
+      ANTHROPIC_MODEL: runtime.main,
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
+      ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
     }
     return JSON.stringify(parsed, null, 2)
   } catch {
@@ -271,7 +282,8 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
     baseUrl: provider?.baseUrl ?? '',
     apiFormat: provider?.apiFormat ?? 'anthropic',
     authStrategy: provider?.authStrategy,
-    defaultModels: provider?.models ?? { main: '', haiku: '', sonnet: '', opus: '' },
+    defaultModels: provider?.models ?? [],
+    defaultFastModel: provider?.fastModel,
     modelContextWindows: provider?.modelContextWindows,
     defaultEnv: provider?.autoCompactWindow !== undefined
       ? { [AUTO_COMPACT_WINDOW_ENV_KEY]: String(provider.autoCompactWindow) }
@@ -282,7 +294,7 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
 }
 
 function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }: ProviderFormProps) {
-  const { createProvider, updateProvider, testConfig } = useProviderStore()
+  const { createProvider, updateProvider, testConfig, discoverModels, discoverProviderModels } = useProviderStore()
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const t = useTranslation()
 
@@ -307,7 +319,8 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [apiKey, setApiKey] = useState(provider?.apiKey ?? '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [notes, setNotes] = useState(provider?.notes ?? '')
-  const [models, setModels] = useState<ModelMapping>(provider?.models ?? { ...initialPreset.defaultModels })
+  const [models, setModels] = useState<ProviderModel[]>(() => (provider?.models ?? initialPreset.defaultModels).map((model) => ({ ...model })))
+  const [fastModel, setFastModel] = useState(provider?.fastModel ?? initialPreset.defaultFastModel ?? '')
   const [modelContextInputs, setModelContextInputs] = useState<ModelContextInputs>(
     getModelContextInputs(provider?.models ?? initialPreset.defaultModels, initialPreset, provider),
   )
@@ -320,6 +333,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null)
   const [isTesting, setIsTesting] = useState(false)
+  const [isDiscovering, setIsDiscovering] = useState(false)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [discoveredModels, setDiscoveredModels] = useState<ProviderModel[]>([])
+  const [newModelId, setNewModelId] = useState('')
+  const [newModelName, setNewModelName] = useState('')
   const [settingsJson, setSettingsJson] = useState('')
   const [settingsJsonError, setSettingsJsonError] = useState<string | null>(null)
   const jsonPastedRef = useRef(false)
@@ -334,7 +352,8 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         const needsProxy = apiFormat !== 'anthropic'
         const autoCompactWindowEnv = autoCompactWindow.trim()
         const modelContextWindows = buildModelContextWindows(models, modelContextInputs)
-        const normalizedModels = normalizeModelMapping(models)
+        const normalizedModels = normalizeModels(models)
+        const runtime = runtimeModelMapping(normalizedModels, fastModel)
         const existingEnv = (settings.env as Record<string, string>) || {}
         const cleanedEnv = stripProviderSettingsJsonEnv(existingEnv, presetDefaultEnvKeys)
         const merged = {
@@ -349,10 +368,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
               : {}),
             ANTHROPIC_BASE_URL: needsProxy ? 'http://127.0.0.1:3456/proxy' : baseUrl,
             ...buildSettingsJsonAuthEnv(apiFormat, authStrategy, apiKey, selectedPreset),
-            ANTHROPIC_MODEL: normalizedModels.main,
-            ANTHROPIC_DEFAULT_HAIKU_MODEL: normalizedModels.haiku,
-            ANTHROPIC_DEFAULT_SONNET_MODEL: normalizedModels.sonnet,
-            ANTHROPIC_DEFAULT_OPUS_MODEL: normalizedModels.opus,
+            ANTHROPIC_MODEL: runtime.main,
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
+            ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
+            ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
+            ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
           },
         }
         setSettingsJson(JSON.stringify(merged, null, 2))
@@ -368,18 +388,21 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setBaseUrl(preset.baseUrl)
     setApiFormat(preset.apiFormat ?? 'anthropic')
     setAuthStrategy(getPresetAuthStrategy(preset))
-    setModels({ ...preset.defaultModels })
+    setModels(preset.defaultModels.map((model) => ({ ...model })))
+    setFastModel(preset.defaultFastModel ?? '')
     setModelContextInputs(getModelContextInputs(preset.defaultModels, preset))
     setAutoCompactWindow(getPresetAutoCompactWindow(preset))
     setShowContextSettings(false)
     setTestResult(null)
+    setDiscoveredModels([])
+    setDiscoveryError(null)
   }
 
   const isCustom = selectedPreset.id === 'custom'
   const requiresApiKey = selectedPreset.needsApiKey !== false
   const autoCompactWindowErrorKey = getAutoCompactWindowErrorKey(autoCompactWindow)
-  const modelContextWindowErrorSlots = MODEL_SLOTS.filter((slot) => getModelContextWindowErrorKey(modelContextInputs[slot]))
-  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.main.trim() && !settingsJsonError && !autoCompactWindowErrorKey && modelContextWindowErrorSlots.length === 0
+  const modelContextWindowErrors = Object.values(modelContextInputs).filter((value) => getModelContextWindowErrorKey(value))
+  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !autoCompactWindowErrorKey && modelContextWindowErrors.length === 0
   const apiKeyUrl = selectedPreset.apiKeyUrl?.trim()
   const displayedSettingsJson = showApiKey
     ? settingsJson
@@ -448,7 +471,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const contextSummary = configuredContextSummary.length > 0
     ? [...configuredContextSummary, fallbackContextSummary].join(' · ')
     : t('settings.providers.contextSummaryAuto')
-  const shouldShowContextFields = showContextSettings || modelContextWindowErrorSlots.length > 0 || !!autoCompactWindowErrorKey
+  const shouldShowContextFields = showContextSettings || modelContextWindowErrors.length > 0 || !!autoCompactWindowErrorKey
   const handleAutoCompactWindowChange = (value: string) => {
     setAutoCompactWindow(value)
     setSettingsJson((current) => updateSettingsJsonAutoCompactWindow(current, value))
@@ -469,27 +492,63 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setAuthStrategy(value)
     setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, value, apiKey, selectedPreset, baseUrl))
   }
-  const handleModelChange = (slot: ModelSlot, value: string) => {
-    const nextModels = { ...models, [slot]: value }
-    const nextInputs = {
-      ...modelContextInputs,
-      [slot]: getModelContextInputValue(value, selectedPreset, provider),
-    }
+  const updateModels = (nextModels: ProviderModel[], nextFastModel = fastModel) => {
+    const normalized = normalizeModels(nextModels)
+    const validFastModel = normalized.some((model) => model.id === nextFastModel) ? nextFastModel : ''
     setModels(nextModels)
-    setModelContextInputs(nextInputs)
+    setFastModel(validFastModel)
     setSettingsJson((current) => updateSettingsJsonModelContextWindows(
-      updateSettingsJsonModels(current, normalizeModelMapping(nextModels)),
-      buildModelContextWindows(nextModels, nextInputs),
+      updateSettingsJsonModels(current, normalized, validFastModel),
+      buildModelContextWindows(normalized, modelContextInputs),
     ))
   }
-  const handleModelContextWindowChange = (slot: ModelSlot, value: string) => {
-    const nextInputs = { ...modelContextInputs, [slot]: value }
+  const handleModelContextWindowChange = (modelId: string, value: string) => {
+    const nextInputs = { ...modelContextInputs, [modelId]: value }
     setModelContextInputs(nextInputs)
     setSettingsJson((current) => updateSettingsJsonModelContextWindows(
       current,
       buildModelContextWindows(models, nextInputs),
     ))
   }
+  const handleDiscoverModels = async () => {
+    if (!baseUrl.trim()) return
+    setIsDiscovering(true)
+    setDiscoveryError(null)
+    try {
+      const fetched = mode === 'edit' && provider && !apiKey.trim()
+        ? await discoverProviderModels(provider.id)
+        : await discoverModels({
+            baseUrl: baseUrl.trim(),
+            apiKey: apiKey.trim() || selectedPreset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || '',
+            authStrategy,
+            apiFormat,
+          })
+      setDiscoveredModels(fetched)
+    } catch (err) {
+      setDiscoveredModels([])
+      setDiscoveryError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsDiscovering(false)
+    }
+  }
+  const handleAddModel = () => {
+    const id = newModelId.trim()
+    if (!id || models.some((model) => model.id === id)) return
+    const suggestion = discoveredModels.find((model) => model.id === id)
+    const name = newModelName.trim() || suggestion?.name
+    const nextModels = [...models, { id, ...(name ? { name } : {}) }]
+    setModelContextInputs((current) => ({
+      ...current,
+      [id]: getModelContextInputValue(id, selectedPreset, provider),
+    }))
+    updateModels(nextModels)
+    setNewModelId('')
+    setNewModelName('')
+  }
+  const duplicateModelNames = new Set(
+    models.map((model) => model.name?.trim()).filter((name): name is string => !!name)
+      .filter((name, index, names) => names.indexOf(name) !== index),
+  )
   const renderPresetButton = (preset: ProviderPreset) => (
     <button
       key={preset.id}
@@ -507,7 +566,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
 
   const handleSubmit = async () => {
     if (!canSubmit) return
-    const normalizedModels = normalizeModelMapping(models)
+    const normalizedModels = normalizeModels(models)
     const parsedAutoCompactWindow = parseAutoCompactWindowInput(autoCompactWindow)
     const parsedModelContextWindows = buildModelContextWindows(models, modelContextInputs)
     setIsSubmitting(true)
@@ -530,6 +589,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           baseUrl: baseUrl.trim(),
           apiFormat,
           models: normalizedModels,
+          ...(fastModel && { fastModel }),
           ...(parsedAutoCompactWindow !== undefined && { autoCompactWindow: parsedAutoCompactWindow }),
           ...(Object.keys(parsedModelContextWindows).length > 0 && { modelContextWindows: parsedModelContextWindows }),
           notes: notes.trim() || undefined,
@@ -542,6 +602,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           authStrategy,
           apiFormat,
           models: normalizedModels,
+          fastModel: fastModel || null,
           autoCompactWindow: parsedAutoCompactWindow ?? null,
           modelContextWindows: Object.keys(parsedModelContextWindows).length > 0
             ? parsedModelContextWindows
@@ -561,7 +622,8 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   }
 
   const handleTest = async () => {
-    if (!baseUrl.trim() || !models.main.trim()) return
+    const testModel = models[0]?.id.trim()
+    if (!baseUrl.trim() || !testModel) return
     setIsTesting(true)
     setTestResult(null)
     try {
@@ -569,7 +631,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       if (mode === 'edit' && provider && !apiKey.trim()) {
         result = await useProviderStore.getState().testProvider(provider.id, {
           baseUrl: baseUrl.trim(),
-          modelId: models.main.trim(),
+          modelId: testModel,
           apiFormat,
           authStrategy,
         })
@@ -578,7 +640,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         result = await testConfig({
           baseUrl: baseUrl.trim(),
           apiKey: apiKey.trim() || selectedPreset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || 'local',
-          modelId: models.main.trim(),
+          modelId: testModel,
           authStrategy,
           apiFormat,
         })
@@ -716,12 +778,120 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         )}
 
         <div>
-          <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.modelMapping')}</label>
-          <div className="grid grid-cols-2 gap-2">
-            <Input label={t('settings.providers.mainModel')} required value={models.main} onChange={(e) => handleModelChange('main', e.target.value)} placeholder="Model ID" />
-            <Input label={t('settings.providers.haikuModel')} value={models.haiku} onChange={(e) => handleModelChange('haiku', e.target.value)} placeholder={t('settings.providers.sameAsMain')} />
-            <Input label={t('settings.providers.sonnetModel')} value={models.sonnet} onChange={(e) => handleModelChange('sonnet', e.target.value)} placeholder={t('settings.providers.sameAsMain')} />
-            <Input label={t('settings.providers.opusModel')} value={models.opus} onChange={(e) => handleModelChange('opus', e.target.value)} placeholder={t('settings.providers.sameAsMain')} />
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.providers.models')}</label>
+            <Button variant="secondary" size="sm" onClick={handleDiscoverModels} loading={isDiscovering} disabled={!baseUrl.trim()}>
+              {t('settings.providers.fetchModels')}
+            </Button>
+          </div>
+          {discoveryError && (
+            <p className="mb-2 text-[11px] text-[var(--color-error)]">{discoveryError}</p>
+          )}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">{t('settings.providers.modelId')}</label>
+              <input
+                aria-label={t('settings.providers.modelId')}
+                list="provider-discovered-models"
+                value={newModelId}
+                onChange={(event) => {
+                  const id = event.target.value
+                  setNewModelId(id)
+                  const suggestion = discoveredModels.find((model) => model.id === id)
+                  if (suggestion?.name) setNewModelName(suggestion.name)
+                }}
+                placeholder={t('settings.providers.modelIdPlaceholder')}
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]"
+              />
+              <datalist id="provider-discovered-models">
+                {discoveredModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+              </datalist>
+            </div>
+            <Input label={t('settings.providers.displayName')} value={newModelName} onChange={(event) => setNewModelName(event.target.value)} placeholder={t('settings.providers.displayNameOptional')} />
+            <Button variant="secondary" onClick={handleAddModel} disabled={!newModelId.trim() || models.some((model) => model.id === newModelId.trim())}>
+              {t('common.add')}
+            </Button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {models.map((model, index) => (
+              <div key={model.id} className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-2">
+                <div className="min-w-0 flex-1">
+                  <input
+                    aria-label={t('settings.providers.displayName')}
+                    value={model.name ?? ''}
+                    onChange={(event) => updateModels(models.map((entry, candidateIndex) => (
+                      candidateIndex === index
+                        ? { ...entry, name: event.target.value || undefined }
+                        : entry
+                    )))}
+                    placeholder={model.id}
+                    className="h-8 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
+                  />
+                  <div className="mt-1 truncate text-[11px] text-[var(--color-text-tertiary)]">{model.id}</div>
+                  {index === 0 && (
+                    <div className="mt-1 text-[11px] font-medium text-[var(--color-brand)]">{t('settings.providers.defaultModel')}</div>
+                  )}
+                  {model.name && duplicateModelNames.has(model.name.trim()) && (
+                    <div className="mt-1 text-[11px] text-[var(--color-warning)]">{t('settings.providers.duplicateDisplayName')}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => {
+                    const nextModels = [...models]
+                    const [moved] = nextModels.splice(index, 1)
+                    if (!moved) return
+                    nextModels.splice(index - 1, 0, moved)
+                    updateModels(nextModels)
+                  }}
+                  aria-label={t('settings.providers.moveModelUp')}
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
+                >
+                  <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={index === models.length - 1}
+                  onClick={() => {
+                    const nextModels = [...models]
+                    const [moved] = nextModels.splice(index, 1)
+                    if (!moved) return
+                    nextModels.splice(index + 1, 0, moved)
+                    updateModels(nextModels)
+                  }}
+                  aria-label={t('settings.providers.moveModelDown')}
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
+                >
+                  <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
+                  aria-label={t('common.delete')}
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-error)]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            <label htmlFor="provider-fast-model" className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">{t('settings.providers.fastModel')}</label>
+            <select
+              id="provider-fast-model"
+              value={fastModel}
+              onChange={(event) => {
+                const nextFastModel = event.target.value
+                setFastModel(nextFastModel)
+                setSettingsJson((current) => updateSettingsJsonModels(current, normalizeModels(models), nextFastModel))
+              }}
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
+            >
+              <option value="">{t('settings.providers.fastModelDefault')}</option>
+              {models.map((model) => <option key={model.id} value={model.id}>{model.name || model.id}</option>)}
+            </select>
+            <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">{t('settings.providers.fastModelDesc')}</p>
           </div>
         </div>
 
@@ -759,21 +929,14 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
               <div>
                 <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.modelContextWindows')}</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {MODEL_SLOTS.map((slot) => {
-                    const errorKey = getModelContextWindowErrorKey(modelContextInputs[slot])
-                    const labelKey = slot === 'main'
-                      ? 'settings.providers.mainContextWindow'
-                      : slot === 'haiku'
-                        ? 'settings.providers.haikuContextWindow'
-                        : slot === 'sonnet'
-                          ? 'settings.providers.sonnetContextWindow'
-                          : 'settings.providers.opusContextWindow'
+                  {models.map((model) => {
+                    const errorKey = getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
                     return (
-                      <div key={slot}>
+                      <div key={model.id}>
                         <Input
-                          label={t(labelKey)}
-                          value={modelContextInputs[slot]}
-                          onChange={(e) => handleModelContextWindowChange(slot, e.target.value)}
+                          label={model.name || model.id}
+                          value={modelContextInputs[model.id] ?? ''}
+                          onChange={(e) => handleModelContextWindowChange(model.id, e.target.value)}
                           placeholder={t('settings.providers.contextWindowPlaceholder')}
                         />
                         {errorKey && (
@@ -816,7 +979,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="secondary" size="sm" onClick={handleTest} loading={isTesting} disabled={!baseUrl.trim() || !models.main.trim()}>
+          <Button variant="secondary" size="sm" onClick={handleTest} loading={isTesting} disabled={!baseUrl.trim() || !models[0]?.id.trim()}>
             {t('settings.providers.testConnection')}
           </Button>
           {testResult && (
@@ -880,20 +1043,20 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                       parsedContextWindows = {}
                     }
                   }
-                  const newModels: Partial<ModelMapping> = {}
-                  if (env.ANTHROPIC_MODEL) newModels.main = env.ANTHROPIC_MODEL
-                  if (env.ANTHROPIC_DEFAULT_HAIKU_MODEL) newModels.haiku = env.ANTHROPIC_DEFAULT_HAIKU_MODEL
-                  if (env.ANTHROPIC_DEFAULT_SONNET_MODEL) newModels.sonnet = env.ANTHROPIC_DEFAULT_SONNET_MODEL
-                  if (env.ANTHROPIC_DEFAULT_OPUS_MODEL) newModels.opus = env.ANTHROPIC_DEFAULT_OPUS_MODEL
-                  if (Object.keys(newModels).length > 0) {
-                    setModels((prev) => {
-                      const nextModels = { ...prev, ...newModels }
-                      setModelContextInputs(getModelContextInputs(nextModels, {
-                        ...selectedPreset,
-                        modelContextWindows: parsedContextWindows,
-                      }))
-                      return nextModels
-                    })
+                  const pastedModels = normalizeModels([
+                    env.ANTHROPIC_MODEL,
+                    env.ANTHROPIC_DEFAULT_SONNET_MODEL,
+                    env.ANTHROPIC_DEFAULT_OPUS_MODEL,
+                    env.ANTHROPIC_DEFAULT_HAIKU_MODEL,
+                  ].filter((id): id is string => typeof id === 'string' && !!id.trim()).map((id) => ({ id })))
+                  if (pastedModels.length > 0) {
+                    const pastedFast = env.ANTHROPIC_SMALL_FAST_MODEL || env.ANTHROPIC_DEFAULT_HAIKU_MODEL || ''
+                    setModels(pastedModels)
+                    setFastModel(pastedModels.some((model) => model.id === pastedFast) && pastedFast !== pastedModels[0]?.id ? pastedFast : '')
+                    setModelContextInputs(getModelContextInputs(pastedModels, {
+                      ...selectedPreset,
+                      modelContextWindows: parsedContextWindows,
+                    }))
                   } else if (Object.keys(parsedContextWindows).length > 0) {
                     setModelContextInputs(getModelContextInputs(models, {
                       ...selectedPreset,

@@ -1149,12 +1149,7 @@ describe('Settings > Providers tab', () => {
         apiKey: '***',
         baseUrl: 'https://api.minimaxi.com',
         apiFormat: 'openai_chat',
-        models: {
-          main: 'MiniMax-M2.7-highspeed',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        models: [{ id: 'MiniMax-M2.7-highspeed' }],
         notes: '',
       },
     ]
@@ -1190,12 +1185,7 @@ describe('Settings > Providers tab', () => {
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: 'custom-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [{ id: 'custom-main' }],
         needsApiKey: true,
         websiteUrl: '',
       },
@@ -1206,7 +1196,7 @@ describe('Settings > Providers tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Provider/i }))
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: /Fast model/i })).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Anthropic Messages \(native\)/i }))
     fireEvent.click(within(dialog).getByRole('button', { name: /OpenAI Responses API \(proxy\)/i }))
@@ -1215,7 +1205,7 @@ describe('Settings > Providers tab', () => {
     expect(within(dialog).getByText('Requests will be translated via the local proxy')).toBeInTheDocument()
   })
 
-  it('normalizes blank model mappings to the main model when saving a provider', async () => {
+  it('adds a model ID when saving a provider', async () => {
     providerStoreState.createProvider = vi.fn().mockResolvedValue({
       id: 'provider-new',
       presetId: 'custom',
@@ -1223,12 +1213,7 @@ describe('Settings > Providers tab', () => {
       apiKey: 'sk-test',
       baseUrl: 'https://api.example.com/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'gpt-5.5',
-        haiku: 'gpt-5.5',
-        sonnet: 'gpt-5.5',
-        opus: 'gpt-5.5',
-      },
+      models: [{ id: 'gpt-5.5' }],
     })
     providerStoreState.presets = [
       {
@@ -1236,12 +1221,7 @@ describe('Settings > Providers tab', () => {
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: '',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [],
         needsApiKey: true,
         websiteUrl: '',
       },
@@ -1252,17 +1232,14 @@ describe('Settings > Providers tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Provider|添加服务商/i }))
     const dialog = screen.getByRole('dialog')
     fireEvent.change(within(dialog).getByPlaceholderText('sk-...'), { target: { value: 'sk-test' } })
-    fireEvent.change(within(dialog).getByLabelText(/Main Model|主模型/i), { target: { value: 'gpt-5.5' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /Save|Add|保存|添加/i }))
+    fireEvent.change(within(dialog).getByLabelText(/Model ID|模型 ID/i), { target: { value: 'gpt-5.5' } })
+    fireEvent.click(within(dialog).getAllByRole('button', { name: /Add|添加/i })[0]!)
+    const saveButtons = within(dialog).getAllByRole('button', { name: /Save|Add|保存|添加/i })
+    fireEvent.click(saveButtons[saveButtons.length - 1]!)
 
     await waitFor(() => {
       expect(providerStoreState.createProvider).toHaveBeenCalledWith(expect.objectContaining({
-        models: {
-          main: 'gpt-5.5',
-          haiku: 'gpt-5.5',
-          sonnet: 'gpt-5.5',
-          opus: 'gpt-5.5',
-        },
+        models: [{ id: 'gpt-5.5' }],
       }))
     })
   })
@@ -1274,12 +1251,7 @@ describe('Settings > Providers tab', () => {
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: 'custom-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [{ id: 'custom-main' }],
         needsApiKey: true,
         websiteUrl: '',
       },

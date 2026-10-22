@@ -253,7 +253,7 @@ describe('E2E: Full Flow', () => {
         if (msg.type === 'connected') {
           ws.send(JSON.stringify({ type: 'user_message', content: 'Hello' }))
         }
-        if (msg.type === 'session_patch' && msg.changes?.turn?.phase === 'idle' && messages.length > 2) {
+        if (msg.type === 'status' && msg.state === 'idle' && messages.length > 2) {
           ws.close()
           resolve()
         }

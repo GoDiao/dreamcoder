@@ -116,12 +116,8 @@ describe('ModelSelector', () => {
         apiKey: '***',
         baseUrl: 'https://api.example.com',
         apiFormat: 'anthropic',
-        models: {
-          main: 'provider-main',
-          haiku: 'provider-fast',
-          sonnet: 'provider-main',
-          opus: '',
-        },
+        models: [{ id: 'provider-main' }, { id: 'provider-fast', name: 'Fast Display' }],
+        fastModel: 'provider-fast',
       }],
       activeId: 'provider-a',
       hasLoadedProviders: true,
@@ -169,7 +165,7 @@ describe('ModelSelector', () => {
         apiKey: '***',
         baseUrl: 'https://api.example.com',
         apiFormat: 'anthropic',
-        models: { main: 'provider-main', haiku: '', sonnet: '', opus: '' },
+        models: [{ id: 'provider-main' }],
       }],
       activeId: 'provider-a',
       hasLoadedProviders: true,
@@ -217,7 +213,7 @@ describe('ModelSelector', () => {
         apiKey: '***',
         baseUrl: 'https://api.example.com',
         apiFormat: 'anthropic',
-        models: { main: 'provider-main', haiku: 'provider-fast', sonnet: '', opus: '' },
+        models: [{ id: 'provider-main' }, { id: 'provider-fast' }],
       }],
       activeId: 'provider-a',
       hasLoadedProviders: true,
@@ -239,7 +235,7 @@ describe('ModelSelector', () => {
     })
   })
 
-  it('lists only the active provider without subscription sections', async () => {
+  it('lists models from every provider and marks the active provider as default', async () => {
     useSettingsStore.setState({
       locale: 'en',
       availableModels: MODELS,
@@ -247,20 +243,26 @@ describe('ModelSelector', () => {
       activeProviderName: 'Provider A',
     })
     useProviderStore.setState({
-      providers: [{
-        id: 'provider-a',
-        presetId: 'custom',
-        name: 'Provider A',
-        apiKey: '***',
-        baseUrl: 'https://api.example.com',
-        apiFormat: 'anthropic',
-        models: {
-          main: 'provider-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
+      providers: [
+        {
+          id: 'provider-a',
+          presetId: 'custom',
+          name: 'Provider A',
+          apiKey: '***',
+          baseUrl: 'https://api.example.com',
+          apiFormat: 'anthropic',
+          models: [{ id: 'provider-main', name: 'Main Display' }],
         },
-      }],
+        {
+          id: 'provider-b',
+          presetId: 'custom',
+          name: 'Provider B',
+          apiKey: '***',
+          baseUrl: 'https://other.example.com',
+          apiFormat: 'anthropic',
+          models: [{ id: 'other-model', name: 'Other Display' }],
+        },
+      ],
       activeId: 'provider-a',
       hasLoadedProviders: true,
       isLoading: true,
@@ -274,6 +276,10 @@ describe('ModelSelector', () => {
     expect(dropdown.textContent).not.toContain('Claude Official')
     expect(dropdown.textContent).not.toContain('ChatGPT Official')
     expect(dropdown.textContent).toContain('Provider A')
+    expect(dropdown.textContent).toContain('Provider B')
+    expect(dropdown.textContent).toContain('Main Display')
+    expect(dropdown.textContent).toContain('provider-main')
+    expect(dropdown.textContent).toContain('Other Display')
   })
 
   it('portals the dropdown outside clipping containers and positions it below the trigger', async () => {

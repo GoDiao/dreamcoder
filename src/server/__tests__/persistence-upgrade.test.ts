@@ -49,7 +49,7 @@ describe('persistent storage upgrade migrations', () => {
           name: 'Legacy Provider',
           apiKey: 'token',
           baseUrl: 'https://example.test',
-          models: { main: 'model-main', haiku: '', sonnet: '', opus: '' },
+          models: { main: 'model-main', haiku: 'model-fast', sonnet: 'model-sonnet', opus: 'model-main' },
           extraFutureField: 'keep-me',
         }],
       }, null, 2),
@@ -73,6 +73,12 @@ describe('persistent storage upgrade migrations', () => {
     expect(migrated.activeProviderId).toBeUndefined()
     expect(migrated.rootFutureField).toEqual({ keep: true })
     expect(migrated.providers?.[0]?.extraFutureField).toBe('keep-me')
+    expect(migrated.providers?.[0]?.models).toEqual([
+      { id: 'model-main' },
+      { id: 'model-sonnet' },
+      { id: 'model-fast' },
+    ])
+    expect(migrated.providers?.[0]?.fastModel).toBe('model-fast')
 
     const backups = (await listFiles(dreamcoderDir)).filter((file) => file.startsWith('providers.json.bak-before-migration-'))
     expect(backups.length).toBe(1)
@@ -131,7 +137,7 @@ describe('persistent storage upgrade migrations', () => {
         id?: string
         presetId?: string
         apiFormat?: string
-        models?: Record<string, string>
+        models?: Array<{ id: string; name?: string }>
         notes?: string
       }>
     }
@@ -141,12 +147,10 @@ describe('persistent storage upgrade migrations', () => {
       presetId: 'custom',
       apiFormat: 'anthropic',
       notes: 'keep note',
-      models: {
-        main: 'legacy-sonnet',
-        haiku: 'legacy-sonnet',
-        sonnet: 'legacy-sonnet',
-        opus: 'legacy-sonnet',
-      },
+      models: [
+        { id: 'legacy-sonnet', name: 'Legacy Sonnet' },
+        { id: 'legacy-haiku', name: 'Legacy Haiku' },
+      ],
     })
 
     const managedSettings = JSON.parse(await fs.readFile(path.join(tempDir, 'dreamcoder', 'settings.json'), 'utf-8')) as {
@@ -161,7 +165,7 @@ describe('persistent storage upgrade migrations', () => {
     const service = new ProviderService()
     const { providers, activeId } = await service.listProviders()
     expect(activeId).toBe('legacy-provider')
-    expect(providers[0]?.models.main).toBe('legacy-sonnet')
+    expect(providers[0]?.models[0]?.id).toBe('legacy-sonnet')
   })
 
   test('does not overwrite current dreamcoder provider storage with a legacy root config', async () => {

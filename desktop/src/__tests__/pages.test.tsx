@@ -23,7 +23,7 @@ const TEST_PROVIDER = vi.hoisted(() => ({
   apiKey: '***',
   baseUrl: 'https://example.invalid',
   apiFormat: 'anthropic' as const,
-  models: { main: 'test-main', haiku: '', sonnet: '', opus: '' },
+  models: [{ id: 'test-main' }],
 }))
 
 vi.mock('../api/providers', () => ({

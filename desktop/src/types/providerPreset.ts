@@ -1,18 +1,12 @@
-import type { ApiFormat, ProviderAuthStrategy } from './provider'
-
-export type ModelMapping = {
-  main: string
-  haiku: string
-  sonnet: string
-  opus: string
-}
+import type { ApiFormat, ProviderAuthStrategy, ProviderModel } from './provider'
 
 export type ProviderPreset = {
   id: string
   name: string
   baseUrl: string
   apiFormat: ApiFormat
-  defaultModels: ModelMapping
+  defaultModels: ProviderModel[]
+  defaultFastModel?: string
   needsApiKey: boolean
   websiteUrl: string
   apiKeyUrl?: string

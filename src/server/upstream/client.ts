@@ -19,7 +19,7 @@ import {
   resolveProviderApiKey,
   stripContextSuffix,
 } from '../services/providerRuntimeEnv.js'
-import type { ApiFormat, ProviderAuthStrategy, SavedProvider } from '../types/provider.js'
+import type { ApiFormat, ProviderAuthStrategy, ProviderModel, SavedProvider } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl } from './baseUrl.js'
 
 export type UpstreamTarget = {
@@ -32,6 +32,10 @@ export type UpstreamTarget = {
 export type UpstreamResult =
   | { ok: true; httpStatus: number; message: AnthropicResponse }
   | { ok: true; httpStatus: number; stream: ReadableStream<Uint8Array> }
+  | { ok: false; httpStatus?: number; error: string }
+
+export type UpstreamModelsResult =
+  | { ok: true; httpStatus: number; models: ProviderModel[] }
   | { ok: false; httpStatus?: number; error: string }
 
 type UpstreamRequest = {
@@ -109,6 +113,63 @@ export async function sendToUpstream(
   } catch (err) {
     return { ok: false, httpStatus: 502, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+export async function fetchUpstreamModels(target: UpstreamTarget): Promise<UpstreamModelsResult> {
+  const networkSettings = await loadNetworkSettings()
+  const base = normalizeUpstreamBaseUrl(target.baseUrl)
+  const headers = target.apiFormat === 'anthropic'
+    ? {
+        'anthropic-version': '2023-06-01',
+        ...buildAnthropicAuthHeaders(target.apiKey, target.authStrategy),
+      }
+    : { Authorization: `Bearer ${target.apiKey}` }
+
+  let response: Response
+  try {
+    response = await fetchWithTimeout(`${base}/v1/models`, {
+      method: 'GET',
+      headers,
+      ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
+    }, networkSettings.aiRequestTimeoutMs, false)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      return { ok: false, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)` }
+    }
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    return {
+      ok: false,
+      httpStatus: response.status,
+      error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
+    }
+  }
+
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  const data = body && Array.isArray(body.data) ? body.data : null
+  if (!data) {
+    return { ok: false, httpStatus: 502, error: 'Upstream model response is missing a data array' }
+  }
+
+  const seen = new Set<string>()
+  const models = data.flatMap((entry): ProviderModel[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const record = entry as Record<string, unknown>
+    const id = typeof record.id === 'string' ? record.id.trim() : ''
+    if (!id || seen.has(id)) return []
+    seen.add(id)
+    const rawName = typeof record.display_name === 'string'
+      ? record.display_name
+      : typeof record.name === 'string'
+        ? record.name
+        : ''
+    const name = rawName.trim()
+    return [{ id, ...(name && name !== id ? { name } : {}) }]
+  })
+  return { ok: true, httpStatus: response.status, models }
 }
 
 function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest): UpstreamRequest {

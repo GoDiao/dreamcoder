@@ -1,21 +1,19 @@
 import { z } from 'zod'
 
 import providerPresetsJson from './providerPresets.json'
-import { ApiFormatSchema, ProviderAuthStrategySchema } from '../types/provider.js'
-
-const ModelMappingSchema = z.object({
-  main: z.string(),
-  haiku: z.string(),
-  sonnet: z.string(),
-  opus: z.string(),
-})
+import {
+  ApiFormatSchema,
+  ProviderAuthStrategySchema,
+  ProviderModelsSchema,
+} from '../types/provider.js'
 
 const ProviderPresetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   baseUrl: z.string(),
   apiFormat: ApiFormatSchema,
-  defaultModels: ModelMappingSchema,
+  defaultModels: ProviderModelsSchema,
+  defaultFastModel: z.string().min(1).optional(),
   needsApiKey: z.boolean(),
   websiteUrl: z.string(),
   apiKeyUrl: z.string().optional(),
@@ -29,7 +27,6 @@ const ProviderPresetSchema = z.object({
 
 const ProviderPresetsSchema = z.array(ProviderPresetSchema)
 
-export type ModelMapping = z.infer<typeof ModelMappingSchema>
 export type ProviderPreset = z.infer<typeof ProviderPresetSchema>
 
 export const PROVIDER_PRESETS = ProviderPresetsSchema.parse(providerPresetsJson)
