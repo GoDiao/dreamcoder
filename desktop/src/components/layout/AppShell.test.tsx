@@ -102,7 +102,7 @@ vi.mock('./ContentRouter', () => ({
   ContentRouter: () => <section>content loaded</section>,
 }))
 
-vi.mock('../../pages/Settings', () => ({
+vi.mock('../../pages/SettingsModal', () => ({
   SettingsModal: () => <div>settings modal mounted</div>,
 }))
 

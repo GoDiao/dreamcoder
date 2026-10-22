@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
+import type { Mermaid } from 'mermaid'
 import { Modal } from '../shared/Modal'
 import { CopyButton } from '../shared/CopyButton'
 
@@ -8,7 +8,6 @@ type Props = {
   code: string
 }
 
-let mermaidInitialized = false
 const MIN_PREVIEW_ZOOM = 0.5
 const MAX_PREVIEW_ZOOM = 3
 const PREVIEW_ZOOM_STEP = 0.25
@@ -26,16 +25,28 @@ type DragState = {
   scrollTop: number
 }
 
-function initMermaid() {
-  if (mermaidInitialized) return
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'default',
-    securityLevel: 'strict',
-    suppressErrorRendering: true,
-    fontFamily: 'var(--font-sans)',
-  })
-  mermaidInitialized = true
+let mermaidPromise: Promise<Mermaid> | null = null
+
+// Mermaid is large, so it is only fetched once a message actually contains a diagram.
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import('mermaid').then(
+    ({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'strict',
+        suppressErrorRendering: true,
+        fontFamily: 'var(--font-sans)',
+      })
+      return mermaid
+    },
+    (err: unknown) => {
+      // Let a later diagram retry instead of caching a failed chunk load forever.
+      mermaidPromise = null
+      throw err
+    },
+  )
+  return mermaidPromise
 }
 
 let mermaidIdCounter = 0
@@ -106,11 +117,10 @@ export function MermaidRenderer({ code }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    initMermaid()
 
     const id = `mermaid-${++mermaidIdCounter}`
 
-    mermaid.render(id, code).then(
+    loadMermaid().then((mermaid) => mermaid.render(id, code)).then(
       ({ svg: renderedSvg }) => {
         if (!cancelled) {
           setSvg(renderedSvg)

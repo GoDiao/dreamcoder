@@ -18,10 +18,17 @@ vi.mock('./MemorySettings', () => ({ MemorySettings: () => <div>memory page</div
 vi.mock('../components/plugins/PluginList', () => ({ PluginList: () => null }))
 vi.mock('../components/plugins/PluginDetail', () => ({ PluginDetail: () => null }))
 
-import { SettingsModal } from './Settings'
+import { SettingsModal } from './SettingsModal'
 import { Dropdown } from '../components/shared/Dropdown'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
+
+// The settings pages load lazily when the window opens; let that import settle and render.
+async function flushSettingsPages() {
+  await act(async () => {
+    await import('./Settings')
+  })
+}
 
 function renderWithOpener() {
   return render(
@@ -44,13 +51,14 @@ describe('SettingsModal', () => {
     vi.useRealTimers()
   })
 
-  it('opens at the requested category and closes on Escape, returning focus to the opener', () => {
+  it('opens at the requested category and closes on Escape, returning focus to the opener', async () => {
     renderWithOpener()
     const opener = screen.getByRole('button', { name: 'open settings' })
     opener.focus()
 
     fireEvent.click(opener)
     act(() => { vi.runOnlyPendingTimers() })
+    await flushSettingsPages()
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('memory page')).toBeInTheDocument()
@@ -109,9 +117,10 @@ describe('SettingsModal', () => {
     expect(useUIStore.getState().settingsOpen).toBe(false)
   })
 
-  it('filters categories by the nav search and clears it when reopened', () => {
+  it('filters categories by the nav search and clears it when reopened', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
+    await flushSettingsPages()
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'mem' } })
 
@@ -128,9 +137,10 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('navigation')).toHaveTextContent('Providers')
   })
 
-  it('switches category from the nav', () => {
+  it('switches category from the nav', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
+    await flushSettingsPages()
 
     fireEvent.click(screen.getByRole('button', { name: 'About' }))
 

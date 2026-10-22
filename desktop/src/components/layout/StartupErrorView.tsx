@@ -2,7 +2,7 @@ import { Copy, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from '../../i18n'
 import { Button } from '../shared/Button'
-import { DoctorPanel } from '../doctor/DoctorPanel'
+import { LazyDoctorPanel } from '../doctor/LazyDoctorPanel'
 import { copyTextToClipboard } from '../chat/clipboard'
 
 const LOG_MARKER = '\n\nRecent server logs:\n'
@@ -97,7 +97,7 @@ export function StartupErrorView({ error }: StartupErrorViewProps) {
             </Button>
           </div>
 
-          <DoctorPanel compact />
+          <LazyDoctorPanel compact />
         </div>
       </section>
     </div>

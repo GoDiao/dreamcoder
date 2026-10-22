@@ -1,12 +1,11 @@
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback, useEffect, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import DOMPurify from 'dompurify'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
 import { marked, type Tokens } from 'marked'
 import { CodeViewer } from '../chat/CodeViewer'
 import { MermaidRenderer } from '../chat/MermaidRenderer'
 import { copyTextToClipboard } from '../chat/clipboard'
+import { getLoadedKatex, loadKatex } from '../../lib/katexLoader'
 
 type Props = {
   content: string
@@ -228,10 +227,18 @@ function extractMath(content: string): { markdown: string; mathBlocks: MathBlock
   return { markdown: output, mathBlocks }
 }
 
+function escapeHtmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function renderMath(block: MathBlock): string {
   const cacheKey = `${block.displayMode ? 'block' : 'inline'}\0${block.tex}`
   const cached = mathRenderCache.get(cacheKey)
   if (cached) return cached
+
+  // Until KaTeX has loaded, show the TeX source in place; the renderer re-runs once it arrives.
+  const katex = getLoadedKatex()
+  if (!katex) return escapeHtmlText(block.tex)
 
   try {
     const rendered = katex.renderToString(block.tex, {
@@ -460,6 +467,19 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
     () => getProseClasses(variant, className),
     [variant, className],
   )
+  const [katexReady, setKatexReady] = useState(() => getLoadedKatex() !== null)
+  const needsKatex = mathBlocks.length > 0 && !katexReady
+
+  useEffect(() => {
+    if (!needsKatex) return
+    let cancelled = false
+    loadKatex().then(
+      () => { if (!cancelled) setKatexReady(true) },
+      // The TeX source stays visible; the next message with math retries the load.
+      () => {},
+    )
+    return () => { cancelled = true }
+  }, [needsKatex])
 
   const parts = useMemo(() => {
     if (codeBlocks.length === 0) {
@@ -487,7 +507,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
     }
 
     return result
-  }, [html, codeBlocks, mathBlocks])
+  }, [html, codeBlocks, mathBlocks, katexReady]) // katexReady re-runs the math enhancement once KaTeX loads
 
   const handleClick = useCallback(async (event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null

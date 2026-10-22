@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { PanelRight, SquareTerminal, Target } from 'lucide-react'
 import {
   SCHEDULED_TAB_ID,
@@ -20,7 +20,6 @@ import { useTranslation } from '../i18n'
 import { MessageList } from '../components/chat/MessageList'
 import { ChatInput } from '../components/chat/ChatInput'
 import { SessionTaskBar } from '../components/chat/SessionTaskBar'
-import { WorkspacePanel } from '../components/workspace/WorkspacePanel'
 import { OpenProjectMenu } from '../components/layout/OpenProjectMenu'
 import { SessionHeaderMenu } from '../components/layout/SessionHeaderMenu'
 import { TeamStatusBar } from '../components/teams/TeamStatusBar'
@@ -28,11 +27,15 @@ import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
 import { useWindowDrag } from '../hooks/useWindowDrag'
+import { Spinner } from '../components/shared/Spinner'
 import { isMacOverlayTitlebar } from '../lib/windowChrome'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
 const TASK_POLL_INTERVAL_MS = 1000
 const WORKSPACE_RESIZE_STEP = 32
+// The workspace panel (file tree, diffs, terminal) loads the first time it is opened.
+const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
+
 const SIDE_PANEL_CLASS = [
   'relative flex shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]',
   'max-w-[calc(100%-320px)]',
@@ -483,11 +486,23 @@ export function ActiveSession() {
             style={panelExpanded ? undefined : { width: panelWidth }}
           >
             {!panelExpanded && <WorkspaceResizeHandle />}
-            <WorkspacePanel
-              sessionId={activeTabId}
-              terminalCwd={getSessionTerminalCwd(session)}
-              contextLabel={contextLabel}
-            />
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  aria-label={t('common.loading')}
+                  className="flex h-full min-h-0 w-full min-w-0 items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-tertiary)]"
+                >
+                  <Spinner size={16} />
+                </div>
+              }
+            >
+              <WorkspacePanel
+                sessionId={activeTabId}
+                terminalCwd={getSessionTerminalCwd(session)}
+                contextLabel={contextLabel}
+              />
+            </Suspense>
           </div>
         ) : null}
       </div>
