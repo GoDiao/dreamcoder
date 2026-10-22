@@ -16,7 +16,6 @@ describe('DiffViewer', () => {
     expect(screen.getByText('src/greeting.ts')).toBeInTheDocument()
     expect(screen.getByText('+1')).toBeInTheDocument()
     expect(screen.getByText('-1')).toBeInTheDocument()
-    // The placeholder reserves roughly the diff's height so the card does not jump.
     expect(screen.getByRole('status', { name: 'Loading diff' })).toHaveStyle({ height: '60px' })
 
     const body = container.querySelector('.max-h-\\[400px\\]') as HTMLElement

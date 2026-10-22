@@ -36,7 +36,6 @@ describe('LazyDoctorPanel', () => {
       </main>,
     )
 
-    // React reports the error it caught at the panel's own boundary.
     await waitFor(() => expect(consoleError).toHaveBeenCalled())
     expect(screen.getByText('Something went wrong.')).toBeInTheDocument()
     expect(container.querySelector('main')?.children).toHaveLength(1)

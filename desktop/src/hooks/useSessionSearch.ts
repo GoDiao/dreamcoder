@@ -10,7 +10,6 @@ type FuseConstructor = typeof Fuse
 
 let fusePromise: Promise<FuseConstructor> | null = null
 
-// Fuse is only needed once the session search opens, so keep it out of the startup bundle.
 function loadFuse(): Promise<FuseConstructor> {
   fusePromise ??= import('fuse.js').then(
     ({ default: FuseClass }) => FuseClass,
@@ -38,7 +37,6 @@ export function useSessionSearch(query: string) {
 
     async function load() {
       const fuseLoad = loadFuse()
-      // Observed below; this only stops an early failure from being reported as unhandled.
       fuseLoad.catch(() => {})
       try {
         const byId = new Map<string, SessionListItem>()

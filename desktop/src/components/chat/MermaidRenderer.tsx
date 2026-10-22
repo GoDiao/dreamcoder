@@ -27,7 +27,6 @@ type DragState = {
 
 let mermaidPromise: Promise<Mermaid> | null = null
 
-// Mermaid is large, so it is only fetched once a message actually contains a diagram.
 function loadMermaid(): Promise<Mermaid> {
   mermaidPromise ??= import('mermaid').then(
     ({ default: mermaid }) => {
@@ -41,7 +40,6 @@ function loadMermaid(): Promise<Mermaid> {
       return mermaid
     },
     (err: unknown) => {
-      // Let a later diagram retry instead of caching a failed chunk load forever.
       mermaidPromise = null
       throw err
     },

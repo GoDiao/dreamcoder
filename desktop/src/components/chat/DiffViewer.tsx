@@ -3,8 +3,6 @@ import { CopyButton } from '../shared/CopyButton'
 
 const DiffViewerBody = lazy(() => import('./DiffViewerBody'))
 
-// Matches the rendered diff rows (12px font, 1.45 line height, 1px padding) so the card
-// does not jump when the diff body finishes loading.
 const DIFF_ROW_HEIGHT_PX = 20
 const DIFF_MAX_HEIGHT_PX = 400
 

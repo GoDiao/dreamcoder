@@ -31,11 +31,10 @@ import { Spinner } from '../components/shared/Spinner'
 import { isMacOverlayTitlebar } from '../lib/windowChrome'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
-const TASK_POLL_INTERVAL_MS = 1000
-const WORKSPACE_RESIZE_STEP = 32
-// The workspace panel (file tree, diffs, terminal) loads the first time it is opened.
 const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
 
+const TASK_POLL_INTERVAL_MS = 1000
+const WORKSPACE_RESIZE_STEP = 32
 const SIDE_PANEL_CLASS = [
   'relative flex shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]',
   'max-w-[calc(100%-320px)]',

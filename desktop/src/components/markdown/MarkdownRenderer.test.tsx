@@ -26,7 +26,6 @@ function visibleMathText(container: HTMLElement): string {
 }
 
 describe('MarkdownRenderer', () => {
-  // These tests assert KaTeX output; loading KaTeX on demand is covered in MarkdownRenderer.lazyMath.test.tsx.
   beforeAll(async () => {
     await loadKatex()
   })

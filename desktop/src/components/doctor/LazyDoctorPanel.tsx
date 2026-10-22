@@ -9,8 +9,6 @@ type DoctorPanelProps = {
 type GuardProps = { children: ReactNode }
 type GuardState = { failed: boolean }
 
-// The Doctor panel is shown on error screens. If its chunk cannot load there, render nothing
-// rather than letting the failure escape the screen that is already reporting an error.
 class DoctorPanelLoadGuard extends Component<GuardProps, GuardState> {
   state: GuardState = { failed: false }
 
@@ -23,7 +21,6 @@ class DoctorPanelLoadGuard extends Component<GuardProps, GuardState> {
   }
 }
 
-/** DoctorPanel loaded on first render, for screens on the startup path. */
 export function LazyDoctorPanel(props: DoctorPanelProps) {
   return (
     <DoctorPanelLoadGuard>

@@ -597,7 +597,6 @@ describe('ActiveSession task polling', () => {
     useWorkspacePanelStore.getState().openPanel(sessionId)
 
     render(<ActiveSession />)
-    // The workspace panel is loaded on first open.
     await screen.findByTestId('workspace-panel')
 
     const contentRow = screen.getByTestId('active-session-content-row')

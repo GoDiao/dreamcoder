@@ -23,7 +23,6 @@ import { Dropdown } from '../components/shared/Dropdown'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
 
-// The settings pages load lazily when the window opens; let that import settle and render.
 async function flushSettingsPages() {
   await act(async () => {
     await import('./Settings')

@@ -236,7 +236,6 @@ function renderMath(block: MathBlock): string {
   const cached = mathRenderCache.get(cacheKey)
   if (cached) return cached
 
-  // Until KaTeX has loaded, show the TeX source in place; the renderer re-runs once it arrives.
   const katex = getLoadedKatex()
   if (!katex) return escapeHtmlText(block.tex)
 
@@ -475,7 +474,6 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
     let cancelled = false
     loadKatex().then(
       () => { if (!cancelled) setKatexReady(true) },
-      // The TeX source stays visible; the next message with math retries the load.
       () => {},
     )
     return () => { cancelled = true }
@@ -507,7 +505,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
     }
 
     return result
-  }, [html, codeBlocks, mathBlocks, katexReady]) // katexReady re-runs the math enhancement once KaTeX loads
+  }, [html, codeBlocks, mathBlocks, katexReady])
 
   const handleClick = useCallback(async (event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null

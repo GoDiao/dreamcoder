@@ -109,8 +109,6 @@ const diffStyles = {
   },
 }
 
-// Loaded on demand by DiffViewer: react-diff-viewer and its styling runtime are only
-// needed once a tool call or permission prompt actually shows a diff.
 export default function DiffViewerBody({ filePath, oldString, newString }: Props) {
   const language = inferLanguage(filePath)
 

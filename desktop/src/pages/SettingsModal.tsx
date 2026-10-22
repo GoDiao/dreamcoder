@@ -6,8 +6,6 @@ import { useUIStore } from '../stores/uiStore'
 import { useEscapeLayer } from '../components/shared/Modal'
 import { Spinner } from '../components/shared/Spinner'
 
-// The settings pages load when the window first opens, so they add nothing to app startup.
-// This shell stays eager so it can remember the opener before the window takes focus.
 const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })))
 
 const MODAL_EXIT_MS = 180
