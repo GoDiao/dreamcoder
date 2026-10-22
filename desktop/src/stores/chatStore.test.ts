@@ -2372,7 +2372,7 @@ describe('chatStore history mapping', () => {
     expect(updateTabStatusMock).toHaveBeenCalledWith(TEST_SESSION_ID, 'idle')
   })
 
-  it('flushes pending text before appending a thinking block', () => {
+  it('flushes pending text before appending a thinking block', async () => {
     vi.useFakeTimers()
 
     useChatStore.setState({
@@ -2389,6 +2389,8 @@ describe('chatStore history mapping', () => {
       type: 'thinking',
       text: 'internal note',
     })
+
+    await vi.advanceTimersByTimeAsync(60)
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
       { type: 'assistant_text', content: 'visible answer before thinking' },
@@ -2961,3 +2963,61 @@ describe('chatStore permission requests shared across clients', () => {
     expect(session().chatState).toBe('tool_executing')
   })
 })
+
+describe('thinking delta buffering', () => {
+  beforeEach(() => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession() } })
+  })
+
+  it('buffers several thinking deltas in one window into a single store update', async () => {
+    vi.useFakeTimers()
+    let updates = 0
+    const unsub = useChatStore.subscribe(() => {
+      updates += 1
+    })
+    const send = useChatStore.getState().handleServerMessage
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'one ' })
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'two ' })
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'three' })
+    expect(updates).toBe(0)
+    await vi.advanceTimersByTimeAsync(60)
+    expect(updates).toBe(1)
+    const messages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatchObject({ type: 'thinking', content: 'one two three' })
+    unsub()
+    vi.useRealTimers()
+  })
+
+  it('flushes pending thinking before the first text delta, so thinking comes first', async () => {
+    vi.useFakeTimers()
+    const send = useChatStore.getState().handleServerMessage
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'hmm ' })
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'let me think' })
+    send(TEST_SESSION_ID, { type: 'content_delta', text: 'the answer' })
+    // the thinking landed in the message list before the text delta was buffered
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
+      { type: 'thinking', content: 'hmm let me think' },
+    ])
+    await vi.advanceTimersByTimeAsync(60)
+    send(TEST_SESSION_ID, { type: 'message_complete', usage: { input_tokens: 1, output_tokens: 2 } })
+    const messages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
+    expect(messages.map((m) => m.type)).toEqual(['thinking', 'assistant_text'])
+    expect(messages[1]).toMatchObject({ content: 'the answer' })
+    vi.useRealTimers()
+  })
+
+  it('merges a later thinking window into the same thinking message', async () => {
+    vi.useFakeTimers()
+    const send = useChatStore.getState().handleServerMessage
+    send(TEST_SESSION_ID, { type: 'thinking', text: 'first' })
+    await vi.advanceTimersByTimeAsync(60)
+    send(TEST_SESSION_ID, { type: 'thinking', text: ' second' })
+    await vi.advanceTimersByTimeAsync(60)
+    const messages = useChatStore.getState().sessions[TEST_SESSION_ID]?.messages ?? []
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatchObject({ type: 'thinking', content: 'first second' })
+    vi.useRealTimers()
+  })
+})
+
