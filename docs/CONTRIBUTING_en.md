@@ -74,6 +74,7 @@ git checkout main && git checkout -b feat/your-feature
    - React function components + Hooks.
    - Zustand for state management.
    - Tailwind CSS v4 for styling.
+   - No comments in new code, JSDoc and test comments included. Let names and structure carry the meaning. Existing comments in code you don't touch can stay.
 
 3. **Commit**. Use semantic commit messages:
    ```
