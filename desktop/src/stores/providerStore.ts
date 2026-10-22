@@ -32,7 +32,6 @@ type ProviderStore = {
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
   discoverModels: (input: DiscoverProviderModelsInput) => Promise<ProviderModel[]>
-  discoverProviderModels: (id: string) => Promise<ProviderModel[]>
 }
 
 function providerModelIds(provider: SavedProvider): Set<string> {
@@ -160,11 +159,6 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
   discoverModels: async (input) => {
     const { models } = await providersApi.discoverModels(input)
-    return models
-  },
-
-  discoverProviderModels: async (id) => {
-    const { models } = await providersApi.discoverProviderModels(id)
     return models
   },
 }))

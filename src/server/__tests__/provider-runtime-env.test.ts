@@ -57,7 +57,7 @@ describe('providerRuntimeEnv', () => {
     })
   })
 
-  test('resolves a valid saved selection and falls back from stale model IDs', () => {
+  test('resolves a valid managed env model and ignores stale saved model keys', () => {
     const provider = {
       id: 'provider-1',
       presetId: 'custom',
@@ -70,9 +70,12 @@ describe('providerRuntimeEnv', () => {
       updatedAt: new Date().toISOString(),
     } satisfies SavedProvider
 
-    expect(resolveProviderDefaultModel(provider, { model: 'model-selected' })).toBe('model-selected')
     expect(resolveProviderDefaultModel(provider, {
-      model: 'stale-model',
+      model: 'stale-saved-model',
+      env: { ANTHROPIC_MODEL: 'model-selected' },
+    })).toBe('model-selected')
+    expect(resolveProviderDefaultModel(provider, {
+      model: 'model-selected',
       env: { ANTHROPIC_MODEL: 'also-stale' },
     })).toBe('model-main')
   })

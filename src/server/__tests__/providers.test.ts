@@ -327,6 +327,36 @@ describe('ProviderService', () => {
       expect(updated.apiKey).toBe('sk-test-key-123')
     })
 
+    test('removing the fast model row clears the saved fast model', async () => {
+      const svc = new ProviderService()
+      const added = await svc.addProvider(sampleInput())
+
+      const updated = await svc.updateProvider(added.id, {
+        models: added.models.filter((model) => model.id !== added.fastModel),
+      })
+
+      expect(updated.fastModel).toBeUndefined()
+    })
+
+    test('setting fastModel to null clears the saved fast model', async () => {
+      const svc = new ProviderService()
+      const added = await svc.addProvider(sampleInput())
+
+      const updated = await svc.updateProvider(added.id, { fastModel: null })
+
+      expect(updated.fastModel).toBeUndefined()
+    })
+
+    test('rejects an explicitly updated fast model outside the updated model list', async () => {
+      const svc = new ProviderService()
+      const added = await svc.addProvider(sampleInput())
+
+      await expect(svc.updateProvider(added.id, {
+        models: [{ id: 'only-model' }],
+        fastModel: 'missing-model',
+      })).rejects.toThrow('Fast model must be one of the provider models')
+    })
+
     test('should throw 404 for non-existent provider', async () => {
       const svc = new ProviderService()
 
@@ -890,22 +920,45 @@ describe('ProviderService', () => {
       }
     })
 
-    test('reports an unsupported model endpoint without changing provider data', async () => {
+    test('follows Anthropic model-list pagination', async () => {
+      const requests: URL[] = []
       const server = Bun.serve({
         hostname: '127.0.0.1',
         port: 0,
-        fetch() {
-          return new Response('not found', { status: 404 })
+        fetch(req) {
+          const url = new URL(req.url)
+          requests.push(url)
+          if (url.searchParams.get('after_id') === 'claude-page-1') {
+            return Response.json({
+              data: [{ id: 'claude-page-2', display_name: 'Claude Page 2' }],
+              has_more: false,
+              last_id: 'claude-page-2',
+            })
+          }
+          return Response.json({
+            data: [{ id: 'claude-page-1', display_name: 'Claude Page 1' }],
+            has_more: true,
+            last_id: 'claude-page-1',
+          })
         },
       })
 
       try {
-        const service = new ProviderService()
-        const provider = await service.addProvider(sampleInput({
+        const models = await new ProviderService().discoverModels({
           baseUrl: `http://127.0.0.1:${server.port}`,
-        }))
-        await expect(service.discoverProviderModels(provider.id)).rejects.toThrow('HTTP 404')
-        expect((await service.getProvider(provider.id)).models).toEqual(provider.models)
+          apiKey: 'anthropic-secret',
+          apiFormat: 'anthropic',
+          authStrategy: 'api_key',
+        })
+        expect(requests).toHaveLength(2)
+        expect(requests[0]?.searchParams.get('limit')).toBe('1000')
+        expect(requests[0]?.searchParams.get('after_id')).toBeNull()
+        expect(requests[1]?.searchParams.get('limit')).toBe('1000')
+        expect(requests[1]?.searchParams.get('after_id')).toBe('claude-page-1')
+        expect(models).toEqual([
+          { id: 'claude-page-1', name: 'Claude Page 1' },
+          { id: 'claude-page-2', name: 'Claude Page 2' },
+        ])
       } finally {
         server.stop(true)
       }

@@ -99,11 +99,6 @@ export async function handleProvidersApi(
       return Response.json({ result })
     }
 
-    if (action === 'models') {
-      if (req.method !== 'POST') throw methodNotAllowed(req.method)
-      return Response.json({ models: await providerService.discoverProviderModels(id) })
-    }
-
     if (req.method === 'GET') {
       const provider = await providerService.getProvider(id)
       return Response.json({ provider })

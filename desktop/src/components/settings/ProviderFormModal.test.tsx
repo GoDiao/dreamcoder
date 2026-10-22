@@ -8,7 +8,6 @@ const providersApiMock = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   discoverModels: vi.fn(),
-  discoverProviderModels: vi.fn(),
 }))
 
 vi.mock('../../api/providers.ts', () => ({
@@ -40,6 +39,7 @@ const createdProvider: SavedProvider = {
 }
 
 const createProviderMock = vi.fn()
+const updateProviderMock = vi.fn()
 const discoverModelsMock = vi.fn()
 const fetchAllMock = vi.fn()
 
@@ -134,5 +134,116 @@ describe('ProviderFormModal create mode', () => {
     expect(createProviderMock).toHaveBeenCalledWith(expect.objectContaining({
       models: [{ id: 'model-main' }, { id: 'model-new', name: 'New Model' }],
     }))
+  })
+})
+
+describe('ProviderFormModal edit mode', () => {
+  const models = Array.from({ length: 5 }, (_, index) => ({
+    id: `model-${index + 1}`,
+    name: `Model ${index + 1}`,
+  }))
+  const provider: SavedProvider = {
+    ...createdProvider,
+    models,
+    fastModel: 'model-5',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    providersApiMock.getSettings.mockResolvedValue({ skipWebFetchPreflight: true })
+    providersApiMock.updateSettings.mockResolvedValue(undefined)
+    updateProviderMock.mockResolvedValue(provider)
+    discoverModelsMock.mockResolvedValue([
+      { id: 'discovered-1' },
+      { id: 'discovered-2' },
+    ])
+    fetchAllMock.mockResolvedValue(undefined)
+    useSettingsStore.setState({ locale: 'en', fetchAll: fetchAllMock })
+    useProviderStore.setState(useProviderStore.getInitialState(), true)
+    useProviderStore.setState({
+      updateProvider: updateProviderMock,
+      discoverModels: discoverModelsMock,
+    })
+  })
+
+  it('preserves all named model rows when an unrelated settings JSON key changes', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    const textarea = document.querySelector('textarea')
+    expect(textarea).not.toBeNull()
+    await waitFor(() => expect(textarea!.value).toContain('skipWebFetchPreflight'))
+
+    const settings = JSON.parse(textarea!.value) as Record<string, unknown>
+    settings.skipWebFetchPreflight = false
+    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({ models }),
+    ))
+  })
+
+  it('merges changed runtime model IDs without dropping existing named rows', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    const textarea = document.querySelector('textarea')
+    expect(textarea).not.toBeNull()
+    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
+
+    const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
+    settings.env.ANTHROPIC_MODEL = 'model-3'
+    settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = 'model-4'
+    settings.env.ANTHROPIC_SMALL_FAST_MODEL = 'model-4'
+    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({
+        models: [models[2], models[0], models[1], models[3], models[4]],
+        fastModel: 'model-4',
+      }),
+    ))
+  })
+
+  it('fetches with the current edit form values and announces the result count', async () => {
+    const localProvider = { ...provider, apiKey: '' }
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={localProvider} presets={[deepseekPreset]} />,
+    )
+    fireEvent.change(screen.getByDisplayValue(provider.baseUrl), {
+      target: { value: 'http://127.0.0.1:11434' },
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+
+    expect(discoverModelsMock).toHaveBeenCalledWith(expect.objectContaining({
+      baseUrl: 'http://127.0.0.1:11434',
+      apiKey: '',
+    }))
+    expect(screen.getByRole('status')).toHaveTextContent('2 models found')
+  })
+
+  it('announces empty discovery results and exposes discovery errors as alerts', async () => {
+    discoverModelsMock.mockResolvedValueOnce([])
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('No models returned')
+
+    discoverModelsMock.mockRejectedValueOnce(new Error('discovery failed'))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('discovery failed')
   })
 })

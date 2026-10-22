@@ -125,51 +125,74 @@ export async function fetchUpstreamModels(target: UpstreamTarget): Promise<Upstr
       }
     : { Authorization: `Bearer ${target.apiKey}` }
 
-  let response: Response
-  try {
-    response = await fetchWithTimeout(`${base}/v1/models`, {
-      method: 'GET',
-      headers,
-      ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
-    }, networkSettings.aiRequestTimeoutMs, false)
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'TimeoutError') {
-      return { ok: false, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)` }
-    }
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '')
-    return {
-      ok: false,
-      httpStatus: response.status,
-      error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
-    }
-  }
-
-  const body = await response.json().catch(() => null) as Record<string, unknown> | null
-  const data = body && Array.isArray(body.data) ? body.data : null
-  if (!data) {
-    return { ok: false, httpStatus: 502, error: 'Upstream model response is missing a data array' }
-  }
-
   const seen = new Set<string>()
-  const models = data.flatMap((entry): ProviderModel[] => {
-    if (!entry || typeof entry !== 'object') return []
-    const record = entry as Record<string, unknown>
-    const id = typeof record.id === 'string' ? record.id.trim() : ''
-    if (!id || seen.has(id)) return []
-    seen.add(id)
-    const rawName = typeof record.display_name === 'string'
-      ? record.display_name
-      : typeof record.name === 'string'
-        ? record.name
-        : ''
-    const name = rawName.trim()
-    return [{ id, ...(name && name !== id ? { name } : {}) }]
-  })
-  return { ok: true, httpStatus: response.status, models }
+  const models: ProviderModel[] = []
+  const maxPages = target.apiFormat === 'anthropic' ? 10 : 1
+  let afterId = ''
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const url = new URL(`${base}/v1/models`)
+    if (target.apiFormat === 'anthropic') {
+      url.searchParams.set('limit', '1000')
+      if (afterId) url.searchParams.set('after_id', afterId)
+    }
+
+    let response: Response
+    try {
+      response = await fetchWithTimeout(url.toString(), {
+        method: 'GET',
+        headers,
+        ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
+      }, networkSettings.aiRequestTimeoutMs, false)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'TimeoutError') {
+        return { ok: false, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)` }
+      }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      return {
+        ok: false,
+        httpStatus: response.status,
+        error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
+      }
+    }
+
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null
+    const data = body && Array.isArray(body.data) ? body.data : null
+    if (!data) {
+      return { ok: false, httpStatus: 502, error: 'Upstream model response is missing a data array' }
+    }
+
+    for (const entry of data) {
+      if (!entry || typeof entry !== 'object') continue
+      const record = entry as Record<string, unknown>
+      const id = typeof record.id === 'string' ? record.id.trim() : ''
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      const rawName = typeof record.display_name === 'string'
+        ? record.display_name
+        : typeof record.name === 'string'
+          ? record.name
+          : ''
+      const name = rawName.trim()
+      models.push({ id, ...(name && name !== id ? { name } : {}) })
+    }
+
+    if (target.apiFormat !== 'anthropic' || body?.has_more !== true) {
+      return { ok: true, httpStatus: response.status, models }
+    }
+
+    const lastId = typeof body.last_id === 'string' ? body.last_id.trim() : ''
+    if (!lastId || lastId === afterId) {
+      return { ok: false, httpStatus: 502, error: 'Upstream model pagination is missing a usable last_id' }
+    }
+    afterId = lastId
+  }
+
+  return { ok: false, httpStatus: 502, error: `Upstream model pagination exceeded ${maxPages} pages` }
 }
 
 function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest): UpstreamRequest {

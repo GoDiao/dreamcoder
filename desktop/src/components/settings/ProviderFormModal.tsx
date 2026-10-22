@@ -294,7 +294,7 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
 }
 
 function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }: ProviderFormProps) {
-  const { createProvider, updateProvider, testConfig, discoverModels, discoverProviderModels } = useProviderStore()
+  const { createProvider, updateProvider, testConfig, discoverModels } = useProviderStore()
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const t = useTranslation()
 
@@ -335,6 +335,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [isTesting, setIsTesting] = useState(false)
   const [isDiscovering, setIsDiscovering] = useState(false)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [discoveryCount, setDiscoveryCount] = useState<number | null>(null)
   const [discoveredModels, setDiscoveredModels] = useState<ProviderModel[]>([])
   const [newModelId, setNewModelId] = useState('')
   const [newModelName, setNewModelName] = useState('')
@@ -396,6 +397,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setTestResult(null)
     setDiscoveredModels([])
     setDiscoveryError(null)
+    setDiscoveryCount(null)
   }
 
   const isCustom = selectedPreset.id === 'custom'
@@ -514,16 +516,16 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     if (!baseUrl.trim()) return
     setIsDiscovering(true)
     setDiscoveryError(null)
+    setDiscoveryCount(null)
     try {
-      const fetched = mode === 'edit' && provider && !apiKey.trim()
-        ? await discoverProviderModels(provider.id)
-        : await discoverModels({
-            baseUrl: baseUrl.trim(),
-            apiKey: apiKey.trim() || selectedPreset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || '',
-            authStrategy,
-            apiFormat,
-          })
+      const fetched = await discoverModels({
+        baseUrl: baseUrl.trim(),
+        apiKey: apiKey.trim() || selectedPreset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || '',
+        authStrategy,
+        apiFormat,
+      })
       setDiscoveredModels(fetched)
+      setDiscoveryCount(fetched.length)
     } catch (err) {
       setDiscoveredModels([])
       setDiscoveryError(err instanceof Error ? err.message : String(err))
@@ -785,7 +787,14 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
             </Button>
           </div>
           {discoveryError && (
-            <p className="mb-2 text-[11px] text-[var(--color-error)]">{discoveryError}</p>
+            <p role="alert" className="mb-2 text-[11px] text-[var(--color-error)]">{discoveryError}</p>
+          )}
+          {discoveryCount !== null && (
+            <p role="status" className="mb-2 text-[11px] text-[var(--color-text-secondary)]">
+              {discoveryCount > 0
+                ? t('settings.providers.modelsFound', { count: discoveryCount })
+                : t('settings.providers.noModelsReturned')}
+            </p>
           )}
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
             <div>
@@ -1043,17 +1052,23 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                       parsedContextWindows = {}
                     }
                   }
-                  const pastedModels = normalizeModels([
-                    env.ANTHROPIC_MODEL,
-                    env.ANTHROPIC_DEFAULT_SONNET_MODEL,
-                    env.ANTHROPIC_DEFAULT_OPUS_MODEL,
-                    env.ANTHROPIC_DEFAULT_HAIKU_MODEL,
-                  ].filter((id): id is string => typeof id === 'string' && !!id.trim()).map((id) => ({ id })))
-                  if (pastedModels.length > 0) {
-                    const pastedFast = env.ANTHROPIC_SMALL_FAST_MODEL || env.ANTHROPIC_DEFAULT_HAIKU_MODEL || ''
-                    setModels(pastedModels)
-                    setFastModel(pastedModels.some((model) => model.id === pastedFast) && pastedFast !== pastedModels[0]?.id ? pastedFast : '')
-                    setModelContextInputs(getModelContextInputs(pastedModels, {
+                  const currentModels = normalizeModels(models)
+                  const runtime = runtimeModelMapping(currentModels, fastModel)
+                  const pastedMain = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
+                  const rawPastedFast = env.ANTHROPIC_SMALL_FAST_MODEL || env.ANTHROPIC_DEFAULT_HAIKU_MODEL
+                  const pastedFast = typeof rawPastedFast === 'string' ? rawPastedFast.trim() : ''
+                  if (pastedMain && (
+                    pastedMain !== runtime.main ||
+                    (pastedFast || pastedMain) !== runtime.fast
+                  )) {
+                    const head = currentModels.find((model) => model.id === pastedMain) ?? { id: pastedMain }
+                    const mergedModels = [head, ...currentModels.filter((model) => model.id !== pastedMain)]
+                    if (pastedFast && !mergedModels.some((model) => model.id === pastedFast)) {
+                      mergedModels.push({ id: pastedFast })
+                    }
+                    setModels(mergedModels)
+                    setFastModel(pastedFast && pastedFast !== pastedMain ? pastedFast : '')
+                    setModelContextInputs(getModelContextInputs(mergedModels, {
                       ...selectedPreset,
                       modelContextWindows: parsedContextWindows,
                     }))

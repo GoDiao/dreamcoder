@@ -60,7 +60,6 @@ function buildProviderModels(
 function buildProviderChoices(
   providers: SavedProvider[],
   activeId: string | null,
-  _availableModels: ModelInfo[],
 ): ProviderChoice[] {
   return providers.map((provider) => ({
     providerId: provider.id,
@@ -223,9 +222,8 @@ export function ModelSelector({
     () => buildProviderChoices(
       providers,
       activeId,
-      availableModels,
     ),
-    [activeId, availableModels, providers],
+    [activeId, providers],
   )
 
   const selectedModel = isControlled

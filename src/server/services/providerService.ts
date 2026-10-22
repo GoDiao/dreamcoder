@@ -164,7 +164,7 @@ export class ProviderService {
     if (input.modelContextWindows === null) {
       delete updated.modelContextWindows
     }
-    if (input.fastModel === null || (input.models !== undefined && !updated.models.some((model) => model.id === updated.fastModel))) {
+    if (input.fastModel === null || (input.fastModel === undefined && input.models !== undefined && !updated.models.some((model) => model.id === updated.fastModel))) {
       delete updated.fastModel
     }
     this.assertFastModel(updated)
@@ -303,10 +303,6 @@ export class ProviderService {
       apiFormat: overrides?.apiFormat ?? target.apiFormat,
       authStrategy: overrides?.authStrategy ?? target.authStrategy,
     }, overrides?.modelId || getProviderDefaultModel(provider))
-  }
-
-  async discoverProviderModels(id: string): Promise<ProviderModel[]> {
-    return this.fetchModels(resolveUpstreamTarget(await this.getProvider(id)))
   }
 
   async discoverModels(input: DiscoverProviderModelsInput): Promise<ProviderModel[]> {

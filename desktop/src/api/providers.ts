@@ -69,8 +69,4 @@ export const providersApi = {
   discoverModels(input: DiscoverProviderModelsInput) {
     return api.post<ModelsResponse>('/api/providers/models', input)
   },
-
-  discoverProviderModels(id: string) {
-    return api.post<ModelsResponse>(`/api/providers/${id}/models`)
-  },
 }

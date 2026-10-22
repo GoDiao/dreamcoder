@@ -91,13 +91,6 @@ export function resolveProviderDefaultModel(
 ): string {
   const models = normalizeProviderModels(provider.models)
   const modelIds = new Set(models.map((model) => model.id))
-  const explicitModel = typeof managedSettings.model === 'string'
-    ? managedSettings.model.trim()
-    : ''
-  if (explicitModel && modelIds.has(stripContextSuffix(explicitModel))) {
-    return explicitModel
-  }
-
   const env = (managedSettings.env as Record<string, string> | undefined) ?? {}
   const envModel = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
   if (envModel && modelIds.has(stripContextSuffix(envModel))) {

@@ -83,6 +83,13 @@ describe('persistent storage upgrade migrations', () => {
     const backups = (await listFiles(dreamcoderDir)).filter((file) => file.startsWith('providers.json.bak-before-migration-'))
     expect(backups.length).toBe(1)
 
+    resetPersistentStorageMigrationsForTests()
+    const secondReport = await ensurePersistentStorageUpgraded()
+    expect(secondReport.migratedEntries).not.toContain('dreamcoder/providers.json')
+    const backupsAfterSecondRun = (await listFiles(dreamcoderDir))
+      .filter((file) => file.startsWith('providers.json.bak-before-migration-'))
+    expect(backupsAfterSecondRun.length).toBe(1)
+
     const service = new ProviderService()
     const { providers, activeId } = await service.listProviders()
     expect(providers).toHaveLength(1)
@@ -95,6 +102,44 @@ describe('persistent storage upgrade migrations', () => {
     }
     expect(rewritten.rootFutureField).toEqual({ keep: true })
     expect(rewritten.providers?.[0]?.extraFutureField).toBe('keep-me')
+  })
+
+  test('migrates empty and duplicate legacy model slots without inventing a fast model', async () => {
+    const dreamcoderDir = path.join(tempDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
+    const provider = (id: string, models: Record<string, string>) => ({
+      id,
+      presetId: 'custom',
+      name: id,
+      apiKey: 'token',
+      baseUrl: 'https://example.test',
+      models,
+    })
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'providers.json'),
+      JSON.stringify({
+        activeId: null,
+        providers: [
+          provider('empty-fast', { main: 'm', haiku: '', sonnet: '', opus: '' }),
+          provider('duplicates', { main: 'm', haiku: 'm', sonnet: 's', opus: 'm' }),
+          provider('all-empty', { main: '', haiku: '', sonnet: '', opus: '' }),
+        ],
+      }, null, 2),
+      'utf-8',
+    )
+
+    const report = await ensurePersistentStorageUpgraded()
+    expect(report.failures).toEqual([])
+
+    const migrated = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'providers.json'), 'utf-8')) as {
+      providers: Array<{ models: Array<{ id: string }>; fastModel?: string }>
+    }
+    expect(migrated.providers[0]).toMatchObject({ models: [{ id: 'm' }] })
+    expect(migrated.providers[0]?.fastModel).toBeUndefined()
+    expect(migrated.providers[1]).toMatchObject({ models: [{ id: 'm' }, { id: 's' }] })
+    expect(migrated.providers[1]?.fastModel).toBeUndefined()
+    expect(migrated.providers[2]).toMatchObject({ models: [] })
+    expect(migrated.providers[2]?.fastModel).toBeUndefined()
   })
 
   test('imports legacy root providers config into dreamcoder storage without deleting the source', async () => {
