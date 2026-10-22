@@ -3,13 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
-
-function formatElapsed(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}m ${s}s`
-}
+import { ElapsedTime } from './ElapsedTime'
 
 function translateServerVerb(
   t: (key: TranslationKey) => string,
@@ -40,7 +34,8 @@ export function StreamingIndicator() {
   const chatState = sessionState?.chatState ?? 'idle'
   const statusVerb = sessionState?.statusVerb ?? ''
   const apiRetry = sessionState?.apiRetry ?? null
-  const elapsedSeconds = sessionState?.elapsedSeconds ?? 0
+  const turn = sessionState?.mirror?.turn
+  const turnStartedAt = turn && turn.phase !== 'idle' ? turn.startedAt : undefined
   const tokenUsage = sessionState?.tokenUsage ?? { input_tokens: 0, output_tokens: 0 }
 
   useEffect(() => {
@@ -101,11 +96,7 @@ export function StreamingIndicator() {
     <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)]/40 bg-[var(--color-surface-container-low)] px-3 py-1">
       <span className="text-[var(--color-brand)] animate-shimmer text-xs">✦</span>
       <span className="text-xs font-medium text-[var(--color-text-secondary)]">{verb}...</span>
-      {elapsedSeconds > 0 && (
-        <span className="text-[10px] text-[var(--color-text-tertiary)]">
-          {formatElapsed(elapsedSeconds)}
-        </span>
-      )}
+      {turnStartedAt !== undefined && <ElapsedTime startedAt={turnStartedAt} />}
       {tokenUsage.output_tokens > 0 && (
         <span className="text-[10px] text-[var(--color-text-tertiary)]">
           · ↓ {tokenUsage.output_tokens}
