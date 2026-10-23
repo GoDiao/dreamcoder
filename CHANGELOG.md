@@ -34,6 +34,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Fixed
 
 - **Sidebar re-renders** (#157, #158): the sidebar no longer re-renders on streamed text updates. Running indicators still follow session and tab status. Thanks @tedy69.
+- **Re-renders while a reply runs** (#156, #165): the session page no longer re-renders every second during a reply. Only the elapsed time updates, and it now counts from when the server starts the turn. Thanks @princecherry9905.
 - New sessions start on the active provider's main model. Before, activating a provider saved its main model in a hidden setting, and that saved value kept overriding the provider after its main model was edited.
 - The selected model card in the dark theme had light pink colors with text that was hard to read.
 
