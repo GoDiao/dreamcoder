@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { useChatStore } from '../../stores/chatStore'
+import { useChatStore, useSessionField } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ElapsedTime } from './ElapsedTime'
@@ -30,13 +30,14 @@ export function StreamingIndicator() {
   const t = useTranslation()
   const [now, setNow] = useState(() => Date.now())
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
-  const chatState = sessionState?.chatState ?? 'idle'
-  const statusVerb = sessionState?.statusVerb ?? ''
-  const apiRetry = sessionState?.apiRetry ?? null
-  const turn = sessionState?.mirror?.turn
-  const turnStartedAt = turn && turn.phase !== 'idle' ? turn.startedAt : undefined
-  const tokenUsage = sessionState?.tokenUsage ?? { input_tokens: 0, output_tokens: 0 }
+  const chatState = useSessionField(activeTabId, 'chatState') ?? 'idle'
+  const statusVerb = useSessionField(activeTabId, 'statusVerb') ?? ''
+  const apiRetry = useSessionField(activeTabId, 'apiRetry') ?? null
+  const turnStartedAt = useChatStore((s) => {
+    const turn = activeTabId ? s.sessions[activeTabId]?.mirror?.turn : undefined
+    return turn && turn.phase !== 'idle' ? turn.startedAt : undefined
+  })
+  const outputTokens = useChatStore((s) => activeTabId ? s.sessions[activeTabId]?.tokenUsage?.output_tokens ?? 0 : 0)
 
   useEffect(() => {
     if (!apiRetry) return undefined
@@ -97,9 +98,9 @@ export function StreamingIndicator() {
       <span className="text-[var(--color-brand)] animate-shimmer text-xs">✦</span>
       <span className="text-xs font-medium text-[var(--color-text-secondary)]">{verb}...</span>
       {turnStartedAt !== undefined && <ElapsedTime startedAt={turnStartedAt} />}
-      {tokenUsage.output_tokens > 0 && (
+      {outputTokens > 0 && (
         <span className="text-[10px] text-[var(--color-text-tertiary)]">
-          · ↓ {tokenUsage.output_tokens}
+          · ↓ {outputTokens}
         </span>
       )}
     </div>

@@ -61,10 +61,13 @@ function getSelectedAnswer(question: Question, selected: string[] | undefined) {
 }
 
 export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) {
-  const { respondToPermission } = useChatStore()
+  const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
-  const pendingPermission = useChatStore((s) => targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined)
+  const pendingRequestId = useChatStore((s) => {
+    const pending = targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined
+    return pending?.toolUseId === toolUseId ? pending.requestId : null
+  })
   const t = useTranslation()
   const questions = parseInput(input)
   const inputObject = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
@@ -88,7 +91,6 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
   const hasStructuredAnswers = Object.keys(resultAnswers).length > 0
   const hasTerminalResult = hasStructuredAnswers || resultText.length > 0
 
-  const pendingRequest = pendingPermission?.toolUseId === toolUseId ? pendingPermission : null
   const answeredText = useMemo(() => {
     if (hasStructuredAnswers) {
       return questions
@@ -169,7 +171,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     const response = parts.join('; ')
     if (!response) return
 
-    if (!targetSessionId || !pendingRequest) return
+    if (!targetSessionId || !pendingRequestId) return
 
     const answers = questions.reduce<Record<string, string>>((acc, question, index) => {
       const freeText = freeTexts[index]?.trim()
@@ -183,7 +185,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     }, {})
 
     setHasSubmitted(true)
-    respondToPermission(targetSessionId, pendingRequest.requestId, true, {
+    respondToPermission(targetSessionId, pendingRequestId, true, {
       updatedInput: {
         ...inputObject,
         answers,
@@ -384,7 +386,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         <Button
           variant="primary"
           size="xs"
-          disabled={!allAnswered || !pendingRequest}
+          disabled={!allAnswered || !pendingRequestId}
           onClick={handleSubmit}
         >
           {t('question.submit')}
