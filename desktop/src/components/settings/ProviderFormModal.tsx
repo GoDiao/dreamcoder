@@ -342,6 +342,31 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [settingsJson, setSettingsJson] = useState('')
   const [settingsJsonError, setSettingsJsonError] = useState<string | null>(null)
   const jsonPastedRef = useRef(false)
+  const modelsSnapshotRef = useRef<{ models: ProviderModel[]; fastModel: string } | null>(null)
+  const discoveryRequestRef = useRef(0)
+  const newModelIdRef = useRef('')
+  const discoveredSelectionRef = useRef<{ id: string; name: string } | null>(null)
+
+  const clearDiscoveredSelection = () => {
+    const selection = discoveredSelectionRef.current
+    discoveredSelectionRef.current = null
+    if (!selection) return
+    setNewModelId((current) => {
+      if (current !== selection.id) return current
+      newModelIdRef.current = ''
+      return ''
+    })
+    setNewModelName((current) => current === selection.name ? '' : current)
+  }
+
+  const resetDiscovery = () => {
+    discoveryRequestRef.current++
+    setDiscoveredModels([])
+    setDiscoveryError(null)
+    setDiscoveryCount(null)
+    setIsDiscovering(false)
+    clearDiscoveredSelection()
+  }
 
   useEffect(() => {
     if (jsonPastedRef.current) {
@@ -395,9 +420,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setAutoCompactWindow(getPresetAutoCompactWindow(preset))
     setShowContextSettings(false)
     setTestResult(null)
-    setDiscoveredModels([])
-    setDiscoveryError(null)
-    setDiscoveryCount(null)
+    resetDiscovery()
   }
 
   const isCustom = selectedPreset.id === 'custom'
@@ -460,6 +483,19 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     },
   ] satisfies Array<{ value: ProviderAuthStrategy; label: string; description: string; icon: ReactNode }>
   const selectedAuthStrategyLabel = authStrategyItems.find((item) => item.value === authStrategy)?.label ?? t('settings.providers.authStrategyAuthToken')
+  const recommendedDiscoveredModel = discoveredModels.find((model) => (
+    !models.some((savedModel) => savedModel.id === model.id)
+  )) ?? discoveredModels[0]
+  const discoveredModelItems = discoveredModels.map((model) => ({
+    value: model.id,
+    label: model.name || model.id,
+    ...(model.name ? { description: model.id } : {}),
+    icon: (
+      <span className="material-symbols-outlined text-[17px]">
+        {model.id === recommendedDiscoveredModel?.id ? 'auto_awesome' : 'deployed_code'}
+      </span>
+    ),
+  }))
   const configuredContextWindows = buildModelContextWindows(models, modelContextInputs)
   const configuredContextSummary = Object.entries(configuredContextWindows)
     .filter(([model], index, entries) => entries.findIndex(([candidate]) => candidate === model) === index)
@@ -479,18 +515,22 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setSettingsJson((current) => updateSettingsJsonAutoCompactWindow(current, value))
   }
   const handleBaseUrlChange = (value: string) => {
+    resetDiscovery()
     setBaseUrl(value)
     setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, authStrategy, apiKey, selectedPreset, value))
   }
   const handleApiKeyChange = (value: string) => {
+    resetDiscovery()
     setApiKey(value)
     setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, authStrategy, value, selectedPreset, baseUrl))
   }
   const handleApiFormatChange = (value: ApiFormat) => {
+    resetDiscovery()
     setApiFormat(value)
     setSettingsJson((current) => updateSettingsJsonProviderConnection(current, value, authStrategy, apiKey, selectedPreset, baseUrl))
   }
   const handleAuthStrategyChange = (value: ProviderAuthStrategy) => {
+    resetDiscovery()
     setAuthStrategy(value)
     setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, value, apiKey, selectedPreset, baseUrl))
   }
@@ -512,8 +552,16 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       buildModelContextWindows(models, nextInputs),
     ))
   }
+  const selectDiscoveredModel = (model: ProviderModel) => {
+    const name = model.name ?? ''
+    discoveredSelectionRef.current = { id: model.id, name }
+    newModelIdRef.current = model.id
+    setNewModelId(model.id)
+    setNewModelName(name)
+  }
   const handleDiscoverModels = async () => {
     if (!baseUrl.trim()) return
+    const requestId = ++discoveryRequestRef.current
     setIsDiscovering(true)
     setDiscoveryError(null)
     setDiscoveryCount(null)
@@ -524,13 +572,17 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         authStrategy,
         apiFormat,
       })
+      if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels(fetched)
       setDiscoveryCount(fetched.length)
+      const recommended = fetched.find((model) => !models.some((savedModel) => savedModel.id === model.id)) ?? fetched[0]
+      if (recommended && !newModelIdRef.current.trim()) selectDiscoveredModel(recommended)
     } catch (err) {
+      if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels([])
       setDiscoveryError(err instanceof Error ? err.message : String(err))
     } finally {
-      setIsDiscovering(false)
+      if (requestId === discoveryRequestRef.current) setIsDiscovering(false)
     }
   }
   const handleAddModel = () => {
@@ -544,12 +596,36 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       [id]: getModelContextInputValue(id, selectedPreset, provider),
     }))
     updateModels(nextModels)
+    discoveredSelectionRef.current = null
+    newModelIdRef.current = ''
     setNewModelId('')
     setNewModelName('')
   }
   const duplicateModelNames = new Set(
     models.map((model) => model.name?.trim()).filter((name): name is string => !!name)
       .filter((name, index, names) => names.indexOf(name) !== index),
+  )
+  const modelIdInput = (
+    <div className="relative">
+      <input
+        aria-label={t('settings.providers.modelId')}
+        autoComplete="off"
+        value={newModelId}
+        onChange={(event) => {
+          const id = event.target.value
+          discoveredSelectionRef.current = null
+          newModelIdRef.current = id
+          setNewModelId(id)
+          const suggestion = discoveredModels.find((model) => model.id === id)
+          if (suggestion?.name) setNewModelName(suggestion.name)
+        }}
+        placeholder={t('settings.providers.modelIdPlaceholder')}
+        className="h-10 w-full cursor-text rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 pr-10 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]"
+      />
+      {discoveredModels.length > 0 && (
+        <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--color-text-secondary)]">expand_more</span>
+      )}
+    </div>
   )
   const renderPresetButton = (preset: ProviderPreset) => (
     <button
@@ -799,24 +875,30 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
             <div>
               <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">{t('settings.providers.modelId')}</label>
-              <input
-                aria-label={t('settings.providers.modelId')}
-                list="provider-discovered-models"
-                value={newModelId}
-                onChange={(event) => {
-                  const id = event.target.value
-                  setNewModelId(id)
-                  const suggestion = discoveredModels.find((model) => model.id === id)
-                  if (suggestion?.name) setNewModelName(suggestion.name)
-                }}
-                placeholder={t('settings.providers.modelIdPlaceholder')}
-                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]"
-              />
-              <datalist id="provider-discovered-models">
-                {discoveredModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-              </datalist>
+              {discoveredModels.length > 0 ? (
+                <Dropdown<string>
+                  items={discoveredModelItems}
+                  value={newModelId}
+                  onChange={(id) => {
+                    const selected = discoveredModels.find((model) => model.id === id)
+                    if (selected) selectDiscoveredModel(selected)
+                  }}
+                  width="100%"
+                  maxHeight={240}
+                  className="block w-full"
+                  trigger={modelIdInput}
+                />
+              ) : modelIdInput}
             </div>
-            <Input label={t('settings.providers.displayName')} value={newModelName} onChange={(event) => setNewModelName(event.target.value)} placeholder={t('settings.providers.displayNameOptional')} />
+            <Input
+              label={t('settings.providers.displayName')}
+              value={newModelName}
+              onChange={(event) => {
+                discoveredSelectionRef.current = null
+                setNewModelName(event.target.value)
+              }}
+              placeholder={t('settings.providers.displayNameOptional')}
+            />
             <Button variant="secondary" onClick={handleAddModel} disabled={!newModelId.trim() || models.some((model) => model.id === newModelId.trim())}>
               {t('common.add')}
             </Button>
@@ -1006,6 +1088,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.settingsJson')}</label>
           <textarea
             value={displayedSettingsJson}
+            onFocus={() => {
+              modelsSnapshotRef.current = { models, fastModel }
+            }}
+            onBlur={() => {
+              modelsSnapshotRef.current = null
+            }}
             onChange={(e) => {
               const raw = e.target.value
               try {
@@ -1052,8 +1140,9 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                       parsedContextWindows = {}
                     }
                   }
-                  const currentModels = normalizeModels(models)
-                  const runtime = runtimeModelMapping(currentModels, fastModel)
+                  const base = modelsSnapshotRef.current ?? { models, fastModel }
+                  const currentModels = normalizeModels(base.models)
+                  const runtime = runtimeModelMapping(currentModels, base.fastModel)
                   const pastedMain = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
                   const rawPastedFast = env.ANTHROPIC_SMALL_FAST_MODEL || env.ANTHROPIC_DEFAULT_HAIKU_MODEL
                   const pastedFast = typeof rawPastedFast === 'string' ? rawPastedFast.trim() : ''

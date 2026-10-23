@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderPreset } from '../../types/providerPreset'
-import type { SavedProvider } from '../../types/provider'
+import type { ProviderModel, SavedProvider } from '../../types/provider'
 
 const providersApiMock = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -118,15 +118,17 @@ describe('ProviderFormModal create mode', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('discovers a model, suggests its name, and saves the added entry', async () => {
+  it('recommends the first fetched model in the styled picker and saves it', async () => {
     render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
     fireEvent.change(screen.getByPlaceholderText(/sk-/i), { target: { value: 'test-key' } })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
     })
-    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'model-new' } })
+    await waitFor(() => expect(screen.getByLabelText('Model ID')).toHaveValue('model-new'))
     await waitFor(() => expect(screen.getByDisplayValue('New Model')).toBeInTheDocument())
+    fireEvent.click(screen.getByLabelText('Model ID'))
+    expect(screen.getByRole('button', { name: /New Model/ })).toHaveTextContent('model-new')
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]!)
     await fillAndSubmit()
@@ -209,6 +211,31 @@ describe('ProviderFormModal edit mode', () => {
     ))
   })
 
+  it('merges progressive settings JSON model edits against the focus snapshot', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    const textarea = document.querySelector('textarea')
+    expect(textarea).not.toBeNull()
+    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
+
+    fireEvent.focus(textarea!)
+    for (const modelId of ['g', 'gp', 'gpt']) {
+      const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
+      settings.env.ANTHROPIC_MODEL = modelId
+      fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+    }
+    fireEvent.blur(textarea!)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({
+        models: [{ id: 'gpt' }, ...models],
+      }),
+    ))
+  })
+
   it('fetches with the current edit form values and announces the result count', async () => {
     const localProvider = { ...provider, apiKey: '' }
     render(
@@ -227,6 +254,45 @@ describe('ProviderFormModal edit mode', () => {
       apiKey: '',
     }))
     expect(screen.getByRole('status')).toHaveTextContent('2 models found')
+  })
+
+  it('clears discovered models when the connection changes and ignores stale responses', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('2 models found')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('discovered-1')
+    fireEvent.click(screen.getByLabelText('Model ID'))
+    expect(screen.getByRole('button', { name: /discovered-1/ })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByDisplayValue(provider.baseUrl), {
+      target: { value: 'https://new.example/anthropic' },
+    })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Model ID')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /discovered-1/ })).not.toBeInTheDocument()
+
+    let resolveDiscovery!: (models: ProviderModel[]) => void
+    const pendingDiscovery = new Promise<ProviderModel[]>((resolve) => {
+      resolveDiscovery = resolve
+    })
+    discoverModelsMock.mockReturnValueOnce(pendingDiscovery)
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    fireEvent.change(screen.getByDisplayValue('https://new.example/anthropic'), {
+      target: { value: 'https://latest.example/anthropic' },
+    })
+    await act(async () => {
+      resolveDiscovery([{ id: 'stale-model' }])
+      await pendingDiscovery
+    })
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Model ID')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /stale-model/ })).not.toBeInTheDocument()
   })
 
   it('announces empty discovery results and exposes discovery errors as alerts', async () => {
