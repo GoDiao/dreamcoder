@@ -18,6 +18,8 @@ agent team 底下的各层能力，按层调研，每层一份全景文件。产
 | [landscape-evaluation.md](landscape-evaluation.md) | 评测 |
 | <项目>.md | 每个项目一份拆解 |
 | [workspace-isolation.md](workspace-isolation.md) | 成员工作区隔离：统一接口、各实现对照、macOS 实测 |
+| [workspace-isolation-log.md](workspace-isolation-log.md) | 成员工作区隔离的探索记录：讨论结论、读代码发现、实验 |
+| [experiments/](experiments/) | 实验脚本，每个实验一个目录 |
 
 ## 已完成的拆解
 
