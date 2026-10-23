@@ -138,7 +138,7 @@ describe('render counts during one streaming reply', () => {
     }).toEqual({
       ChatInput: 8,
       StreamingIndicator: 14,
-      MessageList: 62,
+      MessageList: 44,
       PermissionDialog: 2,
       historyToolGroup: 0,
       liveToolGroup: 4,

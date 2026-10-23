@@ -8,6 +8,7 @@ type Props = {
   language?: string
   maxLines?: number
   showLineNumbers?: boolean
+  highlighter?: 'shiki' | 'prism'
 }
 
 const warmPrismTheme: PrismTheme = {
@@ -169,12 +170,13 @@ function PrismCodeContent({ code, language, showLineNumbers }: { code: string; l
   )
 }
 
-function CodeArea({ code, language, showLineNumbers }: { code: string; language?: string; showLineNumbers: boolean }) {
+function CodeArea({ code, language, showLineNumbers, highlighter }: { code: string; language?: string; showLineNumbers: boolean; highlighter: 'shiki' | 'prism' }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [runtime, setRuntime] = useState<ShikiRuntime | null>(null)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
+    if (highlighter === 'prism') return
     let cancelled = false
     setLoaded(false)
     loadShikiRuntime().then((nextRuntime) => {
@@ -183,7 +185,7 @@ function CodeArea({ code, language, showLineNumbers }: { code: string; language?
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [highlighter])
 
   useEffect(() => {
     setLoaded(false)
@@ -205,7 +207,8 @@ function CodeArea({ code, language, showLineNumbers }: { code: string; language?
     return () => observer.disconnect()
   }, [runtime, code, language])
 
-  const ShikiHighlighter = runtime?.Highlighter
+  const shikiRuntime = highlighter === 'shiki' ? runtime : null
+  const ShikiHighlighter = shikiRuntime?.Highlighter
 
   return (
     <div
@@ -239,7 +242,7 @@ function CodeArea({ code, language, showLineNumbers }: { code: string; language?
           <ShikiHighlighter
             language={language || 'text'}
             theme={warmShikiTheme}
-            engine={runtime.engine}
+            engine={shikiRuntime.engine}
             showLineNumbers={showLineNumbers}
             showLanguage={false}
             addDefaultStyles={false}
@@ -259,7 +262,7 @@ function CodeArea({ code, language, showLineNumbers }: { code: string; language?
   )
 }
 
-export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = false }: Props) {
+export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = false, highlighter = 'shiki' }: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
 
@@ -289,6 +292,7 @@ export function CodeViewer({ code, language, maxLines = 20, showLineNumbers = fa
         code={visibleCode}
         language={language}
         showLineNumbers={effectiveShowLineNumbers}
+        highlighter={highlighter}
       />
 
       {showExpandToggle && (
