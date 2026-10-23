@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 import { BookMarked, Check, ChevronDown, ChevronRight, CircleAlert, CircleDot, Settings, Square } from 'lucide-react'
 import { ToolCallBlock } from './ToolCallBlock'
+import { ThinkingBlock } from './ThinkingBlock'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { Modal } from '../shared/Modal'
 import { useTranslation } from '../../i18n'
@@ -12,6 +13,8 @@ import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
 
 type ToolCall = Extract<UIMessage, { type: 'tool_use' }>
 type ToolResult = Extract<UIMessage, { type: 'tool_result' }>
+type ThinkingMessage = Extract<UIMessage, { type: 'thinking' }>
+type ActivityStep = ToolCall | ThinkingMessage
 type MemoryToolAction = 'saved' | 'referenced'
 
 type MemoryToolFile = {
@@ -32,6 +35,8 @@ type Props = {
   resultMap: Map<string, ToolResult>
   childToolCallsByParent: Map<string, ToolCall[]>
   agentTaskNotifications: Record<string, AgentTaskNotification>
+  steps?: ActivityStep[]
+  activeThinkingId?: string | null
   isStreaming?: boolean
 }
 
@@ -47,7 +52,11 @@ const TOOL_VERBS: Record<string, (count: number, t: (key: TranslationKey, params
   WebFetch: (n, t) => n === 1 ? t('toolGroup.fetchedOne') : t('toolGroup.fetchedMany', { count: n }),
 }
 
-function generateSummary(toolCalls: ToolCall[], t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+function generateSummary(
+  toolCalls: ToolCall[],
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  thinkingCount = 0,
+): string {
   const counts = new Map<string, number>()
   for (const tc of toolCalls) {
     counts.set(tc.toolName, (counts.get(tc.toolName) ?? 0) + 1)
@@ -58,6 +67,9 @@ function generateSummary(toolCalls: ToolCall[], t: (key: TranslationKey, params?
     const verbFn = TOOL_VERBS[name]
     const label = getCuaToolDisplay(name, undefined, t)?.title ?? name
     parts.push(verbFn ? verbFn(count, t) : `${label} (${count})`)
+  }
+  if (thinkingCount > 0) {
+    parts.push(thinkingCount === 1 ? t('toolGroup.thoughtOne') : t('toolGroup.thoughtMany', { count: thinkingCount }))
   }
 
   return parts.join(', ')
@@ -113,13 +125,16 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   resultMap,
   childToolCallsByParent,
   agentTaskNotifications,
+  steps = toolCalls,
+  activeThinkingId = null,
   isStreaming,
 }: Props) {
   const memoryActivity = getMemoryToolActivity(toolCalls, resultMap)
   if (memoryActivity) {
     const memoryToolCalls = toolCalls.filter(isMemoryToolCall)
     const regularToolCalls = toolCalls.filter((toolCall) => !isMemoryToolCall(toolCall))
-    if (regularToolCalls.length > 0) {
+    const regularSteps = steps.filter((step) => step.type === 'thinking' || !isMemoryToolCall(step))
+    if (regularSteps.length > 0) {
       return (
         <div className="mb-2 space-y-2">
           <MemoryToolActivityGroup
@@ -134,6 +149,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
             resultMap={resultMap}
             childToolCallsByParent={childToolCallsByParent}
             agentTaskNotifications={agentTaskNotifications}
+            steps={regularSteps}
+            activeThinkingId={activeThinkingId}
             isStreaming={isStreaming}
           />
         </div>
@@ -156,6 +173,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
       resultMap={resultMap}
       childToolCallsByParent={childToolCallsByParent}
       agentTaskNotifications={agentTaskNotifications}
+      steps={steps}
+      activeThinkingId={activeThinkingId}
       isStreaming={isStreaming}
     />
   )
@@ -166,9 +185,11 @@ function ToolCallGroupContent({
   resultMap,
   childToolCallsByParent,
   agentTaskNotifications,
+  steps = toolCalls,
+  activeThinkingId = null,
   isStreaming,
 }: Props) {
-  const allAgents = toolCalls.every((toolCall) => toolCall.toolName === 'Agent')
+  const allAgents = toolCalls.length > 0 && toolCalls.every((toolCall) => toolCall.toolName === 'Agent')
 
   if (allAgents) {
     return (
@@ -182,7 +203,7 @@ function ToolCallGroupContent({
     )
   }
 
-  if (toolCalls.length === 1) {
+  if (toolCalls.length === 1 && steps.length === 1) {
     const tc = toolCalls[0]!
     return (
       <ToolCallTree
@@ -199,6 +220,8 @@ function ToolCallGroupContent({
       resultMap={resultMap}
       childToolCallsByParent={childToolCallsByParent}
       agentTaskNotifications={agentTaskNotifications}
+      steps={steps}
+      activeThinkingId={activeThinkingId}
       isStreaming={isStreaming}
     />
   )
@@ -402,17 +425,20 @@ function AgentToolGroup({
   )
 }
 
-function ToolCallGroupMulti({ toolCalls, resultMap, childToolCallsByParent, isStreaming }: Props) {
+function ToolCallGroupMulti({
+  toolCalls,
+  resultMap,
+  childToolCallsByParent,
+  steps = toolCalls,
+  activeThinkingId = null,
+  isStreaming,
+}: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
-  const summary = generateSummary(toolCalls, t)
+  const summary = generateSummary(toolCalls, t, steps.length - toolCalls.length)
   const errorPresent = groupHasErrors(toolCalls, resultMap, childToolCallsByParent)
   const hasUnresolvedTools = hasUnresolvedToolCalls(toolCalls, resultMap, childToolCallsByParent)
-  const isRunning = !!isStreaming || hasUnresolvedTools
-
-  useEffect(() => {
-    if (errorPresent) setExpanded(true)
-  }, [errorPresent])
+  const isRunning = !!isStreaming || hasUnresolvedTools || activeThinkingId !== null
 
   return (
     <div className="mb-2">
@@ -431,17 +457,17 @@ function ToolCallGroupMulti({ toolCalls, resultMap, childToolCallsByParent, isSt
 
       {expanded && (
         <div className="mb-1 ml-[6px] mt-1.5 space-y-1 border-l border-[var(--color-border)] pl-[18px]">
-          {toolCalls.map((tc) => {
-            return (
+          {steps.map((step) => step.type === 'thinking'
+            ? <ThinkingBlock key={step.id} content={step.content} isActive={step.id === activeThinkingId} />
+            : (
               <ToolCallTree
-                key={tc.id}
-                toolCall={tc}
+                key={step.id}
+                toolCall={step}
                 resultMap={resultMap}
                 childToolCallsByParent={childToolCallsByParent}
                 compact
               />
-            )
-          })}
+            ))}
         </div>
       )}
     </div>

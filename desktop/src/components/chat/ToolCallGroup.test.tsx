@@ -74,9 +74,32 @@ describe('ToolCallGroup', () => {
     expect(screen.getByRole('button', { name: /Read 3 files/ })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('opens a group with a failed call', () => {
+  it('keeps a group with a failed call collapsed and marks it as failed', () => {
     renderGroup([resultFor('a'), resultFor('b', true), resultFor('c')])
 
-    expect(screen.getByRole('button', { name: /Read 3 files/ })).toHaveAttribute('aria-expanded', 'true')
+    const header = screen.getByRole('button', { name: /Read 3 files/ })
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(header.querySelector('.text-\\[var\\(--color-error\\)\\]')).not.toBeNull()
+  })
+
+  it('folds thinking into the group summary and shows it as running while it streams', () => {
+    const toolCalls = ['a', 'b'].map(readCall)
+    const thinking = { id: 'think-1', type: 'thinking', content: 'Checking the second file', timestamp: 1 } as const
+    const resultMap = new Map(['a', 'b'].map((id) => [id, resultFor(id)]))
+    render(
+      <ToolCallGroup
+        toolCalls={toolCalls}
+        steps={[toolCalls[0]!, thinking, toolCalls[1]!]}
+        activeThinkingId="think-1"
+        resultMap={resultMap}
+        childToolCallsByParent={new Map()}
+        agentTaskNotifications={{}}
+      />,
+    )
+
+    const header = screen.getByRole('button', { name: /Read 2 files, thought once/ })
+    expect(header.querySelector('.animate-pulse-dot')).not.toBeNull()
+    fireEvent.click(header)
+    expect(screen.getByText('Checking the second file')).toBeInTheDocument()
   })
 })

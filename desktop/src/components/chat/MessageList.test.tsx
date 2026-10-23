@@ -3708,3 +3708,50 @@ describe('buildToolGroupResults', () => {
     expect(again.get('group-use-agent-1')!.childToolCallsByParent).toBe(group.childToolCallsByParent)
   })
 })
+
+describe('activity groups', () => {
+  const thinking = (id: string): UIMessage => ({ id, type: 'thinking', content: `thought ${id}`, timestamp: 1 })
+  const tool = (id: string, toolName = 'Bash'): UIMessage => ({
+    id: `use-${id}`,
+    type: 'tool_use',
+    toolName,
+    toolUseId: id,
+    input: {},
+    timestamp: 1,
+  })
+  const text = (id: string): UIMessage => ({ id, type: 'assistant_text', content: `answer ${id}`, timestamp: 2 })
+
+  it('folds thinking between tool calls into one group up to the next reply text', () => {
+    const { renderItems } = buildRenderModel([
+      thinking('t1'),
+      tool('glob', 'Glob'),
+      thinking('t2'),
+      tool('ls'),
+      thinking('t3'),
+      tool('read', 'Read'),
+      thinking('t4'),
+      text('answer'),
+    ])
+
+    expect(renderItems).toHaveLength(2)
+    const group = renderItems[0]!
+    expect(group.kind).toBe('tool_group')
+    if (group.kind !== 'tool_group') return
+    expect(group.steps.map((step) => step.id)).toEqual(['t1', 'use-glob', 't2', 'use-ls', 't3', 'use-read', 't4'])
+    expect(group.toolCalls.map((call) => call.id)).toEqual(['use-glob', 'use-ls', 'use-read'])
+    expect(renderItems[1]).toMatchObject({ kind: 'message', message: { id: 'answer' } })
+  })
+
+  it('keeps thinking without tool calls as its own message', () => {
+    const { renderItems } = buildRenderModel([thinking('t1'), text('answer')])
+
+    expect(renderItems.map((item) => item.kind)).toEqual(['message', 'message'])
+  })
+
+  it('keeps thinking out of agent groups', () => {
+    const { renderItems } = buildRenderModel([thinking('t1'), tool('a1', 'Agent'), thinking('t2'), tool('b', 'Bash')])
+
+    expect(renderItems.map((item) => (item.kind === 'tool_group' ? item.steps.map((step) => step.id) : item.message.id)))
+      .toEqual(['t1', ['use-a1'], ['t2', 'use-b']])
+  })
+})

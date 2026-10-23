@@ -1175,6 +1175,8 @@ export const en = {
   'toolGroup.searchedMany': 'searched {count} patterns',
   'toolGroup.agentOne': 'dispatched an agent',
   'toolGroup.agentMany': 'dispatched {count} agents',
+  'toolGroup.thoughtOne': 'thought once',
+  'toolGroup.thoughtMany': 'thought {count} times',
   'agentStatus.starting': 'Starting',
   'agentStatus.running': 'Running',
   'agentStatus.done': 'Done',
