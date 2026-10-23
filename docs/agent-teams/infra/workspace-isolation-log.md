@@ -61,7 +61,21 @@
 
 要防的只有 git worktree 提供者：worktree 与用户仓库共用 `.git`，成员删分支、改 remote、改 config、跑 gc 会动到用户仓库。第一版用提示词约束，加上把这几类命令设为需要权限确认，并在能力声明里写明「共用用户仓库」。APFS 克隆的 `.git` 是独立副本，没有这个问题。
 
-### 2.4 排期建议
+### 2.4 隔离按成员可选，EnterWorktree 改为只作用于调用者
+
+- **隔离按成员可选。** 只读的成员（审阅、调研）不需要自己的目录，只改少量不相干文件的成员共用目录也可以。派生成员时可选「共用」或「隔离」，不强制。
+- **删掉 EnterWorktree 隔不掉。** 队友可以在 Bash 里自己 `git worktree add`，不改进程全局目录，对别人无害。限制是：每条 Bash 命令都要先 `cd` 过去（队友的 `cd` 不保留，`src/tools/BashTool/BashTool.tsx:643`）；文件工具全靠绝对路径，写错就写回主目录；建在项目目录外会触发权限请求（#164 下会挂住）；成果只能走 git 分支；UI 看不到。
+- **问题在于 EnterWorktree 改的是全局目录。** 两种修法：
+  - 止血：从队友的工具名单去掉它。归 Dev-Lead。
+  - 并入 #166：EnterWorktree 识别出调用者是队友时，只改该队友自己的目录覆盖，不碰全局。队友由此有一个正规的自助隔离入口。
+- **成员在哪个目录工作要显示给用户。** 已有的链路：
+  - team 文件的成员记录有 `cwd` 与 `worktreePath`（`src/utils/swarm/teamHelpers.ts:84`），派生时不写 `worktreePath`，`cwd` 一律是 lead 的目录（`src/tools/shared/spawnMultiAgent.ts:948,970,989`）。
+  - 服务端读 team 文件的类型含 `worktreePath`（`src/server/services/teamService.ts:58`），转成返回给桌面端的成员数据时丢掉了，只留 `cwd`（`src/server/services/teamService.ts:113-124`）。
+  - 桌面端 `desktop/src/stores/teamStore.ts` 不使用成员目录。
+
+  要补：提供者每次创建副本（无论是成员调用 EnterWorktree，还是派生时分配）都写一条记录，含目录与分支；服务端带出这些字段；成员卡片显示「在哪个目录、哪个分支」。team 文件作为过渡，最终进服务端会话状态。
+
+### 2.5 排期建议
 
 1. agent teams 先理顺：#163、#164、中止 lead 删团队、禁用队友的 EnterWorktree，跑通同进程成员。
 2. 同时，#166 把提供者和合并层做成独立模块。第一个接入方是普通子 agent（`src/tools/AgentTool/AgentTool.tsx:590-641` 已有 `isolation: worktree` 和 `runWithCwdOverride`），替换行为放在开关后面。另写一组不依赖 AgentTool 的接口测试，覆盖多份副本交替合并、冲突往返、重启后重新接上、主目录中途变化。
@@ -72,7 +86,7 @@
 
 `@d091249`，只读，未在运行中的应用里复现。
 
-- **EnterWorktree 会挪走整个团队。** 它在异步 agent 允许的工具名单里（`src/constants/tools.ts:69`），worktree 模式写死开启（`src/utils/worktreeModeEnabled.ts:10`），队友可以调用。它调用 `setCwd` 与 `setOriginalCwd`（`src/tools/EnterWorktreeTool/EnterWorktreeTool.ts:95-96`），改的是进程全局目录；同进程队友没有目录覆盖，会和 lead 一起被挪进去，权限白名单的依据也跟着变。修复归 Dev-Lead 排期，未开 issue。
+- **EnterWorktree 会挪走整个团队。** 它在异步 agent 允许的工具名单里（`src/constants/tools.ts:69`），worktree 模式写死开启（`src/utils/worktreeModeEnabled.ts:10`），队友可以调用。它调用 `setCwd` 与 `setOriginalCwd`（`src/tools/EnterWorktreeTool/EnterWorktreeTool.ts:95-96`），改的是进程全局目录；同进程队友没有目录覆盖，会和 lead 一起被挪进去，权限白名单的依据也跟着变。止血修复归 Dev-Lead 排期，未开 issue；长期修法见 2.4。
 - **中止 lead 会删除团队目录。** `cleanupTeamDirectories` 会强制删除成员的 `worktreePath`（`src/utils/swarm/teamHelpers.ts:532-588,681`）。接上隔离后会变成丢失成员成果，因此副本生命周期要由服务端管理。未开 issue。
 - **`getOriginalCwd()` 被 53 个文件直接使用。** 包括权限工作目录（`src/utils/permissions/filesystem.ts:705-710`）、skills、临时目录、Bash 出错后重置目录。同进程成员第一版可能只做到部分隔离，能力声明要能表达这一点。
 
