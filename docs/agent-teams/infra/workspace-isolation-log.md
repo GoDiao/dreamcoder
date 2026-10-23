@@ -6,7 +6,7 @@
 | 关联 | [#166](https://github.com/GoDiao/dreamcoder/issues/166)、[#162](https://github.com/GoDiao/dreamcoder/issues/162) |
 | 依据 | 与维护者、AT 负责人的讨论（2026-10-23）；fork 源码 `@d091249`；第 3 节实测 |
 
-第 1 节记维护者已经确认的事，第 2 节记倾向但未定稿的判断，第 3 节起是实验。
+第 1 节记维护者已经确认的事，第 2 节记倾向但未定稿的判断，第 3 节是读代码发现的问题，第 4 节起是实验与对比。
 
 ## 1. 已确认
 
@@ -126,8 +126,61 @@
 - 克隆出的文件 inode 与 ctime 都变了，git 默认会全部重新哈希。`clonefile` 保留修改时间与大小，所以成员副本应复用基线索引，并让 git 只比较修改时间与大小。
 - 克隆整个项目目录要 9 秒左右，此前 1.7 秒的数据只克隆了 `node_modules`。
 
-## 5. 待测
+## 5. 对比方案与基线
 
+### 5.1 基线
+
+- **基线 0：现状，共用 lead 的目录。** 正确性基线：准备时间与额外磁盘为零，成员之间没有隔离，代价体现为互相覆盖，不体现为耗时。不需要测。
+- **基线 1：普通 git worktree。** 性能基线，即 Claude Code 现在给子 agent 开隔离的做法（`src/utils/worktree.ts:935`）：`git worktree add`，按 `.worktreeinclude` 复制文件，依赖与编译由成员自己完成。也是全平台兜底实现。
+
+### 5.2 候选方案
+
+| 方案 | 成员目录怎么来 |
+| --- | --- |
+| A. worktree，依赖由提供者补齐 | `git worktree add`，再把 `node_modules` 克隆进去 |
+| B. APFS 克隆整个目录 | 对项目目录调用一次 `clonefile` |
+| C. APFS 按需克隆 | 只克隆源码与 `node_modules`，跳过嵌套 worktree，`target` 可选 |
+
+### 5.3 指标
+
+1. 从创建到能跑 `bun test`。
+2. 从创建到能编出桌面端（Rust 是冷编译还是增量复用）。
+3. 额外磁盘（`df`）。
+4. 合并前扫描加比较的耗时。
+5. 成员日常操作速度（各方案都是原生目录，预计无差别，抽查即可）。
+6. 隔离完整度：`.git` 是否与用户共用，依赖目录是否隔离。
+
+### 5.4 已有数据
+
+- 方案 B：克隆耗时与磁盘（第 4 节）。
+- 只克隆约 4.1 万个文件的 `node_modules`：1.7 秒（[workspace-isolation.md](workspace-isolation.md) 第 3 节）。
+- 指标 4：第 4 节，测于方案 B 的克隆目录。
+- 基线 1、方案 A、方案 C：无数据。
+
+### 5.5 LayerFS 参照
+
+LayerFS 不作基线，作参照列：它在 macOS 上运行于 Docker 的 Linux 虚拟机里，成员命令在容器中执行，比较维度多出「日常操作慢多少」与「是否需要 Docker」。
+
+下表数据来自 LayerFS 官方，v1.0.0 之前，Docker Desktop on macOS，多为单组样本（[layerfs.md](layerfs.md) 第 7 节），不是本机实测：
+
+| 项 | 官方数据 |
+| --- | --- |
+| 挂载一个 Workspace | 约 10 毫秒，依赖随挂载可用 |
+| 一个文件的 Commit | 约 8 毫秒 |
+| 存储 | 157 个快照（4.94 GB 树）存为 100.1 MB |
+| `git status` | 冷 4.5 倍、热 18 倍于原生 |
+| `find` / `grep -r`（冷） | 29 倍 / 36 倍于原生 |
+| `pnpm install`（首次） | 2.6 倍于原生 |
+| `tsc -b`（热）/ `vitest`（冷） | 1.3 倍 / 1.4 倍于原生 |
+
+本机实测的前提与代价：本机的 docker 来自 Rancher Desktop，不是文档所写的 Docker Desktop，容器能否使用 FUSE 未核实；LayerFS 无发布包，原生组件与镜像要在 `rust:1.85.1-bookworm` 容器里从源码构建，需拉取数 GB 镜像，属于机器级改动；Node 版本满足（要求 22.19 起，本机有 22.23 与 24）。
+
+**待验证的假设：** 在 macOS 上、成员数量少且频繁 grep 与构建的场景下，原生目录加事后扫描的总耗时短于 LayerFS，因为 LayerFS 在准备阶段省下的几秒会被每一轮操作的倍数开销抵消。依据只有上表的官方数据，没有同机、同任务的端到端对比。该假设只针对 macOS；Linux 上 LayerFS 为原生 FUSE，结论可能相反。LayerFS 另有每次写可回退、历史可分叉、跨机共享等我们没有的能力，比较时不能只看耗时与磁盘。
+
+## 6. 待测
+
+- 基线 1、方案 A、方案 C 的指标 1–3（第 5 节）。
+- 与 LayerFS 的端到端对比：同一仓库、同一组成员任务（改代码、跑测试、合并），记录总耗时与磁盘。需要先在本机装 LayerFS。
 - 克隆耗时拆分：源码、两份 `node_modules`、`target`、嵌套 worktree 各占多少。设想是源码与 `node_modules` 必须克隆，嵌套 worktree 跳过，`target` 可选。
 - alternates 与 gc：用户仓库删分支并 gc 后，影子库引用的对象会不会被清掉。
 - 克隆后的 `target` 能否被 cargo 增量复用（#166 开放问题）。
