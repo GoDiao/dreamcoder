@@ -6,7 +6,10 @@ English | [简体中文](./README_zh.md)
 
 <div align="center">
 
-# DreamCoder
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/readme-banner.png">
+  <img src="./assets/readme-banner.png" alt="DreamCoder" width="100%">
+</picture>
 
 **A locally run, multi-provider AI coding workspace**
 

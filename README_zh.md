@@ -6,7 +6,10 @@
 
 <div align="center">
 
-# DreamCoder
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/readme-banner.png">
+  <img src="./assets/readme-banner.png" alt="DreamCoder" width="100%">
+</picture>
 
 **本地运行的多模型 AI 编程工作台**
 
