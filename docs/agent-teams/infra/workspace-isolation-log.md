@@ -6,7 +6,7 @@
 | 关联 | [#166](https://github.com/GoDiao/dreamcoder/issues/166)、[#162](https://github.com/GoDiao/dreamcoder/issues/162) |
 | 依据 | 与维护者、AT 负责人的讨论（2026-10-23）；fork 源码 `@d091249`；第 3 节实测 |
 
-第 1 节记维护者已经确认的事，第 2 节记倾向但未定稿的判断，第 3 节是读代码发现的问题，第 4、5 节是实验，第 6 节是方案对比。
+第 1 节记维护者已经确认的事，第 2 节记倾向但未定稿的判断，第 3 节是读代码发现的问题，第 4–6 节是实验，第 7 节是方案对比。
 
 ## 1. 已确认
 
@@ -178,14 +178,93 @@
 - **按需克隆必须跳过嵌套 worktree**，它占整目录克隆耗时的一半左右。
 - **alternates 不能直接用。** 要么影子库自己存所有对象（第 4 节：首次 4–6 秒、27 MB），要么用 alternates 之后再把借来的对象复制进影子库再断开引用（做法与代价未测）。
 
-## 6. 对比方案与基线
+## 6. 实验 3：按项目类型的准备耗时
 
-### 6.1 基线
+2026-10-23。问题：第 5 节只覆盖本仓库、暖缓存、单次样本。换成不同的包管理器与构建工具、冷暖缓存，「重新安装或重新编译」与「从 lead 的目录克隆过去」哪个快。按「重的东西放在哪里」分三类，每类选代表。
+
+### 6.1 方法
+
+- 环境同第 4 节。工具：bun 1.4.2、npm 10.9.8、pnpm 12.14.0（经 corepack）、uv 0.12.9、cargo 1.99.0、go 1.27.1、Gradle 9.8.1（gradlew）、OpenJDK 21。
+- 样例（浅克隆，2026-10-23）：
+
+  | 类别 | 样例 | 版本 | 命令 |
+  | --- | --- | --- | --- |
+  | 项目内依赖目录 | 本仓库，bun | `6f07ea9` | `bun install --frozen-lockfile`（根目录与 `desktop/`） |
+  | | nestjs/nest，npm | `9a95605` | `npm ci --legacy-peer-deps --ignore-scripts` |
+  | | vitejs/vite，pnpm | `82e7aa0` | `pnpm install --frozen-lockfile --ignore-scripts` |
+  | | fastapi/fastapi，uv | `69ddc2b` | `uv sync --frozen` |
+  | 项目内构建产物 | 本仓库 `desktop/src-tauri`，cargo | `6f07ea9` | `cargo build` |
+  | | BurntSushi/ripgrep，cargo | `7cc9c2f` | `cargo build` |
+  | 全局缓存，按内容寻址 | cli/cli，go | `e87ed4c` | `go build ./cmd/gh` |
+  | | square/okhttp，Gradle | `c317930` | `./gradlew --no-daemon :okhttp:compileKotlinJvm` |
+
+- 对每个样例，先在「lead 的目录」（样例克隆）里装好或编好。每轮依次测：
+  - **冷：** 清空该工具的缓存，新建 worktree，重新安装或编译。
+  - **暖：** 缓存保留，新建 worktree，重新安装或编译。
+  - **克隆：** 新建 worktree，把 lead 目录里被忽略的依赖目录或 `target` 克隆进去，再执行一次安装或编译作为校验。Go 与 Gradle 没有项目内的重型目录，「克隆」是克隆整个目录后编译，缓存是暖的。
+- 每格 3 轮，取中位数。
+- **隔离：** 每个工具的缓存都指向临时目录（`BUN_INSTALL_CACHE_DIR`、`npm_config_cache`、pnpm 的 store 与 cache、`UV_CACHE_DIR`、`CARGO_HOME`、`GOCACHE`、`GOMODCACHE`、`GRADLE_USER_HOME`、`COREPACK_HOME`），`HOME` 也指向临时目录，只有 `RUSTUP_HOME` 指回本机且只读。实验前后对照了本机各缓存目录：只有 `~/.cargo/.global-cache` 的修改时间变了，变化时刻与另一个会话在同一台机器上的活动吻合，实验进程的 `CARGO_HOME` 与 `HOME` 都不指向那里，但未核实是谁写的。
+- **与样例原设定的偏差：**
+  - npm 照 nest 自己的 CI 加了 `--legacy-peer-deps`。
+  - npm 与 pnpm 都加了 `--ignore-scripts`，不执行包的安装脚本。真实项目若有安装脚本，重新安装会更慢。
+  - fastapi 钉的是 Python 3.11，本机没有，改用 3.13（满足它要求的 3.10 起）。
+  - okhttp 要求守护进程 JVM 为 Adoptium 发行版，本机是 Homebrew 的 OpenJDK，在样例克隆里删掉了 `gradle/gradle-daemon-jvm.properties` 的 `toolchainVendor` 一行。
+- 冷缓存要联网下载，耗时受网络影响。没有清空系统文件缓存。
+- 脚本：[experiments/prep-matrix/](experiments/prep-matrix/)。先设 `BENCH_DIR`（临时目录）、`DREAMCODER_SRC`（本仓库检出）、`JAVA_HOME`，运行 `setup.sh` 拉取样例，再运行 `deps.sh`、`build.sh`、`globalcache.sh`；bun、cargo 等需在 `PATH` 上。结束后删除 `BENCH_DIR`。
+
+### 6.2 项目内依赖目录
+
+中位数，秒。「克隆」列为克隆耗时加校验耗时。
+
+| 样例 | 冷缓存重新安装 | 暖缓存重新安装 | 克隆 + 校验 |
+| --- | --- | --- | --- |
+| 本仓库，bun | 15.2 | 1.3 | 2.4 + 0.3 = 2.7 |
+| nest，npm | 10.8 | 8.7 | 2.1 + 1.5 = 3.6 |
+| vite，pnpm | 21.0 | 2.6 | 14.6 + 1.2 = 15.8 |
+| fastapi，uv | 16.1 | 1.5 | 1.2 + 5.9 = 7.1 |
+
+- 克隆过去的 `node_modules` 里没有指向 lead 目录的绝对路径（bun、npm、pnpm 都是 0）。
+- fastapi 的 `.venv` 里有 52 个文件写着 lead 目录的绝对路径（脚本的解释器行、可编辑安装的路径文件）。校验时 uv 重新安装了项目本身，耗时比暖缓存下新装还长。
+- vite 的工作区有几十个被忽略的 `node_modules`，克隆它们比 pnpm 从自己的存储区建硬链接慢得多。
+- 第 5 节单次测得 bun 冷缓存 42 秒，这次三轮是 14.5–16.6 秒，差别来自网络。
+
+### 6.3 项目内构建产物
+
+| 样例 | 冷（缓存与 `target` 都没有） | 只缺 `target` | 克隆 `target` + 编译 | 再编一次 |
+| --- | --- | --- | --- | --- |
+| ripgrep | 12.0 秒，编 34 个 crate | 9.6 秒，34 个 | 0.2 + 4.6 秒，9 个 | 0.14 秒 |
+| 本仓库桌面端 | 83.6 秒（1 轮），356 个 | 76.7 秒，356 个 | 1.1 + 18.8 秒，1 个 | 0.76 秒 |
+
+克隆 `target` 后，cargo 只重编路径改变后失效的那部分：本仓库是项目自己的 1 个 crate，ripgrep 是工作区内的 9 个 crate。第 5 节测得同一步骤 32 秒，那次的 `target` 来自主仓库检出，而这次是在样例克隆里先编过一遍，两次失效的范围不同。
+
+### 6.4 全局缓存，按内容寻址
+
+| 样例 | 冷缓存 | 暖缓存，新 worktree | 暖缓存，克隆整个目录 |
+| --- | --- | --- | --- |
+| cli/cli，go | 31.4 秒 | 2.7 秒 | 0.2 + 2.3 秒 |
+| okhttp，Gradle | 182.5 秒，16 个任务全部执行 | 13.3 秒，8 个从构建缓存取 | 0.3 + 14.0 秒，8 个从构建缓存取 |
+
+Gradle 克隆整个目录后，执行的任务数与新 worktree 相同：项目内的 `build/` 与 `.gradle/` 带过去了，但没有让更多任务被判为最新。Gradle 退出后无残留进程。
+
+### 6.5 结论
+
+- **依赖目录：默认重新安装，不克隆。** lead 已经在同一台机器上装过依赖，全局缓存是暖的，所以「暖缓存重新安装」才是实际情形。在暖缓存下，bun、pnpm、uv 重新安装都比克隆快或相当；只有 npm 例外（8.7 秒对 3.6 秒）。
+- **Python 虚拟环境不能克隆**：里面写着绝对路径，克隆过去还得重装。
+- **构建产物：克隆。** 本仓库桌面端从 76.7 秒降到约 20 秒，ripgrep 从 9.6 秒降到 4.8 秒。这是唯一一类克隆明显占优的。
+- **全局缓存：什么都不用做。** Go 与 Gradle 的缓存在项目外面，新 worktree 直接用上；克隆整个目录没有额外收益。冷缓存很慢（31 秒、183 秒），但 lead 编过一次之后就是暖的。
+- **对提供者的含义：**
+  - 依赖默认由提供者在创建时执行项目的安装命令，npm 项目可改为克隆 `node_modules`。
+  - 「值得带过去的目录」默认只有构建产物（如 `target/`），由项目声明，可推广现有的 `.worktreeinclude`。
+  - 这样 git worktree 提供者在 macOS 上用 clonefile 带上 `target`，准备速度就与 APFS 按需克隆持平。APFS 克隆剩下的价值是另外两点：副本与 lead 当前状态一致（含未提交改动），`.git` 独立。
+
+## 7. 对比方案与基线
+
+### 7.1 基线
 
 - **基线 0：现状，共用 lead 的目录。** 正确性基线：准备时间与额外磁盘为零，成员之间没有隔离，代价体现为互相覆盖，不体现为耗时。不需要测。
 - **基线 1：普通 git worktree。** 性能基线，即 Claude Code 现在给子 agent 开隔离的做法（`src/utils/worktree.ts:935`）：`git worktree add`，按 `.worktreeinclude` 复制文件，依赖与编译由成员自己完成。也是全平台兜底实现。
 
-### 6.2 候选方案
+### 7.2 候选方案
 
 | 方案 | 成员目录怎么来 |
 | --- | --- |
@@ -193,7 +272,7 @@
 | B. APFS 克隆整个目录 | 对项目目录调用一次 `clonefile` |
 | C. APFS 按需克隆 | 只克隆源码与 `node_modules`，跳过嵌套 worktree，`target` 可选 |
 
-### 6.3 指标
+### 7.3 指标
 
 1. 从创建到能跑 `bun test`。
 2. 从创建到能编出桌面端（Rust 是冷编译还是增量复用）。
@@ -202,14 +281,15 @@
 5. 成员日常操作速度（各方案都是原生目录，预计无差别，抽查即可）。
 6. 隔离完整度：`.git` 是否与用户共用，依赖目录是否隔离。
 
-### 6.4 已有数据
+### 7.4 已有数据
 
 - 方案 B：克隆耗时与磁盘（第 4 节），耗时拆分见 5.2。
 - 基线 1、方案 A、方案 C 的指标 1、3：5.3；指标 2 只有基线 1 与「C 带 `target`」。
 - 指标 4：第 4 节，测于方案 B 的克隆目录。
+- 指标 1、2 在其他项目类型上：第 6 节（依赖目录、构建产物、全局缓存三类，各两个样例）。
 - 指标 5、6：无实测。
 
-### 6.5 LayerFS 参照
+### 7.5 LayerFS 参照
 
 LayerFS 不作基线，作参照列：它在 macOS 上运行于 Docker 的 Linux 虚拟机里，成员命令在容器中执行，比较维度多出「日常操作慢多少」与「是否需要 Docker」。
 
@@ -229,10 +309,11 @@ LayerFS 不作基线，作参照列：它在 macOS 上运行于 Docker 的 Linux
 
 **待验证的假设：** 在 macOS 上、成员数量少且频繁 grep 与构建的场景下，原生目录加事后扫描的总耗时短于 LayerFS，因为 LayerFS 在准备阶段省下的几秒会被每一轮操作的倍数开销抵消。依据只有上表的官方数据，没有同机、同任务的端到端对比。该假设只针对 macOS；Linux 上 LayerFS 为原生 FUSE，结论可能相反。LayerFS 另有每次写可回退、历史可分叉、跨机共享等我们没有的能力，比较时不能只看耗时与磁盘。
 
-## 7. 待测
+## 8. 待测
 
-- 冷缓存下的基线 1：清空或换用独立的 bun、cargo 缓存后重测装依赖与编译（会联网下载）。
-- 其他包管理器（npm、pnpm）项目上，克隆 `node_modules` 相对重新安装的收益。
+- yarn（classic 与 PnP）项目，以及带安装脚本的真实项目（不加 `--ignore-scripts`）。
+- 其他构建产物目录（如 Next.js 的 `.next/cache`、CMake 的 `build/`）克隆后能否增量复用。
+- 按项目路径区分的全局缓存（Xcode DerivedData），第 6 节未覆盖。
 - alternates 的补救：引用之后把借来的对象复制进影子库再断开，耗时与磁盘多少。
 - 与 LayerFS 的端到端对比：同一仓库、同一组成员任务（改代码、跑测试、合并），记录总耗时与磁盘。需要先在本机装 LayerFS。
 - 文件数更多的仓库（10 万级）上的首次存树与扫描耗时。
