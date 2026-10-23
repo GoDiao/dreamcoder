@@ -125,12 +125,13 @@ function resolutionLabelKey(resolution: PermissionResolution | undefined): Trans
 }
 
 export function PermissionDialog({ sessionId, requestId, toolName, input, description, resolution }: Props) {
-  const { respondToPermission } = useChatStore()
+  const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
-  const pendingPermission = useChatStore((s) => targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined)
+  const isPending = useChatStore((s) =>
+    targetSessionId ? s.sessions[targetSessionId]?.pendingPermission?.requestId === requestId : false,
+  )
   const t = useTranslation()
-  const isPending = pendingPermission?.requestId === requestId
   const [showRaw, setShowRaw] = useState(false)
 
   const cua = getCuaToolDisplay(toolName, input, t)

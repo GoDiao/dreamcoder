@@ -6,7 +6,7 @@ import {
   type TabType,
 } from '../stores/tabStore'
 import { useSessionStore } from '../stores/sessionStore'
-import { useChatStore } from '../stores/chatStore'
+import { useChatStore, useSessionField } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
 import { useUIStore } from '../stores/uiStore'
@@ -239,14 +239,23 @@ export function ActiveSession() {
   const activeTabType = useTabStore((s) => s.tabs.find((tab) => tab.sessionId === s.activeTabId)?.type ?? null)
   const sessions = useSessionStore((s) => s.sessions)
   const connectToSession = useChatStore((s) => s.connectToSession)
-  const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
+  const isRunning = useChatStore((s) => {
+    const chatState = activeTabId ? s.sessions[activeTabId]?.chatState : undefined
+    return chatState !== undefined && chatState !== 'idle'
+  })
+  const hasRunningBackgroundTasks = useChatStore((s) => {
+    const tasks = activeTabId ? s.sessions[activeTabId]?.backgroundAgentTasks : undefined
+    return tasks ? Object.values(tasks).some((task) => task.status === 'running') : false
+  })
+  const hasLoadedTranscript = useChatStore((s) => {
+    const sessionState = activeTabId ? s.sessions[activeTabId] : undefined
+    return Boolean(sessionState && (sessionState.messages.length > 0 || sessionState.streamingText))
+  })
+  const activeGoal = useSessionField(activeTabId, 'activeGoal') ?? null
   const fetchSessionTasks = useCLITaskStore((s) => s.fetchSessionTasks)
   const trackedTaskSessionId = useCLITaskStore((s) => s.sessionId)
   const hasIncompleteTasks = useCLITaskStore((s) => s.tasks.some((task) => task.status !== 'completed'))
   const hasRunningTasks = useCLITaskStore((s) => s.tasks.some((task) => task.status === 'in_progress'))
-  const chatState = sessionState?.chatState ?? 'idle'
-  const hasRunningBackgroundTasks = Object.values(sessionState?.backgroundAgentTasks ?? {})
-    .some((task) => task.status === 'running')
 
   const session = sessions.find((s) => s.id === activeTabId)
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
@@ -299,7 +308,7 @@ export function ActiveSession() {
     if (!activeTabId || isMemberSession) return
 
     const shouldPollTasks =
-      chatState !== 'idle' ||
+      isRunning ||
       (trackedTaskSessionId === activeTabId && hasIncompleteTasks)
 
     if (!shouldPollTasks) return
@@ -314,19 +323,16 @@ export function ActiveSession() {
   }, [
     activeTabId,
     isMemberSession,
-    chatState,
+    isRunning,
     trackedTaskSessionId,
     hasIncompleteTasks,
     fetchSessionTasks,
   ])
 
   const t = useTranslation()
-  const messages = sessionState?.messages ?? []
-  const streamingText = sessionState?.streamingText ?? ''
-  const activeGoal = sessionState?.activeGoal ?? null
-  const isEmpty = messages.length === 0 && !streamingText && (session?.messageCount ?? 0) === 0
+  const isEmpty = !hasLoadedTranscript && (session?.messageCount ?? 0) === 0
 
-  const isActive = chatState !== 'idle' ||
+  const isActive = isRunning ||
     (trackedTaskSessionId === activeTabId && hasRunningTasks) ||
     hasRunningBackgroundTasks
 

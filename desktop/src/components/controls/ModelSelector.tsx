@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { OFFICIAL_DEFAULT_MODEL_ID } from '../../constants/modelCatalog'
 import { useTranslation } from '../../i18n'
-import { sessionRuntimeSelection, useChatStore } from '../../stores/chatStore'
+import { useChatStore, useSessionRuntimeSelection } from '../../stores/chatStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { DRAFT_RUNTIME_SELECTION_KEY, useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -149,10 +149,10 @@ export function ModelSelector({
   const draftRuntimeSelection = useSessionRuntimeStore((state) =>
     runtimeKey === DRAFT_RUNTIME_SELECTION_KEY ? state.selections[runtimeKey] : undefined,
   )
-  const runtimeSession = useChatStore((state) =>
-    runtimeKey && runtimeKey !== DRAFT_RUNTIME_SELECTION_KEY ? state.sessions[runtimeKey] : undefined,
+  const sessionSelection = useSessionRuntimeSelection(
+    runtimeKey && runtimeKey !== DRAFT_RUNTIME_SELECTION_KEY ? runtimeKey : null,
   )
-  const runtimeSelection = draftRuntimeSelection ?? sessionRuntimeSelection(runtimeSession)
+  const runtimeSelection = draftRuntimeSelection ?? sessionSelection
   const [open, setOpen] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null)
   const ref = useRef<HTMLDivElement>(null)

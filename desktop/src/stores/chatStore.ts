@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { wsManager } from '../api/websocket'
 import { sessionsApi } from '../api/sessions'
 import { useTeamStore } from './teamStore'
@@ -691,6 +692,17 @@ export function sessionRuntimeSelection(session: PerSessionState | undefined): R
     modelId: desired.modelId,
     ...(isEffortLevel(desired.effort) ? { effort: desired.effort } : {}),
   }
+}
+
+export function useSessionField<K extends keyof PerSessionState>(
+  sessionId: string | null | undefined,
+  key: K,
+): PerSessionState[K] | undefined {
+  return useChatStore((state) => (sessionId ? state.sessions[sessionId]?.[key] : undefined))
+}
+
+export function useSessionRuntimeSelection(sessionId: string | null | undefined): RuntimeSelection | undefined {
+  return useChatStore(useShallow((state) => (sessionId ? sessionRuntimeSelection(state.sessions[sessionId]) : undefined)))
 }
 
 function runtimeConfigMessage(selection: RuntimeSelection) {
