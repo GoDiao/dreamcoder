@@ -34,12 +34,10 @@ function makeSessionState(overrides: Partial<PerSessionState> = {}): PerSessionS
     activeThinkingId: null,
     pendingPermission: null,
     tokenUsage: { input_tokens: 0, output_tokens: 0 },
-    elapsedSeconds: 0,
     statusVerb: '',
     apiRetry: null,
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
     composerPrefill: null,
     ...overrides,
   }
