@@ -118,24 +118,80 @@ describe('ProviderFormModal create mode', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('recommends the first fetched model in the styled picker and saves it', async () => {
+  it('filters discovered models by id or name without auto-selecting one', async () => {
+    discoverModelsMock.mockResolvedValueOnce([
+      { id: 'alpha-model', name: 'First Model' },
+      { id: 'beta-model', name: 'Second Model' },
+    ])
     render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
-    fireEvent.change(screen.getByPlaceholderText(/sk-/i), { target: { value: 'test-key' } })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
     })
-    await waitFor(() => expect(screen.getByLabelText('Model ID')).toHaveValue('model-new'))
-    await waitFor(() => expect(screen.getByDisplayValue('New Model')).toBeInTheDocument())
-    fireEvent.click(screen.getByLabelText('Model ID'))
-    expect(screen.getByRole('button', { name: /New Model/ })).toHaveTextContent('model-new')
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    expect(input).toHaveValue('')
+
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'SECOND' } })
+    expect(screen.getByRole('option', { name: /Second Model/ })).toHaveTextContent('beta-model')
+    expect(screen.queryByRole('option', { name: /First Model/ })).not.toBeInTheDocument()
+
+    fireEvent.change(input, { target: { value: 'ALPHA-MODEL' } })
+    expect(screen.getByRole('option', { name: /First Model/ })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Second Model/ })).not.toBeInTheDocument()
+  })
+
+  it('picks a discovered model with the keyboard', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    fireEvent.focus(input)
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(input).toHaveAttribute('aria-activedescendant')
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(input).toHaveValue('model-new')
+    expect(screen.getByDisplayValue('New Model')).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('saves a free-text model id exactly as typed', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Model ID' }), {
+      target: { value: 'custom/model:v2' },
+    })
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]!)
     await fillAndSubmit()
 
     expect(createProviderMock).toHaveBeenCalledWith(expect.objectContaining({
-      models: [{ id: 'model-main' }, { id: 'model-new', name: 'New Model' }],
+      models: [{ id: 'model-main' }, { id: 'custom/model:v2' }],
     }))
+  })
+
+  it('keeps focus in the Model ID input when discovery finishes', async () => {
+    let resolveDiscovery!: (models: ProviderModel[]) => void
+    const pendingDiscovery = new Promise<ProviderModel[]>((resolve) => {
+      resolveDiscovery = resolve
+    })
+    discoverModelsMock.mockReturnValueOnce(pendingDiscovery)
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    input.focus()
+    expect(input).toHaveFocus()
+
+    await act(async () => {
+      resolveDiscovery([{ id: 'late-model' }])
+      await pendingDiscovery
+    })
+
+    expect(input).toHaveFocus()
+    expect(input).toHaveValue('')
   })
 })
 
@@ -168,72 +224,45 @@ describe('ProviderFormModal edit mode', () => {
     })
   })
 
-  it('preserves all named model rows when an unrelated settings JSON key changes', async () => {
-    render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
-    )
-    const textarea = document.querySelector('textarea')
-    expect(textarea).not.toBeNull()
-    await waitFor(() => expect(textarea!.value).toContain('skipWebFetchPreflight'))
-
-    const settings = JSON.parse(textarea!.value) as Record<string, unknown>
-    settings.skipWebFetchPreflight = false
-    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
-      provider.id,
-      expect.objectContaining({ models }),
-    ))
-  })
-
-  it('merges changed runtime model IDs without dropping existing named rows', async () => {
-    render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
-    )
-    const textarea = document.querySelector('textarea')
-    expect(textarea).not.toBeNull()
-    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
-
-    const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
-    settings.env.ANTHROPIC_MODEL = 'model-3'
-    settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = 'model-4'
-    settings.env.ANTHROPIC_SMALL_FAST_MODEL = 'model-4'
-    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
-      provider.id,
-      expect.objectContaining({
-        models: [models[2], models[0], models[1], models[3], models[4]],
-        fastModel: 'model-4',
-      }),
-    ))
-  })
-
-  it('merges progressive settings JSON model edits against the focus snapshot', async () => {
-    render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
-    )
-    const textarea = document.querySelector('textarea')
-    expect(textarea).not.toBeNull()
-    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
-
-    fireEvent.focus(textarea!)
-    for (const modelId of ['g', 'gp', 'gpt']) {
-      const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
-      settings.env.ANTHROPIC_MODEL = modelId
-      fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+  it('keeps generated model settings read-only while preserving unrelated JSON edits', async () => {
+    const providerWithContext = {
+      ...provider,
+      modelContextWindows: { 'model-1': 32768 },
     }
-    fireEvent.blur(textarea!)
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={providerWithContext} presets={[deepseekPreset]} />,
+    )
+    const textarea = document.querySelector('textarea')
+    expect(textarea).not.toBeNull()
+    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
+
+    const settings = JSON.parse(textarea!.value) as { skipWebFetchPreflight: boolean; env: Record<string, string> }
+    settings.skipWebFetchPreflight = false
+    settings.env.ANTHROPIC_MODEL = 'changed-model'
+    settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = 'changed-fast'
+    settings.env.ANTHROPIC_SMALL_FAST_MODEL = 'changed-fast'
+    settings.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS = JSON.stringify({ 'model-1': 999999 })
+    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+    const rewritten = JSON.parse(textarea!.value) as { skipWebFetchPreflight: boolean; env: Record<string, string> }
+    expect(rewritten.skipWebFetchPreflight).toBe(false)
+    expect(rewritten.env.ANTHROPIC_MODEL).toBe('model-1')
+    expect(rewritten.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('model-5')
+    expect(rewritten.env.ANTHROPIC_SMALL_FAST_MODEL).toBe('model-5')
+    expect(JSON.parse(rewritten.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS!)).toEqual({ 'model-1': 32768 })
+
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
       provider.id,
       expect.objectContaining({
-        models: [{ id: 'gpt' }, ...models],
+        models,
+        fastModel: 'model-5',
+        modelContextWindows: { 'model-1': 32768 },
       }),
     ))
+    expect(providersApiMock.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      skipWebFetchPreflight: false,
+    }))
   })
 
   it('fetches with the current edit form values and announces the result count', async () => {
@@ -265,16 +294,17 @@ describe('ProviderFormModal edit mode', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
     })
     expect(screen.getByRole('status')).toHaveTextContent('2 models found')
-    expect(screen.getByLabelText('Model ID')).toHaveValue('discovered-1')
-    fireEvent.click(screen.getByLabelText('Model ID'))
-    expect(screen.getByRole('button', { name: /discovered-1/ })).toBeInTheDocument()
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    expect(input).toHaveValue('')
+    fireEvent.focus(input)
+    expect(screen.getByRole('option', { name: /discovered-1/ })).toBeInTheDocument()
 
     fireEvent.change(screen.getByDisplayValue(provider.baseUrl), {
       target: { value: 'https://new.example/anthropic' },
     })
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Model ID')).toHaveValue('')
-    expect(screen.queryByRole('button', { name: /discovered-1/ })).not.toBeInTheDocument()
+    expect(input).toHaveValue('')
+    expect(screen.queryByRole('option', { name: /discovered-1/ })).not.toBeInTheDocument()
 
     let resolveDiscovery!: (models: ProviderModel[]) => void
     const pendingDiscovery = new Promise<ProviderModel[]>((resolve) => {
@@ -291,8 +321,44 @@ describe('ProviderFormModal edit mode', () => {
     })
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Model ID')).toHaveValue('')
-    expect(screen.queryByRole('button', { name: /stale-model/ })).not.toBeInTheDocument()
+    expect(input).toHaveValue('')
+    expect(screen.queryByRole('option', { name: /stale-model/ })).not.toBeInTheDocument()
+  })
+
+  it('resets discovery when a connection value changes in settings JSON', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('2 models found')
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    fireEvent.focus(input)
+    expect(screen.getByRole('option', { name: /discovered-1/ })).toBeInTheDocument()
+
+    let resolveDiscovery!: (models: ProviderModel[]) => void
+    const pendingDiscovery = new Promise<ProviderModel[]>((resolve) => {
+      resolveDiscovery = resolve
+    })
+    discoverModelsMock.mockReturnValueOnce(pendingDiscovery)
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+
+    const textarea = document.querySelector('textarea')
+    expect(textarea).not.toBeNull()
+    const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
+    settings.env.ANTHROPIC_BASE_URL = 'https://json.example/anthropic'
+    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /discovered-1/ })).not.toBeInTheDocument()
+    await act(async () => {
+      resolveDiscovery([{ id: 'stale-json-model' }])
+      await pendingDiscovery
+    })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /stale-json-model/ })).not.toBeInTheDocument()
   })
 
   it('announces empty discovery results and exposes discovery errors as alerts', async () => {
