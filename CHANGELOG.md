@@ -36,6 +36,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- **Bundled file search** (#106): desktop builds include ripgrep, so Glob and Grep work without a system installation. Source development prepares the same pinned binary automatically. Searches with the bundled binary ignore personal ripgrep configuration so it cannot silently exclude project files.
 - **Proxy** (#148): when the ChatGPT sign-in path streams a non-streaming request and the upstream ends with `response.failed` or `error`, the caller now gets an `api_error` (HTTP 502) with the upstream message, instead of an empty `end_turn` reply. Thanks @pcbeingused333.
 - **Sidebar re-renders** (#157, #158): the sidebar no longer re-renders on streamed text updates. Running indicators still follow session and tab status. Thanks @tedy69.
 - **Re-renders while a reply runs** (#156, #165): the session page no longer re-renders every second during a reply. Only the elapsed time updates, and it now counts from when the server starts the turn. Thanks @princecherry9905.

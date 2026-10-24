@@ -87,7 +87,8 @@ git checkout main && git checkout -b feat/your-feature
 
 4. **Test**. Make sure your changes don't break existing functionality:
    ```bash
-   bun test                  # server/CLI tests (needs ripgrep on PATH)
+   bun run prepare:ripgrep    # prepare the pinned search binary
+   bun test                  # server/CLI tests
    cd desktop
    bun run lint              # TypeScript type checking
    bun run test -- --run     # desktop tests
@@ -171,6 +172,35 @@ bun run tauri dev
 > You skipped Step 4 `bun run build`.
 >
 > More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### Bundled ripgrep
+
+`bun run build:sidecars` and `bun run tauri dev` prepare ripgrep automatically.
+The root `bun run build:sidecar` delegates to the same desktop build script.
+For standalone server/CLI development or tests, run `bun run prepare:ripgrep`
+from the repository root first. The first run needs access to GitHub releases
+and `tar` (included with macOS, Windows and common Linux development systems).
+No npm package or system ripgrep installation is required.
+
+The script pins [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0)
+for macOS arm64/x64, Windows x64 and Linux arm64/x64. Linux uses static musl
+binaries for both GNU and musl targets. Archive SHA-256 values in
+`scripts/prepare-ripgrep.ts` come from the release's `.sha256` files, cross-checked
+against GitHub's asset digests; binary hashes were computed after verifying and
+extracting those archives. Existing binaries are reused only when their bytes
+match the pinned binary hash. To update ripgrep, verify both hashes for every
+target and refresh `THIRD_PARTY_NOTICES.md` and the installer smoke-test version.
+
+Source runs read `vendor/ripgrep/<arch>-<platform>/rg` (`rg.exe` on Windows).
+Builds also stage `desktop/src-tauri/binaries/rg-<target-triple>` (plus `.exe`
+on Windows). Tauri removes the target suffix when installing: `rg` sits beside
+`dreamcoder-sidecar` in `Contents/MacOS` on macOS, beside the app on Windows,
+and in the application's binary directory on Linux. License notices are included
+as a bundle resource. Both binary directories are Git-ignored.
+
+Resolution is: `USE_BUILTIN_RIPGREP=0` forces system ripgrep; otherwise the
+executable's neighboring binary, the source vendor binary, system `rg` on
+`PATH`, then unavailable. Stock Bun does not embed ripgrep in the sidecar.
 
 ## Adding an MCP Server to the Curated Registry
 

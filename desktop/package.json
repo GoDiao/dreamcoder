@@ -16,6 +16,7 @@
   },
   "homepage": "https://github.com/GoDiao/dreamcoder#readme",
   "scripts": {
+    "prepare:ripgrep": "bun run ../scripts/prepare-ripgrep.ts",
     "dev": "vite",
     "build": "vite build",
     "build:sidecars": "bun run ./scripts/build-sidecars.ts",

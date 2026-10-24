@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
+import { prepareRipgrep } from '../../scripts/prepare-ripgrep.js'
 
 const desktopRoot = path.resolve(import.meta.dir, '..')
 const repoRoot = path.resolve(desktopRoot, '..')
@@ -11,6 +12,8 @@ const targetTriple =
   (await detectHostTriple())
 
 const bunTarget = mapTargetTripleToBun(targetTriple)
+
+await prepareRipgrep(repoRoot, targetTriple)
 
 console.log('[build-sidecars] scanning for missing imports...')
 const scanProc = Bun.spawn(

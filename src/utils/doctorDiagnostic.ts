@@ -65,7 +65,7 @@ export type DiagnosticInfo = {
   packageManager?: string
   ripgrepStatus: {
     working: boolean
-    mode: 'system' | 'builtin' | 'embedded'
+    mode: 'system' | 'builtin' | 'bundled' | 'unavailable'
     systemPath: string | null
   }
 }
