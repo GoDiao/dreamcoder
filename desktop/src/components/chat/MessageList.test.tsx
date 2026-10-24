@@ -1847,6 +1847,7 @@ describe('MessageList nested tool calls', () => {
     await waitFor(() => {
       expect(screen.getByText('streaming next token')).toBeTruthy()
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(600)
   })
@@ -1985,6 +1986,7 @@ describe('MessageList nested tool calls', () => {
     await waitFor(() => {
       expect(screen.getByText('streaming next token after height change')).toBeTruthy()
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(1000)
 
@@ -2059,6 +2061,7 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
 
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(1200)
@@ -2132,12 +2135,14 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.(makeResizeEntry(400), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollTop).toBe(600)
 
     scrollTopWriteCount = 0
     act(() => {
       resizeCallback?.(makeResizeEntry(401), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
     act(() => {
       resizeCallback?.(makeResizeEntry(400), {} as ResizeObserver)
     })
@@ -2149,6 +2154,7 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.(makeResizeEntry(420), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
 
     expect(scrollTop).toBe(640)
   })

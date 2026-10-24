@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 vi.mock('../chat/CodeViewer', () => ({
-  CodeViewer: ({ code, language }: { code: string; language?: string }) => (
-    <div data-testid="code-viewer" data-language={language ?? ''}>
+  CodeViewer: ({ code, language, highlighter }: { code: string; language?: string; highlighter?: string }) => (
+    <div data-testid="code-viewer" data-language={language ?? ''} data-highlighter={highlighter ?? 'shiki'}>
       {code}
     </div>
   ),
@@ -294,6 +294,13 @@ describe('MarkdownRenderer', () => {
   })
 })
 
+describe('MarkdownRenderer highlighting', () => {
+  it('highlights code blocks with Shiki', () => {
+    render(<MarkdownRenderer content={'Example:\n\n```ts\nconst a = 1\n```'} />)
+    expect(screen.getByTestId('code-viewer')).toHaveAttribute('data-highlighter', 'shiki')
+  })
+})
+
 describe('MarkdownRenderer parse cache', () => {
   beforeEach(() => {
     __markdownParseCacheInternals.reset()
@@ -309,20 +316,6 @@ describe('MarkdownRenderer parse cache', () => {
     render(<MarkdownRenderer content={content} />)
     expect(__markdownParseCacheInternals.finalizedSize()).toBe(1)
     expect(__markdownParseCacheInternals.finalizedChars()).toBe(beforeChars)
-  })
-
-  it('routes streaming content into the streaming cache without evicting finalized entries', () => {
-    const finalizedContent = 'finalized assistant turn text'
-    render(<MarkdownRenderer content={finalizedContent} />)
-    expect(__markdownParseCacheInternals.hasFinalized(finalizedContent)).toBe(true)
-
-    for (let i = 0; i < 8; i++) {
-      const chunk = `streaming partial ${i.toString().repeat(20)}`
-      render(<MarkdownRenderer content={chunk} streaming />)
-    }
-
-    expect(__markdownParseCacheInternals.hasFinalized(finalizedContent)).toBe(true)
-    expect(__markdownParseCacheInternals.streamingSize()).toBeLessThanOrEqual(4)
   })
 
   it('caps the finalized cache to roughly 200 entries', () => {

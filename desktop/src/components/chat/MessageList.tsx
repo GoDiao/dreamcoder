@@ -12,6 +12,7 @@ import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n/locales/en'
 import { UserMessage } from './UserMessage'
 import { AssistantMessage } from './AssistantMessage'
+import { StreamingReply } from './StreamingReply'
 import { ThinkingBlock } from './ThinkingBlock'
 import { ToolCallBlock } from './ToolCallBlock'
 import { ToolCallGroup } from './ToolCallGroup'
@@ -1297,7 +1298,10 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   const addToast = useUIStore((s) => s.addToast)
   const messages = useSessionField(resolvedSessionId, 'messages') ?? EMPTY_MESSAGES
   const chatState = useSessionField(resolvedSessionId, 'chatState') ?? 'idle'
-  const streamingText = useSessionField(resolvedSessionId, 'streamingText') ?? ''
+  const hasStreamingText = useChatStore((s) => {
+    const text = resolvedSessionId ? s.sessions[resolvedSessionId]?.streamingText : undefined
+    return Boolean(text && /\S/.test(text))
+  })
   const activeThinkingId = useSessionField(resolvedSessionId, 'activeThinkingId') ?? null
   const agentTaskNotifications = useSessionField(resolvedSessionId, 'agentTaskNotifications') ?? EMPTY_AGENT_TASK_NOTIFICATIONS
   const activeAskUserQuestionToolUseId = useChatStore((s) => {
@@ -1309,7 +1313,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     return Boolean(sessionState?.activeToolUseId) || Boolean(sessionState?.activeToolName)
   })
   const shouldFollowContentResize =
-    streamingText.trim().length > 0 ||
+    hasStreamingText ||
     chatState === 'streaming' ||
     chatState === 'compacting' ||
     chatState === 'tool_executing' ||
@@ -1324,6 +1328,11 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   )
   const pendingMeasuredHeightsRef = useRef(false)
   const measureFlushFrameRef = useRef<number | null>(null)
+  const stickFrameRef = useRef<number | null>(null)
+  const virtualizationEnabledRef = useRef(false)
+  const previousVirtualizationEnabledRef = useRef<boolean | null>(null)
+  const shouldFollowContentResizeRef = useRef(shouldFollowContentResize)
+  shouldFollowContentResizeRef.current = shouldFollowContentResize
   const lastAutoScrollAtRef = useRef(0)
   const lastContentResizeFollowHeightRef = useRef<number | null>(null)
   const shouldAutoScrollRef = useRef(true)
@@ -1349,7 +1358,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   const branchActionsDisabled =
     isMemberSession ||
     chatState !== 'idle' ||
-    streamingText.trim().length > 0 ||
+    hasStreamingText ||
     Boolean(activeThinkingId) ||
     hasActiveTool
   const hasCompactingDivider = messages.some((message) =>
@@ -1359,9 +1368,13 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     if (measureFlushFrameRef.current !== null) {
       cancelAnimationFrame(measureFlushFrameRef.current)
     }
+    if (stickFrameRef.current !== null) {
+      cancelAnimationFrame(stickFrameRef.current)
+    }
   }, [])
 
   const syncVirtualViewportFromContainer = useCallback((container: HTMLElement) => {
+    if (!virtualizationEnabledRef.current) return
     const nextScrollTop = container.scrollTop
     const nextViewportHeight = container.clientHeight || VIRTUAL_DEFAULT_VIEWPORT_HEIGHT
     setVirtualViewport((current) => {
@@ -1420,6 +1433,34 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
         }
       }
       isProgrammaticScrollingRef.current = false
+    })
+  }, [resolvedSessionId])
+
+  const scheduleStickToBottom = useCallback(() => {
+    if (!shouldAutoScrollRef.current) {
+      setShowJumpToLatest(true)
+      return
+    }
+    if (stickFrameRef.current !== null) return
+    stickFrameRef.current = requestAnimationFrame(() => {
+      stickFrameRef.current = null
+      const container = scrollContainerRef.current
+      if (!container || !shouldAutoScrollRef.current) return
+      ignoreProgrammaticScrollUntilRef.current = performance.now() + 250
+      lastAutoScrollAtRef.current = performance.now()
+      setScrollToBottomWithoutLayoutRead(container, 'auto')
+      ignoreProgrammaticScrollTopRef.current = container.scrollTop
+      if (virtualizationEnabledRef.current) {
+        setVirtualViewport((current) => current.scrollTop === SCROLL_BOTTOM_SENTINEL
+          ? current
+          : { scrollTop: SCROLL_BOTTOM_SENTINEL, viewportHeight: current.viewportHeight })
+      }
+      if (resolvedSessionId) {
+        sessionScrollSnapshots.set(resolvedSessionId, {
+          scrollTop: container.scrollTop,
+          wasAtBottom: true,
+        })
+      }
     })
   }, [resolvedSessionId])
 
@@ -1547,7 +1588,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     }
 
     scrollToBottom('auto')
-  }, [messages.length, resolvedSessionId, scrollToBottom, streamingText])
+  }, [messages.length, resolvedSessionId, scrollToBottom])
 
   const handleJumpToLatest = useCallback(() => {
     scrollToBottom('auto')
@@ -1569,14 +1610,14 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
         }
         lastContentResizeFollowHeightRef.current = nextHeight
       }
-      if (!shouldFollowContentResize) return
+      if (!shouldFollowContentResizeRef.current) return
       if (!shouldAutoScrollRef.current) return
-      scrollToBottom('auto')
+      scheduleStickToBottom()
     })
     observer.observe(content)
 
     return () => observer.disconnect()
-  }, [scrollToBottom, shouldFollowContentResize])
+  }, [scheduleStickToBottom])
 
   const { toolResultMap, childToolCallsByParent, renderItems } = useMemo(
     () => buildRenderModel(messages, activeAskUserQuestionToolUseId),
@@ -1645,6 +1686,17 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     ),
     [measuredItemsVersion, renderItemKeys, renderItemMetrics, renderItems, virtualViewport],
   )
+  virtualizationEnabledRef.current = virtualTranscriptWindow.enabled
+
+  useEffect(() => {
+    const wasEnabled = previousVirtualizationEnabledRef.current
+    previousVirtualizationEnabledRef.current = virtualTranscriptWindow.enabled
+    const container = scrollContainerRef.current
+    if (wasEnabled === false && virtualTranscriptWindow.enabled && container) {
+      syncVirtualViewportFromContainer(container)
+    }
+  }, [syncVirtualViewportFromContainer, virtualTranscriptWindow.enabled])
+
   const confirmTurnCard = useMemo(
     () => turnChangeCards.find((card) => card.target.messageId === turnUndoConfirmTargetId) ?? null,
     [turnChangeCards, turnUndoConfirmTargetId],
@@ -1924,9 +1976,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
             <VirtualSpacer height={virtualTranscriptWindow.afterHeight} position="bottom" />
           ) : null}
 
-          {streamingText.trim() && (
-            <AssistantMessage content={streamingText} isStreaming={chatState === 'streaming'} />
-          )}
+          <StreamingReply sessionId={resolvedSessionId} onGrow={scheduleStickToBottom} />
 
           {chatState === 'compacting' && !hasCompactingDivider && (
             <CompactStatusDivider state="compacting" />
