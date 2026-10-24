@@ -9,6 +9,7 @@ export const docIds = [
   '04-session-context',
   '05-streaming-recovery',
   '06-desktop-integration',
+  '07-codebase-tour',
 ] as const;
 
 export type DocId = (typeof docIds)[number];
@@ -23,6 +24,7 @@ export const docTitles: Record<Lang, Record<DocId, string>> = {
     '04-session-context': '会话持久化与上下文工程',
     '05-streaming-recovery': '流式响应与故障恢复',
     '06-desktop-integration': '模型接入与桌面端集成',
+    '07-codebase-tour': '代码库导览',
   },
   en: {
     README: 'Contents and conventions',
@@ -33,6 +35,7 @@ export const docTitles: Record<Lang, Record<DocId, string>> = {
     '04-session-context': 'Session persistence and context engineering',
     '05-streaming-recovery': 'Streaming responses and failure recovery',
     '06-desktop-integration': 'Model access and desktop integration',
+    '07-codebase-tour': 'Codebase Tour',
   },
 };
 
