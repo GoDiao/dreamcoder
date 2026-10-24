@@ -46,12 +46,11 @@ vi.mock('../../i18n', () => ({
     'repoLaunch.remoteBranch': 'Remote branch',
     'repoLaunch.searchBranch': 'Search branches',
     'repoLaunch.selectBranch': 'Select branch',
-    'repoLaunch.selectWorktree': 'Select worktree mode',
-    'repoLaunch.worktreeCurrent': 'Current worktree',
-    'repoLaunch.worktreeIsolated': 'Isolated worktree',
+    'repoLaunch.newWorktree': 'Run in a new worktree',
+    'repoLaunch.newWorktreeHint': 'Leaves your current checkout untouched',
     'repoLaunch.notice.branchTitle': 'Could not switch to the selected branch',
     'repoLaunch.notice.dirtyTitle': 'Uncommitted changes',
-    'repoLaunch.notice.useWorktree': 'Use isolated worktree',
+    'repoLaunch.notice.useWorktree': 'Use a new worktree',
     'repoLaunch.notice.pickBranch': 'Choose another branch',
     'repoLaunch.notice.retry': 'Retry',
     'tabs.close': 'Close',
@@ -179,6 +178,36 @@ describe('RepositoryLaunchControls', () => {
     })
   })
 
+  it('keeps the worktree choice inside the branch menu instead of a separate control', async () => {
+    const onUseWorktreeChange = vi.fn()
+    const { rerender } = renderControls({ onUseWorktreeChange, placement: 'composer' })
+
+    await screen.findByRole('button', { name: 'Select branch: main' })
+    expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent))
+      .toEqual(['Project /repo', 'Select branch: main'])
+
+    await openBranchMenu()
+    const toggle = await screen.findByRole('switch', { name: 'Run in a new worktree' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(toggle)
+    expect(onUseWorktreeChange).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
+
+    rerender(
+      <RepositoryLaunchControls
+        workDir="/repo"
+        onWorkDirChange={vi.fn()}
+        branch="main"
+        onBranchChange={vi.fn()}
+        useWorktree
+        onUseWorktreeChange={onUseWorktreeChange}
+        placement="composer"
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Select branch: main · Run in a new worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Run in a new worktree' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('offers an isolated worktree when the working tree is dirty', async () => {
     apiMocks.getRepositoryContext.mockResolvedValue({ ...okRepositoryContext, dirty: true })
     const onUseWorktreeChange = vi.fn()
@@ -188,7 +217,7 @@ describe('RepositoryLaunchControls', () => {
     expect(notice).toHaveTextContent('Uncommitted changes')
     expect(notice).toHaveTextContent('Dirty worktree')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use isolated worktree' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use a new worktree' }))
     expect(onUseWorktreeChange).toHaveBeenCalledWith(true)
   })
 

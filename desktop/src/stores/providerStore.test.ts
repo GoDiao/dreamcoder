@@ -4,9 +4,7 @@ import type { SavedProvider } from '../types/provider'
 const {
   providersApiMock,
   chatStoreState,
-  runtimeStoreState,
   setSessionRuntimeMock,
-  setSelectionMock,
   settingsSetModelMock,
   settingsFetchAllMock,
 } = vi.hoisted(() => ({
@@ -24,15 +22,14 @@ const {
     testConfig: vi.fn(),
   },
   chatStoreState: {
-    sessions: {} as Record<string, { connectionState: string; chatState: string }>,
+    sessions: {} as Record<string, {
+      connectionState: string
+      chatState: string
+      mirror?: { runtime: { desired: { providerId: string | null; modelId: string } | null; effective: null } }
+    }>,
     setSessionRuntime: vi.fn(),
   },
-  runtimeStoreState: {
-    selections: {} as Record<string, { providerId: string | null; modelId: string }>,
-    setSelection: vi.fn(),
-  },
   setSessionRuntimeMock: vi.fn(),
-  setSelectionMock: vi.fn(),
   settingsSetModelMock: vi.fn(),
   settingsFetchAllMock: vi.fn(),
 }))
@@ -42,19 +39,12 @@ vi.mock('../api/providers', () => ({
 }))
 
 vi.mock('./chatStore', () => ({
+  sessionRuntimeSelection: (session?: { mirror?: { runtime: { desired: unknown } } }) =>
+    session?.mirror?.runtime.desired ?? undefined,
   useChatStore: {
     getState: () => ({
       ...chatStoreState,
       setSessionRuntime: setSessionRuntimeMock,
-    }),
-  },
-}))
-
-vi.mock('./sessionRuntimeStore', () => ({
-  useSessionRuntimeStore: {
-    getState: () => ({
-      ...runtimeStoreState,
-      setSelection: setSelectionMock,
     }),
   },
 }))
@@ -90,7 +80,6 @@ describe('providerStore runtime refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     chatStoreState.sessions = {}
-    runtimeStoreState.selections = {}
     providersApiMock.list.mockResolvedValue({ providers: [], activeId: null })
   })
 
@@ -105,14 +94,11 @@ describe('providerStore runtime refresh', () => {
     const { useProviderStore } = await import('./providerStore')
     await useProviderStore.getState().updateProvider(provider.id, { apiKey: 'new-key' })
 
-    expect(setSelectionMock).toHaveBeenCalledWith('session-a', {
-      providerId: provider.id,
-      modelId: 'model-main',
-    })
     expect(setSessionRuntimeMock).toHaveBeenCalledWith('session-a', {
       providerId: provider.id,
       modelId: 'model-main',
     })
+    expect(settingsFetchAllMock).toHaveBeenCalled()
   })
 
   it('keeps an explicit provider model selection when the model still exists', async () => {
@@ -120,10 +106,11 @@ describe('providerStore runtime refresh', () => {
     providersApiMock.update.mockResolvedValue({ provider })
     providersApiMock.list.mockResolvedValue({ providers: [provider], activeId: null })
     chatStoreState.sessions = {
-      'session-a': { connectionState: 'connected', chatState: 'idle' },
-    }
-    runtimeStoreState.selections = {
-      'session-a': { providerId: provider.id, modelId: 'model-opus' },
+      'session-a': {
+        connectionState: 'connected',
+        chatState: 'idle',
+        mirror: { runtime: { desired: { providerId: provider.id, modelId: 'model-opus' }, effective: null } },
+      },
     }
 
     const { useProviderStore } = await import('./providerStore')
@@ -147,11 +134,10 @@ describe('providerStore runtime refresh', () => {
     const { useProviderStore } = await import('./providerStore')
     await useProviderStore.getState().updateProvider(provider.id, { apiKey: 'new-key' })
 
-    expect(setSelectionMock).not.toHaveBeenCalled()
     expect(setSessionRuntimeMock).not.toHaveBeenCalled()
   })
 
-  it('sets the provider main model when activating a saved provider', async () => {
+  it('refreshes settings without writing a global model when activating a saved provider', async () => {
     const provider = makeProvider()
     providersApiMock.activate.mockResolvedValue({ ok: true })
     providersApiMock.list.mockResolvedValue({
@@ -162,7 +148,7 @@ describe('providerStore runtime refresh', () => {
     const { useProviderStore } = await import('./providerStore')
     await useProviderStore.getState().activateProvider(provider.id)
 
-    expect(settingsSetModelMock).toHaveBeenCalledWith('model-main')
+    expect(settingsSetModelMock).not.toHaveBeenCalled()
     expect(settingsFetchAllMock).toHaveBeenCalled()
   })
 })

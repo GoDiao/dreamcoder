@@ -1860,6 +1860,8 @@ html, body, #root {
   --color-surface-user-msg: #32322C;
   --color-surface-glass: #2D2D29;
   --color-surface-glass-border: #3B3B34;
+  --color-model-option-selected-bg: rgba(215, 139, 107, 0.12);
+  --color-model-option-selected-border: rgba(215, 139, 107, 0.28);
   --color-code-bg: #20201E;
   --color-terminal-bg: #1C1C1A;
   --color-terminal-border: #3B3B34;

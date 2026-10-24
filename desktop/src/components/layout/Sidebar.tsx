@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -66,7 +67,13 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
-  const chatSessions = useChatStore((s) => s.sessions)
+  const runningChatSessionIds = useChatStore(useShallow((s) => {
+    const ids = new Set<string>()
+    for (const [sessionId, session] of Object.entries(s.sessions)) {
+      if (session.chatState !== 'idle') ids.add(sessionId)
+    }
+    return ids
+  }))
   const closeTab = useTabStore((s) => s.closeTab)
   const disconnectSession = useChatStore((s) => s.disconnectSession)
   const [searchQuery, setSearchQuery] = useState('')
@@ -186,15 +193,12 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     [sessions],
   )
   const runningSessionIds = useMemo(() => {
-    const ids = new Set<string>()
+    const ids = new Set(runningChatSessionIds)
     for (const tab of tabs) {
       if (tab.type === 'session' && tab.status === 'running') ids.add(tab.sessionId)
     }
-    for (const [sessionId, sessionState] of Object.entries(chatSessions)) {
-      if (sessionState.chatState !== 'idle') ids.add(sessionId)
-    }
     return ids
-  }, [chatSessions, tabs])
+  }, [runningChatSessionIds, tabs])
   const pendingBatchDeleteSessions = useMemo(
     () => (pendingBatchDeleteSessionIds ?? [])
       .map((sessionId) => sessionsById.get(sessionId))

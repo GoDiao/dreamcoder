@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { createPortal } from 'react-dom'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
@@ -25,15 +24,15 @@ const MODE_ICONS: Record<PermissionMode, LucideIcon> = {
 type Props = {
   workDir?: string
   compact?: boolean
-  value?: PermissionMode
-  onChange?: (mode: PermissionMode) => void
+  value: PermissionMode
+  effectiveValue?: PermissionMode
+  onChange: (mode: PermissionMode) => void
 }
 
-export function PermissionModeSelector({ workDir: workDirProp, compact = false, value, onChange }: Props = {}) {
+export function PermissionModeSelector({ workDir: workDirProp, compact = false, value: currentMode, effectiveValue, onChange }: Props) {
   const t = useTranslation()
   const isMobile = useMobileViewport() && !isTauriRuntime()
-  const { permissionMode: storeMode, setPermissionMode } = useSettingsStore()
-  const setSessionPermissionMode = useChatStore((s) => s.setSessionPermissionMode)
+  const defaultMode = useSettingsStore((s) => s.permissionMode)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const sessions = useSessionStore((s) => s.sessions)
   const [open, setOpen] = useState(false)
@@ -44,8 +43,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const isControlled = value !== undefined
-  const currentMode = isControlled ? value : storeMode
 
   const PERMISSION_ITEMS: Array<{
     value: PermissionMode
@@ -55,22 +52,22 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   }> = [
     {
       value: 'default',
-      label: t('permMode.askPermissions'),
+      label: t('permMode.label.default'),
       description: t('permMode.askPermDesc'),
     },
     {
       value: 'acceptEdits',
-      label: t('permMode.autoAccept'),
+      label: t('permMode.label.acceptEdits'),
       description: t('permMode.autoAcceptDesc'),
     },
     {
       value: 'plan',
-      label: t('permMode.planMode'),
+      label: t('permMode.label.plan'),
       description: t('permMode.planModeDesc'),
     },
     {
       value: 'bypassPermissions',
-      label: t('permMode.bypass'),
+      label: t('permMode.label.bypassPermissions'),
       description: t('permMode.bypassDesc'),
       color: 'text-[var(--color-error)]',
     },
@@ -161,12 +158,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
                 setConfirmDialog(true)
                 return
               }
-              if (isControlled) {
-                onChange?.(item.value)
-              } else {
-                void setPermissionMode(item.value)
-                if (activeTabId) setSessionPermissionMode(activeTabId, item.value)
-              }
+              onChange(item.value)
               setOpen(false)
             }}
             className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)] ${
@@ -175,7 +167,14 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
           >
             <Icon size={15} className={`mt-0.5 shrink-0 ${item.color || 'text-[var(--color-text-secondary)]'}`} aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <div className="text-ui-body font-medium text-[var(--color-text-primary)]">{item.label}</div>
+              <div className="flex items-center gap-1.5 text-ui-body font-medium text-[var(--color-text-primary)]">
+                {item.label}
+                {item.value === defaultMode && (
+                  <span className="rounded px-1 text-ui-aux font-normal text-[var(--color-text-tertiary)] ring-1 ring-inset ring-[var(--color-border)]">
+                    {t('permMode.defaultTag')}
+                  </span>
+                )}
+              </div>
               <div className="mt-0.5 text-ui-aux text-[var(--color-text-tertiary)]">{item.description}</div>
             </div>
             {selected && <Check size={14} className="mt-1 shrink-0 text-[var(--color-text-primary)]" aria-hidden="true" />}
@@ -184,6 +183,10 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
       })}
     </div>
   )
+
+  const pendingNote = effectiveValue && effectiveValue !== currentMode
+    ? t('permMode.pendingSwitch', { mode: MODE_LABELS[currentMode] })
+    : undefined
 
   return (
     <div ref={ref} className="relative">
@@ -194,10 +197,17 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        title={compact ? MODE_LABELS[currentMode] : undefined}
+        title={pendingNote ?? (compact ? MODE_LABELS[currentMode] : undefined)}
         className={`${PICKER_TRIGGER_CLASS} ${compactButtonClass}`}
       >
         <CurrentIcon size={14} className="shrink-0" aria-hidden="true" />
+        {pendingNote && (
+          <span
+            data-testid="permission-mode-pending"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-warning)] animate-pulse-dot"
+            aria-hidden="true"
+          />
+        )}
         {!compact && (
           <>
             <span className="truncate">{MODE_LABELS[currentMode]}</span>
@@ -279,12 +289,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
               </button>
               <button
                 onClick={() => {
-                  if (isControlled) {
-                    onChange?.('bypassPermissions')
-                  } else {
-                    void setPermissionMode('bypassPermissions')
-                    if (activeTabId) setSessionPermissionMode(activeTabId, 'bypassPermissions')
-                  }
+                  onChange('bypassPermissions')
                   setConfirmDialog(false)
                 }}
                 className="px-4 py-2 text-xs font-semibold text-white bg-[var(--color-error)] hover:opacity-90 rounded-lg transition-colors"

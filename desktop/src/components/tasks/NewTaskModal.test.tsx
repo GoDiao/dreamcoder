@@ -85,4 +85,46 @@ describe('NewTaskModal', () => {
       recurring: true,
     }))
   })
+
+  it('starts a new task in the default for new sessions and saves that mode with it', async () => {
+    const createTask = vi.fn(async () => {})
+    useTaskStore.setState({ createTask } as Partial<ReturnType<typeof useTaskStore.getState>>)
+    useSettingsStore.setState({ locale: 'en', permissionMode: 'acceptEdits' })
+
+    render(<NewTaskModal open onClose={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Accept edits' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'mode task' } })
+    fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: 'mode' } })
+    fireEvent.change(screen.getByPlaceholderText(/Look at the commits/i), { target: { value: 'Say hello.' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task' }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(createTask).toHaveBeenCalledTimes(1))
+    expect(createTask).toHaveBeenCalledWith(expect.objectContaining({ permissionMode: 'acceptEdits' }))
+  })
+
+  it('saves a mode picked for the task', async () => {
+    const createTask = vi.fn(async () => {})
+    useTaskStore.setState({ createTask } as Partial<ReturnType<typeof useTaskStore.getState>>)
+    useSettingsStore.setState({ locale: 'en', permissionMode: 'acceptEdits' })
+
+    render(<NewTaskModal open onClose={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept edits' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Plan/ }))
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'mode task' } })
+    fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: 'mode' } })
+    fireEvent.change(screen.getByPlaceholderText(/Look at the commits/i), { target: { value: 'Say hello.' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task' }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(createTask).toHaveBeenCalledTimes(1))
+    expect(createTask).toHaveBeenCalledWith(expect.objectContaining({ permissionMode: 'plan' }))
+  })
+
 })

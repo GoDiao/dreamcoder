@@ -17,6 +17,7 @@ import { McpCatalogBrowse } from '../components/mcp/McpCatalogBrowse'
 import { McpCatalogInstall } from '../components/mcp/McpCatalogInstall'
 import { McpEditorFields, McpEditorLayout, McpEditorSection } from '../components/mcp/McpServerEditor'
 import { catalogScopeIsShadowed } from '../lib/mcpCatalogInstall'
+import { randomUUID } from '../lib/uuid'
 import type { McpCatalogEntry, McpServerRecord, McpUpsertPayload, McpWritableScope } from '../types/mcp'
 
 type EditorMode =
@@ -82,17 +83,12 @@ const STATUS_TONE: Record<McpServerRecord['status'], string> = {
   disabled: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] border-[var(--color-border)]',
 }
 
-function createId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
 function createStringRow(value = ''): StringRow {
-  return { id: createId(), value }
+  return { id: randomUUID(), value }
 }
 
 function createKeyValueRow(key = '', value = ''): KeyValueRow {
-  return { id: createId(), key, value }
+  return { id: randomUUID(), key, value }
 }
 
 function createEmptyDraft(): McpDraft {

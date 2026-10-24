@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MessageList, buildRenderModel } from './MessageList'
+import { MessageList, buildRenderModel, buildToolGroupResults } from './MessageList'
 import { relativizeWorkspacePath } from './CurrentTurnChangeCard'
 import { sessionsApi } from '../../api/sessions'
 import { useChatStore } from '../../stores/chatStore'
@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
-import type { UIMessage } from '../../types/chat'
+import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import type { PerSessionState } from '../../stores/chatStore'
 
 const ACTIVE_TAB = 'active-tab'
@@ -34,12 +34,10 @@ function makeSessionState(overrides: Partial<PerSessionState> = {}): PerSessionS
     activeThinkingId: null,
     pendingPermission: null,
     tokenUsage: { input_tokens: 0, output_tokens: 0 },
-    elapsedSeconds: 0,
     statusVerb: '',
     apiRetry: null,
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
     composerPrefill: null,
     ...overrides,
   }
@@ -875,6 +873,8 @@ describe('MessageList nested tool calls', () => {
     const groupSummary = screen.getByText('TaskUpdate (1), ran a command')
     const groupButton = groupSummary.closest('button')
     expect(groupButton?.textContent).not.toContain('check_circle')
+    expect(groupButton?.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(groupButton!)
     expect(screen.getByText('local_bash')).toBeTruthy()
   })
 
@@ -3598,5 +3598,107 @@ describe('MessageList nested tool calls', () => {
         'CLI exited during startup (code 1): DreamCoder on Windows requires git-bash (https://git-scm.com/downloads/win).',
       ),
     ).toBeTruthy()
+  })
+})
+
+describe('buildToolGroupResults', () => {
+  const read = (id: string, parentToolUseId?: string): UIMessage => ({
+    id: `use-${id}`,
+    type: 'tool_use',
+    toolName: id.startsWith('agent') ? 'Agent' : 'Read',
+    toolUseId: id,
+    input: {},
+    timestamp: 1,
+    ...(parentToolUseId ? { parentToolUseId } : {}),
+  })
+  const result = (id: string, parentToolUseId?: string): UIMessage => ({
+    id: `result-${id}`,
+    type: 'tool_result',
+    toolUseId: id,
+    content: `${id} done`,
+    isError: false,
+    timestamp: 2,
+    ...(parentToolUseId ? { parentToolUseId } : {}),
+  })
+  const note = (id: string, status: AgentTaskNotification['status'] = 'completed'): AgentTaskNotification => ({
+    taskId: `task-${id}`,
+    toolUseId: id,
+    status,
+    summary: id,
+  })
+  const build = (
+    messages: UIMessage[],
+    previous?: ReturnType<typeof buildToolGroupResults>,
+    notifications: Record<string, AgentTaskNotification> = {},
+  ) => {
+    const model = buildRenderModel(messages)
+    return buildToolGroupResults(model.renderItems, model.toolResultMap, model.childToolCallsByParent, notifications, previous)
+  }
+
+  it('gives each group only its own results and children', () => {
+    const groups = build([
+      read('a'),
+      result('a'),
+      { id: 'text', type: 'assistant_text', content: 'between', timestamp: 3 },
+      read('agent-1'),
+      read('child', 'agent-1'),
+      result('child', 'agent-1'),
+    ])
+
+    expect([...groups.get('group-use-a')!.resultMap.keys()]).toEqual(['a'])
+    const agentGroup = groups.get('group-use-agent-1')!
+    expect([...agentGroup.resultMap.keys()]).toEqual(['child'])
+    expect(agentGroup.childToolCallsByParent.get('agent-1')?.map((call) => call.id)).toEqual(['use-child'])
+  })
+
+  it('keeps references for groups whose results did not change', () => {
+    const history = [read('a'), result('a'), { id: 'text', type: 'assistant_text', content: 'next', timestamp: 3 } as UIMessage]
+    const useB = read('b')
+    const before = build([...history, useB])
+    const after = build([...history, useB, result('b')], before)
+
+    expect(after.get('group-use-a')).toEqual(before.get('group-use-a'))
+    expect(after.get('group-use-a')!.toolCalls).toBe(before.get('group-use-a')!.toolCalls)
+    expect(after.get('group-use-a')!.resultMap).toBe(before.get('group-use-a')!.resultMap)
+    expect(after.get('group-use-b')!.toolCalls).toBe(before.get('group-use-b')!.toolCalls)
+    expect(after.get('group-use-b')!.resultMap).not.toBe(before.get('group-use-b')!.resultMap)
+    expect(after.get('group-use-b')!.resultMap.get('b')).toMatchObject({ content: 'b done' })
+  })
+
+  it('gives a group only its own agent notifications and replaces them only when they change', () => {
+    const messages: UIMessage[] = [
+      read('agent-1'),
+      { id: 'text', type: 'assistant_text', content: 'between', timestamp: 3 },
+      read('agent-2'),
+    ]
+    const failed = note('agent-1', 'failed')
+    const before = build(messages, undefined, { 'agent-1': failed })
+    expect(Object.keys(before.get('group-use-agent-1')!.agentTaskNotifications)).toEqual(['agent-1'])
+    expect(before.get('group-use-agent-2')!.agentTaskNotifications).toEqual({})
+
+    const same = build(messages, before, { 'agent-1': failed })
+    expect(same.get('group-use-agent-1')!.agentTaskNotifications).toBe(before.get('group-use-agent-1')!.agentTaskNotifications)
+
+    const changed = build(messages, before, { 'agent-1': note('agent-1') })
+    expect(changed.get('group-use-agent-1')!.agentTaskNotifications).not.toBe(before.get('group-use-agent-1')!.agentTaskNotifications)
+    expect(changed.get('group-use-agent-1')!.agentTaskNotifications['agent-1']?.status).toBe('completed')
+    expect(changed.get('group-use-agent-2')!.agentTaskNotifications).toBe(before.get('group-use-agent-2')!.agentTaskNotifications)
+  })
+
+  it('includes grandchildren and keeps the child map stable', () => {
+    const messages = [
+      read('agent-1'),
+      read('agent-child', 'agent-1'),
+      read('leaf', 'agent-child'),
+      result('leaf', 'agent-child'),
+    ]
+    const before = build(messages, undefined, { 'agent-child': note('agent-child') })
+    const group = before.get('group-use-agent-1')!
+    expect(group.resultMap.has('leaf')).toBe(true)
+    expect(group.agentTaskNotifications['agent-child']).toBeDefined()
+    expect([...group.childToolCallsByParent.keys()].sort()).toEqual(['agent-1', 'agent-child'])
+
+    const again = build(messages, before, group.agentTaskNotifications)
+    expect(again.get('group-use-agent-1')!.childToolCallsByParent).toBe(group.childToolCallsByParent)
   })
 })

@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
@@ -17,6 +17,7 @@ vi.mock('../chat/MermaidRenderer', () => ({
 }))
 
 import { MarkdownRenderer, __markdownParseCacheInternals } from './MarkdownRenderer'
+import { loadKatex } from '../../lib/katexLoader'
 
 function visibleMathText(container: HTMLElement): string {
   const clone = container.cloneNode(true) as HTMLElement
@@ -25,6 +26,10 @@ function visibleMathText(container: HTMLElement): string {
 }
 
 describe('MarkdownRenderer', () => {
+  beforeAll(async () => {
+    await loadKatex()
+  })
+
   it('applies document prose classes and custom width classes', () => {
     const { container } = render(
       <MarkdownRenderer

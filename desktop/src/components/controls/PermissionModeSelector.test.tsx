@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
 import '@testing-library/jest-dom'
 
 const viewportMocks = vi.hoisted(() => ({
@@ -24,16 +25,13 @@ vi.mock('../../api/computerUse', () => ({
 
 vi.mock('../../i18n', () => ({
   useTranslation: () => (key: string) => ({
-    'permMode.askPermissions': 'Default',
     'permMode.askPermDesc': 'Ask before changing files or running commands',
-    'permMode.autoAccept': 'Accept edits',
     'permMode.autoAcceptDesc': 'Automatically accept edit operations',
-    'permMode.planMode': 'Plan',
     'permMode.planModeDesc': 'Plan before executing',
-    'permMode.bypass': 'Bypass permissions',
     'permMode.bypassDesc': 'Run without permission prompts',
     'permMode.executionPermissions': 'Execution Permissions',
-    'permMode.label.default': 'Default',
+    'permMode.label.default': 'Manual',
+    'permMode.defaultTag': 'default',
     'permMode.label.acceptEdits': 'Accept edits',
     'permMode.label.plan': 'Plan',
     'permMode.label.bypassPermissions': 'Bypass permissions',
@@ -56,6 +54,12 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 
+function renderSelector(props: Partial<ComponentProps<typeof PermissionModeSelector>> = {}) {
+  const onChange = props.onChange ?? vi.fn()
+  render(<PermissionModeSelector value="default" {...props} onChange={onChange} />)
+  return { onChange }
+}
+
 describe('PermissionModeSelector', () => {
   beforeEach(() => {
     viewportMocks.isMobile = false
@@ -68,9 +72,9 @@ describe('PermissionModeSelector', () => {
   it('labels the compact mobile trigger and opens a phone-sized menu sheet', () => {
     viewportMocks.isMobile = true
 
-    render(<PermissionModeSelector compact workDir="/repo" />)
+    renderSelector({ compact: true, workDir: '/repo' })
 
-    const trigger = screen.getByRole('button', { name: 'Default' })
+    const trigger = screen.getByRole('button', { name: 'Manual' })
     expect(trigger).toHaveClass('h-11', 'w-11')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
@@ -117,9 +121,9 @@ describe('PermissionModeSelector', () => {
       tabs: [{ sessionId: 'current-tab', title: 'Current', type: 'session', status: 'idle' }],
     })
 
-    render(<PermissionModeSelector compact />)
+    renderSelector({ compact: true })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Default' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
 
     expect(screen.getByText('C:\\Users\\LinTan\\MyScript\\test5')).toBeInTheDocument()
@@ -127,16 +131,14 @@ describe('PermissionModeSelector', () => {
   })
 
   it('lists the modes without a menu heading and marks the current one', () => {
-    useSettingsStore.setState({ permissionMode: 'plan' })
-
-    render(<PermissionModeSelector />)
+    renderSelector({ value: 'plan' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
 
     expect(screen.queryByText('Execution Permissions')).not.toBeInTheDocument()
     const items = screen.getAllByRole('menuitemradio')
     expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringContaining('Default'),
+      expect.stringContaining('Manual'),
       expect.stringContaining('Accept edits'),
       expect.stringContaining('Plan'),
       expect.stringContaining('Bypass permissions'),
@@ -144,18 +146,56 @@ describe('PermissionModeSelector', () => {
     expect(screen.getByRole('menuitemradio', { name: /Plan/ })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('shows the dontAsk mode by its English name', () => {
-    useSettingsStore.setState({ permissionMode: 'dontAsk' })
+  it('shows the value it is given, not the default for new sessions', () => {
+    useSettingsStore.setState({ permissionMode: 'acceptEdits' })
 
-    render(<PermissionModeSelector />)
+    renderSelector({ value: 'plan' })
+
+    expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument()
+  })
+
+  it('marks the default for new sessions with a tag', () => {
+    useSettingsStore.setState({ permissionMode: 'acceptEdits' })
+
+    renderSelector({ value: 'plan' })
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+
+    expect(screen.getByRole('menuitemradio', { name: /Accept edits/ })).toHaveTextContent('default')
+    expect(screen.getByRole('menuitemradio', { name: /Plan/ })).not.toHaveTextContent('default')
+  })
+
+  it('reports a picked mode through onChange and leaves the default for new sessions alone', () => {
+    const setDefault = vi.fn(async () => {})
+    useSettingsStore.setState({ setPermissionMode: setDefault })
+
+    const { onChange } = renderSelector()
+    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Accept edits/ }))
+
+    expect(onChange).toHaveBeenCalledWith('acceptEdits')
+    expect(setDefault).not.toHaveBeenCalled()
+  })
+
+  it('asks before switching to Bypass', () => {
+    const { onChange } = renderSelector()
+    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
+
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Enable bypass' }))
+    expect(onChange).toHaveBeenCalledWith('bypassPermissions')
+  })
+
+  it('shows the dontAsk mode by its English name', () => {
+    renderSelector({ value: 'dontAsk' })
 
     expect(screen.getByRole('button', { name: "Don't ask" })).toHaveTextContent("Don't ask")
   })
 
   it('warns that Computer Use actions skip confirmation when bypass is enabled with Computer Use on', async () => {
     computerUseMocks.getConfig.mockResolvedValue({ enabled: true, driverPath: null })
-    render(<PermissionModeSelector workDir="/repo" />)
-    fireEvent.click(screen.getByRole('button', { name: /Default/ }))
+    renderSelector({ workDir: '/repo' })
+    fireEvent.click(screen.getByRole('button', { name: /Manual/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
     expect(await screen.findByRole('note')).toHaveTextContent(
       'Computer Use actions will no longer ask for confirmation.',
@@ -163,10 +203,29 @@ describe('PermissionModeSelector', () => {
   })
 
   it('shows no Computer Use warning when Computer Use is off', async () => {
-    render(<PermissionModeSelector workDir="/repo" />)
-    fireEvent.click(screen.getByRole('button', { name: /Default/ }))
+    renderSelector({ workDir: '/repo' })
+    fireEvent.click(screen.getByRole('button', { name: /Manual/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
     await waitFor(() => expect(computerUseMocks.getConfig).toHaveBeenCalled())
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+
+  it('shows the chosen mode at once and marks it until the CLI applies it', () => {
+    renderSelector({ value: 'bypassPermissions', effectiveValue: 'default' })
+
+    expect(screen.getByTestId('permission-mode-pending')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bypass permissions' })).toHaveAttribute('title', 'permMode.pendingSwitch')
+  })
+
+  it('shows no pending mark when the CLI runs the chosen mode', () => {
+    renderSelector({ value: 'plan', effectiveValue: 'plan' })
+
+    expect(screen.queryByTestId('permission-mode-pending')).not.toBeInTheDocument()
+  })
+
+  it('shows no pending mark before the CLI has reported a mode', () => {
+    renderSelector({ value: 'plan' })
+
+    expect(screen.queryByTestId('permission-mode-pending')).not.toBeInTheDocument()
   })
 })

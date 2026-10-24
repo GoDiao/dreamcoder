@@ -1,5 +1,6 @@
 import type { ClientMessage, ServerMessage } from '../types/chat'
 import { getAuthToken, getBaseUrl } from './client'
+import { isBrowserH5Runtime } from '../lib/desktopRuntime'
 
 type MessageHandler = (msg: ServerMessage) => void
 
@@ -186,6 +187,11 @@ export function buildSessionWebSocketUrl(sessionId: string) {
     url.searchParams.set('token', token)
   } else {
     url.searchParams.delete('token')
+  }
+  if (isBrowserH5Runtime()) {
+    url.searchParams.set('client', 'h5')
+  } else {
+    url.searchParams.delete('client')
   }
 
   return url.toString()

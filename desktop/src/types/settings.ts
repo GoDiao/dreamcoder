@@ -1,6 +1,6 @@
-import type { PermissionMode } from '@protocol'
+import type { DefaultPermissionMode, PermissionMode } from '@protocol'
 
-export type { PermissionMode }
+export type { DefaultPermissionMode, PermissionMode }
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
 export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora'] as const

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Profiler } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
@@ -235,6 +236,7 @@ describe('Sidebar', () => {
       deleteSessions,
     })
     useChatStore.setState({
+      sessions: {},
       connectToSession,
       disconnectSession,
     } as Partial<ReturnType<typeof useChatStore.getState>>)
@@ -877,6 +879,81 @@ describe('Sidebar', () => {
     const idleRow = screen.getByRole('button', { name: /^Idle Source/ })
     expect(within(idleRow).queryByLabelText('Session running')).not.toBeInTheDocument()
     expect(idleRow).toHaveAttribute('title', 'Idle Source')
+  })
+
+  it('does not re-render for streamed text or idle session changes', async () => {
+    vi.useFakeTimers()
+    useSessionStore.setState({
+      sessions: [makeSession('running', 'Running session', '/workspace/repo', '2026-05-19T12:00:00.000Z')],
+    })
+    useChatStore.setState({
+      sessions: { running: { ...useChatStore.getState().getSession('running'), chatState: 'streaming' } },
+    })
+    const onRender = vi.fn()
+    await act(async () => {
+      render(<Profiler id="sidebar" onRender={onRender}><Sidebar /></Profiler>)
+    })
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.getState().handleServerMessage('running', { type: 'content_delta', text: 'Hello' })
+      vi.advanceTimersByTime(50)
+    })
+
+    expect(useChatStore.getState().getSession('running').streamingText).toBe('Hello')
+    expect(onRender).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Session running')).toBeInTheDocument()
+
+    act(() => {
+      useChatStore.setState((state) => ({
+        sessions: { idle: state.getSession('idle'), ...state.sessions },
+      }))
+    })
+
+    expect(onRender).not.toHaveBeenCalled()
+  })
+
+  it('updates running indicators only when running session membership changes', async () => {
+    useSessionStore.setState({
+      sessions: [
+        makeSession('first', 'First session', '/workspace/repo', '2026-05-19T12:00:00.000Z'),
+        makeSession('second', 'Second session', '/workspace/repo', '2026-05-19T11:00:00.000Z'),
+      ],
+    })
+    const first = useChatStore.getState().getSession('first')
+    const second = useChatStore.getState().getSession('second')
+    const onRender = vi.fn()
+    await act(async () => {
+      render(<Profiler id="sidebar" onRender={onRender}><Sidebar /></Profiler>)
+    })
+    onRender.mockClear()
+    expect(screen.queryByLabelText('Session running')).not.toBeInTheDocument()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first: { ...first, chatState: 'thinking' }, second } })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(within(screen.getByRole('button', { name: /^First session/ })).getByLabelText('Session running')).toBeInTheDocument()
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first: { ...first, chatState: 'tool_executing' }, second } })
+    })
+    expect(onRender).not.toHaveBeenCalled()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first, second: { ...second, chatState: 'streaming' } } })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(within(screen.getByRole('button', { name: /^First session/ })).queryByLabelText('Session running')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^Second session/ })).getByLabelText('Session running')).toBeInTheDocument()
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.setState({ sessions: {} })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(screen.queryByLabelText('Session running')).not.toBeInTheDocument()
   })
 
   it('shows a toast when session creation fails', async () => {

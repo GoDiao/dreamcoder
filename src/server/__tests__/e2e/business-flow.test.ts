@@ -153,11 +153,16 @@ describe('Business Flow: Permission Modes', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions', 'dontAsk']
+  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
 
   it('should default to "default" mode', async () => {
     const { data } = await api('GET', '/api/permissions/mode')
     expect(data.mode).toBe('default')
+  })
+
+  it('should not offer "dontAsk" as the default for new sessions', async () => {
+    const { status } = await api('PUT', '/api/permissions/mode', { mode: 'dontAsk' })
+    expect(status).toBe(400)
   })
 
   for (const mode of VALID_MODES) {
@@ -699,7 +704,7 @@ describe('Business Flow: WebSocket Chat', () => {
         if (msg.type === 'connected') {
           ws.send(JSON.stringify({ type: 'user_message', content: 'test message' }))
         }
-        if (msg.type === 'status' && msg.state === 'idle' && messages.length > 3) {
+        if (msg.type === 'session_patch' && msg.changes?.turn?.phase === 'idle' && messages.length > 3) {
           ws.close()
           resolve()
         }
@@ -710,13 +715,16 @@ describe('Business Flow: WebSocket Chat', () => {
 
     const types = messages.map((m) => m.type)
     expect(types).toContain('connected')
-    expect(types).toContain('status')
+    expect(types).toContain('session_snapshot')
     expect(types).toContain('content_start')
     expect(types).toContain('content_delta')
     expect(types).toContain('message_complete')
 
-    const statusMsgs = messages.filter((m) => m.type === 'status')
-    expect(statusMsgs[0].state).toBe('thinking')
+    const turnPhases = messages
+      .filter((m) => m.type === 'session_patch' && m.changes?.turn)
+      .map((m) => m.changes.turn.phase)
+    expect(turnPhases[0]).toBe('running')
+    expect(turnPhases.at(-1)).toBe('idle')
   }, 40_000)
 
   it('should handle ping/pong', async () => {
@@ -749,19 +757,16 @@ describe('Business Flow: WebSocket Chat', () => {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data as string)
         messages.push(msg)
-        if (msg.type === 'connected') {
+        if (msg.type === 'session_snapshot') {
           ws.send(JSON.stringify({ type: 'stop_generation' }))
-        }
-        if (msg.type === 'status' && msg.state === 'idle') {
-          ws.close()
-          resolve()
+          setTimeout(() => { ws.close(); resolve() }, 200)
         }
       }
       setTimeout(() => { ws.close(); resolve() }, 3000)
     })
 
-    const idleStatus = messages.find((m) => m.type === 'status' && m.state === 'idle')
-    expect(idleStatus).toBeDefined()
+    expect(messages.find((m) => m.type === 'session_snapshot')?.state.turn.phase).toBe('idle')
+    expect(messages.some((m) => m.type === 'error')).toBe(false)
   })
 
   it('should handle invalid message gracefully', async () => {

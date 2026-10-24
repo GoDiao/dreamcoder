@@ -2,7 +2,7 @@ import { useRef, useEffect, useMemo, memo, useState, useCallback, useDeferredVal
 import { ArrowDown, BookMarked, Bot, CheckCircle2, ChevronDown, ChevronRight, CircleStop, FileStack, LoaderCircle, MessageCircle, Settings, Target, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
-import { useChatStore } from '../../stores/chatStore'
+import { useChatStore, useSessionField } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useTabStore } from '../../stores/tabStore'
@@ -45,6 +45,13 @@ type RenderModel = {
   renderItems: RenderItem[]
   toolResultMap: Map<string, ToolResult>
   childToolCallsByParent: Map<string, ToolCall[]>
+}
+
+type ToolGroupResults = {
+  toolCalls: ToolCall[]
+  resultMap: Map<string, ToolResult>
+  childToolCallsByParent: Map<string, ToolCall[]>
+  agentTaskNotifications: Record<string, AgentTaskNotification>
 }
 
 type RewindTurnTarget = {
@@ -557,6 +564,66 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
   return { renderItems: items, toolResultMap, childToolCallsByParent }
 }
 
+function sameItems<T>(a: readonly T[], b: readonly T[]) {
+  return a.length === b.length && a.every((item, index) => item === b[index])
+}
+
+function sameMapEntries<V>(a: Map<string, V>, b: Map<string, V>, same: (x: V, y: V) => boolean) {
+  if (a.size !== b.size) return false
+  for (const [key, value] of a) {
+    const other = b.get(key)
+    if (other === undefined || !same(value, other)) return false
+  }
+  return true
+}
+
+function sameRecordEntries<V>(a: Record<string, V>, b: Record<string, V>) {
+  const keys = Object.keys(a)
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])
+}
+
+export function buildToolGroupResults(
+  renderItems: RenderItem[],
+  toolResultMap: Map<string, ToolResult>,
+  childToolCallsByParent: Map<string, ToolCall[]>,
+  agentTaskNotifications: Record<string, AgentTaskNotification>,
+  previous: Map<string, ToolGroupResults> = new Map(),
+): Map<string, ToolGroupResults> {
+  const groups = new Map<string, ToolGroupResults>()
+  for (const item of renderItems) {
+    if (item.kind !== 'tool_group') continue
+    const resultMap = new Map<string, ToolResult>()
+    const childMap = new Map<string, ToolCall[]>()
+    const notifications: Record<string, AgentTaskNotification> = {}
+    const pending = [...item.toolCalls]
+    while (pending.length > 0) {
+      const toolCall = pending.pop()!
+      const result = toolResultMap.get(toolCall.toolUseId)
+      if (result) resultMap.set(toolCall.toolUseId, result)
+      const notification = agentTaskNotifications[toolCall.toolUseId]
+      if (notification) notifications[toolCall.toolUseId] = notification
+      const children = childToolCallsByParent.get(toolCall.toolUseId)
+      if (children) {
+        childMap.set(toolCall.toolUseId, children)
+        pending.push(...children)
+      }
+    }
+
+    const prior = previous.get(item.id)
+    groups.set(item.id, {
+      toolCalls: prior && sameItems(prior.toolCalls, item.toolCalls) ? prior.toolCalls : item.toolCalls,
+      resultMap: prior && sameMapEntries(prior.resultMap, resultMap, Object.is) ? prior.resultMap : resultMap,
+      childToolCallsByParent: prior && sameMapEntries(prior.childToolCallsByParent, childMap, sameItems)
+        ? prior.childToolCallsByParent
+        : childMap,
+      agentTaskNotifications: prior && sameRecordEntries(prior.agentTaskNotifications, notifications)
+        ? prior.agentTaskNotifications
+        : notifications,
+    })
+  }
+  return groups
+}
+
 function isTurnResponseMessage(message: UIMessage) {
   return (
     message.type === 'assistant_text' ||
@@ -817,6 +884,7 @@ const VIRTUAL_MIN_ITEM_HEIGHT = 48
 const VIRTUAL_MAX_ITEM_HEIGHT = 24_000
 const CONTENT_RESIZE_FOLLOW_MIN_DELTA_PX = 2
 const EMPTY_MESSAGES: UIMessage[] = []
+const EMPTY_AGENT_TASK_NOTIFICATIONS: Record<string, AgentTaskNotification> = {}
 const CHAT_SCROLL_AREA_CLASS = [
   'chat-scroll-area',
   '[scrollbar-width:auto]',
@@ -1219,9 +1287,6 @@ const MeasuredRenderItem = memo(function MeasuredRenderItem({
 export function MessageList({ sessionId, compact = false }: MessageListProps = {}) {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const resolvedSessionId = sessionId ?? activeTabId
-  const sessionState = useChatStore((s) =>
-    resolvedSessionId ? s.sessions[resolvedSessionId] : undefined,
-  )
   const branchSession = useSessionStore((s) => s.branchSession)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
   const reloadHistory = useChatStore((s) => s.reloadHistory)
@@ -1230,15 +1295,19 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     resolvedSessionId ? Boolean(s.getMemberBySessionId(resolvedSessionId)) : false,
   )
   const addToast = useUIStore((s) => s.addToast)
-  const messages = sessionState?.messages ?? EMPTY_MESSAGES
-  const chatState = sessionState?.chatState ?? 'idle'
-  const streamingText = sessionState?.streamingText ?? ''
-  const activeThinkingId = sessionState?.activeThinkingId ?? null
-  const agentTaskNotifications = sessionState?.agentTaskNotifications ?? {}
-  const activeAskUserQuestionToolUseId =
-    sessionState?.pendingPermission?.toolName === 'AskUserQuestion'
-      ? sessionState.pendingPermission.toolUseId
-      : null
+  const messages = useSessionField(resolvedSessionId, 'messages') ?? EMPTY_MESSAGES
+  const chatState = useSessionField(resolvedSessionId, 'chatState') ?? 'idle'
+  const streamingText = useSessionField(resolvedSessionId, 'streamingText') ?? ''
+  const activeThinkingId = useSessionField(resolvedSessionId, 'activeThinkingId') ?? null
+  const agentTaskNotifications = useSessionField(resolvedSessionId, 'agentTaskNotifications') ?? EMPTY_AGENT_TASK_NOTIFICATIONS
+  const activeAskUserQuestionToolUseId = useChatStore((s) => {
+    const pending = resolvedSessionId ? s.sessions[resolvedSessionId]?.pendingPermission : undefined
+    return pending?.toolName === 'AskUserQuestion' ? pending.toolUseId : null
+  })
+  const hasActiveTool = useChatStore((s) => {
+    const sessionState = resolvedSessionId ? s.sessions[resolvedSessionId] : undefined
+    return Boolean(sessionState?.activeToolUseId) || Boolean(sessionState?.activeToolName)
+  })
   const shouldFollowContentResize =
     streamingText.trim().length > 0 ||
     chatState === 'streaming' ||
@@ -1282,8 +1351,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     chatState !== 'idle' ||
     streamingText.trim().length > 0 ||
     Boolean(activeThinkingId) ||
-    Boolean(sessionState?.activeToolUseId) ||
-    Boolean(sessionState?.activeToolName)
+    hasActiveTool
   const hasCompactingDivider = messages.some((message) =>
     message.type === 'compact_summary' && message.phase === 'compacting')
 
@@ -1514,6 +1582,18 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     () => buildRenderModel(messages, activeAskUserQuestionToolUseId),
     [activeAskUserQuestionToolUseId, messages],
   )
+  const toolGroupResultsRef = useRef(new Map<string, ToolGroupResults>())
+  const toolGroupResults = useMemo(() => {
+    const next = buildToolGroupResults(
+      renderItems,
+      toolResultMap,
+      childToolCallsByParent,
+      agentTaskNotifications,
+      toolGroupResultsRef.current,
+    )
+    toolGroupResultsRef.current = next
+    return next
+  }, [agentTaskNotifications, childToolCallsByParent, renderItems, toolResultMap])
   const deferredMessages = useDeferredValue(messages)
   const branchableMessageTargets = useMemo(
     () => branchActionsDisabled
@@ -1754,15 +1834,6 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
 
   const replyCopyTextByMessageId = useMemo(() => getReplyCopyTexts(deferredMessages), [deferredMessages])
 
-  const toolResultByToolUseId = useMemo(() => {
-    if (toolResultMap.size === 0) return new Map<string, { content: unknown; isError: boolean }>()
-    const result = new Map<string, { content: unknown; isError: boolean }>()
-    for (const [toolUseId, toolResult] of toolResultMap) {
-      result.set(toolUseId, { content: toolResult.content, isError: toolResult.isError })
-    }
-    return result
-  }, [toolResultMap])
-
   const renderTranscriptItem = (item: RenderItem, index: number) => {
     const cardsForItem = turnCardsByRenderIndex.get(index) ?? []
 
@@ -1770,10 +1841,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
       <>
         {item.kind === 'tool_group' ? (
           <ToolCallGroup
-            toolCalls={item.toolCalls}
-            resultMap={toolResultMap}
-            childToolCallsByParent={childToolCallsByParent}
-            agentTaskNotifications={agentTaskNotifications}
+            {...toolGroupResults.get(item.id)!}
             isStreaming={
               chatState === 'tool_executing' &&
               item.toolCalls.some((tc) => !toolResultMap.has(tc.toolUseId))
@@ -1787,7 +1855,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
             agentTaskNotifications={agentTaskNotifications}
             toolResult={
               item.message.type === 'tool_use'
-                ? toolResultByToolUseId.get(item.message.toolUseId) ?? null
+                ? toolResultMap.get(item.message.toolUseId) ?? null
                 : null
             }
             branchAction={branchActionByMessageId.get(item.message.id)}
@@ -2014,6 +2082,7 @@ export const MessageBlock = memo(function MessageBlock({
           toolName={message.toolName}
           input={message.input}
           description={message.description}
+          resolution={message.resolution}
         />
       )
     case 'error': {

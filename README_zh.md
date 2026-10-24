@@ -6,7 +6,10 @@
 
 <div align="center">
 
-# DreamCoder
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/readme-banner.png">
+  <img src="./assets/readme-banner.png" alt="DreamCoder" width="100%">
+</picture>
 
 **本地运行的多模型 AI 编程工作台**
 
@@ -26,6 +29,8 @@
 国内 AtomGit 托管：[atomgit.com/GoDiao/DreamCoder](https://atomgit.com/GoDiao/DreamCoder)（镜像仓库；issue 和 PR 请提交到 [GitHub](https://github.com/GoDiao/dreamcoder)）
 
 </div>
+
+> 🎉 **500 Star 了！** 感谢每一位点 Star、试用、提 issue 和贡献代码的朋友。DreamCoder 才五个月大，是你们让它一点点长起来的。我们接下来会更进一步跟进前沿 coding agent 的最佳实践，完成一切可以提升用户体验的尝试和崭新的功能，我们的目标一直会是**星辰大海**。
 
 > 🌱 **欢迎贡献！** 可以从 [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 和 [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22) 开始；动手前请阅读 [贡献指南](docs/CONTRIBUTING_zh.md)。
 

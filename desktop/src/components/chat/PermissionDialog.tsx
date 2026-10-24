@@ -6,6 +6,7 @@ import type { TranslationKey } from '../../i18n'
 import { Button } from '../shared/Button'
 import { DiffViewer } from './DiffViewer'
 import { getCuaToolDisplay, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import type { PermissionResolution } from '../../types/chat'
 
 type Props = {
   sessionId?: string | null
@@ -13,6 +14,7 @@ type Props = {
   toolName: string
   input: unknown
   description?: string
+  resolution?: PermissionResolution
 }
 
 const TOOL_META: Record<string, { icon: string; label: string; color: string }> = {
@@ -116,13 +118,20 @@ function renderPermissionPreview(toolName: string, input: unknown) {
   return null
 }
 
-export function PermissionDialog({ sessionId, requestId, toolName, input, description }: Props) {
-  const { respondToPermission } = useChatStore()
+function resolutionLabelKey(resolution: PermissionResolution | undefined): TranslationKey {
+  if (!resolution?.remote) return 'permission.responded'
+  if (resolution.outcome === 'withdrawn') return 'permission.withdrawn'
+  return resolution.outcome === 'allowed' ? 'permission.allowedElsewhere' : 'permission.deniedElsewhere'
+}
+
+export function PermissionDialog({ sessionId, requestId, toolName, input, description, resolution }: Props) {
+  const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
-  const pendingPermission = useChatStore((s) => targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined)
+  const isPending = useChatStore((s) =>
+    targetSessionId ? s.sessions[targetSessionId]?.pendingPermission?.requestId === requestId : false,
+  )
   const t = useTranslation()
-  const isPending = pendingPermission?.requestId === requestId
   const [showRaw, setShowRaw] = useState(false)
 
   const cua = getCuaToolDisplay(toolName, input, t)
@@ -173,7 +182,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             )}
             {!isPending && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]">
-                {t('permission.responded')}
+                {t(resolutionLabelKey(resolution))}
               </span>
             )}
           </div>

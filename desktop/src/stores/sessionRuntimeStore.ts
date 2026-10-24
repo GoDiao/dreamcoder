@@ -23,7 +23,6 @@ type SessionRuntimeStore = {
   selections: Record<string, RuntimeSelection>
   setSelection: (key: string, selection: RuntimeSelection) => void
   clearSelection: (key: string) => void
-  moveSelection: (fromKey: string, toKey: string) => void
 }
 
 function loadSelections(): Record<string, RuntimeSelection> {
@@ -70,18 +69,5 @@ export const useSessionRuntimeStore = create<SessionRuntimeStore>((set) => ({
       const { [key]: _removed, ...rest } = state.selections
       persistSelections(rest)
       return { selections: rest }
-    }),
-
-  moveSelection: (fromKey, toKey) =>
-    set((state) => {
-      const selection = state.selections[fromKey]
-      if (!selection) return state
-      const { [fromKey]: _removed, ...rest } = state.selections
-      const selections = {
-        ...rest,
-        [toKey]: selection,
-      }
-      persistSelections(selections)
-      return { selections }
     }),
 }))

@@ -86,9 +86,7 @@ vi.mock('../api/sessions', async (importOriginal) => {
 
 import { EmptySession } from '../pages/EmptySession'
 import { ActiveSession } from '../pages/ActiveSession'
-import { AgentTeams } from '../pages/AgentTeams'
 import { ScheduledTasks } from '../pages/ScheduledTasks'
-import { ToolInspection } from '../pages/ToolInspection'
 
 import { Sidebar } from '../components/layout/Sidebar'
 import { UserMessage } from '../components/chat/UserMessage'
@@ -99,6 +97,27 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useProviderStore } from '../stores/providerStore'
 import { useSessionRuntimeStore } from '../stores/sessionRuntimeStore'
 import { useTabStore } from '../stores/tabStore'
+import type { RuntimeSelection } from '../types/runtime'
+import type { SessionState } from '../types/chat'
+
+function runtimeMirror(selection: RuntimeSelection): SessionState {
+  return {
+    id: '',
+    version: 1,
+    permission: { desired: 'default', effective: 'default' },
+    runtime: { desired: selection, effective: null },
+    title: { text: null, source: null },
+    workspace: { workDir: '/workspace/project', projectRoot: null, workDirExists: true },
+    process: { phase: 'running', generation: 1 },
+    turn: { phase: 'idle' },
+    pendingPermissions: [],
+    slashCommands: [],
+    activeGoal: null,
+    backgroundTasks: [],
+    team: null,
+    clientCount: 1,
+  } satisfies SessionState
+}
 
 beforeEach(() => {
   useSettingsStore.setState({ locale: 'en' })
@@ -264,11 +283,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -303,11 +320,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -350,11 +365,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -416,11 +429,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -485,11 +496,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -540,11 +549,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -595,7 +602,6 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [
             { name: 'cost', description: 'Show token usage and costs' },
@@ -605,7 +611,6 @@ describe('Content-only pages render without errors', () => {
             })),
           ],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -658,11 +663,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -742,11 +745,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 50_000, output_tokens: 1_000 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -797,11 +798,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -860,11 +859,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -939,11 +936,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1021,11 +1016,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 72_000, output_tokens: 2_000 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1072,13 +1065,10 @@ describe('Content-only pages render without errors', () => {
       isLoading: false,
       error: null,
     })
-    useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-      providerId: 'volcengine-provider',
-      modelId: 'kimi-k2.6',
-    })
     useChatStore.setState({
       sessions: {
         [SESSION_ID]: {
+          mirror: runtimeMirror({ providerId: 'volcengine-provider', modelId: 'kimi-k2.6' }),
           messages: [{ id: 'm-1', type: 'assistant_text', content: 'ready', timestamp: Date.now() }],
           chatState: 'idle',
           connectionState: 'connected',
@@ -1089,11 +1079,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1185,11 +1173,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 26_000, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1200,10 +1186,15 @@ describe('Content-only pages render without errors', () => {
     expect(await screen.findByLabelText('Context usage 10%')).toBeInTheDocument()
 
     act(() => {
-      useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-        providerId: 'zhipu-provider',
-        modelId: 'glm-4.5-air',
-      })
+      useChatStore.setState((state) => ({
+        sessions: {
+          ...state.sessions,
+          [SESSION_ID]: {
+            ...state.sessions[SESSION_ID]!,
+            mirror: runtimeMirror({ providerId: 'zhipu-provider', modelId: 'glm-4.5-air' }),
+          },
+        },
+      }))
     })
 
     expect(await screen.findByLabelText('Context usage 20%')).toBeInTheDocument()
@@ -1216,24 +1207,10 @@ describe('Content-only pages render without errors', () => {
     useSessionRuntimeStore.setState({ selections: {} })
   })
 
-  it('AgentTeams renders team strip and members', () => {
-    const { container } = render(<AgentTeams />)
-    expect(container.innerHTML).toContain('Architect')
-    expect(container.innerHTML).toContain('session-dev')
-    expect(container.innerHTML).toContain('groups')
-  })
-
   it('ScheduledTasks renders (store-connected)', async () => {
     const { container } = render(<ScheduledTasks />)
     await screen.findByText('Scheduled tasks')
     expect(container.innerHTML).toContain('Scheduled tasks')
-  })
-
-  it('ToolInspection renders diff viewer', () => {
-    const { container } = render(<ToolInspection />)
-    expect(container.innerHTML).toContain('edit_file')
-    expect(container.innerHTML).toContain('Split')
-    expect(container.innerHTML).toContain('Unified')
   })
 })
 
@@ -1274,7 +1251,7 @@ describe('AppShell layout renders chrome', () => {
 
 describe('Design system compliance', () => {
   it('Pages use Material Symbols Outlined icons', () => {
-    const pages = [EmptySession, AgentTeams, ToolInspection]
+    const pages = [EmptySession]
     for (const Page of pages) {
       const { container, unmount } = render(<Page />)
       const icons = container.querySelectorAll('.material-symbols-outlined')
@@ -1300,15 +1277,5 @@ describe('Design system compliance', () => {
       ).toBe(true)
       unmount()
     }
-  })
-})
-
-describe('Mock data integration', () => {
-  it('AgentTeams shows team members from mock data', () => {
-    const { container } = render(<AgentTeams />)
-    expect(container.innerHTML).toContain('Architect')
-    expect(container.innerHTML).toContain('Frontend Dev')
-    expect(container.innerHTML).toContain('Backend Dev')
-    expect(container.innerHTML).toContain('Tester')
   })
 })

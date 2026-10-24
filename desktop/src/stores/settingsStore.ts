@@ -12,7 +12,7 @@ import {
   type H5AccessDiagnostics,
   type H5AccessSettings,
   type NetworkSettings,
-  type PermissionMode,
+  type DefaultPermissionMode,
   type EffortLevel,
   type ModelInfo,
   type ThemeMode,
@@ -67,7 +67,7 @@ function getStoredOnboardingCompleted(): boolean {
 }
 
 type SettingsStore = {
-  permissionMode: PermissionMode
+  permissionMode: DefaultPermissionMode
   currentModel: ModelInfo | null
   effortLevel: EffortLevel
   thinkingEnabled: boolean
@@ -96,7 +96,7 @@ type SettingsStore = {
 
   fetchAll: () => Promise<void>
   fetchH5Access: () => Promise<void>
-  setPermissionMode: (mode: PermissionMode) => Promise<void>
+  setPermissionMode: (mode: DefaultPermissionMode) => Promise<void>
   setModel: (modelId: string) => Promise<void>
   setEffort: (level: EffortLevel) => Promise<void>
   setThinkingEnabled: (enabled: boolean) => Promise<void>

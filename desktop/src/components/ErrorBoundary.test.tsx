@@ -33,7 +33,7 @@ describe('ErrorBoundary', () => {
     consoleErrorSpy.mockRestore()
   })
 
-  it('shows retry and compact Doctor fallback when a child crashes', () => {
+  it('shows retry and compact Doctor fallback when a child crashes', async () => {
     render(
       <ErrorBoundary>
         <CrashingChild />
@@ -43,7 +43,7 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong.')).toBeInTheDocument()
     expect(screen.getByText('The error was recorded in Diagnostics.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
-    expect(screen.getByTestId('doctor-panel')).toHaveTextContent('compact doctor')
+    expect(await screen.findByTestId('doctor-panel')).toHaveTextContent('compact doctor')
     expect(reportReactError).toHaveBeenCalled()
   })
 })

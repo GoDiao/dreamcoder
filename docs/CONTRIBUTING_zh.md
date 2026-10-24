@@ -74,6 +74,7 @@ git checkout main && git checkout -b feat/your-feature
    - React 函数组件 + Hooks。
    - 状态管理使用 Zustand。
    - 样式使用 Tailwind CSS v4。
+   - 新代码不写注释，JSDoc 和测试里的说明也不写，靠命名和结构表达意思。没改动的代码里原有的注释可以保留。
 
 3. **提交**。使用语义化 commit message：
    ```

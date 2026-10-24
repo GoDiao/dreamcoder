@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { OFFICIAL_DEFAULT_MODEL_ID } from '../../constants/modelCatalog'
 import { useTranslation } from '../../i18n'
-import { useChatStore } from '../../stores/chatStore'
+import { useChatStore, useSessionRuntimeSelection } from '../../stores/chatStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { DRAFT_RUNTIME_SELECTION_KEY, useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -146,9 +146,13 @@ export function ModelSelector({
     isLoading: providersLoading,
     fetchProviders,
   } = useProviderStore()
-  const runtimeSelection = useSessionRuntimeStore((state) =>
-    runtimeKey ? state.selections[runtimeKey] : undefined,
+  const draftRuntimeSelection = useSessionRuntimeStore((state) =>
+    runtimeKey === DRAFT_RUNTIME_SELECTION_KEY ? state.selections[runtimeKey] : undefined,
   )
+  const sessionSelection = useSessionRuntimeSelection(
+    runtimeKey && runtimeKey !== DRAFT_RUNTIME_SELECTION_KEY ? runtimeKey : null,
+  )
+  const runtimeSelection = draftRuntimeSelection ?? sessionSelection
   const [open, setOpen] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -313,11 +317,10 @@ export function ModelSelector({
 
   const handleRuntimeSelect = (selection: RuntimeSelection) => {
     onRuntimeSelectionChange?.(selection)
-    if (runtimeKey) {
+    if (runtimeKey === DRAFT_RUNTIME_SELECTION_KEY) {
       useSessionRuntimeStore.getState().setSelection(runtimeKey, selection)
-      if (runtimeKey !== DRAFT_RUNTIME_SELECTION_KEY) {
-        useChatStore.getState().setSessionRuntime(runtimeKey, selection)
-      }
+    } else if (runtimeKey) {
+      useChatStore.getState().setSessionRuntime(runtimeKey, selection)
     }
     setOpen(false)
   }

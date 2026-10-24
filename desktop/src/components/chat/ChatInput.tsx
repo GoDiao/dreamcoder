@@ -1,10 +1,15 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from '../../i18n'
-import { useChatStore } from '../../stores/chatStore'
+import {
+  sessionRuntimeSelection,
+  useChatStore,
+  useSessionField,
+  useSessionRuntimeSelection,
+  type PerSessionState,
+} from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useSessionStore } from '../../stores/sessionStore'
-import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useTeamStore } from '../../stores/teamStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import {
@@ -53,6 +58,7 @@ type ChatInputProps = {
 }
 
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
+const EMPTY_SLASH_COMMANDS: PerSessionState['slashCommands'] = []
 
 function workspaceReferenceToAttachment(reference: WorkspaceChatReference): Attachment {
   return {
@@ -125,16 +131,21 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       return next
     })
   }, [])
-  const { sendMessage, stopGeneration, clearComposerInsertion } = useChatStore()
+  const sendMessage = useChatStore((s) => s.sendMessage)
+  const stopGeneration = useChatStore((s) => s.stopGeneration)
+  const clearComposerInsertion = useChatStore((s) => s.clearComposerInsertion)
+  const setSessionPermissionMode = useChatStore((s) => s.setSessionPermissionMode)
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const sessionState = useChatStore((s) => activeTabId ? s.sessions[activeTabId] : undefined)
-  const chatState = sessionState?.chatState ?? 'idle'
-  const slashCommands = sessionState?.slashCommands ?? []
-  const composerPrefill = sessionState?.composerPrefill ?? null
-  const composerInsertion = sessionState?.composerInsertion ?? null
-  const runtimeSelection = useSessionRuntimeStore((state) =>
-    activeTabId ? state.selections[activeTabId] : undefined,
+  const chatState = useSessionField(activeTabId, 'chatState') ?? 'idle'
+  const slashCommands = useSessionField(activeTabId, 'slashCommands') ?? EMPTY_SLASH_COMMANDS
+  const composerPrefill = useSessionField(activeTabId, 'composerPrefill') ?? null
+  const composerInsertion = useSessionField(activeTabId, 'composerInsertion') ?? null
+  const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
+  const permissionMode = useSessionField(activeTabId, 'permissionMode') ?? defaultPermissionMode
+  const effectivePermissionMode = useChatStore((s) =>
+    activeTabId ? s.sessions[activeTabId]?.mirror?.permission.effective ?? undefined : undefined,
   )
+  const runtimeSelection = useSessionRuntimeSelection(activeTabId)
   const currentModel = useSettingsStore((state) => state.currentModel)
   const runtimeSelectionKey = runtimeSelection
     ? `${runtimeSelection.providerId ?? 'none'}:${runtimeSelection.modelId}`
@@ -142,7 +153,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   const providerMissing = useProviderMissing(runtimeSelection)
   const runtimeModelLabel = runtimeSelection?.modelId || currentModel?.name || currentModel?.id
   const activeSession = useSessionStore((state) => activeTabId ? state.sessions.find((session) => session.id === activeTabId) ?? null : null)
-  const loadedMessageCount = sessionState?.messages?.length ?? 0
+  const loadedMessageCount = useChatStore((s) => activeTabId ? s.sessions[activeTabId]?.messages?.length ?? 0 : 0)
   const messageCount = Math.max(loadedMessageCount, activeSession?.messageCount ?? 0)
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null)
@@ -504,12 +515,14 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     const oldId = activeTabId
     const { createSession, deleteSession } = useSessionStore.getState()
     const { replaceTabSession } = useTabStore.getState()
-    const { disconnectSession, connectToSession } = useChatStore.getState()
-    const newId = await createSession(
-      workDir || undefined,
-      repository ? { repository } : undefined,
-    )
-    useSessionRuntimeStore.getState().moveSelection(oldId, newId)
+    const { disconnectSession, connectToSession, sessions } = useChatStore.getState()
+    const permissionMode = sessions[oldId]?.permissionMode
+    const runtime = sessionRuntimeSelection(sessions[oldId])
+    const newId = await createSession(workDir || undefined, {
+      ...(repository ? { repository } : {}),
+      ...(permissionMode ? { permissionMode } : {}),
+      ...(runtime ? { runtime } : {}),
+    })
     disconnectSession(oldId)
     replaceTabSession(oldId, newId)
     connectToSession(newId)
@@ -1089,7 +1102,14 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                         worktreePath={gitInfo?.worktree?.path || gitInfo?.worktree?.plannedPath || null}
                       />
                     )}
-                    <PermissionModeSelector compact={useCompactControls} />
+                    <PermissionModeSelector
+                      compact={useCompactControls}
+                      value={permissionMode}
+                      effectiveValue={effectivePermissionMode as typeof permissionMode | undefined}
+                      onChange={(mode) => {
+                        if (activeTabId) setSessionPermissionMode(activeTabId, mode)
+                      }}
+                    />
                   </>
                 )}
                 right={activeTabId ? (

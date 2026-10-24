@@ -6,7 +6,10 @@ English | [简体中文](./README_zh.md)
 
 <div align="center">
 
-# DreamCoder
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/readme-banner.png">
+  <img src="./assets/readme-banner.png" alt="DreamCoder" width="100%">
+</picture>
 
 **A locally run, multi-provider AI coding workspace**
 
@@ -26,6 +29,8 @@ English | [简体中文](./README_zh.md)
 Also hosted on AtomGit: [atomgit.com/GoDiao/DreamCoder](https://atomgit.com/GoDiao/DreamCoder) (mirror; please open issues and pull requests on [GitHub](https://github.com/GoDiao/dreamcoder))
 
 </div>
+
+> 🎉 **500 stars!** Thank you to everyone who starred, tried, reported issues, and contributed. DreamCoder is only five months old, and it has grown step by step because of you. Next, we'll keep pace with the best practices of frontier coding agents and try everything that can make the experience better, along with brand-new features. Our goal will always be to **reach for the stars**.
 
 > 🌱 **Contributions welcome!** Browse [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) and [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22), and read the [contributing guide](docs/CONTRIBUTING_en.md) before starting.
 

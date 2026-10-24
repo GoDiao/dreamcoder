@@ -126,11 +126,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -193,11 +191,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -260,11 +256,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -333,11 +327,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -394,11 +386,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -454,11 +444,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -532,11 +520,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -551,7 +537,7 @@ describe('ActiveSession task polling', () => {
     useCLITaskStore.setState(originalCliTaskState)
   })
 
-  it('renders the workspace panel to the right of chat and supports resizing', () => {
+  it('renders the workspace panel to the right of chat and supports resizing', async () => {
     const sessionId = 'workspace-session'
 
     useSessionStore.setState({
@@ -586,17 +572,16 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
     useWorkspacePanelStore.getState().openPanel(sessionId)
 
     render(<ActiveSession />)
+    await screen.findByTestId('workspace-panel')
 
     const contentRow = screen.getByTestId('active-session-content-row')
     const chatColumn = screen.getByTestId('active-session-chat-column')
@@ -675,11 +660,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -729,11 +712,9 @@ describe('ActiveSession task polling', () => {
             activeThinkingId: null,
             pendingPermission: null,
             tokenUsage: { input_tokens: 0, output_tokens: 0 },
-            elapsedSeconds: 0,
             statusVerb: '',
             slashCommands: [],
             agentTaskNotifications: {},
-            elapsedTimer: null,
           },
         },
       })
@@ -781,11 +762,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -838,11 +817,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })

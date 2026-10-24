@@ -4,9 +4,40 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Each session keeps its own permission mode.** The selector under the input shows and changes only that session's mode. Before, it showed and wrote one mode shared by every session, so switching one session changed what the others displayed and the mode every later session started in.
+  - The mode is saved in the session's transcript, as Claude Code saves it, so a session resumes in its own mode after a restart. A session imported from Claude Code resumes in the mode it last ran in.
+  - Switching a session that is not running is no longer dropped; it applies when the session next starts.
+  - Turning Bypass permissions on or off in one session no longer makes it the default for new sessions.
+  - When the CLI changes mode by itself, for example after you approve a plan, the selector follows. Before, the change was shown as "thinking".
+  - Settings → Permissions now sets only the default for new sessions, which the selector marks with a "default" tag. A forked session starts in the mode of the session it came from.
+  - "Default" is renamed "Manual". The Chinese interface uses the English mode names too.
+- **Scheduled tasks run in the permission mode chosen for them.** A new task starts with the default for new sessions, and the mode can be changed in the task.
+- **A session looks the same in every window.** The server now keeps each session's state in one place, and every desktop window and phone browser connected to the session sees the same mode, model, title, running status and permission requests.
+  - A permission request answered on one device closes on the others, which say it was allowed or denied elsewhere. A second answer is ignored.
+  - Messages typed on one device show up on the others, and refreshing during a reply no longer loses or duplicates history.
+  - Switching the mode or model while a reply is running waits until the reply ends instead of restarting the CLI mid-reply. The permission selector shows the new mode at once, with a dot that means it takes effect after this reply finishes; switching back before then removes the dot. Opening a session no longer restarts it.
+- **Each session keeps its own model.** The model and effort are saved in the session's transcript, so they survive a restart and are the same on every device. A fork starts with the model of its source. A choice saved on this device by an earlier version moves to the session the first time it is opened.
+- A session that moved into a worktree no longer splits into two files. Its title, mode and worktree survive `/clear`, and a rename is no longer undone when the CLI exits.
+- Agent team updates go only to the sessions of that team.
+- **The worktree choice for a new session is in the branch menu.** "Run in a new worktree" is a switch at the bottom of the branch menu, and the branch button shows a fork icon when it is on. The separate worktree button is gone, so the controls under the input fit on one row, as they do in an existing session.
+- **Starting on another branch is refused when the current checkout has uncommitted changes.** Before, DreamCoder switched the branch and Git carried the changes over. Now the error appears next to the project controls, with a button to run in a new worktree instead.
+- Groups of tool calls, such as "Read 3 files", are collapsed by default, also while they run. A group with a failed call opens by itself.
+- **Faster desktop startup** (#152, #161): KaTeX, Mermaid, the diff viewer, the Doctor panel, the Settings pages, the workspace panel and session search load the first time they are needed, which cuts the JavaScript loaded at startup by about half. Thanks @ibrahimmaq14.
+
+### Removed
+
+- "Don't ask" is no longer offered as the default for new sessions; a session can still be in "Don't ask" when the CLI switches to it.
+- Unused design mockup pages and their mock data.
+
 ### Fixed
 
 - **Proxy** (#148): when the ChatGPT sign-in path streams a non-streaming request and the upstream ends with `response.failed` or `error`, the caller now gets an `api_error` (HTTP 502) with the upstream message, instead of an empty `end_turn` reply. Thanks @pcbeingused333.
+- **Sidebar re-renders** (#157, #158): the sidebar no longer re-renders on streamed text updates. Running indicators still follow session and tab status. Thanks @tedy69.
+- **Re-renders while a reply runs** (#156, #165): the session page no longer re-renders every second during a reply. Only the elapsed time updates, and it now counts from when the server starts the turn. Thanks @princecherry9905.
+- New sessions start on the active provider's main model. Before, activating a provider saved its main model in a hidden setting, and that saved value kept overriding the provider after its main model was edited.
+- The selected model card in the dark theme had light pink colors with text that was hard to read.
 
 ## [0.6.1] — 2026-10-21
 
