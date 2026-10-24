@@ -23,7 +23,8 @@ All notable changes to DreamCoder will be documented in this file.
 - Agent team updates go only to the sessions of that team.
 - **The worktree choice for a new session is in the branch menu.** "Run in a new worktree" is a switch at the bottom of the branch menu, and the branch button shows a fork icon when it is on. The separate worktree button is gone, so the controls under the input fit on one row, as they do in an existing session.
 - **Starting on another branch is refused when the current checkout has uncommitted changes.** Before, DreamCoder switched the branch and Git carried the changes over. Now the error appears next to the project controls, with a button to run in a new worktree instead.
-- Groups of tool calls, such as "Read 3 files", are collapsed by default, also while they run. A group with a failed call opens by itself.
+- Groups of tool calls, such as "Read 3 files", are collapsed by default, also while they run. A group with a failed step stays collapsed and shows a red marker.
+- **Thinking and tool calls between two pieces of reply text fold into one group** (#170), so a short turn no longer pushes the answer far down the page. The summary counts thinking too, e.g. "ran 2 commands, read 1 file, thought 4 times", and the expanded group lists the steps in their original order. Thinking with no tool calls around it is still its own row.
 - **Faster desktop startup** (#152, #161): KaTeX, Mermaid, the diff viewer, the Doctor panel, the Settings pages, the workspace panel and session search load the first time they are needed, which cuts the JavaScript loaded at startup by about half. Thanks @ibrahimmaq14.
 
 ### Removed
