@@ -317,7 +317,7 @@ export class ProviderService {
   private async fetchModels(target: UpstreamTarget): Promise<ProviderModel[]> {
     const result = await fetchUpstreamModels(target)
     if (!result.ok) {
-      throw new ApiError(result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 500 ? 400 : 502, result.error, 'MODEL_DISCOVERY_FAILED')
+      throw new ApiError(502, result.error, 'MODEL_DISCOVERY_FAILED')
     }
     return result.models
   }

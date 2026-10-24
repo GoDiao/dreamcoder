@@ -118,6 +118,47 @@ describe('titleService', () => {
     }
   })
 
+  test('prefers the fast model for titles and otherwise uses the selected model', async () => {
+    const requestedModels: string[] = []
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        const body = await req.json() as { model: string }
+        requestedModels.push(body.model)
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
+        })
+      },
+    })
+
+    try {
+      const providerService = new ProviderService()
+      const provider = await providerService.addProvider({
+        presetId: 'custom',
+        name: 'Title priority',
+        apiKey: 'test-key',
+        authStrategy: 'api_key',
+        baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
+        apiFormat: 'anthropic',
+        models: [
+          { id: 'list-first' },
+          { id: 'selected-model' },
+          { id: 'fast-model' },
+        ],
+      })
+
+      await expect(generateTitle('selected title', provider.id, 'selected-model')).resolves.toBe('Trace ok')
+      await providerService.updateProvider(provider.id, { fastModel: 'fast-model' })
+      await expect(generateTitle('fast title', provider.id, 'selected-model')).resolves.toBe('Trace ok')
+
+      expect(requestedModels).toEqual(['selected-model', 'fast-model'])
+    } finally {
+      server.stop(true)
+    }
+  })
+
   test('generates titles through the OpenAI Chat format for OpenAI-compatible providers', async () => {
     let requestPath = ''
     let authorization: string | null = null

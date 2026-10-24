@@ -28,6 +28,12 @@ const deepseekPreset: ProviderPreset = {
   websiteUrl: 'https://example.invalid',
 }
 
+const deepseekPresetWithFast: ProviderPreset = {
+  ...deepseekPreset,
+  defaultModels: [{ id: 'model-main' }, { id: 'model-fast' }],
+  defaultFastModel: 'model-fast',
+}
+
 const createdProvider: SavedProvider = {
   id: 'provider-1',
   presetId: 'deepseek',
@@ -158,6 +164,24 @@ describe('ProviderFormModal create mode', () => {
     expect(input).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('closes the model suggestions instead of the modal when Escape reaches an option', async () => {
+    const onClose = vi.fn()
+    render(<ProviderFormModal open={true} onClose={onClose} mode="create" presets={[deepseekPreset]} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    fireEvent.focus(input)
+    const option = screen.getByRole('option', { name: /New Model/ })
+    expect(option).toHaveAttribute('tabindex', '-1')
+
+    fireEvent.keyDown(option, { key: 'Escape' })
+
+    expect(screen.queryByRole('listbox', { name: 'Model ID' })).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('saves a free-text model id exactly as typed', async () => {
     render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
     fireEvent.change(screen.getByRole('combobox', { name: 'Model ID' }), {
@@ -222,6 +246,102 @@ describe('ProviderFormModal edit mode', () => {
       updateProvider: updateProviderMock,
       discoverModels: discoverModelsMock,
     })
+  })
+
+  it('does not restore the preset fast model when editing a provider without one', async () => {
+    const providerWithoutFast: SavedProvider = {
+      ...provider,
+      models: [{ id: 'model-main' }],
+      fastModel: undefined,
+    }
+    render(
+      <ProviderFormModal
+        open={true}
+        onClose={vi.fn()}
+        mode="edit"
+        provider={providerWithoutFast}
+        presets={[deepseekPresetWithFast]}
+      />,
+    )
+
+    expect(screen.getByLabelText('Fast model')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      providerWithoutFast.id,
+      expect.objectContaining({ fastModel: null }),
+    ))
+  })
+
+  it('enables saving after deleting a model with an invalid context window', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    fireEvent.change(screen.getByRole('combobox', { name: 'Model ID' }), {
+      target: { value: 'test-b' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: /Context and auto-compact/ }))
+    fireEvent.change(screen.getByLabelText('test-b'), { target: { value: '1' } })
+
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' })
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!)
+
+    expect(screen.queryByText('Must be between 16000 and 10000000.')).not.toBeInTheDocument()
+    expect(save).toBeEnabled()
+  })
+
+  it('saves the reordered model list and generated main model', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    await waitFor(() => expect(document.querySelector('textarea')?.value).toContain('ANTHROPIC_MODEL'))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move model up' })[1]!)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const reordered = [models[1], models[0], ...models.slice(2)]
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({ models: reordered }),
+    ))
+    expect(providersApiMock.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      env: expect.objectContaining({ ANTHROPIC_MODEL: 'model-2' }),
+    }))
+  })
+
+  it('clears the fast model when its row is deleted', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' })
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({
+        models: models.slice(0, -1),
+        fastModel: null,
+      }),
+    ))
+  })
+
+  it('clears the fast model when current selected model is chosen', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Fast model'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
+      provider.id,
+      expect.objectContaining({ fastModel: null }),
+    ))
   })
 
   it('keeps generated model settings read-only while preserving unrelated JSON edits', async () => {

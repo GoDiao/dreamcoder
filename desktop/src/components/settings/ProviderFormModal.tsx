@@ -420,6 +420,13 @@ function ModelDiscoveryCombobox({
           role="listbox"
           aria-label={label}
           data-state="open"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            event.stopPropagation()
+            setOpen(false)
+            setActiveIndex(-1)
+          }}
           className="motion-menu absolute left-0 right-0 top-full z-50 mt-1 max-h-[240px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 shadow-[var(--shadow-dropdown)]"
         >
           {filteredModels.length === 0 ? (
@@ -431,6 +438,7 @@ function ModelDiscoveryCombobox({
               ref={(element) => { optionRefs.current[index] = element }}
               type="button"
               role="option"
+              tabIndex={-1}
               aria-selected={model.id === value}
               onMouseEnter={() => setActiveIndex(index)}
               onMouseDown={(event) => event.preventDefault()}
@@ -481,7 +489,9 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [showApiKey, setShowApiKey] = useState(false)
   const [notes, setNotes] = useState(provider?.notes ?? '')
   const [models, setModels] = useState<ProviderModel[]>(() => (provider?.models ?? initialPreset.defaultModels).map((model) => ({ ...model })))
-  const [fastModel, setFastModel] = useState(provider?.fastModel ?? initialPreset.defaultFastModel ?? '')
+  const [fastModel, setFastModel] = useState(
+    provider ? (provider.fastModel ?? '') : (initialPreset.defaultFastModel ?? ''),
+  )
   const [modelContextInputs, setModelContextInputs] = useState<ModelContextInputs>(
     getModelContextInputs(provider?.models ?? initialPreset.defaultModels, initialPreset, provider),
   )
@@ -584,8 +594,10 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const isCustom = selectedPreset.id === 'custom'
   const requiresApiKey = selectedPreset.needsApiKey !== false
   const autoCompactWindowErrorKey = getAutoCompactWindowErrorKey(autoCompactWindow)
-  const modelContextWindowErrors = Object.values(modelContextInputs).filter((value) => getModelContextWindowErrorKey(value))
-  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !autoCompactWindowErrorKey && modelContextWindowErrors.length === 0
+  const hasModelContextWindowError = models.some((model) => (
+    !!getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
+  ))
+  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !autoCompactWindowErrorKey && !hasModelContextWindowError
   const apiKeyUrl = selectedPreset.apiKeyUrl?.trim()
   const displayedSettingsJson = showApiKey
     ? settingsJson
@@ -654,7 +666,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const contextSummary = configuredContextSummary.length > 0
     ? [...configuredContextSummary, fallbackContextSummary].join(' · ')
     : t('settings.providers.contextSummaryAuto')
-  const shouldShowContextFields = showContextSettings || modelContextWindowErrors.length > 0 || !!autoCompactWindowErrorKey
+  const shouldShowContextFields = showContextSettings || hasModelContextWindowError || !!autoCompactWindowErrorKey
   const handleAutoCompactWindowChange = (value: string) => {
     setAutoCompactWindow(value)
     setSettingsJson((current) => updateSettingsJsonAutoCompactWindow(current, value))

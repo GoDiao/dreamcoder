@@ -1240,6 +1240,68 @@ describe('Providers API', () => {
     expect(body.providers[0].apiKey).toBe('sk-test-key-123')
   })
 
+  test('POST /api/providers/models should return discovered models', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ data: [{ id: 'api-model', display_name: 'API Model' }] })
+      },
+    })
+
+    try {
+      const { req, url, segments } = makeRequest('POST', '/api/providers/models', {
+        baseUrl: `http://127.0.0.1:${server.port}/v1`,
+        apiKey: 'secret',
+        apiFormat: 'openai_chat',
+      })
+      const res = await handleProvidersApi(req, url, segments)
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        models: [{ id: 'api-model', name: 'API Model' }],
+      })
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('POST /api/providers/models should return 400 for invalid input', async () => {
+    const { req, url, segments } = makeRequest('POST', '/api/providers/models', {
+      baseUrl: 'not-a-url',
+      apiKey: '',
+      apiFormat: 'openai_chat',
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(400)
+  })
+
+  test('POST /api/providers/models should return 502 for upstream authentication errors', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return new Response('unauthorized', { status: 401 })
+      },
+    })
+
+    try {
+      const { req, url, segments } = makeRequest('POST', '/api/providers/models', {
+        baseUrl: `http://127.0.0.1:${server.port}/v1`,
+        apiKey: 'bad-key',
+        apiFormat: 'openai_chat',
+      })
+      const res = await handleProvidersApi(req, url, segments)
+      const body = (await res.json()) as { error: string }
+
+      expect(res.status).toBe(502)
+      expect(body.error).toBe('MODEL_DISCOVERY_FAILED')
+    } finally {
+      server.stop(true)
+    }
+  })
+
   test('POST /api/providers should create a provider', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/providers', {
       presetId: 'custom',
