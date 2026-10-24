@@ -846,12 +846,8 @@ describe('WebSocket Chat Integration', () => {
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
       runtimeKind: 'anthropic_compatible',
-      models: {
-        main: 'default-main',
-        haiku: 'default-haiku',
-        sonnet: 'default-sonnet',
-        opus: 'default-opus',
-      },
+      models: [{ id: 'default-main' }, { id: 'default-sonnet' }, { id: 'default-opus' }, { id: 'default-haiku' }],
+      fastModel: 'default-haiku',
     })
     defaultProviderId = defaultProvider.id
     await defaultProviderService.activateProvider(defaultProviderId)
@@ -1144,12 +1140,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-deepseek-toggle',
       baseUrl: 'https://api.deepseek.com/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'deepseek-v4-pro',
-        haiku: 'deepseek-v4-flash',
-        sonnet: 'deepseek-v4-pro',
-        opus: 'deepseek-v4-pro',
-      },
+      models: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-v4-flash' }],
+      fastModel: 'deepseek-v4-flash',
     })
     await providerService.activateProvider(provider.id)
 
@@ -1228,12 +1220,7 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-stale-model',
       baseUrl: 'https://example.invalid/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'minimax-m2',
-        haiku: 'minimax-m2',
-        sonnet: 'minimax-m2',
-        opus: 'minimax-m2',
-      },
+      models: [{ id: 'minimax-m2' }],
     })
     await providerService.activateProvider(provider.id)
     await providerService.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
@@ -1813,12 +1800,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-active-default',
       baseUrl: 'https://api.kimi.com/coding',
       apiFormat: 'anthropic',
-      models: {
-        main: 'active-main',
-        haiku: 'active-haiku',
-        sonnet: 'active-sonnet',
-        opus: 'active-opus',
-      },
+      models: [{ id: 'active-main' }, { id: 'active-sonnet' }, { id: 'active-opus' }, { id: 'active-haiku' }],
+      fastModel: 'active-haiku',
     })
     await providerService.activateProvider(provider.id)
 
@@ -1871,12 +1854,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-parallel-a',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'parallel-a-main',
-        haiku: 'parallel-a-haiku',
-        sonnet: 'parallel-a-sonnet',
-        opus: 'parallel-a-opus',
-      },
+      models: [{ id: 'parallel-a-main' }, { id: 'parallel-a-sonnet' }, { id: 'parallel-a-opus' }, { id: 'parallel-a-haiku' }],
+      fastModel: 'parallel-a-haiku',
     })
     const providerB = await providerService.addProvider({
       presetId: 'custom',
@@ -1884,12 +1863,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-parallel-b',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'parallel-b-main',
-        haiku: 'parallel-b-haiku',
-        sonnet: 'parallel-b-sonnet',
-        opus: 'parallel-b-opus',
-      },
+      models: [{ id: 'parallel-b-main' }, { id: 'parallel-b-sonnet' }, { id: 'parallel-b-opus' }, { id: 'parallel-b-haiku' }],
+      fastModel: 'parallel-b-haiku',
     })
 
     const createSession = async () => {
@@ -1995,12 +1970,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-late-runtime',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'late-main',
-        haiku: 'late-haiku',
-        sonnet: 'late-sonnet',
-        opus: 'late-opus',
-      },
+      models: [{ id: 'late-main' }, { id: 'late-sonnet' }, { id: 'late-opus' }, { id: 'late-haiku' }],
+      fastModel: 'late-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -2104,12 +2075,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-first-turn-runtime',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'first-turn-main',
-        haiku: 'first-turn-haiku',
-        sonnet: 'first-turn-sonnet',
-        opus: 'first-turn-opus',
-      },
+      models: [{ id: 'first-turn-main' }, { id: 'first-turn-sonnet' }, { id: 'first-turn-opus' }, { id: 'first-turn-haiku' }],
+      fastModel: 'first-turn-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -2234,12 +2201,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-idle-runtime',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'idle-main',
-        haiku: 'idle-haiku',
-        sonnet: 'idle-sonnet',
-        opus: 'idle-opus',
-      },
+      models: [{ id: 'idle-main' }, { id: 'idle-sonnet' }, { id: 'idle-opus' }, { id: 'idle-haiku' }],
+      fastModel: 'idle-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -2450,12 +2413,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-current-valid',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'current-main',
-        haiku: 'current-haiku',
-        sonnet: 'current-sonnet',
-        opus: 'current-opus',
-      },
+      models: [{ id: 'current-main' }, { id: 'current-sonnet' }, { id: 'current-opus' }, { id: 'current-haiku' }],
+      fastModel: 'current-haiku',
     })
     await providerService.activateProvider(activeProvider.id)
 
@@ -2698,12 +2657,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-a',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'model-a-main',
-        haiku: 'model-a-haiku',
-        sonnet: 'model-a-sonnet',
-        opus: 'model-a-opus',
-      },
+      models: [{ id: 'model-a-main' }, { id: 'model-a-sonnet' }, { id: 'model-a-opus' }, { id: 'model-a-haiku' }],
+      fastModel: 'model-a-haiku',
     })
     const providerB = await providerService.addProvider({
       presetId: 'custom',
@@ -2711,12 +2666,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-b',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'model-b-main',
-        haiku: 'model-b-haiku',
-        sonnet: 'model-b-sonnet',
-        opus: 'model-b-opus',
-      },
+      models: [{ id: 'model-b-main' }, { id: 'model-b-sonnet' }, { id: 'model-b-opus' }, { id: 'model-b-haiku' }],
+      fastModel: 'model-b-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -2843,12 +2794,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-a',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'restart-a-main',
-        haiku: 'restart-a-haiku',
-        sonnet: 'restart-a-sonnet',
-        opus: 'restart-a-opus',
-      },
+      models: [{ id: 'restart-a-main' }, { id: 'restart-a-sonnet' }, { id: 'restart-a-opus' }, { id: 'restart-a-haiku' }],
+      fastModel: 'restart-a-haiku',
     })
     const providerB = await providerService.addProvider({
       presetId: 'custom',
@@ -2856,12 +2803,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-b',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'restart-b-main',
-        haiku: 'restart-b-haiku',
-        sonnet: 'restart-b-sonnet',
-        opus: 'restart-b-opus',
-      },
+      models: [{ id: 'restart-b-main' }, { id: 'restart-b-sonnet' }, { id: 'restart-b-opus' }, { id: 'restart-b-haiku' }],
+      fastModel: 'restart-b-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -2985,12 +2928,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-effort',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'effort-main',
-        haiku: 'effort-haiku',
-        sonnet: 'effort-sonnet',
-        opus: 'effort-opus',
-      },
+      models: [{ id: 'effort-main' }, { id: 'effort-sonnet' }, { id: 'effort-opus' }, { id: 'effort-haiku' }],
+      fastModel: 'effort-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {
@@ -3115,12 +3054,8 @@ describe('WebSocket Chat Integration', () => {
       apiKey: 'key-effort-invalid',
       baseUrl: 'http://127.0.0.1:1/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'effort-invalid-main',
-        haiku: 'effort-invalid-haiku',
-        sonnet: 'effort-invalid-sonnet',
-        opus: 'effort-invalid-opus',
-      },
+      models: [{ id: 'effort-invalid-main' }, { id: 'effort-invalid-sonnet' }, { id: 'effort-invalid-opus' }, { id: 'effort-invalid-haiku' }],
+      fastModel: 'effort-invalid-haiku',
     })
 
     const createRes = await fetch(`${baseUrl}/api/sessions`, {

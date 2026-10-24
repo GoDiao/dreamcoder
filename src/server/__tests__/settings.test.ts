@@ -529,12 +529,8 @@ describe('Models API', () => {
       baseUrl: 'https://open.bigmodel.cn/api/anthropic',
       apiKey: 'test-key',
       apiFormat: 'anthropic',
-      models: {
-        main: 'glm-5.1',
-        haiku: 'glm-4.5-air',
-        sonnet: 'glm-5-turbo',
-        opus: 'glm-5.1',
-      },
+      models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+      fastModel: 'glm-4.5-air',
     })
     await providerSvc.activateProvider(provider.id)
     await providerSvc.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
@@ -548,7 +544,7 @@ describe('Models API', () => {
     expect(body.model.context).toBe('')
 
     await providerSvc.updateProvider(provider.id, {
-      models: { main: 'glm-5-turbo', haiku: 'glm-4.5-air', sonnet: 'glm-5-turbo', opus: 'glm-5.1' },
+      models: [{ id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }, { id: 'glm-5.1' }],
     })
     const after = makeRequest('GET', '/api/models/current')
     const afterBody = await (await handleModelsApi(after.req, after.url, after.segments)).json()
@@ -564,20 +560,17 @@ describe('Models API', () => {
       baseUrl: 'https://open.bigmodel.cn/api/anthropic',
       apiKey: 'test-key',
       apiFormat: 'anthropic',
-      models: {
-        main: 'glm-5.1',
-        haiku: 'glm-4.5-air',
-        sonnet: 'glm-5-turbo',
-        opus: 'glm-5.1',
-      },
+      models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+      fastModel: 'glm-4.5-air',
     })
     await providerSvc.activateProvider(provider.id)
 
     const putReq = makeRequest('PUT', '/api/models/current', {
-      modelId: 'glm-5-turbo',
+      modelId: 'qwen3.6:27b',
     })
     const putRes = await handleModelsApi(putReq.req, putReq.url, putReq.segments)
     expect(putRes.status).toBe(200)
+    expect((await putRes.json()).model).toBe('qwen3.6:27b')
 
     const managedSettings = await providerSvc.getManagedSettings()
     expect(managedSettings.model).toBeUndefined()

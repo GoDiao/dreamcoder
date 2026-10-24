@@ -662,7 +662,7 @@ describe('Business Flow: WebSocket Chat', () => {
       apiKey: 'sk-fake',
       authStrategy: 'api_key',
       apiFormat: 'anthropic',
-      models: { main: 'fake-model', haiku: 'fake-model', sonnet: 'fake-model', opus: 'fake-model' },
+      models: [{ id: 'fake-model' }],
     })
     await api('POST', `/api/providers/${data.provider.id}/activate`)
   })

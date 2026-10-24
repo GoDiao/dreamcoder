@@ -141,7 +141,7 @@ function ProviderSettings() {
                     )}
                   </div>
                   <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
-                    {provider.baseUrl} &middot; {provider.models.main}
+                    {provider.baseUrl} &middot; {provider.models[0]?.name || provider.models[0]?.id}
                   </div>
                   {test && !test.loading && test.result && (
                     <div

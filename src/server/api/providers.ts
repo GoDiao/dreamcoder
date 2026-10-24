@@ -5,6 +5,7 @@ import {
   CreateProviderSchema,
   UpdateProviderSchema,
   TestProviderSchema,
+  DiscoverProviderModelsSchema,
 } from '../types/provider.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { diagnosticsService } from '../services/diagnosticsService.js'
@@ -22,6 +23,17 @@ export async function handleProvidersApi(
 
     if (id === 'test' && req.method === 'POST') {
       return await handleTestUnsaved(req)
+    }
+
+    if (id === 'models' && req.method === 'POST') {
+      const body = await parseJsonBody(req)
+      try {
+        const input = DiscoverProviderModelsSchema.parse(body)
+        return Response.json({ models: await providerService.discoverModels(input) })
+      } catch (err) {
+        if (err instanceof z.ZodError) throw ApiError.badRequest(err.issues.map((i) => i.message).join('; '))
+        throw err
+      }
     }
 
     if (id === 'presets' && req.method === 'GET') {

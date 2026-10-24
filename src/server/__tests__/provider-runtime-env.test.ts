@@ -6,7 +6,9 @@ import * as path from 'path'
 import {
   mergeActiveProviderManagedEnv,
   readActiveProviderManagedEnv,
+  resolveProviderDefaultModel,
 } from '../services/providerRuntimeEnv.js'
+import type { SavedProvider } from '../types/provider.js'
 
 let tmpDir: string
 
@@ -36,12 +38,7 @@ describe('providerRuntimeEnv', () => {
           authStrategy: 'auth_token',
           baseUrl: 'https://api.example.com/anthropic',
           apiFormat: 'anthropic',
-          models: {
-            main: 'active-main',
-            haiku: '',
-            sonnet: 'active-sonnet',
-            opus: '',
-          },
+          models: [{ id: 'active-main' }, { id: 'active-sonnet' }],
         },
       ],
     })
@@ -54,9 +51,33 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-active',
       ANTHROPIC_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'active-main',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'active-sonnet',
+      ANTHROPIC_SMALL_FAST_MODEL: 'active-main',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'active-main',
     })
+  })
+
+  test('resolves a valid managed env model and ignores stale saved model keys', () => {
+    const provider = {
+      id: 'provider-1',
+      presetId: 'custom',
+      name: 'Provider',
+      apiKey: 'key',
+      baseUrl: 'https://api.example.com',
+      apiFormat: 'anthropic',
+      models: [{ id: 'model-main' }, { id: 'model-selected' }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } satisfies SavedProvider
+
+    expect(resolveProviderDefaultModel(provider, {
+      model: 'stale-saved-model',
+      env: { ANTHROPIC_MODEL: 'model-selected' },
+    })).toBe('model-selected')
+    expect(resolveProviderDefaultModel(provider, {
+      model: 'model-selected',
+      env: { ANTHROPIC_MODEL: 'also-stale' },
+    })).toBe('model-main')
   })
 
   test('strips a trailing /v1 from native Anthropic base URLs', async () => {
@@ -70,7 +91,7 @@ describe('providerRuntimeEnv', () => {
           apiKey: 'sk-active',
           baseUrl: 'https://api.example.com/anthropic/v1/',
           apiFormat: 'anthropic',
-          models: { main: 'm', haiku: 'm', sonnet: 'm', opus: 'm' },
+          models: [{ id: 'm' }],
         },
       ],
     })
@@ -90,12 +111,7 @@ describe('providerRuntimeEnv', () => {
           authStrategy: 'auth_token',
           baseUrl: 'https://sub2api.example.com',
           apiFormat: 'anthropic',
-          models: {
-            main: 'gpt-5.5',
-            haiku: 'gpt-5.5',
-            sonnet: 'gpt-5.5',
-            opus: 'gpt-5.5',
-          },
+          models: [{ id: 'gpt-5.5' }],
         },
       ],
     })

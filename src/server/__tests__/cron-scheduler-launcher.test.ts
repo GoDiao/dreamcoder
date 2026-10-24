@@ -124,12 +124,7 @@ async function activateTestProvider(): Promise<void> {
     baseUrl: 'https://api.default.example',
     apiFormat: 'anthropic',
     runtimeKind: 'anthropic_compatible',
-    models: {
-      main: 'default-main',
-      haiku: '',
-      sonnet: '',
-      opus: '',
-    },
+    models: [{ id: 'default-main' }],
   })
   await providerService.activateProvider(provider.id)
 }
@@ -344,12 +339,8 @@ describe('cron scheduler launcher resolution', () => {
       apiKey: 'provider-key',
       baseUrl: 'https://api.provider.example',
       apiFormat: 'openai_chat',
-      models: {
-        main: 'provider-main',
-        haiku: 'provider-fast',
-        sonnet: 'provider-main',
-        opus: '',
-      },
+      models: [{ id: 'provider-main' }, { id: 'provider-fast' }],
+      fastModel: 'provider-fast',
     })
     const cronService = new CronService()
     const scheduler = new CronScheduler(cronService)

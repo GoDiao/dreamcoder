@@ -550,5 +550,5 @@ Store --> C : patch(effective=bypass, pendingRestart=无)
 
 **试用后的修正**
 
-- 默认模型：`runtime.desired` 为空时按全局默认解析，有激活的 provider 时，全局默认就是这个 provider 的主模型。取托管设置 `env.ANTHROPIC_MODEL`（provider 激活和编辑时同步写入），它与去掉上下文后缀的 `models.main` 相同或为空时用 `models.main`。provider 模式下不再读写托管设置里的 `model` 和 `modelContext`：`GET /api/models/current`、启动时的默认解析（`getDefaultRuntimeSettings`）都不读，`PUT /api/models/current` 不写，桌面端激活 provider 时也不再写。原来激活时写进去的 `model` 不会随 provider 编辑更新，又没有界面能改，会一直盖过 provider 的主模型。没有 provider 时仍读写用户设置的 `model`，行为不变。编辑当前激活的 provider 后，桌面端重新拉取设置，默认模型的显示随之更新。
+- 默认模型：`runtime.desired` 为空时按全局默认解析，有激活的 provider 时，全局默认就是这个 provider 的主模型。托管设置 `env.ANTHROPIC_MODEL`（provider 激活和编辑时同步写入）若对应当前有序模型列表中的模型则使用它，否则使用列表首项 `models[0].id`。provider 模式下不再读写托管设置里的 `model` 和 `modelContext`：`GET /api/models/current`、启动时的默认解析（`getDefaultRuntimeSettings`）都不读，`PUT /api/models/current` 不写，桌面端激活 provider 时也不再写。原来激活时写进去的 `model` 不会随 provider 编辑更新，又没有界面能改，会一直盖过 provider 的主模型。没有 provider 时仍读写用户设置的 `model`，行为不变。编辑当前激活的 provider 后，桌面端重新拉取设置，默认模型的显示随之更新。
 - 权限模式的显示：第 3 步定的「界面显示 `effective`，没有汇报时用 `desired`」改为始终显示 `desired`，即用户选的模式。`effective` 已有汇报且与 `desired` 不同时，选择器上显示一个黄点，提示「本次回复结束后生效」；两者相同时（生效了，或在回合结束前改回原来的模式）黄点消失。回合之外切换普通模式时，CLI 很快汇报新的 `effective`，黄点只会短暂出现。
