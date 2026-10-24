@@ -87,7 +87,8 @@ git checkout main && git checkout -b feat/your-feature
 
 4. **测试**。确保你的改动不会破坏现有功能：
    ```bash
-   bun test                  # 服务端/CLI 测试(需要 PATH 里有 ripgrep)
+   bun run prepare:ripgrep    # 准备固定版本的搜索程序
+   bun test                  # 服务端/CLI 测试
    cd desktop
    bun run lint              # TypeScript 类型检查
    bun run test -- --run     # 桌面端测试
@@ -171,6 +172,29 @@ bun run tauri dev
 > 是漏跑了 Step 4 `bun run build`。
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
+
+### 随包提供 ripgrep
+
+`bun run build:sidecars` 和 `bun run tauri dev` 会自动准备 ripgrep。
+根目录的 `bun run build:sidecar` 也调用同一份桌面构建脚本。
+单独运行服务端、CLI 或测试前，在仓库根目录执行 `bun run prepare:ripgrep`。
+首次执行需要访问 GitHub Releases，并使用系统的 `tar`（macOS、Windows 和常见 Linux
+开发环境均提供）。不需要新增 npm 包，也不需要安装系统级 ripgrep。
+
+脚本固定使用 [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0)，
+覆盖 macOS arm64/x64、Windows x64、Linux arm64/x64；Linux 的 GNU 和 musl 构建均使用
+静态 musl 二进制。`scripts/prepare-ripgrep.ts` 中的压缩包 SHA-256 来自官方发布的
+`.sha256` 文件，并与 GitHub asset digest 交叉核对；二进制 SHA-256 从校验通过的压缩包
+解压后计算。只有文件内容匹配固定校验值才会跳过下载。升级版本时，需重新验证各平台的
+两类校验值，并更新 `THIRD_PARTY_NOTICES.md` 及安装包冒烟测试中的版本。
+
+源码运行读取 `vendor/ripgrep/<arch>-<platform>/rg`（Windows 为 `rg.exe`）。构建还会
+生成 `desktop/src-tauri/binaries/rg-<target-triple>`（Windows 另带 `.exe`）。Tauri 安装时
+去掉 target 后缀：macOS 位于 `Contents/MacOS`，Windows 位于应用目录，Linux 位于应用
+二进制目录，均与 sidecar 相邻。许可证作为资源随包分发。两个二进制目录均已被 Git 忽略。
+
+查找顺序：`USE_BUILTIN_RIPGREP=0` 强制使用系统版本；否则依次查找可执行文件旁的版本、
+源码 vendor 版本、`PATH` 中的系统 `rg`，最后报告不可用。标准 Bun 不在 sidecar 内嵌 ripgrep。
 
 ## 向精选 MCP 注册表添加服务器
 

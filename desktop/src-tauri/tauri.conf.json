@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run prepare:ripgrep && bun run dev",
     "beforeBuildCommand": "bun run build && bun run build:sidecars"
   },
   "app": {
@@ -46,10 +46,12 @@
       }
     },
     "externalBin": [
-      "binaries/dreamcoder-sidecar"
+      "binaries/dreamcoder-sidecar",
+      "binaries/rg"
     ],
     "resources": [
-      "../dist"
+      "../dist",
+      "../../THIRD_PARTY_NOTICES.md"
     ],
     "icon": [
       "icons/32x32.png",

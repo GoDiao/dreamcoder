@@ -348,12 +348,10 @@ export function convertToSandboxRuntimeConfig(
     }
   }
   // Ripgrep config for sandbox. User settings take priority; otherwise pass our rg.
-  // In embedded mode (argv0='rg' dispatch), sandbox-runtime spawns with argv0 set.
-  const { rgPath, rgArgs, argv0 } = ripgrepCommand()
+  const { rgPath, rgArgs } = ripgrepCommand()
   const ripgrepConfig = settings.sandbox?.ripgrep ?? {
     command: rgPath,
     args: rgArgs,
-    argv0,
   }
 
   return {
