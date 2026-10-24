@@ -33,6 +33,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- **Proxy** (#148): when the ChatGPT sign-in path streams a non-streaming request and the upstream ends with `response.failed` or `error`, the caller now gets an `api_error` (HTTP 502) with the upstream message, instead of an empty `end_turn` reply. Thanks @pcbeingused333.
 - **Sidebar re-renders** (#157, #158): the sidebar no longer re-renders on streamed text updates. Running indicators still follow session and tab status. Thanks @tedy69.
 - **Re-renders while a reply runs** (#156, #165): the session page no longer re-renders every second during a reply. Only the elapsed time updates, and it now counts from when the server starts the turn. Thanks @princecherry9905.
 - **Smoother streaming replies** (#154): a reply that is still streaming is no longer re-parsed and redrawn in full on every update. Finished paragraphs, lists, tables and code blocks are drawn once and stay in place; only the part still being written is redrawn. Text selected in the finished part stays selected while the reply continues. Code in a streaming reply uses the lighter highlighter and gets full highlighting when the reply ends, so code blocks no longer flicker. Following the bottom of the reply now scrolls at most once per frame.
