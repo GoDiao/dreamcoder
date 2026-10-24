@@ -51,10 +51,11 @@ bun run test -- --run       # desktop tests (vitest)
 Read your whole diff against `main` (`git diff main...HEAD`) and check:
 
 - **Nothing left over.** No debug logging, temporary timing or test hooks, commented-out code, stray files, or unrelated reformatting. The lockfile changes only if you added a dependency.
-- **No comments in added lines.** This catches most of them:
+- **No comments in added lines.** This catches most of them and skips URLs such as `https://`:
   ```bash
-  git diff main...HEAD -U0 -- '*.ts' '*.tsx' '*.rs' | grep -nE '^\+.*(//|/\*|^\+\s*\*)'
+  git diff main...HEAD -U0 -- '*.ts' '*.tsx' '*.rs' | grep -nE '^\+(\s*(//|/\*|\*)|.*[^:]//|.*\s/\*)'
   ```
+  It can still flag a `//` inside a string; check each hit before removing it.
 - **Every place the change belongs.** Search for the field, setting or message type you touched and update every layer that uses it: server state, the desktop mirror, the H5 page, i18n in both languages, and their tests.
 - **The paths around the happy path.** Errors and empty states; a page refresh or reconnect in the middle of a reply; the same session open in two clients; switching sessions.
 - **Both themes and both languages** for UI changes.
