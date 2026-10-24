@@ -484,6 +484,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [name, setName] = useState(provider?.name ?? getPresetDisplayName(initialPreset, t))
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? initialPreset.baseUrl)
   const [apiFormat, setApiFormat] = useState<ApiFormat>(provider?.apiFormat ?? initialPreset.apiFormat ?? 'anthropic')
+  const [modelsApiFormat, setModelsApiFormat] = useState<ApiFormat>(apiFormat)
   const [authStrategy, setAuthStrategy] = useState<ProviderAuthStrategy>(provider?.authStrategy ?? getPresetAuthStrategy(initialPreset))
   const [apiKey, setApiKey] = useState(provider?.apiKey ?? '')
   const [showApiKey, setShowApiKey] = useState(false)
@@ -506,6 +507,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [isTesting, setIsTesting] = useState(false)
   const [isDiscovering, setIsDiscovering] = useState(false)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [discoveryCount, setDiscoveryCount] = useState<number | null>(null)
   const [discoveredModels, setDiscoveredModels] = useState<ProviderModel[]>([])
   const [newModelId, setNewModelId] = useState('')
@@ -581,6 +583,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setName(getPresetDisplayName(preset, t))
     setBaseUrl(preset.baseUrl)
     setApiFormat(preset.apiFormat ?? 'anthropic')
+    setModelsApiFormat(preset.apiFormat ?? 'anthropic')
     setAuthStrategy(getPresetAuthStrategy(preset))
     setModels(preset.defaultModels.map((model) => ({ ...model })))
     setFastModel(preset.defaultFastModel ?? '')
@@ -731,6 +734,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels(fetched)
       setDiscoveryCount(fetched.length)
+      setModelsApiFormat(apiFormat)
     } catch (err) {
       if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels([])
@@ -779,6 +783,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     const parsedAutoCompactWindow = parseAutoCompactWindowInput(autoCompactWindow)
     const parsedModelContextWindows = buildModelContextWindows(models, modelContextInputs)
     setIsSubmitting(true)
+    setSaveError(null)
     try {
       if (settingsJson.trim()) {
         try {
@@ -825,6 +830,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       onClose()
     } catch (err) {
       console.error('Failed to save provider:', err)
+      setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsSubmitting(false)
     }
@@ -870,6 +876,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       width={720}
       footer={
         <>
+          {saveError && (
+            <p role="alert" className="mr-auto self-center text-xs text-[var(--color-error)] [overflow-wrap:anywhere]">
+              {t('settings.providers.saveFailed', { error: saveError })}
+            </p>
+          )}
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit} loading={isSubmitting}>
             {mode === 'create' ? t('common.add') : t('common.save')}
@@ -995,6 +1006,9 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           </div>
           {discoveryError && (
             <p role="alert" className="mb-2 text-[11px] text-[var(--color-error)]">{discoveryError}</p>
+          )}
+          {models.length > 0 && apiFormat !== modelsApiFormat && (
+            <p role="status" className="mb-2 text-[11px] text-[var(--color-warning)]">{t('settings.providers.apiFormatChangedModels')}</p>
           )}
           {discoveryCount !== null && (
             <p role="status" className="mb-2 text-[11px] text-[var(--color-text-secondary)]">

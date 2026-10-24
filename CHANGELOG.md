@@ -26,6 +26,8 @@ All notable changes to DreamCoder will be documented in this file.
 - Groups of tool calls, such as "Read 3 files", are collapsed by default, also while they run. A group with a failed step stays collapsed and shows a red marker (#150).
 - **Thinking and tool calls between two pieces of reply text fold into one group** (#170), so a short turn no longer pushes the answer far down the page. The summary counts thinking too, e.g. "ran 2 commands, read 1 file, thought 4 times", and the expanded group lists the steps in their original order. Thinking with no tool calls around it is still its own row.
 - **Faster desktop startup** (#152, #161): KaTeX, Mermaid, the diff viewer, the Doctor panel, the Settings pages, the workspace panel and session search load the first time they are needed, which cuts the JavaScript loaded at startup by about half. Thanks @ibrahimmaq14.
+- **A provider holds any number of models, in order, and an optional fast model** (#159). The first model is the main model. Settings → Providers can fetch the provider's model list and pick from it, and the generated settings JSON follows the list. Session titles use the fast model, or the session's model when there is none. Thanks @AIR-Xie.
+  - Existing providers are migrated on first start, and the old file is kept as `providers.json.bak-before-migration-*`. Older versions cannot read the migrated file: restore that backup before downgrading.
 
 ### Removed
 
@@ -41,6 +43,7 @@ All notable changes to DreamCoder will be documented in this file.
 - **Smoother streaming replies** (#154, #171): a reply that is still streaming is no longer re-parsed and redrawn in full on every update. Finished paragraphs, lists, tables and code blocks are drawn once and stay in place; only the part still being written is redrawn. Text selected in the finished part stays selected while the reply continues. Code in a streaming reply uses the lighter highlighter and gets full highlighting when the reply ends, so code blocks no longer flicker. Following the bottom of the reply now scrolls at most once per frame.
 - New sessions start on the active provider's main model. Before, activating a provider saved its main model in a hidden setting, and that saved value kept overriding the provider after its main model was edited (#150).
 - The selected model card in the dark theme had light pink colors with text that was hard to read (#150).
+- Saving a provider that the server rejects now shows the error in the form. Before, the Save button did nothing and the form gave no sign of why (#175).
 
 ## [0.6.1] — 2026-10-21
 

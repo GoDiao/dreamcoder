@@ -1277,7 +1277,7 @@ describe('Providers API', () => {
     expect(res.status).toBe(400)
   })
 
-  test('POST /api/providers/models should return 502 for upstream authentication errors', async () => {
+  test('POST /api/providers/models should return 400 when the upstream rejects the credentials', async () => {
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -1290,6 +1290,31 @@ describe('Providers API', () => {
       const { req, url, segments } = makeRequest('POST', '/api/providers/models', {
         baseUrl: `http://127.0.0.1:${server.port}/v1`,
         apiKey: 'bad-key',
+        apiFormat: 'openai_chat',
+      })
+      const res = await handleProvidersApi(req, url, segments)
+      const body = (await res.json()) as { error: string }
+
+      expect(res.status).toBe(400)
+      expect(body.error).toBe('MODEL_DISCOVERY_FAILED')
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('POST /api/providers/models should return 502 when the upstream fails with a server error', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return new Response('boom', { status: 503 })
+      },
+    })
+
+    try {
+      const { req, url, segments } = makeRequest('POST', '/api/providers/models', {
+        baseUrl: `http://127.0.0.1:${server.port}/v1`,
+        apiKey: 'sk-test',
         apiFormat: 'openai_chat',
       })
       const res = await handleProvidersApi(req, url, segments)

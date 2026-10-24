@@ -248,6 +248,25 @@ describe('ProviderFormModal edit mode', () => {
     })
   })
 
+  it('shows the save error and keeps the modal open when saving fails', async () => {
+    updateProviderMock.mockRejectedValue(new Error('Base URL is invalid'))
+    const onClose = vi.fn()
+    render(
+      <ProviderFormModal open={true} onClose={onClose} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Could not save: Base URL is invalid')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+
+    updateProviderMock.mockResolvedValue(provider)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText(/Could not save/)).not.toBeInTheDocument()
+  })
+
   it('does not restore the preset fast model when editing a provider without one', async () => {
     const providerWithoutFast: SavedProvider = {
       ...provider,
@@ -403,6 +422,24 @@ describe('ProviderFormModal edit mode', () => {
       apiKey: '',
     }))
     expect(screen.getByRole('status')).toHaveTextContent('2 models found')
+  })
+
+  it('asks to fetch models again after the API format changes until a fetch succeeds', async () => {
+    render(
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+    )
+    const hint = 'Model IDs can differ between API formats. Fetch models again and check the list below.'
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Anthropic Messages/ }))
+    fireEvent.click(screen.getByRole('button', { name: /OpenAI Chat Completions/ }))
+    expect(screen.getByText(hint)).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    expect(discoverModelsMock).toHaveBeenCalledWith(expect.objectContaining({ apiFormat: 'openai_chat' }))
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
   })
 
   it('clears discovered models when the connection changes and ignores stale responses', async () => {
