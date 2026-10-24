@@ -6,7 +6,11 @@ import '@testing-library/jest-dom'
 const counts = vi.hoisted(() => ({
   commits: {} as Record<string, number>,
   toolGroups: {} as Record<string, number>,
-  toolGroupProps: {} as Record<string, { resultMap: Map<string, { content: unknown }> }>,
+  toolGroupProps: {} as Record<string, {
+    resultMap: Map<string, { content: unknown }>
+    steps?: Array<{ id: string; content?: unknown }>
+    activeThinkingId?: string | null
+  }>,
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -262,6 +266,35 @@ describe('components still update on the fields they use', () => {
       mirror: { ...mirror, runtime: { desired: { providerId: 'p1', modelId: 'm2', effort: 'high' }, effective: null } } as PerSessionState['mirror'],
     })
     expect(result.current).toEqual({ providerId: 'p1', modelId: 'm2', effort: 'high' })
+  })
+
+  it('only the group holding the streaming thinking re-renders', () => {
+    const session = useChatStore.getState().sessions[SCENARIO_SESSION_ID]!
+    const liveTurn: PerSessionState['messages'] = [
+      ...session.messages,
+      { id: 'u2', type: 'user_text', content: 'Run the tests', timestamp: 1 },
+      { id: LIVE_GROUP_ID, type: 'tool_use', toolName: 'Bash', toolUseId: 'tu-live', input: { command: 'ls' }, timestamp: 2 },
+      { id: 'r-live', type: 'tool_result', toolUseId: 'tu-live', content: 'files', isError: false, timestamp: 3 },
+    ]
+    patchSession({ messages: liveTurn, chatState: 'thinking' })
+    render(<MessageList sessionId={SCENARIO_SESSION_ID} />)
+    resetCounts()
+
+    let thought = ''
+    for (let i = 0; i < 3; i++) {
+      thought += `step ${i} `
+      patchSession({
+        messages: [...liveTurn, { id: 'think-live', type: 'thinking', content: thought, timestamp: 4 }],
+        activeThinkingId: 'think-live',
+      })
+    }
+
+    expect(counts.toolGroups[HISTORY_GROUP_ID]).toBeUndefined()
+    expect(counts.toolGroups[LIVE_GROUP_ID]).toBe(3)
+    const liveProps = counts.toolGroupProps[LIVE_GROUP_ID]!
+    expect(liveProps.steps?.map((step) => step.id)).toEqual([LIVE_GROUP_ID, 'think-live'])
+    expect(liveProps.steps?.[1]?.content).toBe(thought)
+    expect(liveProps.activeThinkingId).toBe('think-live')
   })
 
   it('a tool group re-renders when its own result arrives', () => {

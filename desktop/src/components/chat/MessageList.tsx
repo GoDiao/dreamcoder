@@ -37,9 +37,11 @@ type MemoryEvent = Extract<UIMessage, { type: 'memory_event' }>
 type GoalEvent = Extract<UIMessage, { type: 'goal_event' }>
 type BackgroundTaskEvent = Extract<UIMessage, { type: 'background_task' }>
 type CompactSummaryEvent = Extract<UIMessage, { type: 'compact_summary' }>
+type ThinkingMessage = Extract<UIMessage, { type: 'thinking' }>
+type ActivityStep = ToolCall | ThinkingMessage
 
 type RenderItem =
-  | { kind: 'tool_group'; toolCalls: ToolCall[]; id: string }
+  | { kind: 'tool_group'; toolCalls: ToolCall[]; steps: ActivityStep[]; id: string }
   | { kind: 'message'; message: UIMessage }
 
 type RenderModel = {
@@ -50,6 +52,7 @@ type RenderModel = {
 
 type ToolGroupResults = {
   toolCalls: ToolCall[]
+  steps: ActivityStep[]
   resultMap: Map<string, ToolResult>
   childToolCallsByParent: Map<string, ToolCall[]>
   agentTaskNotifications: Record<string, AgentTaskNotification>
@@ -468,25 +471,39 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
   const lastUnresolvedAskUserQuestionIndexByToolUseId = new Map<string, number>()
   let lastUnresolvedAskUserQuestionIndex: number | null = null
   let pendingToolCalls: ToolCall[] = []
+  let pendingSteps: ActivityStep[] = []
 
   const flushGroup = () => {
     if (pendingToolCalls.length > 0) {
       items.push({
         kind: 'tool_group',
         toolCalls: [...pendingToolCalls],
-        id: `group-${pendingToolCalls[0]!.id}`,
+        steps: [...pendingSteps],
+        id: `group-${pendingSteps[0]!.id}`,
       })
-      pendingToolCalls = []
+    } else {
+      for (const step of pendingSteps) items.push({ kind: 'message', message: step })
     }
+    pendingToolCalls = []
+    pendingSteps = []
   }
+  const pendingIsAgentGroup = () =>
+    pendingToolCalls.length > 0 && pendingToolCalls.every((pendingToolCall) => pendingToolCall.toolName === 'Agent')
   const appendRootToolCall = (toolCall: ToolCall) => {
     const nextIsAgent = toolCall.toolName === 'Agent'
-    const pendingIsAgentGroup = pendingToolCalls.every((pendingToolCall) => pendingToolCall.toolName === 'Agent')
+    const hasPendingThinking = pendingSteps.length > pendingToolCalls.length
 
-    if (pendingToolCalls.length > 0 && pendingIsAgentGroup !== nextIsAgent) {
+    if (pendingToolCalls.length > 0 && pendingIsAgentGroup() !== nextIsAgent) {
+      flushGroup()
+    } else if (nextIsAgent && hasPendingThinking) {
       flushGroup()
     }
     pendingToolCalls.push(toolCall)
+    pendingSteps.push(toolCall)
+  }
+  const appendThinking = (message: ThinkingMessage) => {
+    if (pendingIsAgentGroup()) flushGroup()
+    pendingSteps.push(message)
   }
 
   for (const msg of messages) {
@@ -555,6 +572,8 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
       } else {
         appendRootToolCall(msg)
       }
+    } else if (msg.type === 'thinking') {
+      appendThinking(msg)
     } else {
       flushGroup()
       items.push({ kind: 'message', message: msg })
@@ -613,6 +632,7 @@ export function buildToolGroupResults(
     const prior = previous.get(item.id)
     groups.set(item.id, {
       toolCalls: prior && sameItems(prior.toolCalls, item.toolCalls) ? prior.toolCalls : item.toolCalls,
+      steps: prior && sameItems(prior.steps, item.steps) ? prior.steps : item.steps,
       resultMap: prior && sameMapEntries(prior.resultMap, resultMap, Object.is) ? prior.resultMap : resultMap,
       childToolCallsByParent: prior && sameMapEntries(prior.childToolCallsByParent, childMap, sameItems)
         ? prior.childToolCallsByParent
@@ -1030,7 +1050,7 @@ function getMessageContentWeight(message: UIMessage): number {
 
 function getRenderItemContentWeight(item: RenderItem): number {
   if (item.kind === 'message') return getMessageContentWeight(item.message)
-  return item.toolCalls.reduce((total, toolCall) => total + getMessageContentWeight(toolCall), 0)
+  return item.steps.reduce((total, step) => total + getMessageContentWeight(step), 0)
 }
 
 function shouldVirtualizeRenderItems(metrics: VirtualRenderItemMetric[]) {
@@ -1129,7 +1149,7 @@ function getMessageMetricSignature(message: UIMessage): string {
 
 function getRenderItemMetricSignature(item: RenderItem): string {
   if (item.kind === 'message') return getMessageMetricSignature(item.message)
-  return item.toolCalls.map(getMessageMetricSignature).join('|')
+  return item.steps.map(getMessageMetricSignature).join('|')
 }
 
 function findVirtualStartIndex(offsets: number[], target: number) {
@@ -1894,6 +1914,9 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
         {item.kind === 'tool_group' ? (
           <ToolCallGroup
             {...toolGroupResults.get(item.id)!}
+            activeThinkingId={
+              activeThinkingId && item.steps.some((step) => step.id === activeThinkingId) ? activeThinkingId : null
+            }
             isStreaming={
               chatState === 'tool_executing' &&
               item.toolCalls.some((tc) => !toolResultMap.has(tc.toolUseId))
