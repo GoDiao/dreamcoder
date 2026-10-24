@@ -1,4 +1,5 @@
 import { openaiResponsesToAnthropic } from '../transform/openaiResponsesToAnthropic.js'
+import { upstreamErrorMessage } from './openaiResponsesStreamToAnthropic.js'
 import type {
   AnthropicResponse,
   OpenAIResponsesResponse,
@@ -13,7 +14,6 @@ type StreamFallbackState = {
   usage: OpenAIResponsesResponse['usage']
 }
 
-/** The upstream Responses stream ended with `response.failed` or `error`. */
 export class OpenAIResponsesStreamError extends Error {}
 
 export async function openaiResponsesStreamToAnthropicResponse(
@@ -92,15 +92,6 @@ export async function openaiResponsesStreamToAnthropicResponse(
     completedResponse ?? buildFallbackResponse(fallback),
     model,
   )
-}
-
-// Same message lookup as the streaming converter's `error` / `response.failed` case.
-function upstreamErrorMessage(data: Record<string, unknown>): string {
-  const response = data.response as Record<string, unknown> | undefined
-  const error = (response?.error ?? data.error ?? data) as Record<string, unknown> | undefined
-  return typeof error?.message === 'string' && error.message
-    ? error.message
-    : 'Upstream Responses stream failed'
 }
 
 function updateFallbackState(
