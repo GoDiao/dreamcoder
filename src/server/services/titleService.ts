@@ -34,6 +34,7 @@ export function deriveTitle(raw: string): string | undefined {
 export async function generateTitle(
   conversationText: string,
   providerId?: string | null,
+  selectedModel?: string,
 ): Promise<string | null> {
   const trimmed = cleanSessionTitleSource(conversationText)
   if (!trimmed) return null
@@ -56,10 +57,12 @@ export async function generateTitle(
     if (!resolvedProvider) return null
     const target = resolveUpstreamTarget(resolvedProvider)
     if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) return null
+    const titleModel = resolvedProvider.fastModel || selectedModel || resolvedProvider.models[0]?.id
+    if (!titleModel) return null
 
     const shouldDisableThinking = await shouldDisableThinkingForTitle()
     const result = await sendToUpstream(target, {
-      model: resolvedProvider.models.haiku || resolvedProvider.models.main,
+      model: titleModel,
       max_tokens: TITLE_MAX_OUTPUT_TOKENS,
       system: TITLE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],

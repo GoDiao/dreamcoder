@@ -944,6 +944,7 @@ export class ConversationService {
       'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+      'ANTHROPIC_SMALL_FAST_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
       'ANTHROPIC_DEFAULT_SONNET_MODEL',
       'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
@@ -977,14 +978,11 @@ export class ConversationService {
 
     const explicitProviderEnv =
       typeof options?.providerId === 'string'
-        ? await this.providerService.getProviderRuntimeEnv(options.providerId)
+        ? await this.providerService.getProviderRuntimeEnv(options.providerId, options.model)
         : null
     const userSettings = await new SettingsService().getUserSettings()
     const networkEnv = buildNetworkEnvironment(normalizeNetworkSettings(userSettings))
     applyAgentTeamsSetting(cleanEnv, userSettings)
-    if (explicitProviderEnv && options?.model?.trim()) {
-      explicitProviderEnv.ANTHROPIC_MODEL = options.model.trim()
-    }
     const attributionHeaderEnv = attributionHeaderEnvForModel(
       options?.model?.trim() ||
         explicitProviderEnv?.ANTHROPIC_MODEL ||

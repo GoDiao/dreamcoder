@@ -9,11 +9,9 @@ export type ProviderAuthStrategy =
 
 export type ProviderRuntimeKind = 'anthropic_compatible'
 
-export type ModelMapping = {
-  main: string
-  haiku: string
-  sonnet: string
-  opus: string
+export type ProviderModel = {
+  id: string
+  name?: string
 }
 
 export type ModelContextWindows = Record<string, number>
@@ -27,7 +25,8 @@ export type SavedProvider = {
   baseUrl: string
   apiFormat: ApiFormat
   runtimeKind?: ProviderRuntimeKind
-  models: ModelMapping
+  models: ProviderModel[]
+  fastModel?: string
   autoCompactWindow?: number
   modelContextWindows?: ModelContextWindows
   notes?: string
@@ -41,7 +40,8 @@ export type CreateProviderInput = {
   baseUrl: string
   apiFormat?: ApiFormat
   runtimeKind?: ProviderRuntimeKind
-  models: ModelMapping
+  models: ProviderModel[]
+  fastModel?: string
   autoCompactWindow?: number
   modelContextWindows?: ModelContextWindows
   notes?: string
@@ -54,7 +54,8 @@ export type UpdateProviderInput = {
   baseUrl?: string
   apiFormat?: ApiFormat
   runtimeKind?: ProviderRuntimeKind
-  models?: ModelMapping
+  models?: ProviderModel[]
+  fastModel?: string | null
   autoCompactWindow?: number | null
   modelContextWindows?: ModelContextWindows | null
   notes?: string
@@ -64,6 +65,13 @@ export type TestProviderConfigInput = {
   baseUrl: string
   apiKey: string
   modelId: string
+  authStrategy?: ProviderAuthStrategy
+  apiFormat?: ApiFormat
+}
+
+export type DiscoverProviderModelsInput = {
+  baseUrl: string
+  apiKey: string
   authStrategy?: ProviderAuthStrategy
   apiFormat?: ApiFormat
 }

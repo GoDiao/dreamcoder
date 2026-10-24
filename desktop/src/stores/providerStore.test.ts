@@ -66,12 +66,12 @@ function makeProvider(overrides: Partial<SavedProvider> = {}): SavedProvider {
     apiKey: 'key-a',
     baseUrl: 'https://example.invalid/api',
     apiFormat: 'anthropic',
-    models: {
-      main: 'model-main',
-      haiku: 'model-haiku',
-      sonnet: 'model-sonnet',
-      opus: 'model-opus',
-    },
+    models: [
+      { id: 'model-main' },
+      { id: 'model-haiku' },
+      { id: 'model-sonnet' },
+      { id: 'model-opus' },
+    ],
     ...overrides,
   }
 }

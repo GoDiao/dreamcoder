@@ -1,6 +1,7 @@
 import { SettingsService } from '../services/settingsService.js'
 import { ProviderService } from '../services/providerService.js'
 import { resolveProviderDefaultModel } from '../services/providerRuntimeEnv.js'
+import type { ProviderModel } from '../types/provider.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 const DEFAULT_MODELS = [
@@ -39,70 +40,23 @@ type ApiModelInfo = {
   context: string
 }
 
-function addUniqueModel(
-  models: ApiModelInfo[],
-  model: ApiModelInfo | null,
-): void {
-  if (!model || !model.id.trim()) {
-    return
-  }
-
-  if (models.some(existing => existing.id === model.id)) {
-    return
-  }
-
-  models.push(model)
-}
-
-function buildProviderModelList(models: {
-  main: string
-  haiku: string
-  sonnet: string
-  opus: string
-}): ApiModelInfo[] {
-  const modelList: ApiModelInfo[] = []
-
-  addUniqueModel(modelList, {
-    id: models.main,
-    name: models.main,
-    description: 'Main model',
+function buildProviderModelList(models: ProviderModel[]): ApiModelInfo[] {
+  return models.map((model) => ({
+    id: model.id,
+    name: model.name || model.id,
+    description: model.name ? model.id : '',
     context: '',
-  })
-  addUniqueModel(modelList, models.haiku
-    ? {
-        id: models.haiku,
-        name: models.haiku,
-        description: 'Haiku model',
-        context: '',
-      }
-    : null)
-  addUniqueModel(modelList, models.sonnet
-    ? {
-        id: models.sonnet,
-        name: models.sonnet,
-        description: 'Sonnet model',
-        context: '',
-      }
-    : null)
-  addUniqueModel(modelList, models.opus
-    ? {
-        id: models.opus,
-        name: models.opus,
-        description: 'Opus model',
-        context: '',
-      }
-    : null)
-
-  return modelList
+  }))
 }
 
 function getEnvConfiguredAnthropicModels(): ApiModelInfo[] {
-  return buildProviderModelList({
-    main: process.env.ANTHROPIC_MODEL?.trim() || '',
-    haiku: process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() || '',
-    sonnet: process.env.ANTHROPIC_DEFAULT_SONNET_MODEL?.trim() || '',
-    opus: process.env.ANTHROPIC_DEFAULT_OPUS_MODEL?.trim() || '',
-  })
+  const ids = [
+    process.env.ANTHROPIC_MODEL?.trim() || '',
+    process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() || '',
+    process.env.ANTHROPIC_DEFAULT_SONNET_MODEL?.trim() || '',
+    process.env.ANTHROPIC_DEFAULT_OPUS_MODEL?.trim() || '',
+  ]
+  return buildProviderModelList([...new Set(ids)].filter(Boolean).map((id) => ({ id })))
 }
 
 function getStandaloneModelList(): ApiModelInfo[] {
@@ -168,6 +122,7 @@ async function handleCurrentModel(req: Request): Promise<Response> {
     const { providers, activeId } = await providerService.listProviders()
     const activeProvider = activeId ? providers.find((p) => p.id === activeId) : null
     let currentModelId: string
+    let currentModelName: string
     let contextTier: string | undefined
 
     if (activeProvider) {
@@ -175,13 +130,14 @@ async function handleCurrentModel(req: Request): Promise<Response> {
         activeProvider,
         await providerService.getManagedSettings(),
       )
+      currentModelName = activeProvider.models.find((model) => model.id === currentModelId)?.name || currentModelId
     } else {
       const settings = await settingsService.getUserSettings()
       const envModel = process.env.ANTHROPIC_MODEL?.trim() || ''
       currentModelId = (settings.model as string) || envModel || DEFAULT_MODEL
+      currentModelName = currentModelId
       contextTier = (settings.modelContext as string) || undefined
     }
-    const currentModelName = currentModelId
 
     const lookupId = contextTier ? `${currentModelId}:${contextTier}` : currentModelId
 
@@ -216,10 +172,14 @@ async function handleCurrentModel(req: Request): Promise<Response> {
     const colonIdx = modelId.indexOf(':')
     const baseId = colonIdx !== -1 ? modelId.slice(0, colonIdx) : modelId
     const contextTier = colonIdx !== -1 ? modelId.slice(colonIdx + 1) : undefined
-    await settingsService.updateUserSettings({
-      model: baseId,
-      modelContext: contextTier || undefined,
-    })
+
+    const updates: Record<string, unknown> = { model: baseId }
+    if (contextTier) {
+      updates.modelContext = contextTier
+    } else {
+      updates.modelContext = undefined
+    }
+    await settingsService.updateUserSettings(updates)
     return Response.json({ ok: true, model: modelId })
   }
 
