@@ -5,7 +5,7 @@ import { Button } from '../shared/Button'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { sessionsApi, type SessionExport, type SessionExportOptions } from '../../api/sessions'
 import { useTranslation } from '../../i18n'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { useUIStore } from '../../stores/uiStore'
 
 type Format = SessionExportOptions['format']
@@ -15,7 +15,7 @@ type Format = SessionExportOptions['format']
  * in the native dialog; a browser (H5) downloads it.
  */
 async function saveExport(file: SessionExport): Promise<boolean> {
-  if (isTauriRuntime()) {
+  if (isDesktopRuntime()) {
     const markdown = file.format === 'markdown'
     const path = await pickExportPath({
       defaultPath: file.fileName,

@@ -37,11 +37,9 @@ describe('default shell preferences', () => {
     expect(screen.queryByPlaceholderText('Bash Path')).not.toBeInTheDocument()
   })
 
-  it('passes the current terminal settings to native detection', async () => {
-    const settings = { startupShell: 'custom' as const, customShellPath: '/opt/shell', bashPath: '/opt/bash' }
-    useSettingsStore.setState({ desktopTerminal: settings })
+  it('asks the sidecar for the default shell', async () => {
     render(<TerminalShellSettings />)
-    await waitFor(() => expect(native.detect).toHaveBeenCalledWith(settings))
+    await waitFor(() => expect(native.detect).toHaveBeenCalledWith())
   })
 
   it.each(['macos', 'linux'])('shows detection and Unix choices on %s', async (platform) => {

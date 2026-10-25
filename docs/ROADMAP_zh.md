@@ -4,7 +4,7 @@
 
 ## Phase 1 — 桌面端 GUI + 多模型支持 ✅
 
-- [x] Tauri 2 桌面应用（macOS Apple Silicon 为日常开发平台；Windows x64 测试充分；Linux 尽力支持）
+- [x] Electron 桌面应用（macOS Apple Silicon 为日常开发平台；Windows x64 测试充分；Linux 尽力支持）
 - [x] 多 Provider 配置（Anthropic/OpenAI 兼容接口；DeepSeek、通义千问、Kimi、智谱 GLM、LM Studio、Ollama 等预设）
 - [x] 可视化设置界面 (Provider、API Key、模型映射)
 - [x] 会话管理 (多标签、侧边栏、历史搜索)

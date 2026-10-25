@@ -7,23 +7,23 @@
 ## ⚡ 5 分钟快速上手 (TL;DR)
 
 ```bash
-# 1. 在 GitHub 上 Fork，然后 clone 你的 fork（需要 Bun >= 1.0、Rust、Node >= 18）
+# 1. 在 GitHub 上 Fork，然后 clone 你的 fork（需要 Bun >= 1.0、Node >= 18）
 git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 
 # 2. 装根工作区依赖（sidecar 运行时）
 bun install
 
-# 3. 装桌面端依赖（Tauri CLI + React 前端）
+# 3. 装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
-# 4. 编译 sidecar 二进制（不跑这步，第 6 步会因 externalBin 缺失而失败）
+# 4. 下载 Electron 本体（Bun 不会运行 Electron 的安装脚本）
+bun run electron:install
+
+# 5. 编译 sidecar 二进制（不跑这步，第 6 步无法启动本地服务）
 bun run build:sidecars
 
-# 5. 构建一次前端（生成 desktop/dist，tauri dev 启动时需要它）
-bun run build
-
-# 6. 启动桌面端开发模式
-bun run tauri dev
+# 6. 启动桌面端开发模式（同时启动 Vite 和 Electron）
+bun run electron:dev
 
 # 7. 在 issue 列表挑一个带 `good first issue` 或 `help wanted` 标签的任务，
 #    从 main 分支拉一个功能分支
@@ -101,7 +101,7 @@ git checkout main && git checkout -b feat/your-feature
 
 ```
 dreamcoder/
-├── desktop/               # Tauri 桌面应用
+├── desktop/               # Electron 桌面应用
 │   ├── src/
 │   │   ├── components/    # React 组件
 │   │   ├── stores/        # Zustand 状态管理
@@ -109,7 +109,7 @@ dreamcoder/
 │   │   ├── hooks/         # React Hooks
 │   │   ├── pages/         # 页面组件
 │   │   └── i18n/          # 国际化
-│   └── src-tauri/         # Rust 后端
+│   └── electron/          # Electron 主进程与 preload
 ├── src/                   # CLI 与后端服务（src/server/）
 ├── website/               # 项目官网
 └── docs/                  # 文档
@@ -121,11 +121,11 @@ dreamcoder/
 
 > ⚠️ **平台支持说明**
 >
-> 维护者目前**主要在 macOS（Apple Silicon）上开发**，从源码运行（`bun run tauri dev`），
-> 但打包后的 macOS 安装包尚未验证。**Windows x64** 是此前的主力平台，经过长期实测，
+> 维护者目前**主要在 macOS（Apple Silicon）上开发**，从源码运行（`bun run electron:dev`）。
+> **Windows x64** 是此前的主力平台，经过长期实测，
 > 但维护者现在不在 Windows 上日常开发，新改动的 Windows 验证尤其需要帮助。
-> 代码里也有 Linux 的平台分支，但维护者日常不在 Linux 上跑。
-> 如果你在 Windows 或 Linux 上，或者要打包 macOS 应用：
+> Linux 暂不打包，维护者日常也不在 Linux 上跑。
+> 如果你在 Windows 或 Linux 上：
 >
 > - 桌面端**可能**能构建运行，但你可能撞到未验证过的问题
 >   （Linux 内存问题正在 [#25](https://github.com/GoDiao/dreamcoder/issues/25) 调查中）。
@@ -136,10 +136,7 @@ dreamcoder/
 ```bash
 # 环境要求
 # - Bun >= 1.0
-# - Rust (用于编译 Tauri)
-# - Node.js >= 18
-# - Linux 还需要 WebKitGTK / libappindicator / librsvg 等系统库
-#   详见 https://v2.tauri.app/start/prerequisites/
+# - Node.js >= 18（Electron 的安装脚本在 Node 上运行）
 
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
@@ -147,35 +144,34 @@ cd dreamcoder
 # Step 1: 安装根工作区依赖（sidecar：Anthropic SDK / AWS SDK / ink 等）
 bun install
 
-# Step 2: 安装桌面端依赖（Tauri CLI + React 前端）
+# Step 2: 安装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
-# Step 3: 编译 sidecar 二进制
-#   这一步会产物 desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
-#   tauri.conf.json 里 externalBin 指向它，没有的话 step 5 会启动失败。
+# Step 3: 下载 Electron 本体
+#   Bun 不会运行 Electron 的安装脚本，这一步下载一次即可。
+bun run electron:install
+
+# Step 4: 编译 sidecar 二进制
+#   生成 desktop/binaries/dreamcoder-sidecar-<target>，主进程启动它作为本地服务。
 bun run build:sidecars
 
-# Step 4: 构建一次前端
-#   生成 desktop/dist。tauri.conf.json 把它列为打包资源，
-#   所以即使 dev 模式的界面由 Vite 提供，没有它 step 5 也会启动失败。
-bun run build
-
 # Step 5: 启动 dev 模式
-bun run tauri dev
+#   在 1420 端口启动 Vite，编译主进程并打开 Electron。
+bun run electron:dev
 ```
 
-> 看到 `failed to find binary 'dreamcoder-sidecar-...'`？
-> 99% 是漏跑了 Step 3 `bun run build:sidecars`。
-> 看到 `command not found: tauri` 或 `@tauri-apps/cli` 报错？
-> 99% 是漏跑了 Step 2 `cd desktop && bun install`（Tauri CLI 在 desktop 子包里，根 install 不会装）。
-> 看到 ``resource path `../dist` doesn't exist``？
-> 是漏跑了 Step 4 `bun run build`。
+> 看到 `Electron failed to install correctly`？
+> 是漏跑了 Step 3 `bun run electron:install`。
+> 窗口打开了，但显示 "Local server failed to start"？
+> 是漏跑了 Step 4 `bun run build:sidecars`。
+> `bun run build` 生成 `desktop/dist`，sidecar 用它给 H5 页面提供界面；dev 模式不需要。
+> `bun run electron:pack` 构建当前平台的安装包，产物在 `desktop/electron-release/`。
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
 
 ### 随包提供 ripgrep
 
-`bun run build:sidecars` 和 `bun run tauri dev` 会自动准备 ripgrep。
+`bun run build:sidecars` 会自动准备 ripgrep。
 根目录的 `bun run build:sidecar` 也调用同一份桌面构建脚本。
 单独运行服务端、CLI 或测试前，在仓库根目录执行 `bun run prepare:ripgrep`。
 首次执行需要访问 GitHub Releases，并使用系统的 `tar`（macOS、Windows 和常见 Linux
@@ -189,9 +185,9 @@ bun run tauri dev
 两类校验值，并更新 `THIRD_PARTY_NOTICES.md` 及安装包冒烟测试中的版本。
 
 源码运行读取 `vendor/ripgrep/<arch>-<platform>/rg`（Windows 为 `rg.exe`）。构建还会
-生成 `desktop/src-tauri/binaries/rg-<target-triple>`（Windows 另带 `.exe`）。Tauri 安装时
-去掉 target 后缀：macOS 位于 `Contents/MacOS`，Windows 位于应用目录，Linux 位于应用
-二进制目录，均与 sidecar 相邻。许可证作为资源随包分发。两个二进制目录均已被 Git 忽略。
+生成 `desktop/binaries/rg-<target-triple>`（Windows 另带 `.exe`）。安装包里去掉 target
+后缀：macOS 位于 `Resources/bin`，Windows 位于 `resources\bin`，均与 sidecar 相邻。
+许可证作为资源随包分发。两个二进制目录均已被 Git 忽略。
 
 查找顺序：`USE_BUILTIN_RIPGREP=0` 强制使用系统版本；否则依次查找可执行文件旁的版本、
 源码 vendor 版本、`PATH` 中的系统 `rg`，最后报告不可用。标准 Bun 不在 sidecar 内嵌 ripgrep。

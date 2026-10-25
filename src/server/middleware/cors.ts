@@ -32,9 +32,7 @@ export type CorsResolutionOptions = {
 }
 
 const LOCAL_ORIGINS = new Set([
-  'http://tauri.localhost',
-  'https://tauri.localhost',
-  'tauri://localhost',
+  'dreamcoder://localhost',
 ])
 
 function isLocalOrigin(origin?: string | null): boolean {

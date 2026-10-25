@@ -8,7 +8,7 @@ import { useTranslation } from '../../i18n'
 import { computerUseApi } from '../../api/computerUse'
 import type { PermissionMode } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
 import { Check, ChevronDown, FilePenLine, NotebookPen, ShieldCheck, Zap, type LucideIcon } from 'lucide-react'
 import { PICKER_TRIGGER_CLASS, POPOVER_CLASS } from './controlStyles'
@@ -31,7 +31,7 @@ type Props = {
 
 export function PermissionModeSelector({ workDir: workDirProp, compact = false, value: currentMode, effectiveValue, onChange }: Props) {
   const t = useTranslation()
-  const isMobile = useMobileViewport() && !isTauriRuntime()
+  const isMobile = useMobileViewport() && !isDesktopRuntime()
   const defaultMode = useSettingsStore((s) => s.permissionMode)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const sessions = useSessionStore((s) => s.sessions)

@@ -12,7 +12,7 @@ import {
   H5ConnectionRequiredError,
   initializeDesktopServerUrl,
   isH5ConnectionRequiredError,
-  isTauriRuntime,
+  isDesktopRuntime,
 } from '../../lib/desktopRuntime'
 import { WindowControls } from './WindowControls'
 import { TitlebarSidebarToggle } from './TitlebarSidebarToggle'
@@ -29,7 +29,6 @@ import { firstLaunchWasShown, useFirstLaunchGate } from '../onboarding/useFirstL
 import { useReleaseIdleSessions } from '../../hooks/useReleaseIdleSessions'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
-import { useWindowDrag } from '../../hooks/useWindowDrag'
 import { useTeamStore } from '../../stores/teamStore'
 import type { Tab } from '../../stores/tabStore'
 
@@ -52,8 +51,8 @@ export function AppShell() {
   const [mobileSidebarMounted, setMobileSidebarMounted] = useState(false)
   const [mobileSidebarVisible, setMobileSidebarVisible] = useState(false)
   const t = useTranslation()
-  const tauriRuntime = isTauriRuntime()
-  const isMobileShell = useMobileViewport() && !tauriRuntime
+  const desktopShell = isDesktopRuntime()
+  const isMobileShell = useMobileViewport() && !desktopShell
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const setActiveTab = useTabStore((s) => s.setActiveTab)
@@ -83,7 +82,7 @@ export function AppShell() {
   // The settings window is modal: keep keyboard and screen readers out of the page behind it.
   const behindSettingsProps: { inert?: '' } = settingsOpen ? { inert: '' } : {}
   // The desktop app hides a collapsed sidebar and toggles it from the title row.
-  const titlebarToggle = tauriRuntime && !isMobileShell
+  const titlebarToggle = desktopShell && !isMobileShell
   const macTitlebar = titlebarToggle && isMacOverlayTitlebar()
   const sidebarHiddenProps: HTMLAttributes<HTMLDivElement> & { inert?: '' } =
     (isMobileShell || titlebarToggle) && !effectiveSidebarOpen
@@ -134,7 +133,7 @@ export function AppShell() {
         })().catch(() => {})
       } catch (error) {
         if (!cancelled) {
-          if (!tauriRuntime && isH5ConnectionRequiredError(error)) {
+          if (!desktopShell && isH5ConnectionRequiredError(error)) {
             setH5StartupError(error)
             setStartupError(null)
           } else {
@@ -151,10 +150,10 @@ export function AppShell() {
     return () => {
       cancelled = true
     }
-  }, [bootstrapNonce, fetchSettings, tauriRuntime])
+  }, [bootstrapNonce, fetchSettings, desktopShell])
 
   useEffect(() => {
-    if (!tauriRuntime) return
+    if (!desktopShell) return
     let unlisten: (() => void) | undefined
     onMenuNavigate((event) => {
       const target = event.payload as SettingsTab | 'settings'
@@ -223,7 +222,7 @@ export function AppShell() {
     toggleSidebar()
   }
 
-  if (!tauriRuntime && h5StartupError) {
+  if (!desktopShell && h5StartupError) {
     return (
       <H5ConnectionView
         initialServerUrl={h5StartupError.serverUrl}
@@ -253,7 +252,7 @@ export function AppShell() {
     <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
       {macTitlebar ? (
         <TitlebarSidebarToggle
-          className="fixed z-[60]"
+          className="window-no-drag fixed z-[60]"
           style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
         />
       ) : null}
@@ -371,13 +370,11 @@ export function AppShell() {
  * whose header also moves the window, and as tall as that header otherwise.
  */
 function WindowDragStrip({ tall, mac, floating = false }: { tall: boolean; mac: boolean; floating?: boolean }) {
-  const handleDrag = useWindowDrag()
   return (
     <div
       data-testid="window-drag-strip"
-      onMouseDown={handleDrag}
       style={mac ? { height: 'var(--titlebar-height)' } : undefined}
-      className={`${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
+      className={`window-drag-region ${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
     >
       {mac ? null : (
         <div className="flex items-center pl-3">

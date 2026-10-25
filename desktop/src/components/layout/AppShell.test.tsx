@@ -6,7 +6,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 
 const mocks = vi.hoisted(() => ({
   initializeDesktopServerUrl: vi.fn(),
-  isTauriRuntime: false,
+  isDesktopRuntime: false,
   isMacTitlebar: false,
   isMobile: false,
   fetchAll: vi.fn(),
@@ -23,13 +23,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../lib/desktopRuntime', () => ({
   initializeDesktopServerUrl: mocks.initializeDesktopServerUrl,
-  isTauriRuntime: () => mocks.isTauriRuntime,
+  isDesktopRuntime: () => mocks.isDesktopRuntime,
   isH5ConnectionRequiredError: (error: unknown) =>
     error instanceof Error && error.name === 'H5ConnectionRequiredError',
 }))
 
 vi.mock('../../lib/windowChrome', () => ({
-  isMacOverlayTitlebar: () => mocks.isTauriRuntime && mocks.isMacTitlebar,
+  isMacOverlayTitlebar: () => mocks.isDesktopRuntime && mocks.isMacTitlebar,
 }))
 
 vi.mock('../../stores/settingsStore', () => ({
@@ -131,7 +131,7 @@ import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 describe('AppShell boot flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.isTauriRuntime = false
+    mocks.isDesktopRuntime = false
     mocks.isMacTitlebar = false
     mocks.isMobile = false
     mocks.initializeDesktopServerUrl.mockResolvedValue('http://127.0.0.1:3456')
@@ -252,8 +252,8 @@ describe('AppShell boot flow', () => {
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the Tauri startup error path unchanged', async () => {
-    mocks.isTauriRuntime = true
+  it('keeps the desktop startup error path unchanged', async () => {
+    mocks.isDesktopRuntime = true
     mocks.initializeDesktopServerUrl.mockRejectedValueOnce(
       Object.assign(new Error('desktop server startup failed'), {
         name: 'H5ConnectionRequiredError',
@@ -268,7 +268,7 @@ describe('AppShell boot flow', () => {
   })
 
   it('gives pages without a session header a top strip as tall as that header', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
 
     const { rerender } = render(<AppShell />)
     expect(await screen.findByTestId('window-drag-strip')).toHaveClass('h-11')
@@ -285,7 +285,7 @@ describe('AppShell boot flow', () => {
   })
 
   it('hides the whole sidebar from one titlebar toggle in the desktop app', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
 
     render(<AppShell />)
     const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
@@ -302,7 +302,7 @@ describe('AppShell boot flow', () => {
   })
 
   it('puts the macOS toggle right of the traffic lights and drops the strip on session pages', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     mocks.isMacTitlebar = true
     mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
     mocks.tabState.activeTabId = 'session-1'
@@ -310,11 +310,12 @@ describe('AppShell boot flow', () => {
     render(<AppShell />)
     const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
     expect(toggle.style.left).toBe('var(--traffic-lights-end)')
+    expect(toggle).toHaveClass('window-no-drag')
     expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
   })
 
   it('keeps the macOS window movable while settings covers a session header', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     mocks.isMacTitlebar = true
     mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
     mocks.tabState.activeTabId = 'session-1'

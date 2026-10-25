@@ -17,15 +17,15 @@ DreamCoder — AI Coding Agent 桌面应用。DreamSeed 竞赛参赛作品。
 
 | 层级 | 技术 |
 |------|------|
-| 桌面壳 | Tauri 2 (Rust) |
+| 桌面壳 | Electron |
 | 前端 | React + TypeScript |
 | 运行时 | Bun |
 | 样式 | Tailwind CSS v4 主题系统 |
 
 ## 系统要求
 
-- Windows 10+ (x64)：需要 WebView2 Runtime（Windows 10 较新版本已内置）和 Git Bash
-- macOS (Apple Silicon)：可从源码运行，打包安装包尚未验证
+- Windows 10+ (x64)：终端使用 Git Bash 时需要另装 Git for Windows
+- macOS (Apple Silicon)：提供 `.dmg` 安装包，也可从源码运行
 - Linux：尚未日常验证，详见根目录 README 的「平台支持现状」
 
 ## 开发指南
@@ -34,19 +34,21 @@ DreamCoder — AI Coding Agent 桌面应用。DreamSeed 竞赛参赛作品。
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
 bun install                # 根工作区依赖（sidecar 运行时）
-cd desktop && bun install  # 桌面端依赖（Tauri CLI + React 前端）
+cd desktop && bun install  # 桌面端依赖（Electron + React 前端）
+bun run electron:install   # 下载 Electron 本体
 bun run build:sidecars     # 编译 sidecar 二进制
-bun run build              # 构建一次前端，生成 desktop/dist
-bun run tauri dev
+bun run electron:dev       # 同时启动 Vite 和 Electron
 ```
+
+主进程和 preload 的说明见 [electron/README.md](electron/README.md)。
 
 ## 构建发布
 
 ```bash
-bun run tauri build
+bun run electron:pack
 ```
 
-构建产物位于 `build-artifacts/` 目录。
+构建产物位于 `electron-release/` 目录。
 
 ## 许可证
 

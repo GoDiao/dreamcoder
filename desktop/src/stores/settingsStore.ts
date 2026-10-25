@@ -22,7 +22,7 @@ import {
   type UpdateProxySettings,
   type WebSearchSettings,
 } from '../types/settings'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import type { Locale } from '../i18n'
 import {
   APP_ZOOM_CONTROL_STEP,
@@ -481,7 +481,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   fetchAppMode: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     try {
       const [result, directories] = await Promise.all([
         getAppMode(),
@@ -500,7 +500,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   setAppMode: async (mode, portableDir) => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     const prev = get().appMode
     const newMode: AppModeConfig = {
       ...prev,

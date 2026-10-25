@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent } from 'react'
 import { Eraser, Info, RotateCcw } from 'lucide-react'
-import { useSettingsStore } from '../stores/settingsStore'
 import { useTranslation, type TranslationKey } from '../i18n'
-import { terminalApi } from '../api/terminal'
+import { TerminalDisconnectedError, terminalApi } from '../api/terminal'
 import {
   attachTerminalRuntime,
   createLocalTerminalRuntimeId,
@@ -96,14 +95,20 @@ export function TerminalSettings({
   const resizeSession = useCallback(() => {
     const terminal = runtime.terminal
     const fit = runtime.fit
-    const sessionId = runtime.nativeSessionId
     if (!terminal || !fit) return
 
     fit.fit()
-    if (sessionId) {
-      void terminalApi.resize(sessionId, terminal.cols, terminal.rows).catch(() => {})
+    try {
+      runtime.connection?.resize(terminal.cols, terminal.rows)
+    } catch (err) {
+      console.warn('[terminal] Failed to resize the terminal', err)
     }
   }, [runtime])
+
+  const terminalErrorMessage = useCallback((err: unknown) => {
+    if (err instanceof TerminalDisconnectedError) return t('settings.terminal.connectionClosed')
+    return err instanceof Error ? err.message : String(err)
+  }, [t])
 
   const startTerminal = useCallback(async () => {
     if (!terminalApi.isAvailable()) {
@@ -116,15 +121,10 @@ export function TerminalSettings({
 
     updateTerminalRuntime(runtime, { error: null, warning: null, status: 'starting', shellInfo: null })
 
-    const existing = runtime.nativeSessionId
-    if (existing) {
-      await terminalApi.kill(existing).catch(() => {})
-      runtime.nativeSessionId = null
-    }
+    runtime.connection?.close()
+    runtime.connection = null
     runtime.dataDisposable?.dispose()
     runtime.dataDisposable = null
-    runtime.unlisteners.forEach((unlisten) => unlisten())
-    runtime.unlisteners = []
 
     runtime.terminal?.dispose()
     runtime.terminal = null
@@ -172,58 +172,54 @@ export function TerminalSettings({
     updateTerminalRuntime(runtime, { terminal, fit })
     fit.fit()
 
-    const outputUnlisten = await terminalApi.onOutput((payload) => {
-      if (payload.session_id === runtime.nativeSessionId) {
-        terminal.write(payload.data)
-      }
-    })
-    const exitUnlisten = await terminalApi.onExit((payload) => {
-      if (payload.session_id !== runtime.nativeSessionId) return
-      updateTerminalRuntime(runtime, { status: 'exited' })
-      const signal = payload.signal ? `, ${payload.signal}` : ''
-      terminal.writeln(`\r\n[process exited: ${payload.code}${signal}]`)
-      updateTerminalRuntime(runtime, { nativeSessionId: null })
-    })
-    runtime.unlisteners = [outputUnlisten, exitUnlisten]
-
     runtime.dataDisposable = terminal.onData((data) => {
-      const sessionId = runtime.nativeSessionId
-      if (sessionId) {
-        void terminalApi.write(sessionId, data).catch((err) => {
-          updateTerminalRuntime(runtime, {
-            error: err instanceof Error ? err.message : String(err),
-            status: 'error',
-          })
+      try {
+        runtime.connection?.write(data)
+      } catch (err) {
+        updateTerminalRuntime(runtime, {
+          error: terminalErrorMessage(err),
+          status: 'error',
         })
       }
     })
 
     try {
-      const result = await terminalApi.spawn({
+      const connection = await terminalApi.open({
         cols: terminal.cols,
         rows: terminal.rows,
         ...(cwd ? { cwd } : {}),
-        settings: useSettingsStore.getState().desktopTerminal,
+        onOutput: (data) => terminal.write(data),
+        onExit: (exit) => {
+          const signal = exit.signal ? `, ${exit.signal}` : ''
+          terminal.writeln(`\r\n[process exited: ${exit.code}${signal}]`)
+          updateTerminalRuntime(runtime, { status: 'exited', connection: null })
+        },
+        onError: (message) => {
+          updateTerminalRuntime(runtime, { error: message, status: 'error' })
+        },
+        onDisconnect: () => {
+          updateTerminalRuntime(runtime, { error: t('settings.terminal.connectionClosed'), status: 'error' })
+        },
       })
       updateTerminalRuntime(runtime, {
-        nativeSessionId: result.session_id,
-        shellInfo: { shell: result.shell, cwd: result.cwd },
-        warning: result.warning ?? null,
+        connection,
+        shellInfo: { shell: connection.shell, cwd: connection.cwd },
+        warning: connection.warning,
         status: 'running',
       })
       resizeSession()
     } catch (err) {
-      outputUnlisten()
-      exitUnlisten()
+      runtime.dataDisposable?.dispose()
+      runtime.dataDisposable = null
       terminal.dispose()
       updateTerminalRuntime(runtime, {
         terminal: null,
         fit: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: terminalErrorMessage(err),
         status: 'error',
       })
     }
-  }, [cwd, resizeSession, runtime])
+  }, [cwd, resizeSession, runtime, t, terminalErrorMessage])
 
   useEffect(() => {
     if (!terminalApi.isAvailable()) return

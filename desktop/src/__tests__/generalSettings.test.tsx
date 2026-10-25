@@ -23,13 +23,16 @@ const desktopNotificationsMock = vi.hoisted(() => ({
 const clipboardMock = vi.hoisted(() => ({
   copyTextToClipboard: vi.fn(),
 }))
-const tauriCoreMock = vi.hoisted(() => ({
+const shellCoreMock = vi.hoisted(() => ({
   invoke: vi.fn(),
 }))
-const tauriDialogMock = vi.hoisted(() => ({
+const terminalApiMock = vi.hoisted(() => ({
+  detectDefaultShell: vi.fn(),
+}))
+const shellDialogMock = vi.hoisted(() => ({
   open: vi.fn(),
 }))
-const tauriProcessMock = vi.hoisted(() => ({
+const shellProcessMock = vi.hoisted(() => ({
   relaunch: vi.fn(),
 }))
 const providerStoreState = {
@@ -70,11 +73,14 @@ vi.mock('../lib/desktopNotifications', () => desktopNotificationsMock)
 vi.mock('../components/chat/clipboard', () => clipboardMock)
 vi.mock('../lib/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/shell')>()),
-  prepareAppModeRestart: () => tauriCoreMock.invoke('prepare_for_app_mode_restart'),
-  detectDefaultTerminalShell: (settings: unknown) => tauriCoreMock.invoke('detect_default_terminal_shell', { settings }),
-  pickDirectory: tauriDialogMock.open,
-  relaunchApp: tauriProcessMock.relaunch,
+  prepareAppModeRestart: () => shellCoreMock.invoke('prepare_for_app_mode_restart'),
+  pickDirectory: shellDialogMock.open,
+  relaunchApp: shellProcessMock.relaunch,
 }))
+vi.mock('../api/terminal', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../api/terminal')>()
+  return { ...original, terminalApi: { ...original.terminalApi, detectDefaultShell: terminalApiMock.detectDefaultShell } }
+})
 vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
@@ -142,13 +148,14 @@ describe('Settings > General tab', () => {
     desktopNotificationsMock.openDesktopNotificationSettings.mockResolvedValue(true)
     clipboardMock.copyTextToClipboard.mockReset()
     clipboardMock.copyTextToClipboard.mockResolvedValue(true)
-    tauriCoreMock.invoke.mockReset()
-    tauriCoreMock.invoke.mockImplementation(async (command: string) => command === 'detect_default_terminal_shell' ? { platform: 'macos', shell: '/bin/zsh' } : undefined)
-    tauriDialogMock.open.mockReset()
-    tauriDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
-    tauriProcessMock.relaunch.mockReset()
-    tauriProcessMock.relaunch.mockResolvedValue(undefined)
-    delete (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__
+    shellCoreMock.invoke.mockReset()
+    terminalApiMock.detectDefaultShell.mockReset()
+    terminalApiMock.detectDefaultShell.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
+    shellDialogMock.open.mockReset()
+    shellDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
+    shellProcessMock.relaunch.mockReset()
+    shellProcessMock.relaunch.mockResolvedValue(undefined)
+    delete (window as unknown as { dreamcoderShell?: object }).dreamcoderShell
     MOCK_GET_SETTINGS.mockResolvedValue({})
     MOCK_UPDATE_SETTINGS.mockResolvedValue({})
     providerStoreState.providers = []
@@ -288,7 +295,7 @@ describe('Settings > General tab', () => {
   })
 
   it('offers a default shell dropdown in General settings and persists Unix choices', async () => {
-    (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {}
+    (window as unknown as { dreamcoderShell?: object }).dreamcoderShell = {}
     useSettingsStore.setState({
       desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: null },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
@@ -306,7 +313,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
     expect(screen.queryByText('Default shell')).not.toBeInTheDocument()
-    expect(tauriCoreMock.invoke).not.toHaveBeenCalledWith('detect_default_terminal_shell', undefined)
+    expect(terminalApiMock.detectDefaultShell).not.toHaveBeenCalled()
   })
 
   it('shows WebFetch preflight toggle enabled by default', () => {
@@ -476,8 +483,8 @@ describe('Settings > General tab', () => {
   })
 
   it('keeps data storage at the bottom of General settings', () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useClaudeCodeImportStore.setState({
       status: {
         claudeCodeDir: '/Users/test/.claude',
@@ -508,8 +515,8 @@ describe('Settings > General tab', () => {
   })
 
   it('lets desktop users choose a portable data directory and relaunch immediately', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -528,14 +535,14 @@ describe('Settings > General tab', () => {
 
     await waitFor(() => {
       expect(useSettingsStore.getState().setAppMode).toHaveBeenCalledWith('portable', '/Users/test/dreamcoder-data')
-      expect(tauriCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
-      expect(tauriProcessMock.relaunch).toHaveBeenCalledTimes(1)
+      expect(shellCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
+      expect(shellProcessMock.relaunch).toHaveBeenCalledTimes(1)
     })
   })
 
   it('switches back to the system directory without deleting portable data', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({
       appMode: {
         mode: 'portable',
@@ -558,14 +565,14 @@ describe('Settings > General tab', () => {
 
     await waitFor(() => {
       expect(useSettingsStore.getState().setAppMode).toHaveBeenCalledWith('default', null)
-      expect(tauriCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
-      expect(tauriProcessMock.relaunch).toHaveBeenCalledTimes(1)
+      expect(shellCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
+      expect(shellProcessMock.relaunch).toHaveBeenCalledTimes(1)
     })
   })
 
   it('validates portable directory input and lets users reset to the app-side folder', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -584,9 +591,9 @@ describe('Settings > General tab', () => {
   })
 
   it('shows folder picker failures as an inline storage error', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
-    tauriDialogMock.open.mockRejectedValueOnce(new Error('dialog unavailable'))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
+    shellDialogMock.open.mockRejectedValueOnce(new Error('dialog unavailable'))
 
     render(<Settings />)
 
@@ -599,8 +606,8 @@ describe('Settings > General tab', () => {
   })
 
   it('treats external DREAMCODER_CONFIG_DIR as the controlling data source', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({
       appMode: {
         mode: 'portable',
@@ -629,8 +636,8 @@ describe('Settings > General tab', () => {
   })
 
   it('keeps mode switch confirmation cancelable before restart starts', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -649,9 +656,9 @@ describe('Settings > General tab', () => {
   })
 
   it('shows restart preparation failures without relaunching', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
-    tauriCoreMock.invoke.mockImplementation(async (command: string) => {
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
+    shellCoreMock.invoke.mockImplementation(async (command: string) => {
       if (command === 'prepare_for_app_mode_restart') throw new Error('restart preparation failed')
       return { platform: 'macos', shell: '/bin/zsh' }
     })
@@ -665,12 +672,12 @@ describe('Settings > General tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save and Restart' }))
 
     expect(await screen.findByText('restart preparation failed')).toBeInTheDocument()
-    expect(tauriProcessMock.relaunch).not.toHaveBeenCalled()
+    expect(shellProcessMock.relaunch).not.toHaveBeenCalled()
   })
 
   it('shows the saved restart-required state inside the storage section', () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({ appModeRequiresRestart: true })
 
     render(<Settings />)
@@ -792,6 +799,20 @@ describe('Settings > General tab', () => {
     await vi.waitFor(() => {
       expect(desktopNotificationsMock.openDesktopNotificationSettings).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('offers system settings when the system manages notification permission', async () => {
+    desktopNotificationsMock.getDesktopNotificationPermission.mockResolvedValue('unknown')
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+    expect(await screen.findByText('Permission: Managed in system settings')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
+    })
+
+    expect(desktopNotificationsMock.openDesktopNotificationSettings).toHaveBeenCalledTimes(1)
+    expect(desktopNotificationsMock.requestDesktopNotificationPermission).not.toHaveBeenCalled()
   })
 
   it('moves H5 access out of General into its own Settings tab', () => {

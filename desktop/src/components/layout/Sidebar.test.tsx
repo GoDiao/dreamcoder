@@ -275,7 +275,7 @@ describe('Sidebar', () => {
       { sessionId: 'session-new-1', title: 'New Session', type: 'session', status: 'idle' },
     ])
     expect(useTabStore.getState().activeTabId).toBe('session-new-1')
-    expect(screen.getByRole('complementary')).not.toHaveAttribute('data-tauri-drag-region')
+    expect(screen.getByRole('complementary')).not.toHaveClass('window-drag-region')
   })
 
   it('groups sessions by project and expands overflow rows', () => {

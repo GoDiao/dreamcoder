@@ -126,11 +126,11 @@ describe('wsManager reconnect buffering', () => {
   it('leaves the client kind off inside the desktop app', () => {
     clientMocks.baseUrl = 'http://127.0.0.1:3456'
     clientMocks.authToken = null
-    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
+    ;(window as unknown as Record<string, unknown>).dreamcoderShell = {}
     try {
       expect(buildSessionWebSocketUrl('desktop-session')).toBe('ws://127.0.0.1:3456/ws/desktop-session')
     } finally {
-      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+      delete (window as unknown as Record<string, unknown>).dreamcoderShell
     }
   })
 })

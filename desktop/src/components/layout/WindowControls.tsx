@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { getAppWindow } from '../../lib/shell'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 
-export const showWindowControls = isTauri && isWindows
+export const showWindowControls = isDesktop && isWindows
 
 export function WindowControls() {
   const [maximized, setMaximized] = useState(false)

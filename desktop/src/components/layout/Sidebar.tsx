@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { pickDirectory } from '../../lib/shell'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
@@ -14,13 +15,12 @@ import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
 import { SidebarMoreMenu } from './SidebarMoreMenu'
 import { useMenuNavigation } from '../../hooks/useMenuNavigation'
-import { useWindowDrag } from '../../hooks/useWindowDrag'
 import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarProjectSortBy } from './ProjectManagementDialog'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 const SESSION_LIST_AUTO_REFRESH_MS = 30_000
 const SESSION_LIST_FOCUS_REFRESH_MIN_MS = 5_000
@@ -208,7 +208,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   )
   // The mobile drawer and the desktop app slide the whole sidebar out of view
   // instead of narrowing it to the icon rail, so their layout stays expanded.
-  const expanded = isMobile || isTauri ? true : sidebarOpen
+  const expanded = isMobile || isDesktop ? true : sidebarOpen
   const closeMobileDrawer = useCallback(() => {
     if (isMobile) onRequestClose?.()
   }, [isMobile, onRequestClose])
@@ -415,7 +415,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   const createSessionFromExistingFolder = useCallback(async () => {
     setCreateProjectMenu(null)
-    if (!isTauri) {
+    if (!isDesktop) {
       addToast({
         type: 'error',
         message: t('sidebar.chooseProjectFolderUnavailable'),
@@ -638,7 +638,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     setRenameValue('')
   }, [renamingId, renameValue, renameSession])
 
-  const handleSidebarDrag = useWindowDrag()
 
   useEffect(() => {
     if (!isBatchMode) return
@@ -665,15 +664,14 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   return (
     <aside
-      onMouseDown={handleSidebarDrag}
       className="sidebar-panel relative h-full flex flex-col bg-[var(--color-surface-sidebar)] border-r border-[var(--color-border)] select-none"
       data-state={expanded ? 'open' : 'closed'}
       aria-label="Sidebar"
     >
       {/* On macOS the top band is the title row: traffic lights and the sidebar toggle. */}
       <div
-        className={`px-3 pb-2 ${isTauri && !isWindows ? '' : 'pt-3'}`}
-        style={isTauri && !isWindows ? { paddingTop: 'var(--titlebar-height)' } : undefined}
+        className={`window-drag-region px-3 pb-2 ${isDesktop && !isWindows ? '' : 'pt-3'}`}
+        style={isDesktop && !isWindows ? { paddingTop: 'var(--titlebar-height)' } : undefined}
       >
         <div className={`flex ${expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2'}`}>
           <div className={`flex min-w-0 items-center ${expanded ? 'gap-2.5' : 'justify-center'}`}>
@@ -711,7 +709,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
-            ) : isTauri ? null : (
+            ) : isDesktop ? null : (
               // The desktop app's toggle is in the title row (TitlebarSidebarToggle).
               <button
                 type="button"

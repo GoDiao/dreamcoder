@@ -10,7 +10,7 @@ import type { SavedProvider } from '../../types/provider'
 import type { RuntimeSelection } from '../../types/runtime'
 import type { EffortLevel, ModelInfo } from '../../types/settings'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
 import { ChevronDown } from 'lucide-react'
 import { PICKER_TRIGGER_CLASS, POPOVER_CLASS } from './controlStyles'
@@ -97,7 +97,7 @@ export function ModelSelector({
   compact = false,
 }: Props = {}) {
   const t = useTranslation()
-  const isMobileBrowser = useMobileViewport() && !isTauriRuntime()
+  const isMobileBrowser = useMobileViewport() && !isDesktopRuntime()
   const {
     currentModel: storeModel,
     availableModels,

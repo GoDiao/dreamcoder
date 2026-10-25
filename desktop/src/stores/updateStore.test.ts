@@ -17,7 +17,7 @@ describe('updateStore', () => {
     relaunch.mockReset()
     invoke.mockReset()
     window.localStorage.clear()
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })

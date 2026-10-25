@@ -1,8 +1,8 @@
-import { isTauriRuntime } from './desktopRuntime'
+import { isDesktopRuntime } from './desktopRuntime'
 import { openExternalLink } from './shell'
 
 export function openExternalUrl(url: string): void {
-  if (!isTauriRuntime()) {
+  if (!isDesktopRuntime()) {
     window.open(url, '_blank', 'noopener,noreferrer')
     return
   }

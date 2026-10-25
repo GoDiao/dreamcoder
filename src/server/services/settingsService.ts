@@ -54,42 +54,7 @@ export class SettingsService {
   }
 
   async getUserSettings(): Promise<Record<string, unknown>> {
-    const filePath = this.getUserSettingsPath()
-    return this.withWriteLock(filePath, () => this.readUserSettings(filePath))
-  }
-
-  private async readUserSettings(filePath: string): Promise<Record<string, unknown>> {
-    const settings = await this.readJsonFile(filePath)
-    const legacyPath = process.env.DREAMCODER_LEGACY_TERMINAL_CONFIG_PATH
-    if (!legacyPath) return settings
-    const terminal = normalizeJsonObject(settings.desktopTerminal) ?? {}
-    if (Object.prototype.hasOwnProperty.call(terminal, 'bashPath')) return settings
-
-    let legacy: Record<string, unknown>
-    try {
-      const contents = await fs.readFile(legacyPath, 'utf-8')
-      const parsed: unknown = JSON.parse(contents)
-      const normalized = normalizeJsonObject(parsed)
-      if (!normalized) throw new Error('Expected a terminal settings object')
-      legacy = normalized
-      if (legacy.bash_path != null && typeof legacy.bash_path !== 'string') {
-        throw new Error('Expected bash_path to be a string or null')
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return settings
-      console.warn(`[desktop] Skipped terminal settings migration from ${legacyPath}`, error)
-      return settings
-    }
-
-    const migrated = {
-      ...settings,
-      desktopTerminal: {
-        ...terminal,
-        bashPath: typeof legacy.bash_path === 'string' ? legacy.bash_path.trim() || null : null,
-      },
-    }
-    await this.writeJsonFile(filePath, migrated)
-    return migrated
+    return this.readJsonFile(this.getUserSettingsPath())
   }
 
   async getProjectSettings(projectRoot?: string): Promise<Record<string, unknown>> {
@@ -153,7 +118,7 @@ export class SettingsService {
   async updateUserSettings(settings: Record<string, unknown>): Promise<void> {
     const filePath = this.getUserSettingsPath()
     await this.withWriteLock(filePath, async () => {
-      const current = await this.readUserSettings(filePath)
+      const current = await this.readJsonFile(filePath)
       const merged = Object.assign({}, current, settings)
       await this.writeJsonFile(filePath, merged)
     })

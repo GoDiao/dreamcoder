@@ -14,7 +14,7 @@ import { terminalApi } from '../../api/terminal'
 import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
 import { TerminalShellSettings } from './TerminalShellSettings'
 import { ProxyConfigForm } from './ProxyConfigForm'
@@ -109,7 +109,7 @@ export function GeneralSettings() {
   }, [])
 
   useEffect(() => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     void fetchAppMode()
   }, [fetchAppMode])
 
@@ -183,7 +183,9 @@ export function GeneralSettings() {
     denied: t('settings.general.notificationsStatusDenied'),
     default: t('settings.general.notificationsStatusDefault'),
     unsupported: t('settings.general.notificationsStatusUnsupported'),
+    unknown: t('settings.general.notificationsStatusUnknown'),
   }
+  const notificationSettingsOnly = notificationPermission === 'denied' || notificationPermission === 'unknown'
 
   const handleDesktopNotificationsToggle = async (enabled: boolean) => {
     await setDesktopNotificationsEnabled(enabled)
@@ -193,7 +195,7 @@ export function GeneralSettings() {
     try {
       const permission = await requestDesktopNotificationPermission()
       setNotificationPermission(permission)
-      if (permission === 'granted') {
+      if (permission === 'granted' || permission === 'unknown') {
         void notifyDesktop({
           title: t('settings.general.notificationsTestTitle'),
           body: t('settings.general.notificationsTestBody'),
@@ -210,7 +212,7 @@ export function GeneralSettings() {
   const handleNotificationPermissionAction = async () => {
     setNotificationActionRunning(true)
     try {
-      if (notificationPermission === 'denied') {
+      if (notificationSettingsOnly) {
         await openDesktopNotificationSettings()
       } else {
         const permission = await requestDesktopNotificationPermission()
@@ -386,7 +388,7 @@ export function GeneralSettings() {
     modeActionRunning ||
     (storageChoice === appMode.mode &&
       (storageChoice === 'default' || portableDirDraft.trim() === (appMode.portableDir ?? '')))
-  const showShellRow = isTauriRuntime() && terminalApi.isAvailable()
+  const showShellRow = isDesktopRuntime() && terminalApi.isAvailable()
 
   return (
     <div>
@@ -490,7 +492,7 @@ export function GeneralSettings() {
                   disabled={notificationActionRunning}
                   onClick={() => void handleNotificationPermissionAction()}
                 >
-                  {notificationPermission === 'denied'
+                  {notificationSettingsOnly
                     ? t('settings.general.notificationsOpenSettings')
                     : t('settings.general.notificationsAuthorize')}
                 </Button>
@@ -729,7 +731,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && (
+        {isDesktopRuntime() && (
           <SettingsDisclosureRow title={t('settings.general.storageTitle')} summary={storageSummary}>
             <SettingsRow
               title={t('settings.general.storageMode')}
@@ -836,7 +838,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && <ClaudeCodeImportSettings />}
+        {isDesktopRuntime() && <ClaudeCodeImportSettings />}
       </SettingsGroup>
 
       <ConfirmDialog

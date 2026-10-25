@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { pickDirectory } from '../../lib/shell'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { createPortal } from 'react-dom'
 import { sessionsApi, type RecentProject } from '../../api/sessions'
 import { filesystemApi } from '../../api/filesystem'
@@ -24,10 +25,6 @@ const DROPDOWN_WIDTH = 400
 const DROPDOWN_VIEWPORT_MARGIN = 12
 const DROPDOWN_HEIGHT = 380
 
-function isTauriRuntime() {
-  return typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-}
-
 function projectNameFromPath(filePath: string) {
   const displayRoot = filePath.includes(DESKTOP_WORKTREE_MARKER)
     ? filePath.slice(0, filePath.indexOf(DESKTOP_WORKTREE_MARKER))
@@ -47,7 +44,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number; direction: 'up' | 'down' } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const isMobileBrowser = useMobileViewport() && !isTauriRuntime()
+  const isMobileBrowser = useMobileViewport() && !isDesktopRuntime()
 
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -127,7 +124,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
   }
 
   const handleChooseFolder = async () => {
-    if (isTauriRuntime()) {
+    if (isDesktopRuntime()) {
       setIsOpen(false)
       try {
         const selected = await pickDirectory({
