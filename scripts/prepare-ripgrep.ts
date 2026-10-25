@@ -65,6 +65,11 @@ async function matchesChecksum(filename: string, expected: string): Promise<bool
   }
 }
 
+export function tarCommand(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string {
+  if (platform !== 'win32') return 'tar'
+  return path.win32.join(env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+}
+
 async function downloadArchive(url: string): Promise<Uint8Array> {
   const response = await fetch(url)
   if (!response.ok) throw new Error(`Ripgrep download failed: ${response.status} ${url}`)
@@ -94,7 +99,7 @@ export async function installRipgrep(
     await Bun.write(archivePath, archive)
     const binaryName = windows ? 'rg.exe' : 'rg'
     const entry = `${basename}/${binaryName}`
-    const proc = Bun.spawn(['tar', '-xf', archivePath, '-C', staging, entry], {
+    const proc = Bun.spawn([tarCommand(), '-xf', archivePath, '-C', staging, entry], {
       stdout: 'pipe',
       stderr: 'pipe',
     })

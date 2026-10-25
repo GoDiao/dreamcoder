@@ -7,7 +7,7 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/release.yml']
+    paths: ['.github/workflows/release.yml', 'scripts/prepare-ripgrep.ts']
 
 permissions:
   contents: write

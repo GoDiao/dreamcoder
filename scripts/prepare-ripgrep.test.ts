@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { getRipgrepTarget, installRipgrep, RIPGREP_TARGETS, RIPGREP_VERSION } from './prepare-ripgrep.js'
+import { getRipgrepTarget, installRipgrep, RIPGREP_TARGETS, RIPGREP_VERSION, tarCommand } from './prepare-ripgrep.js'
 
 const tempDirs: string[] = []
 
@@ -41,6 +41,13 @@ describe('ripgrep preparation', () => {
     expect(getRipgrepTarget('aarch64-unknown-linux-gnu')).toBe(RIPGREP_TARGETS['aarch64-unknown-linux-musl'])
     expect(getRipgrepTarget('x86_64-unknown-linux-gnu')).toBe(RIPGREP_TARGETS['x86_64-unknown-linux-musl'])
     expect(() => getRipgrepTarget('unknown')).toThrow('Unsupported ripgrep target')
+  })
+
+  test('uses the system bsdtar on Windows so drive-letter paths and zip archives extract', () => {
+    expect(tarCommand('win32', { SystemRoot: 'D:\\Windows' })).toBe('D:\\Windows\\System32\\tar.exe')
+    expect(tarCommand('win32', {})).toBe('C:\\Windows\\System32\\tar.exe')
+    expect(tarCommand('darwin', { SystemRoot: 'D:\\Windows' })).toBe('tar')
+    expect(tarCommand('linux', {})).toBe('tar')
   })
 
   test('verifies and extracts a release, then skips downloading only when binary bytes match', async () => {
