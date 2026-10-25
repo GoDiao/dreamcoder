@@ -25,7 +25,7 @@
     "build:electron": "bun run ./scripts/build-electron.ts",
     "electron:dev": "bun run build:electron && DREAMCODER_ELECTRON_DEV_URL=http://localhost:1420 electron electron-dist",
     "electron:start": "bun run build:electron && electron electron-dist",
-    "electron:pack": "DREAMCODER_SHELL=electron bun run build && bun run build:sidecars && bun run build:electron && electron-builder --mac --arm64",
+    "electron:pack": "DREAMCODER_SHELL=electron bun run build && bun run build:sidecars && bun run build:electron && electron-builder --publish never -c.mac.identity=-",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",

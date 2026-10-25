@@ -42,10 +42,10 @@ const VERSION_FILES = [
 ]
 
 function getCurrentVersion(): string {
-  const tauriConf = JSON.parse(
-    readFileSync(path.join(root, 'desktop/src-tauri/tauri.conf.json'), 'utf-8'),
+  const desktopPackage = JSON.parse(
+    readFileSync(path.join(root, 'desktop/package.json'), 'utf-8'),
   )
-  return tauriConf.version
+  return desktopPackage.version
 }
 
 function bumpVersion(current: string, bump: string): string {

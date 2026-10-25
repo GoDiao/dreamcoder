@@ -7,7 +7,7 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/release.yml', 'scripts/prepare-ripgrep.ts']
+    paths: ['.github/workflows/release.yml', 'scripts/prepare-ripgrep.ts', 'desktop/electron-builder.json', 'desktop/electron/build/**']
 
 permissions:
   contents: write
@@ -59,13 +59,11 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            target: aarch64-apple-darwin
-            bundles: app,dmg
-            asset: bundle/dmg/*.dmg
+            platform: --mac
+            asset: '*.dmg'
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bundles: nsis
-            asset: bundle/nsis/*-setup.exe
+            platform: --win
+            asset: '*-setup.exe'
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -77,40 +75,50 @@ jobs:
         with:
           bun-version: 1.4.2
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: desktop/src-tauri -> target
-
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile
           cd desktop && bun install --frozen-lockfile
+          node node_modules/electron/install.js
 
-      # The updater has no endpoints yet, so skip its signed artifacts.
-      # macOS builds are ad-hoc signed until there is a Developer ID.
+      - name: Build the app
+        working-directory: desktop
+        run: |
+          DREAMCODER_SHELL=electron bun run build
+          bun run build:sidecars
+          bun run build:electron
+
+      # Without a signing certificate in the repository secrets, macOS builds are
+      # ad-hoc signed and Windows builds are unsigned. With the secrets set,
+      # electron-builder signs both and notarizes the macOS app.
       - name: Build installer
         working-directory: desktop
-        run: >
-          bun x tauri build --ci
-          --target ${{ matrix.target }}
-          --bundles ${{ matrix.bundles }}
-          --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"-"}}}'
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          args=(--publish never ${{ matrix.platform }})
+          if [ "$RUNNER_OS" = macOS ] && [ -z "$CSC_LINK" ]; then
+            args+=(-c.mac.identity=-)
+          fi
+          bun x electron-builder "${args[@]}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dreamcoder-${{ matrix.target }}
-          path: desktop/src-tauri/target/${{ matrix.target }}/release/${{ matrix.asset }}
+          name: dreamcoder-${{ runner.os }}
+          path: desktop/electron-release/${{ matrix.asset }}
           if-no-files-found: error
 
       - name: Upload to draft release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.ref_name }}" desktop/src-tauri/target/${{ matrix.target }}/release/${{ matrix.asset }} --clobber
+        run: gh release upload "${{ github.ref_name }}" desktop/electron-release/${{ matrix.asset }} --clobber
 
   smoke:
     needs: build

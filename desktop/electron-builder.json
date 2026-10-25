@@ -1,6 +1,7 @@
 {
   "appId": "com.dreamcoder.desktop",
   "productName": "DreamCoder",
+  "publish": null,
   "directories": {
     "app": "electron-dist",
     "output": "electron-release"
@@ -17,12 +18,8 @@
       "to": "dist"
     },
     {
-      "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin",
-      "to": "bin/dreamcoder-sidecar"
-    },
-    {
-      "from": "src-tauri/binaries/rg-aarch64-apple-darwin",
-      "to": "bin/rg"
+      "from": "src-tauri/icons/32x32.png",
+      "to": "icons/tray.png"
     },
     {
       "from": "../THIRD_PARTY_NOTICES.md",
@@ -30,6 +27,11 @@
     }
   ],
   "npmRebuild": false,
+  "electronDist": "node_modules/electron/dist",
+  "electronLanguages": [
+    "en",
+    "zh_CN"
+  ],
   "mac": {
     "target": [
       {
@@ -40,12 +42,66 @@
       }
     ],
     "icon": "src-tauri/icons/icon.icns",
-    "identity": null,
-    "entitlements": "src-tauri/Entitlements.plist"
+    "category": "public.app-category.developer-tools",
+    "hardenedRuntime": true,
+    "entitlements": "electron/build/entitlements.mac.plist",
+    "entitlementsInherit": "electron/build/entitlements.mac.plist",
+    "artifactName": "${productName}_${version}_aarch64.${ext}",
+    "extraResources": [
+      {
+        "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin",
+        "to": "bin/dreamcoder-sidecar"
+      },
+      {
+        "from": "src-tauri/binaries/rg-aarch64-apple-darwin",
+        "to": "bin/rg"
+      }
+    ]
   },
-  "electronDist": "node_modules/electron/dist",
-  "electronLanguages": [
-    "en",
-    "zh_CN"
-  ]
+  "dmg": {
+    "window": {
+      "width": 660,
+      "height": 400
+    },
+    "contents": [
+      {
+        "x": 180,
+        "y": 170
+      },
+      {
+        "x": 480,
+        "y": 170,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "src-tauri/icons/icon.ico",
+    "artifactName": "${productName}_${version}_x64-setup.${ext}",
+    "extraResources": [
+      {
+        "from": "src-tauri/binaries/dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
+        "to": "bin/dreamcoder-sidecar.exe"
+      },
+      {
+        "from": "src-tauri/binaries/rg-x86_64-pc-windows-msvc.exe",
+        "to": "bin/rg.exe"
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "include": "electron/build/installer.nsh"
+  }
 }
