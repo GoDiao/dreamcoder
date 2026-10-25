@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { getAppWindow } from '../../lib/shell'
+import { isTauriRuntime } from '../../lib/desktopRuntime'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isTauri = isTauriRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 
 export const showWindowControls = isTauri && isWindows

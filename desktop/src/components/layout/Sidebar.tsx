@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { pickDirectory } from '../../lib/shell'
+import { isTauriRuntime } from '../../lib/desktopRuntime'
 import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
@@ -20,7 +21,7 @@ import { ShortcutsDialog } from './ShortcutsDialog'
 import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isTauri = isTauriRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 const SESSION_LIST_AUTO_REFRESH_MS = 30_000
 const SESSION_LIST_FOCUS_REFRESH_MIN_MS = 5_000

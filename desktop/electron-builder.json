@@ -1,0 +1,22 @@
+{
+  "appId": "com.dreamcoder.desktop",
+  "productName": "DreamCoder",
+  "directories": {
+    "app": "electron-dist",
+    "output": "electron-release"
+  },
+  "files": ["main.cjs", "preload.cjs", "package.json"],
+  "extraResources": [
+    { "from": "dist", "to": "dist" },
+    { "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin", "to": "bin/dreamcoder-sidecar" },
+    { "from": "src-tauri/binaries/rg-aarch64-apple-darwin", "to": "bin/rg" },
+    { "from": "../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+  ],
+  "npmRebuild": false,
+  "mac": {
+    "target": [{ "target": "dmg", "arch": ["arm64"] }],
+    "icon": "src-tauri/icons/icon.icns",
+    "identity": null,
+    "entitlements": "src-tauri/Entitlements.plist"
+  }
+}

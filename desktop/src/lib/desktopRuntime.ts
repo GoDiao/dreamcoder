@@ -1,4 +1,5 @@
 import { getServerUrl } from './shell'
+import { ELECTRON_BRIDGE_KEY } from './shell/electronBridge'
 import {
   api,
   getDefaultBaseUrl,
@@ -35,7 +36,7 @@ export class H5ConnectionRequiredError extends Error {
 
 export function isTauriRuntime() {
   if (typeof window === 'undefined') return false
-  return '__TAURI_INTERNALS__' in window || '__TAURI__' in window
+  return '__TAURI_INTERNALS__' in window || '__TAURI__' in window || ELECTRON_BRIDGE_KEY in window
 }
 
 export function isBrowserH5Runtime() {
