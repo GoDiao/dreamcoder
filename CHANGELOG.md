@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0-beta.1] — 2026-10-26
+
+A pre-release of the Electron desktop app. Windows has not been tested on real machines yet; reports are welcome in the Windows testing issue.
+
 ### Changed
 
 - **The desktop app runs on Electron instead of Tauri** (#174). The interface now renders in Chromium on every platform. On macOS, long sessions are much faster: laying out a streaming reply takes about 1 ms per update instead of about 20 ms (265 ms at the slow end), and scrolling up through 1,000 messages no longer stalls. The installers are larger: the macOS `.dmg` is about 150 MB instead of 46 MB.

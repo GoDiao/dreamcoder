@@ -7,7 +7,7 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/release.yml', 'scripts/prepare-ripgrep.ts', 'desktop/electron-builder.json', 'desktop/electron/build/**']
+    paths: ['.github/workflows/release.yml', 'scripts/release.ts', 'scripts/prepare-ripgrep.ts', 'desktop/electron-builder.json', 'desktop/electron/build/**']
 
 permissions:
   contents: write
@@ -48,7 +48,9 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; uploading assets to it."
           else
-            gh release create "$TAG" --draft --verify-tag --title "DreamCoder $TAG" --notes-file notes.md
+            prerelease=()
+            case "$version" in *-*) prerelease=(--prerelease) ;; esac
+            gh release create "$TAG" --draft "${prerelease[@]}" --verify-tag --title "DreamCoder $TAG" --notes-file notes.md
           fi
 
   build:
