@@ -8,7 +8,7 @@ import { Button } from '../shared/Button'
 import { getPresetDisplayName } from './presetDisplayName'
 import { ProviderIcon } from './ProviderIcon'
 import { Dropdown } from '../shared/Dropdown'
-import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
+import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ProviderModel, DiscoveredProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
 import {
   API_KEY_JSON_PLACEHOLDER,
@@ -34,21 +34,12 @@ function requirePreset(preset: ProviderPreset | undefined): ProviderPreset {
   return preset
 }
 
-const AUTO_COMPACT_WINDOW_ENV_KEY = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW'
 const MODEL_CONTEXT_WINDOWS_ENV_KEY = 'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS'
 const MODEL_CONTEXT_WINDOW_MIN = 16000
 const MODEL_CONTEXT_WINDOW_MAX = 10000000
 const DEFAULT_PROVIDER_AUTH_STRATEGY: ProviderAuthStrategy = 'auth_token'
 const AUTH_ENV_KEYS = new Set(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])
 type ModelContextInputs = Record<string, string>
-
-function formatContextWindow(value: number): string {
-  return value.toLocaleString('en-US')
-}
-
-function getPresetAutoCompactWindow(preset: ProviderPreset): string {
-  return preset.defaultEnv?.[AUTO_COMPACT_WINDOW_ENV_KEY] ?? ''
-}
 
 function getPresetAuthStrategy(preset: ProviderPreset): ProviderAuthStrategy {
   return preset.authStrategy ?? DEFAULT_PROVIDER_AUTH_STRATEGY
@@ -102,16 +93,7 @@ function inferAuthStrategyFromEnv(env: Record<string, string>): ProviderAuthStra
   return null
 }
 
-function parseAutoCompactWindowInput(value: string): number | undefined {
-  const trimmed = value.trim()
-  if (!trimmed) return undefined
-  const parsed = Number(trimmed)
-  if (!Number.isInteger(parsed)) return undefined
-  if (parsed < MODEL_CONTEXT_WINDOW_MIN || parsed > MODEL_CONTEXT_WINDOW_MAX) return undefined
-  return parsed
-}
-
-function getAutoCompactWindowErrorKey(value: string): 'number' | 'range' | null {
+function getModelContextWindowErrorKey(value: string): 'number' | 'range' | null {
   const trimmed = value.trim()
   if (!trimmed) return null
   const parsed = Number(trimmed)
@@ -121,11 +103,9 @@ function getAutoCompactWindowErrorKey(value: string): 'number' | 'range' | null 
 }
 
 function parseModelContextWindowsInput(value: string): number | undefined {
-  return parseAutoCompactWindowInput(value)
-}
-
-function getModelContextWindowErrorKey(value: string): 'number' | 'range' | null {
-  return getAutoCompactWindowErrorKey(value)
+  const trimmed = value.trim()
+  if (!trimmed || getModelContextWindowErrorKey(trimmed)) return undefined
+  return Number(trimmed)
 }
 
 function getModelContextInputValue(
@@ -184,26 +164,6 @@ function runtimeModelMapping(models: ProviderModel[], fastModel?: string): {
   return {
     main,
     fast: fastModel && models.some((model) => model.id === fastModel) ? fastModel : main,
-  }
-}
-
-function updateSettingsJsonAutoCompactWindow(raw: string, value: string): string {
-  try {
-    const parsed = JSON.parse(raw || '{}') as { env?: Record<string, unknown> }
-    const existingEnv = parsed.env && typeof parsed.env === 'object' && !Array.isArray(parsed.env)
-      ? parsed.env
-      : {}
-    const env = { ...existingEnv }
-    const trimmed = value.trim()
-    if (trimmed) {
-      env[AUTO_COMPACT_WINDOW_ENV_KEY] = trimmed
-    } else {
-      delete env[AUTO_COMPACT_WINDOW_ENV_KEY]
-    }
-    parsed.env = env
-    return JSON.stringify(parsed, null, 2)
-  } catch {
-    return raw
   }
 }
 
@@ -285,9 +245,6 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
     defaultModels: provider?.models ?? [],
     defaultFastModel: provider?.fastModel,
     modelContextWindows: provider?.modelContextWindows,
-    defaultEnv: provider?.autoCompactWindow !== undefined
-      ? { [AUTO_COMPACT_WINDOW_ENV_KEY]: String(provider.autoCompactWindow) }
-      : undefined,
     needsApiKey: true,
     websiteUrl: '',
   }
@@ -463,7 +420,10 @@ function ModelDiscoveryCombobox({
 }
 
 function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }: ProviderFormProps) {
-  const { createProvider, updateProvider, testConfig, discoverModels } = useProviderStore()
+  const createProvider = useProviderStore((state) => state.createProvider)
+  const updateProvider = useProviderStore((state) => state.updateProvider)
+  const testConfig = useProviderStore((state) => state.testConfig)
+  const discoverModels = useProviderStore((state) => state.discoverModels)
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const t = useTranslation()
 
@@ -496,12 +456,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [modelContextInputs, setModelContextInputs] = useState<ModelContextInputs>(
     getModelContextInputs(provider?.models ?? initialPreset.defaultModels, initialPreset, provider),
   )
-  const [autoCompactWindow, setAutoCompactWindow] = useState(
-    provider?.autoCompactWindow !== undefined
-      ? String(provider.autoCompactWindow)
-      : getPresetAutoCompactWindow(initialPreset),
-  )
-  const [showContextSettings, setShowContextSettings] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null)
   const [isTesting, setIsTesting] = useState(false)
@@ -509,10 +463,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [discoveryCount, setDiscoveryCount] = useState<number | null>(null)
-  const [discoveredModels, setDiscoveredModels] = useState<ProviderModel[]>([])
+  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredProviderModel[]>([])
   const [newModelId, setNewModelId] = useState('')
   const [newModelName, setNewModelName] = useState('')
   const [settingsJson, setSettingsJson] = useState('')
+  const [settingsReady, setSettingsReady] = useState(false)
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false)
   const [settingsJsonError, setSettingsJsonError] = useState<string | null>(null)
   const jsonPastedRef = useRef(false)
   const discoveryRequestRef = useRef(0)
@@ -543,42 +499,44 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       jsonPastedRef.current = false
       return
     }
-    import('../../api/providers').then(({ providersApi }) => {
-      providersApi.getSettings().then((settings) => {
-        const needsProxy = apiFormat !== 'anthropic'
-        const autoCompactWindowEnv = autoCompactWindow.trim()
-        const modelContextWindows = buildModelContextWindows(models, modelContextInputs)
-        const normalizedModels = normalizeModels(models)
-        const runtime = runtimeModelMapping(normalizedModels, fastModel)
-        const existingEnv = (settings.env as Record<string, string>) || {}
-        const cleanedEnv = stripProviderSettingsJsonEnv(existingEnv, presetDefaultEnvKeys)
-        const merged = {
-          ...settings,
-          skipWebFetchPreflight: settings.skipWebFetchPreflight ?? true,
-          env: {
-            ...cleanedEnv,
-            ...omitAuthEnv(selectedPreset.defaultEnv),
-            ...(autoCompactWindowEnv ? { [AUTO_COMPACT_WINDOW_ENV_KEY]: autoCompactWindowEnv } : {}),
-            ...(Object.keys(modelContextWindows).length > 0
-              ? { [MODEL_CONTEXT_WINDOWS_ENV_KEY]: JSON.stringify(modelContextWindows) }
-              : {}),
-            ANTHROPIC_BASE_URL: needsProxy ? 'http://127.0.0.1:3456/proxy' : baseUrl,
-            ...buildSettingsJsonAuthEnv(apiFormat, authStrategy, apiKey, selectedPreset),
-            ANTHROPIC_MODEL: runtime.main,
-            ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
-            ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
-            ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
-            ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
-          },
-        }
-        setSettingsJson(JSON.stringify(merged, null, 2))
-      }).catch(() => {
-        setSettingsJson(JSON.stringify({}, null, 2))
-      })
+    let cancelled = false
+    setSettingsLoadFailed(false)
+    import('../../api/providers').then(({ providersApi }) => providersApi.getSettings()).then((settings) => {
+      if (cancelled) return
+      const needsProxy = apiFormat !== 'anthropic'
+      const modelContextWindows = buildModelContextWindows(models, modelContextInputs)
+      const normalizedModels = normalizeModels(models)
+      const runtime = runtimeModelMapping(normalizedModels, fastModel)
+      const existingEnv = (settings.env as Record<string, string>) || {}
+      const cleanedEnv = stripProviderSettingsJsonEnv(existingEnv, presetDefaultEnvKeys)
+      const merged = {
+        ...settings,
+        skipWebFetchPreflight: settings.skipWebFetchPreflight ?? true,
+        env: {
+          ...cleanedEnv,
+          ...omitAuthEnv(selectedPreset.defaultEnv),
+          ...(Object.keys(modelContextWindows).length > 0
+            ? { [MODEL_CONTEXT_WINDOWS_ENV_KEY]: JSON.stringify(modelContextWindows) }
+            : {}),
+          ANTHROPIC_BASE_URL: needsProxy ? 'http://127.0.0.1:3456/proxy' : baseUrl,
+          ...buildSettingsJsonAuthEnv(apiFormat, authStrategy, apiKey, selectedPreset),
+          ANTHROPIC_MODEL: runtime.main,
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
+          ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
+          ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
+          ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
+        },
+      }
+      setSettingsJson(JSON.stringify(merged, null, 2))
+      setSettingsReady(true)
+    }).catch(() => {
+      if (!cancelled) setSettingsLoadFailed(true)
     })
+    return () => { cancelled = true }
   }, [selectedPreset.id])
 
   const handlePresetChange = (preset: ProviderPreset) => {
+    if (preset.id !== selectedPreset.id) setSettingsReady(false)
     setSelectedPreset(preset)
     setName(getPresetDisplayName(preset, t))
     setBaseUrl(preset.baseUrl)
@@ -588,19 +546,16 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setModels(preset.defaultModels.map((model) => ({ ...model })))
     setFastModel(preset.defaultFastModel ?? '')
     setModelContextInputs(getModelContextInputs(preset.defaultModels, preset))
-    setAutoCompactWindow(getPresetAutoCompactWindow(preset))
-    setShowContextSettings(false)
     setTestResult(null)
     resetDiscovery()
   }
 
   const isCustom = selectedPreset.id === 'custom'
   const requiresApiKey = selectedPreset.needsApiKey !== false
-  const autoCompactWindowErrorKey = getAutoCompactWindowErrorKey(autoCompactWindow)
   const hasModelContextWindowError = models.some((model) => (
     !!getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
   ))
-  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !autoCompactWindowErrorKey && !hasModelContextWindowError
+  const canSubmit = settingsReady && name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !hasModelContextWindowError
   const apiKeyUrl = selectedPreset.apiKeyUrl?.trim()
   const displayedSettingsJson = showApiKey
     ? settingsJson
@@ -656,24 +611,13 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     },
   ] satisfies Array<{ value: ProviderAuthStrategy; label: string; description: string; icon: ReactNode }>
   const selectedAuthStrategyLabel = authStrategyItems.find((item) => item.value === authStrategy)?.label ?? t('settings.providers.authStrategyAuthToken')
-  const configuredContextWindows = buildModelContextWindows(models, modelContextInputs)
-  const configuredContextSummary = Object.entries(configuredContextWindows)
-    .filter(([model], index, entries) => entries.findIndex(([candidate]) => candidate === model) === index)
-    .map(([model, value]) => `${model}: ${formatContextWindow(value)}`)
-  const parsedFallbackContextWindow = parseAutoCompactWindowInput(autoCompactWindow)
-  const fallbackContextSummary = parsedFallbackContextWindow !== undefined
-    ? t('settings.providers.contextFallbackSummary', {
-      tokens: formatContextWindow(parsedFallbackContextWindow),
-    })
-    : t('settings.providers.contextFallbackAuto')
-  const contextSummary = configuredContextSummary.length > 0
-    ? [...configuredContextSummary, fallbackContextSummary].join(' · ')
-    : t('settings.providers.contextSummaryAuto')
-  const shouldShowContextFields = showContextSettings || hasModelContextWindowError || !!autoCompactWindowErrorKey
-  const handleAutoCompactWindowChange = (value: string) => {
-    setAutoCompactWindow(value)
-    setSettingsJson((current) => updateSettingsJsonAutoCompactWindow(current, value))
-  }
+  useEffect(() => {
+    if (!settingsReady) return
+    setSettingsJson((current) => updateSettingsJsonModelContextWindows(
+      current,
+      buildModelContextWindows(models, modelContextInputs),
+    ))
+  }, [settingsReady, models, modelContextInputs])
   const handleBaseUrlChange = (value: string) => {
     resetDiscovery()
     setBaseUrl(value)
@@ -699,18 +643,10 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     const validFastModel = normalized.some((model) => model.id === nextFastModel) ? nextFastModel : ''
     setModels(nextModels)
     setFastModel(validFastModel)
-    setSettingsJson((current) => updateSettingsJsonModelContextWindows(
-      updateSettingsJsonModels(current, normalized, validFastModel),
-      buildModelContextWindows(normalized, modelContextInputs),
-    ))
+    setSettingsJson((current) => updateSettingsJsonModels(current, normalized, validFastModel))
   }
   const handleModelContextWindowChange = (modelId: string, value: string) => {
-    const nextInputs = { ...modelContextInputs, [modelId]: value }
-    setModelContextInputs(nextInputs)
-    setSettingsJson((current) => updateSettingsJsonModelContextWindows(
-      current,
-      buildModelContextWindows(models, nextInputs),
-    ))
+    setModelContextInputs((current) => ({ ...current, [modelId]: value }))
   }
   const selectDiscoveredModel = (model: ProviderModel) => {
     const name = model.name ?? ''
@@ -726,6 +662,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setDiscoveryCount(null)
     try {
       const fetched = await discoverModels({
+        presetId: selectedPreset.id,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim() || selectedPreset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || '',
         authStrategy,
@@ -733,6 +670,15 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       })
       if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels(fetched)
+      setModelContextInputs((current) => {
+        const next = { ...current }
+        for (const model of fetched) {
+          if (Object.prototype.hasOwnProperty.call(current, model.id) && !current[model.id]?.trim() && model.contextWindow !== undefined) {
+            next[model.id] = String(model.contextWindow)
+          }
+        }
+        return next
+      })
       setDiscoveryCount(fetched.length)
       setModelsApiFormat(apiFormat)
     } catch (err) {
@@ -751,7 +697,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     const nextModels = [...models, { id, ...(name ? { name } : {}) }]
     setModelContextInputs((current) => ({
       ...current,
-      [id]: getModelContextInputValue(id, selectedPreset, provider),
+      [id]: getModelContextInputValue(id, selectedPreset, provider) || (suggestion?.contextWindow !== undefined ? String(suggestion.contextWindow) : ''),
     }))
     updateModels(nextModels)
     discoveredSelectionRef.current = null
@@ -780,7 +726,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const handleSubmit = async () => {
     if (!canSubmit) return
     const normalizedModels = normalizeModels(models)
-    const parsedAutoCompactWindow = parseAutoCompactWindowInput(autoCompactWindow)
     const parsedModelContextWindows = buildModelContextWindows(models, modelContextInputs)
     setIsSubmitting(true)
     setSaveError(null)
@@ -804,7 +749,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           apiFormat,
           models: normalizedModels,
           ...(fastModel && { fastModel }),
-          ...(parsedAutoCompactWindow !== undefined && { autoCompactWindow: parsedAutoCompactWindow }),
           ...(Object.keys(parsedModelContextWindows).length > 0 && { modelContextWindows: parsedModelContextWindows }),
           notes: notes.trim() || undefined,
         })
@@ -817,7 +761,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           apiFormat,
           models: normalizedModels,
           fastModel: fastModel || null,
-          autoCompactWindow: parsedAutoCompactWindow ?? null,
           modelContextWindows: Object.keys(parsedModelContextWindows).length > 0
             ? parsedModelContextWindows
             : null,
@@ -876,6 +819,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       width={720}
       footer={
         <>
+          {settingsLoadFailed && (
+            <p role="alert" className="mr-auto self-center text-xs text-[var(--color-error)]">
+              {t('settings.providers.settingsLoadFailed')}
+            </p>
+          )}
           {saveError && (
             <p role="alert" className="mr-auto self-center text-xs text-[var(--color-error)] [overflow-wrap:anywhere]">
               {t('settings.providers.saveFailed', { error: saveError })}
@@ -1049,69 +997,93 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
             </Button>
           </div>
           <div className="mt-3 space-y-2">
-            {models.map((model, index) => (
-              <div key={model.id} className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-2">
-                <div className="min-w-0 flex-1">
-                  <input
-                    aria-label={t('settings.providers.displayName')}
-                    value={model.name ?? ''}
-                    onChange={(event) => updateModels(models.map((entry, candidateIndex) => (
-                      candidateIndex === index
-                        ? { ...entry, name: event.target.value || undefined }
-                        : entry
-                    )))}
-                    placeholder={model.id}
-                    className="h-8 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
-                  />
-                  <div className="mt-1 truncate text-[11px] text-[var(--color-text-tertiary)]">{model.id}</div>
-                  {index === 0 && (
-                    <div className="mt-1 text-[11px] font-medium text-[var(--color-brand)]">{t('settings.providers.defaultModel')}</div>
-                  )}
-                  {model.name && duplicateModelNames.has(model.name.trim()) && (
-                    <div className="mt-1 text-[11px] text-[var(--color-warning)]">{t('settings.providers.duplicateDisplayName')}</div>
-                  )}
+            {models.map((model, index) => {
+              const errorKey = getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
+              return (
+                <div key={model.id} className="flex flex-wrap items-start gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-2">
+                  <div className="min-w-0 flex-1">
+                    <input
+                      aria-label={t('settings.providers.displayName')}
+                      value={model.name ?? ''}
+                      onChange={(event) => updateModels(models.map((entry, candidateIndex) => (
+                        candidateIndex === index
+                          ? { ...entry, name: event.target.value || undefined }
+                          : entry
+                      )))}
+                      placeholder={model.id}
+                      className="h-8 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
+                    />
+                    <div className="mt-1 truncate text-[11px] text-[var(--color-text-tertiary)]">{model.id}</div>
+                    {index === 0 && (
+                      <div className="mt-1 text-[11px] font-medium text-[var(--color-brand)]">{t('settings.providers.defaultModel')}</div>
+                    )}
+                    {model.name && duplicateModelNames.has(model.name.trim()) && (
+                      <div className="mt-1 text-[11px] text-[var(--color-warning)]">{t('settings.providers.duplicateDisplayName')}</div>
+                    )}
+                  </div>
+                  <div className="w-36 min-w-0">
+                    <input
+                      aria-label={t('settings.providers.modelContextWindowLabel', { model: model.id })}
+                      aria-invalid={!!errorKey}
+                      inputMode="numeric"
+                      value={modelContextInputs[model.id] ?? ''}
+                      onChange={(event) => handleModelContextWindowChange(model.id, event.target.value)}
+                      placeholder={t('settings.providers.contextWindowPlaceholder')}
+                      className={`h-8 w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] ${errorKey ? 'border-[var(--color-error)]' : 'border-[var(--color-border)]'}`}
+                    />
+                    <div className={`mt-1 text-[11px] ${errorKey ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}>
+                      {errorKey
+                        ? t(errorKey === 'number'
+                          ? 'settings.providers.modelContextWindowNumberError'
+                          : 'settings.providers.modelContextWindowRangeError')
+                        : t('settings.providers.modelContextWindow')}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => {
+                      const nextModels = [...models]
+                      const [moved] = nextModels.splice(index, 1)
+                      if (!moved) return
+                      nextModels.splice(index - 1, 0, moved)
+                      updateModels(nextModels)
+                    }}
+                    aria-label={t('settings.providers.moveModelUp')}
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === models.length - 1}
+                    onClick={() => {
+                      const nextModels = [...models]
+                      const [moved] = nextModels.splice(index, 1)
+                      if (!moved) return
+                      nextModels.splice(index + 1, 0, moved)
+                      updateModels(nextModels)
+                    }}
+                    aria-label={t('settings.providers.moveModelDown')}
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
+                    aria-label={t('common.delete')}
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-error)]"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={index === 0}
-                  onClick={() => {
-                    const nextModels = [...models]
-                    const [moved] = nextModels.splice(index, 1)
-                    if (!moved) return
-                    nextModels.splice(index - 1, 0, moved)
-                    updateModels(nextModels)
-                  }}
-                  aria-label={t('settings.providers.moveModelUp')}
-                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
-                >
-                  <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={index === models.length - 1}
-                  onClick={() => {
-                    const nextModels = [...models]
-                    const [moved] = nextModels.splice(index, 1)
-                    if (!moved) return
-                    nextModels.splice(index + 1, 0, moved)
-                    updateModels(nextModels)
-                  }}
-                  aria-label={t('settings.providers.moveModelDown')}
-                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
-                >
-                  <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
-                  aria-label={t('common.delete')}
-                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-error)]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">delete</span>
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
+          <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
+            {t('settings.providers.modelContextWindowsDesc')}
+          </p>
           <div className="mt-3">
             <label htmlFor="provider-fast-model" className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">{t('settings.providers.fastModel')}</label>
             <select
@@ -1129,89 +1101,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
             </select>
             <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">{t('settings.providers.fastModelDesc')}</p>
           </div>
-        </div>
-
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-          <button
-            type="button"
-            onClick={() => setShowContextSettings((visible) => !visible)}
-            className="flex w-full items-start gap-3 px-3 py-3 text-left outline-none transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--shadow-focus-ring)]"
-            aria-expanded={shouldShowContextFields}
-          >
-            <span className="material-symbols-outlined mt-0.5 text-[18px] text-[var(--color-brand)]">compress</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-[var(--color-text-primary)]">
-                {t('settings.providers.contextSettingsTitle')}
-              </span>
-              <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">
-                {contextSummary}
-              </span>
-              <span className="mt-1 block text-[11px] leading-5 text-[var(--color-text-tertiary)]">
-                {t('settings.providers.contextSettingsDesc')}
-              </span>
-            </span>
-            <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand)]">
-              {shouldShowContextFields
-                ? t('settings.providers.contextSettingsHide')
-                : t('settings.providers.contextSettingsEdit')}
-              <span className="material-symbols-outlined text-[16px]">
-                {shouldShowContextFields ? 'expand_less' : 'expand_more'}
-              </span>
-            </span>
-          </button>
-
-          {shouldShowContextFields && (
-            <div className="border-t border-[var(--color-border)] px-3 pb-3 pt-3">
-              <div>
-                <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.modelContextWindows')}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {models.map((model) => {
-                    const errorKey = getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
-                    return (
-                      <div key={model.id}>
-                        <Input
-                          label={model.name || model.id}
-                          value={modelContextInputs[model.id] ?? ''}
-                          onChange={(e) => handleModelContextWindowChange(model.id, e.target.value)}
-                          placeholder={t('settings.providers.contextWindowPlaceholder')}
-                        />
-                        {errorKey && (
-                          <p className="text-[11px] text-[var(--color-error)] mt-1">
-                            {errorKey === 'number'
-                              ? t('settings.providers.modelContextWindowNumberError')
-                              : t('settings.providers.modelContextWindowRangeError')}
-                          </p>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <p className="text-[11px] text-[var(--color-text-tertiary)] mt-1">
-                  {t('settings.providers.modelContextWindowsDesc')}
-                </p>
-              </div>
-
-              <div className="mt-3">
-                <Input
-                  label={t('settings.providers.autoCompactWindow')}
-                  value={autoCompactWindow}
-                  onChange={(e) => handleAutoCompactWindowChange(e.target.value)}
-                  placeholder={t('settings.providers.autoCompactWindowPlaceholder')}
-                />
-                {autoCompactWindowErrorKey ? (
-                  <p className="text-[11px] text-[var(--color-error)] mt-1">
-                    {autoCompactWindowErrorKey === 'number'
-                      ? t('settings.providers.autoCompactWindowNumberError')
-                      : t('settings.providers.autoCompactWindowRangeError')}
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-[var(--color-text-tertiary)] mt-1">
-                    {t('settings.providers.autoCompactWindowDesc')}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -1232,6 +1121,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         <div>
           <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.settingsJson')}</label>
           <textarea
+            disabled={!settingsReady}
             value={displayedSettingsJson}
             onChange={(e) => {
               const raw = e.target.value
@@ -1269,11 +1159,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                   }
                   if (nextAuthStrategy) {
                     setAuthStrategy(nextAuthStrategy)
-                  }
-                  if (env[AUTO_COMPACT_WINDOW_ENV_KEY] !== undefined) {
-                    setAutoCompactWindow(String(env[AUTO_COMPACT_WINDOW_ENV_KEY]))
-                  } else {
-                    setAutoCompactWindow('')
                   }
                 }
                 const normalizedModels = normalizeModels(models)

@@ -28,7 +28,7 @@ import type {
   ApiFormat,
   ProviderAuthStrategy,
   DiscoverProviderModelsInput,
-  ProviderModel,
+  DiscoveredProviderModel,
 } from '../types/provider.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
@@ -127,7 +127,6 @@ export class ProviderService {
       runtimeKind: input.runtimeKind ?? 'anthropic_compatible',
       models: normalizeProviderModels(input.models),
       ...(input.fastModel !== undefined && { fastModel: input.fastModel }),
-      ...(input.autoCompactWindow !== undefined && { autoCompactWindow: input.autoCompactWindow }),
       ...(input.modelContextWindows !== undefined && { modelContextWindows: input.modelContextWindows }),
       ...(input.notes !== undefined && { notes: input.notes }),
     }
@@ -154,12 +153,8 @@ export class ProviderService {
       ...(input.runtimeKind !== undefined && { runtimeKind: input.runtimeKind }),
       ...(input.models !== undefined && { models: normalizeProviderModels(input.models) }),
       ...(typeof input.fastModel === 'string' && { fastModel: input.fastModel }),
-      ...(typeof input.autoCompactWindow === 'number' && { autoCompactWindow: input.autoCompactWindow }),
       ...(input.modelContextWindows !== undefined && input.modelContextWindows !== null && { modelContextWindows: input.modelContextWindows }),
       ...(input.notes !== undefined && { notes: input.notes }),
-    }
-    if (input.autoCompactWindow === null) {
-      delete updated.autoCompactWindow
     }
     if (input.modelContextWindows === null) {
       delete updated.modelContextWindows
@@ -305,17 +300,17 @@ export class ProviderService {
     }, overrides?.modelId || getProviderDefaultModel(provider))
   }
 
-  async discoverModels(input: DiscoverProviderModelsInput): Promise<ProviderModel[]> {
+  async discoverModels(input: DiscoverProviderModelsInput): Promise<DiscoveredProviderModel[]> {
     return this.fetchModels({
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
       apiFormat: input.apiFormat ?? 'anthropic',
       authStrategy: input.authStrategy ?? 'api_key',
-    })
+    }, input.presetId)
   }
 
-  private async fetchModels(target: UpstreamTarget): Promise<ProviderModel[]> {
-    const result = await fetchUpstreamModels(target)
+  private async fetchModels(target: UpstreamTarget, presetId?: string): Promise<DiscoveredProviderModel[]> {
+    const result = await fetchUpstreamModels(target, presetId)
     if (!result.ok) {
       const upstreamRejected = result.httpStatus !== undefined && result.httpStatus >= 400 && result.httpStatus < 500
       throw new ApiError(upstreamRejected ? 400 : 502, result.error, 'MODEL_DISCOVERY_FAILED')

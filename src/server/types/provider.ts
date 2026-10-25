@@ -38,10 +38,10 @@ export const ProviderModelsSchema = z.array(ProviderModelSchema).superRefine((mo
   })
 })
 
-export const AutoCompactWindowSchema = z.number().int().min(16000).max(10000000)
+export const ModelContextWindowSchema = z.number().int().min(16000).max(10000000)
 export const ModelContextWindowsSchema = z.record(
   z.string().min(1),
-  z.number().int().min(16000).max(10000000),
+  ModelContextWindowSchema,
 )
 
 export const SavedProviderSchema = z.object({
@@ -55,7 +55,6 @@ export const SavedProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
-  autoCompactWindow: AutoCompactWindowSchema.optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
   notes: z.string().optional(),
 })
@@ -76,7 +75,6 @@ export const CreateProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
-  autoCompactWindow: AutoCompactWindowSchema.optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
   notes: z.string().optional(),
 })
@@ -90,7 +88,6 @@ export const UpdateProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.optional(),
   models: ProviderModelsSchema.min(1).optional(),
   fastModel: z.string().trim().min(1).nullable().optional(),
-  autoCompactWindow: AutoCompactWindowSchema.nullable().optional(),
   modelContextWindows: ModelContextWindowsSchema.nullable().optional(),
   notes: z.string().optional(),
 })
@@ -104,6 +101,7 @@ export const TestProviderSchema = z.object({
 })
 
 export const DiscoverProviderModelsSchema = z.object({
+  presetId: z.string().optional(),
   baseUrl: z.string().url(),
   apiKey: z.string(),
   authStrategy: ProviderAuthStrategySchema.optional(),
@@ -111,6 +109,7 @@ export const DiscoverProviderModelsSchema = z.object({
 })
 
 export type ProviderModel = z.infer<typeof ProviderModelSchema>
+export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
 export type CreateProviderInput = z.infer<typeof CreateProviderSchema>

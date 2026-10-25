@@ -31,6 +31,11 @@ function Harness({ onOuterEscape }: { onOuterEscape: () => void }) {
 }
 
 describe('ComposerBox plus menu', () => {
+  it('keeps the outer focus ring because its textarea has no border of its own', () => {
+    render(<Harness onOuterEscape={() => {}} />)
+    expect(screen.getByTestId('composer').classList.contains('glass-panel-focus')).toBe(true)
+  })
+
   it('focuses the first item, moves with arrows and closes on Escape back to the trigger', () => {
     const onOuterEscape = vi.fn()
     render(<Harness onOuterEscape={onOuterEscape} />)

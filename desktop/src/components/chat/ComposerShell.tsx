@@ -67,7 +67,7 @@ export function ComposerBox({
     <div
       ref={panelRef}
       data-testid={testId}
-      className={`glass-panel relative flex items-end gap-1.5 overflow-visible rounded-2xl px-2 py-1.5 transition-colors ${
+      className={`glass-panel glass-panel-focus relative flex items-end gap-1.5 overflow-visible rounded-2xl px-2 py-1.5 transition-colors ${
         isDragActive ? 'composer-drop-target-active' : ''
       }`}
       {...dragHandlers}

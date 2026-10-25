@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { prepareAppModeRestart, relaunchApp, pickDirectory } from '../../lib/shell'
-import { useSettingsStore } from '../../stores/settingsStore'
+import { DEFAULT_AUTO_COMPACT_PERCENT, useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { Input } from '../shared/Input'
@@ -31,12 +31,16 @@ const NETWORK_TIMEOUT_MIN_SECONDS = 5
 const NETWORK_TIMEOUT_MAX_SECONDS = 600
 const NETWORK_TIMEOUT_STEP_SECONDS = 30
 
+const AUTO_COMPACT_PERCENTS = [50, 60, 70, 80, 90, 95]
+
 export function GeneralSettings() {
   const {
     effortLevel,
     setEffort,
     thinkingEnabled,
     setThinkingEnabled,
+    autoCompactPercent,
+    setAutoCompactPercent,
     locale,
     setLocale,
     theme,
@@ -113,6 +117,12 @@ export function GeneralSettings() {
     setPortableDirDraft(appMode.portableDir ?? appMode.defaultPortableDir ?? '')
   }, [appMode.defaultPortableDir, appMode.portableDir])
 
+  const AUTO_COMPACT_OPTIONS = [...new Set([...AUTO_COMPACT_PERCENTS, autoCompactPercent])].sort((a, b) => a - b).map((percent) => ({
+    value: String(percent),
+    label: percent === DEFAULT_AUTO_COMPACT_PERCENT
+      ? t('settings.general.autoCompactDefaultOption', { percent })
+      : `${percent}%`,
+  }))
   const EFFORT_OPTIONS: Array<{ value: EffortLevel; label: string }> = [
     { value: 'low', label: 'Low' },
     { value: 'medium', label: 'Medium' },
@@ -438,6 +448,18 @@ export function GeneralSettings() {
               label={t('settings.general.thinkingEnabled')}
               checked={thinkingEnabled}
               onChange={(checked) => void setThinkingEnabled(checked)}
+            />
+          }
+        />
+        <SettingsRow
+          title={t('settings.general.autoCompactTitle')}
+          description={t('settings.general.autoCompactDescription')}
+          control={
+            <SettingsSelect<string>
+              label={t('settings.general.autoCompactTitle')}
+              options={AUTO_COMPACT_OPTIONS}
+              value={String(autoCompactPercent)}
+              onChange={(value) => void setAutoCompactPercent(Number(value))}
             />
           }
         />

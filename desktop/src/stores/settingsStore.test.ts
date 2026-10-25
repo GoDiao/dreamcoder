@@ -1124,3 +1124,66 @@ describe('settingsStore H5 access behavior', () => {
     expect('h5AccessGeneratedToken' in useSettingsStore.getState()).toBe(false)
   })
 })
+
+describe('settingsStore auto-compact percent', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    window.localStorage.clear()
+  })
+
+  function mockApis(getUser: ReturnType<typeof vi.fn>, updateUser: ReturnType<typeof vi.fn>) {
+    vi.doMock('../api/settings', () => ({
+      settingsApi: {
+        getUser,
+        updateUser,
+        getPermissionMode: vi.fn().mockResolvedValue({ mode: 'default' }),
+        setPermissionMode: vi.fn(),
+        getCliLauncherStatus: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/models', () => ({
+      modelsApi: {
+        list: vi.fn().mockResolvedValue({ models: [] }),
+        getCurrent: vi.fn().mockResolvedValue({ model: null }),
+        setCurrent: vi.fn(),
+        getEffort: vi.fn().mockResolvedValue({ level: 'medium' }),
+        setEffort: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/h5Access', () => ({
+      h5AccessApi: {
+        get: vi.fn().mockResolvedValue({
+          settings: { enabled: false, tokenPreview: null, allowedOrigins: [], publicBaseUrl: null },
+        }),
+        enable: vi.fn(),
+        disable: vi.fn(),
+        regenerate: vi.fn(),
+        update: vi.fn(),
+      },
+    }))
+  }
+
+  it('loads the saved percent and falls back to 90', async () => {
+    const getUser = vi.fn().mockResolvedValueOnce({ autoCompactPercent: 70 }).mockResolvedValueOnce({})
+    mockApis(getUser, vi.fn())
+    const { useSettingsStore } = await import('./settingsStore')
+
+    await useSettingsStore.getState().fetchAll()
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(70)
+    await useSettingsStore.getState().fetchAll()
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(90)
+  })
+
+  it('saves the percent and restores the previous value when saving fails', async () => {
+    const updateUser = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('offline'))
+    mockApis(vi.fn(), updateUser)
+    const { useSettingsStore } = await import('./settingsStore')
+
+    await useSettingsStore.getState().setAutoCompactPercent(60)
+    expect(updateUser).toHaveBeenCalledWith({ autoCompactPercent: 60 })
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(60)
+    await useSettingsStore.getState().setAutoCompactPercent(80)
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(60)
+  })
+})
