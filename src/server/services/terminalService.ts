@@ -247,9 +247,22 @@ async function loginShellEnvironment(shell: string): Promise<Record<string, stri
     console.warn(`[terminal] Could not read the login environment of ${shell}`, error)
     return {}
   }
-  const timer = setTimeout(() => proc.kill(), LOGIN_ENV_TIMEOUT_MS)
+  const read = Promise.all([new Response(proc.stdout as ReadableStream).text(), proc.exited])
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      proc.kill()
+      resolve(null)
+    }, LOGIN_ENV_TIMEOUT_MS)
+  })
   try {
-    const [output, code] = await Promise.all([new Response(proc.stdout as ReadableStream).text(), proc.exited])
+    const result = await Promise.race([read, timedOut])
+    if (!result) {
+      console.warn(`[terminal] Timed out reading the login environment of ${shell}`)
+      read.catch((error) => console.warn(`[terminal] Login environment read of ${shell} failed after the timeout`, error))
+      return {}
+    }
+    const [output, code] = result
     return code === 0 ? parseEnvBlock(output) : {}
   } finally {
     clearTimeout(timer)

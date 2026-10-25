@@ -7,13 +7,12 @@ import {
   isPersistableWindowState,
   readWindowState,
   restorableBounds,
-  toStoredWindowState,
   writeWindowState,
 } from './windowState'
 
 const valid = { x: 100, y: 100, width: 1200, height: 800, maximized: false }
-const retina = { bounds: { x: 0, y: 0, width: 1512, height: 982 }, scaleFactor: 2 }
-const external = { bounds: { x: 1512, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }
+const retina = { x: 0, y: 25, width: 1512, height: 957 }
+const external = { x: 1512, y: 0, width: 1920, height: 1080 }
 
 let dir = ''
 
@@ -40,21 +39,15 @@ describe('window state rules', () => {
   })
 })
 
-describe('physical pixels, as Tauri stored them', () => {
-  it('stores bounds scaled by the display factor', () => {
-    expect(toStoredWindowState({ x: 10, y: 20, width: 1000, height: 700 }, true, retina))
-      .toEqual({ x: 20, y: 40, width: 2000, height: 1400, maximized: true })
-  })
-
-  it('restores on the display the state falls on, in display units', () => {
-    expect(restorableBounds({ x: 20, y: 40, width: 2000, height: 1400, maximized: false }, [retina, external]))
-      .toEqual({ x: 10, y: 20, width: 1000, height: 700 })
-    expect(restorableBounds({ x: 3200, y: 100, width: 1200, height: 800, maximized: false }, [retina, external]))
-      .toEqual({ x: 3200, y: 100, width: 1200, height: 800 })
+describe('restoring across displays with different scale factors', () => {
+  it('restores the saved bounds unchanged on whichever display shows them', () => {
+    expect(restorableBounds(valid, [retina, external])).toEqual({ x: 100, y: 100, width: 1200, height: 800 })
+    expect(restorableBounds({ ...valid, x: 1600 }, [retina, external])).toEqual({ x: 1600, y: 100, width: 1200, height: 800 })
   })
 
   it('skips a state that no display shows', () => {
     expect(restorableBounds({ ...valid, x: -5000 }, [retina, external])).toBeNull()
+    expect(restorableBounds({ ...valid, x: 1600 }, [retina])).toBeNull()
   })
 })
 

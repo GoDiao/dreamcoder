@@ -10,8 +10,8 @@ The desktop app is an Electron main process that starts the Bun sidecar (`src/se
 
 - `main.ts`: resolves the config directory and portable mode, starts the sidecar, opens the window (on the Vite dev server or on `dist/` through `dreamcoder://localhost` with a content security policy), the macOS menu, the tray, notifications and the `shell:invoke` handlers.
 - `sidecar.ts`: reserves a port and starts `dreamcoder-sidecar server --app-root … --host 0.0.0.0 --port …`, waits until the port accepts connections and passes recent logs on failure. The sidecar is stopped on quit (the whole process tree on Windows), and `DREAMCODER_PARENT_PID` lets it exit on its own if the main process dies.
-- `appMode.ts`: portable mode. `app-mode.json` and `window-state.json` stay where the Tauri shell kept them (next to the executable in `CLAUDE_CONFIG_DIR`, or in the `com.dreamcoder.desktop` app config directory), so app mode and the window position carry over. With a config directory, Chromium's data goes to `<config>/Electron`.
-- `windowState.ts`: window bounds in physical pixels, restored only when they fit on a display.
+- `appMode.ts`: portable mode. `app-mode.json` sits in the active config directory and in Electron's user data folder; the default portable folder is `CLAUDE_CONFIG_DIR` next to the executable. With a config directory, Electron's user data goes to `<config>/Electron`.
+- `windowState.ts`: window bounds in Electron's screen coordinates, kept in `window-state.json` in the user data folder and restored only when they overlap a display.
 - `sessionExport.ts`: writes session exports to the path picked in the save dialog (`.md`, `.markdown`, `.json`).
 - `build/`: entitlements for the hardened runtime (the sidecar needs JIT), the NSIS hooks that stop running sidecars, the app icons and their sources.
 - `../scripts/build-electron.ts`: bundles `main.ts` and `preload.ts` to `electron-dist/` and writes the app's `package.json` there.

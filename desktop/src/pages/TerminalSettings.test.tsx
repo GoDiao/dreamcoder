@@ -31,6 +31,7 @@ const terminalMocks = vi.hoisted(() => {
       onOutput: (data: string) => void
       onExit: (exit: { code: number; signal: string | null }) => void
       onError: (message: string) => void
+      onDisconnect: () => void
     },
     detectDefaultShell: vi.fn(),
   }
@@ -45,6 +46,7 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 vi.mock('../api/terminal', () => ({
+  TerminalDisconnectedError: class TerminalDisconnectedError extends Error {},
   terminalApi: {
     isAvailable: () => terminalMocks.available,
     open: terminalMocks.open,
@@ -218,14 +220,15 @@ describe('TerminalSettings', () => {
     expect(screen.getByText('Exited')).toBeInTheDocument()
   })
 
-  it('shows a connection error reported after the shell started', async () => {
+  it('shows a translated message when the connection drops after the shell started', async () => {
+    useSettingsStore.setState({ locale: 'zh' })
     terminalMocks.available = true
     render(<TerminalSettings />)
-    await waitFor(() => expect(screen.getByText('Running')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('运行中')).toBeInTheDocument())
 
-    act(() => terminalMocks.lastInput?.onError('Terminal connection closed.'))
+    act(() => terminalMocks.lastInput?.onDisconnect())
 
-    expect(await screen.findByText('Terminal connection closed.')).toBeInTheDocument()
+    expect(await screen.findByText('终端连接已断开。')).toBeInTheDocument()
   })
 
   it('shows the start error when the shell cannot start', async () => {

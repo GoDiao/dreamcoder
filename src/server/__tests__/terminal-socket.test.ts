@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { startServer } from '../index.js'
+import { H5AccessService } from '../services/h5AccessService.js'
 import { ProviderService } from '../services/providerService.js'
 import type { TerminalServerMessage } from '../ws/terminalSocket.js'
 
@@ -94,6 +95,25 @@ describe('terminal API', () => {
       headers: { ...headers, Connection: 'Upgrade', Upgrade: 'websocket' },
     })
     expect(upgrade.status).toBe(403)
+  })
+
+  test('stays desktop-only for authorized H5 clients when H5 access is enabled', async () => {
+    const origin = 'https://phone.example'
+    const service = new H5AccessService()
+    await service.updateSettings({ allowedOrigins: [origin] })
+    const { token } = await service.enable()
+    const headers = { Origin: origin, Authorization: `Bearer ${token}` }
+
+    expect((await fetch(`${baseUrl}/api/sessions`, { headers })).status).toBe(200)
+    for (const request of [
+      fetch(`${baseUrl}/api/terminal/default-shell`, { headers }),
+      fetch(`${baseUrl}/api/terminal/validate-bash-path`, { method: 'POST', headers, body: JSON.stringify({ path: null }) }),
+      fetch(`${baseUrl}/terminal?token=${token}`, { headers: { ...headers, Connection: 'Upgrade', Upgrade: 'websocket' } }),
+    ]) {
+      const response = await request
+      expect(response.status).toBe(403)
+      expect(JSON.stringify(await response.json())).toContain('only available in the local desktop app')
+    }
   })
 })
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -223,6 +223,21 @@ describe.skipIf(!posix)('desktop sidecar environment', () => {
     expect(env.KEEP).toBe('yes')
     expect(env.SHELL).toBe(shell)
     expect(env.LANG).toMatch(/UTF-8$/)
+  })
+
+  test('stops waiting for the login shell after the timeout even when a child holds its output', async () => {
+    const shell = path.join(tmpDir, 'slow-shell')
+    await fs.writeFile(shell, '#!/bin/sh\nsleep 4 &\nsleep 4\n')
+    await fs.chmod(shell, 0o755)
+    process.env.SHELL = shell
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    const started = Date.now()
+    const env = await desktopSidecarEnvironment({ PATH: '/usr/bin' }, [])
+
+    expect(Date.now() - started).toBeLessThan(3500)
+    expect(env.PATH).toBe('/usr/bin')
+    warn.mockRestore()
   })
 
   test('keeps the inherited environment when the login shell fails', async () => {

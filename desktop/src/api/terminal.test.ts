@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildTerminalSocketUrl, terminalApi, type OpenTerminalInput, type TerminalServerMessage } from './terminal'
+import { buildTerminalSocketUrl, TerminalDisconnectedError, terminalApi, type OpenTerminalInput, type TerminalServerMessage } from './terminal'
 import { setAuthToken, setBaseUrl } from './client'
 
 const runtime = vi.hoisted(() => ({ desktop: true, get: vi.fn(), post: vi.fn() }))
@@ -37,7 +37,7 @@ class FakeWebSocket {
 }
 
 function openInput(overrides: Partial<OpenTerminalInput> = {}): OpenTerminalInput {
-  return { cols: 80, rows: 24, onOutput: vi.fn(), onExit: vi.fn(), onError: vi.fn(), ...overrides }
+  return { cols: 80, rows: 24, onOutput: vi.fn(), onExit: vi.fn(), onError: vi.fn(), onDisconnect: vi.fn(), ...overrides }
 }
 
 describe('terminal API', () => {
@@ -96,19 +96,26 @@ describe('terminal API', () => {
     await expect(opening).rejects.toThrow('terminal cwd does not exist: /missing')
   })
 
+  it('rejects with a disconnect error when the socket closes before the shell starts', async () => {
+    const opening = terminalApi.open(openInput())
+    FakeWebSocket.instances[0]!.close()
+    await expect(opening).rejects.toBeInstanceOf(TerminalDisconnectedError)
+  })
+
   it('reports a dropped connection after the shell started but not a deliberate close', async () => {
     const dropped = openInput()
     const opening = terminalApi.open(dropped)
     FakeWebSocket.instances[0]!.serverSends({ type: 'started', shell: '/bin/sh', cwd: '/', warning: null })
     await opening
     FakeWebSocket.instances[0]!.close()
-    expect(dropped.onError).toHaveBeenCalledWith('Terminal connection closed.')
+    expect(dropped.onDisconnect).toHaveBeenCalledOnce()
+    expect(dropped.onError).not.toHaveBeenCalled()
 
     const closed = openInput()
     const second = terminalApi.open(closed)
     FakeWebSocket.instances[1]!.serverSends({ type: 'started', shell: '/bin/sh', cwd: '/', warning: null })
     ;(await second).close()
-    expect(closed.onError).not.toHaveBeenCalled()
+    expect(closed.onDisconnect).not.toHaveBeenCalled()
   })
 
   it('refuses to write once the socket is closed', async () => {
@@ -116,7 +123,7 @@ describe('terminal API', () => {
     FakeWebSocket.instances[0]!.serverSends({ type: 'started', shell: '/bin/sh', cwd: '/', warning: null })
     const connection = await opening
     connection.close()
-    expect(() => connection.write('x')).toThrow('Terminal is not connected.')
+    expect(() => connection.write('x')).toThrow(TerminalDisconnectedError)
   })
 
   it('asks the sidecar for the default shell and bash path validation', async () => {

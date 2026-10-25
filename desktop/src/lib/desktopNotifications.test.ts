@@ -40,7 +40,7 @@ vi.mock('./shell', () => ({
   getMacNotificationPermission: () => coreApiMock.invoke('macos_notification_permission_state'),
   requestMacNotificationPermission: () => coreApiMock.invoke('macos_request_notification_permission'),
   sendMacNotification: (input: unknown) => coreApiMock.invoke('macos_send_notification', input),
-  openWindowsNotificationSettings: () => coreApiMock.invoke('open_windows_notification_settings'),
+  openNotificationSettings: () => coreApiMock.invoke('open_notification_settings'),
   openExternalLink: shellApiMock.open,
   requestAppAttention: () => requestUserAttentionMock(1),
   getAppWindow: async () => windowApiMock.getCurrentWindow(),
@@ -289,17 +289,27 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('opens Windows notification settings through the native command', async () => {
+  it.each(['Win32', 'MacIntel'])('opens notification settings through the main process on %s', async (platform) => {
     Object.defineProperty(navigator, 'platform', {
       configurable: true,
-      value: 'Win32',
+      value: platform,
     })
     coreApiMock.invoke.mockResolvedValueOnce(true)
 
     await expect(openDesktopNotificationSettings()).resolves.toBe(true)
 
-    expect(coreApiMock.invoke).toHaveBeenCalledWith('open_windows_notification_settings')
+    expect(coreApiMock.invoke).toHaveBeenCalledWith('open_notification_settings')
     expect(shellApiMock.open).not.toHaveBeenCalled()
+  })
+
+  it('passes an unknown macOS permission through', async () => {
+    Object.defineProperty(navigator, 'platform', {
+      configurable: true,
+      value: 'MacIntel',
+    })
+    coreApiMock.invoke.mockResolvedValueOnce('unknown')
+
+    await expect(getDesktopNotificationPermission()).resolves.toBe('unknown')
   })
 
   it('reports and requests macOS notification permission through the native bridge', async () => {

@@ -30,6 +30,14 @@ export type OpenTerminalInput = {
   onOutput(data: string): void
   onExit(exit: TerminalExit): void
   onError(message: string): void
+  onDisconnect(): void
+}
+
+export class TerminalDisconnectedError extends Error {
+  constructor() {
+    super('Terminal connection closed.')
+    this.name = 'TerminalDisconnectedError'
+  }
 }
 
 function requireDesktop() {
@@ -60,7 +68,7 @@ async function openTerminal(input: OpenTerminalInput): Promise<TerminalConnectio
     let finished = false
 
     const send = (message: TerminalClientMessage) => {
-      if (ws.readyState !== WebSocket.OPEN) throw new Error('Terminal is not connected.')
+      if (ws.readyState !== WebSocket.OPEN) throw new TerminalDisconnectedError()
       ws.send(JSON.stringify(message))
     }
 
@@ -99,8 +107,8 @@ async function openTerminal(input: OpenTerminalInput): Promise<TerminalConnectio
     }
 
     ws.onclose = () => {
-      if (!started) reject(new Error('Terminal connection closed before the shell started.'))
-      else if (!finished) input.onError('Terminal connection closed.')
+      if (!started) reject(new TerminalDisconnectedError())
+      else if (!finished) input.onDisconnect()
       finished = true
     }
   })

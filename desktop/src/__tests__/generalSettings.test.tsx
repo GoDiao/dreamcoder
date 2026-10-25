@@ -801,6 +801,20 @@ describe('Settings > General tab', () => {
     })
   })
 
+  it('offers system settings when the system manages notification permission', async () => {
+    desktopNotificationsMock.getDesktopNotificationPermission.mockResolvedValue('unknown')
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+    expect(await screen.findByText('Permission: Managed in system settings')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
+    })
+
+    expect(desktopNotificationsMock.openDesktopNotificationSettings).toHaveBeenCalledTimes(1)
+    expect(desktopNotificationsMock.requestDesktopNotificationPermission).not.toHaveBeenCalled()
+  })
+
   it('moves H5 access out of General into its own Settings tab', () => {
     render(<Settings />)
 

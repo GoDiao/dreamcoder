@@ -24,11 +24,8 @@ import {
   CONFIG_DIR_ENV,
   currentAppMode,
   determineStartupPortableDir,
-  legacyTerminalConfigPath,
   PORTABLE_MARKER_ENV,
   setAppMode,
-  APP_ID,
-  WINDOW_STATE_FILE,
 } from './appMode'
 import { writeSessionExport } from './sessionExport'
 import { startSidecar, type SidecarPaths, type SidecarRuntime } from './sidecar'
@@ -37,10 +34,11 @@ import {
   MIN_WINDOW_WIDTH,
   readWindowState,
   restorableBounds,
-  toStoredWindowState,
+  WINDOW_STATE_FILE,
   writeWindowState,
 } from './windowState'
 
+const APP_ID = 'com.dreamcoder.desktop'
 const APP_SCHEME = 'dreamcoder'
 const APP_ORIGIN = `${APP_SCHEME}://localhost`
 const DEV_URL = process.env.DREAMCODER_ELECTRON_DEV_URL
@@ -62,7 +60,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ])
 
-const locations = appModeLocations(process.execPath, app.getPath('appData'))
+const locations = appModeLocations(process.execPath, app.getPath('userData'))
 const startupPortableDir = determineStartupPortableDir(process.env, locations)
 if (startupPortableDir) {
   process.env[CONFIG_DIR_ENV] = startupPortableDir
@@ -146,7 +144,7 @@ function showMainWindow() {
 }
 
 function windowStateFile() {
-  return path.join(process.env[CONFIG_DIR_ENV] || locations.systemConfigDir, WINDOW_STATE_FILE)
+  return path.join(app.getPath('userData'), WINDOW_STATE_FILE)
 }
 
 function saveWindowState() {
@@ -156,8 +154,7 @@ function saveWindowState() {
   }
   if (!mainWindow || mainWindow.isMinimized()) return
   const bounds = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds()
-  const display = screen.getDisplayMatching(bounds)
-  writeWindowState(windowStateFile(), toStoredWindowState(bounds, mainWindow.isMaximized(), display))
+  writeWindowState(windowStateFile(), { ...bounds, maximized: mainWindow.isMaximized() })
 }
 
 function scheduleWindowStateSave() {
@@ -168,7 +165,7 @@ function scheduleWindowStateSave() {
 function restoreWindowBounds(win: BrowserWindow): boolean {
   const state = readWindowState(windowStateFile())
   if (!state) return false
-  const bounds = restorableBounds(state, screen.getAllDisplays())
+  const bounds = restorableBounds(state, screen.getAllDisplays().map((display) => display.workArea))
   if (!bounds) return false
   win.setBounds(bounds)
   return state.maximized
@@ -269,8 +266,11 @@ const handlers: Record<string, Handler> = {
     clickPayload: args.clickPayload,
   }),
   open_notification_settings: async () => {
-    if (!IS_WINDOWS) return false
-    await shell.openExternal('ms-settings:notifications')
+    const url = IS_MAC
+      ? 'x-apple.systempreferences:com.apple.preference.notifications'
+      : IS_WINDOWS ? 'ms-settings:notifications' : null
+    if (!url) return false
+    await shell.openExternal(url)
     return true
   },
   request_attention: () => {
@@ -414,7 +414,7 @@ if (!app.requestSingleInstanceLock()) {
     installApplicationMenu()
     installTray(paths.trayIcon)
     try {
-      sidecar = await startSidecar(paths, app.getVersion(), legacyTerminalConfigPath(process.env, locations))
+      sidecar = await startSidecar(paths, app.getVersion())
     } catch (error) {
       sidecarError = error instanceof Error ? error.message : String(error)
       console.error('[electron] sidecar failed to start', sidecarError)

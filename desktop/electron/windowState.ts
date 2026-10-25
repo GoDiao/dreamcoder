@@ -1,13 +1,13 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
+export const WINDOW_STATE_FILE = 'window-state.json'
 export const MIN_WINDOW_WIDTH = 960
 export const MIN_WINDOW_HEIGHT = 640
 const MIN_VISIBLE_PIXELS = 64
 
 export type Rect = { x: number; y: number; width: number; height: number }
 export type StoredWindowState = Rect & { maximized: boolean }
-export type DisplayInfo = { bounds: Rect; scaleFactor: number }
 
 export function isPersistableWindowState(state: StoredWindowState): boolean {
   return state.width >= MIN_WINDOW_WIDTH && state.height >= MIN_WINDOW_HEIGHT
@@ -20,26 +20,9 @@ export function hasMeaningfulIntersection(rect: Rect, area: Rect): boolean {
     && rect.y < area.y + area.height - MIN_VISIBLE_PIXELS
 }
 
-function scale(rect: Rect, factor: number): Rect {
-  return {
-    x: Math.round(rect.x * factor),
-    y: Math.round(rect.y * factor),
-    width: Math.round(rect.width * factor),
-    height: Math.round(rect.height * factor),
-  }
-}
-
-export function toStoredWindowState(bounds: Rect, maximized: boolean, display: DisplayInfo): StoredWindowState {
-  return { ...scale(bounds, display.scaleFactor), maximized }
-}
-
-export function restorableBounds(state: StoredWindowState, displays: DisplayInfo[]): Rect | null {
-  if (displays.length === 0) return scale(state, 1)
-  for (const display of displays) {
-    const physicalArea = scale(display.bounds, display.scaleFactor)
-    if (hasMeaningfulIntersection(state, physicalArea)) return scale(state, 1 / display.scaleFactor)
-  }
-  return null
+export function restorableBounds(state: StoredWindowState, workAreas: Rect[]): Rect | null {
+  if (!workAreas.some((area) => hasMeaningfulIntersection(state, area))) return null
+  return { x: state.x, y: state.y, width: state.width, height: state.height }
 }
 
 function parseWindowState(value: unknown): StoredWindowState | null {

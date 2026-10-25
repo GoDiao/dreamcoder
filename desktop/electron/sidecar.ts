@@ -62,12 +62,11 @@ async function waitForServer(port: number, child: ChildProcess, spawnError: () =
   throw new Error(`desktop server did not start listening on ${CONTROL_HOST}:${port} within 10 seconds`)
 }
 
-function sidecarEnv(paths: SidecarPaths, appVersion: string, legacyTerminalConfigPath: string): NodeJS.ProcessEnv {
+function sidecarEnv(paths: SidecarPaths, appVersion: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CLAUDE_H5_AUTO_PUBLIC_URL: '1',
     CLAUDE_H5_DIST_DIR: paths.h5DistDir,
-    DREAMCODER_LEGACY_TERMINAL_CONFIG_PATH: legacyTerminalConfigPath,
     DREAMCODER_PARENT_PID: String(process.pid),
     APP_VERSION: appVersion,
   }
@@ -80,13 +79,13 @@ function sidecarEnv(paths: SidecarPaths, appVersion: string, legacyTerminalConfi
   return env
 }
 
-export async function startSidecar(paths: SidecarPaths, appVersion: string, legacyTerminalConfigPath: string): Promise<SidecarRuntime> {
+export async function startSidecar(paths: SidecarPaths, appVersion: string): Promise<SidecarRuntime> {
   const port = await reservePort()
   const logs: string[] = []
   const child = spawn(
     paths.binary,
     ['server', '--app-root', paths.appRoot, '--host', BIND_HOST, '--port', String(port)],
-    { env: sidecarEnv(paths, appVersion, legacyTerminalConfigPath), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+    { env: sidecarEnv(paths, appVersion), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
   )
   const record = (stream: string) => (chunk: Buffer) => {
     for (const line of chunk.toString('utf8').split('\n')) {

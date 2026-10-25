@@ -26,7 +26,7 @@ export type ShellUpdate = {
   close: () => Promise<void>
 }
 
-export type NativeNotificationPermission = NotificationPermission | 'unsupported' | 'prompt' | 'prompt-with-rationale'
+export type NativeNotificationPermission = NotificationPermission | 'unsupported' | 'unknown' | 'prompt' | 'prompt-with-rationale'
 
 function bridge(): ElectronShellBridge {
   const value = (window as unknown as Record<string, ElectronShellBridge | undefined>)[ELECTRON_BRIDGE_KEY]
@@ -136,8 +136,8 @@ export function onMenuNavigate(handler: (event: { payload: string }) => void): P
   return listen<string>('native-menu-navigate', (payload) => handler({ payload }))
 }
 
-function supportedPermission(): Promise<NativeNotificationPermission> {
-  return invoke<boolean>('notification_supported').then((supported) => (supported ? 'granted' : 'unsupported'))
+function supportedPermission(whenSupported: 'granted' | 'unknown'): Promise<NativeNotificationPermission> {
+  return invoke<boolean>('notification_supported').then((supported) => (supported ? whenSupported : 'unsupported'))
 }
 
 export function getWindowsNotificationPermission() {
@@ -145,22 +145,22 @@ export function getWindowsNotificationPermission() {
 }
 
 export function requestWindowsNotificationPermission() {
-  return supportedPermission()
+  return supportedPermission('granted')
 }
 
 export function getMacNotificationPermission() {
-  return supportedPermission()
+  return supportedPermission('unknown')
 }
 
 export function requestMacNotificationPermission() {
-  return supportedPermission()
+  return supportedPermission('unknown')
 }
 
 export function sendMacNotification(input: { title: string; body?: string; target?: string }) {
   return invoke<boolean>('notification_send', { title: input.title, body: input.body, clickPayload: input.target })
 }
 
-export function openWindowsNotificationSettings() {
+export function openNotificationSettings() {
   return invoke<boolean>('open_notification_settings')
 }
 

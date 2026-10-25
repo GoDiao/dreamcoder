@@ -183,7 +183,9 @@ export function GeneralSettings() {
     denied: t('settings.general.notificationsStatusDenied'),
     default: t('settings.general.notificationsStatusDefault'),
     unsupported: t('settings.general.notificationsStatusUnsupported'),
+    unknown: t('settings.general.notificationsStatusUnknown'),
   }
+  const notificationSettingsOnly = notificationPermission === 'denied' || notificationPermission === 'unknown'
 
   const handleDesktopNotificationsToggle = async (enabled: boolean) => {
     await setDesktopNotificationsEnabled(enabled)
@@ -193,7 +195,7 @@ export function GeneralSettings() {
     try {
       const permission = await requestDesktopNotificationPermission()
       setNotificationPermission(permission)
-      if (permission === 'granted') {
+      if (permission === 'granted' || permission === 'unknown') {
         void notifyDesktop({
           title: t('settings.general.notificationsTestTitle'),
           body: t('settings.general.notificationsTestBody'),
@@ -210,7 +212,7 @@ export function GeneralSettings() {
   const handleNotificationPermissionAction = async () => {
     setNotificationActionRunning(true)
     try {
-      if (notificationPermission === 'denied') {
+      if (notificationSettingsOnly) {
         await openDesktopNotificationSettings()
       } else {
         const permission = await requestDesktopNotificationPermission()
@@ -490,7 +492,7 @@ export function GeneralSettings() {
                   disabled={notificationActionRunning}
                   onClick={() => void handleNotificationPermissionAction()}
                 >
-                  {notificationPermission === 'denied'
+                  {notificationSettingsOnly
                     ? t('settings.general.notificationsOpenSettings')
                     : t('settings.general.notificationsAuthorize')}
                 </Button>

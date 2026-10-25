@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent } from 'react'
 import { Eraser, Info, RotateCcw } from 'lucide-react'
 import { useTranslation, type TranslationKey } from '../i18n'
-import { terminalApi } from '../api/terminal'
+import { TerminalDisconnectedError, terminalApi } from '../api/terminal'
 import {
   attachTerminalRuntime,
   createLocalTerminalRuntimeId,
@@ -105,6 +105,11 @@ export function TerminalSettings({
     }
   }, [runtime])
 
+  const terminalErrorMessage = useCallback((err: unknown) => {
+    if (err instanceof TerminalDisconnectedError) return t('settings.terminal.connectionClosed')
+    return err instanceof Error ? err.message : String(err)
+  }, [t])
+
   const startTerminal = useCallback(async () => {
     if (!terminalApi.isAvailable()) {
       updateTerminalRuntime(runtime, { status: 'unavailable' })
@@ -172,7 +177,7 @@ export function TerminalSettings({
         runtime.connection?.write(data)
       } catch (err) {
         updateTerminalRuntime(runtime, {
-          error: err instanceof Error ? err.message : String(err),
+          error: terminalErrorMessage(err),
           status: 'error',
         })
       }
@@ -192,6 +197,9 @@ export function TerminalSettings({
         onError: (message) => {
           updateTerminalRuntime(runtime, { error: message, status: 'error' })
         },
+        onDisconnect: () => {
+          updateTerminalRuntime(runtime, { error: t('settings.terminal.connectionClosed'), status: 'error' })
+        },
       })
       updateTerminalRuntime(runtime, {
         connection,
@@ -207,11 +215,11 @@ export function TerminalSettings({
       updateTerminalRuntime(runtime, {
         terminal: null,
         fit: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: terminalErrorMessage(err),
         status: 'error',
       })
     }
-  }, [cwd, resizeSession, runtime])
+  }, [cwd, resizeSession, runtime, t, terminalErrorMessage])
 
   useEffect(() => {
     if (!terminalApi.isAvailable()) return

@@ -5,9 +5,6 @@ export const CONFIG_DIR_ENV = 'DREAMCODER_CONFIG_DIR'
 export const PORTABLE_MARKER_ENV = 'DREAMCODER_APP_PORTABLE_DIR'
 export const PORTABLE_DIR_NAME = 'CLAUDE_CONFIG_DIR'
 export const APP_MODE_FILE = 'app-mode.json'
-export const WINDOW_STATE_FILE = 'window-state.json'
-export const TERMINAL_CONFIG_FILE = 'terminal-config.json'
-export const APP_ID = 'com.dreamcoder.desktop'
 
 export type AppMode = 'default' | 'portable'
 
@@ -21,13 +18,13 @@ export type AppModeLocations = {
   systemConfigDir: string
 }
 
-const PORTABLE_DATA_FILES = ['settings.json', '.claude.json', '.mcp.json', WINDOW_STATE_FILE, TERMINAL_CONFIG_FILE]
-const PORTABLE_DATA_DIRS = ['Cache', 'EBWebView', 'projects', 'skills', 'plugins', 'cowork_plugins', 'dreamcoder']
+const PORTABLE_DATA_FILES = ['settings.json', '.claude.json', '.mcp.json']
+const PORTABLE_DATA_DIRS = ['Cache', 'projects', 'skills', 'plugins', 'cowork_plugins', 'dreamcoder']
 
-export function appModeLocations(executablePath: string, appDataDir: string): AppModeLocations {
+export function appModeLocations(executablePath: string, systemConfigDir: string): AppModeLocations {
   return {
     defaultPortableDir: path.join(path.dirname(executablePath), PORTABLE_DIR_NAME),
-    systemConfigDir: path.join(appDataDir, APP_ID),
+    systemConfigDir,
   }
 }
 
@@ -62,7 +59,7 @@ export function readAppModeConfig(dir: string): AppModeConfig | null {
   }
   if (!parsed || typeof parsed !== 'object') return null
   const value = parsed as Record<string, unknown>
-  const mode = typeof value.mode === 'string' && value.mode.toLowerCase() === 'portable' ? 'portable' : 'default'
+  const mode = value.mode === 'portable' ? 'portable' : 'default'
   const portableDir = typeof value.portable_dir === 'string' ? value.portable_dir : null
   return { mode, portable_dir: portableDir }
 }
@@ -139,8 +136,4 @@ export function clearPortableEnvForRestart(env: NodeJS.ProcessEnv) {
   if (!env[PORTABLE_MARKER_ENV]) return
   delete env[CONFIG_DIR_ENV]
   delete env[PORTABLE_MARKER_ENV]
-}
-
-export function legacyTerminalConfigPath(env: NodeJS.ProcessEnv, locations: AppModeLocations) {
-  return path.join(env[CONFIG_DIR_ENV] || locations.systemConfigDir, TERMINAL_CONFIG_FILE)
 }

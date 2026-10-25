@@ -49,12 +49,13 @@ describe('electron shell', () => {
 
   it('reports notification permission from main-process support', async () => {
     const { bridge } = installBridge(async (command) => (command === 'notification_supported' ? true : undefined))
-    await expect(electronShell.getMacNotificationPermission()).resolves.toBe('granted')
-    await expect(electronShell.requestMacNotificationPermission()).resolves.toBe('granted')
+    await expect(electronShell.getMacNotificationPermission()).resolves.toBe('unknown')
+    await expect(electronShell.requestMacNotificationPermission()).resolves.toBe('unknown')
     await expect(electronShell.getWindowsNotificationPermission()).resolves.toBe(true)
     await expect(electronShell.isNotificationPermissionGranted()).resolves.toBe(true)
     bridge.invoke.mockResolvedValue(false)
     await expect(electronShell.requestWindowsNotificationPermission()).resolves.toBe('unsupported')
+    await expect(electronShell.getMacNotificationPermission()).resolves.toBe('unsupported')
     await expect(electronShell.requestNotificationPermission()).resolves.toBe('denied')
   })
 

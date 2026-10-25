@@ -3,7 +3,6 @@ import {
   isNotificationPermissionGranted,
   requestNotificationPermission,
   sendNotification,
-  openExternalLink,
   requestAppAttention,
   getAppWindow,
   onNotificationClicked,
@@ -13,7 +12,7 @@ import {
   getMacNotificationPermission,
   requestMacNotificationPermission,
   sendMacNotification as sendMacShellNotification,
-  openWindowsNotificationSettings,
+  openNotificationSettings,
 } from './shell'
 
 const DEFAULT_COOLDOWN_MS = 750
@@ -41,7 +40,7 @@ type NativeNotificationPayload = {
 }
 
 type NativeNotificationSender = (options: NativeNotificationPayload) => Promise<boolean> | boolean
-export type DesktopNotificationPermission = NotificationPermission | 'unsupported'
+export type DesktopNotificationPermission = NotificationPermission | 'unsupported' | 'unknown'
 
 const TARGET_EXTRA_KEY = 'dcTarget'
 const notifiedKeys = new Set<string>()
@@ -69,17 +68,6 @@ function detectPlatform(): 'darwin' | 'win32' | 'linux' | 'unknown' {
   if (userAgent.includes('win')) return 'win32'
   if (userAgent.includes('linux')) return 'linux'
   return 'unknown'
-}
-
-function getNotificationSettingsUrl(): string | null {
-  switch (detectPlatform()) {
-    case 'darwin':
-      return 'x-apple.systempreferences:com.apple.preference.notifications'
-    case 'win32':
-      return 'ms-settings:notifications'
-    default:
-      return null
-  }
 }
 
 function normalizePermission(value: unknown): DesktopNotificationPermission {
@@ -125,7 +113,7 @@ async function invokeMacNotificationPermissionState(): Promise<DesktopNotificati
 
   try {
     const permission = await getMacNotificationPermission()
-    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
+    return ['default', 'denied', 'granted', 'unsupported', 'unknown'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
       console.warn('[desktopNotifications] failed to read macOS notification permission:', err)
@@ -139,7 +127,7 @@ async function invokeMacNotificationPermissionRequest(): Promise<DesktopNotifica
 
   try {
     const permission = await requestMacNotificationPermission()
-    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
+    return ['default', 'denied', 'granted', 'unsupported', 'unknown'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
       console.warn('[desktopNotifications] failed to request macOS notification permission:', err)
@@ -266,27 +254,11 @@ export async function requestDesktopNotificationPermission(): Promise<DesktopNot
 }
 
 export async function openDesktopNotificationSettings(): Promise<boolean> {
-  const url = getNotificationSettingsUrl()
-  if (!url) return false
-
-  if (detectPlatform() === 'win32') {
-    try {
-      const opened = await openWindowsNotificationSettings()
-      if (opened) return true
-    } catch {
-    }
-  }
-
   try {
-    await openExternalLink(url)
-    return true
-  } catch {
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer')
-      return true
-    } catch {
-      return false
-    }
+    return await openNotificationSettings()
+  } catch (err) {
+    console.warn('[desktopNotifications] failed to open notification settings:', err)
+    return false
   }
 }
 

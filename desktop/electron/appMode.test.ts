@@ -9,8 +9,6 @@ import {
   detectPortableDir,
   determineStartupPortableDir,
   dirHasPortableData,
-  legacyTerminalConfigPath,
-  PORTABLE_DIR_NAME,
   readAppModeConfig,
   setAppMode,
   type AppModeLocations,
@@ -26,7 +24,7 @@ function writeMode(dir: string, value: unknown) {
 
 beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), 'electron-app-mode-'))
-  locations = appModeLocations(path.join(root, 'app', 'DreamCoder.exe'), path.join(root, 'appdata'))
+  locations = appModeLocations(path.join(root, 'app', 'DreamCoder.exe'), path.join(root, 'userdata'))
 })
 
 afterEach(() => {
@@ -34,10 +32,10 @@ afterEach(() => {
 })
 
 describe('app mode locations', () => {
-  it('uses the folder next to the executable and the Tauri app config dir', () => {
+  it('uses the portable folder next to the executable and the app data dir', () => {
     expect(locations).toEqual({
-      defaultPortableDir: path.join(root, 'app', PORTABLE_DIR_NAME),
-      systemConfigDir: path.join(root, 'appdata', 'com.dreamcoder.desktop'),
+      defaultPortableDir: path.join(root, 'app/CLAUDE_CONFIG_DIR'),
+      systemConfigDir: path.join(root, 'userdata'),
     })
   })
 })
@@ -52,6 +50,13 @@ describe('portable data detection', () => {
 })
 
 describe('startup portable dir', () => {
+  it('finds data in the portable folder next to the executable', () => {
+    const portableDir = path.join(root, 'app/CLAUDE_CONFIG_DIR')
+    mkdirSync(portableDir, { recursive: true })
+    writeFileSync(path.join(portableDir, 'settings.json'), '{}')
+    expect(determineStartupPortableDir({}, locations)).toBe(portableDir)
+  })
+
   it('leaves an explicit config dir alone', () => {
     writeMode(locations.defaultPortableDir, { mode: 'portable' })
     expect(determineStartupPortableDir({ DREAMCODER_CONFIG_DIR: '/explicit' }, locations)).toBeNull()
@@ -62,7 +67,7 @@ describe('startup portable dir', () => {
     expect(determineStartupPortableDir({}, locations)).toBe('/elsewhere')
     writeFileSync(path.join(locations.defaultPortableDir, 'settings.json'), '{}')
     expect(determineStartupPortableDir({}, locations)).toBe(locations.defaultPortableDir)
-    writeMode(locations.defaultPortableDir, { mode: 'Default' })
+    writeMode(locations.defaultPortableDir, { mode: 'default' })
     expect(determineStartupPortableDir({}, locations)).toBeNull()
   })
 
@@ -91,7 +96,7 @@ describe('current app mode', () => {
 })
 
 describe('setting the app mode', () => {
-  it('writes portable mode to the active, target and system dirs in the Tauri format', () => {
+  it('writes portable mode to the active, target and system dirs', () => {
     const target = path.join(root, 'portable-target')
     setAppMode({}, locations, { mode: 'portable', portableDir: ` ${target} ` })
     const expected = { mode: 'portable', portable_dir: target }
@@ -116,7 +121,7 @@ describe('setting the app mode', () => {
   })
 })
 
-describe('restart and legacy paths', () => {
+describe('restart', () => {
   it('drops only a config dir that portable mode set', () => {
     const portable: NodeJS.ProcessEnv = { DREAMCODER_CONFIG_DIR: '/p', DREAMCODER_APP_PORTABLE_DIR: '1' }
     clearPortableEnvForRestart(portable)
@@ -124,10 +129,5 @@ describe('restart and legacy paths', () => {
     const explicit: NodeJS.ProcessEnv = { DREAMCODER_CONFIG_DIR: '/env' }
     clearPortableEnvForRestart(explicit)
     expect(explicit).toEqual({ DREAMCODER_CONFIG_DIR: '/env' })
-  })
-
-  it('points the legacy terminal config at the config dir or the Tauri app config dir', () => {
-    expect(legacyTerminalConfigPath({}, locations)).toBe(path.join(locations.systemConfigDir, 'terminal-config.json'))
-    expect(legacyTerminalConfigPath({ DREAMCODER_CONFIG_DIR: '/env' }, locations)).toBe(path.join('/env', 'terminal-config.json'))
   })
 })
