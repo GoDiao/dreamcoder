@@ -110,7 +110,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 | 桌面外壳 | [Tauri 2](https://v2.tauri.app/) (Rust) |
 | 前端 UI | React 18 + Vite + TailwindCSS 4 |
 | 后端运行时 | Bun (Node.js 兼容) |
-| 终端 | portable-pty (Rust) + xterm.js |
+| 终端 | sidecar 内的 Bun PTY + xterm.js |
 | 状态管理 | Zustand |
 | 协议 | WebSocket, MCP, LSP |
 

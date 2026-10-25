@@ -55,7 +55,7 @@ describe('electron shell', () => {
 
   it('rejects functions the spike does not implement', async () => {
     installBridge(async () => undefined)
-    await expect(electronShell.spawnTerminal({ cols: 80, rows: 24, settings: { startupShell: 'system', customShellPath: '', bashPath: '' } }))
-      .rejects.toThrow('spawnTerminal is not implemented in the Electron spike')
+    await expect(electronShell.setAppMode({ mode: 'portable', portableDir: null }))
+      .rejects.toThrow('setAppMode is not implemented in the Electron spike')
   })
 })

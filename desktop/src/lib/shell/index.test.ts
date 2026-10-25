@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { detectDefaultTerminalShell, onFileDrop, onNotificationAction, onTerminalOutput, pickDirectory, pickFiles, spawnTerminal, checkForAppUpdate, type TerminalOutputPayload } from './index'
+import { onFileDrop, onNotificationAction, pickDirectory, pickFiles, checkForAppUpdate } from './index'
 
 const native = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), open: vi.fn(), check: vi.fn(), onAction: vi.fn(), onDragDropEvent: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({ invoke: native.invoke }))
@@ -12,30 +12,6 @@ vi.mock('@tauri-apps/api/webview', () => ({ getCurrentWebview: () => ({ onDragDr
 beforeEach(() => vi.clearAllMocks())
 
 describe('shell transport', () => {
-  it('sends the full terminal settings to spawning and default detection', async () => {
-    const settings = { startupShell: 'system' as const, customShellPath: '', bashPath: 'C:\\Git\\bash.exe' }
-    const input = { cols: 80, rows: 24, cwd: '/work', settings }
-    native.invoke.mockResolvedValueOnce({ session_id: 2, shell: '/shell', cwd: '/work', warning: 'fallback' })
-    await expect(spawnTerminal(input)).resolves.toMatchObject({ session_id: 2, warning: 'fallback' })
-    expect(native.invoke).toHaveBeenLastCalledWith('terminal_spawn', input)
-    await detectDefaultTerminalShell(settings)
-    expect(native.invoke).toHaveBeenLastCalledWith('detect_default_terminal_shell', { settings })
-  })
-
-  it('unwraps terminal output and preserves the unsubscribe handle', async () => {
-    const unlisten = vi.fn()
-    let receive: ((event: { payload: TerminalOutputPayload }) => void) | undefined
-    native.listen.mockImplementation(async (_name: string, handler: typeof receive) => {
-      receive = handler
-      return unlisten
-    })
-    const handler = vi.fn()
-    expect(await onTerminalOutput(handler)).toBe(unlisten)
-    expect(native.listen).toHaveBeenCalledWith('terminal-output', expect.any(Function))
-    receive?.({ payload: { session_id: 2, data: 'output' } })
-    expect(handler).toHaveBeenCalledWith({ session_id: 2, data: 'output' })
-  })
-
   it('preserves cancellation and multiple file selections', async () => {
     native.open.mockResolvedValueOnce(null).mockResolvedValueOnce(['/a', '/b'])
     await expect(pickDirectory({ title: 'Project' })).resolves.toBeNull()

@@ -1,17 +1,6 @@
-import type { AppMode, AppModeConfig, DesktopTerminalSettings } from '../../types/settings'
+import type { AppMode, AppModeConfig } from '../../types/settings'
 
 export type Unlisten = () => void
-
-export type TerminalSpawnResult = {
-  session_id: number
-  shell: string
-  cwd: string
-  warning?: string | null
-}
-
-export type TerminalOutputPayload = { session_id: number; data: string }
-export type TerminalExitPayload = { session_id: number; code: number; signal?: string | null }
-export type TerminalShellDetection = { shell: string; platform: 'windows' | 'macos' | 'linux' }
 
 export type AppWindow = {
   minimize: () => Promise<void>
@@ -150,40 +139,6 @@ export async function onFileDrop(handler: (event: { payload: FileDropPayload }) 
 export async function onMenuNavigate(handler: (event: { payload: string }) => void): Promise<Unlisten> {
   const events = await import('@tauri-apps/api/event')
   return events.listen<string>('native-menu-navigate', handler)
-}
-
-export function spawnTerminal(input: { cols: number; rows: number; cwd?: string; settings: DesktopTerminalSettings }) {
-  return invoke<TerminalSpawnResult>('terminal_spawn', input)
-}
-
-export function writeTerminal(sessionId: number, data: string) {
-  return invoke<void>('terminal_write', { sessionId, data })
-}
-
-export function resizeTerminal(sessionId: number, cols: number, rows: number) {
-  return invoke<void>('terminal_resize', { sessionId, cols, rows })
-}
-
-export function killTerminal(sessionId: number) {
-  return invoke<void>('terminal_kill', { sessionId })
-}
-
-export function detectDefaultTerminalShell(settings: DesktopTerminalSettings) {
-  return invoke<TerminalShellDetection>('detect_default_terminal_shell', { settings })
-}
-
-export function validateTerminalBashPath(path: string | null) {
-  return invoke<string | null>('validate_terminal_bash_path', { path })
-}
-
-export async function onTerminalOutput(handler: (payload: TerminalOutputPayload) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<TerminalOutputPayload>('terminal-output', (event) => handler(event.payload))
-}
-
-export async function onTerminalExit(handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<TerminalExitPayload>('terminal-exit', (event) => handler(event.payload))
 }
 
 export function getWindowsNotificationPermission() {

@@ -99,6 +99,10 @@ export function shouldBlockDisabledH5Access({
   return classifyH5Request(request, url, context) === 'h5-browser'
 }
 
+export function isDesktopOnlyPath(pathname: string): boolean {
+  return pathname === '/terminal' || pathname === '/api/terminal' || pathname.startsWith('/api/terminal/')
+}
+
 function isH5ProtectedCapabilityPath(pathname: string): boolean {
   return pathname.startsWith('/api/') ||
     pathname.startsWith('/proxy/') ||

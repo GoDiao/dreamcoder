@@ -28,7 +28,7 @@ function DesktopTerminalShellSettings() {
   const isWindows = detection?.platform === 'windows'
   useEffect(() => {
     let cancelled = false
-    void terminalApi.detectDefaultShell(useSettingsStore.getState().desktopTerminal).then((result) => {
+    void terminalApi.detectDefaultShell().then((result) => {
       if (cancelled) return
       setDetection(result)
     }).catch((error) => {

@@ -1,13 +1,9 @@
-import type { AppMode, AppModeConfig, DesktopTerminalSettings } from '../../types/settings'
+import type { AppMode, AppModeConfig } from '../../types/settings'
 import type {
   AppWindow,
   FileDropPayload,
   NativeNotificationPermission,
   ShellUpdate,
-  TerminalExitPayload,
-  TerminalOutputPayload,
-  TerminalShellDetection,
-  TerminalSpawnResult,
   Unlisten,
 } from './index'
 import { ELECTRON_BRIDGE_KEY, type ElectronDialogFilter, type ElectronOpenDialogInput, type ElectronShellBridge } from './electronBridge'
@@ -18,10 +14,6 @@ export type {
   FileDropPosition,
   NativeNotificationPermission,
   ShellUpdate,
-  TerminalExitPayload,
-  TerminalOutputPayload,
-  TerminalShellDetection,
-  TerminalSpawnResult,
   Unlisten,
   UpdateDownloadEvent,
 } from './index'
@@ -137,38 +129,6 @@ export async function onFileDrop(_handler: (event: { payload: FileDropPayload })
 
 export function onMenuNavigate(handler: (event: { payload: string }) => void): Promise<Unlisten> {
   return listen<string>('native-menu-navigate', (payload) => handler({ payload }))
-}
-
-export function spawnTerminal(_input: { cols: number; rows: number; cwd?: string; settings: DesktopTerminalSettings }): Promise<TerminalSpawnResult> {
-  return notImplemented('spawnTerminal')
-}
-
-export function writeTerminal(_sessionId: number, _data: string): Promise<void> {
-  return notImplemented('writeTerminal')
-}
-
-export function resizeTerminal(_sessionId: number, _cols: number, _rows: number): Promise<void> {
-  return notImplemented('resizeTerminal')
-}
-
-export function killTerminal(_sessionId: number): Promise<void> {
-  return notImplemented('killTerminal')
-}
-
-export function detectDefaultTerminalShell(_settings: DesktopTerminalSettings): Promise<TerminalShellDetection> {
-  return notImplemented('detectDefaultTerminalShell')
-}
-
-export function validateTerminalBashPath(_path: string | null): Promise<string | null> {
-  return notImplemented('validateTerminalBashPath')
-}
-
-export function onTerminalOutput(_handler: (payload: TerminalOutputPayload) => void): Promise<Unlisten> {
-  return notImplemented('onTerminalOutput')
-}
-
-export function onTerminalExit(_handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
-  return notImplemented('onTerminalExit')
 }
 
 export function getWindowsNotificationPermission(): Promise<boolean | null> {

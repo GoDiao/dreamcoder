@@ -107,7 +107,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 | Desktop Shell | [Tauri 2](https://v2.tauri.app/) (Rust) |
 | Frontend UI | React 18 + Vite + TailwindCSS 4 |
 | Backend Runtime | Bun (Node.js compatible) |
-| Terminal | portable-pty (Rust) + xterm.js |
+| Terminal | Bun PTY in the sidecar + xterm.js |
 | State Management | Zustand |
 | Protocol | WebSocket, MCP, LSP |
 

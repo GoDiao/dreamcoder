@@ -26,6 +26,9 @@ const clipboardMock = vi.hoisted(() => ({
 const tauriCoreMock = vi.hoisted(() => ({
   invoke: vi.fn(),
 }))
+const terminalApiMock = vi.hoisted(() => ({
+  detectDefaultShell: vi.fn(),
+}))
 const tauriDialogMock = vi.hoisted(() => ({
   open: vi.fn(),
 }))
@@ -71,10 +74,13 @@ vi.mock('../components/chat/clipboard', () => clipboardMock)
 vi.mock('../lib/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/shell')>()),
   prepareAppModeRestart: () => tauriCoreMock.invoke('prepare_for_app_mode_restart'),
-  detectDefaultTerminalShell: (settings: unknown) => tauriCoreMock.invoke('detect_default_terminal_shell', { settings }),
   pickDirectory: tauriDialogMock.open,
   relaunchApp: tauriProcessMock.relaunch,
 }))
+vi.mock('../api/terminal', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../api/terminal')>()
+  return { ...original, terminalApi: { ...original.terminalApi, detectDefaultShell: terminalApiMock.detectDefaultShell } }
+})
 vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
@@ -143,7 +149,8 @@ describe('Settings > General tab', () => {
     clipboardMock.copyTextToClipboard.mockReset()
     clipboardMock.copyTextToClipboard.mockResolvedValue(true)
     tauriCoreMock.invoke.mockReset()
-    tauriCoreMock.invoke.mockImplementation(async (command: string) => command === 'detect_default_terminal_shell' ? { platform: 'macos', shell: '/bin/zsh' } : undefined)
+    terminalApiMock.detectDefaultShell.mockReset()
+    terminalApiMock.detectDefaultShell.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
     tauriDialogMock.open.mockReset()
     tauriDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
     tauriProcessMock.relaunch.mockReset()
@@ -306,7 +313,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
     expect(screen.queryByText('Default shell')).not.toBeInTheDocument()
-    expect(tauriCoreMock.invoke).not.toHaveBeenCalledWith('detect_default_terminal_shell', undefined)
+    expect(terminalApiMock.detectDefaultShell).not.toHaveBeenCalled()
   })
 
   it('shows WebFetch preflight toggle enabled by default', () => {
