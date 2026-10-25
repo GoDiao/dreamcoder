@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type MouseEvent } from 'react'
+import { getAppWindow } from '../lib/shell'
 import { isTauriRuntime } from '../lib/desktopRuntime'
 
 /** Elements that keep their own click behaviour and never start a window drag. */
@@ -23,9 +24,9 @@ export function useWindowDrag(): (event: MouseEvent) => void {
   useEffect(() => {
     if (!isTauriRuntime()) return
     // Loaded ahead of time so the drag starts on the mouse-down itself.
-    import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => {
-        windowRef.current = getCurrentWindow()
+    getAppWindow()
+      .then((win) => {
+        windowRef.current = win
       })
       .catch(() => {})
   }, [])

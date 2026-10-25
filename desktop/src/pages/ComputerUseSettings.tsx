@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { pickFile } from '../lib/shell'
 import {
   computerUseApi,
   type ComputerUseStatus,
@@ -183,8 +184,7 @@ export function ComputerUseSettings() {
 
   const choosePath = async () => {
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({ multiple: false, directory: false, title: t('settings.computerUse.pathDialogTitle') })
+      const selected = await pickFile({ multiple: false, directory: false, title: t('settings.computerUse.pathDialogTitle') })
       const selectedPath = Array.isArray(selected) ? selected[0] : selected
       if (typeof selectedPath === 'string' && selectedPath.trim()) {
         setPathDraft(selectedPath)

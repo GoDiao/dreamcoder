@@ -6,6 +6,7 @@ import { SettingsSelect } from './SettingsSelect'
 import { SettingsRow } from './SettingsRow'
 import { Input } from '../shared/Input'
 import { Button } from '../shared/Button'
+import { BashPathSettings } from './BashPathSettings'
 import type { DesktopTerminalStartupShell } from '../../types/settings'
 
 export function TerminalShellSettings() {
@@ -27,7 +28,7 @@ function DesktopTerminalShellSettings() {
   const isWindows = detection?.platform === 'windows'
   useEffect(() => {
     let cancelled = false
-    void terminalApi.detectDefaultShell().then((result) => {
+    void terminalApi.detectDefaultShell(useSettingsStore.getState().desktopTerminal).then((result) => {
       if (cancelled) return
       setDetection(result)
     }).catch((error) => {
@@ -152,6 +153,8 @@ function DesktopTerminalShellSettings() {
               {t('settings.terminal.saveShell')}
             </Button>
           </div>
+
+          {isWindows && <BashPathSettings />}
         </>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { isTauriRuntime } from './desktopRuntime'
+import { openExternalLink } from './shell'
 
 export function openExternalUrl(url: string): void {
   if (!isTauriRuntime()) {
@@ -6,7 +7,6 @@ export function openExternalUrl(url: string): void {
     return
   }
 
-  void import('@tauri-apps/plugin-shell')
-    .then((mod) => mod.open(url))
+  void openExternalLink(url)
     .catch(() => window.open(url, '_blank', 'noopener,noreferrer'))
 }

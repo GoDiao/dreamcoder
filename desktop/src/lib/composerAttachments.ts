@@ -1,4 +1,5 @@
 import { isTauriRuntime } from './desktopRuntime'
+import { pickFiles } from './shell'
 
 export type ComposerAttachment = {
   id: string
@@ -52,8 +53,7 @@ export async function selectNativeFileAttachments(): Promise<ComposerAttachment[
   if (!isTauriRuntime()) return null
 
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
+    const selected = await pickFiles({
       multiple: true,
       directory: false,
     })

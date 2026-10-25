@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { pickDirectory } from '../../lib/shell'
 import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
@@ -422,8 +423,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       return
     }
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
+      const selected = await pickDirectory({
         directory: true,
         multiple: false,
         title: t('sidebar.useExistingFolder'),

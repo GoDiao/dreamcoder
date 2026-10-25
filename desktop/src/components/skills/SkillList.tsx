@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, FileText, Plus } from 'lucide-react'
+import { useEffect, useMemo, type ReactNode } from 'react'
+import { ChevronRight, FileText, Plus } from 'lucide-react'
 import { useSkillStore } from '../../stores/skillStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -74,7 +74,7 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
         placeholder={t('settings.skills.searchPlaceholder')}
         className="w-[230px] min-w-[140px] max-w-full max-[780px]:flex-1"
       />
-      <SkillAddMenu />
+      <SkillAddButton />
     </div>
   )
 
@@ -181,78 +181,16 @@ function SkillBadge({ children }: { children: ReactNode }) {
   )
 }
 
-function SkillAddMenu() {
+function SkillAddButton() {
   const t = useTranslation()
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const firstItemRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    firstItemRef.current?.focus()
-    const handlePointer = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      setOpen(false)
-      triggerRef.current?.focus()
-    }
-    document.addEventListener('mousedown', handlePointer)
-    document.addEventListener('keydown', handleKey, true)
-    return () => {
-      document.removeEventListener('mousedown', handlePointer)
-      document.removeEventListener('keydown', handleKey, true)
-    }
-  }, [open])
-
-  const go = (tab: 'plugins' | 'terminal') => {
-    setOpen(false)
-    useUIStore.getState().openSettings(tab)
-  }
-
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-[6px] bg-[var(--color-text-primary)] px-2.5 text-xs font-medium leading-[18px] text-[var(--color-surface-container-lowest)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-      >
-        <Plus size={13} aria-hidden="true" />
-        {t('settings.skills.add')}
-        <ChevronDown size={13} aria-hidden="true" />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          aria-label={t('settings.skills.add')}
-          className="motion-menu absolute right-0 top-full z-50 mt-1 w-[200px] rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-[var(--shadow-dropdown)]"
-          data-state="open"
-        >
-          <button
-            ref={firstItemRef}
-            type="button"
-            role="menuitem"
-            onClick={() => go('plugins')}
-            className="flex min-h-[34px] w-full items-center rounded-[6px] px-2.5 text-left text-[13px] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] focus-visible:bg-[var(--color-surface-hover)] focus-visible:outline-none"
-          >
-            {t('settings.skills.addFromPlugins')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go('terminal')}
-            className="flex min-h-[34px] w-full items-center rounded-[6px] px-2.5 text-left text-[13px] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] focus-visible:bg-[var(--color-surface-hover)] focus-visible:outline-none"
-          >
-            {t('settings.skills.addFromTerminal')}
-          </button>
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => useUIStore.getState().openSettings('plugins')}
+      className="inline-flex h-8 items-center gap-1.5 rounded-[6px] bg-[var(--color-text-primary)] px-2.5 text-xs font-medium leading-[18px] text-[var(--color-surface-container-lowest)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+    >
+      <Plus size={13} aria-hidden="true" />
+      {t('settings.skills.addFromPlugins')}
+    </button>
   )
 }

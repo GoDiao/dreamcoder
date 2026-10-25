@@ -15,7 +15,6 @@ import {
   SettingsIcon,
   ShieldCheck,
   Smartphone,
-  TerminalIcon,
   Wrench,
   Zap,
   type LucideIcon,
@@ -30,7 +29,6 @@ import { PluginDetail } from '../components/plugins/PluginDetail'
 import { ComputerUseSettings } from './ComputerUseSettings'
 import { H5AccessSettings } from '../components/settings/H5AccessSettings'
 import { McpSettings } from './McpSettings'
-import { TerminalSettings } from './TerminalSettings'
 import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { ActivitySettings } from './ActivitySettings'
 import { MemorySettings } from './MemorySettings'
@@ -61,7 +59,6 @@ const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
   {
     titleKey: 'settings.group.local',
     items: [
-      { tab: 'terminal', Icon: TerminalIcon },
       { tab: 'h5Access', Icon: Smartphone },
       { tab: 'computerUse', Icon: Monitor },
       { tab: 'diagnostics', Icon: Wrench },
@@ -151,7 +148,6 @@ export function Settings() {
           {activeTab === 'activity' && <ActivitySettings />}
           {activeTab === 'general' && <GeneralSettings />}
           {activeTab === 'h5Access' && <H5AccessSettings />}
-          {activeTab === 'terminal' && <TerminalSettings showPreferences />}
           {activeTab === 'mcp' && <McpSettings />}
           {activeTab === 'agents' && <AgentsSettings />}
           {activeTab === 'skills' && <SkillSettings />}

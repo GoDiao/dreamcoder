@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { prepareAppModeRestart, relaunchApp, pickDirectory } from '../../lib/shell'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
@@ -295,8 +296,7 @@ export function GeneralSettings() {
   const openPortableDirPicker = async () => {
     setModeError(null)
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
+      const selected = await pickDirectory({
         directory: true,
         multiple: false,
         title: t('settings.general.storageChooseDirTitle'),
@@ -341,10 +341,8 @@ export function GeneralSettings() {
     setModeError(null)
     try {
       await setAppModeAction(pendingMode, pendingPortableDir)
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('prepare_for_app_mode_restart')
-      const { relaunch } = await import('@tauri-apps/plugin-process')
-      await relaunch()
+      await prepareAppModeRestart()
+      await relaunchApp()
     } catch (error) {
       setModeError(
         error instanceof Error

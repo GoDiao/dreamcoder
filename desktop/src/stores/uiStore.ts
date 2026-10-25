@@ -50,7 +50,6 @@ export type SettingsTab =
   | 'activity'
   | 'general'
   | 'h5Access'
-  | 'terminal'
   | 'mcp'
   | 'agents'
   | 'skills'

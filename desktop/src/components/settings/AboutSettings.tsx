@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getAppVersion } from '../../lib/shell'
 import { ExternalLink } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 import { Button } from '../shared/Button'
@@ -21,8 +22,7 @@ export function AboutSettings() {
   useEffect(() => {
     let cancelled = false
 
-    import('@tauri-apps/api/app')
-      .then((mod) => mod.getVersion())
+    getAppVersion()
       .then((value) => {
         if (!cancelled) setVersion(value)
       })

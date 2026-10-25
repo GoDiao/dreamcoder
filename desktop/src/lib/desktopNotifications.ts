@@ -1,4 +1,20 @@
 import { useSettingsStore } from '../stores/settingsStore'
+import {
+  isNotificationPermissionGranted,
+  requestNotificationPermission,
+  sendNotification,
+  openExternalLink,
+  requestAppAttention,
+  getAppWindow,
+  onNotificationClicked,
+  onNotificationAction,
+  getWindowsNotificationPermission,
+  requestWindowsNotificationPermission,
+  getMacNotificationPermission,
+  requestMacNotificationPermission,
+  sendMacNotification as sendMacShellNotification,
+  openWindowsNotificationSettings,
+} from './shell'
 
 const DEFAULT_COOLDOWN_MS = 750
 
@@ -26,7 +42,6 @@ type NativeNotificationPayload = {
 
 type NativeNotificationSender = (options: NativeNotificationPayload) => Promise<boolean> | boolean
 export type DesktopNotificationPermission = NotificationPermission | 'unsupported'
-type PluginPermissionState = DesktopNotificationPermission | 'prompt' | 'prompt-with-rationale'
 
 const TARGET_EXTRA_KEY = 'dcTarget'
 const notifiedKeys = new Set<string>()
@@ -81,8 +96,7 @@ async function invokeWindowsNotificationPermissionState(): Promise<DesktopNotifi
   if (detectPlatform() !== 'win32') return null
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const granted = await invoke<boolean | null>('plugin:notification|is_permission_granted')
+    const granted = await getWindowsNotificationPermission()
     return normalizePermission(granted)
   } catch (err) {
     if (typeof console !== 'undefined') {
@@ -96,8 +110,7 @@ async function invokeWindowsNotificationPermissionRequest(): Promise<DesktopNoti
   if (detectPlatform() !== 'win32') return null
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const permission = await invoke<PluginPermissionState>('plugin:notification|request_permission')
+    const permission = await requestWindowsNotificationPermission()
     return normalizePermission(permission)
   } catch (err) {
     if (typeof console !== 'undefined') {
@@ -111,9 +124,8 @@ async function invokeMacNotificationPermissionState(): Promise<DesktopNotificati
   if (detectPlatform() !== 'darwin') return null
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const permission = await invoke<DesktopNotificationPermission>('macos_notification_permission_state')
-    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission : 'unsupported'
+    const permission = await getMacNotificationPermission()
+    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
       console.warn('[desktopNotifications] failed to read macOS notification permission:', err)
@@ -126,9 +138,8 @@ async function invokeMacNotificationPermissionRequest(): Promise<DesktopNotifica
   if (detectPlatform() !== 'darwin') return null
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const permission = await invoke<DesktopNotificationPermission>('macos_request_notification_permission')
-    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission : 'unsupported'
+    const permission = await requestMacNotificationPermission()
+    return ['default', 'denied', 'granted', 'unsupported'].includes(permission) ? permission as DesktopNotificationPermission : 'unsupported'
   } catch (err) {
     if (typeof console !== 'undefined') {
       console.warn('[desktopNotifications] failed to request macOS notification permission:', err)
@@ -210,9 +221,8 @@ async function sendMacNotification(options: { title: string; body?: string; targ
   if (detectPlatform() !== 'darwin') return null
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
     const target = options.target ? JSON.stringify(options.target) : undefined
-    const sent = await invoke<boolean>('macos_send_notification', {
+    const sent = await sendMacShellNotification({
       title: options.title,
       body: options.body,
       ...(target ? { target } : {}),
@@ -234,8 +244,7 @@ export async function getDesktopNotificationPermission(): Promise<DesktopNotific
   if (windowsPermission) return windowsPermission
 
   try {
-    const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
-    if (await isPermissionGranted()) return 'granted'
+    if (await isNotificationPermissionGranted()) return 'granted'
   } catch {
   }
   return readBrowserNotificationPermission()
@@ -249,13 +258,8 @@ export async function requestDesktopNotificationPermission(): Promise<DesktopNot
   if (windowsPermission) return windowsPermission
 
   try {
-    const {
-      isPermissionGranted,
-      requestPermission,
-    } = await import('@tauri-apps/plugin-notification')
-
-    if (await isPermissionGranted()) return 'granted'
-    return await requestPermission()
+    if (await isNotificationPermissionGranted()) return 'granted'
+    return await requestNotificationPermission()
   } catch {
     return readBrowserNotificationPermission()
   }
@@ -267,16 +271,14 @@ export async function openDesktopNotificationSettings(): Promise<boolean> {
 
   if (detectPlatform() === 'win32') {
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const opened = await invoke<boolean>('open_windows_notification_settings')
+      const opened = await openWindowsNotificationSettings()
       if (opened) return true
     } catch {
     }
   }
 
   try {
-    const { open } = await import('@tauri-apps/plugin-shell')
-    await open(url)
+    await openExternalLink(url)
     return true
   } catch {
     try {
@@ -292,26 +294,20 @@ async function sendNativeNotification(options: { title: string; body?: string; t
   const macSent = await sendMacNotification(options)
   if (macSent !== null) return macSent
 
-  const {
-    isPermissionGranted,
-    sendNotification,
-  } = await import('@tauri-apps/plugin-notification')
-
   const windowsPermission = await invokeWindowsNotificationPermissionState()
-  const permissionGranted = windowsPermission ? windowsPermission === 'granted' : await isPermissionGranted()
+  const permissionGranted = windowsPermission ? windowsPermission === 'granted' : await isNotificationPermissionGranted()
   if (!permissionGranted) {
     return false
   }
 
   const payload = buildNativeNotificationPayload(options)
-  sendNotification(payload)
+  await sendNotification(payload)
   return true
 }
 
 async function requestWindowAttention(): Promise<boolean> {
   try {
-    const { getCurrentWindow, UserAttentionType } = await import('@tauri-apps/api/window')
-    await getCurrentWindow().requestUserAttention(UserAttentionType.Critical)
+    await requestAppAttention()
     return true
   } catch {
     return false
@@ -320,23 +316,11 @@ async function requestWindowAttention(): Promise<boolean> {
 
 async function focusCurrentWindow(): Promise<void> {
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
+    const win = await getAppWindow()
     await (win as unknown as { show?: () => Promise<void> | void }).show?.()
     await (win as unknown as { setFocus?: () => Promise<void> | void }).setFocus?.()
   } catch {
   }
-}
-
-function disposePluginListener(listener: unknown): void {
-  if (typeof listener === 'function') {
-    listener()
-    return
-  }
-  const unregister = listener && typeof listener === 'object'
-    ? (listener as { unregister?: () => Promise<void> | void }).unregister
-    : undefined
-  if (typeof unregister === 'function') void unregister.call(listener)
 }
 
 export async function installDesktopNotificationClickListener(
@@ -351,8 +335,7 @@ export async function installDesktopNotificationClickListener(
   }
 
   try {
-    const { listen } = await import('@tauri-apps/api/event')
-    const unlisten = await listen<unknown>('desktop-notification-clicked', (event) => {
+    const unlisten = await onNotificationClicked((event) => {
       handlePayload(event.payload)
     })
     cleanups.push(unlisten)
@@ -360,13 +343,8 @@ export async function installDesktopNotificationClickListener(
   }
 
   try {
-    const { onAction } = await import('@tauri-apps/plugin-notification') as {
-      onAction?: (cb: (notification: unknown) => void) => Promise<unknown>
-    }
-    if (onAction) {
-      const listener = await onAction(handlePayload)
-      cleanups.push(() => disposePluginListener(listener))
-    }
+    const unlisten = await onNotificationAction(handlePayload)
+    cleanups.push(unlisten)
   } catch {
   }
 

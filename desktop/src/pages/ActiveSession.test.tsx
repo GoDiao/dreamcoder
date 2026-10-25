@@ -18,8 +18,9 @@ vi.mock('../lib/desktopRuntime', async (importOriginal) => ({
   isTauriRuntime: () => windowMocks.tauri,
 }))
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
+vi.mock('../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/shell')>()),
+  getAppWindow: async () => ({
     startDragging: windowMocks.startDragging,
     toggleMaximize: windowMocks.toggleMaximize,
   }),
@@ -898,7 +899,7 @@ describe('ActiveSession task polling', () => {
     render(<ActiveSession />)
     // The window module is loaded once on mount.
     await act(async () => {
-      await import('@tauri-apps/api/window')
+      await import('../lib/shell')
     })
 
     fireEvent.mouseDown(screen.getByRole('heading', { name: 'Drag Session' }), { button: 0, detail: 1 })

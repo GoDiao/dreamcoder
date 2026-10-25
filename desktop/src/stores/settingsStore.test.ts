@@ -318,25 +318,30 @@ describe('settingsStore app mode', () => {
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
       defaultPortableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
     })
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
 
     const { useSettingsStore } = await import('./settingsStore')
 
+    const { statusApi } = await import('../api/status')
+    vi.spyOn(statusApi, 'getConfigDirectories').mockResolvedValue({ configDir: '/data/active', defaultConfigDir: '/data/default' })
+
     await useSettingsStore.getState().fetchAppMode()
 
-    expect(invoke).toHaveBeenCalledWith('get_app_mode')
+    expect(invoke).toHaveBeenCalledWith()
     expect(useSettingsStore.getState().appMode).toEqual({
       mode: 'portable',
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
       defaultPortableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
+      activeConfigDir: '/data/active',
+      systemConfigDir: '/data/default',
     })
   })
 
   it('persists app mode through the native desktop command and marks restart required', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
 
@@ -352,7 +357,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('portable')
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'portable',
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
     })
@@ -368,7 +373,7 @@ describe('settingsStore app mode', () => {
 
   it('persists a user-selected portable directory', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
 
@@ -384,7 +389,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('portable', 'D:\\portable-data')
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'portable',
       portableDir: 'D:\\portable-data',
     })
@@ -398,7 +403,7 @@ describe('settingsStore app mode', () => {
 
   it('switches app mode back to the system data source', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
     const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
     tauriWindow.__TAURI_INTERNALS__ = {}
 
@@ -416,7 +421,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('default', null)
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'default',
       portableDir: null,
     })
@@ -726,6 +731,7 @@ describe('settingsStore desktop terminal shell persistence', () => {
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell: 'system',
       customShellPath: '',
+      bashPath: null,
     })
 
     await useSettingsStore.getState().fetchAll()
@@ -733,6 +739,7 @@ describe('settingsStore desktop terminal shell persistence', () => {
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell,
       customShellPath: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+      bashPath: null,
     })
   })
 
@@ -779,18 +786,49 @@ describe('settingsStore desktop terminal shell persistence', () => {
     await useSettingsStore.getState().setDesktopTerminal({
       startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
+      bashPath: null,
     })
 
     expect(updateUser).toHaveBeenCalledWith({
       desktopTerminal: {
         startupShell,
         customShellPath: 'C:\\tools\\pwsh.exe',
+        bashPath: null,
       },
     })
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
+      bashPath: null,
     })
+  })
+})
+
+describe('settingsStore terminal settings patches', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('preserves the bash path when changing the startup shell and normalizes path patches', async () => {
+    const updateUser = vi.fn().mockResolvedValue({ ok: true })
+    vi.doMock('../api/settings', () => ({ settingsApi: { updateUser } }))
+    const { useSettingsStore } = await import('./settingsStore')
+    useSettingsStore.setState({ desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: '/legacy/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ startupShell: 'custom', customShellPath: '/custom/shell' })
+    expect(updateUser).toHaveBeenLastCalledWith({ desktopTerminal: { startupShell: 'custom', customShellPath: '/custom/shell', bashPath: '/legacy/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ bashPath: ' /new/bash ' })
+    expect(updateUser).toHaveBeenLastCalledWith({ desktopTerminal: { startupShell: 'custom', customShellPath: '/custom/shell', bashPath: '/new/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ bashPath: null })
+    expect(useSettingsStore.getState().desktopTerminal.bashPath).toBeNull()
+  })
+
+  it('restores the terminal settings when persistence fails', async () => {
+    vi.doMock('../api/settings', () => ({ settingsApi: { updateUser: vi.fn().mockRejectedValue(new Error('save failed')) } }))
+    const { useSettingsStore } = await import('./settingsStore')
+    const previous = { startupShell: 'system' as const, customShellPath: '', bashPath: '/legacy/bash' }
+    useSettingsStore.setState({ desktopTerminal: previous })
+    await expect(useSettingsStore.getState().setDesktopTerminal({ bashPath: null })).rejects.toThrow('save failed')
+    expect(useSettingsStore.getState().desktopTerminal).toEqual(previous)
   })
 })
 

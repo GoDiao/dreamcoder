@@ -683,7 +683,18 @@ describe('Status API', () => {
     const body = await res.json()
     expect(body.platform).toBeDefined()
     expect(body.arch).toBeDefined()
-    expect(body.configDir).toBeDefined()
+    expect(body.configDir).toBe(tmpDir)
+    expect(body.defaultConfigDir).toBe(path.join(os.homedir(), '.dreamcoder').normalize('NFC'))
+  })
+
+  it('reports the same active and default directory without an override', async () => {
+    delete process.env.DREAMCODER_CONFIG_DIR
+    const { req, url, segments } = makeRequest('GET', '/api/status/diagnostics')
+    const response = await handleStatusApi(req, url, segments)
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
+    const body = await response.json()
+    expect(body.configDir).toBe(path.join(os.homedir(), '.dreamcoder').normalize('NFC'))
+    expect(body.defaultConfigDir).toBe(body.configDir)
   })
 
   it('GET /api/status/usage should return token usage', async () => {

@@ -54,16 +54,12 @@ vi.mock('../../api/websocket', () => ({
   },
 }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: mocks.dialogOpen,
-}))
-
-vi.mock('@tauri-apps/api/webview', () => ({
-  getCurrentWebview: () => ({
-    onDragDropEvent: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
-      mocks.webviewDragHandlers.push(handler)
-      return mocks.webviewUnlisten
-    }),
+vi.mock('../../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/shell')>()),
+  pickFiles: mocks.dialogOpen,
+  onFileDrop: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
+    mocks.webviewDragHandlers.push(handler)
+    return mocks.webviewUnlisten
   }),
 }))
 

@@ -68,9 +68,13 @@ vi.mock('../api/providers', () => ({
 
 vi.mock('../lib/desktopNotifications', () => desktopNotificationsMock)
 vi.mock('../components/chat/clipboard', () => clipboardMock)
-vi.mock('@tauri-apps/api/core', () => tauriCoreMock)
-vi.mock('@tauri-apps/plugin-dialog', () => tauriDialogMock)
-vi.mock('@tauri-apps/plugin-process', () => tauriProcessMock)
+vi.mock('../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/shell')>()),
+  prepareAppModeRestart: () => tauriCoreMock.invoke('prepare_for_app_mode_restart'),
+  detectDefaultTerminalShell: (settings: unknown) => tauriCoreMock.invoke('detect_default_terminal_shell', { settings }),
+  pickDirectory: tauriDialogMock.open,
+  relaunchApp: tauriProcessMock.relaunch,
+}))
 vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
@@ -282,7 +286,7 @@ describe('Settings > General tab', () => {
   it('offers a default shell dropdown in General settings and persists Unix choices', async () => {
     (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {}
     useSettingsStore.setState({
-      desktopTerminal: { startupShell: 'system', customShellPath: '' },
+      desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: null },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
     render(<Settings />)
@@ -1122,11 +1126,11 @@ describe('Settings > General tab', () => {
     )
   })
 
-  it('keeps extension tabs available alongside the terminal tab', () => {
+  it('lists extension tabs without a terminal tab', () => {
     render(<Settings />)
 
     expect(screen.queryByText('Install')).not.toBeInTheDocument()
-    expect(screen.getByText('Terminal')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Terminal' })).not.toBeInTheDocument()
     expect(screen.getByText('MCP')).toBeInTheDocument()
     expect(screen.getByText('Plugins')).toBeInTheDocument()
   })

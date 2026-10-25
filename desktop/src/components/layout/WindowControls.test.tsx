@@ -8,8 +8,8 @@ const close = vi.fn().mockResolvedValue(undefined)
 const isMaximized = vi.fn().mockResolvedValue(false)
 const onResized = vi.fn().mockResolvedValue(() => {})
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
+vi.mock('../../lib/shell', () => ({
+  getAppWindow: async () => ({
     minimize,
     toggleMaximize,
     close,
