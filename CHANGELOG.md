@@ -4,6 +4,8 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-25
+
 ### Changed
 
 - **Terminal settings** (#173): the Settings page no longer has a Terminal tab. Use the terminal in the session's workspace panel; the Skills page's install button now opens plugin settings directly. The startup shell and, on Windows, the Bash path are under General. Both are saved in the sidecar's settings, and an existing Bash path is migrated automatically.
