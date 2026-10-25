@@ -54,10 +54,30 @@ describe('electron shell', () => {
     expect(listeners.has('window-resized')).toBe(false)
   })
 
-  it('rejects functions the spike does not implement', async () => {
-    installBridge(async () => undefined)
-    await expect(electronShell.sendNotification({ title: 'Done' }))
-      .rejects.toThrow('sendNotification is not implemented in the Electron spike')
+  it('reports notification permission from main-process support', async () => {
+    const { bridge } = installBridge(async (command) => (command === 'notification_supported' ? true : undefined))
+    await expect(electronShell.getMacNotificationPermission()).resolves.toBe('granted')
+    await expect(electronShell.requestMacNotificationPermission()).resolves.toBe('granted')
+    await expect(electronShell.getWindowsNotificationPermission()).resolves.toBe(true)
+    await expect(electronShell.isNotificationPermissionGranted()).resolves.toBe(true)
+    bridge.invoke.mockResolvedValue(false)
+    await expect(electronShell.requestWindowsNotificationPermission()).resolves.toBe('unsupported')
+    await expect(electronShell.requestNotificationPermission()).resolves.toBe('denied')
+  })
+
+  it('sends notifications with the payload a click should return', async () => {
+    const { bridge, listeners } = installBridge(async () => true)
+    await expect(electronShell.sendMacNotification({ title: 'Done', body: 'Turn finished', target: '{"type":"scheduled"}' })).resolves.toBe(true)
+    expect(bridge.invoke).toHaveBeenLastCalledWith('notification_send', { title: 'Done', body: 'Turn finished', clickPayload: '{"type":"scheduled"}' })
+    await electronShell.sendNotification({ title: 'Done', id: 3, extra: { dcTarget: 'x' } })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('notification_send', { title: 'Done', body: undefined, clickPayload: { id: 3, extra: { dcTarget: 'x' } } })
+
+    const clicked = vi.fn()
+    const unlisten = await electronShell.onNotificationClicked(clicked)
+    listeners.get('desktop-notification-clicked')?.({ id: 3 })
+    expect(clicked).toHaveBeenCalledWith({ payload: { id: 3 } })
+    unlisten()
+    expect(listeners.has('desktop-notification-clicked')).toBe(false)
   })
 
   it('routes app mode, export and update preparation to the main process', async () => {

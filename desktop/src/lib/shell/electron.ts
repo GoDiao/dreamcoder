@@ -32,10 +32,6 @@ async function listen<T>(event: string, handler: (payload: T) => void): Promise<
   return bridge().listen(event, (payload) => handler(payload as T))
 }
 
-function notImplemented(name: string): Promise<never> {
-  return Promise.reject(new Error(`${name} is not implemented in the Electron spike`))
-}
-
 function openDialog(input: ElectronOpenDialogInput) {
   return invoke<string[] | null>('dialog_open', input)
 }
@@ -135,46 +131,50 @@ export function onMenuNavigate(handler: (event: { payload: string }) => void): P
   return listen<string>('native-menu-navigate', (payload) => handler({ payload }))
 }
 
-export function getWindowsNotificationPermission(): Promise<boolean | null> {
-  return notImplemented('getWindowsNotificationPermission')
+function supportedPermission(): Promise<NativeNotificationPermission> {
+  return invoke<boolean>('notification_supported').then((supported) => (supported ? 'granted' : 'unsupported'))
 }
 
-export function requestWindowsNotificationPermission(): Promise<NativeNotificationPermission> {
-  return notImplemented('requestWindowsNotificationPermission')
+export function getWindowsNotificationPermission() {
+  return invoke<boolean>('notification_supported')
 }
 
-export function getMacNotificationPermission(): Promise<NativeNotificationPermission> {
-  return notImplemented('getMacNotificationPermission')
+export function requestWindowsNotificationPermission() {
+  return supportedPermission()
 }
 
-export function requestMacNotificationPermission(): Promise<NativeNotificationPermission> {
-  return notImplemented('requestMacNotificationPermission')
+export function getMacNotificationPermission() {
+  return supportedPermission()
 }
 
-export function sendMacNotification(_input: { title: string; body?: string; target?: string }): Promise<boolean> {
-  return notImplemented('sendMacNotification')
+export function requestMacNotificationPermission() {
+  return supportedPermission()
 }
 
-export function openWindowsNotificationSettings(): Promise<boolean> {
-  return notImplemented('openWindowsNotificationSettings')
+export function sendMacNotification(input: { title: string; body?: string; target?: string }) {
+  return invoke<boolean>('notification_send', { title: input.title, body: input.body, clickPayload: input.target })
 }
 
-export function isNotificationPermissionGranted(): Promise<boolean> {
-  return notImplemented('isNotificationPermissionGranted')
+export function openWindowsNotificationSettings() {
+  return invoke<boolean>('open_notification_settings')
 }
 
-export function requestNotificationPermission(): Promise<NotificationPermission> {
-  return notImplemented('requestNotificationPermission')
+export function isNotificationPermissionGranted() {
+  return invoke<boolean>('notification_supported')
 }
 
-export function sendNotification(_input: { title: string; body?: string; id?: number; extra?: Record<string, unknown> }): Promise<void> {
-  return notImplemented('sendNotification')
+export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  return (await invoke<boolean>('notification_supported')) ? 'granted' : 'denied'
 }
 
-export function onNotificationClicked(_handler: (event: { payload: unknown }) => void): Promise<Unlisten> {
-  return notImplemented('onNotificationClicked')
+export async function sendNotification(input: { title: string; body?: string; id?: number; extra?: Record<string, unknown> }) {
+  await invoke<boolean>('notification_send', { title: input.title, body: input.body, clickPayload: { id: input.id, extra: input.extra } })
 }
 
-export function onNotificationAction(_handler: (notification: unknown) => void): Promise<Unlisten> {
-  return notImplemented('onNotificationAction')
+export function onNotificationClicked(handler: (event: { payload: unknown }) => void): Promise<Unlisten> {
+  return listen<unknown>('desktop-notification-clicked', (payload) => handler({ payload }))
+}
+
+export async function onNotificationAction(_handler: (notification: unknown) => void): Promise<Unlisten> {
+  return () => {}
 }

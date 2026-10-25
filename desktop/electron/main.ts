@@ -6,6 +6,7 @@ import {
   Menu,
   nativeImage,
   net,
+  Notification,
   protocol,
   screen,
   shell,
@@ -26,6 +27,7 @@ import {
   legacyTerminalConfigPath,
   PORTABLE_MARKER_ENV,
   setAppMode,
+  TAURI_IDENTIFIER,
   WINDOW_STATE_FILE,
 } from './appMode'
 import { writeSessionExport } from './sessionExport'
@@ -66,6 +68,7 @@ let tray: Tray | null = null
 let sidecar: SidecarRuntime | null = null
 let sidecarError: string | null = null
 let quitting = false
+const activeNotifications = new Set<Notification>()
 let saveTimer: NodeJS.Timeout | null = null
 
 function hostTriple() {
@@ -185,6 +188,25 @@ function stopSidecar() {
   }
 }
 
+function showNotification(input: { title: string; body?: string; clickPayload?: unknown }) {
+  if (!Notification.isSupported()) return false
+  const notification = new Notification({ title: input.title, body: input.body ?? '' })
+  activeNotifications.add(notification)
+  const release = () => activeNotifications.delete(notification)
+  notification.on('click', () => {
+    release()
+    showMainWindow()
+    if (input.clickPayload !== undefined) emit('desktop-notification-clicked', input.clickPayload)
+  })
+  notification.on('close', release)
+  notification.on('failed', (_event, error) => {
+    release()
+    console.error('[electron] notification failed', error)
+  })
+  notification.show()
+  return true
+}
+
 type Handler = (args: Record<string, unknown>) => unknown
 
 const handlers: Record<string, Handler> = {
@@ -226,6 +248,17 @@ const handlers: Record<string, Handler> = {
   window_is_maximized: () => window().isMaximized(),
   window_show: () => window().show(),
   window_focus: () => window().focus(),
+  notification_supported: () => Notification.isSupported(),
+  notification_send: (args) => showNotification({
+    title: String(args.title),
+    body: typeof args.body === 'string' ? args.body : undefined,
+    clickPayload: args.clickPayload,
+  }),
+  open_notification_settings: async () => {
+    if (!IS_WINDOWS) return false
+    await shell.openExternal('ms-settings:notifications')
+    return true
+  },
   request_attention: () => {
     if (IS_MAC) app.dock?.bounce('critical')
     else window().flashFrame(true)
@@ -345,6 +378,8 @@ function createWindow(startUrl: string) {
   mainWindow = win
   void win.loadURL(startUrl)
 }
+
+if (IS_WINDOWS) app.setAppUserModelId(TAURI_IDENTIFIER)
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
