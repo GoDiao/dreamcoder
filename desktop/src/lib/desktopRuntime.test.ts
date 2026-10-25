@@ -18,12 +18,14 @@ vi.mock('../api/client', () => ({
   setBaseUrl: clientMocks.setBaseUrl,
 }))
 
+import { ELECTRON_BRIDGE_KEY } from './shell/electronBridge'
 import {
   H5ConnectionRequiredError,
   H5_SERVER_URL_STORAGE_KEY,
   H5_TOKEN_STORAGE_KEY,
   initializeDesktopServerUrl,
   isLoopbackHostname,
+  isTauriRuntime,
   requiresH5AuthForServerUrl,
   saveAndVerifyH5Connection,
 } from './desktopRuntime'
@@ -48,6 +50,16 @@ describe('desktopRuntime browser H5 bootstrap', () => {
   afterEach(() => {
     vi.useRealTimers()
     globalThis.fetch = originalFetch
+  })
+
+  it('treats the Electron preload bridge as a desktop shell', () => {
+    expect(isTauriRuntime()).toBe(false)
+    Object.assign(window, { [ELECTRON_BRIDGE_KEY]: {} })
+    try {
+      expect(isTauriRuntime()).toBe(true)
+    } finally {
+      delete (window as unknown as Record<string, unknown>)[ELECTRON_BRIDGE_KEY]
+    }
   })
 
   it('treats IPv6 loopback as local', () => {
