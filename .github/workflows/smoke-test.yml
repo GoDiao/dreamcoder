@@ -110,7 +110,7 @@ jobs:
           if ($status.version -ne $env:TAG.TrimStart('v')) { throw "Unexpected version $($status.version)" }
           $sessions = Invoke-RestMethod "http://127.0.0.1:$port/api/sessions" -TimeoutSec 30
           if ($null -eq $sessions.sessions) { throw 'No sessions field in /api/sessions' }
-          $fixture = Join-Path $env:TEMP "dreamcoder-rg-smoke-$([guid]::NewGuid())"
+          $fixture = Join-Path $env:USERPROFILE "dreamcoder-rg-smoke-$([guid]::NewGuid())"
           New-Item -ItemType Directory -Path $fixture | Out-Null
           try {
             Set-Content -Path (Join-Path $fixture 'bundled-ripgrep-smoke.txt') -Value 'ripgrep smoke test'
