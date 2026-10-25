@@ -104,6 +104,9 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: |
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            [ -n "${!name}" ] || unset "$name"
+          done
           args=(--publish never ${{ matrix.platform }})
           if [ "$RUNNER_OS" = macOS ] && [ -z "$CSC_LINK" ]; then
             args+=(-c.mac.identity=-)
