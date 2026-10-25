@@ -109,7 +109,7 @@ function CommandPaletteContent() {
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
-        className="motion-modal-panel glass-panel relative flex max-h-[85vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[var(--radius-xl)]"
+        className="motion-modal-panel glass-panel glass-panel-focus relative flex max-h-[85vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[var(--radius-xl)]"
         data-state={visible ? 'open' : 'closed'}
       >
         <h2 id={`${id}-title`} className="sr-only">{t('commandPalette.title')}</h2>

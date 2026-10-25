@@ -56,7 +56,7 @@ vi.mock('../api/agents', () => ({
 }))
 
 vi.mock('../stores/providerStore', () => ({
-  useProviderStore: () => providerStoreState,
+  useProviderStore: <T,>(selector?: (state: typeof providerStoreState) => T) => selector ? selector(providerStoreState) : providerStoreState,
 }))
 
 vi.mock('../api/providers', () => ({
@@ -169,6 +169,7 @@ describe('Settings > General tab', () => {
       locale: 'en',
       theme: 'light',
       thinkingEnabled: true,
+      autoCompactPercent: 90,
       skipWebFetchPreflight: true,
       agentTeamsEnabled: false,
       desktopNotificationsEnabled: true,
@@ -186,6 +187,9 @@ describe('Settings > General tab', () => {
       },
       h5AccessDiagnostics: null,
       h5AccessError: null,
+      setAutoCompactPercent: vi.fn().mockImplementation(async (percent: number) => {
+        useSettingsStore.setState({ autoCompactPercent: percent })
+      }),
       setThinkingEnabled: vi.fn().mockImplementation(async (enabled: boolean) => {
         useSettingsStore.setState({ thinkingEnabled: enabled })
       }),
@@ -729,6 +733,20 @@ describe('Settings > General tab', () => {
     expect(useSettingsStore.getState().setResponseLanguage).toHaveBeenCalledWith('chinese')
   })
 
+  it('lets the user choose when long conversations auto-compact', () => {
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+
+    const trigger = screen.getByRole('button', { name: 'Auto-compact' })
+    expect(trigger).toHaveTextContent('90% (default)')
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '70%' }))
+
+    expect(useSettingsStore.getState().setAutoCompactPercent).toHaveBeenCalledWith(70)
+    expect(screen.getByRole('button', { name: 'Auto-compact' })).toHaveTextContent('70%')
+  })
+
   it('lets the user disable desktop system notifications', () => {
     render(<Settings />)
 
@@ -1239,6 +1257,7 @@ describe('Settings > Providers tab', () => {
     fireEvent.change(within(dialog).getByLabelText(/Model ID|模型 ID/i), { target: { value: 'gpt-5.5' } })
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Add|添加/i })[0]!)
     const saveButtons = within(dialog).getAllByRole('button', { name: /Save|Add|保存|添加/i })
+    await waitFor(() => expect(saveButtons[saveButtons.length - 1]!).toBeEnabled())
     fireEvent.click(saveButtons[saveButtons.length - 1]!)
 
     await waitFor(() => {

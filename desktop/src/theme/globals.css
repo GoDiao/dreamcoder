@@ -1251,7 +1251,7 @@ html, body, #root {
   box-shadow: var(--shadow-dropdown);
 }
 
-.glass-panel:focus-within {
+.glass-panel-focus:focus-within {
   box-shadow: var(--shadow-focus-ring), var(--shadow-dropdown);
 }
 
@@ -1889,8 +1889,7 @@ html, body, #root {
   --color-btn-primary-fg: #FFFAF4;
 }
 
-/* Glass panels (composer, dialogs) show focus on the outer box only. */
-.glass-panel:focus-within {
+.glass-panel-focus:focus-within {
   border-color: var(--color-border-focus);
   box-shadow: var(--shadow-focus-ring), var(--shadow-dropdown);
 }

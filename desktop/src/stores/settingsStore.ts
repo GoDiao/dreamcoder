@@ -41,6 +41,7 @@ export const UI_ZOOM_MIN = MIN_APP_ZOOM
 export const UI_ZOOM_MAX = MAX_APP_ZOOM
 export const UI_ZOOM_STEP = APP_ZOOM_CONTROL_STEP
 export const UI_ZOOM_DEFAULT = DEFAULT_APP_ZOOM
+export const DEFAULT_AUTO_COMPACT_PERCENT = 90
 let desktopNotificationsSaveQueue: Promise<void> = Promise.resolve()
 
 function detectSystemLocale(): Locale {
@@ -73,6 +74,7 @@ type SettingsStore = {
   currentModel: ModelInfo | null
   effortLevel: EffortLevel
   thinkingEnabled: boolean
+  autoCompactPercent: number
   availableModels: ModelInfo[]
   activeProviderName: string | null
   locale: Locale
@@ -102,6 +104,7 @@ type SettingsStore = {
   setModel: (modelId: string) => Promise<void>
   setEffort: (level: EffortLevel) => Promise<void>
   setThinkingEnabled: (enabled: boolean) => Promise<void>
+  setAutoCompactPercent: (percent: number) => Promise<void>
   setLocale: (locale: Locale) => void
   setTheme: (theme: ThemeMode) => Promise<void>
   setSkipWebFetchPreflight: (enabled: boolean) => Promise<void>
@@ -160,6 +163,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   currentModel: null,
   effortLevel: 'medium',
   thinkingEnabled: true,
+  autoCompactPercent: DEFAULT_AUTO_COMPACT_PERCENT,
   availableModels: [],
   activeProviderName: null,
   locale: getStoredLocale(),
@@ -220,6 +224,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         currentModel: model,
         effortLevel: level,
         thinkingEnabled: userSettings.alwaysThinkingEnabled !== false,
+        autoCompactPercent: typeof userSettings.autoCompactPercent === 'number' ? userSettings.autoCompactPercent : DEFAULT_AUTO_COMPACT_PERCENT,
         theme,
         skipWebFetchPreflight: userSettings.skipWebFetchPreflight !== false,
         desktopNotificationsEnabled: userSettings.desktopNotificationsEnabled === true,
@@ -285,6 +290,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       await settingsApi.updateUser({ alwaysThinkingEnabled: enabled })
     } catch {
       set({ thinkingEnabled: prev })
+    }
+  },
+
+  setAutoCompactPercent: async (percent) => {
+    const prev = get().autoCompactPercent
+    set({ autoCompactPercent: percent })
+    try {
+      await settingsApi.updateUser({ autoCompactPercent: percent })
+    } catch {
+      set({ autoCompactPercent: prev })
     }
   },
 

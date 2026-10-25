@@ -251,13 +251,6 @@ describe('ProviderService', () => {
       expect(provider.notes).toBe('dev environment')
     })
 
-    test('should preserve optional auto compact window', async () => {
-      const svc = new ProviderService()
-      const provider = await svc.addProvider(sampleInput({ autoCompactWindow: 64000 }))
-
-      expect(provider.autoCompactWindow).toBe(64000)
-    })
-
     test('should preserve optional model context windows', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
@@ -385,28 +378,6 @@ describe('ProviderService', () => {
       expect(env.ANTHROPIC_AUTH_TOKEN).toBe('sk-new-key')
       expect(env.ANTHROPIC_API_KEY).toBe('')
       expect(env.ANTHROPIC_MODEL).toBe('model-main')
-    })
-
-    test('updating active provider should override and clear auto compact window', async () => {
-      const svc = new ProviderService()
-      const added = await svc.addProvider(sampleInput({ autoCompactWindow: 64000 }))
-      await svc.activateProvider(added.id)
-
-      let settings = await readSettings()
-      let env = settings.env as Record<string, string>
-      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('64000')
-
-      await svc.updateProvider(added.id, { autoCompactWindow: 32000 })
-
-      settings = await readSettings()
-      env = settings.env as Record<string, string>
-      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('32000')
-
-      await svc.updateProvider(added.id, { autoCompactWindow: null })
-
-      settings = await readSettings()
-      env = settings.env as Record<string, string>
-      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
     })
 
     test('should use the selected model for all primary runtime roles', async () => {
@@ -689,23 +660,6 @@ describe('ProviderService', () => {
       })
     })
 
-    test('provider auto compact window should override preset default env on activation and runtime env', async () => {
-      const svc = new ProviderService()
-      const provider = await svc.addProvider(sampleInput({
-        presetId: 'custom',
-        autoCompactWindow: 32000,
-      }))
-
-      await svc.activateProvider(provider.id)
-
-      const settings = await readSettings()
-      const env = settings.env as Record<string, string>
-      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('32000')
-
-      const runtimeEnv = await svc.getProviderRuntimeEnv(provider.id)
-      expect(runtimeEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('32000')
-    })
-
     test('should preserve existing settings.json fields on activation', async () => {
       await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
       await fs.writeFile(
@@ -723,6 +677,23 @@ describe('ProviderService', () => {
       const env = settings.env as Record<string, string>
       expect(env.CUSTOM_VAR).toBe('keep-me')
       expect(env.ANTHROPIC_BASE_URL).toBe('https://api.example.com')
+    })
+
+    test('removes a stale auto compact window left in settings.json on activation', async () => {
+      await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+      await fs.writeFile(
+        path.join(tmpDir, 'dreamcoder', 'settings.json'),
+        JSON.stringify({ env: { CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000', CUSTOM_VAR: 'keep-me' } }),
+      )
+
+      const svc = new ProviderService()
+      const provider = await svc.addProvider(sampleInput())
+
+      await svc.activateProvider(provider.id)
+
+      const env = (await readSettings()).env as Record<string, string>
+      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
+      expect(env.CUSTOM_VAR).toBe('keep-me')
     })
 
     test('should not modify the original settings.json in the config dir', async () => {
@@ -1334,37 +1305,20 @@ describe('Providers API', () => {
       baseUrl: 'https://api.example.com',
       apiKey: 'sk-test',
       apiFormat: 'anthropic',
-      autoCompactWindow: 64000,
       models: [{ id: 'gpt-4' }, { id: 'gpt-4-haiku' }],
       fastModel: 'gpt-4-haiku',
     })
     const res = await handleProvidersApi(req, url, segments)
 
     expect(res.status).toBe(201)
-    const body = (await res.json()) as { provider: { name: string; models: Array<{ id: string }>; autoCompactWindow: number } }
+    const body = (await res.json()) as { provider: { name: string; models: Array<{ id: string }> } }
     expect(body.provider.name).toBe('New Provider')
     expect(body.provider.models[0]?.id).toBe('gpt-4')
-    expect(body.provider.autoCompactWindow).toBe(64000)
   })
 
   test('POST /api/providers should return 400 for invalid input', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/providers', {
       name: '',
-    })
-    const res = await handleProvidersApi(req, url, segments)
-
-    expect(res.status).toBe(400)
-  })
-
-  test('POST /api/providers should return 400 for invalid auto compact window', async () => {
-    const { req, url, segments } = makeRequest('POST', '/api/providers', {
-      presetId: 'custom',
-      name: 'New Provider',
-      baseUrl: 'https://api.example.com',
-      apiKey: 'sk-test',
-      apiFormat: 'anthropic',
-      autoCompactWindow: 8000,
-      models: [{ id: 'gpt-4' }],
     })
     const res = await handleProvidersApi(req, url, segments)
 

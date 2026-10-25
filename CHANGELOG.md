@@ -4,6 +4,14 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Context windows beside each model** (#105). In Settings → Providers each model has its own context window field next to its name. Fetching models fills empty fields with the window the provider reports and never replaces a typed or saved value.
+  - Providers whose model list includes a context length, such as OpenRouter and Kimi, need no extra requests. Ollama, LM Studio, DeepSeek and Qwen are looked up from their own model APIs.
+  - The form can be saved only after the current settings have loaded. If they fail to load, the form says so instead of saving over them.
+- **Auto-compact at 90% of the context window** (#105). Long conversations are compacted at 90% of the model's context window, after the room kept for the summary, instead of about 33K tokens before it is full. A 1M model now compacts around 882K tokens instead of 967K, and a 200K model around 162K instead of 167K. Settings → General → Auto-compact sets a different percentage for every session. The provider form no longer has "Unknown Model Fallback Window": despite its name it replaced the window of every model of the provider when deciding when to compact. A value saved there is dropped.
+- Typing in a dialog no longer lights up the dialog's whole border; only the focused field is highlighted.
+
 ## [0.7.0] — 2026-10-25
 
 ### Changed

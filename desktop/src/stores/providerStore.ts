@@ -8,7 +8,7 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
-  ProviderModel,
+  DiscoveredProviderModel,
   DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
@@ -31,7 +31,7 @@ type ProviderStore = {
   activateProvider: (id: string) => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
-  discoverModels: (input: DiscoverProviderModelsInput) => Promise<ProviderModel[]>
+  discoverModels: (input: DiscoverProviderModelsInput) => Promise<DiscoveredProviderModel[]>
 }
 
 function providerModelIds(provider: SavedProvider): Set<string> {
