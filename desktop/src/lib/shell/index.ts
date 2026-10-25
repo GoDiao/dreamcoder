@@ -131,6 +131,11 @@ export async function requestAppAttention() {
   return window.getCurrentWindow().requestUserAttention(window.UserAttentionType.Critical)
 }
 
+export function getFilePath(file: File): string | undefined {
+  const path = (file as File & { path?: unknown }).path
+  return typeof path === 'string' && path.length > 0 ? path : undefined
+}
+
 export async function onFileDrop(handler: (event: { payload: FileDropPayload }) => void): Promise<Unlisten> {
   const webview = await import('@tauri-apps/api/webview')
   return webview.getCurrentWebview().onDragDropEvent(handler)

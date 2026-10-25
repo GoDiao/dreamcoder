@@ -1,5 +1,5 @@
 import { isTauriRuntime } from './desktopRuntime'
-import { pickFiles } from './shell'
+import { getFilePath, pickFiles } from './shell'
 
 export type ComposerAttachment = {
   id: string
@@ -77,13 +77,8 @@ function normalizeDialogSelection(selected: string | string[] | null): string[] 
   return paths.filter((filePath) => typeof filePath === 'string' && filePath.length > 0)
 }
 
-function getNativeFilePath(file: File): string | undefined {
-  const path = (file as File & { path?: unknown }).path
-  return typeof path === 'string' && path.length > 0 ? path : undefined
-}
-
 async function fileToComposerAttachment(file: File): Promise<ComposerAttachment | null> {
-  const nativePath = isTauriRuntime() ? getNativeFilePath(file) : undefined
+  const nativePath = isTauriRuntime() ? getFilePath(file) : undefined
   if (nativePath) {
     return pathToComposerAttachment(nativePath)
   }

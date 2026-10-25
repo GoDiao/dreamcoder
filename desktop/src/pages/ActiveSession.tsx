@@ -351,7 +351,7 @@ export function ActiveSession() {
           data-testid="session-header"
           onMouseDown={handleHeaderDrag}
           style={headerStyle}
-          className={`flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${macTitlebar ? '' : 'h-11'}`}
+          className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${macTitlebar ? '' : 'h-11'}`}
         >
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">

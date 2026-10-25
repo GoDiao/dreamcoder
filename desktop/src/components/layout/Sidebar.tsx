@@ -673,7 +673,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     >
       {/* On macOS the top band is the title row: traffic lights and the sidebar toggle. */}
       <div
-        className={`px-3 pb-2 ${isTauri && !isWindows ? '' : 'pt-3'}`}
+        className={`window-drag-region px-3 pb-2 ${isTauri && !isWindows ? '' : 'pt-3'}`}
         style={isTauri && !isWindows ? { paddingTop: 'var(--titlebar-height)' } : undefined}
       >
         <div className={`flex ${expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2'}`}>

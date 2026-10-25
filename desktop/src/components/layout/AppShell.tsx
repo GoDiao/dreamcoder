@@ -377,7 +377,7 @@ function WindowDragStrip({ tall, mac, floating = false }: { tall: boolean; mac: 
       data-testid="window-drag-strip"
       onMouseDown={handleDrag}
       style={mac ? { height: 'var(--titlebar-height)' } : undefined}
-      className={`${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
+      className={`window-drag-region ${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
     >
       {mac ? null : (
         <div className="flex items-center pl-3">

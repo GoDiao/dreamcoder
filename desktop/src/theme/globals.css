@@ -1239,6 +1239,16 @@ html, body, #root {
   color: var(--color-selection-fg);
 }
 
+.window-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.window-drag-region :is(button, input, textarea, select, a, [role="button"], [role="tab"], [role="menu"], [role="dialog"]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 .custom-shadow {
   box-shadow: var(--shadow-dropdown);
 }

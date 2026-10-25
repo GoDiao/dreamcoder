@@ -48,28 +48,28 @@ export function getAppMode() {
   return invoke<Omit<AppModeConfig, 'activeConfigDir' | 'systemConfigDir'>>('get_app_mode')
 }
 
-export function setAppMode(_input: { mode: AppMode; portableDir: string | null }): Promise<void> {
-  return notImplemented('setAppMode')
+export function setAppMode(input: { mode: AppMode; portableDir: string | null }) {
+  return invoke<void>('set_app_mode', input)
 }
 
-export function prepareAppModeRestart(): Promise<void> {
-  return notImplemented('prepareAppModeRestart')
+export function prepareAppModeRestart() {
+  return invoke<void>('prepare_app_mode_restart')
 }
 
 export function setAppZoom(input: { zoomFactor: number }) {
   return invoke<void>('set_app_zoom', input)
 }
 
-export function writeSessionExport(_input: { path: string; contents: string }): Promise<void> {
-  return notImplemented('writeSessionExport')
+export function writeSessionExport(input: { path: string; contents: string }) {
+  return invoke<void>('write_session_export', input)
 }
 
-export function prepareUpdateInstall(): Promise<void> {
-  return notImplemented('prepareUpdateInstall')
+export function prepareUpdateInstall() {
+  return invoke<void>('prepare_update_install')
 }
 
-export function cancelUpdateInstall(): Promise<void> {
-  return notImplemented('cancelUpdateInstall')
+export function cancelUpdateInstall() {
+  return invoke<void>('cancel_update_install')
 }
 
 export function relaunchApp() {
@@ -81,7 +81,7 @@ export function getAppVersion() {
 }
 
 export async function checkForAppUpdate(_options?: { proxy: string }): Promise<ShellUpdate | null> {
-  return null
+  throw new Error('Automatic updates are not configured for this build.')
 }
 
 export async function pickDirectory(options: { title?: string; directory?: true; multiple?: false }) {
@@ -113,7 +113,7 @@ export async function getAppWindow(): Promise<AppWindow> {
     close: () => invoke<void>('window_close'),
     isMaximized: () => invoke<boolean>('window_is_maximized'),
     onResized: (handler) => listen<void>('window-resized', handler),
-    startDragging: () => notImplemented('startDragging'),
+    startDragging: async () => {},
     show: () => invoke<void>('window_show'),
     setFocus: () => invoke<void>('window_focus'),
   }
@@ -121,6 +121,10 @@ export async function getAppWindow(): Promise<AppWindow> {
 
 export function requestAppAttention() {
   return invoke<void>('request_attention')
+}
+
+export function getFilePath(file: File): string | undefined {
+  return bridge().pathForFile(file) || undefined
 }
 
 export async function onFileDrop(_handler: (event: { payload: FileDropPayload }) => void): Promise<Unlisten> {
