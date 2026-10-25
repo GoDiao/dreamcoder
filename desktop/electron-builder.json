@@ -5,18 +5,47 @@
     "app": "electron-dist",
     "output": "electron-release"
   },
-  "files": ["main.cjs", "preload.cjs", "package.json"],
+  "files": [
+    "main.cjs",
+    "preload.cjs",
+    "package.json",
+    "!node_modules{,/**/*}"
+  ],
   "extraResources": [
-    { "from": "dist", "to": "dist" },
-    { "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin", "to": "bin/dreamcoder-sidecar" },
-    { "from": "src-tauri/binaries/rg-aarch64-apple-darwin", "to": "bin/rg" },
-    { "from": "../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+    {
+      "from": "dist",
+      "to": "dist"
+    },
+    {
+      "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin",
+      "to": "bin/dreamcoder-sidecar"
+    },
+    {
+      "from": "src-tauri/binaries/rg-aarch64-apple-darwin",
+      "to": "bin/rg"
+    },
+    {
+      "from": "../THIRD_PARTY_NOTICES.md",
+      "to": "THIRD_PARTY_NOTICES.md"
+    }
   ],
   "npmRebuild": false,
   "mac": {
-    "target": [{ "target": "dmg", "arch": ["arm64"] }],
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64"
+        ]
+      }
+    ],
     "icon": "src-tauri/icons/icon.icns",
     "identity": null,
     "entitlements": "src-tauri/Entitlements.plist"
-  }
+  },
+  "electronDist": "node_modules/electron/dist",
+  "electronLanguages": [
+    "en",
+    "zh_CN"
+  ]
 }
