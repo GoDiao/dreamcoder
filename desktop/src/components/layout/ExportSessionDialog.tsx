@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { writeSessionExport, pickExportPath } from '../../lib/shell'
 import { Modal } from '../shared/Modal'
 import { Button } from '../shared/Button'
 import { SegmentedControl } from '../shared/SegmentedControl'
@@ -15,15 +16,13 @@ type Format = SessionExportOptions['format']
  */
 async function saveExport(file: SessionExport): Promise<boolean> {
   if (isTauriRuntime()) {
-    const { save } = await import('@tauri-apps/plugin-dialog')
     const markdown = file.format === 'markdown'
-    const path = await save({
+    const path = await pickExportPath({
       defaultPath: file.fileName,
       filters: [markdown ? { name: 'Markdown', extensions: ['md'] } : { name: 'JSON', extensions: ['json'] }],
     })
     if (!path) return false
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('write_session_export', { path, contents: file.content })
+    await writeSessionExport({ path, contents: file.content })
     return true
   }
   const blob = new Blob([file.content], { type: file.format === 'json' ? 'application/json' : 'text/markdown' })

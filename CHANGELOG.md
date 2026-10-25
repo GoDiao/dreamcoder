@@ -6,6 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Changed
 
+- **Terminal settings** (#173): the Settings page no longer has a Terminal tab. Use the terminal in the session's workspace panel; the Skills page's install button now opens plugin settings directly. The startup shell and, on Windows, the Bash path are under General. Both are saved in the sidecar's settings, and an existing Bash path is migrated automatically.
 - **Each session keeps its own permission mode** (#149). The selector under the input shows and changes only that session's mode. Before, it showed and wrote one mode shared by every session, so switching one session changed what the others displayed and the mode every later session started in.
   - The mode is saved in the session's transcript, as Claude Code saves it, so a session resumes in its own mode after a restart. A session imported from Claude Code resumes in the mode it last ran in.
   - Switching a session that is not running is no longer dropped; it applies when the session next starts.

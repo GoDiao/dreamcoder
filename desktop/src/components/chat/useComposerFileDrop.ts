@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
+import { onFileDrop, type FileDropPosition } from '../../lib/shell'
 import { isTauriRuntime } from '../../lib/desktopRuntime'
 import {
   dataTransferHasFiles,
@@ -7,22 +8,6 @@ import {
   type ComposerAttachment,
 } from '../../lib/composerAttachments'
 
-type TauriDropPosition = {
-  x: number
-  y: number
-}
-
-type TauriDragDropPayload =
-  | { type: 'enter'; paths: string[]; position: TauriDropPosition }
-  | { type: 'over'; position: TauriDropPosition }
-  | { type: 'drop'; paths: string[]; position: TauriDropPosition }
-  | { type: 'leave' }
-  | { type: 'cancel' }
-
-type TauriDragDropEvent = {
-  payload: TauriDragDropPayload
-}
-
 type UseComposerFileDropOptions = {
   disabled?: boolean
   panelRef: RefObject<HTMLElement | null>
@@ -30,7 +15,7 @@ type UseComposerFileDropOptions = {
   onError?: (error: unknown) => void
 }
 
-function isPointInsideElement(element: HTMLElement | null, position: TauriDropPosition): boolean {
+function isPointInsideElement(element: HTMLElement | null, position: FileDropPosition): boolean {
   if (!element) return false
   const rect = element.getBoundingClientRect()
   return (
@@ -71,32 +56,29 @@ export function useComposerFileDrop({
     let disposed = false
     let unlisten: (() => void) | undefined
 
-    void import('@tauri-apps/api/webview')
-      .then(({ getCurrentWebview }) =>
-        getCurrentWebview().onDragDropEvent((event) => {
-          if (disposed) return
+    void onFileDrop((event) => {
+      if (disposed) return
 
-          const payload = event.payload as TauriDragDropEvent['payload']
-          if (payload.type === 'cancel' || payload.type === 'leave') {
-            dragDepthRef.current = 0
-            setIsDragActive(false)
-            return
-          }
+      const payload = event.payload
+      if (payload.type === 'cancel' || payload.type === 'leave') {
+        dragDepthRef.current = 0
+        setIsDragActive(false)
+        return
+      }
 
-          const isInside = isPointInsideElement(panelRef.current, payload.position)
-          if (payload.type === 'enter' || payload.type === 'over') {
-            setIsDragActive(!disabledRef.current && isInside)
-            return
-          }
+      const isInside = isPointInsideElement(panelRef.current, payload.position)
+      if (payload.type === 'enter' || payload.type === 'over') {
+        setIsDragActive(!disabledRef.current && isInside)
+        return
+      }
 
-          dragDepthRef.current = 0
-          setIsDragActive(false)
-          if (disabledRef.current || !isInside) return
+      dragDepthRef.current = 0
+      setIsDragActive(false)
+      if (disabledRef.current || !isInside) return
 
-          const attachments = pathsToComposerAttachments(payload.paths)
-          if (attachments.length > 0) onAttachmentsRef.current(attachments)
-        }),
-      )
+      const attachments = pathsToComposerAttachments(payload.paths)
+      if (attachments.length > 0) onAttachmentsRef.current(attachments)
+    })
       .then((nextUnlisten) => {
         if (disposed) {
           nextUnlisten()

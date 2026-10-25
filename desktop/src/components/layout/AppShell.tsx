@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type HTMLAttributes } from 'react'
+import { onMenuNavigate } from '../../lib/shell'
 import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
 import { ToastContainer } from '../shared/Toast'
@@ -155,13 +156,10 @@ export function AppShell() {
   useEffect(() => {
     if (!tauriRuntime) return
     let unlisten: (() => void) | undefined
-    import('@tauri-apps/api/event')
-      .then(({ listen }) =>
-        listen<string>('native-menu-navigate', (event) => {
-          const target = event.payload as SettingsTab | 'settings'
-          useUIStore.getState().openSettings(target === 'about' ? 'about' : undefined)
-        }),
-      )
+    onMenuNavigate((event) => {
+      const target = event.payload as SettingsTab | 'settings'
+      useUIStore.getState().openSettings(target === 'about' ? 'about' : undefined)
+    })
       .then((fn) => { unlisten = fn })
       .catch(() => {})
     return () => { unlisten?.() }

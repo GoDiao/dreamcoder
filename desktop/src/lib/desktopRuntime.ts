@@ -1,3 +1,4 @@
+import { getServerUrl } from './shell'
 import {
   api,
   getDefaultBaseUrl,
@@ -114,8 +115,7 @@ export async function initializeDesktopServerUrl() {
   }
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const serverUrl = await invoke<string>('get_server_url')
+    const serverUrl = await getServerUrl()
     setBaseUrl(serverUrl)
     setAuthToken(null)
     await waitForHealth(serverUrl)

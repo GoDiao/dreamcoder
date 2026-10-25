@@ -4,16 +4,11 @@ const check = vi.fn()
 const relaunch = vi.fn()
 const invoke = vi.fn()
 
-vi.mock('@tauri-apps/plugin-updater', () => ({
-  check,
-}))
-
-vi.mock('@tauri-apps/plugin-process', () => ({
-  relaunch,
-}))
-
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke,
+vi.mock('../lib/shell', () => ({
+  checkForAppUpdate: check,
+  relaunchApp: relaunch,
+  prepareUpdateInstall: () => invoke('prepare_for_update_install'),
+  cancelUpdateInstall: () => invoke('cancel_update_install'),
 }))
 
 describe('updateStore', () => {

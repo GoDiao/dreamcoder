@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent } from 'react'
 import { Eraser, Info, RotateCcw } from 'lucide-react'
+import { useSettingsStore } from '../stores/settingsStore'
 import { useTranslation, type TranslationKey } from '../i18n'
 import { terminalApi } from '../api/terminal'
 import {
@@ -44,7 +45,6 @@ type TerminalSettingsProps = {
   testId?: string
   workspace?: boolean
   docked?: boolean
-  showPreferences?: boolean
   runtimeId?: string
   preserveOnUnmount?: boolean
   /** Docked only: content placed at the start of the toolbar (the panel's terminal tabs). */
@@ -61,7 +61,6 @@ export function TerminalSettings({
   testId = 'settings-terminal-host',
   workspace = false,
   docked = false,
-  showPreferences = false,
   runtimeId,
   preserveOnUnmount = false,
   toolbarLeading,
@@ -85,8 +84,6 @@ export function TerminalSettings({
   const warning = runtime.warning
   const error = runtime.error
   const shellInfo = runtime.shellInfo
-  const isWindows = typeof navigator !== 'undefined'
-    && (/^Win/i.test(navigator.platform) || /Windows/i.test(navigator.userAgent))
 
   useEffect(() => {
     return subscribeTerminalRuntime(runtime, () => forceRuntimeUpdate((value) => value + 1))
@@ -206,6 +203,7 @@ export function TerminalSettings({
         cols: terminal.cols,
         rows: terminal.rows,
         ...(cwd ? { cwd } : {}),
+        settings: useSettingsStore.getState().desktopTerminal,
       })
       updateTerminalRuntime(runtime, {
         nativeSessionId: result.session_id,
@@ -409,10 +407,6 @@ export function TerminalSettings({
 
       {notices}
 
-      {showPreferences && isWindows && terminalApi.isAvailable() && (
-        <BashPathSettings isTauri />
-      )}
-
       {status === 'unavailable' ? unavailableNotice : (
         <div
           data-testid="settings-terminal-frame"
@@ -501,120 +495,5 @@ function StatusPill({ status, label, compact = false }: { status: TerminalStatus
       <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
       {label}
     </span>
-  )
-}
-
-function BashPathSettings({ isTauri }: { isTauri: boolean }) {
-  const t = useTranslation()
-  const [bashPath, setBashPath] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [invalid, setInvalid] = useState(false)
-
-  useEffect(() => {
-    if (!isTauri) return
-    void terminalApi.getBashPath().then((path) => setBashPath(path)).catch(() => {})
-  }, [isTauri])
-
-  const handleSave = async () => {
-    const trimmed = bashPath?.trim() || null
-    setSaving(true)
-    setInvalid(false)
-    setSaved(false)
-    try {
-      await terminalApi.setBashPath(trimmed)
-      setBashPath(trimmed)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch {
-      setInvalid(true)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReset = async () => {
-    setSaving(true)
-    setSaved(false)
-    setInvalid(false)
-    try {
-      await terminalApi.setBashPath(null)
-      setBashPath(null)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch {
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleBrowse = async () => {
-    if (!isTauri) return
-    try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
-        title: t('settings.terminal.bashPathLabel'),
-        multiple: false,
-        filters: [{
-          name: 'Bash Executable',
-          extensions: ['exe', '', 'bat', 'cmd', 'ps1'],
-        }],
-      })
-      if (selected && typeof selected === 'string') {
-        setBashPath(selected)
-        setInvalid(false)
-      }
-    } catch {
-    }
-  }
-
-  if (!isTauri) return null
-
-  return (
-    <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
-      <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-primary)]">
-        {t('settings.terminal.bashPathLabel')}
-      </label>
-      <p className="mb-2 text-xs text-[var(--color-text-tertiary)]">
-        {t('settings.terminal.bashPathDescription')}
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={bashPath || ''}
-          onChange={(e) => { setBashPath(e.target.value); setInvalid(false); setSaved(false) }}
-          placeholder={t('settings.terminal.bashPathLabel')}
-          className="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-mono text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)]"
-        />
-        <button
-          type="button"
-          onClick={handleBrowse}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-        >
-          <span className="material-symbols-outlined text-[16px]">folder_open</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-text-primary)] px-3 text-xs font-medium text-[var(--color-surface)] transition-colors hover:opacity-90 disabled:opacity-50"
-        >
-          {saved ? t('settings.terminal.bashPathSaved') : t('settings.terminal.bashPathSave')}
-        </button>
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={saving || bashPath === null}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-        >
-          {t('settings.terminal.bashPathReset')}
-        </button>
-      </div>
-      {invalid && (
-        <p className="mt-1.5 text-xs text-[var(--color-error)]">
-          {t('settings.terminal.bashPathInvalid')}
-        </p>
-      )}
-    </div>
   )
 }

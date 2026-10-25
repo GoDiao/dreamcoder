@@ -13,14 +13,36 @@ vi.mock('../../api/terminal', () => ({ terminalApi: {
 describe('default shell preferences', () => {
   beforeEach(() => {
     native.available = true
+    native.detect.mockReset()
     native.detect.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
     useSettingsStore.setState({
       locale: 'en',
-      desktopTerminal: { startupShell: 'system', customShellPath: '' },
+      desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: null },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
   })
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+  })
+
+  it('shows the Bash path setting only on Windows', async () => {
+    native.detect.mockResolvedValue({ platform: 'windows', shell: 'cmd.exe' })
+    render(<TerminalShellSettings />)
+    expect(await screen.findByPlaceholderText('Bash Path')).toBeInTheDocument()
+    cleanup()
+    native.detect.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
+    render(<TerminalShellSettings />)
+    expect(await screen.findByRole('button', { name: 'Save shell' })).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Bash Path')).not.toBeInTheDocument()
+  })
+
+  it('passes the current terminal settings to native detection', async () => {
+    const settings = { startupShell: 'custom' as const, customShellPath: '/opt/shell', bashPath: '/opt/bash' }
+    useSettingsStore.setState({ desktopTerminal: settings })
+    render(<TerminalShellSettings />)
+    await waitFor(() => expect(native.detect).toHaveBeenCalledWith(settings))
+  })
 
   it.each(['macos', 'linux'])('shows detection and Unix choices on %s', async (platform) => {
     native.detect.mockResolvedValue({ platform, shell: '/usr/bin/fish' })
@@ -48,7 +70,7 @@ describe('default shell preferences', () => {
   })
 
   it('validates custom Unix paths and persists a trimmed absolute path', async () => {
-    useSettingsStore.setState({ desktopTerminal: { startupShell: 'custom', customShellPath: '' } })
+    useSettingsStore.setState({ desktopTerminal: { startupShell: 'custom', customShellPath: '', bashPath: null } })
     render(<TerminalShellSettings />)
     await screen.findByRole('button', { name: 'Default shell' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })

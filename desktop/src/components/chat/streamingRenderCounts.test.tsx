@@ -27,10 +27,10 @@ vi.mock('../../api/websocket', () => ({
   },
 }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
-
-vi.mock('@tauri-apps/api/webview', () => ({
-  getCurrentWebview: () => ({ onDragDropEvent: vi.fn(async () => () => {}) }),
+vi.mock('../../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/shell')>()),
+  pickFiles: vi.fn(),
+  onFileDrop: vi.fn(async () => () => {}),
 }))
 
 vi.mock('../controls/PermissionModeSelector', () => ({

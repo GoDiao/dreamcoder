@@ -230,8 +230,6 @@ const TERMINAL_CONFIG_FILE: &str = "terminal-config.json";
 const APP_MODE_FILE: &str = "app-mode.json";
 /// DreamCoder's config directory variable. Claude Code's own variable is not used.
 pub const CONFIG_DIR_ENV: &str = "DREAMCODER_CONFIG_DIR";
-/// DreamCoder's default config directory under the home directory, matching the CLI.
-pub const DEFAULT_CONFIG_DIR_NAME: &str = ".dreamcoder";
 /// Name of the portable data folder next to the executable. It predates
 /// `DREAMCODER_CONFIG_DIR` and is kept so existing portable installs keep their data.
 pub const PORTABLE_DIR_NAME: &str = "CLAUDE_CONFIG_DIR";
@@ -320,47 +318,7 @@ fn get_default_portable_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-#[derive(Serialize, Deserialize)]
-struct TerminalConfig {
-    #[serde(default)]
-    bash_path: Option<String>,
-}
-
-impl TerminalConfig {
-    fn load(app: &AppHandle) -> Self {
-        let path = match terminal_config_path(app) {
-            Some(p) => p,
-            None => return Self::default(),
-        };
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|data| serde_json::from_str(&data).ok())
-            .unwrap_or_default()
-    }
-
-    fn save(&self, app: &AppHandle) -> Result<(), String> {
-        let Some(path) = terminal_config_path(app) else {
-            return Err("terminal config path is unavailable".to_string());
-        };
-        if let Some(parent) = path.parent() {
-            if let Err(err) = fs::create_dir_all(parent) {
-                return Err(format!("create terminal config directory: {err}"));
-            }
-        }
-        let data = match serde_json::to_string_pretty(self) {
-            Ok(data) => data,
-            Err(err) => {
-                return Err(format!("serialize terminal config: {err}"));
-            }
-        };
-        if let Err(err) = fs::write(&path, data) {
-            return Err(format!("write terminal config: {err}"));
-        }
-        Ok(())
-    }
-}
-
-fn terminal_config_path(app: &AppHandle) -> Option<PathBuf> {
+fn legacy_terminal_config_path(app: &AppHandle) -> Option<PathBuf> {
     std::env::var(CONFIG_DIR_ENV)
         .ok()
         .map(|dir| PathBuf::from(&dir).join(TERMINAL_CONFIG_FILE))
@@ -371,12 +329,6 @@ fn terminal_config_path(app: &AppHandle) -> Option<PathBuf> {
                 None
             }
         })
-}
-
-impl Default for TerminalConfig {
-    fn default() -> Self {
-        Self { bash_path: None }
-    }
 }
 
 #[derive(Default)]
@@ -442,15 +394,10 @@ struct TerminalExitPayload {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct DesktopTerminalSettingsFile {
-    desktop_terminal: Option<DesktopTerminalConfig>,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 struct DesktopTerminalConfig {
     startup_shell: Option<String>,
     custom_shell_path: Option<String>,
+    bash_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -544,7 +491,6 @@ fn cancel_update_install(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn get_app_mode(_app: AppHandle) -> serde_json::Value {
     let env_config_dir = std::env::var(CONFIG_DIR_ENV).ok().map(PathBuf::from);
-    let active_config_dir = env_config_dir.clone().or_else(claude_config_dir);
     let config_dir_source = if env_config_dir.is_some() {
         if std::env::var_os(PORTABLE_MARKER_ENV).is_some() {
             "portable"
@@ -560,11 +506,6 @@ fn get_app_mode(_app: AppHandle) -> serde_json::Value {
         "mode": if env_config_dir.is_some() { "portable" } else { "default" },
         "portableDir": config_dir.as_ref().and_then(|p| p.to_str()),
         "defaultPortableDir": get_default_portable_dir().as_ref().and_then(|p| p.to_str()),
-        "activeConfigDir": active_config_dir.as_ref().and_then(|p| p.to_str()),
-        "systemConfigDir": home_dir()
-            .map(|path| path.join(DEFAULT_CONFIG_DIR_NAME))
-            .as_ref()
-            .and_then(|p| p.to_str()),
         "configDirSource": config_dir_source,
     })
 }
@@ -915,9 +856,10 @@ fn terminal_spawn(
     cols: u16,
     rows: u16,
     cwd: Option<String>,
+    settings: Option<DesktopTerminalConfig>,
 ) -> Result<TerminalSpawnResult, String> {
     let cwd_path = resolve_terminal_cwd(cwd)?;
-    let selection = resolved_terminal_shell(&app);
+    let selection = resolved_terminal_shell(settings.as_ref());
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -1118,10 +1060,9 @@ struct TerminalShellDetection {
 }
 
 #[tauri::command]
-fn detect_default_terminal_shell(app: AppHandle) -> TerminalShellDetection {
-    let config = TerminalConfig::load(&app);
+fn detect_default_terminal_shell(settings: Option<DesktopTerminalConfig>) -> TerminalShellDetection {
     TerminalShellDetection {
-        shell: default_shell(config.bash_path.as_deref()),
+        shell: default_shell(settings.as_ref().and_then(|config| config.bash_path.as_deref())),
         platform: if cfg!(target_os = "windows") {
             "windows"
         } else if cfg!(target_os = "macos") {
@@ -1133,16 +1074,8 @@ fn detect_default_terminal_shell(app: AppHandle) -> TerminalShellDetection {
 }
 
 #[tauri::command]
-fn get_terminal_bash_path(app: AppHandle) -> Option<String> {
-    let config = TerminalConfig::load(&app);
-    config.bash_path
-}
-
-#[tauri::command]
-fn set_terminal_bash_path(app: AppHandle, path: Option<String>) -> Result<(), String> {
-    let mut config = TerminalConfig::load(&app);
-    config.bash_path = normalize_terminal_bash_path(path)?;
-    config.save(&app)
+fn validate_terminal_bash_path(path: Option<String>) -> Result<Option<String>, String> {
+    normalize_terminal_bash_path(path)
 }
 
 #[tauri::command]
@@ -1383,31 +1316,10 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-/// DreamCoder's config directory, as the sidecar resolves it.
-fn claude_config_dir() -> Option<PathBuf> {
-    std::env::var_os(CONFIG_DIR_ENV)
-        .map(PathBuf::from)
-        .or_else(|| home_dir().map(|path| path.join(DEFAULT_CONFIG_DIR_NAME)))
-}
-
-fn desktop_terminal_settings_path() -> Option<PathBuf> {
-    claude_config_dir().map(|path| path.join("settings.json"))
-}
-
-fn read_desktop_terminal_config() -> Option<DesktopTerminalConfig> {
-    let path = desktop_terminal_settings_path()?;
-    let contents = fs::read_to_string(path).ok()?;
-    let settings = serde_json::from_str::<DesktopTerminalSettingsFile>(&contents).ok()?;
-    settings.desktop_terminal
-}
-
-fn resolved_terminal_shell(app: &AppHandle) -> terminal_shell::ShellSelection {
-    let terminal_config = TerminalConfig::load(app);
-    let system_default = default_shell(terminal_config.bash_path.as_deref());
+fn resolved_terminal_shell(config: Option<&DesktopTerminalConfig>) -> terminal_shell::ShellSelection {
+    let system_default = default_shell(config.and_then(|config| config.bash_path.as_deref()));
     let platform = current_terminal_host_platform();
-    let configured = read_desktop_terminal_config();
-    let override_shell =
-        resolve_desktop_terminal_shell(platform, configured.as_ref(), &system_default);
+    let override_shell = resolve_desktop_terminal_shell(platform, config, &system_default);
     terminal_shell::select_shell(system_default, override_shell)
 }
 
@@ -1635,6 +1547,9 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
         sidecar = sidecar
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
+    }
+    if let Some(path) = legacy_terminal_config_path(app) {
+        sidecar = sidecar.env("DREAMCODER_LEGACY_TERMINAL_CONFIG_PATH", path);
     }
     let sidecar = sidecar
         .env("DREAMCODER_PARENT_PID", std::process::id().to_string())
@@ -1975,6 +1890,7 @@ mod tests {
         let pwsh = DesktopTerminalConfig {
             startup_shell: Some("pwsh".to_string()),
             custom_shell_path: None,
+            bash_path: None,
         };
         assert_eq!(
             resolve_desktop_terminal_shell(
@@ -1989,6 +1905,7 @@ mod tests {
         let custom = DesktopTerminalConfig {
             startup_shell: Some("custom".to_string()),
             custom_shell_path: Some("/tmp/custom-shell".to_string()),
+            bash_path: None,
         };
         assert_eq!(
             resolve_desktop_terminal_shell(
@@ -2007,6 +1924,7 @@ mod tests {
         let bash = DesktopTerminalConfig {
             startup_shell: Some("bash".to_string()),
             custom_shell_path: None,
+            bash_path: None,
         };
         let resolved = resolve_desktop_terminal_shell(
             TerminalHostPlatform::Posix, Some(&bash), "/bin/zsh",
@@ -2016,10 +1934,36 @@ mod tests {
         let custom = DesktopTerminalConfig {
             startup_shell: Some("custom".to_string()),
             custom_shell_path: Some(" /bin/sh ".to_string()),
+            bash_path: None,
         };
         assert_eq!(resolve_desktop_terminal_shell(
             TerminalHostPlatform::Posix, Some(&custom), "/bin/zsh",
         ).unwrap(), Some("/bin/sh".to_string()));
+    }
+
+    #[test]
+    fn terminal_settings_deserialize_the_frontend_payload() {
+        let config: DesktopTerminalConfig = serde_json::from_value(serde_json::json!({
+            "startupShell": "custom",
+            "customShellPath": "/bin/sh",
+            "bashPath": "C:\\Git\\bash.exe"
+        })).expect("terminal settings payload");
+        assert_eq!(config.startup_shell.as_deref(), Some("custom"));
+        assert_eq!(config.custom_shell_path.as_deref(), Some("/bin/sh"));
+        assert_eq!(config.bash_path.as_deref(), Some("C:\\Git\\bash.exe"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn terminal_selection_uses_the_supplied_settings() {
+        let config = DesktopTerminalConfig {
+            startup_shell: Some("custom".to_string()),
+            custom_shell_path: Some("/bin/sh".to_string()),
+            bash_path: None,
+        };
+        let selection = super::resolved_terminal_shell(Some(&config));
+        assert_eq!(selection.shell, "/bin/sh");
+        assert!(selection.warning.is_none());
     }
 
     #[test]
@@ -2084,8 +2028,7 @@ pub fn run() {
             terminal_resize,
             terminal_kill,
             detect_default_terminal_shell,
-            get_terminal_bash_path,
-            set_terminal_bash_path,
+            validate_terminal_bash_path,
             macos_notification_permission_state,
             macos_request_notification_permission,
             macos_send_notification,

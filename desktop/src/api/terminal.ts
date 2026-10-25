@@ -1,76 +1,43 @@
 import { isTauriRuntime } from '../lib/desktopRuntime'
+import * as shell from '../lib/shell'
+import type { DesktopTerminalSettings } from '../types/settings'
 
-export type TerminalSpawnResult = {
-  session_id: number
-  shell: string
-  cwd: string
-  warning?: string | null
-}
+export type { TerminalSpawnResult, TerminalOutputPayload, TerminalExitPayload, TerminalShellDetection } from '../lib/shell'
 
-export type TerminalOutputPayload = {
-  session_id: number
-  data: string
-}
-
-export type TerminalExitPayload = {
-  session_id: number
-  code: number
-  signal?: string | null
-}
-
-export type TerminalShellDetection = {
-  shell: string
-  platform: 'windows' | 'macos' | 'linux'
-}
-
-type Unlisten = () => void
-
-async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+async function inDesktop<T>(action: () => Promise<T>): Promise<T> {
   if (!isTauriRuntime()) {
     throw new Error('Terminal is available in the desktop app runtime.')
   }
-  const api = await import('@tauri-apps/api/core')
-  return api.invoke<T>(command, args)
+  return action()
 }
 
 export const terminalApi = {
   isAvailable: isTauriRuntime,
 
-  spawn(input: { cols: number; rows: number; cwd?: string }) {
-    return invoke<TerminalSpawnResult>('terminal_spawn', input)
+  spawn(input: { cols: number; rows: number; cwd?: string; settings: DesktopTerminalSettings }) {
+    return inDesktop(() => shell.spawnTerminal(input))
   },
 
   write(sessionId: number, data: string) {
-    return invoke<void>('terminal_write', { sessionId, data })
+    return inDesktop(() => shell.writeTerminal(sessionId, data))
   },
 
   resize(sessionId: number, cols: number, rows: number) {
-    return invoke<void>('terminal_resize', { sessionId, cols, rows })
+    return inDesktop(() => shell.resizeTerminal(sessionId, cols, rows))
   },
 
   kill(sessionId: number) {
-    return invoke<void>('terminal_kill', { sessionId })
+    return inDesktop(() => shell.killTerminal(sessionId))
   },
 
-  async onOutput(handler: (payload: TerminalOutputPayload) => void): Promise<Unlisten> {
-    const events = await import('@tauri-apps/api/event')
-    return events.listen<TerminalOutputPayload>('terminal-output', (event) => handler(event.payload))
+  onOutput: shell.onTerminalOutput,
+  onExit: shell.onTerminalExit,
+
+  detectDefaultShell(settings: DesktopTerminalSettings) {
+    return inDesktop(() => shell.detectDefaultTerminalShell(settings))
   },
 
-  async onExit(handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
-    const events = await import('@tauri-apps/api/event')
-    return events.listen<TerminalExitPayload>('terminal-exit', (event) => handler(event.payload))
-  },
-
-  detectDefaultShell() {
-    return invoke<TerminalShellDetection>('detect_default_terminal_shell')
-  },
-
-  getBashPath() {
-    return invoke<string | null>('get_terminal_bash_path', undefined)
-  },
-
-  setBashPath(path: string | null) {
-    return invoke<void>('set_terminal_bash_path', { path })
+  validateBashPath(path: string | null) {
+    return inDesktop(() => shell.validateTerminalBashPath(path))
   },
 }

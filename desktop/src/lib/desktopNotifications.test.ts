@@ -27,11 +27,25 @@ const windowApiMock = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('@tauri-apps/plugin-notification', () => notificationPluginMock)
-vi.mock('@tauri-apps/api/core', () => coreApiMock)
-vi.mock('@tauri-apps/api/event', () => eventApiMock)
-vi.mock('@tauri-apps/api/window', () => windowApiMock)
-vi.mock('@tauri-apps/plugin-shell', () => shellApiMock)
+vi.mock('./shell', () => ({
+  isNotificationPermissionGranted: notificationPluginMock.isPermissionGranted,
+  requestNotificationPermission: notificationPluginMock.requestPermission,
+  sendNotification: notificationPluginMock.sendNotification,
+  onNotificationAction: async (handler: (payload: unknown) => void) => {
+    const listener = await notificationPluginMock.onAction(handler)
+    return () => listener.unregister()
+  },
+  getWindowsNotificationPermission: () => coreApiMock.invoke('plugin:notification|is_permission_granted'),
+  requestWindowsNotificationPermission: () => coreApiMock.invoke('plugin:notification|request_permission'),
+  getMacNotificationPermission: () => coreApiMock.invoke('macos_notification_permission_state'),
+  requestMacNotificationPermission: () => coreApiMock.invoke('macos_request_notification_permission'),
+  sendMacNotification: (input: unknown) => coreApiMock.invoke('macos_send_notification', input),
+  openWindowsNotificationSettings: () => coreApiMock.invoke('open_windows_notification_settings'),
+  openExternalLink: shellApiMock.open,
+  requestAppAttention: () => requestUserAttentionMock(1),
+  getAppWindow: async () => windowApiMock.getCurrentWindow(),
+  onNotificationClicked: (handler: (event: { payload: unknown }) => void) => eventApiMock.listen('desktop-notification-clicked', handler),
+}))
 
 import {
   getDesktopNotificationPermission,

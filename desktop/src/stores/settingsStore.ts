@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import { getAppMode, setAppMode } from '../lib/shell'
 import { ApiError } from '../api/client'
 import { settingsApi } from '../api/settings'
+import { statusApi } from '../api/status'
 import { modelsApi } from '../api/models'
 import { h5AccessApi } from '../api/h5Access'
 import {
@@ -105,7 +107,7 @@ type SettingsStore = {
   setSkipWebFetchPreflight: (enabled: boolean) => Promise<void>
   setAgentTeamsEnabled: (enabled: boolean) => Promise<void>
   setDesktopNotificationsEnabled: (enabled: boolean) => Promise<void>
-  setDesktopTerminal: (settings: DesktopTerminalSettings) => Promise<void>
+  setDesktopTerminal: (settings: Partial<DesktopTerminalSettings>) => Promise<void>
   setWebSearch: (settings: WebSearchSettings) => Promise<void>
   setUpdateProxy: (settings: UpdateProxySettings) => Promise<void>
   setNetwork: (settings: NetworkSettings) => Promise<void>
@@ -137,6 +139,7 @@ const DEFAULT_H5_ACCESS_SETTINGS: H5AccessSettings = {
 const DEFAULT_DESKTOP_TERMINAL_SETTINGS: DesktopTerminalSettings = {
   startupShell: 'system',
   customShellPath: '',
+  bashPath: null,
 }
 
 const DEFAULT_UPDATE_PROXY_SETTINGS: UpdateProxySettings = {
@@ -345,7 +348,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setDesktopTerminal: async (settings) => {
     const prev = get().desktopTerminal
-    const next = normalizeDesktopTerminalSettings(settings)
+    const next = normalizeDesktopTerminalSettings({ ...prev, ...settings })
     set({ desktopTerminal: next })
     try {
       await settingsApi.updateUser({ desktopTerminal: next })
@@ -465,10 +468,20 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   fetchAppMode: async () => {
     if (!isTauriRuntime()) return
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const result: AppModeConfig = await invoke('get_app_mode')
-      set({ appMode: result })
-    } catch { }
+      const [result, directories] = await Promise.all([
+        getAppMode(),
+        statusApi.getConfigDirectories(),
+      ])
+      set({
+        appMode: {
+          ...result,
+          activeConfigDir: directories.configDir,
+          systemConfigDir: directories.defaultConfigDir,
+        },
+      })
+    } catch (error) {
+      console.error('[settings] Failed to load app mode', error)
+    }
   },
 
   setAppMode: async (mode, portableDir) => {
@@ -487,8 +500,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
     set({ appMode: newMode, appModeRequiresRestart: true })
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('set_app_mode', {
+      await setAppMode({
         mode,
         portableDir: newMode.portableDir || null,
       })
@@ -551,6 +563,7 @@ function normalizeDesktopTerminalSettings(
     customShellPath: typeof settings?.customShellPath === 'string'
       ? settings.customShellPath
       : DEFAULT_DESKTOP_TERMINAL_SETTINGS.customShellPath,
+    bashPath: typeof settings?.bashPath === 'string' ? settings.bashPath.trim() || null : null,
   }
 }
 

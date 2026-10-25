@@ -67,6 +67,7 @@ export type DesktopTerminalStartupShell =
 export type DesktopTerminalSettings = {
   startupShell: DesktopTerminalStartupShell
   customShellPath: string
+  bashPath: string | null
 }
 
 export type ModelInfo = {

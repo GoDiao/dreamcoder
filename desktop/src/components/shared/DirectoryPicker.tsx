@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { pickDirectory } from '../../lib/shell'
 import { createPortal } from 'react-dom'
 import { sessionsApi, type RecentProject } from '../../api/sessions'
 import { filesystemApi } from '../../api/filesystem'
@@ -129,8 +130,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
     if (isTauriRuntime()) {
       setIsOpen(false)
       try {
-        const { open } = await import('@tauri-apps/plugin-dialog')
-        const selected = await open({
+        const selected = await pickDirectory({
           directory: true,
           multiple: false,
           title: t('dirPicker.chooseProjectFolder'),
