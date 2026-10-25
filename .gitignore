@@ -31,9 +31,10 @@ artifacts/coverage/
 # Desktop build output
 desktop/dist/
 desktop/build-artifacts/
-desktop/src-tauri/binaries/
-desktop/src-tauri/target/
-desktop/src-tauri/gen/
+desktop/binaries/
+desktop/.electron-cache/
+desktop/electron-dist/
+desktop/electron-release/
 desktop/package-lock.json
 
 # Desktop brand asset candidates (keep only selected ones in public/)
@@ -90,8 +91,3 @@ experiments/system1-guardrail/**/runs/
 experiments/system1-guardrail/dataset/data/**/*.jsonl.gz
 
 vendor/ripgrep/
-
-# Electron spike
-desktop/.electron-cache/
-desktop/electron-dist/
-desktop/electron-release/

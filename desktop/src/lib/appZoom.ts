@@ -1,5 +1,5 @@
 import { setAppZoom } from './shell'
-import { isTauriRuntime } from './desktopRuntime'
+import { isDesktopRuntime } from './desktopRuntime'
 
 export const APP_ZOOM_STORAGE_KEY = 'dreamcoder-app-zoom'
 export const LEGACY_UI_ZOOM_STORAGE_KEY = 'dreamcoder-ui-zoom'
@@ -71,7 +71,7 @@ function setCssAppZoomMode(level: number, mode: 'css' | 'native') {
 }
 
 async function trySetNativeAppZoom(level: number): Promise<boolean> {
-  if (!isTauriRuntime()) return false
+  if (!isDesktopRuntime()) return false
   try {
     await setAppZoom({ zoomFactor: level })
     setCssAppZoomMode(level, 'native')

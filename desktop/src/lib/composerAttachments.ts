@@ -1,4 +1,4 @@
-import { isTauriRuntime } from './desktopRuntime'
+import { isDesktopRuntime } from './desktopRuntime'
 import { getFilePath, pickFiles } from './shell'
 
 export type ComposerAttachment = {
@@ -50,7 +50,7 @@ export async function dataTransferToComposerAttachments(dataTransfer: DataTransf
 }
 
 export async function selectNativeFileAttachments(): Promise<ComposerAttachment[] | null> {
-  if (!isTauriRuntime()) return null
+  if (!isDesktopRuntime()) return null
 
   try {
     const selected = await pickFiles({
@@ -78,7 +78,7 @@ function normalizeDialogSelection(selected: string | string[] | null): string[] 
 }
 
 async function fileToComposerAttachment(file: File): Promise<ComposerAttachment | null> {
-  const nativePath = isTauriRuntime() ? getFilePath(file) : undefined
+  const nativePath = isDesktopRuntime() ? getFilePath(file) : undefined
   if (nativePath) {
     return pathToComposerAttachment(nativePath)
   }

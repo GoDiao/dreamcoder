@@ -20,14 +20,12 @@
     "dev": "vite",
     "build": "vite build",
     "build:sidecars": "bun run ./scripts/build-sidecars.ts",
-    "build:macos-arm64": "bash ./scripts/build-macos-arm64.sh",
-    "build:windows-x64": "powershell -ExecutionPolicy Bypass -File ./scripts/build-windows-x64.ps1",
     "build:electron": "bun run ./scripts/build-electron.ts",
-    "electron:dev": "bun run build:electron && DREAMCODER_ELECTRON_DEV_URL=http://localhost:1420 electron electron-dist",
+    "electron:install": "node node_modules/electron/install.js",
+    "electron:dev": "bun run ./scripts/electron-dev.ts",
     "electron:start": "bun run build:electron && electron electron-dist",
-    "electron:pack": "DREAMCODER_SHELL=electron bun run build && bun run build:sidecars && bun run build:electron && electron-builder --publish never -c.mac.identity=-",
+    "electron:pack": "bun run build && bun run build:sidecars && bun run build:electron && electron-builder --publish never -c.mac.identity=-",
     "preview": "vite preview",
-    "tauri": "tauri",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "lint": "tsc --noEmit && tsc --noEmit -p electron"
@@ -69,14 +67,5 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.10",
     "vitest": "^3.0.4"
-  },
-  "optionalDependencies": {
-    "@tauri-apps/api": "^2.3.0",
-    "@tauri-apps/cli": "^2.3.1",
-    "@tauri-apps/plugin-dialog": "^2.2.1",
-    "@tauri-apps/plugin-notification": "^2.2.1",
-    "@tauri-apps/plugin-process": "^2.2.1",
-    "@tauri-apps/plugin-shell": "^2.2.1",
-    "@tauri-apps/plugin-updater": "^2.2.1"
   }
 }

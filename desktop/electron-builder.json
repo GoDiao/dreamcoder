@@ -18,7 +18,7 @@
       "to": "dist"
     },
     {
-      "from": "src-tauri/icons/32x32.png",
+      "from": "electron/build/icons/tray.png",
       "to": "icons/tray.png"
     },
     {
@@ -41,7 +41,7 @@
         ]
       }
     ],
-    "icon": "src-tauri/icons/icon.icns",
+    "icon": "electron/build/icons/icon.icns",
     "category": "public.app-category.developer-tools",
     "hardenedRuntime": true,
     "entitlements": "electron/build/entitlements.mac.plist",
@@ -49,11 +49,11 @@
     "artifactName": "${productName}_${version}_aarch64.${ext}",
     "extraResources": [
       {
-        "from": "src-tauri/binaries/dreamcoder-sidecar-aarch64-apple-darwin",
+        "from": "binaries/dreamcoder-sidecar-aarch64-apple-darwin",
         "to": "bin/dreamcoder-sidecar"
       },
       {
-        "from": "src-tauri/binaries/rg-aarch64-apple-darwin",
+        "from": "binaries/rg-aarch64-apple-darwin",
         "to": "bin/rg"
       }
     ]
@@ -85,15 +85,15 @@
         ]
       }
     ],
-    "icon": "src-tauri/icons/icon.ico",
+    "icon": "electron/build/icons/icon.ico",
     "artifactName": "${productName}_${version}_x64-setup.${ext}",
     "extraResources": [
       {
-        "from": "src-tauri/binaries/dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
+        "from": "binaries/dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
         "to": "bin/dreamcoder-sidecar.exe"
       },
       {
-        "from": "src-tauri/binaries/rg-x86_64-pc-windows-msvc.exe",
+        "from": "binaries/rg-x86_64-pc-windows-msvc.exe",
         "to": "bin/rg.exe"
       }
     ]

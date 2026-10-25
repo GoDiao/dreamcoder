@@ -309,7 +309,7 @@ describe('settingsStore app mode', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    delete (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__
+    delete (window as unknown as { dreamcoderShell?: object }).dreamcoderShell
   })
 
   it('hydrates app mode from the native desktop command', async () => {
@@ -319,8 +319,8 @@ describe('settingsStore app mode', () => {
       defaultPortableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
     })
     vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
 
@@ -342,8 +342,8 @@ describe('settingsStore app mode', () => {
   it('persists app mode through the native desktop command and marks restart required', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
     vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({
@@ -374,8 +374,8 @@ describe('settingsStore app mode', () => {
   it('persists a user-selected portable directory', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
     vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({
@@ -404,8 +404,8 @@ describe('settingsStore app mode', () => {
   it('switches app mode back to the system data source', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
     vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({

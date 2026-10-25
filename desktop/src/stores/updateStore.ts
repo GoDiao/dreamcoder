@@ -6,7 +6,7 @@ import {
   type ShellUpdate,
   checkForAppUpdate,
 } from '../lib/shell'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import type { UpdateProxySettings } from '../types/settings'
 import { useSettingsStore } from './settingsStore'
 
@@ -113,7 +113,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   shouldPrompt: false,
 
   initialize: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     if (!startupCheckPromise) {
       startupCheckPromise = (async () => {
         await new Promise((resolve) => setTimeout(resolve, 5000))
@@ -127,7 +127,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   },
 
   checkForUpdates: async ({ silent = false } = {}) => {
-    if (!isTauriRuntime()) return null
+    if (!isDesktopRuntime()) return null
 
     set((state) => ({
       ...state,
@@ -195,7 +195,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   },
 
   installUpdate: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
 
     let update = pendingUpdate
     if (update && pendingUpdateProxyKey !== getUpdateProxyKey()) {

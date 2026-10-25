@@ -5,7 +5,7 @@ import '@testing-library/jest-dom'
 
 const viewportMocks = vi.hoisted(() => ({
   isMobile: false,
-  isTauri: false,
+  isDesktop: false,
 }))
 
 const apiMocks = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ vi.mock('../../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../../lib/desktopRuntime', () => ({
-  isTauriRuntime: () => viewportMocks.isTauri,
+  isDesktopRuntime: () => viewportMocks.isDesktop,
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -109,7 +109,7 @@ async function openBranchMenu() {
 describe('RepositoryLaunchControls', () => {
   beforeEach(() => {
     viewportMocks.isMobile = false
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
     apiMocks.getRepositoryContext.mockReset()
     apiMocks.getRepositoryContext.mockResolvedValue(okRepositoryContext)
     Element.prototype.scrollIntoView = vi.fn()
@@ -138,7 +138,7 @@ describe('RepositoryLaunchControls', () => {
 
   it('uses the full-width mobile bottom sheet in H5 mobile browser mode', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
 
     renderControls()
 
@@ -150,9 +150,9 @@ describe('RepositoryLaunchControls', () => {
     expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
   })
 
-  it('does not use the H5 mobile sheet inside Tauri even on a narrow viewport', async () => {
+  it('does not use the H5 mobile sheet inside the desktop app even on a narrow viewport', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = true
+    viewportMocks.isDesktop = true
 
     renderControls()
 

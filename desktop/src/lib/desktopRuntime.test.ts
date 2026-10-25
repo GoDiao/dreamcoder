@@ -25,7 +25,7 @@ import {
   H5_TOKEN_STORAGE_KEY,
   initializeDesktopServerUrl,
   isLoopbackHostname,
-  isTauriRuntime,
+  isDesktopRuntime,
   requiresH5AuthForServerUrl,
   saveAndVerifyH5Connection,
 } from './desktopRuntime'
@@ -53,10 +53,10 @@ describe('desktopRuntime browser H5 bootstrap', () => {
   })
 
   it('treats the Electron preload bridge as a desktop shell', () => {
-    expect(isTauriRuntime()).toBe(false)
+    expect(isDesktopRuntime()).toBe(false)
     Object.assign(window, { [ELECTRON_BRIDGE_KEY]: {} })
     try {
-      expect(isTauriRuntime()).toBe(true)
+      expect(isDesktopRuntime()).toBe(true)
     } finally {
       delete (window as unknown as Record<string, unknown>)[ELECTRON_BRIDGE_KEY]
     }

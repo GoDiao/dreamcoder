@@ -28,7 +28,7 @@ describe('WindowControls', () => {
     isMaximized.mockClear()
     onResized.mockClear()
 
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })
@@ -40,14 +40,14 @@ describe('WindowControls', () => {
   })
 
   afterEach(() => {
-    Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
+    Reflect.deleteProperty(window, 'dreamcoderShell')
     Object.defineProperty(navigator, 'platform', {
       configurable: true,
       value: originalPlatform,
     })
   })
 
-  it('invokes Tauri window APIs for custom controls on Windows', async () => {
+  it('invokes shell window APIs for custom controls on Windows', async () => {
     const { WindowControls } = await import('./WindowControls')
 
     render(<WindowControls />)

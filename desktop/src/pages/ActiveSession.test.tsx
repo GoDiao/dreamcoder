@@ -8,22 +8,12 @@ const viewportMocks = vi.hoisted(() => ({
 }))
 
 const windowMocks = vi.hoisted(() => ({
-  tauri: false,
-  startDragging: vi.fn(() => Promise.resolve()),
-  toggleMaximize: vi.fn(() => Promise.resolve()),
+  desktop: false,
 }))
 
 vi.mock('../lib/desktopRuntime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/desktopRuntime')>()),
-  isTauriRuntime: () => windowMocks.tauri,
-}))
-
-vi.mock('../lib/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/shell')>()),
-  getAppWindow: async () => ({
-    startDragging: windowMocks.startDragging,
-    toggleMaximize: windowMocks.toggleMaximize,
-  }),
+  isDesktopRuntime: () => windowMocks.desktop,
 }))
 
 vi.mock('../hooks/useMobileViewport', () => ({
@@ -80,9 +70,7 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   viewportMocks.isMobile = false
-  windowMocks.tauri = false
-  windowMocks.startDragging.mockClear()
-  windowMocks.toggleMaximize.mockClear()
+  windowMocks.desktop = false
   useTabStore.setState({ tabs: [], activeTabId: null })
   useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
   useChatStore.setState({ sessions: {} })
@@ -873,8 +861,8 @@ describe('ActiveSession task polling', () => {
     expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()
   })
 
-  it('moves the window from anywhere on the header except its buttons', async () => {
-    windowMocks.tauri = true
+  it('makes the session header a window drag region', () => {
+    windowMocks.desktop = true
     const sessionId = 'drag-session'
     useSessionStore.setState({
       sessions: [{
@@ -897,21 +885,8 @@ describe('ActiveSession task polling', () => {
     })
 
     render(<ActiveSession />)
-    // The window module is loaded once on mount.
-    await act(async () => {
-      await import('../lib/shell')
-    })
 
-    fireEvent.mouseDown(screen.getByRole('heading', { name: 'Drag Session' }), { button: 0, detail: 1 })
-    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
-
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Terminal' }), { button: 0, detail: 1 })
-    fireEvent.mouseDown(screen.getByTestId('session-header'), { button: 2, detail: 1 })
-    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
-
-    fireEvent.mouseDown(screen.getByTestId('session-header'), { button: 0, detail: 2 })
-    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1)
-    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('session-header')).toHaveClass('window-drag-region')
   })
 
   it('hides the chat column while the panel is expanded and restores side by side', () => {

@@ -27,7 +27,7 @@ import {
   legacyTerminalConfigPath,
   PORTABLE_MARKER_ENV,
   setAppMode,
-  TAURI_IDENTIFIER,
+  APP_ID,
   WINDOW_STATE_FILE,
 } from './appMode'
 import { writeSessionExport } from './sessionExport'
@@ -45,6 +45,15 @@ const APP_SCHEME = 'dreamcoder'
 const APP_ORIGIN = `${APP_SCHEME}://localhost`
 const DEV_URL = process.env.DREAMCODER_ELECTRON_DEV_URL
 const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: http://127.0.0.1:* http://localhost:*",
+  "font-src 'self' data:",
+  "connect-src 'self' ws://127.0.0.1:* http://127.0.0.1:* ws://localhost:* http://localhost:*",
+  "media-src 'self' blob:",
+].join('; ')
 const WINDOW_STATE_SAVE_DELAY_MS = 300
 const IS_MAC = process.platform === 'darwin'
 const IS_WINDOWS = process.platform === 'win32'
@@ -75,6 +84,8 @@ function hostTriple() {
   if (process.platform === 'darwin' && process.arch === 'arm64') return 'aarch64-apple-darwin'
   if (process.platform === 'darwin' && process.arch === 'x64') return 'x86_64-apple-darwin'
   if (IS_WINDOWS && process.arch === 'x64') return 'x86_64-pc-windows-msvc'
+  if (process.platform === 'linux' && process.arch === 'x64') return 'x86_64-unknown-linux-gnu'
+  if (process.platform === 'linux' && process.arch === 'arm64') return 'aarch64-unknown-linux-gnu'
   throw new Error(`unsupported platform: ${process.platform}-${process.arch}`)
 }
 
@@ -94,24 +105,27 @@ function resolvePaths(): AppPaths {
     }
   }
   const desktopRoot = path.resolve(app.getAppPath(), '..')
-  const binDir = path.join(desktopRoot, 'src-tauri', 'binaries')
+  const binDir = path.join(desktopRoot, 'binaries')
   const dist = path.join(desktopRoot, 'dist')
   return {
     binary: path.join(binDir, `dreamcoder-sidecar-${hostTriple()}${exe}`),
     appRoot: binDir,
     h5DistDir: dist,
     webDist: dist,
-    trayIcon: path.join(desktopRoot, 'src-tauri', 'icons', '32x32.png'),
+    trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', 'tray.png'),
   }
 }
 
 function serveDist(webDist: string) {
-  protocol.handle(APP_SCHEME, (request) => {
+  protocol.handle(APP_SCHEME, async (request) => {
     const pathname = decodeURIComponent(new URL(request.url).pathname)
     const target = path.normalize(path.join(webDist, pathname))
     const inside = target.startsWith(webDist + path.sep)
     const file = inside && path.extname(target) ? target : path.join(webDist, 'index.html')
-    return net.fetch(pathToFileURL(file).toString())
+    const response = await net.fetch(pathToFileURL(file).toString())
+    const headers = new Headers(response.headers)
+    headers.set('Content-Security-Policy', CONTENT_SECURITY_POLICY)
+    return new Response(response.body, { status: response.status, headers })
   })
 }
 
@@ -359,6 +373,14 @@ function createWindow(startUrl: string) {
     event.preventDefault()
     void openExternal(url).catch((error) => console.error('[electron] open external failed', error))
   })
+  if (!app.isPackaged) {
+    win.webContents.on('before-input-event', (event, input) => {
+      const devToolsShortcut = input.key === 'F12' || ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i')
+      if (input.type !== 'keyDown' || !devToolsShortcut) return
+      event.preventDefault()
+      win.webContents.toggleDevTools()
+    })
+  }
   win.on('resize', () => emit('window-resized'))
   win.on('close', (event) => {
     saveWindowState()
@@ -379,7 +401,7 @@ function createWindow(startUrl: string) {
   void win.loadURL(startUrl)
 }
 
-if (IS_WINDOWS) app.setAppUserModelId(TAURI_IDENTIFIER)
+if (IS_WINDOWS) app.setAppUserModelId(APP_ID)
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()

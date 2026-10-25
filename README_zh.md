@@ -17,7 +17,7 @@
 
 [**⬇️ 下载 macOS 版（Apple Silicon）**](https://github.com/GoDiao/dreamcoder/releases/latest) · [**⬇️ 下载 Windows 版（x64）**](https://github.com/GoDiao/dreamcoder/releases/latest)
 
-[![Tauri 2](https://img.shields.io/badge/Tauri-2-blue)](https://v2.tauri.app/)
+[![Electron](https://img.shields.io/badge/Electron-45-47848F)](https://www.electronjs.org/)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
 [![Bun](https://img.shields.io/badge/Bun-✓-fbf0df)](https://bun.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
@@ -107,7 +107,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 | 组件 | 技术选型 |
 |------|----------|
-| 桌面外壳 | [Tauri 2](https://v2.tauri.app/) (Rust) |
+| 桌面外壳 | [Electron](https://www.electronjs.org/) |
 | 前端 UI | React 18 + Vite + TailwindCSS 4 |
 | 后端运行时 | Bun (Node.js 兼容) |
 | 终端 | sidecar 内的 Bun PTY + xterm.js |
@@ -124,9 +124,9 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 | macOS arm64   | ✅ 维护者日常开发平台                          | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest)（未签名）        |
 | Linux x64     | ⚠️ 暂未日常验证                                | ❌ 欢迎社区共同补齐                                    |
 
-> 维护者目前主要在 **macOS（Apple Silicon）** 上开发，从源码运行（`bun run tauri dev`），自 v0.5.0 起提供 `.dmg` 安装包。
+> 维护者目前主要在 **macOS（Apple Silicon）** 上开发，从源码运行（`bun run electron:dev`），自 v0.5.0 起提供 `.dmg` 安装包。
 > **Windows x64** 是此前的主力平台，经过长期实测；维护者现在不在 Windows 上日常开发，新改动在 Windows 上的表现尤其欢迎反馈。
-> **Linux** 代码中保留了 `#[cfg(target_os = "linux")]` 分支，但维护者并不日常使用，仍属于“代码已覆盖、体验待更多实机验证”的状态。
+> **Linux** 暂不构建安装包；从源码运行桌面端或许可行，但维护者并不日常使用，仍属于尽力支持的状态。
 > Ubuntu 浏览器版的验证范围、exFAT 依赖安装问题及本地 Ollama 调用结果见[Linux 验证报告](docs/LINUX_BROWSER_VALIDATION_zh.md)；启动、关闭和按 PID 终止进程的方法见[浏览器版使用指南](docs/WEB_USAGE_zh.md)。
 > 如果你正在使用 Windows 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
@@ -151,12 +151,11 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 ### 环境要求
 *   [Bun](https://bun.sh/) >= 1.0
-*   [Rust](https://www.rust-lang.org/tools/install)（用于构建桌面端）
 *   Node.js >= 18（部分依赖仍会用到）
 
 ### 安装与运行
 
-> macOS（Apple Silicon）和 Windows x64 的安装包在 [Releases](https://github.com/GoDiao/dreamcoder/releases/latest) 下载。安装包暂未签名，首次打开的方法见发布说明。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**以下步骤建议完整执行**，否则 `tauri dev` 往往会因为 sidecar 二进制、前端构建产物或 Tauri CLI 缺失而无法启动。
+> macOS（Apple Silicon）和 Windows x64 的安装包在 [Releases](https://github.com/GoDiao/dreamcoder/releases/latest) 下载。安装包暂未签名，首次打开的方法见发布说明。下面是从源码运行开发版的方法。这是一个 Bun monorepo（根目录与 `desktop/` 各自维护依赖）；**以下步骤请完整执行**，缺少 Electron 本体或 sidecar 二进制时 `electron:dev` 无法启动。
 
 ```bash
 # 0. 克隆仓库
@@ -166,22 +165,20 @@ cd dreamcoder
 # 1. 安装根工作区依赖（sidecar 运行时：Anthropic SDK / AWS SDK / ink 等）
 bun install
 
-# 2. 安装桌面端依赖（Tauri CLI + React 前端）
+# 2. 安装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
-# 3. 编译 sidecar 二进制
+# 3. 下载 Electron 本体（Bun 不会运行 Electron 的安装脚本）
+bun run electron:install
+
+# 4. 编译 sidecar 二进制
 bun run build:sidecars
 
-# 4. 构建一次前端（生成 desktop/dist；没有它 tauri dev 会报 resource path `../dist` doesn't exist）
-bun run build
-
-# 5. 启动桌面端开发模式
-bun run tauri dev
+# 5. 启动桌面端开发模式（同时启动 Vite 和 Electron）
+bun run electron:dev
 ```
 
-> **Linux 用户**：还需要先安装 WebKitGTK、libappindicator、librsvg 等系统依赖，
-> 详见 [Tauri 官方 prerequisites](https://v2.tauri.app/start/prerequisites/)。
-> 如果你愿意补充发行版对应命令，欢迎直接提交 PR。
+> 构建当前平台的安装包：`bun run electron:pack`，产物在 `desktop/electron-release/`。
 
 ### 配置 AI 模型
 

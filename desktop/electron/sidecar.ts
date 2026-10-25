@@ -50,9 +50,11 @@ function canConnect(port: number): Promise<boolean> {
   })
 }
 
-async function waitForServer(port: number, child: ChildProcess) {
+async function waitForServer(port: number, child: ChildProcess, spawnError: () => Error | null) {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS
   while (Date.now() < deadline) {
+    const error = spawnError()
+    if (error) throw new Error(`sidecar failed to start: ${error.message}`)
     if (child.exitCode !== null) throw new Error(`sidecar exited with code ${child.exitCode}`)
     if (await canConnect(port)) return
     await new Promise((resolve) => setTimeout(resolve, 150))
@@ -96,12 +98,17 @@ export async function startSidecar(paths: SidecarPaths, appVersion: string, lega
   }
   child.stdout?.on('data', record('stdout'))
   child.stderr?.on('data', record('stderr'))
+  let spawnError: Error | null = null
+  child.once('error', (error) => {
+    spawnError = error
+    console.error('[claude-server] sidecar failed to start', error)
+  })
   child.once('exit', (code, signal) => {
     console.error(`[claude-server] sidecar exited (code=${code}, signal=${signal})`)
   })
 
   try {
-    await waitForServer(port, child)
+    await waitForServer(port, child, () => spawnError)
   } catch (error) {
     child.kill()
     const message = error instanceof Error ? error.message : String(error)

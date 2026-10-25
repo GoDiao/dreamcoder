@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { pickDirectory } from '../../lib/shell'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { createPortal } from 'react-dom'
 import { sessionsApi, type RecentProject } from '../../api/sessions'
 import { filesystemApi } from '../../api/filesystem'
@@ -44,7 +44,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number; direction: 'up' | 'down' } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const isMobileBrowser = useMobileViewport() && !isTauriRuntime()
+  const isMobileBrowser = useMobileViewport() && !isDesktopRuntime()
 
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -124,7 +124,7 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
   }
 
   const handleChooseFolder = async () => {
-    if (isTauriRuntime()) {
+    if (isDesktopRuntime()) {
       setIsOpen(false)
       try {
         const selected = await pickDirectory({

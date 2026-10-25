@@ -23,22 +23,6 @@ const jsonVersionSet = (content: string, version: string) =>
 const VERSION_FILES = [
   { path: 'package.json', update: replaceJsonVersion, updated: jsonVersionSet },
   { path: 'desktop/package.json', update: replaceJsonVersion, updated: jsonVersionSet },
-  { path: 'desktop/src-tauri/tauri.conf.json', update: replaceJsonVersion, updated: jsonVersionSet },
-  {
-    path: 'desktop/src-tauri/Cargo.toml',
-    update: (content: string, version: string) =>
-      content.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`),
-    updated: (content: string, version: string) =>
-      content.match(/^version\s*=\s*"([^"]*)"/m)?.[1] === version,
-  },
-  {
-    // Only the app's own entry; the dependency versions stay as locked.
-    path: 'desktop/src-tauri/Cargo.lock',
-    update: (content: string, version: string) =>
-      content.replace(/(name = "dreamcoder-desktop"\r?\nversion = )"[^"]*"/, `$1"${version}"`),
-    updated: (content: string, version: string) =>
-      content.match(/name = "dreamcoder-desktop"\r?\nversion = "([^"]*)"/)?.[1] === version,
-  },
 ]
 
 function getCurrentVersion(): string {

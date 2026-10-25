@@ -4,11 +4,10 @@ import { hostRipgrepTarget, prepareRipgrep } from '../../scripts/prepare-ripgrep
 
 const desktopRoot = path.resolve(import.meta.dir, '..')
 const repoRoot = path.resolve(desktopRoot, '..')
-const binariesDir = path.join(desktopRoot, 'src-tauri', 'binaries')
+const binariesDir = path.join(desktopRoot, 'binaries')
 
 const targetTriple =
-  process.env.TAURI_ENV_TARGET_TRIPLE ||
-  process.env.CARGO_BUILD_TARGET ||
+  process.env.DREAMCODER_TARGET_TRIPLE ||
   hostRipgrepTarget()
 
 const bunTarget = mapTargetTripleToBun(targetTriple)

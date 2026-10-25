@@ -19,10 +19,8 @@ const mocks = vi.hoisted(() => ({
   wsSend: vi.fn(),
   wsDisconnect: vi.fn(),
   dialogOpen: vi.fn(),
-  webviewDragHandlers: [] as Array<(event: { payload: unknown }) => void>,
-  webviewUnlisten: vi.fn(),
   isMobile: false,
-  isTauriRuntime: false,
+  isDesktopRuntime: false,
 }))
 
 vi.mock('../api/sessions', () => ({
@@ -70,16 +68,13 @@ vi.mock('../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../lib/desktopRuntime', () => ({
-  isTauriRuntime: () => mocks.isTauriRuntime,
+  isDesktopRuntime: () => mocks.isDesktopRuntime,
 }))
 
 vi.mock('../lib/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/shell')>()),
   pickFiles: mocks.dialogOpen,
-  onFileDrop: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
-    mocks.webviewDragHandlers.push(handler)
-    return mocks.webviewUnlisten
-  }),
+  getFilePath: (file: File) => (file as File & { path?: string }).path,
 }))
 
 vi.mock('../components/shared/DirectoryPicker', () => ({
@@ -175,9 +170,8 @@ describe('EmptySession', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.webviewDragHandlers.length = 0
     mocks.isMobile = false
-    mocks.isTauriRuntime = false
+    mocks.isDesktopRuntime = false
     useSettingsStore.setState({ locale: 'en', activeProviderName: null })
     useSessionStore.setState(initialSessionState, true)
     useChatStore.setState(initialChatState, true)
@@ -531,7 +525,7 @@ describe('EmptySession', () => {
   })
 
   it('uses native desktop file paths for draft attachments', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     mocks.dialogOpen.mockResolvedValueOnce([
       'C:\\Users\\Nanmi\\Desktop\\huge-a.log',
       '/Users/nanmi/tmp/huge-b.zip',
@@ -575,7 +569,7 @@ describe('EmptySession', () => {
   })
 
   it('shows a drop affordance and sends dropped desktop files as path attachments', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     const droppedFile = new File(['large file'], 'ignored-name.log', { type: 'text/plain' })
     Object.defineProperty(droppedFile, 'path', {
       configurable: true,

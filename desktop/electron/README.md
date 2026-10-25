@@ -1,41 +1,41 @@
-# Electron shell (spike)
+# Electron shell
 
-RFC #174 step 3. An Electron main process that runs the same frontend and the same Bun sidecar as the Tauri shell. The Tauri build is unchanged; the Electron build is selected at build time.
+The desktop app is an Electron main process that starts the Bun sidecar (`src/server`) and shows the React frontend (`desktop/src`) in one window. The main process only does OS-level work: windows, menus, tray, notifications, dialogs, single instance, app mode. Everything else lives in the sidecar.
 
-## How the shell is selected
+## How the page talks to the shell
 
-`desktop/src/lib/shell/index.ts` is the Tauri implementation. `desktop/src/lib/shell/electron.ts` implements the same exports over the preload bridge (`window.dreamcoderShell`). When Vite runs with `DREAMCODER_SHELL=electron`, a resolver plugin in `vite.config.ts` swaps every import of `lib/shell/index.ts` for `lib/shell/electron.ts`. Without it nothing changes. `electron.test.ts` fails if the two modules stop exporting the same names and types.
+`preload.ts` exposes `window.dreamcoderShell` with `contextBridge`: `invoke(command, args)`, `listen(event, handler)` and `pathForFile(file)`. The renderer runs with `contextIsolation` and `sandbox`, without Node. `desktop/src/lib/shell/index.ts` is the only module in the page that uses the bridge; components import from `lib/shell`. `main.ts` answers `shell:invoke` only from the main window, and errors come back without Electron's IPC prefix.
 
 ## Files
 
-- `main.ts`: starts the sidecar, opens the window, serves `dist/` on `dreamcoder://localhost` in production, and answers `shell:invoke` calls.
-- `sidecar.ts`: reserves a port and starts `dreamcoder-sidecar server --app-root … --host 0.0.0.0 --port …` with the same environment as the Tauri shell, waits until the port accepts connections, and passes the recent logs on failure. The sidecar is killed on quit, and `DREAMCODER_PARENT_PID` lets it exit on its own if the main process dies.
-- `preload.ts`: exposes `invoke` and `listen` with `contextBridge`. The renderer runs with `contextIsolation` and `sandbox`.
+- `main.ts`: resolves the config directory and portable mode, starts the sidecar, opens the window (on the Vite dev server or on `dist/` through `dreamcoder://localhost` with a content security policy), the macOS menu, the tray, notifications and the `shell:invoke` handlers.
+- `sidecar.ts`: reserves a port and starts `dreamcoder-sidecar server --app-root … --host 0.0.0.0 --port …`, waits until the port accepts connections and passes recent logs on failure. The sidecar is stopped on quit (the whole process tree on Windows), and `DREAMCODER_PARENT_PID` lets it exit on its own if the main process dies.
+- `appMode.ts`: portable mode. `app-mode.json` and `window-state.json` stay where the Tauri shell kept them (next to the executable in `CLAUDE_CONFIG_DIR`, or in the `com.dreamcoder.desktop` app config directory), so app mode and the window position carry over. With a config directory, Chromium's data goes to `<config>/Electron`.
+- `windowState.ts`: window bounds in physical pixels, restored only when they fit on a display.
+- `sessionExport.ts`: writes session exports to the path picked in the save dialog (`.md`, `.markdown`, `.json`).
+- `build/`: entitlements for the hardened runtime (the sidecar needs JIT), the NSIS hooks that stop running sidecars, the app icons and their sources.
 - `../scripts/build-electron.ts`: bundles `main.ts` and `preload.ts` to `electron-dist/` and writes the app's `package.json` there.
-- `../electron-builder.json`: macOS arm64 `.dmg`. `dist/`, the sidecar and `rg` go to `Contents/Resources`.
+- `../scripts/electron-dev.ts`: `bun run electron:dev`, which starts Vite and Electron together.
+- `../electron-builder.json`: the macOS arm64 `.dmg` and the Windows x64 NSIS installer. `dist/`, the sidecar and `rg` go to `Resources`; the sidecar and `rg` sit side by side in `Resources/bin`.
 
 ## Run
 
-Build the sidecar first (`bun run build:sidecars`, needs `rustc` on `PATH` for the host triple).
-
-Development, against the Vite dev server:
+From `desktop/`, after `bun install`:
 
 ```bash
-DREAMCODER_SHELL=electron bun run dev
-bun run electron:dev
+bun run electron:install   # once: download the Electron binary
+bun run build:sidecars     # build the sidecar and stage ripgrep in desktop/binaries
+bun run electron:dev       # Vite on port 1420 plus Electron
 ```
 
-Production build without packaging:
+`bun run build && bun run electron:start` runs the built frontend without packaging. In development builds, F12 or Ctrl/Cmd+Shift+I opens the developer tools.
 
-```bash
-DREAMCODER_SHELL=electron bun run build
-bun run electron:start
-```
-
-Packaged, unsigned `.dmg` in `electron-release/`:
+## Package
 
 ```bash
 bun run electron:pack
 ```
 
-Electron downloads its binary on install. Set `ELECTRON_CACHE` and `electron_config_cache` to `desktop/.electron-cache` to keep it inside the checkout, then run `node node_modules/electron/install.js` (Bun does not run Electron's install script).
+It builds the frontend, the sidecar and the main process, then the installer for the current platform in `electron-release/`. Local macOS builds are ad-hoc signed. The release workflow signs and notarizes when the signing secrets are set (see `.github/workflows/release.yml`).
+
+electron-builder downloads helper tools (dmgbuild on macOS, NSIS on Windows) into its cache. To keep them inside the checkout, set `ELECTRON_BUILDER_CACHE=$PWD/.electron-cache/builder` for the build. `ELECTRON_CACHE` does the same for `electron:install`. Both folders are Git-ignored.

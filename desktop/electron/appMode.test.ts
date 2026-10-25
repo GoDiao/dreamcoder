@@ -10,6 +10,7 @@ import {
   determineStartupPortableDir,
   dirHasPortableData,
   legacyTerminalConfigPath,
+  PORTABLE_DIR_NAME,
   readAppModeConfig,
   setAppMode,
   type AppModeLocations,
@@ -35,7 +36,7 @@ afterEach(() => {
 describe('app mode locations', () => {
   it('uses the folder next to the executable and the Tauri app config dir', () => {
     expect(locations).toEqual({
-      defaultPortableDir: path.join(root, 'app', 'CLAUDE_CONFIG_DIR'),
+      defaultPortableDir: path.join(root, 'app', PORTABLE_DIR_NAME),
       systemConfigDir: path.join(root, 'appdata', 'com.dreamcoder.desktop'),
     })
   })

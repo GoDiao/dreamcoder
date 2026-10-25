@@ -9,7 +9,7 @@ import { useUpdateStore } from '../../stores/updateStore'
 describe('UpdateChecker', () => {
   beforeEach(() => {
     useSettingsStore.setState({ locale: 'en' })
-    Object.defineProperty(window, '__TAURI__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       value: {},
       configurable: true,
     })

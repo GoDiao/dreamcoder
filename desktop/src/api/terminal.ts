@@ -1,4 +1,4 @@
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import { api, getAuthToken, getBaseUrl } from './client'
 
 export type TerminalShellDetection = { shell: string; platform: 'windows' | 'macos' | 'linux' }
@@ -33,7 +33,7 @@ export type OpenTerminalInput = {
 }
 
 function requireDesktop() {
-  if (!isTauriRuntime()) {
+  if (!isDesktopRuntime()) {
     throw new Error('Terminal is available in the desktop app runtime.')
   }
 }
@@ -107,7 +107,7 @@ async function openTerminal(input: OpenTerminalInput): Promise<TerminalConnectio
 }
 
 export const terminalApi = {
-  isAvailable: isTauriRuntime,
+  isAvailable: isDesktopRuntime,
 
   open: openTerminal,
 

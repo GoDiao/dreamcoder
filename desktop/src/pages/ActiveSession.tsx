@@ -26,10 +26,9 @@ import { TeamStatusBar } from '../components/teams/TeamStatusBar'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport } from '../hooks/useMobileViewport'
-import { useWindowDrag } from '../hooks/useWindowDrag'
 import { Spinner } from '../components/shared/Spinner'
 import { isMacOverlayTitlebar } from '../lib/windowChrome'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 
 const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
 
@@ -234,7 +233,7 @@ function getSessionProjectName(session: SessionListItem | undefined, repoName: s
 }
 
 export function ActiveSession() {
-  const isMobileLayout = useMobileViewport() && !isTauriRuntime()
+  const isMobileLayout = useMobileViewport() && !isDesktopRuntime()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const activeTabType = useTabStore((s) => s.tabs.find((tab) => tab.sessionId === s.activeTabId)?.type ?? null)
   const sessions = useSessionStore((s) => s.sessions)
@@ -261,7 +260,6 @@ export function ActiveSession() {
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const activeTeam = useTeamStore((s) => s.activeTeam)
   const isMemberSession = !!memberInfo
-  const handleHeaderDrag = useWindowDrag()
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   // On macOS the header is the window's title row. With the sidebar hidden it
   // starts at the window's edge, under the traffic lights and the sidebar toggle.
@@ -349,7 +347,6 @@ export function ActiveSession() {
       {showHeader && (
         <header
           data-testid="session-header"
-          onMouseDown={handleHeaderDrag}
           style={headerStyle}
           className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${macTitlebar ? '' : 'h-11'}`}
         >
@@ -369,7 +366,7 @@ export function ActiveSession() {
           </div>
           {canUsePanel && (
             <div className="flex shrink-0 items-center gap-[3px]">
-              {isTauriRuntime() && <OpenProjectMenu path={openProjectPath} />}
+              {isDesktopRuntime() && <OpenProjectMenu path={openProjectPath} />}
               <HeaderIconButton
                 label={t('session.header.terminal')}
                 pressed={showPanel && panelTab === 'terminal'}

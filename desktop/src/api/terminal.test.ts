@@ -3,7 +3,7 @@ import { buildTerminalSocketUrl, terminalApi, type OpenTerminalInput, type Termi
 import { setAuthToken, setBaseUrl } from './client'
 
 const runtime = vi.hoisted(() => ({ desktop: true, get: vi.fn(), post: vi.fn() }))
-vi.mock('../lib/desktopRuntime', () => ({ isTauriRuntime: () => runtime.desktop }))
+vi.mock('../lib/desktopRuntime', () => ({ isDesktopRuntime: () => runtime.desktop }))
 vi.mock('./client', async (importOriginal) => {
   const original = await importOriginal<typeof import('./client')>()
   return { ...original, api: { ...original.api, get: runtime.get, post: runtime.post } }

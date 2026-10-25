@@ -7,7 +7,7 @@ export const PORTABLE_DIR_NAME = 'CLAUDE_CONFIG_DIR'
 export const APP_MODE_FILE = 'app-mode.json'
 export const WINDOW_STATE_FILE = 'window-state.json'
 export const TERMINAL_CONFIG_FILE = 'terminal-config.json'
-export const TAURI_IDENTIFIER = 'com.dreamcoder.desktop'
+export const APP_ID = 'com.dreamcoder.desktop'
 
 export type AppMode = 'default' | 'portable'
 
@@ -27,7 +27,7 @@ const PORTABLE_DATA_DIRS = ['Cache', 'EBWebView', 'projects', 'skills', 'plugins
 export function appModeLocations(executablePath: string, appDataDir: string): AppModeLocations {
   return {
     defaultPortableDir: path.join(path.dirname(executablePath), PORTABLE_DIR_NAME),
-    systemConfigDir: path.join(appDataDir, TAURI_IDENTIFIER),
+    systemConfigDir: path.join(appDataDir, APP_ID),
   }
 }
 

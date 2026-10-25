@@ -78,7 +78,7 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('sends through the Tauri plugin when native notification permission is already granted', async () => {
+  it('sends through the shell notification API when native notification permission is already granted', async () => {
     notificationPluginMock.isPermissionGranted.mockResolvedValue(true)
 
     notifyDesktop({
@@ -96,7 +96,7 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('passes notification targets through the Tauri plugin payload', async () => {
+  it('passes notification targets through the shell notification payload', async () => {
     notificationPluginMock.isPermissionGranted.mockResolvedValue(true)
     const target = { type: 'session' as const, sessionId: 'session-1', title: 'Build fix' }
 
@@ -194,7 +194,7 @@ describe('desktopNotifications', () => {
     warnSpy.mockRestore()
   })
 
-  it('does not fall back to the Tauri plugin when the macOS bridge fails', async () => {
+  it('does not fall back to the shell notification API when the macOS bridge fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     Object.defineProperty(navigator, 'platform', {
       configurable: true,
@@ -319,7 +319,7 @@ describe('desktopNotifications', () => {
     expect(notificationPluginMock.requestPermission).not.toHaveBeenCalled()
   })
 
-  it('does not use the Tauri plugin permission fallback on macOS bridge errors', async () => {
+  it('does not use the shell permission fallback on macOS bridge errors', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     Object.defineProperty(navigator, 'platform', {
       configurable: true,

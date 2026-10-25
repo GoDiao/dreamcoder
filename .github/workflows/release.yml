@@ -79,12 +79,12 @@ jobs:
         run: |
           bun install --frozen-lockfile
           cd desktop && bun install --frozen-lockfile
-          node node_modules/electron/install.js
+          bun run electron:install
 
       - name: Build the app
         working-directory: desktop
         run: |
-          DREAMCODER_SHELL=electron bun run build
+          bun run build
           bun run build:sidecars
           bun run build:electron
 

@@ -5,7 +5,7 @@ Guidance for coding agents (and humans) working on DreamCoder. Setup, build orde
 ## Project layout
 
 - `desktop/src`: desktop UI, React with zustand stores (`desktop/src/stores`).
-- `desktop/src-tauri`: the Tauri app in Rust.
+- `desktop/electron`: the Electron main process and preload. The page reaches it only through `desktop/src/lib/shell`.
 - `src/server`: the Bun server that runs as the app's sidecar. It starts one CLI process per session.
 - `src`: the CLI, derived from Claude Code. The app drives it in `--print` stream-json mode.
 - Session state lives on the server. The desktop app and the H5 page mirror it. New session state belongs in the server state store, not only in a client store. See [docs/session-state-tech-design.md](docs/session-state-tech-design.md).
@@ -34,7 +34,7 @@ bun run test -- --run       # desktop tests (vitest)
 - **Reuse before you write.** Search for an existing helper, hook or component before adding one. UI building blocks live in `desktop/src/components/shared` (`Button`, `Dropdown`, `Modal`, `Switch`, …); HTTP calls go through `desktop/src/api`.
 - **Don't duplicate logic.** If the same logic appears a second time, extract it into a function or hook in the module that owns that concept, and make both callers use it. Don't copy a block and tweak it.
 - **One source of truth.** Don't keep a second copy of state that is owned elsewhere. Derive values instead of storing them (e.g. compute elapsed time from the turn's start time instead of counting in the store). Session state is owned by the server; clients read it.
-- **One place per concern.** The sidecar owns business logic and configuration. The Rust shell in `desktop/src-tauri` only does OS-level work (windows, tray, updater, notifications, single instance) and asks the sidecar for anything else instead of computing it again.
+- **One place per concern.** The sidecar owns business logic and configuration. The Electron main process in `desktop/electron` only does OS-level work (windows, tray, menus, notifications, single instance, dialogs) and asks the sidecar for anything else instead of computing it again.
 - **Change the layer that owns the behavior.** UI components don't call the server directly; they go through stores and `desktop/src/api`. Server route and WebSocket handlers stay thin and call services in `src/server/services` and `src/server/session`. Session state changes go through the reducer in `src/server/session/state`.
 - **Fix the cause, not the symptom.** Don't add a flag, retry or special case to hide a bug you haven't explained.
 - **Keep the change as small as the problem.** No speculative abstractions, options or extension points. When new code replaces old code, delete the old path in the same PR instead of leaving both.

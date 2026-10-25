@@ -106,7 +106,7 @@ describe('TerminalSettings', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   })
 
-  it('shows a desktop-runtime empty state outside Tauri', () => {
+  it('shows a desktop-runtime empty state outside the desktop app', () => {
     render(<TerminalSettings />)
 
     expect(screen.getByTestId('settings-terminal-toolbar')).toHaveTextContent('Terminal')
@@ -114,7 +114,7 @@ describe('TerminalSettings', () => {
     expect(terminalMocks.open).not.toHaveBeenCalled()
   })
 
-  it('starts a host terminal session when Tauri is available', async () => {
+  it('starts a host terminal session in the desktop app', async () => {
     terminalMocks.available = true
 
     render(<TerminalSettings />)

@@ -21,9 +21,9 @@ describe('h5AccessPolicy', () => {
     expect(isLoopbackHost('192.168.0.20')).toBe(false)
   })
 
-  test('keeps Tauri WebView requests to loopback tokenless', () => {
+  test('keeps desktop app requests to loopback tokenless', () => {
     const request = req('http://127.0.0.1:3456/api/status', {
-      headers: { Origin: 'http://tauri.localhost' },
+      headers: { Origin: 'dreamcoder://localhost' },
     })
     expect(classifyH5Request(request, new URL(request.url), localContext)).toBe('local-trusted')
     expect(shouldRequireH5Token({ request, url: new URL(request.url), h5Enabled: true, context: localContext })).toBe(false)
@@ -70,7 +70,7 @@ describe('h5AccessPolicy', () => {
   })
 
   test('keeps local desktop chat websocket routes tokenless', () => {
-    for (const init of [{}, { headers: { Origin: 'http://tauri.localhost' } }]) {
+    for (const init of [{}, { headers: { Origin: 'dreamcoder://localhost' } }]) {
       const request = req('http://127.0.0.1:3456/ws/session-1', init)
       expect(classifyH5Request(request, new URL(request.url), localContext)).toBe('local-trusted')
       expect(shouldRequireH5Token({ request, url: new URL(request.url), h5Enabled: true, context: localContext })).toBe(false)

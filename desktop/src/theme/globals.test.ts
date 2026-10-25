@@ -155,3 +155,10 @@ it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary but
     expect(contrast, `${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5)
   }
 })
+
+describe('window drag regions', () => {
+  it('drag the window from title areas but leave their controls clickable', () => {
+    expect(normalizedCss).toMatch(/\.window-drag-region \{\s*-webkit-app-region: drag;\s*app-region: drag;\s*\}/)
+    expect(normalizedCss).toMatch(/\.window-drag-region :is\(button, input, textarea, select, a, \[role="button"\][^)]*\) \{\s*-webkit-app-region: no-drag;\s*app-region: no-drag;\s*\}/)
+  })
+})

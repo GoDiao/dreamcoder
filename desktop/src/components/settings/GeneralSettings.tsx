@@ -14,7 +14,7 @@ import { terminalApi } from '../../api/terminal'
 import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
 import { TerminalShellSettings } from './TerminalShellSettings'
 import { ProxyConfigForm } from './ProxyConfigForm'
@@ -109,7 +109,7 @@ export function GeneralSettings() {
   }, [])
 
   useEffect(() => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     void fetchAppMode()
   }, [fetchAppMode])
 
@@ -386,7 +386,7 @@ export function GeneralSettings() {
     modeActionRunning ||
     (storageChoice === appMode.mode &&
       (storageChoice === 'default' || portableDirDraft.trim() === (appMode.portableDir ?? '')))
-  const showShellRow = isTauriRuntime() && terminalApi.isAvailable()
+  const showShellRow = isDesktopRuntime() && terminalApi.isAvailable()
 
   return (
     <div>
@@ -729,7 +729,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && (
+        {isDesktopRuntime() && (
           <SettingsDisclosureRow title={t('settings.general.storageTitle')} summary={storageSummary}>
             <SettingsRow
               title={t('settings.general.storageMode')}
@@ -836,7 +836,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && <ClaudeCodeImportSettings />}
+        {isDesktopRuntime() && <ClaudeCodeImportSettings />}
       </SettingsGroup>
 
       <ConfirmDialog
