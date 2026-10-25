@@ -252,7 +252,7 @@ export function AppShell() {
     <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
       {macTitlebar ? (
         <TitlebarSidebarToggle
-          className="fixed z-[60]"
+          className="window-no-drag fixed z-[60]"
           style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
         />
       ) : null}

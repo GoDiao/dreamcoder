@@ -140,7 +140,7 @@ export function Settings() {
       </nav>
 
       <div
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-10 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-14 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
       >
         <div className={`max-w-[760px] motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
           {activeTab === 'providers' && <ProviderSettings />}

@@ -18,6 +18,11 @@ All notable changes to DreamCoder will be documented in this file.
 - **Auto-compact at 90% of the context window** (#105). Long conversations are compacted at 90% of the model's context window, after the room kept for the summary, instead of about 33K tokens before it is full. A 1M model now compacts around 882K tokens instead of 967K, and a 200K model around 162K instead of 167K. Settings → General → Auto-compact sets a different percentage for every session. The provider form no longer has "Unknown Model Fallback Window": despite its name it replaced the window of every model of the provider when deciding when to compact. A value saved there is dropped.
 - Typing in a dialog no longer lights up the dialog's whole border; only the focused field is highlighted.
 
+### Fixed
+
+- Opening a memory file from a chat link no longer shows "An unexpected error occurred" when the file does not exist yet. The memory page selects the project and shows that it has no memory files.
+- The close button of the settings window no longer covers the buttons at the top right of a settings page, such as Add Provider.
+
 ## [0.7.0] — 2026-10-25
 
 ### Changed

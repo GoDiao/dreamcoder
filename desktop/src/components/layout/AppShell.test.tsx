@@ -310,6 +310,7 @@ describe('AppShell boot flow', () => {
     render(<AppShell />)
     const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
     expect(toggle.style.left).toBe('var(--traffic-lights-end)')
+    expect(toggle).toHaveClass('window-no-drag')
     expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
   })
 

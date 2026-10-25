@@ -31,6 +31,7 @@ export function MemorySettings() {
     selectProject,
     fetchFiles,
     openFile,
+    openListedFile,
     updateDraft,
     saveFile,
   } = useMemoryStore()
@@ -102,13 +103,13 @@ export function MemorySettings() {
       setPendingMemoryPath(null)
       return
     }
-    void openFile(target.projectId, target.path).then(() => {
+    void openListedFile(target.projectId, target.path).then(() => {
       setPendingMemoryPath(null)
     })
   }, [
     isLoadingFile,
     isLoadingProjects,
-    openFile,
+    openListedFile,
     pendingMemoryPath,
     projects,
     selectProject,

@@ -1244,7 +1244,8 @@ html, body, #root {
   app-region: drag;
 }
 
-.window-drag-region :is(button, input, textarea, select, a, [role="button"], [role="tab"], [role="menu"], [role="dialog"]) {
+.window-drag-region :is(button, input, textarea, select, a, [role="button"], [role="tab"], [role="menu"], [role="dialog"]),
+.window-no-drag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

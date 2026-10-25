@@ -352,7 +352,7 @@ function createWindow(startUrl: string) {
     minHeight: MIN_WINDOW_HEIGHT,
     show: false,
     ...(IS_MAC
-      ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 16, y: 24 } }
+      ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 16, y: 15 } }
       : { frame: !IS_WINDOWS }),
     acceptFirstMouse: true,
     webPreferences: {

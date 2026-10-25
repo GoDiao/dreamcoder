@@ -19,6 +19,7 @@ type MemoryStore = {
   selectProject: (projectId: string) => void
   fetchFiles: (projectId: string) => Promise<void>
   openFile: (projectId: string, path: string) => Promise<void>
+  openListedFile: (projectId: string, path: string) => Promise<void>
   updateDraft: (content: string) => void
   saveFile: () => Promise<void>
   createFile: (projectId: string, path: string, content: string) => Promise<void>
@@ -78,6 +79,13 @@ export const useMemoryStore = create<MemoryStore>((set, get) => ({
       })
     } catch (err) {
       set({ error: (err as Error).message, isLoadingFiles: false })
+    }
+  },
+
+  openListedFile: async (projectId, path) => {
+    await get().fetchFiles(projectId)
+    if (get().files.some((file) => file.path === path)) {
+      await get().openFile(projectId, path)
     }
   },
 
