@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle.
+
 ## [0.7.0] — 2026-10-25
 
 ### Changed
