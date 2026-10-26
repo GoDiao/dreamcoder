@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
+
 ## [0.8.0-beta.1] — 2026-10-26
 
 A pre-release of the Electron desktop app. Windows has not been tested on real machines yet; reports are welcome in the Windows testing issue.

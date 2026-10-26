@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -275,6 +275,91 @@ describe('titleService', () => {
       expect(requestBody?.messages?.[0]?.content).toBe('/frontend-design @website 重新设计首页')
     } finally {
       server.stop(true)
+    }
+  })
+
+  async function writeLoggedProvider(port: number): Promise<void> {
+    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'dreamcoder', 'providers.json'),
+      JSON.stringify({
+        activeId: 'logged-provider',
+        providers: [
+          {
+            id: 'logged-provider',
+            presetId: 'custom',
+            name: 'Logged provider',
+            apiKey: 'test-key',
+            baseUrl: `http://127.0.0.1:${port}/anthropic`,
+            apiFormat: 'anthropic',
+            models: [{ id: 'logged-model' }],
+          },
+        ],
+      }, null, 2),
+    )
+  }
+
+  test('logs why the title request failed upstream', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return new Response('{"error":{"message":"unknown model logged-model"}}', { status: 400 })
+      },
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await writeLoggedProvider(server.port)
+      await expect(generateTitle('explain this', undefined, undefined, 'session-1')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-1')
+      expect(logged).toContain('logged-provider')
+      expect(logged).toContain('logged-model')
+      expect(logged).toContain('HTTP 400')
+      expect(logged).toContain('unknown model logged-model')
+    } finally {
+      warn.mockRestore()
+      server.stop(true)
+    }
+  })
+
+  test('logs the reply when it is not a usable title', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: 'Sure, here is how the parser works: it reads the file line by line.' }],
+        })
+      },
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await writeLoggedProvider(server.port)
+      await expect(generateTitle('explain this', undefined, undefined, 'session-2')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-2')
+      expect(logged).toContain('reply is not a title')
+      expect(logged).toContain('Sure, here is how the parser works')
+    } finally {
+      warn.mockRestore()
+      server.stop(true)
+    }
+  })
+
+  test('logs when no provider is configured', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await expect(generateTitle('explain this', undefined, undefined, 'session-3')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-3')
+      expect(logged).toContain('no provider')
+    } finally {
+      warn.mockRestore()
     }
   })
 
