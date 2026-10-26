@@ -1039,8 +1039,6 @@ async function getRuntimeSettings(sessionId: string): Promise<RuntimeSettings> {
 
 async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
   const runtimeOverride = sessionId ? store.peek(sessionId)?.runtime.desired : undefined
-  // A null provider used to mean the official sign-in, which is gone; such an
-  // override falls back to the default settings.
   if (runtimeOverride?.providerId === null) {
     return getDefaultRuntimeSettings()
   }
