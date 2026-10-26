@@ -798,7 +798,7 @@ function triggerTitleGeneration(sessionId: string): void {
         }
       }
 
-      const aiTitle = await generateTitle(text, runtimeProviderId, runtimeModel)
+      const aiTitle = await generateTitle(text, runtimeProviderId, runtimeModel, sessionId)
       if (aiTitle) {
         const saved = await saveAiTitle(sessionId, aiTitle)
         if (!saved) {
