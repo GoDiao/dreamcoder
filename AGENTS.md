@@ -38,6 +38,7 @@ bun run test -- --run       # desktop tests (vitest)
 - **Change the layer that owns the behavior.** UI components don't call the server directly; they go through stores and `desktop/src/api`. Server route and WebSocket handlers stay thin and call services in `src/server/services` and `src/server/session`. Session state changes go through the reducer in `src/server/session/state`.
 - **Fix the cause, not the symptom.** Don't add a flag, retry or special case to hide a bug you haven't explained.
 - **Keep the change as small as the problem.** No speculative abstractions, options or extension points. When new code replaces old code, delete the old path in the same PR instead of leaving both.
+- **Migrate the callers, don't wrap the new code.** When you replace a library or component, update its call sites and delete the old one. Don't keep the old component as an adapter that only renames props or passes them through. That leaves two entry points for one concept. A wrapper must compose several parts or add behavior.
 - **Protocol changes update both sides.** When a message or API shape changes, update the server, the desktop app, the H5 page and their types together.
 - **Don't swallow errors.** Surface them to the user with an i18n message, or log them with enough context to debug; never an empty `catch`.
 - **Keep rendering cheap.** No work in render that grows with the length of a session, and no store writes on a timer or on every stream chunk unless they are batched.
