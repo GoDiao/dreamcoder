@@ -6,6 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).
 - When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
 
 ## [0.8.0-beta.1] — 2026-10-26

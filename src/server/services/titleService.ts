@@ -57,7 +57,6 @@ export async function generateTitle(
 
   try {
     const providerService = new ProviderService()
-    if (providerId === null) return fail('no provider')
 
     let resolvedProvider = providerId
       ? await providerService.getProvider(providerId)

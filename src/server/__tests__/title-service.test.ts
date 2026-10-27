@@ -299,6 +299,30 @@ describe('titleService', () => {
     )
   }
 
+  test('uses the active provider for an effort-only runtime selection', async () => {
+    let requestBody: Record<string, unknown> | null = null
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        requestBody = await req.json() as Record<string, unknown>
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
+        })
+      },
+    })
+
+    try {
+      await writeLoggedProvider(server.port)
+
+      await expect(generateTitle('explain this', null, '')).resolves.toBe('Trace ok')
+      expect(requestBody?.model).toBe('logged-model')
+    } finally {
+      server.stop(true)
+    }
+  })
+
   test('logs why the title request failed upstream', async () => {
     const server = Bun.serve({
       hostname: '127.0.0.1',
