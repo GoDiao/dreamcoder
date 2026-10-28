@@ -152,7 +152,7 @@ cd desktop && bun install
 bun run electron:install
 
 # Step 4: 编译 sidecar 二进制
-#   生成 desktop/binaries/dreamcoder-sidecar-<target>，主进程启动它作为本地服务。
+#   生成 desktop/binaries/<target>/dreamcoder-sidecar（rg 与它放在同一目录，和打包后的布局一致），主进程启动它作为本地服务。
 bun run build:sidecars
 
 # Step 5: 启动 dev 模式
@@ -185,8 +185,8 @@ bun run electron:dev
 两类校验值，并更新 `THIRD_PARTY_NOTICES.md` 及安装包冒烟测试中的版本。
 
 源码运行读取 `vendor/ripgrep/<arch>-<platform>/rg`（Windows 为 `rg.exe`）。构建还会
-生成 `desktop/binaries/rg-<target-triple>`（Windows 另带 `.exe`）。安装包里去掉 target
-后缀：macOS 位于 `Resources/bin`，Windows 位于 `resources\bin`，均与 sidecar 相邻。
+生成 `desktop/binaries/<target-triple>/rg`（Windows 另带 `.exe`），与 sidecar 在同一目录。
+安装包会复制该目录：macOS 位于 `Resources/bin`，Windows 位于 `resources\bin`，均与 sidecar 相邻。
 许可证作为资源随包分发。两个二进制目录均已被 Git 忽略。
 
 查找顺序：`USE_BUILTIN_RIPGREP=0` 强制使用系统版本；否则依次查找可执行文件旁的版本、

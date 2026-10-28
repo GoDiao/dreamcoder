@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { getRipgrepTarget, installRipgrep, RIPGREP_TARGETS, RIPGREP_VERSION, tarCommand } from './prepare-ripgrep.js'
+import { devBinariesDir, getRipgrepTarget, installRipgrep, RIPGREP_TARGETS, RIPGREP_VERSION, tarCommand } from './prepare-ripgrep.js'
 
 const tempDirs: string[] = []
 
@@ -41,6 +41,11 @@ describe('ripgrep preparation', () => {
     expect(getRipgrepTarget('aarch64-unknown-linux-gnu')).toBe(RIPGREP_TARGETS['aarch64-unknown-linux-musl'])
     expect(getRipgrepTarget('x86_64-unknown-linux-gnu')).toBe(RIPGREP_TARGETS['x86_64-unknown-linux-musl'])
     expect(() => getRipgrepTarget('unknown')).toThrow('Unsupported ripgrep target')
+  })
+
+  test('stages ripgrep like the packaged layout: one directory per target, plain rg name', () => {
+    expect(devBinariesDir('/repo', 'aarch64-apple-darwin')).toBe(path.join('/repo', 'desktop', 'binaries', 'aarch64-apple-darwin'))
+    expect(path.basename(devBinariesDir('/repo', 'x86_64-pc-windows-msvc'))).toBe('x86_64-pc-windows-msvc')
   })
 
   test('uses the system bsdtar on Windows so drive-letter paths and zip archives extract', () => {

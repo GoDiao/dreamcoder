@@ -1,14 +1,14 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
-import { hostRipgrepTarget, prepareRipgrep } from '../../scripts/prepare-ripgrep.js'
+import { devBinariesDir, hostRipgrepTarget, prepareRipgrep } from '../../scripts/prepare-ripgrep.js'
 
 const desktopRoot = path.resolve(import.meta.dir, '..')
 const repoRoot = path.resolve(desktopRoot, '..')
-const binariesDir = path.join(desktopRoot, 'binaries')
 
 const targetTriple =
   process.env.DREAMCODER_TARGET_TRIPLE ||
   hostRipgrepTarget()
+const binariesDir = devBinariesDir(repoRoot, targetTriple)
 
 const bunTarget = mapTargetTripleToBun(targetTriple)
 
@@ -28,7 +28,7 @@ await mkdir(binariesDir, { recursive: true })
 
 await compileExecutable({
   entrypoint: path.join(desktopRoot, 'sidecars/dreamcoder-sidecar.ts'),
-  outfileBase: path.join(binariesDir, `dreamcoder-sidecar-${targetTriple}`),
+  outfileBase: path.join(binariesDir, 'dreamcoder-sidecar'),
   productName: 'DreamCoder Sidecar',
   bunTarget,
 })

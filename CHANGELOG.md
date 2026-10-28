@@ -6,6 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195).
 - Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).
 - When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
 
