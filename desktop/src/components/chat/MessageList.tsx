@@ -1,5 +1,6 @@
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useRef, useEffect, useMemo, memo, useState, useCallback, useDeferredValue, useLayoutEffect, type ReactNode } from 'react'
-import { ArrowDown, BookMarked, Bot, CheckCircle2, ChevronDown, ChevronRight, CircleStop, FileStack, LoaderCircle, MessageCircle, Settings, Target, XCircle } from 'lucide-react'
+import { ArrowDown, BookMarked, Bot, CheckCircle2, ChevronDown, ChevronRight, CircleStop, FileStack, LoaderCircle, Settings, Target, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
 import { useChatStore, useSessionField } from '../../stores/chatStore'
@@ -24,7 +25,8 @@ import { InlineTaskSummary } from './InlineTaskSummary'
 import { CurrentTurnChangeCard } from './CurrentTurnChangeCard'
 import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { clearWindowSelection, getSelectionPopoverPosition, useSelectionPopoverDismiss } from '../../hooks/useSelectionPopoverDismiss'
+import { getSelectionAnchor, useQuoteSelection } from '../../lib/selectionPopover'
+import { SelectionPopover } from '../shared/SelectionPopover'
 import {
   getHeightsForSession,
   getMetricsForSession,
@@ -84,24 +86,13 @@ type ChatSelectionState = {
   text: string
   x: number
   y: number
+  width: number
+  height: number
 }
-
-const CHAT_SELECTION_MENU_OFFSET = 10
-const CHAT_SELECTION_MENU_WIDTH = 158
-const CHAT_SELECTION_MENU_HEIGHT = 44
 
 function getElementForNode(node: Node | null): Element | null {
   if (!node) return null
   return node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
-}
-
-function getChatSelectionPosition(range: Range, root: HTMLElement, pointer: { clientX: number; clientY: number }) {
-  return getSelectionPopoverPosition(range, root, {
-    menuWidth: CHAT_SELECTION_MENU_WIDTH,
-    menuHeight: CHAT_SELECTION_MENU_HEIGHT,
-    offset: CHAT_SELECTION_MENU_OFFSET,
-    fallbackPointer: pointer,
-  })
 }
 
 function getChatSelectionFromContainer(
@@ -123,36 +114,9 @@ function getChatSelectionFromContainer(
   if (!text) return null
 
   return {
-    ...getChatSelectionPosition(range, root, pointer),
+    ...getSelectionAnchor(range, pointer),
     text,
   }
-}
-
-function ChatSelectionMenu({
-  selection,
-  onAdd,
-  popoverRef,
-}: {
-  selection: ChatSelectionState | null
-  onAdd: () => void
-  popoverRef: { current: HTMLButtonElement | null }
-}) {
-  const t = useTranslation()
-  if (!selection) return null
-
-  return (
-    <button
-      ref={popoverRef}
-      type="button"
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onAdd}
-      className="fixed z-50 inline-flex h-11 items-center gap-2 rounded-full border border-[var(--color-border)]/70 bg-[var(--color-surface-container-lowest)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] shadow-[0_10px_28px_rgba(15,23,42,0.14),0_2px_8px_rgba(15,23,42,0.08)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35"
-      style={{ left: selection.x, top: selection.y }}
-    >
-      <MessageCircle size={21} strokeWidth={2.15} className="shrink-0 text-[var(--color-text-primary)]" aria-hidden="true" />
-      <span>{t('chat.addSelectionToChat')}</span>
-    </button>
-  )
 }
 
 function formatCompactTokenCount(tokens: number): string {
@@ -285,7 +249,7 @@ function GoalEventCard({ message }: { message: GoalEvent }) {
                   {metaDetails.map((detail) => (
                     <span
                       key={detail}
-                      className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
+                      className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
                     >
                       {detail}
                     </span>
@@ -398,54 +362,33 @@ function SelectableChatMessage({
   children: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const selectionMenuRef = useRef<HTMLButtonElement>(null)
   const addReference = useWorkspaceChatContextStore((state) => state.addReference)
-  const [selectionMenu, setSelectionMenu] = useState<ChatSelectionState | null>(null)
+  const quote = useQuoteSelection((event) => getChatSelectionFromContainer(rootRef.current, event), `${messageId}:${content}`)
   const t = useTranslation()
   const sourceName = role === 'assistant'
     ? t('chat.assistantMessageReference')
     : t('chat.userMessageReference')
 
-  useEffect(() => {
-    setSelectionMenu(null)
-  }, [content, messageId])
-
-  const dismissSelectionMenu = useCallback(() => {
-    setSelectionMenu(null)
-  }, [])
-
-  useSelectionPopoverDismiss({
-    active: Boolean(selectionMenu),
-    popoverRef: selectionMenuRef,
-    onDismiss: dismissSelectionMenu,
-  })
-
-  const addCurrentSelectionToChat = useCallback(() => {
-    if (!sessionId || !selectionMenu) return
+  const addCurrentSelectionToChat = () => {
+    if (!sessionId || !quote.selection) return
     addReference(sessionId, {
       kind: 'chat-selection',
       path: `chat://${role}/${messageId}`,
       name: sourceName,
-      quote: selectionMenu.text,
+      quote: quote.selection.text,
       sourceRole: role,
       messageId,
     })
-    setSelectionMenu(null)
-    clearWindowSelection()
-  }, [addReference, messageId, role, selectionMenu, sessionId, sourceName])
+    quote.dismiss()
+  }
 
   return (
     <div
       ref={rootRef}
-      onMouseUp={(event) => {
-        setSelectionMenu(getChatSelectionFromContainer(rootRef.current, event))
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setSelectionMenu(null)
-      }}
+      onMouseUp={quote.onMouseUp}
     >
       {children}
-      <ChatSelectionMenu selection={selectionMenu} onAdd={addCurrentSelectionToChat} popoverRef={selectionMenuRef} />
+      <SelectionPopover quote={quote} label={t('chat.replyToSelection')} onAdd={addCurrentSelectionToChat} />
     </div>
   )
 }
@@ -868,13 +811,11 @@ function MemoryEventCard({ message }: { message: MemoryEvent }) {
             ) : null}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {visibleFiles.map((file) => (
-                <span
-                  key={file.path}
-                  title={file.path}
+                <HintTooltip key={file.path} content={file.path}><span
                   className="max-w-full truncate rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-mono text-[10px] text-[var(--color-text-secondary)]"
                 >
                   {memoryFileLabel(file.path)}
-                </span>
+                </span></HintTooltip>
               ))}
               {hiddenCount > 0 ? (
                 <span className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-mono text-[10px] text-[var(--color-text-tertiary)]">
@@ -2010,7 +1951,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           )}
 
           {!isLoadingTurnChangeCards && turnChangeCards.length === 0 && turnChangeLoadError && (
-            <div className="mx-auto mb-5 w-full max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--color-error)]/25 bg-[var(--color-error-container)]/18 px-4 py-3 text-xs text-[var(--color-error)]">
+            <div className="mx-auto mb-5 w-full max-w-[860px] rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error-container)]/18 px-4 py-3 text-xs text-[var(--color-error)]">
               {turnChangeLoadError}
             </div>
           )}
@@ -2020,16 +1961,15 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
       </div>
 
       {showJumpToLatest && (
-        <button
+        <HintTooltip content={t('chat.jumpToLatest')}><button
           type="button"
           onClick={handleJumpToLatest}
-          title={t('chat.jumpToLatest')}
           aria-label={t('chat.jumpToLatest')}
           className="absolute bottom-4 right-5 z-20 flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-3 text-xs font-medium text-[var(--color-text-primary)] shadow-[var(--shadow-dropdown)] transition-colors hover:border-[var(--color-brand)]/50 hover:bg-[var(--color-surface-container-low)]"
         >
           <ArrowDown size={15} aria-hidden="true" />
           <span>{t('chat.jumpToLatest')}</span>
-        </button>
+        </button></HintTooltip>
       )}
 
       <ConfirmDialog
@@ -2050,7 +1990,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           ? t('chat.turnChangesLatestConfirmUndo')
           : t('chat.turnChangesHistoricalConfirmUndo')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
         loading={Boolean(rewindingTurnId)}
       />
     </div>

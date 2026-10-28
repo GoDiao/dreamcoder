@@ -1,6 +1,6 @@
 import { Stethoscope } from 'lucide-react'
 import { useState } from 'react'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { useTranslation } from '../../i18n'
 import { runDoctorRepair, type DoctorRepairResult } from '../../lib/doctorRepair'
 import { useUIStore } from '../../stores/uiStore'
@@ -53,8 +53,8 @@ export function DoctorPanel({ compact = false }: DoctorPanelProps) {
             size="sm"
             onClick={handleRunDoctor}
             loading={isRunning}
-            icon={<Stethoscope className="h-4 w-4" aria-hidden="true" />}
           >
+            <Stethoscope data-icon="inline-start" className="h-4 w-4" aria-hidden="true" />
             {t('settings.diagnostics.runDoctor')}
           </Button>
         </div>

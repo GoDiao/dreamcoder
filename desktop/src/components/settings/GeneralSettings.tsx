@@ -3,9 +3,9 @@ import { prepareAppModeRestart, relaunchApp, pickDirectory } from '../../lib/she
 import { DEFAULT_AUTO_COMPACT_PERCENT, useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { Input } from '../shared/Input'
-import { Button } from '../shared/Button'
-import { Switch } from '../shared/Switch'
+import { LabeledInput } from '../shared/LabeledInput'
+import { Button } from '../shared/ui/button'
+import { Switch } from '../shared/ui/switch'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { SettingsGroup, SettingsRow } from './SettingsRow'
 import { SettingsSelect } from './SettingsSelect'
@@ -447,9 +447,9 @@ export function GeneralSettings() {
           description={t('settings.general.thinkingDescription')}
           control={
             <Switch
-              label={t('settings.general.thinkingEnabled')}
+              aria-label={t('settings.general.thinkingEnabled')}
               checked={thinkingEnabled}
-              onChange={(checked) => void setThinkingEnabled(checked)}
+              onCheckedChange={(checked) => void setThinkingEnabled(checked)}
             />
           }
         />
@@ -473,9 +473,9 @@ export function GeneralSettings() {
           description={t('settings.general.notificationsDescription')}
           control={
             <Switch
-              label={t('settings.general.notificationsEnabled')}
+              aria-label={t('settings.general.notificationsEnabled')}
               checked={desktopNotificationsEnabled}
-              onChange={(checked) => void handleDesktopNotificationsToggle(checked)}
+              onCheckedChange={(checked) => void handleDesktopNotificationsToggle(checked)}
             />
           }
         />
@@ -487,7 +487,7 @@ export function GeneralSettings() {
               notificationPermission !== 'granted' && notificationPermission !== 'unsupported' ? (
                 <Button
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="whitespace-nowrap"
                   disabled={notificationActionRunning}
                   onClick={() => void handleNotificationPermissionAction()}
@@ -508,9 +508,9 @@ export function GeneralSettings() {
           description={t('settings.general.agentTeamsDescription')}
           control={
             <Switch
-              label={t('settings.general.agentTeamsTitle')}
+              aria-label={t('settings.general.agentTeamsTitle')}
               checked={agentTeamsEnabled}
-              onChange={(checked) => void setAgentTeamsEnabled(checked)}
+              onCheckedChange={(checked) => void setAgentTeamsEnabled(checked)}
             />
           }
         />
@@ -567,7 +567,7 @@ export function GeneralSettings() {
                 <Button
                   type="button"
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="w-12 px-0"
                   aria-label={t('settings.general.networkTimeoutDecrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) - NETWORK_TIMEOUT_STEP_SECONDS)}
@@ -598,10 +598,10 @@ export function GeneralSettings() {
                       }
                       setNetworkSaveError(null)
                     }}
-                    className={`h-9 w-full rounded-[var(--radius-md)] border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
+                    className={`h-9 w-full rounded-md border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
                       networkTimeoutError
                         ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
-                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]'
+                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:ring-3 focus:ring-ui-ring/50'
                     }`}
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-tertiary)]">
@@ -611,7 +611,7 @@ export function GeneralSettings() {
                 <Button
                   type="button"
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="w-12 px-0"
                   aria-label={t('settings.general.networkTimeoutIncrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) + NETWORK_TIMEOUT_STEP_SECONDS)}
@@ -644,10 +644,10 @@ export function GeneralSettings() {
           />
           <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
             <div>
-              <Input
+              <LabeledInput
                 id="web-search-tavily-key"
-                type="password"
                 label={t('settings.general.webSearchTavilyKey')}
+                type="password"
                 value={webSearchDraft.tavilyApiKey ?? ''}
                 placeholder="tvly-..."
                 autoComplete="off"
@@ -672,10 +672,10 @@ export function GeneralSettings() {
               </div>
             </div>
             <div>
-              <Input
+              <LabeledInput
                 id="web-search-brave-key"
-                type="password"
                 label={t('settings.general.webSearchBraveKey')}
+                type="password"
                 value={webSearchDraft.braveApiKey ?? ''}
                 placeholder={t('settings.general.webSearchBravePlaceholder')}
                 autoComplete="off"
@@ -703,7 +703,7 @@ export function GeneralSettings() {
           <div className="mt-4 flex justify-end">
             <Button
               size="xs"
-              variant="secondary"
+              variant="outline"
               className="whitespace-nowrap"
               disabled={!webSearchDirty}
               onClick={() => void setWebSearch(webSearchDraft)}
@@ -717,9 +717,9 @@ export function GeneralSettings() {
             description={t('settings.general.webFetchPreflightDescription')}
             control={
               <Switch
-                label={t('settings.general.webFetchPreflightEnabled')}
+                aria-label={t('settings.general.webFetchPreflightEnabled')}
                 checked={skipWebFetchPreflight}
-                onChange={(checked) => void setSkipWebFetchPreflight(checked)}
+                onCheckedChange={(checked) => void setSkipWebFetchPreflight(checked)}
               />
             }
           />
@@ -760,7 +760,7 @@ export function GeneralSettings() {
               <div className="mt-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
-                    <Input
+                    <LabeledInput
                       id="portable-data-dir"
                       label={t('settings.general.storagePortableDirLabel')}
                       value={portableDirDraft}
@@ -775,7 +775,7 @@ export function GeneralSettings() {
                   <Button
                     type="button"
                     size="xs"
-                    variant="secondary"
+                    variant="outline"
                     className="mb-1 flex-shrink-0 whitespace-nowrap"
                     onClick={() => void openPortableDirPicker()}
                   >
@@ -826,7 +826,7 @@ export function GeneralSettings() {
               <Button
                 type="button"
                 size="xs"
-                variant="secondary"
+                variant="outline"
                 disabled={storageApplyDisabled}
                 onClick={() => openModeSwitchConfirm(storageChoice)}
               >
@@ -863,7 +863,7 @@ export function GeneralSettings() {
         )}
         confirmLabel={t('settings.general.modeSwitchConfirm')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="primary"
+        confirmVariant="default"
         loading={modeActionRunning}
       />
     </div>

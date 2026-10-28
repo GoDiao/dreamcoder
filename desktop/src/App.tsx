@@ -2,6 +2,8 @@ import { AppShell } from './components/layout/AppShell'
 import { useScheduledTaskDesktopNotifications } from './hooks/useScheduledTaskDesktopNotifications'
 import { installDesktopNotificationNavigation } from './lib/desktopNotificationNavigation'
 import { useEffect } from 'react'
+import { TooltipProvider } from './components/shared/ui/tooltip'
+import { Toaster } from './components/shared/ui/sonner'
 
 export function App() {
   useScheduledTaskDesktopNotifications()
@@ -22,5 +24,10 @@ export function App() {
       cleanup?.()
     }
   }, [])
-  return <AppShell />
+  return (
+    <TooltipProvider delayDuration={400}>
+      <AppShell />
+      <Toaster position="bottom-right" />
+    </TooltipProvider>
+  )
 }

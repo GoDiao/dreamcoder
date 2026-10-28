@@ -1,13 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 
-vi.mock('../../i18n', () => ({
-  useTranslation: () => (key: string, params?: Record<string, string | number>) =>
-    params ? `${key}:${Object.values(params).join(',')}` : key,
-}))
+vi.mock('../../i18n', () => {
+  const translate = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}:${Object.values(params).join(',')}` : key
+  return { useTranslation: () => translate }
+})
 
-import { parseUnifiedDiff, WorkspaceDiffSurface } from './WorkspaceCodeSurface'
+import { LineCommentEditor, limitUnifiedDiff, parseUnifiedDiff, WorkspaceDiffSurface } from './WorkspaceCodeSurface'
 
 const DIFF = [
   'diff --git a/src/a.ts b/src/a.ts',
@@ -56,25 +57,94 @@ describe('parseUnifiedDiff', () => {
   })
 })
 
+describe('diff preview limit', () => {
+  it('keeps hunk counts and real line offsets valid when clipping a patch', () => {
+    const clipped = limitUnifiedDiff(DIFF, 9)
+    expect(clipped).toContain('@@ -10,2 +10,3 @@ export function a() {')
+    expect(clipped).toContain('+const three = 3')
+    expect(clipped).not.toContain('return one')
+    expect(parseUnifiedDiff(clipped).at(-1)).toMatchObject({ kind: 'add', newLine: 12 })
+  })
+})
+
 describe('WorkspaceDiffSurface', () => {
-  it('shows real line numbers and allows comments on added and context lines only', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows real line numbers and allows comments on added and context lines only', async () => {
     const onAddLineComment = vi.fn()
     render(
       <WorkspaceDiffSurface value={DIFF} path="src/a.ts" hideFileHeaders onAddLineComment={onAddLineComment} />,
     )
 
     expect(screen.queryByText('diff --git a/src/a.ts b/src/a.ts')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'workspace.commentLine:10' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'workspace.commentLine:12' })).toBeInTheDocument()
-    const removed = document.querySelector('[data-diff-line-kind="remove"]')
-    expect(removed?.querySelector('button')).toBeNull()
-    expect(removed?.textContent).toContain('11')
+    const shadow = document.querySelector('diffs-container')!.shadowRoot!
+    const code = within(shadow as unknown as HTMLElement)
+    await waitFor(() => expect(code.getByRole('button', { name: 'workspace.commentLine:10' })).toBeTruthy())
+    expect(code.getByRole('button', { name: 'workspace.commentLine:10' })).toBeInTheDocument()
+    expect(code.getByRole('button', { name: 'workspace.commentLine:12' })).toBeInTheDocument()
+    const removed = shadow.querySelector<HTMLElement>('[data-column-number][data-line-type="change-deletion"]')!
+    expect(removed).not.toHaveAttribute('role')
+    expect(removed).not.toHaveAttribute('tabindex')
+    expect(removed.textContent).toContain('11')
+    fireEvent.click(removed)
+    fireEvent.keyDown(removed, { key: 'Enter' })
+    expect(screen.queryByPlaceholderText('workspace.commentPlaceholder')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'workspace.commentLine:12' }))
+    fireEvent.click(code.getByRole('button', { name: 'workspace.commentLine:12' }))
     fireEvent.change(screen.getByPlaceholderText('workspace.commentPlaceholder'), { target: { value: 'rename' } })
     fireEvent.click(screen.getByRole('button', { name: 'workspace.addCommentToChat' }))
 
     expect(onAddLineComment).toHaveBeenCalledWith(12, 'rename', 'const three = 3')
+  })
+
+  it('keeps the rendered diff while a comment is typed', async () => {
+    render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} />)
+    const shadow = document.querySelector('diffs-container')!.shadowRoot!
+    const code = within(shadow as unknown as HTMLElement)
+    await waitFor(() => expect(code.getByRole('button', { name: 'workspace.commentLine:12' })).toBeTruthy())
+    fireEvent.click(code.getByRole('button', { name: 'workspace.commentLine:12' }))
+    const line = await waitFor(() => code.getByRole('button', { name: 'workspace.commentLine:12' }))
+    fireEvent.change(screen.getByPlaceholderText('workspace.commentPlaceholder'), { target: { value: 'r' } })
+    fireEvent.change(screen.getByPlaceholderText('workspace.commentPlaceholder'), { target: { value: 're' } })
+    expect(line.isConnected).toBe(true)
+    expect(code.getByRole('button', { name: 'workspace.commentLine:12' })).toBe(line)
+  })
+
+  it.each([
+    ['added lines', ['const two = 22', 'const three = 3'], { text: 'const two = 22\nconst three = 3', startLine: 11, endLine: 12 }],
+    ['a removed line', ['const two = 2', 'const two = 22'], { text: 'const two = 2\nconst two = 22' }],
+  ])('adds a selection across %s to the chat', async (_name, [first, last], expected) => {
+    const onAddSelection = vi.fn()
+    render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddSelection={onAddSelection} />)
+    const shadow = document.querySelector('diffs-container')!.shadowRoot!
+    await waitFor(() => expect(shadow.querySelector('[data-line]')).toBeTruthy())
+    const row = (text: string) => Array.from(shadow.querySelectorAll('[data-line]')).find((node) => node.textContent === text)!
+    const start = row(first!)
+    const end = row(last!)
+    const getComposedRanges = () => [{ startContainer: start, startOffset: 0, endContainer: end, endOffset: end.childNodes.length }]
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, getComposedRanges, removeAllRanges: () => {} } as unknown as Selection)
+
+    fireEvent.mouseUp(screen.getByTestId('workspace-code'), { clientX: 10, clientY: 10 })
+    fireEvent.click(await screen.findByRole('button', { name: 'workspace.addSelectionToChat' }))
+
+    expect(onAddSelection).toHaveBeenCalledExactlyOnceWith(expected)
+  })
+
+  it('shows clipped lines only after expanding and clips them again on collapse', async () => {
+    const value = Array.from({ length: 30 }, (_, index) => `+line ${index + 1}`).join('\n')
+    render(<WorkspaceDiffSurface value={value} path="src/a.ts" lineLimit={10} />)
+    const shadowText = () => document.querySelector('diffs-container')!.shadowRoot!.textContent ?? ''
+    await waitFor(() => expect(shadowText()).toContain('line 10'))
+    expect(shadowText()).not.toContain('line 11')
+
+    fireEvent.click(screen.getByRole('button', { name: 'workspace.showAllLoadedLines' }))
+    await waitFor(() => expect(shadowText()).toContain('line 30'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'workspace.collapsePreview' }))
+    await waitFor(() => expect(shadowText()).not.toContain('line 11'))
+    expect(shadowText()).toContain('line 10')
   })
 
   it('opens the comment editor on the first added line when requested', () => {
@@ -85,5 +155,13 @@ describe('WorkspaceDiffSurface', () => {
 
     rerender(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} commentRequest={1} />)
     expect(screen.getByText('workspace.commentLineTarget:11')).toBeInTheDocument()
+  })
+})
+
+describe('LineCommentEditor focus', () => {
+  it('focuses the comment text on open', () => {
+    render(<LineCommentEditor lineNumber={1} draft="" onDraftChange={() => {}} onCancel={() => {}} onSubmit={() => {}} />)
+    const textarea = screen.getByPlaceholderText('workspace.commentPlaceholder')
+    expect(textarea).toHaveFocus()
   })
 })

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { SegmentedControl } from './SegmentedControl'
@@ -20,27 +20,26 @@ function Harness() {
 }
 
 describe('SegmentedControl', () => {
-  it('keeps only the selected option tabbable and moves the selection with arrow keys', () => {
+  it('focuses the selected option on entry and moves the selection with arrow keys', async () => {
     render(<Harness />)
     const radio = (name: string) => screen.getByRole('radio', { name })
 
-    expect([radio('A'), radio('B'), radio('C')].map((item) => item.tabIndex)).toEqual([-1, 0, -1])
-
-    radio('B').focus()
+    act(() => screen.getByRole('radiogroup').focus())
+    await waitFor(() => expect(document.activeElement).toBe(radio('B')))
     fireEvent.keyDown(radio('B'), { key: 'ArrowRight' })
-    expect(radio('C').getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(radio('C').getAttribute('aria-checked')).toBe('true'))
     expect(document.activeElement).toBe(radio('C'))
     expect(radio('C').tabIndex).toBe(0)
 
     fireEvent.keyDown(radio('C'), { key: 'ArrowDown' })
-    expect(radio('A').getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(radio('A').getAttribute('aria-checked')).toBe('true'))
     expect(document.activeElement).toBe(radio('A'))
 
     fireEvent.keyDown(radio('A'), { key: 'ArrowUp' })
-    expect(radio('C').getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(radio('C').getAttribute('aria-checked')).toBe('true'))
 
     fireEvent.keyDown(radio('C'), { key: 'Home' })
-    expect(radio('A').getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(radio('A').getAttribute('aria-checked')).toBe('true'))
     expect(document.activeElement).toBe(radio('A'))
   })
 })

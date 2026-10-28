@@ -1,3 +1,4 @@
+import { ToggleGroup, ToggleGroupItem } from '../shared/ui/toggle-group'
 import { useTranslation } from '../../i18n'
 
 type Props = {
@@ -20,36 +21,15 @@ const DAY_KEYS = [
 export function DayOfWeekPicker({ selected, onChange }: Props) {
   const t = useTranslation()
 
-  const toggle = (day: number) => {
-    if (selected.includes(day)) {
-      if (selected.length <= 1) return
-      onChange(selected.filter((d) => d !== day))
-    } else {
-      onChange([...selected, day])
-    }
-  }
-
   return (
-    <div className="flex gap-1.5">
-      {DAY_ORDER.map((day) => {
-        const isActive = selected.includes(day)
-        return (
-          <button
-            key={day}
-            type="button"
-            onClick={() => toggle(day)}
-            className={`
-              w-8 h-8 rounded-full text-xs font-medium transition-colors
-              ${isActive
-                ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)] border border-[var(--color-border-focus)]'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
-              }
-            `}
-          >
-            {t(DAY_KEYS[day]!)}
-          </button>
-        )
-      })}
-    </div>
+    <ToggleGroup type="multiple" variant="outline" value={selected.map(String)} aria-label={t('newTask.specificDays')} onValueChange={(values) => {
+      if (values.length > 0) onChange(values.map(Number))
+    }}>
+      {DAY_ORDER.map((day) => (
+        <ToggleGroupItem key={day} value={String(day)} className="size-8 p-0">
+          {t(DAY_KEYS[day]!)}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   )
 }

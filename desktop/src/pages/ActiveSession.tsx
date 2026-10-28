@@ -1,5 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
-import { PanelRight, SquareTerminal, Target } from 'lucide-react'
+import { ArrowLeftIcon, BotIcon, CircleCheckIcon, PanelRight, SquareTerminal, Target } from 'lucide-react'
+import { usePanelWidthPersistence } from '../hooks/usePanelWidthPersistence'
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/shared/ui/resizable'
+import { Button } from '../components/shared/ui/button'
+import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import {
   SCHEDULED_TAB_ID,
   useTabStore,
@@ -25,18 +29,16 @@ import { SessionHeaderMenu } from '../components/layout/SessionHeaderMenu'
 import { TeamStatusBar } from '../components/teams/TeamStatusBar'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
-import { useMobileViewport } from '../hooks/useMobileViewport'
-import { Spinner } from '../components/shared/Spinner'
+import { useMobileViewport, useViewportQuery } from '../hooks/useMobileViewport'
+import { Spinner } from '../components/shared/ui/spinner'
 import { isMacOverlayTitlebar } from '../lib/windowChrome'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 
 const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
 
 const TASK_POLL_INTERVAL_MS = 1000
-const WORKSPACE_RESIZE_STEP = 32
 const SIDE_PANEL_CLASS = [
-  'relative flex shrink-0 border-l border-[var(--color-border)] bg-[var(--color-surface)]',
-  'max-w-[calc(100%-320px)]',
+  'relative flex border-l border-[var(--color-border)] bg-[var(--color-surface)]',
   'max-[850px]:absolute max-[850px]:inset-y-0 max-[850px]:right-0 max-[850px]:z-20',
   'max-[850px]:w-[min(380px,100%)]! max-[850px]:max-w-full max-[850px]:shadow-[var(--shadow-dropdown)]',
 ].join(' ')
@@ -100,9 +102,9 @@ function ActiveGoalStrip({
         </span>
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-memory-accent)]" aria-hidden="true" />
         <span className="shrink-0 text-[var(--color-text-tertiary)]">{statusLabel}</span>
-        <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]" title={objective}>
+        <HintTooltip content={objective}><span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]">
           {objective}
-        </span>
+        </span></HintTooltip>
         {meta.length > 0 ? (
           <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)] lg:flex">
             {meta.map((item) => (
@@ -112,86 +114,6 @@ function ActiveGoalStrip({
         ) : null}
       </div>
     </div>
-  )
-}
-
-function WorkspaceResizeHandle() {
-  const t = useTranslation()
-  const width = useWorkspacePanelStore((state) => state.width)
-  const setWidth = useWorkspacePanelStore((state) => state.setWidth)
-  const handleRef = useRef<HTMLDivElement>(null)
-  const [dragState, setDragState] = useState<{ startX: number; startWidth: number; maxWidth: number } | null>(null)
-  const dragStateRef = useRef(dragState)
-
-  useEffect(() => {
-    dragStateRef.current = dragState
-  }, [dragState])
-
-  const getMaxWidth = () => {
-    const row = handleRef.current?.parentElement?.parentElement
-    const rowWidth = row?.clientWidth ?? 0
-    return rowWidth > 0 ? rowWidth - WORKSPACE_PANEL_MIN_CHAT_WIDTH : Number.POSITIVE_INFINITY
-  }
-
-  useEffect(() => {
-    if (!dragState) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const current = dragStateRef.current
-      if (!current) return
-      setWidth(Math.min(current.startWidth + current.startX - event.clientX, current.maxWidth))
-    }
-
-    const handlePointerUp = () => {
-      setDragState(null)
-    }
-
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerUp)
-
-    return () => {
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerUp)
-    }
-  }, [dragState, setWidth])
-
-  return (
-    <div
-      ref={handleRef}
-      role="separator"
-      aria-label={t('workspace.resizePanel')}
-      aria-orientation="vertical"
-      aria-valuenow={width}
-      aria-valuemin={WORKSPACE_PANEL_MIN_WIDTH}
-      aria-valuemax={WORKSPACE_PANEL_MAX_WIDTH}
-      title={t('workspace.resizePanel')}
-      tabIndex={0}
-      data-testid="workspace-resize-handle"
-      onPointerDown={(event) => {
-        if (event.button !== 0) return
-        event.preventDefault()
-        setDragState({ startX: event.clientX, startWidth: width, maxWidth: getMaxWidth() })
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'ArrowLeft') {
-          event.preventDefault()
-          setWidth(Math.min(width + WORKSPACE_RESIZE_STEP, getMaxWidth()))
-        }
-        if (event.key === 'ArrowRight') {
-          event.preventDefault()
-          setWidth(width - WORKSPACE_RESIZE_STEP)
-        }
-      }}
-      className={`absolute bottom-0 left-[-3px] top-0 z-10 w-[6px] cursor-col-resize outline-none transition-colors hover:bg-[var(--color-brand)]/20 focus-visible:bg-[var(--color-brand)]/30 max-[850px]:hidden ${
-        dragState ? 'bg-[var(--color-brand)]/20' : ''
-      }`}
-    />
   )
 }
 
@@ -207,20 +129,16 @@ function HeaderIconButton({
   children: ReactNode
 }) {
   return (
-    <button
-      type="button"
+    <HintTooltip content={label}><Button
+      variant="ghost"
+      size="icon-sm"
       aria-label={label}
       aria-pressed={pressed}
-      title={label}
       onClick={onClick}
-      className={`inline-flex h-[29px] w-[29px] items-center justify-center rounded-[7px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
-        pressed
-          ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
-      }`}
+      className={pressed ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}
     >
       {children}
-    </button>
+    </Button></HintTooltip>
   )
 }
 
@@ -233,6 +151,8 @@ function getSessionProjectName(session: SessionListItem | undefined, repoName: s
 }
 
 export function ActiveSession() {
+  const useOverlayPanel = useViewportQuery('(width < 850px)')
+  const setPanelWidth = useWorkspacePanelStore((state) => state.setWidth)
   const isMobileLayout = useMobileViewport() && !isDesktopRuntime()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const activeTabType = useTabStore((s) => s.tabs.find((tab) => tab.sessionId === s.activeTabId)?.type ?? null)
@@ -282,6 +202,7 @@ export function ActiveSession() {
     showPanel && activeTabId ? state.isPanelExpanded(activeTabId) : false,
   )
   const panelWidth = useWorkspacePanelStore((state) => state.width)
+  const { panelRef: workspacePanelRef, onLayoutChanged } = usePanelWidthPersistence(setPanelWidth, showPanel && !panelExpanded && !useOverlayPanel)
   const workspaceStatus = useWorkspacePanelStore((state) => activeTabId ? state.statusBySession[activeTabId] : undefined)
   const workspaceStatusLoading = useWorkspacePanelStore((state) =>
     activeTabId ? state.loading.statusBySession[activeTabId] ?? false : false,
@@ -387,10 +308,12 @@ export function ActiveSession() {
         </header>
       )}
 
-      <div data-testid="active-session-content-row" className="relative flex min-h-0 min-w-0 flex-1">
+      <ResizablePanelGroup orientation="horizontal" data-testid="active-session-content-row" className="relative min-h-0 min-w-0 flex-1" onLayoutChanged={onLayoutChanged}>
+        <ResizablePanel id="conversation-panel" minSize={panelExpanded || useOverlayPanel ? 0 : showPanel ? WORKSPACE_PANEL_MIN_CHAT_WIDTH : 0} maxSize={panelExpanded ? 0 : undefined} className="flex min-h-0">
         <div
           data-testid="active-session-chat-column"
-          className={panelExpanded ? 'hidden' : `flex min-w-0 flex-1 flex-col ${showPanel ? 'min-[850px]:min-w-[320px]' : ''}`}
+          hidden={panelExpanded}
+          className="flex min-w-0 flex-1 flex-col"
         >
           {isMemberSession && (
             <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface-container)]">
@@ -401,9 +324,9 @@ export function ActiveSession() {
                       <span className="flex h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse-dot" />
                     )}
                     {memberInfo?.status === 'completed' && (
-                      <span className="material-symbols-outlined text-[14px] text-[var(--color-success)]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      <CircleCheckIcon className="shrink-0 text-[var(--color-success)]" aria-hidden="true" size={14} />
                     )}
-                    <span className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">smart_toy</span>
+                    <BotIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={14} />
                     <span className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {memberInfo?.role}
                     </span>
@@ -430,7 +353,7 @@ export function ActiveSession() {
                   disabled={!activeTeam?.leadSessionId}
                   className="flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-50 disabled:hover:text-[var(--color-text-secondary)]"
                 >
-                  <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+                  <ArrowLeftIcon aria-hidden="true" size={14} />
                   {t('teams.backToLeader')}
                 </button>
               </div>
@@ -448,7 +371,7 @@ export function ActiveSession() {
               <div className="flex max-w-md flex-col items-center text-center">
                 {isMemberSession ? (
                   <>
-                    <span className="material-symbols-outlined text-[48px] mb-4 text-[var(--color-text-tertiary)]">smart_toy</span>
+                    <BotIcon className="shrink-0 mb-4 text-[var(--color-text-tertiary)]" aria-hidden="true" size={48} />
                     <p className="text-[var(--color-text-secondary)]">
                       {memberInfo?.status === 'running'
                         ? `${memberInfo.role} ${t('teams.working')}`
@@ -481,13 +404,16 @@ export function ActiveSession() {
           />
         </div>
 
+        </ResizablePanel>
+        {showPanel && !panelExpanded && !useOverlayPanel ? <ResizableHandle aria-label={t('workspace.resizePanel')} data-testid="workspace-resize-handle" className="w-1.5" /> : null}
         {showPanel ? (
-          <div
+          <ResizablePanel id="workspace-panel" panelRef={workspacePanelRef} groupResizeBehavior="preserve-pixel-size"
+            defaultSize={panelExpanded ? '100%' : useOverlayPanel ? 0 : panelWidth}
+            minSize={panelExpanded || useOverlayPanel ? 0 : WORKSPACE_PANEL_MIN_WIDTH}
+            maxSize={panelExpanded ? '100%' : useOverlayPanel ? 0 : WORKSPACE_PANEL_MAX_WIDTH}
             data-testid="session-side-panel"
-            className={panelExpanded ? 'flex min-w-0 flex-1' : SIDE_PANEL_CLASS}
-            style={panelExpanded ? undefined : { width: panelWidth }}
+            className={panelExpanded ? 'flex min-w-0' : SIDE_PANEL_CLASS}
           >
-            {!panelExpanded && <WorkspaceResizeHandle />}
             <Suspense
               fallback={
                 <div
@@ -495,7 +421,7 @@ export function ActiveSession() {
                   aria-label={t('common.loading')}
                   className="flex h-full min-h-0 w-full min-w-0 items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-tertiary)]"
                 >
-                  <Spinner size={16} />
+                  <Spinner aria-hidden="true" />
                 </div>
               }
             >
@@ -505,9 +431,9 @@ export function ActiveSession() {
                 contextLabel={contextLabel}
               />
             </Suspense>
-          </div>
+          </ResizablePanel>
         ) : null}
-      </div>
+      </ResizablePanelGroup>
     </div>
   )
 }

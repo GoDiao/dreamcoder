@@ -1,3 +1,4 @@
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { Folder, GitBranch } from 'lucide-react'
 
 type Props = {
@@ -38,9 +39,8 @@ export function ProjectLabel({
   if (!label) return null
 
   return (
-    <span
+    <HintTooltip content={title}><span
       data-testid="composer-project-label"
-      title={title}
       className="inline-flex h-7 min-w-0 max-w-[280px] items-center gap-1.5 px-1.5 text-ui-aux text-[var(--color-text-secondary)]"
     >
       <Folder size={14} className="shrink-0" aria-hidden="true" />
@@ -56,6 +56,6 @@ export function ProjectLabel({
           worktree
         </span>
       )}
-    </span>
+    </span></HintTooltip>
   )
 }

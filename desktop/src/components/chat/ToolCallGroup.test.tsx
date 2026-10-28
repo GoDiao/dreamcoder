@@ -102,4 +102,60 @@ describe('ToolCallGroup', () => {
     fireEvent.click(header)
     expect(screen.getByText('Checking the second file')).toBeInTheDocument()
   })
+
+  it('expands and collapses a memory reference card from its header', () => {
+    const memoryRead: ToolCall = {
+      id: 'msg-memory',
+      type: 'tool_use',
+      toolName: 'Read',
+      toolUseId: 'memory',
+      input: { file_path: '/repo/memory/preferences.md' },
+      timestamp: 1,
+    }
+    render(
+      <ToolCallGroup
+        toolCalls={[memoryRead]}
+        resultMap={new Map([['memory', resultFor('memory')]])}
+        childToolCallsByParent={new Map()}
+        agentTaskNotifications={{}}
+      />,
+    )
+
+    const header = screen.getByRole('button', { name: /1 memory reference/ })
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: '/repo/memory/preferences.md' })).not.toBeInTheDocument()
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: '/repo/memory/preferences.md' })).toBeInTheDocument()
+    fireEvent.click(header)
+    expect(screen.queryByRole('button', { name: '/repo/memory/preferences.md' })).not.toBeInTheDocument()
+  })
+
+  it('expands and collapses an agent card from its chevron button', () => {
+    const agentCall: ToolCall = {
+      id: 'msg-agent',
+      type: 'tool_use',
+      toolName: 'Agent',
+      toolUseId: 'agent',
+      input: { description: 'Scan the repo' },
+      timestamp: 1,
+    }
+    render(
+      <ToolCallGroup
+        toolCalls={[agentCall]}
+        resultMap={new Map([['agent', resultFor('agent')]])}
+        childToolCallsByParent={new Map()}
+        agentTaskNotifications={{}}
+      />,
+    )
+
+    expect(screen.queryByText('No tool activity yet')).not.toBeInTheDocument()
+    const expand = screen.getByRole('button', { name: 'Expand agent' })
+    expect(expand).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(expand)
+    expect(screen.getByRole('button', { name: 'Collapse agent' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('No tool activity yet')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse agent' }))
+    expect(screen.queryByText('No tool activity yet')).not.toBeInTheDocument()
+  })
 })

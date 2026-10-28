@@ -46,7 +46,7 @@ describe('default shell preferences', () => {
     native.detect.mockResolvedValue({ platform, shell: '/usr/bin/fish' })
     render(<TerminalShellSettings />)
     await waitFor(() => expect(native.detect).toHaveBeenCalled())
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByText('/usr/bin/fish')).toBeInTheDocument()
     for (const shell of ['zsh', 'bash', 'fish']) {
       expect(screen.getByRole('menuitemradio', { name: shell })).toBeInTheDocument()
@@ -61,7 +61,7 @@ describe('default shell preferences', () => {
   it('keeps Windows shell choices using the native host platform', async () => {
     native.detect.mockResolvedValue({ platform: 'windows', shell: 'cmd.exe' })
     render(<TerminalShellSettings />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByText('cmd.exe')).toBeInTheDocument()
     expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
     expect(screen.queryByRole('menuitemradio', { name: 'fish' })).not.toBeInTheDocument()
@@ -99,8 +99,9 @@ describe('default shell preferences', () => {
     expect(screen.queryByRole('button', { name: 'Default shell' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Detecting the host shell')
     await act(async () => { resolveHost({ platform: 'windows', shell: 'cmd.exe' }) })
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(screen.getAllByRole('button', { name: 'Default shell' })).toHaveLength(1)
   })
 

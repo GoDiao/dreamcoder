@@ -31,7 +31,7 @@ bun run test -- --run       # desktop tests (vitest)
 
 ## Design
 
-- **Reuse before you write.** Search for an existing helper, hook or component before adding one. UI building blocks live in `desktop/src/components/shared` (`Button`, `Dropdown`, `Modal`, `Switch`, …); HTTP calls go through `desktop/src/api`.
+- **Reuse before you write.** Search for an existing helper, hook or component before adding one. UI building blocks are the shadcn primitives in `desktop/src/components/shared/ui` (`button`, `input`, `switch`, …) and the compositions in `desktop/src/components/shared` (`Modal`, `Dropdown`, `LabeledInput`, …), listed in `desktop/src/components/README.md`; HTTP calls go through `desktop/src/api`.
 - **Don't duplicate logic.** If the same logic appears a second time, extract it into a function or hook in the module that owns that concept, and make both callers use it. Don't copy a block and tweak it.
 - **One source of truth.** Don't keep a second copy of state that is owned elsewhere. Derive values instead of storing them (e.g. compute elapsed time from the turn's start time instead of counting in the store). Session state is owned by the server; clients read it.
 - **One place per concern.** The sidecar owns business logic and configuration. The Electron main process in `desktop/electron` only does OS-level work (windows, tray, menus, notifications, single instance, dialogs) and asks the sidecar for anything else instead of computing it again.

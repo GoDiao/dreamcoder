@@ -170,6 +170,17 @@ bun run electron:dev
 >
 > More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+### Desktop UI components
+
+The desktop uses the Radix variant of shadcn/ui, generated from
+`desktop/components.json` into `desktop/src/components/shared/ui`. Callers use
+those primitives directly; the compositions in `desktop/src/components/shared`
+add behavior and do not rename or forward props. The
+[component source inventory](../desktop/src/components/README.md) lists every
+primitive and composition, the local adaptations (theme tokens in the `ui-`
+namespace, Shiki, Pierre, Safari 17.5 as the minimum H5 browser) and how to
+update components with the shadcn CLI.
+
 ### Bundled ripgrep
 
 `bun run build:sidecars` prepares ripgrep automatically.

@@ -1,3 +1,4 @@
+import { FileTextIcon, FolderIcon, MessageSquareIcon, XIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ImageGalleryModal } from './ImageGalleryModal'
 
@@ -89,6 +90,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
           const quotePreview = attachment.quote?.trim().replace(/\s+/g, ' ')
           const hasQuotePreview = !!quotePreview
 
+          const AttachmentIcon = hasQuotePreview ? MessageSquareIcon : attachment.isDirectory ? FolderIcon : FileTextIcon
           return (
             <div
               key={attachment.id || `${attachment.name}-${index}`}
@@ -100,9 +102,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                   : 'h-9 items-center gap-2 rounded-full px-3',
               ].join(' ')}
             >
-              <span className={`material-symbols-outlined shrink-0 text-[17px] text-[var(--color-text-tertiary)] ${hasQuotePreview ? 'mt-0.5' : ''}`}>
-                {hasQuotePreview ? 'chat_bubble' : attachment.isDirectory ? 'folder' : 'description'}
-              </span>
+              <AttachmentIcon className={`shrink-0 text-[var(--color-text-tertiary)] ${hasQuotePreview ? 'mt-0.5' : ''}`} aria-hidden="true" size={17} />
               <span className="min-w-0">
                 <span className="block min-w-0 max-w-[260px] truncate text-[13px] font-medium leading-5 text-[var(--color-text-primary)]">
                   {attachment.name}{lineLabel}
@@ -120,7 +120,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                   className={`${hasQuotePreview ? 'mt-0.5' : 'ml-0.5'} flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]`}
                   aria-label={`Remove ${attachment.name}`}
                 >
-                  <span className="material-symbols-outlined text-[17px]">close</span>
+                  <XIcon aria-hidden="true" size={17} />
                 </button>
               )}
             </div>

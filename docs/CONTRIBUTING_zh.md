@@ -169,6 +169,12 @@ bun run electron:dev
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
 
+### 桌面 UI 组件
+
+桌面端使用 Radix 版本的 shadcn/ui，由 `desktop/components.json` 生成到 `desktop/src/components/shared/ui`。
+调用方直接使用这些组件；`desktop/src/components/shared` 里的组合组件只增加行为，不做改名或转发。
+[组件说明](../desktop/src/components/README.md)列出了全部组件、本地改动（`ui-` 命名空间的主题 token、Shiki、Pierre、H5 最低 Safari 17.5）以及用 shadcn CLI 更新组件的方法。
+
 ### 随包提供 ripgrep
 
 `bun run build:sidecars` 会自动准备 ripgrep。

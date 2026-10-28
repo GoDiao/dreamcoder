@@ -37,7 +37,7 @@ type TabStore = {
   closeTab: (sessionId: string) => void
   /** Drop tabs without changing the active page (used to release idle sessions). */
   dropTabs: (sessionIds: string[]) => void
-  setActiveTab: (sessionId: string) => void
+  setActiveTab: (sessionId: string | null) => void
   updateTabTitle: (sessionId: string, title: string) => void
   updateTabStatus: (sessionId: string, status: Tab['status']) => void
   replaceTabSession: (oldSessionId: string, newSessionId: string) => void
@@ -142,7 +142,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       openTabs: tabs.map((t) => ({ sessionId: t.sessionId, title: t.title, type: t.type })),
       activeTabId: activeTabId && tabs.some((tab) => tab.sessionId === activeTabId)
         ? activeTabId
-        : (tabs[0]?.sessionId ?? null),
+        : null,
     }
     try {
       localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(data))
@@ -201,7 +201,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
       const activeId = data.activeTabId && validTabs.some((t) => t.sessionId === data.activeTabId)
         ? data.activeTabId
-        : validTabs[0]!.sessionId
+        : null
 
       set({ tabs: validTabs, activeTabId: activeId })
     } catch { }

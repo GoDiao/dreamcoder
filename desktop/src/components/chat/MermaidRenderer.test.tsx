@@ -54,7 +54,7 @@ describe('MermaidRenderer', () => {
 
     fireEvent.click(previewButton)
 
-    await screen.findByText('Mermaid Diagram')
+    await screen.findByRole('dialog', { name: 'Mermaid diagram' })
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
 

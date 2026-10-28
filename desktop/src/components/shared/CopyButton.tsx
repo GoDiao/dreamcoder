@@ -1,23 +1,34 @@
-import { useEffect, useState } from 'react'
-import { copyTextToClipboard } from '../chat/clipboard'
+import { Tooltip as HintTooltip } from './Tooltip'
+import { useEffect, useState, type MouseEventHandler } from 'react'
+import type { VariantProps } from 'class-variance-authority'
+import { Check, Copy } from 'lucide-react'
+import { Button, type buttonVariants } from './ui/button'
+import { useTranslation } from '../../i18n'
+import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
 
 type Props = {
   text: string
   label?: string
   copiedLabel?: string
-  displayLabel?: string
-  displayCopiedLabel?: string
+  iconOnly?: boolean
+  size?: VariantProps<typeof buttonVariants>['size']
+  onClick?: MouseEventHandler<HTMLButtonElement>
   className?: string
 }
 
 export function CopyButton({
   text,
-  label = 'Copy',
-  copiedLabel = 'Copied',
-  displayLabel,
-  displayCopiedLabel,
+  label,
+  copiedLabel,
+  iconOnly = false,
+  size = 'xs',
+  onClick,
   className = '',
 }: Props) {
+  const t = useTranslation()
+  const copyAndNotify = useCopyAndNotify()
+  const copyLabel = label ?? t('common.copy')
+  const copiedText = copiedLabel ?? t('common.copied')
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -27,32 +38,24 @@ export function CopyButton({
   }, [copied])
 
   const handleCopy = async () => {
-    try {
-      const ok = await copyTextToClipboard(text)
-      if (!ok) {
-        setCopied(false)
-        return
-      }
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
+    setCopied(await copyAndNotify(text))
   }
 
-  const currentLabel = copied ? copiedLabel : label
-  const buttonText = copied
-    ? (displayCopiedLabel ?? copiedLabel)
-    : (displayLabel ?? label)
+  const currentLabel = copied ? copiedText : copyLabel
 
   return (
-    <button
+    <HintTooltip content={currentLabel}><Button
+      variant="ghost"
+      size={size}
       type="button"
-      onClick={handleCopy}
+      onClick={(event) => {
+        onClick?.(event)
+        void handleCopy()
+      }}
       className={className}
       aria-label={currentLabel}
-      title={currentLabel}
     >
-      {buttonText}
-    </button>
+      {iconOnly ? (copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />) : currentLabel}
+    </Button></HintTooltip>
   )
 }

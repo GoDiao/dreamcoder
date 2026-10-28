@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import { memo } from 'react'
 import { MarkdownRenderer, StreamingMarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { MessageActionBar, type MessageBranchAction } from './MessageActionBar'
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export const AssistantMessage = memo(function AssistantMessage({ content, isStreaming, incremental, branchAction, replyCopyText }: Props) {
+  const t = useTranslation()
   if (!content.trim()) return null
 
   const documentLayout = shouldUseDocumentLayout(content)
@@ -47,7 +49,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
         {replyCopyText !== undefined ? (
           <MessageActionBar
             copyText={isStreaming ? undefined : replyCopyText}
-            copyLabel="Copy reply"
+            copyLabel={t('chat.copyReply')}
             branchAction={branchAction}
             align="start"
           />

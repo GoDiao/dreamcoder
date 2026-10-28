@@ -13,10 +13,10 @@ import { AssistantMessage } from './AssistantMessage'
 const REPLY = 'Here is the code:\n\n```ts\nconst a = 1\n```\n\nDone.'
 
 describe('AssistantMessage', () => {
-  it('renders a streaming reply incrementally with the lightweight highlighter', () => {
+  it('renders a streaming reply incrementally with the shared highlighter', () => {
     const { container } = render(<AssistantMessage content={REPLY} isStreaming incremental />)
     expect(container.querySelector('[data-streaming-block]')).not.toBeNull()
-    expect(screen.getByTestId('code-viewer')).toHaveAttribute('data-highlighter', 'prism')
+    expect(screen.getByTestId('code-viewer')).toHaveAttribute('data-highlighter', 'shiki')
   })
 
   it('renders a committed reply in full with Shiki', () => {

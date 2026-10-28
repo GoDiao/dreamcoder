@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { writeSessionExport, pickExportPath } from '../../lib/shell'
 import { Modal } from '../shared/Modal'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
+import { Checkbox } from '../shared/ui/checkbox'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { sessionsApi, type SessionExport, type SessionExportOptions } from '../../api/sessions'
 import { useTranslation } from '../../i18n'
@@ -66,7 +67,7 @@ export function ExportSessionDialog({ sessionId, open, onClose }: { sessionId: s
 
   const option = (checked: boolean, onChange: (value: boolean) => void, label: string, disabled = false) => (
     <label className={`flex items-center gap-2 text-ui-body ${disabled ? 'text-[var(--color-text-tertiary)]' : 'text-[var(--color-text-primary)]'}`}>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => onChange(value === true)} />
       {label}
     </label>
   )

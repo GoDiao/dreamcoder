@@ -1,6 +1,8 @@
-import { useEffect, useState, type MouseEvent } from 'react'
-import { Check, Copy, Split } from 'lucide-react'
-import { copyTextToClipboard } from './clipboard'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
+import type { MouseEvent } from 'react'
+import { Split } from 'lucide-react'
+import { CopyButton } from '../shared/CopyButton'
+import { Button } from '../shared/ui/button'
 
 export type MessageBranchAction = {
   label: string
@@ -28,7 +30,7 @@ type Props = {
 const blurAfterClick = (event: MouseEvent<HTMLButtonElement>) => event.currentTarget.blur()
 
 const ICON_BUTTON_CLASS =
-  'inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[var(--color-text-tertiary)] hover:border-[var(--color-border)]/70 hover:bg-[var(--color-surface-container-low)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35 disabled:cursor-wait disabled:opacity-60'
+  'rounded-md text-[var(--color-text-tertiary)] transition-none hover:border-[var(--color-border)]/70 hover:bg-[var(--color-surface-container-low)] hover:text-[var(--color-text-primary)]'
 
 export function MessageActionBar({
   copyText,
@@ -51,9 +53,9 @@ export function MessageActionBar({
     >
       <div className="flex items-center gap-0.5">
         {timestamp ? <MessageTime timestamp={timestamp} /> : null}
-        {hasCopy ? <CopyIconButton text={copyText!} label={copyLabel} /> : null}
+        {hasCopy ? <CopyButton text={copyText!} label={copyLabel} iconOnly size="icon-sm" onClick={blurAfterClick} className={ICON_BUTTON_CLASS} /> : null}
         {branchAction ? (
-          <button
+          <HintTooltip content={branchAction.label}><Button variant="ghost" size="icon-sm"
             type="button"
             onClick={(event) => {
               blurAfterClick(event)
@@ -61,38 +63,13 @@ export function MessageActionBar({
             }}
             disabled={branchAction.loading}
             aria-label={branchAction.label}
-            title={branchAction.label}
             className={ICON_BUTTON_CLASS}
           >
             <Split size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
+          </Button></HintTooltip>
         ) : null}
       </div>
     </div>
-  )
-}
-
-function CopyIconButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 1500)
-    return () => window.clearTimeout(timer)
-  }, [copied])
-
-  const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
-    blurAfterClick(event)
-    setCopied(await copyTextToClipboard(text).catch(() => false))
-  }
-
-  const currentLabel = copied ? 'Copied' : label
-  return (
-    <button type="button" onClick={handleCopy} aria-label={currentLabel} title={currentLabel} className={ICON_BUTTON_CLASS}>
-      {copied
-        ? <Check size={14} strokeWidth={2} aria-hidden="true" />
-        : <Copy size={14} strokeWidth={2} aria-hidden="true" />}
-    </button>
   )
 }
 
@@ -106,12 +83,11 @@ function MessageTime({ timestamp }: { timestamp: number }) {
     : sent.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <time
+    <HintTooltip content={sent.toLocaleString()}><time
       dateTime={sent.toISOString()}
-      title={sent.toLocaleString()}
       className="mr-1 text-[11px] text-[var(--color-text-tertiary)]"
     >
       {label}
-    </time>
+    </time></HintTooltip>
   )
 }
