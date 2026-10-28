@@ -707,7 +707,7 @@ describe('ChatInput file mentions', () => {
       expect(input.value).toBe('讲一下这个目录。')
     })
     expect(screen.getByText('backend/')).toBeInTheDocument()
-    expect(screen.getByText('folder')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove backend/' })).toBeInTheDocument()
 
     fireEvent.keyDown(input, { key: 'Enter' })
 
@@ -747,7 +747,7 @@ describe('ChatInput file mentions', () => {
 
     render(<ChatInput compact />)
 
-    fireEvent.click(screen.getByLabelText('Open composer tools'))
+    fireEvent.keyDown(screen.getByLabelText('Open composer tools'), { key: 'Enter' })
     fireEvent.click(screen.getByText('Add files or photos'))
 
     expect(await screen.findByText('large-a.log')).toBeInTheDocument()
@@ -887,8 +887,8 @@ describe('ChatInput file mentions', () => {
       target: { value: 'ship it', selectionStart: 7 },
     })
 
-    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('h-11', 'w-11')
-    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('h-11', 'w-11')
+    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('size-11')
+    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('size-11')
     expect(screen.queryByText('Run')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-toolbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input-shell')).toHaveClass('px-3')

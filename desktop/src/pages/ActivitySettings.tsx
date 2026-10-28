@@ -1,3 +1,5 @@
+import { LoaderCircleIcon } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/shared/ui/tooltip'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
 import { SettingsSummary } from '../components/settings/SettingsSummary'
@@ -30,7 +32,6 @@ const HEAT_CELL_GAP = 3
 const HEAT_LABEL_WIDTH = 38
 const HEAT_CELL_MIN = 6
 const HEAT_CELL_MAX = 22
-const TOOLTIP_WIDTH = 172
 const HEAT_COLORS = [
   'var(--color-activity-heat-0)',
   'var(--color-activity-heat-1)',
@@ -201,8 +202,6 @@ export function ActivitySettings() {
   const [stats, setStats] = useState<ActivityStatsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null)
-  const [focusedDate, setFocusedDate] = useState<string | null>(null)
   const [heatCellSize, setHeatCellSize] = useState(10)
 
   useEffect(() => {
@@ -253,24 +252,9 @@ export function ActivitySettings() {
   const days = useMemo(() => buildHeatmapDays(stats), [stats])
   const monthLabels = useMemo(() => buildMonthLabels(days, locale), [days, locale])
   const today = days.length > 0 ? days[days.length - 1] : null
-  const activeTooltipDate = hoveredDate ?? focusedDate
-  const tooltipDay = days.find((day) => day.date === activeTooltipDate) ?? null
-  const tooltipIndex = tooltipDay ? days.findIndex((day) => day.date === tooltipDay.date) : -1
   const heatGridWidth = WEEK_COUNT * heatCellSize + (WEEK_COUNT - 1) * HEAT_CELL_GAP
   const heatGridHeight = 7 * heatCellSize + 6 * HEAT_CELL_GAP
   const heatmapWidth = HEAT_LABEL_WIDTH + heatGridWidth
-  const tooltipStyle = tooltipIndex >= 0
-    ? {
-        left: Math.max(
-          HEAT_LABEL_WIDTH,
-          Math.min(
-            heatmapWidth - TOOLTIP_WIDTH,
-            HEAT_LABEL_WIDTH + Math.floor(tooltipIndex / 7) * (heatCellSize + HEAT_CELL_GAP) - 52,
-          ),
-        ),
-        top: Math.max(28, 30 + (tooltipIndex % 7) * (heatCellSize + HEAT_CELL_GAP) - 50),
-      }
-    : undefined
   const dateRange = days.length > 0 && days[0] && today ? formatDateRange(days[0].date, today.date) : ''
   const yesterdayDate = today ? localDateKey(addDays(parseLocalDate(today.date), -1)) : null
   const yesterday = days.find((day) => day.date === yesterdayDate) ?? null
@@ -279,17 +263,17 @@ export function ActivitySettings() {
   const metrics: SummaryMetric[] = [
     {
       label: t('settings.activity.metric.today'),
-      value: today ? `${formatTokens(today.tokens)} tokens` : '0 tokens',
+      value: t('settings.activity.tokenCount', { count: formatTokens(today?.tokens ?? 0) }),
       detail: today ? formatSessionCount(today.sessionCount, t) : formatSessionCount(0, t),
     },
     {
       label: t('settings.activity.metric.yesterday'),
-      value: `${formatTokens(yesterday?.tokens ?? 0)} tokens`,
+      value: t('settings.activity.tokenCount', { count: formatTokens(yesterday?.tokens ?? 0) }),
       detail: formatSessionCount(yesterday?.sessionCount ?? 0, t),
     },
     {
       label: t('settings.activity.metric.last30'),
-      value: `${formatTokens(last30Usage.tokens)} tokens`,
+      value: t('settings.activity.tokenCount', { count: formatTokens(last30Usage.tokens) }),
       detail: formatSessionCount(last30Usage.sessions, t),
     },
   ]
@@ -314,7 +298,7 @@ export function ActivitySettings() {
       <div className="min-w-0">
         {isLoading ? (
           <div className="flex min-h-[190px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
-            <span className="material-symbols-outlined mr-2 animate-spin text-[18px]">progress_activity</span>
+            <LoaderCircleIcon className="shrink-0 mr-2 animate-spin" aria-hidden="true" size={18} />
             {t('common.loading')}
           </div>
         ) : error ? (
@@ -360,50 +344,27 @@ export function ActivitySettings() {
                       columnGap: HEAT_CELL_GAP,
                       rowGap: HEAT_CELL_GAP,
                     }}
-                    onMouseLeave={() => setHoveredDate(null)}
                   >
-                    {days.map((day) => {
-                      const isSelected = activeTooltipDate === day.date
-                      const tooltipId = `activity-day-tooltip-${day.date}`
-                      return (
-                        <button
-                          key={day.date}
-                          type="button"
-                          role="gridcell"
-                          aria-label={`${formatDateLabel(day.date, locale)}: ${formatSessionCount(day.sessionCount, t)}, ${formatTokens(day.tokens)} tokens`}
-                          aria-describedby={activeTooltipDate === day.date ? tooltipId : undefined}
-                          className={`rounded-[3px] border transition-[border-color,transform] hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface)] ${
-                            isSelected
-                              ? 'border-[var(--color-activity-cell-border-active)]'
-                              : 'border-[var(--color-activity-cell-border)] hover:border-[var(--color-activity-cell-border-hover)]'
-                          }`}
-                          style={{
-                            width: heatCellSize,
-                            height: heatCellSize,
-                            backgroundColor: HEAT_COLORS[day.level],
-                          }}
-                          onFocus={() => setFocusedDate(day.date)}
-                          onBlur={() => setFocusedDate(null)}
-                          onMouseEnter={() => setHoveredDate(day.date)}
-                        />
-                      )
-                    })}
+                    {days.map((day) => (
+                      <Tooltip key={day.date} delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            role="gridcell"
+                            aria-label={`${formatDateLabel(day.date, locale)}: ${formatSessionCount(day.sessionCount, t)}, ${t('settings.activity.tokenCount', { count: formatTokens(day.tokens) })}`}
+                            className="rounded-sm border border-[var(--color-activity-cell-border)] transition-[border-color,transform] hover:scale-110 hover:border-[var(--color-activity-cell-border-hover)] data-[state=instant-open]:border-[var(--color-activity-cell-border-active)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface)]"
+                            style={{ width: heatCellSize, height: heatCellSize, backgroundColor: HEAT_COLORS[day.level] }}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent className="block min-w-[172px] border border-[var(--color-activity-tooltip-border)] bg-[var(--color-activity-tooltip-surface)] text-xs shadow-[var(--shadow-dropdown)]">
+                          <div className="font-medium text-[var(--color-activity-tooltip-text)]">{formatDateLabel(day.date, locale)}</div>
+                          <div className="mt-1 text-[var(--color-activity-tooltip-muted)]">{formatSessionCount(day.sessionCount, t)} · {t('settings.activity.tokenCount', { count: formatTokens(day.tokens) })}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
                   </div>
                 </div>
 
-                {tooltipDay && (
-                  <div
-                    id={`activity-day-tooltip-${tooltipDay.date}`}
-                    role="tooltip"
-                    className="pointer-events-none absolute z-20 min-w-[172px] rounded-md border border-[var(--color-activity-tooltip-border)] bg-[var(--color-activity-tooltip-surface)] px-3 py-2 text-xs shadow-xl"
-                    style={tooltipStyle}
-                  >
-                    <div className="font-medium text-[var(--color-activity-tooltip-text)]">{formatDateLabel(tooltipDay.date, locale)}</div>
-                    <div className="mt-1 text-[var(--color-activity-tooltip-muted)]">
-                      {formatSessionCount(tooltipDay.sessionCount, t)} · {formatTokens(tooltipDay.tokens)} tokens
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
+import { Button } from '../shared/ui/button'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { ChevronRight, FileText, Plus } from 'lucide-react'
 import { useSkillStore } from '../../stores/skillStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -82,9 +84,7 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
     return (
       <div className="min-w-0">
         {header}
-        <div className="flex justify-center py-12">
-          <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-        </div>
+        <LoadingBlock />
       </div>
     )
   }
@@ -184,13 +184,9 @@ function SkillBadge({ children }: { children: ReactNode }) {
 function SkillAddButton() {
   const t = useTranslation()
   return (
-    <button
-      type="button"
-      onClick={() => useUIStore.getState().openSettings('plugins')}
-      className="inline-flex h-8 items-center gap-1.5 rounded-[6px] bg-[var(--color-text-primary)] px-2.5 text-xs font-medium leading-[18px] text-[var(--color-surface-container-lowest)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-    >
-      <Plus size={13} aria-hidden="true" />
+    <Button onClick={() => useUIStore.getState().openSettings('plugins')}>
+      <Plus aria-hidden="true" />
       {t('settings.skills.addFromPlugins')}
-    </button>
+    </Button>
   )
 }

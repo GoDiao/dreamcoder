@@ -5,6 +5,7 @@ import '@testing-library/jest-dom'
 import { Settings } from '../pages/Settings'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
+import { toast } from 'sonner'
 import { useUpdateStore } from '../stores/updateStore'
 import { useClaudeCodeImportStore } from '../stores/claudeCodeImportStore'
 import type { SavedProvider } from '../types/provider'
@@ -130,7 +131,7 @@ function expandSection(title: string) {
 }
 
 function chooseOption(trigger: string, option: string | RegExp) {
-  fireEvent.click(screen.getByRole('button', { name: trigger }))
+  fireEvent.keyDown(screen.getByRole('button', { name: trigger }), { key: 'ArrowDown' })
   fireEvent.click(screen.getByRole('menuitemradio', { name: option }))
 }
 
@@ -276,7 +277,7 @@ describe('Settings > General tab', () => {
       updateH5AccessSettings: vi.fn(),
     })
 
-    useUIStore.setState({ settingsTab: 'providers', toasts: [] })
+    useUIStore.setState({ settingsTab: 'providers' })
     useUpdateStore.setState({
       status: 'idle',
       availableVersion: null,
@@ -303,7 +304,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
     expandSection('Default shell')
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'bash' }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
     expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'bash', customShellPath: '' })
@@ -326,13 +327,13 @@ describe('Settings > General tab', () => {
     expect(toggle).toBeChecked()
   })
 
-  it('offers all seven themes in a borderless dropdown and saves the choice', () => {
+  it('offers all seven themes in a borderless dropdown and saves the choice', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
     const trigger = screen.getByRole('button', { name: 'Color theme' })
     expect(trigger).toHaveTextContent('Warm Classic')
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
 
     const options = screen.getAllByRole('menuitemradio').map((option) => option.textContent)
     expect(options).toEqual(['Pure White', 'Warm Classic', 'Dark', 'Midnight', 'DreamField Emerald', 'Autumn Amber', 'Aurora'])
@@ -341,7 +342,7 @@ describe('Settings > General tab', () => {
 
     expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('aurora')
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 
   it('marks the pure white appearance theme as selected', () => {
@@ -349,26 +350,28 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    fireEvent.click(screen.getByRole('button', { name: 'Color theme' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Color theme' }), { key: 'ArrowDown' })
 
     expect(screen.getByRole('menuitemradio', { name: 'Pure White' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('menuitemradio', { name: 'Warm Classic' })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('closes a settings dropdown with Escape and on outside click', () => {
+  it('closes a settings dropdown with Escape and on outside click', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
     const trigger = screen.getByRole('button', { name: 'Color theme' })
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     expect(screen.getByRole('menu', { name: 'Color theme' })).toBeInTheDocument()
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
     expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    await waitFor(() => expect(trigger).toHaveFocus())
 
-    fireEvent.click(trigger)
-    fireEvent.mouseDown(document.body)
-    expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    await waitFor(() => {
+      fireEvent.pointerDown(document.body, { button: 0, pointerType: 'mouse' })
+      expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+    })
   })
 
   it('groups General settings and uses a segmented control for effort', () => {
@@ -454,10 +457,7 @@ describe('Settings > General tab', () => {
         url: 'http://127.0.0.1:7890',
       },
     })
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'Network settings saved.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('Network settings saved.')
   })
 
   it('validates typed provider network timeout and supports precise step controls', () => {
@@ -734,7 +734,7 @@ describe('Settings > General tab', () => {
 
     const trigger = screen.getByRole('button', { name: 'Response Language' })
     expect(trigger).toHaveTextContent('Default (match conversation)')
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: '中文 (Chinese)' }))
 
     expect(useSettingsStore.getState().setResponseLanguage).toHaveBeenCalledWith('chinese')
@@ -747,7 +747,7 @@ describe('Settings > General tab', () => {
 
     const trigger = screen.getByRole('button', { name: 'Auto-compact' })
     expect(trigger).toHaveTextContent('90% (default)')
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: '70%' }))
 
     expect(useSettingsStore.getState().setAutoCompactPercent).toHaveBeenCalledWith(70)
@@ -849,7 +849,7 @@ describe('Settings > General tab', () => {
     const section = screen.getByRole('region', { name: 'H5 Access' })
 
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
-    const dialog = screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })
     expect(within(dialog).getByText(/desktop H5 app on your LAN address and port/i)).toBeInTheDocument()
 
     await act(async () => {
@@ -877,7 +877,7 @@ describe('Settings > General tab', () => {
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
+      fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
     })
 
     await within(section).findByAltText('H5 access QR code')
@@ -888,10 +888,7 @@ describe('Settings > General tab', () => {
     expect(clipboardMock.copyTextToClipboard).toHaveBeenCalledWith(
       'http://192.168.0.102:3456/?serverUrl=http%3A%2F%2F192.168.0.102%3A3456&h5Token=h5_default_generated_token',
     )
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'QR link copied.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('QR link copied.')
   })
 
   it('guides enabled H5 users to generate a token before the QR code exists', async () => {
@@ -936,7 +933,7 @@ describe('Settings > General tab', () => {
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
+      fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
     })
 
     fireEvent.click(within(section).getByRole('button', { name: 'Show token' }))
@@ -964,10 +961,7 @@ describe('Settings > General tab', () => {
     })
 
     expect(clipboardMock.copyTextToClipboard).toHaveBeenCalledWith('https://phone.example/app')
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'H5 URL copied.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('H5 URL copied.')
   })
 
   it('shows the H5-specific store error when the H5 settings load failed', () => {
@@ -1177,6 +1171,7 @@ describe('Settings > General tab', () => {
 
 describe('Settings > Providers tab', () => {
   beforeEach(() => {
+    useUIStore.setState({ settingsTab: 'providers' })
     MOCK_DELETE_PROVIDER.mockReset()
     MOCK_GET_SETTINGS.mockResolvedValue({})
     MOCK_UPDATE_SETTINGS.mockResolvedValue({})
@@ -1209,10 +1204,10 @@ describe('Settings > Providers tab', () => {
     })
 
     expect(MOCK_DELETE_PROVIDER).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(screen.getByText('Delete provider "MiniMax-M2.7-highspeed(openai)"? This cannot be undone.')).toBeInTheDocument()
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = screen.getByRole('alertdialog')
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
       await Promise.resolve()
@@ -1221,7 +1216,7 @@ describe('Settings > Providers tab', () => {
     expect(MOCK_DELETE_PROVIDER).toHaveBeenCalledWith('provider-1')
   })
 
-  it('uses the shared dropdown for API format in the provider form', () => {
+  it('uses the shared select for API format in the provider form', () => {
     providerStoreState.presets = [
       {
         id: 'custom',
@@ -1241,10 +1236,10 @@ describe('Settings > Providers tab', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('combobox', { name: /Fast model/i })).toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /Anthropic Messages \(native\)/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /OpenAI Responses API \(proxy\)/i }))
+    fireEvent.keyDown(within(dialog).getByRole('combobox', { name: 'API Format' }), { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('option', { name: /OpenAI Responses API \(proxy\)/i }))
 
-    expect(within(dialog).getByRole('button', { name: /OpenAI Responses API \(proxy\)/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: 'API Format' })).toHaveTextContent(/OpenAI Responses API \(proxy\)/i)
     expect(within(dialog).getByText('Requests will be translated via the local proxy')).toBeInTheDocument()
   })
 
@@ -1310,10 +1305,10 @@ describe('Settings > Providers tab', () => {
 
     expect(apiKeyInput).toHaveAttribute('type', 'password')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show API Key' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show API key' }))
 
     expect(apiKeyInput).toHaveAttribute('type', 'text')
-    expect(within(dialog).getByRole('button', { name: 'Hide API Key' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Hide API key' })).toBeInTheDocument()
   })
 })
 

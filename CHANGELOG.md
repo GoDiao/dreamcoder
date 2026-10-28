@@ -4,6 +4,14 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The desktop interface is rebuilt on shadcn/ui** (#191). The app now runs on React 19, and buttons, dialogs, menus, notifications and panels share one set of components in all seven themes. Dialogs keep focus inside and return it when closed, and menus and the file tree work from the keyboard. Icons are lucide SVGs instead of the Material Symbols font. The H5 page needs Safari 17.5 or later.
+  - Code blocks are highlighted with Shiki in light and dark themes and show plain text while highlighting loads. Chat and workspace diffs are rendered with Pierre, with line comments and quoting of selected lines.
+  - A new conversation stays a local draft until the first message or attachment is sent. Opening a new conversation from the sidebar, a project or the keyboard shortcut no longer creates an empty session.
+  - The context button under the input shows usage as a ring; hover it for the breakdown. The task list shows how many steps are done.
+  - The model and effort are picked from two separate lists under the input. Typing while no text field has focus goes to the message input.
+
 ### Fixed
 
 - Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).

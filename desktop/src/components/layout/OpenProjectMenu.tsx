@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { Code2, ExternalLink, FolderOpen } from 'lucide-react'
+import { useUIStore } from '../../stores/uiStore'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../shared/ui/dropdown-menu'
+import { Button } from '../shared/ui/button'
+import { Tooltip } from '../shared/Tooltip'
 import { useTranslation } from '../../i18n'
 import { useOpenTargetStore, type OpenTarget } from '../../stores/openTargetStore'
 
@@ -45,40 +48,9 @@ export function OpenProjectMenu({ path }: Props) {
   const primaryTargetId = useOpenTargetStore((state) => state.primaryTargetId)
   const ensureTargets = useOpenTargetStore((state) => state.ensureTargets)
   const openTarget = useOpenTargetStore((state) => state.openTarget)
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
-    if (!path) {
-      setOpen(false)
-      return
-    }
-    void ensureTargets()
+    if (path) void ensureTargets()
   }, [ensureTargets, path])
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleDocumentMouseDown = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
-      setOpen(false)
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setOpen(false)
-    }
-
-    document.addEventListener('mousedown', handleDocumentMouseDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleDocumentMouseDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open])
 
   const primaryTarget = useMemo(
     () => targets.find((target) => target.id === primaryTargetId) ?? targets[0] ?? null,
@@ -91,8 +63,7 @@ export function OpenProjectMenu({ path }: Props) {
     try {
       await openTarget(targetId, path)
     } catch {
-    } finally {
-      setOpen(false)
+      useUIStore.getState().addToast({ type: 'error', message: t('openProject.openFailed') })
     }
   }
 
@@ -102,58 +73,25 @@ export function OpenProjectMenu({ path }: Props) {
     ? t('openProject.openProject')
     : t('openProject.openIn', { target: primaryTarget.label })
 
-  const rect = buttonRef.current?.getBoundingClientRect()
+  const trigger = (
+    <Button variant="ghost" size="icon" aria-label={buttonLabel} onClick={hasMenu ? undefined : () => void handleOpenTarget(primaryTarget.id)}>
+      <ExternalLink size={16} aria-hidden="true" />
+    </Button>
+  )
+
+  if (!hasMenu) return <Tooltip content={buttonLabel}>{trigger}</Tooltip>
 
   return (
-    <div className="relative flex items-center">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={buttonLabel}
-        aria-haspopup={hasMenu ? 'menu' : undefined}
-        aria-expanded={hasMenu ? open : undefined}
-        title={buttonLabel}
-        onClick={() => {
-          if (hasMenu) {
-            setOpen((value) => !value)
-            return
-          }
-          void handleOpenTarget(primaryTarget.id)
-        }}
-        className={`inline-flex h-[29px] w-[29px] items-center justify-center rounded-[7px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
-          open
-            ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
-        }`}
-      >
-        <ExternalLink size={16} strokeWidth={1.9} aria-hidden="true" />
-      </button>
-
-      {open && hasMenu && rect ? createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          className="motion-menu fixed z-50 min-w-[200px] overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-[var(--shadow-dropdown)]"
-          data-state="open"
-          style={{ top: rect.bottom + 6, right: Math.max(12, window.innerWidth - rect.right) }}
-        >
-          {targets.map((target) => (
-            <button
-              key={target.id}
-              type="button"
-              role="menuitem"
-              onClick={() => void handleOpenTarget(target.id)}
-              className="flex w-full items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-ui-nav text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)]"
-            >
-              <span className="flex h-5 w-5 items-center justify-center text-[var(--color-text-secondary)]">
-                <TargetIcon target={target} size={18} />
-              </span>
-              <span className="min-w-0 truncate">{target.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
-      ) : null}
-    </div>
+    <DropdownMenu>
+      <Tooltip content={buttonLabel}><DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger></Tooltip>
+      <DropdownMenuContent align="end" className="min-w-[200px]">
+        {targets.map((target) => (
+          <DropdownMenuItem key={target.id} onSelect={() => void handleOpenTarget(target.id)}>
+            <TargetIcon target={target} size={18} />
+            <span className="min-w-0 truncate">{target.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

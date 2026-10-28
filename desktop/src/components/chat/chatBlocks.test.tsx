@@ -19,13 +19,14 @@ describe('chat blocks', () => {
 
     expect(screen.getByText(/Thinking/)).toBeTruthy()
     expect(container.textContent).toContain('this is a long internal reasoning trace')
-    expect(container.querySelector('.thinking-cursor')).toBeNull()
+    expect(screen.getByRole('button', { expanded: false })).toBeTruthy()
+    expect(container.querySelector('[data-slot=trace-line][data-status=running]')).not.toBeNull()
   })
 
   it('does not animate inactive historical thinking blocks', () => {
     const { container } = render(<ThinkingBlock content="old reasoning" isActive={false} />)
 
-    expect(container.querySelector('.thinking-inline-cursor')).toBeNull()
+    expect(container.querySelector('[data-slot=trace-line][data-status=running]')).toBeNull()
   })
 
   it('shows tool previews only after expanding the tool block', () => {
@@ -239,6 +240,6 @@ describe('chat blocks', () => {
 
     expect(container.textContent).toContain('/tmp/example.ts')
     expect(container.textContent).toContain('Allow')
-    expect(container.querySelector('[class*="rounded-[var(--radius-lg)]"]')).toBeTruthy()
+    expect(container.querySelector('[class*="rounded-lg"]')).toBeTruthy()
   })
 })

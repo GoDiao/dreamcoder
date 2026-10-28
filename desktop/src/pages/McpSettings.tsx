@@ -1,11 +1,14 @@
+import { ArrowLeftIcon, Plus, RefreshCwIcon, Settings2, Trash2Icon } from 'lucide-react'
+import { Spinner } from '../components/shared/ui/spinner'
+import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Settings2 } from 'lucide-react'
-import { Button } from '../components/shared/Button'
-import { Switch } from '../components/shared/Switch'
+import { Button } from '../components/shared/ui/button'
+import { Switch } from '../components/shared/ui/switch'
 import { SegmentedControl } from '../components/shared/SegmentedControl'
 import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
 import { SettingsSection, SettingsSummary } from '../components/settings/SettingsSummary'
-import { Input } from '../components/shared/Input'
+import { Input } from '../components/shared/ui/input'
+import { LabeledInput } from '../components/shared/LabeledInput'
 import { Modal } from '../components/shared/Modal'
 import { useTranslation } from '../i18n'
 import { useUIStore } from '../stores/uiStore'
@@ -309,22 +312,23 @@ function ArraySection({
               onChange={(event) => onChange(row.id, 'value', event.target.value)}
               placeholder={valuePlaceholder}
             />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onRemove(row.id)}
-              className="mt-1 flex h-10 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+              className="text-[var(--color-text-tertiary)]"
               aria-label={addLabel}
             >
-              <span className="material-symbols-outlined text-[18px]">delete</span>
-            </button>
+              <Trash2Icon aria-hidden="true" size={18} />
+            </Button>
           </div>
         ))}
         <button
           type="button"
           onClick={onAdd}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
+          <Plus aria-hidden="true" size={18} />
           {addLabel}
         </button>
       </div>
@@ -339,7 +343,7 @@ function LoadingState({ label }: { label: string }) {
       aria-live="polite"
       className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center"
     >
-      <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
+      <Spinner aria-hidden="true" className="size-7 text-[var(--color-brand)]" />
       <div className="text-sm font-medium text-[var(--color-text-secondary)]">{label}</div>
     </div>
   )
@@ -371,14 +375,14 @@ function ServerRow({
           <span className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{server.name}</span>
           <StatusBadge server={server} />
         </div>
-        <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]" title={details.join(' · ')}>
+        <HintTooltip content={details.join(' · ')}><div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
           {details.map((part, index) => (
             <span key={index}>
               {index > 0 ? ' · ' : null}
               <span className={part === server.projectPath ? 'font-[var(--font-mono)]' : undefined}>{part}</span>
             </span>
           ))}
-        </div>
+        </div></HintTooltip>
         {server.statusDetail && (
           <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-tertiary)]">{server.statusDetail}</div>
         )}
@@ -386,19 +390,20 @@ function ServerRow({
 
       <div className="flex flex-shrink-0 items-center gap-1.5">
         <Switch
-          label={server.name}
+          aria-label={server.name}
           checked={server.enabled}
           disabled={isBusy || !server.canToggle}
-          onChange={onToggle}
+          onCheckedChange={onToggle}
         />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onOpen}
-          className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          className="text-[var(--color-text-secondary)]"
           aria-label={`Open ${server.name}`}
         >
           <Settings2 size={15} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -642,7 +647,7 @@ export function McpSettings() {
           <Button variant="ghost" onClick={() => setPendingDeleteServer(null)} disabled={isDeleting}>
             {t('settings.mcp.form.cancel')}
           </Button>
-          <Button variant="danger" onClick={confirmDelete} loading={isDeleting}>
+          <Button variant="destructive" onClick={confirmDelete} loading={isDeleting}>
             {t('settings.mcp.form.confirmDelete')}
           </Button>
         </>
@@ -767,14 +772,10 @@ export function McpSettings() {
     return (
       <>
         <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => setView({ type: 'list' })}
-            className="mb-5 inline-flex items-center gap-1.5 rounded-[6px] text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-          >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <Button variant="ghost" size="xs" onClick={() => setView({ type: 'list' })} className="mb-5 text-[var(--color-text-secondary)]">
+            <ArrowLeftIcon aria-hidden="true" />
             {t('settings.mcp.form.back')}
-          </button>
+          </Button>
 
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
@@ -788,14 +789,14 @@ export function McpSettings() {
               </div>
             </div>
             {server.canReconnect && (
-              <Button variant="secondary" onClick={() => handleReconnect(server)} loading={busyServerKey === getServerIdentityKey(server)}>
-                <span className="material-symbols-outlined text-[16px]">sync</span>
+              <Button variant="outline" onClick={() => handleReconnect(server)} loading={busyServerKey === getServerIdentityKey(server)}>
+                <RefreshCwIcon data-icon="inline-start" aria-hidden="true" size={16} />
                 {t('settings.mcp.form.reconnect')}
               </Button>
             )}
           </div>
 
-          <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
             <div className="grid gap-4 md:grid-cols-2">
               <InfoPair label={t('settings.mcp.form.transport')} value={transportLabel(server.transport, t)} />
               <InfoPair label={t('settings.mcp.form.scope')} value={scopeLabel(server, t)} />
@@ -804,7 +805,7 @@ export function McpSettings() {
             </div>
             <div className="mt-5">
               <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">{t('settings.mcp.form.rawConfig')}</div>
-              <pre className="overflow-x-auto rounded-[var(--radius-lg)] bg-[var(--color-surface-hover)] p-4 text-xs text-[var(--color-text-secondary)]">
+              <pre className="overflow-x-auto rounded-lg bg-[var(--color-surface-hover)] p-4 text-xs text-[var(--color-text-secondary)]">
                 {JSON.stringify(server.config, null, 2)}
               </pre>
             </div>
@@ -833,8 +834,8 @@ export function McpSettings() {
           </>}
           headerActions={editing && targetServer && <>
             {targetServer.canReconnect && (
-              <Button variant="secondary" onClick={() => handleReconnect(targetServer)} loading={busyServerKey === getServerIdentityKey(targetServer)}>
-                <span className="material-symbols-outlined text-[16px]">sync</span>
+              <Button variant="outline" onClick={() => handleReconnect(targetServer)} loading={busyServerKey === getServerIdentityKey(targetServer)}>
+                <RefreshCwIcon data-icon="inline-start" aria-hidden="true" size={16} />
                 {t('settings.mcp.form.reconnect')}
               </Button>
             )}
@@ -845,7 +846,7 @@ export function McpSettings() {
                 onClick={() => handleDelete(targetServer)}
                 loading={isDeleting}
               >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <Trash2Icon aria-hidden="true" size={16} />
                 {t('settings.mcp.form.uninstall')}
               </Button>
             )}
@@ -867,7 +868,7 @@ export function McpSettings() {
             currentWorkDir={currentWorkDir}
           />
 
-          <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+          <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
             <div className="grid grid-cols-3">
               {(['stdio', 'http', 'sse'] as TransportKind[]).map((transport) => {
                 const active = draft.transport === transport
@@ -899,12 +900,12 @@ export function McpSettings() {
           {draft.transport === 'stdio' ? (
             <>
               <McpEditorSection>
-                <Input
+                <LabeledInput
                   label={t('settings.mcp.form.command')}
+                  required
                   value={draft.command}
                   onChange={(event) => setDraftField('command', event.target.value)}
                   placeholder={t('settings.mcp.form.commandPlaceholder')}
-                  required
                 />
                 <p className="mt-2 text-xs leading-5 text-[var(--color-text-tertiary)]">
                   {t('settings.mcp.form.commandHostHint')}
@@ -936,12 +937,12 @@ export function McpSettings() {
           ) : (
             <>
               <McpEditorSection>
-                <Input
+                <LabeledInput
                   label={draft.transport === 'http' ? t('settings.mcp.form.url') : t('settings.mcp.form.sseUrl')}
+                  required
                   value={draft.url}
                   onChange={(event) => setDraftField('url', event.target.value)}
                   placeholder={t('settings.mcp.form.urlPlaceholder')}
-                  required
                 />
               </McpEditorSection>
 
@@ -958,13 +959,13 @@ export function McpSettings() {
 
               <McpEditorSection>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input
+                  <LabeledInput
                     label={t('settings.mcp.form.oauthClientId')}
                     value={draft.oauthClientId}
                     onChange={(event) => setDraftField('oauthClientId', event.target.value)}
                     placeholder={t('settings.mcp.form.oauthClientIdPlaceholder')}
                   />
-                  <Input
+                  <LabeledInput
                     label={t('settings.mcp.form.oauthCallbackPort')}
                     value={draft.oauthCallbackPort}
                     onChange={(event) => setDraftField('oauthCallbackPort', event.target.value)}
@@ -972,7 +973,7 @@ export function McpSettings() {
                   />
                 </div>
                 <div className="mt-4">
-                  <Input
+                  <LabeledInput
                     label={t('settings.mcp.form.headersHelper')}
                     value={draft.headersHelper}
                     onChange={(event) => setDraftField('headersHelper', event.target.value)}
@@ -996,7 +997,8 @@ export function McpSettings() {
         title={t('settings.mcp.title')}
         description={t('settings.mcp.description')}
         actions={!catalogVisible ? (
-          <Button variant="secondary" size="xs" onClick={beginCreate} icon={<Plus size={13} aria-hidden="true" />}>
+          <Button variant="outline" size="xs" onClick={beginCreate}>
+            <Plus data-icon="inline-start" size={13} aria-hidden="true" />
             {t('settings.mcp.addServer')}
           </Button>
         ) : null}
@@ -1077,7 +1079,7 @@ export function McpSettings() {
 
 function InfoPair({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[var(--radius-lg)] bg-[var(--color-surface-hover)] px-4 py-3">
+    <div className="rounded-lg bg-[var(--color-surface-hover)] px-4 py-3">
       <div className="text-xs uppercase tracking-[0.16em] font-semibold text-[var(--color-text-tertiary)] mb-2">{label}</div>
       <div className="text-sm text-[var(--color-text-primary)] break-all">{value}</div>
     </div>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import '@testing-library/jest-dom'
@@ -46,6 +46,7 @@ vi.mock('../../i18n', () => ({
     'permMode.computerUseBypassWarning': 'Computer Use actions will no longer ask for confirmation.',
     'common.cancel': 'Cancel',
     'tabs.close': 'Close',
+      'common.close': 'Close',
   }[key] ?? key),
 }))
 
@@ -69,6 +70,17 @@ describe('PermissionModeSelector', () => {
     useTabStore.setState({ activeTabId: null, tabs: [] })
   })
 
+  it.each([false, true])('disables permission changes while submitting on mobile=%s', (mobile) => {
+    viewportMocks.isMobile = mobile
+    const { onChange } = renderSelector({ disabled: true })
+    const trigger = screen.getByRole('button', { name: 'Manual' })
+    expect(trigger).toBeDisabled()
+    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    expect(screen.queryByRole(mobile ? 'radio' : 'menuitemradio')).not.toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('labels the compact mobile trigger and opens a phone-sized menu sheet', () => {
     viewportMocks.isMobile = true
 
@@ -76,7 +88,7 @@ describe('PermissionModeSelector', () => {
 
     const trigger = screen.getByRole('button', { name: 'Manual' })
     expect(trigger).toHaveClass('h-11', 'w-11')
-    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(trigger)
@@ -85,10 +97,36 @@ describe('PermissionModeSelector', () => {
     expect(trigger).toHaveAttribute('aria-controls', 'permission-mode-menu')
     expect(screen.getByRole('dialog', { name: 'Execution Permissions' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitemradio', { name: /Accept edits/ })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Execution Permissions' })).toHaveAttribute('id', 'permission-mode-menu')
+    expect(screen.getByRole('radio', { name: /Accept edits/ })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('uses the active tab workspace when showing the bypass confirmation path', () => {
+  it('marks the current mode and applies a pick in the mobile radio group', () => {
+    viewportMocks.isMobile = true
+    const { onChange } = renderSelector({ value: 'plan' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Plan/ })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('radio', { name: /Accept edits/ }))
+    expect(onChange).toHaveBeenCalledWith('acceptEdits')
+  })
+
+  it('leaves the desktop trigger popup attributes to Radix so aria-controls names the open menu', async () => {
+    renderSelector()
+    const trigger = screen.getByRole('button', { name: 'Manual' })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    await screen.findByRole('menu')
+
+    const controlled = trigger.getAttribute('aria-controls')
+    expect(controlled).toBeTruthy()
+    expect(document.getElementById(controlled!)).toBe(screen.getByRole('menu'))
+  })
+
+  it('uses the active tab workspace when showing the bypass confirmation path', async () => {
     useSessionStore.setState({
       activeSessionId: 'previous-session',
       sessions: [
@@ -123,17 +161,17 @@ describe('PermissionModeSelector', () => {
 
     renderSelector({ compact: true })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Manual' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
 
-    expect(screen.getByText('C:\\Users\\LinTan\\MyScript\\test5')).toBeInTheDocument()
+    expect(await screen.findByText('C:\\Users\\LinTan\\MyScript\\test5')).toBeInTheDocument()
     expect(screen.queryByText('C:\\Users\\LinTan')).not.toBeInTheDocument()
   })
 
   it('lists the modes without a menu heading and marks the current one', () => {
     renderSelector({ value: 'plan' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Plan' }), { key: 'ArrowDown' })
 
     expect(screen.queryByText('Execution Permissions')).not.toBeInTheDocument()
     const items = screen.getAllByRole('menuitemradio')
@@ -158,7 +196,7 @@ describe('PermissionModeSelector', () => {
     useSettingsStore.setState({ permissionMode: 'acceptEdits' })
 
     renderSelector({ value: 'plan' })
-    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Plan' }), { key: 'ArrowDown' })
 
     expect(screen.getByRole('menuitemradio', { name: /Accept edits/ })).toHaveTextContent('default')
     expect(screen.getByRole('menuitemradio', { name: /Plan/ })).not.toHaveTextContent('default')
@@ -169,20 +207,20 @@ describe('PermissionModeSelector', () => {
     useSettingsStore.setState({ setPermissionMode: setDefault })
 
     const { onChange } = renderSelector()
-    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Manual' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Accept edits/ }))
 
     expect(onChange).toHaveBeenCalledWith('acceptEdits')
     expect(setDefault).not.toHaveBeenCalled()
   })
 
-  it('asks before switching to Bypass', () => {
+  it('asks before switching to Bypass', async () => {
     const { onChange } = renderSelector()
-    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Manual' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
 
     expect(onChange).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Enable bypass' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Enable bypass' }))
     expect(onChange).toHaveBeenCalledWith('bypassPermissions')
   })
 
@@ -195,7 +233,7 @@ describe('PermissionModeSelector', () => {
   it('warns that Computer Use actions skip confirmation when bypass is enabled with Computer Use on', async () => {
     computerUseMocks.getConfig.mockResolvedValue({ enabled: true, driverPath: null })
     renderSelector({ workDir: '/repo' })
-    fireEvent.click(screen.getByRole('button', { name: /Manual/ }))
+    fireEvent.keyDown(screen.getByRole('button', { name: /Manual/ }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
     expect(await screen.findByRole('note')).toHaveTextContent(
       'Computer Use actions will no longer ask for confirmation.',
@@ -204,17 +242,18 @@ describe('PermissionModeSelector', () => {
 
   it('shows no Computer Use warning when Computer Use is off', async () => {
     renderSelector({ workDir: '/repo' })
-    fireEvent.click(screen.getByRole('button', { name: /Manual/ }))
+    fireEvent.keyDown(screen.getByRole('button', { name: /Manual/ }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))
     await waitFor(() => expect(computerUseMocks.getConfig).toHaveBeenCalled())
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
 
-  it('shows the chosen mode at once and marks it until the CLI applies it', () => {
+  it('shows the chosen mode at once and marks it until the CLI applies it', async () => {
     renderSelector({ value: 'bypassPermissions', effectiveValue: 'default' })
 
     expect(screen.getByTestId('permission-mode-pending')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Bypass permissions' })).toHaveAttribute('title', 'permMode.pendingSwitch')
+    act(() => screen.getByRole('button', { name: 'Bypass permissions' }).focus())
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('permMode.pendingSwitch')
   })
 
   it('shows no pending mark when the CLI runs the chosen mode', () => {

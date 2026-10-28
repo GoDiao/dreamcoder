@@ -18,7 +18,7 @@
 [**⬇️ 下载 macOS 版（Apple Silicon）**](https://github.com/GoDiao/dreamcoder/releases/latest) · [**⬇️ 下载 Windows 版（x64）**](https://github.com/GoDiao/dreamcoder/releases/latest)
 
 [![Electron](https://img.shields.io/badge/Electron-45-47848F)](https://www.electronjs.org/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
 [![Bun](https://img.shields.io/badge/Bun-✓-fbf0df)](https://bun.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 [![Good First Issues](https://img.shields.io/github/issues/GoDiao/dreamcoder/good%20first%20issue?color=7057ff&label=good%20first%20issues)](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
@@ -108,7 +108,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 | 组件 | 技术选型 |
 |------|----------|
 | 桌面外壳 | [Electron](https://www.electronjs.org/) |
-| 前端 UI | React 18 + Vite + TailwindCSS 4 |
+| 前端 UI | React 19 + Vite + TailwindCSS 4 |
 | 后端运行时 | Bun (Node.js 兼容) |
 | 终端 | sidecar 内的 Bun PTY + xterm.js |
 | 状态管理 | Zustand |

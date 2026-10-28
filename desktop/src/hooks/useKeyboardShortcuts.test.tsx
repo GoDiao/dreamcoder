@@ -5,15 +5,23 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useUIStore } from '../stores/uiStore'
 import { useSessionStore } from '../stores/sessionStore'
+import { useTabStore } from '../stores/tabStore'
+import { useNewSessionStore } from '../stores/newSessionStore'
+import { Modal } from '../components/shared/Modal'
+import { ConfirmDialog } from '../components/shared/ConfirmDialog'
 
 describe('useKeyboardShortcuts quick switcher', () => {
   beforeEach(() => {
+    useTabStore.setState(useTabStore.getInitialState(), true)
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useUIStore.setState({ activeModal: null, sidebarOpen: false })
   })
 
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    useTabStore.setState(useTabStore.getInitialState(), true)
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useUIStore.setState({ activeModal: null })
   })
 
@@ -63,12 +71,33 @@ describe('useKeyboardShortcuts quick switcher', () => {
     expect(useUIStore.getState().activeModal).toBeNull()
   })
 
+  it.each([
+    ['dialog', () => <Modal open onClose={() => {}} title="Provider"><input aria-label="Name" /></Modal>],
+    ['alert dialog', () => <ConfirmDialog open onClose={() => {}} onConfirm={() => {}} title="Delete" body="Sure?" confirmLabel="Delete" cancelLabel="Cancel" />],
+  ])('does not cover an open %s', (_name, Overlay) => {
+    render(<><ShortcutHost /><Overlay /></>)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    expect(useUIStore.getState().activeModal).toBeNull()
+  })
+
   it('does not run underlying actions while the palette is open', () => {
     useUIStore.setState({ activeModal: 'command-palette' })
     const setActiveSession = vi.spyOn(useSessionStore.getState(), 'setActiveSession')
     render(<ShortcutHost />)
     fireEvent.keyDown(document, { key: 'n', ctrlKey: true })
     expect(setActiveSession).not.toHaveBeenCalled()
+  })
+
+  it.each([{ metaKey: true }, { ctrlKey: true }])('opens the draft page with the new-session shortcut %o', (modifier) => {
+    useTabStore.getState().openTab('__scheduled__', 'Scheduled', 'scheduled')
+    useNewSessionStore.getState().updateDraft({ input: 'Keep this question' })
+    const createSession = vi.spyOn(useSessionStore.getState(), 'createSession')
+    render(<ShortcutHost />)
+    fireEvent.keyDown(document, { key: 'n', ...modifier })
+
+    expect(useTabStore.getState().activeTabId).toBeNull()
+    expect(useNewSessionStore.getState().input).toBe('Keep this question')
+    expect(createSession).not.toHaveBeenCalled()
   })
 
   it('removes its listener when unmounted', () => {

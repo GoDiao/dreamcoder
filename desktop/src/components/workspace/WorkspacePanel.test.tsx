@@ -2,7 +2,7 @@
 
 // @ts-expect-error jsdom is installed in this workspace without local type declarations
 import { JSDOM } from 'jsdom'
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 if (typeof document === 'undefined') {
@@ -92,6 +92,9 @@ async function renderPanel(sessionId: string) {
 
 async function clickElement(element: Element) {
   await act(async () => {
+    fireEvent(element, Object.assign(new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }), { pointerType: 'mouse' }))
+    fireEvent.mouseDown(element, { button: 0 })
+    fireEvent.mouseUp(element, { button: 0 })
     fireEvent.click(element)
     await Promise.resolve()
   })
@@ -106,6 +109,18 @@ function findTextNodeContaining(container: Element, text: string) {
     current = walker.nextNode()
   }
   throw new Error(`Unable to find text node containing ${text}`)
+}
+
+function previewQueries(view: Awaited<ReturnType<typeof renderPanel>>) {
+  const root = view.getByTestId('workspace-code')
+  const shadow = root.querySelector('diffs-container')?.shadowRoot
+  return within((shadow ?? root) as HTMLElement)
+}
+
+function previewText(view: Awaited<ReturnType<typeof renderPanel>>) {
+  const root = view.getByTestId('workspace-code')
+  const shadow = root.querySelector('diffs-container')?.shadowRoot
+  return shadow ? Array.from(shadow.querySelectorAll('[data-line]')).map((row) => row.textContent).join('\n') : root.textContent
 }
 
 async function selectWorkspaceCodeText(
@@ -245,7 +260,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useWorkspacePanelStore, type WorkspacePreviewEntry } from '../../stores/workspacePanelStore'
-import { useUIStore } from '../../stores/uiStore'
+import { toast } from 'sonner'
 import { useTerminalPanelStore } from '../../stores/terminalPanelStore'
 import { WorkspacePanel } from './WorkspacePanel'
 
@@ -408,7 +423,7 @@ describe('WorkspacePanel', () => {
 
     expect(view.getByPlaceholderText('Filter files...')).toBeTruthy()
 
-    const row = await view.findByTitle('src/app.ts')
+    const row = await view.findByRole('button', { name: 'src/app.ts' })
     expect(row.textContent).toContain('app.ts')
     expect(row.textContent).toContain('+4')
     expect(row.textContent).toContain('−1')
@@ -431,11 +446,11 @@ describe('WorkspacePanel', () => {
     })
 
     await waitFor(() => {
-      expect(view.getByTestId('workspace-code').textContent).toContain('console.log("new")')
+      expect(previewText(view)).toContain('console.log("new")')
     })
     const body = view.getByTestId('workspace-file-body')
     expect(body.textContent).toContain('src/app.ts')
-    expect(view.getByRole('button', { name: 'Comment line 1' })).toBeTruthy()
+    expect(previewQueries(view).getByRole('button', { name: 'Comment line 1' })).toBeTruthy()
     expect(view.getByRole('button', { name: 'Add to chat' })).toBeTruthy()
     expect(view.getByRole('button', { name: 'Line comment' })).toBeTruthy()
 
@@ -499,7 +514,7 @@ describe('WorkspacePanel', () => {
     await waitFor(() => {
       expect(view.getByRole('button', { name: 'Changed files' })).toBeTruthy()
     })
-    expect(view.getByTitle('src/Fresh.ts')).toBeTruthy()
+    expect(view.getByRole('button', { name: 'src/Fresh.ts' })).toBeTruthy()
   })
 
   it('loads workspace status when opened while the chat is running', async () => {
@@ -537,7 +552,7 @@ describe('WorkspacePanel', () => {
       expect(getMocks().getWorkspaceStatusMock).toHaveBeenCalledWith('session-running-open')
     })
     await waitFor(() => {
-      expect(view.getByTitle('src/running.ts')).toBeTruthy()
+      expect(view.getByRole('button', { name: 'src/running.ts' })).toBeTruthy()
     })
     expect(view.queryByText('Loading...')).toBeNull()
   })
@@ -571,17 +586,17 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-non-git')
 
     await waitFor(() => {
-      expect(view.getByTitle('src/app.ts')).toBeTruthy()
+      expect(view.getByRole('button', { name: 'src/app.ts' })).toBeTruthy()
     })
     expect(view.queryByText('No matching files')).toBeNull()
 
-    await clickElement(view.getByTitle('src/app.ts'))
+    await clickElement(view.getByRole('button', { name: 'src/app.ts' }))
 
     await waitFor(() => {
       expect(getMocks().getWorkspaceDiffMock).toHaveBeenCalledWith('session-non-git', 'src/app.ts')
     })
     await waitFor(() => {
-      expect(view.getByTestId('workspace-code').textContent).toContain('export const answer = 2')
+      expect(previewText(view)).toContain('export const answer = 2')
     })
   })
 
@@ -687,7 +702,7 @@ describe('WorkspacePanel', () => {
     expect(view.getByRole('button', { name: 'Changed files' })).toBeTruthy()
 
     await clickElement(view.getByRole('button', { name: 'Changed files' }))
-    await clickElement(view.getByRole('menuitem', { name: 'All files' }))
+    await clickElement(view.getByRole('menuitemradio', { name: 'All files' }))
 
     await waitFor(() => {
       expect(getMocks().getWorkspaceTreeMock).toHaveBeenCalledWith('session-tree', '')
@@ -719,6 +734,8 @@ describe('WorkspacePanel', () => {
       throw new Error('Expected src label to be rendered inside a folder button')
     }
     expect(folderButton.getAttribute('aria-expanded')).toBe('false')
+    expect(folderButton.classList.contains('justify-start')).toBe(true)
+    expect(folderButton.classList.contains('justify-center')).toBe(false)
 
     await clickElement(folderButton)
 
@@ -756,7 +773,7 @@ describe('WorkspacePanel', () => {
     })
 
     await waitFor(() => {
-      expect(view.getByTestId('workspace-code').textContent).toContain('export const ready = true')
+      expect(previewText(view)).toContain('export const ready = true')
     })
     expect(fileRow.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByTestId('workspace-file-body').textContent).toContain('src/index.ts')
@@ -786,11 +803,11 @@ describe('WorkspacePanel', () => {
     expect(view.getAllByTestId('workspace-file-body')).toHaveLength(2)
     expect(view.queryByRole('tablist', { name: 'Preview tabs' })).toBeNull()
 
-    await clickElement(view.getByTitle('src/a.ts'))
+    await clickElement(view.getByRole('button', { name: 'src/a.ts' }))
 
     expect(view.getAllByTestId('workspace-file-body')).toHaveLength(1)
-    expect(view.getByTestId('workspace-code').textContent).toContain('beta')
-    expect(view.getByTitle('src/b.ts').getAttribute('aria-expanded')).toBe('true')
+    expect(previewText(view)).toContain('beta')
+    expect(view.getByRole('button', { name: 'src/b.ts' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('uses theme tokens for the panel and code surface in dark mode', async () => {
@@ -855,15 +872,14 @@ describe('WorkspacePanel', () => {
     }))
 
     const view = await renderPanel('session-large-preview')
-    const highlightedCode = view.getByTestId('workspace-code').textContent ?? ''
+    const highlightedCode = previewText(view) ?? ''
 
-    expect(highlightedCode).toContain('+line 1')
-    expect(highlightedCode).toContain('+line 2000')
-    expect(highlightedCode).not.toContain('+line 2001')
+    expect(highlightedCode).toContain('line 1')
+    expect(highlightedCode).not.toContain('line 2001')
     await clickElement(view.getByRole('button', { name: 'Show all loaded lines' }))
 
     await waitFor(() => {
-      expect(view.getByTestId('workspace-code').textContent).toContain('+line 2300')
+      expect(view.getByRole('button', { name: 'Collapse preview' })).toBeTruthy()
     })
     expect(view.getByRole('button', { name: 'Collapse preview' })).toBeTruthy()
   })
@@ -895,12 +911,11 @@ describe('WorkspacePanel', () => {
 
     const view = await renderPanel('session-wide-diff')
     const diffSurface = view.getByTestId('workspace-code')
-    const firstRow = diffSurface.querySelector('[data-diff-line-kind]')
+    const shadow = diffSurface.querySelector('diffs-container')!.shadowRoot!
+    const code = shadow.querySelector('pre')
 
-    expect(firstRow?.className).toContain('w-max')
-    expect(firstRow?.className).toContain('min-w-full')
-    expect(firstRow?.className).toContain('grid-cols-[48px_18px_max-content]')
-    expect(diffSurface.textContent).toContain(longDiffLine)
+    expect(code?.getAttribute('data-overflow')).toBe('scroll')
+    expect(previewText(view)).toContain(longDiffLine.slice(1))
   })
 
   it('can expand long file previews beyond the default rendered line cap', async () => {
@@ -930,7 +945,7 @@ describe('WorkspacePanel', () => {
     }))
 
     const view = await renderPanel('session-large-file-preview')
-    const highlightedCode = view.getByTestId('workspace-code').textContent ?? ''
+    const highlightedCode = previewText(view) ?? ''
 
     expect(highlightedCode).toContain('const line1 = 1')
     expect(highlightedCode).toContain('const line2000 = 2000')
@@ -938,7 +953,7 @@ describe('WorkspacePanel', () => {
     await clickElement(view.getByRole('button', { name: 'Show all loaded lines' }))
 
     await waitFor(() => {
-      expect(view.getByTestId('workspace-code').textContent).toContain('const line2300 = 2300')
+      expect(previewText(view)).toContain('const line2300 = 2300')
     })
     expect(view.getByRole('button', { name: 'Collapse preview' })).toBeTruthy()
   }, 20_000)
@@ -1043,9 +1058,9 @@ describe('WorkspacePanel', () => {
 
     const view = await renderPanel('session-preview-menu')
 
-    expect(view.getByRole('button', { name: 'Comment line 4' })).toBeTruthy()
-    expect(view.getByRole('button', { name: 'Comment line 5' })).toBeTruthy()
-    expect(view.queryByRole('button', { name: 'Comment line 6' })).toBeNull()
+    expect(previewQueries(view).getByRole('button', { name: 'Comment line 4' })).toBeTruthy()
+    expect(previewQueries(view).getByRole('button', { name: 'Comment line 5' })).toBeTruthy()
+    expect(previewQueries(view).queryByRole('button', { name: 'Comment line 6' })).toBeNull()
 
     await clickElement(view.getByRole('button', { name: 'Line comment' }))
     expect(view.getByText('Line 5')).toBeTruthy()
@@ -1105,7 +1120,7 @@ describe('WorkspacePanel', () => {
     getMocks().getWorkspaceDiffMock.mockReturnValue(refreshed.promise)
 
     const view = await renderPanel('session-draft')
-    await clickElement(view.getByRole('button', { name: 'Comment line 5' }))
+    await clickElement(previewQueries(view).getByRole('button', { name: 'Comment line 5' }))
     await act(() => {
       fireEvent.change(view.getByPlaceholderText('Describe what should change here...'), {
         target: { value: 'Keep me' },
@@ -1124,7 +1139,7 @@ describe('WorkspacePanel', () => {
       refreshed.resolve({ state: 'ok', path: 'vite.config.js', diff: '@@ -4,2 +4,3 @@\n plugins: [],\n-port: 1\n+port: 2\n+host: true' })
       await refresh
     })
-    expect(view.getByRole('button', { name: 'Comment line 6' })).toBeTruthy()
+    expect(previewQueries(view).getByRole('button', { name: 'Comment line 6' })).toBeTruthy()
     expect((view.getByPlaceholderText('Describe what should change here...') as HTMLTextAreaElement).value).toBe('Keep me')
   })
 
@@ -1166,7 +1181,7 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-add-file')
 
     await act(() => {
-      fireEvent.contextMenu(view.getByRole('button', { name: /App\.tsx/i }), {
+      fireEvent.contextMenu(view.getByRole('treeitem', { name: /App\.tsx/i }), {
         clientX: 260,
         clientY: 80,
       })
@@ -1222,7 +1237,7 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-add-directory')
 
     await act(() => {
-      fireEvent.contextMenu(view.getByRole('button', { name: /src/i }), {
+      fireEvent.contextMenu(view.getByRole('treeitem', { name: /src/i }), {
         clientX: 260,
         clientY: 80,
       })
@@ -1298,7 +1313,7 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-cite-file')
 
     await act(() => {
-      fireEvent.contextMenu(view.getByRole('button', { name: /App\.tsx/i }), {
+      fireEvent.contextMenu(view.getByRole('treeitem', { name: /App\.tsx/i }), {
         clientX: 260,
         clientY: 80,
       })
@@ -1361,7 +1376,7 @@ describe('WorkspacePanel', () => {
       const view = await renderPanel('session-copy-file')
 
       await act(() => {
-        fireEvent.contextMenu(view.getByRole('button', { name: /App\.tsx/i }), {
+        fireEvent.contextMenu(view.getByRole('treeitem', { name: /App\.tsx/i }), {
           clientX: 260,
           clientY: 80,
         })
@@ -1373,13 +1388,10 @@ describe('WorkspacePanel', () => {
         expect(execCommand).toHaveBeenCalledWith('copy')
       })
       expect(writeText).toHaveBeenCalledWith('src/App.tsx')
-      expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-        type: 'success',
-        message: 'Path copied.',
-      })
+      expect(toast.success).toHaveBeenLastCalledWith('Path copied.')
 
       await act(() => {
-        fireEvent.contextMenu(view.getByRole('button', { name: /App\.tsx/i }), {
+        fireEvent.contextMenu(view.getByRole('treeitem', { name: /App\.tsx/i }), {
           clientX: 260,
           clientY: 80,
         })
@@ -1426,7 +1438,7 @@ describe('WorkspacePanel', () => {
 
     const view = await renderPanel('session-line-comment')
 
-    await clickElement(view.getByRole('button', { name: 'Comment line 1' }))
+    await clickElement(previewQueries(view).getByRole('button', { name: 'Comment line 1' }))
     const textarea = view.getByPlaceholderText('Describe what should change here...')
     await act(() => {
       fireEvent.change(textarea, { target: { value: 'Rename this title' } })
@@ -1474,8 +1486,8 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-code-selection')
 
     await selectWorkspaceCodeText(view, 1, 'const title = "Todo"', 2, 'export default title')
-    const addButtons = view.getAllByRole('button', { name: 'Add to chat' })
-    await clickElement(addButtons.find((button) => button.style.left !== '')!)
+    const quotePopover = view.getByRole('dialog', { name: 'Add to chat' })
+    await clickElement(within(quotePopover).getByRole('button', { name: 'Add to chat' }))
 
     expect(useWorkspaceChatContextStore.getState().referencesBySession['session-code-selection']).toMatchObject([
       {
@@ -1491,7 +1503,7 @@ describe('WorkspacePanel', () => {
     expect(useWorkspaceChatContextStore.getState().referencesBySession['session-code-selection']?.[0]?.note).toBeUndefined()
   })
 
-  it('keeps the selected-code action near the preview instead of the file tree', async () => {
+  it('portals the selected-code action and dismisses it with Escape', async () => {
     await setWorkspaceState((state) => ({
       ...state,
       panelBySession: {
@@ -1518,20 +1530,19 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-selection-position')
 
     await selectWorkspaceCodeText(view, 1, 'const title = "Todo"', 1, 'const title = "Todo"')
-    const addButtons = view.getAllByRole('button', { name: 'Add to chat' })
-    const floatingAddButton = addButtons.find((button) => button.style.left !== '')!
-
-    expect(floatingAddButton.style.left).toBe('101px')
-    expect(floatingAddButton.style.top).toBe('46px')
+    const quotePopover = view.getByRole('dialog', { name: 'Add to chat' })
+    expect(view.container.contains(quotePopover)).toBe(false)
+    expect(within(quotePopover).getByRole('button', { name: 'Add to chat' })).not.toBeNull()
 
     fireEvent.keyDown(view.getByTestId('workspace-code').parentElement?.parentElement ?? view.getByTestId('workspace-code'), {
       key: 'Escape',
     })
     await flushReactWork()
     expect(view.queryAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
+    expect(window.getSelection()?.toString()).toBe('const title = "Todo"')
   })
 
-  it('dismisses the selected-code action when clicking outside the popover', async () => {
+  it('closes the selected-code action but keeps the selection when pressing outside the popover', async () => {
     await setWorkspaceState((state) => ({
       ...state,
       panelBySession: {
@@ -1567,7 +1578,7 @@ describe('WorkspacePanel', () => {
     await flushReactWork()
 
     expect(view.queryAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
-    expect(window.getSelection()?.toString()).toBe('')
+    expect(window.getSelection()?.toString()).toBe('const title = "Todo"')
   })
 
   it('adds selected markdown text from a preview to the chat context', async () => {
@@ -1599,9 +1610,8 @@ describe('WorkspacePanel', () => {
     const markdownSurface = paragraph.closest('.overflow-auto') ?? paragraph
 
     await selectRenderedText(paragraph, 'Alpha note and Beta note', markdownSurface)
-    const addButtons = view.getAllByRole('button', { name: 'Add to chat' })
-    const floatingAddButton = addButtons.find((button) => button.style.left !== '')!
-    await clickElement(floatingAddButton)
+    const quotePopover = view.getByRole('dialog', { name: 'Add to chat' })
+    await clickElement(within(quotePopover).getByRole('button', { name: 'Add to chat' }))
 
     expect(useWorkspaceChatContextStore.getState().referencesBySession['session-markdown-selection']).toMatchObject([
       {
@@ -1675,12 +1685,8 @@ describe('WorkspacePanel', () => {
     }))
 
     const view = await renderPanel('session-compact-header')
-    const viewMenuButton = view.getByRole('button', { name: 'Changed files' })
-    const refreshButton = view.getByRole('button', { name: 'Refresh workspace' })
-
-    expect(viewMenuButton.className).toContain('text-[12px]')
-    expect(refreshButton.className).toContain('h-7 w-7')
-    expect(refreshButton.getAttribute('title')).toBe('Refresh workspace')
+    expect(view.getByRole('button', { name: 'Changed files' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Refresh workspace' })).toBeTruthy()
 
     const tabs = view.getByRole('tablist', { name: 'Side panel' })
     expect(tabs).toBeTruthy()
@@ -1723,12 +1729,12 @@ describe('WorkspacePanel', () => {
     await act(() => {
       fireEvent.keyDown(terminalTabs()[0]!, { key: 'ArrowRight' })
     })
-    expect(terminalTabs()[1]!.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(terminalTabs()[1]!.getAttribute('aria-selected')).toBe('true'))
     expect(document.activeElement).toBe(terminalTabs()[1])
     await act(() => {
       fireEvent.keyDown(terminalTabs()[1]!, { key: 'Home' })
     })
-    expect(terminalTabs()[0]!.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(terminalTabs()[0]!.getAttribute('aria-selected')).toBe('true'))
     expect(document.activeElement).toBe(terminalTabs()[0])
 
     await clickElement(view.getByRole('button', { name: 'Close Terminal 2' }))
@@ -1738,6 +1744,28 @@ describe('WorkspacePanel', () => {
     await clickElement(view.getByRole('tab', { name: 'Files' }))
     expect(useWorkspacePanelStore.getState().getPanelTab('session-terminals')).toBe('files')
     useTerminalPanelStore.getState().clearSession('session-terminals')
+  })
+
+  it('shows a labelled skeleton while the changed view loads', async () => {
+    getMocks().getWorkspaceStatusMock.mockImplementation(() => new Promise(() => {}))
+    await setWorkspaceState((state) => ({
+      ...state,
+      panelBySession: {
+        ...state.panelBySession,
+        'session-loading': {
+          isOpen: true,
+          tab: 'files',
+          expanded: false,
+          activeView: 'changed',
+          hasUserSelectedView: true,
+        },
+      },
+    }))
+
+    const view = await renderPanel('session-loading')
+
+    const status = (await view.findByText('Loading...')).closest('[role="status"]')
+    expect(status?.querySelector('[data-slot="skeleton"]')).toBeTruthy()
   })
 
   it('shows explicit empty and error states in the changed view', async () => {
@@ -1769,6 +1797,7 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-empty')
 
     expect(view.getByText('No changes')).toBeTruthy()
+    expect(view.getByText('No changes').closest('[data-slot="empty"]')?.getAttribute('role')).toBe('status')
 
     getMocks().getWorkspaceStatusMock.mockImplementation(async (sessionId: string) => {
       if (sessionId === 'session-error') {

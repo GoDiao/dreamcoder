@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SavedProvider, ProviderTestResult } from '../../types/provider'
 import { ProviderFormModal } from './ProviderFormModal'
@@ -85,11 +86,11 @@ function ProviderSettings() {
         actions={
           <Button
             size="xs"
-            variant="secondary"
+            variant="outline"
             onClick={() => setShowCreateModal(true)}
             disabled={isPresetsLoading || presets.length === 0}
-            icon={<Plus size={13} aria-hidden="true" />}
           >
+            <Plus data-icon="inline-start" size={13} aria-hidden="true" />
             {t('settings.providers.addProvider')}
           </Button>
         }
@@ -106,9 +107,7 @@ function ProviderSettings() {
       )}
 
       {isLoading && providers.length === 0 ? (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-        </div>
+        <LoadingBlock className="py-8" />
       ) : hasLoadedProviders && providers.length === 0 ? (
         <p className="py-6 text-xs text-[var(--color-text-tertiary)]">{t('settings.providers.empty')}</p>
       ) : (
@@ -155,12 +154,12 @@ function ProviderSettings() {
                 </div>
                 <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
                   {!isActive && (
-                    <Button variant="secondary" size="xs" onClick={() => handleActivate(provider.id)}>{t('settings.providers.setDefault')}</Button>
+                    <Button variant="outline" size="xs" onClick={() => handleActivate(provider.id)}>{t('settings.providers.setDefault')}</Button>
                   )}
-                  <Button variant="secondary" size="xs" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
-                  <Button variant="secondary" size="xs" onClick={() => setEditingProvider(provider)}>{t('settings.providers.edit')}</Button>
+                  <Button variant="outline" size="xs" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
+                  <Button variant="outline" size="xs" onClick={() => setEditingProvider(provider)}>{t('settings.providers.edit')}</Button>
                   {!isActive && (
-                    <Button variant="secondary" size="xs" onClick={() => handleDelete(provider)} className="text-[var(--color-error)] hover:text-[var(--color-error)]">{t('common.delete')}</Button>
+                    <Button variant="outline" size="xs" onClick={() => handleDelete(provider)} className="text-[var(--color-error)] hover:text-[var(--color-error)]">{t('common.delete')}</Button>
                   )}
                 </div>
               </div>
@@ -188,7 +187,7 @@ function ProviderSettings() {
         body={pendingDeleteProvider ? t('settings.providers.confirmDelete', { name: pendingDeleteProvider.name }) : ''}
         confirmLabel={t('common.delete')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
         loading={isDeletingProvider}
       />
     </div>

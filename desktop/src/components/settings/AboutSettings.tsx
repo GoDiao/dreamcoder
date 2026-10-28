@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getAppVersion } from '../../lib/shell'
 import { ExternalLink } from 'lucide-react'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { SettingsListRow, SettingsSection } from './SettingsSummary'
 import { useTranslation } from '../../i18n'
 
@@ -79,7 +79,8 @@ export function AboutSettings() {
 
 function ExternalButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <Button size="xs" variant="secondary" onClick={onClick} icon={<ExternalLink size={13} aria-hidden="true" />}>
+    <Button size="xs" variant="outline" onClick={onClick}>
+      <ExternalLink data-icon="inline-start" size={13} aria-hidden="true" />
       {label}
     </Button>
   )

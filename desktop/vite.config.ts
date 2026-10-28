@@ -6,7 +6,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    target: ['es2021', 'safari15'],
+    target: ['es2021', 'safari17.5'],
     chunkSizeWarningLimit: 2200,
     rollupOptions: {
       onwarn(warning, warn) {

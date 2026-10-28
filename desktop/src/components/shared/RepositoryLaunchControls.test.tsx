@@ -27,8 +27,8 @@ vi.mock('../../api/sessions', () => ({
 }))
 
 vi.mock('./DirectoryPicker', () => ({
-  DirectoryPicker: ({ value }: { value: string }) => (
-    <button type="button">Project {value}</button>
+  DirectoryPicker: ({ value, disabled }: { value: string; disabled?: boolean }) => (
+    <button type="button" disabled={disabled}>Project {value}</button>
   ),
 }))
 
@@ -54,6 +54,7 @@ vi.mock('../../i18n', () => ({
     'repoLaunch.notice.pickBranch': 'Choose another branch',
     'repoLaunch.notice.retry': 'Retry',
     'tabs.close': 'Close',
+      'common.close': 'Close',
   }[key] ?? key),
 }))
 
@@ -122,8 +123,14 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
-    expect(listbox.parentElement?.className).toContain('w-[390px]')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveClass('w-[min(390px,calc(100vw-24px))]')
+  })
+
+  it('disables the project picker together with the rest of the controls', () => {
+    renderControls({ disabled: true })
+
+    expect(screen.getByRole('button', { name: 'Project /repo' })).toBeDisabled()
   })
 
   it('uses the flatter desktop bar when embedded in a composer', async () => {
@@ -145,7 +152,7 @@ describe('RepositoryLaunchControls', () => {
     await openBranchMenu()
 
     const dialog = await screen.findByRole('dialog', { name: 'Select branch' })
-    expect(dialog).toHaveClass('inset-x-0')
+    expect(dialog).toHaveAttribute('data-vaul-drawer-direction', 'bottom')
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
     expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
   })
@@ -160,7 +167,7 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
   })
 
   it('keeps keyboard branch selection working from the search field', async () => {

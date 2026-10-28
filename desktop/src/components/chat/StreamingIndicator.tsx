@@ -1,3 +1,4 @@
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useChatStore, useSessionField } from '../../stores/chatStore'
@@ -72,9 +73,9 @@ export function StreamingIndicator() {
           {t('chat.retry.waiting', { seconds: formatRetrySeconds(remainingMs) })}
         </span>
         {detailText && (
-          <span className="min-w-0 max-w-full truncate text-amber-700 dark:text-amber-200" title={detailText}>
+          <HintTooltip content={detailText}><span className="min-w-0 max-w-full truncate text-amber-700 dark:text-amber-200">
             {detailText}
-          </span>
+          </span></HintTooltip>
         )}
       </div>
     )

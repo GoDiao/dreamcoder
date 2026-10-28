@@ -1,6 +1,8 @@
+import { Textarea } from '../components/shared/ui/textarea'
+import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, FileText, RefreshCw } from 'lucide-react'
-import { Button } from '../components/shared/Button'
+import { Button } from '../components/shared/ui/button'
 import { SearchField } from '../components/shared/SearchField'
 import { SegmentedControl } from '../components/shared/SegmentedControl'
 import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
@@ -177,19 +179,19 @@ export function MemorySettings() {
         actions={
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="xs"
             onClick={handleRefresh}
             loading={isLoadingProjects || isLoadingFiles}
-            icon={<RefreshCw size={13} aria-hidden="true" />}
           >
+            <RefreshCw data-icon="inline-start" size={13} aria-hidden="true" />
             {t('settings.memory.refresh')}
           </Button>
         }
       />
 
       {error && (
-        <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-2 text-xs text-[var(--color-error)]">
+        <div className="mb-3 rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-2 text-xs text-[var(--color-error)]">
           {error}
         </div>
       )}
@@ -257,9 +259,8 @@ export function MemorySettings() {
                   </span>
                 ) : null}
               </div>
-              <span
+              <HintTooltip content={selectedProject && selectedFile ? `${selectedProject.memoryDir}/${selectedFile.path}` : undefined}><span
                 className="truncate text-[11px] text-[var(--color-text-tertiary)]"
-                title={selectedProject && selectedFile ? `${selectedProject.memoryDir}/${selectedFile.path}` : undefined}
               >
                 {selectedProject
                   ? [
@@ -269,7 +270,7 @@ export function MemorySettings() {
                       selectedFile?.updatedAt ? formatDate(selectedFile.updatedAt) : null,
                     ].filter(Boolean).join(' · ')
                   : t('settings.memory.selectProject')}
-              </span>
+              </span></HintTooltip>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <SegmentedControl<MemoryViewMode>
@@ -284,7 +285,7 @@ export function MemorySettings() {
               />
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 size="xs"
                 disabled={!selectedFile || !isDirty || isSaving}
                 onClick={() => selectedFile && updateDraft(selectedFile.content)}
@@ -306,12 +307,12 @@ export function MemorySettings() {
           {selectedFile ? (
             <div className="flex min-h-0 flex-1 py-4 min-[760px]:pl-5">
               {viewMode === 'edit' ? (
-                <textarea
+                <Textarea
                   aria-label={t('settings.memory.editor')}
                   value={draftContent}
                   onChange={(event) => updateDraft(event.target.value)}
                   spellCheck={false}
-                  className="min-h-[360px] w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-[13px] leading-[1.8] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus-visible:outline-none"
+                  className="field-sizing-fixed min-h-[360px] w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-[13px] leading-[1.8] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus-visible:outline-none"
                 />
               ) : (
                 <div className="min-w-0 max-w-[62ch] flex-1">
@@ -369,11 +370,10 @@ function ProjectTreeRow({
   const display = projectDisplayName(project.label)
   return (
     <div>
-      <button
+      <HintTooltip content={project.label}><Button variant="ghost"
         type="button"
         data-testid="memory-project-row"
         onClick={onToggle}
-        title={project.label}
         aria-expanded={expanded}
         aria-label={t('settings.memory.toggleFolder', { name: display })}
         className={ROW_CLASS}
@@ -387,7 +387,7 @@ function ProjectTreeRow({
         ) : (
           <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{fileCount}</span>
         )}
-      </button>
+      </Button></HintTooltip>
 
       {expanded ? (
         loading ? (
@@ -415,7 +415,7 @@ function ProjectTreeRow({
 }
 
 const ROW_CLASS =
-  'flex w-full min-w-0 items-center gap-1.5 rounded-[7px] px-2 py-[5px] text-left text-[13px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]'
+  'flex h-auto w-full justify-start min-w-0 items-center gap-1.5 rounded-[7px] px-2 py-[5px] text-left text-[13px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none'
 
 function rowIndent(depth: number): number {
   return 8 + depth * 18
@@ -436,7 +436,8 @@ function FileRow({
 }) {
   const t = useTranslation()
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       onClick={onSelect}
       aria-current={active ? 'true' : undefined}
@@ -457,7 +458,7 @@ function FileRow({
           className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)]"
         />
       ) : null}
-    </button>
+    </Button>
   )
 }
 
@@ -496,7 +497,8 @@ function MemoryTreeRow({
   const isCollapsed = !forceExpanded && collapsedFolders.has(node.path)
   return (
     <div>
-      <button
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => onToggleFolder(node.path)}
         aria-expanded={!isCollapsed}
@@ -509,7 +511,7 @@ function MemoryTreeRow({
           : <ChevronDown size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />}
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
         <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{node.fileCount}</span>
-      </button>
+      </Button>
       {!isCollapsed
         ? node.children.map((child) => (
             <MemoryTreeRow

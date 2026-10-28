@@ -18,7 +18,7 @@ English | [简体中文](./README_zh.md)
 [**⬇️ Download for macOS (Apple Silicon)**](https://github.com/GoDiao/dreamcoder/releases/latest) · [**⬇️ Download for Windows (x64)**](https://github.com/GoDiao/dreamcoder/releases/latest)
 
 [![Electron](https://img.shields.io/badge/Electron-45-47848F)](https://www.electronjs.org/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
 [![Bun](https://img.shields.io/badge/Bun-✓-fbf0df)](https://bun.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 [![Good First Issues](https://img.shields.io/github/issues/GoDiao/dreamcoder/good%20first%20issue?color=7057ff&label=good%20first%20issues)](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
@@ -105,7 +105,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 | Component | Technology |
 |-----------|------------|
 | Desktop Shell | [Electron](https://www.electronjs.org/) |
-| Frontend UI | React 18 + Vite + TailwindCSS 4 |
+| Frontend UI | React 19 + Vite + TailwindCSS 4 |
 | Backend Runtime | Bun (Node.js compatible) |
 | Terminal | Bun PTY in the sidecar + xterm.js |
 | State Management | Zustand |
