@@ -2,9 +2,23 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | 探索中的临时记录；结论稳定后并入 [workspace-isolation.md](workspace-isolation.md) 与 [#166](https://github.com/GoDiao/dreamcoder/issues/166) |
+| 状态 | 2026-10-28 起暂缓，见下方「暂缓」一节；结论稳定后并入 [workspace-isolation.md](workspace-isolation.md) 与 [#166](https://github.com/GoDiao/dreamcoder/issues/166) |
 | 关联 | [#166](https://github.com/GoDiao/dreamcoder/issues/166)、[#162](https://github.com/GoDiao/dreamcoder/issues/162) |
 | 依据 | 与维护者、AT 负责人的讨论（2026-10-23）；fork 源码 `@d091249`；第 3 节实测 |
+
+## 暂缓
+
+2026-10-28，维护者决定降低本项优先级。原因如下：
+
+- **前提未验证。** 隔离与合并只服务于「多个成员并行改同一个项目」。团队功能目前基本流程还跑不通（[#163](https://github.com/GoDiao/dreamcoder/issues/163)、[#164](https://github.com/GoDiao/dreamcoder/issues/164)、中止 lead 会删团队目录、EnterWorktree 改全局 cwd）。多成员并行在真实任务上有没有收益、冲突有多频繁，还没有数据。
+- **实验没测出速度优势。** 第 4–6 节的结果是：扫描与合并本身很便宜，准备工作区的收益只落在重的构建产物上。剩下的价值是：成员成果自动合回、lead 未提交的改动也能作为基线、macOS 原生运行，而这些价值的大小取决于合并有多频繁。
+- **对照：[rudderlabs/devbox](https://github.com/rudderlabs/devbox)。** 它是 RudderStack 开源的后台自主开发系统（2026-10-27 发布），称内部约 35% 的 PR 由它合并。它的并行单位是仓库：一个仓库只有一个 agent 在改，每个仓库各开一个 PR，不做同仓库多成员合并。它的投入放在单任务的可靠性上：审计划门、PR 评论与 CI 失败回流、凭证隔离、知识随 PR 提交。
+
+**重启条件：** 团队基本流程修好，并在真实任务上用过几次，确认同目录多成员并行有收益。届时先做最小的一块，即给子 agent 现有的 worktree 隔离加「合回 lead 目录」，再决定是否做完整系统。
+
+**数据的时效：** 第 4–6 节里 dreamcoder 的 Rust 数据测于 Tauri 时期（`6f07ea9`）。main 已在 [#185](https://github.com/GoDiao/dreamcoder/pull/185) 迁到 Electron，`desktop/src-tauri` 已删除，所以实验脚本中的 Rust 步骤在当前 main 上无法重跑。
+
+## 说明
 
 第 1 节记维护者已经确认的事，第 2 节记倾向但未定稿的判断，第 3 节是读代码发现的问题，第 4–6 节是实验，第 7 节是方案对比。
 
