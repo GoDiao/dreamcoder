@@ -114,7 +114,6 @@ describe('filterToolsForAgent worktree tools', () => {
   }
 
   test('in-process teammates do not get EnterWorktree or ExitWorktree', () => {
-    // These change the process-wide cwd, which every teammate and the lead share.
     const names = runWithTeammateContext(
       createTeammateContext({
         agentId: 'researcher@team',

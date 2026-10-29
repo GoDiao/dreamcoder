@@ -96,9 +96,6 @@ export function filterToolsForAgent({
     if (ALL_AGENT_DISALLOWED_TOOLS.has(tool.name)) {
       return false
     }
-    // Worktree tools change the process-wide cwd (process.chdir, setCwd,
-    // setOriginalCwd), and in-process teammates share one process with the lead
-    // and each other, so one teammate entering a worktree would move them all.
     if (
       (tool.name === ENTER_WORKTREE_TOOL_NAME ||
         tool.name === EXIT_WORKTREE_TOOL_NAME) &&
