@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0-beta.2] — 2026-10-29
+
+A second pre-release of the Electron desktop app. Windows has still not been tested on real machines; reports are welcome in the Windows testing issue (#188).
+
 ### Added
 
 - **The agent can show pages in the conversation** (#202). When a chart, a diagram or a walkthrough explains better than text, the agent builds a page from [ShowAI](https://github.com/Renaissance-Mind/ShowAI) components: charts and over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, step-by-step walkthroughs, comparison matrices, roadmaps, 3D scenes, PDFs and more, plus HTML it writes itself for what no component can draw. The page appears in a card in the conversation; each change is a new revision, and the card can be enlarged or opened in the side panel. Pages follow the app's light or dark theme and run in a sandbox that cannot reach the network, the app or your files. The page reader makes the macOS `.dmg` about 6 MB larger.
