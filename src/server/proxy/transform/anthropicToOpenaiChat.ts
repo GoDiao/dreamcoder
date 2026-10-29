@@ -35,6 +35,9 @@ export function anthropicToOpenaiChat(
     stream: body.stream,
   }
 
+  // A streamed Chat Completions reply carries token usage only when asked for.
+  if (body.stream) result.stream_options = { include_usage: true }
+
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
 

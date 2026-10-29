@@ -38,6 +38,7 @@ export type OpenAIChatRequest = {
   top_p?: number
   stop?: string | string[]
   stream?: boolean
+  stream_options?: { include_usage: boolean }
   tools?: OpenAITool[]
   tool_choice?: unknown
   reasoning_effort?: 'low' | 'medium' | 'high'
