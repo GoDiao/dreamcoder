@@ -56,7 +56,9 @@ import {
 import { emitTaskProgress as emitTaskProgressEvent } from '../../utils/task/sdkProgress.js'
 import { isInProcessTeammate } from '../../utils/teammateContext.js'
 import { getTokenCountFromUsage } from '../../utils/tokens.js'
+import { ENTER_WORKTREE_TOOL_NAME } from '../EnterWorktreeTool/constants.js'
 import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../ExitPlanModeTool/constants.js'
+import { EXIT_WORKTREE_TOOL_NAME } from '../ExitWorktreeTool/constants.js'
 import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME } from './constants.js'
 import type { AgentDefinition } from './loadAgentsDir.js'
 export type ResolvedAgentTools = {
@@ -92,6 +94,16 @@ export function filterToolsForAgent({
       return true
     }
     if (ALL_AGENT_DISALLOWED_TOOLS.has(tool.name)) {
+      return false
+    }
+    // Worktree tools change the process-wide cwd (process.chdir, setCwd,
+    // setOriginalCwd), and in-process teammates share one process with the lead
+    // and each other, so one teammate entering a worktree would move them all.
+    if (
+      (tool.name === ENTER_WORKTREE_TOOL_NAME ||
+        tool.name === EXIT_WORKTREE_TOOL_NAME) &&
+      isInProcessTeammate()
+    ) {
       return false
     }
     if (!isBuiltIn && CUSTOM_AGENT_DISALLOWED_TOOLS.has(tool.name)) {

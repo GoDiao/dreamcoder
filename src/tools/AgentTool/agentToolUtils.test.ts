@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import type { AppState } from '../../state/AppState.js'
 import { IDLE_SPECULATION_STATE } from '../../state/AppStateStore.js'
 import { createTaskStateBase } from '../../Task.js'
-import type { ToolUseContext } from '../../Tool.js'
+import type { ToolUseContext, Tools } from '../../Tool.js'
 import type { LocalAgentTaskState } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
 import type { Message } from '../../types/message.js'
 import { getEmptyToolPermissionContext } from '../../Tool.js'
@@ -11,7 +11,13 @@ import {
   resetCommandQueue,
 } from '../../utils/messageQueueManager.js'
 import { createAssistantMessage } from '../../utils/messages.js'
-import { runAsyncAgentLifecycle } from './agentToolUtils.js'
+import {
+  createTeammateContext,
+  runWithTeammateContext,
+} from '../../utils/teammateContext.js'
+import { ENTER_WORKTREE_TOOL_NAME } from '../EnterWorktreeTool/constants.js'
+import { EXIT_WORKTREE_TOOL_NAME } from '../ExitWorktreeTool/constants.js'
+import { filterToolsForAgent, runAsyncAgentLifecycle } from './agentToolUtils.js'
 
 describe('runAsyncAgentLifecycle', () => {
   afterEach(() => {
@@ -91,5 +97,44 @@ describe('runAsyncAgentLifecycle', () => {
       '<status>completed</status>',
     )
     expect(String(getCommandQueue()[0]?.value)).toContain('Review complete.')
+  })
+})
+
+describe('filterToolsForAgent worktree tools', () => {
+  const tools = [
+    { name: 'Read' },
+    { name: ENTER_WORKTREE_TOOL_NAME },
+    { name: EXIT_WORKTREE_TOOL_NAME },
+  ] as unknown as Tools
+
+  function namesForAsyncAgent(): string[] {
+    return filterToolsForAgent({ tools, isBuiltIn: true, isAsync: true }).map(
+      tool => tool.name,
+    )
+  }
+
+  test('in-process teammates do not get EnterWorktree or ExitWorktree', () => {
+    // These change the process-wide cwd, which every teammate and the lead share.
+    const names = runWithTeammateContext(
+      createTeammateContext({
+        agentId: 'researcher@team',
+        agentName: 'researcher',
+        teamName: 'team',
+        planModeRequired: false,
+        parentSessionId: 'session',
+        abortController: new AbortController(),
+      }),
+      namesForAsyncAgent,
+    )
+
+    expect(names).toEqual(['Read'])
+  })
+
+  test('async agents outside a teammate context keep the worktree tools', () => {
+    expect(namesForAsyncAgent()).toEqual([
+      'Read',
+      ENTER_WORKTREE_TOOL_NAME,
+      EXIT_WORKTREE_TOOL_NAME,
+    ])
   })
 })
