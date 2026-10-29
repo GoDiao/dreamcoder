@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 const { sessionsApiMock } = vi.hoisted(() => ({
@@ -71,6 +71,43 @@ describe('ContextUsageIndicator request behavior', () => {
       configurable: true,
       value: originalVisibility,
     })
+  })
+
+  it('opens keyboard-accessible details with progress and refreshes on activation', async () => {
+    sessionsApiMock.getInspection.mockResolvedValue(baseInspection)
+    render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} />)
+    const trigger = await screen.findByRole('button', { name: /21%/ })
+    expect(screen.getByTestId('context-usage-ring').getAttribute('style')).toMatch(/conic-gradient\(.* 75\.6\d*deg/)
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    fireEvent.focus(trigger)
+    const progress = await screen.findByRole('progressbar', { name: 'Context' })
+    expect(progress).toHaveAttribute('aria-valuenow', '21')
+    expect(screen.getByRole('progressbar', { name: 'Messages' })).toHaveAttribute('aria-valuenow', '21')
+    fireEvent.click(trigger)
+    await waitFor(() => expect(sessionsApiMock.getInspection).toHaveBeenCalledTimes(2))
+    fireEvent.keyDown(trigger, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
+  })
+
+  it('shows the same context details in the compact drawer', async () => {
+    sessionsApiMock.getInspection.mockResolvedValue(baseInspection)
+    render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} compact />)
+    const trigger = await screen.findByRole('button', { name: /21%/ })
+    fireEvent.click(trigger)
+    expect(await screen.findByRole('dialog', { name: 'Context' })).toBeVisible()
+    expect(screen.getByRole('progressbar', { name: 'Messages' })).toHaveAttribute('aria-valuenow', '21')
+  })
+
+  it('switches between the hover card and the compact drawer without a controlled-state warning', async () => {
+    sessionsApiMock.getInspection.mockResolvedValue(baseInspection)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const view = render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} />)
+    await screen.findByRole('button', { name: /21%/ })
+    view.rerender(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} compact />)
+    view.rerender(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} />)
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('from controlled to uncontrolled'))
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('from uncontrolled to controlled'))
+    warn.mockRestore()
   })
 
   it('does not auto-fetch context while the document is hidden', async () => {
@@ -207,7 +244,7 @@ describe('ContextUsageIndicator request behavior', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getAllByText('21%').length).toBeGreaterThan(0)
+      expect(screen.getByRole('button', { name: /21%/ })).toBeInTheDocument()
     })
 
     await act(async () => {
@@ -218,8 +255,8 @@ describe('ContextUsageIndicator request behavior', () => {
       await first.promise
     })
 
-    expect(screen.getAllByText('21%').length).toBeGreaterThan(0)
-    expect(screen.queryByText('90%')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /21%/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /90%/ })).not.toBeInTheDocument()
   })
 
   it('ignores a stale inspection response when identity changes while hidden', async () => {
@@ -263,6 +300,6 @@ describe('ContextUsageIndicator request behavior', () => {
     })
 
     expect(sessionsApiMock.getInspection).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('90%')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /90%/ })).not.toBeInTheDocument()
   })
 })

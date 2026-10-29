@@ -1,14 +1,47 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { act } from 'react'
+import type { GroupProps, PanelImperativeHandle, PanelProps } from 'react-resizable-panels'
 
 const viewportMocks = vi.hoisted(() => ({
   isMobile: false,
 }))
 
+const windowMocks = vi.hoisted(() => ({
+  desktop: false,
+}))
+
+vi.mock('../lib/desktopRuntime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/desktopRuntime')>()),
+  isDesktopRuntime: () => windowMocks.desktop,
+}))
+
+const panelMocks = vi.hoisted(() => ({
+  onLayoutChanged: undefined as GroupProps['onLayoutChanged'],
+  workspacePanelRef: undefined as { current: PanelImperativeHandle | null } | undefined,
+  panelProps: {} as Record<string, PanelProps>,
+}))
+
+vi.mock('react-resizable-panels', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-resizable-panels')>()
+  return {
+    ...actual,
+    Group: (props: GroupProps) => {
+      panelMocks.onLayoutChanged = props.onLayoutChanged
+      return <actual.Group {...props} />
+    },
+    Panel: (props: PanelProps) => {
+      if (props.id) panelMocks.panelProps[props.id] = props
+      if (props.id === 'workspace-panel') panelMocks.workspacePanelRef = props.panelRef as { current: PanelImperativeHandle | null }
+      return <actual.Panel {...props} />
+    },
+  }
+})
+
 vi.mock('../hooks/useMobileViewport', () => ({
   useMobileViewport: () => viewportMocks.isMobile,
+  useViewportQuery: () => viewportMocks.isMobile,
 }))
 
 vi.mock('../components/chat/MessageList', () => ({
@@ -54,13 +87,15 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
 import { useTeamStore } from '../stores/teamStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
-import { WORKSPACE_PANEL_DEFAULT_WIDTH } from '../stores/workspacePanelStore'
 import { useTerminalPanelStore } from '../stores/terminalPanelStore'
 
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.restoreAllMocks()
+  panelMocks.panelProps = {}
   viewportMocks.isMobile = false
+  windowMocks.desktop = false
   useTabStore.setState({ tabs: [], activeTabId: null })
   useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
   useChatStore.setState({ sessions: {} })
@@ -105,11 +140,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -120,7 +153,7 @@ describe('ActiveSession task polling', () => {
     expect(screen.getByTestId('chat-input')).toHaveAttribute('data-variant', 'default')
   })
 
-  it('renders the current goal as a lightweight header strip without a page-level panel', () => {
+  it('renders the current goal as a strip at the top of the chat column', () => {
     const sessionId = 'goal-visible-session'
 
     useSessionStore.setState({
@@ -172,11 +205,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -186,6 +217,8 @@ describe('ActiveSession task polling', () => {
     expect(screen.queryByTestId('active-goal-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('active-goal-strip')).toBeInTheDocument()
     expect(screen.getByTestId('active-goal-strip')).toHaveTextContent('ship the smoke test')
+    expect(within(screen.getByTestId('active-session-chat-column')).getByTestId('active-goal-strip')).toBeInTheDocument()
+    expect(within(screen.getByTestId('session-header')).queryByTestId('active-goal-strip')).not.toBeInTheDocument()
     expect(screen.getByTestId('message-list')).toBeInTheDocument()
   })
 
@@ -237,11 +270,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -310,11 +341,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -371,11 +400,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -431,11 +458,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -509,11 +534,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -528,7 +551,7 @@ describe('ActiveSession task polling', () => {
     useCLITaskStore.setState(originalCliTaskState)
   })
 
-  it('renders the workspace panel to the right of chat and supports resizing', () => {
+  it('renders the workspace panel to the right of chat with an accessible resize separator', async () => {
     const sessionId = 'workspace-session'
 
     useSessionStore.setState({
@@ -563,17 +586,16 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
     useWorkspacePanelStore.getState().openPanel(sessionId)
 
     render(<ActiveSession />)
+    await screen.findByTestId('workspace-panel')
 
     const contentRow = screen.getByTestId('active-session-content-row')
     const chatColumn = screen.getByTestId('active-session-chat-column')
@@ -585,36 +607,34 @@ describe('ActiveSession task polling', () => {
     expect(within(contentRow).getByTestId('workspace-panel')).toHaveTextContent(`workspace:${sessionId}`)
     expect(within(chatColumn).getByTestId('chat-input')).toBeInTheDocument()
     expect(within(chatColumn).getByTestId('chat-input')).toHaveAttribute('data-compact', 'true')
-    expect(chatColumn).toHaveClass('flex-1')
-    expect(chatColumn).not.toHaveClass('shrink-0')
-    expect(contentRow.children[0]).toBe(chatColumn)
-    expect(contentRow.children[1]).toBe(sidePanel)
-    expect(sidePanel).toContainElement(resizeHandle)
+    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
+    expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 280, maxSize: 680 })
+    expect(contentRow.children[0]).toContainElement(chatColumn)
+    expect(contentRow.children[1]).toBe(resizeHandle)
+    expect(contentRow.children[2]).toBe(sidePanel)
     expect(sidePanel).toContainElement(screen.getByTestId('workspace-panel'))
-    expect(sidePanel).toHaveStyle({ width: `${WORKSPACE_PANEL_DEFAULT_WIDTH}px` })
-    expect(sidePanel.className).toContain('max-w-[calc(100%-320px)]')
-    expect(sidePanel.className).toContain('max-[850px]:absolute')
-    expect(resizeHandle).toHaveAttribute('aria-valuemin', '280')
-    expect(resizeHandle).toHaveAttribute('aria-valuemax', '680')
+    expect(resizeHandle).toHaveAttribute('role', 'separator')
+    expect(resizeHandle).toHaveAttribute('aria-orientation', 'vertical')
+  })
 
-    act(() => {
-      fireEvent.keyDown(resizeHandle, { key: 'ArrowLeft' })
+  it('saves the workspace panel width after the user resizes it', async () => {
+    const sessionId = 'workspace-session'
+    useSessionStore.setState({
+      sessions: [{ id: sessionId, title: 'Workspace Session', createdAt: '2026-04-26T00:00:00.000Z', modifiedAt: '2026-04-26T00:00:00.000Z', messageCount: 1, projectPath: '', workDir: '/tmp/project', workDirExists: true }],
+      activeSessionId: sessionId,
+      isLoading: false,
+      error: null,
     })
-    expect(useWorkspacePanelStore.getState().width).toBe(WORKSPACE_PANEL_DEFAULT_WIDTH + 32)
+    useTabStore.setState({ tabs: [{ sessionId, title: 'Workspace Session', type: 'session', status: 'idle' }], activeTabId: sessionId })
+    useWorkspacePanelStore.getState().openPanel(sessionId)
+    useWorkspacePanelStore.getState().setWidth(400)
 
-    act(() => {
-      const pointerDown = createEvent.pointerDown(resizeHandle)
-      Object.defineProperty(pointerDown, 'button', { value: 0 })
-      Object.defineProperty(pointerDown, 'clientX', { value: 600 })
-      fireEvent(resizeHandle, pointerDown)
-    })
-    act(() => {
-      const pointerMove = new Event('pointermove')
-      Object.defineProperty(pointerMove, 'clientX', { value: 300 })
-      window.dispatchEvent(pointerMove)
-      window.dispatchEvent(new Event('pointerup'))
-    })
-    expect(useWorkspacePanelStore.getState().width).toBe(680)
+    render(<ActiveSession />)
+    await screen.findByTestId('workspace-resize-handle')
+    panelMocks.workspacePanelRef!.current = { getSize: () => ({ asPercentage: 40, inPixels: 520 }) } as unknown as PanelImperativeHandle
+    act(() => panelMocks.onLayoutChanged!({}, { isUserInteraction: true } as Parameters<NonNullable<GroupProps['onLayoutChanged']>>[1]))
+
+    await waitFor(() => expect(useWorkspacePanelStore.getState().width).toBe(520))
   })
 
   it('does not render the workspace panel when closed or for member sessions', () => {
@@ -652,11 +672,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -706,11 +724,9 @@ describe('ActiveSession task polling', () => {
             activeThinkingId: null,
             pendingPermission: null,
             tokenUsage: { input_tokens: 0, output_tokens: 0 },
-            elapsedSeconds: 0,
             statusVerb: '',
             slashCommands: [],
             agentTaskNotifications: {},
-            elapsedTimer: null,
           },
         },
       })
@@ -758,11 +774,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -815,11 +829,9 @@ describe('ActiveSession task polling', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -838,10 +850,12 @@ describe('ActiveSession task polling', () => {
 
     render(<ActiveSession />)
 
-    const meta = screen.getByTestId('session-header-meta')
-    expect(meta).toHaveTextContent('project-root')
-    expect(meta).toHaveTextContent('feat/panel')
-    expect(meta).not.toHaveTextContent('messages')
+    // One row: the title and buttons; project and branch live under the input.
+    const header = screen.getByTestId('session-header')
+    expect(header).toHaveTextContent('Terminal Session')
+    expect(header).not.toHaveTextContent('project-root')
+    expect(header).not.toHaveTextContent('feat/panel')
+    expect(screen.queryByTestId('session-header-meta')).not.toBeInTheDocument()
 
     const terminalButton = screen.getByRole('button', { name: 'Terminal' })
     const filesButton = screen.getByRole('button', { name: 'Files and changes' })
@@ -868,6 +882,34 @@ describe('ActiveSession task polling', () => {
     })
     expect(useWorkspacePanelStore.getState().isPanelOpen(sessionId)).toBe(false)
     expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()
+  })
+
+  it('makes the session header a window drag region', () => {
+    windowMocks.desktop = true
+    const sessionId = 'drag-session'
+    useSessionStore.setState({
+      sessions: [{
+        id: sessionId,
+        title: 'Drag Session',
+        createdAt: '2026-04-10T00:00:00.000Z',
+        modifiedAt: '2026-04-10T00:00:00.000Z',
+        messageCount: 1,
+        projectPath: '',
+        workDir: null,
+        workDirExists: true,
+      }],
+      activeSessionId: sessionId,
+      isLoading: false,
+      error: null,
+    })
+    useTabStore.setState({
+      tabs: [{ sessionId, title: 'Drag Session', type: 'session', status: 'idle' }],
+      activeTabId: sessionId,
+    })
+
+    render(<ActiveSession />)
+
+    expect(screen.getByTestId('session-header')).toHaveClass('window-drag-region')
   })
 
   it('hides the chat column while the panel is expanded and restores side by side', () => {
@@ -897,15 +939,18 @@ describe('ActiveSession task polling', () => {
 
     render(<ActiveSession />)
 
-    expect(screen.getByTestId('active-session-chat-column')).toHaveClass('hidden')
-    expect(screen.getByTestId('session-side-panel')).toHaveClass('flex-1')
+    expect(screen.getByTestId('active-session-chat-column')).not.toBeVisible()
+    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ maxSize: 0 })
+    expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 0, maxSize: '100%' })
     expect(screen.queryByTestId('workspace-resize-handle')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Expanded Session' })).toBeInTheDocument()
 
     act(() => {
       useWorkspacePanelStore.getState().toggleExpanded(sessionId)
     })
-    expect(screen.getByTestId('active-session-chat-column')).not.toHaveClass('hidden')
+    expect(screen.getByTestId('active-session-chat-column')).toBeVisible()
+    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
+    expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 280, maxSize: 680 })
     expect(screen.getByTestId('workspace-resize-handle')).toBeInTheDocument()
     useTerminalPanelStore.getState().clearSession(sessionId)
   })

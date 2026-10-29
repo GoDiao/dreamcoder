@@ -51,7 +51,7 @@ const configDir = process.env.CONFIG_DIR
 const upstream = `http://127.0.0.1:${process.env.UPSTREAM_PORT}`
 mkdirSync(join(configDir, 'dreamcoder'), { recursive: true })
 writeFileSync(join(configDir, 'dreamcoder', 'providers.json'), JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
   activeId: 'parallel-provider-a',
   providers: [
     {
@@ -62,12 +62,13 @@ writeFileSync(join(configDir, 'dreamcoder', 'providers.json'), JSON.stringify({
       authStrategy: 'auth_token',
       baseUrl: `${upstream}/provider-a`,
       apiFormat: 'anthropic',
-      models: {
-        main: 'parallel-model-a',
-        haiku: 'parallel-model-a-haiku',
-        sonnet: 'parallel-model-a-sonnet',
-        opus: 'parallel-model-a-opus',
-      },
+      models: [
+        { id: 'parallel-model-a' },
+        { id: 'parallel-model-a-sonnet' },
+        { id: 'parallel-model-a-opus' },
+        { id: 'parallel-model-a-haiku' },
+      ],
+      fastModel: 'parallel-model-a-haiku',
     },
     {
       id: 'parallel-provider-b',
@@ -77,12 +78,13 @@ writeFileSync(join(configDir, 'dreamcoder', 'providers.json'), JSON.stringify({
       authStrategy: 'auth_token',
       baseUrl: `${upstream}/provider-b`,
       apiFormat: 'anthropic',
-      models: {
-        main: 'parallel-model-b',
-        haiku: 'parallel-model-b-haiku',
-        sonnet: 'parallel-model-b-sonnet',
-        opus: 'parallel-model-b-opus',
-      },
+      models: [
+        { id: 'parallel-model-b' },
+        { id: 'parallel-model-b-sonnet' },
+        { id: 'parallel-model-b-opus' },
+        { id: 'parallel-model-b-haiku' },
+      ],
+      fastModel: 'parallel-model-b-haiku',
     },
   ],
 }, null, 2) + '\n')

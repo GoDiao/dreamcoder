@@ -2,18 +2,18 @@ import { useEffect, useState } from 'react'
 
 const MOBILE_VIEWPORT_QUERY = '(max-width: 767px)'
 
-function getInitialMobileViewport() {
+function getInitialMobileViewport(query: string) {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-  return window.matchMedia(MOBILE_VIEWPORT_QUERY).matches
+  return window.matchMedia(query).matches
 }
 
-export function useMobileViewport() {
-  const [isMobile, setIsMobile] = useState(getInitialMobileViewport)
+export function useViewportQuery(query: string) {
+  const [isMobile, setIsMobile] = useState(() => getInitialMobileViewport(query))
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
 
-    const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_QUERY)
+    const mediaQuery = window.matchMedia(query)
     const handleChange = (event: MediaQueryListEvent) => {
       setIsMobile(event.matches)
     }
@@ -32,7 +32,11 @@ export function useMobileViewport() {
         mediaQuery.removeListener(handleChange)
       }
     }
-  }, [])
+  }, [query])
 
   return isMobile
+}
+
+export function useMobileViewport() {
+  return useViewportQuery(MOBILE_VIEWPORT_QUERY)
 }

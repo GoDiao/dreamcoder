@@ -1,15 +1,20 @@
+import { useTranslation } from '../../i18n'
 import { memo } from 'react'
-import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
+import { MarkdownRenderer, StreamingMarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { MessageActionBar, type MessageBranchAction } from './MessageActionBar'
 import { InlineImageGallery } from './InlineImageGallery'
 
 type Props = {
   content: string
   isStreaming?: boolean
+  incremental?: boolean
   branchAction?: MessageBranchAction
+  /** The reply's actions, shown under its last text: copy takes the whole reply. Omitted on earlier texts. */
+  replyCopyText?: string
 }
 
-export const AssistantMessage = memo(function AssistantMessage({ content, isStreaming, branchAction }: Props) {
+export const AssistantMessage = memo(function AssistantMessage({ content, isStreaming, incremental, branchAction, replyCopyText }: Props) {
+  const t = useTranslation()
   if (!content.trim()) return null
 
   const documentLayout = shouldUseDocumentLayout(content)
@@ -22,24 +27,33 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
         className="flex w-full min-w-0 max-w-full flex-col items-start gap-1.5"
       >
         <div className="w-full min-w-0 text-ui-message leading-[1.75] text-[var(--color-text-primary)]">
-          <MarkdownRenderer
-            content={content}
-            variant={documentLayout ? 'document' : 'default'}
-            streaming={isStreaming}
-            className={MESSAGE_PROSE_CLASSES}
-          />
+          {incremental ? (
+            <StreamingMarkdownRenderer
+              content={content}
+              variant={documentLayout ? 'document' : 'default'}
+              className={MESSAGE_PROSE_CLASSES}
+            />
+          ) : (
+            <MarkdownRenderer
+              content={content}
+              variant={documentLayout ? 'document' : 'default'}
+              className={MESSAGE_PROSE_CLASSES}
+            />
+          )}
           {!isStreaming && <InlineImageGallery text={content} />}
           {isStreaming && (
             <span className="ml-0.5 inline-block h-4 w-0.5 animate-shimmer bg-[var(--color-brand)] align-text-bottom" />
           )}
         </div>
 
-        <MessageActionBar
-          copyText={isStreaming ? undefined : content}
-          copyLabel="Copy reply"
-          branchAction={branchAction}
-          align="start"
-        />
+        {replyCopyText !== undefined ? (
+          <MessageActionBar
+            copyText={isStreaming ? undefined : replyCopyText}
+            copyLabel={t('chat.copyReply')}
+            branchAction={branchAction}
+            align="start"
+          />
+        ) : null}
       </div>
     </div>
   )

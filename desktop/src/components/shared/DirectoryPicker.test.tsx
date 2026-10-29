@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 
@@ -14,20 +14,23 @@ vi.mock('../../api/filesystem', () => ({
   },
 }))
 
-import { DirectoryPicker } from './DirectoryPicker'
+let DirectoryPicker: typeof import('./DirectoryPicker').DirectoryPicker
 import { sessionsApi } from '../../api/sessions'
 import { filesystemApi } from '../../api/filesystem'
 
 describe('DirectoryPicker', () => {
   let originalInnerWidth: number
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules()
+    DirectoryPicker = (await import('./DirectoryPicker')).DirectoryPicker
     originalInnerWidth = window.innerWidth
   })
 
   afterEach(() => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
     vi.restoreAllMocks()
+    vi.resetModules()
   })
 
   it('uses the source repository name as the fallback label for desktop worktree paths', () => {
@@ -81,11 +84,11 @@ describe('DirectoryPicker', () => {
 
     const trigger = screen.getByRole('button')
     expect(trigger).toHaveTextContent('project')
-    expect(trigger.className).toContain('rounded-[7px]')
+    expect(trigger.className).toContain('rounded-md')
     expect(trigger.className).not.toContain('rounded-full')
   })
 
-  it('constrains long workbar project names without hiding the full path from hover users', () => {
+  it('constrains long workbar project names and exposes the full path through a tooltip', async () => {
     const longProjectName = 'project-with-a-very-long-directory-name-that-should-not-stretch-the-launch-bar'
     const longPath = `/workspace/${longProjectName}`
 
@@ -100,7 +103,8 @@ describe('DirectoryPicker', () => {
     const trigger = screen.getByRole('button')
     const label = screen.getByText(longProjectName)
     const triggerClasses = trigger.className.split(/\s+/)
-    expect(trigger).toHaveAttribute('title', longPath)
+    act(() => trigger.focus())
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longPath)
     expect(triggerClasses).toContain('max-w-full')
     expect(triggerClasses).not.toContain('w-full')
     expect(trigger.parentElement?.className).toContain('max-w-[320px]')
@@ -120,34 +124,22 @@ describe('DirectoryPicker', () => {
     expect(screen.getByRole('button').querySelector('svg')).toBeInTheDocument()
   })
 
-  it('keeps the recent-project menu inside the viewport when the trigger is near the right edge', async () => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
-    vi.mocked(sessionsApi.getRecentProjects).mockResolvedValue({ projects: [] })
-
-    render(
-      <DirectoryPicker
-        value="/workspace/project"
-        onChange={vi.fn()}
-      />,
-    )
-
+  it('does not open its menu while disabled', () => {
+    render(<DirectoryPicker value="/workspace/project" onChange={vi.fn()} disabled />)
     const trigger = screen.getByRole('button')
-    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
-      x: 920,
-      y: 24,
-      top: 24,
-      left: 920,
-      right: 1010,
-      bottom: 60,
-      width: 90,
-      height: 36,
-      toJSON: () => ({}),
-    } as DOMRect)
-
+    expect(trigger).toBeDisabled()
     fireEvent.click(trigger)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 
-    const menu = await screen.findByTestId('directory-picker-menu')
-    expect(menu).toHaveStyle({ left: '612px', width: '400px' })
+  it('portals the recent-project popover and delegates positioning to Radix', async () => {
+    vi.mocked(sessionsApi.getRecentProjects).mockResolvedValue({ projects: [] })
+    const { container } = render(<DirectoryPicker value="/workspace/project" onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button'))
+    const menu = await screen.findByRole('dialog')
+    expect(container.contains(menu)).toBe(false)
+    expect(menu).toHaveAttribute('data-slot', 'popover-content')
+    expect(menu.parentElement).toHaveStyle({ position: 'fixed' })
   })
 
   it('renders browse entries without nesting interactive buttons', async () => {

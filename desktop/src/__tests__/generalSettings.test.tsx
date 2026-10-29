@@ -5,6 +5,7 @@ import '@testing-library/jest-dom'
 import { Settings } from '../pages/Settings'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
+import { toast } from 'sonner'
 import { useUpdateStore } from '../stores/updateStore'
 import { useClaudeCodeImportStore } from '../stores/claudeCodeImportStore'
 import type { SavedProvider } from '../types/provider'
@@ -23,13 +24,16 @@ const desktopNotificationsMock = vi.hoisted(() => ({
 const clipboardMock = vi.hoisted(() => ({
   copyTextToClipboard: vi.fn(),
 }))
-const tauriCoreMock = vi.hoisted(() => ({
+const shellCoreMock = vi.hoisted(() => ({
   invoke: vi.fn(),
 }))
-const tauriDialogMock = vi.hoisted(() => ({
+const terminalApiMock = vi.hoisted(() => ({
+  detectDefaultShell: vi.fn(),
+}))
+const shellDialogMock = vi.hoisted(() => ({
   open: vi.fn(),
 }))
-const tauriProcessMock = vi.hoisted(() => ({
+const shellProcessMock = vi.hoisted(() => ({
   relaunch: vi.fn(),
 }))
 const providerStoreState = {
@@ -56,7 +60,7 @@ vi.mock('../api/agents', () => ({
 }))
 
 vi.mock('../stores/providerStore', () => ({
-  useProviderStore: () => providerStoreState,
+  useProviderStore: <T,>(selector?: (state: typeof providerStoreState) => T) => selector ? selector(providerStoreState) : providerStoreState,
 }))
 
 vi.mock('../api/providers', () => ({
@@ -68,9 +72,16 @@ vi.mock('../api/providers', () => ({
 
 vi.mock('../lib/desktopNotifications', () => desktopNotificationsMock)
 vi.mock('../components/chat/clipboard', () => clipboardMock)
-vi.mock('@tauri-apps/api/core', () => tauriCoreMock)
-vi.mock('@tauri-apps/plugin-dialog', () => tauriDialogMock)
-vi.mock('@tauri-apps/plugin-process', () => tauriProcessMock)
+vi.mock('../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/shell')>()),
+  prepareAppModeRestart: () => shellCoreMock.invoke('prepare_for_app_mode_restart'),
+  pickDirectory: shellDialogMock.open,
+  relaunchApp: shellProcessMock.relaunch,
+}))
+vi.mock('../api/terminal', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../api/terminal')>()
+  return { ...original, terminalApi: { ...original.terminalApi, detectDefaultShell: terminalApiMock.detectDefaultShell } }
+})
 vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,h5qr'),
@@ -120,7 +131,7 @@ function expandSection(title: string) {
 }
 
 function chooseOption(trigger: string, option: string | RegExp) {
-  fireEvent.click(screen.getByRole('button', { name: trigger }))
+  fireEvent.keyDown(screen.getByRole('button', { name: trigger }), { key: 'ArrowDown' })
   fireEvent.click(screen.getByRole('menuitemradio', { name: option }))
 }
 
@@ -138,13 +149,14 @@ describe('Settings > General tab', () => {
     desktopNotificationsMock.openDesktopNotificationSettings.mockResolvedValue(true)
     clipboardMock.copyTextToClipboard.mockReset()
     clipboardMock.copyTextToClipboard.mockResolvedValue(true)
-    tauriCoreMock.invoke.mockReset()
-    tauriCoreMock.invoke.mockImplementation(async (command: string) => command === 'detect_default_terminal_shell' ? { platform: 'macos', shell: '/bin/zsh' } : undefined)
-    tauriDialogMock.open.mockReset()
-    tauriDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
-    tauriProcessMock.relaunch.mockReset()
-    tauriProcessMock.relaunch.mockResolvedValue(undefined)
-    delete (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__
+    shellCoreMock.invoke.mockReset()
+    terminalApiMock.detectDefaultShell.mockReset()
+    terminalApiMock.detectDefaultShell.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
+    shellDialogMock.open.mockReset()
+    shellDialogMock.open.mockResolvedValue('/Users/test/dreamcoder-data')
+    shellProcessMock.relaunch.mockReset()
+    shellProcessMock.relaunch.mockResolvedValue(undefined)
+    delete (window as unknown as { dreamcoderShell?: object }).dreamcoderShell
     MOCK_GET_SETTINGS.mockResolvedValue({})
     MOCK_UPDATE_SETTINGS.mockResolvedValue({})
     providerStoreState.providers = []
@@ -165,6 +177,7 @@ describe('Settings > General tab', () => {
       locale: 'en',
       theme: 'light',
       thinkingEnabled: true,
+      autoCompactPercent: 90,
       skipWebFetchPreflight: true,
       agentTeamsEnabled: false,
       desktopNotificationsEnabled: true,
@@ -182,6 +195,9 @@ describe('Settings > General tab', () => {
       },
       h5AccessDiagnostics: null,
       h5AccessError: null,
+      setAutoCompactPercent: vi.fn().mockImplementation(async (percent: number) => {
+        useSettingsStore.setState({ autoCompactPercent: percent })
+      }),
       setThinkingEnabled: vi.fn().mockImplementation(async (enabled: boolean) => {
         useSettingsStore.setState({ thinkingEnabled: enabled })
       }),
@@ -261,7 +277,7 @@ describe('Settings > General tab', () => {
       updateH5AccessSettings: vi.fn(),
     })
 
-    useUIStore.setState({ settingsTab: 'providers', toasts: [] })
+    useUIStore.setState({ settingsTab: 'providers' })
     useUpdateStore.setState({
       status: 'idle',
       availableVersion: null,
@@ -280,15 +296,15 @@ describe('Settings > General tab', () => {
   })
 
   it('offers a default shell dropdown in General settings and persists Unix choices', async () => {
-    (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {}
+    (window as unknown as { dreamcoderShell?: object }).dreamcoderShell = {}
     useSettingsStore.setState({
-      desktopTerminal: { startupShell: 'system', customShellPath: '' },
+      desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: null },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
     expandSection('Default shell')
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'bash' }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
     expect(useSettingsStore.getState().setDesktopTerminal).toHaveBeenCalledWith({ startupShell: 'bash', customShellPath: '' })
@@ -298,7 +314,7 @@ describe('Settings > General tab', () => {
     render(<Settings />)
     fireEvent.click(screen.getByText('General'))
     expect(screen.queryByText('Default shell')).not.toBeInTheDocument()
-    expect(tauriCoreMock.invoke).not.toHaveBeenCalledWith('detect_default_terminal_shell', undefined)
+    expect(terminalApiMock.detectDefaultShell).not.toHaveBeenCalled()
   })
 
   it('shows WebFetch preflight toggle enabled by default', () => {
@@ -311,13 +327,13 @@ describe('Settings > General tab', () => {
     expect(toggle).toBeChecked()
   })
 
-  it('offers all seven themes in a borderless dropdown and saves the choice', () => {
+  it('offers all seven themes in a borderless dropdown and saves the choice', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
     const trigger = screen.getByRole('button', { name: 'Color theme' })
     expect(trigger).toHaveTextContent('Warm Classic')
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
 
     const options = screen.getAllByRole('menuitemradio').map((option) => option.textContent)
     expect(options).toEqual(['Pure White', 'Warm Classic', 'Dark', 'Midnight', 'DreamField Emerald', 'Autumn Amber', 'Aurora'])
@@ -326,7 +342,7 @@ describe('Settings > General tab', () => {
 
     expect(useSettingsStore.getState().setTheme).toHaveBeenCalledWith('aurora')
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 
   it('marks the pure white appearance theme as selected', () => {
@@ -334,26 +350,28 @@ describe('Settings > General tab', () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
-    fireEvent.click(screen.getByRole('button', { name: 'Color theme' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Color theme' }), { key: 'ArrowDown' })
 
     expect(screen.getByRole('menuitemradio', { name: 'Pure White' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('menuitemradio', { name: 'Warm Classic' })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('closes a settings dropdown with Escape and on outside click', () => {
+  it('closes a settings dropdown with Escape and on outside click', async () => {
     render(<Settings />)
 
     fireEvent.click(screen.getByText('General'))
     const trigger = screen.getByRole('button', { name: 'Color theme' })
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     expect(screen.getByRole('menu', { name: 'Color theme' })).toBeInTheDocument()
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
     expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    await waitFor(() => expect(trigger).toHaveFocus())
 
-    fireEvent.click(trigger)
-    fireEvent.mouseDown(document.body)
-    expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    await waitFor(() => {
+      fireEvent.pointerDown(document.body, { button: 0, pointerType: 'mouse' })
+      expect(screen.queryByRole('menu', { name: 'Color theme' })).not.toBeInTheDocument()
+    })
   })
 
   it('groups General settings and uses a segmented control for effort', () => {
@@ -439,10 +457,7 @@ describe('Settings > General tab', () => {
         url: 'http://127.0.0.1:7890',
       },
     })
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'Network settings saved.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('Network settings saved.')
   })
 
   it('validates typed provider network timeout and supports precise step controls', () => {
@@ -468,8 +483,8 @@ describe('Settings > General tab', () => {
   })
 
   it('keeps data storage at the bottom of General settings', () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useClaudeCodeImportStore.setState({
       status: {
         claudeCodeDir: '/Users/test/.claude',
@@ -500,8 +515,8 @@ describe('Settings > General tab', () => {
   })
 
   it('lets desktop users choose a portable data directory and relaunch immediately', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -520,14 +535,14 @@ describe('Settings > General tab', () => {
 
     await waitFor(() => {
       expect(useSettingsStore.getState().setAppMode).toHaveBeenCalledWith('portable', '/Users/test/dreamcoder-data')
-      expect(tauriCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
-      expect(tauriProcessMock.relaunch).toHaveBeenCalledTimes(1)
+      expect(shellCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
+      expect(shellProcessMock.relaunch).toHaveBeenCalledTimes(1)
     })
   })
 
   it('switches back to the system directory without deleting portable data', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({
       appMode: {
         mode: 'portable',
@@ -550,14 +565,14 @@ describe('Settings > General tab', () => {
 
     await waitFor(() => {
       expect(useSettingsStore.getState().setAppMode).toHaveBeenCalledWith('default', null)
-      expect(tauriCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
-      expect(tauriProcessMock.relaunch).toHaveBeenCalledTimes(1)
+      expect(shellCoreMock.invoke).toHaveBeenCalledWith('prepare_for_app_mode_restart')
+      expect(shellProcessMock.relaunch).toHaveBeenCalledTimes(1)
     })
   })
 
   it('validates portable directory input and lets users reset to the app-side folder', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -576,9 +591,9 @@ describe('Settings > General tab', () => {
   })
 
   it('shows folder picker failures as an inline storage error', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
-    tauriDialogMock.open.mockRejectedValueOnce(new Error('dialog unavailable'))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
+    shellDialogMock.open.mockRejectedValueOnce(new Error('dialog unavailable'))
 
     render(<Settings />)
 
@@ -591,8 +606,8 @@ describe('Settings > General tab', () => {
   })
 
   it('treats external DREAMCODER_CONFIG_DIR as the controlling data source', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({
       appMode: {
         mode: 'portable',
@@ -621,8 +636,8 @@ describe('Settings > General tab', () => {
   })
 
   it('keeps mode switch confirmation cancelable before restart starts', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     render(<Settings />)
 
@@ -641,9 +656,9 @@ describe('Settings > General tab', () => {
   })
 
   it('shows restart preparation failures without relaunching', async () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
-    tauriCoreMock.invoke.mockImplementation(async (command: string) => {
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
+    shellCoreMock.invoke.mockImplementation(async (command: string) => {
       if (command === 'prepare_for_app_mode_restart') throw new Error('restart preparation failed')
       return { platform: 'macos', shell: '/bin/zsh' }
     })
@@ -657,12 +672,12 @@ describe('Settings > General tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save and Restart' }))
 
     expect(await screen.findByText('restart preparation failed')).toBeInTheDocument()
-    expect(tauriProcessMock.relaunch).not.toHaveBeenCalled()
+    expect(shellProcessMock.relaunch).not.toHaveBeenCalled()
   })
 
   it('shows the saved restart-required state inside the storage section', () => {
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
     useSettingsStore.setState({ appModeRequiresRestart: true })
 
     render(<Settings />)
@@ -719,10 +734,24 @@ describe('Settings > General tab', () => {
 
     const trigger = screen.getByRole('button', { name: 'Response Language' })
     expect(trigger).toHaveTextContent('Default (match conversation)')
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: '中文 (Chinese)' }))
 
     expect(useSettingsStore.getState().setResponseLanguage).toHaveBeenCalledWith('chinese')
+  })
+
+  it('lets the user choose when long conversations auto-compact', () => {
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+
+    const trigger = screen.getByRole('button', { name: 'Auto-compact' })
+    expect(trigger).toHaveTextContent('90% (default)')
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '70%' }))
+
+    expect(useSettingsStore.getState().setAutoCompactPercent).toHaveBeenCalledWith(70)
+    expect(screen.getByRole('button', { name: 'Auto-compact' })).toHaveTextContent('70%')
   })
 
   it('lets the user disable desktop system notifications', () => {
@@ -772,6 +801,20 @@ describe('Settings > General tab', () => {
     })
   })
 
+  it('offers system settings when the system manages notification permission', async () => {
+    desktopNotificationsMock.getDesktopNotificationPermission.mockResolvedValue('unknown')
+    render(<Settings />)
+
+    fireEvent.click(screen.getByText('General'))
+    expect(await screen.findByText('Permission: Managed in system settings')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
+    })
+
+    expect(desktopNotificationsMock.openDesktopNotificationSettings).toHaveBeenCalledTimes(1)
+    expect(desktopNotificationsMock.requestDesktopNotificationPermission).not.toHaveBeenCalled()
+  })
+
   it('moves H5 access out of General into its own Settings tab', () => {
     render(<Settings />)
 
@@ -806,7 +849,7 @@ describe('Settings > General tab', () => {
     const section = screen.getByRole('region', { name: 'H5 Access' })
 
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
-    const dialog = screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })
     expect(within(dialog).getByText(/desktop H5 app on your LAN address and port/i)).toBeInTheDocument()
 
     await act(async () => {
@@ -834,7 +877,7 @@ describe('Settings > General tab', () => {
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
+      fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
     })
 
     await within(section).findByAltText('H5 access QR code')
@@ -845,10 +888,7 @@ describe('Settings > General tab', () => {
     expect(clipboardMock.copyTextToClipboard).toHaveBeenCalledWith(
       'http://192.168.0.102:3456/?serverUrl=http%3A%2F%2F192.168.0.102%3A3456&h5Token=h5_default_generated_token',
     )
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'QR link copied.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('QR link copied.')
   })
 
   it('guides enabled H5 users to generate a token before the QR code exists', async () => {
@@ -893,7 +933,7 @@ describe('Settings > General tab', () => {
     fireEvent.click(within(section).getByLabelText('Enable H5 access'))
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
+      fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Enable LAN H5 access?' })).getByRole('button', { name: 'Enable H5 access' }))
     })
 
     fireEvent.click(within(section).getByRole('button', { name: 'Show token' }))
@@ -921,10 +961,7 @@ describe('Settings > General tab', () => {
     })
 
     expect(clipboardMock.copyTextToClipboard).toHaveBeenCalledWith('https://phone.example/app')
-    expect(useUIStore.getState().toasts[useUIStore.getState().toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'H5 URL copied.',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('H5 URL copied.')
   })
 
   it('shows the H5-specific store error when the H5 settings load failed', () => {
@@ -1122,11 +1159,11 @@ describe('Settings > General tab', () => {
     )
   })
 
-  it('keeps extension tabs available alongside the terminal tab', () => {
+  it('lists extension tabs without a terminal tab', () => {
     render(<Settings />)
 
     expect(screen.queryByText('Install')).not.toBeInTheDocument()
-    expect(screen.getByText('Terminal')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Terminal' })).not.toBeInTheDocument()
     expect(screen.getByText('MCP')).toBeInTheDocument()
     expect(screen.getByText('Plugins')).toBeInTheDocument()
   })
@@ -1134,6 +1171,7 @@ describe('Settings > General tab', () => {
 
 describe('Settings > Providers tab', () => {
   beforeEach(() => {
+    useUIStore.setState({ settingsTab: 'providers' })
     MOCK_DELETE_PROVIDER.mockReset()
     MOCK_GET_SETTINGS.mockResolvedValue({})
     MOCK_UPDATE_SETTINGS.mockResolvedValue({})
@@ -1149,12 +1187,7 @@ describe('Settings > Providers tab', () => {
         apiKey: '***',
         baseUrl: 'https://api.minimaxi.com',
         apiFormat: 'openai_chat',
-        models: {
-          main: 'MiniMax-M2.7-highspeed',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        models: [{ id: 'MiniMax-M2.7-highspeed' }],
         notes: '',
       },
     ]
@@ -1171,10 +1204,10 @@ describe('Settings > Providers tab', () => {
     })
 
     expect(MOCK_DELETE_PROVIDER).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(screen.getByText('Delete provider "MiniMax-M2.7-highspeed(openai)"? This cannot be undone.')).toBeInTheDocument()
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = screen.getByRole('alertdialog')
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
       await Promise.resolve()
@@ -1183,19 +1216,14 @@ describe('Settings > Providers tab', () => {
     expect(MOCK_DELETE_PROVIDER).toHaveBeenCalledWith('provider-1')
   })
 
-  it('uses the shared dropdown for API format in the provider form', () => {
+  it('uses the shared select for API format in the provider form', () => {
     providerStoreState.presets = [
       {
         id: 'custom',
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: 'custom-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [{ id: 'custom-main' }],
         needsApiKey: true,
         websiteUrl: '',
       },
@@ -1206,16 +1234,16 @@ describe('Settings > Providers tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Provider/i }))
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: /Fast model/i })).toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /Anthropic Messages \(native\)/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /OpenAI Responses API \(proxy\)/i }))
+    fireEvent.keyDown(within(dialog).getByRole('combobox', { name: 'API Format' }), { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('option', { name: /OpenAI Responses API \(proxy\)/i }))
 
-    expect(within(dialog).getByRole('button', { name: /OpenAI Responses API \(proxy\)/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: 'API Format' })).toHaveTextContent(/OpenAI Responses API \(proxy\)/i)
     expect(within(dialog).getByText('Requests will be translated via the local proxy')).toBeInTheDocument()
   })
 
-  it('normalizes blank model mappings to the main model when saving a provider', async () => {
+  it('adds a model ID when saving a provider', async () => {
     providerStoreState.createProvider = vi.fn().mockResolvedValue({
       id: 'provider-new',
       presetId: 'custom',
@@ -1223,12 +1251,7 @@ describe('Settings > Providers tab', () => {
       apiKey: 'sk-test',
       baseUrl: 'https://api.example.com/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'gpt-5.5',
-        haiku: 'gpt-5.5',
-        sonnet: 'gpt-5.5',
-        opus: 'gpt-5.5',
-      },
+      models: [{ id: 'gpt-5.5' }],
     })
     providerStoreState.presets = [
       {
@@ -1236,12 +1259,7 @@ describe('Settings > Providers tab', () => {
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: '',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [],
         needsApiKey: true,
         websiteUrl: '',
       },
@@ -1252,17 +1270,15 @@ describe('Settings > Providers tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Provider|添加服务商/i }))
     const dialog = screen.getByRole('dialog')
     fireEvent.change(within(dialog).getByPlaceholderText('sk-...'), { target: { value: 'sk-test' } })
-    fireEvent.change(within(dialog).getByLabelText(/Main Model|主模型/i), { target: { value: 'gpt-5.5' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: /Save|Add|保存|添加/i }))
+    fireEvent.change(within(dialog).getByLabelText(/Model ID|模型 ID/i), { target: { value: 'gpt-5.5' } })
+    fireEvent.click(within(dialog).getAllByRole('button', { name: /Add|添加/i })[0]!)
+    const saveButtons = within(dialog).getAllByRole('button', { name: /Save|Add|保存|添加/i })
+    await waitFor(() => expect(saveButtons[saveButtons.length - 1]!).toBeEnabled())
+    fireEvent.click(saveButtons[saveButtons.length - 1]!)
 
     await waitFor(() => {
       expect(providerStoreState.createProvider).toHaveBeenCalledWith(expect.objectContaining({
-        models: {
-          main: 'gpt-5.5',
-          haiku: 'gpt-5.5',
-          sonnet: 'gpt-5.5',
-          opus: 'gpt-5.5',
-        },
+        models: [{ id: 'gpt-5.5' }],
       }))
     })
   })
@@ -1274,12 +1290,7 @@ describe('Settings > Providers tab', () => {
         name: 'Custom',
         baseUrl: 'https://api.example.com/anthropic',
         apiFormat: 'anthropic',
-        defaultModels: {
-          main: 'custom-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
+        defaultModels: [{ id: 'custom-main' }],
         needsApiKey: true,
         websiteUrl: '',
       },
@@ -1294,10 +1305,10 @@ describe('Settings > Providers tab', () => {
 
     expect(apiKeyInput).toHaveAttribute('type', 'password')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show API Key' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show API key' }))
 
     expect(apiKeyInput).toHaveAttribute('type', 'text')
-    expect(within(dialog).getByRole('button', { name: 'Hide API Key' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Hide API key' })).toBeInTheDocument()
   })
 })
 

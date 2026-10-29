@@ -1,14 +1,15 @@
+import { CircleAlertIcon, GitBranchIcon, LoaderCircleIcon, MaximizeIcon, MinusIcon, PlusIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
+import type { Mermaid } from 'mermaid'
 import { Modal } from '../shared/Modal'
 import { CopyButton } from '../shared/CopyButton'
+import { useTranslation } from '../../i18n'
 
 type Props = {
   code: string
 }
 
-let mermaidInitialized = false
 const MIN_PREVIEW_ZOOM = 0.5
 const MAX_PREVIEW_ZOOM = 3
 const PREVIEW_ZOOM_STEP = 0.25
@@ -26,16 +27,26 @@ type DragState = {
   scrollTop: number
 }
 
-function initMermaid() {
-  if (mermaidInitialized) return
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'default',
-    securityLevel: 'strict',
-    suppressErrorRendering: true,
-    fontFamily: 'var(--font-sans)',
-  })
-  mermaidInitialized = true
+let mermaidPromise: Promise<Mermaid> | null = null
+
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import('mermaid').then(
+    ({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'strict',
+        suppressErrorRendering: true,
+        fontFamily: 'var(--font-sans)',
+      })
+      return mermaid
+    },
+    (err: unknown) => {
+      mermaidPromise = null
+      throw err
+    },
+  )
+  return mermaidPromise
 }
 
 let mermaidIdCounter = 0
@@ -92,6 +103,7 @@ function parseSvgMetrics(svg: string): SvgMetrics | null {
 }
 
 export function MermaidRenderer({ code }: Props) {
+  const t = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const previewViewportRef = useRef<HTMLDivElement>(null)
   const previewContentRef = useRef<HTMLDivElement>(null)
@@ -106,11 +118,10 @@ export function MermaidRenderer({ code }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    initMermaid()
 
     const id = `mermaid-${++mermaidIdCounter}`
 
-    mermaid.render(id, code).then(
+    loadMermaid().then((mermaid) => mermaid.render(id, code)).then(
       ({ svg: renderedSvg }) => {
         if (!cancelled) {
           setSvg(renderedSvg)
@@ -228,9 +239,9 @@ export function MermaidRenderer({ code }: Props) {
 
   if (error) {
     return (
-      <div className="my-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-error)]/30">
+      <div className="my-4 overflow-hidden rounded-lg border border-[var(--color-error)]/30">
         <div className="flex items-center gap-2 border-b border-[var(--color-error)]/20 bg-[var(--color-error-container)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-error)]">
-          <span className="material-symbols-outlined text-[14px]">error</span>
+          <CircleAlertIcon aria-hidden="true" size={14} />
           Mermaid Error
         </div>
         <div className="bg-[var(--color-error-container)]/30 px-3 py-2 font-[var(--font-mono)] text-[11px] text-[var(--color-error)]">
@@ -242,9 +253,9 @@ export function MermaidRenderer({ code }: Props) {
 
   if (!svg) {
     return (
-      <div className="my-4 flex items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)]/50 bg-[var(--color-surface-container-low)] py-8">
+      <div className="my-4 flex items-center justify-center rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-surface-container-low)] py-8">
         <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-tertiary)]">
-          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+          <LoaderCircleIcon className="shrink-0 animate-spin" aria-hidden="true" size={16} />
           Rendering diagram...
         </div>
       </div>
@@ -253,10 +264,10 @@ export function MermaidRenderer({ code }: Props) {
 
   return (
     <>
-      <div className="my-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
+      <div className="my-4 overflow-hidden rounded-lg border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
         <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5 text-[11px] text-[var(--color-text-tertiary)]">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px]">account_tree</span>
+            <GitBranchIcon aria-hidden="true" size={14} />
             <span className="font-semibold uppercase tracking-[0.14em]">Mermaid</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -264,7 +275,7 @@ export function MermaidRenderer({ code }: Props) {
               onClick={handlePreview}
               className="flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] px-2 py-1 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)]"
             >
-              <span className="material-symbols-outlined text-[12px]">fullscreen</span>
+              <MaximizeIcon aria-hidden="true" size={12} />
               Preview
             </button>
             <CopyButton
@@ -283,22 +294,18 @@ export function MermaidRenderer({ code }: Props) {
         />
       </div>
 
-      <Modal open={previewOpen} onClose={handlePreviewClose} width={1100}>
+      <Modal open={previewOpen} onClose={handlePreviewClose} title={t('mermaid.previewTitle')} width={1100}>
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-              <span className="material-symbols-outlined text-[18px]">account_tree</span>
-              Mermaid Diagram
-            </div>
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-1">
                 <button
                   type="button"
                   onClick={zoomOut}
-                  aria-label="Zoom out"
+                  aria-label={t('mermaid.zoomOut')}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
                 >
-                  <span className="material-symbols-outlined text-[16px]">remove</span>
+                  <MinusIcon aria-hidden="true" size={16} />
                 </button>
                 <button
                   type="button"
@@ -310,10 +317,10 @@ export function MermaidRenderer({ code }: Props) {
                 <button
                   type="button"
                   onClick={zoomIn}
-                  aria-label="Zoom in"
+                  aria-label={t('mermaid.zoomIn')}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
                 >
-                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <PlusIcon aria-hidden="true" size={16} />
                 </button>
               </div>
               <CopyButton

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import { getAppMode, setAppMode } from '../lib/shell'
 import { ApiError } from '../api/client'
 import { settingsApi } from '../api/settings'
+import { statusApi } from '../api/status'
 import { modelsApi } from '../api/models'
 import { h5AccessApi } from '../api/h5Access'
 import {
@@ -12,7 +14,7 @@ import {
   type H5AccessDiagnostics,
   type H5AccessSettings,
   type NetworkSettings,
-  type PermissionMode,
+  type DefaultPermissionMode,
   type EffortLevel,
   type ModelInfo,
   type ThemeMode,
@@ -20,7 +22,7 @@ import {
   type UpdateProxySettings,
   type WebSearchSettings,
 } from '../types/settings'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import type { Locale } from '../i18n'
 import {
   APP_ZOOM_CONTROL_STEP,
@@ -39,6 +41,7 @@ export const UI_ZOOM_MIN = MIN_APP_ZOOM
 export const UI_ZOOM_MAX = MAX_APP_ZOOM
 export const UI_ZOOM_STEP = APP_ZOOM_CONTROL_STEP
 export const UI_ZOOM_DEFAULT = DEFAULT_APP_ZOOM
+export const DEFAULT_AUTO_COMPACT_PERCENT = 90
 let desktopNotificationsSaveQueue: Promise<void> = Promise.resolve()
 
 function detectSystemLocale(): Locale {
@@ -67,10 +70,11 @@ function getStoredOnboardingCompleted(): boolean {
 }
 
 type SettingsStore = {
-  permissionMode: PermissionMode
+  permissionMode: DefaultPermissionMode
   currentModel: ModelInfo | null
   effortLevel: EffortLevel
   thinkingEnabled: boolean
+  autoCompactPercent: number
   availableModels: ModelInfo[]
   activeProviderName: string | null
   locale: Locale
@@ -96,16 +100,17 @@ type SettingsStore = {
 
   fetchAll: () => Promise<void>
   fetchH5Access: () => Promise<void>
-  setPermissionMode: (mode: PermissionMode) => Promise<void>
+  setPermissionMode: (mode: DefaultPermissionMode) => Promise<void>
   setModel: (modelId: string) => Promise<void>
   setEffort: (level: EffortLevel) => Promise<void>
   setThinkingEnabled: (enabled: boolean) => Promise<void>
+  setAutoCompactPercent: (percent: number) => Promise<void>
   setLocale: (locale: Locale) => void
   setTheme: (theme: ThemeMode) => Promise<void>
   setSkipWebFetchPreflight: (enabled: boolean) => Promise<void>
   setAgentTeamsEnabled: (enabled: boolean) => Promise<void>
   setDesktopNotificationsEnabled: (enabled: boolean) => Promise<void>
-  setDesktopTerminal: (settings: DesktopTerminalSettings) => Promise<void>
+  setDesktopTerminal: (settings: Partial<DesktopTerminalSettings>) => Promise<void>
   setWebSearch: (settings: WebSearchSettings) => Promise<void>
   setUpdateProxy: (settings: UpdateProxySettings) => Promise<void>
   setNetwork: (settings: NetworkSettings) => Promise<void>
@@ -137,6 +142,7 @@ const DEFAULT_H5_ACCESS_SETTINGS: H5AccessSettings = {
 const DEFAULT_DESKTOP_TERMINAL_SETTINGS: DesktopTerminalSettings = {
   startupShell: 'system',
   customShellPath: '',
+  bashPath: null,
 }
 
 const DEFAULT_UPDATE_PROXY_SETTINGS: UpdateProxySettings = {
@@ -157,6 +163,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   currentModel: null,
   effortLevel: 'medium',
   thinkingEnabled: true,
+  autoCompactPercent: DEFAULT_AUTO_COMPACT_PERCENT,
   availableModels: [],
   activeProviderName: null,
   locale: getStoredLocale(),
@@ -217,6 +224,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         currentModel: model,
         effortLevel: level,
         thinkingEnabled: userSettings.alwaysThinkingEnabled !== false,
+        autoCompactPercent: typeof userSettings.autoCompactPercent === 'number' ? userSettings.autoCompactPercent : DEFAULT_AUTO_COMPACT_PERCENT,
         theme,
         skipWebFetchPreflight: userSettings.skipWebFetchPreflight !== false,
         desktopNotificationsEnabled: userSettings.desktopNotificationsEnabled === true,
@@ -285,6 +293,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 
+  setAutoCompactPercent: async (percent) => {
+    const prev = get().autoCompactPercent
+    set({ autoCompactPercent: percent })
+    try {
+      await settingsApi.updateUser({ autoCompactPercent: percent })
+    } catch {
+      set({ autoCompactPercent: prev })
+    }
+  },
+
   setLocale: (locale) => {
     set({ locale })
     try { localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { }
@@ -345,7 +363,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setDesktopTerminal: async (settings) => {
     const prev = get().desktopTerminal
-    const next = normalizeDesktopTerminalSettings(settings)
+    const next = normalizeDesktopTerminalSettings({ ...prev, ...settings })
     set({ desktopTerminal: next })
     try {
       await settingsApi.updateUser({ desktopTerminal: next })
@@ -463,16 +481,26 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   fetchAppMode: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const result: AppModeConfig = await invoke('get_app_mode')
-      set({ appMode: result })
-    } catch { }
+      const [result, directories] = await Promise.all([
+        getAppMode(),
+        statusApi.getConfigDirectories(),
+      ])
+      set({
+        appMode: {
+          ...result,
+          activeConfigDir: directories.configDir,
+          systemConfigDir: directories.defaultConfigDir,
+        },
+      })
+    } catch (error) {
+      console.error('[settings] Failed to load app mode', error)
+    }
   },
 
   setAppMode: async (mode, portableDir) => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     const prev = get().appMode
     const newMode: AppModeConfig = {
       ...prev,
@@ -487,8 +515,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
     set({ appMode: newMode, appModeRequiresRestart: true })
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('set_app_mode', {
+      await setAppMode({
         mode,
         portableDir: newMode.portableDir || null,
       })
@@ -551,6 +578,7 @@ function normalizeDesktopTerminalSettings(
     customShellPath: typeof settings?.customShellPath === 'string'
       ? settings.customShellPath
       : DEFAULT_DESKTOP_TERMINAL_SETTINGS.customShellPath,
+    bashPath: typeof settings?.bashPath === 'string' ? settings.bashPath.trim() || null : null,
   }
 }
 

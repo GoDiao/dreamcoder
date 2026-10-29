@@ -1,19 +1,18 @@
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import DOMPurify from 'dompurify'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
 import { marked, type Tokens } from 'marked'
 import { CodeViewer } from '../chat/CodeViewer'
 import { MermaidRenderer } from '../chat/MermaidRenderer'
 import { copyTextToClipboard } from '../chat/clipboard'
+import { getLoadedKatex, loadKatex } from '../../lib/katexLoader'
+import { EMPTY_STREAMING_BLOCKS, splitStreamingBlocks } from './streamingBlocks'
 
 type Props = {
   content: string
   variant?: 'default' | 'document' | 'compact'
   className?: string
   cache?: boolean
-  streaming?: boolean
   onLinkClick?: (href: string, event: ReactMouseEvent<HTMLDivElement>) => boolean | void
 }
 
@@ -228,10 +227,17 @@ function extractMath(content: string): { markdown: string; mathBlocks: MathBlock
   return { markdown: output, mathBlocks }
 }
 
+function escapeHtmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function renderMath(block: MathBlock): string {
   const cacheKey = `${block.displayMode ? 'block' : 'inline'}\0${block.tex}`
   const cached = mathRenderCache.get(cacheKey)
   if (cached) return cached
+
+  const katex = getLoadedKatex()
+  if (!katex) return escapeHtmlText(block.tex)
 
   try {
     const rendered = katex.renderToString(block.tex, {
@@ -315,10 +321,8 @@ type CacheEntry = {
 
 const FINALIZED_CACHE_MAX_ENTRIES = 200
 const FINALIZED_CACHE_MAX_CHARS = 8_000_000
-const STREAMING_CACHE_MAX_ENTRIES = 4
 
 const finalizedMarkdownCache = new Map<string, CacheEntry>()
-const streamingMarkdownCache = new Map<string, CacheEntry>()
 let finalizedMarkdownCacheChars = 0
 
 function fnv1aHash(value: string): number {
@@ -347,47 +351,29 @@ function evictFinalizedMarkdownEntries(): void {
   }
 }
 
-function evictStreamingMarkdownEntries(): void {
-  while (streamingMarkdownCache.size > STREAMING_CACHE_MAX_ENTRIES) {
-    const oldestKey = streamingMarkdownCache.keys().next().value
-    if (typeof oldestKey !== 'string') break
-    streamingMarkdownCache.delete(oldestKey)
-  }
-}
-
-function getCachedMarkdownParse(content: string, streaming: boolean): MarkdownParseResult {
-  const cache = streaming ? streamingMarkdownCache : finalizedMarkdownCache
+function getCachedMarkdownParse(content: string): MarkdownParseResult {
   const key = buildMarkdownCacheKey(content)
-  const cached = cache.get(key)
+  const cached = finalizedMarkdownCache.get(key)
   if (cached) {
-    cache.delete(key)
-    cache.set(key, cached)
+    finalizedMarkdownCache.delete(key)
+    finalizedMarkdownCache.set(key, cached)
     return cached.parsed
   }
 
   const parsed = parseMarkdown(content)
-  const entry: CacheEntry = { parsed, chars: content.length }
-  cache.set(key, entry)
-
-  if (streaming) {
-    evictStreamingMarkdownEntries()
-  } else {
-    finalizedMarkdownCacheChars += content.length
-    evictFinalizedMarkdownEntries()
-  }
+  finalizedMarkdownCache.set(key, { parsed, chars: content.length })
+  finalizedMarkdownCacheChars += content.length
+  evictFinalizedMarkdownEntries()
 
   return parsed
 }
 
 export const __markdownParseCacheInternals = {
   finalizedSize: () => finalizedMarkdownCache.size,
-  streamingSize: () => streamingMarkdownCache.size,
   finalizedChars: () => finalizedMarkdownCacheChars,
   hasFinalized: (content: string) => finalizedMarkdownCache.has(buildMarkdownCacheKey(content)),
-  hasStreaming: (content: string) => streamingMarkdownCache.has(buildMarkdownCacheKey(content)),
   reset: () => {
     finalizedMarkdownCache.clear()
-    streamingMarkdownCache.clear()
     finalizedMarkdownCacheChars = 0
   },
 }
@@ -451,45 +437,70 @@ function getProseClasses(variant: 'default' | 'document' | 'compact', className?
     .join(' ')
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, variant = 'default', className, cache = true, streaming = false, onLinkClick }: Props) {
-  const { html, codeBlocks, mathBlocks } = useMemo(
-    () => cache ? getCachedMarkdownParse(content, streaming) : parseMarkdown(content),
-    [cache, content, streaming],
+function useKatexReady(mathBlocks: MathBlock[]): boolean {
+  const [katexReady, setKatexReady] = useState(() => getLoadedKatex() !== null)
+  const needsKatex = mathBlocks.length > 0 && !katexReady
+
+  useEffect(() => {
+    if (!needsKatex) return
+    let cancelled = false
+    loadKatex().then(
+      () => { if (!cancelled) setKatexReady(true) },
+      () => {},
+    )
+    return () => { cancelled = true }
+  }, [needsKatex])
+
+  return katexReady
+}
+
+function buildMarkdownParts(html: string, codeBlocks: CodeBlock[], mathBlocks: MathBlock[]): MarkdownPart[] {
+  if (codeBlocks.length === 0) {
+    return [{ type: 'html', content: enhanceMarkdownHtml(html, mathBlocks) }]
+  }
+
+  const result: MarkdownPart[] = []
+  let remaining = html
+
+  for (const block of codeBlocks) {
+    const marker = `<div data-codeblock-id="${block.id}"></div>`
+    const idx = remaining.indexOf(marker)
+    if (idx === -1) continue
+
+    const before = remaining.slice(0, idx)
+    if (before) {
+      result.push({ type: 'html', content: enhanceMarkdownHtml(before, mathBlocks) })
+    }
+    result.push({ type: 'code', block })
+    remaining = remaining.slice(idx + marker.length)
+  }
+
+  if (remaining) {
+    result.push({ type: 'html', content: enhanceMarkdownHtml(remaining, mathBlocks) })
+  }
+
+  return result
+}
+
+function renderMarkdownParts(parts: MarkdownPart[]) {
+  return parts.map((part, i) =>
+    part.type === 'html' ? (
+      <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
+    ) : shouldRenderAsMermaid(part.block) ? (
+      <MermaidRenderer key={part.block.id} code={part.block.code} />
+    ) : (
+      <div key={part.block.id} className="my-4">
+        <CodeViewer
+          code={part.block.code}
+          language={part.block.language}
+        />
+      </div>
+    )
   )
-  const proseClasses = useMemo(
-    () => getProseClasses(variant, className),
-    [variant, className],
-  )
+}
 
-  const parts = useMemo(() => {
-    if (codeBlocks.length === 0) {
-      return [{ type: 'html' as const, content: enhanceMarkdownHtml(html, mathBlocks) }]
-    }
-
-    const result: MarkdownPart[] = []
-    let remaining = html
-
-    for (const block of codeBlocks) {
-      const marker = `<div data-codeblock-id="${block.id}"></div>`
-      const idx = remaining.indexOf(marker)
-      if (idx === -1) continue
-
-      const before = remaining.slice(0, idx)
-      if (before) {
-        result.push({ type: 'html', content: enhanceMarkdownHtml(before, mathBlocks) })
-      }
-      result.push({ type: 'code', block })
-      remaining = remaining.slice(idx + marker.length)
-    }
-
-    if (remaining) {
-      result.push({ type: 'html', content: enhanceMarkdownHtml(remaining, mathBlocks) })
-    }
-
-    return result
-  }, [html, codeBlocks, mathBlocks])
-
-  const handleClick = useCallback(async (event: ReactMouseEvent<HTMLDivElement>) => {
+function useMarkdownClickHandler(onLinkClick: Props['onLinkClick']) {
+  return useCallback(async (event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null
     const button = target?.closest<HTMLButtonElement>('[data-copy-code]')
     if (!button) {
@@ -516,6 +527,23 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
       button.textContent = original
     }, 1500)
   }, [onLinkClick])
+}
+
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, variant = 'default', className, cache = true, onLinkClick }: Props) {
+  const { html, codeBlocks, mathBlocks } = useMemo(
+    () => cache ? getCachedMarkdownParse(content) : parseMarkdown(content),
+    [cache, content],
+  )
+  const proseClasses = useMemo(
+    () => getProseClasses(variant, className),
+    [variant, className],
+  )
+  const katexReady = useKatexReady(mathBlocks)
+  const parts = useMemo(
+    () => buildMarkdownParts(html, codeBlocks, mathBlocks),
+    [html, codeBlocks, mathBlocks, katexReady],
+  )
+  const handleClick = useMarkdownClickHandler(onLinkClick)
 
   if (codeBlocks.length === 0) {
     return (
@@ -529,20 +557,51 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
 
   return (
     <div className={proseClasses} onClick={handleClick}>
-      {parts.map((part, i) =>
-        part.type === 'html' ? (
-          <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
-        ) : shouldRenderAsMermaid(part.block) ? (
-          <MermaidRenderer key={part.block.id} code={part.block.code} />
-        ) : (
-          <div key={part.block.id} className="my-4">
-            <CodeViewer
-              code={part.block.code}
-              language={part.block.language}
-            />
-          </div>
-        )
-      )}
+      {renderMarkdownParts(parts)}
+    </div>
+  )
+})
+
+const StreamingMarkdownBlock = memo(function StreamingMarkdownBlock({ content }: { content: string }) {
+  const { html, codeBlocks, mathBlocks } = useMemo(() => parseMarkdown(content), [content])
+  const katexReady = useKatexReady(mathBlocks)
+  const parts = useMemo(
+    () => buildMarkdownParts(html, codeBlocks, mathBlocks),
+    [html, codeBlocks, mathBlocks, katexReady],
+  )
+
+  if (codeBlocks.length === 0) {
+    return (
+      <div
+        data-streaming-block=""
+        dangerouslySetInnerHTML={{ __html: parts[0]?.type === 'html' ? parts[0].content : '' }}
+      />
+    )
+  }
+
+  return <div data-streaming-block="">{renderMarkdownParts(parts)}</div>
+})
+
+type StreamingProps = Omit<Props, 'cache'>
+
+export const StreamingMarkdownRenderer = memo(function StreamingMarkdownRenderer({ content, variant = 'default', className, onLinkClick }: StreamingProps) {
+  const blocksRef = useRef(EMPTY_STREAMING_BLOCKS)
+  const blocks = useMemo(() => splitStreamingBlocks(blocksRef.current, content), [content])
+  blocksRef.current = blocks
+  const proseClasses = useMemo(
+    () => getProseClasses(variant, className),
+    [variant, className],
+  )
+  const handleClick = useMarkdownClickHandler(onLinkClick)
+
+  return (
+    <div className={proseClasses} onClick={handleClick}>
+      {blocks.finished.map((block, index) => (
+        <StreamingMarkdownBlock key={index} content={block} />
+      ))}
+      {blocks.tail.trim() ? (
+        <StreamingMarkdownBlock key={blocks.finished.length} content={blocks.tail} />
+      ) : null}
     </div>
   )
 })

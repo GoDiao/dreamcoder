@@ -7,23 +7,23 @@ Thank you for your interest in DreamCoder! Whether you're reporting a bug, sugge
 ## ⚡ 5-Minute Quick Start (TL;DR)
 
 ```bash
-# 1. Fork on GitHub, then clone your fork (Bun >= 1.0, Rust, Node >= 18 required)
+# 1. Fork on GitHub, then clone your fork (Bun >= 1.0 and Node >= 18 required)
 git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 
 # 2. Install root workspace deps (sidecar runtime)
 bun install
 
-# 3. Install desktop deps (Tauri CLI + React frontend)
+# 3. Install desktop deps (Electron + React frontend)
 cd desktop && bun install
 
-# 4. Compile the sidecar binary (without this, step 6 fails — externalBin can't find it)
+# 4. Download the Electron binary (Bun does not run Electron's install script)
+bun run electron:install
+
+# 5. Compile the sidecar binary (without it, step 6 fails to start the local server)
 bun run build:sidecars
 
-# 5. Build the frontend once (creates desktop/dist, which tauri dev requires)
-bun run build
-
-# 6. Start the desktop app in dev mode
-bun run tauri dev
+# 6. Start the desktop app in dev mode (Vite and Electron together)
+bun run electron:dev
 
 # 7. Pick an issue with the `good first issue` or `help wanted` label,
 #    create a feature branch from `main`
@@ -74,6 +74,7 @@ git checkout main && git checkout -b feat/your-feature
    - React function components + Hooks.
    - Zustand for state management.
    - Tailwind CSS v4 for styling.
+   - No comments in new code, JSDoc and test comments included. Let names and structure carry the meaning. Existing comments in code you don't touch can stay.
 
 3. **Commit**. Use semantic commit messages:
    ```
@@ -86,7 +87,8 @@ git checkout main && git checkout -b feat/your-feature
 
 4. **Test**. Make sure your changes don't break existing functionality:
    ```bash
-   bun test                  # server/CLI tests (needs ripgrep on PATH)
+   bun run prepare:ripgrep    # prepare the pinned search binary
+   bun test                  # server/CLI tests
    cd desktop
    bun run lint              # TypeScript type checking
    bun run test -- --run     # desktop tests
@@ -99,7 +101,7 @@ git checkout main && git checkout -b feat/your-feature
 
 ```
 dreamcoder/
-├── desktop/               # Tauri desktop app
+├── desktop/               # Electron desktop app
 │   ├── src/
 │   │   ├── components/    # React components
 │   │   ├── stores/        # Zustand state management
@@ -107,7 +109,7 @@ dreamcoder/
 │   │   ├── hooks/         # React Hooks
 │   │   ├── pages/         # Page components
 │   │   └── i18n/          # Internationalization
-│   └── src-tauri/         # Rust backend
+│   └── electron/          # Electron main process and preload
 ├── src/                   # CLI and backend server (src/server/)
 └── docs/                  # Documentation
 ```
@@ -119,11 +121,11 @@ Provider preset contributions have a focused guide in the website documentation 
 > ⚠️ **Platform support note**
 >
 > The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source
-> (`bun run tauri dev`); packaged macOS builds are not verified yet. **Windows x64** was the
+> (`bun run electron:dev`). **Windows x64** was the
 > main platform before and has been tested extensively, but the maintainer no longer develops
 > on it day to day, so help verifying new changes on Windows is especially welcome.
-> The codebase also includes Linux branches, but the maintainer does not run Linux day-to-day.
-> If you're on Windows or Linux, or building a packaged macOS app:
+> Linux is not packaged, and the maintainer does not run it day-to-day.
+> If you're on Windows or Linux:
 >
 > - The desktop app **may** build and run, but you may hit untested issues
 >   (see [#25](https://github.com/GoDiao/dreamcoder/issues/25) for an active Linux memory investigation).
@@ -134,10 +136,7 @@ Provider preset contributions have a focused guide in the website documentation 
 ```bash
 # Prerequisites
 # - Bun >= 1.0
-# - Rust (for compiling Tauri)
-# - Node.js >= 18
-# - Linux also needs WebKitGTK, libappindicator, librsvg, etc.
-#   See https://v2.tauri.app/start/prerequisites/
+# - Node.js >= 18 (Electron's installer runs on Node)
 
 git clone https://github.com/GoDiao/dreamcoder.git
 cd dreamcoder
@@ -145,31 +144,71 @@ cd dreamcoder
 # Step 1: install root workspace deps (sidecar: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
 
-# Step 2: install desktop deps (Tauri CLI + React frontend)
+# Step 2: install desktop deps (Electron + React frontend)
 cd desktop && bun install
 
-# Step 3: compile the sidecar binary
-#   Produces desktop/src-tauri/binaries/dreamcoder-sidecar-<target>
-#   tauri.conf.json's externalBin points at it; step 5 fails to launch without it.
+# Step 3: download the Electron binary
+#   Bun does not run Electron's install script, so this fetches the binary once.
+bun run electron:install
+
+# Step 4: compile the sidecar binary
+#   Produces desktop/binaries/dreamcoder-sidecar-<target>, which the main
+#   process starts as the local server.
 bun run build:sidecars
 
-# Step 4: build the frontend once
-#   Produces desktop/dist. tauri.conf.json bundles it as a resource, so step 5
-#   fails without it even though dev mode serves the UI from Vite.
-bun run build
-
 # Step 5: launch dev mode
-bun run tauri dev
+#   Starts Vite on port 1420, builds the main process and opens Electron.
+bun run electron:dev
 ```
 
-> Seeing `failed to find binary 'dreamcoder-sidecar-...'`?
-> 99% chance you skipped Step 3 `bun run build:sidecars`.
-> Seeing `command not found: tauri` or a `@tauri-apps/cli` error?
-> 99% chance you skipped Step 2 `cd desktop && bun install` (Tauri CLI lives in the desktop sub-package; root install won't pull it in).
-> Seeing ``resource path `../dist` doesn't exist``?
-> You skipped Step 4 `bun run build`.
+> Seeing `Electron failed to install correctly`?
+> You skipped Step 3 `bun run electron:install`.
+> The window opens with "Local server failed to start"?
+> You skipped Step 4 `bun run build:sidecars`.
+> `bun run build` builds `desktop/dist`, which the sidecar serves to the H5 page; dev mode does not need it.
+> `bun run electron:pack` builds an installer for your platform into `desktop/electron-release/`.
 >
 > More common issues in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### Desktop UI components
+
+The desktop uses the Radix variant of shadcn/ui, generated from
+`desktop/components.json` into `desktop/src/components/shared/ui`. Callers use
+those primitives directly; the compositions in `desktop/src/components/shared`
+add behavior and do not rename or forward props. The
+[component source inventory](../desktop/src/components/README.md) lists every
+primitive and composition, the local adaptations (theme tokens in the `ui-`
+namespace, Shiki, Pierre, Safari 17.5 as the minimum H5 browser) and how to
+update components with the shadcn CLI.
+
+### Bundled ripgrep
+
+`bun run build:sidecars` prepares ripgrep automatically.
+The root `bun run build:sidecar` delegates to the same desktop build script.
+For standalone server/CLI development or tests, run `bun run prepare:ripgrep`
+from the repository root first. The first run needs access to GitHub releases
+and `tar` (included with macOS, Windows and common Linux development systems).
+No npm package or system ripgrep installation is required.
+
+The script pins [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0)
+for macOS arm64/x64, Windows x64 and Linux arm64/x64. Linux uses static musl
+binaries for both GNU and musl targets. Archive SHA-256 values in
+`scripts/prepare-ripgrep.ts` come from the release's `.sha256` files, cross-checked
+against GitHub's asset digests; binary hashes were computed after verifying and
+extracting those archives. Existing binaries are reused only when their bytes
+match the pinned binary hash. To update ripgrep, verify both hashes for every
+target and refresh `THIRD_PARTY_NOTICES.md` and the installer smoke-test version.
+
+Source runs read `vendor/ripgrep/<arch>-<platform>/rg` (`rg.exe` on Windows).
+Builds also stage `desktop/binaries/rg-<target-triple>` (plus `.exe` on
+Windows). The installers drop the target suffix: `rg` sits beside
+`dreamcoder-sidecar` in `Resources/bin` on macOS and `resources\bin` on
+Windows. License notices are included as a resource. Both binary directories
+are Git-ignored.
+
+Resolution is: `USE_BUILTIN_RIPGREP=0` forces system ripgrep; otherwise the
+executable's neighboring binary, the source vendor binary, system `rg` on
+`PATH`, then unavailable. Stock Bun does not embed ripgrep in the sidecar.
 
 ## Adding an MCP Server to the Curated Registry
 

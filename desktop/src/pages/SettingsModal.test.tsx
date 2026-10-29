@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
@@ -18,10 +18,16 @@ vi.mock('./MemorySettings', () => ({ MemorySettings: () => <div>memory page</div
 vi.mock('../components/plugins/PluginList', () => ({ PluginList: () => null }))
 vi.mock('../components/plugins/PluginDetail', () => ({ PluginDetail: () => null }))
 
-import { SettingsModal } from './Settings'
+import { SettingsModal } from './SettingsModal'
 import { Dropdown } from '../components/shared/Dropdown'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
+
+async function flushSettingsPages() {
+  await act(async () => {
+    await import('./Settings')
+  })
+}
 
 function renderWithOpener() {
   return render(
@@ -32,25 +38,24 @@ function renderWithOpener() {
   )
 }
 
-describe('SettingsModal', () => {
+describe('SettingsModal', async () => {
   beforeEach(() => {
-    vi.useFakeTimers()
     useSettingsStore.setState({ locale: 'en' })
     useUIStore.setState({ settingsOpen: false, settingsTab: 'providers' })
   })
 
   afterEach(() => {
     cleanup()
-    vi.useRealTimers()
   })
 
-  it('opens at the requested category and closes on Escape, returning focus to the opener', () => {
+  it('opens at the requested category and closes on Escape, returning focus to the opener', async () => {
     renderWithOpener()
     const opener = screen.getByRole('button', { name: 'open settings' })
     opener.focus()
 
     fireEvent.click(opener)
-    act(() => { vi.runOnlyPendingTimers() })
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+    await flushSettingsPages()
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('memory page')).toBeInTheDocument()
@@ -59,12 +64,12 @@ describe('SettingsModal', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(useUIStore.getState().settingsOpen).toBe(false)
-    expect(document.activeElement).toBe(opener)
-    act(() => { vi.advanceTimersByTime(200) })
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('falls back to the composer when the opener is gone by the time settings close', () => {
+  it('falls back to the composer when the opener is gone by the time settings close', async () => {
     function DisappearingOpener() {
       const [shown, setShown] = useState(true)
       return (
@@ -89,14 +94,14 @@ describe('SettingsModal', () => {
     const opener = screen.getByRole('button', { name: 'transient opener' })
     opener.focus()
     fireEvent.click(opener)
-    act(() => { vi.runOnlyPendingTimers() })
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'composer' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'composer' })))
   })
 
-  it('closes from the close button and the backdrop', () => {
+  it('closes from the close button and the backdrop', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
 
@@ -104,14 +109,17 @@ describe('SettingsModal', () => {
     expect(useUIStore.getState().settingsOpen).toBe(false)
 
     act(() => { useUIStore.getState().openSettings() })
-    const backdrop = screen.getByTestId('settings-overlay').firstElementChild as HTMLElement
-    fireEvent.click(backdrop)
-    expect(useUIStore.getState().settingsOpen).toBe(false)
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]')!
+    await waitFor(() => {
+      fireEvent.pointerDown(overlay, { button: 0, pointerType: 'mouse' })
+      expect(useUIStore.getState().settingsOpen).toBe(false)
+    })
   })
 
-  it('filters categories by the nav search and clears it when reopened', () => {
+  it('filters categories by the nav search and clears it when reopened', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
+    await flushSettingsPages()
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'mem' } })
 
@@ -121,16 +129,17 @@ describe('SettingsModal', () => {
     expect(nav).not.toHaveTextContent('About')
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    act(() => { vi.advanceTimersByTime(200) })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     act(() => { useUIStore.getState().openSettings() })
 
     expect(screen.getByRole('searchbox', { name: 'Search settings' })).toHaveValue('')
     expect(screen.getByRole('navigation')).toHaveTextContent('Providers')
   })
 
-  it('switches category from the nav', () => {
+  it('switches category from the nav', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
+    await flushSettingsPages()
 
     fireEvent.click(screen.getByRole('button', { name: 'About' }))
 
@@ -138,7 +147,7 @@ describe('SettingsModal', () => {
     expect(screen.getByText('about page')).toBeInTheDocument()
   })
 
-  it('lets an open dropdown inside the window take Escape first', () => {
+  it('lets an open dropdown inside the window take Escape first', async () => {
     useUIStore.getState().openSettings()
     renderWithOpener()
     render(
@@ -146,12 +155,12 @@ describe('SettingsModal', () => {
         items={[{ value: 'a', label: 'Option A' }]}
         value="a"
         onChange={() => {}}
-        trigger={<span>pick</span>}
+        trigger={<button>pick</button>}
       />,
       { container: screen.getByRole('dialog').appendChild(document.createElement('div')) },
     )
 
-    fireEvent.click(screen.getByText('pick'))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'pick' }), { key: 'ArrowDown' })
     expect(screen.getByText('Option A')).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })

@@ -23,7 +23,7 @@ const TEST_PROVIDER = vi.hoisted(() => ({
   apiKey: '***',
   baseUrl: 'https://example.invalid',
   apiFormat: 'anthropic' as const,
-  models: { main: 'test-main', haiku: '', sonnet: '', opus: '' },
+  models: [{ id: 'test-main' }],
 }))
 
 vi.mock('../api/providers', () => ({
@@ -86,9 +86,7 @@ vi.mock('../api/sessions', async (importOriginal) => {
 
 import { EmptySession } from '../pages/EmptySession'
 import { ActiveSession } from '../pages/ActiveSession'
-import { AgentTeams } from '../pages/AgentTeams'
 import { ScheduledTasks } from '../pages/ScheduledTasks'
-import { ToolInspection } from '../pages/ToolInspection'
 
 import { Sidebar } from '../components/layout/Sidebar'
 import { UserMessage } from '../components/chat/UserMessage'
@@ -99,8 +97,30 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useProviderStore } from '../stores/providerStore'
 import { useSessionRuntimeStore } from '../stores/sessionRuntimeStore'
 import { useTabStore } from '../stores/tabStore'
+import type { RuntimeSelection } from '../types/runtime'
+import type { SessionState } from '../types/chat'
+
+function runtimeMirror(selection: RuntimeSelection): SessionState {
+  return {
+    id: '',
+    version: 1,
+    permission: { desired: 'default', effective: 'default' },
+    runtime: { desired: selection, effective: null },
+    title: { text: null, source: null },
+    workspace: { workDir: '/workspace/project', projectRoot: null, workDirExists: true },
+    process: { phase: 'running', generation: 1 },
+    turn: { phase: 'idle' },
+    pendingPermissions: [],
+    slashCommands: [],
+    activeGoal: null,
+    backgroundTasks: [],
+    team: null,
+    clientCount: 1,
+  } satisfies SessionState
+}
 
 beforeEach(() => {
+  vi.clearAllMocks()
   useSettingsStore.setState({ locale: 'en' })
   useProviderStore.setState({
     providers: [TEST_PROVIDER],
@@ -196,8 +216,8 @@ describe('Content-only pages render without errors', () => {
   it('EmptySession shows draft context usage before a session is created', async () => {
     render(<EmptySession />)
 
-    const indicator = await screen.findByLabelText('Context usage not calculated')
-    expect(indicator).toHaveTextContent('--')
+    await screen.findByLabelText('Context usage not calculated')
+    expect(screen.getByTestId('context-usage-ring').getAttribute('style')).not.toContain('conic-gradient')
     expect(vi.mocked(sessionsApi.getInspection)).not.toHaveBeenCalled()
   })
 
@@ -230,8 +250,8 @@ describe('Content-only pages render without errors', () => {
     fireEvent.click(screen.getByLabelText('Context usage not calculated'))
 
     expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
-    expect(screen.getAllByText('kimi-k2.6')).toHaveLength(2)
-    expect(screen.getAllByText('Context usage will be calculated after the session starts.')).toHaveLength(2)
+    expect(screen.getByText('kimi-k2.6')).toBeVisible()
+    expect(screen.getByText('Context usage will be calculated after the session starts.')).toBeVisible()
   })
 
   it('EmptySession plus menu exposes uploads and slash commands before chat starts', async () => {
@@ -241,7 +261,7 @@ describe('Content-only pages render without errors', () => {
       await Promise.resolve()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Open composer tools' }))
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Open composer tools' }), { key: 'Enter' })
       await Promise.resolve()
     })
     expect(screen.getByText('Add files or photos')).toBeInTheDocument()
@@ -264,11 +284,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -303,11 +321,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -350,11 +366,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -416,11 +430,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -434,7 +446,7 @@ describe('Content-only pages render without errors', () => {
 
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Available MCP tools')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('deepwiki'))
+    fireEvent.click(await screen.findByRole('button', { name: /deepwiki/ }))
     expect(useUIStore.getState().settingsOpen).toBe(true)
     expect(useUIStore.getState().settingsTab).toBe('mcp')
 
@@ -485,11 +497,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -503,7 +513,7 @@ describe('Content-only pages render without errors', () => {
 
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Available skills')).toBeInTheDocument()
-    expect(screen.getByText('/lark-mail')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /\/lark-mail/ })).toBeInTheDocument()
 
     resetPageStores()
   })
@@ -540,11 +550,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -595,7 +603,6 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [
             { name: 'cost', description: 'Show token usage and costs' },
@@ -605,7 +612,6 @@ describe('Content-only pages render without errors', () => {
             })),
           ],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
@@ -658,17 +664,15 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
       sendMessage,
     })
 
-    const { container } = render(<ActiveSession />)
+    render(<ActiveSession />)
     const textarea = screen.getByRole('textbox')
     fireEvent.change(textarea, { target: { value: '/status', selectionStart: 7 } })
     fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
@@ -676,10 +680,10 @@ describe('Content-only pages render without errors', () => {
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Session inspector')).toBeInTheDocument()
     expect(vi.mocked(sessionsApi.getInspection)).toHaveBeenCalledWith(SESSION_ID, { includeContext: false })
-    expect(container.innerHTML).toContain('bg-[var(--color-inspector-surface)]')
-    expect(container.innerHTML).not.toContain('bg-[#fbfaf6]')
-    expect(container.innerHTML).not.toContain('bg-[#f4f2ed]')
-    expect(container.innerHTML).not.toContain('border-[#d8b3a8]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).toContain('bg-[var(--color-inspector-surface)]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#fbfaf6]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#f4f2ed]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('border-[#d8b3a8]')
 
     resetPageStores()
   })
@@ -742,19 +746,19 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 50_000, output_tokens: 1_000 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage 42%')).toBeInTheDocument()
-    expect(screen.getByText('120,000')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage 42%' })
+    fireEvent.focus(indicator)
+    await screen.findByText(/\/ 120,000$/)
+    expect(screen.getByText(/\/ 120,000$/)).toBeInTheDocument()
     expect(vi.mocked(sessionsApi.getInspection)).toHaveBeenCalledWith(SESSION_ID, {
       includeContext: true,
       contextOnly: true,
@@ -797,11 +801,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -809,8 +811,8 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage loading')
-    expect(indicator).toHaveTextContent('--')
-    expect(indicator).toHaveClass('h-8')
+    expect(screen.queryByTestId('context-usage-ring')).not.toBeInTheDocument()
+    expect(indicator).toHaveAttribute('data-size', 'icon-sm')
 
     resetPageStores()
   })
@@ -860,11 +862,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -872,7 +872,9 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage not calculated')
-    expect(indicator).toHaveTextContent('--')
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
+    expect(screen.getByTestId('context-usage-ring').getAttribute('style')).not.toContain('conic-gradient')
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.getByText('Context usage will be calculated after the session starts.')).toBeInTheDocument()
     expect(screen.queryByText('CLI session is not running')).not.toBeInTheDocument()
@@ -939,11 +941,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -951,7 +951,9 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage 22%')
-    expect(indicator).toHaveTextContent('22%')
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
+    expect(indicator).toHaveAccessibleName(/22%/)
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.queryByText('Context usage will be calculated after the session starts.')).not.toBeInTheDocument()
 
@@ -1021,20 +1023,20 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 72_000, output_tokens: 2_000 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage 7%')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage 7%' })
+    fireEvent.focus(indicator)
+    await screen.findByText('deepseek-v4-pro')
     expect(screen.getByText('deepseek-v4-pro')).toBeInTheDocument()
-    expect(screen.getByText('1,000,000')).toBeInTheDocument()
+    expect(screen.getByText(/\/ 1,000,000$/)).toBeInTheDocument()
     expect(screen.getByText('Estimate')).toBeInTheDocument()
     expect(screen.queryByText('Autocompact buffer')).not.toBeInTheDocument()
 
@@ -1072,13 +1074,10 @@ describe('Content-only pages render without errors', () => {
       isLoading: false,
       error: null,
     })
-    useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-      providerId: 'volcengine-provider',
-      modelId: 'kimi-k2.6',
-    })
     useChatStore.setState({
       sessions: {
         [SESSION_ID]: {
+          mirror: runtimeMirror({ providerId: 'volcengine-provider', modelId: 'kimi-k2.6' }),
           messages: [{ id: 'm-1', type: 'assistant_text', content: 'ready', timestamp: Date.now() }],
           chatState: 'idle',
           connectionState: 'connected',
@@ -1089,18 +1088,18 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage unavailable')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage unavailable' })
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.queryByText('Unknown model')).not.toBeInTheDocument()
 
@@ -1185,11 +1184,9 @@ describe('Content-only pages render without errors', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 26_000, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -1200,10 +1197,15 @@ describe('Content-only pages render without errors', () => {
     expect(await screen.findByLabelText('Context usage 10%')).toBeInTheDocument()
 
     act(() => {
-      useSessionRuntimeStore.getState().setSelection(SESSION_ID, {
-        providerId: 'zhipu-provider',
-        modelId: 'glm-4.5-air',
-      })
+      useChatStore.setState((state) => ({
+        sessions: {
+          ...state.sessions,
+          [SESSION_ID]: {
+            ...state.sessions[SESSION_ID]!,
+            mirror: runtimeMirror({ providerId: 'zhipu-provider', modelId: 'glm-4.5-air' }),
+          },
+        },
+      }))
     })
 
     expect(await screen.findByLabelText('Context usage 20%')).toBeInTheDocument()
@@ -1216,24 +1218,10 @@ describe('Content-only pages render without errors', () => {
     useSessionRuntimeStore.setState({ selections: {} })
   })
 
-  it('AgentTeams renders team strip and members', () => {
-    const { container } = render(<AgentTeams />)
-    expect(container.innerHTML).toContain('Architect')
-    expect(container.innerHTML).toContain('session-dev')
-    expect(container.innerHTML).toContain('groups')
-  })
-
   it('ScheduledTasks renders (store-connected)', async () => {
     const { container } = render(<ScheduledTasks />)
     await screen.findByText('Scheduled tasks')
     expect(container.innerHTML).toContain('Scheduled tasks')
-  })
-
-  it('ToolInspection renders diff viewer', () => {
-    const { container } = render(<ToolInspection />)
-    expect(container.innerHTML).toContain('edit_file')
-    expect(container.innerHTML).toContain('Split')
-    expect(container.innerHTML).toContain('Unified')
   })
 })
 
@@ -1273,11 +1261,11 @@ describe('AppShell layout renders chrome', () => {
 })
 
 describe('Design system compliance', () => {
-  it('Pages use Material Symbols Outlined icons', () => {
-    const pages = [EmptySession, AgentTeams, ToolInspection]
+  it('Pages use lucide icons', () => {
+    const pages = [EmptySession]
     for (const Page of pages) {
       const { container, unmount } = render(<Page />)
-      const icons = container.querySelectorAll('.material-symbols-outlined')
+      const icons = container.querySelectorAll('svg.lucide')
       expect(icons.length).toBeGreaterThan(0)
       unmount()
     }
@@ -1300,15 +1288,5 @@ describe('Design system compliance', () => {
       ).toBe(true)
       unmount()
     }
-  })
-})
-
-describe('Mock data integration', () => {
-  it('AgentTeams shows team members from mock data', () => {
-    const { container } = render(<AgentTeams />)
-    expect(container.innerHTML).toContain('Architect')
-    expect(container.innerHTML).toContain('Frontend Dev')
-    expect(container.innerHTML).toContain('Backend Dev')
-    expect(container.innerHTML).toContain('Tester')
   })
 })

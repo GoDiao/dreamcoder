@@ -1,11 +1,10 @@
 import type { ServerWebSocket } from 'bun'
 import type { WebSocketData } from './handler.js'
+import type { PermissionMode } from './protocol.js'
+import type { OutputPipeline } from '../session/outputPipeline.js'
+import type { RuntimeSelection } from '../session/state/types.js'
 
-export type SessionSlashCommand = {
-  name: string
-  description: string
-  argumentHint?: string
-}
+export type { SessionSlashCommand } from '../session/state/types.js'
 
 export type SessionTitleState = {
   userMessageCount: number
@@ -15,31 +14,12 @@ export type SessionTitleState = {
   startedGenerationCounts: Set<number>
 }
 
-export type RuntimeOverride = {
-  providerId: string | null
-  modelId: string
-  /** Per-session reasoning effort; falls back to the global setting when absent. */
-  effort?: string
-}
-
-export function isSameRuntimeOverride(a: RuntimeOverride, b: RuntimeOverride): boolean {
-  return a.providerId === b.providerId && a.modelId === b.modelId && a.effort === b.effort
-}
-
-export type SessionStreamState = {
-  hasReceivedStreamEvents: boolean
-  activeBlockTypes: Map<number, 'text' | 'tool_use' | 'thinking'>
-  activeToolBlocks: Map<number, { toolName: string; toolUseId: string; inputJson: string; parentToolUseId?: string }>
-  pendingLocalCommand?: { name: string; args: string }
-  pendingToolBlocks: Map<string, { toolName: string; toolUseId: string; parentToolUseId?: string }>
-  toolParentUseIds: Map<string, string>
-  lastApiError?: {
-    message: string
-    code: string
-  }
-}
-
 type Timer = ReturnType<typeof setTimeout>
+
+export type SessionEndpoint = {
+  serverHost: string
+  serverPort: number
+}
 
 /**
  * Everything the WebSocket layer remembers about one desktop session.
@@ -50,15 +30,15 @@ type Timer = ReturnType<typeof setTimeout>
  */
 export type SessionRuntime = {
   clients: Set<ServerWebSocket<WebSocketData>>
+  pipeline?: OutputPipeline
+  endpoint?: SessionEndpoint
+  pendingModeRequests: Map<string, PermissionMode>
+  answeredPermissions: Set<string>
   disconnectCleanupTimer?: Timer
-  stopRequested: boolean
-  slashCommands?: SessionSlashCommand[]
   title?: SessionTitleState
-  stream?: SessionStreamState
-  runtimeOverride?: RuntimeOverride
   runtimeTransition?: Promise<void>
+  queuedFromRuntime?: { selection: RuntimeSelection | null }
   startup?: Promise<void>
-  lastStartupWorkDir?: string
   prewarm: {
     pending: boolean
     done: boolean
@@ -74,7 +54,8 @@ export function getSessionRuntime(sessionId: string): SessionRuntime {
   if (!runtime) {
     runtime = {
       clients: new Set(),
-      stopRequested: false,
+      pendingModeRequests: new Map(),
+      answeredPermissions: new Set(),
       prewarm: { pending: false, done: false },
     }
     sessionRuntimes.set(sessionId, runtime)
@@ -87,23 +68,11 @@ export function peekSessionRuntime(sessionId: string): SessionRuntime | undefine
   return sessionRuntimes.get(sessionId)
 }
 
-export function createStreamState(): SessionStreamState {
-  return {
-    hasReceivedStreamEvents: false,
-    activeBlockTypes: new Map(),
-    activeToolBlocks: new Map(),
-    pendingLocalCommand: undefined,
-    pendingToolBlocks: new Map(),
-    toolParentUseIds: new Map(),
-    lastApiError: undefined,
-  }
-}
-
 /** Forgets the current conversation (`/clear`) while keeping runtime settings and clients. */
 export function resetConversationState(runtime: SessionRuntime): void {
-  runtime.slashCommands = undefined
   runtime.title = undefined
-  runtime.stream = undefined
+  runtime.answeredPermissions.clear()
+  runtime.pipeline?.resetStream()
 }
 
 export function clearPrewarmState(runtime: SessionRuntime): void {
@@ -121,6 +90,7 @@ export function disposeSessionRuntime(sessionId: string): SessionRuntime | undef
   if (!runtime) return undefined
   if (runtime.disconnectCleanupTimer) clearTimeout(runtime.disconnectCleanupTimer)
   clearPrewarmState(runtime)
+  runtime.pipeline?.detach()
   sessionRuntimes.delete(sessionId)
   return runtime
 }

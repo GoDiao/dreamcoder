@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../shared/Modal'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { diagnosticsApi, type ProblemReport } from '../../api/diagnostics'
-import { copyTextToClipboard } from '../chat/clipboard'
+import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
 import { useTranslation } from '../../i18n'
 import { buildBugReportUrl, buildProblemReportText } from '../../lib/problemReport'
 import { openExternalUrl } from '../../lib/externalUrl'
@@ -12,6 +12,7 @@ import { useUIStore } from '../../stores/uiStore'
 export function ReportProblemDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslation()
   const addToast = useUIStore((s) => s.addToast)
+  const copyAndNotify = useCopyAndNotify()
   const [report, setReport] = useState<ProblemReport | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -35,12 +36,7 @@ export function ReportProblemDialog({ open, onClose }: { open: boolean; onClose:
 
   const text = useMemo(() => (report ? buildProblemReportText(report) : ''), [report])
 
-  const handleCopy = async () => {
-    const copied = await copyTextToClipboard(text)
-    addToast(copied
-      ? { type: 'success', message: t('reportProblem.copied') }
-      : { type: 'error', message: t('reportProblem.copyFailed') })
-  }
+  const handleCopy = () => copyAndNotify(text, t('reportProblem.copied'))
 
   const handleOpenIssue = () => {
     if (report) openExternalUrl(buildBugReportUrl(report))
@@ -70,10 +66,10 @@ export function ReportProblemDialog({ open, onClose }: { open: boolean; onClose:
       width={560}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" variant="secondary" disabled={isExporting} onClick={() => void handleExport()}>
+          <Button size="sm" variant="outline" disabled={isExporting} onClick={() => void handleExport()}>
             {t('reportProblem.exportBundle')}
           </Button>
-          <Button size="sm" variant="secondary" disabled={!report} onClick={() => void handleCopy()}>
+          <Button size="sm" variant="outline" disabled={!report} onClick={() => void handleCopy()}>
             {t('reportProblem.copy')}
           </Button>
           <Button size="sm" disabled={!report} onClick={handleOpenIssue}>

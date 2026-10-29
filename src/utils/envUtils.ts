@@ -18,12 +18,16 @@ export function getConfigDirOverride(): string | undefined {
 /** DreamCoder's default config directory name, under the home directory. */
 export const DREAMCODER_CONFIG_DIR_NAME = '.dreamcoder'
 
+export function getDefaultConfigDir(): string {
+  return join(homedir(), DREAMCODER_CONFIG_DIR_NAME).normalize('NFC')
+}
+
 // Memoized: 150+ callers, many on hot paths. Keyed off DREAMCODER_CONFIG_DIR so
 // tests that change the env var get a fresh value without explicit cache.clear.
 export const getClaudeConfigHomeDir = memoize(
   (): string => {
     return (
-      getConfigDirOverride() ?? join(homedir(), DREAMCODER_CONFIG_DIR_NAME)
+      getConfigDirOverride() ?? getDefaultConfigDir()
     ).normalize('NFC')
   },
   () => getConfigDirOverride(),

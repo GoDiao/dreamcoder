@@ -1,5 +1,7 @@
 import { api } from './client'
 import type { SessionListItem, SessionTranscript } from '../types/session'
+import type { PermissionMode } from '../types/settings'
+import type { RuntimeSelection } from '../types/runtime'
 
 type SessionsResponse = { sessions: SessionListItem[]; total: number }
 type CreateSessionResponse = { sessionId: string; workDir?: string }
@@ -34,6 +36,8 @@ export type CreateSessionRepositoryOptions = {
 export type CreateSessionRequest = {
   workDir?: string
   repository?: CreateSessionRepositoryOptions
+  permissionMode?: PermissionMode
+  runtime?: RuntimeSelection
 }
 export type BranchSessionRequest = {
   targetMessageId: string

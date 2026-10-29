@@ -2,19 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
-const { initializeMock, renderMock } = vi.hoisted(() => ({
+const { initializeMock, renderMock, mermaidModule } = vi.hoisted(() => ({
   initializeMock: vi.fn(),
   renderMock: vi.fn(),
+  mermaidModule: { loads: 0 },
 }))
 
-vi.mock('mermaid', () => ({
-  default: {
-    initialize: initializeMock,
-    render: renderMock,
-  },
-}))
+vi.mock('mermaid', () => {
+  mermaidModule.loads += 1
+  return {
+    default: {
+      initialize: initializeMock,
+      render: renderMock,
+    },
+  }
+})
 
 import { MermaidRenderer } from './MermaidRenderer'
+
+const mermaidLoadsAtImport = mermaidModule.loads
 
 describe('MermaidRenderer', () => {
   beforeEach(() => {
@@ -25,18 +31,30 @@ describe('MermaidRenderer', () => {
     })
   })
 
+  it('loads mermaid only once a diagram renders, showing progress until then', async () => {
+    expect(mermaidLoadsAtImport).toBe(0)
+
+    render(<MermaidRenderer code={'graph TB\nA-->B'} />)
+
+    expect(screen.getByText('Rendering diagram...')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /preview/i })).toBeInTheDocument()
+    expect(mermaidModule.loads).toBe(1)
+    expect(initializeMock).toHaveBeenCalledWith(expect.objectContaining({
+      securityLevel: 'strict',
+      suppressErrorRendering: true,
+    }))
+    expect(renderMock).toHaveBeenCalledWith(expect.stringMatching(/^mermaid-\d+$/), 'graph TB\nA-->B')
+  })
+
   it('opens preview with zoom controls and updates the zoom label', async () => {
     render(<MermaidRenderer code={'graph TB\nA-->B'} />)
 
     const previewButton = await screen.findByRole('button', { name: /preview/i })
     expect(previewButton).toBeInTheDocument()
-    expect(initializeMock).toHaveBeenCalledWith(expect.objectContaining({
-      suppressErrorRendering: true,
-    }))
 
     fireEvent.click(previewButton)
 
-    await screen.findByText('Mermaid Diagram')
+    await screen.findByRole('dialog', { name: 'Mermaid diagram' })
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
 

@@ -196,7 +196,7 @@ describe('upstream client', () => {
       baseUrl: 'http://localhost:1234',
       apiFormat: 'anthropic',
       runtimeKind: 'anthropic_compatible',
-      models: { main: 'm', haiku: 'm', sonnet: 'm', opus: 'm' },
+      models: [{ id: 'm' }],
     }
 
     expect(resolveUpstreamTarget(provider)).toEqual({

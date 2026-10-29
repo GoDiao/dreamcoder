@@ -1,0 +1,107 @@
+{
+  "appId": "com.dreamcoder.desktop",
+  "productName": "DreamCoder",
+  "publish": null,
+  "directories": {
+    "app": "electron-dist",
+    "output": "electron-release"
+  },
+  "files": [
+    "main.cjs",
+    "preload.cjs",
+    "package.json",
+    "!node_modules{,/**/*}"
+  ],
+  "extraResources": [
+    {
+      "from": "dist",
+      "to": "dist"
+    },
+    {
+      "from": "electron/build/icons/tray.png",
+      "to": "icons/tray.png"
+    },
+    {
+      "from": "../THIRD_PARTY_NOTICES.md",
+      "to": "THIRD_PARTY_NOTICES.md"
+    }
+  ],
+  "npmRebuild": false,
+  "electronDist": "node_modules/electron/dist",
+  "electronLanguages": [
+    "en",
+    "zh_CN"
+  ],
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64"
+        ]
+      }
+    ],
+    "icon": "electron/build/icons/icon.icns",
+    "category": "public.app-category.developer-tools",
+    "hardenedRuntime": true,
+    "entitlements": "electron/build/entitlements.mac.plist",
+    "entitlementsInherit": "electron/build/entitlements.mac.plist",
+    "artifactName": "${productName}_${version}_aarch64.${ext}",
+    "extraResources": [
+      {
+        "from": "binaries/dreamcoder-sidecar-aarch64-apple-darwin",
+        "to": "bin/dreamcoder-sidecar"
+      },
+      {
+        "from": "binaries/rg-aarch64-apple-darwin",
+        "to": "bin/rg"
+      }
+    ]
+  },
+  "dmg": {
+    "window": {
+      "width": 660,
+      "height": 400
+    },
+    "contents": [
+      {
+        "x": 180,
+        "y": 170
+      },
+      {
+        "x": 480,
+        "y": 170,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "electron/build/icons/icon.ico",
+    "artifactName": "${productName}_${version}_x64-setup.${ext}",
+    "extraResources": [
+      {
+        "from": "binaries/dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
+        "to": "bin/dreamcoder-sidecar.exe"
+      },
+      {
+        "from": "binaries/rg-x86_64-pc-windows-msvc.exe",
+        "to": "bin/rg.exe"
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "include": "electron/build/installer.nsh"
+  }
+}

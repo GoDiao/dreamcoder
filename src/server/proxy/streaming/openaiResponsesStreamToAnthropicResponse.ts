@@ -1,4 +1,5 @@
 import { openaiResponsesToAnthropic } from '../transform/openaiResponsesToAnthropic.js'
+import { upstreamErrorMessage } from './openaiResponsesStreamToAnthropic.js'
 import type {
   AnthropicResponse,
   OpenAIResponsesResponse,
@@ -13,6 +14,8 @@ type StreamFallbackState = {
   usage: OpenAIResponsesResponse['usage']
 }
 
+export class OpenAIResponsesStreamError extends Error {}
+
 export async function openaiResponsesStreamToAnthropicResponse(
   upstream: ReadableStream<Uint8Array>,
   model: string,
@@ -22,6 +25,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
   let buffer = ''
   let currentEvent = ''
   let completedResponse: OpenAIResponsesResponse | null = null
+  let upstreamError: string | null = null
 
   const fallback: StreamFallbackState = {
     id: `resp_${Date.now()}`,
@@ -66,16 +70,22 @@ export async function openaiResponsesStreamToAnthropicResponse(
         continue
       }
 
-      if (currentEvent === 'response.completed') {
+      if (currentEvent === 'response.completed' || currentEvent === 'response.incomplete') {
         const response = data.response
         if (isOpenAIResponsesResponse(response)) {
           completedResponse = response
         }
+      } else if (currentEvent === 'response.failed' || currentEvent === 'error') {
+        upstreamError = upstreamErrorMessage(data)
       } else {
         updateFallbackState(currentEvent, data, fallback)
       }
       currentEvent = ''
     }
+  }
+
+  if (!completedResponse && upstreamError !== null) {
+    throw new OpenAIResponsesStreamError(upstreamError)
   }
 
   return openaiResponsesToAnthropic(

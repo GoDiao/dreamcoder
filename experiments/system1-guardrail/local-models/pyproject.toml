@@ -1,0 +1,45 @@
+[project]
+name = "system1-local-models"
+version = "0.0.0"
+description = "Local decision model adapters for the System 1 guardrail experiment (#127)"
+requires-python = ">=3.11"
+dependencies = [
+  # Pinned to the version already in the local uv cache.
+  "torch==2.14.0",
+  "safetensors>=0.5",
+  "numpy>=1.26",
+  "huggingface-hub",
+]
+
+# Julia-1 needs transformers <5.1 and d1-omni-600M needs >=5.15, so the
+# models are split into two groups that cannot be installed together:
+#   uv run --group julia-laya ...   (the default)
+#   uv run --no-default-groups --group decide ...
+[dependency-groups]
+julia-laya = [
+  "transformers==5.0.0",
+  "laya==0.4.12",
+  "supersonic-julia",
+]
+decide = [
+  "transformers==5.17.0",
+  "gliner2[local]==2.1.0",
+  # d1-omni-600M's model code imports its vision and audio encoders.
+  "torchvision",
+  "pillow",
+  "soundfile",
+  # Small local chat models in MLX format (Apple Silicon); pinned to the cached version.
+  "mlx-lm==0.32.0; sys_platform == 'darwin'",
+]
+
+[tool.uv]
+package = false
+# Use an installed interpreter; never download one.
+python-preference = "only-system"
+default-groups = ["julia-laya"]
+conflicts = [[{ group = "julia-laya" }, { group = "decide" }]]
+
+[tool.uv.sources]
+# Julia-1's inference code at the commit of the cached weights. uv does not
+# fetch Git LFS files, so the clone carries code only.
+supersonic-julia = { git = "https://huggingface.co/SupersonicLabs/Julia-1", rev = "a85b127321d580d65176c89ced8273f305745d85" }

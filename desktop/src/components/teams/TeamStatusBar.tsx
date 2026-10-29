@@ -1,3 +1,4 @@
+import { BotIcon, ChevronUpIcon, CircleAlertIcon, CircleCheckIcon, CircleEllipsisIcon, CircleIcon, ExternalLinkIcon, UsersIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTeamStore } from '../../stores/teamStore'
 import { useTranslation } from '../../i18n'
@@ -5,22 +6,22 @@ import type { TeamMember } from '../../types/team'
 
 const memberStatusConfig = {
   running: {
-    icon: 'pending',
+    icon: CircleEllipsisIcon,
     color: 'var(--color-warning)',
     pulse: true,
   },
   idle: {
-    icon: 'radio_button_unchecked',
+    icon: CircleIcon,
     color: 'var(--color-text-tertiary)',
     pulse: false,
   },
   completed: {
-    icon: 'check_circle',
+    icon: CircleCheckIcon,
     color: 'var(--color-success)',
     pulse: false,
   },
   error: {
-    icon: 'error',
+    icon: CircleAlertIcon,
     color: 'var(--color-error)',
     pulse: false,
   },
@@ -45,13 +46,13 @@ export function TeamStatusBar() {
 
   return (
     <div className="shrink-0 px-8">
-      <div className="mx-auto max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] overflow-hidden mb-2">
+      <div className="mx-auto max-w-[860px] rounded-lg border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] overflow-hidden mb-2">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-container-low)] transition-colors bg-[var(--color-surface-container)]"
         >
-          <div className="flex items-center justify-center w-6 h-6 rounded-[var(--radius-md)] bg-[var(--color-brand)]/10">
-            <span className="material-symbols-outlined text-[14px] text-[var(--color-brand)]">groups</span>
+          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[var(--color-brand)]/10">
+            <UsersIcon className="shrink-0 text-[var(--color-brand)]" aria-hidden="true" size={14} />
           </div>
 
           <span className="text-xs font-semibold text-[var(--color-text-primary)]">
@@ -79,12 +80,8 @@ export function TeamStatusBar() {
             </span>
           )}
 
-          <span
-            className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)] transition-transform duration-200"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-          >
-            expand_less
-          </span>
+          <ChevronUpIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform duration-200"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }} aria-hidden="true" size={14} />
         </button>
 
         {expanded && (
@@ -107,16 +104,12 @@ function MemberRow({ member, onView }: { member: TeamMember; onView: () => void 
       onClick={onView}
       className="w-full flex items-center gap-2 py-1.5 px-1 rounded-md text-left hover:bg-[var(--color-surface-container-low)] transition-colors group"
     >
-      <span
-        className={`material-symbols-outlined text-[16px] shrink-0 ${config.pulse ? 'animate-pulse-dot' : ''}`}
-        style={{ color: config.color, fontVariationSettings: "'FILL' 1" }}
-      >
-        {config.icon}
-      </span>
+      <config.icon className={`shrink-0 ${config.pulse ? 'animate-pulse-dot' : ''}`}
+        style={{ color: config.color }} aria-hidden="true" size={16} />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[12px] text-[var(--color-text-tertiary)]">smart_toy</span>
+          <BotIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={12} />
           <span className={`text-xs ${
             member.status === 'completed'
               ? 'text-[var(--color-text-tertiary)]'
@@ -136,9 +129,7 @@ function MemberRow({ member, onView }: { member: TeamMember; onView: () => void 
         )}
       </div>
 
-      <span className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity">
-        open_in_new
-      </span>
+      <ExternalLinkIcon className="shrink-0 text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" size={14} />
     </button>
   )
 }

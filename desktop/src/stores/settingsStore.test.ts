@@ -309,7 +309,7 @@ describe('settingsStore app mode', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    delete (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__
+    delete (window as unknown as { dreamcoderShell?: object }).dreamcoderShell
   })
 
   it('hydrates app mode from the native desktop command', async () => {
@@ -318,27 +318,32 @@ describe('settingsStore app mode', () => {
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
       defaultPortableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
     })
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
 
+    const { statusApi } = await import('../api/status')
+    vi.spyOn(statusApi, 'getConfigDirectories').mockResolvedValue({ configDir: '/data/active', defaultConfigDir: '/data/default' })
+
     await useSettingsStore.getState().fetchAppMode()
 
-    expect(invoke).toHaveBeenCalledWith('get_app_mode')
+    expect(invoke).toHaveBeenCalledWith()
     expect(useSettingsStore.getState().appMode).toEqual({
       mode: 'portable',
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
       defaultPortableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
+      activeConfigDir: '/data/active',
+      systemConfigDir: '/data/default',
     })
   })
 
   it('persists app mode through the native desktop command and marks restart required', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({
@@ -352,7 +357,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('portable')
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'portable',
       portableDir: 'C:\\dreamcoder\\CLAUDE_CONFIG_DIR',
     })
@@ -368,9 +373,9 @@ describe('settingsStore app mode', () => {
 
   it('persists a user-selected portable directory', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({
@@ -384,7 +389,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('portable', 'D:\\portable-data')
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'portable',
       portableDir: 'D:\\portable-data',
     })
@@ -398,9 +403,9 @@ describe('settingsStore app mode', () => {
 
   it('switches app mode back to the system data source', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
-    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
-    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: object }
-    tauriWindow.__TAURI_INTERNALS__ = {}
+    vi.doMock('../lib/shell', () => ({ getAppMode: invoke, setAppMode: invoke }))
+    const desktopWindow = window as unknown as { dreamcoderShell?: object }
+    desktopWindow.dreamcoderShell = {}
 
     const { useSettingsStore } = await import('./settingsStore')
     useSettingsStore.setState({
@@ -416,7 +421,7 @@ describe('settingsStore app mode', () => {
 
     await useSettingsStore.getState().setAppMode('default', null)
 
-    expect(invoke).toHaveBeenCalledWith('set_app_mode', {
+    expect(invoke).toHaveBeenCalledWith({
       mode: 'default',
       portableDir: null,
     })
@@ -726,6 +731,7 @@ describe('settingsStore desktop terminal shell persistence', () => {
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell: 'system',
       customShellPath: '',
+      bashPath: null,
     })
 
     await useSettingsStore.getState().fetchAll()
@@ -733,6 +739,7 @@ describe('settingsStore desktop terminal shell persistence', () => {
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell,
       customShellPath: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+      bashPath: null,
     })
   })
 
@@ -779,18 +786,49 @@ describe('settingsStore desktop terminal shell persistence', () => {
     await useSettingsStore.getState().setDesktopTerminal({
       startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
+      bashPath: null,
     })
 
     expect(updateUser).toHaveBeenCalledWith({
       desktopTerminal: {
         startupShell,
         customShellPath: 'C:\\tools\\pwsh.exe',
+        bashPath: null,
       },
     })
     expect(useSettingsStore.getState().desktopTerminal).toEqual({
       startupShell,
       customShellPath: 'C:\\tools\\pwsh.exe',
+      bashPath: null,
     })
+  })
+})
+
+describe('settingsStore terminal settings patches', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('preserves the bash path when changing the startup shell and normalizes path patches', async () => {
+    const updateUser = vi.fn().mockResolvedValue({ ok: true })
+    vi.doMock('../api/settings', () => ({ settingsApi: { updateUser } }))
+    const { useSettingsStore } = await import('./settingsStore')
+    useSettingsStore.setState({ desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: '/legacy/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ startupShell: 'custom', customShellPath: '/custom/shell' })
+    expect(updateUser).toHaveBeenLastCalledWith({ desktopTerminal: { startupShell: 'custom', customShellPath: '/custom/shell', bashPath: '/legacy/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ bashPath: ' /new/bash ' })
+    expect(updateUser).toHaveBeenLastCalledWith({ desktopTerminal: { startupShell: 'custom', customShellPath: '/custom/shell', bashPath: '/new/bash' } })
+    await useSettingsStore.getState().setDesktopTerminal({ bashPath: null })
+    expect(useSettingsStore.getState().desktopTerminal.bashPath).toBeNull()
+  })
+
+  it('restores the terminal settings when persistence fails', async () => {
+    vi.doMock('../api/settings', () => ({ settingsApi: { updateUser: vi.fn().mockRejectedValue(new Error('save failed')) } }))
+    const { useSettingsStore } = await import('./settingsStore')
+    const previous = { startupShell: 'system' as const, customShellPath: '', bashPath: '/legacy/bash' }
+    useSettingsStore.setState({ desktopTerminal: previous })
+    await expect(useSettingsStore.getState().setDesktopTerminal({ bashPath: null })).rejects.toThrow('save failed')
+    expect(useSettingsStore.getState().desktopTerminal).toEqual(previous)
   })
 })
 
@@ -1084,5 +1122,68 @@ describe('settingsStore H5 access behavior', () => {
     })
     expect(useSettingsStore.getState().h5AccessError).toBeNull()
     expect('h5AccessGeneratedToken' in useSettingsStore.getState()).toBe(false)
+  })
+})
+
+describe('settingsStore auto-compact percent', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    window.localStorage.clear()
+  })
+
+  function mockApis(getUser: ReturnType<typeof vi.fn>, updateUser: ReturnType<typeof vi.fn>) {
+    vi.doMock('../api/settings', () => ({
+      settingsApi: {
+        getUser,
+        updateUser,
+        getPermissionMode: vi.fn().mockResolvedValue({ mode: 'default' }),
+        setPermissionMode: vi.fn(),
+        getCliLauncherStatus: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/models', () => ({
+      modelsApi: {
+        list: vi.fn().mockResolvedValue({ models: [] }),
+        getCurrent: vi.fn().mockResolvedValue({ model: null }),
+        setCurrent: vi.fn(),
+        getEffort: vi.fn().mockResolvedValue({ level: 'medium' }),
+        setEffort: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/h5Access', () => ({
+      h5AccessApi: {
+        get: vi.fn().mockResolvedValue({
+          settings: { enabled: false, tokenPreview: null, allowedOrigins: [], publicBaseUrl: null },
+        }),
+        enable: vi.fn(),
+        disable: vi.fn(),
+        regenerate: vi.fn(),
+        update: vi.fn(),
+      },
+    }))
+  }
+
+  it('loads the saved percent and falls back to 90', async () => {
+    const getUser = vi.fn().mockResolvedValueOnce({ autoCompactPercent: 70 }).mockResolvedValueOnce({})
+    mockApis(getUser, vi.fn())
+    const { useSettingsStore } = await import('./settingsStore')
+
+    await useSettingsStore.getState().fetchAll()
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(70)
+    await useSettingsStore.getState().fetchAll()
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(90)
+  })
+
+  it('saves the percent and restores the previous value when saving fails', async () => {
+    const updateUser = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('offline'))
+    mockApis(vi.fn(), updateUser)
+    const { useSettingsStore } = await import('./settingsStore')
+
+    await useSettingsStore.getState().setAutoCompactPercent(60)
+    expect(updateUser).toHaveBeenCalledWith({ autoCompactPercent: 60 })
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(60)
+    await useSettingsStore.getState().setAutoCompactPercent(80)
+    expect(useSettingsStore.getState().autoCompactPercent).toBe(60)
   })
 })

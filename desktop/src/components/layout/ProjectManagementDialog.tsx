@@ -1,6 +1,6 @@
 import { FolderOpen, ListChecks, Pin, PinOff, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { Modal } from '../shared/Modal'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { SettingsGroup, SettingsRow } from '../settings/SettingsRow'
 import { useTranslation } from '../../i18n'
@@ -67,22 +67,22 @@ export function ProjectManagementDialog({
         <>
           <Button
             size="xs"
-            variant="secondary"
+            variant="outline"
             onClick={onRefresh}
             disabled={isRefreshing}
-            icon={<RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true" />}
           >
+            <RefreshCw data-icon="inline-start" size={14} className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
             {t('sidebar.refreshSessions')}
           </Button>
           <Button
             size="xs"
-            variant="secondary"
+            variant="outline"
             onClick={onToggleBatchMode}
-            icon={<ListChecks size={14} aria-hidden="true" />}
           >
+            <ListChecks data-icon="inline-start" size={14} aria-hidden="true" />
             {isBatchMode ? t('sidebar.batchExit') : t('sidebar.batchManage')}
           </Button>
-          <Button size="xs" variant="primary" onClick={onClose}>
+          <Button size="xs" onClick={onClose}>
             {t('sidebar.manageDone')}
           </Button>
         </>
@@ -149,8 +149,10 @@ export function ProjectManagementDialog({
                     variant="ghost"
                     aria-pressed={project.pinned}
                     onClick={() => onTogglePinned(project.key)}
-                    icon={project.pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
                   >
+                    {project.pinned
+                      ? <PinOff data-icon="inline-start" size={14} aria-hidden="true" />
+                      : <Pin data-icon="inline-start" size={14} aria-hidden="true" />}
                     {t(project.pinned ? 'sidebar.unpinProject' : 'sidebar.pinProject')}
                   </Button>
                   <Button
@@ -160,14 +162,17 @@ export function ProjectManagementDialog({
                     onClick={() => onOpenInFinder(project.key)}
                     aria-label={t('sidebar.openInFinder')}
                     title={t('sidebar.openInFinder')}
-                    icon={<FolderOpen size={14} aria-hidden="true" />}
-                  />
+                  >
+                    <FolderOpen size={14} aria-hidden="true" />
+                  </Button>
                   <Button
                     size="xs"
                     variant="ghost"
                     onClick={() => onToggleHidden(project.key)}
-                    icon={project.hidden ? <RotateCcw size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
                   >
+                    {project.hidden
+                      ? <RotateCcw data-icon="inline-start" size={14} aria-hidden="true" />
+                      : <X data-icon="inline-start" size={14} aria-hidden="true" />}
                     {t(project.hidden ? 'sidebar.restoreProjectToSidebar' : 'sidebar.hideProjectFromSidebar')}
                   </Button>
                 </div>
@@ -178,10 +183,10 @@ export function ProjectManagementDialog({
             <div className="pt-2.5">
               <Button
                 size="xs"
-                variant="secondary"
+                variant="outline"
                 onClick={onRestoreAllHidden}
-                icon={<RotateCcw size={14} aria-hidden="true" />}
               >
+                <RotateCcw data-icon="inline-start" size={14} aria-hidden="true" />
                 {t('sidebar.restoreHiddenProjects', { count: hiddenProjectCount })}
               </Button>
             </div>

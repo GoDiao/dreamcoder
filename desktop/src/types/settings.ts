@@ -1,6 +1,6 @@
-import type { PermissionMode } from '@protocol'
+import type { DefaultPermissionMode, PermissionMode } from '@protocol'
 
-export type { PermissionMode }
+export type { DefaultPermissionMode, PermissionMode }
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
 export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora'] as const
@@ -67,6 +67,7 @@ export type DesktopTerminalStartupShell =
 export type DesktopTerminalSettings = {
   startupShell: DesktopTerminalStartupShell
   customShellPath: string
+  bashPath: string | null
 }
 
 export type ModelInfo = {
@@ -81,6 +82,7 @@ export type UserSettings = {
   modelContext?: string
   effort?: EffortLevel
   alwaysThinkingEnabled?: boolean
+  autoCompactPercent?: number
   permissionMode?: PermissionMode
   theme?: ThemeMode
   skipWebFetchPreflight?: boolean

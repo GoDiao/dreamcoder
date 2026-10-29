@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -57,12 +57,8 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'glm-5.1',
-                haiku: 'glm-4.5-air',
-                sonnet: 'glm-5-turbo',
-                opus: 'glm-5.1',
-              },
+              models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+              fastModel: 'glm-4.5-air',
             },
           ],
         }, null, 2),
@@ -70,6 +66,7 @@ describe('titleService', () => {
 
       await expect(generateTitle('请只回复 trace-ok')).resolves.toBe('Trace ok')
       expect(requestBody?.thinking).toEqual({ type: 'disabled' })
+      expect(requestBody?.model).toBe('glm-4.5-air')
     } finally {
       server.stop(true)
     }
@@ -108,12 +105,7 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'deepseek-v4-pro',
-                haiku: 'deepseek-v4-pro',
-                sonnet: 'deepseek-v4-pro',
-                opus: 'deepseek-v4-pro',
-              },
+              models: [{ id: 'deepseek-v4-pro' }],
             },
           ],
         }, null, 2),
@@ -121,6 +113,47 @@ describe('titleService', () => {
 
       await expect(generateTitle('请只回复 trace-ok')).resolves.toBe('Trace ok')
       expect(requestBody?.thinking).toEqual({ type: 'disabled' })
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('prefers the fast model for titles and otherwise uses the selected model', async () => {
+    const requestedModels: string[] = []
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        const body = await req.json() as { model: string }
+        requestedModels.push(body.model)
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
+        })
+      },
+    })
+
+    try {
+      const providerService = new ProviderService()
+      const provider = await providerService.addProvider({
+        presetId: 'custom',
+        name: 'Title priority',
+        apiKey: 'test-key',
+        authStrategy: 'api_key',
+        baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
+        apiFormat: 'anthropic',
+        models: [
+          { id: 'list-first' },
+          { id: 'selected-model' },
+          { id: 'fast-model' },
+        ],
+      })
+
+      await expect(generateTitle('selected title', provider.id, 'selected-model')).resolves.toBe('Trace ok')
+      await providerService.updateProvider(provider.id, { fastModel: 'fast-model' })
+      await expect(generateTitle('fast title', provider.id, 'selected-model')).resolves.toBe('Trace ok')
+
+      expect(requestedModels).toEqual(['selected-model', 'fast-model'])
     } finally {
       server.stop(true)
     }
@@ -164,12 +197,8 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/v1`,
               apiFormat: 'openai_chat',
-              models: {
-                main: 'gpt-main',
-                haiku: 'gpt-mini',
-                sonnet: 'gpt-main',
-                opus: 'gpt-main',
-              },
+              models: [{ id: 'gpt-main' }, { id: 'gpt-mini' }],
+              fastModel: 'gpt-mini',
             },
           ],
         }, null, 2),
@@ -226,12 +255,12 @@ describe('titleService', () => {
               apiKey: 'test-key',
               baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
               apiFormat: 'anthropic',
-              models: {
-                main: 'claude-sonnet-4-7',
-                haiku: 'claude-haiku-4-5',
-                sonnet: 'claude-sonnet-4-7',
-                opus: 'claude-opus-4-7',
-              },
+              models: [
+                { id: 'claude-sonnet-4-7' },
+                { id: 'claude-haiku-4-5' },
+                { id: 'claude-opus-4-7' },
+              ],
+              fastModel: 'claude-haiku-4-5',
             },
           ],
         }, null, 2),
@@ -246,6 +275,115 @@ describe('titleService', () => {
       expect(requestBody?.messages?.[0]?.content).toBe('/frontend-design @website 重新设计首页')
     } finally {
       server.stop(true)
+    }
+  })
+
+  async function writeLoggedProvider(port: number): Promise<void> {
+    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'dreamcoder', 'providers.json'),
+      JSON.stringify({
+        activeId: 'logged-provider',
+        providers: [
+          {
+            id: 'logged-provider',
+            presetId: 'custom',
+            name: 'Logged provider',
+            apiKey: 'test-key',
+            baseUrl: `http://127.0.0.1:${port}/anthropic`,
+            apiFormat: 'anthropic',
+            models: [{ id: 'logged-model' }],
+          },
+        ],
+      }, null, 2),
+    )
+  }
+
+  test('uses the active provider for an effort-only runtime selection', async () => {
+    let requestBody: Record<string, unknown> | null = null
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        requestBody = await req.json() as Record<string, unknown>
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
+        })
+      },
+    })
+
+    try {
+      await writeLoggedProvider(server.port)
+
+      await expect(generateTitle('explain this', null, '')).resolves.toBe('Trace ok')
+      expect(requestBody?.model).toBe('logged-model')
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('logs why the title request failed upstream', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return new Response('{"error":{"message":"unknown model logged-model"}}', { status: 400 })
+      },
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await writeLoggedProvider(server.port)
+      await expect(generateTitle('explain this', undefined, undefined, 'session-1')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-1')
+      expect(logged).toContain('logged-provider')
+      expect(logged).toContain('logged-model')
+      expect(logged).toContain('HTTP 400')
+      expect(logged).toContain('unknown model logged-model')
+    } finally {
+      warn.mockRestore()
+      server.stop(true)
+    }
+  })
+
+  test('logs the reply when it is not a usable title', async () => {
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: 'Sure, here is how the parser works: it reads the file line by line.' }],
+        })
+      },
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await writeLoggedProvider(server.port)
+      await expect(generateTitle('explain this', undefined, undefined, 'session-2')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-2')
+      expect(logged).toContain('reply is not a title')
+      expect(logged).toContain('Sure, here is how the parser works')
+    } finally {
+      warn.mockRestore()
+      server.stop(true)
+    }
+  })
+
+  test('logs when no provider is configured', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await expect(generateTitle('explain this', undefined, undefined, 'session-3')).resolves.toBeNull()
+      const logged = warn.mock.calls.map((call) => call.join(' ')).join('\n')
+      expect(logged).toContain('session-3')
+      expect(logged).toContain('no provider')
+    } finally {
+      warn.mockRestore()
     }
   })
 

@@ -3,14 +3,13 @@ import QRCode from 'qrcode'
 import { Copy, Eye, EyeOff, PowerOff, QrCode, RotateCw } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
-import { useUIStore } from '../../stores/uiStore'
-import { Button } from '../shared/Button'
-import { Switch } from '../shared/Switch'
+import { Button } from '../shared/ui/button'
+import { Switch } from '../shared/ui/switch'
 import { SettingsRow } from './SettingsRow'
 import { SettingsPageHeader } from './SettingsPageHeader'
-import { Input } from '../shared/Input'
+import { LabeledInput } from '../shared/LabeledInput'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { copyTextToClipboard } from '../chat/clipboard'
+import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
 
 function buildH5LaunchUrl(baseUrl: string | null, token: string | null): string | null {
   if (!baseUrl) return null
@@ -101,7 +100,7 @@ export function H5AccessSettings() {
     updateH5AccessSettings,
   } = useSettingsStore()
   const t = useTranslation()
-  const addToast = useUIStore((s) => s.addToast)
+  const copyAndNotify = useCopyAndNotify()
   const [h5PublicBaseUrlDraft, setH5PublicBaseUrlDraft] = useState(extractH5AccessAddressDraft(h5Access.publicBaseUrl))
   const [h5GeneratedToken, setH5GeneratedToken] = useState<string | null>(null)
   const [h5TokenVisible, setH5TokenVisible] = useState(false)
@@ -173,20 +172,12 @@ export function H5AccessSettings() {
 
   const handleH5UrlCopy = async () => {
     if (!h5AccessUrl) return
-    const copied = await copyTextToClipboard(h5AccessUrl)
-    addToast({
-      type: copied ? 'success' : 'error',
-      message: copied ? t('settings.general.h5AccessUrlCopied') : t('common.copyFailed'),
-    })
+    await copyAndNotify(h5AccessUrl, t('settings.general.h5AccessUrlCopied'))
   }
 
   const handleH5LaunchUrlCopy = async () => {
     if (!h5LaunchUrl) return
-    const copied = await copyTextToClipboard(h5LaunchUrl)
-    addToast({
-      type: copied ? 'success' : 'error',
-      message: copied ? t('settings.general.h5AccessLaunchUrlCopied') : t('common.copyFailed'),
-    })
+    await copyAndNotify(h5LaunchUrl, t('settings.general.h5AccessLaunchUrlCopied'))
   }
 
   const handleH5EnableConfirm = async () => {
@@ -237,10 +228,10 @@ export function H5AccessSettings() {
             }
             control={
               <Switch
-                label={t('settings.general.h5AccessEnabled')}
+                aria-label={t('settings.general.h5AccessEnabled')}
                 checked={h5Access.enabled}
                 disabled={h5ActionRunning}
-                onChange={(checked) => {
+                onCheckedChange={(checked) => {
                   if (checked) {
                     setH5EnableConfirmOpen(true)
                   } else {
@@ -272,7 +263,6 @@ export function H5AccessSettings() {
                 <div className="mt-2">
                   <Button
                     size="xs"
-                    variant="primary"
                     loading={h5ActionRunning}
                     onClick={() => void handleH5SwitchToSuggestedHost()}
                     data-testid="h5-access-stale-host-apply"
@@ -298,14 +288,14 @@ export function H5AccessSettings() {
           <div className="mt-4 grid grid-cols-1 gap-3">
             <h3 className="text-[13px] font-medium text-[var(--color-text-secondary)]">{t('settings.h5.addressTitle')}</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
-              <Input
+              <LabeledInput
                 id="h5-access-public-url"
                 label={t('settings.general.h5AccessPublicHost')}
                 value={h5PublicBaseUrlDraft}
                 placeholder={t('settings.general.h5AccessPublicHostPlaceholder')}
                 onChange={(event) => setH5PublicBaseUrlDraft(event.target.value)}
               />
-              <Input
+              <LabeledInput
                 id="h5-access-current-port"
                 label={t('settings.general.h5AccessCurrentPort')}
                 value={h5AccessPort ?? t('settings.general.h5AccessCurrentPortUnknown')}
@@ -319,7 +309,7 @@ export function H5AccessSettings() {
               </p>
               <Button
                 size="xs"
-                variant="secondary"
+                variant="outline"
                 onClick={() => void handleH5SettingsSave()}
                 disabled={!h5AccessDirty || h5ActionRunning}
                 aria-label={t('settings.general.h5AccessSave')}
@@ -342,12 +332,12 @@ export function H5AccessSettings() {
                 </div>
                 <Button
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="shrink-0"
-                  icon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
                   aria-label={t('settings.general.h5AccessCopyUrl')}
                   onClick={() => void handleH5UrlCopy()}
                 >
+                  <Copy data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />
                   {t('settings.general.h5AccessCopy')}
                 </Button>
               </div>
@@ -390,20 +380,20 @@ export function H5AccessSettings() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       size="xs"
-                      variant="secondary"
-                      icon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                      variant="outline"
                       disabled={!h5LaunchUrl || !h5GeneratedToken}
                       onClick={() => void handleH5LaunchUrlCopy()}
                     >
+                      <Copy data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />
                       {t('settings.general.h5AccessCopyLaunchUrl')}
                     </Button>
                     <Button
                       size="xs"
-                      variant={h5GeneratedToken ? 'secondary' : 'primary'}
-                      icon={<RotateCw className="h-3.5 w-3.5" aria-hidden="true" />}
+                      variant={h5GeneratedToken ? 'outline' : 'default'}
                       loading={h5ActionRunning}
                       onClick={() => void handleH5Regenerate()}
                     >
+                      <RotateCw data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />
                       {h5GeneratedToken ? t('settings.general.h5AccessRegenerate') : t('settings.general.h5AccessGenerateToken')}
                     </Button>
                   </div>
@@ -428,20 +418,22 @@ export function H5AccessSettings() {
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
                   <Button
                     size="xs"
-                    variant="secondary"
-                    icon={h5TokenVisible ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                    variant="outline"
                     disabled={!h5GeneratedToken}
                     onClick={() => setH5TokenVisible((visible) => !visible)}
                   >
+                    {h5TokenVisible
+                      ? <EyeOff data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />
+                      : <Eye data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />}
                     {h5TokenVisible ? t('settings.general.h5AccessHideToken') : t('settings.general.h5AccessShowToken')}
                   </Button>
                   <Button
                     size="xs"
-                    variant="danger"
-                    icon={<PowerOff className="h-3.5 w-3.5" aria-hidden="true" />}
+                    variant="destructive"
                     loading={h5ActionRunning}
                     onClick={() => void handleH5Disable()}
                   >
+                    <PowerOff data-icon="inline-start" className="h-3.5 w-3.5" aria-hidden="true" />
                     {t('settings.general.h5AccessDisable')}
                   </Button>
                 </div>
@@ -470,7 +462,7 @@ export function H5AccessSettings() {
         body={t('settings.general.h5AccessConfirmBody')}
         confirmLabel={t('settings.general.h5AccessConfirmEnable')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
         loading={h5ActionRunning}
       />
     </div>

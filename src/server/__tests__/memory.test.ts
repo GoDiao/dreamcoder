@@ -149,6 +149,14 @@ describe('memory API', () => {
     })
   })
 
+  it('answers 404 for a memory file that does not exist', async () => {
+    const projectId = sanitizePath(path.join(tmpDir, 'workspace', 'app'))
+    await fs.mkdir(path.join(tmpDir, 'projects', projectId, 'memory'), { recursive: true })
+
+    const res = await request('GET', `/api/memory/file?projectId=${encodeURIComponent(projectId)}&path=MEMORY.md`)
+    expect(res.status).toBe(404)
+  })
+
   it('rejects traversal and symlink escapes', async () => {
     const projectId = sanitizePath(path.join(tmpDir, 'workspace', 'app'))
     const memoryDir = path.join(tmpDir, 'projects', projectId, 'memory')

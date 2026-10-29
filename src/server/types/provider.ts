@@ -19,17 +19,29 @@ export type ProviderAuthStrategy = z.infer<typeof ProviderAuthStrategySchema>
 export const ProviderRuntimeKindSchema = z.enum(['anthropic_compatible'])
 export type ProviderRuntimeKind = z.infer<typeof ProviderRuntimeKindSchema>
 
-export const ModelMappingSchema = z.object({
-  main: z.string(),
-  haiku: z.string(),
-  sonnet: z.string(),
-  opus: z.string(),
+export const ProviderModelSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1).optional(),
 })
 
-export const AutoCompactWindowSchema = z.number().int().min(16000).max(10000000)
+export const ProviderModelsSchema = z.array(ProviderModelSchema).superRefine((models, ctx) => {
+  const seen = new Set<string>()
+  models.forEach((model, index) => {
+    if (seen.has(model.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Model IDs must be unique',
+        path: [index, 'id'],
+      })
+    }
+    seen.add(model.id)
+  })
+})
+
+export const ModelContextWindowSchema = z.number().int().min(16000).max(10000000)
 export const ModelContextWindowsSchema = z.record(
   z.string().min(1),
-  z.number().int().min(16000).max(10000000),
+  ModelContextWindowSchema,
 )
 
 export const SavedProviderSchema = z.object({
@@ -41,8 +53,8 @@ export const SavedProviderSchema = z.object({
   baseUrl: z.string(),
   apiFormat: ApiFormatSchema.default('anthropic'),
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
-  models: ModelMappingSchema,
-  autoCompactWindow: AutoCompactWindowSchema.optional(),
+  models: ProviderModelsSchema.min(1),
+  fastModel: z.string().trim().min(1).optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
   notes: z.string().optional(),
 })
@@ -61,8 +73,8 @@ export const CreateProviderSchema = z.object({
   baseUrl: z.string(),
   apiFormat: ApiFormatSchema.default('anthropic'),
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
-  models: ModelMappingSchema,
-  autoCompactWindow: AutoCompactWindowSchema.optional(),
+  models: ProviderModelsSchema.min(1),
+  fastModel: z.string().trim().min(1).optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
   notes: z.string().optional(),
 })
@@ -74,8 +86,8 @@ export const UpdateProviderSchema = z.object({
   baseUrl: z.string().optional(),
   apiFormat: ApiFormatSchema.optional(),
   runtimeKind: ProviderRuntimeKindSchema.optional(),
-  models: ModelMappingSchema.optional(),
-  autoCompactWindow: AutoCompactWindowSchema.nullable().optional(),
+  models: ProviderModelsSchema.min(1).optional(),
+  fastModel: z.string().trim().min(1).nullable().optional(),
   modelContextWindows: ModelContextWindowsSchema.nullable().optional(),
   notes: z.string().optional(),
 })
@@ -88,12 +100,22 @@ export const TestProviderSchema = z.object({
   apiFormat: ApiFormatSchema.default('anthropic'),
 })
 
-export type ModelMapping = z.infer<typeof ModelMappingSchema>
+export const DiscoverProviderModelsSchema = z.object({
+  presetId: z.string().optional(),
+  baseUrl: z.string().url(),
+  apiKey: z.string(),
+  authStrategy: ProviderAuthStrategySchema.optional(),
+  apiFormat: ApiFormatSchema.default('anthropic'),
+})
+
+export type ProviderModel = z.infer<typeof ProviderModelSchema>
+export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
 export type CreateProviderInput = z.infer<typeof CreateProviderSchema>
 export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>
 export type TestProviderInput = z.infer<typeof TestProviderSchema>
+export type DiscoverProviderModelsInput = z.infer<typeof DiscoverProviderModelsSchema>
 
 export interface ProviderTestStepResult {
   success: boolean

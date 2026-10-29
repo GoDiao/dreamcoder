@@ -211,6 +211,7 @@ import {
   recordAttributionSnapshot,
   saveAgentSetting,
   saveMode,
+  savePermissionMode,
   saveAiGeneratedTitle,
   restoreSessionMetadata,
 } from 'src/utils/sessionStorage.js'
@@ -1068,6 +1069,7 @@ function runHeadlessStreaming(
       newMode === (feature('TRANSCRIPT_CLASSIFIER') && 'auto') ||
       newMode === 'dontAsk'
     ) {
+      savePermissionMode(newMode)
       output.enqueue({
         type: 'system',
         subtype: 'status',

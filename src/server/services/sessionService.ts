@@ -1,10 +1,8 @@
 import * as fs from 'node:fs/promises'
-import * as fsSync from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import * as readline from 'node:readline'
 import { ApiError } from '../middleware/errorHandler.js'
-import { sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
+import { LITE_READ_BUF_SIZE, sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { calculateUSDCost, MODEL_COSTS } from '../../utils/modelCost.js'
@@ -36,6 +34,11 @@ import {
 import { buildSessionTranscript } from '../transcript/history.js'
 import type { SessionTranscript } from '../transcript/items.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import type { PermissionMode } from '../ws/protocol.js'
+import type { TitleSource } from '../session/state/types.js'
+import { permissionModeFromTranscriptEntries } from './permissionModes.js'
+import { runtimeSelectionFromTranscriptEntries } from './runtimeSelection.js'
+import type { RuntimeSelection } from '../session/state/types.js'
 
 export type SessionListItem = {
   id: string
@@ -43,6 +46,8 @@ export type SessionListItem = {
   createdAt: string
   modifiedAt: string
   messageCount: number
+  /** False when messageCount skipped the unread middle of a large transcript. */
+  messageCountExact?: boolean
   projectPath: string
   projectRoot: string | null
   workDir: string | null
@@ -146,6 +151,47 @@ export type TranscriptContextEstimate = {
   }
 }
 
+const SESSION_METADATA_ENTRY_TYPES = [
+  'session-meta',
+  'custom-title',
+  'ai-title',
+  'permission-mode',
+  'runtime-config',
+  'worktree-state',
+] as const
+
+const CLEAR_KEPT_ENTRY_TYPES = ['custom-title', 'ai-title', 'worktree-state'] as const
+
+function lastEntryOfType(entries: RawEntry[], type: string): RawEntry | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i]?.type === type) return entries[i]
+  }
+  return undefined
+}
+
+function entryTime(entry: RawEntry | undefined): number | null {
+  if (!entry || typeof entry.timestamp !== 'string') return null
+  const time = Date.parse(entry.timestamp)
+  return Number.isNaN(time) ? null : time
+}
+
+function newerMetadataEntries(duplicate: RawEntry[], primary: RawEntry[]): RawEntry[] {
+  const carried: RawEntry[] = []
+  for (const type of SESSION_METADATA_ENTRY_TYPES) {
+    const candidate = lastEntryOfType(duplicate, type)
+    if (!candidate) continue
+    const current = lastEntryOfType(primary, type)
+    if (!current) {
+      carried.push(candidate)
+      continue
+    }
+    const candidateTime = entryTime(candidate)
+    const currentTime = entryTime(current)
+    if (candidateTime !== null && (currentTime === null || candidateTime > currentTime)) carried.push(candidate)
+  }
+  return carried
+}
+
 type RawEntry = {
   type?: string
   subtype?: string
@@ -199,7 +245,162 @@ type PersistedWorktreeSession = {
   hookBased?: boolean
 }
 
+async function readWindow(handle: fs.FileHandle, position: number, length: number): Promise<Buffer> {
+  if (length <= 0) return Buffer.alloc(0)
+  const buf = Buffer.allocUnsafe(length)
+  const { bytesRead } = await handle.read(buf, 0, length, position)
+  return bytesRead === length ? buf : buf.subarray(0, bytesRead)
+}
+
+/**
+ * Complete JSONL lines inside a byte window.
+ * A window that begins or ends mid-line drops that partial record so a cut
+ * multi-byte character is never parsed.
+ */
+function completeWindowLines(
+  buf: Buffer,
+  dropLeadingPartial: boolean,
+  dropTrailingPartial: boolean,
+): string[] {
+  const byteLength = buf.length
+  if (byteLength === 0) return []
+
+  let start = 0
+  let end = byteLength
+  if (dropLeadingPartial) {
+    const newline = buf.indexOf(0x0a)
+    if (newline < 0) return []
+    start = newline + 1
+  }
+  if (dropTrailingPartial) {
+    const lastNewline = buf.lastIndexOf(0x0a, end - 1)
+    if (lastNewline < start) return []
+    end = lastNewline
+  }
+  if (end <= start) return []
+
+  const parts = buf.toString('utf8', start, end).split('\n')
+  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop()
+  return parts
+}
+
+const HEAD_READ_CHUNK = 64 * 1024
+
+/**
+ * First `limit` non-empty lines, then stop. A snapshot line can be larger
+ * than the tail window, so the head is bounded by line count rather than bytes.
+ */
+async function readHeadNonEmptyLines(
+  handle: fs.FileHandle,
+  size: number,
+  limit: number,
+): Promise<{ lines: string[]; endOffset: number }> {
+  const lines: string[] = []
+  if (limit <= 0 || size <= 0) return { lines, endOffset: 0 }
+
+  let offset = 0
+  let pending = Buffer.alloc(0)
+  while (offset < size && lines.length < limit) {
+    const chunk = await readWindow(handle, offset, Math.min(HEAD_READ_CHUNK, size - offset))
+    if (chunk.length === 0) break
+    offset += chunk.length
+    const buf = pending.length === 0 ? chunk : Buffer.concat([pending, chunk])
+    let start = 0
+    for (let i = 0; i < buf.length; i++) {
+      if (buf[i] !== 0x0a) continue
+      const line = buf.toString('utf8', start, i).trim()
+      start = i + 1
+      if (!line) continue
+      lines.push(line)
+      if (lines.length >= limit) {
+        return { lines, endOffset: offset - (buf.length - start) }
+      }
+    }
+    pending = start === buf.length ? Buffer.alloc(0) : Buffer.from(buf.subarray(start))
+  }
+
+  if (pending.length > 0 && lines.length < limit) {
+    const line = pending.toString('utf8').trim()
+    if (line) lines.push(line)
+  }
+  return { lines, endOffset: offset }
+}
+
+/** Lines after the head. The last 64KB is enough once the head has stopped early. */
+async function readTailLines(
+  handle: fs.FileHandle,
+  size: number,
+  headEndOffset: number,
+): Promise<{ lines: string[]; exact: boolean }> {
+  if (headEndOffset >= size) return { lines: [], exact: true }
+
+  const tailStart = Math.max(0, size - LITE_READ_BUF_SIZE)
+  if (headEndOffset >= tailStart) {
+    const rest = await readWindow(handle, headEndOffset, size - headEndOffset)
+    return { lines: completeWindowLines(rest, false, false), exact: true }
+  }
+
+  const tail = await readWindow(handle, tailStart, size - tailStart)
+  let dropLeading = false
+  if (tailStart > 0) {
+    const boundary = await readWindow(handle, tailStart - 1, 1)
+    dropLeading = boundary.length !== 1 || boundary[0] !== 0x0a
+  }
+  return { lines: completeWindowLines(tail, dropLeading, false), exact: false }
+}
+
+function summarizeSessionWindowLines(
+  lines: string[],
+  headLines: number,
+  tailLines: number,
+  includeLastAssistantMessage: boolean,
+): { entries: RawEntry[]; messageCount: number; lastAssistantMessage: string } {
+  const trimmedLines: string[] = []
+  let messageCount = 0
+  let lastAssistantMessage = ''
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    trimmedLines.push(trimmed)
+
+    if (
+      (trimmed.includes('"type":"user"') || trimmed.includes('"type":"assistant"')) &&
+      trimmed.includes('"role"')
+    ) {
+      messageCount++
+    }
+
+    if (includeLastAssistantMessage && trimmed.includes('"assistant"')) {
+      try {
+        const entry = JSON.parse(trimmed) as RawEntry
+        if (
+          entry?.type === 'assistant' &&
+          entry.message?.role === 'assistant' &&
+          !entry.isSidechain &&
+          !entry.isMeta &&
+          !entry.parent_tool_use_id &&
+          !shouldHideTranscriptEntry(entry)
+        ) {
+          const text = extractTextBlocks(entry.message.content).join('\n').trim()
+          if (text) lastAssistantMessage = text
+        }
+      } catch { }
+    }
+  }
+
+  const head = trimmedLines.slice(0, headLines)
+  const orderedTail = trimmedLines.slice(Math.max(0, trimmedLines.length - tailLines))
+  const entries: RawEntry[] = []
+  for (const line of [...head, ...orderedTail]) {
+    try { entries.push(JSON.parse(line) as RawEntry) } catch { }
+  }
+  return { entries, messageCount, lastAssistantMessage }
+}
+
 export class SessionService {
+  private transcriptWrites = new Map<string, Promise<void>>()
+
   private getConfigDir(): string {
     return getClaudeConfigHomeDir()
   }
@@ -216,90 +417,38 @@ export class SessionService {
     return readJsonlFile<RawEntry>(filePath)
   }
 
-  private scanSessionFileHead(
+  private async scanSessionFileHead(
     filePath: string,
     headLines: number,
     tailLines: number,
     includeLastAssistantMessage = false,
-  ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string }> {
-    return new Promise((resolve, reject) => {
-      const head: string[] = []
-      const tailRing: string[] = new Array(tailLines)
-      let lineCount = 0
-      let messageCount = 0
-      let lastAssistantMessage = ''
-      let settled = false
-
-      const stream = fsSync.createReadStream(filePath, { encoding: 'utf-8' })
-      const rl = readline.createInterface({ input: stream, crlfDelay: Infinity })
-
-      rl.on('line', (line) => {
-        const trimmed = line.trim()
-        if (!trimmed) return
-
-        if (lineCount < headLines) {
-          head.push(trimmed)
-        }
-        tailRing[lineCount % tailLines] = trimmed
-        lineCount++
-
-        if (
-          (trimmed.includes('"type":"user"') || trimmed.includes('"type":"assistant"')) &&
-          trimmed.includes('"role"')
-        ) {
-          messageCount++
-        }
-
-        if (includeLastAssistantMessage && trimmed.includes('"assistant"')) {
-          try {
-            const entry = JSON.parse(trimmed) as RawEntry
-            if (
-              entry?.type === 'assistant' &&
-              entry.message?.role === 'assistant' &&
-              !entry.isSidechain &&
-              !entry.isMeta &&
-              !entry.parent_tool_use_id &&
-              !shouldHideTranscriptEntry(entry)
-            ) {
-              const text = extractTextBlocks(entry.message.content).join('\n').trim()
-              if (text) lastAssistantMessage = text
-            }
-          } catch { }
-        }
-      })
-
-      rl.on('close', () => {
-        if (settled) return
-        settled = true
-        const tailStart = Math.max(0, lineCount - tailLines)
-        const orderedTail: string[] = []
-        for (let i = tailStart; i < lineCount; i++) {
-          const entry = tailRing[i % tailLines]
-          if (entry) orderedTail.push(entry)
-        }
-
-        const selected = [...head, ...orderedTail]
-        const entries: RawEntry[] = []
-        for (const line of selected) {
-          try { entries.push(JSON.parse(line) as RawEntry) } catch { }
-        }
-        resolve({ entries, messageCount, lastAssistantMessage })
-      })
-
-      const handleError = (err: Error) => {
-        if (settled) return
-        settled = true
-        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          resolve({ entries: [], messageCount: 0, lastAssistantMessage: '' })
-        } else {
-          reject(err)
-        }
-        rl.close()
-        stream.destroy()
+  ): Promise<{ entries: RawEntry[]; messageCount: number; lastAssistantMessage: string; messageCountExact: boolean }> {
+    let handle: fs.FileHandle | undefined
+    try {
+      handle = await fs.open(filePath, 'r')
+      const stat = await handle.stat()
+      if (!stat.isFile()) {
+        const error = new Error(`EISDIR: illegal operation on a directory, read '${filePath}'`) as NodeJS.ErrnoException
+        error.code = 'EISDIR'
+        throw error
       }
-      rl.on('error', handleError)
-      stream.on('error', handleError)
-    })
+      const head = await readHeadNonEmptyLines(handle, stat.size, headLines)
+      const tail = await readTailLines(handle, stat.size, head.endOffset)
+      const summary = summarizeSessionWindowLines(
+        [...head.lines, ...tail.lines],
+        headLines,
+        tailLines,
+        includeLastAssistantMessage,
+      )
+      return { ...summary, messageCountExact: tail.exact }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { entries: [], messageCount: 0, lastAssistantMessage: '', messageCountExact: true }
+      }
+      throw err
+    } finally {
+      await handle?.close()
+    }
   }
 
   private async appendJsonlEntry(filePath: string, entry: Record<string, unknown>): Promise<void> {
@@ -464,23 +613,27 @@ export class SessionService {
   }
 
   private extractTitle(entries: RawEntry[]): string {
+    return this.extractTitleWithSource(entries)?.text ?? 'Untitled Session'
+  }
+
+  private extractTitleWithSource(entries: RawEntry[]): { text: string; source: TitleSource } | null {
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i]!
       if (e.type === 'custom-title' && e.customTitle) {
-        return e.customTitle
+        return { text: e.customTitle, source: 'custom' }
       }
     }
 
     for (const e of entries) {
       const goalTitle = this.goalCreationCommandTitle(e)
-      if (goalTitle) return goalTitle
+      if (goalTitle) return { text: goalTitle, source: 'goal' }
     }
 
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i]!
       if (e.type === 'ai-title' && e.aiTitle) {
         const title = cleanSessionTitleSource(String(e.aiTitle))
-        if (title) return title
+        if (title) return { text: title, source: 'ai' }
       }
     }
 
@@ -498,12 +651,12 @@ export class SessionService {
         }
         if (text) {
           const title = cleanSessionTitleSource(text)
-          if (title) return title.length > 80 ? title.slice(0, 80) + '...' : title
+          if (title) return { text: title.length > 80 ? title.slice(0, 80) + '...' : title, source: 'first-message' }
         }
       }
     }
 
-    return 'Untitled Session'
+    return null
   }
 
   private async discoverSessionFiles(projectFilter?: string): Promise<
@@ -605,7 +758,48 @@ export class SessionService {
   async findSessionFile(
     sessionId: string
   ): Promise<{ filePath: string; projectDir: string } | null> {
-    return (await this.findSessionFiles(sessionId))[0] ?? null
+    const matches = await this.findSessionFiles(sessionId)
+    if (matches.length <= 1) return matches[0] ?? null
+    for (const match of matches) {
+      if (this.hasConversationContent(await this.readJsonlFile(match.filePath))) return match
+    }
+    return matches[0]!
+  }
+
+  private hasConversationContent(entries: RawEntry[]): boolean {
+    return this.countTranscriptMessages(entries) > 0 ||
+      entries.some((entry) => entry.type === 'system' && entry.subtype === 'local_command')
+  }
+
+  private enqueueSessionWrite<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.transcriptWrites.get(sessionId) ?? Promise.resolve()
+    const next = previous.catch(() => {}).then(task)
+    const settled = next.then(() => {}, () => {})
+    this.transcriptWrites.set(sessionId, settled)
+    void settled.finally(() => {
+      if (this.transcriptWrites.get(sessionId) === settled) this.transcriptWrites.delete(sessionId)
+    })
+    return next
+  }
+
+  private async writableSessionFile(sessionId: string): Promise<{ filePath: string; projectDir: string } | null> {
+    const primary = await this.findSessionFile(sessionId)
+    if (!primary) return null
+    const duplicates = (await this.findSessionFiles(sessionId)).filter((match) => match.filePath !== primary.filePath)
+    if (duplicates.length === 0) return primary
+    let primaryEntries = await this.readJsonlFile(primary.filePath)
+    if (!this.hasConversationContent(primaryEntries)) return primary
+    for (const duplicate of duplicates) {
+      const entries = await this.readJsonlFile(duplicate.filePath)
+      if (this.hasConversationContent(entries)) continue
+      const carried = newerMetadataEntries(entries, primaryEntries)
+      for (const entry of carried) {
+        await this.appendJsonlEntry(primary.filePath, entry)
+      }
+      primaryEntries = [...primaryEntries, ...carried]
+      await fs.rm(duplicate.filePath, { force: true })
+    }
+    return primary
   }
 
   private isValidSessionId(id: string): boolean {
@@ -891,7 +1085,7 @@ export class SessionService {
 
     const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
       try {
-        const { entries: headEntries, messageCount, lastAssistantMessage } = await this.scanSessionFileHead(
+        const { entries: headEntries, messageCount, lastAssistantMessage, messageCountExact } = await this.scanSessionFileHead(
           filePath,
           100,
           100,
@@ -917,6 +1111,7 @@ export class SessionService {
           createdAt,
           modifiedAt: stat.mtime.toISOString(),
           messageCount,
+          ...(messageCountExact ? {} : { messageCountExact: false }),
           projectPath: projectDir,
           projectRoot,
           workDir,
@@ -994,6 +1189,8 @@ export class SessionService {
   async createSession(
     workDir?: string,
     repositoryOptions?: CreateSessionRepositoryOptions,
+    permissionMode?: PermissionMode,
+    runtime?: RuntimeSelection,
   ): Promise<{ sessionId: string; workDir: string }> {
     const resolvedWorkDir = workDir || os.homedir()
     const sessionId = crypto.randomUUID()
@@ -1040,7 +1237,17 @@ export class SessionService {
       timestamp: now,
     }
 
-    await fs.writeFile(filePath, JSON.stringify(initialEntry) + '\n' + JSON.stringify(metaEntry) + '\n', 'utf-8')
+    const modeEntry = permissionMode
+      ? JSON.stringify(this.permissionModeEntry(sessionId, permissionMode)) + '\n'
+      : ''
+    const runtimeEntry = runtime
+      ? JSON.stringify(this.runtimeConfigEntry(sessionId, runtime)) + '\n'
+      : ''
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(initialEntry) + '\n' + JSON.stringify(metaEntry) + '\n' + modeEntry + runtimeEntry,
+      'utf-8',
+    )
 
     return { sessionId, workDir: absWorkDir }
   }
@@ -1092,29 +1299,41 @@ export class SessionService {
       throw ApiError.badRequest('title is required')
     }
 
-    const found = await this.findSessionFile(sessionId)
-    if (!found) {
-      throw ApiError.notFound(`Session not found: ${sessionId}`)
-    }
-
-    const entry = {
-      type: 'custom-title',
-      customTitle: title,
-      timestamp: new Date().toISOString(),
-    }
-
-    await this.appendJsonlEntry(found.filePath, entry)
+    await this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) {
+        throw ApiError.notFound(`Session not found: ${sessionId}`)
+      }
+      await this.appendJsonlEntry(found.filePath, this.customTitleEntry(title))
+    })
   }
 
-  async appendAiTitle(sessionId: string, title: string): Promise<void> {
-    const found = await this.findSessionFile(sessionId)
-    if (!found) return
-
-    await this.appendJsonlEntry(found.filePath, {
-      type: 'ai-title',
-      aiTitle: title,
-      timestamp: new Date().toISOString(),
+  appendAiTitle(sessionId: string, title: string): Promise<void> {
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) return
+      await this.appendJsonlEntry(found.filePath, {
+        type: 'ai-title',
+        aiTitle: title,
+        timestamp: new Date().toISOString(),
+      })
     })
+  }
+
+  restoreCustomTitle(sessionId: string, title: string): Promise<boolean> {
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) return false
+      const entries = await this.readJsonlFile(found.filePath)
+      const last = lastEntryOfType(entries, 'custom-title')
+      if (last?.customTitle === title) return false
+      await this.appendJsonlEntry(found.filePath, this.customTitleEntry(title))
+      return true
+    })
+  }
+
+  private customTitleEntry(title: string): Record<string, unknown> {
+    return { type: 'custom-title', customTitle: title, timestamp: new Date().toISOString() }
   }
 
   async getCustomTitle(sessionId: string): Promise<string | null> {
@@ -1185,8 +1404,12 @@ export class SessionService {
     await fs.unlink(found.filePath)
   }
 
-  async clearSessionTranscript(sessionId: string, fallbackWorkDir?: string): Promise<void> {
-    let found = await this.findSessionFile(sessionId)
+  clearSessionTranscript(sessionId: string, fallbackWorkDir?: string): Promise<void> {
+    return this.enqueueSessionWrite(sessionId, () => this.rewriteClearedTranscript(sessionId, fallbackWorkDir))
+  }
+
+  private async rewriteClearedTranscript(sessionId: string, fallbackWorkDir?: string): Promise<void> {
+    let found = await this.writableSessionFile(sessionId)
     if (!found && fallbackWorkDir) {
       const resolvedPath = path.resolve(normalizeDriveRootPathForPlatform(fallbackWorkDir))
       const absWorkDir = await fs.realpath(resolvedPath).catch(() => resolvedPath)
@@ -1204,6 +1427,8 @@ export class SessionService {
     const entries = await this.readJsonlFile(found.filePath)
     const workDir = this.resolveWorkDirFromEntries(entries, found.projectDir) || fallbackWorkDir || process.cwd()
     const repository = this.resolveRepositoryFromEntries(entries)
+    const permissionMode = permissionModeFromTranscriptEntries(entries)
+    const runtime = runtimeSelectionFromTranscriptEntries(entries)
     const now = new Date().toISOString()
 
     const initialEntry = {
@@ -1225,14 +1450,81 @@ export class SessionService {
       timestamp: now,
     }
 
+    const modeEntry = permissionMode
+      ? `${JSON.stringify(this.permissionModeEntry(sessionId, permissionMode))}\n`
+      : ''
+    const runtimeEntry = runtime !== undefined
+      ? `${JSON.stringify(this.runtimeConfigEntry(sessionId, runtime))}\n`
+      : ''
+    const keptEntries = CLEAR_KEPT_ENTRY_TYPES
+      .map((type) => lastEntryOfType(entries, type))
+      .filter((entry): entry is RawEntry => !!entry)
+      .map((entry) => `${JSON.stringify(entry)}\n`)
+      .join('')
     await fs.writeFile(
       found.filePath,
-      `${JSON.stringify(initialEntry)}\n${JSON.stringify(metaEntry)}\n`,
+      `${JSON.stringify(initialEntry)}\n${JSON.stringify(metaEntry)}\n${modeEntry}${runtimeEntry}${keptEntries}`,
       'utf-8',
     )
   }
 
-  async appendSessionMetadata(
+  async getSessionRestoreInfo(sessionId: string): Promise<{
+    permissionMode: PermissionMode | null
+    runtime?: RuntimeSelection | null
+    title: { text: string; source: TitleSource } | null
+    workDir: string
+    projectRoot: string | null
+    repository?: PreparedSessionWorkspace['repository']
+    workDirExists: boolean
+  } | null> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) return null
+    const entries = await this.readJsonlFile(found.filePath)
+    const workDir = this.resolveWorkDirFromEntries(entries, found.projectDir) || ''
+    const repository = this.resolveRepositoryFromEntries(entries)
+    const runtime = runtimeSelectionFromTranscriptEntries(entries)
+    return {
+      permissionMode: permissionModeFromTranscriptEntries(entries),
+      ...(runtime !== undefined ? { runtime } : {}),
+      title: this.extractTitleWithSource(entries),
+      workDir,
+      projectRoot: workDir ? await this.resolveProjectRootFromEntries(entries, workDir, found.projectDir) : null,
+      ...(repository ? { repository } : {}),
+      workDirExists: workDir ? await this.pathExists(workDir) : false,
+    }
+  }
+
+  async getSessionPermissionMode(sessionId: string): Promise<PermissionMode | null> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) return null
+    return permissionModeFromTranscriptEntries(await this.readJsonlFile(found.filePath))
+  }
+
+  appendSessionPermissionMode(sessionId: string, permissionMode: PermissionMode): Promise<void> {
+    return this.appendSessionEntry(sessionId, this.permissionModeEntry(sessionId, permissionMode))
+  }
+
+  appendSessionRuntimeConfig(sessionId: string, runtime: RuntimeSelection | null): Promise<void> {
+    return this.appendSessionEntry(sessionId, this.runtimeConfigEntry(sessionId, runtime))
+  }
+
+  private appendSessionEntry(sessionId: string, entry: Record<string, unknown>): Promise<void> {
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) return
+      await this.appendJsonlEntry(found.filePath, entry)
+    })
+  }
+
+  private permissionModeEntry(sessionId: string, permissionMode: PermissionMode): Record<string, unknown> {
+    return { type: 'permission-mode', permissionMode, sessionId, timestamp: new Date().toISOString() }
+  }
+
+  private runtimeConfigEntry(sessionId: string, runtime: RuntimeSelection | null): Record<string, unknown> {
+    return { type: 'runtime-config', runtime, sessionId, timestamp: new Date().toISOString() }
+  }
+
+  appendSessionMetadata(
     sessionId: string,
     metadata: {
       workDir: string
@@ -1240,79 +1532,44 @@ export class SessionService {
       repository?: PreparedSessionWorkspace['repository']
     }
   ): Promise<void> {
-    const matches = await this.findSessionFiles(sessionId)
-    if (matches.length === 0) return
-
-    let repository = metadata.repository
-    if (!repository) {
-      for (const match of matches) {
-        const candidate = this.resolveRepositoryFromEntries(await this.readJsonlFile(match.filePath))
-        if (candidate) {
-          repository = candidate
-          break
-        }
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) return
+      const entries = await this.readJsonlFile(found.filePath)
+      const workDir = normalizeDriveRootPathForPlatform(metadata.workDir)
+      const repository = metadata.repository ?? this.resolveRepositoryFromEntries(entries)
+      const lastMeta = lastEntryOfType(entries, 'session-meta')
+      if (
+        !lastMeta ||
+        lastMeta.workDir !== workDir ||
+        JSON.stringify(lastMeta.repository ?? null) !== JSON.stringify(repository ?? null)
+      ) {
+        await this.appendJsonlEntry(found.filePath, {
+          type: 'session-meta',
+          isMeta: true,
+          workDir,
+          repository,
+          timestamp: new Date().toISOString(),
+        })
       }
-    }
-
-    const normalizedWorkDir = normalizeDriveRootPathForPlatform(metadata.workDir)
-    const targetProjectDir = this.sanitizePath(normalizedWorkDir)
-    const targetFilePath = path.join(this.getProjectsDir(), targetProjectDir, `${sessionId}.jsonl`)
-    await fs.mkdir(path.dirname(targetFilePath), { recursive: true })
-
-    await this.appendJsonlEntry(targetFilePath, {
-      type: 'session-meta',
-      isMeta: true,
-      workDir: normalizedWorkDir,
-      repository,
-      timestamp: new Date().toISOString(),
+      if (metadata.customTitle && lastEntryOfType(entries, 'custom-title')?.customTitle !== metadata.customTitle) {
+        await this.appendJsonlEntry(found.filePath, this.customTitleEntry(metadata.customTitle))
+      }
     })
-
-    if (metadata.customTitle) {
-      await this.appendJsonlEntry(targetFilePath, {
-        type: 'custom-title',
-        customTitle: metadata.customTitle,
-        timestamp: new Date().toISOString(),
-      })
-    }
   }
 
-  async deletePlaceholderSessionFiles(
-    sessionId: string,
-    keepWorkDir: string,
-  ): Promise<number> {
-    if (!this.isValidSessionId(sessionId)) return 0
-
-    const projectsDir = this.getProjectsDir()
-    let projectDirs: import('node:fs').Dirent[]
-    try {
-      projectDirs = await fs.readdir(projectsDir, { withFileTypes: true })
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return 0
-      throw err
-    }
-
-    const keepProjectDir = this.sanitizePath(normalizeDriveRootPathForPlatform(keepWorkDir))
-    let removed = 0
-    for (const projectDir of projectDirs) {
-      if (!projectDir.isDirectory()) continue
-      if (projectDir.name === keepProjectDir) continue
-      const filePath = path.join(projectsDir, projectDir.name, `${sessionId}.jsonl`)
-      const entries = await this.readJsonlFile(filePath)
-      if (entries.length === 0) continue
-
-      if (this.countTranscriptMessages(entries) > 0) continue
-
-      await fs.rm(filePath, { force: true })
-      removed += 1
-    }
-    return removed
-  }
-
-  async trimSessionMessagesFrom(
+  trimSessionMessagesFrom(
     sessionId: string,
     startMessageId: string,
   ): Promise<TrimSessionResult> {
-    const found = await this.findSessionFile(sessionId)
+    return this.enqueueSessionWrite(sessionId, () => this.trimSessionFile(sessionId, startMessageId))
+  }
+
+  private async trimSessionFile(
+    sessionId: string,
+    startMessageId: string,
+  ): Promise<TrimSessionResult> {
+    const found = await this.writableSessionFile(sessionId)
     if (!found) {
       throw ApiError.notFound(`Session not found: ${sessionId}`)
     }

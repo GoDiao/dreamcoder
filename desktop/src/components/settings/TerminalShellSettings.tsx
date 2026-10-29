@@ -4,8 +4,9 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { SettingsSelect } from './SettingsSelect'
 import { SettingsRow } from './SettingsRow'
-import { Input } from '../shared/Input'
-import { Button } from '../shared/Button'
+import { LabeledInput } from '../shared/LabeledInput'
+import { Button } from '../shared/ui/button'
+import { BashPathSettings } from './BashPathSettings'
 import type { DesktopTerminalStartupShell } from '../../types/settings'
 
 export function TerminalShellSettings() {
@@ -119,8 +120,9 @@ function DesktopTerminalShellSettings() {
 
           {startupShell === 'custom' && (
             <div className="mt-2">
-              <Input
+              <LabeledInput
                 label={t('settings.terminal.customPath')}
+                error={preferencesError ?? undefined}
                 placeholder={isWindows ? t('settings.terminal.customPathPlaceholder') : '/usr/local/bin/fish'}
                 value={customShellPath}
                 onChange={(event) => {
@@ -128,7 +130,6 @@ function DesktopTerminalShellSettings() {
                   setPreferencesError(null)
                   setPreferencesSaved(false)
                 }}
-                error={preferencesError ?? undefined}
               />
             </div>
           )}
@@ -152,6 +153,8 @@ function DesktopTerminalShellSettings() {
               {t('settings.terminal.saveShell')}
             </Button>
           </div>
+
+          {isWindows && <BashPathSettings />}
         </>
       )}
     </div>

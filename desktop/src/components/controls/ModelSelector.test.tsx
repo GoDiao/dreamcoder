@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 import { ModelSelector } from './ModelSelector'
@@ -8,17 +8,44 @@ import { useProviderStore } from '../../stores/providerStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { ModelInfo } from '../../types/settings'
+import type { RuntimeSelection } from '../../types/runtime'
 
 const MODELS: ModelInfo[] = [
   { id: 'alpha', name: 'Alpha', description: 'Fast model', context: '128k' },
   { id: 'beta', name: 'Beta', description: 'Careful model', context: '200k' },
 ]
 
-async function clickByRole(name: RegExp | string) {
-  await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name }))
-    await Promise.resolve()
-  })
+async function chooseOption(combobox: HTMLElement, option: RegExp | string) {
+  act(() => combobox.focus())
+  fireEvent.keyDown(combobox, { key: 'ArrowDown' })
+  fireEvent.click(await screen.findByRole('option', { name: option }))
+}
+
+function mirrorRuntime(sessionId: string, selection: RuntimeSelection) {
+  useChatStore.setState((state) => ({
+    sessions: {
+      ...state.sessions,
+      [sessionId]: {
+        ...state.getSession(sessionId),
+        mirror: {
+          id: sessionId,
+          version: 1,
+          permission: { desired: 'default', effective: 'default' },
+          runtime: { desired: selection, effective: null },
+          title: { text: null, source: null },
+          workspace: { workDir: '/workspace/project', projectRoot: null, workDirExists: true },
+          process: { phase: 'running', generation: 1 },
+          turn: { phase: 'idle' },
+          pendingPermissions: [],
+          slashCommands: [],
+          activeGoal: null,
+          backgroundTasks: [],
+          team: null,
+          clientCount: 1,
+        },
+      },
+    },
+  }))
 }
 
 afterEach(() => {
@@ -29,187 +56,141 @@ afterEach(() => {
   useChatStore.setState(useChatStore.getInitialState(), true)
 })
 
+function seedProviders(models = [{ id: 'provider-main' }, { id: 'provider-fast', name: 'Fast Display' }]) {
+  useSettingsStore.setState({
+    locale: 'en',
+    availableModels: MODELS,
+    currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
+    activeProviderName: 'Provider A',
+    effortLevel: 'medium',
+  })
+  useProviderStore.setState({
+    providers: [
+      {
+        id: 'provider-a',
+        presetId: 'custom',
+        name: 'Provider A',
+        apiKey: '***',
+        baseUrl: 'https://api.example.com',
+        apiFormat: 'anthropic',
+        models,
+      },
+      {
+        id: 'provider-b',
+        presetId: 'custom',
+        name: 'Provider B',
+        apiKey: '***',
+        baseUrl: 'https://other.example.com',
+        apiFormat: 'anthropic',
+        models: [{ id: 'other-model', name: 'Other Display' }],
+      },
+    ],
+    activeId: 'provider-a',
+    hasLoadedProviders: true,
+    isLoading: true,
+  })
+}
+
 describe('ModelSelector', () => {
-  it('uses controlled model selection without mutating settings directly', async () => {
-    const onChange = vi.fn()
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: MODELS,
-      currentModel: MODELS[0],
-    })
+  it('reports model and effort changes through onRuntimeSelectionChange without a runtime key', async () => {
+    const onRuntimeSelectionChange = vi.fn()
+    seedProviders()
 
-    render(<ModelSelector value="alpha" onChange={onChange} />)
+    render(<ModelSelector onRuntimeSelectionChange={onRuntimeSelectionChange} />)
 
-    await clickByRole(/alpha/i)
-    await clickByRole(/Beta/)
+    await chooseOption(screen.getByRole('combobox', { name: /^Select model/ }), 'Fast Display')
+    expect(onRuntimeSelectionChange).toHaveBeenLastCalledWith({ providerId: 'provider-a', modelId: 'provider-fast' })
 
-    expect(onChange).toHaveBeenCalledWith('beta')
+    await chooseOption(screen.getByRole('combobox', { name: 'Effort: Medium' }), 'High')
+    expect(onRuntimeSelectionChange).toHaveBeenLastCalledWith({ providerId: null, modelId: '', effort: 'high' })
   })
 
-  it('routes uncontrolled model and effort changes through settings actions', async () => {
-    const setModel = vi.fn(async () => {})
-    const setEffort = vi.fn(async () => {})
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: MODELS,
-      currentModel: MODELS[0],
-      effortLevel: 'medium',
-      setModel,
-      setEffort,
-    })
+  it('names the model trigger after the selected model', () => {
+    seedProviders()
+    mirrorRuntime('session-name', { providerId: 'provider-a', modelId: 'provider-fast' })
 
-    render(<ModelSelector />)
+    render(<ModelSelector runtimeKey="session-name" />)
 
-    await clickByRole(/alpha/i)
-    await clickByRole(/Beta/)
-    expect(setModel).toHaveBeenCalledWith('beta')
-
-    await clickByRole(/Alpha/)
-    await clickByRole(/^High$/)
-    expect(setEffort).toHaveBeenCalledWith('high')
+    expect(screen.getByRole('combobox', { name: 'Select model: Fast Display' })).toBeInTheDocument()
   })
 
   it('selects provider-scoped runtime models and mirrors session selections', async () => {
     const setSessionRuntime = vi.fn()
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: [
-        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
-        { id: 'provider-fast', name: 'provider-fast', description: 'Haiku model', context: '' },
-      ],
-      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
-      activeProviderName: 'Provider A',
-    })
-    useProviderStore.setState({
-      providers: [{
-        id: 'provider-a',
-        presetId: 'custom',
-        name: 'Provider A',
-        apiKey: '***',
-        baseUrl: 'https://api.example.com',
-        apiFormat: 'anthropic',
-        models: {
-          main: 'provider-main',
-          haiku: 'provider-fast',
-          sonnet: 'provider-main',
-          opus: '',
-        },
-      }],
-      activeId: 'provider-a',
-      hasLoadedProviders: true,
-      isLoading: true,
-    })
-    useChatStore.setState({
-      setSessionRuntime,
-    } as Partial<ReturnType<typeof useChatStore.getState>>)
+    seedProviders()
+    useChatStore.setState({ setSessionRuntime } as Partial<ReturnType<typeof useChatStore.getState>>)
 
     render(<ModelSelector runtimeKey="session-1" />)
 
-    await clickByRole(/provider-main/)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /provider-fast/ }))
-      await Promise.resolve()
-    })
+    await chooseOption(screen.getByRole('combobox', { name: /^Select model/ }), 'Fast Display')
 
-    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
-      providerId: 'provider-a',
-      modelId: 'provider-fast',
-    })
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toBeUndefined()
     expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
       providerId: 'provider-a',
       modelId: 'provider-fast',
     })
   })
 
-  it('sets the effort per session from the composer menu and shows it in the trigger', async () => {
+  it('picks the same model id under the provider that was clicked', async () => {
     const setSessionRuntime = vi.fn()
+    seedProviders([{ id: 'shared' }])
+    useProviderStore.setState((state) => ({
+      providers: state.providers.map((provider) =>
+        provider.id === 'provider-b' ? { ...provider, models: [{ id: 'shared' }] } : provider),
+    }))
+    useChatStore.setState({ setSessionRuntime } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+    render(<ModelSelector runtimeKey="session-1" />)
+    const combobox = screen.getByRole('combobox', { name: /^Select model/ })
+    act(() => combobox.focus())
+    fireEvent.keyDown(combobox, { key: 'ArrowDown' })
+    const group = await screen.findByRole('group', { name: /Provider B/ })
+    fireEvent.click(within(group).getByRole('option', { name: 'shared' }))
+
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-1', { providerId: 'provider-b', modelId: 'shared' })
+  })
+
+  it('sets the effort per session from its own select and shows it in the trigger', async () => {
+    const setSessionRuntime = vi.fn((sessionId: string, selection: RuntimeSelection) => {
+      mirrorRuntime(sessionId, selection)
+    })
     const setEffort = vi.fn(async () => {})
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: [
-        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
-      ],
-      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
-      activeProviderName: 'Provider A',
-      effortLevel: 'medium',
-      setEffort,
-    })
-    useProviderStore.setState({
-      providers: [{
-        id: 'provider-a',
-        presetId: 'custom',
-        name: 'Provider A',
-        apiKey: '***',
-        baseUrl: 'https://api.example.com',
-        apiFormat: 'anthropic',
-        models: { main: 'provider-main', haiku: '', sonnet: '', opus: '' },
-      }],
-      activeId: 'provider-a',
-      hasLoadedProviders: true,
-      isLoading: true,
-    })
-    useChatStore.setState({
-      setSessionRuntime,
-    } as Partial<ReturnType<typeof useChatStore.getState>>)
+    seedProviders()
+    useSettingsStore.setState({ setEffort })
+    useChatStore.setState({ setSessionRuntime } as Partial<ReturnType<typeof useChatStore.getState>>)
 
     render(<ModelSelector runtimeKey="session-1" />)
 
-    expect(screen.getByRole('button', { name: 'provider-main · Medium' })).toBeInTheDocument()
-    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /^Select model/ })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Effort: Medium' })).toHaveTextContent('Effort Medium')
 
-    await clickByRole('provider-main · Medium')
-    expect(screen.queryByText('Model Configuration')).not.toBeInTheDocument()
-    await clickByRole(/^High$/)
+    await chooseOption(screen.getByRole('combobox', { name: 'Effort: Medium' }), 'High')
 
     expect(setEffort).not.toHaveBeenCalled()
-    // No model was chosen for this session, so only the effort is pinned and
-    // the session keeps following the default provider and model.
-    expect(useSessionRuntimeStore.getState().selections['session-1']).toEqual({
-      providerId: null,
-      modelId: '',
-      effort: 'high',
-    })
+    expect(useSessionRuntimeStore.getState().selections['session-1']).toBeUndefined()
     expect(setSessionRuntime).toHaveBeenCalledWith('session-1', {
       providerId: null,
       modelId: '',
       effort: 'high',
     })
-    expect(screen.getByRole('button', { name: 'provider-main · High' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Effort: High' })).toHaveTextContent('Effort High')
+  })
+
+  it('shortens the effort trigger in compact mode', () => {
+    seedProviders()
+
+    render(<ModelSelector runtimeKey="session-1" compact />)
+
+    expect(screen.getByRole('combobox', { name: 'Effort: Medium' })).toHaveTextContent(/^Medium$/)
   })
 
   it('keeps an explicit model choice when only the effort changes', async () => {
     const setSessionRuntime = vi.fn()
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: [
-        { id: 'provider-main', name: 'provider-main', description: 'Main model', context: '' },
-      ],
-      currentModel: { id: 'provider-main', name: 'provider-main', description: '', context: '' },
-      activeProviderName: 'Provider A',
-      effortLevel: 'medium',
-    })
-    useProviderStore.setState({
-      providers: [{
-        id: 'provider-a',
-        presetId: 'custom',
-        name: 'Provider A',
-        apiKey: '***',
-        baseUrl: 'https://api.example.com',
-        apiFormat: 'anthropic',
-        models: { main: 'provider-main', haiku: 'provider-fast', sonnet: '', opus: '' },
-      }],
-      activeId: 'provider-a',
-      hasLoadedProviders: true,
-      isLoading: true,
-    })
-    useChatStore.setState({
-      setSessionRuntime,
-    } as Partial<ReturnType<typeof useChatStore.getState>>)
-    useSessionRuntimeStore.getState().setSelection('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
+    seedProviders()
+    useChatStore.setState({ setSessionRuntime } as Partial<ReturnType<typeof useChatStore.getState>>)
+    mirrorRuntime('session-2', { providerId: 'provider-a', modelId: 'provider-fast' })
 
     render(<ModelSelector runtimeKey="session-2" />)
-    await clickByRole('provider-fast · Medium')
-    await clickByRole(/^Max$/)
+    await chooseOption(screen.getByRole('combobox', { name: 'Effort: Medium' }), 'Max')
 
     expect(setSessionRuntime).toHaveBeenCalledWith('session-2', {
       providerId: 'provider-a',
@@ -218,83 +199,55 @@ describe('ModelSelector', () => {
     })
   })
 
-  it('lists only the active provider without subscription sections', async () => {
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: MODELS,
-      currentModel: MODELS[0],
-      activeProviderName: 'Provider A',
+  it('keeps the effort when the model changes', async () => {
+    const setSessionRuntime = vi.fn()
+    seedProviders()
+    useChatStore.setState({ setSessionRuntime } as Partial<ReturnType<typeof useChatStore.getState>>)
+    mirrorRuntime('session-3', { providerId: 'provider-a', modelId: 'provider-main', effort: 'high' })
+
+    render(<ModelSelector runtimeKey="session-3" />)
+    await chooseOption(screen.getByRole('combobox', { name: /^Select model/ }), 'Fast Display')
+
+    expect(setSessionRuntime).toHaveBeenCalledWith('session-3', {
+      providerId: 'provider-a',
+      modelId: 'provider-fast',
+      effort: 'high',
     })
-    useProviderStore.setState({
-      providers: [{
-        id: 'provider-a',
-        presetId: 'custom',
-        name: 'Provider A',
-        apiKey: '***',
-        baseUrl: 'https://api.example.com',
-        apiFormat: 'anthropic',
-        models: {
-          main: 'provider-main',
-          haiku: '',
-          sonnet: '',
-          opus: '',
-        },
-      }],
-      activeId: 'provider-a',
-      hasLoadedProviders: true,
-      isLoading: true,
-    })
-
-    render(<ModelSelector runtimeKey="session-hide" />)
-
-    await clickByRole(/alpha/i)
-
-    const dropdown = screen.getByTestId('model-selector-dropdown')
-    expect(dropdown.textContent).not.toContain('Claude Official')
-    expect(dropdown.textContent).not.toContain('ChatGPT Official')
-    expect(dropdown.textContent).toContain('Provider A')
   })
 
-  it('portals the dropdown outside clipping containers and positions it below the trigger', async () => {
-    useSettingsStore.setState({
-      locale: 'en',
-      availableModels: MODELS,
-      currentModel: MODELS[0],
-    })
+  it('shows a selected model that is missing from its provider in the trigger', () => {
+    seedProviders()
+    mirrorRuntime('session-4', { providerId: 'provider-a', modelId: 'retired-model' })
 
-    const { container } = render(
-      <div data-testid="scroll-container" className="overflow-hidden">
-        <ModelSelector value="alpha" onChange={vi.fn()} />
-      </div>,
-    )
+    render(<ModelSelector runtimeKey="session-4" />)
 
-    const trigger = screen.getByRole('button', { name: /alpha/i })
-    Object.defineProperty(trigger.parentElement, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => ({
-        top: 120,
-        right: 520,
-        bottom: 150,
-        left: 240,
-        width: 280,
-        height: 30,
-        x: 240,
-        y: 120,
-        toJSON: () => {},
-      }),
-    })
+    expect(screen.getByRole('combobox', { name: /^Select model/ })).toHaveTextContent('retired-model')
+  })
 
-    await act(async () => {
-      fireEvent.click(trigger)
-      await Promise.resolve()
-    })
+  it('groups models by provider, labels the groups and marks the default provider', async () => {
+    seedProviders()
 
-    const dropdown = screen.getByTestId('model-selector-dropdown')
-    expect(container.contains(dropdown)).toBe(false)
-    expect(document.body.contains(dropdown)).toBe(true)
-    expect(dropdown.className).toContain('fixed')
-    expect(dropdown.style.top).toBe('158px')
-    expect(dropdown.style.left).toBe('160px')
-    expect(dropdown.style.width).toBe('360px')
+    render(<ModelSelector runtimeKey="session-hide" />)
+    const combobox = screen.getByRole('combobox', { name: /^Select model/ })
+    act(() => combobox.focus())
+    fireEvent.keyDown(combobox, { key: 'ArrowDown' })
+
+    const groupA = await screen.findByRole('group', { name: /Provider A/ })
+    const groupB = screen.getByRole('group', { name: /Provider B/ })
+    expect(groupA).toHaveTextContent('Default')
+    expect(groupB).not.toHaveTextContent('Default')
+    expect(within(groupA).getAllByRole('option').map((option) => option.textContent)).toEqual(['provider-main', 'Fast Display'])
+    expect(within(groupB).getAllByRole('option').map((option) => option.textContent)).toEqual(['Other Display'])
+    expect(screen.queryByText('Claude Official')).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'provider-main' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('disables both selects together', () => {
+    seedProviders()
+
+    render(<ModelSelector runtimeKey="session-1" disabled />)
+
+    expect(screen.getByRole('combobox', { name: /^Select model/ })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Effort: Medium' })).toBeDisabled()
   })
 })

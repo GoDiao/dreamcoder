@@ -1,8 +1,10 @@
+import { ArrowLeftIcon } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 import { useTranslation } from '../../i18n'
 import type { McpWritableScope } from '../../types/mcp'
 import { DirectoryPicker } from '../shared/DirectoryPicker'
-import { Input } from '../shared/Input'
+import { Button } from '../shared/ui/button'
+import { LabeledInput } from '../shared/LabeledInput'
 
 const WRITABLE_SCOPES: McpWritableScope[] = ['local', 'project', 'user']
 
@@ -24,10 +26,10 @@ export function McpEditorLayout({
   const t = useTranslation()
   return (
     <div className="min-w-0">
-      <button type="button" onClick={onBack} disabled={backDisabled} className="mb-5 inline-flex items-center gap-1.5 rounded-[6px] text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50">
-        <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
+      <Button variant="ghost" size="xs" onClick={onBack} disabled={backDisabled} className="mb-5 text-[var(--color-text-secondary)]">
+        <ArrowLeftIcon aria-hidden="true" />
         {t('settings.mcp.form.back')}
-      </button>
+      </Button>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
           <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{title}</h2>
@@ -49,7 +51,7 @@ export function McpEditorSection({ title, description, children }: {
   children: ReactNode
 }) {
   return (
-    <section aria-label={title} className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+    <section aria-label={title} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
       {title && <h3 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>}
       {description && <p className="mb-3 text-xs leading-5 text-[var(--color-text-tertiary)]">{description}</p>}
       {children}
@@ -95,16 +97,16 @@ export function McpEditorFields({
   return (
     <>
       <McpEditorSection>
-        <Input
+        <LabeledInput
           label={t('settings.mcp.form.name')}
+          error={nameError}
+          required
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
           placeholder={t('settings.mcp.form.namePlaceholder')}
           disabled={nameDisabled}
-          error={nameError}
-          aria-invalid={!!nameError}
           autoFocus={autoFocus}
-          required
+          aria-invalid={!!nameError}
         />
       </McpEditorSection>
       <McpEditorSection title={t('settings.mcp.form.scope')} description={scopeHint}>
@@ -117,7 +119,7 @@ export function McpEditorFields({
               aria-describedby={`${scopeDescriptionId}-${choice}`}
               aria-pressed={scope === choice}
               onClick={() => onScopeChange(choice)}
-              className={`rounded-[var(--radius-md)] border p-3 text-left transition-colors ${scope === choice
+              className={`rounded-md border p-3 text-left transition-colors ${scope === choice
                 ? 'border-[var(--color-border-focus)] bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
                 : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
             >

@@ -8,7 +8,7 @@ export type CatalogResult =
 /**
  * The JSON import is intentional: Bun embeds it in the compiled desktop
  * sidecar, so the catalog is available both from the repository and from a
- * packaged Tauri installation.
+ * packaged desktop installation.
  */
 export function loadCuratedMcpCatalog(input: unknown = catalogJson): CatalogResult {
   const result = validateRegistry(input)

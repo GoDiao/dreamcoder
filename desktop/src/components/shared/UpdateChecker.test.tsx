@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { toast } from 'sonner'
+import { Toaster } from './ui/sonner'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 import { UpdateChecker } from './UpdateChecker'
@@ -7,9 +9,20 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useUpdateStore } from '../../stores/updateStore'
 
 describe('UpdateChecker', () => {
+  const settings = useSettingsStore.getState()
+  const updates = useUpdateStore.getState()
+  const shell = Object.getOwnPropertyDescriptor(window, 'dreamcoderShell')
+  afterEach(() => {
+    cleanup()
+    toast.dismiss()
+    useSettingsStore.setState(settings, true)
+    useUpdateStore.setState(updates, true)
+    if (shell) Object.defineProperty(window, 'dreamcoderShell', shell)
+    else Reflect.deleteProperty(window, 'dreamcoderShell')
+  })
   beforeEach(() => {
     useSettingsStore.setState({ locale: 'en' })
-    Object.defineProperty(window, '__TAURI__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       value: {},
       configurable: true,
     })
@@ -31,10 +44,10 @@ describe('UpdateChecker', () => {
     })
   })
 
-  it('renders markdown release notes in the update prompt', () => {
-    render(<UpdateChecker />)
+  it('renders markdown release notes in the update prompt', async () => {
+    render(<><Toaster /><UpdateChecker /></>)
 
-    expect(screen.getByText('v0.1.5 available')).toBeInTheDocument()
+    expect(await screen.findByText('v0.1.5 available')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'DreamCoder v0.1.5' })).toBeInTheDocument()
 
     const link = screen.getByRole('link', { name: 'Release notes' })
@@ -42,7 +55,7 @@ describe('UpdateChecker', () => {
     expect(link).toHaveAttribute('target', '_blank')
   })
 
-  it('shows downloaded bytes when the updater does not provide total size', () => {
+  it('shows downloaded bytes when the updater does not provide total size', async () => {
     useUpdateStore.setState({
       status: 'downloading',
       availableVersion: '0.1.5',
@@ -59,9 +72,40 @@ describe('UpdateChecker', () => {
       dismissPrompt: vi.fn(),
     })
 
-    render(<UpdateChecker />)
+    render(<><Toaster /><UpdateChecker /></>)
 
-    expect(screen.getByText('Downloading update... 1.5 KB downloaded')).toBeInTheDocument()
+    expect(await screen.findByText('Downloading update... 1.5 KB downloaded')).toBeInTheDocument()
     expect(screen.queryByText(/0%/)).not.toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('data-state', 'indeterminate')
   })
+})
+
+it('updates one nonmodal notification and removes it when dismissed', async () => {
+  const previous = useUpdateStore.getState()
+  const shell = Object.getOwnPropertyDescriptor(window, 'dreamcoderShell')
+  const settings = useSettingsStore.getState()
+  Object.defineProperty(window, 'dreamcoderShell', { value: {}, configurable: true })
+  useSettingsStore.setState({ locale: 'en' })
+  const install = vi.fn()
+  useUpdateStore.setState({ ...previous, initialize: vi.fn(), status: 'available', availableVersion: '1.2.3', shouldPrompt: true, releaseNotes: '', installUpdate: install, dismissPrompt: () => useUpdateStore.setState({ shouldPrompt: false }) })
+  try {
+    render(<><Toaster /><UpdateChecker /></>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update now' }))
+    expect(install).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => useUpdateStore.setState({ status: 'downloading', totalBytes: 100, progressPercent: 30 }))
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '30')
+    expect(screen.getAllByText('v1.2.3 available')).toHaveLength(1)
+    act(() => useUpdateStore.setState({ status: 'available' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Later' }))
+    await waitFor(() => expect(screen.queryByText('v1.2.3 available')).not.toBeInTheDocument())
+  } finally {
+    cleanup()
+    toast.dismiss()
+    useUpdateStore.setState(previous, true)
+    useSettingsStore.setState(settings, true)
+    if (shell) Object.defineProperty(window, 'dreamcoderShell', shell)
+    else Reflect.deleteProperty(window, 'dreamcoderShell')
+  }
 })

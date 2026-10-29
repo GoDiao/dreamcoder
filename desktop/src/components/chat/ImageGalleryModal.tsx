@@ -1,3 +1,6 @@
+import { Button } from '../shared/ui/button'
+import { useTranslation } from '../../i18n'
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import { Modal } from '../shared/Modal'
 
@@ -15,6 +18,7 @@ type Props = {
 }
 
 export function ImageGalleryModal({ open, images, activeIndex, onClose, onSelect }: Props) {
+  const t = useTranslation()
   const activeImage = images[activeIndex]
 
   useEffect(() => {
@@ -35,53 +39,51 @@ export function ImageGalleryModal({ open, images, activeIndex, onClose, onSelect
   if (!activeImage) return null
 
   return (
-    <Modal open={open} onClose={onClose} width={960}>
-      <div className="space-y-4">
+    <Modal open={open} onClose={onClose} title={activeImage.name} width={960}>
+      <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-[var(--color-text-primary)]">{activeImage.name}</div>
-            <div className="text-xs text-[var(--color-text-tertiary)]">
-              {activeIndex + 1} / {images.length}
-            </div>
+          <div className="text-xs text-[var(--color-text-tertiary)]">
+            {activeIndex + 1} / {images.length}
           </div>
           {images.length > 1 && (
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="outline" size="icon-lg"
                 onClick={() => onSelect((activeIndex - 1 + images.length) % images.length)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-                aria-label="Previous image"
+                className="rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                aria-label={t('chat.previousImage')}
               >
-                <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-              </button>
-              <button
+                <ChevronLeftIcon aria-hidden="true" size={18} />
+              </Button>
+              <Button variant="outline" size="icon-lg"
                 onClick={() => onSelect((activeIndex + 1) % images.length)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
-                aria-label="Next image"
+                className="rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                aria-label={t('chat.nextImage')}
               >
-                <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-              </button>
+                <ChevronRightIcon aria-hidden="true" size={18} />
+              </Button>
             </div>
           )}
         </div>
 
-        <div className="flex max-h-[70vh] items-center justify-center overflow-hidden rounded-2xl bg-[#111]">
+        <div className="flex max-h-[70vh] items-center justify-center overflow-hidden rounded-2xl bg-ui-muted">
           <img src={activeImage.src} alt={activeImage.name} className="max-h-[70vh] w-full object-contain" />
         </div>
 
         {images.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {images.map((image, index) => (
-              <button
+              <Button variant="outline"
                 key={`${image.name}-${index}`}
                 onClick={() => onSelect(index)}
-                className={`overflow-hidden rounded-xl border transition-all ${
+                aria-pressed={index === activeIndex}
+                className={`size-16 shrink-0 overflow-hidden rounded-xl p-0 ${
                   index === activeIndex
                     ? 'border-[var(--color-brand)] shadow-[0_0_0_1px_var(--color-brand)]'
                     : 'border-[var(--color-border)]'
                 }`}
               >
                 <img src={image.src} alt={image.name} className="h-16 w-16 object-cover" />
-              </button>
+              </Button>
             ))}
           </div>
         )}

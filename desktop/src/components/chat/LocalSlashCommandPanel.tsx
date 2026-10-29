@@ -1,3 +1,8 @@
+import { Button } from '../shared/ui/button'
+import { Spinner } from '../shared/ui/spinner'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../shared/ui/tabs'
+import { InfoIcon, PowerOffIcon, ServerIcon, XIcon } from 'lucide-react'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { skillsApi } from '../../api/skills'
 import { mcpApi } from '../../api/mcp'
@@ -73,20 +78,22 @@ function PanelShell({
   children: React.ReactNode
   onClose: () => void
 }) {
+  const t = useTranslation()
   return (
-    <div className="absolute bottom-full left-0 right-0 z-50 mb-3 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]">
+    <div className="overflow-hidden bg-ui-popover">
       <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4">
         <div>
           <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>
           <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">{subtitle}</p>
         </div>
-        <button
+        <Button variant="ghost" size="icon-lg"
           type="button"
           onClick={onClose}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+          aria-label={t('common.close')}
+          className="rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
         >
-          <span className="material-symbols-outlined text-[18px]">close</span>
-        </button>
+          <XIcon aria-hidden="true" size={18} />
+        </Button>
       </div>
       <div className="max-h-[min(620px,72vh)] overflow-y-auto px-5 py-4">{children}</div>
     </div>
@@ -96,7 +103,7 @@ function PanelShell({
 function LoadingState({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center py-12 text-sm text-[var(--color-text-tertiary)]">
-      <div className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
+      <Spinner aria-hidden="true" className="mr-3 size-5 text-[var(--color-brand)]" />
       {label}
     </div>
   )
@@ -184,7 +191,7 @@ function MetricCard({ label, value, detail }: { label: string; value: React.Reac
 function InspectorNotice({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-[var(--color-inspector-border)] bg-[var(--color-inspector-surface)] px-4 py-3 text-[14px] text-[var(--color-inspector-heading)]">
-      <span className="material-symbols-outlined text-[18px] text-[var(--color-inspector-muted)]">info</span>
+      <InfoIcon className="shrink-0 text-[var(--color-inspector-muted)]" aria-hidden="true" size={18} />
       <span>{children}</span>
     </div>
   )
@@ -338,6 +345,7 @@ function isCapacityCategory(category: ContextCategory) {
 }
 
 function ContextStackedBar({ categories, rawMaxTokens }: { categories: ContextCategory[]; rawMaxTokens: number }) {
+  const t = useTranslation()
   const activeCategories = categories.filter((category) => !isCapacityCategory(category) && category.tokens > 0)
   if (activeCategories.length === 0) return null
 
@@ -345,14 +353,12 @@ function ContextStackedBar({ categories, rawMaxTokens }: { categories: ContextCa
     <div className="overflow-hidden rounded-full bg-[var(--color-inspector-chip)]">
       <div className="flex h-2.5 w-full">
         {activeCategories.map((category) => (
-          <div
-            key={category.name}
-            title={`${category.name}: ${formatNumber(category.tokens)} tokens`}
+          <HintTooltip key={category.name} content={t('slash.inspector.context.categoryTokens', { name: category.name, count: formatNumber(category.tokens) })}><div
             style={{
               width: `${Math.max(0.5, (category.tokens / rawMaxTokens) * 100)}%`,
               backgroundColor: category.color,
             }}
-          />
+          /></HintTooltip>
         ))}
       </div>
     </div>
@@ -422,13 +428,13 @@ function MemoryFilesBreakdown({ files, t }: { files: ContextMemoryFile[]; t: Tra
       <div className="rounded-md border border-[var(--color-inspector-border)] bg-[var(--color-inspector-panel)] px-5 py-5">
         <div className="flex items-center justify-between gap-3">
           <InspectorSectionTitle>{t('slash.inspector.context.memoryFiles')}</InspectorSectionTitle>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => openSettings()}
             className="rounded-sm border border-[var(--color-inspector-border)] bg-[var(--color-inspector-chip)] px-2.5 py-1 text-xs font-semibold text-[var(--color-inspector-muted-strong)] hover:text-[var(--color-inspector-text)]"
           >
             {t('slash.inspector.context.openMemory')}
-          </button>
+          </Button>
         </div>
         <div className="mt-4 text-sm text-[var(--color-inspector-muted)]">{t('slash.inspector.context.noMemoryFiles')}</div>
       </div>
@@ -439,13 +445,13 @@ function MemoryFilesBreakdown({ files, t }: { files: ContextMemoryFile[]; t: Tra
     <div className="rounded-md border border-[var(--color-inspector-border)] bg-[var(--color-inspector-panel)] px-5 py-5">
       <div className="flex items-center justify-between gap-3">
         <InspectorSectionTitle>{t('slash.inspector.context.memoryFiles')}</InspectorSectionTitle>
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => openSettings(files[0]?.path)}
           className="rounded-sm border border-[var(--color-inspector-border)] bg-[var(--color-inspector-chip)] px-2.5 py-1 text-xs font-semibold text-[var(--color-inspector-muted-strong)] hover:text-[var(--color-inspector-text)]"
         >
           {t('slash.inspector.context.openMemory')}
-        </button>
+        </Button>
       </div>
       <div className="mt-4 grid gap-2">
         {files.map((file) => (
@@ -454,12 +460,12 @@ function MemoryFilesBreakdown({ files, t }: { files: ContextMemoryFile[]; t: Tra
             className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-[var(--color-inspector-border)] bg-[var(--color-inspector-surface)] px-3 py-2"
           >
             <div className="min-w-0">
-              <div className="truncate font-mono text-sm font-semibold text-[var(--color-inspector-text)]" title={file.path}>
+              <HintTooltip content={file.path}><div className="truncate font-mono text-sm font-semibold text-[var(--color-inspector-text)]">
                 {memoryContextFileLabel(file.path)}
-              </div>
-              <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--color-inspector-muted)]" title={file.path}>
+              </div></HintTooltip>
+              <HintTooltip content={file.path}><div className="mt-0.5 truncate font-mono text-[11px] text-[var(--color-inspector-muted)]">
                 {file.path}
-              </div>
+              </div></HintTooltip>
             </div>
             <div className="shrink-0 text-right font-mono">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-inspector-muted-strong)]">{file.type}</div>
@@ -510,11 +516,9 @@ function InspectorStatusBadge({ status, t }: { status: string; t: Translate }) {
 
 function McpServerIcon({ status }: { status: string }) {
   const isFailed = status === 'failed'
-  const icon = isFailed ? 'power_off' : 'dns'
+  const Icon = isFailed ? PowerOffIcon : ServerIcon
   return (
-    <span className={`material-symbols-outlined text-[20px] ${isFailed ? 'text-[var(--color-inspector-danger)]' : 'text-[var(--color-inspector-success)]'}`}>
-      {icon}
-    </span>
+    <Icon className={`shrink-0 ${isFailed ? 'text-[var(--color-inspector-danger)]' : 'text-[var(--color-inspector-success)]'}`} aria-hidden="true" size={20} />
   )
 }
 
@@ -653,7 +657,7 @@ function StatusTab({
       {mcpServers.length > 0 && (
         <section>
           <InspectorSectionTitle
-            action={<button type="button" className="font-mono text-[12px] tracking-[0.18em] text-[var(--color-inspector-accent)] hover:text-[var(--color-inspector-accent-hover)]">↻ {t('slash.inspector.status.refresh')}</button>}
+            action={<Button variant="ghost" type="button" className="font-mono text-[12px] tracking-[0.18em] text-[var(--color-inspector-accent)] hover:text-[var(--color-inspector-accent-hover)]">↻ {t('slash.inspector.status.refresh')}</Button>}
           >
             {t('slash.inspector.status.mcpServers')}
           </InspectorSectionTitle>
@@ -693,39 +697,34 @@ function SessionInspectorShell({
   t: Translate
 }) {
   return (
-    <div
-      className="absolute bottom-full left-0 right-0 z-50 mb-4 overflow-hidden rounded-[10px] border border-[var(--color-inspector-border)] bg-[var(--color-inspector-surface)] text-[var(--color-inspector-text)] shadow-[var(--shadow-inspector)]"
+    <Tabs value={selectedTab} onValueChange={(value) => {
+      const tab = tabs.find((candidate) => candidate.id === value)
+      if (tab) onSelectTab(tab.id)
+    }}
+      className="overflow-hidden bg-[var(--color-inspector-surface)] text-[var(--color-inspector-text)]"
     >
       <div className="grid min-h-[64px] grid-cols-[1fr_auto_1fr] items-center border-b border-[var(--color-inspector-border)] bg-[var(--color-inspector-surface)] px-6">
         <div className="font-mono text-[16px] font-semibold uppercase text-[var(--color-inspector-accent)]">{t('slash.inspector.title')}</div>
-        <div className="flex items-center gap-8">
+        <TabsList variant="line" aria-label={t('slash.inspector.title')} className="gap-6">
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onSelectTab(tab.id)}
-              className={`relative h-10 px-0 font-sans text-sm transition-colors ${
-                selectedTab === tab.id ? 'text-[var(--color-inspector-accent)]' : 'text-[var(--color-inspector-muted-strong)] hover:text-[var(--color-inspector-accent)]'
-              }`}
-            >
+            <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}
-              {selectedTab === tab.id && <span className="absolute bottom-1 left-0 right-0 h-[2px] bg-[var(--color-inspector-accent)]" />}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
         <div className="flex justify-end">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onClose}
             aria-label={t('slash.inspector.close')}
-            className="flex h-10 w-10 items-center justify-center text-[var(--color-inspector-accent)] transition-colors hover:text-[var(--color-inspector-accent-hover)]"
+            className="size-10 text-[var(--color-inspector-accent)] hover:text-[var(--color-inspector-accent-hover)]"
           >
-            <span className="material-symbols-outlined text-[24px]">close</span>
-          </button>
+            <XIcon aria-hidden="true" size={24} />
+          </Button>
         </div>
       </div>
-      <div className="max-h-[min(540px,58vh)] overflow-y-auto bg-[var(--color-inspector-surface)] px-6 py-6">{children}</div>
-    </div>
+      <TabsContent value={selectedTab} className="max-h-[min(540px,58vh)] overflow-y-auto bg-[var(--color-inspector-surface)] px-6 py-6">{children}</TabsContent>
+    </Tabs>
   )
 }
 
@@ -911,7 +910,7 @@ function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
               </div>
               <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                 {grouped.get(scope)?.map((server) => (
-                  <button
+                  <Button variant="ghost" size="row"
                     type="button"
                     key={`${server.scope}:${server.projectPath ?? 'global'}:${server.name}`}
                     onClick={() => {
@@ -919,7 +918,7 @@ function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
                       useUIStore.getState().openSettings('mcp')
                       onClose()
                     }}
-                    className="block w-full border-t border-[var(--color-border)] px-4 py-4 text-left first:border-t-0 hover:bg-[var(--color-surface-hover)]"
+                    className="block border-t border-[var(--color-border)] px-4 py-4 first:border-t-0"
                   >
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-semibold text-[var(--color-text-primary)]">{server.name}</div>
@@ -930,13 +929,13 @@ function McpPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                       <span className="rounded-full bg-[var(--color-surface-hover)] px-2 py-1">{server.transport}</span>
                       {server.projectPath && (
-                        <span className="rounded-full bg-[var(--color-surface-hover)] px-2 py-1" title={server.projectPath}>
+                        <HintTooltip content={server.projectPath}><span className="rounded-full bg-[var(--color-surface-hover)] px-2 py-1">
                           {projectBadge(server.projectPath, t)}
-                        </span>
+                        </span></HintTooltip>
                       )}
                       <span className="truncate">{server.summary}</span>
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </section>
@@ -984,7 +983,7 @@ function SkillsPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
           {skills.map((skill) => (
-            <button
+            <Button variant="ghost" size="row"
               type="button"
               key={`${skill.source}:${skill.name}`}
               onClick={async () => {
@@ -992,7 +991,7 @@ function SkillsPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
                 useUIStore.getState().openSettings('skills')
                 onClose()
               }}
-              className="block w-full border-t border-[var(--color-border)] px-4 py-4 text-left first:border-t-0 hover:bg-[var(--color-surface-hover)]"
+              className="block border-t border-[var(--color-border)] px-4 py-4 first:border-t-0"
             >
               <div className="flex items-center gap-3">
                 <div className="text-sm font-semibold text-[var(--color-text-primary)]">/{skill.name}</div>
@@ -1001,7 +1000,7 @@ function SkillsPanel({ cwd, onClose }: { cwd?: string; onClose: () => void }) {
                 </span>
               </div>
               <div className="mt-2 text-xs leading-6 text-[var(--color-text-tertiary)]">{skill.description}</div>
-            </button>
+            </Button>
           ))}
         </div>
       )}

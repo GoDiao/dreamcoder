@@ -228,26 +228,15 @@ describe('Settings > Skills tab', () => {
     expect(screen.getByRole('searchbox', { name: 'Search skills' })).toHaveValue('alpha')
   })
 
-  it('offers plugin and terminal install paths from the Add menu', () => {
+  it('opens plugin settings from the install button', () => {
     render(<Settings />)
     switchToSkillsTab()
 
-    const add = screen.getByRole('button', { name: 'Add' })
-    fireEvent.click(add)
-    expect(add).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('menuitem', { name: 'Install in terminal' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Install from plugins' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Install from plugins' }))
 
     expect(useUIStore.getState().settingsTab).toBe('plugins')
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-
-    act(() => {
-      useUIStore.getState().openSettings('skills')
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Install in terminal' }))
-    expect(useUIStore.getState().settingsTab).toBe('terminal')
   })
+
 
   it('uses the active session workDir while the settings window is open', () => {
     const fetchSkills = vi.fn()

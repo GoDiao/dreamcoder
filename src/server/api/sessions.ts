@@ -5,7 +5,15 @@ import { exportFileName, renderSessionJson, renderSessionMarkdown } from '../tra
 import { version as packageVersion } from '../../../package.json'
 import { conversationService } from '../services/conversationService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { closeSessionConnection, getSlashCommands } from '../ws/handler.js'
+import {
+  closeSessionConnection,
+  getSlashCommands,
+  noteSessionRenamed,
+  resolveSessionPermissionMode,
+  resolveSessionRuntimeSelection,
+} from '../ws/handler.js'
+import { isPermissionMode } from '../services/permissionModes.js'
+import { normalizeRuntimeSelection } from '../services/runtimeSelection.js'
 import { listSkillSlashCommands, type SkillSlashCommand } from './skills.js'
 import { WorkspaceService } from '../services/workspaceService.js'
 import {
@@ -248,9 +256,9 @@ async function handleSessionWorkspaceRoute(
 }
 
 async function createSession(req: Request): Promise<Response> {
-  let body: { workDir?: string; repository?: CreateSessionRepositoryOptions }
+  let body: { workDir?: string; repository?: CreateSessionRepositoryOptions; permissionMode?: unknown; runtime?: unknown }
   try {
-    body = (await req.json()) as { workDir?: string; repository?: CreateSessionRepositoryOptions }
+    body = (await req.json()) as typeof body
   } catch {
     throw ApiError.badRequest('Invalid JSON body')
   }
@@ -271,7 +279,21 @@ async function createSession(req: Request): Promise<Response> {
     }
   }
 
-  const result = await sessionService.createSession(body.workDir, body.repository)
+  if (body.permissionMode !== undefined && !isPermissionMode(body.permissionMode)) {
+    throw ApiError.badRequest(`Unknown permission mode: ${String(body.permissionMode)}`)
+  }
+
+  const runtime = body.runtime === undefined || body.runtime === null ? null : normalizeRuntimeSelection(body.runtime)
+  if (body.runtime !== undefined && body.runtime !== null && !runtime) {
+    throw ApiError.badRequest('runtime must name a model or an effort level')
+  }
+
+  const result = await sessionService.createSession(
+    body.workDir,
+    body.repository,
+    body.permissionMode,
+    runtime ?? undefined,
+  )
   recentProjectsCache = null
   return Response.json(result, { status: 201 })
 }
@@ -476,7 +498,7 @@ async function getSessionInspection(sessionId: string, url: URL): Promise<Respon
     status: {
       sessionId,
       workDir,
-      permissionMode: conversationService.getSessionPermissionMode(sessionId),
+      permissionMode: await resolveSessionPermissionMode(sessionId),
       version: typeof initMessage?.claude_code_version === 'string' ? initMessage.claude_code_version : transcriptMetadata?.version,
       cwd: typeof initMessage?.cwd === 'string' ? initMessage.cwd : transcriptMetadata?.cwd ?? workDir,
       model: typeof initMessage?.model === 'string' ? initMessage.model : transcriptMetadata?.model,
@@ -723,6 +745,12 @@ async function branchSession(req: Request, sessionId: string): Promise<Response>
       sourceRepository: launchInfo.repository,
       sourceWorktreeSession: launchInfo.worktreeSession,
     })
+    await sessionService.appendSessionPermissionMode(
+      result.sessionId,
+      await resolveSessionPermissionMode(sessionId),
+    )
+    const runtime = await resolveSessionRuntimeSelection(sessionId)
+    if (runtime) await sessionService.appendSessionRuntimeConfig(result.sessionId, runtime)
 
     return Response.json({
       sessionId: result.sessionId,
@@ -790,6 +818,7 @@ async function patchSession(req: Request, sessionId: string): Promise<Response> 
   }
 
   await sessionService.renameSession(sessionId, body.title)
+  noteSessionRenamed(sessionId, body.title)
   return Response.json({ ok: true })
 }
 
@@ -832,13 +861,8 @@ async function getRecentProjects(url: URL): Promise<Response> {
 
   const realPathMap = new Map<string, { projectPath: string; modifiedAt: string; sessionCount: number; sessionId: string }>()
   for (const s of validSessions) {
-    let realPath: string
-    try {
-      const workDir = await sessionService.getSessionWorkDir(s.id)
-      realPath = s.projectRoot || workDir || sessionService.desanitizePath(s.projectPath)
-    } catch {
-      realPath = s.projectRoot || sessionService.desanitizePath(s.projectPath)
-    }
+    // workDir and projectRoot already come from the bounded head/tail scan.
+    const realPath = s.projectRoot || s.workDir || sessionService.desanitizePath(s.projectPath)
 
     const existing = realPathMap.get(realPath)
     if (!existing || s.modifiedAt > existing.modifiedAt) {

@@ -1,7 +1,7 @@
 /**
  * DreamCoder mark: a prompt-shaped crescent moon and a star as the cursor,
  * white on a brand-coloured tile. The tile follows the theme's brand colour;
- * the same artwork is in desktop/src-tauri/app-icon.svg for the app icons.
+ * the same artwork is in desktop/electron/build/app-icon.svg for the app icons.
  */
 export function DreamCoderIcon({ size = 32, className }: { size?: number; className?: string }) {
   return (
