@@ -18,6 +18,13 @@ describe('anthropicToOpenaiChat', () => {
     expect(result.messages).toEqual([{ role: 'user', content: 'Hello' }])
   })
 
+  test('streaming requests ask for token usage', () => {
+    const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
+    expect(anthropicToOpenaiChat({ ...base, stream: true }).stream_options).toEqual({ include_usage: true })
+    expect(anthropicToOpenaiChat(base).stream_options).toBeUndefined()
+    expect(anthropicToOpenaiChat({ ...base, stream: false }).stream_options).toBeUndefined()
+  })
+
   test('system prompt string', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4',
