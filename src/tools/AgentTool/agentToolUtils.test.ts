@@ -11,7 +11,17 @@ import {
   resetCommandQueue,
 } from '../../utils/messageQueueManager.js'
 import { createAssistantMessage } from '../../utils/messages.js'
-import { runAsyncAgentLifecycle } from './agentToolUtils.js'
+import type { Tool, Tools } from '../../Tool.js'
+import {
+  createTeammateContext,
+  runWithTeammateContext,
+} from '../../utils/teammateContext.js'
+import { ENTER_WORKTREE_TOOL_NAME } from '../EnterWorktreeTool/constants.js'
+import { EXIT_WORKTREE_TOOL_NAME } from '../ExitWorktreeTool/constants.js'
+import {
+  filterToolsForAgent,
+  runAsyncAgentLifecycle,
+} from './agentToolUtils.js'
 
 describe('runAsyncAgentLifecycle', () => {
   afterEach(() => {
@@ -91,5 +101,46 @@ describe('runAsyncAgentLifecycle', () => {
       '<status>completed</status>',
     )
     expect(String(getCommandQueue()[0]?.value)).toContain('Review complete.')
+  })
+})
+
+describe('filterToolsForAgent', () => {
+  const namedTool = (name: string) => ({ name }) as unknown as Tool
+  const tools: Tools = [
+    'Read',
+    'Edit',
+    ENTER_WORKTREE_TOOL_NAME,
+    EXIT_WORKTREE_TOOL_NAME,
+  ].map(namedTool)
+  const names = (filtered: Tools) => filtered.map(tool => tool.name)
+
+  test('in-process teammates do not get the worktree tools', () => {
+    // EnterWorktree changes the cwd of the whole process, which the lead and
+    // every other in-process teammate share.
+    const teammate = createTeammateContext({
+      agentId: 'a@team',
+      agentName: 'a',
+      teamName: 'team',
+      planModeRequired: false,
+      parentSessionId: 'session',
+      abortController: new AbortController(),
+    })
+
+    const filtered = runWithTeammateContext(teammate, () =>
+      filterToolsForAgent({ tools, isBuiltIn: true, isAsync: true }),
+    )
+
+    expect(names(filtered)).toEqual(['Read', 'Edit'])
+  })
+
+  test('async agents outside a teammate keep the worktree tools', () => {
+    const filtered = filterToolsForAgent({
+      tools,
+      isBuiltIn: true,
+      isAsync: true,
+    })
+
+    expect(names(filtered)).toContain(ENTER_WORKTREE_TOOL_NAME)
+    expect(names(filtered)).toContain(EXIT_WORKTREE_TOOL_NAME)
   })
 })

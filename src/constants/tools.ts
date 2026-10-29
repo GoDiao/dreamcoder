@@ -70,6 +70,16 @@ export const ASYNC_AGENT_ALLOWED_TOOLS = new Set([
   EXIT_WORKTREE_TOOL_NAME,
 ])
 /**
+ * Tools an in-process teammate must not get even though async agents may have
+ * them. EnterWorktree/ExitWorktree change process-wide state (process.chdir,
+ * setCwd, setOriginalCwd), and teammates share the process with the lead and
+ * each other, so one teammate entering a worktree would move everyone's cwd.
+ */
+export const IN_PROCESS_TEAMMATE_DISALLOWED_TOOLS = new Set([
+  ENTER_WORKTREE_TOOL_NAME,
+  EXIT_WORKTREE_TOOL_NAME,
+])
+/**
  * Tools allowed only for in-process teammates (not general async agents).
  * These are injected by inProcessRunner.ts and allowed through filterToolsForAgent
  * via isInProcessTeammate() check.

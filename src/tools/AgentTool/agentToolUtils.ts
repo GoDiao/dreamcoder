@@ -6,6 +6,7 @@ import {
   ASYNC_AGENT_ALLOWED_TOOLS,
   CUSTOM_AGENT_DISALLOWED_TOOLS,
   IN_PROCESS_TEAMMATE_ALLOWED_TOOLS,
+  IN_PROCESS_TEAMMATE_DISALLOWED_TOOLS,
 } from '../../constants/tools.js'
 import { startAgentSummarization } from '../../services/AgentSummary/agentSummary.js'
 import {
@@ -95,6 +96,12 @@ export function filterToolsForAgent({
       return false
     }
     if (!isBuiltIn && CUSTOM_AGENT_DISALLOWED_TOOLS.has(tool.name)) {
+      return false
+    }
+    if (
+      isInProcessTeammate() &&
+      IN_PROCESS_TEAMMATE_DISALLOWED_TOOLS.has(tool.name)
+    ) {
       return false
     }
     if (isAsync && !ASYNC_AGENT_ALLOWED_TOOLS.has(tool.name)) {
