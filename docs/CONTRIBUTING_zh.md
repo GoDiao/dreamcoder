@@ -13,6 +13,9 @@ git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 # 2. 装根工作区依赖（sidecar 运行时）
 bun install
 
+# ShowAI 页面阅读器及其依赖（vendor/showai）
+(cd vendor/showai && bun install)
+
 # 3. 装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
@@ -143,6 +146,9 @@ cd dreamcoder
 
 # Step 1: 安装根工作区依赖（sidecar：Anthropic SDK / AWS SDK / ink 等）
 bun install
+
+# ShowAI 页面阅读器及其依赖（vendor/showai）
+(cd vendor/showai && bun install)
 
 # Step 2: 安装桌面端依赖（Electron + React 前端）
 cd desktop && bun install

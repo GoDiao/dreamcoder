@@ -6,14 +6,15 @@ import {
   type WorkspaceStatusResult,
   type WorkspaceTreeResult,
 } from '../api/sessions'
+import { closeBrowser, submitBrowserInput } from '../lib/browserGuests'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
+import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
 export const WORKSPACE_PANEL_DEFAULT_WIDTH = 380
 export const WORKSPACE_PANEL_MIN_WIDTH = 280
 export const WORKSPACE_PANEL_MAX_WIDTH = 680
 export const WORKSPACE_PANEL_MIN_CHAT_WIDTH = 320
 
-export type WorkspacePanelTab = 'files' | 'terminal'
-export type WorkspacePanelView = 'changed' | 'all'
 export type WorkspacePreviewKind = 'file' | 'diff'
 export type WorkspacePreviewState =
   | 'loading'
@@ -36,12 +37,29 @@ export type WorkspacePreviewEntry = {
   size?: number
 }
 
+export type WorkspaceTab =
+  | { id: string; kind: 'launcher' }
+  | { id: string; kind: 'changes' }
+  | { id: string; kind: 'files' }
+  | { id: string; kind: 'file'; path: string }
+  | { id: string; kind: 'browser'; url: string; title: string }
+  | { id: string; kind: 'terminal'; index: number; shell?: string }
+  | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
+
+export type WorkspaceTabKind = WorkspaceTab['kind']
+
+export type WorkspaceTabTarget =
+  | { kind: 'launcher' | 'changes' | 'files' | 'terminal' }
+  | { kind: 'file'; path: string }
+  | { kind: 'browser'; url: string }
+  | { kind: 'uiPage'; pageId: string; revision: number; title: string }
+
 export type WorkspacePanelSessionState = {
   isOpen: boolean
-  tab: WorkspacePanelTab
   expanded: boolean
-  activeView: WorkspacePanelView
-  hasUserSelectedView?: boolean
+  tabs: WorkspaceTab[]
+  activeTabId: string | null
+  recentFiles: string[]
 }
 
 type WorkspacePanelLoadingState = {
@@ -68,32 +86,40 @@ type WorkspacePanelStore = {
   errors: WorkspacePanelErrorState
 
   isPanelOpen: (sessionId: string) => boolean
-  getPanelTab: (sessionId: string) => WorkspacePanelTab
   isPanelExpanded: (sessionId: string) => boolean
-  getActiveView: (sessionId: string) => WorkspacePanelView
-  openPanel: (sessionId: string, tab?: WorkspacePanelTab) => void
+  getActiveTab: (sessionId: string) => WorkspaceTab | null
+  openTab: (sessionId: string, target: WorkspaceTabTarget) => string
+  openAddress: (sessionId: string, input: string, projectRoot: string | null) => Promise<void>
+  activateTab: (sessionId: string, tabId: string) => void
+  closeTab: (sessionId: string, tabId: string) => void
+  patchTab: (sessionId: string, tabId: string, patch: WorkspaceTabPatch) => void
   closePanel: (sessionId: string) => void
-  togglePanel: (sessionId: string, tab?: WorkspacePanelTab) => void
-  setPanelTab: (sessionId: string, tab: WorkspacePanelTab) => void
+  togglePanel: (sessionId: string) => void
   toggleExpanded: (sessionId: string) => void
   setWidth: (width: number) => void
-  setActiveView: (sessionId: string, view: WorkspacePanelView) => void
   loadStatus: (sessionId: string) => Promise<void>
   loadTree: (sessionId: string, path?: string) => Promise<void>
   toggleTreeNode: (sessionId: string, path: string) => Promise<void>
   expandPreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
   collapsePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => void
   togglePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
+  ensurePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
   refreshPreviews: (sessionId: string) => Promise<void>
+  releaseSession: (sessionId: string) => void
   clearSession: (sessionId: string) => void
-  resetSessionUi: (sessionId: string) => void
 }
+
+type WorkspaceTabPatch = { url?: string; title?: string; shell?: string }
+
+const PANEL_STORAGE_KEY = 'dreamcoder-workspace-panels'
+const MAX_RECENT_FILES = 8
 
 const DEFAULT_PANEL_STATE: WorkspacePanelSessionState = {
   isOpen: false,
-  tab: 'files',
   expanded: false,
-  activeView: 'changed',
+  tabs: [],
+  activeTabId: null,
+  recentFiles: [],
 }
 
 const statusRequestIds = new Map<string, number>()
@@ -181,8 +207,130 @@ function patchSessionPanel(
   }
 }
 
+function newTabId() {
+  return crypto.randomUUID()
+}
+
+function isSameTarget(tab: WorkspaceTab, target: WorkspaceTabTarget) {
+  switch (target.kind) {
+    case 'changes':
+    case 'files':
+      return tab.kind === target.kind
+    case 'file':
+      return tab.kind === 'file' && tab.path === target.path
+    case 'uiPage':
+      return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision
+    default:
+      return false
+  }
+}
+
+function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceTab {
+  const id = newTabId()
+  switch (target.kind) {
+    case 'file':
+      return { id, kind: 'file', path: target.path }
+    case 'browser':
+      return { id, kind: 'browser', url: target.url, title: '' }
+    case 'uiPage':
+      return { id, kind: 'uiPage', pageId: target.pageId, revision: target.revision, title: target.title }
+    case 'terminal': {
+      const index = Math.max(0, ...tabs.map((tab) => tab.kind === 'terminal' ? tab.index : 0)) + 1
+      return { id, kind: 'terminal', index }
+    }
+    default:
+      return { id, kind: target.kind }
+  }
+}
+
+function disposeTab(tab: WorkspaceTab) {
+  if (tab.kind === 'terminal') destroyTerminalRuntime(tab.id)
+  if (tab.kind === 'browser') closeBrowser(tab.id)
+}
+
+async function isWorkspaceFile(sessionId: string, path: string) {
+  const result = await sessionsApi.getWorkspaceFile(sessionId, path)
+  return result.state === 'ok' || result.state === 'binary' || result.state === 'too_large'
+}
+
+function defaultTarget(status: WorkspaceStatusResult | undefined): WorkspaceTabTarget {
+  return status?.state === 'ok' && status.changedFiles.length === 0 ? { kind: 'files' } : { kind: 'changes' }
+}
+
+export function getShellDisplayName(shell: string | undefined) {
+  if (!shell) return undefined
+  const name = shell.split(/[\\/]/).pop()?.replace(/\.exe$/i, '')
+  return name || undefined
+}
+
+type StoredPanel = Pick<WorkspacePanelSessionState, 'isOpen' | 'tabs' | 'activeTabId' | 'recentFiles'>
+
+function isStoredTab(value: unknown): value is WorkspaceTab {
+  if (!value || typeof value !== 'object') return false
+  const tab = value as Record<string, unknown>
+  if (typeof tab.id !== 'string') return false
+  switch (tab.kind) {
+    case 'launcher':
+    case 'changes':
+    case 'files':
+      return true
+    case 'file':
+      return typeof tab.path === 'string'
+    case 'browser':
+      return typeof tab.url === 'string' && typeof tab.title === 'string'
+    case 'uiPage':
+      return typeof tab.pageId === 'string' && typeof tab.revision === 'number' && typeof tab.title === 'string'
+    default:
+      return false
+  }
+}
+
+function restorePanel(value: unknown): WorkspacePanelSessionState | null {
+  if (!value || typeof value !== 'object') return null
+  const stored = value as Partial<Record<keyof StoredPanel, unknown>>
+  const tabs = Array.isArray(stored.tabs) ? stored.tabs.filter(isStoredTab) : []
+  const activeTabId = tabs.some((tab) => tab.id === stored.activeTabId) ? stored.activeTabId as string : tabs.at(-1)?.id ?? null
+  const recentFiles = Array.isArray(stored.recentFiles) ? stored.recentFiles.filter((path): path is string => typeof path === 'string') : []
+  return { ...DEFAULT_PANEL_STATE, isOpen: stored.isOpen === true && tabs.length > 0, tabs, activeTabId, recentFiles }
+}
+
+function readStoredPanels(): Record<string, WorkspacePanelSessionState | undefined> {
+  try {
+    const raw = localStorage.getItem(PANEL_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([sessionId, value]) => {
+        const panel = restorePanel(value)
+        return panel ? [[sessionId, panel]] : []
+      }),
+    )
+  } catch (error) {
+    console.warn('[workspace] Failed to restore side panel tabs', error)
+    return {}
+  }
+}
+
+function writeStoredPanels(panelBySession: Record<string, WorkspacePanelSessionState | undefined>) {
+  const stored = Object.fromEntries(
+    Object.entries(panelBySession).flatMap(([sessionId, panel]) => {
+      if (!panel) return []
+      const tabs = panel.tabs.filter((tab) => tab.kind !== 'terminal')
+      if (tabs.length === 0 && panel.recentFiles.length === 0) return []
+      const value: StoredPanel = { isOpen: panel.isOpen, tabs, activeTabId: panel.activeTabId, recentFiles: panel.recentFiles }
+      return [[sessionId, value]]
+    }),
+  )
+  try {
+    localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(stored))
+  } catch (error) {
+    console.warn('[workspace] Failed to save side panel tabs', error)
+  }
+}
+
 export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => ({
-  panelBySession: {},
+  panelBySession: readStoredPanels(),
   width: WORKSPACE_PANEL_DEFAULT_WIDTH,
   statusBySession: {},
   expandedPathsBySession: {},
@@ -201,20 +349,84 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   },
 
   isPanelOpen: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).isOpen,
-  getPanelTab: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).tab,
   isPanelExpanded: (sessionId) => {
     const panel = getSessionPanelState(get().panelBySession, sessionId)
     return panel.isOpen && panel.expanded
   },
-  getActiveView: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).activeView,
+  getActiveTab: (sessionId) => {
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    return panel.tabs.find((tab) => tab.id === panel.activeTabId) ?? null
+  },
 
-  openPanel: (sessionId, tab) =>
+  openTab: (sessionId, target) => {
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const existing = panel.tabs.find((tab) => isSameTarget(tab, target))
+    const active = panel.tabs.find((tab) => tab.id === panel.activeTabId)
+    const replaced = active?.kind === 'launcher' && target.kind !== 'launcher' ? active : null
+    const tab = existing ?? createTab(target, panel.tabs)
+    const tabs = existing
+      ? panel.tabs.filter((candidate) => candidate !== replaced)
+      : replaced
+        ? panel.tabs.map((candidate) => candidate === replaced ? tab : candidate)
+        : [...panel.tabs, tab]
+    const recentFiles = target.kind === 'file'
+      ? [target.path, ...panel.recentFiles.filter((path) => path !== target.path)].slice(0, MAX_RECENT_FILES)
+      : panel.recentFiles
+    set((state) => ({
+      panelBySession: patchSessionPanel(state.panelBySession, sessionId, { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
+    }))
+    return tab.id
+  },
+
+  openAddress: async (sessionId, input, projectRoot) => {
+    const value = input.trim()
+    if (!value) return
+    if (!isDesktopRuntime() || await isWorkspaceFile(sessionId, value)) {
+      get().openTab(sessionId, { kind: 'file', path: value })
+      return
+    }
+    const tabId = get().openTab(sessionId, { kind: 'browser', url: '' })
+    await submitBrowserInput(sessionId, tabId, value, projectRoot)
+  },
+
+  activateTab: (sessionId, tabId) =>
+    set((state) => {
+      const panel = getSessionPanelState(state.panelBySession, sessionId)
+      if (!panel.tabs.some((tab) => tab.id === tabId)) return state
+      return { panelBySession: patchSessionPanel(state.panelBySession, sessionId, { activeTabId: tabId }) }
+    }),
+
+  closeTab: (sessionId, tabId) => {
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const index = panel.tabs.findIndex((tab) => tab.id === tabId)
+    if (index < 0) return
+    disposeTab(panel.tabs[index]!)
+    const tabs = panel.tabs.filter((tab) => tab.id !== tabId)
+    const activeTabId = panel.activeTabId === tabId
+      ? tabs[Math.min(index, tabs.length - 1)]?.id ?? null
+      : panel.activeTabId
     set((state) => ({
       panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
-        isOpen: true,
-        ...(tab ? { tab } : {}),
+        tabs,
+        activeTabId,
+        ...(tabs.length === 0 ? { isOpen: false, expanded: false } : {}),
       }),
-    })),
+    }))
+  },
+
+  patchTab: (sessionId, tabId, patch) =>
+    set((state) => {
+      const panel = state.panelBySession[sessionId]
+      const tab = panel?.tabs.find((candidate) => candidate.id === tabId)
+      if (!panel || !tab) return state
+      const next = { ...tab, ...patch } as WorkspaceTab
+      if (Object.keys(patch).every((key) => tab[key as keyof WorkspaceTab] === next[key as keyof WorkspaceTab])) return state
+      return {
+        panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+          tabs: panel.tabs.map((candidate) => candidate.id === tabId ? next : candidate),
+        }),
+      }
+    }),
 
   closePanel: (sessionId) =>
     set((state) => ({
@@ -224,19 +436,18 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       }),
     })),
 
-  togglePanel: (sessionId, tab = 'files') => {
+  togglePanel: (sessionId) => {
     const panel = getSessionPanelState(get().panelBySession, sessionId)
-    if (panel.isOpen && panel.tab === tab) {
+    if (panel.isOpen) {
       get().closePanel(sessionId)
       return
     }
-    get().openPanel(sessionId, tab)
+    if (panel.tabs.length === 0) {
+      get().openTab(sessionId, defaultTarget(get().statusBySession[sessionId]))
+      return
+    }
+    set((state) => ({ panelBySession: patchSessionPanel(state.panelBySession, sessionId, { isOpen: true }) }))
   },
-
-  setPanelTab: (sessionId, tab) =>
-    set((state) => ({
-      panelBySession: patchSessionPanel(state.panelBySession, sessionId, { tab }),
-    })),
 
   toggleExpanded: (sessionId) =>
     set((state) => ({
@@ -246,18 +457,6 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     })),
 
   setWidth: (width) => set({ width: clampWorkspacePanelWidth(width) }),
-
-  setActiveView: (sessionId, view) =>
-    set((state) => ({
-      panelBySession: {
-        ...state.panelBySession,
-        [sessionId]: {
-          ...getSessionPanelState(state.panelBySession, sessionId),
-          activeView: view,
-          hasUserSelectedView: true,
-        },
-      },
-    })),
 
   loadStatus: async (sessionId) => {
     const requestId = nextRequestId(statusRequestIds, sessionId)
@@ -283,41 +482,26 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       const result = await sessionsApi.getWorkspaceStatus(sessionId)
       if (!isLatestRequest(statusRequestIds, sessionId, requestId)) return
 
-      set((state) => {
-        const panel = getSessionPanelState(state.panelBySession, sessionId)
-        const nextActiveView =
-          !panel.hasUserSelectedView && result.state === 'ok'
-            ? result.changedFiles.length > 0 ? 'changed' : 'all'
-            : panel.activeView
-
-        return {
-          panelBySession: {
-            ...state.panelBySession,
-            [sessionId]: {
-              ...panel,
-              activeView: nextActiveView,
-            },
-          },
+      set((state) => ({
+        statusBySession: {
+          ...state.statusBySession,
+          [sessionId]: result,
+        },
+        loading: {
+          ...state.loading,
           statusBySession: {
-            ...state.statusBySession,
-            [sessionId]: result,
+            ...state.loading.statusBySession,
+            [sessionId]: false,
           },
-          loading: {
-            ...state.loading,
-            statusBySession: {
-              ...state.loading.statusBySession,
-              [sessionId]: false,
-            },
+        },
+        errors: {
+          ...state.errors,
+          statusBySession: {
+            ...state.errors.statusBySession,
+            [sessionId]: result.error ?? null,
           },
-          errors: {
-            ...state.errors,
-            statusBySession: {
-              ...state.errors.statusBySession,
-              [sessionId]: result.error ?? null,
-            },
-          },
-        }
-      })
+        },
+      }))
     } catch (error) {
       if (!isLatestRequest(statusRequestIds, sessionId, requestId)) return
 
@@ -450,9 +634,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       }
     })
 
-    const existing = get().previewsBySession[sessionId]?.[previewId]
-    if (existing && existing.state !== 'error') return
-    await loadPreview(sessionId, path, kind)
+    await get().ensurePreview(sessionId, path, kind)
   },
 
   collapsePreview: (sessionId, path, kind) => {
@@ -478,12 +660,22 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     await get().expandPreview(sessionId, path, kind)
   },
 
+  ensurePreview: async (sessionId, path, kind) => {
+    const existing = get().previewsBySession[sessionId]?.[getWorkspacePreviewId(path, kind)]
+    if (existing && existing.state !== 'error') return
+    await loadPreview(sessionId, path, kind)
+  },
+
   refreshPreviews: async (sessionId) => {
     invalidateSessionScopedRequests(previewRequestIds, sessionId)
     const cached = get().previewsBySession[sessionId] ?? {}
-    const expandedIds = new Set(get().expandedPreviewIdsBySession[sessionId] ?? [])
+    const shownIds = new Set([
+      ...get().expandedPreviewIdsBySession[sessionId] ?? [],
+      ...getSessionPanelState(get().panelBySession, sessionId).tabs
+        .flatMap((tab) => tab.kind === 'file' ? [getWorkspacePreviewId(tab.path, 'file')] : []),
+    ])
     const kept = Object.fromEntries(
-      Object.entries(cached).filter(([id, entry]) => entry && expandedIds.has(id)),
+      Object.entries(cached).filter(([id, entry]) => entry && shownIds.has(id)),
     ) as Record<string, WorkspacePreviewEntry>
     // Keep expanded previews on screen while they refetch so open comment drafts survive.
     set((state) => ({
@@ -504,33 +696,46 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     )
   },
 
-  clearSession: (sessionId) => {
+  releaseSession: (sessionId) => {
+    const panel = get().panelBySession[sessionId]
+    panel?.tabs.forEach(disposeTab)
     invalidateRequest(statusRequestIds, sessionId)
     invalidateSessionScopedRequests(treeRequestIds, sessionId)
     invalidateSessionScopedRequests(previewRequestIds, sessionId)
 
-    set((state) => ({
-      panelBySession: removeRecordKey(state.panelBySession, sessionId),
-      statusBySession: removeRecordKey(state.statusBySession, sessionId),
-      expandedPathsBySession: removeRecordKey(state.expandedPathsBySession, sessionId),
-      treeBySessionPath: removeRecordKey(state.treeBySessionPath, sessionId),
-      previewsBySession: removeRecordKey(state.previewsBySession, sessionId),
-      expandedPreviewIdsBySession: removeRecordKey(state.expandedPreviewIdsBySession, sessionId),
-      loading: {
-        statusBySession: removeRecordKey(state.loading.statusBySession, sessionId),
-        treeBySessionPath: stripSessionKeys(state.loading.treeBySessionPath, sessionId),
-        previewById: stripSessionKeys(state.loading.previewById, sessionId),
-      },
-      errors: {
-        statusBySession: removeRecordKey(state.errors.statusBySession, sessionId),
-        treeBySessionPath: stripSessionKeys(state.errors.treeBySessionPath, sessionId),
-        previewById: stripSessionKeys(state.errors.previewById, sessionId),
-      },
-    }))
+    set((state) => {
+      const tabs = panel?.tabs.filter((tab) => tab.kind !== 'terminal') ?? []
+      return {
+        panelBySession: panel
+          ? patchSessionPanel(state.panelBySession, sessionId, {
+            tabs,
+            activeTabId: tabs.some((tab) => tab.id === panel.activeTabId) ? panel.activeTabId : tabs.at(-1)?.id ?? null,
+            isOpen: panel.isOpen && tabs.length > 0,
+            expanded: false,
+          })
+          : state.panelBySession,
+        statusBySession: removeRecordKey(state.statusBySession, sessionId),
+        expandedPathsBySession: removeRecordKey(state.expandedPathsBySession, sessionId),
+        treeBySessionPath: removeRecordKey(state.treeBySessionPath, sessionId),
+        previewsBySession: removeRecordKey(state.previewsBySession, sessionId),
+        expandedPreviewIdsBySession: removeRecordKey(state.expandedPreviewIdsBySession, sessionId),
+        loading: {
+          statusBySession: removeRecordKey(state.loading.statusBySession, sessionId),
+          treeBySessionPath: stripSessionKeys(state.loading.treeBySessionPath, sessionId),
+          previewById: stripSessionKeys(state.loading.previewById, sessionId),
+        },
+        errors: {
+          statusBySession: removeRecordKey(state.errors.statusBySession, sessionId),
+          treeBySessionPath: stripSessionKeys(state.errors.treeBySessionPath, sessionId),
+          previewById: stripSessionKeys(state.errors.previewById, sessionId),
+        },
+      }
+    })
   },
 
-  resetSessionUi: (sessionId) => {
-    get().clearSession(sessionId)
+  clearSession: (sessionId) => {
+    get().releaseSession(sessionId)
+    set((state) => ({ panelBySession: removeRecordKey(state.panelBySession, sessionId) }))
   },
 }))
 
@@ -614,3 +819,7 @@ async function loadPreview(
     setPreviewEntry(sessionId, previewId, { ...baseEntry, state: 'error', error: message }, false, message)
   }
 }
+
+useWorkspacePanelStore.subscribe((state, previous) => {
+  if (state.panelBySession !== previous.panelBySession) writeStoredPanels(state.panelBySession)
+})

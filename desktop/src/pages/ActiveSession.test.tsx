@@ -67,14 +67,24 @@ vi.mock('../components/chat/SessionTaskBar', () => ({
 vi.mock('../components/workspace/WorkspacePanel', () => ({
   WorkspacePanel: ({
     sessionId,
+    sessionTitle,
+    titleRowStyle,
     terminalCwd,
     contextLabel,
   }: {
     sessionId: string
+    sessionTitle: string
+    titleRowStyle?: { paddingLeft?: string }
     terminalCwd?: string
     contextLabel?: string
   }) => (
-    <div data-testid="workspace-panel" data-cwd={terminalCwd ?? ''} data-context={contextLabel ?? ''}>
+    <div
+      data-testid="workspace-panel"
+      data-title={sessionTitle}
+      data-inset={titleRowStyle?.paddingLeft ? 'true' : 'false'}
+      data-cwd={terminalCwd ?? ''}
+      data-context={contextLabel ?? ''}
+    >
       workspace:{sessionId}
     </div>
   ),
@@ -87,7 +97,7 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
 import { useTeamStore } from '../stores/teamStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
-import { useTerminalPanelStore } from '../stores/terminalPanelStore'
+import { useUIStore } from '../stores/uiStore'
 
 afterEach(() => {
   cleanup()
@@ -101,7 +111,7 @@ afterEach(() => {
   useChatStore.setState({ sessions: {} })
   useTeamStore.setState({ teams: [], activeTeam: null, memberColors: new Map(), error: null })
   useWorkspacePanelStore.setState(useWorkspacePanelStore.getInitialState(), true)
-  useTerminalPanelStore.setState(useTerminalPanelStore.getInitialState(), true)
+  localStorage.clear()
 })
 
 describe('ActiveSession task polling', () => {
@@ -592,7 +602,7 @@ describe('ActiveSession task polling', () => {
         },
       },
     })
-    useWorkspacePanelStore.getState().openPanel(sessionId)
+    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'changes' })
 
     render(<ActiveSession />)
     await screen.findByTestId('workspace-panel')
@@ -626,7 +636,7 @@ describe('ActiveSession task polling', () => {
       error: null,
     })
     useTabStore.setState({ tabs: [{ sessionId, title: 'Workspace Session', type: 'session', status: 'idle' }], activeTabId: sessionId })
-    useWorkspacePanelStore.getState().openPanel(sessionId)
+    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'changes' })
     useWorkspacePanelStore.getState().setWidth(400)
 
     render(<ActiveSession />)
@@ -730,7 +740,7 @@ describe('ActiveSession task polling', () => {
           },
         },
       })
-      useWorkspacePanelStore.getState().openPanel(memberSessionId)
+      useWorkspacePanelStore.getState().openTab(memberSessionId, { kind: 'changes' })
       rerender(<ActiveSession />)
     })
 
@@ -780,7 +790,7 @@ describe('ActiveSession task polling', () => {
         },
       },
     })
-    useWorkspacePanelStore.getState().openPanel(sessionId, 'terminal')
+    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'terminal' })
 
     render(<ActiveSession />)
 
@@ -793,7 +803,8 @@ describe('ActiveSession task polling', () => {
     expect(screen.queryByRole('button', { name: 'Terminal' })).not.toBeInTheDocument()
   })
 
-  it('opens one side panel from the header terminal and files buttons and passes the session context', () => {
+  it('opens one side panel from the header button and passes the session context', async () => {
+    windowMocks.desktop = true
     const sessionId = 'terminal-session'
 
     useSessionStore.setState({
@@ -857,31 +868,20 @@ describe('ActiveSession task polling', () => {
     expect(header).not.toHaveTextContent('feat/panel')
     expect(screen.queryByTestId('session-header-meta')).not.toBeInTheDocument()
 
-    const terminalButton = screen.getByRole('button', { name: 'Terminal' })
-    const filesButton = screen.getByRole('button', { name: 'Files and changes' })
+    expect(screen.queryByRole('button', { name: 'Terminal' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()
 
     act(() => {
-      fireEvent.click(terminalButton)
+      fireEvent.click(screen.getByRole('button', { name: 'Open side panel' }))
     })
-    expect(useWorkspacePanelStore.getState().getPanelTab(sessionId)).toBe('terminal')
-    expect(terminalButton).toHaveAttribute('aria-pressed', 'true')
-    expect(filesButton).toHaveAttribute('aria-pressed', 'false')
-    const panel = screen.getByTestId('workspace-panel')
+    expect(useWorkspacePanelStore.getState().getActiveTab(sessionId)?.kind).toBe('files')
+    expect(screen.queryByRole('button', { name: 'Open side panel' })).not.toBeInTheDocument()
+    const panel = await screen.findByTestId('workspace-panel')
+    expect(panel).toHaveAttribute('data-title', 'Terminal Session')
     expect(panel).toHaveAttribute('data-cwd', '/tmp/project-root/packages/app')
     expect(panel).toHaveAttribute('data-context', 'project-root · feat/panel')
-
-    act(() => {
-      fireEvent.click(filesButton)
-    })
-    expect(useWorkspacePanelStore.getState().isPanelOpen(sessionId)).toBe(true)
-    expect(useWorkspacePanelStore.getState().getPanelTab(sessionId)).toBe('files')
-
-    act(() => {
-      fireEvent.click(filesButton)
-    })
-    expect(useWorkspacePanelStore.getState().isPanelOpen(sessionId)).toBe(false)
-    expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('active-session-chat-column')).toContainElement(header)
+    expect(screen.getByTestId('session-side-panel')).not.toContainElement(header)
   })
 
   it('makes the session header a window drag region', () => {
@@ -912,7 +912,10 @@ describe('ActiveSession task polling', () => {
     expect(screen.getByTestId('session-header')).toHaveClass('window-drag-region')
   })
 
-  it('hides the chat column while the panel is expanded and restores side by side', () => {
+  it('hides the chat column while the panel is expanded and restores side by side', async () => {
+    windowMocks.desktop = true
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    useUIStore.setState({ sidebarOpen: false })
     const sessionId = 'expanded-session'
 
     useSessionStore.setState({
@@ -934,7 +937,7 @@ describe('ActiveSession task polling', () => {
       tabs: [{ sessionId, title: 'Expanded Session', type: 'session', status: 'idle' }],
       activeTabId: sessionId,
     })
-    useWorkspacePanelStore.getState().openPanel(sessionId, 'terminal')
+    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'terminal' })
     useWorkspacePanelStore.getState().toggleExpanded(sessionId)
 
     render(<ActiveSession />)
@@ -943,7 +946,8 @@ describe('ActiveSession task polling', () => {
     expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ maxSize: 0 })
     expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 0, maxSize: '100%' })
     expect(screen.queryByTestId('workspace-resize-handle')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Expanded Session' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Expanded Session' })).not.toBeInTheDocument()
+    expect(await screen.findByTestId('workspace-panel')).toHaveAttribute('data-inset', 'true')
 
     act(() => {
       useWorkspacePanelStore.getState().toggleExpanded(sessionId)
@@ -952,7 +956,9 @@ describe('ActiveSession task polling', () => {
     expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
     expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 280, maxSize: 680 })
     expect(screen.getByTestId('workspace-resize-handle')).toBeInTheDocument()
-    useTerminalPanelStore.getState().clearSession(sessionId)
+    expect(screen.getByTestId('workspace-panel')).toHaveAttribute('data-inset', 'false')
+    expect(screen.getByRole('heading', { name: 'Expanded Session' })).toBeInTheDocument()
+    useUIStore.setState({ sidebarOpen: true })
   })
 
   it('keeps the header on an empty session and shows a title-and-hint hero', () => {
@@ -982,7 +988,7 @@ describe('ActiveSession task polling', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Empty Session' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Terminal' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open side panel' })).toBeInTheDocument()
     expect(screen.queryByTestId('message-list')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input')).toHaveAttribute('data-variant', 'hero')
   })

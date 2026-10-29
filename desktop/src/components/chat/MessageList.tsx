@@ -20,6 +20,7 @@ import { ToolCallGroup } from './ToolCallGroup'
 import { ToolResultBlock } from './ToolResultBlock'
 import { PermissionDialog } from './PermissionDialog'
 import { AskUserQuestion } from './AskUserQuestion'
+import { ShowUIBlock, uiPageOfCall } from './ShowUIBlock'
 import { StreamingIndicator } from './StreamingIndicator'
 import { InlineTaskSummary } from './InlineTaskSummary'
 import { CurrentTurnChangeCard } from './CurrentTurnChangeCard'
@@ -457,6 +458,16 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
       toolResultMap.set(msg.toolUseId, msg)
     }
   }
+  const lastPageWriteInTurn = new Map<string, string>()
+  let turn = 0
+  for (const msg of messages) {
+    if (msg.type === 'user_text') turn += 1
+    if (msg.type !== 'tool_use' || msg.toolName !== 'ShowUI') continue
+    const page = uiPageOfCall(msg.input, toolResultMap.get(msg.toolUseId))
+    if (page) lastPageWriteInTurn.set(`${turn}:${page.pageId}`, msg.toolUseId)
+  }
+  const pageCardToolUseIds = new Set(lastPageWriteInTurn.values())
+
   messages.forEach((msg, index) => {
     if (
       msg.type === 'tool_use' &&
@@ -512,6 +523,12 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
         }
         flushGroup()
         items.push({ kind: 'message', message: msg })
+      } else if (msg.toolName === 'ShowUI') {
+        appendRootToolCall(msg)
+        if (pageCardToolUseIds.has(msg.toolUseId)) {
+          flushGroup()
+          items.push({ kind: 'message', message: msg })
+        }
       } else {
         appendRootToolCall(msg)
       }
@@ -2064,6 +2081,9 @@ export const MessageBlock = memo(function MessageBlock({
             result={toolResult?.content}
           />
         )
+      }
+      if (message.toolName === 'ShowUI' && sessionId) {
+        return <ShowUIBlock sessionId={sessionId} input={message.input} result={toolResult} />
       }
       return (
         <ToolCallBlock

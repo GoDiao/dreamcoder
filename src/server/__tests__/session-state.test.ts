@@ -181,6 +181,7 @@ describe('session state store', () => {
     runtime: null,
     title: { text: 'Saved', source: 'custom' as const },
     workspace: { workDir: '/repo', projectRoot: '/repo', workDirExists: true },
+    uiPages: [],
   }
 
   it('restores persisted fields once and tells subscribers', async () => {

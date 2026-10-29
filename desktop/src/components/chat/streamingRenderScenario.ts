@@ -21,6 +21,7 @@ function mirror(turn: SessionState['turn']): SessionState {
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
+    uiPages: [],
     team: null,
     clientCount: 1,
   }

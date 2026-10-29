@@ -9,6 +9,9 @@ if (typeof (vi as HoistedVi).hoisted !== 'function') {
 }
 
 const mocks = vi.hoisted(() => ({
+  closeBrowser: vi.fn(),
+  submitBrowserInput: vi.fn(),
+  destroyTerminalRuntime: vi.fn(),
   getWorkspaceStatusMock: vi.fn(),
   getWorkspaceTreeMock: vi.fn(),
   getWorkspaceFileMock: vi.fn(),
@@ -24,7 +27,17 @@ vi.mock('../api/sessions', () => ({
   },
 }))
 
+vi.mock('../lib/browserGuests', () => ({
+  closeBrowser: mocks.closeBrowser,
+  submitBrowserInput: mocks.submitBrowserInput,
+}))
+
+vi.mock('../lib/terminalRuntime', () => ({
+  destroyTerminalRuntime: mocks.destroyTerminalRuntime,
+}))
+
 import { sessionsApi } from '../api/sessions'
+import { ELECTRON_BRIDGE_KEY } from '../lib/shell/electronBridge'
 import {
   WORKSPACE_PANEL_DEFAULT_WIDTH,
   WORKSPACE_PANEL_MAX_WIDTH,
@@ -53,8 +66,22 @@ describe('workspacePanelStore', () => {
 
   afterEach(() => {
     useWorkspacePanelStore.setState(initialState, true)
+    localStorage.clear()
+    delete (window as unknown as Record<string, unknown>)[ELECTRON_BRIDGE_KEY]
     vi.restoreAllMocks()
   })
+
+  const okStatus = (changedFiles: Array<{ path: string; status: 'modified'; additions: number; deletions: number }> = []) => ({
+    state: 'ok' as const,
+    workDir: '/repo',
+    repoName: 'repo',
+    branch: 'main',
+    isGitRepo: true,
+    changedFiles,
+  })
+
+  const panel = (sessionId: string) => useWorkspacePanelStore.getState().panelBySession[sessionId]
+  const kinds = (sessionId: string) => panel(sessionId)?.tabs.map((tab) => tab.kind)
 
   it('uses hoisted session api mocks', () => {
     expect(sessionsApi.getWorkspaceStatus).toBe(mocks.getWorkspaceStatusMock)
@@ -63,56 +90,138 @@ describe('workspacePanelStore', () => {
     expect(sessionsApi.getWorkspaceDiff).toBe(mocks.getWorkspaceDiffMock)
   })
 
-  it('keeps panel open state, tab and active view isolated per session', () => {
+  it('keeps tabs and the open state per session', () => {
     const store = useWorkspacePanelStore.getState()
-
     expect(store.isPanelOpen('session-a')).toBe(false)
-    expect(store.getPanelTab('session-a')).toBe('files')
-    expect(store.getActiveView('session-a')).toBe('changed')
+    expect(store.getActiveTab('session-a')).toBeNull()
     expect(store.width).toBe(WORKSPACE_PANEL_DEFAULT_WIDTH)
     expect(WORKSPACE_PANEL_DEFAULT_WIDTH).toBe(380)
 
-    store.openPanel('session-a')
-    store.setActiveView('session-a', 'all')
+    const changes = store.openTab('session-a', { kind: 'changes' })
+    store.openTab('session-b', { kind: 'files' })
 
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
-    expect(useWorkspacePanelStore.getState().getActiveView('session-a')).toBe('all')
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-b')).toBe(false)
-    expect(useWorkspacePanelStore.getState().getActiveView('session-b')).toBe('changed')
-
-    store.togglePanel('session-b', 'terminal')
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-b')).toBe(true)
-    expect(useWorkspacePanelStore.getState().getPanelTab('session-b')).toBe('terminal')
-    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
+    expect(useWorkspacePanelStore.getState().getActiveTab('session-a')).toEqual({ id: changes, kind: 'changes' })
+    expect(kinds('session-b')).toEqual(['files'])
 
     store.closePanel('session-a')
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(false)
-    expect(useWorkspacePanelStore.getState().getActiveView('session-a')).toBe('all')
+    expect(kinds('session-a')).toEqual(['changes'])
   })
 
-  it('switches tabs when the other tab button is pressed and closes on the showing tab', () => {
+  it('reuses the open tab of a list, file or page revision and adds every browser and terminal', () => {
+    const store = useWorkspacePanelStore.getState()
+    const files = store.openTab('s', { kind: 'files' })
+    const file = store.openTab('s', { kind: 'file', path: 'src/a.ts' })
+    const page = store.openTab('s', { kind: 'uiPage', pageId: 'p1', revision: 1, title: 'Plan' })
+
+    expect(store.openTab('s', { kind: 'files' })).toBe(files)
+    expect(store.openTab('s', { kind: 'file', path: 'src/a.ts' })).toBe(file)
+    expect(store.openTab('s', { kind: 'uiPage', pageId: 'p1', revision: 1, title: 'Plan' })).toBe(page)
+    expect(store.openTab('s', { kind: 'uiPage', pageId: 'p1', revision: 2, title: 'Plan' })).not.toBe(page)
+    store.openTab('s', { kind: 'browser', url: 'https://a.test/' })
+    store.openTab('s', { kind: 'browser', url: 'https://a.test/' })
+    store.openTab('s', { kind: 'terminal' })
+    store.openTab('s', { kind: 'terminal' })
+
+    expect(kinds('s')).toEqual(['files', 'file', 'uiPage', 'uiPage', 'browser', 'browser', 'terminal', 'terminal'])
+    expect(panel('s')?.tabs.filter((tab) => tab.kind === 'terminal').map((tab) => tab.kind === 'terminal' && tab.index)).toEqual([1, 2])
+    expect(panel('s')?.recentFiles).toEqual(['src/a.ts'])
+  })
+
+  it('turns the new tab page into what is opened from it', () => {
+    const store = useWorkspacePanelStore.getState()
+    const changes = store.openTab('s', { kind: 'changes' })
+    const launcher = store.openTab('s', { kind: 'launcher' })
+    const file = store.openTab('s', { kind: 'file', path: 'README.md' })
+    expect(kinds('s')).toEqual(['changes', 'file'])
+    expect(panel('s')?.activeTabId).toBe(file)
+    expect(file).not.toBe(launcher)
+
+    store.openTab('s', { kind: 'launcher' })
+    expect(store.openTab('s', { kind: 'changes' })).toBe(changes)
+    expect(kinds('s')).toEqual(['changes', 'file'])
+    expect(panel('s')?.activeTabId).toBe(changes)
+  })
+
+  it('closes a tab with what runs in it, shows its neighbour and closes the panel with the last tab', () => {
+    const store = useWorkspacePanelStore.getState()
+    const browser = store.openTab('s', { kind: 'browser', url: 'https://a.test/' })
+    const terminal = store.openTab('s', { kind: 'terminal' })
+    const files = store.openTab('s', { kind: 'files' })
+    store.activateTab('s', terminal)
+
+    store.closeTab('s', terminal)
+    expect(mocks.destroyTerminalRuntime).toHaveBeenCalledWith(terminal)
+    expect(panel('s')?.activeTabId).toBe(files)
+
+    store.closeTab('s', files)
+    expect(panel('s')?.activeTabId).toBe(browser)
+    store.closeTab('s', browser)
+    expect(mocks.closeBrowser).toHaveBeenCalledWith(browser)
+    expect(useWorkspacePanelStore.getState().isPanelOpen('s')).toBe(false)
+    expect(panel('s')?.activeTabId).toBeNull()
+  })
+
+  it('opens an empty panel on the changes, or on the files when nothing changed', () => {
+    useWorkspacePanelStore.setState({ statusBySession: { clean: okStatus() } })
     const store = useWorkspacePanelStore.getState()
 
-    store.togglePanel('session-a', 'files')
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
-    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
+    store.togglePanel('dirty')
+    store.togglePanel('clean')
+    expect(kinds('dirty')).toEqual(['changes'])
+    expect(kinds('clean')).toEqual(['files'])
 
-    store.togglePanel('session-a', 'terminal')
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(true)
-    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('terminal')
+    store.togglePanel('dirty')
+    expect(useWorkspacePanelStore.getState().isPanelOpen('dirty')).toBe(false)
+    store.togglePanel('dirty')
+    expect(kinds('dirty')).toEqual(['changes'])
+  })
 
-    store.togglePanel('session-a', 'terminal')
-    expect(useWorkspacePanelStore.getState().isPanelOpen('session-a')).toBe(false)
+  it('records the address, title and shell a tab reports', () => {
+    const store = useWorkspacePanelStore.getState()
+    const browser = store.openTab('s', { kind: 'browser', url: '' })
+    const terminal = store.openTab('s', { kind: 'terminal' })
+    store.patchTab('s', browser, { url: 'http://localhost:3000/', title: 'App' })
+    store.patchTab('s', terminal, { shell: 'zsh' })
 
-    store.setPanelTab('session-a', 'files')
-    store.openPanel('session-a')
-    expect(useWorkspacePanelStore.getState().getPanelTab('session-a')).toBe('files')
+    expect(panel('s')?.tabs).toEqual([
+      { id: browser, kind: 'browser', url: 'http://localhost:3000/', title: 'App' },
+      { id: terminal, kind: 'terminal', index: 1, shell: 'zsh' },
+    ])
+    const before = panel('s')
+    store.patchTab('s', terminal, { shell: 'zsh' })
+    expect(panel('s')).toBe(before)
+  })
+
+  it('opens a typed address as a project file, or as a web page in the desktop app', async () => {
+    mocks.getWorkspaceFileMock.mockImplementation(async (_sessionId: string, path: string) => (
+      path === 'src/a.ts' ? { state: 'ok', path, content: '' } : { state: 'missing', path }
+    ))
+    mocks.submitBrowserInput.mockResolvedValue(undefined)
+    const store = useWorkspacePanelStore.getState()
+
+    await store.openAddress('h5', 'localhost:3000', null)
+    expect(useWorkspacePanelStore.getState().getActiveTab('h5')).toMatchObject({ kind: 'file', path: 'localhost:3000' })
+    expect(mocks.getWorkspaceFileMock).not.toHaveBeenCalled()
+
+    Object.assign(window, { [ELECTRON_BRIDGE_KEY]: {} })
+    await store.openAddress('s', '  src/a.ts ', '/repo')
+    expect(useWorkspacePanelStore.getState().getActiveTab('s')).toMatchObject({ kind: 'file', path: 'src/a.ts' })
+
+    await store.openAddress('s', 'localhost:3000', '/repo')
+    const browser = useWorkspacePanelStore.getState().getActiveTab('s')
+    expect(browser).toMatchObject({ kind: 'browser', url: '' })
+    expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s', browser?.id, 'localhost:3000', '/repo')
+
+    await store.openAddress('s', '   ', '/repo')
+    expect(kinds('s')).toEqual(['file', 'browser'])
   })
 
   it('expands and restores the panel and resets expansion on close', () => {
     const store = useWorkspacePanelStore.getState()
 
-    store.openPanel('session-a', 'files')
+    store.openTab('session-a', { kind: 'files' })
     store.toggleExpanded('session-a')
     expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(true)
     store.toggleExpanded('session-a')
@@ -121,8 +230,54 @@ describe('workspacePanelStore', () => {
     store.toggleExpanded('session-a')
     store.closePanel('session-a')
     expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(false)
-    store.openPanel('session-a')
+    store.togglePanel('session-a')
     expect(useWorkspacePanelStore.getState().isPanelExpanded('session-a')).toBe(false)
+  })
+
+  it('saves the tabs of each session without terminals and restores them on the next start', async () => {
+    const store = useWorkspacePanelStore.getState()
+    const file = store.openTab('s', { kind: 'file', path: 'src/a.ts' })
+    const browser = store.openTab('s', { kind: 'browser', url: 'http://localhost:3000/' })
+    const terminal = store.openTab('s', { kind: 'terminal' })
+    store.openTab('closed', { kind: 'changes' })
+    store.closePanel('closed')
+    expect(panel('s')?.activeTabId).toBe(terminal)
+
+    vi.resetModules()
+    const restarted = await import('./workspacePanelStore')
+    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+
+    expect(restored.s).toEqual({
+      isOpen: true,
+      expanded: false,
+      tabs: [
+        { id: file, kind: 'file', path: 'src/a.ts' },
+        { id: browser, kind: 'browser', url: 'http://localhost:3000/', title: '' },
+      ],
+      activeTabId: browser,
+      recentFiles: ['src/a.ts'],
+    })
+    expect(restored.closed?.isOpen).toBe(false)
+  })
+
+  it('ignores saved tabs it cannot read', async () => {
+    localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify({
+      s: { isOpen: true, tabs: [{ id: 't1', kind: 'terminal', index: 1 }, { id: 'x', kind: 'file' }, { kind: 'files' }], activeTabId: 't1' },
+      t: 'nonsense',
+    }))
+    vi.resetModules()
+    const restarted = await import('./workspacePanelStore')
+
+    expect(restarted.useWorkspacePanelStore.getState().panelBySession).toEqual({
+      s: { isOpen: false, expanded: false, tabs: [], activeTabId: null, recentFiles: [] },
+    })
+
+    localStorage.setItem('dreamcoder-workspace-panels', '{')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.resetModules()
+    const broken = await import('./workspacePanelStore')
+    expect(broken.useWorkspacePanelStore.getState().panelBySession).toEqual({})
+    expect(warn).toHaveBeenCalledWith('[workspace] Failed to restore side panel tabs', expect.any(SyntaxError))
   })
 
   it('clamps the panel width to 280-680', () => {
@@ -163,124 +318,6 @@ describe('workspacePanelStore', () => {
     })
     expect(useWorkspacePanelStore.getState().loading.statusBySession['session-1']).toBe(false)
     expect(useWorkspacePanelStore.getState().errors.statusBySession['session-1']).toBeNull()
-  })
-
-  it('defaults an empty changed-files status to the all-files view', async () => {
-    mocks.getWorkspaceStatusMock.mockResolvedValue({
-      state: 'ok',
-      workDir: '/repo',
-      repoName: 'repo',
-      branch: 'main',
-      isGitRepo: true,
-      changedFiles: [],
-    })
-
-    useWorkspacePanelStore.getState().openPanel('session-empty-changes')
-    expect(useWorkspacePanelStore.getState().getActiveView('session-empty-changes')).toBe('changed')
-
-    await useWorkspacePanelStore.getState().loadStatus('session-empty-changes')
-
-    expect(useWorkspacePanelStore.getState().statusBySession['session-empty-changes']?.changedFiles).toEqual([])
-    expect(useWorkspacePanelStore.getState().getActiveView('session-empty-changes')).toBe('all')
-  })
-
-  it('keeps the changed-files view when status contains changes', async () => {
-    mocks.getWorkspaceStatusMock.mockResolvedValue({
-      state: 'ok',
-      workDir: '/repo',
-      repoName: 'repo',
-      branch: 'main',
-      isGitRepo: true,
-      changedFiles: [
-        {
-          path: 'src/app.ts',
-          status: 'modified',
-          additions: 2,
-          deletions: 1,
-        },
-      ],
-    })
-
-    useWorkspacePanelStore.getState().openPanel('session-has-changes')
-    await useWorkspacePanelStore.getState().loadStatus('session-has-changes')
-
-    expect(useWorkspacePanelStore.getState().getActiveView('session-has-changes')).toBe('changed')
-  })
-
-  it('returns to changed-files when a refreshed default all-files view now has changes', async () => {
-    mocks.getWorkspaceStatusMock
-      .mockResolvedValueOnce({
-        state: 'ok',
-        workDir: '/repo',
-        repoName: 'repo',
-        branch: 'main',
-        isGitRepo: true,
-        changedFiles: [],
-      })
-      .mockResolvedValueOnce({
-        state: 'ok',
-        workDir: '/repo',
-        repoName: 'repo',
-        branch: 'main',
-        isGitRepo: true,
-        changedFiles: [
-          {
-            path: 'src/app.ts',
-            status: 'modified',
-            additions: 2,
-            deletions: 1,
-          },
-        ],
-      })
-
-    useWorkspacePanelStore.getState().openPanel('session-refresh-changes')
-    await useWorkspacePanelStore.getState().loadStatus('session-refresh-changes')
-    expect(useWorkspacePanelStore.getState().getActiveView('session-refresh-changes')).toBe('all')
-
-    await useWorkspacePanelStore.getState().loadStatus('session-refresh-changes')
-
-    expect(useWorkspacePanelStore.getState().getActiveView('session-refresh-changes')).toBe('changed')
-  })
-
-  it('does not override an explicit all-files selection when refreshed status has changes', async () => {
-    mocks.getWorkspaceStatusMock.mockResolvedValue({
-      state: 'ok',
-      workDir: '/repo',
-      repoName: 'repo',
-      branch: 'main',
-      isGitRepo: true,
-      changedFiles: [
-        {
-          path: 'src/app.ts',
-          status: 'modified',
-          additions: 2,
-          deletions: 1,
-        },
-      ],
-    })
-
-    useWorkspacePanelStore.getState().openPanel('session-explicit-all')
-    useWorkspacePanelStore.getState().setActiveView('session-explicit-all', 'all')
-    await useWorkspacePanelStore.getState().loadStatus('session-explicit-all')
-
-    expect(useWorkspacePanelStore.getState().getActiveView('session-explicit-all')).toBe('all')
-  })
-
-  it('does not override an explicit changed-files selection when status is empty', async () => {
-    mocks.getWorkspaceStatusMock.mockResolvedValue({
-      state: 'ok',
-      workDir: '/repo',
-      repoName: 'repo',
-      branch: 'main',
-      isGitRepo: true,
-      changedFiles: [],
-    })
-
-    useWorkspacePanelStore.getState().openPanel('session-explicit-changed')
-    useWorkspacePanelStore.getState().setActiveView('session-explicit-changed', 'changed')
-    await useWorkspacePanelStore.getState().loadStatus('session-explicit-changed')
-
-    expect(useWorkspacePanelStore.getState().getActiveView('session-explicit-changed')).toBe('changed')
   })
 
   it('captures workspace status request errors', async () => {
@@ -410,6 +447,19 @@ describe('workspacePanelStore', () => {
     expect(mocks.getWorkspaceDiffMock).toHaveBeenCalledTimes(2)
   })
 
+  it('refreshes the previews of open file tabs with the expanded diffs', async () => {
+    mocks.getWorkspaceFileMock.mockResolvedValueOnce({ state: 'ok', path: 'a.ts', content: 'v1' })
+    const store = useWorkspacePanelStore.getState()
+    store.openTab('s', { kind: 'file', path: 'a.ts' })
+    await store.ensurePreview('s', 'a.ts', 'file')
+    await store.ensurePreview('s', 'a.ts', 'file')
+    expect(mocks.getWorkspaceFileMock).toHaveBeenCalledTimes(1)
+
+    mocks.getWorkspaceFileMock.mockResolvedValueOnce({ state: 'ok', path: 'a.ts', content: 'v2' })
+    await store.refreshPreviews('s')
+    expect(useWorkspacePanelStore.getState().previewsBySession.s?.['file:a.ts']?.content).toBe('v2')
+  })
+
   it('refreshes expanded previews and drops collapsed cache entries', async () => {
     let version = 1
     mocks.getWorkspaceDiffMock.mockImplementation(async (_sessionId: string, path: string) => ({
@@ -535,112 +585,54 @@ describe('workspacePanelStore', () => {
     expect(useWorkspacePanelStore.getState().previewsBySession['session-preview-race']?.['diff:a.ts']?.diff).toBe('fresh')
   })
 
-  it('clears session UI and cached data for clearSession and resetSessionUi', () => {
+  it('drops the cached data of a released session but keeps its tabs, except terminals', () => {
+    const store = useWorkspacePanelStore.getState()
+    const file = store.openTab('s', { kind: 'file', path: 'src/a.ts' })
+    const browser = store.openTab('s', { kind: 'browser', url: 'https://a.test/' })
+    const terminal = store.openTab('s', { kind: 'terminal' })
+    store.openTab('other', { kind: 'changes' })
     useWorkspacePanelStore.setState((state) => ({
-      ...state,
-      panelBySession: {
-        'session-clear': { isOpen: true, tab: 'files', expanded: false, activeView: 'all' },
-        'session-reset': { isOpen: true, tab: 'terminal', expanded: true, activeView: 'all' },
-      },
-      statusBySession: {
-        'session-clear': {
-          state: 'ok',
-          workDir: '/repo',
-          repoName: 'repo',
-          branch: 'main',
-          isGitRepo: true,
-          changedFiles: [],
-        },
-        'session-reset': {
-          state: 'ok',
-          workDir: '/repo',
-          repoName: 'repo',
-          branch: 'main',
-          isGitRepo: true,
-          changedFiles: [],
-        },
-      },
-      expandedPathsBySession: {
-        'session-clear': ['src'],
-        'session-reset': ['src'],
-      },
-      treeBySessionPath: {
-        'session-clear': {
-          src: { state: 'ok', path: 'src', entries: [] },
-        },
-        'session-reset': {
-          src: { state: 'ok', path: 'src', entries: [] },
-        },
-      },
-      previewsBySession: {
-        'session-clear': {
-          'file:src/a.ts': { id: 'file:src/a.ts', path: 'src/a.ts', kind: 'file', title: 'a.ts' },
-        },
-        'session-reset': {
-          'file:src/b.ts': { id: 'file:src/b.ts', path: 'src/b.ts', kind: 'file', title: 'b.ts' },
-        },
-      },
-      expandedPreviewIdsBySession: {
-        'session-clear': ['file:src/a.ts'],
-        'session-reset': ['file:src/b.ts'],
-      },
-      loading: {
-        statusBySession: {
-          'session-clear': true,
-          'session-reset': true,
-        },
-        treeBySessionPath: {
-          'session-clear::src': true,
-          'session-reset::src': true,
-        },
-        previewById: {
-          'session-clear::file:src/a.ts': true,
-          'session-reset::file:src/b.ts': true,
-        },
-      },
-      errors: {
-        statusBySession: {
-          'session-clear': 'bad',
-          'session-reset': 'bad',
-        },
-        treeBySessionPath: {
-          'session-clear::src': 'bad',
-          'session-reset::src': 'bad',
-        },
-        previewById: {
-          'session-clear::file:src/a.ts': 'bad',
-          'session-reset::file:src/b.ts': 'bad',
-        },
-      },
+      statusBySession: { s: okStatus(), other: okStatus() },
+      expandedPathsBySession: { s: ['src'] },
+      treeBySessionPath: { s: { src: { state: 'ok', path: 'src', entries: [] } } },
+      previewsBySession: { s: { 'file:src/a.ts': { id: 'file:src/a.ts', path: 'src/a.ts', kind: 'file', title: 'a.ts' } } },
+      expandedPreviewIdsBySession: { s: ['diff:src/a.ts'] },
+      loading: { ...state.loading, treeBySessionPath: { 's::src': true }, previewById: { 's::file:src/a.ts': true } },
+      errors: { ...state.errors, statusBySession: { s: 'bad' }, treeBySessionPath: { 's::src': 'bad' } },
     }))
 
-    useWorkspacePanelStore.getState().clearSession('session-clear')
-    useWorkspacePanelStore.getState().resetSessionUi('session-reset')
+    store.releaseSession('s')
 
     const state = useWorkspacePanelStore.getState()
-    expect(state.panelBySession['session-clear']).toBeUndefined()
-    expect(state.panelBySession['session-reset']).toBeUndefined()
-    expect(state.statusBySession['session-clear']).toBeUndefined()
-    expect(state.statusBySession['session-reset']).toBeUndefined()
-    expect(state.expandedPathsBySession['session-clear']).toBeUndefined()
-    expect(state.expandedPathsBySession['session-reset']).toBeUndefined()
-    expect(state.treeBySessionPath['session-clear']).toBeUndefined()
-    expect(state.treeBySessionPath['session-reset']).toBeUndefined()
-    expect(state.previewsBySession['session-clear']).toBeUndefined()
-    expect(state.previewsBySession['session-reset']).toBeUndefined()
-    expect(state.expandedPreviewIdsBySession['session-clear']).toBeUndefined()
-    expect(state.expandedPreviewIdsBySession['session-reset']).toBeUndefined()
-    expect(state.loading.statusBySession['session-clear']).toBeUndefined()
-    expect(state.loading.statusBySession['session-reset']).toBeUndefined()
-    expect(state.loading.treeBySessionPath['session-clear::src']).toBeUndefined()
-    expect(state.loading.treeBySessionPath['session-reset::src']).toBeUndefined()
-    expect(state.loading.previewById['session-clear::file:src/a.ts']).toBeUndefined()
-    expect(state.loading.previewById['session-reset::file:src/b.ts']).toBeUndefined()
-    expect(state.errors.statusBySession['session-clear']).toBeUndefined()
-    expect(state.errors.statusBySession['session-reset']).toBeUndefined()
-    expect(state.errors.treeBySessionPath['session-clear::src']).toBeUndefined()
-    expect(state.errors.treeBySessionPath['session-reset::src']).toBeUndefined()
-    expect(state.errors.previewById['session-clear::file:src/a.ts']).toBeUndefined()
-    expect(state.errors.previewById['session-reset::file:src/b.ts']).toBeUndefined()
+    expect(mocks.destroyTerminalRuntime).toHaveBeenCalledWith(terminal)
+    expect(mocks.closeBrowser).toHaveBeenCalledWith(browser)
+    expect(state.panelBySession.s).toMatchObject({
+      isOpen: true,
+      tabs: [{ id: file, kind: 'file', path: 'src/a.ts' }, { id: browser, kind: 'browser' }],
+      activeTabId: browser,
+    })
+    expect(state.statusBySession).toEqual({ other: okStatus() })
+    expect(state.expandedPathsBySession.s).toBeUndefined()
+    expect(state.treeBySessionPath.s).toBeUndefined()
+    expect(state.previewsBySession.s).toBeUndefined()
+    expect(state.expandedPreviewIdsBySession.s).toBeUndefined()
+    expect(state.loading.treeBySessionPath).toEqual({})
+    expect(state.loading.previewById).toEqual({})
+    expect(state.errors.statusBySession).toEqual({})
+    expect(state.errors.treeBySessionPath).toEqual({})
+    expect(kinds('other')).toEqual(['changes'])
+  })
+
+  it('forgets the tabs of a deleted session', () => {
+    const store = useWorkspacePanelStore.getState()
+    const browser = store.openTab('s', { kind: 'browser', url: 'https://a.test/' })
+    store.openTab('other', { kind: 'changes' })
+
+    store.clearSession('s')
+
+    expect(mocks.closeBrowser).toHaveBeenCalledWith(browser)
+    expect(useWorkspacePanelStore.getState().panelBySession.s).toBeUndefined()
+    expect(JSON.parse(localStorage.getItem('dreamcoder-workspace-panels') ?? '{}')).not.toHaveProperty('s')
+    expect(kinds('other')).toEqual(['changes'])
   })
 })

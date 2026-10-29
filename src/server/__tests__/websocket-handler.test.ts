@@ -175,6 +175,19 @@ describe('WebSocket handler session runtime lifetime', () => {
       .toContainEqual({ type: 'error', message: 'boom', code: 'CLI_ERROR' })
   })
 
+  it('sends a tool call that arrives only in the final message after a stream fell back to a non-streaming request', () => {
+    const sessionId = `fallback-${crypto.randomUUID()}`
+    translateCliMessage({ type: 'stream_event', event: { type: 'message_start' } }, sessionId)
+    translateCliMessage({ type: 'stream_event', event: { type: 'content_block_start', index: 0, content_block: { type: 'thinking' } } }, sessionId)
+
+    const messages = translateCliMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'call-1', name: 'ShowUI', input: { pageId: 'p' } }] },
+    }, sessionId)
+
+    expect(messages).toContainEqual({ type: 'tool_use_complete', toolName: 'ShowUI', toolUseId: 'call-1', input: { pageId: 'p' }, parentToolUseId: undefined })
+  })
+
   it('test reset clears every per-session runtime state', () => {
     const sessionId = `reset-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)

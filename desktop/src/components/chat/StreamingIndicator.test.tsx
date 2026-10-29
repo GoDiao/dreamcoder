@@ -48,6 +48,7 @@ function sessionWithTurn(sessionId: string, turn: SessionState['turn']): PerSess
       slashCommands: [],
       activeGoal: null,
       backgroundTasks: [],
+      uiPages: [],
       team: null,
       clientCount: 1,
     },

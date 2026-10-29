@@ -1,0 +1,373 @@
+{
+  "g2-bar": {
+    "main": {
+      "fields": [
+        "genre",
+        "sold"
+      ]
+    }
+  },
+  "g2-line": {
+    "main": {
+      "fields": [
+        "date",
+        "close"
+      ]
+    }
+  },
+  "g2-area": {
+    "main": {
+      "fields": [
+        "date",
+        "close"
+      ]
+    }
+  },
+  "g2-scatter-plot": {
+    "main": {
+      "fields": [
+        "height",
+        "weight"
+      ]
+    }
+  },
+  "g2-bubble-chart": {
+    "main": {
+      "fields": [
+        "continent",
+        "LifeExpectancy",
+        "GDP",
+        "Population"
+      ]
+    }
+  },
+  "g2-multi-set-bar": {
+    "main": {
+      "fields": [
+        "year",
+        "genre",
+        "sold"
+      ]
+    }
+  },
+  "g2-bi-directional-bar": {
+    "main": {
+      "fields": [
+        "department",
+        "group"
+      ]
+    }
+  },
+  "g2-radar-chart": {
+    "main": {
+      "fields": [
+        "ability",
+        "score"
+      ]
+    }
+  },
+  "g2-radial-bar": {
+    "main": {
+      "fields": [
+        "question",
+        "percent",
+        "odd"
+      ]
+    }
+  },
+  "g2-parallel": {
+    "main": {
+      "fields": [
+        "economy (mpg)",
+        "cylinders",
+        "displacement (cc)",
+        "power (hp)",
+        "weight (lb)",
+        "0-60 mph (s)",
+        "year"
+      ]
+    }
+  },
+  "g2-regressioncurve": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-pie": {
+    "main": {
+      "fields": [
+        "browser",
+        "value"
+      ]
+    }
+  },
+  "g2-donut-chart": {
+    "main": {
+      "fields": [
+        "genre",
+        "sold"
+      ]
+    }
+  },
+  "g2-stacked-bar": {
+    "main": {
+      "fields": [
+        "name",
+        "month",
+        "rainfall"
+      ]
+    }
+  },
+  "g2-stacked-area": {
+    "main": {
+      "fields": [
+        "country",
+        "year",
+        "value"
+      ]
+    }
+  },
+  "g2-rose": {
+    "main": {
+      "fields": [
+        "country",
+        "cost"
+      ]
+    }
+  },
+  "g2-mosaic": {
+    "main": {
+      "fields": [
+        "market",
+        "segment",
+        "value"
+      ]
+    }
+  },
+  "g2-treemap": {
+    "main": {
+      "fields": [
+        "size"
+      ]
+    }
+  },
+  "g2-sunburst": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-funnel": {
+    "main": {
+      "fields": [
+        "stage",
+        "value"
+      ]
+    }
+  },
+  "g2-histogram": {
+    "main": {
+      "fields": [
+        "carat"
+      ]
+    }
+  },
+  "g2-boxplot": {
+    "main": {
+      "fields": [
+        "Expt",
+        "Speed"
+      ]
+    }
+  },
+  "g2-violin": {
+    "main": {
+      "fields": [
+        "species",
+        "x",
+        "y"
+      ]
+    }
+  },
+  "g2-distributioncurve": {
+    "main": {
+      "fields": []
+    }
+  },
+  "g2-heatmap": {
+    "layer-1": {
+      "fields": [
+        "g",
+        "l",
+        "tmp"
+      ]
+    }
+  },
+  "g2-color-map": {
+    "main": {
+      "fields": [
+        "month",
+        "product",
+        "sales"
+      ]
+    }
+  },
+  "g2-contourline": {
+    "main": {
+      "fields": [
+        "x",
+        "y",
+        "level",
+        "lineId"
+      ]
+    }
+  },
+  "g2-stem-leaf": {
+    "main": {
+      "fields": [
+        "x",
+        "y",
+        "text",
+        "fill",
+        "fontSize",
+        "fontWeight"
+      ]
+    },
+    "layer-1": {
+      "fields": null
+    }
+  },
+  "g2-sankey": {
+    "main": {
+      "fields": []
+    }
+  },
+  "g2-chord": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-arcdiagram": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-pack": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-venn": {
+    "main": {
+      "fields": []
+    }
+  },
+  "g2-gantt": {
+    "main": {
+      "fields": [
+        "name",
+        "startTime",
+        "endTime"
+      ]
+    }
+  },
+  "g2-k-chart": {
+    "main": {
+      "fields": [
+        "time",
+        "start",
+        "max",
+        "min",
+        "end"
+      ]
+    }
+  },
+  "g2-kagi": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-spiral": {
+    "main": {
+      "fields": [
+        "time",
+        "category",
+        "sales"
+      ]
+    }
+  },
+  "g2-choropleth-map": {
+    "us-10m": {
+      "fields": null
+    },
+    "unemployment2": {
+      "fields": [
+        "id",
+        "state",
+        "rate"
+      ]
+    }
+  },
+  "g2-dot-map": {
+    "us-10m": {
+      "fields": null
+    },
+    "airports": {
+      "fields": [
+        "iata",
+        "name",
+        "latitude",
+        "longitude"
+      ]
+    }
+  },
+  "g2-bubble-map": {
+    "londonBoroughs": {
+      "fields": null
+    },
+    "londonCentroids": {
+      "fields": [
+        "name",
+        "cx",
+        "cy"
+      ]
+    }
+  },
+  "g2-gauge": {
+    "main": {
+      "fields": null
+    }
+  },
+  "g2-bullet": {
+    "layer-0": {
+      "fields": [
+        "title",
+        "ranges",
+        "measures",
+        "target"
+      ]
+    },
+    "layer-1": {
+      "fields": [
+        "title",
+        "ranges",
+        "measures",
+        "target"
+      ]
+    },
+    "layer-2": {
+      "fields": [
+        "title",
+        "ranges",
+        "measures",
+        "target"
+      ]
+    }
+  },
+  "g2-wordcloud": {
+    "main": {
+      "fields": [
+        "text"
+      ]
+    }
+  }
+}

@@ -40,6 +40,7 @@ function mirrorRuntime(sessionId: string, selection: RuntimeSelection) {
           slashCommands: [],
           activeGoal: null,
           backgroundTasks: [],
+          uiPages: [],
           team: null,
           clientCount: 1,
         },

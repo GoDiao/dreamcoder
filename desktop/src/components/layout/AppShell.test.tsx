@@ -120,6 +120,10 @@ vi.mock('../shared/UpdateChecker', () => ({
   UpdateChecker: () => <div>updates loaded</div>,
 }))
 
+vi.mock('../workspace/BrowserGuestLayer', () => ({
+  BrowserGuestLayer: () => <div data-testid="browser-guest-layer" />,
+}))
+
 import { AppShell } from './AppShell'
 import { useProviderStore } from '../../stores/providerStore'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
@@ -161,6 +165,18 @@ describe('AppShell boot flow', () => {
     expect(screen.getByText('settings modal mounted')).toBeInTheDocument()
     expect(screen.getByText('content loaded')).toBeInTheDocument()
     expect(screen.getByText('updates loaded')).toBeInTheDocument()
+  })
+
+  it('mounts the browser guest layer in the desktop app only', async () => {
+    mocks.isDesktopRuntime = true
+    const desktop = render(<AppShell />)
+    expect(await desktop.findByTestId('browser-guest-layer')).toBeInTheDocument()
+    desktop.unmount()
+
+    mocks.isDesktopRuntime = false
+    render(<AppShell />)
+    expect(await screen.findByText('sidebar loaded')).toBeInTheDocument()
+    expect(screen.queryByTestId('browser-guest-layer')).not.toBeInTheDocument()
   })
 
   it('shows startup diagnostics instead of a blank shell when bootstrap fails', async () => {

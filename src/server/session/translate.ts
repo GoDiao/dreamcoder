@@ -1,3 +1,5 @@
+import { SHOW_UI_TOOL_NAME } from '../../tools/ShowUITool/constants.js'
+import { parseUiPageResult } from '../../utils/uiPages.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import {
   extractCompactSummary,
@@ -19,7 +21,9 @@ export type SessionStreamState = {
   activeToolBlocks: Map<number, { toolName: string; toolUseId: string; inputJson: string; parentToolUseId?: string }>
   pendingLocalCommand?: { name: string; args: string }
   pendingToolBlocks: Map<string, { toolName: string; toolUseId: string; parentToolUseId?: string }>
+  streamedToolUseIds: Set<string>
   toolParentUseIds: Map<string, string>
+  showUiToolUseIds: Set<string>
   lastApiError?: {
     message: string
     code: string
@@ -39,7 +43,9 @@ export function createStreamState(): SessionStreamState {
     activeToolBlocks: new Map(),
     pendingLocalCommand: undefined,
     pendingToolBlocks: new Map(),
+    streamedToolUseIds: new Set(),
     toolParentUseIds: new Map(),
+    showUiToolUseIds: new Set(),
     lastApiError: undefined,
     stopRequested: false,
   }
@@ -98,6 +104,12 @@ function replayedUserMessage(cliMsg: any): ServerMessage | null {
       : ''
   if (!text.trim() || (Array.isArray(content) && content.some((block: any) => block?.type === 'tool_result'))) return null
   return { type: 'user_message', id: cliMsg.uuid, content: text }
+}
+
+function unstreamedToolUse(streamState: SessionStreamState, cliMsg: any, block: any): ServerMessage {
+  const parentToolUseId = cliParentToolUseId(cliMsg)
+  rememberToolParentUseId(streamState, block.id, parentToolUseId)
+  return { type: 'tool_use_complete', toolName: block.name, toolUseId: block.id, input: block.input, parentToolUseId }
 }
 
 function cliParentToolUseId(cliMsg: any): string | undefined {
@@ -194,6 +206,7 @@ function translateMessages(
         const messages: ServerMessage[] = []
 
         for (const block of cliMsg.message.content) {
+          if (block.type === 'tool_use' && block.name === SHOW_UI_TOOL_NAME) streamState.showUiToolUseIds.add(block.id)
           if (streamState.hasReceivedStreamEvents) {
             if (block.type === 'tool_use' && streamState.pendingToolBlocks.has(block.id)) {
               const pending = streamState.pendingToolBlocks.get(block.id)!
@@ -206,6 +219,8 @@ function translateMessages(
                 input: block.input,
                 parentToolUseId: pending.parentToolUseId,
               })
+            } else if (block.type === 'tool_use' && !streamState.streamedToolUseIds.has(block.id)) {
+              messages.push(unstreamedToolUse(streamState, cliMsg, block))
             }
           } else {
             if (block.type === 'thinking' && block.thinking) {
@@ -214,21 +229,14 @@ function translateMessages(
               messages.push({ type: 'content_start', blockType: 'text' })
               messages.push({ type: 'content_delta', text: block.text })
             } else if (block.type === 'tool_use') {
-              const parentToolUseId = cliParentToolUseId(cliMsg)
-              rememberToolParentUseId(streamState, block.id, parentToolUseId)
-              messages.push({
-                type: 'tool_use_complete',
-                toolName: block.name,
-                toolUseId: block.id,
-                input: block.input,
-                parentToolUseId,
-              })
+              messages.push(unstreamedToolUse(streamState, cliMsg, block))
             }
           }
         }
 
         streamState.hasReceivedStreamEvents = false
         streamState.pendingToolBlocks.clear()
+        streamState.streamedToolUseIds.clear()
         if (typeof cliMsg.uuid === 'string' && hasTextBlock(cliMsg.message.content)) {
           messages.push({ type: 'message_id', id: cliMsg.uuid })
         }
@@ -274,6 +282,10 @@ function translateMessages(
             const rememberedParentToolUseId = consumeToolParentUseId(streamState, block.tool_use_id)
             const parentToolUseId =
               cliParentToolUseId(cliMsg) ?? rememberedParentToolUseId
+            if (streamState.showUiToolUseIds.delete(block.tool_use_id) && !block.is_error) {
+              const page = parseUiPageResult(block.content)
+              if (page) events.push({ type: 'ui_page_reported', page })
+            }
             messages.push({
               type: 'tool_result',
               toolUseId: block.tool_use_id,
@@ -309,6 +321,7 @@ function translateMessages(
             events.push({ type: 'turn_activity_reported', activity: 'tool' })
             const parentToolUseId = cliParentToolUseId(cliMsg)
             streamState.activeBlockTypes.set(index, 'tool_use')
+            if (contentBlock.id) streamState.streamedToolUseIds.add(contentBlock.id)
             streamState.activeToolBlocks.set(index, {
               toolName: contentBlock.name || '',
               toolUseId: contentBlock.id || '',

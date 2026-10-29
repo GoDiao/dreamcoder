@@ -40,6 +40,9 @@ try {
   if (await spawn(['bun', 'run', './scripts/build-electron.ts']).exited !== 0) {
     throw new Error('[electron-dev] building the main process failed')
   }
+  if (await spawn(['bun', 'run', 'build:showai-reader']).exited !== 0) {
+    throw new Error('[electron-dev] building the ShowAI reader failed')
+  }
   const electron = spawn(
     [String(electronPath), 'electron-dist', ...process.argv.slice(2)],
     { ...process.env, DREAMCODER_ELECTRON_DEV_URL: devUrl },

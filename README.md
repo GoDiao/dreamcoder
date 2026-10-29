@@ -42,6 +42,7 @@ DreamCoder runs its desktop app and session service locally, bringing model conf
 
 *   **Choose a model provider**: Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama; custom endpoints are also supported. Model availability depends on your provider and configuration.
 *   **Follow the work**: Review sessions, file changes, terminal activity, and tool calls on your desktop.
+*   **See it, not just read it**: The agent can answer with interactive pages (charts, diagrams, step-by-step walkthroughs) shown right in the conversation, and a built-in browser shows your dev server next to the chat.
 *   **Continue on your phone**: Enable H5 Access to reach desktop sessions from a phone browser on the same LAN. Access across networks requires a reverse proxy you configure yourself.
 *   **Learn how a coding agent works**: A seven-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
 
@@ -52,7 +53,8 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 ## 🚀 Key Features
 
 ### 1. Native Desktop Experience
-*   **Smoother session management**: Visual history, a sidebar with several ways to organize sessions, and a side panel per session for file changes and terminals.
+*   **Smoother session management**: Visual history, a sidebar with several ways to organize sessions, and a full-height side panel per session.
+*   **A side panel of tabs**: Changes, the file tree, single files, web pages, terminals and pages each open as a tab from the new tab page. Each session keeps its own tabs, and they come back after a restart (terminals excepted).
 *   **Terminal built into the workflow**: Built-in PTY (PowerShell/Bash/Zsh) with xterm.js.
 *   **Settings you can manage visually**: Configure providers, API keys, and preferences without editing JSON files.
 
@@ -61,16 +63,40 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/main.png" alt="Main workspace">
 </picture>
 
-### 2. Multi-Provider Configuration
+### 2. Pages and a Built-in Browser
+*   **Pages in the conversation**: When a chart, a diagram or a walkthrough explains better than text, the agent builds a page from components: charts and over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, step-by-step walkthroughs, comparison matrices, roadmaps, 3D scenes and more. Each change is a new revision; enlarge a page or open it in the side panel.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/pages-3.png">
+  <img src="./assets/pages-3.png" alt="A 3D airplane page with pitch, roll and yaw sliders">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/pages-2.png">
+  <img src="./assets/pages-2.png" alt="A step-by-step walkthrough page" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/pages-1.png">
+  <img src="./assets/pages-1.png" alt="A small dashboard page with metrics and a chart" width="49%">
+</picture>
+
+*   **Built-in browser**: Open a local dev server, an HTML file in the project or an https site in a side panel tab, next to the conversation. Sign-ins are kept across restarts. Desktop app only.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/browser.png">
+  <img src="./assets/browser.png" alt="The built-in browser in a side panel tab">
+</picture>
+
+### 3. Multi-Provider Configuration
 *   **Presets and custom endpoints**: Set the API key, endpoint, and model mapping for your chosen provider.
 *   **Connection check**: Test the availability and latency of configured endpoints in Settings.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/setting_provider.png">
-  <img src="./assets/setting_provider.png" alt="Provider settings">
+  <img src="./assets/setting_provider.png" alt="Adding a provider from a preset">
 </picture>
 
-### 3. Claude Code Workflows
+### 4. Claude Code Workflows
 *   **Computer Use**: operates desktop apps and browsers in the background through UI elements, powered by [cua-driver](https://github.com/trycua/cua) (MIT). DreamCoder downloads it when you turn Computer Use on; no Python needed. Verified on macOS; Windows needs community testing, Linux is a preview.
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
@@ -80,11 +106,11 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/setting_computeruse.png" alt="Computer Use settings">
 </picture>
 
-### 4. Continue on Your Phone over LAN
+### 5. Continue on Your Phone over LAN
 *   **H5 Access**: Enable access in Settings, manage the token, and use the QR code to connect a phone on the same LAN.
 *   **Access scope**: Keep the desktop app running. Cross-network access requires your own reverse proxy; the deployment guide is still in progress.
 
-### 5. MCP Extensions
+### 6. MCP Extensions
 *   **Visual configuration**: Manage MCP servers in the UI instead of editing JSON by hand.
 
 <picture>
@@ -108,6 +134,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 | Frontend UI | React 19 + Vite + TailwindCSS 4 |
 | Backend Runtime | Bun (Node.js compatible) |
 | Terminal | Bun PTY in the sidecar + xterm.js |
+| Pages | [ShowAI](https://github.com/Renaissance-Mind/ShowAI) page format and reader |
 | State Management | Zustand |
 | Protocol | WebSocket, MCP, LSP |
 
@@ -161,6 +188,9 @@ cd dreamcoder
 
 # 1. Install root workspace dependencies (sidecar runtime: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
+
+# The ShowAI page reader and its dependencies (vendor/showai)
+(cd vendor/showai && bun install)
 
 # 2. Install desktop dependencies (Electron + React frontend)
 cd desktop && bun install

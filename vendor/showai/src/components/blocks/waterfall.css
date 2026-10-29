@@ -1,0 +1,365 @@
+/* waterfall: a bridge from an opening value to a closing value.
+ * Totals use the text color; gains and losses use good/bad tones that follow light and dark themes. */
+/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
+ * for structural elements, and the rules below (0,3,0) set this block's own values. */
+.sb-block.wf-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
+  margin: 0;
+}
+.sb-block.wf-block li:not(svg) {
+  padding: 0;
+}
+.sb-block.wf-block pre:not(svg) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+}
+/* Doubled class so the shared .sb-block font and size do not override these. */
+.sb-block.wf-block {
+  --wf-text: var(--text, #222222);
+  --wf-muted: var(--muted, #6a6a6a);
+  --wf-line: var(--line, #dddddd);
+  --wf-paper: var(--paper, #ffffff);
+  --wf-surface: var(--surface, #fafafa);
+  --wf-accent: var(--accent, #120a8f);
+  --wf-accent-soft: var(--accent-soft, #eeedf9);
+  --wf-good: #1d5fc4;
+  --wf-bad: #c4402f;
+  color: var(--wf-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  container-type: inline-size;
+}
+:root[data-theme="dark"] .sb-block.wf-block,
+[data-theme="dark"] .sb-block.wf-block {
+  --wf-good: #7fb0f0;
+  --wf-bad: #ef8a7c;
+}
+.sb-block.wf-block * {
+  box-sizing: border-box;
+}
+.sb-block.wf-block .wf-tone-total {
+  --wf-tone: var(--wf-text);
+}
+.sb-block.wf-block .wf-tone-good {
+  --wf-tone: var(--wf-good);
+}
+.sb-block.wf-block .wf-tone-bad {
+  --wf-tone: var(--wf-bad);
+}
+.sb-block.wf-block .wf-eyebrow {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--wf-muted);
+  font-weight: 600;
+}
+.sb-block.wf-block .wf-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 2px 0 0;
+}
+.sb-block.wf-block .wf-story {
+  margin: 6px 0 14px;
+  font-size: 18px;
+  line-height: 1.42;
+  font-weight: 650;
+  max-width: 44em;
+}
+
+/* ---------------------------------------------------------------- headlines */
+.sb-block.wf-block .wf-heads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0;
+  border-top: 2px solid var(--wf-text);
+  border-bottom: 1px solid var(--wf-line);
+}
+.sb-block.wf-block .wf-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px 11px 0;
+  min-width: 0;
+}
+.sb-block.wf-block .wf-head + .wf-head {
+  padding-left: 16px;
+  border-left: 1px solid var(--wf-line);
+}
+.sb-block.wf-block .wf-head dt {
+  font-size: 12px;
+  color: var(--wf-muted);
+  font-weight: 600;
+}
+.sb-block.wf-block .wf-head dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sb-block.wf-block .wf-head b {
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.sb-block.wf-block .wf-head dd span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wf-tone);
+}
+.sb-block.wf-block .wf-head dd .wf-tone-total {
+  color: var(--wf-muted);
+}
+
+/* ---------------------------------------------------------------- chart */
+.sb-block.wf-block .wf-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+  gap: 20px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+.sb-block.wf-block .wf-chart {
+  margin: 0;
+  min-width: 0;
+}
+.sb-block.wf-block .wf-scroll {
+  overflow-x: auto;
+}
+.sb-block.wf-block .wf-canvas {
+  position: relative;
+}
+.sb-block.wf-block .wf-canvas svg {
+  display: block;
+  overflow: visible;
+}
+.sb-block.wf-block .wf-gridline {
+  stroke: var(--wf-line);
+}
+.sb-block.wf-block .wf-zero {
+  stroke: var(--wf-muted);
+}
+.sb-block.wf-block .wf-tick {
+  font-size: 11px;
+  fill: var(--wf-muted);
+}
+.sb-block.wf-block .wf-break path {
+  fill: none;
+  stroke: var(--wf-muted);
+  stroke-width: 1.4;
+}
+.sb-block.wf-block .wf-bar {
+  cursor: pointer;
+  outline: none;
+}
+.sb-block.wf-block .wf-slot {
+  fill: transparent;
+}
+.sb-block.wf-block .wf-bar.is-active .wf-slot {
+  fill: var(--wf-accent-soft);
+}
+.sb-block.wf-block .wf-bar:focus-visible .wf-slot {
+  stroke: var(--wf-accent);
+  stroke-width: 2;
+}
+.sb-block.wf-block .wf-fill {
+  fill: var(--wf-tone);
+  opacity: 0.78;
+  transition: opacity 0.15s;
+}
+.sb-block.wf-block .wf-bar:hover .wf-fill,
+.sb-block.wf-block .wf-bar.is-active .wf-fill {
+  opacity: 1;
+}
+.sb-block.wf-block .wf-connector {
+  stroke: var(--wf-muted);
+  stroke-dasharray: 3 3;
+}
+.sb-block.wf-block .wf-value {
+  font-size: 12.5px;
+  font-weight: 700;
+  fill: var(--wf-tone);
+}
+.sb-block.wf-block .wf-labels {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 44px;
+}
+.sb-block.wf-block .wf-labels span {
+  position: absolute;
+  top: 4px;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--wf-muted);
+  cursor: pointer;
+}
+.sb-block.wf-block .wf-labels span.is-active {
+  color: var(--wf-text);
+  font-weight: 750;
+}
+.sb-block.wf-block .wf-chart figcaption {
+  font-size: 11.5px;
+  color: var(--wf-muted);
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sb-block.wf-block .wf-warn {
+  color: var(--wf-bad);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- side panel */
+.sb-block.wf-block .wf-side {
+  border-radius: 12px;
+  background: var(--wf-surface);
+  border: 1px solid var(--wf-line);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sb-block.wf-block .wf-side-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sb-block.wf-block .wf-side-top span {
+  font-size: 13px;
+  font-weight: 700;
+}
+.sb-block.wf-block .wf-side-top b {
+  font-size: 23px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--wf-tone);
+  white-space: nowrap;
+}
+.sb-block.wf-block .wf-side-title {
+  font-size: 12px;
+  color: var(--wf-muted);
+  margin: 2px 0 10px;
+  font-weight: 600;
+}
+.sb-block.wf-block .wf-side ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sb-block.wf-block .wf-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sb-block.wf-block .wf-row span:first-child {
+  min-width: 0;
+}
+.sb-block.wf-block .wf-num {
+  white-space: nowrap;
+}
+.sb-block.wf-block .wf-num em {
+  font-style: normal;
+  color: var(--wf-muted);
+  margin-left: 6px;
+  font-size: 12px;
+}
+.sb-block.wf-block .wf-track {
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wf-line) 70%, transparent);
+  margin-top: 4px;
+  overflow: hidden;
+}
+.sb-block.wf-block .wf-track span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--wf-tone);
+  transition: width 0.3s ease;
+}
+.sb-block.wf-block .wf-muted {
+  color: var(--wf-muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.sb-block.wf-block .wf-note {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--wf-line);
+}
+.sb-block.wf-block .wf-hint {
+  margin: auto 0 0;
+  padding-top: 10px;
+  font-size: 11.5px;
+  color: var(--wf-muted);
+}
+.sb-block.wf-block .wf-static {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.sb-block.wf-block .wf-static summary {
+  cursor: pointer;
+  color: var(--wf-muted);
+}
+.sb-block.wf-block .wf-static table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 8px;
+}
+.sb-block.wf-block .wf-static th,
+.sb-block.wf-block .wf-static td {
+  border-bottom: 1px solid var(--wf-line);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+@container (max-width: 760px) {
+  .sb-block.wf-block .wf-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sb-block.wf-block .wf-head b {
+    font-size: 22px;
+  }
+  .sb-block.wf-block .wf-story {
+    font-size: 16px;
+  }
+}
+@container (max-width: 420px) {
+  .sb-block.wf-block .wf-head + .wf-head {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-block.wf-block .wf-fill,
+  .sb-block.wf-block .wf-track span {
+    transition: none;
+  }
+}
+@media print {
+  .sb-block.wf-block .wf-hint {
+    display: none;
+  }
+  .sb-block.wf-block .wf-scroll {
+    overflow: visible;
+  }
+}

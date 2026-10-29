@@ -13,6 +13,9 @@ git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 # 2. Install root workspace deps (sidecar runtime)
 bun install
 
+# The ShowAI page reader and its dependencies (vendor/showai)
+(cd vendor/showai && bun install)
+
 # 3. Install desktop deps (Electron + React frontend)
 cd desktop && bun install
 
@@ -143,6 +146,9 @@ cd dreamcoder
 
 # Step 1: install root workspace deps (sidecar: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
+
+# The ShowAI page reader and its dependencies (vendor/showai)
+(cd vendor/showai && bun install)
 
 # Step 2: install desktop deps (Electron + React frontend)
 cd desktop && bun install

@@ -20,7 +20,9 @@ vi.mock('../api/sessions', () => ({
 }))
 
 import { useSessionStore } from './sessionStore'
+import { useBrowserStore } from './browserStore'
 import { useTabStore } from './tabStore'
+import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
 
 const initialState = useSessionStore.getState()
@@ -225,6 +227,26 @@ describe('sessionStore', () => {
     await pendingRefresh
 
     expect(useSessionStore.getState().sessions).toEqual([recentSession])
+  })
+
+  it.each(['single', 'batch'] as const)('closes the browser of a session after a %s deletion', async (mode) => {
+    const doomed = session('with-browser')
+    useSessionStore.setState({ sessions: [doomed] })
+    const doomedTab = useWorkspacePanelStore.getState().openTab(doomed.id, { kind: 'browser', url: 'https://example.com/' })
+    const otherTab = useWorkspacePanelStore.getState().openTab('other', { kind: 'browser', url: 'https://other.test/' })
+    useBrowserStore.getState().patchPage(doomedTab, { loading: true })
+    useBrowserStore.getState().patchPage(otherTab, { loading: true })
+    deleteMock.mockResolvedValue({ ok: true })
+    batchDeleteMock.mockResolvedValue({ successes: [doomed.id], failures: [] })
+
+    if (mode === 'single') await useSessionStore.getState().deleteSession(doomed.id)
+    else await useSessionStore.getState().deleteSessions([doomed.id])
+
+    expect(Object.keys(useBrowserStore.getState().pageByTab)).toEqual([otherTab])
+    expect(useWorkspacePanelStore.getState().panelBySession[doomed.id]).toBeUndefined()
+    useBrowserStore.setState(useBrowserStore.getInitialState(), true)
+    useWorkspacePanelStore.setState({ panelBySession: {} })
+    localStorage.clear()
   })
 
   it('forwards direct branch switch repository options when creating a session', async () => {

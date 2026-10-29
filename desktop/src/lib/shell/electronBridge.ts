@@ -1,4 +1,8 @@
 export const ELECTRON_BRIDGE_KEY = 'dreamcoderShell'
+export const BROWSER_PARTITION = 'persist:dreamcoder-browser'
+
+export type BrowserRefusal = 'scheme' | 'noProject' | 'outsideProject' | 'notFound' | 'notHtml'
+export type BrowserResolveResult = { ok: true; url: string } | { ok: false; reason: BrowserRefusal }
 
 export type ElectronShellBridge = {
   invoke: <T>(command: string, args?: Record<string, unknown>) => Promise<T>

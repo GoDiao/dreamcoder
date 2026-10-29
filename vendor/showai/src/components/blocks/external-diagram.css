@@ -1,0 +1,114 @@
+.sb-external-diagram {
+  min-width: 0;
+  position: relative;
+}
+.sb-diagram-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--paper, #fff);
+}
+.sb-diagram-editor {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 520px);
+  padding: 12px;
+}
+.sb-diagram-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 10px;
+}
+.sb-diagram-display-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.sb-diagram-editor .sb-diagram-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sb-diagram-editor .sb-diagram-toggle input {
+  width: auto;
+}
+.sb-diagram-notes {
+  margin: 8px 0;
+  color: var(--muted);
+}
+.sb-diagram-editor select,
+.sb-diagram-editor input:not([type="file"]),
+.sb-diagram-editor textarea {
+  width: 100%;
+  min-width: 0;
+}
+.sb-diagram-editor details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--text);
+}
+.sb-diagram-labels > div {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+}
+.sb-diagram-source {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+.sb-diagram-upload {
+  width: fit-content;
+  cursor: pointer;
+}
+.sb-diagram-upload input {
+  display: none;
+}
+.sb-diagram-editor .sb-editor-footer {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .sb-diagram-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media print {
+  .sb-external-diagram .viewport-lock-button {
+    display: none;
+  }
+}
+/* Placed just before the frame: covers its reserved area while it loads and
+   only fades in after a short delay, so fast loads show nothing. */
+.sb-diagram-pending {
+  position: relative;
+  height: 0;
+}
+.sb-diagram-pending > [role="status"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #6b6b6b);
+  font-size: 13px;
+  pointer-events: none;
+  animation: sb-diagram-pending-in 160ms ease-out 180ms both;
+}
+@keyframes sb-diagram-pending-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-diagram-pending > [role="status"] {
+    animation-duration: 1ms;
+  }
+}

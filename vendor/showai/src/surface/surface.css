@@ -1,0 +1,1154 @@
+.surface-editor-shell {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+.surface-extra-actions {
+  display: contents;
+}
+.page-surface {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  overflow: clip;
+  isolation: isolate;
+  background: var(--paper, var(--bg));
+  outline-offset: -3px;
+  touch-action: none;
+  /* Screen-size factor for selection chrome inside every enclosing zoom. */
+  --board-inv: calc(var(--board-inv-outer, 1) / var(--board-zoom, 1));
+}
+.surface-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  overflow-anchor: none;
+}
+.surface-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  --board-inv-outer: var(--board-inv);
+}
+.agent-reference-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  cursor: crosshair;
+  touch-action: none;
+}
+.agent-reference-hint {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #ddd);
+  box-shadow: 0 3px 18px #0001;
+  font-size: 12px;
+  pointer-events: none;
+}
+.agent-reference-marquee {
+  position: absolute;
+  border: 1.5px dashed #4585ed;
+  background: #4585ed12;
+  pointer-events: none;
+}
+.agent-reference-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+}
+.agent-reference-preview rect,
+.agent-reference-preview circle,
+.agent-reference-preview path {
+  fill: #4585ed0b;
+  stroke: #4585ed;
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+}
+.surface-object.is-container:has(
+    > .surface-object-content > .container-page[data-frameless="true"]
+  ) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.container-page[data-frameless="true"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.surface-metadata {
+  position: absolute;
+  left: 22px;
+  top: 14px;
+  z-index: 15;
+  max-width: min(50%, 480px);
+  color: var(--muted);
+  background: var(--paper, var(--bg));
+}
+.surface-page-title,
+.surface-metadata .portable-title {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  border: 0;
+  background: transparent;
+  resize: none;
+  padding: 4px;
+  margin: 0;
+  height: auto;
+  line-height: 1.5;
+}
+.surface-object {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+/* Bare media in a Board uses the existing object controls without a second frame. */
+.surface-object:has(> .surface-object-content > .sb-media),
+.surface-object:has(> .surface-object-content > .sb-pdf) {
+  border: 0;
+}
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-content,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-content {
+  padding: 0;
+}
+.surface-object-content > .sb-media,
+.surface-object-content > .sb-pdf {
+  margin: 0;
+}
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.surface-object:has(> .surface-object-content > .sb-media).is-selected
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf).is-selected
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header:focus-within,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header
+  .surface-object-grip
+  > span,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header
+  .surface-object-grip
+  > span {
+  display: none;
+}
+.surface-object:focus-within,
+.surface-object.is-moving {
+  z-index: 2;
+}
+.surface-object.is-moving {
+  user-select: none;
+}
+.surface-object[data-erasing="true"] {
+  opacity: 0.35 !important;
+}
+.board-eraser-cursor {
+  fill: #64748b18;
+  stroke: #64748b;
+  stroke-width: 1;
+  pointer-events: none;
+}
+.surface-object-content {
+  padding: 18px 28px 26px;
+  min-width: 0;
+}
+.surface-object.is-region > .surface-object-content {
+  padding: 26px 44px 44px;
+}
+.surface-object-header {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.surface-object-header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.surface-object-header .surface-object-grip {
+  flex: 1;
+  justify-content: flex-start;
+  text-align: left;
+  min-width: 0;
+}
+.surface-object-grip span {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.surface-object-grip[data-surface-handle] {
+  cursor: grab;
+  touch-action: none;
+}
+.surface-object-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 4px 7px;
+  border: 0;
+  color: var(--muted);
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: 5px;
+}
+.surface-object-content .document-content {
+  min-height: 80px;
+}
+.surface-layout-flow > * + * {
+  margin-top: 16px;
+}
+.surface-layout-grid {
+  display: grid;
+  align-items: start;
+}
+.surface-layout-free {
+  position: relative;
+}
+.surface-layout-free > .surface-object {
+  max-width: none;
+}
+.surface-toolbar {
+  position: absolute;
+  z-index: 80;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 4px 20px #0000000a;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+}
+.surface-toolbar button,
+.surface-toolbar summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--text);
+  cursor: pointer;
+}
+.surface-toolbar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.surface-toolbar summary::-webkit-details-marker {
+  display: none;
+}
+.surface-toolbar summary:hover {
+  background: var(--hover);
+}
+.surface-toolbar .surface-zoom {
+  min-width: 48px;
+  padding: 6px 2px;
+  font-variant-numeric: tabular-nums;
+}
+.surface-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line, var(--border));
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+.surface-popover-anchor {
+  position: relative;
+}
+.surface-navigation,
+.surface-add-menu {
+  position: absolute;
+  bottom: 44px;
+  left: 0;
+  width: 280px;
+  max-height: min(480px, 70dvh);
+  overflow: auto;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  box-shadow: 0 8px 36px #00000012;
+  padding: 10px;
+}
+.surface-add-menu {
+  width: 160px;
+  left: auto;
+  right: 0;
+  display: grid;
+}
+.surface-navigation strong {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 7px 8px;
+}
+.surface-navigation p {
+  font-size: 12px;
+  margin: 8px;
+}
+.surface-navigation-row {
+  display: flex;
+  align-items: center;
+}
+.surface-navigation-row > button:first-child {
+  flex: 1;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.surface-navigation form {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, var(--border));
+}
+.surface-navigation input,
+.surface-inspector input,
+.surface-inspector select {
+  width: 100%;
+  border: 1px solid var(--line, var(--border));
+  padding: 7px 8px;
+  font-size: 13px;
+  background: var(--paper, var(--bg));
+  border-radius: 6px;
+}
+.surface-empty {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.surface-empty button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: var(--text);
+}
+.surface-inspector {
+  position: absolute;
+  right: 16px;
+  top: 56px;
+  width: 250px;
+  max-height: calc(100% - 150px);
+  overflow: auto;
+  z-index: 25;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 32px #0000000a;
+  font-size: 13px;
+}
+.surface-inspector header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.surface-inspector label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--muted);
+}
+.surface-inspector-actions {
+  display: flex;
+  gap: 6px;
+}
+.surface-inspector button {
+  padding: 6px;
+  border-radius: 5px;
+}
+.surface-error {
+  position: absolute;
+  z-index: 35;
+  bottom: 80px;
+  left: 24px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.page-surface.is-hand,
+.page-surface.is-hand .surface-scroll {
+  cursor: grab;
+}
+.page-surface.is-panning,
+.page-surface.is-panning * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.page-surface.is-panning iframe,
+.surface-object.is-moving iframe {
+  pointer-events: none;
+}
+.surface-template {
+  height: 580px;
+  max-height: 70dvh;
+}
+.studio-scroll.has-page-surface {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+.studio-scroll.has-page-surface > .surface-editor-shell {
+  position: absolute;
+  inset: 0;
+}
+.canvas-app:has(.surface-editor-shell) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.portable-app:has(> .page-surface) {
+  height: 100dvh;
+}
+@media (max-width: 640px) {
+  .surface-toolbar {
+    bottom: 12px;
+  }
+  .surface-toolbar button,
+  .surface-toolbar summary {
+    padding: 6px;
+  }
+  .surface-inspector {
+    width: 220px;
+    right: 10px;
+  }
+  .surface-metadata {
+    left: 10px;
+  }
+  .surface-navigation {
+    width: 255px;
+  }
+}
+@media print {
+  .portable-app:has(> .page-surface),
+  .page-surface,
+  .surface-editor-shell {
+    height: auto;
+    overflow: visible;
+  }
+  .surface-scroll,
+  .surface-world,
+  .surface-metadata {
+    position: static;
+    width: auto;
+    height: auto;
+    transform: none !important;
+  }
+  .surface-world {
+    will-change: auto;
+  }
+  .surface-toolbar,
+  .surface-object-header,
+  .surface-object-resize,
+  .surface-inspector,
+  .surface-empty {
+    display: none;
+  }
+  .surface-object {
+    position: static !important;
+    width: auto !important;
+    min-height: 0 !important;
+    left: auto !important;
+    top: auto !important;
+    margin: 12px 0;
+    border: 0 !important;
+    break-inside: auto;
+  }
+  .surface-layout-grid {
+    display: block;
+  }
+  .surface-layout-free {
+    min-height: 0 !important;
+  }
+  .surface-object-content,
+  .surface-object.is-region > .surface-object-content {
+    padding: 0;
+  }
+}
+.surface-reading > .surface-object {
+  width: 100%;
+}
+.surface-reading-heading .portable-title {
+  font-size: 18px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.surface-reading .surface-object-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+@media (max-width: 640px) {
+  .surface-reading .surface-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+.surface-empty-region {
+  min-height: 88px;
+  width: 100%;
+  padding: 18px;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.surface-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.surface-editor-shell {
+  display: flex;
+  min-width: 0;
+}
+.page-surface {
+  min-width: 0;
+}
+.surface-inspector {
+  position: relative;
+  flex: 0 0 250px;
+  right: auto;
+  top: auto;
+  margin: 56px 16px 80px 0;
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  .surface-inspector {
+    position: absolute;
+    top: auto;
+    bottom: 70px;
+    right: 10px;
+    margin: 0;
+    width: min(280px, calc(100% - 20px));
+    max-height: 55%;
+  }
+}
+
+.board-snap-guides {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+  stroke: #e06b52;
+  stroke-width: 1;
+}
+.board-marquee {
+  position: absolute;
+  pointer-events: none;
+  border: calc(1px * var(--board-inv, 1)) solid #467de3;
+  background: #467de31a;
+  z-index: 30;
+}
+.surface-object-rotate {
+  position: absolute;
+  left: calc(50% - 12px * var(--board-inv, 1));
+  top: calc(-44px * var(--board-inv, 1));
+  width: calc(24px * var(--board-inv, 1));
+  height: calc(24px * var(--board-inv, 1));
+  padding: 0;
+  font-size: calc(13px * var(--board-inv, 1));
+  line-height: 1;
+  border: calc(1px * var(--board-inv, 1)) solid var(--border, #ccc);
+  border-radius: 50%;
+  background: var(--panel, white);
+  color: var(--text, #252629);
+  cursor: grab;
+  z-index: 12;
+  touch-action: none;
+}
+.board-selection-count {
+  padding: 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.board-group-outline {
+  position: absolute;
+  pointer-events: none;
+  z-index: 13;
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
+}
+.board-style-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+}
+.board-component-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.board-component-actions:empty {
+  display: none;
+}
+.board-component-actions[hidden] {
+  display: none;
+}
+.board-component-actions .sb-actions {
+  position: static;
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+.board-component-actions .sb-g2-toolbar {
+  margin: 0;
+  padding: 0 6px;
+}
+.board-component-settings {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(560px, 65dvh);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 8px 32px #00000012;
+  font-size: 13px;
+}
+.board-component-settings[hidden] {
+  display: none;
+}
+.board-component-settings :is(.sb-editor-panel, .sb-g2-editor) {
+  margin: 0;
+}
+.board-component-settings button {
+  white-space: normal;
+}
+.board-style-controls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.board-style-controls input[type="color"] {
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+.board-style-controls input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.board-style-controls input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.board-style-controls input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.board-stroke-slider {
+  position: relative;
+  display: block;
+  width: 80px;
+  height: 24px;
+}
+.board-stroke-track {
+  width: 100%;
+  height: 100%;
+  fill: var(--text);
+  opacity: 0.18;
+  pointer-events: none;
+}
+.board-stroke-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+.board-stroke-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 24px;
+  background: transparent;
+}
+.board-stroke-slider input[type="range"]::-moz-range-track {
+  height: 24px;
+  background: transparent;
+}
+.board-stroke-slider input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  border: 2px solid var(--paper, var(--bg));
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--line, var(--border));
+}
+.board-stroke-slider input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--paper, var(--bg));
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--line, var(--border));
+}
+.board-stroke-value-rail {
+  position: absolute;
+  inset: 0 8px;
+  pointer-events: none;
+}
+.board-stroke-value-rail output {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 5px;
+  background: var(--paper, var(--bg));
+  color: var(--text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 8px #0000000a;
+  visibility: hidden;
+}
+.board-stroke-slider[data-active] output {
+  visibility: visible;
+}
+.board-style-controls button {
+  min-width: 24px;
+  min-height: 26px;
+  padding: 3px;
+}
+.container-workspace .container-inspector.board-bottom-inspector {
+  position: absolute;
+  z-index: 25;
+  right: 12px;
+  bottom: 90px;
+  top: auto;
+  margin: 0;
+  width: min(280px, calc(100% - 24px));
+  max-height: calc(100% - 160px);
+  overflow: auto;
+}
+.page-surface .surface-object.is-region {
+  border-color: var(--line, var(--border));
+}
+.page-surface .surface-object.is-hovered:not(.is-drawing) {
+  outline: calc(1px * var(--board-inv, 1)) solid #467de380;
+  outline-offset: calc(2px * var(--board-inv, 1));
+}
+/* A selected Board object always shows its frame, at a constant screen width. */
+.surface-world > .surface-object.is-selected:not(.is-drawing),
+.surface-world
+  .surface-layout-free
+  > .surface-object.is-selected:not(.is-drawing) {
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
+  outline-offset: calc(2px * var(--board-inv, 1));
+}
+.surface-world .surface-object.is-bind-target:not(.is-drawing) {
+  outline: calc(2px * var(--board-inv, 1)) solid #467de3;
+  outline-offset: calc(3px * var(--board-inv, 1));
+}
+.surface-world .surface-object.is-bind-target.is-drawing .board-drawing {
+  filter: drop-shadow(0 0 2px #467de3);
+}
+.board-lock-badge {
+  position: absolute;
+  top: calc(-10px * var(--board-inv, 1));
+  right: calc(-10px * var(--board-inv, 1));
+  display: grid;
+  place-items: center;
+  width: calc(20px * var(--board-inv, 1));
+  height: calc(20px * var(--board-inv, 1));
+  border-radius: 50%;
+  background: #467de3;
+  color: white;
+  z-index: 16;
+  pointer-events: none;
+}
+.board-lock-badge svg {
+  width: calc(11px * var(--board-inv, 1));
+  height: calc(11px * var(--board-inv, 1));
+}
+.page-surface.has-drawing-hit .board-drawing-input {
+  cursor: move;
+}
+@media (max-width: 640px) {
+  .surface-toolbar {
+    bottom: 10px;
+  }
+  .board-style-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+body:has([data-showai-development]) .surface-toolbar {
+  bottom: 36px;
+}
+@media print {
+  .board-group-outline,
+  .board-bottom-inspector {
+    display: none !important;
+  }
+}
+@media print {
+  .surface-object-rotate,
+  .board-snap-guides,
+  .board-marquee {
+    display: none !important;
+  }
+}
+.board-arrow-endpoint {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: calc(13px * var(--board-inv, 1));
+  height: calc(13px * var(--board-inv, 1));
+  padding: 0;
+  border: calc(2px * var(--board-inv, 1)) solid #467de3;
+  border-radius: 50%;
+  background: white;
+  cursor: crosshair;
+  touch-action: none;
+  z-index: 14;
+}
+@media print {
+  .board-arrow-endpoint {
+    display: none !important;
+  }
+}
+.board-resize-handle {
+  position: absolute;
+  width: calc(28px * var(--board-inv, 1));
+  height: calc(28px * var(--board-inv, 1));
+  padding: 0;
+  border: 0;
+  background: transparent;
+  z-index: 15;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+.board-resize-handle::after {
+  content: "";
+  position: absolute;
+  width: calc(10px * var(--board-inv, 1));
+  height: calc(10px * var(--board-inv, 1));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: calc(1px * var(--board-inv, 1)) solid #467de3;
+  border-radius: calc(2px * var(--board-inv, 1));
+  background: white;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .board-resize-handle {
+    width: calc(40px * var(--board-inv, 1));
+    height: calc(40px * var(--board-inv, 1));
+  }
+}
+.board-resize-handle.handle-nw {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+.board-resize-handle.handle-n {
+  left: 50%;
+  top: 0;
+  cursor: ns-resize;
+}
+.board-resize-handle.handle-ne {
+  left: 100%;
+  top: 0;
+  cursor: nesw-resize;
+}
+.board-resize-handle.handle-e {
+  left: 100%;
+  top: 50%;
+  cursor: ew-resize;
+}
+.board-resize-handle.handle-se {
+  left: 100%;
+  top: 100%;
+  cursor: nwse-resize;
+}
+.board-resize-handle.handle-s {
+  left: 50%;
+  top: 100%;
+  cursor: ns-resize;
+}
+.board-resize-handle.handle-sw {
+  left: 0;
+  top: 100%;
+  cursor: nesw-resize;
+}
+.board-resize-handle.handle-w {
+  left: 0;
+  top: 50%;
+  cursor: ew-resize;
+}
+@media print {
+  .board-resize-handle {
+    display: none !important;
+  }
+}
+.surface-object:not(.is-selected) > .board-resize-handle {
+  display: none;
+}
+/* Unselected objects hint at resizing only while hovered. */
+.surface-object.is-hovered:not(.is-selected):not(.is-locked)
+  > .board-resize-handle.handle-se,
+.surface-object[data-board-fixed-height="false"].is-hovered:not(
+    .is-selected
+  ):not(.is-locked)
+  > .board-resize-handle.handle-e {
+  display: block;
+  opacity: 0.5;
+}
+.page-surface.has-object-menu
+  > .surface-scroll
+  > .surface-world
+  > .surface-object
+  > :is(.surface-object-header, .board-resize-handle, .surface-object-rotate) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Free regions frame other objects: only their border and children take
+   pointer input, so content they overlap stays reachable. */
+.surface-world
+  .surface-object.is-region:has(
+    > .surface-object-content > .surface-layout-free
+  ),
+.surface-world
+  .surface-object.is-region
+  > .surface-object-content:has(> .surface-layout-free),
+.surface-world .surface-object.is-region .surface-layout-free {
+  pointer-events: none;
+}
+.surface-world .surface-object.is-region .surface-layout-free > *,
+.surface-world .surface-object.is-region > [data-surface-ui] {
+  pointer-events: auto;
+}
+
+/* Move one composited texture while panning instead of repainting the viewport. */
+.surface-grid {
+  display: none;
+}
+/* Native Board retains object data/layout in the editor while a single native
+   scene owns their presentation and camera for every input tool. */
+.page-surface[data-native-board-active="true"]
+  > .surface-scroll
+  > :is(.surface-world, .surface-grid) {
+  visibility: hidden;
+}
+.page-surface.has-board-grid > .surface-scroll > .surface-grid {
+  display: block;
+  position: absolute;
+  inset: calc(0px - var(--board-grid-size, 24px));
+  pointer-events: none;
+  contain: strict;
+  will-change: transform;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--text, #252629) 18%, transparent) 1px,
+    transparent 1.4px
+  );
+  background-size: var(--board-grid-size, 24px) var(--board-grid-size, 24px);
+}
+
+.page-surface.is-hand .surface-world *,
+.page-surface.is-hand-tool,
+.page-surface.is-hand-tool .surface-world * {
+  cursor: grab !important;
+}
+.page-surface.is-hand-tool.is-panning,
+.page-surface.is-hand-tool.is-panning * {
+  cursor: grabbing !important;
+}
+.page-surface.is-text-tool > .surface-scroll,
+.page-surface.is-text-tool .surface-world > .surface-object {
+  cursor: text;
+}
+.surface-empty.is-hint {
+  pointer-events: none;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* Align and distribute open from the selection actions in the docked toolbar. */
+.board-align-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.board-align-options {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(4, 30px);
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 10px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 8px 32px #00000012;
+}
+.board-align-options button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text);
+}
+.board-align-options button:hover {
+  background: var(--hover);
+}
+.board-align-options button:disabled {
+  opacity: 0.35;
+}
+
+.board-minimap {
+  position: absolute;
+  z-index: 19;
+  right: 16px;
+  bottom: 20px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 10px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 4px 20px #0000000f;
+  cursor: pointer;
+  touch-action: none;
+}
+.board-minimap-object {
+  fill: color-mix(in srgb, var(--text, #252629) 22%, transparent);
+}
+.board-minimap-view {
+  fill: #467de314;
+  stroke: #467de3;
+  stroke-width: 1;
+}
+body:has([data-showai-development]) .board-minimap {
+  bottom: 36px;
+}
+@media (max-width: 640px) {
+  .board-minimap {
+    display: none;
+  }
+}
+@media print {
+  .board-minimap,
+  .board-lock-badge {
+    display: none !important;
+  }
+  .page-surface.has-board-grid > .surface-scroll > .surface-grid {
+    display: none;
+  }
+}
+
+html[data-native="ios"] .board-resize-handle {
+  width: calc(40px * var(--board-inv, 1));
+  height: calc(40px * var(--board-inv, 1));
+}
+
+/* Native archive groups have an extent-local drawing space, not region chrome.
+   This also overrides Page/mobile region gutters. Selection handles stay UI. */
+.page-surface .surface-object.is-region.is-ink-archive-group,
+.surface-object.is-region.is-ink-archive-group {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  min-width: 1px;
+  min-height: 1px;
+  overflow: visible;
+  margin: 0;
+}
+.surface-object.is-region.is-ink-archive-group > .surface-object-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  min-width: 1px;
+  min-height: 1px;
+  overflow: visible;
+}
+.ink-archive-local-space {
+  position: absolute;
+  left: 0;
+  top: 0;
+}

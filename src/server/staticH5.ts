@@ -50,8 +50,8 @@ export async function handleStaticH5Request(req: Request, url: URL): Promise<Res
   return new Response(Bun.file(filePath), { status: 200, headers })
 }
 
-async function resolveH5DistDir(): Promise<string | null> {
-  const candidates = [
+function distDirCandidates(): string[] {
+  return [
     process.env.CLAUDE_H5_DIST_DIR,
     process.env.CLAUDE_APP_ROOT
       ? path.resolve(process.env.CLAUDE_APP_ROOT, '..', 'dist')
@@ -62,18 +62,28 @@ async function resolveH5DistDir(): Promise<string | null> {
     path.resolve(process.cwd(), 'desktop', 'dist'),
     path.resolve(process.cwd(), 'dist'),
   ].filter((candidate): candidate is string => !!candidate)
+}
 
-  for (const candidate of candidates) {
-    try {
-      const stat = await fs.stat(path.join(candidate, 'index.html'))
-      if (stat.isFile()) {
-        return path.resolve(candidate)
-      }
-    } catch {
+async function resolveDistDirContaining(entry: string): Promise<string | null> {
+  for (const candidate of distDirCandidates()) {
+    if (await fileIfExists(path.join(candidate, entry))) {
+      return path.resolve(candidate)
     }
   }
-
   return null
+}
+
+function resolveH5DistDir(): Promise<string | null> {
+  return resolveDistDirContaining('index.html')
+}
+
+export async function resolveDistAsset(pathname: string): Promise<string | null> {
+  const distDir = await resolveDistDirContaining(pathname)
+  if (!distDir) {
+    return null
+  }
+  const requested = containedPath(distDir, pathname)
+  return requested ? fileIfExists(requested) : null
 }
 
 async function resolveStaticFilePath(distDir: string, pathname: string): Promise<string | null> {
@@ -126,6 +136,6 @@ async function fileIfExists(filePath: string): Promise<string | null> {
   }
 }
 
-function contentTypeForPath(filePath: string): string {
+export function contentTypeForPath(filePath: string): string {
   return MIME_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream'
 }

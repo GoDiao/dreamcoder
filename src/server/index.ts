@@ -12,6 +12,7 @@ import { enableConfigs } from '../utils/config.js'
 import { diagnosticsService } from './services/diagnosticsService.js'
 import { ensurePersistentStorageUpgraded } from './services/persistentStorageMigrations.js'
 import { handleStaticH5Request } from './staticH5.js'
+import { handleUiPageRequest, isUiPageRequest } from './uiPageHost.js'
 import { classifyH5Request, isDesktopOnlyPath, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
 import { H5AccessService } from './services/h5AccessService.js'
 
@@ -311,6 +312,10 @@ export function startServer(port = PORT, host = HOST) {
               { status: 500 },
             ), cors)
           }
+        }
+
+        if (isUiPageRequest(url)) {
+          return handleUiPageRequest(req, url)
         }
 
         if (url.pathname.startsWith('/proxy/')) {
