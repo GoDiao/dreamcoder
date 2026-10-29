@@ -21,6 +21,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- **Agent teams:** stopping or restarting a lead session no longer deletes its team and task list. Teams are removed only by `TeamDelete`, not when the CLI process exits (Stop, `/clear`, restart, app quit).
 - **Agent teams:** opening a teammate from the team view shows its conversation instead of an empty page.
   - Each teammate now keeps one transcript. Before, every message it received started a new file with its whole history copied in.
   - Transcripts written before this update still open.

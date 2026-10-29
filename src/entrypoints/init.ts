@@ -188,16 +188,9 @@ export const init = memoize(async (): Promise<void> => {
     // Register LSP manager cleanup (initialization happens in main.tsx after --plugin-dir is processed)
     registerCleanup(shutdownLspServerManager)
 
-    // gh-32730: teams created by subagents (or main agent without
-    // explicit TeamDelete) were left on disk forever. Register cleanup
-    // for all teams created this session. Lazy import: swarm code is
-    // behind feature gate and most sessions never create teams.
-    registerCleanup(async () => {
-      const { cleanupSessionTeams } = await import(
-        '../utils/swarm/teamHelpers.js'
-      )
-      await cleanupSessionTeams()
-    })
+    // Teams are deleted only by an explicit TeamDelete, never on process exit:
+    // the server stops the CLI on Stop, /clear, restart and app quit, and a
+    // restarted or resumed session must find its team and task list on disk.
 
     // Initialize scratchpad directory if enabled
     if (isScratchpadEnabled()) {
