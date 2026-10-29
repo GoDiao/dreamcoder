@@ -5,6 +5,7 @@ import type {
   SessionStateEvent,
   SessionStateKey,
   SessionStatePatch,
+  UiPageSummary,
 } from './types.js'
 
 export function createSessionState(id: string): SessionState {
@@ -21,6 +22,7 @@ export function createSessionState(id: string): SessionState {
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
+    uiPages: [],
     team: null,
     clientCount: 0,
   }
@@ -53,6 +55,7 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
         runtime: { ...state.runtime, desired: event.fields.runtime },
         title: event.fields.title,
         workspace: event.fields.workspace,
+        uiPages: event.fields.uiPages.reduce(upsertUiPage, state.uiPages),
       }
 
     case 'permission_desired_changed': {
@@ -173,6 +176,9 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
     case 'background_task_reported':
       return { ...state, backgroundTasks: upsertBackgroundTask(state.backgroundTasks, event.task, event.at) }
 
+    case 'ui_page_reported':
+      return { ...state, uiPages: upsertUiPage(state.uiPages, event.page) }
+
     case 'team_changed':
       return { ...state, team: event.team }
 
@@ -263,6 +269,13 @@ function trimFinishedTasks(tasks: BackgroundTaskSummary[]): BackgroundTaskSummar
   if (finished.length <= MAX_FINISHED_BACKGROUND_TASKS) return tasks
   const dropped = new Set(finished.slice(0, finished.length - MAX_FINISHED_BACKGROUND_TASKS))
   return tasks.filter((task) => !dropped.has(task))
+}
+
+function upsertUiPage(pages: UiPageSummary[], page: UiPageSummary): UiPageSummary[] {
+  const existing = pages.find((candidate) => candidate.pageId === page.pageId)
+  if (!existing) return [...pages, page]
+  if (existing.revision > page.revision) return pages
+  return pages.map((candidate) => (candidate.pageId === page.pageId ? page : candidate))
 }
 
 function dropUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {

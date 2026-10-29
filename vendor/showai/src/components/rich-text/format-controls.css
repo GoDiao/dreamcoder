@@ -1,0 +1,282 @@
+.rich-format-controls {
+  display: contents;
+}
+.rich-format-group {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+.rich-format-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  flex-shrink: 0;
+  background: var(--line, #e8e8eb);
+}
+.rich-format-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--text, #343a35);
+}
+.rich-format-select > svg:last-child {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  color: var(--muted, #777);
+}
+.rich-format-select select {
+  appearance: none;
+  width: 100%;
+  height: 32px;
+  padding: 0 21px 0 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: 12px/1.2 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+.rich-format-block {
+  width: 70px;
+}
+.rich-format-font {
+  width: 76px;
+}
+.rich-format-size {
+  width: 58px;
+}
+.rich-format-alignment {
+  width: 41px;
+}
+.rich-format-alignment > svg:first-child {
+  margin-left: 6px;
+}
+.rich-format-alignment select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.rich-format-select:hover,
+.rich-format-colors-toggle:hover {
+  background: var(--hover, #f5f5f7);
+}
+.rich-format-select:focus-within {
+  outline: 2px solid var(--accent, #6c805f);
+  outline-offset: -2px;
+}
+.rich-format-select select:focus-visible {
+  outline: none;
+}
+.rich-format-colors-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 43px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, #343a35);
+  cursor: pointer;
+}
+.rich-format-colors-toggle.is-active {
+  background: var(--accent-soft, #eeedf9);
+  color: var(--accent, #6c805f);
+}
+.rich-format-color-icon {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.rich-format-color-icon i {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+.rich-text-selection-toolbar.editor-bubble {
+  --editor-soft: var(--accent-soft, #eeedf9);
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  flex-wrap: wrap;
+  overflow: visible;
+  border: 1px solid var(--line, #e8e8eb);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 12px #25233508,
+    0 12px 36px #25233514;
+}
+.rich-text-selection-toolbar .editor-tool,
+.editor-toolbar .rich-format-group .editor-tool {
+  width: 30px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--text, #343a35);
+  cursor: pointer;
+}
+.rich-text-selection-toolbar .editor-tool:hover,
+.rich-text-selection-toolbar .editor-tool.is-active {
+  color: var(--accent, #6c805f);
+  background: var(--editor-soft);
+}
+.rich-text-selection-toolbar .toolbar-divider {
+  margin: 0 5px;
+  height: 18px;
+}
+.rich-text-selection-toolbar .editor-bubble-assistant {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent, #6c805f) 12%, transparent);
+  border-radius: 7px;
+  background: var(--accent-soft, #eeedf9);
+  color: var(--accent, #6c805f);
+  font: 500 12px/1.2 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+/* Copy reference sits beside Ask AI as a compact icon; its tooltip names the count. */
+.rich-text-selection-toolbar .editor-bubble-reference {
+  color: var(--accent, #6c805f);
+}
+.rich-text-selection-toolbar .editor-bubble-assistant:hover {
+  background: color-mix(
+    in srgb,
+    var(--accent, #6c805f) 15%,
+    var(--paper, white)
+  );
+}
+.rich-text-selection-toolbar :is(button, input):focus-visible,
+.rich-format-color-panel :is(button, input):focus-visible {
+  outline: 2px solid var(--accent, #6c805f);
+  outline-offset: 2px;
+}
+.editor-toolbar:has(.rich-format-controls) {
+  flex-wrap: wrap;
+}
+.editor-toolbar-panel.rich-format-color-panel {
+  width: 140px;
+  padding: 12px;
+}
+.rich-format-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 24px);
+  justify-content: space-between;
+  gap: 10px;
+}
+.rich-format-swatch,
+.rich-format-custom-color {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #0000000a;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.rich-format-swatch:hover {
+  transform: scale(1.12);
+}
+.rich-format-swatch.is-active {
+  outline: 2px solid var(--accent, #6c805f);
+  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px var(--paper, white);
+}
+.rich-format-custom-color {
+  overflow: hidden;
+  border-color: var(--line, #ddd);
+}
+.rich-format-custom-color input {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.rich-format-custom-color input::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+.rich-format-custom-color input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.rich-format-highlight-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+.rich-format-highlight-modes button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #777);
+  font: 11px/1.2 var(--font-ui, system-ui, sans-serif);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rich-format-highlight-modes button[aria-pressed="true"] {
+  border-color: var(--line, #e8e8eb);
+  background: var(--hover, #f5f5f7);
+  color: var(--text, #343a35);
+}
+.rich-format-highlight-preview {
+  color: #343a35;
+  font:
+    600 12px/1.3 Georgia,
+    serif;
+  background: linear-gradient(transparent 52%, var(--highlight-preview) 52%);
+}
+.rich-format-highlight-preview.is-full {
+  background: var(--highlight-preview);
+}
+@media (max-width: 740px) {
+  .rich-text-selection-toolbar .rich-format-divider,
+  .rich-text-selection-toolbar .toolbar-divider {
+    margin-inline: 2px;
+  }
+}
+
+.rich-format-clear-highlight {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #777);
+  font: inherit;
+  cursor: pointer;
+}
+.rich-format-clear-highlight:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rich-text-selection-toolbar .editor-bubble-insert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--editor-muted, #6b6b6b);
+  font: 500 12px/1.2 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+.rich-text-selection-toolbar .editor-bubble-insert:hover {
+  background: var(--editor-soft);
+  color: var(--accent, #6c805f);
+}

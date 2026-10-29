@@ -21,6 +21,10 @@ export type AppModeLocations = {
 const PORTABLE_DATA_FILES = ['settings.json', '.claude.json', '.mcp.json']
 const PORTABLE_DATA_DIRS = ['Cache', 'projects', 'skills', 'plugins', 'cowork_plugins', 'dreamcoder']
 
+export function electronUserDataDir(configDir: string) {
+  return path.join(configDir, 'Electron')
+}
+
 export function appModeLocations(executablePath: string, systemConfigDir: string): AppModeLocations {
   return {
     defaultPortableDir: path.join(path.dirname(executablePath), PORTABLE_DIR_NAME),

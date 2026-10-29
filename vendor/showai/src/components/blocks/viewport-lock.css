@@ -1,0 +1,68 @@
+.viewport-lock-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--sb-line, var(--line, #e9ece5));
+  border-radius: 6px;
+  background: var(--sb-surface, var(--paper, #fff));
+  color: var(--sb-muted, var(--muted, #92968f));
+  cursor: pointer;
+}
+.viewport-lock-button[aria-pressed="false"] {
+  color: var(--accent, #120a8f);
+}
+.viewport-lock-button:hover {
+  background: var(--sb-hover, var(--hover, #f0f2ed));
+}
+.viewport-lock-button:focus-visible {
+  outline: 2px solid var(--accent, #120a8f);
+  outline-offset: 2px;
+}
+.viewport-lock-error {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 220px;
+  padding: 8px;
+  background: var(--paper, #fff);
+  color: var(--text, #343a35);
+  font-size: 11px;
+}
+.viewport-lock-button:hover .viewport-lock-error,
+.viewport-lock-button:focus-visible .viewport-lock-error {
+  display: block;
+}
+[data-viewport-locked="true"] > .surface-scroll {
+  touch-action: pan-y;
+  overscroll-behavior: auto;
+}
+.sf-block[data-viewport-locked="true"] .react-flow__pane,
+.sf-block[data-viewport-locked="true"] .react-flow__node {
+  touch-action: pan-y;
+  cursor: auto;
+}
+.sb-header:has(~ .viewport-lock-button) {
+  right: 42px;
+}
+.sb-header.has-caption:has(~ .viewport-lock-button) {
+  right: auto;
+  padding-right: 42px;
+}
+.sb-header.has-caption:has(~ .viewport-lock-button) > .sb-actions {
+  right: 42px;
+}
+.sb-g2-chart:has(> .viewport-lock-button) > .sb-g2-toolbar {
+  padding-right: 42px;
+}
+@media print {
+  .viewport-lock-button {
+    display: none !important;
+  }
+}

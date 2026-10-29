@@ -1494,6 +1494,11 @@ export class SessionService {
     }
   }
 
+  async getSessionDataDir(sessionId: string): Promise<string | null> {
+    const found = await this.findSessionFile(sessionId)
+    return found ? path.join(this.getProjectsDir(), found.projectDir, sessionId) : null
+  }
+
   async getSessionPermissionMode(sessionId: string): Promise<PermissionMode | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null

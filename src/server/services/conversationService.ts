@@ -22,6 +22,7 @@ import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSett
 import { SettingsService } from './settingsService.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { permissionModeCliArgs } from './permissionModes.js'
+import { SHOW_UI_ENABLED_ENV } from '../../tools/ShowUITool/constants.js'
 
 const MAX_CAPTURED_PROCESS_LINES = 80
 const MAX_CAPTURED_SDK_MESSAGES = 40
@@ -1000,6 +1001,7 @@ export class ConversationService {
       CLAUDE_CODE_ENABLE_TASKS: '1',
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
       CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: '1',
+      [SHOW_UI_ENABLED_ENV]: '1',
       CLAUDE_CODE_DIAGNOSTICS_FILE: cliDiagnosticsPath,
       CLAUDE_COWORK_MEMORY_PATH_OVERRIDE: this.resolveDesktopAutoMemoryPath(workDir),
       CALLER_DIR: workDir,

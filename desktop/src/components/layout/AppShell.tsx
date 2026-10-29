@@ -6,6 +6,7 @@ import { onMenuNavigate } from '../../lib/shell'
 import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
 import { UpdateChecker } from '../shared/UpdateChecker'
+import { BrowserGuestLayer } from '../workspace/BrowserGuestLayer'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useUIStore, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, type SettingsTab } from '../../stores/uiStore'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
@@ -365,6 +366,7 @@ export function AppShell() {
           style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
         />
       ) : null}
+      {desktopShell ? <BrowserGuestLayer /> : null}
       <SettingsModal />
       <CommandPalette />
       <UpdateChecker />

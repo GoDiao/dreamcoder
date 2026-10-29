@@ -9,6 +9,7 @@ import {
   detectPortableDir,
   determineStartupPortableDir,
   dirHasPortableData,
+  electronUserDataDir,
   readAppModeConfig,
   setAppMode,
   type AppModeLocations,
@@ -129,5 +130,12 @@ describe('restart', () => {
     const explicit: NodeJS.ProcessEnv = { DREAMCODER_CONFIG_DIR: '/env' }
     clearPortableEnvForRestart(explicit)
     expect(explicit).toEqual({ DREAMCODER_CONFIG_DIR: '/env' })
+  })
+})
+
+describe('electron user data', () => {
+  it('keeps each config directory in its own user data folder', () => {
+    expect(electronUserDataDir(path.join('/work', 'a'))).toBe(path.join('/work', 'a', 'Electron'))
+    expect(electronUserDataDir(path.join('/work', 'b'))).not.toBe(electronUserDataDir(path.join('/work', 'a')))
   })
 })

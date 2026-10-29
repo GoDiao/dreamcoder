@@ -18,7 +18,8 @@
   "scripts": {
     "prepare:ripgrep": "bun run ../scripts/prepare-ripgrep.ts",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && bun run build:showai-reader",
+    "build:showai-reader": "bun ../vendor/showai/build-reader.ts dist/showai-reader",
     "build:sidecars": "bun run ./scripts/build-sidecars.ts",
     "build:electron": "bun run ./scripts/build-electron.ts",
     "electron:install": "node node_modules/electron/install.js",

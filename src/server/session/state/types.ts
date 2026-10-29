@@ -1,6 +1,12 @@
 import type { BackgroundTaskEvent, GoalEventAction } from '../../transcript/classify.js'
 import type { ClientKind, PermissionMode } from '../../ws/protocol.js'
 
+export type UiPageSummary = {
+  pageId: string
+  title: string
+  revision: number
+}
+
 export type RuntimeSelection = {
   providerId: string | null
   modelId: string
@@ -95,6 +101,7 @@ export type SessionState = {
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
+  uiPages: UiPageSummary[]
   team: { name: string; role: 'lead' | 'member' } | null
   clientCount: number
 }
@@ -108,6 +115,7 @@ export type RestoredSessionFields = {
   runtime: RuntimeSelection | null
   title: SessionState['title']
   workspace: SessionState['workspace']
+  uiPages: UiPageSummary[]
 }
 
 export type SessionStateEvent =
@@ -133,6 +141,7 @@ export type SessionStateEvent =
   | { type: 'slash_commands_reported'; commands: SessionSlashCommand[] }
   | { type: 'goal_reported'; goal: Omit<ActiveGoal, 'updatedAt'>; at: number }
   | { type: 'background_task_reported'; task: BackgroundTaskEvent; at: number }
+  | { type: 'ui_page_reported'; page: UiPageSummary }
   | { type: 'team_changed'; team: SessionState['team'] }
   | { type: 'clients_changed'; count: number }
   | { type: 'conversation_cleared' }

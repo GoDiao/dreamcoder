@@ -1,3 +1,5 @@
+export const UI_PAGE_ROUTE_PREFIX = '/ui-pages/'
+
 export type H5RequestKind = 'local-trusted' | 'internal-sdk' | 'h5-browser'
 export type H5RequestContext = {
   clientAddress: string | null
@@ -105,7 +107,8 @@ function isH5ProtectedCapabilityPath(pathname: string): boolean {
   return pathname.startsWith('/api/') ||
     pathname.startsWith('/proxy/') ||
     pathname.startsWith('/ws/') ||
-    pathname.startsWith('/sdk/')
+    pathname.startsWith('/sdk/') ||
+    pathname.startsWith(UI_PAGE_ROUTE_PREFIX)
 }
 
 function isH5BrowserCapabilityPath(pathname: string): boolean {

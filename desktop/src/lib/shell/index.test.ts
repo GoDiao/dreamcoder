@@ -109,4 +109,33 @@ describe('electron shell', () => {
     expect(electronShell.getFilePath(new File(['x'], 'dropped.txt'))).toBe('/Users/me/dropped.txt')
     expect(electronShell.getFilePath(new File(['x'], 'pasted.png'))).toBeUndefined()
   })
+  it('sends browser commands to the main process', async () => {
+    const { bridge } = installBridge(async () => ({ ok: true, url: 'http://localhost:3000/' }))
+    await expect(electronShell.resolveBrowserInput({ input: 'localhost:3000', projectRoot: '/repo' })).resolves.toEqual({ ok: true, url: 'http://localhost:3000/' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_resolve', { input: 'localhost:3000', projectRoot: '/repo' })
+    await electronShell.openBrowserUrlInSystem('https://example.com/')
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_open_in_system', { url: 'https://example.com/' })
+    await electronShell.openBrowserExternalProtocol('zoommtg://x')
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_open_protocol', { url: 'zoommtg://x' })
+    await electronShell.clearBrowserData()
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_clear_data', undefined)
+  })
+
+  it('delivers browser events from the main process', async () => {
+    const { listeners } = installBridge(async () => undefined)
+    const blocked = vi.fn()
+    const external = vi.fn()
+    const shortcut = vi.fn()
+    await electronShell.onBrowserBlocked(blocked)
+    await electronShell.onBrowserExternalRequest(external)
+    await electronShell.onBrowserShortcut(shortcut)
+
+    listeners.get('browser-blocked')?.({ guestId: 1, url: 'http://x.test', reason: 'scheme' })
+    listeners.get('browser-external-request')?.({ url: 'vscode://x' })
+    listeners.get('browser-shortcut')?.({ key: 'k' })
+
+    expect(blocked).toHaveBeenCalledWith({ guestId: 1, url: 'http://x.test', reason: 'scheme' })
+    expect(external).toHaveBeenCalledWith({ url: 'vscode://x' })
+    expect(shortcut).toHaveBeenCalledWith({ key: 'k' })
+  })
 })

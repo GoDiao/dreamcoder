@@ -178,6 +178,7 @@ function mirrorState(overrides: Partial<SessionState> = {}): SessionState {
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
+    uiPages: [],
     team: null,
     clientCount: 1,
     ...overrides,

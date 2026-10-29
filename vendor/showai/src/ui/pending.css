@@ -1,0 +1,59 @@
+.showai-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 14px 0;
+  color: var(--muted, #6b6b6b);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.showai-pending-anchor {
+  position: relative;
+  height: 0;
+}
+.showai-pending.is-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  pointer-events: none;
+}
+.showai-pending-label {
+  animation: showai-pending-in 160ms ease-out both;
+}
+.showai-pending-bar {
+  display: block;
+  height: 12px;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--border, rgba(127, 127, 127, 0.18));
+  opacity: 0.55;
+  animation: showai-pending-pulse 1.6s ease-in-out infinite;
+}
+.showai-pending-bar:nth-child(3n + 2) {
+  width: 72%;
+}
+.showai-pending-bar:nth-child(3n) {
+  width: 86%;
+}
+@keyframes showai-pending-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes showai-pending-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .showai-pending-label,
+  .showai-pending-bar {
+    animation: none;
+  }
+}

@@ -1,0 +1,43 @@
+import { defineMessages } from "../index";
+
+// Waterfall (bridge) built-in: how a starting value becomes an ending value.
+export default defineMessages("waterfall", {
+  "zh-CN": {
+    title: "瀑布桥图",
+    "kind.total": "合计",
+    "kind.up": "增加",
+    "kind.down": "减少",
+    chart: "从期初到期末的逐项变动",
+    step: "{label}，{kind} {value}",
+    hint: "点击柱子或用方向键切换，查看这一步的构成。",
+    axisFloor: "纵轴从 {value} 起，以便看清变动。",
+    mismatch: "「{label}」写的是 {stated}，各项累计为 {computed}，两者对不上。",
+    share: "占比",
+    noBreakdown: "这一步没有列出构成。",
+    breakdownGap: "明细合计 {sum}，与这一步的 {value} 相差 {gap}。",
+    readAll: "以表格阅读全部步骤（{count}）",
+    "column.step": "步骤",
+    "column.kind": "类型",
+    "column.value": "变动",
+    "column.level": "累计",
+  },
+  en: {
+    title: "Waterfall",
+    "kind.total": "Total",
+    "kind.up": "Increase",
+    "kind.down": "Decrease",
+    chart: "Step-by-step change from opening to closing value",
+    step: "{label}, {kind} {value}",
+    hint: "Click a bar or use the arrow keys to see what makes up that step.",
+    axisFloor: "The axis starts at {value} so the changes stay visible.",
+    mismatch: "“{label}” states {stated}, but the steps add up to {computed}.",
+    share: "Share",
+    noBreakdown: "No breakdown is listed for this step.",
+    breakdownGap: "Items add up to {sum}, {gap} away from this step's {value}.",
+    readAll: "Read every step as a table ({count})",
+    "column.step": "Step",
+    "column.kind": "Kind",
+    "column.value": "Change",
+    "column.level": "Running total",
+  },
+});

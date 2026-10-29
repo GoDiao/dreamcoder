@@ -15,6 +15,7 @@ import type { AgentTaskNotification } from '../../types/chat'
 import { getCuaToolDisplay, humanizeCuaResult, isCuaPermissionError } from '../../lib/cuaToolDisplay'
 import { useUIStore } from '../../stores/uiStore'
 import { ToolResultImages, extractToolResultImages } from './ToolResultImages'
+import { parseUiPageResult } from '../../lib/uiPageBridge'
 
 type Props = {
   toolName: string
@@ -409,6 +410,10 @@ function getToolResultSummary(
   }
 
   if (toolName === 'Bash') return ''
+  if (toolName === 'ShowUI') {
+    const page = parseUiPageResult(content)
+    return page ? (t?.('uiPage.revision', { title: page.title, revision: page.revision }) ?? `${page.title} · rev ${page.revision}`) : ''
+  }
 
   const lineCount = text.split('\n').length
   if (lineCount > 1) {
@@ -445,9 +450,22 @@ function getToolSummary(toolName: string, obj: Record<string, unknown>, t?: (key
       return typeof obj.pattern === 'string' ? obj.pattern : ''
     case 'Agent':
       return typeof obj.description === 'string' ? obj.description : ''
+    case 'ShowUI':
+      return getShowUiSummary(obj, t)
     default:
       return ''
   }
+}
+
+function getShowUiSummary(obj: Record<string, unknown>, t?: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (obj.catalog === true) return t?.('tool.showUi.catalog') ?? 'List components'
+  if (Array.isArray(obj.describe)) {
+    const kinds = obj.describe.filter((kind): kind is string => typeof kind === 'string').join(', ')
+    return t?.('tool.showUi.describe', { kinds }) ?? `Read the format of ${kinds}`
+  }
+  if ('blocks' in obj) return t?.('tool.showUi.create') ?? 'Create a page'
+  if ('operations' in obj) return t?.('tool.showUi.update') ?? 'Update a page'
+  return t?.('tool.showUi.read') ?? 'Read a page'
 }
 
 function extractTextContent(content: unknown): string | null {

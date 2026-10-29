@@ -1,9 +1,9 @@
-import { ArrowLeftIcon, BotIcon, CircleCheckIcon, PanelRight, SquareTerminal, Target } from 'lucide-react'
+import { ArrowLeftIcon, BotIcon, CircleCheckIcon, PanelRight, Target } from 'lucide-react'
 import { usePanelWidthPersistence } from '../hooks/usePanelWidthPersistence'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/shared/ui/resizable'
 import { Button } from '../components/shared/ui/button'
 import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
-import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type CSSProperties } from 'react'
 import {
   SCHEDULED_TAB_ID,
   useTabStore,
@@ -117,31 +117,6 @@ function ActiveGoalStrip({
   )
 }
 
-function HeaderIconButton({
-  label,
-  pressed,
-  onClick,
-  children,
-}: {
-  label: string
-  pressed: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <HintTooltip content={label}><Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={label}
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={pressed ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}
-    >
-      {children}
-    </Button></HintTooltip>
-  )
-}
-
 function getSessionProjectName(session: SessionListItem | undefined, repoName: string | null | undefined) {
   if (!session) return repoName ?? undefined
   return getPathName(session.projectRoot)
@@ -184,12 +159,13 @@ export function ActiveSession() {
   // On macOS the header is the window's title row. With the sidebar hidden it
   // starts at the window's edge, under the traffic lights and the sidebar toggle.
   const macTitlebar = isMacOverlayTitlebar()
-  const headerStyle = macTitlebar
+  const titleRowStyle = (atWindowEdge: boolean): CSSProperties | undefined => macTitlebar
     ? {
         height: 'var(--titlebar-height)',
-        ...(sidebarOpen ? {} : { paddingLeft: 'calc(var(--traffic-lights-end) + 1.75rem + 12px)' }),
+        ...(atWindowEdge && !sidebarOpen ? { paddingLeft: 'calc(var(--traffic-lights-end) + 1.75rem + 12px)' } : {}),
       }
     : undefined
+  const titleRowClass = macTitlebar ? '' : 'h-11'
   const canUsePanel = Boolean(activeTabId) &&
     isSessionTabState(activeTabId, activeTabType) &&
     !isMemberSession &&
@@ -197,7 +173,6 @@ export function ActiveSession() {
   const showPanel = useWorkspacePanelStore((state) =>
     canUsePanel && activeTabId ? state.isPanelOpen(activeTabId) : false,
   )
-  const panelTab = useWorkspacePanelStore((state) => activeTabId ? state.getPanelTab(activeTabId) : 'files')
   const panelExpanded = useWorkspacePanelStore((state) =>
     showPanel && activeTabId ? state.isPanelExpanded(activeTabId) : false,
   )
@@ -265,49 +240,6 @@ export function ActiveSession() {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
-      {showHeader && (
-        <header
-          data-testid="session-header"
-          style={headerStyle}
-          className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${macTitlebar ? '' : 'h-11'}`}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">
-              {session?.title || t('session.untitled')}
-            </h1>
-            {isActive && (
-              <span
-                data-testid="session-header-running"
-                className="flex shrink-0 items-center gap-1 text-ui-aux text-[var(--color-text-secondary)]"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
-                {t('session.active')}
-              </span>
-            )}
-          </div>
-          {canUsePanel && (
-            <div className="flex shrink-0 items-center gap-[3px]">
-              {isDesktopRuntime() && <OpenProjectMenu path={openProjectPath} />}
-              <HeaderIconButton
-                label={t('session.header.terminal')}
-                pressed={showPanel && panelTab === 'terminal'}
-                onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId, 'terminal')}
-              >
-                <SquareTerminal size={17} strokeWidth={1.9} aria-hidden="true" />
-              </HeaderIconButton>
-              <HeaderIconButton
-                label={t('session.header.files')}
-                pressed={showPanel && panelTab === 'files'}
-                onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId, 'files')}
-              >
-                <PanelRight size={17} strokeWidth={1.9} aria-hidden="true" />
-              </HeaderIconButton>
-              <SessionHeaderMenu sessionId={activeTabId} title={session?.title || ''} />
-            </div>
-          )}
-        </header>
-      )}
-
       <ResizablePanelGroup orientation="horizontal" data-testid="active-session-content-row" className="relative min-h-0 min-w-0 flex-1" onLayoutChanged={onLayoutChanged}>
         <ResizablePanel id="conversation-panel" minSize={panelExpanded || useOverlayPanel ? 0 : showPanel ? WORKSPACE_PANEL_MIN_CHAT_WIDTH : 0} maxSize={panelExpanded ? 0 : undefined} className="flex min-h-0">
         <div
@@ -315,6 +247,48 @@ export function ActiveSession() {
           hidden={panelExpanded}
           className="flex min-w-0 flex-1 flex-col"
         >
+          {showHeader && (
+            <header
+              data-testid="session-header"
+              style={titleRowStyle(true)}
+              className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${titleRowClass}`}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">
+                  {session?.title || t('session.untitled')}
+                </h1>
+                {isActive && (
+                  <span
+                    data-testid="session-header-running"
+                    className="flex shrink-0 items-center gap-1 text-ui-aux text-[var(--color-text-secondary)]"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
+                    {t('session.active')}
+                  </span>
+                )}
+              </div>
+              {canUsePanel && (
+                <div className="flex shrink-0 items-center gap-[3px]">
+                  {isDesktopRuntime() && <OpenProjectMenu path={openProjectPath} />}
+                  <SessionHeaderMenu sessionId={activeTabId} title={session?.title || ''} />
+                  {!showPanel && (
+                    <HintTooltip content={t('workspace.openSidePanel')}>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t('workspace.openSidePanel')}
+                        onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId)}
+                        className="text-[var(--color-text-secondary)]"
+                      >
+                        <PanelRight size={17} strokeWidth={1.9} aria-hidden="true" />
+                      </Button>
+                    </HintTooltip>
+                  )}
+                </div>
+              )}
+            </header>
+          )}
+
           {isMemberSession && (
             <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface-container)]">
               <div className="mx-auto max-w-[860px] flex items-center justify-between gap-4 px-8 py-2">
@@ -427,8 +401,12 @@ export function ActiveSession() {
             >
               <WorkspacePanel
                 sessionId={activeTabId}
+                sessionTitle={session?.title || t('session.untitled')}
+                titleRowStyle={titleRowStyle(panelExpanded)}
+                titleRowClass={titleRowClass}
                 terminalCwd={getSessionTerminalCwd(session)}
                 contextLabel={contextLabel}
+                projectRoot={openProjectPath}
               />
             </Suspense>
           </ResizablePanel>

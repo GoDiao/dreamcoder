@@ -90,3 +90,35 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## ShowAI 0.10.0
+
+DreamCoder includes source code from ShowAI (https://github.com/Renaissance-Mind/ShowAI,
+commit 9be7012364d7329e5de159e93b25fa1a9b2f6bae) in `vendor/showai`, with the changes listed in
+`vendor/showai/README.md`. It is distributed under the MIT license. Its diagram components carry
+templates from Archify (https://github.com/tt-a1i/archify), Diagram Design
+(https://github.com/cathrynlavery/diagram-design) and Fireworks Tech Graph
+(https://github.com/yizhiyanhua-ai/fireworks-tech-graph), all MIT licensed; their license texts and
+notices are in `vendor/showai/src/components/blocks/diagrams/licenses.json`.
+
+MIT License
+
+Copyright (c) 2026 Renaissance Mind
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

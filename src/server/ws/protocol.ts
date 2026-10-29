@@ -22,6 +22,7 @@ export type {
   SessionStatePatch,
   TurnActivity,
   TurnPhase,
+  UiPageSummary,
 } from '../session/state/types.js'
 
 /** The permission modes a client may set; mirrors the CLI's `ExternalPermissionMode`. */

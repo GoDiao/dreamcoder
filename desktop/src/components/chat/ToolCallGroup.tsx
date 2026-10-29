@@ -97,9 +97,12 @@ function groupHasErrors(
   resultMap: Map<string, ToolResult>,
   childToolCallsByParent: Map<string, ToolCall[]>,
 ): boolean {
-  return toolCalls.some((tc) => {
-    return toolCallHasError(tc, resultMap, childToolCallsByParent)
-  })
+  const succeeded = (toolCall: ToolCall) =>
+    resultMap.has(toolCall.toolUseId) && !toolCallHasError(toolCall, resultMap, childToolCallsByParent)
+  return toolCalls.some((toolCall, index) =>
+    toolCallHasError(toolCall, resultMap, childToolCallsByParent)
+    && !toolCalls.slice(index + 1).some((later) => later.toolName === toolCall.toolName && succeeded(later)),
+  )
 }
 
 function isToolCallResolved(

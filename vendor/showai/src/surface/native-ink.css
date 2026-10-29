@@ -1,0 +1,35 @@
+.board-ink-dark {
+  display: none;
+}
+:root[data-theme="dark"] .board-ink-light {
+  display: none;
+}
+:root[data-theme="dark"] .board-ink-dark {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .board-ink-light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .board-ink-dark {
+    display: block;
+  }
+}
+.native-ink-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.native-ink-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.page-surface[data-native-ink-active="true"] [data-native-ink] {
+  visibility: hidden;
+}
