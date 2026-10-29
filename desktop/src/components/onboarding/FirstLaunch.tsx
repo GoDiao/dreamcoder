@@ -4,7 +4,7 @@ import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
 import { ProviderFormModal } from '../settings/ProviderFormModal'
 import type { SavedProvider } from '../../types/provider'
@@ -83,7 +83,7 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
     )
   } else {
     importStatus = (
-      <Button size="xs" variant="secondary" disabled={finishing} onClick={() => void startImport()}>
+      <Button size="xs" variant="outline" disabled={finishing} onClick={() => void startImport()}>
         {t('firstLaunch.importAction')}
       </Button>
     )

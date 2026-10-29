@@ -5,7 +5,7 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
-  ProviderModel,
+  DiscoveredProviderModel,
   DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
@@ -14,7 +14,7 @@ type ProvidersResponse = { providers: SavedProvider[]; activeId: string | null }
 type ProviderResponse = { provider: SavedProvider }
 type PresetsResponse = { presets: ProviderPreset[] }
 type TestResultResponse = { result: ProviderTestResult }
-type ModelsResponse = { models: ProviderModel[] }
+type ModelsResponse = { models: DiscoveredProviderModel[] }
 type AuthStatusResponse = {
   hasAuth: boolean
   source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'

@@ -1,8 +1,8 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { saveAndVerifyH5Connection } from '../../lib/desktopRuntime'
-import { Button } from '../shared/Button'
-import { Input } from '../shared/Input'
+import { Button } from '../shared/ui/button'
+import { LabeledInput } from '../shared/LabeledInput'
 
 type H5ConnectionViewProps = {
   initialServerUrl?: string | null
@@ -50,22 +50,22 @@ export function H5ConnectionView({
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <Input
+          <LabeledInput
             label="Server URL"
+            required
             placeholder="https://chat.example.com"
             value={serverUrl}
             onChange={(event) => setServerUrl(event.target.value)}
             autoComplete="url"
-            required
           />
-          <Input
+          <LabeledInput
             label="H5 Token"
+            required
             type="password"
             placeholder="h5_..."
             value={token}
             onChange={(event) => setToken(event.target.value)}
             autoComplete="current-password"
-            required
           />
 
           {error ? (

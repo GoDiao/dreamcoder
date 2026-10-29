@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
-import { join, relative, resolve, sep } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 function sourceFiles(directory: string): string[] {
@@ -11,11 +11,10 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('shell dependency boundary', () => {
-  it('keeps every Tauri dependency inside the shell module', () => {
+  it('keeps the page code away from Electron modules', () => {
     const root = resolve('src')
     const violations = sourceFiles(root).filter((file) => {
-      if (relative(root, file).split(sep).join('/').startsWith('lib/shell/')) return false
-      return readFileSync(file, 'utf8').includes('@tauri-apps/')
+      return /from ['"]electron['"]/.test(readFileSync(file, 'utf8'))
     }).map((file) => relative(root, file))
     expect(violations).toEqual([])
   })

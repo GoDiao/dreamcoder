@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dir, '..')
-const USAGE = 'Usage: bun run scripts/release.ts <patch|minor|major|x.y.z> [--dry]'
+const USAGE = 'Usage: bun run scripts/release.ts <patch|minor|major|x.y.z|x.y.z-pre.N> [--dry]'
 
 const replaceJsonVersion = (content: string, version: string) =>
   content.replace(/"version":\s*"[^"]*"/, `"version": "${version}"`)
@@ -23,34 +23,32 @@ const jsonVersionSet = (content: string, version: string) =>
 const VERSION_FILES = [
   { path: 'package.json', update: replaceJsonVersion, updated: jsonVersionSet },
   { path: 'desktop/package.json', update: replaceJsonVersion, updated: jsonVersionSet },
-  { path: 'desktop/src-tauri/tauri.conf.json', update: replaceJsonVersion, updated: jsonVersionSet },
-  {
-    path: 'desktop/src-tauri/Cargo.toml',
-    update: (content: string, version: string) =>
-      content.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`),
-    updated: (content: string, version: string) =>
-      content.match(/^version\s*=\s*"([^"]*)"/m)?.[1] === version,
-  },
-  {
-    // Only the app's own entry; the dependency versions stay as locked.
-    path: 'desktop/src-tauri/Cargo.lock',
-    update: (content: string, version: string) =>
-      content.replace(/(name = "dreamcoder-desktop"\r?\nversion = )"[^"]*"/, `$1"${version}"`),
-    updated: (content: string, version: string) =>
-      content.match(/name = "dreamcoder-desktop"\r?\nversion = "([^"]*)"/)?.[1] === version,
-  },
 ]
 
 function getCurrentVersion(): string {
-  const tauriConf = JSON.parse(
-    readFileSync(path.join(root, 'desktop/src-tauri/tauri.conf.json'), 'utf-8'),
+  const desktopPackage = JSON.parse(
+    readFileSync(path.join(root, 'desktop/package.json'), 'utf-8'),
   )
-  return tauriConf.version
+  return desktopPackage.version
 }
 
-function bumpVersion(current: string, bump: string): string {
-  if (/^\d+\.\d+\.\d+$/.test(bump)) {
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+
+export function isPrerelease(version: string): boolean {
+  return version.includes('-')
+}
+
+export function bumpVersion(current: string, bump: string): string {
+  if (VERSION_PATTERN.test(bump)) {
     return bump
+  }
+
+  if (!['patch', 'minor', 'major'].includes(bump)) {
+    throw new Error(`Invalid bump type: ${bump}`)
+  }
+
+  if (isPrerelease(current)) {
+    throw new Error(`${current} is a pre-release; give the next version explicitly, e.g. 0.8.0 or 0.8.0-beta.2`)
   }
 
   const [major, minor, patch] = current.split('.').map(Number)
@@ -60,62 +58,71 @@ function bumpVersion(current: string, bump: string): string {
       return `${major}.${minor}.${patch + 1}`
     case 'minor':
       return `${major}.${minor + 1}.0`
-    case 'major':
-      return `${major + 1}.0.0`
     default:
-      console.error(`Invalid bump type: ${bump}`)
-      console.error(USAGE)
-      process.exit(1)
+      return `${major + 1}.0.0`
   }
 }
 
-const args = process.argv.slice(2)
-const dryRun = args.includes('--dry')
-const bumpArg = args.find((a) => a !== '--dry')
-
-if (!bumpArg) {
-  console.error(USAGE)
-  process.exit(1)
+if (import.meta.main) {
+  main()
 }
 
-const current = getCurrentVersion()
-const next = bumpVersion(current, bumpArg)
-const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf-8')
-const hasChangelogSection = changelog.split('\n').some((line) => line.startsWith(`## [${next}]`))
+function main(): void {
+  const args = process.argv.slice(2)
+  const dryRun = args.includes('--dry')
+  const bumpArg = args.find((a) => a !== '--dry')
 
-console.log(`\n  Version: ${current} → ${next}`)
-console.log(`  Tag:     v${next}`)
-console.log(`  CHANGELOG section "## [${next}]": ${hasChangelogSection ? 'present' : 'missing'}`)
-console.log(`  Dry run: ${dryRun}\n`)
-
-if (dryRun) {
-  console.log('Files that would be updated:')
-  for (const file of VERSION_FILES) {
-    console.log(`  - ${file.path}`)
-  }
-  process.exit(0)
-}
-
-// Compute and check every file before writing any, so a failure leaves nothing half-bumped.
-const updates = VERSION_FILES.map((file) => {
-  const filePath = path.join(root, file.path)
-  const content = file.update(readFileSync(filePath, 'utf-8'), next)
-  if (!file.updated(content, next)) {
-    console.error(`  Could not set the version in ${file.path}; nothing was written.`)
+  if (!bumpArg) {
+    console.error(USAGE)
     process.exit(1)
   }
-  return { file, filePath, content }
-})
 
-for (const { file, filePath, content } of updates) {
-  writeFileSync(filePath, content)
-  console.log(`  Updated: ${file.path}`)
+  const current = getCurrentVersion()
+  let next: string
+  try {
+    next = bumpVersion(current, bumpArg)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    console.error(USAGE)
+    process.exit(1)
+  }
+  const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf-8')
+  const hasChangelogSection = changelog.split('\n').some((line) => line.startsWith(`## [${next}]`))
+
+  console.log(`\n  Version: ${current} → ${next}`)
+  console.log(`  Tag:     v${next}`)
+  console.log(`  CHANGELOG section "## [${next}]": ${hasChangelogSection ? 'present' : 'missing'}`)
+  console.log(`  Dry run: ${dryRun}\n`)
+
+  if (dryRun) {
+    console.log('Files that would be updated:')
+    for (const file of VERSION_FILES) {
+      console.log(`  - ${file.path}`)
+    }
+    process.exit(0)
+  }
+
+  // Compute and check every file before writing any, so a failure leaves nothing half-bumped.
+  const updates = VERSION_FILES.map((file) => {
+    const filePath = path.join(root, file.path)
+    const content = file.update(readFileSync(filePath, 'utf-8'), next)
+    if (!file.updated(content, next)) {
+      console.error(`  Could not set the version in ${file.path}; nothing was written.`)
+      process.exit(1)
+    }
+    return { file, filePath, content }
+  })
+
+  for (const { file, filePath, content } of updates) {
+    writeFileSync(filePath, content)
+    console.log(`  Updated: ${file.path}`)
+  }
+
+  if (!hasChangelogSection) {
+    console.warn(`\n  CHANGELOG.md has no "## [${next}]" section yet. The Release workflow`)
+    console.warn('  takes the release notes from it and fails without one.')
+  }
+
+  console.log('\n  Next: commit on a release branch and open a pull request. After it merges,')
+  console.log(`  tag main with: git tag -a v${next} -m "DreamCoder v${next}" && git push origin v${next}\n`)
 }
-
-if (!hasChangelogSection) {
-  console.warn(`\n  CHANGELOG.md has no "## [${next}]" section yet. The Release workflow`)
-  console.warn('  takes the release notes from it and fails without one.')
-}
-
-console.log('\n  Next: commit on a release branch and open a pull request. After it merges,')
-console.log(`  tag main with: git tag -a v${next} -m "DreamCoder v${next}" && git push origin v${next}\n`)

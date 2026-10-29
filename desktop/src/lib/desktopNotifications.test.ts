@@ -40,7 +40,7 @@ vi.mock('./shell', () => ({
   getMacNotificationPermission: () => coreApiMock.invoke('macos_notification_permission_state'),
   requestMacNotificationPermission: () => coreApiMock.invoke('macos_request_notification_permission'),
   sendMacNotification: (input: unknown) => coreApiMock.invoke('macos_send_notification', input),
-  openWindowsNotificationSettings: () => coreApiMock.invoke('open_windows_notification_settings'),
+  openNotificationSettings: () => coreApiMock.invoke('open_notification_settings'),
   openExternalLink: shellApiMock.open,
   requestAppAttention: () => requestUserAttentionMock(1),
   getAppWindow: async () => windowApiMock.getCurrentWindow(),
@@ -78,7 +78,7 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('sends through the Tauri plugin when native notification permission is already granted', async () => {
+  it('sends through the shell notification API when native notification permission is already granted', async () => {
     notificationPluginMock.isPermissionGranted.mockResolvedValue(true)
 
     notifyDesktop({
@@ -96,7 +96,7 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('passes notification targets through the Tauri plugin payload', async () => {
+  it('passes notification targets through the shell notification payload', async () => {
     notificationPluginMock.isPermissionGranted.mockResolvedValue(true)
     const target = { type: 'session' as const, sessionId: 'session-1', title: 'Build fix' }
 
@@ -194,7 +194,7 @@ describe('desktopNotifications', () => {
     warnSpy.mockRestore()
   })
 
-  it('does not fall back to the Tauri plugin when the macOS bridge fails', async () => {
+  it('does not fall back to the shell notification API when the macOS bridge fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     Object.defineProperty(navigator, 'platform', {
       configurable: true,
@@ -289,17 +289,27 @@ describe('desktopNotifications', () => {
     })
   })
 
-  it('opens Windows notification settings through the native command', async () => {
+  it.each(['Win32', 'MacIntel'])('opens notification settings through the main process on %s', async (platform) => {
     Object.defineProperty(navigator, 'platform', {
       configurable: true,
-      value: 'Win32',
+      value: platform,
     })
     coreApiMock.invoke.mockResolvedValueOnce(true)
 
     await expect(openDesktopNotificationSettings()).resolves.toBe(true)
 
-    expect(coreApiMock.invoke).toHaveBeenCalledWith('open_windows_notification_settings')
+    expect(coreApiMock.invoke).toHaveBeenCalledWith('open_notification_settings')
     expect(shellApiMock.open).not.toHaveBeenCalled()
+  })
+
+  it('passes an unknown macOS permission through', async () => {
+    Object.defineProperty(navigator, 'platform', {
+      configurable: true,
+      value: 'MacIntel',
+    })
+    coreApiMock.invoke.mockResolvedValueOnce('unknown')
+
+    await expect(getDesktopNotificationPermission()).resolves.toBe('unknown')
   })
 
   it('reports and requests macOS notification permission through the native bridge', async () => {
@@ -319,7 +329,7 @@ describe('desktopNotifications', () => {
     expect(notificationPluginMock.requestPermission).not.toHaveBeenCalled()
   })
 
-  it('does not use the Tauri plugin permission fallback on macOS bridge errors', async () => {
+  it('does not use the shell permission fallback on macOS bridge errors', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     Object.defineProperty(navigator, 'platform', {
       configurable: true,

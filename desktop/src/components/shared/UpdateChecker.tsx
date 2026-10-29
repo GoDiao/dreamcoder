@@ -1,11 +1,33 @@
-import { useEffect } from 'react'
+import { toast } from 'sonner'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card'
+import { Progress } from './ui/progress'
+import { Button } from './ui/button'
+import { useEffect, useId } from 'react'
 import { useTranslation } from '../../i18n'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { useUpdateStore } from '../../stores/updateStore'
 import { formatBytes } from '../../lib/formatBytes'
 
 export function UpdateChecker() {
+  const id = useId()
+  const status = useUpdateStore((state) => state.status)
+  const availableVersion = useUpdateStore((state) => state.availableVersion)
+  const shouldPrompt = useUpdateStore((state) => state.shouldPrompt)
+  const initialize = useUpdateStore((state) => state.initialize)
+  const visible = isDesktopRuntime() && shouldPrompt && !!availableVersion && ['available', 'downloading', 'restarting'].includes(status)
+
+  useEffect(() => { void initialize() }, [initialize])
+  useEffect(() => {
+    if (visible) toast.custom(() => <UpdatePrompt />, { id, duration: Infinity, position: 'top-right', dismissible: false })
+    else toast.dismiss(id)
+    return () => { toast.dismiss(id) }
+  }, [id, visible])
+
+  return null
+}
+
+function UpdatePrompt() {
   const t = useTranslation()
   const status = useUpdateStore((s) => s.status)
   const availableVersion = useUpdateStore((s) => s.availableVersion)
@@ -14,21 +36,8 @@ export function UpdateChecker() {
   const downloadedBytes = useUpdateStore((s) => s.downloadedBytes)
   const totalBytes = useUpdateStore((s) => s.totalBytes)
   const error = useUpdateStore((s) => s.error)
-  const shouldPrompt = useUpdateStore((s) => s.shouldPrompt)
-  const initialize = useUpdateStore((s) => s.initialize)
   const installUpdate = useUpdateStore((s) => s.installUpdate)
   const dismissPrompt = useUpdateStore((s) => s.dismissPrompt)
-
-  useEffect(() => {
-    void initialize()
-  }, [initialize])
-
-  if (!isTauriRuntime()) return null
-
-  const showPopup =
-    shouldPrompt && !!availableVersion && ['available', 'downloading', 'restarting'].includes(status)
-
-  if (!showPopup) return null
 
   const hasKnownProgress = typeof totalBytes === 'number' && totalBytes > 0
   const downloadedText = formatBytes(downloadedBytes)
@@ -41,13 +50,16 @@ export function UpdateChecker() {
           : t('update.progressBytes', { downloaded: downloadedText })
         : null
 
-  return (
-    <div className="fixed top-4 right-4 z-[200] max-w-sm">
-      <div className="bg-[var(--color-surface-container-low)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-dropdown)] p-4">
-        <p className="text-sm font-medium text-[var(--color-text-primary)]">
-          {t('update.available', { version: availableVersion })}
-        </p>
+  if (!availableVersion) return null
 
+  return (
+    <Card className="w-full gap-3 py-4">
+      <CardHeader>
+        <CardTitle>
+          {t('update.available', { version: availableVersion })}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         {releaseNotes && (
           <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-[var(--color-border)]/60 bg-[var(--color-surface)]/70 px-3 py-2">
             <MarkdownRenderer
@@ -59,16 +71,7 @@ export function UpdateChecker() {
 
         {(status === 'downloading' || status === 'restarting') && (
           <div className="mt-3">
-            <div className="h-1.5 bg-[var(--color-surface)] rounded-full overflow-hidden">
-              {hasKnownProgress || status === 'restarting' ? (
-                <div
-                  className="h-full bg-[var(--color-text-accent)] transition-all duration-300"
-                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                />
-              ) : (
-                <div className="h-full w-1/3 rounded-full bg-[var(--color-text-accent)]/75 animate-pulse" />
-              )}
-            </div>
+            <Progress aria-label={t('update.downloading')} value={hasKnownProgress || status === 'restarting' ? Math.min(progressPercent, 100) : null} />
             {statusText && (
               <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                 {statusText}
@@ -84,23 +87,21 @@ export function UpdateChecker() {
           </p>
         )}
 
+      </CardContent>
         {status === 'available' && (
-          <div className="mt-3 flex gap-2">
-            <button
+          <CardFooter className="gap-2">
+            <Button size="sm"
               onClick={() => void installUpdate()}
-              className="px-3 py-1 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--color-text-accent)] text-white hover:opacity-90 transition-opacity"
             >
               {t('update.now')}
-            </button>
-            <button
+            </Button>
+            <Button size="sm" variant="ghost"
               onClick={dismissPrompt}
-              className="px-3 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
             >
               {t('update.later')}
-            </button>
-          </div>
+            </Button>
+          </CardFooter>
         )}
-      </div>
-    </div>
+    </Card>
   )
 }

@@ -46,6 +46,11 @@ describe('CommandPalette', () => {
   const originalScrollIntoView = Element.prototype.scrollIntoView
 
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+    })
     window.localStorage.clear()
     useUIStore.setState({ activeModal: null })
     useTabStore.setState({ tabs: [], activeTabId: null })
@@ -61,6 +66,7 @@ describe('CommandPalette', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     useChatStore.setState({ connectToSession: originalConnect })
     useSessionStore.setState({ sessions: [] })
     useUIStore.setState({ activeModal: null })
@@ -147,7 +153,7 @@ describe('CommandPalette', () => {
     expect(matches).toHaveLength(1)
     expect(matches[0]).toHaveTextContent('Authentication flow')
     expect(matches[0]).toHaveAttribute('aria-selected', 'true')
-    expect(input).toHaveAttribute('aria-activedescendant', matches[0]!.id)
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', matches[0]!.id))
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(connectToSession).toHaveBeenCalledExactlyOnceWith('newer')
   })
@@ -176,7 +182,7 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(opener).toHaveFocus()
+    await waitFor(() => expect(opener).toHaveFocus())
     expect(connectToSession).not.toHaveBeenCalled()
   })
 
@@ -189,7 +195,7 @@ describe('CommandPalette', () => {
 
     const backdrop = dialog.previousElementSibling
     expect(backdrop).not.toBeNull()
-    fireEvent.click(backdrop!)
+    fireEvent.pointerDown(backdrop!, { pointerType: 'mouse', button: 0 })
     expect(useUIStore.getState().activeModal).toBeNull()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })

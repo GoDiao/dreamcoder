@@ -4,9 +4,42 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The desktop interface is rebuilt on shadcn/ui** (#191). The app now runs on React 19, and buttons, dialogs, menus, notifications and panels share one set of components in all seven themes. Dialogs keep focus inside and return it when closed, and menus and the file tree work from the keyboard. Icons are lucide SVGs instead of the Material Symbols font. The H5 page needs Safari 17.5 or later.
+  - Code blocks are highlighted with Shiki in light and dark themes and show plain text while highlighting loads. Chat and workspace diffs are rendered with Pierre, with line comments and quoting of selected lines.
+  - A new conversation stays a local draft until the first message or attachment is sent. Opening a new conversation from the sidebar, a project or the keyboard shortcut no longer creates an empty session.
+  - The context button under the input shows usage as a ring; hover it for the breakdown. The task list shows how many steps are done.
+  - The model and effort are picked from two separate lists under the input. Typing while no text field has focus goes to the message input.
+
 ### Fixed
 
+- Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).
+- When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
 - **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle.
+
+## [0.8.0-beta.1] — 2026-10-26
+
+A pre-release of the Electron desktop app. Windows has not been tested on real machines yet; reports are welcome in the Windows testing issue.
+
+### Changed
+
+- **The desktop app runs on Electron instead of Tauri** (#174). The interface now renders in Chromium on every platform. On macOS, long sessions are much faster: laying out a streaming reply takes about 1 ms per update instead of about 20 ms (265 ms at the slow end), and scrolling up through 1,000 messages no longer stalls. The installers are larger: the macOS `.dmg` is about 150 MB instead of 46 MB.
+  - Install the new version by hand, as before. On Windows it installs to a new folder, so uninstall the previous DreamCoder from Settings → Apps afterwards.
+  - Sessions, providers and settings carry over. The window position and portable mode start fresh, and so do the preferences the old window kept in its own storage: theme, interface language, zoom, sidebar width and open tabs. Set up portable mode again in Settings → General.
+  - On Windows and macOS the title bar areas still move the window; the empty middle of the sidebar no longer does.
+- **The terminal runs in the local server** (#173). Each terminal is a shell the DreamCoder server starts, so it behaves the same in every desktop build. Closing a terminal tab or quitting the app ends its shell. The terminal is available only in the desktop app, not on the H5 page.
+- Building from source no longer needs Rust: `bun run electron:install`, `bun run build:sidecars` and `bun run electron:dev` in `desktop/` (see CONTRIBUTING).
+- **Context windows beside each model** (#105). In Settings → Providers each model has its own context window field next to its name. Fetching models fills empty fields with the window the provider reports and never replaces a typed or saved value.
+  - Providers whose model list includes a context length, such as OpenRouter and Kimi, need no extra requests. Ollama, LM Studio, DeepSeek and Qwen are looked up from their own model APIs.
+  - The form can be saved only after the current settings have loaded. If they fail to load, the form says so instead of saving over them.
+- **Auto-compact at 90% of the context window** (#105). Long conversations are compacted at 90% of the model's context window, after the room kept for the summary, instead of about 33K tokens before it is full. A 1M model now compacts around 882K tokens instead of 967K, and a 200K model around 162K instead of 167K. Settings → General → Auto-compact sets a different percentage for every session. The provider form no longer has "Unknown Model Fallback Window": despite its name it replaced the window of every model of the provider when deciding when to compact. A value saved there is dropped.
+- Typing in a dialog no longer lights up the dialog's whole border; only the focused field is highlighted.
+
+### Fixed
+
+- Opening a memory file from a chat link no longer shows "An unexpected error occurred" when the file does not exist yet. The memory page selects the project and shows that it has no memory files.
+- The close button of the settings window no longer covers the buttons at the top right of a settings page, such as Add Provider.
 
 ## [0.7.0] — 2026-10-25
 

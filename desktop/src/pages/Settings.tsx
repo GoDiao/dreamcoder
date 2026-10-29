@@ -38,6 +38,7 @@ import { ProviderSettings } from '../components/settings/ProviderSettings'
 import { AgentsSettings } from '../components/settings/AgentsSettings'
 import { SkillSettings } from '../components/settings/SkillSettings'
 import { AboutSettings } from '../components/settings/AboutSettings'
+import { Button } from '../components/shared/ui/button'
 import { SearchField } from '../components/shared/SearchField'
 import { moveRovingFocus } from '../lib/rovingFocus'
 
@@ -140,7 +141,7 @@ export function Settings() {
       </nav>
 
       <div
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-10 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-14 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
       >
         <div className={`max-w-[760px] motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
           {activeTab === 'providers' && <ProviderSettings />}
@@ -164,14 +165,15 @@ export function Settings() {
 
 function NavButton({ Icon, label, active, onClick }: { Icon: LucideIcon; label: string; active: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="row"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`flex w-full flex-shrink-0 items-center gap-[9px] rounded-[8px] px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] max-[700px]:w-auto ${
+      className={`gap-[9px] rounded-[8px] py-1.5 text-[13px] max-[700px]:w-auto ${
         active
           ? 'bg-[var(--color-surface-selected)] font-medium text-[var(--color-text-primary)]'
-          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-secondary)]'
       }`}
     >
       <Icon
@@ -181,7 +183,7 @@ function NavButton({ Icon, label, active, onClick }: { Icon: LucideIcon; label: 
         className={`flex-shrink-0 ${active ? '' : 'text-[var(--color-text-secondary)]'}`}
       />
       <span className="whitespace-nowrap">{label}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -224,18 +226,17 @@ function PermissionSettings() {
           const isSelected = permissionMode === mode
           const tabbable = isSelected || (index === 0 && !PERMISSION_MODES.some((entry) => entry.mode === permissionMode))
           return (
-            <button
+            <Button
               key={mode}
-              type="button"
+              variant="ghost"
+              size="row"
               role="radio"
               aria-checked={isSelected}
               tabIndex={tabbable ? 0 : -1}
               data-value={mode}
               onClick={() => setPermissionMode(mode)}
-              className={`flex w-full items-center gap-3.5 border-b border-[var(--color-border-separator)] px-3 py-4 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
-                isSelected
-                  ? 'rounded-[8px] bg-[var(--color-surface-hover)]'
-                  : 'hover:bg-[var(--color-surface-hover)]'
+              className={`gap-3.5 rounded-none border-0 border-b border-[var(--color-border-separator)] px-3 py-4 last:border-b-0 ${
+                isSelected ? 'rounded-[8px] bg-[var(--color-surface-hover)]' : ''
               }`}
             >
               <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="flex-shrink-0 text-[var(--color-text-secondary)]" />
@@ -251,7 +252,7 @@ function PermissionSettings() {
               <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-brand)]">
                 {isSelected ? <Check size={16} strokeWidth={2} aria-hidden="true" /> : null}
               </span>
-            </button>
+            </Button>
           )
         })}
       </div>

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 
 vi.mock('../../i18n', () => ({
@@ -50,8 +50,10 @@ vi.mock('../../stores/openTargetStore', () => ({
 }))
 
 import { OpenProjectMenu } from './OpenProjectMenu'
+import { useUIStore } from '../../stores/uiStore'
 
 describe('OpenProjectMenu', () => {
+  afterEach(() => vi.restoreAllMocks())
   beforeEach(() => {
     storeMocks.ensureTargets.mockReset()
     storeMocks.openTarget.mockReset()
@@ -90,7 +92,7 @@ describe('OpenProjectMenu', () => {
     const { container } = render(<OpenProjectMenu path="/repo" />)
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Open project' }))
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Open project' }), { key: 'ArrowDown' })
     })
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect([
@@ -102,6 +104,15 @@ describe('OpenProjectMenu', () => {
     })
 
     expect(storeMocks.openTarget).toHaveBeenCalledWith('finder', '/repo')
+  })
+
+  it('shows a localized error when opening the target fails', async () => {
+    storeMocks.state.targets = [{ id: 'finder', kind: 'file_manager', label: 'Finder', icon: 'finder', platform: 'darwin' }]
+    storeMocks.openTarget.mockRejectedValue(new Error('Target exited'))
+    const addToast = vi.spyOn(useUIStore.getState(), 'addToast').mockImplementation(() => undefined)
+    render(<OpenProjectMenu path="/repo" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Finder' }))
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith({ type: 'error', message: 'Could not open project' }))
   })
 
   it('does not render without a path', () => {

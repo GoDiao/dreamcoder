@@ -5,7 +5,7 @@ import '@testing-library/jest-dom'
 
 const viewportMocks = vi.hoisted(() => ({
   isMobile: false,
-  isTauri: false,
+  isDesktop: false,
 }))
 
 const apiMocks = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ vi.mock('../../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../../lib/desktopRuntime', () => ({
-  isTauriRuntime: () => viewportMocks.isTauri,
+  isDesktopRuntime: () => viewportMocks.isDesktop,
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -27,8 +27,8 @@ vi.mock('../../api/sessions', () => ({
 }))
 
 vi.mock('./DirectoryPicker', () => ({
-  DirectoryPicker: ({ value }: { value: string }) => (
-    <button type="button">Project {value}</button>
+  DirectoryPicker: ({ value, disabled }: { value: string; disabled?: boolean }) => (
+    <button type="button" disabled={disabled}>Project {value}</button>
   ),
 }))
 
@@ -54,6 +54,7 @@ vi.mock('../../i18n', () => ({
     'repoLaunch.notice.pickBranch': 'Choose another branch',
     'repoLaunch.notice.retry': 'Retry',
     'tabs.close': 'Close',
+      'common.close': 'Close',
   }[key] ?? key),
 }))
 
@@ -109,7 +110,7 @@ async function openBranchMenu() {
 describe('RepositoryLaunchControls', () => {
   beforeEach(() => {
     viewportMocks.isMobile = false
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
     apiMocks.getRepositoryContext.mockReset()
     apiMocks.getRepositoryContext.mockResolvedValue(okRepositoryContext)
     Element.prototype.scrollIntoView = vi.fn()
@@ -122,8 +123,14 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
-    expect(listbox.parentElement?.className).toContain('w-[390px]')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveClass('w-[min(390px,calc(100vw-24px))]')
+  })
+
+  it('disables the project picker together with the rest of the controls', () => {
+    renderControls({ disabled: true })
+
+    expect(screen.getByRole('button', { name: 'Project /repo' })).toBeDisabled()
   })
 
   it('uses the flatter desktop bar when embedded in a composer', async () => {
@@ -138,21 +145,21 @@ describe('RepositoryLaunchControls', () => {
 
   it('uses the full-width mobile bottom sheet in H5 mobile browser mode', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
 
     renderControls()
 
     await openBranchMenu()
 
     const dialog = await screen.findByRole('dialog', { name: 'Select branch' })
-    expect(dialog).toHaveClass('inset-x-0')
+    expect(dialog).toHaveAttribute('data-vaul-drawer-direction', 'bottom')
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
     expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
   })
 
-  it('does not use the H5 mobile sheet inside Tauri even on a narrow viewport', async () => {
+  it('does not use the H5 mobile sheet inside the desktop app even on a narrow viewport', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = true
+    viewportMocks.isDesktop = true
 
     renderControls()
 
@@ -160,7 +167,7 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
   })
 
   it('keeps keyboard branch selection working from the search field', async () => {

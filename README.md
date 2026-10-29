@@ -17,8 +17,8 @@ English | [简体中文](./README_zh.md)
 
 [**⬇️ Download for macOS (Apple Silicon)**](https://github.com/GoDiao/dreamcoder/releases/latest) · [**⬇️ Download for Windows (x64)**](https://github.com/GoDiao/dreamcoder/releases/latest)
 
-[![Tauri 2](https://img.shields.io/badge/Tauri-2-blue)](https://v2.tauri.app/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+[![Electron](https://img.shields.io/badge/Electron-45-47848F)](https://www.electronjs.org/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
 [![Bun](https://img.shields.io/badge/Bun-✓-fbf0df)](https://bun.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 [![Good First Issues](https://img.shields.io/github/issues/GoDiao/dreamcoder/good%20first%20issue?color=7057ff&label=good%20first%20issues)](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
@@ -104,10 +104,10 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 
 | Component | Technology |
 |-----------|------------|
-| Desktop Shell | [Tauri 2](https://v2.tauri.app/) (Rust) |
-| Frontend UI | React 18 + Vite + TailwindCSS 4 |
+| Desktop Shell | [Electron](https://www.electronjs.org/) |
+| Frontend UI | React 19 + Vite + TailwindCSS 4 |
 | Backend Runtime | Bun (Node.js compatible) |
-| Terminal | portable-pty (Rust) + xterm.js |
+| Terminal | Bun PTY in the sidecar + xterm.js |
 | State Management | Zustand |
 | Protocol | WebSocket, MCP, LSP |
 
@@ -121,9 +121,9 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 | macOS arm64  | ✅ Maintainer's daily platform           | ✅ [`.dmg`](https://github.com/GoDiao/dreamcoder/releases/latest) (unsigned)      |
 | Linux x64    | ⚠️ Not part of daily validation yet      | ❌ Community help welcome                                 |
 
-> The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source (`bun run tauri dev`); it ships as a `.dmg` from v0.5.0.
+> The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source (`bun run electron:dev`); it ships as a `.dmg` from v0.5.0.
 > **Windows x64** was the main platform before and has been tested extensively, but the maintainer no longer develops on it day to day, so feedback on how new changes behave on Windows is especially welcome.
-> **Linux** has `#[cfg(target_os = "linux")]` branches in the codebase, but it is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
+> **Linux** is not built or packaged; running the desktop app from source may work but is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
 > For the validated Ubuntu browser workflow, exFAT installation workaround, and local Ollama results, see the [Linux validation report](docs/LINUX_BROWSER_VALIDATION.md). For startup, shutdown, and termination by PID, see the [browser usage guide](docs/WEB_USAGE.md).
 > If you're running DreamCoder on Windows or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
@@ -148,12 +148,11 @@ See [ROADMAP](docs/ROADMAP_en.md)
 
 ### Prerequisites
 *   [Bun](https://bun.sh/) >= 1.0
-*   [Rust](https://www.rust-lang.org/tools/install) (required to build the desktop app)
 *   Node.js >= 18 (still needed by parts of the dependency chain)
 
 ### Installation
 
-> Installers for macOS (Apple Silicon) and Windows x64 are on [Releases](https://github.com/GoDiao/dreamcoder/releases/latest). They are not code-signed yet; the release notes explain how to open them the first time. The steps below run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below** to avoid startup failures in `tauri dev`, especially around the sidecar binary, the frontend build output, or missing Tauri CLI pieces.
+> Installers for macOS (Apple Silicon) and Windows x64 are on [Releases](https://github.com/GoDiao/dreamcoder/releases/latest). They are not code-signed yet; the release notes explain how to open them the first time. The steps below run the development version from source. This is a Bun monorepo, with separate dependencies at the repo root and in `desktop/`. **Run all the steps below**; `electron:dev` fails to start without the Electron binary or the sidecar binary.
 
 ```bash
 # 0. Clone the repo
@@ -163,22 +162,20 @@ cd dreamcoder
 # 1. Install root workspace dependencies (sidecar runtime: Anthropic SDK, AWS SDK, ink, etc.)
 bun install
 
-# 2. Install desktop dependencies (Tauri CLI + React frontend)
+# 2. Install desktop dependencies (Electron + React frontend)
 cd desktop && bun install
 
-# 3. Build the sidecar binary
+# 3. Download the Electron binary (Bun does not run Electron's install script)
+bun run electron:install
+
+# 4. Build the sidecar binary
 bun run build:sidecars
 
-# 4. Build the frontend once (creates desktop/dist; without it tauri dev fails with resource path `../dist` doesn't exist)
-bun run build
-
-# 5. Launch the desktop app in dev mode
-bun run tauri dev
+# 5. Launch the desktop app in dev mode (starts Vite and Electron together)
+bun run electron:dev
 ```
 
-> **Linux users**: you will also need system packages such as WebKitGTK, libappindicator, and librsvg.
-> See the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/) for details.
-> If you can contribute distro-specific setup commands, a PR would be greatly appreciated.
+> To build an installer for your platform, run `bun run electron:pack`; it writes to `desktop/electron-release/`.
 
 ### Configure Your Model
 

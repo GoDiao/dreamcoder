@@ -127,7 +127,7 @@ export async function prepareRipgrep(repoRoot: string, targetTriple: string): Pr
   const extension = target.platform.endsWith('-win32') ? '.exe' : ''
   const vendorPath = path.join(repoRoot, 'vendor', 'ripgrep', target.platform, `rg${extension}`)
   await installRipgrep(target, vendorPath)
-  const binaries = path.join(repoRoot, 'desktop', 'src-tauri', 'binaries')
+  const binaries = path.join(repoRoot, 'desktop', 'binaries')
   await mkdir(binaries, { recursive: true })
   const bundledPath = path.join(binaries, `rg-${targetTriple}${extension}`)
   if (!await matchesChecksum(bundledPath, target.binarySha256)) {
@@ -140,6 +140,6 @@ export async function prepareRipgrep(repoRoot: string, targetTriple: string): Pr
 if (import.meta.main) {
   await prepareRipgrep(
     path.resolve(import.meta.dir, '..'),
-    process.env.TAURI_ENV_TARGET_TRIPLE || process.env.CARGO_BUILD_TARGET || hostRipgrepTarget(),
+    process.env.DREAMCODER_TARGET_TRIPLE || hostRipgrepTarget(),
   )
 }

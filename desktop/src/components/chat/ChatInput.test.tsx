@@ -20,8 +20,6 @@ const mocks = vi.hoisted(() => ({
   browse: vi.fn(),
   wsSend: vi.fn(),
   dialogOpen: vi.fn(),
-  webviewDragHandlers: [] as Array<(event: { payload: unknown }) => void>,
-  webviewUnlisten: vi.fn(),
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -57,10 +55,7 @@ vi.mock('../../api/websocket', () => ({
 vi.mock('../../lib/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/shell')>()),
   pickFiles: mocks.dialogOpen,
-  onFileDrop: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
-    mocks.webviewDragHandlers.push(handler)
-    return mocks.webviewUnlisten
-  }),
+  getFilePath: (file: File) => (file as File & { path?: string }).path,
 }))
 
 vi.mock('../../hooks/useMobileViewport', () => ({
@@ -127,8 +122,7 @@ describe('ChatInput file mentions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.webviewDragHandlers.length = 0
-    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as Window & { dreamcoderShell?: unknown }).dreamcoderShell
     viewportMocks.isMobile = false
     useSettingsStore.setState({ locale: 'en' })
     useChatStore.setState(initialChatState, true)
@@ -713,7 +707,7 @@ describe('ChatInput file mentions', () => {
       expect(input.value).toBe('讲一下这个目录。')
     })
     expect(screen.getByText('backend/')).toBeInTheDocument()
-    expect(screen.getByText('folder')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove backend/' })).toBeInTheDocument()
 
     fireEvent.keyDown(input, { key: 'Enter' })
 
@@ -742,7 +736,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('uses native desktop file paths instead of inlining selected files', async () => {
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })
@@ -753,7 +747,7 @@ describe('ChatInput file mentions', () => {
 
     render(<ChatInput compact />)
 
-    fireEvent.click(screen.getByLabelText('Open composer tools'))
+    fireEvent.keyDown(screen.getByLabelText('Open composer tools'), { key: 'Enter' })
     fireEvent.click(screen.getByText('Add files or photos'))
 
     expect(await screen.findByText('large-a.log')).toBeInTheDocument()
@@ -789,50 +783,25 @@ describe('ChatInput file mentions', () => {
     })
   })
 
-  it('accepts native desktop file drops on the active session composer as path-only attachments', async () => {
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+  it('accepts desktop file drops on the active session composer as path-only attachments', async () => {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })
+    const droppedFile = new File(['large file'], 'ignored-name.log', { type: 'text/plain' })
+    Object.defineProperty(droppedFile, 'path', {
+      configurable: true,
+      value: '/Users/nanmi/drop/large-a.log',
+    })
+    const dataTransfer = { types: ['Files'], files: [droppedFile], dropEffect: '' }
 
     render(<ChatInput compact />)
 
     const panel = screen.getByTestId('chat-input-panel')
-    Object.defineProperty(panel, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => ({
-        left: 0,
-        top: 0,
-        right: 640,
-        bottom: 180,
-        width: 640,
-        height: 180,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }),
-    })
-
-    await waitFor(() => {
-      expect(mocks.webviewDragHandlers).toHaveLength(1)
-    })
-
-    act(() => {
-      mocks.webviewDragHandlers[0]?.({
-        payload: { type: 'over', position: { x: 24, y: 24 } },
-      })
-    })
+    fireEvent.dragOver(panel, { dataTransfer })
     expect(screen.getByTestId('chat-input-drop-overlay')).toBeInTheDocument()
 
-    act(() => {
-      mocks.webviewDragHandlers[0]?.({
-        payload: {
-          type: 'drop',
-          position: { x: 24, y: 24 },
-          paths: ['/Users/nanmi/drop/large-a.log'],
-        },
-      })
-    })
+    fireEvent.drop(panel, { dataTransfer })
 
     expect(await screen.findByText('large-a.log')).toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-drop-overlay')).not.toBeInTheDocument()
@@ -918,8 +887,8 @@ describe('ChatInput file mentions', () => {
       target: { value: 'ship it', selectionStart: 7 },
     })
 
-    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('h-11', 'w-11')
-    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('h-11', 'w-11')
+    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('size-11')
+    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('size-11')
     expect(screen.queryByText('Run')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-toolbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input-shell')).toHaveClass('px-3')

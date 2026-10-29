@@ -214,7 +214,7 @@ describe('McpSettings', () => {
     await renderLoadedMcpSettings()
     fireEvent.click(screen.getByRole('radio', { name: 'Browse' }))
     await screen.findByText('Filesystem')
-    fireEvent.click(screen.getByRole('button', { name: 'Filter by tag' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Filter by tag' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'utility' }))
 
     expect(screen.getByText('Time')).toBeInTheDocument()
@@ -547,7 +547,7 @@ describe('McpSettings', () => {
     expect(screen.getByText('project')).toBeInTheDocument()
 
     await act(async () => {
-      fireEvent.click(screen.getByTitle('/workspace/project'))
+      fireEvent.click(screen.getByRole('button', { name: 'project' }))
     })
 
     await act(async () => {

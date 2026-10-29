@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent } from 'react'
-import { Eraser, Info, RotateCcw } from 'lucide-react'
-import { useSettingsStore } from '../stores/settingsStore'
+import { BrushIcon, Eraser, Info, MonitorIcon, PlusIcon, RotateCcw } from 'lucide-react'
+import { Button } from '../components/shared/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/shared/ui/tooltip'
+import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type WheelEvent } from 'react'
 import { useTranslation, type TranslationKey } from '../i18n'
-import { terminalApi } from '../api/terminal'
+import { TerminalDisconnectedError, terminalApi } from '../api/terminal'
 import {
   attachTerminalRuntime,
   createLocalTerminalRuntimeId,
@@ -96,14 +98,20 @@ export function TerminalSettings({
   const resizeSession = useCallback(() => {
     const terminal = runtime.terminal
     const fit = runtime.fit
-    const sessionId = runtime.nativeSessionId
     if (!terminal || !fit) return
 
     fit.fit()
-    if (sessionId) {
-      void terminalApi.resize(sessionId, terminal.cols, terminal.rows).catch(() => {})
+    try {
+      runtime.connection?.resize(terminal.cols, terminal.rows)
+    } catch (err) {
+      console.warn('[terminal] Failed to resize the terminal', err)
     }
   }, [runtime])
+
+  const terminalErrorMessage = useCallback((err: unknown) => {
+    if (err instanceof TerminalDisconnectedError) return t('settings.terminal.connectionClosed')
+    return err instanceof Error ? err.message : String(err)
+  }, [t])
 
   const startTerminal = useCallback(async () => {
     if (!terminalApi.isAvailable()) {
@@ -116,15 +124,10 @@ export function TerminalSettings({
 
     updateTerminalRuntime(runtime, { error: null, warning: null, status: 'starting', shellInfo: null })
 
-    const existing = runtime.nativeSessionId
-    if (existing) {
-      await terminalApi.kill(existing).catch(() => {})
-      runtime.nativeSessionId = null
-    }
+    runtime.connection?.close()
+    runtime.connection = null
     runtime.dataDisposable?.dispose()
     runtime.dataDisposable = null
-    runtime.unlisteners.forEach((unlisten) => unlisten())
-    runtime.unlisteners = []
 
     runtime.terminal?.dispose()
     runtime.terminal = null
@@ -172,58 +175,54 @@ export function TerminalSettings({
     updateTerminalRuntime(runtime, { terminal, fit })
     fit.fit()
 
-    const outputUnlisten = await terminalApi.onOutput((payload) => {
-      if (payload.session_id === runtime.nativeSessionId) {
-        terminal.write(payload.data)
-      }
-    })
-    const exitUnlisten = await terminalApi.onExit((payload) => {
-      if (payload.session_id !== runtime.nativeSessionId) return
-      updateTerminalRuntime(runtime, { status: 'exited' })
-      const signal = payload.signal ? `, ${payload.signal}` : ''
-      terminal.writeln(`\r\n[process exited: ${payload.code}${signal}]`)
-      updateTerminalRuntime(runtime, { nativeSessionId: null })
-    })
-    runtime.unlisteners = [outputUnlisten, exitUnlisten]
-
     runtime.dataDisposable = terminal.onData((data) => {
-      const sessionId = runtime.nativeSessionId
-      if (sessionId) {
-        void terminalApi.write(sessionId, data).catch((err) => {
-          updateTerminalRuntime(runtime, {
-            error: err instanceof Error ? err.message : String(err),
-            status: 'error',
-          })
+      try {
+        runtime.connection?.write(data)
+      } catch (err) {
+        updateTerminalRuntime(runtime, {
+          error: terminalErrorMessage(err),
+          status: 'error',
         })
       }
     })
 
     try {
-      const result = await terminalApi.spawn({
+      const connection = await terminalApi.open({
         cols: terminal.cols,
         rows: terminal.rows,
         ...(cwd ? { cwd } : {}),
-        settings: useSettingsStore.getState().desktopTerminal,
+        onOutput: (data) => terminal.write(data),
+        onExit: (exit) => {
+          const signal = exit.signal ? `, ${exit.signal}` : ''
+          terminal.writeln(`\r\n[process exited: ${exit.code}${signal}]`)
+          updateTerminalRuntime(runtime, { status: 'exited', connection: null })
+        },
+        onError: (message) => {
+          updateTerminalRuntime(runtime, { error: message, status: 'error' })
+        },
+        onDisconnect: () => {
+          updateTerminalRuntime(runtime, { error: t('settings.terminal.connectionClosed'), status: 'error' })
+        },
       })
       updateTerminalRuntime(runtime, {
-        nativeSessionId: result.session_id,
-        shellInfo: { shell: result.shell, cwd: result.cwd },
-        warning: result.warning ?? null,
+        connection,
+        shellInfo: { shell: connection.shell, cwd: connection.cwd },
+        warning: connection.warning,
         status: 'running',
       })
       resizeSession()
     } catch (err) {
-      outputUnlisten()
-      exitUnlisten()
+      runtime.dataDisposable?.dispose()
+      runtime.dataDisposable = null
       terminal.dispose()
       updateTerminalRuntime(runtime, {
         terminal: null,
         fit: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: terminalErrorMessage(err),
         status: 'error',
       })
     }
-  }, [cwd, resizeSession, runtime])
+  }, [cwd, resizeSession, runtime, t, terminalErrorMessage])
 
   useEffect(() => {
     if (!terminalApi.isAvailable()) return
@@ -272,13 +271,13 @@ export function TerminalSettings({
   const notices = (
     <>
       {error && (
-        <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-error)]/20 bg-[var(--color-error)]/10 px-3 py-2 text-sm text-[var(--color-error)]">
+        <div className="mb-3 rounded-md border border-[var(--color-error)]/20 bg-[var(--color-error)]/10 px-3 py-2 text-sm text-[var(--color-error)]">
           {error}
         </div>
       )}
 
       {warning && (
-        <div role="status" className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-terminal-warning)]/30 bg-[var(--color-terminal-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+        <div role="status" className="mb-3 rounded-md border border-[var(--color-terminal-warning)]/30 bg-[var(--color-terminal-warning)]/10 px-3 py-2 text-sm text-[var(--color-text-secondary)]">
           <p>{t('settings.terminal.shellFallback', { shell: shellInfo?.shell ?? '' })}</p>
           <p className="mt-1 text-xs">{warning}</p>
         </div>
@@ -287,11 +286,9 @@ export function TerminalSettings({
   )
 
   const unavailableNotice = (
-    <div className="flex flex-1 items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-8 text-center">
+    <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-8 text-center">
       <div>
-        <span className="material-symbols-outlined mb-3 block text-[32px] text-[var(--color-text-tertiary)]">
-          desktop_windows
-        </span>
+        <MonitorIcon className="mx-auto shrink-0 mb-3 block text-[var(--color-text-tertiary)]" aria-hidden="true" size={32} />
         <p className="text-sm font-medium text-[var(--color-text-primary)]">
           {t('settings.terminal.unavailableTitle')}
         </p>
@@ -308,16 +305,22 @@ export function TerminalSettings({
       <div className="flex h-full min-h-0 flex-col overflow-hidden p-3">
         <div data-testid="settings-terminal-toolbar" className="flex min-w-0 shrink-0 items-center gap-1">
           <div className="flex min-w-0 flex-1 items-center">{toolbarLeading}</div>
-          <DockedIconButton
-            label={t('settings.terminal.clear')}
-            onClick={clearTerminal}
-            disabled={!runtime.terminal}
-          >
-            <Eraser size={14} strokeWidth={2} aria-hidden="true" />
-          </DockedIconButton>
-          <DockedIconButton label={t('settings.terminal.restart')} onClick={() => void startTerminal()}>
-            <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
-          </DockedIconButton>
+          <HintTooltip content={t('settings.terminal.clear')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('settings.terminal.clear')}
+              onClick={clearTerminal}
+              disabled={!runtime.terminal}
+            >
+              <Eraser aria-hidden="true" />
+            </Button>
+          </HintTooltip>
+          <HintTooltip content={t('settings.terminal.restart')}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('settings.terminal.restart')} onClick={() => void startTerminal()}>
+              <RotateCcw aria-hidden="true" />
+            </Button>
+          </HintTooltip>
         </div>
         {(meta || statusLabel) && (
           <div data-testid="terminal-meta" className="mx-0.5 mt-2.5 flex min-w-0 shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)]">
@@ -376,32 +379,19 @@ export function TerminalSettings({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {onNewTerminal && (
-            <button
-              type="button"
-              onClick={onNewTerminal}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
+            <Button variant="outline" onClick={onNewTerminal}>
+              <PlusIcon aria-hidden="true" />
               {t('terminal.newTab')}
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={clearTerminal}
-            disabled={!runtime.terminal}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[16px]">mop</span>
+          <Button variant="outline" onClick={clearTerminal} disabled={!runtime.terminal}>
+            <BrushIcon aria-hidden="true" />
             {t('settings.terminal.clear')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void startTerminal()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--color-text-primary)] px-2.5 text-xs font-medium text-[var(--color-surface)] transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
-          >
-            <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+          </Button>
+          <Button onClick={() => void startTerminal()}>
+            <RotateCcw aria-hidden="true" />
             {t('settings.terminal.restart')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -411,7 +401,7 @@ export function TerminalSettings({
         <div
           data-testid="settings-terminal-frame"
           onWheelCapture={handleTerminalWheelCapture}
-          className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-terminal-border)] bg-[var(--color-terminal-bg)] shadow-[var(--shadow-dropdown)]"
+          className="min-h-0 flex-1 overflow-hidden rounded-sm border border-[var(--color-terminal-border)] bg-[var(--color-terminal-bg)] shadow-[var(--shadow-dropdown)]"
         >
           <div
             ref={hostRef}
@@ -424,59 +414,26 @@ export function TerminalSettings({
   )
 }
 
-function DockedIconButton({
-  label,
-  onClick,
-  disabled = false,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-45"
-    >
-      {children}
-    </button>
-  )
-}
-
 function TerminalHelpHint({ compact = false }: { compact?: boolean }) {
   const t = useTranslation()
-  const tooltipId = useId()
   const [open, setOpen] = useState(false)
 
   return (
-    <span className="group relative inline-flex shrink-0">
-      <button
-        type="button"
-        aria-label={t('settings.terminal.infoLabel')}
-        aria-describedby={tooltipId}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false)
-        }}
-        className={`${compact ? 'h-6 w-6' : 'h-7 w-7'} inline-flex items-center justify-center rounded-full text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]`}
-      >
-        <Info className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} aria-hidden="true" strokeWidth={2.2} />
-      </button>
-      <span
-        id={tooltipId}
-        role="tooltip"
-        className={`${open ? 'visible opacity-100' : 'invisible opacity-0'} absolute left-0 top-full z-30 mt-2 w-[min(340px,calc(100vw-3rem))] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-high)] px-3 py-2 text-left text-xs leading-5 text-[var(--color-text-secondary)] shadow-[var(--shadow-dropdown)] transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100`}
-      >
-        {t('settings.terminal.description')}
-      </span>
-    </span>
+    <Tooltip open={open} onOpenChange={setOpen} delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size={compact ? 'icon-xs' : 'icon-sm'}
+          aria-label={t('settings.terminal.infoLabel')}
+          aria-expanded={open}
+          onClick={(event) => { event.preventDefault(); setOpen((value) => !value) }}
+          className="rounded-full text-ui-muted-foreground"
+        >
+          <Info size={compact ? 14 : 16} aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[min(340px,calc(100vw-3rem))] text-left leading-5">{t('settings.terminal.description')}</TooltipContent>
+    </Tooltip>
   )
 }
 

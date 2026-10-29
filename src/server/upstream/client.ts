@@ -19,8 +19,9 @@ import {
   resolveProviderApiKey,
   stripContextSuffix,
 } from '../services/providerRuntimeEnv.js'
-import type { ApiFormat, ProviderAuthStrategy, ProviderModel, SavedProvider } from '../types/provider.js'
+import type { ApiFormat, ProviderAuthStrategy, DiscoveredProviderModel, SavedProvider } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl } from './baseUrl.js'
+import { fillContextWindows } from './contextWindows/index.js'
 
 export type UpstreamTarget = {
   baseUrl: string
@@ -35,7 +36,7 @@ export type UpstreamResult =
   | { ok: false; httpStatus?: number; error: string }
 
 export type UpstreamModelsResult =
-  | { ok: true; httpStatus: number; models: ProviderModel[] }
+  | { ok: true; httpStatus: number; models: DiscoveredProviderModel[] }
   | { ok: false; httpStatus?: number; error: string }
 
 type UpstreamRequest = {
@@ -115,7 +116,7 @@ export async function sendToUpstream(
   }
 }
 
-export async function fetchUpstreamModels(target: UpstreamTarget): Promise<UpstreamModelsResult> {
+export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: string): Promise<UpstreamModelsResult> {
   const networkSettings = await loadNetworkSettings()
   const base = normalizeUpstreamBaseUrl(target.baseUrl)
   const headers = target.apiFormat === 'anthropic'
@@ -126,7 +127,8 @@ export async function fetchUpstreamModels(target: UpstreamTarget): Promise<Upstr
     : { Authorization: `Bearer ${target.apiKey}` }
 
   const seen = new Set<string>()
-  const models: ProviderModel[] = []
+  const models: DiscoveredProviderModel[] = []
+  const listed: Record<string, unknown>[] = []
   const maxPages = target.apiFormat === 'anthropic' ? 10 : 1
   let afterId = ''
 
@@ -172,6 +174,7 @@ export async function fetchUpstreamModels(target: UpstreamTarget): Promise<Upstr
       const id = typeof record.id === 'string' ? record.id.trim() : ''
       if (!id || seen.has(id)) continue
       seen.add(id)
+      listed.push(record)
       const rawName = typeof record.display_name === 'string'
         ? record.display_name
         : typeof record.name === 'string'
@@ -182,6 +185,7 @@ export async function fetchUpstreamModels(target: UpstreamTarget): Promise<Upstr
     }
 
     if (target.apiFormat !== 'anthropic' || body?.has_more !== true) {
+      await fillContextWindows(models, { baseUrl: target.baseUrl, apiKey: target.apiKey, presetId, listed, networkSettings })
       return { ok: true, httpStatus: response.status, models }
     }
 

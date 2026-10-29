@@ -1,3 +1,7 @@
+import { TriangleAlertIcon } from 'lucide-react'
+import { Button } from '../shared/ui/button'
+import { ComposerPopover } from './ComposerPopover'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from '../../i18n'
 import {
@@ -40,7 +44,8 @@ import {
   resolveSlashUiAction,
 } from './composerUtils'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { useTypeToFocus } from '../../hooks/useTypeToFocus'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import {
   filesToComposerAttachments,
   selectNativeFileAttachments,
@@ -91,7 +96,7 @@ function insertComposerTokenAtRange(value: string, start: number, end: number, t
 
 export function ChatInput({ variant = 'default', compact = false }: ChatInputProps) {
   const t = useTranslation()
-  const isMobileComposer = useMobileViewport() && !isTauriRuntime()
+  const isMobileComposer = useMobileViewport() && !isDesktopRuntime()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
@@ -111,10 +116,9 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   const [noticeSlot, setNoticeSlot] = useState<HTMLDivElement | null>(null)
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  useTypeToFocus(textareaRef, !isMobileComposer)
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const plusMenuRef = useRef<HTMLDivElement>(null)
-  const slashMenuRef = useRef<HTMLDivElement>(null)
   const fileSearchRef = useRef<FileSearchMenuHandle>(null)
   const slashItemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const previousActiveTabIdRef = useRef<string | null>(null)
@@ -352,65 +356,12 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     resizeComposerTextarea(textareaRef.current)
   }, [input, providerMissing])
 
-  useEffect(() => {
-    if (!plusMenuOpen) return
-    const handleClick = (event: MouseEvent) => {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
-        setPlusMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [plusMenuOpen])
 
-  useEffect(() => {
-    if (!slashMenuOpen) return
-    const handleClick = (event: MouseEvent) => {
-      if (
-        slashMenuRef.current &&
-        !slashMenuRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setSlashMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [slashMenuOpen])
 
-  useEffect(() => {
-    if (!localSlashPanel) return
-    const handleClick = (event: MouseEvent) => {
-      if (
-        slashMenuRef.current &&
-        !slashMenuRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setLocalSlashPanel(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [localSlashPanel])
 
-  useEffect(() => {
-    if (!fileSearchOpen) return
-    const handleClick = (event: MouseEvent) => {
-      const menu = document.getElementById('file-search-menu')
-      if (
-        menu &&
-        !menu.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setFileSearchOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [fileSearchOpen])
+
+
+
 
   const allSlashCommands = useMemo(
     () => mergeSlashCommands(slashCommands, FALLBACK_SLASH_COMMANDS),
@@ -798,7 +749,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
 
   const { isDragActive, dragHandlers } = useComposerFileDrop({
     disabled: isMemberSession || isWorkspaceMissing,
-    panelRef,
     onAttachments: appendAttachments,
     onError: (error) => {
       console.warn('[attachments] Failed to read dropped files', error)
@@ -806,7 +756,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   })
 
   const openAttachmentPicker = useCallback(() => {
-    if (!isTauriRuntime()) {
+    if (!isDesktopRuntime()) {
       fileInputRef.current?.click()
       setPlusMenuOpen(false)
       return
@@ -881,7 +831,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       )}
 
       {!isMemberSession && fileSearchOpen && (
-        <FileSearchMenu
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('fileSearch.title')} onClose={() => setFileSearchOpen(false)} preserveInputFocus><FileSearchMenu
           ref={fileSearchRef}
           cwd={activeLaunchWorkDir || resolvedWorkDir || ''}
           filter={atFilter}
@@ -927,37 +877,32 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               })
             }
           }}
-        />
+        /></ComposerPopover>
       )}
 
       {!isMemberSession && localSlashPanel && (
-        <div ref={slashMenuRef}>
-          <LocalSlashCommandPanel
-            command={localSlashPanel}
-            sessionId={activeTabId ?? undefined}
-            cwd={activeLaunchWorkDir || resolvedWorkDir}
-            commands={allSlashCommands}
-            onClose={() => setLocalSlashPanel(null)}
-          />
-        </div>
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setLocalSlashPanel(null)}><LocalSlashCommandPanel
+          command={localSlashPanel}
+          sessionId={activeTabId ?? undefined}
+          cwd={activeLaunchWorkDir || resolvedWorkDir}
+          commands={allSlashCommands}
+          onClose={() => setLocalSlashPanel(null)}
+        /></ComposerPopover>
       )}
 
       {!isMemberSession && slashMenuOpen && filteredCommands.length > 0 && (
-        <div
-          ref={slashMenuRef}
-          className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]"
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setSlashMenuOpen(false)} preserveInputFocus><div
+          className="overflow-hidden bg-ui-popover"
         >
           <div className="max-h-[300px] overflow-y-auto p-1">
             {filteredCommands.map((command, index) => (
-              <button
+              <Button variant="ghost" size="row"
                 key={command.name}
                 ref={(el) => { slashItemRefs.current[index] = el }}
                 onClick={() => selectSlashCommand(command.name)}
                 onMouseEnter={() => setSlashSelectedIndex(index)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                  index === slashSelectedIndex
-                    ? 'bg-[var(--color-surface-hover)]'
-                    : 'hover:bg-[var(--color-surface-hover)]'
+                className={`items-center gap-3 px-3 ${
+                  index === slashSelectedIndex ? 'bg-[var(--color-surface-hover)]' : ''
                 }`}
               >
                 <span className="flex min-w-0 max-w-[52%] shrink-0 items-baseline gap-1.5">
@@ -973,7 +918,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                 <span className="min-w-0 flex-1 truncate text-ui-aux text-[var(--color-text-tertiary)]">
                   {command.description}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
           {!isMobileComposer ? (
@@ -986,7 +931,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               <span>{t('chat.dismiss')}</span>
             </div>
           ) : null}
-        </div>
+        </div></ComposerPopover>
       )}
     </>
   )
@@ -1023,12 +968,12 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                 role="status"
                 className="mb-2 flex items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]"
               >
-                <span className="material-symbols-outlined shrink-0 text-[14px]" aria-hidden="true">warning</span>
-                <span className="min-w-0 truncate" title={activeSession?.workDir || undefined}>
+                <TriangleAlertIcon className="shrink-0" aria-hidden="true" size={14} />
+                <HintTooltip content={activeSession?.workDir || undefined}><span className="min-w-0 truncate">
                   {activeSession?.workDir
                     ? t('chat.workspaceMissing', { dir: activeSession.workDir })
                     : t('chat.placeholderMissing')}
-                </span>
+                </span></HintTooltip>
               </div>
             )}
 
@@ -1048,7 +993,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                 addFilesLabel,
                 slashCommandsLabel,
                 toggleLabel: t('chat.composerTools'),
-                menuRef: plusMenuRef,
               }}
               textareaRef={textareaRef}
               textareaProps={{

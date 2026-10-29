@@ -75,7 +75,7 @@ describe('Settings > Permissions tab', () => {
     computerUseApiMock.getConfig.mockReset()
     computerUseApiMock.getStatus.mockReturnValue(new Promise(() => {}))
     useSettingsStore.setState({ locale: 'en', permissionMode: 'default' })
-    useUIStore.setState({ settingsTab: 'permissions', toasts: [] })
+    useUIStore.setState({ settingsTab: 'permissions' })
   })
 
   it('warns under Bypass permissions when Computer Use is on', async () => {

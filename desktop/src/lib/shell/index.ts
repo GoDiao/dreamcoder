@@ -1,17 +1,7 @@
-import type { AppMode, AppModeConfig, DesktopTerminalSettings } from '../../types/settings'
+import type { AppMode, AppModeConfig } from '../../types/settings'
+import { ELECTRON_BRIDGE_KEY, type ElectronDialogFilter, type ElectronOpenDialogInput, type ElectronShellBridge } from './electronBridge'
 
 export type Unlisten = () => void
-
-export type TerminalSpawnResult = {
-  session_id: number
-  shell: string
-  cwd: string
-  warning?: string | null
-}
-
-export type TerminalOutputPayload = { session_id: number; data: string }
-export type TerminalExitPayload = { session_id: number; code: number; signal?: string | null }
-export type TerminalShellDetection = { shell: string; platform: 'windows' | 'macos' | 'linux' }
 
 export type AppWindow = {
   minimize: () => Promise<void>
@@ -19,19 +9,9 @@ export type AppWindow = {
   close: () => Promise<void>
   isMaximized: () => Promise<boolean>
   onResized: (handler: () => void) => Promise<Unlisten>
-  startDragging: () => Promise<void>
   show: () => Promise<void>
   setFocus: () => Promise<void>
 }
-
-export type FileDropPosition = { x: number; y: number }
-
-export type FileDropPayload =
-  | { type: 'enter'; paths: string[]; position: FileDropPosition }
-  | { type: 'drop'; paths: string[]; position: FileDropPosition }
-  | { type: 'over'; position: FileDropPosition }
-  | { type: 'leave' }
-  | { type: 'cancel' }
 
 export type UpdateDownloadEvent =
   | { event: 'Started'; data: { contentLength?: number } }
@@ -46,18 +26,24 @@ export type ShellUpdate = {
   close: () => Promise<void>
 }
 
-export type NativeNotificationPermission = NotificationPermission | 'unsupported' | 'prompt' | 'prompt-with-rationale'
+export type NativeNotificationPermission = NotificationPermission | 'unsupported' | 'unknown' | 'prompt' | 'prompt-with-rationale'
 
-type FilePickerOptions = {
-  title?: string
-  directory?: false
-  multiple?: false
-  filters?: Array<{ name: string; extensions: string[] }>
+function bridge(): ElectronShellBridge {
+  const value = (window as unknown as Record<string, ElectronShellBridge | undefined>)[ELECTRON_BRIDGE_KEY]
+  if (!value) throw new Error('Electron shell bridge is not available')
+  return value
 }
 
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  const core = await import('@tauri-apps/api/core')
-  return core.invoke<T>(command, args)
+  return bridge().invoke<T>(command, args)
+}
+
+async function listen<T>(event: string, handler: (payload: T) => void): Promise<Unlisten> {
+  return bridge().listen(event, (payload) => handler(payload as T))
+}
+
+function openDialog(input: ElectronOpenDialogInput) {
+  return invoke<string[] | null>('dialog_open', input)
 }
 
 export function getServerUrl() {
@@ -73,7 +59,7 @@ export function setAppMode(input: { mode: AppMode; portableDir: string | null })
 }
 
 export function prepareAppModeRestart() {
-  return invoke<void>('prepare_for_app_mode_restart')
+  return invoke<void>('prepare_app_mode_restart')
 }
 
 export function setAppZoom(input: { zoomFactor: number }) {
@@ -85,153 +71,115 @@ export function writeSessionExport(input: { path: string; contents: string }) {
 }
 
 export function prepareUpdateInstall() {
-  return invoke<void>('prepare_for_update_install')
+  return invoke<void>('prepare_update_install')
 }
 
 export function cancelUpdateInstall() {
   return invoke<void>('cancel_update_install')
 }
 
-export async function relaunchApp() {
-  const process = await import('@tauri-apps/plugin-process')
-  return process.relaunch()
+export function relaunchApp() {
+  return invoke<void>('relaunch')
 }
 
-export async function getAppVersion() {
-  const app = await import('@tauri-apps/api/app')
-  return app.getVersion()
+export function getAppVersion() {
+  return invoke<string>('get_app_version')
 }
 
-export async function checkForAppUpdate(options?: { proxy: string }): Promise<ShellUpdate | null> {
-  const updater = await import('@tauri-apps/plugin-updater')
-  return updater.check(options)
+export async function checkForAppUpdate(_options?: { proxy: string }): Promise<ShellUpdate | null> {
+  throw new Error('Automatic updates are not configured for this build.')
 }
 
 export async function pickDirectory(options: { title?: string; directory?: true; multiple?: false }) {
-  const dialog = await import('@tauri-apps/plugin-dialog')
-  return dialog.open({ ...options, directory: true, multiple: false })
+  const paths = await openDialog({ title: options.title, directory: true, multiple: false })
+  return paths?.[0] ?? null
 }
 
-export async function pickFile(options: FilePickerOptions) {
-  const dialog = await import('@tauri-apps/plugin-dialog')
-  return dialog.open({ ...options, directory: false, multiple: false })
+export async function pickFile(options: { title?: string; directory?: false; multiple?: false; filters?: ElectronDialogFilter[] }) {
+  const paths = await openDialog({ title: options.title, directory: false, multiple: false, filters: options.filters })
+  return paths?.[0] ?? null
 }
 
-export async function pickFiles(options: { multiple?: true; directory?: false }) {
-  const dialog = await import('@tauri-apps/plugin-dialog')
-  return dialog.open({ ...options, multiple: true, directory: false })
+export function pickFiles(_options: { multiple?: true; directory?: false }) {
+  return openDialog({ directory: false, multiple: true })
 }
 
-export async function pickExportPath(options: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> }) {
-  const dialog = await import('@tauri-apps/plugin-dialog')
-  return dialog.save(options)
+export function pickExportPath(options: { defaultPath: string; filters: ElectronDialogFilter[] }) {
+  return invoke<string | null>('dialog_save', options)
 }
 
-export async function openExternalLink(url: string) {
-  const shell = await import('@tauri-apps/plugin-shell')
-  return shell.open(url)
+export function openExternalLink(url: string) {
+  return invoke<void>('open_external', { url })
 }
 
 export async function getAppWindow(): Promise<AppWindow> {
-  const window = await import('@tauri-apps/api/window')
-  return window.getCurrentWindow()
+  return {
+    minimize: () => invoke<void>('window_minimize'),
+    toggleMaximize: () => invoke<void>('window_toggle_maximize'),
+    close: () => invoke<void>('window_close'),
+    isMaximized: () => invoke<boolean>('window_is_maximized'),
+    onResized: (handler) => listen<void>('window-resized', handler),
+    show: () => invoke<void>('window_show'),
+    setFocus: () => invoke<void>('window_focus'),
+  }
 }
 
-export async function requestAppAttention() {
-  const window = await import('@tauri-apps/api/window')
-  return window.getCurrentWindow().requestUserAttention(window.UserAttentionType.Critical)
+export function requestAppAttention() {
+  return invoke<void>('request_attention')
 }
 
-export async function onFileDrop(handler: (event: { payload: FileDropPayload }) => void): Promise<Unlisten> {
-  const webview = await import('@tauri-apps/api/webview')
-  return webview.getCurrentWebview().onDragDropEvent(handler)
+export function getFilePath(file: File): string | undefined {
+  return bridge().pathForFile(file) || undefined
 }
 
-export async function onMenuNavigate(handler: (event: { payload: string }) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<string>('native-menu-navigate', handler)
+export function onMenuNavigate(handler: (event: { payload: string }) => void): Promise<Unlisten> {
+  return listen<string>('native-menu-navigate', (payload) => handler({ payload }))
 }
 
-export function spawnTerminal(input: { cols: number; rows: number; cwd?: string; settings: DesktopTerminalSettings }) {
-  return invoke<TerminalSpawnResult>('terminal_spawn', input)
-}
-
-export function writeTerminal(sessionId: number, data: string) {
-  return invoke<void>('terminal_write', { sessionId, data })
-}
-
-export function resizeTerminal(sessionId: number, cols: number, rows: number) {
-  return invoke<void>('terminal_resize', { sessionId, cols, rows })
-}
-
-export function killTerminal(sessionId: number) {
-  return invoke<void>('terminal_kill', { sessionId })
-}
-
-export function detectDefaultTerminalShell(settings: DesktopTerminalSettings) {
-  return invoke<TerminalShellDetection>('detect_default_terminal_shell', { settings })
-}
-
-export function validateTerminalBashPath(path: string | null) {
-  return invoke<string | null>('validate_terminal_bash_path', { path })
-}
-
-export async function onTerminalOutput(handler: (payload: TerminalOutputPayload) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<TerminalOutputPayload>('terminal-output', (event) => handler(event.payload))
-}
-
-export async function onTerminalExit(handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<TerminalExitPayload>('terminal-exit', (event) => handler(event.payload))
+function supportedPermission(whenSupported: 'granted' | 'unknown'): Promise<NativeNotificationPermission> {
+  return invoke<boolean>('notification_supported').then((supported) => (supported ? whenSupported : 'unsupported'))
 }
 
 export function getWindowsNotificationPermission() {
-  return invoke<boolean | null>('plugin:notification|is_permission_granted')
+  return invoke<boolean>('notification_supported')
 }
 
 export function requestWindowsNotificationPermission() {
-  return invoke<NativeNotificationPermission>('plugin:notification|request_permission')
+  return supportedPermission('granted')
 }
 
 export function getMacNotificationPermission() {
-  return invoke<NativeNotificationPermission>('macos_notification_permission_state')
+  return supportedPermission('unknown')
 }
 
 export function requestMacNotificationPermission() {
-  return invoke<NativeNotificationPermission>('macos_request_notification_permission')
+  return supportedPermission('unknown')
 }
 
 export function sendMacNotification(input: { title: string; body?: string; target?: string }) {
-  return invoke<boolean>('macos_send_notification', input)
+  return invoke<boolean>('notification_send', { title: input.title, body: input.body, clickPayload: input.target })
 }
 
-export function openWindowsNotificationSettings() {
-  return invoke<boolean>('open_windows_notification_settings')
+export function openNotificationSettings() {
+  return invoke<boolean>('open_notification_settings')
 }
 
-export async function isNotificationPermissionGranted() {
-  const notification = await import('@tauri-apps/plugin-notification')
-  return notification.isPermissionGranted()
+export function isNotificationPermissionGranted() {
+  return invoke<boolean>('notification_supported')
 }
 
-export async function requestNotificationPermission() {
-  const notification = await import('@tauri-apps/plugin-notification')
-  return notification.requestPermission()
+export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  return (await invoke<boolean>('notification_supported')) ? 'granted' : 'denied'
 }
 
 export async function sendNotification(input: { title: string; body?: string; id?: number; extra?: Record<string, unknown> }) {
-  const notification = await import('@tauri-apps/plugin-notification')
-  notification.sendNotification(input)
+  await invoke<boolean>('notification_send', { title: input.title, body: input.body, clickPayload: { id: input.id, extra: input.extra } })
 }
 
-export async function onNotificationClicked(handler: (event: { payload: unknown }) => void): Promise<Unlisten> {
-  const events = await import('@tauri-apps/api/event')
-  return events.listen<unknown>('desktop-notification-clicked', handler)
+export function onNotificationClicked(handler: (event: { payload: unknown }) => void): Promise<Unlisten> {
+  return listen<unknown>('desktop-notification-clicked', (payload) => handler({ payload }))
 }
 
-export async function onNotificationAction(handler: (notification: unknown) => void): Promise<Unlisten> {
-  const notification = await import('@tauri-apps/plugin-notification')
-  const listener = await notification.onAction(handler)
-  return () => { void listener.unregister() }
+export async function onNotificationAction(_handler: (notification: unknown) => void): Promise<Unlisten> {
+  return () => {}
 }

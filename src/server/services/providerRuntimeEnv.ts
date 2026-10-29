@@ -238,9 +238,6 @@ export function buildProviderManagedEnv(
   return {
     ...omitAuthEnv(presetDefaultEnv),
     ...customProviderCapabilityEnv,
-    ...(provider.autoCompactWindow !== undefined && {
-      CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(provider.autoCompactWindow),
-    }),
     ...(Object.keys(modelContextWindows).length > 0 && {
       [MODEL_CONTEXT_WINDOWS_ENV_KEY]: JSON.stringify(modelContextWindows),
     }),

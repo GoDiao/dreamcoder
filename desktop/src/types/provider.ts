@@ -14,6 +14,8 @@ export type ProviderModel = {
   name?: string
 }
 
+export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
+
 export type ModelContextWindows = Record<string, number>
 
 export type SavedProvider = {
@@ -27,7 +29,6 @@ export type SavedProvider = {
   runtimeKind?: ProviderRuntimeKind
   models: ProviderModel[]
   fastModel?: string
-  autoCompactWindow?: number
   modelContextWindows?: ModelContextWindows
   notes?: string
 }
@@ -42,7 +43,6 @@ export type CreateProviderInput = {
   runtimeKind?: ProviderRuntimeKind
   models: ProviderModel[]
   fastModel?: string
-  autoCompactWindow?: number
   modelContextWindows?: ModelContextWindows
   notes?: string
 }
@@ -56,7 +56,6 @@ export type UpdateProviderInput = {
   runtimeKind?: ProviderRuntimeKind
   models?: ProviderModel[]
   fastModel?: string | null
-  autoCompactWindow?: number | null
   modelContextWindows?: ModelContextWindows | null
   notes?: string
 }
@@ -70,6 +69,7 @@ export type TestProviderConfigInput = {
 }
 
 export type DiscoverProviderModelsInput = {
+  presetId?: string
   baseUrl: string
   apiKey: string
   authStrategy?: ProviderAuthStrategy

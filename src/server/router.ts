@@ -21,6 +21,7 @@ import { handleOpenTargetsApi } from './api/open-targets.js'
 import { handleMemoryApi } from './api/memory.js'
 import { handleDesktopUiApi } from './api/desktop-ui.js'
 import { handleClaudeCodeImportApi } from './api/claude-code-import.js'
+import { handleTerminalApi } from './api/terminal.js'
 
 export async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -95,6 +96,9 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
 
     case 'activity-stats':
       return handleActivityStatsApi(req, url, segments)
+
+    case 'terminal':
+      return handleTerminalApi(req, url, segments)
 
     case 'open-targets':
       return handleOpenTargetsApi(req, url, segments)

@@ -798,7 +798,7 @@ function triggerTitleGeneration(sessionId: string): void {
         }
       }
 
-      const aiTitle = await generateTitle(text, runtimeProviderId, runtimeModel)
+      const aiTitle = await generateTitle(text, runtimeProviderId, runtimeModel, sessionId)
       if (aiTitle) {
         const saved = await saveAiTitle(sessionId, aiTitle)
         if (!saved) {
@@ -1039,8 +1039,6 @@ async function getRuntimeSettings(sessionId: string): Promise<RuntimeSettings> {
 
 async function resolveRuntimeSettings(sessionId?: string): Promise<RuntimeSettings> {
   const runtimeOverride = sessionId ? store.peek(sessionId)?.runtime.desired : undefined
-  // A null provider used to mean the official sign-in, which is gone; such an
-  // override falls back to the default settings.
   if (runtimeOverride?.providerId === null) {
     return getDefaultRuntimeSettings()
   }

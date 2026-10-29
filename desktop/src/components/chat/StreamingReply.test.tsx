@@ -45,12 +45,12 @@ describe('reply highlighting from streaming to committed', () => {
     cleanup()
   })
 
-  it('renders the streaming reply incrementally with the lightweight highlighter', () => {
+  it('renders the streaming reply incrementally with the shared highlighter', () => {
     patchSession({ chatState: 'streaming', streamingText: REPLY })
     const { container } = render(<StreamingReply sessionId={SCENARIO_SESSION_ID} />)
 
     expect(container.querySelector('[data-streaming-block]')).not.toBeNull()
-    expect(screen.getByTestId('code-viewer')).toHaveAttribute('data-highlighter', 'prism')
+    expect(screen.getByTestId('code-viewer')).toHaveAttribute('data-highlighter', 'shiki')
   })
 
   it('renders a committed reply in the transcript in full with Shiki', () => {

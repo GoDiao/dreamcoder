@@ -5,9 +5,7 @@ export type H5RequestContext = {
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 const LOCAL_ORIGINS = new Set([
-  'http://tauri.localhost',
-  'https://tauri.localhost',
-  'tauri://localhost',
+  'dreamcoder://localhost',
 ])
 
 export function normalizeHostname(hostname: string): string {
@@ -97,6 +95,10 @@ export function shouldBlockDisabledH5Access({
   }
 
   return classifyH5Request(request, url, context) === 'h5-browser'
+}
+
+export function isDesktopOnlyPath(pathname: string): boolean {
+  return pathname === '/terminal' || pathname === '/api/terminal' || pathname.startsWith('/api/terminal/')
 }
 
 function isH5ProtectedCapabilityPath(pathname: string): boolean {

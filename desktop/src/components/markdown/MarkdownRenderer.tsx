@@ -482,7 +482,7 @@ function buildMarkdownParts(html: string, codeBlocks: CodeBlock[], mathBlocks: M
   return result
 }
 
-function renderMarkdownParts(parts: MarkdownPart[], highlighter: 'shiki' | 'prism') {
+function renderMarkdownParts(parts: MarkdownPart[]) {
   return parts.map((part, i) =>
     part.type === 'html' ? (
       <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
@@ -493,7 +493,6 @@ function renderMarkdownParts(parts: MarkdownPart[], highlighter: 'shiki' | 'pris
         <CodeViewer
           code={part.block.code}
           language={part.block.language}
-          highlighter={highlighter}
         />
       </div>
     )
@@ -558,7 +557,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, varian
 
   return (
     <div className={proseClasses} onClick={handleClick}>
-      {renderMarkdownParts(parts, 'shiki')}
+      {renderMarkdownParts(parts)}
     </div>
   )
 })
@@ -580,7 +579,7 @@ const StreamingMarkdownBlock = memo(function StreamingMarkdownBlock({ content }:
     )
   }
 
-  return <div data-streaming-block="">{renderMarkdownParts(parts, 'prism')}</div>
+  return <div data-streaming-block="">{renderMarkdownParts(parts)}</div>
 })
 
 type StreamingProps = Omit<Props, 'cache'>

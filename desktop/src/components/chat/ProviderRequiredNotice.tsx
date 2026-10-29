@@ -2,7 +2,7 @@ import { useTranslation } from '../../i18n'
 import { useProviderStore } from '../../stores/providerStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { RuntimeSelection } from '../../types/runtime'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 
 export function openProviderSettings() {
   useUIStore.getState().openSettings('providers')
@@ -43,7 +43,7 @@ export function ProviderGateCard({ className = '', testId = 'provider-required-n
             : t('chat.providerGate.noneBody')}
         </span>
       </div>
-      <Button size="xs" variant="primary" className="h-8 shrink-0 px-3.5 text-[13px]" onClick={openProviderSettings}>
+      <Button size="xs" className="h-8 shrink-0 px-3.5 text-[13px]" onClick={openProviderSettings}>
         {hasProviders ? t('chat.providerGate.choose') : t('settings.providers.addProvider')}
       </Button>
     </div>
