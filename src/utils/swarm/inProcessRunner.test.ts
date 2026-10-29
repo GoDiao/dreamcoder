@@ -137,7 +137,7 @@ describe('runInProcessTeammate', () => {
 
     const task = await eventually(
       () => getTask(taskListId, id),
-      found => found?.owner === TEAMMATE,
+      found => found?.owner === TEAMMATE && found.status === 'in_progress',
     )
     expect(task).toMatchObject({ owner: TEAMMATE, status: 'in_progress' })
     const prompts = await eventually(
