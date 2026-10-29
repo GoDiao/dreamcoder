@@ -1,9 +1,12 @@
+import { ArrowLeftIcon, BotIcon, ChevronRightIcon, CircleAlertIcon, NetworkIcon, SparklesIcon, ZapIcon } from 'lucide-react'
+import { DetailStat, MetaPill } from '../settings/SettingsSummary'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { useMemo, useState, type ReactNode } from 'react'
 import { usePluginStore } from '../../stores/pluginStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { PluginCapabilityKey } from '../../types/plugin'
 import { useSkillStore } from '../../stores/skillStore'
@@ -52,9 +55,7 @@ export function PluginDetail() {
 
   if (isDetailLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-      </div>
+      <LoadingBlock />
     )
   }
 
@@ -176,7 +177,7 @@ export function PluginDetail() {
           onClick={clearSelection}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]"
         >
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <ArrowLeftIcon aria-hidden="true" size={16} />
           {t('settings.plugins.back')}
         </button>
       </div>
@@ -216,22 +217,22 @@ export function PluginDetail() {
             <DetailStat
               label={t('settings.plugins.summary.skills')}
               value={String(selectedPlugin.componentCounts.skills)}
-              icon="auto_awesome"
+              icon={SparklesIcon}
             />
             <DetailStat
               label={t('settings.plugins.summary.agents')}
               value={String(selectedPlugin.componentCounts.agents)}
-              icon="smart_toy"
+              icon={BotIcon}
             />
             <DetailStat
               label={t('settings.plugins.summary.mcp')}
               value={String(selectedPlugin.componentCounts.mcpServers)}
-              icon="hub"
+              icon={NetworkIcon}
             />
             <DetailStat
               label={t('settings.plugins.summary.hooks')}
               value={String(selectedPlugin.componentCounts.hooks)}
-              icon="bolt"
+              icon={ZapIcon}
             />
           </div>
         </div>
@@ -242,7 +243,7 @@ export function PluginDetail() {
           {canMutate && (
             selectedPlugin.enabled ? (
               <Button
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 loading={isApplying && actionKey === 'disable'}
                 onClick={() => void runAction('disable', () => disablePlugin(selectedPlugin.id, selectedPlugin.scope, currentWorkDir, activeSessionId || undefined))}
@@ -262,7 +263,7 @@ export function PluginDetail() {
 
           {canMutate && (
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               loading={isApplying && actionKey === 'update'}
               onClick={() => void runAction('update', () => updatePlugin(selectedPlugin.id, selectedPlugin.scope, currentWorkDir, activeSessionId || undefined))}
@@ -272,7 +273,7 @@ export function PluginDetail() {
           )}
 
           <Button
-            variant="secondary"
+            variant="outline"
             size="sm"
             loading={isApplying && actionKey === 'reload'}
             onClick={() => void handleReload()}
@@ -282,7 +283,7 @@ export function PluginDetail() {
 
           {canMutate && (
             <Button
-              variant="danger"
+              variant="destructive"
               size="sm"
               loading={isApplying && actionKey === 'uninstall'}
               onClick={() => {
@@ -310,9 +311,7 @@ export function PluginDetail() {
       {selectedPlugin.errors.length > 0 && (
         <section className="rounded-2xl border border-[var(--color-error)]/20 bg-[var(--color-error)]/6 px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-error)]">
-              error
-            </span>
+            <CircleAlertIcon className="shrink-0 text-[var(--color-error)]" aria-hidden="true" size={18} />
             <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
               {t('settings.plugins.errorsTitle')}
             </h4>
@@ -493,7 +492,7 @@ export function PluginDetail() {
         body={t('settings.plugins.confirmUninstall', { name: selectedPlugin.name })}
         confirmLabel={t('settings.plugins.uninstall')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
         loading={isApplying && actionKey === 'uninstall'}
       />
     </div>
@@ -568,9 +567,7 @@ function SkillPreviewCard({
             {t('settings.skills.slashCommand')}
           </span>
         </div>
-        <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5">
-          chevron_right
-        </span>
+        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
       <div className="mt-1 text-[11px] text-[var(--color-text-tertiary)] break-all">/{slashName}</div>
       <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">{description}</div>
@@ -616,9 +613,7 @@ function AgentPreviewCard({
           <div className="text-sm font-semibold text-[var(--color-text-primary)] break-all">{name}</div>
           <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">{description}</div>
         </div>
-        <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5">
-          chevron_right
-        </span>
+        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
     </button>
   )
@@ -654,9 +649,7 @@ function McpPreviewCard({
           </div>
           <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-all">{summary}</div>
         </div>
-        <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5">
-          chevron_right
-        </span>
+        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
     </button>
   )
@@ -690,36 +683,6 @@ function HookPreviewCard({
             {action}
           </span>
         ))}
-      </div>
-    </div>
-  )
-}
-
-function MetaPill({ children }: { children: ReactNode }) {
-  return (
-    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
-      {children}
-    </span>
-  )
-}
-
-function DetailStat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: string
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
-        <span className="material-symbols-outlined text-[14px]">{icon}</span>
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-base font-semibold text-[var(--color-text-primary)] break-all">
-        {value}
       </div>
     </div>
   )

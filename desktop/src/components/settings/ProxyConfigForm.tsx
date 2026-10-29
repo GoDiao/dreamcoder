@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { Input } from '../shared/Input'
-import { Button } from '../shared/Button'
+import { LabeledInput } from '../shared/LabeledInput'
+import { Button } from '../shared/ui/button'
 import { SettingsRow } from './SettingsRow'
 import { SettingsSelect } from './SettingsSelect'
 
@@ -75,12 +75,12 @@ export function ProxyConfigForm({
 
       {mode === 'manual' && (
         <div className="mt-3">
-          <Input
+          <LabeledInput
             label={labels.urlLabel}
+            error={proxyError ?? undefined}
             value={url}
             placeholder={labels.urlPlaceholder}
             autoComplete="off"
-            error={proxyError ?? undefined}
             onChange={(event) => onUrlChange(event.target.value)}
           />
           {!proxyError && (
@@ -99,7 +99,7 @@ export function ProxyConfigForm({
         </p>
         <Button
           size="xs"
-          variant="secondary"
+          variant="outline"
           className="whitespace-nowrap"
           disabled={!isDirty || !!proxyError || isSaving}
           loading={isSaving}

@@ -1,3 +1,5 @@
+import { ChevronRightIcon, FileTextIcon, FolderIcon, FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { forwardRef, useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { ApiError } from '../../api/client'
 import { filesystemApi } from '../../api/filesystem'
@@ -195,6 +197,7 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
     const displayPath = getDisplayPath(entry)
     const parentPath = relativePath.split('/').slice(0, -1).join('/')
     const selected = selectedIndex === index
+    const EntryIcon = entry.isDirectory ? FolderIcon : FileTextIcon
     return (
       <div
         key={entry.path}
@@ -213,17 +216,14 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
           role="option"
           aria-selected={selected}
         >
-          <span className={`material-symbols-outlined shrink-0 text-[17px] ${entry.isDirectory ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-secondary)]'}`}>
-            {entry.isDirectory ? 'folder' : 'description'}
-          </span>
+          <EntryIcon className={`shrink-0 ${entry.isDirectory ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-secondary)]'}`} aria-hidden="true" size={17} />
           <span className="min-w-0 flex-1">
             {isSearchMode ? (
-              <span
+              <HintTooltip content={displayPath}><span
                 className="block truncate font-[var(--font-mono)] text-sm text-[var(--color-text-primary)]"
-                title={displayPath}
               >
                 {displayPath}
-              </span>
+              </span></HintTooltip>
             ) : (
               <>
                 <span className="block truncate text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</span>
@@ -240,18 +240,17 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
           ) : null}
         </button>
         {entry.isDirectory ? (
-          <button
+          <HintTooltip content={t('fileSearch.openFolder')}><button
             type="button"
             aria-label={t('fileSearch.openFolder')}
-            title={t('fileSearch.openFolder')}
             onClick={(event) => {
               event.stopPropagation()
               navigateEntry(entry)
             }}
             className="my-1 flex w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-tertiary)] opacity-70 transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/40 group-hover:opacity-100"
           >
-            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-          </button>
+            <ChevronRightIcon aria-hidden="true" size={16} />
+          </button></HintTooltip>
         ) : null}
       </div>
     )
@@ -260,13 +259,13 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
   return (
     <div
       id="file-search-menu"
-      className={`absolute bottom-full mb-2 z-50 w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)] ${
-        compact ? 'left-0 right-0 min-w-0 max-w-[calc(100vw-32px)]' : 'left-0 min-w-[480px]'
+      className={`w-full overflow-hidden bg-ui-popover ${
+        compact ? 'min-w-0' : ''
       }`}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-1.5 border-b border-[var(--color-border)] px-3 py-2 text-[11px]">
-        <span className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">folder_open</span>
+        <FolderOpenIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={14} />
         <span className="text-[var(--color-text-tertiary)] font-mono">{cwd.split('/').pop() || cwd}</span>
         {breadcrumbs.map((seg, i) => (
           <span key={i} className="flex items-center gap-1">
@@ -278,7 +277,7 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
           <span className="ml-auto truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">@{filter}</span>
         ) : null}
         {loading && (
-          <span className="material-symbols-outlined text-[12px] text-[var(--color-text-tertiary)] animate-spin ml-1">progress_activity</span>
+          <LoaderCircleIcon className="shrink-0 text-[var(--color-text-tertiary)] animate-spin ml-1" aria-hidden="true" size={12} />
         )}
       </div>
 
@@ -293,11 +292,7 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
           <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">
             {filter ? t('fileSearch.noMatch') : t('fileSearch.noFiles')}
           </div>
-        ) : (
-          <>
-            {entries.map(renderEntry)}
-          </>
-        )}
+        ) : entries.map(renderEntry)}
       </div>
 
       {!compact ? (

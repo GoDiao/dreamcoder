@@ -1,4 +1,5 @@
 import { Modal } from '../shared/Modal'
+import { Kbd } from '../shared/ui/kbd'
 import { useTranslation, type TranslationKey } from '../../i18n'
 
 type Shortcut = { keys: string[]; label: TranslationKey }
@@ -61,12 +62,12 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
                   <dt className="text-ui-nav text-[var(--color-text-primary)]">{t(item.label)}</dt>
                   <dd className="flex flex-shrink-0 items-center gap-1">
                     {item.keys.map((key) => (
-                      <kbd
+                      <Kbd
                         key={key}
-                        className="min-w-[22px] rounded-[5px] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1.5 py-0.5 text-center font-sans text-ui-aux text-[var(--color-text-secondary)]"
+                        className="min-w-[22px]"
                       >
                         {key}
-                      </kbd>
+                      </Kbd>
                     ))}
                   </dd>
                 </div>

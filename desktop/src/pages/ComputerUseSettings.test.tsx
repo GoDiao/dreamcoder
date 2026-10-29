@@ -74,12 +74,12 @@ describe('ComputerUseSettings', () => {
     render(<ComputerUseSettings />)
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Computer control' }))
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText(/about 76 MB from GitHub/)).toBeInTheDocument()
     expect(within(dialog).getByText(/telemetry is turned off/)).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(computerUseApiMock.install).not.toHaveBeenCalled()
     expect(computerUseApiMock.updateConfig).not.toHaveBeenCalled()
     expect(screen.getByRole('switch', { name: 'Computer control' })).not.toBeChecked()
@@ -179,7 +179,7 @@ describe('ComputerUseSettings', () => {
     render(<ComputerUseSettings />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Install 0.34.0' }))
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText(/Other tools using cua are disconnected/)).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalled())
@@ -211,7 +211,7 @@ describe('ComputerUseSettings', () => {
 
     expect(await screen.findByText(/50 MB in \/cfg\/\.runtime/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove old runtime' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(computerUseApiMock.cleanupLegacyRuntime).toHaveBeenCalled())
   })
 
@@ -235,7 +235,7 @@ describe('ComputerUseSettings', () => {
     computerUseApiMock.install.mockResolvedValue({ phase: 'downloading', startedAt: 'now', output: [] })
     render(<ComputerUseSettings />)
     fireEvent.click(await screen.findByRole('switch', { name: 'Computer control' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalledWith(true))
     expect(computerUseApiMock.updateConfig).not.toHaveBeenCalled()
   })
@@ -245,7 +245,7 @@ describe('ComputerUseSettings', () => {
     computerUseApiMock.install.mockResolvedValue({ phase: 'downloading', startedAt: 'now', output: [] })
     render(<ComputerUseSettings />)
     fireEvent.click(await screen.findByRole('button', { name: 'Install' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalledWith(false))
   })
 
@@ -257,7 +257,7 @@ describe('ComputerUseSettings', () => {
     expect(screen.getByText('Not installed')).toBeInTheDocument()
     expect(screen.queryByText(/Takes effect in new sessions/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(computerUseApiMock.install).toHaveBeenCalled())
     expect(computerUseApiMock.updateConfig).not.toHaveBeenCalled()
   })

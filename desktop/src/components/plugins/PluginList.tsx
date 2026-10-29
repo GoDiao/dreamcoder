@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { usePluginStore } from '../../stores/pluginStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { ChevronRight, RefreshCw, RotateCw } from 'lucide-react'
 import { SettingsListRow, SettingsSection, SettingsSummary } from '../settings/SettingsSummary'
 import type { PluginSummary } from '../../types/plugin'
@@ -75,9 +76,7 @@ export function PluginList() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-      </div>
+      <LoadingBlock />
     )
   }
 
@@ -102,20 +101,20 @@ export function PluginList() {
     <div className="min-w-0">
       <div className="mb-1 flex flex-wrap items-center justify-end gap-1.5">
         <Button
-          variant="secondary"
+          variant="outline"
           size="xs"
           onClick={() => void fetchPlugins(currentWorkDir)}
-          icon={<RefreshCw size={13} aria-hidden="true" />}
         >
+          <RefreshCw data-icon="inline-start" size={13} aria-hidden="true" />
           {t('settings.plugins.refresh')}
         </Button>
         <Button
-          variant="secondary"
+          variant="outline"
           size="xs"
           onClick={handleReload}
           loading={isApplying}
-          icon={<RotateCw size={13} aria-hidden="true" />}
         >
+          <RotateCw data-icon="inline-start" size={13} aria-hidden="true" />
           {t('settings.plugins.apply')}
         </Button>
       </div>
@@ -189,11 +188,12 @@ function renderGroup(
   return (
     <SettingsSection key={bucket} title={t(titleKey)} count={items.length}>
       {items.map((plugin) => (
-        <button
+        <Button
           key={plugin.id}
-          type="button"
+          variant="ghost"
+          size="row"
           onClick={() => void fetchPluginDetail(plugin.id, cwd)}
-          className="flex w-full min-w-0 items-center gap-3 border-b border-[var(--color-border-separator)] py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          className="gap-3 rounded-none border-0 border-b border-[var(--color-border-separator)] px-0 py-2.5"
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
@@ -230,7 +230,7 @@ function renderGroup(
             </span>
           </span>
           <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
-        </button>
+        </Button>
       ))}
     </SettingsSection>
   )

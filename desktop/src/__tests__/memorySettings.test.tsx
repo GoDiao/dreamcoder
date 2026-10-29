@@ -389,6 +389,32 @@ describe('MemorySettings', () => {
     expect(useUIStore.getState().pendingMemoryPath).toBeNull()
   })
 
+  it('opens the project without an error when the requested memory file does not exist', async () => {
+    memoryApiMock.listProjects.mockResolvedValue({
+      projects: [
+        {
+          id: '-workspace-demo',
+          label: '/workspace/demo',
+          memoryDir: '/tmp/claude/projects/-workspace-demo/memory',
+          exists: true,
+          fileCount: 0,
+          isCurrent: true,
+        },
+      ],
+    })
+    memoryApiMock.listFiles.mockResolvedValue({ files: [] })
+    useUIStore.setState({
+      pendingMemoryPath: '/tmp/claude/projects/-workspace-demo/memory/MEMORY.md',
+    })
+
+    render(<MemorySettings />)
+
+    expect(await screen.findByText('No memory files yet')).toBeInTheDocument()
+    await waitFor(() => expect(useUIStore.getState().pendingMemoryPath).toBeNull())
+    expect(memoryApiMock.readFile).not.toHaveBeenCalled()
+    expect(useMemoryStore.getState().error).toBeNull()
+  })
+
   it('defaults to preview, switches to edit, and marks the edited file as unsaved', async () => {
     render(<MemorySettings />)
 

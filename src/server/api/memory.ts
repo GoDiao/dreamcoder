@@ -289,6 +289,10 @@ async function resolveMemoryFilePath(
     mustExist: opts.mustExist,
   })
   const candidate = path.resolve(memoryDir, relativePath)
+  await assertWithinDirectory(candidate, memoryDir, false)
+  if (opts.mustExist && !(await fileExists(candidate))) {
+    throw ApiError.notFound(`Memory file not found: ${relativePath}`)
+  }
   await assertWithinDirectory(candidate, memoryDir, opts.mustExist)
   return candidate
 }

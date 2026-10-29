@@ -1,13 +1,12 @@
+import { ComposerPopover } from '../components/chat/ComposerPopover'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { skillsApi } from '../api/skills'
 import { useTranslation } from '../i18n'
-import { useSessionStore } from '../stores/sessionStore'
-import { useChatStore } from '../stores/chatStore'
+import { useNewSessionStore } from '../stores/newSessionStore'
 import { usePluginStore } from '../stores/pluginStore'
 import { useSessionRuntimeStore, DRAFT_RUNTIME_SELECTION_KEY } from '../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
-import { useTabStore } from '../stores/tabStore'
 import { RepositoryLaunchControls, type RepositoryLaunchError } from '../components/shared/RepositoryLaunchControls'
 import { PermissionModeSelector } from '../components/controls/PermissionModeSelector'
 import { ModelSelector } from '../components/controls/ModelSelector'
@@ -19,7 +18,8 @@ import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
 import { FileSearchMenu, type FileSearchMenuHandle } from '../components/chat/FileSearchMenu'
 import { LocalSlashCommandPanel, type LocalSlashCommandName } from '../components/chat/LocalSlashCommandPanel'
 import { useMobileViewport } from '../hooks/useMobileViewport'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { useTypeToFocus } from '../hooks/useTypeToFocus'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import {
   filesToComposerAttachments,
   selectNativeFileAttachments,
@@ -37,20 +37,30 @@ import {
   resolveRepositoryLaunchError,
   resolveSlashUiAction,
 } from '../components/chat/composerUtils'
-import type { AttachmentRef } from '../types/chat'
+import type { PermissionMode } from '../types/settings'
 import type { SlashCommandOption } from '../components/chat/composerUtils'
 
 type Attachment = ComposerAttachment
 
 export function EmptySession() {
   const t = useTranslation()
-  const [input, setInput] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [workDir, setWorkDir] = useState('')
-  const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
-  const [useWorktree, setUseWorktree] = useState(false)
+  const input = useNewSessionStore((state) => state.input)
+  const isSubmitting = useNewSessionStore((state) => state.isSubmitting)
+  const createdSessionId = useNewSessionStore((state) => state.createdSessionId)
+  const workDir = useNewSessionStore((state) => state.workDir)
+  const selectedBranch = useNewSessionStore((state) => state.branch)
+  const useWorktree = useNewSessionStore((state) => state.useWorktree)
+  const updateDraft = useNewSessionStore((state) => state.updateDraft)
+  const setWorkDir = useNewSessionStore((state) => state.setWorkDir)
+  const submitDraft = useNewSessionStore((state) => state.submit)
+  const setInput = (input: string) => updateDraft({ input })
+  const setSelectedBranch = useCallback((branch: string | null) => updateDraft({ branch }), [updateDraft])
+  const setUseWorktree = (useWorktree: boolean) => updateDraft({ useWorktree })
   const [repositoryLaunchReady, setRepositoryLaunchReady] = useState(true)
-  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const attachments = useNewSessionStore((state) => state.attachments)
+  const setAttachments = useCallback((value: Attachment[] | ((previous: Attachment[]) => Attachment[])) => {
+    updateDraft((draft) => ({ attachments: typeof value === 'function' ? value(draft.attachments) : value }))
+  }, [updateDraft])
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
   const [slashMenuOpen, setSlashMenuOpen] = useState(false)
   const [fileSearchOpen, setFileSearchOpen] = useState(false)
@@ -65,15 +75,14 @@ export function EmptySession() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const plusMenuRef = useRef<HTMLDivElement>(null)
-  const slashMenuRef = useRef<HTMLDivElement>(null)
   const fileSearchRef = useRef<FileSearchMenuHandle>(null)
   const slashItemRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const createSession = useSessionStore((state) => state.createSession)
-  const sendMessage = useChatStore((state) => state.sendMessage)
-  const connectToSession = useChatStore((state) => state.connectToSession)
   const addToast = useUIStore((state) => state.addToast)
   const currentModel = useSettingsStore((state) => state.currentModel)
+  const defaultPermissionMode = useSettingsStore((state) => state.permissionMode)
+  const draftPermissionMode = useNewSessionStore((state) => state.permissionMode)
+  const setDraftPermissionMode = (permissionMode: PermissionMode) => updateDraft({ permissionMode })
+  const permissionMode = draftPermissionMode ?? defaultPermissionMode
   const lastPluginReloadSummary = usePluginStore((state) => state.lastReloadSummary)
   const draftRuntimeSelection = useSessionRuntimeStore((state) => state.selections[DRAFT_RUNTIME_SELECTION_KEY])
   const draftRuntimeSelectionKey = draftRuntimeSelection
@@ -81,7 +90,8 @@ export function EmptySession() {
     : undefined
   const providerMissing = useProviderMissing(draftRuntimeSelection)
   const draftModelLabel = draftRuntimeSelection?.modelId ?? currentModel?.name ?? currentModel?.id
-  const isMobileComposer = useMobileViewport() && !isTauriRuntime()
+  const isMobileComposer = useMobileViewport() && !isDesktopRuntime()
+  useTypeToFocus(textareaRef, !isMobileComposer)
 
   useEffect(() => {
     textareaRef.current?.focus()
@@ -90,66 +100,6 @@ export function EmptySession() {
   useEffect(() => {
     resizeComposerTextarea(textareaRef.current)
   }, [input, providerMissing])
-
-  useEffect(() => {
-    if (!plusMenuOpen) return
-    const handleClick = (event: MouseEvent) => {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
-        setPlusMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [plusMenuOpen])
-
-  useEffect(() => {
-    if (!slashMenuOpen) return
-    const handleClick = (event: MouseEvent) => {
-      if (
-        slashMenuRef.current &&
-        !slashMenuRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setSlashMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [slashMenuOpen])
-
-  useEffect(() => {
-    if (!localSlashPanel) return
-    const handleClick = (event: MouseEvent) => {
-      if (
-        slashMenuRef.current &&
-        !slashMenuRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setLocalSlashPanel(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [localSlashPanel])
-
-  useEffect(() => {
-    if (!fileSearchOpen) return
-    const handleClick = (event: MouseEvent) => {
-      const menu = document.getElementById('file-search-menu')
-      if (
-        menu &&
-        !menu.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
-        setFileSearchOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [fileSearchOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -183,9 +133,8 @@ export function EmptySession() {
   )
 
   const handleWorkDirChange = (newWorkDir: string) => {
+    if (newWorkDir === workDir) return
     setWorkDir(newWorkDir)
-    setSelectedBranch(null)
-    setUseWorktree(false)
     setRepositoryLaunchReady(!newWorkDir)
     setLaunchError(null)
   }
@@ -201,8 +150,7 @@ export function EmptySession() {
   }, [filteredCommands, slashFilter])
   const canSubmit = (
     input.trim().length > 0 ||
-    attachments.length > 0 ||
-    !!workDir
+    attachments.length > 0
   ) && !isSubmitting && repositoryLaunchReady
 
   useEffect(() => {
@@ -244,34 +192,9 @@ export function EmptySession() {
       return
     }
 
-    setIsSubmitting(true)
     setLaunchError(null)
     try {
-      const explicitDraftSelection = useSessionRuntimeStore.getState().selections[DRAFT_RUNTIME_SELECTION_KEY]
-      const sessionId = await createSession(
-        workDir || undefined,
-        selectedBranch
-          ? { repository: { branch: selectedBranch, worktree: useWorktree } }
-          : undefined,
-      )
-      if (explicitDraftSelection) {
-        useSessionRuntimeStore.getState().setSelection(sessionId, explicitDraftSelection)
-        useSessionRuntimeStore.getState().clearSelection(DRAFT_RUNTIME_SELECTION_KEY)
-      }
-      useTabStore.getState().openTab(sessionId, 'New Session')
-      connectToSession(sessionId)
-      const attachmentPayload: AttachmentRef[] = attachments.map((attachment) => ({
-        type: attachment.type,
-        name: attachment.name,
-        path: attachment.path,
-        data: attachment.data,
-        mimeType: attachment.mimeType,
-      }))
-      if (text || attachmentPayload.length > 0) {
-        sendMessage(sessionId, text, attachmentPayload)
-      }
-      setInput('')
-      setAttachments([])
+      await submitDraft(permissionMode, t('sidebar.newSession'))
     } catch (error) {
       const repositoryError = resolveRepositoryLaunchError(error, t)
       if (repositoryError) {
@@ -282,8 +205,6 @@ export function EmptySession() {
           message: resolveCreateSessionErrorMessage(error, t),
         })
       }
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -433,7 +354,6 @@ export function EmptySession() {
   }, [])
 
   const { isDragActive, dragHandlers } = useComposerFileDrop({
-    panelRef,
     onAttachments: appendAttachments,
     onError: (error) => {
       console.warn('[attachments] Failed to read dropped files', error)
@@ -441,7 +361,7 @@ export function EmptySession() {
   })
 
   const openAttachmentPicker = useCallback(() => {
-    if (!isTauriRuntime()) {
+    if (!isDesktopRuntime()) {
       fileInputRef.current?.click()
       setPlusMenuOpen(false)
       return
@@ -511,7 +431,7 @@ export function EmptySession() {
       )}
 
       {fileSearchOpen && (
-        <FileSearchMenu
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('fileSearch.title')} onClose={() => setFileSearchOpen(false)} preserveInputFocus><FileSearchMenu
           ref={fileSearchRef}
           cwd={workDir || ''}
           filter={atFilter}
@@ -556,24 +476,21 @@ export function EmptySession() {
               })
             }
           }}
-        />
+        /></ComposerPopover>
       )}
 
       {localSlashPanel && (
-        <div ref={slashMenuRef}>
-          <LocalSlashCommandPanel
-            command={localSlashPanel}
-            cwd={workDir || undefined}
-            commands={allSlashCommands}
-            onClose={() => setLocalSlashPanel(null)}
-          />
-        </div>
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setLocalSlashPanel(null)}><LocalSlashCommandPanel
+          command={localSlashPanel}
+          cwd={workDir || undefined}
+          commands={allSlashCommands}
+          onClose={() => setLocalSlashPanel(null)}
+        /></ComposerPopover>
       )}
 
       {slashMenuOpen && filteredCommands.length > 0 && (
-        <div
-          ref={slashMenuRef}
-          className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] shadow-[var(--shadow-dropdown)]"
+        <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setSlashMenuOpen(false)} preserveInputFocus><div
+          className="overflow-hidden bg-ui-popover"
         >
           <div className="max-h-[260px] overflow-y-auto p-1">
             {filteredCommands.map((command, index) => (
@@ -598,7 +515,7 @@ export function EmptySession() {
               </button>
             ))}
           </div>
-        </div>
+        </div></ComposerPopover>
       )}
     </>
   )
@@ -649,11 +566,11 @@ export function EmptySession() {
                   addFilesLabel: t('empty.addFiles'),
                   slashCommandsLabel: t('empty.slashCommands'),
                   toggleLabel: t('chat.composerTools'),
-                  menuRef: plusMenuRef,
                 }}
                 textareaRef={textareaRef}
                 textareaProps={{
                   value: input,
+                  disabled: isSubmitting,
                   onChange: (event) => handleInputChange(event.target.value, event.target.selectionStart ?? event.target.value.length),
                   onKeyDown: handleKeyDown,
                   onPaste: handlePaste,
@@ -680,18 +597,24 @@ export function EmptySession() {
                       useWorktree={useWorktree}
                       onUseWorktreeChange={setUseWorktree}
                       onLaunchReadyChange={setRepositoryLaunchReady}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !!createdSessionId}
                       placement="composer"
                       launchError={launchError}
                       onLaunchErrorDismiss={() => setLaunchError(null)}
                       noticeSlot={noticeSlot}
                     />
-                    <PermissionModeSelector workDir={workDir} compact={isMobileComposer} />
+                    <PermissionModeSelector
+                      disabled={isSubmitting || !!createdSessionId}
+                      workDir={workDir}
+                      compact={isMobileComposer}
+                      value={permissionMode}
+                      onChange={setDraftPermissionMode}
+                    />
                   </>
                 )}
                 right={(
                   <>
-                    <ModelSelector runtimeKey={DRAFT_RUNTIME_SELECTION_KEY} disabled={isSubmitting} compact={isMobileComposer} />
+                    <ModelSelector runtimeKey={DRAFT_RUNTIME_SELECTION_KEY} disabled={isSubmitting || !!createdSessionId} compact={isMobileComposer} />
                     <ContextUsageIndicator
                       chatState="idle"
                       messageCount={0}

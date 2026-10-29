@@ -1,3 +1,5 @@
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from '../shared/ui/input-group'
+import { TriangleAlertIcon } from 'lucide-react'
 import { PermissionModeSelector } from '../controls/PermissionModeSelector'
 import { ModelSelector } from '../controls/ModelSelector'
 import { DirectoryPicker } from '../shared/DirectoryPicker'
@@ -41,17 +43,18 @@ export function PromptEditor({
 }: Props) {
   const t = useTranslation()
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] focus-within:border-[var(--color-border-focus)] transition-colors overflow-visible">
-      <textarea
+    <InputGroup className="items-stretch">
+      <InputGroupTextarea
+        aria-label={t('newTask.prompt')}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="w-full resize-y bg-transparent px-3 py-2.5 text-sm leading-relaxed text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
+        className="field-sizing-fixed w-full resize-y bg-transparent px-3 py-2.5 text-sm leading-relaxed text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
         style={{ minHeight: 120 }}
       />
 
-      <div className="border-t border-[var(--color-border)]/40 px-3 py-2 flex flex-col gap-2 bg-[var(--color-surface-container-low)] rounded-b-[var(--radius-lg)]">
+      <InputGroupAddon align="block-end" className="items-stretch border-t flex-col">
         <div className="flex items-center justify-between">
           <PermissionModeSelector value={permissionMode} onChange={onPermissionModeChange} workDir={folderPath || undefined} />
           <ModelSelector
@@ -69,11 +72,11 @@ export function PromptEditor({
 
         {permissionMode === 'bypassPermissions' && (
           <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-[var(--color-error)]/8 text-[10px] text-[var(--color-error)]">
-            <span className="material-symbols-outlined text-[12px]">warning</span>
+            <TriangleAlertIcon aria-hidden="true" size={12} />
             {t('promptEditor.bypassWarning')}{folderPath ? ` ${t('promptEditor.within')} ${folderPath}` : ` ${t('promptEditor.selectFolder')}`}.
           </div>
         )}
-      </div>
-    </div>
+      </InputGroupAddon>
+    </InputGroup>
   )
 }

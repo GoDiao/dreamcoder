@@ -1,12 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUIStore } from '../../stores/uiStore'
 import { useSessionStore } from '../../stores/sessionStore'
 
 const mocks = vi.hoisted(() => ({
   initializeDesktopServerUrl: vi.fn(),
-  isTauriRuntime: false,
+  isDesktopRuntime: false,
+  isMacTitlebar: false,
   isMobile: false,
   fetchAll: vi.fn(),
   restoreTabs: vi.fn(),
@@ -22,9 +23,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../lib/desktopRuntime', () => ({
   initializeDesktopServerUrl: mocks.initializeDesktopServerUrl,
-  isTauriRuntime: () => mocks.isTauriRuntime,
+  isDesktopRuntime: () => mocks.isDesktopRuntime,
   isH5ConnectionRequiredError: (error: unknown) =>
     error instanceof Error && error.name === 'H5ConnectionRequiredError',
+}))
+
+vi.mock('../../lib/windowChrome', () => ({
+  isMacOverlayTitlebar: () => mocks.isDesktopRuntime && mocks.isMacTitlebar,
 }))
 
 vi.mock('../../stores/settingsStore', () => ({
@@ -97,7 +102,7 @@ vi.mock('./ContentRouter', () => ({
   ContentRouter: () => <section>content loaded</section>,
 }))
 
-vi.mock('../../pages/Settings', () => ({
+vi.mock('../../pages/SettingsModal', () => ({
   SettingsModal: () => <div>settings modal mounted</div>,
 }))
 
@@ -111,10 +116,6 @@ vi.mock('./H5ConnectionView', () => ({
   ),
 }))
 
-vi.mock('../shared/Toast', () => ({
-  ToastContainer: () => null,
-}))
-
 vi.mock('../shared/UpdateChecker', () => ({
   UpdateChecker: () => <div>updates loaded</div>,
 }))
@@ -122,11 +123,14 @@ vi.mock('../shared/UpdateChecker', () => ({
 import { AppShell } from './AppShell'
 import { useProviderStore } from '../../stores/providerStore'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
+import { resetFirstLaunchWasShown } from '../onboarding/useFirstLaunchGate'
 
 describe('AppShell boot flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.isTauriRuntime = false
+    resetFirstLaunchWasShown()
+    mocks.isDesktopRuntime = false
+    mocks.isMacTitlebar = false
     mocks.isMobile = false
     mocks.initializeDesktopServerUrl.mockResolvedValue('http://127.0.0.1:3456')
     mocks.fetchAll.mockResolvedValue(undefined)
@@ -142,6 +146,10 @@ describe('AppShell boot flow', () => {
     mocks.tabState.tabs = []
     useSessionStore.setState({ sessions: [], activeSessionId: null, isLoading: false, error: null })
     useUIStore.setState({ sidebarOpen: true, settingsOpen: false })
+  })
+
+  afterEach(() => {
+    resetFirstLaunchWasShown()
   })
 
   it('renders the desktop chrome after server and settings bootstrap', async () => {
@@ -246,8 +254,8 @@ describe('AppShell boot flow', () => {
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the Tauri startup error path unchanged', async () => {
-    mocks.isTauriRuntime = true
+  it('keeps the desktop startup error path unchanged', async () => {
+    mocks.isDesktopRuntime = true
     mocks.initializeDesktopServerUrl.mockRejectedValueOnce(
       Object.assign(new Error('desktop server startup failed'), {
         name: 'H5ConnectionRequiredError',
@@ -259,6 +267,73 @@ describe('AppShell boot flow', () => {
 
     expect(await screen.findByText('app.serverFailed')).toBeInTheDocument()
     expect(screen.queryByText('h5 connection view')).not.toBeInTheDocument()
+  })
+
+  it('gives pages without a session header a top strip as tall as that header', async () => {
+    mocks.isDesktopRuntime = true
+
+    const { rerender } = render(<AppShell />)
+    expect(await screen.findByTestId('window-drag-strip')).toHaveClass('h-11')
+
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+    rerender(<AppShell />)
+    expect(screen.getByTestId('window-drag-strip')).not.toHaveClass('h-11')
+
+    mocks.tabState.tabs = [{ sessionId: 'scheduled', title: 'Scheduled', type: 'scheduled', status: 'idle' }]
+    mocks.tabState.activeTabId = 'scheduled'
+    rerender(<AppShell />)
+    expect(screen.getByTestId('window-drag-strip')).toHaveClass('h-11')
+  })
+
+  it('hides the whole sidebar from one titlebar toggle in the desktop app', async () => {
+    mocks.isDesktopRuntime = true
+
+    render(<AppShell />)
+    const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
+    expect(screen.getByTestId('window-drag-strip')).toContainElement(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(toggle)
+
+    const sidebar = screen.getByTestId('sidebar-shell')
+    expect(sidebar).toHaveAttribute('data-state', 'closed')
+    expect(sidebar).toHaveAttribute('aria-hidden', 'true')
+    expect(sidebar).toHaveAttribute('inert')
+    expect(screen.getByTestId('titlebar-sidebar-toggle')).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar.expand' }))
+
+    expect(sidebar).not.toHaveAttribute('inert')
+    expect(sidebar).not.toHaveAttribute('aria-hidden')
+    expect(screen.getByRole('button', { name: 'sidebar.collapse' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('puts the macOS toggle right of the traffic lights and drops the strip on session pages', async () => {
+    mocks.isDesktopRuntime = true
+    mocks.isMacTitlebar = true
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+
+    render(<AppShell />)
+    const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
+    expect(toggle.style.left).toBe('var(--traffic-lights-end)')
+    expect(toggle).toHaveClass('window-no-drag')
+    const panels = document.querySelector('[data-slot="resizable-panel-group"]')!
+    expect(panels.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
+  })
+
+  it('keeps the macOS window movable while settings covers a session header', async () => {
+    mocks.isDesktopRuntime = true
+    mocks.isMacTitlebar = true
+    mocks.tabState.tabs = [{ sessionId: 'session-1', title: 'Session', type: 'session', status: 'idle' }]
+    mocks.tabState.activeTabId = 'session-1'
+    useUIStore.setState({ settingsOpen: true })
+
+    render(<AppShell />)
+    expect(await screen.findByTestId('window-drag-strip')).toHaveClass('fixed')
+    expect(screen.getByTestId('titlebar-sidebar-toggle')).toBeDisabled()
   })
 
   it('renders a mobile drawer toggle and backdrop in browser H5 mode', async () => {
@@ -327,6 +402,38 @@ describe('AppShell boot flow', () => {
     expect(screen.getByTestId('mobile-sidebar-toggle')).toHaveClass('h-10', 'w-10')
   })
 
+  it('shows an estimated message count as a lower bound', async () => {
+    mocks.isMobile = true
+    mocks.tabState.activeTabId = 'session-mobile'
+    mocks.tabState.tabs = [
+      { sessionId: 'session-mobile', title: 'Fallback tab title', type: 'session', status: 'idle' },
+    ]
+    useSessionStore.setState({
+      sessions: [{
+        id: 'session-mobile',
+        title: 'Long imported session',
+        createdAt: '2026-05-10T00:00:00.000Z',
+        modifiedAt: new Date().toISOString(),
+        messageCount: 12,
+        messageCountExact: false,
+        projectPath: '/tmp/project',
+        workDir: '/tmp/project',
+        workDirExists: true,
+      }],
+      activeSessionId: 'session-mobile',
+      isLoading: false,
+      error: null,
+    })
+
+    render(<AppShell />)
+
+    await screen.findByText('content loaded')
+
+    const header = screen.getByTestId('mobile-session-header')
+    expect(header).toHaveTextContent('session.messagesAtLeast')
+    expect(header.textContent).not.toMatch(/session\.messages(?!AtLeast)/)
+  })
+
   it('makes the page behind the settings window inert while it is open', async () => {
     useUIStore.setState({ settingsOpen: true })
 
@@ -336,6 +443,11 @@ describe('AppShell boot flow', () => {
     // The window drag strip stays usable; everything else in the main area is inert.
     expect(document.querySelector('#content-area > [inert]')).not.toBeNull()
     expect(screen.getByTestId('sidebar-shell')).toHaveAttribute('inert')
+
+    act(() => useUIStore.getState().closeSettings())
+
+    expect(screen.getByRole('complementary').closest('[inert]')).toBeNull()
+    expect(screen.getByText('content loaded').closest('[inert]')).toBeNull()
   })
 
   it('keeps browser H5 mobile on chat tabs when scheduled tasks was restored as active', async () => {

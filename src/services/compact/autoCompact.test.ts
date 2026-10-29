@@ -1,8 +1,12 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-import { getEffectiveContextWindowSize } from './autoCompact.js'
+import { getAutoCompactThreshold, getEffectiveContextWindowSize } from './autoCompact.js'
 import { getContextWindowForModel } from '../../utils/context.js'
 import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
+import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 
 let originalAutoCompactWindow: string | undefined
 let originalContextWindows: string | undefined
@@ -57,5 +61,36 @@ describe('model context window resolution', () => {
     process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = '1000000'
 
     expect(getEffectiveContextWindowSize('unknown-future-model')).toBe(980_000)
+  })
+})
+
+describe('auto-compact threshold', () => {
+  let configDir: string
+  let originalConfigDir: string | undefined
+
+  beforeEach(async () => {
+    configDir = await mkdtemp(join(tmpdir(), 'auto-compact-'))
+    originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+    process.env.DREAMCODER_CONFIG_DIR = configDir
+    resetSettingsCache()
+  })
+
+  afterEach(async () => {
+    if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+    else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
+    resetSettingsCache()
+    await rm(configDir, { recursive: true, force: true })
+  })
+
+  test('compacts at 90% of the window left after the summary reserve by default', () => {
+    expect(getAutoCompactThreshold('glm-5.1')).toBe(162_000)
+    expect(getAutoCompactThreshold('deepseek-v4-pro')).toBe(882_000)
+  })
+
+  test('uses the percentage from user settings', async () => {
+    await writeFile(join(configDir, 'settings.json'), JSON.stringify({ autoCompactPercent: 50 }))
+    resetSettingsCache()
+    expect(getAutoCompactThreshold('glm-5.1')).toBe(90_000)
+    expect(getAutoCompactThreshold('deepseek-v4-pro')).toBe(490_000)
   })
 })

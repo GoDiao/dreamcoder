@@ -5,7 +5,13 @@ import * as path from 'path'
 import { getOriginalCwd, setCwdState, setOriginalCwd } from '../../bootstrap/state.js'
 import * as mcpClient from '../../services/mcp/client.js'
 import * as mcpConfig from '../../services/mcp/config.js'
-import { _setGlobalConfigCacheForTesting, getProjectPathForConfig } from '../../utils/config.js'
+import {
+  _setGlobalConfigCacheForTesting,
+  getGlobalConfig,
+  getProjectPathForConfig,
+  saveGlobalConfig,
+  type GlobalConfig,
+} from '../../utils/config.js'
 import { getGlobalClaudeFile } from '../../utils/env.js'
 import * as mcpHostPreflight from '../services/mcpHostPreflight.js'
 import { handleMcpApi } from '../api/mcp.js'
@@ -14,6 +20,7 @@ import { conversationService } from '../services/conversationService.js'
 let tmpDir: string
 let projectRoot: string
 let originalConfigDir: string | undefined
+let savedTestGlobalConfig: Pick<GlobalConfig, 'mcpServers' | 'projects'>
 let connectSpy: ReturnType<typeof spyOn> | undefined
 let getClaudeCodeMcpConfigsSpy: ReturnType<typeof spyOn> | undefined
 let getAllMcpConfigsSpy: ReturnType<typeof spyOn> | undefined
@@ -36,9 +43,12 @@ async function setup() {
   originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
   process.env.DREAMCODER_CONFIG_DIR = tmpDir
   clearConfigPathCaches()
+  const { mcpServers, projects } = getGlobalConfig()
+  savedTestGlobalConfig = structuredClone({ mcpServers, projects })
 }
 
 async function teardown() {
+  saveGlobalConfig((current) => ({ ...current, ...structuredClone(savedTestGlobalConfig) }))
   if (originalConfigDir !== undefined) {
     process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
   } else {

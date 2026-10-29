@@ -6,7 +6,7 @@ import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { ProviderSettings } from './ProviderSettings'
 
-const models = { main: 'model-main', haiku: 'model-main', sonnet: 'model-main', opus: 'model-main' }
+const models = [{ id: 'model-main' }]
 const providers: SavedProvider[] = [
   {
     id: 'deepseek-1',

@@ -11,12 +11,13 @@ import {
   buildProviderAuthEnv,
   buildProviderManagedEnv,
   getManagedEnvKeys,
+  getProviderDefaultModel,
   getPresetDefaultEnv,
-  normalizeModelMapping,
+  normalizeProviderModels,
   normalizeProvidersIndex,
 } from './providerRuntimeEnv.js'
 import { loadNetworkSettings } from './networkSettings.js'
-import { resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
+import { fetchUpstreamModels, resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
 import type {
   SavedProvider,
   ProvidersIndex,
@@ -26,6 +27,8 @@ import type {
   ProviderTestResult,
   ApiFormat,
   ProviderAuthStrategy,
+  DiscoverProviderModelsInput,
+  DiscoveredProviderModel,
 } from '../types/provider.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
@@ -122,11 +125,12 @@ export class ProviderService {
       baseUrl: input.baseUrl,
       apiFormat: input.apiFormat ?? 'anthropic',
       runtimeKind: input.runtimeKind ?? 'anthropic_compatible',
-      models: normalizeModelMapping(input.models),
-      ...(input.autoCompactWindow !== undefined && { autoCompactWindow: input.autoCompactWindow }),
+      models: normalizeProviderModels(input.models),
+      ...(input.fastModel !== undefined && { fastModel: input.fastModel }),
       ...(input.modelContextWindows !== undefined && { modelContextWindows: input.modelContextWindows }),
       ...(input.notes !== undefined && { notes: input.notes }),
     }
+    this.assertFastModel(provider)
 
     index.providers.push(provider)
     await this.writeIndex(index)
@@ -147,17 +151,18 @@ export class ProviderService {
       ...(input.baseUrl !== undefined && { baseUrl: input.baseUrl }),
       ...(input.apiFormat !== undefined && { apiFormat: input.apiFormat }),
       ...(input.runtimeKind !== undefined && { runtimeKind: input.runtimeKind }),
-      ...(input.models !== undefined && { models: normalizeModelMapping(input.models) }),
-      ...(typeof input.autoCompactWindow === 'number' && { autoCompactWindow: input.autoCompactWindow }),
+      ...(input.models !== undefined && { models: normalizeProviderModels(input.models) }),
+      ...(typeof input.fastModel === 'string' && { fastModel: input.fastModel }),
       ...(input.modelContextWindows !== undefined && input.modelContextWindows !== null && { modelContextWindows: input.modelContextWindows }),
       ...(input.notes !== undefined && { notes: input.notes }),
-    }
-    if (input.autoCompactWindow === null) {
-      delete updated.autoCompactWindow
     }
     if (input.modelContextWindows === null) {
       delete updated.modelContextWindows
     }
+    if (input.fastModel === null || (input.fastModel === undefined && input.models !== undefined && !updated.models.some((model) => model.id === updated.fastModel))) {
+      delete updated.fastModel
+    }
+    this.assertFastModel(updated)
 
     index.providers[idx] = updated
     await this.writeIndex(index)
@@ -195,18 +200,20 @@ export class ProviderService {
 
   private buildManagedEnv(
     provider: SavedProvider,
-    options?: { proxyPath?: string },
+    options?: { proxyPath?: string; modelId?: string },
   ): Record<string, string> {
     return buildProviderManagedEnv(provider, {
       proxyPath: options?.proxyPath,
+      modelId: options?.modelId,
       serverPort: ProviderService.serverPort,
     })
   }
 
-  async getProviderRuntimeEnv(id: string): Promise<Record<string, string>> {
+  async getProviderRuntimeEnv(id: string, modelId?: string): Promise<Record<string, string>> {
     const provider = await this.getProvider(id)
     return this.buildManagedEnv(provider, {
       proxyPath: `/proxy/providers/${provider.id}`,
+      modelId,
     })
   }
 
@@ -290,7 +297,31 @@ export class ProviderService {
       baseUrl: overrides?.baseUrl || target.baseUrl,
       apiFormat: overrides?.apiFormat ?? target.apiFormat,
       authStrategy: overrides?.authStrategy ?? target.authStrategy,
-    }, overrides?.modelId || provider.models.main)
+    }, overrides?.modelId || getProviderDefaultModel(provider))
+  }
+
+  async discoverModels(input: DiscoverProviderModelsInput): Promise<DiscoveredProviderModel[]> {
+    return this.fetchModels({
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey,
+      apiFormat: input.apiFormat ?? 'anthropic',
+      authStrategy: input.authStrategy ?? 'api_key',
+    }, input.presetId)
+  }
+
+  private async fetchModels(target: UpstreamTarget, presetId?: string): Promise<DiscoveredProviderModel[]> {
+    const result = await fetchUpstreamModels(target, presetId)
+    if (!result.ok) {
+      const upstreamRejected = result.httpStatus !== undefined && result.httpStatus >= 400 && result.httpStatus < 500
+      throw new ApiError(upstreamRejected ? 400 : 502, result.error, 'MODEL_DISCOVERY_FAILED')
+    }
+    return result.models
+  }
+
+  private assertFastModel(provider: SavedProvider): void {
+    if (provider.fastModel && !provider.models.some((model) => model.id === provider.fastModel)) {
+      throw ApiError.badRequest('Fast model must be one of the provider models')
+    }
   }
 
   async testProviderConfig(input: TestProviderInput): Promise<ProviderTestResult> {

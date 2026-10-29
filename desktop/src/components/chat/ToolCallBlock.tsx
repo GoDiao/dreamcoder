@@ -1,12 +1,18 @@
+import { CodeBlock, CodeBlockContent, CodeBlockLine, CodeBlockActions } from '../shared/ui/code-block'
+import { Button } from '../shared/ui/button'
+import { Trace, TraceCollapsible, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '../shared/ui/trace'
+import { CollapsibleContent } from '../shared/ui/collapsible'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { memo, useMemo, useState } from 'react'
-import { LoaderCircle, Terminal, FileText, Edit3, FileEdit, Search, FileSearch, Bot, Globe, Download, File, Sparkles, Wrench, AlertCircle, ChevronRight, MousePointerClick, Keyboard, ScanEye, AppWindow, Clipboard, Monitor } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
+import { getToolIcon } from './toolIcons'
 import { CodeViewer } from './CodeViewer'
 import { DiffViewer } from './DiffViewer'
 import { CopyButton } from '../shared/CopyButton'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import type { AgentTaskNotification } from '../../types/chat'
-import { getCuaToolDisplay, humanizeCuaResult, isCuaPermissionError, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { getCuaToolDisplay, humanizeCuaResult, isCuaPermissionError } from '../../lib/cuaToolDisplay'
 import { useUIStore } from '../../stores/uiStore'
 import { ToolResultImages, extractToolResultImages } from './ToolResultImages'
 
@@ -20,30 +26,6 @@ type Props = {
   partialInput?: string
 }
 
-const TOOL_ICONS: Record<string, React.ElementType> = {
-  Bash: Terminal,
-  Read: FileText,
-  Write: Edit3,
-  Edit: FileEdit,
-  Glob: Search,
-  Grep: FileSearch,
-  Agent: Bot,
-  WebSearch: Globe,
-  WebFetch: Download,
-  NotebookEdit: File,
-  Skill: Sparkles,
-}
-
-const CUA_TOOL_ICONS: Record<CuaToolIcon, React.ElementType> = {
-  pointer: MousePointerClick,
-  keyboard: Keyboard,
-  screen: ScanEye,
-  app: AppWindow,
-  browser: Globe,
-  clipboard: Clipboard,
-  other: Monitor,
-}
-
 const WRITER_PREVIEW_MAX_LINES = 120
 const WRITER_PREVIEW_MAX_CHARS = 30000
 
@@ -55,7 +37,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const result = useMemo(() => (isCua ? humanizeCuaResult(rawResult, t) : rawResult), [isCua, rawResult, t])
   const obj = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const cua = useMemo(() => getCuaToolDisplay(toolName, input, t), [input, toolName, t])
-  const IconComponent = cua ? CUA_TOOL_ICONS[cua.icon] : TOOL_ICONS[toolName] || Wrench
+  const IconComponent = getToolIcon(toolName, cua?.icon)
   const title = cua ? cua.title : toolName
   const filePath = !cua && typeof obj.file_path === 'string' ? obj.file_path : ''
   const summary = filePath ? filePath.split('/').pop() : cua ? cua.summary : getToolSummary(toolName, obj, t)
@@ -81,90 +63,83 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const outputText = toolName === 'Read' || diff ? null : stripAnsi(extractTextContent(result?.content) ?? '').trimEnd() || null
   const expandable = Boolean(diff || streamingPreview || inputView || outputText || resultImages.length > 0)
 
-  return (
-    <div className={compact ? 'mb-0' : 'mb-2'}>
-      <button
-        type="button"
-        aria-expanded={expandable ? expanded : undefined}
-        onClick={() => {
-          if (expandable) {
-            setExpanded((value) => !value)
-          }
-        }}
-        className={`flex min-h-7 w-full select-none items-center gap-2 rounded-md text-left text-ui-aux text-[var(--color-text-secondary)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
-          expandable ? 'hover:text-[var(--color-text-primary)]' : 'cursor-default'
-        }`}
-      >
-        <IconComponent size={14} aria-hidden="true" className="shrink-0" />
-        <span className="flex min-w-0 flex-1 items-baseline gap-2">
-          <span className="shrink-0 font-medium text-[var(--color-text-primary)]">{title}</span>
-          {summary ? (
-            <span title={summary} className="min-w-0 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
-              {summary}
-            </span>
-          ) : null}
-        </span>
-        {pendingSummary ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-outline)]">
-            <LoaderCircle size={12} strokeWidth={2.4} className="animate-spin" aria-hidden="true" />
-            {pendingSummary}
-          </span>
-        ) : result && outputSummary ? (
-          <span
-            title={outputSummary}
-            className={`min-w-0 max-w-[45%] truncate text-[10px] ${
-              result.isError
-                ? 'text-[var(--color-error)]'
-                : 'text-[var(--color-outline)]'
-            }`}
-          >
-            {outputSummary}
-          </span>
-        ) : null}
-        {result?.isError && (
-          <AlertCircle size={14} className="shrink-0 text-[var(--color-error)]" />
-        )}
-        {expandable && (
-          <ChevronRight size={13} aria-hidden="true" className={`shrink-0 text-[var(--color-text-tertiary)] transition-transform ${expanded ? 'rotate-90' : ''}`} />
-        )}
-      </button>
-
-      {showCuaSettingsLink && (
-        <div className="pb-1 pl-[22px] text-xs">
-          <button
-            type="button"
-            onClick={() => useUIStore.getState().openSettings('computerUse')}
-            className="select-none font-medium text-[var(--color-brand)] hover:underline"
-          >
-            {t('cuaTool.openSettings')}
-          </button>
-        </div>
+  const line = (
+    <TraceLine status={pendingSummary ? 'running' : result?.isError ? 'error' : undefined} className="min-h-7 w-full">
+      <TraceIcon><IconComponent size={14} /></TraceIcon>
+      <TraceTitle className="shrink-0 font-medium">{title}</TraceTitle>
+      {summary ? (
+        <HintTooltip content={summary}><span className="min-w-0 flex-1 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+          {summary}
+        </span></HintTooltip>
+      ) : null}
+      {pendingSummary ? (
+        <TraceDescription className="text-[10px]">{pendingSummary}</TraceDescription>
+      ) : result && outputSummary ? (
+        <HintTooltip content={outputSummary}><span
+          className={`min-w-0 max-w-[45%] truncate text-[10px] ${
+            result.isError
+              ? 'text-[var(--color-error)]'
+              : 'text-[var(--color-outline)]'
+          }`}
+        >
+          {outputSummary}
+        </span></HintTooltip>
+      ) : null}
+      {result?.isError && (
+        <AlertCircle size={14} className="shrink-0 text-[var(--color-error)]" />
       )}
+    </TraceLine>
+  )
 
-      {expandable && expanded && (
-        <div className="mb-1 mt-1 space-y-2 pl-[22px]">
-          <ToolResultImages images={resultImages} />
-          {diff}
-          {streamingPreview}
-          {(inputView || outputText) && (
-            <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-              {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
-              {outputText && (
-                <ToolSection
-                  copyText={outputText}
-                  t={t}
-                  className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
-                >
-                  <pre className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
-                    {outputText}
-                  </pre>
-                </ToolSection>
+  const cuaSettingsLink = showCuaSettingsLink && (
+    <div className="pb-1 pl-[22px] text-xs">
+      <Button variant="ghost"
+        type="button"
+        onClick={() => useUIStore.getState().openSettings('computerUse')}
+        className="select-none font-medium text-[var(--color-brand)] hover:underline"
+      >
+        {t('cuaTool.openSettings')}
+      </Button>
+    </div>
+  )
+
+  return (
+    <Trace className={compact ? 'mb-0' : 'mb-2'}>
+      {expandable ? (
+        <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="gap-2">
+          <TraceCollapsibleTrigger className="w-full select-none">{line}</TraceCollapsibleTrigger>
+          {cuaSettingsLink}
+          <CollapsibleContent>
+            <div className="mb-1 mt-1 space-y-2 pl-[22px]">
+              <ToolResultImages images={resultImages} />
+              {diff}
+              {streamingPreview}
+              {(inputView || outputText) && (
+                <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
+                  {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
+                  {outputText && (
+                    <ToolSection
+                      copyText={outputText}
+                      t={t}
+                      className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
+                    >
+                      <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
+                        {outputText}
+                      </CodeBlockContent>
+                    </ToolSection>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </CollapsibleContent>
+        </TraceCollapsible>
+      ) : (
+        <>
+          {line}
+          {cuaSettingsLink}
+        </>
       )}
-    </div>
+    </Trace>
   )
 })
 
@@ -215,7 +190,8 @@ function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<strin
 
   return (
     <ToolSection copyText={showRaw ? rawText : view.text} t={t}>
-      <pre className={`${SECTION_PRE_CLASS} max-h-[240px] text-[var(--color-text-primary)]`}>
+      <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[240px] text-[var(--color-text-primary)]`}>
+        <CodeBlockLine>
         {view.note && (
           <span className="block text-[var(--color-text-tertiary)]">{`# ${view.note}`}</span>
         )}
@@ -223,20 +199,21 @@ function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<strin
           <span className="select-none text-[var(--color-brand)]">$ </span>
         )}
         {view.text}
-      </pre>
+        </CodeBlockLine>
+      </CodeBlockContent>
       {view.hasMore && (
         <>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => setShowRaw((value) => !value)}
             className="select-none px-3 pb-2 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]"
           >
             {showRaw ? t('tool.hideFullInput') : t('tool.showFullInput')}
-          </button>
+          </Button>
           {showRaw && (
-            <pre className={`${SECTION_PRE_CLASS} max-h-[240px] border-t border-dashed border-[var(--color-border)]/60 text-[var(--color-text-secondary)]`}>
+            <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[240px] border-t border-dashed border-[var(--color-border)]/60 text-[var(--color-text-secondary)]`}>
               {rawText}
-            </pre>
+            </CodeBlockContent>
           )}
         </>
       )}
@@ -246,15 +223,15 @@ function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<strin
 
 function ToolSection({ copyText, t, className = '', children }: { copyText: string; t: Translate; className?: string; children: React.ReactNode }) {
   return (
-    <div className={`group/section relative ${className}`}>
+    <CodeBlock size="sm" className={`group/section ${className}`}>
       {children}
-      <CopyButton
+      <CodeBlockActions><CopyButton
         text={copyText}
         label={t('tool.copy')}
         copiedLabel={t('tool.copied')}
         className="absolute right-2 top-1.5 select-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:text-[var(--color-text-primary)] focus-visible:opacity-100 group-hover/section:opacity-100"
-      />
-    </div>
+      /></CodeBlockActions>
+    </CodeBlock>
   )
 }
 
@@ -379,9 +356,9 @@ function renderWriterPreview(
           </span>
         ) : null}
       </div>
-      <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words bg-[var(--color-code-bg)] px-3 py-2 font-[var(--font-mono)] text-[12px] leading-[1.45] text-[var(--color-code-fg)]">
+      <CodeBlockContent wrap className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words bg-[var(--color-code-bg)] px-3 py-2 font-[var(--font-mono)] text-[12px] leading-[1.45] text-[var(--color-code-fg)]">
         {visibleContent}
-      </pre>
+      </CodeBlockContent>
     </div>
   )
 }

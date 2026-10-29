@@ -1,4 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowLeftIcon, BracesIcon, ChevronDownIcon, ChevronRightIcon, FileCodeIcon, FileIcon, FileTextIcon, FolderIcon, FolderOpenIcon, LayersIcon, NotepadTextIcon, SlidersHorizontalIcon, TerminalIcon, type LucideIcon } from 'lucide-react'
+import { DetailStat, MetaPill } from '../settings/SettingsSummary'
+import { LoadingBlock } from '../shared/LoadingBlock'
+import { useMemo, useState } from 'react'
 import { useSkillStore } from '../../stores/skillStore'
 import { useTranslation } from '../../i18n'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
@@ -42,9 +45,7 @@ export function SkillDetail() {
 
   if (isDetailLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-      </div>
+      <LoadingBlock />
     )
   }
 
@@ -62,7 +63,7 @@ export function SkillDetail() {
           onClick={handleBack}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]"
         >
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <ArrowLeftIcon aria-hidden="true" size={16} />
           {t('settings.skills.back')}
         </button>
       </div>
@@ -97,22 +98,22 @@ export function SkillDetail() {
             <DetailStat
               label={t('settings.skills.summary.totalFiles')}
               value={String(files.length)}
-              icon="folder_open"
+              icon={FolderOpenIcon}
             />
             <DetailStat
               label={t('settings.skills.summary.tokens')}
               value={t('settings.skills.tokenEstimateShort', { count: String(Math.ceil(meta.contentLength / 4)) })}
-              icon="notes"
+              icon={NotepadTextIcon}
             />
             <DetailStat
               label={t('settings.skills.summary.source')}
               value={t(`settings.skills.source.${meta.source}`)}
-              icon="layers"
+              icon={LayersIcon}
             />
             <DetailStat
               label={t('settings.skills.summary.entry')}
               value={files.some((file) => file.isEntry) ? 'SKILL.md' : '—'}
-              icon="article"
+              icon={FileTextIcon}
             />
           </div>
         </div>
@@ -121,9 +122,7 @@ export function SkillDetail() {
       {metaEntries.length > 0 && (
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">
-              tune
-            </span>
+            <SlidersHorizontalIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={18} />
             <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
               {t('settings.skills.metaTitle')}
             </h4>
@@ -249,19 +248,15 @@ function TreeView({
   onSelect: (path: string) => void
   depth: number
 }) {
-  return (
-    <>
-      {nodes.map((node) => (
-        <TreeItem
-          key={node.path}
-          node={node}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-          depth={depth}
-        />
-      ))}
-    </>
-  )
+  return nodes.map((node) => (
+    <TreeItem
+      key={node.path}
+      node={node}
+      selectedPath={selectedPath}
+      onSelect={onSelect}
+      depth={depth}
+    />
+  ))
 }
 
 function TreeItem({
@@ -279,7 +274,8 @@ function TreeItem({
   const isSelected = node.path === selectedPath
   const isDir = node.type === 'directory'
 
-  const icon = isDir ? (expanded ? 'folder_open' : 'folder') : fileIcon(node.name)
+  const ExpandIcon = expanded ? ChevronDownIcon : ChevronRightIcon
+  const Icon = isDir ? (expanded ? FolderOpenIcon : FolderIcon) : fileIcon(node.name)
 
   return (
     <div>
@@ -293,15 +289,11 @@ function TreeItem({
         style={{ marginLeft: `${depth * 12}px`, width: `calc(100% - ${depth * 12}px)` }}
       >
         {isDir ? (
-          <span className="material-symbols-outlined text-[12px] text-[var(--color-text-tertiary)]">
-            {expanded ? 'expand_more' : 'chevron_right'}
-          </span>
+          <ExpandIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={12} />
         ) : (
           <span style={{ width: 12 }} />
         )}
-        <span className="material-symbols-outlined text-[14px] text-[var(--color-text-tertiary)]">
-          {icon}
-        </span>
+        <Icon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={14} />
         <span className="truncate">{node.name}</span>
       </button>
 
@@ -314,36 +306,6 @@ function TreeItem({
         />
       )}
     </div>
-  )
-}
-
-function DetailStat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: string
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
-        <span className="material-symbols-outlined text-[14px]">{icon}</span>
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-base font-semibold text-[var(--color-text-primary)] break-all">
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function MetaPill({ children }: { children: ReactNode }) {
-  return (
-    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
-      {children}
-    </span>
   )
 }
 
@@ -385,11 +347,11 @@ function formatMetaValue(value: unknown) {
   return String(value)
 }
 
-function fileIcon(filename: string): string {
+function fileIcon(filename: string): LucideIcon {
   const ext = filename.split('.').pop()?.toLowerCase()
   switch (ext) {
     case 'md':
-      return 'description'
+      return FileTextIcon
     case 'ts':
     case 'tsx':
     case 'js':
@@ -397,16 +359,16 @@ function fileIcon(filename: string): string {
     case 'py':
     case 'rs':
     case 'go':
-      return 'code'
+      return FileCodeIcon
     case 'json':
     case 'yaml':
     case 'yml':
     case 'toml':
-      return 'data_object'
+      return BracesIcon
     case 'sh':
     case 'bash':
-      return 'terminal'
+      return TerminalIcon
     default:
-      return 'draft'
+      return FileIcon
   }
 }

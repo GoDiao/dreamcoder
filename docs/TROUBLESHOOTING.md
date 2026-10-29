@@ -12,66 +12,43 @@ Common issues when building or running DreamCoder, and how to fix them.
 
 ## Build & Setup
 
-### `failed to find binary 'dreamcoder-sidecar-...'`
+### `Electron failed to install correctly`
 
-**Symptom:** `bun run tauri dev` exits immediately with an error about a missing sidecar binary.
+**Symptom:** `bun run electron:dev` stops with `Electron failed to install correctly, please delete node_modules/electron and try installing again`.
 
-**Cause:** You skipped the `bun run build:sidecars` step. The `desktop/src-tauri/binaries/` directory is gitignored — a fresh clone has no sidecar binary until you compile one.
+**Cause:** Bun does not run Electron's install script, so `bun install` leaves the Electron binary undownloaded.
+
+**Fix:**
+```bash
+cd desktop
+bun run electron:install
+bun run electron:dev
+```
+
+---
+
+### The window opens with "Local server failed to start"
+
+**Symptom:** `bun run electron:dev` opens the window, which shows **Local server failed to start** with `sidecar failed to start: spawn … ENOENT`.
+
+**Cause:** You skipped the `bun run build:sidecars` step. The `desktop/binaries/` directory is gitignored, so a fresh clone has no sidecar binary until you compile one.
 
 **Fix:**
 ```bash
 cd desktop
 bun run build:sidecars
-bun run tauri dev
+bun run electron:dev
 ```
 
 ---
 
-### `command not found: tauri` or `@tauri-apps/cli` not found
+### `Vite did not answer on http://localhost:1420`
 
-**Symptom:** Running `bun run tauri dev` complains that `tauri` or `@tauri-apps/cli` is missing.
+**Symptom:** `bun run electron:dev` stops before the window opens.
 
-**Cause:** `@tauri-apps/cli` lives in `desktop/package.json`'s `optionalDependencies`. The root `bun install` does **not** install it — you must also run `bun install` inside `desktop/`.
+**Cause:** Another process holds port 1420, or Vite failed to start (its error is printed above).
 
-**Fix:**
-```bash
-cd desktop
-bun install
-bun run tauri dev
-```
-
----
-
-### `dist/` folder not found
-
-**Symptom:** `bun run tauri dev` fails with ``resource path `../dist` doesn't exist``.
-
-**Cause:** `tauri.conf.json` bundles `../dist` as a resource, so the folder must exist even in dev mode. `bun run tauri dev` only starts the Vite dev server and does not create it, so a fresh clone needs one `bun run build` first.
-
-**Fix:**
-```bash
-cd desktop
-bun run build          # produce dist/
-bun run tauri dev
-```
-
----
-
-### Linux: WebKitGTK / GTK libraries not found
-
-**Symptom:** On Linux, `bun run tauri dev` fails with errors about missing `webkit2gtk`, `libgtk-3`, `libappindicator`, `librsvg`, or similar shared libraries.
-
-**Cause:** Tauri requires several system-level libraries that don't come pre-installed on most Linux distributions.
-
-**Fix:** Install the [Tauri Linux prerequisites](https://v2.tauri.app/start/prerequisites/#linux). Package names vary by distribution:
-
-| Distribution | Command |
-|---|---|
-| Arch Linux | `sudo pacman -S webkit2gtk-4.1 libgtk-3 libappindicator-gtk3 librsvg libsoup3` (community-verified, may need adjustment) |
-| Ubuntu / Debian | See [Tauri docs](https://v2.tauri.app/start/prerequisites/#linux) |
-| Fedora | See [Tauri docs](https://v2.tauri.app/start/prerequisites/#linux) |
-
-> **Note:** The maintainer does not run Linux day-to-day. The Arch command above is a best-effort guess. If you confirm the correct package list for your distro, please open a PR to update this section.
+**Fix:** stop whatever listens on port 1420 (`lsof -i :1420` on macOS and Linux) and run `bun run electron:dev` again.
 
 ---
 
@@ -91,7 +68,7 @@ There appear to be **two separate issues**:
 
 1. **Sidecar memory spike on startup** — `listSessions` was loading every session's full JSONL file into memory. Fixed in [#31](https://github.com/GoDiao/dreamcoder/pull/31): sidecar peak RSS dropped from ~2.5 GB to ~900 MB on a 48-session machine. If you're still on an older build, update to the latest `dev` / `master`.
 
-2. **WebKitGTK memory leak (Linux-specific)** — On Linux with Tauri + WebKitGTK, `WebKitWebProcess` can grow at ~100 MB/s even when the sidecar is not running and the frontend behaves normally in a standalone browser. This suggests a Tauri/WebKitGTK-level issue, possibly specific to certain window managers (e.g. Hyprland).
+2. **WebKitGTK memory leak (Linux-specific)** — With the former Tauri shell on Linux, `WebKitWebProcess` could grow at ~100 MB/s even when the sidecar was not running and the frontend behaved normally in a standalone browser. The Electron shell does not use WebKitGTK; reports on whether Linux still shows the growth are welcome.
 
 For platform-specific investigation details, see [ENVIRONMENT_TESTING.md](ENVIRONMENT_TESTING.md).
 
@@ -99,14 +76,14 @@ For platform-specific investigation details, see [ENVIRONMENT_TESTING.md](ENVIRO
 
 ### App launches but UI is blank / white screen
 
-**Symptom:** The Tauri window opens but shows a blank white page.
+**Symptom:** The DreamCoder window opens but shows a blank white page.
 
-**Cause:** Usually a Vite dev-server connection issue — the frontend dev server may not have started, or the port is blocked.
+**Cause:** Usually a Vite dev-server connection issue: the frontend dev server may not have started, or the port is blocked.
 
 **Fix:**
-1. Check that `bun run tauri dev` (not `bun run dev`) was used — `bun run dev` only starts Vite, not Tauri.
-2. Try a production build instead: `cd desktop && bun run build && bun run tauri dev`.
-3. Check the Tauri devtools console (right-click → Inspect) for errors.
+1. Check that `bun run electron:dev` (not `bun run dev`) was used. `bun run dev` only starts Vite.
+2. Try the built frontend instead: `cd desktop && bun run build && bun run electron:start`.
+3. Open the developer tools with F12 or Ctrl/Cmd+Shift+I (development builds only) and check the console for errors.
 
 ---
 

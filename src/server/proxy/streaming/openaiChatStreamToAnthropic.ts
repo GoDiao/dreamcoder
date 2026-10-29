@@ -24,6 +24,7 @@ type StreamState = {
   blockStopSent: boolean
 
   toolBlocks: Map<number, ToolBlockState>
+  sawToolUse: boolean
 
   model: string
   messageStartSent: boolean
@@ -49,6 +50,7 @@ function createState(model: string): StreamState {
     blockStartSent: false,
     blockStopSent: false,
     toolBlocks: new Map(),
+    sawToolUse: false,
     model,
     messageStartSent: false,
     messageDeltaSent: false,
@@ -234,7 +236,7 @@ function closeAllOpenBlocks(state: StreamState): void {
 type DeltaEx = Record<string, unknown> & {
   content?: string | null
   tool_calls?: Array<{
-    index: number
+    index?: number
     id?: string
     type?: string
     function?: { name?: string; arguments?: string }
@@ -365,11 +367,28 @@ function handleText(delta: DeltaEx, state: StreamState): void {
   })
 }
 
+// Some OpenAI-compatible servers (Gemini's endpoint) stream every parallel call whole,
+// in its own chunk, without `tool_calls[].index`. A delta without an index starts a new
+// call when it brings an id that differs from the latest call's, or a name after the
+// latest call already has one; anything else continues the latest call.
+function toolCallKey(
+  tc: { index?: number; id?: string; function?: { name?: string } },
+  state: StreamState,
+): number {
+  if (typeof tc.index === 'number') return tc.index
+  let lastKey: number | undefined
+  for (const key of state.toolBlocks.keys()) lastKey = key
+  if (lastKey === undefined) return 0
+  const last = state.toolBlocks.get(lastKey)!
+  const startsNewCall = (!!tc.id && tc.id !== last.id) || (!tc.id && !!tc.function?.name && !!last.name)
+  return startsNewCall ? lastKey + 1 : lastKey
+}
+
 function handleToolCalls(delta: DeltaEx, state: StreamState): void {
   if (!delta.tool_calls) return
 
   for (const tc of delta.tool_calls) {
-    const tcIndex = tc.index
+    const tcIndex = toolCallKey(tc, state)
 
     if (!state.toolBlocks.has(tcIndex)) {
       state.toolBlocks.set(tcIndex, {
@@ -385,6 +404,7 @@ function handleToolCalls(delta: DeltaEx, state: StreamState): void {
 
     if (!block.started && block.id && block.name) {
       block.started = true
+      state.sawToolUse = true
       block.anthropicIndex = state.nextContentIndex++
       state.currentBlockType = 'tool_use'
       state.currentBlockIndex = block.anthropicIndex
@@ -419,7 +439,10 @@ function handleFinishReason(
 
   closeAllOpenBlocks(state)
 
-  const stopReason = mapFinishReason(finishReason)
+  let stopReason = mapFinishReason(finishReason)
+  // Gemini ends a tool-calling turn with finish_reason "stop"; clients that keep going only
+  // on stop_reason "tool_use" would otherwise not run the tools.
+  if (state.sawToolUse && stopReason === 'end_turn') stopReason = 'tool_use'
   const usage = mapUsage(chunk.usage)
 
   const messageDelta: SseEvent = {

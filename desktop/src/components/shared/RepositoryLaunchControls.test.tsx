@@ -5,7 +5,7 @@ import '@testing-library/jest-dom'
 
 const viewportMocks = vi.hoisted(() => ({
   isMobile: false,
-  isTauri: false,
+  isDesktop: false,
 }))
 
 const apiMocks = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ vi.mock('../../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../../lib/desktopRuntime', () => ({
-  isTauriRuntime: () => viewportMocks.isTauri,
+  isDesktopRuntime: () => viewportMocks.isDesktop,
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -27,8 +27,8 @@ vi.mock('../../api/sessions', () => ({
 }))
 
 vi.mock('./DirectoryPicker', () => ({
-  DirectoryPicker: ({ value }: { value: string }) => (
-    <button type="button">Project {value}</button>
+  DirectoryPicker: ({ value, disabled }: { value: string; disabled?: boolean }) => (
+    <button type="button" disabled={disabled}>Project {value}</button>
   ),
 }))
 
@@ -46,15 +46,15 @@ vi.mock('../../i18n', () => ({
     'repoLaunch.remoteBranch': 'Remote branch',
     'repoLaunch.searchBranch': 'Search branches',
     'repoLaunch.selectBranch': 'Select branch',
-    'repoLaunch.selectWorktree': 'Select worktree mode',
-    'repoLaunch.worktreeCurrent': 'Current worktree',
-    'repoLaunch.worktreeIsolated': 'Isolated worktree',
+    'repoLaunch.newWorktree': 'Run in a new worktree',
+    'repoLaunch.newWorktreeHint': 'Leaves your current checkout untouched',
     'repoLaunch.notice.branchTitle': 'Could not switch to the selected branch',
     'repoLaunch.notice.dirtyTitle': 'Uncommitted changes',
-    'repoLaunch.notice.useWorktree': 'Use isolated worktree',
+    'repoLaunch.notice.useWorktree': 'Use a new worktree',
     'repoLaunch.notice.pickBranch': 'Choose another branch',
     'repoLaunch.notice.retry': 'Retry',
     'tabs.close': 'Close',
+      'common.close': 'Close',
   }[key] ?? key),
 }))
 
@@ -110,7 +110,7 @@ async function openBranchMenu() {
 describe('RepositoryLaunchControls', () => {
   beforeEach(() => {
     viewportMocks.isMobile = false
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
     apiMocks.getRepositoryContext.mockReset()
     apiMocks.getRepositoryContext.mockResolvedValue(okRepositoryContext)
     Element.prototype.scrollIntoView = vi.fn()
@@ -123,8 +123,14 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
-    expect(listbox.parentElement?.className).toContain('w-[390px]')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveClass('w-[min(390px,calc(100vw-24px))]')
+  })
+
+  it('disables the project picker together with the rest of the controls', () => {
+    renderControls({ disabled: true })
+
+    expect(screen.getByRole('button', { name: 'Project /repo' })).toBeDisabled()
   })
 
   it('uses the flatter desktop bar when embedded in a composer', async () => {
@@ -139,21 +145,21 @@ describe('RepositoryLaunchControls', () => {
 
   it('uses the full-width mobile bottom sheet in H5 mobile browser mode', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = false
+    viewportMocks.isDesktop = false
 
     renderControls()
 
     await openBranchMenu()
 
     const dialog = await screen.findByRole('dialog', { name: 'Select branch' })
-    expect(dialog).toHaveClass('inset-x-0')
+    expect(dialog).toHaveAttribute('data-vaul-drawer-direction', 'bottom')
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
     expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
   })
 
-  it('does not use the H5 mobile sheet inside Tauri even on a narrow viewport', async () => {
+  it('does not use the H5 mobile sheet inside the desktop app even on a narrow viewport', async () => {
     viewportMocks.isMobile = true
-    viewportMocks.isTauri = true
+    viewportMocks.isDesktop = true
 
     renderControls()
 
@@ -161,7 +167,7 @@ describe('RepositoryLaunchControls', () => {
 
     const listbox = await screen.findByRole('listbox', { name: 'Select branch' })
     expect(listbox).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Select branch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Select branch' })).toHaveAttribute('data-slot', 'popover-content')
   })
 
   it('keeps keyboard branch selection working from the search field', async () => {
@@ -179,6 +185,36 @@ describe('RepositoryLaunchControls', () => {
     })
   })
 
+  it('keeps the worktree choice inside the branch menu instead of a separate control', async () => {
+    const onUseWorktreeChange = vi.fn()
+    const { rerender } = renderControls({ onUseWorktreeChange, placement: 'composer' })
+
+    await screen.findByRole('button', { name: 'Select branch: main' })
+    expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent))
+      .toEqual(['Project /repo', 'Select branch: main'])
+
+    await openBranchMenu()
+    const toggle = await screen.findByRole('switch', { name: 'Run in a new worktree' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(toggle)
+    expect(onUseWorktreeChange).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('listbox', { name: 'Select branch' })).toBeInTheDocument()
+
+    rerender(
+      <RepositoryLaunchControls
+        workDir="/repo"
+        onWorkDirChange={vi.fn()}
+        branch="main"
+        onBranchChange={vi.fn()}
+        useWorktree
+        onUseWorktreeChange={onUseWorktreeChange}
+        placement="composer"
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Select branch: main · Run in a new worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Run in a new worktree' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('offers an isolated worktree when the working tree is dirty', async () => {
     apiMocks.getRepositoryContext.mockResolvedValue({ ...okRepositoryContext, dirty: true })
     const onUseWorktreeChange = vi.fn()
@@ -188,7 +224,7 @@ describe('RepositoryLaunchControls', () => {
     expect(notice).toHaveTextContent('Uncommitted changes')
     expect(notice).toHaveTextContent('Dirty worktree')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use isolated worktree' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use a new worktree' }))
     expect(onUseWorktreeChange).toHaveBeenCalledWith(true)
   })
 

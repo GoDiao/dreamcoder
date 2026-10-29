@@ -15,6 +15,7 @@ import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalS
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { SettingsService } from './settingsService.js'
+import { isPermissionMode, permissionModeCliArgs } from './permissionModes.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export type TaskRun = {
@@ -564,7 +565,10 @@ export class CronScheduler {
 
   private getRuntimeArgs(task: CronTask): string[] {
     const model = task.model?.trim()
-    return model ? ['--model', model] : []
+    return [
+      ...(model ? ['--model', model] : []),
+      ...(isPermissionMode(task.permissionMode) ? permissionModeCliArgs(task.permissionMode) : []),
+    ]
   }
 
   private async buildTaskChildEnv(
@@ -585,11 +589,8 @@ export class CronScheduler {
 
     const explicitProviderEnv =
       typeof task.providerId === 'string'
-        ? await this.providerService.getProviderRuntimeEnv(task.providerId)
+        ? await this.providerService.getProviderRuntimeEnv(task.providerId, task.model)
         : null
-    if (explicitProviderEnv && task.model?.trim()) {
-      explicitProviderEnv.ANTHROPIC_MODEL = task.model.trim()
-    }
     const attributionHeaderEnv = attributionHeaderEnvForModel(
       task.model?.trim() ||
         explicitProviderEnv?.ANTHROPIC_MODEL ||

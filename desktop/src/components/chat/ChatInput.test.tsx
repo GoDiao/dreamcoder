@@ -20,8 +20,6 @@ const mocks = vi.hoisted(() => ({
   browse: vi.fn(),
   wsSend: vi.fn(),
   dialogOpen: vi.fn(),
-  webviewDragHandlers: [] as Array<(event: { payload: unknown }) => void>,
-  webviewUnlisten: vi.fn(),
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -54,17 +52,10 @@ vi.mock('../../api/websocket', () => ({
   },
 }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: mocks.dialogOpen,
-}))
-
-vi.mock('@tauri-apps/api/webview', () => ({
-  getCurrentWebview: () => ({
-    onDragDropEvent: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
-      mocks.webviewDragHandlers.push(handler)
-      return mocks.webviewUnlisten
-    }),
-  }),
+vi.mock('../../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/shell')>()),
+  pickFiles: mocks.dialogOpen,
+  getFilePath: (file: File) => (file as File & { path?: string }).path,
 }))
 
 vi.mock('../../hooks/useMobileViewport', () => ({
@@ -131,8 +122,7 @@ describe('ChatInput file mentions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.webviewDragHandlers.length = 0
-    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as Window & { dreamcoderShell?: unknown }).dreamcoderShell
     viewportMocks.isMobile = false
     useSettingsStore.setState({ locale: 'en' })
     useChatStore.setState(initialChatState, true)
@@ -170,11 +160,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -235,11 +223,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
         [historySessionId]: {
           messages: [{ id: 'history-message', type: 'assistant_text', content: 'ready', timestamp: 1 }],
@@ -252,11 +238,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -342,11 +326,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -358,7 +340,7 @@ describe('ChatInput file mentions', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('rows', '1')
 
     expect(await screen.findByRole('button', { name: /Select branch: main/ })).toBeInTheDocument()
-    expect(screen.getByText('Current worktree')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /worktree/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Select a project...')).not.toBeInTheDocument()
     const branchButton = screen.getByRole('button', { name: /Select branch: main/ })
     const controls = screen.getByTestId('chat-input-controls')
@@ -396,11 +378,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -410,7 +390,48 @@ describe('ChatInput file mentions', () => {
     expect(await screen.findByText('repo')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Select branch:/ })).not.toBeInTheDocument()
-    expect(screen.queryByText('Current worktree')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run in a new worktree')).not.toBeInTheDocument()
+  })
+
+  it('names the missing working directory at the input and keeps sending disabled', async () => {
+    useSessionStore.setState({
+      sessions: [{
+        id: sessionId,
+        title: 'Project',
+        createdAt: '2026-05-01T00:00:00.000Z',
+        modifiedAt: '2026-05-01T00:00:00.000Z',
+        messageCount: 2,
+        projectPath: '/repo/deleted-app',
+        workDir: '/repo/deleted-app',
+        workDirExists: false,
+      }],
+      activeSessionId: sessionId,
+    })
+    useChatStore.setState({
+      sessions: {
+        [sessionId]: {
+          messages: [],
+          chatState: 'idle',
+          connectionState: 'connected',
+          streamingText: '',
+          streamingToolInput: '',
+          activeToolUseId: null,
+          activeToolName: null,
+          activeThinkingId: null,
+          pendingPermission: null,
+          tokenUsage: { input_tokens: 0, output_tokens: 0 },
+          statusVerb: '',
+          slashCommands: [],
+          agentTaskNotifications: {},
+        },
+      },
+    })
+
+    render(<ChatInput />)
+
+    const notice = await screen.findByTestId('workspace-missing-notice')
+    expect(notice).toHaveTextContent('/repo/deleted-app')
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled()
   })
 
   it('starts an empty active session on the selected branch without an isolated worktree', async () => {
@@ -441,11 +462,10 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
+          permissionMode: 'plan',
         },
       },
     })
@@ -462,17 +482,20 @@ describe('ChatInput file mentions', () => {
       expect(mocks.create).toHaveBeenCalledWith({
         workDir: '/repo',
         repository: { branch: 'feature/a', worktree: false },
+        permissionMode: 'plan',
       })
     })
     expect(mocks.delete).toHaveBeenCalledWith(sessionId)
     expect(mocks.wsSend).toHaveBeenCalledWith('created-direct', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'run on feature branch',
       attachments: [],
     })
   })
 
   it('starts an empty active session on the selected branch inside an isolated worktree', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
     mocks.create.mockResolvedValueOnce({
       sessionId: 'created-worktree',
       workDir: '/repo/.claude/worktrees/desktop-feature-a-12345678',
@@ -504,11 +527,9 @@ describe('ChatInput file mentions', () => {
           activeThinkingId: null,
           pendingPermission: null,
           tokenUsage: { input_tokens: 0, output_tokens: 0 },
-          elapsedSeconds: 0,
           statusVerb: '',
           slashCommands: [],
           agentTaskNotifications: {},
-          elapsedTimer: null,
         },
       },
     })
@@ -517,9 +538,10 @@ describe('ChatInput file mentions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Select branch: main/ }))
     fireEvent.click(await screen.findByRole('option', { name: /feature\/a/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Select worktree mode: Current worktree/ }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Isolated worktree' }))
-    expect(screen.getByText('Isolated worktree')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Select branch: feature/a' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Run in a new worktree' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Select branch: feature/a · Run in a new worktree' })).toBeInTheDocument()
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'run in a worktree', selectionStart: 17 } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -533,6 +555,7 @@ describe('ChatInput file mentions', () => {
     expect(mocks.delete).toHaveBeenCalledWith(sessionId)
     expect(mocks.wsSend).toHaveBeenCalledWith('created-worktree', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'run in a worktree',
       attachments: [],
     })
@@ -572,6 +595,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '记一下这个文件讲了什么东西。',
       attachments: [{
         type: 'file',
@@ -635,6 +659,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '请看 @"src/App.tsx" 实现',
       attachments: [{
         type: 'file',
@@ -682,12 +707,13 @@ describe('ChatInput file mentions', () => {
       expect(input.value).toBe('讲一下这个目录。')
     })
     expect(screen.getByText('backend/')).toBeInTheDocument()
-    expect(screen.getByText('folder')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove backend/' })).toBeInTheDocument()
 
     fireEvent.keyDown(input, { key: 'Enter' })
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: '讲一下这个目录。',
       attachments: [{
         type: 'file',
@@ -710,7 +736,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('uses native desktop file paths instead of inlining selected files', async () => {
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })
@@ -721,7 +747,7 @@ describe('ChatInput file mentions', () => {
 
     render(<ChatInput compact />)
 
-    fireEvent.click(screen.getByLabelText('Open composer tools'))
+    fireEvent.keyDown(screen.getByLabelText('Open composer tools'), { key: 'Enter' })
     fireEvent.click(screen.getByText('Add files or photos'))
 
     expect(await screen.findByText('large-a.log')).toBeInTheDocument()
@@ -738,6 +764,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: 'analyze these',
       attachments: [
         expect.objectContaining({
@@ -756,50 +783,25 @@ describe('ChatInput file mentions', () => {
     })
   })
 
-  it('accepts native desktop file drops on the active session composer as path-only attachments', async () => {
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+  it('accepts desktop file drops on the active session composer as path-only attachments', async () => {
+    Object.defineProperty(window, 'dreamcoderShell', {
       configurable: true,
       value: {},
     })
+    const droppedFile = new File(['large file'], 'ignored-name.log', { type: 'text/plain' })
+    Object.defineProperty(droppedFile, 'path', {
+      configurable: true,
+      value: '/Users/nanmi/drop/large-a.log',
+    })
+    const dataTransfer = { types: ['Files'], files: [droppedFile], dropEffect: '' }
 
     render(<ChatInput compact />)
 
     const panel = screen.getByTestId('chat-input-panel')
-    Object.defineProperty(panel, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => ({
-        left: 0,
-        top: 0,
-        right: 640,
-        bottom: 180,
-        width: 640,
-        height: 180,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }),
-    })
-
-    await waitFor(() => {
-      expect(mocks.webviewDragHandlers).toHaveLength(1)
-    })
-
-    act(() => {
-      mocks.webviewDragHandlers[0]?.({
-        payload: { type: 'over', position: { x: 24, y: 24 } },
-      })
-    })
+    fireEvent.dragOver(panel, { dataTransfer })
     expect(screen.getByTestId('chat-input-drop-overlay')).toBeInTheDocument()
 
-    act(() => {
-      mocks.webviewDragHandlers[0]?.({
-        payload: {
-          type: 'drop',
-          position: { x: 24, y: 24 },
-          paths: ['/Users/nanmi/drop/large-a.log'],
-        },
-      })
-    })
+    fireEvent.drop(panel, { dataTransfer })
 
     expect(await screen.findByText('large-a.log')).toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-drop-overlay')).not.toBeInTheDocument()
@@ -815,6 +817,7 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
       type: 'user_message',
+      id: expect.any(String),
       content: 'analyze dropped file',
       attachments: [
         expect.objectContaining({
@@ -884,8 +887,8 @@ describe('ChatInput file mentions', () => {
       target: { value: 'ship it', selectionStart: 7 },
     })
 
-    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('h-11', 'w-11')
-    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('h-11', 'w-11')
+    expect(screen.getByRole('button', { name: 'Open composer tools' })).toHaveClass('size-11')
+    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('size-11')
     expect(screen.queryByText('Run')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-toolbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input-shell')).toHaveClass('px-3')

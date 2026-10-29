@@ -54,10 +54,7 @@ async function resolveH5DistDir(): Promise<string | null> {
   const candidates = [
     process.env.CLAUDE_H5_DIST_DIR,
     process.env.CLAUDE_APP_ROOT
-      ? path.resolve(process.env.CLAUDE_APP_ROOT, '..', 'Resources', '_up_', 'dist')
-      : undefined,
-    process.env.CLAUDE_APP_ROOT
-      ? path.resolve(process.env.CLAUDE_APP_ROOT, '..', 'Resources', 'dist')
+      ? path.resolve(process.env.CLAUDE_APP_ROOT, '..', 'dist')
       : undefined,
     process.env.CLAUDE_APP_ROOT
       ? path.resolve(process.env.CLAUDE_APP_ROOT, 'dist')

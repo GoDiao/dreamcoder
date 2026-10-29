@@ -1,3 +1,5 @@
+import { CircleAlertIcon, CircleCheckIcon, ExternalLinkIcon, RefreshCwIcon, TimerOffIcon, XIcon, type LucideIcon } from 'lucide-react'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { useEffect, useState } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
 import { useChatStore } from '../../stores/chatStore'
@@ -12,7 +14,7 @@ function RunOutput({ run }: { run: TaskRun }) {
 
   if (run.error) {
     return (
-      <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-[var(--radius-sm)] border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/28 p-2.5 text-xs text-[var(--color-error)]">
+      <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-sm border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/28 p-2.5 text-xs text-[var(--color-error)]">
         {run.error}
       </div>
     )
@@ -22,14 +24,14 @@ function RunOutput({ run }: { run: TaskRun }) {
 
   if (!text) {
     return (
-      <div className="mt-2 p-2.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-container)] text-xs text-[var(--color-text-tertiary)] italic">
+      <div className="mt-2 p-2.5 rounded-sm bg-[var(--color-surface-container)] text-xs text-[var(--color-text-tertiary)] italic">
         {run.sessionId ? t('tasks.outputHintSession') : t('tasks.noOutputText')}
       </div>
     )
   }
 
   return (
-    <div className="mt-2 max-h-48 overflow-y-auto rounded-[var(--radius-sm)] bg-[var(--color-surface-container)] p-2.5">
+    <div className="mt-2 max-h-48 overflow-y-auto rounded-sm bg-[var(--color-surface-container)] p-2.5">
       <MarkdownRenderer
         content={text}
         variant="compact"
@@ -45,11 +47,11 @@ type Props = {
   refreshKey?: number
 }
 
-const STATUS_CONFIG: Record<string, { icon: string; color: string }> = {
-  running:   { icon: 'sync',         color: 'var(--color-warning)' },
-  completed: { icon: 'check_circle', color: 'var(--color-success)' },
-  failed:    { icon: 'error',        color: 'var(--color-error)' },
-  timeout:   { icon: 'timer_off',    color: 'var(--color-error)' },
+const STATUS_CONFIG: Record<string, { icon: LucideIcon; color: string }> = {
+  running:   { icon: RefreshCwIcon,         color: 'var(--color-warning)' },
+  completed: { icon: CircleCheckIcon, color: 'var(--color-success)' },
+  failed:    { icon: CircleAlertIcon,        color: 'var(--color-error)' },
+  timeout:   { icon: TimerOffIcon,    color: 'var(--color-error)' },
 }
 
 export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
@@ -98,22 +100,21 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
   }, [hasRunning, taskId, refreshKey])
 
   return (
-    <div className="mt-2 mb-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+    <div className="mt-2 mb-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--color-surface-container)]">
         <span className="text-xs font-medium text-[var(--color-text-primary)]">{t('tasks.logsTitle')}</span>
         <button
           onClick={onClose}
+          aria-label={t('common.close')}
           className="p-0.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
         >
-          <span className="material-symbols-outlined text-[16px]">close</span>
+          <XIcon aria-hidden="true" size={16} />
         </button>
       </div>
 
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <div className="animate-spin w-4 h-4 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-          </div>
+          <LoadingBlock className="py-6" spinnerClassName="size-4" />
         ) : runs.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">
             {t('tasks.noLogs')}
@@ -126,12 +127,8 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
               return (
                 <div key={run.id} className="px-4 py-2.5">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`material-symbols-outlined text-[16px] ${run.status === 'running' ? 'animate-spin' : ''}`}
-                      style={{ color: cfg.color, fontVariationSettings: "'FILL' 1" }}
-                    >
-                      {cfg.icon}
-                    </span>
+                    <cfg.icon className={`shrink-0 ${run.status === 'running' ? 'animate-spin' : ''}`}
+                      style={{ color: cfg.color }} aria-hidden="true" size={16} />
 
                     <span className="text-xs font-medium" style={{ color: cfg.color }}>
                       {t(`tasks.runStatus.${run.status}` as any)}
@@ -151,9 +148,9 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                       {run.sessionId && run.status !== 'running' && (
                         <button
                           onClick={() => openSession(run.sessionId!, run.taskName)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[var(--color-brand)] bg-[var(--color-brand)]/8 hover:bg-[var(--color-brand)]/15 rounded-[var(--radius-sm)] transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[var(--color-brand)] bg-[var(--color-brand)]/8 hover:bg-[var(--color-brand)]/15 rounded-sm transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                          <ExternalLinkIcon aria-hidden="true" size={14} />
                           {t('tasks.openSession')}
                         </button>
                       )}

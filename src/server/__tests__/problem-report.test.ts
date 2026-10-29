@@ -33,7 +33,7 @@ function provider(overrides: Partial<SavedProvider>): SavedProvider {
     baseUrl: 'https://gateway.internal.example.com/v1',
     apiFormat: 'anthropic',
     runtimeKind: 'anthropic_compatible',
-    models: { main: 'm', haiku: 'm', sonnet: 'm', opus: 'm' },
+    models: [{ id: 'm' }],
     ...overrides,
   } as SavedProvider
 }

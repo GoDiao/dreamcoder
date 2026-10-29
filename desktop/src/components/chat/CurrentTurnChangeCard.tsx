@@ -1,3 +1,6 @@
+import { ChevronRight, Undo2 } from 'lucide-react'
+import { Button } from '../shared/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../shared/ui/card'
 import { useCallback, useMemo, useState } from 'react'
 import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
 import { useTranslation } from '../../i18n'
@@ -105,16 +108,15 @@ export function CurrentTurnChangeCard({
     : t('chat.turnChangesHistoricalUndoAria')
 
   return (
-    <section
-      className="mx-auto mb-5 w-full max-w-[860px] overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
+    <Card role="region" className="mx-auto mb-5 w-full max-w-[860px] gap-0 py-0"
       aria-label={cardLabel}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <CardTitle>
               {t('chat.turnChangesTitle', { count: files.length })}
-            </span>
+            </CardTitle>
             <span className="font-mono text-sm font-semibold text-[var(--color-success)]">
               +{checkpoint.code.insertions}
             </span>
@@ -122,31 +124,30 @@ export function CurrentTurnChangeCard({
               -{checkpoint.code.deletions}
             </span>
           </div>
-          <div className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">
-            {subtitle}
-          </div>
+          <CardDescription>{subtitle}</CardDescription>
         </div>
 
-        <button
+        <Button variant="outline"
           type="button"
           onClick={onUndo}
           disabled={isUndoing}
           aria-label={undoAria}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-brand)]/40 hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-[var(--color-surface)] px-3 text-xs text-[var(--color-text-secondary)] hover:border-[var(--color-brand)]/40 hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35"
         >
-          <span className="material-symbols-outlined text-[15px]">undo</span>
+          <Undo2 data-icon="inline-start" />
           {isUndoing ? t('chat.turnChangesUndoing') : undoLabel}
-        </button>
-      </div>
+        </Button>
+      </CardHeader>
 
-      <div className="divide-y divide-[var(--color-border)]">
+      <CardContent className="divide-y divide-ui-border px-0">
         {files.map((fileEntry) => {
           const isExpanded = expandedPath === fileEntry.apiPath
           const diffState = diffByPath[fileEntry.apiPath]
           return (
             <div key={fileEntry.apiPath}>
-              <button
+              <Button variant="ghost"
                 type="button"
+                aria-expanded={isExpanded}
                 onClick={() => toggleDiff(fileEntry)}
                 aria-label={t(
                   isExpanded ? 'chat.turnChangesHideDiffAria' : 'chat.turnChangesShowDiffAria',
@@ -154,13 +155,11 @@ export function CurrentTurnChangeCard({
                 )}
                 className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-brand)]/35"
               >
-                <span className="material-symbols-outlined shrink-0 text-[17px] text-[var(--color-text-tertiary)]">
-                  {isExpanded ? 'keyboard_arrow_down' : 'chevron_right'}
-                </span>
+                <ChevronRight aria-hidden="true" className={isExpanded ? 'rotate-90' : undefined} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
                   {fileEntry.displayPath}
                 </span>
-              </button>
+              </Button>
 
               {isExpanded && (
                 <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-4 py-3">
@@ -176,7 +175,7 @@ export function CurrentTurnChangeCard({
                     <WorkspaceDiffSurface
                       value={diffState.diff}
                       path={fileEntry.displayPath}
-                      className="max-h-[430px] overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-code-bg)]"
+                      className="max-h-[430px] overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-code-bg)]"
                     />
                   ) : (
                     <div className="text-xs text-[var(--color-text-tertiary)]">
@@ -188,14 +187,14 @@ export function CurrentTurnChangeCard({
             </div>
           )
         })}
-      </div>
+      </CardContent>
 
       {error && (
-        <div className="border-t border-[var(--color-error)]/20 bg-[var(--color-error-container)]/18 px-4 py-3 text-xs text-[var(--color-error)]">
+        <CardFooter className="border-t border-[var(--color-error)]/20 bg-[var(--color-error-container)]/18 px-4 py-3 text-xs text-[var(--color-error)]">
           {error}
-        </div>
+        </CardFooter>
       )}
-    </section>
+    </Card>
   )
 }
 

@@ -7,7 +7,10 @@ import { getOpenAIOAuthTokens } from './storage.js'
 import { anthropicToOpenaiResponses } from '../../server/proxy/transform/anthropicToOpenaiResponses.js'
 import { openaiResponsesToAnthropic } from '../../server/proxy/transform/openaiResponsesToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropic.js'
-import { openaiResponsesStreamToAnthropicResponse } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import {
+  OpenAIResponsesStreamError,
+  openaiResponsesStreamToAnthropicResponse,
+} from '../../server/proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 import type { AnthropicRequest } from '../../server/proxy/transform/types.js'
 import { logForDebugging } from '../../utils/debug.js'
 
@@ -109,11 +112,22 @@ export function buildOpenAICodexFetch(
     }
 
     if (upstream.body && isEventStreamResponse(upstream)) {
-      const responseBody = await openaiResponsesStreamToAnthropicResponse(
-        upstream.body,
-        mappedModel,
-      )
-      return Response.json(responseBody)
+      try {
+        const responseBody = await openaiResponsesStreamToAnthropicResponse(
+          upstream.body,
+          mappedModel,
+        )
+        return Response.json(responseBody)
+      } catch (error) {
+        if (!(error instanceof OpenAIResponsesStreamError)) throw error
+        return Response.json(
+          {
+            type: 'error',
+            error: { type: 'api_error', message: error.message },
+          },
+          { status: 502 },
+        )
+      }
     }
 
     const responseBody = await upstream.json()

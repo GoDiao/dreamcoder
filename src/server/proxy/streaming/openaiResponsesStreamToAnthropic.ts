@@ -12,6 +12,14 @@ type StreamState = {
   messageStopped: boolean
 }
 
+export function upstreamErrorMessage(data: Record<string, unknown>): string {
+  const response = data.response as Record<string, unknown> | undefined
+  const error = (response?.error ?? data.error ?? data) as Record<string, unknown> | undefined
+  return typeof error?.message === 'string' && error.message
+    ? error.message
+    : 'Upstream Responses stream failed'
+}
+
 function formatSse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 }
@@ -298,11 +306,7 @@ function processEvent(
 
     case 'response.failed':
     case 'error': {
-      const response = data.response as Record<string, unknown> | undefined
-      const error = (response?.error ?? data.error ?? data) as Record<string, unknown> | undefined
-      const message = typeof error?.message === 'string' && error.message
-        ? error.message
-        : 'Upstream Responses stream failed'
+      const message = upstreamErrorMessage(data)
       state.messageStopped = true
       controller.enqueue(encoder.encode(formatSse('error', {
         type: 'error',

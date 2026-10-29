@@ -49,12 +49,7 @@ describe('proxy network settings', () => {
       baseUrl: 'https://api.example.com',
       apiKey: 'sk-test',
       apiFormat: 'openai_chat',
-      models: {
-        main: 'model-main',
-        haiku: 'model-main',
-        sonnet: 'model-main',
-        opus: 'model-main',
-      },
+      models: [{ id: 'model-main' }],
     })
 
     const originalFetch = globalThis.fetch
@@ -125,12 +120,7 @@ describe('proxy network settings', () => {
       baseUrl: 'https://api.example.com',
       apiKey: 'sk-test',
       apiFormat: 'openai_responses',
-      models: {
-        main: 'model-main',
-        haiku: 'model-main',
-        sonnet: 'model-main',
-        opus: 'model-main',
-      },
+      models: [{ id: 'model-main' }],
     })
 
     const originalFetch = globalThis.fetch
@@ -199,12 +189,7 @@ describe('proxy network settings', () => {
       baseUrl: 'https://api.example.com',
       apiKey: 'sk-test',
       apiFormat: 'openai_chat',
-      models: {
-        main: 'model-main',
-        haiku: 'model-main',
-        sonnet: 'model-main',
-        opus: 'model-main',
-      },
+      models: [{ id: 'model-main' }],
     })
 
     const originalFetch = globalThis.fetch

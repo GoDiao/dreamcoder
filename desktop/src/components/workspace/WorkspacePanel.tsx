@@ -1,31 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Ellipsis,
-  FileCode,
-  Files,
-  Folder,
-  Maximize2,
-  MessageCircle,
-  MessageSquare,
-  MessageSquarePlus,
-  Minimize2,
-  Plus,
-  RefreshCw,
-  SquareTerminal,
-  X,
-} from 'lucide-react'
-import { Highlight } from 'prism-react-renderer'
+import { ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, Copy, Ellipsis, FileCode, FileDiffIcon, Files, Folder, FolderOpenIcon, FolderXIcon, GitBranchIcon, ImageOffIcon, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, Plus, RefreshCw, SearchXIcon, SquareTerminal, X, type LucideIcon } from 'lucide-react'
+import { getTextSelectionFromContainer, type WorkspaceTextSelection } from './workspaceSelection'
+import { WorkspaceQuotePopover } from './WorkspaceQuotePopover'
+import { PreviewLimitBar } from './PreviewLimitBar'
+import { WorkspaceTreeNavigation } from './WorkspaceTreeNavigation'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../shared/ui/collapsible'
+import { ActionMenu, RowActionMenu, type MenuAction } from '../shared/ActionMenu'
+import { Dropdown } from '../shared/Dropdown'
+import { Button } from '../shared/ui/button'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../shared/ui/tabs'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../shared/ui/empty'
+import { Skeleton } from '../shared/ui/skeleton'
+import { useEffect, useMemo, useRef, useState, useId, type ReactNode } from 'react'
+import { useHighlightedCode } from '../../hooks/useHighlightedCode'
 import type {
   WorkspaceChangedFile,
   WorkspaceFileStatus,
   WorkspaceTreeEntry,
   WorkspaceTreeResult,
 } from '../../api/sessions'
-import { moveRovingFocus } from '../../lib/rovingFocus'
 import { useTranslation } from '../../i18n'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -41,27 +34,19 @@ import {
 } from '../../stores/terminalPanelStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
-import { useUIStore } from '../../stores/uiStore'
 import { TerminalSettings } from '../../pages/TerminalSettings'
 import { SearchField } from '../shared/SearchField'
-import { copyTextToClipboard } from '../chat/clipboard'
-import { clearWindowSelection, getSelectionPopoverPosition, useSelectionPopoverDismiss } from '../../hooks/useSelectionPopoverDismiss'
+import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
+import { useQuoteSelection } from '../../lib/selectionPopover'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import {
   getFileExtension,
   LineCommentEditor,
-  normalizePrismLanguage,
   WORKSPACE_PREVIEW_LINE_LIMIT,
   WorkspaceDiffSurface,
-  workspacePrismTheme,
 } from './WorkspaceCodeSurface'
 
-type FileContextMenuState = {
-  path: string
-  isDirectory: boolean
-  x: number
-  y: number
-}
+
 
 const FILE_STATUS_META: Record<WorkspaceFileStatus, { label: string; className: string }> = {
   modified: {
@@ -101,9 +86,6 @@ const FILE_STATUS_META: Record<WorkspaceFileStatus, { label: string; className: 
 const EMPTY_TREE_BY_PATH: Record<string, WorkspaceTreeResult | undefined> = {}
 const EMPTY_PREVIEWS: Record<string, WorkspacePreviewEntry | undefined> = {}
 const EMPTY_IDS: string[] = []
-const SELECTION_MENU_OFFSET = 10
-const SELECTION_MENU_WIDTH = 158
-const SELECTION_MENU_HEIGHT = 44
 
 function makeTreeStateKey(sessionId: string, path: string) {
   return `${sessionId}::${path}`
@@ -192,82 +174,6 @@ function treeEntryMatchesFilter(
   return childTree.entries.some((child) => treeEntryMatchesFilter(child, query, treeByPath))
 }
 
-type WorkspaceTextSelection = {
-  text: string
-  startLine?: number
-  endLine?: number
-}
-
-type FloatingSelectionMenuState = WorkspaceTextSelection & {
-  x: number
-  y: number
-}
-
-type SelectionPointer = {
-  clientX: number
-  clientY: number
-}
-
-function getElementForNode(node: Node | null): Element | null {
-  if (!node) return null
-  return node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
-}
-
-function getLineNumberFromNode(node: Node | null, root: HTMLElement) {
-  const element = getElementForNode(node)
-  const row = element?.closest('[data-workspace-line-number]')
-  if (!row || !root.contains(row)) return undefined
-  const line = Number(row.getAttribute('data-workspace-line-number'))
-  return Number.isFinite(line) ? line : undefined
-}
-
-function getSelectionPosition(range: Range, root: HTMLElement, pointer?: SelectionPointer) {
-  return getSelectionPopoverPosition(range, root, {
-    menuWidth: SELECTION_MENU_WIDTH,
-    menuHeight: SELECTION_MENU_HEIGHT,
-    offset: SELECTION_MENU_OFFSET,
-    fallbackPointer: pointer,
-  })
-}
-
-function getTextSelectionFromContainer(
-  root: HTMLElement | null,
-  resolveLines?: (text: string, range: Range) => { startLine?: number; endLine?: number },
-  pointer?: SelectionPointer,
-): FloatingSelectionMenuState | null {
-  if (!root) return null
-
-  const selection = window.getSelection()
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
-
-  const range = selection.getRangeAt(0)
-  const startElement = getElementForNode(range.startContainer)
-  const endElement = getElementForNode(range.endContainer)
-  if (!startElement || !endElement || !root.contains(startElement) || !root.contains(endElement)) {
-    return null
-  }
-
-  const text = selection.toString().trim()
-  if (!text) return null
-
-  const nodeLines = {
-    startLine: getLineNumberFromNode(range.startContainer, root),
-    endLine: getLineNumberFromNode(range.endContainer, root),
-  }
-  const resolvedLines = resolveLines?.(text, range) ?? nodeLines
-  const startLine = resolvedLines.startLine ?? nodeLines.startLine
-  const endLine = resolvedLines.endLine ?? nodeLines.endLine ?? startLine
-  const orderedStart = startLine && endLine ? Math.min(startLine, endLine) : startLine
-  const orderedEnd = startLine && endLine ? Math.max(startLine, endLine) : endLine
-
-  return {
-    ...getSelectionPosition(range, root, pointer),
-    text,
-    ...(orderedStart ? { startLine: orderedStart } : {}),
-    ...(orderedEnd ? { endLine: orderedEnd } : {}),
-  }
-}
-
 function getLineRangeForText(value: string, text: string) {
   const index = value.indexOf(text)
   if (index < 0) return {}
@@ -276,58 +182,49 @@ function getLineRangeForText(value: string, text: string) {
   return { startLine, endLine }
 }
 
-function FloatingSelectionMenu({
-  selection,
-  onAdd,
-  popoverRef,
-}: {
-  selection: FloatingSelectionMenuState | null
-  onAdd: () => void
-  popoverRef: { current: HTMLButtonElement | null }
-}) {
-  const t = useTranslation()
-  if (!selection) return null
-
-  return (
-    <button
-      ref={popoverRef}
-      type="button"
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onAdd}
-      className="fixed z-50 inline-flex h-11 items-center gap-2 rounded-full border border-[var(--color-border)]/70 bg-[var(--color-surface-container-lowest)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] shadow-[0_10px_28px_rgba(15,23,42,0.14),0_2px_8px_rgba(15,23,42,0.08)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/35"
-      style={{ left: selection.x, top: selection.y }}
-    >
-      <MessageCircle size={21} strokeWidth={2.15} className="shrink-0 text-[var(--color-text-primary)]" aria-hidden="true" />
-      <span>{t('workspace.addSelectionToChat')}</span>
-    </button>
-  )
-}
-
 function PanelMessage({
-  icon,
+  icon: Icon,
   message,
   tone = 'muted',
   compact = false,
 }: {
-  icon: string
+  icon: LucideIcon
   message: string
   tone?: 'muted' | 'error'
   compact?: boolean
 }) {
-  const toneClass =
-    tone === 'error'
-      ? 'text-[var(--color-error)]'
-      : 'text-[var(--color-text-tertiary)]'
+  const toneClass = tone === 'error' ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'
+
+  if (compact) {
+    return (
+      <Empty role={tone === 'error' ? 'alert' : 'status'} className={`flex-row justify-start gap-2 rounded-none p-0 px-4 py-2 text-left text-[11px] ${toneClass}`}>
+        <Icon className="shrink-0" aria-hidden="true" size={16} />
+        <EmptyDescription className={`min-w-0 text-[11px] leading-relaxed ${toneClass}`}>{message}</EmptyDescription>
+      </Empty>
+    )
+  }
 
   return (
-    <div
-      className={`flex items-center gap-2 px-4 ${compact ? 'py-2 text-[11px]' : 'py-8 text-xs'} ${toneClass}`}
-      role={tone === 'error' ? 'alert' : 'status'}
-    >
-      <span className={`material-symbols-outlined shrink-0 text-[16px] ${icon === 'progress_activity' ? 'animate-spin' : ''}`}>
-        {icon}
-      </span>
-      <span className="min-w-0 leading-relaxed">{message}</span>
+    <Empty role={tone === 'error' ? 'alert' : 'status'} className="gap-2 px-4 py-8">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" className={toneClass}><Icon aria-hidden="true" /></EmptyMedia>
+        <EmptyDescription className={`text-xs ${toneClass}`}>{message}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
+function PanelLoading({ label, compact = false }: { label: string; compact?: boolean }) {
+  return (
+    <div role="status" className={`flex flex-col gap-2 px-4 ${compact ? 'py-2' : 'py-4'}`}>
+      <span className="sr-only">{label}</span>
+      <Skeleton className="h-3 w-40" />
+      {!compact && (
+        <>
+          <Skeleton className="h-3 w-56" />
+          <Skeleton className="h-3 w-32" />
+        </>
+      )}
     </div>
   )
 }
@@ -352,31 +249,32 @@ function CodeSurface({
 }) {
   const t = useTranslation()
   const surfaceRef = useRef<HTMLDivElement>(null)
-  const selectionMenuRef = useRef<HTMLButtonElement>(null)
   const [commentLine, setCommentLineState] = useState<number | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
   const [showAllLines, setShowAllLines] = useState(false)
-  const [selectionMenu, setSelectionMenu] = useState<FloatingSelectionMenuState | null>(null)
   const lines = value.split('\n')
   const setCommentLine = (line: number | null) => {
     setCommentLineState(line)
     setCommentDraft('')
   }
   const visibleLines = showAllLines ? lines : lines.slice(0, WORKSPACE_PREVIEW_LINE_LIMIT)
+  const quote = useQuoteSelection((event) => {
+    const selection = getTextSelectionFromContainer(surfaceRef.current, event)
+    if (!selection?.startLine || !selection.endLine || selection.startLine === selection.endLine) return selection
+    return { ...selection, text: visibleLines.slice(selection.startLine - 1, selection.endLine).join('\n').trim() }
+  }, value)
   const activeQuote = commentLine ? visibleLines[commentLine - 1] ?? '' : ''
   const usePlainLargePreview = showAllLines && lines.length > WORKSPACE_PREVIEW_LINE_LIMIT
-  const visibleCode = usePlainLargePreview ? '' : visibleLines.join('\n')
+  const highlightedLines = useHighlightedCode(visibleLines.join('\n'), usePlainLargePreview ? 'text' : language)
 
   useEffect(() => {
     setShowAllLines(false)
     setCommentLine(null)
-    setSelectionMenu(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, language])
 
   // A refresh of the same file keeps the open editor while its line still exists.
   useEffect(() => {
-    setSelectionMenu(null)
     if (commentLine !== null && commentLine > lines.length) setCommentLine(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
@@ -384,40 +282,6 @@ function CodeSurface({
   useEffect(() => {
     if (commentRequest > 0) setCommentLine(1)
   }, [commentRequest])
-
-  const dismissSelectionMenu = useCallback(() => {
-    setSelectionMenu(null)
-  }, [])
-
-  useSelectionPopoverDismiss({
-    active: Boolean(selectionMenu),
-    popoverRef: selectionMenuRef,
-    onDismiss: dismissSelectionMenu,
-  })
-
-  const handleSelectionMouseUp = (event: MouseEvent<HTMLDivElement>) => {
-    const selection = getTextSelectionFromContainer(surfaceRef.current, undefined, event)
-    if (!selection?.startLine || !selection.endLine || selection.startLine === selection.endLine) {
-      setSelectionMenu(selection)
-      return
-    }
-
-    setSelectionMenu({
-      ...selection,
-      text: visibleLines.slice(selection.startLine - 1, selection.endLine).join('\n').trim(),
-    })
-  }
-
-  const addCurrentSelectionToChat = () => {
-    if (!selectionMenu) return
-    onAddSelection({
-      text: selectionMenu.text,
-      startLine: selectionMenu.startLine,
-      endLine: selectionMenu.endLine,
-    })
-    setSelectionMenu(null)
-    clearWindowSelection()
-  }
 
   const renderLineCommentEditor = (lineNumber: number) => {
     if (commentLine !== lineNumber) return null
@@ -450,92 +314,28 @@ function CodeSurface({
     <div
       ref={surfaceRef}
       className={className}
-      onMouseUp={handleSelectionMouseUp}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setSelectionMenu(null)
-      }}
+      onMouseUp={quote.onMouseUp}
     >
       <div className="relative min-w-max py-2">
-        {usePlainLargePreview ? (
-          <pre
-            data-workspace-code=""
-            data-testid="workspace-code"
-            className="m-0 font-[var(--font-mono)] text-[12px] leading-[1.55]"
-            style={{ color: 'var(--color-code-fg)', background: 'transparent' }}
-          >
-            {visibleLines.map((line, index) => {
-              const lineNumber = index + 1
-              return (
-                <div key={lineNumber}>
-                  <div
-                    className="group grid grid-cols-[48px_minmax(0,1fr)] gap-3 px-3 hover:bg-[var(--color-surface-hover)]"
-                    data-workspace-line-number={lineNumber}
-                  >
-                    {renderLineNumberButton(lineNumber)}
-                    <span className="whitespace-pre pr-6">{line || ' '}</span>
-                  </div>
-                  {renderLineCommentEditor(lineNumber)}
+        <pre data-workspace-code="" data-testid="workspace-code" className="m-0 font-mono text-xs leading-[1.55]">
+          {visibleLines.map((line, index) => {
+            const lineNumber = index + 1
+            return (
+              <div key={lineNumber}>
+                <div data-workspace-line-number={lineNumber} className="group grid grid-cols-[48px_minmax(0,1fr)] gap-3 px-3 hover:bg-ui-muted">
+                  {renderLineNumberButton(lineNumber)}
+                  <span className="whitespace-pre pr-6">{highlightedLines[index] || line || ' '}</span>
                 </div>
-              )
-            })}
-          </pre>
-        ) : (
-          <Highlight
-            theme={workspacePrismTheme}
-            code={visibleCode}
-            language={normalizePrismLanguage(language)}
-          >
-            {({ tokens, getLineProps, getTokenProps }) => (
-              <pre
-                data-workspace-code=""
-                data-testid="workspace-code"
-                className="m-0 font-[var(--font-mono)] text-[12px] leading-[1.55]"
-                style={{ color: 'var(--color-code-fg)', background: 'transparent' }}
-              >
-                {tokens.map((line, index) => {
-                  const { key: lineKey, ...lineProps } = getLineProps({ line, key: index })
-                  const lineNumber = index + 1
-                  return (
-                    <div key={String(lineKey)}>
-                      <div
-                        {...lineProps}
-                        data-workspace-line-number={lineNumber}
-                        className="group grid grid-cols-[48px_minmax(0,1fr)] gap-3 px-3 hover:bg-[var(--color-surface-hover)]"
-                      >
-                        {renderLineNumberButton(lineNumber)}
-                        <span className="whitespace-pre pr-6">
-                          {line.length === 1 && line[0]?.empty ? ' ' : line.map((token, tokenIndex) => {
-                            const { key: tokenKey, ...tokenProps } = getTokenProps({ token, key: tokenIndex })
-                            return <span key={String(tokenKey)} {...tokenProps} />
-                          })}
-                        </span>
-                      </div>
-                      {renderLineCommentEditor(lineNumber)}
-                    </div>
-                  )
-                })}
-              </pre>
-            )}
-          </Highlight>
-        )}
+                {renderLineCommentEditor(lineNumber)}
+              </div>
+            )
+          })}
+        </pre>
         {lines.length > WORKSPACE_PREVIEW_LINE_LIMIT && (
-          <div className="sticky bottom-0 flex items-center gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-glass)] px-3 py-2 text-xs text-[var(--color-text-tertiary)] backdrop-blur">
-            <span>
-              {showAllLines
-                ? t('workspace.previewAllLines', { total: lines.length })
-                : t('workspace.previewLineLimit', { count: visibleLines.length, total: lines.length })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowAllLines((current) => !current)}
-              className="ml-auto rounded-[6px] px-2 py-1 text-[12px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-            >
-              {showAllLines ? t('workspace.collapsePreview') : t('workspace.showAllLoadedLines')}
-            </button>
-          </div>
+          <PreviewLimitBar shown={visibleLines.length} total={lines.length} expanded={showAllLines} onToggle={() => setShowAllLines((current) => !current)} />
         )}
       </div>
-      <FloatingSelectionMenu selection={selectionMenu} onAdd={addCurrentSelectionToChat} popoverRef={selectionMenuRef} />
+      <WorkspaceQuotePopover quote={quote} onAddSelection={onAddSelection} />
     </div>
   )
 }
@@ -550,50 +350,16 @@ function MarkdownSurface({
   className?: string
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
-  const selectionMenuRef = useRef<HTMLButtonElement>(null)
-  const [selectionMenu, setSelectionMenu] = useState<FloatingSelectionMenuState | null>(null)
-
-  useEffect(() => {
-    setSelectionMenu(null)
-  }, [value])
-
-  const dismissSelectionMenu = useCallback(() => {
-    setSelectionMenu(null)
-  }, [])
-
-  useSelectionPopoverDismiss({
-    active: Boolean(selectionMenu),
-    popoverRef: selectionMenuRef,
-    onDismiss: dismissSelectionMenu,
-  })
-
-  const handleSelectionMouseUp = (event: MouseEvent<HTMLDivElement>) => {
-    setSelectionMenu(getTextSelectionFromContainer(
-      surfaceRef.current,
-      (text) => getLineRangeForText(value, text),
-      event,
-    ))
-  }
-
-  const addCurrentSelectionToChat = () => {
-    if (!selectionMenu) return
-    onAddSelection({
-      text: selectionMenu.text,
-      startLine: selectionMenu.startLine,
-      endLine: selectionMenu.endLine,
-    })
-    setSelectionMenu(null)
-    clearWindowSelection()
-  }
+  const quote = useQuoteSelection(
+    (event) => getTextSelectionFromContainer(surfaceRef.current, event, (text) => getLineRangeForText(value, text)),
+    value,
+  )
 
   return (
     <div
       ref={surfaceRef}
       className={className}
-      onMouseUp={handleSelectionMouseUp}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setSelectionMenu(null)
-      }}
+      onMouseUp={quote.onMouseUp}
     >
       <div className="mx-auto w-full max-w-[860px] px-4 py-3">
         <MarkdownRenderer
@@ -602,7 +368,7 @@ function MarkdownSurface({
           className="workspace-markdown-preview prose-p:text-[14px] prose-p:leading-7 prose-h1:text-[24px] prose-h2:text-[18px] prose-h3:text-[15px] prose-code:text-[12px] prose-pre:my-4"
         />
       </div>
-      <FloatingSelectionMenu selection={selectionMenu} onAdd={addCurrentSelectionToChat} popoverRef={selectionMenuRef} />
+      <WorkspaceQuotePopover quote={quote} onAddSelection={onAddSelection} />
     </div>
   )
 }
@@ -613,7 +379,7 @@ function ImagePreview({ tab }: { tab: WorkspacePreviewEntry }) {
   if (!tab.dataUrl) {
     return (
       <PanelMessage
-        icon="image_not_supported"
+        icon={ImageOffIcon}
         message={tab.error || t('workspace.imagePreviewUnavailable')}
       />
     )
@@ -650,32 +416,31 @@ function FileStatusLetter({ status }: { status: WorkspaceFileStatus }) {
   )
 }
 
-const FILE_ROW_CLASS =
-  'flex w-full items-center gap-1.5 rounded-[6px] py-[7px] pr-1.5 text-left text-[12px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]'
+const FILE_ROW_CLASS = 'gap-1.5 rounded-[6px] py-[7px] pr-1.5 text-[12px] text-[var(--color-text-primary)]'
 
 function ChangedFileItem({
   file,
   expanded,
   onToggle,
-  onContextMenu,
+  actions,
   children,
 }: {
   file: WorkspaceChangedFile
   expanded: boolean
   onToggle: () => void
-  onContextMenu: (event: MouseEvent, path: string) => void
+  actions: MenuAction[]
   children?: ReactNode
 }) {
   const { name, dir } = getPathParts(file.path)
   const Chevron = expanded ? ChevronDown : ChevronRight
   return (
     <div data-testid="workspace-file-item" className="border-t border-[var(--color-border)] first:border-t-0">
-      <button
-        type="button"
+      <RowActionMenu actions={actions} hint={file.path}>{() => <Button
+        variant="ghost"
+        size="row"
         aria-expanded={expanded}
-        title={file.path}
+        aria-label={file.path}
         onClick={onToggle}
-        onContextMenu={(event) => onContextMenu(event, file.path)}
         className={`${FILE_ROW_CLASS} pl-1.5`}
       >
         <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
@@ -689,7 +454,7 @@ function ChangedFileItem({
           <span className="text-[var(--color-error)]">−{file.deletions}</span>
         </span>
         <FileStatusLetter status={file.status} />
-      </button>
+      </Button>}</RowActionMenu>
       {expanded && children}
     </div>
   )
@@ -707,7 +472,7 @@ type TreeNodeProps = {
   filterQuery: string
   onToggle: (path: string) => void
   onToggleFile: (path: string) => void
-  onFileContextMenu: (event: MouseEvent, path: string, isDirectory: boolean) => void
+  getFileActions: (path: string, isDirectory: boolean) => MenuAction[]
   renderFileBody: (path: string) => ReactNode
 }
 
@@ -723,10 +488,12 @@ function TreeNode({
   filterQuery,
   onToggle,
   onToggleFile,
-  onFileContextMenu,
+  getFileActions,
   renderFileBody,
 }: TreeNodeProps) {
   const t = useTranslation()
+  const groupId = useId()
+  const parentPath = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
   const childTree = treeByPath[entry.path]
   const childLoading = treeLoadingByPath[makeTreeStateKey(sessionId, entry.path)] ?? false
   const childError = treeErrorsByPath[makeTreeStateKey(sessionId, entry.path)] ?? null
@@ -736,128 +503,91 @@ function TreeNode({
   const indent = 6 + depth * 14
   const Chevron = isExpanded ? ChevronDown : ChevronRight
 
-  if (!entry.isDirectory) {
-    return (
-      <div>
-        <button
-          type="button"
-          aria-expanded={isExpanded}
-          title={entry.path}
-          onClick={() => onToggleFile(entry.path)}
-          onContextMenu={(event) => onFileContextMenu(event, entry.path, false)}
-          className={FILE_ROW_CLASS}
-          style={{ paddingLeft: indent }}
-        >
-          <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
-          <FileCode size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
-          <span className="min-w-0 truncate">{entry.name}</span>
-        </button>
-        {isExpanded && <div style={{ paddingLeft: indent }}>{renderFileBody(entry.path)}</div>}
-      </div>
-    )
-  }
+  const Icon = entry.isDirectory ? Folder : FileCode
+  const toggle = entry.isDirectory ? onToggle : onToggleFile
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => onToggle(entry.path)}
-        onContextMenu={(event) => onFileContextMenu(event, entry.path, true)}
-        aria-expanded={isExpanded}
-        className={FILE_ROW_CLASS}
-        style={{ paddingLeft: indent }}
-      >
-        <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
-        <Folder size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
-        <span className="min-w-0 truncate">{entry.name}</span>
-      </button>
+    <Collapsible open={isExpanded} onOpenChange={() => toggle(entry.path)}>
+      <RowActionMenu actions={getFileActions(entry.path, entry.isDirectory)} hint={entry.path}>{() => (
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="row"
+            role="treeitem"
+            tabIndex={-1}
+            aria-level={depth + 1}
+            aria-expanded={isExpanded}
+            aria-label={entry.path}
+            data-tree-path={entry.path}
+            data-parent-path={parentPath}
+            data-directory={entry.isDirectory ? true : undefined}
+            aria-owns={entry.isDirectory && isExpanded ? groupId : undefined}
+            className={FILE_ROW_CLASS}
+            style={{ paddingLeft: indent }}
+          >
+            <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+            <Icon size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+            <span className="min-w-0 truncate">{entry.name}</span>
+          </Button>
+        </CollapsibleTrigger>
+      )}</RowActionMenu>
+      {entry.isDirectory ? (
+        <CollapsibleContent id={groupId} role="group">
+            {childLoading && !childTree && (
+              <PanelLoading compact label={t('common.loading')} />
+            )}
 
-      {isExpanded && (
-        <div>
-          {childLoading && !childTree && (
-            <PanelMessage compact icon="progress_activity" message={t('common.loading')} />
-          )}
+            {!childLoading && childError && (
+              <PanelMessage compact icon={CircleAlertIcon} tone="error" message={childError} />
+            )}
 
-          {!childLoading && childError && (
-            <PanelMessage compact icon="error" tone="error" message={childError} />
-          )}
+            {!childLoading && !childError && childTree?.state === 'missing' && (
+              <PanelMessage compact icon={FolderXIcon} message={t('workspace.previewState.missing')} />
+            )}
 
-          {!childLoading && !childError && childTree?.state === 'missing' && (
-            <PanelMessage compact icon="folder_off" message={t('workspace.previewState.missing')} />
-          )}
-
-          {!childLoading && !childError && childTree?.state === 'error' && (
-            <PanelMessage
-              compact
-              icon="error"
-              tone="error"
-              message={childTree.error || t('workspace.loadError')}
-            />
-          )}
-
-          {!childLoading && !childError && childTree?.state === 'ok' && childTree.entries.length === 0 && (
-            <PanelMessage compact icon="folder_open" message={t('workspace.noFiles')} />
-          )}
-
-          {!childLoading && !childError && childTree?.state === 'ok' && childTree.entries
-            .filter((childEntry) => treeEntryMatchesFilter(childEntry, filterQuery, treeByPath))
-            .map((childEntry) => (
-              <TreeNode
-                key={childEntry.path}
-                sessionId={sessionId}
-                entry={childEntry}
-                depth={depth + 1}
-                expandedPaths={expandedPaths}
-                expandedFilePaths={expandedFilePaths}
-                treeByPath={treeByPath}
-                treeLoadingByPath={treeLoadingByPath}
-                treeErrorsByPath={treeErrorsByPath}
-                filterQuery={filterQuery}
-                onToggle={onToggle}
-                onToggleFile={onToggleFile}
-                onFileContextMenu={onFileContextMenu}
-                renderFileBody={renderFileBody}
+            {!childLoading && !childError && childTree?.state === 'error' && (
+              <PanelMessage
+                compact
+                icon={CircleAlertIcon}
+                tone="error"
+                message={childTree.error || t('workspace.loadError')}
               />
-            ))}
-        </div>
+            )}
+
+            {!childLoading && !childError && childTree?.state === 'ok' && childTree.entries.length === 0 && (
+              <PanelMessage compact icon={FolderOpenIcon} message={t('workspace.noFiles')} />
+            )}
+
+            {!childLoading && !childError && childTree?.state === 'ok' && childTree.entries
+              .filter((childEntry) => treeEntryMatchesFilter(childEntry, filterQuery, treeByPath))
+              .map((childEntry) => (
+                <TreeNode
+                  key={childEntry.path}
+                  sessionId={sessionId}
+                  entry={childEntry}
+                  depth={depth + 1}
+                  expandedPaths={expandedPaths}
+                  expandedFilePaths={expandedFilePaths}
+                  treeByPath={treeByPath}
+                  treeLoadingByPath={treeLoadingByPath}
+                  treeErrorsByPath={treeErrorsByPath}
+                  filterQuery={filterQuery}
+                  onToggle={onToggle}
+                  onToggleFile={onToggleFile}
+                  getFileActions={getFileActions}
+                  renderFileBody={renderFileBody}
+                />
+              ))}
+        </CollapsibleContent>
+      ) : (
+        <CollapsibleContent style={{ paddingLeft: indent }}>{renderFileBody(entry.path)}</CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   )
 }
 
 const EXPANDED_SURFACE_CLASS =
   'max-h-[420px] overflow-auto rounded-[7px] border border-[var(--color-border)] bg-[var(--color-code-bg)]'
-
-function FileActionButton({
-  label,
-  onClick,
-  disabled = false,
-  children,
-  iconOnly = false,
-  ...rest
-}: {
-  label: string
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void
-  disabled?: boolean
-  children: ReactNode
-  iconOnly?: boolean
-  'aria-haspopup'?: 'menu'
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={iconOnly ? label : undefined}
-      title={iconOnly ? label : undefined}
-      className="inline-flex h-7 items-center gap-1 rounded-[6px] px-1.5 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:cursor-not-allowed disabled:opacity-45"
-      {...rest}
-    >
-      {children}
-      {!iconOnly && <span>{label}</span>}
-    </button>
-  )
-}
 
 function FileExpandedBody({
   path,
@@ -865,7 +595,7 @@ function FileExpandedBody({
   loading,
   error,
   onAddToChat,
-  onMore,
+  actions,
   onAddLineComment,
   onAddSelection,
 }: {
@@ -874,7 +604,7 @@ function FileExpandedBody({
   loading: boolean
   error: string | null
   onAddToChat: () => void
-  onMore: (event: MouseEvent<HTMLButtonElement>) => void
+  actions: MenuAction[]
   onAddLineComment: (line: number, note: string, quote: string) => void
   onAddSelection: (selection: WorkspaceTextSelection) => void
 }) {
@@ -889,9 +619,9 @@ function FileExpandedBody({
 
   let content: ReactNode
   if (state === 'loading') {
-    content = <PanelMessage compact icon="progress_activity" message={t('workspace.previewState.loading')} />
+    content = <PanelLoading compact label={t('workspace.previewState.loading')} />
   } else if (isEmptyDiff) {
-    content = <PanelMessage compact icon="difference" message={t('workspace.emptyDiff')} />
+    content = <PanelMessage compact icon={FileDiffIcon} message={t('workspace.emptyDiff')} />
   } else if (state === 'ok' && isDiff) {
     content = (
       <WorkspaceDiffSurface
@@ -901,6 +631,7 @@ function FileExpandedBody({
         className={EXPANDED_SURFACE_CLASS}
         commentRequest={commentRequest}
         onAddLineComment={onAddLineComment}
+        onAddSelection={onAddSelection}
       />
     )
   } else if (isImage && entry) {
@@ -929,7 +660,7 @@ function FileExpandedBody({
     content = (
       <PanelMessage
         compact
-        icon="error"
+        icon={CircleAlertIcon}
         tone={state === 'error' ? 'error' : 'muted'}
         message={getInlineStateMessage(t, state, error || entry?.error || null)}
       />
@@ -941,19 +672,17 @@ function FileExpandedBody({
       <div className="mb-1.5 break-all text-[11px] text-[var(--color-text-tertiary)]">{path}</div>
       {content}
       <div className="mt-1.5 flex flex-wrap items-center gap-0.5">
-        <FileActionButton label={t('workspace.addToChat')} onClick={onAddToChat}>
-          <MessageSquarePlus size={13} strokeWidth={1.9} aria-hidden="true" />
-        </FileActionButton>
-        <FileActionButton
-          label={t('workspace.lineComment')}
-          onClick={() => setCommentRequest((value) => value + 1)}
-          disabled={!canComment}
-        >
-          <MessageSquare size={13} strokeWidth={1.9} aria-hidden="true" />
-        </FileActionButton>
-        <FileActionButton label={t('workspace.moreFileActions')} onClick={onMore} iconOnly aria-haspopup="menu">
-          <Ellipsis size={14} strokeWidth={1.9} aria-hidden="true" />
-        </FileActionButton>
+        <Button variant="ghost" size="xs" onClick={onAddToChat}>
+          <MessageSquarePlus aria-hidden="true" />
+          {t('workspace.addToChat')}
+        </Button>
+        <Button variant="ghost" size="xs" onClick={() => setCommentRequest((value) => value + 1)} disabled={!canComment}>
+          <MessageSquare aria-hidden="true" />
+          {t('workspace.lineComment')}
+        </Button>
+        <ActionMenu label={t('workspace.moreFileActions')} actions={actions} trigger={
+          <Button variant="ghost" size="icon-sm" aria-label={t('workspace.moreFileActions')}><Ellipsis size={14} aria-hidden="true" /></Button>
+        } />
       </div>
     </div>
   )
@@ -961,10 +690,8 @@ function FileExpandedBody({
 
 function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
   const t = useTranslation()
-  const addToast = useUIStore((state) => state.addToast)
+  const copyAndNotify = useCopyAndNotify()
   const [filterQuery, setFilterQuery] = useState('')
-  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false)
-  const [fileContextMenu, setFileContextMenu] = useState<FileContextMenuState | null>(null)
   const activeView = useWorkspacePanelStore((state) => state.getActiveView(sessionId))
   const status = useWorkspacePanelStore((state) => state.statusBySession[sessionId])
   const treeByPath = useWorkspacePanelStore((state) => state.treeBySessionPath[sessionId] ?? EMPTY_TREE_BY_PATH)
@@ -1037,16 +764,6 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
     void loadTree(sessionId, '')
   }, [activeView, loadTree, rootTree, rootTreeError, rootTreeLoading, sessionId])
 
-  useEffect(() => {
-    if (!fileContextMenu && !isViewMenuOpen) return
-    const close = () => {
-      setFileContextMenu(null)
-      setIsViewMenuOpen(false)
-    }
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [fileContextMenu, isViewMenuOpen])
-
   const handleRefresh = () => {
     void loadStatus(sessionId)
     void refreshPreviews(sessionId)
@@ -1090,32 +807,16 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
     })
   }
 
-  const handleSetActiveView = (view: 'changed' | 'all') => {
-    setActiveView(sessionId, view)
-    setIsViewMenuOpen(false)
-  }
-
-  const handleFileContextMenu = (event: MouseEvent, path: string, isDirectory = false) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setFileContextMenu({ path, isDirectory, x: event.clientX, y: event.clientY })
-  }
-
-  const openFileActionsMenu = (event: MouseEvent<HTMLButtonElement>, path: string) => {
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    setFileContextMenu({ path, isDirectory: false, x: rect.left, y: rect.bottom + 4 })
-  }
-
   const copyWorkspacePath = async (path: string, mode: 'relative' | 'absolute' = 'relative') => {
     const pathToCopy = mode === 'absolute' ? resolveWorkspaceAttachmentPath(status?.workDir, path) : path
-    const copied = await copyTextToClipboard(pathToCopy)
-    setFileContextMenu(null)
-    addToast({
-      type: copied ? 'success' : 'error',
-      message: copied ? t('workspace.pathCopied') : t('common.copyFailed'),
-    })
+    await copyAndNotify(pathToCopy, t('workspace.pathCopied'))
   }
+
+  const getFileActions = (path: string, isDirectory = false): MenuAction[] => [
+    { id: 'add', label: t('workspace.addToChat'), icon: <MessageSquarePlus size={14} aria-hidden="true" />, onSelect: () => addWorkspacePathToChat(path, isDirectory) },
+    { id: 'relative', label: t('workspace.copyPath'), icon: <Copy size={14} aria-hidden="true" />, onSelect: () => void copyWorkspacePath(path) },
+    { id: 'absolute', label: t('workspace.copyAbsolutePath'), icon: <Copy size={14} aria-hidden="true" />, onSelect: () => void copyWorkspacePath(path, 'absolute') },
+  ]
 
   const renderFileBody = (path: string, kind: WorkspacePreviewKind) => {
     const previewId = getWorkspacePreviewId(path, kind)
@@ -1127,7 +828,7 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
         loading={previewLoadingById[requestKey] ?? false}
         error={previewErrorsById[requestKey] ?? null}
         onAddToChat={() => addWorkspacePathToChat(path)}
-        onMore={(event) => openFileActionsMenu(event, path)}
+        actions={getFileActions(path)}
         onAddLineComment={(line, note, quote) => addLineCommentToChat(path, line, note, quote)}
         onAddSelection={(selection) => addSelectionToChat(path, selection)}
       />
@@ -1136,21 +837,21 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
 
   const renderChangedView = () => {
     if (statusLoading && !status) {
-      return <PanelMessage icon="progress_activity" message={t('common.loading')} />
+      return <PanelLoading label={t('common.loading')} />
     }
 
     if (status?.state === 'missing_workdir') {
-      return <PanelMessage icon="folder_off" message={t('workspace.missingWorkdir')} />
+      return <PanelMessage icon={FolderXIcon} message={t('workspace.missingWorkdir')} />
     }
 
     if (status?.state === 'not_git_repo') {
-      return <PanelMessage icon="account_tree" message={t('workspace.notGitRepo')} />
+      return <PanelMessage icon={GitBranchIcon} message={t('workspace.notGitRepo')} />
     }
 
     if (statusError || status?.state === 'error') {
       return (
         <PanelMessage
-          icon="error"
+          icon={CircleAlertIcon}
           tone="error"
           message={statusError || status?.error || t('workspace.loadError')}
         />
@@ -1158,15 +859,15 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
     }
 
     if (!status) {
-      return <PanelMessage icon="progress_activity" message={t('common.loading')} />
+      return <PanelLoading label={t('common.loading')} />
     }
 
     if (status.changedFiles.length === 0) {
-      return <PanelMessage icon="check_circle" message={t('workspace.noChanges')} />
+      return <PanelMessage icon={CircleCheckIcon} message={t('workspace.noChanges')} />
     }
 
     if (filteredChangedFiles.length === 0) {
-      return <PanelMessage icon="search_off" message={t('workspace.noMatchingFiles')} />
+      return <PanelMessage icon={SearchXIcon} message={t('workspace.noMatchingFiles')} />
     }
 
     return (
@@ -1177,7 +878,7 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
             file={file}
             expanded={expandedIdSet.has(getWorkspacePreviewId(file.path, 'diff'))}
             onToggle={() => void togglePreview(sessionId, file.path, 'diff')}
-            onContextMenu={handleFileContextMenu}
+            actions={getFileActions(file.path)}
           >
             {renderFileBody(file.path, 'diff')}
           </ChangedFileItem>
@@ -1188,35 +889,35 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
 
   const renderAllFilesView = () => {
     if (rootTreeLoading && !rootTree) {
-      return <PanelMessage icon="progress_activity" message={t('common.loading')} />
+      return <PanelLoading label={t('common.loading')} />
     }
 
     if (rootTreeError) {
-      return <PanelMessage icon="error" tone="error" message={rootTreeError} />
+      return <PanelMessage icon={CircleAlertIcon} tone="error" message={rootTreeError} />
     }
 
     if (rootTree?.state === 'missing') {
-      return <PanelMessage icon="folder_off" message={t('workspace.missingWorkdir')} />
+      return <PanelMessage icon={FolderXIcon} message={t('workspace.missingWorkdir')} />
     }
 
     if (rootTree?.state === 'error') {
-      return <PanelMessage icon="error" tone="error" message={rootTree.error || t('workspace.loadError')} />
+      return <PanelMessage icon={CircleAlertIcon} tone="error" message={rootTree.error || t('workspace.loadError')} />
     }
 
     if (!rootTree) {
-      return <PanelMessage icon="progress_activity" message={t('common.loading')} />
+      return <PanelLoading label={t('common.loading')} />
     }
 
     if (rootTree.entries.length === 0) {
-      return <PanelMessage icon="folder_open" message={t('workspace.noFiles')} />
+      return <PanelMessage icon={FolderOpenIcon} message={t('workspace.noFiles')} />
     }
 
     if (filteredRootEntries.length === 0) {
-      return <PanelMessage icon="search_off" message={t('workspace.noMatchingFiles')} />
+      return <PanelMessage icon={SearchXIcon} message={t('workspace.noMatchingFiles')} />
     }
 
     return (
-      <div>
+      <WorkspaceTreeNavigation label={t('workspace.allFiles')}>
         {filteredRootEntries.map((entry) => (
           <TreeNode
             key={entry.path}
@@ -1235,11 +936,11 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
             onToggleFile={(path) => {
               void togglePreview(sessionId, path, 'file')
             }}
-            onFileContextMenu={handleFileContextMenu}
+            getFileActions={getFileActions}
             renderFileBody={(path) => renderFileBody(path, 'file')}
           />
         ))}
-      </div>
+      </WorkspaceTreeNavigation>
     )
   }
 
@@ -1248,52 +949,21 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-1.5 px-3 pb-2 pt-3">
-        <div className="relative min-w-0 flex-1">
-          <button
-            type="button"
-            aria-label={viewLabel}
-            aria-haspopup="menu"
-            aria-expanded={isViewMenuOpen}
-            onClick={(event) => {
-              event.stopPropagation()
-              setIsViewMenuOpen((open) => !open)
-            }}
-            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-[6px] px-1.5 py-1 text-[12px] font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-          >
-            <span className="truncate">{viewLabel}</span>
-            <ChevronDown size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
-          </button>
-          {isViewMenuOpen && (
-            <div
-              role="menu"
-              onClick={(event) => event.stopPropagation()}
-              className="absolute left-0 top-[calc(100%+4px)] z-30 min-w-[132px] overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 shadow-[var(--shadow-dropdown)]"
-            >
-              {(['changed', 'all'] as const).map((view) => {
-                const selected = activeView === view
-                return (
-                  <button
-                    key={view}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => handleSetActiveView(view)}
-                    className={`flex h-7 w-full items-center gap-2 px-2.5 text-left text-[12px] transition-colors ${
-                      selected ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {view === 'changed' ? t('workspace.changedFiles') : t('workspace.allFiles')}
-                    </span>
-                    {selected && <Check size={13} strokeWidth={2} aria-hidden="true" className="text-[var(--color-brand)]" />}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-        <PanelIconButton label={t('workspace.refresh')} onClick={handleRefresh}>
-          <RefreshCw size={14} strokeWidth={1.9} aria-hidden="true" />
-        </PanelIconButton>
+        <Dropdown
+          value={activeView}
+          onChange={(view) => setActiveView(sessionId, view)}
+          items={[{ value: 'changed', label: t('workspace.changedFiles') }, { value: 'all', label: t('workspace.allFiles') }]}
+          width={160}
+          className="min-w-0 flex-1"
+          trigger={<Button variant="ghost" size="xs" aria-label={viewLabel} className="max-w-full min-w-0">
+            <span className="truncate">{viewLabel}</span><ChevronDown aria-hidden="true" />
+          </Button>}
+        />
+        <HintTooltip content={t('workspace.refresh')}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('workspace.refresh')} onClick={handleRefresh}>
+              <RefreshCw aria-hidden="true" />
+            </Button>
+          </HintTooltip>
       </div>
 
       <div className="shrink-0 px-3 pb-2">
@@ -1309,68 +979,7 @@ function WorkspaceFilesView({ sessionId }: { sessionId: string }) {
         {activeView === 'changed' ? renderChangedView() : renderAllFilesView()}
       </div>
 
-      {fileContextMenu && (
-        <div
-          role="menu"
-          className="fixed z-50 min-w-[156px] rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-1 text-[12px] shadow-[var(--shadow-dropdown)]"
-          style={{ left: fileContextMenu.x, top: fileContextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              addWorkspacePathToChat(fileContextMenu.path, fileContextMenu.isDirectory)
-              setFileContextMenu(null)
-            }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            <MessageSquarePlus size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
-            <span>{t('workspace.addToChat')}</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void copyWorkspacePath(fileContextMenu.path)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            <Copy size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
-            <span>{t('workspace.copyPath')}</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void copyWorkspacePath(fileContextMenu.path, 'absolute')}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-          >
-            <Copy size={14} strokeWidth={1.9} aria-hidden="true" className="text-[var(--color-text-tertiary)]" />
-            <span>{t('workspace.copyAbsolutePath')}</span>
-          </button>
-        </div>
-      )}
     </div>
-  )
-}
-
-function PanelIconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-    >
-      {children}
-    </button>
   )
 }
 
@@ -1400,7 +1009,6 @@ function WorkspaceTerminalView({
     ensureSession(sessionId)
   }, [ensureSession, sessionId])
 
-  // Each terminal renders its own copy of the tab strip, so keyboard switching moves focus to the visible copy.
   useEffect(() => {
     if (!focusTabAfterSwitchRef.current) return
     focusTabAfterSwitchRef.current = false
@@ -1417,17 +1025,10 @@ function WorkspaceTerminalView({
     `${terminal.shell ?? t('terminal.defaultName')} ${terminal.index}`
 
   const tabs = (
-    <div
-      role="tablist"
+    <TabsList
       aria-label={t('terminal.tabsLabel')}
-      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
-      onKeyDown={(event) => {
-        const id = moveRovingFocus(event, '[role="tab"]', 'horizontal')?.dataset.terminalId
-        if (id && id !== activeTerminalId) {
-          focusTabAfterSwitchRef.current = true
-          setActiveTerminal(sessionId, id)
-        }
-      }}
+      variant="line"
+      className="min-w-0 justify-start overflow-x-auto"
     >
       {terminals.map((terminal) => {
         const selected = terminal.id === activeTerminalId
@@ -1441,45 +1042,48 @@ function WorkspaceTerminalView({
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
           >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              tabIndex={selected ? 0 : -1}
+            <TabsTrigger
+              value={terminal.id}
               data-terminal-id={terminal.id}
-              onClick={() => setActiveTerminal(sessionId, terminal.id)}
-              className="inline-flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[11px] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="inline-flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[11px] focus-visible:outline-none"
             >
               <SquareTerminal size={12} strokeWidth={1.9} aria-hidden="true" />
               {title}
-            </button>
+            </TabsTrigger>
             {canClose && (
-              <button
+              <HintTooltip content={t('terminal.closeTerminal', { name: title })}><button
                 type="button"
                 aria-label={t('terminal.closeTerminal', { name: title })}
-                title={t('terminal.closeTerminal', { name: title })}
                 onClick={() => closeTerminal(sessionId, terminal.id)}
-                className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded-[4px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded-[4px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ui-ring/50"
               >
                 <X size={11} strokeWidth={2} aria-hidden="true" />
-              </button>
+              </button></HintTooltip>
             )}
           </span>
         )
       })}
-      <PanelIconButton label={t('terminal.newTab')} onClick={() => addTerminal(sessionId)}>
-        <Plus size={14} strokeWidth={1.9} aria-hidden="true" />
-      </PanelIconButton>
-    </div>
+      <HintTooltip content={t('terminal.newTab')}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('terminal.newTab')} onClick={() => addTerminal(sessionId)}>
+              <Plus aria-hidden="true" />
+            </Button>
+          </HintTooltip>
+    </TabsList>
   )
 
   return (
+    <Tabs value={activeTerminalId} onValueChange={(id) => {
+      focusTabAfterSwitchRef.current = true
+      setActiveTerminal(sessionId, id)
+    }} asChild>
     <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">
       {terminals.map((terminal) => {
         const selected = terminal.id === activeTerminalId
         return (
-          <div
+          <TabsContent
             key={terminal.id}
+            value={terminal.id}
+            forceMount
             data-testid="session-terminal-panel"
             hidden={!selected}
             className="flex min-h-0 flex-1 flex-col"
@@ -1491,17 +1095,18 @@ function WorkspaceTerminalView({
               runtimeId={terminal.id}
               preserveOnUnmount
               testId={`session-terminal-host-${terminal.id}`}
-              toolbarLeading={tabs}
+              toolbarLeading={selected ? tabs : undefined}
               meta={contextLabel}
               onShellChange={(shell) => {
                 const name = getShellDisplayName(shell)
                 if (name) setTerminalShell(sessionId, terminal.id, name)
               }}
             />
-          </div>
+          </TabsContent>
         )
       })}
     </div>
+    </Tabs>
   )
 }
 
@@ -1532,71 +1137,50 @@ export function WorkspacePanel({ sessionId, terminalCwd, contextLabel }: Workspa
   const expandLabel = expanded ? t('workspace.restorePanel') : t('workspace.expandPanel')
 
   return (
+    <Tabs value={tab} onValueChange={(value) => { if (value === 'files' || value === 'terminal') setPanelTab(sessionId, value) }} asChild>
     <aside
       data-testid="workspace-panel"
       aria-label={t('workspace.panelTabs')}
       className="flex h-full min-h-0 w-full min-w-0 flex-col bg-[var(--color-surface)]"
     >
       <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--color-border)] pl-2.5 pr-2 pt-1.5">
-        <div
-          role="tablist"
-          aria-label={t('workspace.panelTabs')}
-          className="flex items-center gap-0.5"
-          onKeyDown={(event) => {
-            const id = moveRovingFocus(event, '[role="tab"]', 'horizontal')?.dataset.panelTab
-            const next = panelTabs.find((entry) => entry.id === id)
-            if (next && next.id !== tab) setPanelTab(sessionId, next.id)
-          }}
-        >
-          {panelTabs.map(({ id, label, Icon }) => {
-            const selected = tab === id
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                tabIndex={selected ? 0 : -1}
-                data-panel-tab={id}
-                onClick={() => setPanelTab(sessionId, id)}
-                className={`-mb-px inline-flex items-center gap-1.5 rounded-t-[6px] border-b-2 px-2.5 pb-2 pt-1.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
-                  selected
-                    ? 'border-[var(--color-text-primary)] text-[var(--color-text-primary)]'
-                    : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                <Icon size={14} strokeWidth={1.9} aria-hidden="true" />
-                {label}
-              </button>
-            )
-          })}
-        </div>
+        <TabsList aria-label={t('workspace.panelTabs')} variant="line">
+          {panelTabs.map(({ id, label, Icon }) => (
+            <TabsTrigger key={id} value={id} data-panel-tab={id}>
+              <Icon data-icon="inline-start" aria-hidden="true" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
         <span className="flex-1" />
         <div className="flex items-center gap-0.5 pb-1">
-          <PanelIconButton label={expandLabel} onClick={() => toggleExpanded(sessionId)}>
-            {expanded
-              ? <Minimize2 size={14} strokeWidth={1.9} aria-hidden="true" />
-              : <Maximize2 size={14} strokeWidth={1.9} aria-hidden="true" />}
-          </PanelIconButton>
-          <PanelIconButton label={t('workspace.closeSidePanel')} onClick={() => closePanel(sessionId)}>
-            <X size={14} strokeWidth={1.9} aria-hidden="true" />
-          </PanelIconButton>
+          <HintTooltip content={expandLabel}>
+            <Button variant="ghost" size="icon-sm" aria-label={expandLabel} onClick={() => toggleExpanded(sessionId)}>
+              {expanded ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+            </Button>
+          </HintTooltip>
+          <HintTooltip content={t('workspace.closeSidePanel')}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('workspace.closeSidePanel')} onClick={() => closePanel(sessionId)}>
+              <X aria-hidden="true" />
+            </Button>
+          </HintTooltip>
         </div>
       </div>
 
-      <div hidden={tab !== 'files'} className="flex min-h-0 flex-1 flex-col">
+      <TabsContent value="files" forceMount hidden={tab !== 'files'} className="flex min-h-0 flex-1 flex-col">
         <WorkspaceFilesView sessionId={sessionId} />
-      </div>
+      </TabsContent>
       {(tab === 'terminal' || hasTerminals) && (
-        <div hidden={tab !== 'terminal'} className="flex min-h-0 flex-1 flex-col">
+        <TabsContent value="terminal" forceMount hidden={tab !== 'terminal'} className="flex min-h-0 flex-1 flex-col">
           <WorkspaceTerminalView
             sessionId={sessionId}
             active={tab === 'terminal'}
             cwd={terminalCwd}
             contextLabel={contextLabel}
           />
-        </div>
+        </TabsContent>
       )}
     </aside>
+    </Tabs>
   )
 }

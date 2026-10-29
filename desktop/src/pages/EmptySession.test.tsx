@@ -19,10 +19,8 @@ const mocks = vi.hoisted(() => ({
   wsSend: vi.fn(),
   wsDisconnect: vi.fn(),
   dialogOpen: vi.fn(),
-  webviewDragHandlers: [] as Array<(event: { payload: unknown }) => void>,
-  webviewUnlisten: vi.fn(),
   isMobile: false,
-  isTauriRuntime: false,
+  isDesktopRuntime: false,
 }))
 
 vi.mock('../api/sessions', () => ({
@@ -70,33 +68,32 @@ vi.mock('../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../lib/desktopRuntime', () => ({
-  isTauriRuntime: () => mocks.isTauriRuntime,
+  isDesktopRuntime: () => mocks.isDesktopRuntime,
 }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: mocks.dialogOpen,
-}))
-
-vi.mock('@tauri-apps/api/webview', () => ({
-  getCurrentWebview: () => ({
-    onDragDropEvent: vi.fn(async (handler: (event: { payload: unknown }) => void) => {
-      mocks.webviewDragHandlers.push(handler)
-      return mocks.webviewUnlisten
-    }),
-  }),
+vi.mock('../lib/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/shell')>()),
+  pickFiles: mocks.dialogOpen,
+  getFilePath: (file: File) => (file as File & { path?: string }).path,
 }))
 
 vi.mock('../components/shared/DirectoryPicker', () => ({
-  DirectoryPicker: ({ value, onChange }: { value: string; onChange: (path: string) => void }) => (
-    <button type="button" aria-label="Pick project" data-value={value} onClick={() => onChange('/workspace/project')}>
+  DirectoryPicker: ({ value, onChange, disabled }: { value: string; onChange: (path: string) => void; disabled?: boolean }) => (
+    <button type="button" aria-label="Pick project" data-value={value} disabled={disabled} onClick={() => onChange('/workspace/project')}>
       Pick project
     </button>
   ),
 }))
 
 vi.mock('../components/controls/PermissionModeSelector', () => ({
-  PermissionModeSelector: ({ compact }: { compact?: boolean }) => (
-    <button type="button" data-testid="permission-mode-selector" data-compact={compact ? 'true' : 'false'}>
+  PermissionModeSelector: ({ compact, value, onChange }: { compact?: boolean; value: string; onChange: (mode: string) => void }) => (
+    <button
+      type="button"
+      data-testid="permission-mode-selector"
+      data-compact={compact ? 'true' : 'false'}
+      data-value={value}
+      onClick={() => onChange('plan')}
+    >
       Bypass
     </button>
   ),
@@ -111,6 +108,7 @@ vi.mock('../components/controls/ModelSelector', () => ({
 }))
 
 import { EmptySession } from './EmptySession'
+import { useNewSessionStore } from '../stores/newSessionStore'
 import { ApiError } from '../api/client'
 import { useChatStore } from '../stores/chatStore'
 import { useSessionRuntimeStore } from '../stores/sessionRuntimeStore'
@@ -118,6 +116,7 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
+import { toast } from 'sonner'
 import { usePluginStore } from '../stores/pluginStore'
 import { useProviderStore } from '../stores/providerStore'
 import type { RepositoryContextResult } from '../api/sessions'
@@ -173,10 +172,10 @@ describe('EmptySession', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.webviewDragHandlers.length = 0
     mocks.isMobile = false
-    mocks.isTauriRuntime = false
+    mocks.isDesktopRuntime = false
     useSettingsStore.setState({ locale: 'en', activeProviderName: null })
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useSessionStore.setState(initialSessionState, true)
     useChatStore.setState(initialChatState, true)
     useTabStore.setState(initialTabState, true)
@@ -215,6 +214,7 @@ describe('EmptySession', () => {
 
   afterEach(() => {
     cleanup()
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useSessionStore.setState(initialSessionState, true)
     useChatStore.setState(initialChatState, true)
     useTabStore.setState(initialTabState, true)
@@ -251,7 +251,7 @@ describe('EmptySession', () => {
         apiKey: 'key',
         baseUrl: 'https://example.invalid',
         apiFormat: 'anthropic',
-        models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+        models: [{ id: 'm' }],
       }],
     })
 
@@ -261,6 +261,16 @@ describe('EmptySession', () => {
     expect(card).toHaveTextContent('Choose a default provider to start chatting')
     fireEvent.click(screen.getByRole('button', { name: 'Choose provider' }))
     expect(useUIStore.getState().settingsTab).toBe('providers')
+  })
+
+  it('sends typing to the composer when nothing else has focus', () => {
+    render(<EmptySession />)
+    const composer = screen.getByRole('textbox')
+    act(() => composer.blur())
+
+    fireEvent.keyDown(document.body, { key: 'h' })
+
+    expect(composer).toHaveFocus()
   })
 
   it('keeps the draft when the provider card gives way to the composer', () => {
@@ -286,7 +296,7 @@ describe('EmptySession', () => {
           apiKey: 'key',
           baseUrl: 'https://example.invalid',
           apiFormat: 'anthropic',
-          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+          models: [{ id: 'm' }],
         }],
       })
     })
@@ -309,7 +319,7 @@ describe('EmptySession', () => {
           apiKey: 'key',
           baseUrl: 'https://example.invalid',
           apiFormat: 'anthropic',
-          models: { main: 'm', haiku: '', sonnet: '', opus: '' },
+          models: [{ id: 'm' }],
         }],
       })
     })
@@ -326,7 +336,7 @@ describe('EmptySession', () => {
       expect(screen.getByTestId('permission-mode-selector')).toHaveAttribute('data-compact', 'true')
     })
     expect(screen.getByTestId('model-selector')).toHaveAttribute('data-compact', 'true')
-    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('h-11', 'w-11')
+    expect(screen.getByRole('button', { name: 'Run' })).toHaveClass('size-11')
     expect(screen.getByTestId('empty-session-composer-shell')).toHaveClass('px-3')
     expect(screen.getByTestId('empty-session-composer-panel')).toHaveClass('rounded-2xl')
   })
@@ -428,6 +438,48 @@ describe('EmptySession', () => {
     expect(screen.getByTestId('empty-session-controls')).toContainElement(screen.getByTestId('permission-mode-selector'))
   })
 
+  it('keeps the draft across unmounts without adding a session to the list', async () => {
+    const first = render(<EmptySession />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this question' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+    fireEvent.click(screen.getByTestId('permission-mode-selector'))
+    await screen.findByText('main')
+    first.unmount()
+    render(<EmptySession />)
+
+    expect(screen.getByRole('textbox')).toHaveValue('Keep this question')
+    expect(screen.getByRole('button', { name: 'Pick project' })).toHaveAttribute('data-value', '/workspace/project')
+    expect(screen.getByTestId('permission-mode-selector')).toHaveAttribute('data-value', 'plan')
+    expect(useSessionStore.getState().sessions).toEqual([])
+    expect(mocks.createSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps submission ready when reselecting the same draft project', async () => {
+    render(<EmptySession />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Question' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+    expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled()
+    expect(mocks.createSession).not.toHaveBeenCalled()
+  })
+
+  it('locks the project picker while the session is being created', () => {
+    render(<EmptySession />)
+    expect(screen.getByRole('button', { name: 'Pick project' })).toBeEnabled()
+    act(() => useNewSessionStore.setState({ isSubmitting: true }))
+    expect(screen.getByRole('button', { name: 'Pick project' })).toBeDisabled()
+  })
+
+  it('cannot create an empty session just by selecting a project', async () => {
+    render(<EmptySession />)
+    fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+    await screen.findByText('main')
+    expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled()
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    expect(mocks.createSession).not.toHaveBeenCalled()
+  })
+
   it('creates a session with the selected project and branch when submitted', async () => {
     render(<EmptySession />)
 
@@ -453,6 +505,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
 
@@ -471,6 +524,7 @@ describe('EmptySession', () => {
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'draft question',
       attachments: [],
     })
@@ -478,7 +532,30 @@ describe('EmptySession', () => {
     expect(useSessionRuntimeStore.getState().selections['draft-session']).toBeUndefined()
   })
 
-  it('stores and replays a draft runtime only when the user explicitly selected one', async () => {
+  it('creates the session in the mode picked for it, without changing the default for new sessions', async () => {
+    const setDefault = vi.fn(async () => {})
+    const { permissionMode, setPermissionMode } = useSettingsStore.getState()
+    useSettingsStore.setState({ permissionMode: 'acceptEdits', setPermissionMode: setDefault })
+
+    render(<EmptySession />)
+
+    const selector = screen.getByTestId('permission-mode-selector')
+    expect(selector).toHaveAttribute('data-value', 'acceptEdits')
+    fireEvent.click(selector)
+    expect(selector).toHaveAttribute('data-value', 'plan')
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'draft question', selectionStart: 14 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Run/i }))
+
+    await waitFor(() => {
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'plan' })
+    })
+    expect(setDefault).not.toHaveBeenCalled()
+    useSettingsStore.setState({ permissionMode, setPermissionMode })
+  })
+
+  it('creates the session with the draft runtime only when the user explicitly selected one', async () => {
     useSessionRuntimeStore.getState().setSelection('__draft__', {
       providerId: 'provider-explicit',
       modelId: 'model-explicit',
@@ -493,29 +570,18 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({
+        permissionMode: 'default',
+        runtime: { providerId: 'provider-explicit', modelId: 'model-explicit' },
+      })
     })
 
-    expect(useSessionRuntimeStore.getState().selections['draft-session']).toEqual({
-      providerId: 'provider-explicit',
-      modelId: 'model-explicit',
-    })
-    expect(useSessionRuntimeStore.getState().selections['__draft__']).toBeUndefined()
-    expect(mocks.wsSend.mock.calls.slice(0, 2)).toEqual([
-      [
-        'draft-session',
-        {
-          type: 'set_runtime_config',
-          providerId: 'provider-explicit',
-          modelId: 'model-explicit',
-        },
-      ],
-      ['draft-session', { type: 'prewarm_session' }],
-    ])
+    expect(useSessionRuntimeStore.getState().selections).toEqual({})
+    expect(mocks.wsSend).not.toHaveBeenCalledWith('draft-session', expect.objectContaining({ type: 'set_runtime_config' }))
   })
 
   it('uses native desktop file paths for draft attachments', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     mocks.dialogOpen.mockResolvedValueOnce([
       'C:\\Users\\Nanmi\\Desktop\\huge-a.log',
       '/Users/nanmi/tmp/huge-b.zip',
@@ -523,7 +589,7 @@ describe('EmptySession', () => {
 
     render(<EmptySession />)
 
-    fireEvent.click(screen.getByLabelText('Open composer tools'))
+    fireEvent.keyDown(screen.getByLabelText('Open composer tools'), { key: 'Enter' })
     fireEvent.click(screen.getByText('Add files or photos'))
 
     expect(await screen.findByText('huge-a.log')).toBeInTheDocument()
@@ -535,10 +601,11 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'check these files',
       attachments: [
         expect.objectContaining({
@@ -558,7 +625,7 @@ describe('EmptySession', () => {
   })
 
   it('shows a drop affordance and sends dropped desktop files as path attachments', async () => {
-    mocks.isTauriRuntime = true
+    mocks.isDesktopRuntime = true
     const droppedFile = new File(['large file'], 'ignored-name.log', { type: 'text/plain' })
     Object.defineProperty(droppedFile, 'path', {
       configurable: true,
@@ -587,10 +654,11 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
-      expect(mocks.createSession).toHaveBeenCalledWith({})
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
     })
     expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', {
       type: 'user_message',
+      id: expect.any(String),
       content: 'use this context',
       attachments: [
         expect.objectContaining({
@@ -655,13 +723,14 @@ describe('EmptySession', () => {
 
     expect(screen.queryByText('Current project is not a Git repository.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Select branch:/ })).not.toBeInTheDocument()
-    expect(screen.queryByText('Current worktree')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run in a new worktree')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     await waitFor(() => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
+        permissionMode: 'default',
       })
     })
   })
@@ -681,15 +750,33 @@ describe('EmptySession', () => {
 
     await waitFor(() => {
       expect(screen.getByText('main')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Run/i })).toBeEnabled()
     })
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
     const notice = await screen.findByTestId('repo-launch-notice-launch-dirty')
     expect(notice).toHaveTextContent(
-      'Current project has uncommitted changes. Direct branch switching was blocked; enable "Isolated worktree" or commit/stash your changes first.',
+      'Current project has uncommitted changes. Direct branch switching was blocked; turn on "Run in a new worktree" in the branch menu, or commit/stash your changes first.',
     )
-    expect(screen.getByRole('button', { name: 'Use isolated worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use a new worktree' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('draft question')
+    expect(useTabStore.getState().activeTabId).toBeNull()
+  })
+
+  it('shows an error toast and keeps the draft when session creation fails', async () => {
+    mocks.createSession.mockRejectedValueOnce(new Error('boom'))
+
+    render(<EmptySession />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'draft question', selectionStart: 14 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Run/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: /Run/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledExactlyOnceWith('boom'))
     expect(screen.getByRole('textbox')).toHaveValue('draft question')
     expect(useTabStore.getState().activeTabId).toBeNull()
   })
@@ -757,6 +844,7 @@ describe('EmptySession', () => {
 
     await waitFor(() => {
       expect(screen.getByText('main')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Run/i })).toBeEnabled()
     })
 
     expect(screen.queryByText('worktree-desktop-feature-a-12345678')).not.toBeInTheDocument()
@@ -767,6 +855,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
   })
@@ -843,14 +932,16 @@ describe('EmptySession', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
 
     await waitFor(() => {
-      expect(screen.getByText('main')).toBeInTheDocument()
-      expect(screen.getByText('Current worktree')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Select branch: main' })).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Selected branch is already checked out in another worktree. Direct launch may be blocked by Git; use "Isolated worktree" to avoid changing directories.')).toBeInTheDocument()
+    expect(screen.getByText('Selected branch is already checked out in another worktree. Direct launch may be blocked by Git; run in a new worktree to avoid changing directories.')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Select worktree mode: Current worktree/ }))
-    expect(await screen.findByRole('option', { name: 'Current worktree' })).not.toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Select branch: main' }))
+    const worktreeSwitch = await screen.findByRole('switch', { name: 'Run in a new worktree' })
+    expect(worktreeSwitch).not.toBeDisabled()
+    expect(worktreeSwitch).toHaveAttribute('aria-checked', 'false')
+    fireEvent.keyDown(document, { key: 'Escape' })
 
     fireEvent.click(screen.getByRole('button', { name: /Run/i }))
 
@@ -858,6 +949,7 @@ describe('EmptySession', () => {
       expect(mocks.createSession).toHaveBeenCalledWith({
         workDir: '/workspace/project',
         repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
       })
     })
   })

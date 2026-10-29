@@ -1,3 +1,5 @@
+import { getServerUrl } from './shell'
+import { ELECTRON_BRIDGE_KEY } from './shell/electronBridge'
 import {
   api,
   getDefaultBaseUrl,
@@ -32,13 +34,13 @@ export class H5ConnectionRequiredError extends Error {
   }
 }
 
-export function isTauriRuntime() {
+export function isDesktopRuntime() {
   if (typeof window === 'undefined') return false
-  return '__TAURI_INTERNALS__' in window || '__TAURI__' in window
+  return ELECTRON_BRIDGE_KEY in window
 }
 
 export function isBrowserH5Runtime() {
-  return typeof window !== 'undefined' && !isTauriRuntime()
+  return typeof window !== 'undefined' && !isDesktopRuntime()
 }
 
 export function readStoredH5Connection(): StoredH5Connection {
@@ -109,13 +111,12 @@ export function isH5ConnectionRequiredError(error: unknown): error is H5Connecti
 export async function initializeDesktopServerUrl() {
   const fallbackUrl = getDefaultBaseUrl()
 
-  if (!isTauriRuntime()) {
+  if (!isDesktopRuntime()) {
     return initializeBrowserServerUrl(fallbackUrl)
   }
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const serverUrl = await invoke<string>('get_server_url')
+    const serverUrl = await getServerUrl()
     setBaseUrl(serverUrl)
     setAuthToken(null)
     await waitForHealth(serverUrl)

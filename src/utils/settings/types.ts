@@ -712,6 +712,15 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Whether /rename updates the terminal tab title (defaults to true). Set to false to keep auto-generated topic titles.',
         ),
+      autoCompactPercent: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Percentage of the context window left after the summary reserve at which conversations are auto-compacted (defaults to 90).',
+        ),
       alwaysThinkingEnabled: z
         .boolean()
         .optional()

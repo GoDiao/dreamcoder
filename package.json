@@ -1,18 +1,19 @@
 {
   "name": "dreamcoder",
-  "version": "0.6.0",
+  "version": "0.8.0-beta.1",
   "private": true,
   "type": "module",
   "bin": {
     "dreamcoder": "./bin/dreamcoder"
   },
   "scripts": {
+    "prepare:ripgrep": "bun run scripts/prepare-ripgrep.ts",
     "dreamcoder": "bun run ./bin/dreamcoder",
     "start": "bun run ./bin/dreamcoder",
     "dev:server": "SERVER_PORT=3456 bun run src/server/index.ts",
     "dev:desktop": "cd desktop && bun run dev",
     "build:desktop": "cd desktop && bun run build",
-    "build:sidecar": "bun build --compile ./desktop/sidecars/dreamcoder-sidecar.ts --outfile desktop/src-tauri/binaries/dreamcoder-sidecar.exe",
+    "build:sidecar": "cd desktop && bun run build:sidecars",
     "test": "bun test",
     "test:desktop": "cd desktop && bun run test",
     "lint:desktop": "cd desktop && bun run lint"

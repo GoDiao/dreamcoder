@@ -4,12 +4,11 @@
     "name": "DeepSeek",
     "baseUrl": "https://api.deepseek.com/anthropic",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "deepseek-v4-pro",
-      "haiku": "deepseek-v4-flash",
-      "sonnet": "deepseek-v4-pro",
-      "opus": "deepseek-v4-pro"
-    },
+    "defaultModels": [
+      { "id": "deepseek-v4-pro" },
+      { "id": "deepseek-v4-flash" }
+    ],
+    "defaultFastModel": "deepseek-v4-flash",
     "needsApiKey": true,
     "websiteUrl": "https://platform.deepseek.com",
     "apiKeyUrl": "https://platform.deepseek.com/api_keys",
@@ -31,12 +30,12 @@
     "name": "Qwen (Alibaba Cloud)",
     "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "apiFormat": "openai_chat",
-    "defaultModels": {
-      "main": "qwen-max",
-      "haiku": "qwen-turbo",
-      "sonnet": "qwen-plus",
-      "opus": "qwen-max"
-    },
+    "defaultModels": [
+      { "id": "qwen-max" },
+      { "id": "qwen-plus" },
+      { "id": "qwen-turbo" }
+    ],
+    "defaultFastModel": "qwen-turbo",
     "needsApiKey": true,
     "websiteUrl": "https://dashscope.console.aliyun.com",
     "authStrategy": "api_key"
@@ -46,12 +45,9 @@
     "name": "Kimi (Moonshot)",
     "baseUrl": "https://api.kimi.com/coding",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "kimi-k2.6",
-      "haiku": "kimi-k2.6",
-      "sonnet": "kimi-k2.6",
-      "opus": "kimi-k2.6"
-    },
+    "defaultModels": [
+      { "id": "kimi-k2.6" }
+    ],
     "needsApiKey": true,
     "websiteUrl": "https://platform.moonshot.cn",
     "apiKeyUrl": "https://platform.kimi.com/console/api-keys",
@@ -69,12 +65,12 @@
     "name": "Zhipu GLM",
     "baseUrl": "https://open.bigmodel.cn/api/anthropic",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "glm-5.1",
-      "haiku": "glm-4.5-air",
-      "sonnet": "glm-5-turbo",
-      "opus": "glm-5.1"
-    },
+    "defaultModels": [
+      { "id": "glm-5.1" },
+      { "id": "glm-5-turbo" },
+      { "id": "glm-4.5-air" }
+    ],
+    "defaultFastModel": "glm-4.5-air",
     "needsApiKey": true,
     "websiteUrl": "https://open.bigmodel.cn",
     "authStrategy": "auth_token",
@@ -92,12 +88,9 @@
     "name": "LM Studio",
     "baseUrl": "http://localhost:1234",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "qwen/qwen3.6-27b",
-      "haiku": "qwen/qwen3.6-27b",
-      "sonnet": "qwen/qwen3.6-27b",
-      "opus": "qwen/qwen3.6-27b"
-    },
+    "defaultModels": [
+      { "id": "qwen/qwen3.6-27b" }
+    ],
     "needsApiKey": false,
     "websiteUrl": "https://lmstudio.ai",
     "authStrategy": "auth_token_empty_api_key",
@@ -110,12 +103,9 @@
     "name": "Ollama",
     "baseUrl": "http://localhost:11434",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "qwen3.6:27b",
-      "haiku": "qwen3.6:27b",
-      "sonnet": "qwen3.6:27b",
-      "opus": "qwen3.6:27b"
-    },
+    "defaultModels": [
+      { "id": "qwen3.6:27b" }
+    ],
     "needsApiKey": false,
     "websiteUrl": "https://ollama.com",
     "authStrategy": "auth_token_empty_api_key",
@@ -128,12 +118,7 @@
     "name": "Custom Provider",
     "baseUrl": "",
     "apiFormat": "anthropic",
-    "defaultModels": {
-      "main": "",
-      "haiku": "",
-      "sonnet": "",
-      "opus": ""
-    },
+    "defaultModels": [],
     "needsApiKey": true,
     "websiteUrl": "",
     "authStrategy": "auth_token"

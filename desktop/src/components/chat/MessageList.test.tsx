@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MessageList, buildRenderModel } from './MessageList'
+import { MessageList, buildRenderModel, buildToolGroupResults } from './MessageList'
 import { relativizeWorkspacePath } from './CurrentTurnChangeCard'
 import { sessionsApi } from '../../api/sessions'
 import { useChatStore } from '../../stores/chatStore'
@@ -9,7 +9,8 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
-import type { UIMessage } from '../../types/chat'
+import { toast } from 'sonner'
+import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import type { PerSessionState } from '../../stores/chatStore'
 
 const ACTIVE_TAB = 'active-tab'
@@ -34,12 +35,10 @@ function makeSessionState(overrides: Partial<PerSessionState> = {}): PerSessionS
     activeThinkingId: null,
     pendingPermission: null,
     tokenUsage: { input_tokens: 0, output_tokens: 0 },
-    elapsedSeconds: 0,
     statusVerb: '',
     apiRetry: null,
     slashCommands: [],
     agentTaskNotifications: {},
-    elapsedTimer: null,
     composerPrefill: null,
     ...overrides,
   }
@@ -875,6 +874,8 @@ describe('MessageList nested tool calls', () => {
     const groupSummary = screen.getByText('TaskUpdate (1), ran a command')
     const groupButton = groupSummary.closest('button')
     expect(groupButton?.textContent).not.toContain('check_circle')
+    expect(groupButton?.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(groupButton!)
     expect(screen.getByText('local_bash')).toBeTruthy()
   })
 
@@ -980,6 +981,8 @@ describe('MessageList nested tool calls', () => {
     expect(screen.getByText('Saved 1 memory item(s)')).toBeTruthy()
     expect(screen.getByText('preferences.md')).toBeTruthy()
     expect(screen.getByText('Tool details')).toBeTruthy()
+    const preview = screen.getByRole('button', { name: '/Users/test/.claude/projects/example/memory/preferences.md' })
+    expect(preview).toBeTruthy()
     const memoryCardClassName = screen.getByTestId('memory-tool-activity-card').className
     expect(memoryCardClassName).toContain('border-[var(--color-memory-border)]')
     expect(memoryCardClassName).toContain('bg-[var(--color-memory-surface)]')
@@ -1540,7 +1543,7 @@ describe('MessageList nested tool calls', () => {
     expect(within(dialog).queryByText(/\{"results"/)).toBeNull()
   })
 
-  it('renders copy controls for user messages and scopes assistant copy to a single reply', async () => {
+  it('puts one copy control under a reply and copies all of its texts', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, {
       clipboard: {
@@ -1579,14 +1582,13 @@ describe('MessageList nested tool calls', () => {
 
     expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy reply' })[1]!)
+    const copyReplyButtons = screen.getAllByRole('button', { name: 'Copy reply' })
+    expect(copyReplyButtons).toHaveLength(1)
+    fireEvent.click(copyReplyButtons[0]!)
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('再看 desktop 前后端边界。')
+      expect(writeText).toHaveBeenCalledWith('先看 CLI 和服务端入口。\n\n再看 desktop 前后端边界。')
     })
-    expect(writeText).not.toHaveBeenCalledWith(
-      '先看 CLI 和服务端入口。\n再看 desktop 前后端边界。'
-    )
   })
 
   it('adds selected user message text to the composer context', async () => {
@@ -1607,10 +1609,10 @@ describe('MessageList nested tool calls', () => {
 
     const userText = screen.getByText('Please inspect the workspace selection behavior.')
     await selectMessageText(userText, 'workspace selection behavior')
-    const floatingAddButton = screen.getByRole('button', { name: 'Add to chat' })
+    const floatingAddButton = screen.getByRole('button', { name: 'Reply' })
 
-    expect(floatingAddButton.style.left).toBe('141px')
-    expect(floatingAddButton.style.top).toBe('26px')
+    expect(screen.getByRole('dialog', { name: 'Reply' }).parentElement?.parentElement).toBe(document.body)
+    expect(userText.closest('[data-message-shell]')?.contains(floatingAddButton)).toBe(false)
 
     fireEvent.click(floatingAddButton)
 
@@ -1645,7 +1647,7 @@ describe('MessageList nested tool calls', () => {
 
     const assistantText = screen.getByText(/First inspect the file tree/)
     await selectMessageText(assistantText, 'quote the selected lines')
-    fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
 
     expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB]).toMatchObject([
       {
@@ -1659,7 +1661,7 @@ describe('MessageList nested tool calls', () => {
     ])
   })
 
-  it('dismisses the selected-message action when clicking outside the popover', async () => {
+  it('closes the selected-message action but keeps the selection when pressing outside the popover', async () => {
     useChatStore.setState({
       sessions: {
         [ACTIVE_TAB]: makeSessionState({
@@ -1677,15 +1679,31 @@ describe('MessageList nested tool calls', () => {
 
     const assistantText = screen.getByText(/Clicking outside should clear/)
     await selectMessageText(assistantText, 'selected reply')
-    expect(screen.getByRole('button', { name: 'Add to chat' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
 
     await act(async () => {
       fireEvent.pointerDown(document.body)
       await Promise.resolve()
     })
 
-    expect(screen.queryByRole('button', { name: 'Add to chat' })).toBeNull()
-    expect(window.getSelection()?.toString()).toBe('')
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    expect(window.getSelection()?.toString()).toBe('selected reply')
+  })
+
+  it.each(['scroll', 'resize', 'escape'])('dismisses a reply selection on %s', async (action) => {
+    useChatStore.setState({ sessions: {
+      [ACTIVE_TAB]: makeSessionState({ messages: [{ id: 'assistant-1', type: 'assistant_text', content: 'Reply to this selection.', timestamp: 1 }] }),
+    } })
+    render(<MessageList />)
+    await selectMessageText(screen.getByText('Reply to this selection.'), 'this selection')
+    const button = screen.getByRole('button', { name: 'Reply' })
+    await act(async () => {
+      if (action === 'escape') fireEvent.keyDown(button, { key: 'Escape' })
+      else fireEvent(window, new Event(action))
+    })
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB] ?? []).toEqual([])
+    expect(window.getSelection()?.toString()).toBe('this selection')
   })
 
   it('keeps only the latest selected-message action when selecting across messages', async () => {
@@ -1715,7 +1733,7 @@ describe('MessageList nested tool calls', () => {
     const firstText = screen.getByText(/First assistant reply/)
     const secondText = screen.getByText(/Second assistant reply/)
     await selectMessageText(firstText, 'First assistant reply')
-    expect(screen.getAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1)
 
     await act(async () => {
       fireEvent.pointerDown(secondText)
@@ -1723,8 +1741,8 @@ describe('MessageList nested tool calls', () => {
     })
     await selectMessageText(secondText, 'Second assistant reply')
 
-    expect(screen.getAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
+    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
     expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB]).toMatchObject([
       {
         messageId: 'assistant-2',
@@ -1848,6 +1866,7 @@ describe('MessageList nested tool calls', () => {
     await waitFor(() => {
       expect(screen.getByText('streaming next token')).toBeTruthy()
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(600)
   })
@@ -1986,6 +2005,7 @@ describe('MessageList nested tool calls', () => {
     await waitFor(() => {
       expect(screen.getByText('streaming next token after height change')).toBeTruthy()
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(1000)
 
@@ -2060,6 +2080,7 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
 
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(scrollTop).toBe(1200)
@@ -2133,12 +2154,14 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.(makeResizeEntry(400), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
     expect(scrollTop).toBe(600)
 
     scrollTopWriteCount = 0
     act(() => {
       resizeCallback?.(makeResizeEntry(401), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
     act(() => {
       resizeCallback?.(makeResizeEntry(400), {} as ResizeObserver)
     })
@@ -2150,6 +2173,7 @@ describe('MessageList nested tool calls', () => {
     act(() => {
       resizeCallback?.(makeResizeEntry(420), {} as ResizeObserver)
     })
+    await waitForProgrammaticScrollReset()
 
     expect(scrollTop).toBe(640)
   })
@@ -2850,7 +2874,7 @@ describe('MessageList nested tool calls', () => {
     expect(branchButtons[1]!.closest('[data-message-actions]')).toBe(
       screen.getByRole('button', { name: 'Copy reply' }).closest('[data-message-actions]')
     )
-    expect(branchButtons[1]?.getAttribute('title')).toBe('Fork a new conversation')
+    expect(branchButtons[1]?.getAttribute('aria-label')).toBe('Fork a new conversation')
 
     fireEvent.click(branchButtons[1]!)
 
@@ -2865,11 +2889,7 @@ describe('MessageList nested tool calls', () => {
       title: 'Branched session',
       type: 'session',
     })
-    const toasts = useUIStore.getState().toasts
-    expect(toasts[toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'Created forked conversation "Branched session".',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('Created forked conversation "Branched session".')
   })
 
   it('hides branch actions while the current session is still running', () => {
@@ -3116,7 +3136,7 @@ describe('MessageList nested tool calls', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
     const diffSurface = await screen.findByTestId('workspace-code')
-    expect(diffSurface.textContent).toContain('+new')
+    await waitFor(() => expect(diffSurface.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-code]')?.textContent).toContain('new'))
     expect(sessionsApi.getTurnCheckpointDiff).toHaveBeenCalledWith(
       ACTIVE_TAB,
       'user-1',
@@ -3468,7 +3488,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList />)
 
-    const historicalCard = (await screen.findByText('src/first.ts')).closest('section')
+    const historicalCard = (await screen.findAllByRole('region', { name: 'Turn changed files' })).find((card) => within(card).queryByText('src/first.ts'))
     expect(historicalCard).toBeTruthy()
     fireEvent.click(
       within(historicalCard as HTMLElement).getByRole('button', {
@@ -3477,7 +3497,7 @@ describe('MessageList nested tool calls', () => {
     )
 
     expect(sessionsApi.rewind).not.toHaveBeenCalled()
-    const dialog = await screen.findByRole('dialog', { name: 'Rewind to before this turn?' })
+    const dialog = await screen.findByRole('alertdialog', { name: 'Rewind to before this turn?' })
     expect(
       within(dialog).getByText(
         'This will rewind the conversation to before this turn and restore tracked files for that checkpoint.',
@@ -3599,5 +3619,154 @@ describe('MessageList nested tool calls', () => {
         'CLI exited during startup (code 1): DreamCoder on Windows requires git-bash (https://git-scm.com/downloads/win).',
       ),
     ).toBeTruthy()
+  })
+})
+
+describe('buildToolGroupResults', () => {
+  const read = (id: string, parentToolUseId?: string): UIMessage => ({
+    id: `use-${id}`,
+    type: 'tool_use',
+    toolName: id.startsWith('agent') ? 'Agent' : 'Read',
+    toolUseId: id,
+    input: {},
+    timestamp: 1,
+    ...(parentToolUseId ? { parentToolUseId } : {}),
+  })
+  const result = (id: string, parentToolUseId?: string): UIMessage => ({
+    id: `result-${id}`,
+    type: 'tool_result',
+    toolUseId: id,
+    content: `${id} done`,
+    isError: false,
+    timestamp: 2,
+    ...(parentToolUseId ? { parentToolUseId } : {}),
+  })
+  const note = (id: string, status: AgentTaskNotification['status'] = 'completed'): AgentTaskNotification => ({
+    taskId: `task-${id}`,
+    toolUseId: id,
+    status,
+    summary: id,
+  })
+  const build = (
+    messages: UIMessage[],
+    previous?: ReturnType<typeof buildToolGroupResults>,
+    notifications: Record<string, AgentTaskNotification> = {},
+  ) => {
+    const model = buildRenderModel(messages)
+    return buildToolGroupResults(model.renderItems, model.toolResultMap, model.childToolCallsByParent, notifications, previous)
+  }
+
+  it('gives each group only its own results and children', () => {
+    const groups = build([
+      read('a'),
+      result('a'),
+      { id: 'text', type: 'assistant_text', content: 'between', timestamp: 3 },
+      read('agent-1'),
+      read('child', 'agent-1'),
+      result('child', 'agent-1'),
+    ])
+
+    expect([...groups.get('group-use-a')!.resultMap.keys()]).toEqual(['a'])
+    const agentGroup = groups.get('group-use-agent-1')!
+    expect([...agentGroup.resultMap.keys()]).toEqual(['child'])
+    expect(agentGroup.childToolCallsByParent.get('agent-1')?.map((call) => call.id)).toEqual(['use-child'])
+  })
+
+  it('keeps references for groups whose results did not change', () => {
+    const history = [read('a'), result('a'), { id: 'text', type: 'assistant_text', content: 'next', timestamp: 3 } as UIMessage]
+    const useB = read('b')
+    const before = build([...history, useB])
+    const after = build([...history, useB, result('b')], before)
+
+    expect(after.get('group-use-a')).toEqual(before.get('group-use-a'))
+    expect(after.get('group-use-a')!.toolCalls).toBe(before.get('group-use-a')!.toolCalls)
+    expect(after.get('group-use-a')!.resultMap).toBe(before.get('group-use-a')!.resultMap)
+    expect(after.get('group-use-b')!.toolCalls).toBe(before.get('group-use-b')!.toolCalls)
+    expect(after.get('group-use-b')!.resultMap).not.toBe(before.get('group-use-b')!.resultMap)
+    expect(after.get('group-use-b')!.resultMap.get('b')).toMatchObject({ content: 'b done' })
+  })
+
+  it('gives a group only its own agent notifications and replaces them only when they change', () => {
+    const messages: UIMessage[] = [
+      read('agent-1'),
+      { id: 'text', type: 'assistant_text', content: 'between', timestamp: 3 },
+      read('agent-2'),
+    ]
+    const failed = note('agent-1', 'failed')
+    const before = build(messages, undefined, { 'agent-1': failed })
+    expect(Object.keys(before.get('group-use-agent-1')!.agentTaskNotifications)).toEqual(['agent-1'])
+    expect(before.get('group-use-agent-2')!.agentTaskNotifications).toEqual({})
+
+    const same = build(messages, before, { 'agent-1': failed })
+    expect(same.get('group-use-agent-1')!.agentTaskNotifications).toBe(before.get('group-use-agent-1')!.agentTaskNotifications)
+
+    const changed = build(messages, before, { 'agent-1': note('agent-1') })
+    expect(changed.get('group-use-agent-1')!.agentTaskNotifications).not.toBe(before.get('group-use-agent-1')!.agentTaskNotifications)
+    expect(changed.get('group-use-agent-1')!.agentTaskNotifications['agent-1']?.status).toBe('completed')
+    expect(changed.get('group-use-agent-2')!.agentTaskNotifications).toBe(before.get('group-use-agent-2')!.agentTaskNotifications)
+  })
+
+  it('includes grandchildren and keeps the child map stable', () => {
+    const messages = [
+      read('agent-1'),
+      read('agent-child', 'agent-1'),
+      read('leaf', 'agent-child'),
+      result('leaf', 'agent-child'),
+    ]
+    const before = build(messages, undefined, { 'agent-child': note('agent-child') })
+    const group = before.get('group-use-agent-1')!
+    expect(group.resultMap.has('leaf')).toBe(true)
+    expect(group.agentTaskNotifications['agent-child']).toBeDefined()
+    expect([...group.childToolCallsByParent.keys()].sort()).toEqual(['agent-1', 'agent-child'])
+
+    const again = build(messages, before, group.agentTaskNotifications)
+    expect(again.get('group-use-agent-1')!.childToolCallsByParent).toBe(group.childToolCallsByParent)
+  })
+})
+
+describe('activity groups', () => {
+  const thinking = (id: string): UIMessage => ({ id, type: 'thinking', content: `thought ${id}`, timestamp: 1 })
+  const tool = (id: string, toolName = 'Bash'): UIMessage => ({
+    id: `use-${id}`,
+    type: 'tool_use',
+    toolName,
+    toolUseId: id,
+    input: {},
+    timestamp: 1,
+  })
+  const text = (id: string): UIMessage => ({ id, type: 'assistant_text', content: `answer ${id}`, timestamp: 2 })
+
+  it('folds thinking between tool calls into one group up to the next reply text', () => {
+    const { renderItems } = buildRenderModel([
+      thinking('t1'),
+      tool('glob', 'Glob'),
+      thinking('t2'),
+      tool('ls'),
+      thinking('t3'),
+      tool('read', 'Read'),
+      thinking('t4'),
+      text('answer'),
+    ])
+
+    expect(renderItems).toHaveLength(2)
+    const group = renderItems[0]!
+    expect(group.kind).toBe('tool_group')
+    if (group.kind !== 'tool_group') return
+    expect(group.steps.map((step) => step.id)).toEqual(['t1', 'use-glob', 't2', 'use-ls', 't3', 'use-read', 't4'])
+    expect(group.toolCalls.map((call) => call.id)).toEqual(['use-glob', 'use-ls', 'use-read'])
+    expect(renderItems[1]).toMatchObject({ kind: 'message', message: { id: 'answer' } })
+  })
+
+  it('keeps thinking without tool calls as its own message', () => {
+    const { renderItems } = buildRenderModel([thinking('t1'), text('answer')])
+
+    expect(renderItems.map((item) => item.kind)).toEqual(['message', 'message'])
+  })
+
+  it('keeps thinking out of agent groups', () => {
+    const { renderItems } = buildRenderModel([thinking('t1'), tool('a1', 'Agent'), thinking('t2'), tool('b', 'Bash')])
+
+    expect(renderItems.map((item) => (item.kind === 'tool_group' ? item.steps.map((step) => step.id) : item.message.id)))
+      .toEqual(['t1', ['use-a1'], ['t2', 'use-b']])
   })
 })

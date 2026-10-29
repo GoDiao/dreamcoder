@@ -515,6 +515,22 @@ function planIsolatedWorktree(
   }
 }
 
+async function assertCleanCheckout(workDir: string, branchName: string): Promise<void> {
+  const status = await runGit(workDir, ['status', '--porcelain'])
+  if (status.code !== 0) {
+    throw repositoryBadRequest(
+      REPOSITORY_ERROR.contextFailed,
+      `Failed to check for uncommitted changes: ${status.stderr.trim() || 'git status failed'}`,
+    )
+  }
+  if (status.stdout.trim()) {
+    throw repositoryBadRequest(
+      REPOSITORY_ERROR.dirtyWorktree,
+      `The current checkout has uncommitted changes. Commit or stash them, or run in a new worktree, before switching to "${branchName}".`,
+    )
+  }
+}
+
 async function switchExistingCheckout(
   context: RepositoryContextResult,
   branch: ResolvedBranch,
@@ -545,6 +561,8 @@ async function switchExistingCheckout(
       `Branch "${branch.name}" is already checked out in another worktree.`,
     )
   }
+
+  await assertCleanCheckout(context.workDir, branch.name)
 
   const args = branch.local
     ? ['switch', branch.name]
@@ -650,6 +668,10 @@ export async function resolveSessionWorkspaceLaunch(
       REPOSITORY_ERROR.branchNotFound,
       `Branch not found: ${options.branch || 'default branch'}`,
     )
+  }
+
+  if (!options.worktree && branch.name !== context.currentBranch) {
+    await assertCleanCheckout(context.workDir, branch.name)
   }
 
   return options.worktree

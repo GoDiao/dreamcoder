@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export type SettingsSummaryItem = {
@@ -71,6 +72,36 @@ export function SettingsListRow({
         ) : null}
       </div>
       {actions ? <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">{actions}</div> : null}
+    </div>
+  )
+}
+
+export function MetaPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
+      {children}
+    </span>
+  )
+}
+
+export function DetailStat({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: string
+  icon: LucideIcon
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
+        <Icon aria-hidden="true" size={14} />
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 text-base font-semibold text-[var(--color-text-primary)] break-all">
+        {value}
+      </div>
     </div>
   )
 }

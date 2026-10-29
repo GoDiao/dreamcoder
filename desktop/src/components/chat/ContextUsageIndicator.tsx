@@ -1,3 +1,7 @@
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '../shared/ui/hover-card'
+import { Spinner } from '../shared/ui/spinner'
+import { Progress } from '../shared/ui/progress'
+import { Button } from '../shared/ui/button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { sessionsApi, type SessionContextSnapshot } from '../../api/sessions'
 import { useTranslation } from '../../i18n'
@@ -194,14 +198,14 @@ export function ContextUsageIndicator({
   const usedTokens = displayContext?.totalTokens ?? 0
   const maxTokens = displayContext?.rawMaxTokens ?? 0
   const freeTokens = Math.max(0, maxTokens - usedTokens)
-  const strokeColor = percentage >= 90
+  const ringColor = percentage >= 90
     ? 'var(--color-error)'
     : percentage >= 75
       ? 'var(--color-warning)'
       : 'var(--color-secondary)'
   const ringStyle = {
     background: displayContext
-      ? `conic-gradient(${strokeColor} ${percentage * 3.6}deg, var(--color-surface-container-high) 0deg)`
+      ? `conic-gradient(${ringColor} ${percentage * 3.6}deg, var(--color-surface-container-high) 0deg)`
       : 'var(--color-surface-container-high)',
   }
   const displayPercent = displayContext ? formatPercent(percentage) : '--'
@@ -214,63 +218,21 @@ export function ContextUsageIndicator({
       ? t('contextIndicator.loadingAria')
       : t('contextIndicator.unavailableAria')
 
-  return (
-    <div className="group/context relative pointer-events-auto">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={() => {
-          if (compact) {
-            setMobileDetailsOpen(true)
-          }
-          void refresh('manual')
-        }}
-        title={t('contextIndicator.title')}
-        data-testid="context-usage-indicator"
-        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-container)] text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-container-lowest)] ${
-          compact ? 'px-2' : 'px-2.5'
-        }`}
-      >
-        <span className="relative grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full">
-          {loading && !displayContext ? (
-            <span className="absolute inset-[2px] rounded-full border-2 border-[var(--color-text-tertiary)] border-t-transparent motion-safe:animate-spin" />
-          ) : (
-            <span
-              className="relative grid h-[18px] w-[18px] place-items-center rounded-full"
-              style={ringStyle}
-            >
-              <span className="absolute inset-[3px] rounded-full bg-[var(--color-surface-container-lowest)]" />
-              <span
-                className="relative h-[5px] w-[5px] rounded-full"
-                style={{ backgroundColor: displayContext ? strokeColor : 'var(--color-text-tertiary)' }}
-              />
-            </span>
-          )}
-        </span>
-        <span className="font-mono text-[11px] font-semibold tabular-nums">
-          {displayPercent}
-        </span>
-      </button>
-
-      <div className={`pointer-events-none absolute bottom-full right-0 z-40 mb-2 w-[320px] max-w-[calc(100vw-2rem)] translate-y-1 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-4 text-left opacity-0 shadow-[var(--shadow-dropdown)] transition-all duration-150 group-hover/context:translate-y-0 group-hover/context:opacity-100 group-focus-within/context:translate-y-0 group-focus-within/context:opacity-100 ${
-        compact ? 'hidden' : ''
-      }`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
-              {t('contextIndicator.title')}
-            </div>
-            <div className="mt-1 truncate text-sm font-semibold text-[var(--color-text-primary)]">
-              {displayModel ?? t('contextIndicator.modelUnknown')}
-            </div>
-          </div>
-          <div className="shrink-0 font-mono text-xl font-semibold text-[var(--color-text-primary)]">
-            {displayContext ? formatPercent(percentage) : '--'}
-          </div>
+  const detailsContent = (
+    <>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-[var(--color-text-primary)]">{t('contextIndicator.title')}</span>
+          <span className="font-mono text-ui-muted-foreground">
+            {displayContext && maxTokens > 0 ? t('contextIndicator.usedOfWindow', { used: formatNumber(usedTokens), window: formatNumber(maxTokens) }) : displayPercent}
+          </span>
+        </div>
+        <div className="mt-1 truncate text-xs text-[var(--color-text-tertiary)]">
+          {displayModel ?? t('contextIndicator.modelUnknown')}
         </div>
 
         {displayContext ? (
           <>
+            <Progress value={percentage} aria-label={t('contextIndicator.title')} className="mt-4" />
             <div className="mt-4 grid grid-cols-2 gap-3 font-mono text-xs">
               <div>
                 <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.used')}</div>
@@ -280,24 +242,18 @@ export function ContextUsageIndicator({
                 <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.free')}</div>
                 <div className="mt-1 text-[var(--color-text-primary)]">{formatNumber(freeTokens)}</div>
               </div>
-              <div className="col-span-2">
-                <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.window')}</div>
-                <div className="mt-1 text-[var(--color-text-primary)]">{maxTokens > 0 ? formatNumber(maxTokens) : '--'}</div>
-              </div>
             </div>
             {details.length > 0 && (
               <div className="mt-4 space-y-2">
                 {details.map((category) => {
-                  const percent = maxTokens > 0 ? Math.max(0.5, Math.min(100, (category.tokens / maxTokens) * 100)) : 0
+                  const percent = maxTokens > 0 ? Math.max(0, Math.min(100, (category.tokens / maxTokens) * 100)) : 0
                   return (
                     <div key={category.name}>
                       <div className="flex items-center justify-between gap-3 text-xs">
                         <span className="min-w-0 truncate text-[var(--color-text-secondary)]">{category.name}</span>
                         <span className="shrink-0 font-mono text-[var(--color-text-tertiary)]">{formatNumber(category.tokens)}</span>
                       </div>
-                      <div className="mt-1 h-1 overflow-hidden rounded-full bg-[var(--color-surface-container)]">
-                        <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: category.color }} />
-                      </div>
+                      <Progress value={percent} aria-label={category.name} className="mt-1" />
                     </div>
                   )
                 })}
@@ -321,82 +277,58 @@ export function ContextUsageIndicator({
             {loading ? t('contextIndicator.loading') : t('contextIndicator.unavailableDetail')}
           </div>
         )}
-      </div>
+    </>
+  )
 
-      {compact && (
+  const trigger = (
+    <Button
+      variant="outline"
+      size="icon-sm"
+      type="button"
+      aria-label={ariaLabel}
+      onClick={() => {
+        if (compact) {
+          setMobileDetailsOpen(true)
+        }
+        void refresh('manual')
+      }}
+      data-testid="context-usage-indicator"
+      className="shrink-0"
+    >
+      {loading && !displayContext ? (
+        <Spinner aria-hidden="true" className="size-4 text-[var(--color-text-tertiary)] motion-reduce:animate-none" />
+      ) : (
+        <span data-testid="context-usage-ring" className="relative grid size-4 place-items-center rounded-full" style={ringStyle}>
+          <span className="absolute inset-[3px] rounded-full bg-ui-background" />
+        </span>
+      )}
+    </Button>
+  )
+
+  if (compact) {
+    return (
+      <>
+        {trigger}
         <MobileBottomSheet
           open={mobileDetailsOpen}
           onClose={() => setMobileDetailsOpen(false)}
           title={t('contextIndicator.title')}
           closeLabel={t('tabs.close')}
           ariaLabel={t('contextIndicator.title')}
-          headerExtra={(
-            <div className="truncate text-base font-semibold text-[var(--color-text-primary)]">
-              {displayModel ?? t('contextIndicator.modelUnknown')}
-            </div>
-          )}
           contentClassName="p-4"
         >
-          <div className="flex items-end justify-between gap-4">
-            <div className="font-mono text-4xl font-semibold text-[var(--color-text-primary)]">
-              {displayContext ? formatPercent(percentage) : '--'}
-            </div>
-            {contextSource === 'estimate' && (
-              <span className="mb-1 rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
-                {t('contextIndicator.estimate')}
-              </span>
-            )}
-          </div>
-
-          {displayContext ? (
-            <div className="mt-5">
-              <div className="grid grid-cols-3 gap-2 font-mono text-xs">
-                <div className="rounded-xl bg-[var(--color-surface-container)] p-3">
-                  <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.used')}</div>
-                  <div className="mt-1 text-[var(--color-text-primary)]">{formatNumber(usedTokens)}</div>
-                </div>
-                <div className="rounded-xl bg-[var(--color-surface-container)] p-3">
-                  <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.free')}</div>
-                  <div className="mt-1 text-[var(--color-text-primary)]">{formatNumber(freeTokens)}</div>
-                </div>
-                <div className="rounded-xl bg-[var(--color-surface-container)] p-3">
-                  <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.window')}</div>
-                  <div className="mt-1 text-[var(--color-text-primary)]">{maxTokens > 0 ? formatNumber(maxTokens) : '--'}</div>
-                </div>
-              </div>
-              {details.length > 0 && (
-                <div className="mt-5 space-y-3">
-                  {details.map((category) => {
-                    const percent = maxTokens > 0 ? Math.max(0.5, Math.min(100, (category.tokens / maxTokens) * 100)) : 0
-                    return (
-                      <div key={category.name}>
-                        <div className="flex items-center justify-between gap-3 text-xs">
-                          <span className="min-w-0 truncate text-[var(--color-text-secondary)]">{category.name}</span>
-                          <span className="shrink-0 font-mono text-[var(--color-text-tertiary)]">{formatNumber(category.tokens)}</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-container)]">
-                          <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: category.color }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="mt-4 text-[11px] text-[var(--color-text-tertiary)]">
-                {formatUpdatedAt(updatedAt, t)}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-xl bg-[var(--color-surface-container)] p-4 text-sm leading-6 text-[var(--color-text-secondary)]">
-              {isPendingContext
-                ? t('contextIndicator.pendingDetail')
-                : loading
-                  ? t('contextIndicator.loading')
-                  : t('contextIndicator.unavailableDetail')}
-            </div>
-          )}
+          {detailsContent}
         </MobileBottomSheet>
-      )}
-    </div>
+      </>
+    )
+  }
+
+  return (
+    <HoverCard openDelay={10} closeDelay={100}>
+      <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+      <HoverCardContent side="top" align="end" sideOffset={8} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)] p-4">
+        {detailsContent}
+      </HoverCardContent>
+    </HoverCard>
   )
 }
