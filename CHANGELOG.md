@@ -20,6 +20,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- MermaidRenderer tests pass when run in different orders, preserving the record of Mermaid's one-time initialization (#206).
 - Tool calls that arrived after a reply fell back to a non-streaming request were missing from the conversation; they are now shown.
 - Read no longer rejects a text file when a model sends an empty page range.
 - A group of tool calls is no longer marked as failed when a failed call was followed by a successful call of the same tool; the failed call is still shown inside the group.

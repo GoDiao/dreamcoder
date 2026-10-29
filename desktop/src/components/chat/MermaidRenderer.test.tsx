@@ -24,7 +24,6 @@ const mermaidLoadsAtImport = mermaidModule.loads
 
 describe('MermaidRenderer', () => {
   beforeEach(() => {
-    initializeMock.mockReset()
     renderMock.mockReset()
     renderMock.mockResolvedValue({
       svg: '<svg viewBox="0 0 200 100"><rect width="200" height="100"></rect></svg>',
@@ -39,6 +38,7 @@ describe('MermaidRenderer', () => {
     expect(screen.getByText('Rendering diagram...')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /preview/i })).toBeInTheDocument()
     expect(mermaidModule.loads).toBe(1)
+    expect(initializeMock).toHaveBeenCalledTimes(1)
     expect(initializeMock).toHaveBeenCalledWith(expect.objectContaining({
       securityLevel: 'strict',
       suppressErrorRendering: true,
