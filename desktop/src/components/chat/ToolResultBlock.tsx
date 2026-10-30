@@ -1,3 +1,5 @@
+import { Button } from '../shared/ui/button'
+import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
 import { CodeViewer } from './CodeViewer'
 import { memo, useState } from 'react'
 import { useTranslation } from '../../i18n'
@@ -20,25 +22,25 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
   const preview = text.slice(0, 200)
   const hasMore = text.length > 200
 
+  const ResultIcon = isError ? CircleAlertIcon : CircleCheckIcon
   return (
     <div className={`mb-2 overflow-hidden rounded-xl border ${
       isError
         ? 'border-[var(--color-error)]/20'
         : 'border-[var(--color-outline-variant)]/20'
     }`}>
-      <button
+      <Button variant="ghost" size="row"
         type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
-        className={`flex w-full items-center justify-between px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider ${
-        isError
-          ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
-          : 'bg-[var(--color-surface-container-high)] text-[var(--color-outline)]'
-      }`}
+        className={`justify-between px-3 text-[10px] font-bold uppercase tracking-wider ${
+          isError
+            ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
+            : 'bg-[var(--color-surface-container-high)] text-[var(--color-outline)]'
+        }`}
       >
         <span className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[12px]">
-            {isError ? 'error' : 'check_circle'}
-          </span>
+          <ResultIcon aria-hidden="true" size={12} />
           {toolName ? t('tool.result', { toolName }) : t('tool.resultGeneric')}
         </span>
         <span className={`px-2 py-0.5 rounded-full text-[9px] ${
@@ -48,7 +50,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
         }`}>
           {isError ? t('tool.error') : t('tool.success')}
         </span>
-      </button>
+      </Button>
 
       <InlineImageGallery text={text} />
 
@@ -72,12 +74,12 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
       )}
 
       {hasMore && (
-        <button
+        <Button variant="ghost" size="row"
           onClick={() => setExpanded((value) => !value)}
-          className="w-full py-1 text-[10px] font-medium text-[var(--color-text-accent)] hover:underline bg-[var(--color-surface-container-low)] border-t border-[var(--color-outline-variant)]/10"
+          className="justify-center py-1 text-center text-[10px] font-medium text-[var(--color-text-accent)] hover:underline bg-[var(--color-surface-container-low)] border-t border-[var(--color-outline-variant)]/10"
         >
           {expanded ? t('tool.showLess') : t('tool.showMore', { count: text.length - 200 })}
-        </button>
+        </Button>
       )}
     </div>
   )

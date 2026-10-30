@@ -32,6 +32,35 @@ describe('tabStore', () => {
     expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['a', 'c'])
   })
 
+  it('persists and restores the empty page with Scheduled still open', async () => {
+    useTabStore.getState().openTab('__scheduled__', 'Scheduled', 'scheduled')
+    useTabStore.getState().openTab('a', 'A')
+    useTabStore.getState().closeTab('a')
+    expect(JSON.parse(localStorage.getItem('dreamcoder-open-tabs')!).activeTabId).toBeNull()
+    useTabStore.setState({ tabs: [], activeTabId: null })
+
+    await useTabStore.getState().restoreTabs()
+
+    expect(useTabStore.getState().activeTabId).toBeNull()
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__scheduled__'])
+  })
+
+  it.each([null, 'missing'])('does not replace saved selection %s with Scheduled', async (activeTabId) => {
+    localStorage.setItem('dreamcoder-open-tabs', JSON.stringify({
+      openTabs: [
+        { sessionId: '__scheduled__', title: 'Scheduled', type: 'scheduled' },
+        { sessionId: 'missing', title: 'Missing', type: 'session' },
+      ],
+      activeTabId,
+    }))
+    vi.spyOn(sessionsApi, 'list').mockResolvedValue({ sessions: [], total: 0 })
+
+    await useTabStore.getState().restoreTabs()
+
+    expect(useTabStore.getState().activeTabId).toBeNull()
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['__scheduled__'])
+  })
+
   it('reopening a tab moves it to the end and dropTabs keeps the active one', () => {
     const store = useTabStore.getState()
     store.openTab('a', 'A')
@@ -122,7 +151,7 @@ describe('tabStore', () => {
     await useTabStore.getState().restoreTabs()
 
     expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['kept'])
-    expect(useTabStore.getState().activeTabId).toBe('kept')
+    expect(useTabStore.getState().activeTabId).toBeNull()
   })
 
   it('keeps persisted tabs intact when a later page fails so restore can be retried', async () => {

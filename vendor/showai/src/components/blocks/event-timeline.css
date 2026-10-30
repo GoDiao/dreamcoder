@@ -1,0 +1,442 @@
+/* event-timeline: a chart with phase bands and an event list kept on one cursor.
+ * Neutral colors follow the design tokens; tones switch with the theme. */
+/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
+ * for structural elements, and the rules below (0,3,0) set this block's own values. */
+.sb-block.et-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
+  margin: 0;
+}
+.sb-block.et-block li:not(svg) {
+  padding: 0;
+}
+.sb-block.et-block pre:not(svg) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+}
+/* Doubled class so the shared .sb-block font and size do not override these. */
+.sb-block.et-block {
+  --et-text: var(--text, #222222);
+  --et-muted: var(--muted, #6a6a6a);
+  --et-line: var(--line, #dddddd);
+  --et-paper: var(--paper, #ffffff);
+  --et-surface: var(--surface, #fafafa);
+  --et-focus: var(--accent, #120a8f);
+  --et-neutral: #6b736d;
+  --et-neutral-soft: #eef0ee;
+  --et-info: #2c64a8;
+  --et-info-soft: #dfeaf6;
+  --et-good: #2f7d5b;
+  --et-good-soft: #dcefe3;
+  --et-warn: #94600f;
+  --et-warn-soft: #f8ead0;
+  --et-bad: #b53f2b;
+  --et-bad-soft: #f8dfd9;
+  --et-accent: var(--accent, #120a8f);
+  --et-accent-soft: var(--accent-soft, #eeedf9);
+  color: var(--et-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 8px 0;
+  container-type: inline-size;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] .sb-block.et-block,
+[data-theme="dark"] .sb-block.et-block {
+  --et-neutral: #a3aaa5;
+  --et-neutral-soft: #2a2d2b;
+  --et-info: #8bb8eb;
+  --et-info-soft: #1f2d3d;
+  --et-good: #7cc3a0;
+  --et-good-soft: #20352b;
+  --et-warn: #e0a96f;
+  --et-warn-soft: #3a2c1e;
+  --et-bad: #e48b83;
+  --et-bad-soft: #3b2423;
+}
+.sb-block.et-block * {
+  box-sizing: border-box;
+}
+.sb-block.et-block .et-head {
+  margin-bottom: 10px;
+}
+.sb-block.et-block .et-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+.sb-block.et-block .et-sub {
+  color: var(--et-muted);
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+.sb-block.et-block .et-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 28px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--et-line);
+}
+.sb-block.et-block .et-summary div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sb-block.et-block .et-summary dd {
+  order: -1;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.sb-block.et-block .et-summary dt {
+  font-size: 12.5px;
+  color: var(--et-muted);
+}
+.sb-block.et-block .et-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.sb-block.et-block .et-body.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sb-block.et-block .et-main {
+  min-width: 0;
+}
+.sb-block.et-block .et-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  color: var(--et-muted);
+}
+.sb-block.et-block .et-now {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sb-block.et-block .et-now b {
+  font:
+    700 15px ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--et-text);
+}
+.sb-block.et-block .et-phase-pill {
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--et-text);
+}
+.sb-block.et-block .et-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sb-block.et-block .et-value i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sb-block.et-block .et-value b {
+  color: var(--et-text);
+  font-weight: 650;
+}
+.sb-block.et-block .et-chart {
+  min-width: 0;
+}
+.sb-block.et-block .et-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+  cursor: col-resize;
+  user-select: none;
+}
+.sb-block.et-block .et-grid {
+  stroke: var(--et-line);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+.sb-block.et-block .et-baseline {
+  stroke: var(--et-line);
+  stroke-width: 1;
+}
+.sb-block.et-block .et-tick {
+  font:
+    10.5px ui-monospace,
+    Menlo,
+    monospace;
+  fill: var(--et-muted);
+}
+.sb-block.et-block .et-phase-label {
+  font-size: 10.5px;
+  font-weight: 650;
+  fill: var(--et-muted);
+}
+.sb-block.et-block .et-area {
+  fill: currentColor;
+  opacity: 0.15;
+}
+.sb-block.et-block .et-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.sb-block.et-block .et-line.is-dashed {
+  stroke-width: 1.8;
+  stroke-dasharray: 5 3;
+}
+.sb-block.et-block .et-cursor {
+  stroke: var(--et-text);
+  stroke-width: 1.2;
+}
+.sb-block.et-block .et-cursor-dot,
+.sb-block.et-block .et-marker {
+  stroke: var(--et-paper);
+  stroke-width: 1.5;
+}
+.sb-block.et-block .et-marker {
+  cursor: pointer;
+}
+.sb-block.et-block .et-marker.is-future {
+  opacity: 0.45;
+}
+.sb-block.et-block .et-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sb-block.et-block .et-controls input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--et-text);
+}
+.sb-block.et-block .et-step {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--et-line);
+  border-radius: 8px;
+  background: var(--et-paper);
+  color: var(--et-text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sb-block.et-block .et-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.sb-block.et-block .et-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--et-muted);
+}
+.sb-block.et-block .et-legend > span > i {
+  display: inline-block;
+  width: 16px;
+  border-top: 2px solid currentColor;
+  margin-right: 6px;
+  vertical-align: 3px;
+}
+.sb-block.et-block .et-legend > span > i.is-dashed {
+  border-top-style: dashed;
+}
+.sb-block.et-block .et-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sb-block.et-block .et-phase-chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 1px 9px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--et-text);
+  cursor: pointer;
+}
+.sb-block.et-block .et-phase-chip small {
+  font:
+    10.5px ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--et-muted);
+  margin-left: 5px;
+}
+.sb-block.et-block .et-phase-chip[aria-pressed="true"] {
+  border-color: var(--et-text);
+}
+.sb-block.et-block .et-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--et-muted);
+}
+.sb-block.et-block .et-events {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  max-height: 380px;
+  overflow-y: auto;
+  border-left: 2px solid var(--et-line);
+  scrollbar-width: thin;
+}
+.sb-block.et-block .et-events li {
+  position: relative;
+  padding-left: 14px;
+}
+.sb-block.et-block .et-events li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 13px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--et-paper);
+  border: 2px solid var(--kind);
+}
+.sb-block.et-block .et-events li.is-open::before {
+  background: var(--kind);
+}
+.sb-block.et-block .et-events li.is-future {
+  opacity: 0.55;
+}
+.sb-block.et-block .et-events button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sb-block.et-block .et-events button:hover {
+  background: var(--et-surface);
+}
+.sb-block.et-block .et-events li.is-open .et-card {
+  background: var(--et-paper);
+  box-shadow: 0 0 0 1px var(--et-line);
+  border-radius: 9px;
+}
+.sb-block.et-block .et-events li.is-open button:hover {
+  background: transparent;
+}
+.sb-block.et-block .et-events time {
+  font:
+    700 12px ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--et-text);
+}
+.sb-block.et-block .et-kind {
+  justify-self: start;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--kind);
+  border: 1px solid var(--kind);
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 17px;
+}
+.sb-block.et-block .et-events strong {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sb-block.et-block .et-detail {
+  display: none;
+  margin: 0 0 4px;
+  padding: 2px 8px 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--et-muted);
+}
+.sb-block.et-block .et-events li.is-open .et-detail {
+  display: block;
+}
+.sb-block.et-block .et-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sb-block.et-block .et-step:focus-visible,
+.sb-block.et-block .et-phase-chip:focus-visible,
+.sb-block.et-block .et-events button:focus-visible,
+.sb-block.et-block .et-controls input:focus-visible {
+  outline: 2px solid var(--et-focus);
+  outline-offset: 2px;
+}
+
+@container (max-width: 760px) {
+  .sb-block.et-block .et-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sb-block.et-block .et-events {
+    max-height: 300px;
+  }
+  .sb-block.et-block .et-summary {
+    gap: 6px 18px;
+  }
+  .sb-block.et-block .et-summary dd {
+    font-size: 17px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-block.et-block .et-events {
+    scroll-behavior: auto;
+  }
+}
+/* Print and static reading: the chart stays, every event shows its detail. */
+@media print {
+  .sb-block.et-block .et-controls {
+    display: none;
+  }
+  .sb-block.et-block .et-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sb-block.et-block .et-events {
+    max-height: none;
+    overflow: visible;
+  }
+  .sb-block.et-block .et-events li {
+    break-inside: avoid;
+  }
+  .sb-block.et-block .et-events li.is-future {
+    opacity: 1;
+  }
+  .sb-block.et-block .et-detail {
+    display: block;
+  }
+  .sb-block.et-block .et-events li.is-open .et-card {
+    box-shadow: none;
+  }
+}

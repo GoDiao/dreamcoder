@@ -18,6 +18,13 @@ describe('anthropicToOpenaiChat', () => {
     expect(result.messages).toEqual([{ role: 'user', content: 'Hello' }])
   })
 
+  test('streaming requests ask for token usage', () => {
+    const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
+    expect(anthropicToOpenaiChat({ ...base, stream: true }).stream_options).toEqual({ include_usage: true })
+    expect(anthropicToOpenaiChat(base).stream_options).toBeUndefined()
+    expect(anthropicToOpenaiChat({ ...base, stream: false }).stream_options).toBeUndefined()
+  })
+
   test('system prompt string', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4',
@@ -340,6 +347,23 @@ describe('openaiChatToAnthropic', () => {
         content: 'ok',
       })
     }
+  })
+
+  test('tool_calls finished with stop (Gemini) still ends with tool_use', () => {
+    const res = {
+      id: 'x', object: 'chat.completion', created: 0, model: 'gemini',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"NYC"}' } }],
+        },
+        finish_reason: 'stop',
+      }],
+    } as OpenAIChatResponse
+
+    expect(openaiChatToAnthropic(res, 'gemini').stop_reason).toBe('tool_use')
   })
 
   test('finish_reason mapping', () => {

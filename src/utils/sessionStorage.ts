@@ -556,6 +556,7 @@ class Project {
   currentSessionLastPrompt: string | undefined
   currentSessionAgentSetting: string | undefined
   currentSessionMode: 'coordinator' | 'normal' | undefined
+  pendingPermissionMode: string | undefined
   // Tri-state: undefined = never touched (don't write), null = exited worktree,
   // object = currently in worktree. reAppendSessionMetadata writes null so
   // --resume knows the session exited (vs. crashed while inside).
@@ -832,6 +833,14 @@ class Project {
         mode: this.currentSessionMode,
         sessionId,
       })
+    }
+    if (this.pendingPermissionMode) {
+      appendEntryToFile(this.sessionFile, {
+        type: 'permission-mode',
+        permissionMode: this.pendingPermissionMode,
+        sessionId,
+      })
+      this.pendingPermissionMode = undefined
     }
     if (this.currentSessionWorktree !== undefined) {
       appendEntryToFile(this.sessionFile, {
@@ -2829,6 +2838,7 @@ export function clearSessionMetadata(): void {
   project.currentSessionLastPrompt = undefined
   project.currentSessionAgentSetting = undefined
   project.currentSessionMode = undefined
+  project.pendingPermissionMode = undefined
   project.currentSessionWorktree = undefined
   project.currentSessionPrNumber = undefined
   project.currentSessionPrUrl = undefined
@@ -2909,6 +2919,20 @@ export function cacheSessionTitle(customTitle: string): void {
  */
 export function saveMode(mode: 'coordinator' | 'normal'): void {
   getProject().currentSessionMode = mode
+}
+
+export function savePermissionMode(permissionMode: string): void {
+  const project = getProject()
+  if (!project.sessionFile) {
+    project.pendingPermissionMode = permissionMode
+    return
+  }
+  project.pendingPermissionMode = undefined
+  appendEntryToFile(project.sessionFile, {
+    type: 'permission-mode',
+    permissionMode,
+    sessionId: getSessionId(),
+  })
 }
 
 /**

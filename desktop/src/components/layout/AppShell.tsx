@@ -1,8 +1,12 @@
+import { MenuIcon, XIcon } from 'lucide-react'
+import { usePanelWidthPersistence } from '../../hooks/usePanelWidthPersistence'
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../shared/ui/resizable'
 import { useEffect, useRef, useState, type HTMLAttributes } from 'react'
+import { onMenuNavigate } from '../../lib/shell'
 import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
-import { ToastContainer } from '../shared/Toast'
 import { UpdateChecker } from '../shared/UpdateChecker'
+import { BrowserGuestLayer } from '../workspace/BrowserGuestLayer'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useUIStore, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, type SettingsTab } from '../../stores/uiStore'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
@@ -11,10 +15,12 @@ import {
   H5ConnectionRequiredError,
   initializeDesktopServerUrl,
   isH5ConnectionRequiredError,
-  isTauriRuntime,
+  isDesktopRuntime,
 } from '../../lib/desktopRuntime'
-import { WindowControls, showWindowControls } from './WindowControls'
-import { SettingsModal } from '../../pages/Settings'
+import { WindowControls } from './WindowControls'
+import { TitlebarSidebarToggle } from './TitlebarSidebarToggle'
+import { isMacOverlayTitlebar } from '../../lib/windowChrome'
+import { SettingsModal } from '../../pages/SettingsModal'
 import { StartupErrorView } from './StartupErrorView'
 import { useTabStore } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
@@ -26,6 +32,7 @@ import { firstLaunchWasShown, useFirstLaunchGate } from '../onboarding/useFirstL
 import { useReleaseIdleSessions } from '../../hooks/useReleaseIdleSessions'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
+import { useTeamStore } from '../../stores/teamStore'
 import type { Tab } from '../../stores/tabStore'
 
 function isChatTab(tab: Tab | undefined) {
@@ -38,6 +45,7 @@ export function AppShell() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
   const sidebarWidth = useUIStore((s) => s.sidebarWidth)
+  const [sidebarRailWidth] = useState(() => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-rail-width')) || 0)
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const [ready, setReady] = useState(false)
   const [startupError, setStartupError] = useState<string | null>(null)
@@ -47,8 +55,8 @@ export function AppShell() {
   const [mobileSidebarMounted, setMobileSidebarMounted] = useState(false)
   const [mobileSidebarVisible, setMobileSidebarVisible] = useState(false)
   const t = useTranslation()
-  const tauriRuntime = isTauriRuntime()
-  const isMobileShell = useMobileViewport() && !tauriRuntime
+  const desktopShell = isDesktopRuntime()
+  const isMobileShell = useMobileViewport() && !desktopShell
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const setActiveTab = useTabStore((s) => s.setActiveTab)
@@ -61,6 +69,10 @@ export function AppShell() {
   const effectiveSidebarVisible = isMobileShell ? mobileSidebarVisible : sidebarOpen
   const activeTab = tabs.find((tab) => tab.sessionId === activeTabId)
   const isActiveChatTab = isChatTab(activeTab)
+  // Mirrors ContentRouter and ActiveSession: every tab but scheduled tasks is a
+  // session page, and a teammate's session has no header.
+  const isTeammateSession = useTeamStore((s) => activeTabId ? !!s.getMemberBySessionId(activeTabId) : false)
+  const pageHasSessionHeader = !!activeTab && activeTab.type !== 'scheduled' && !isTeammateSession
   const mobileSessionTitle = activeSession?.title || activeTab?.title || t('session.untitled')
   const mobileSessionUpdated = (() => {
     if (!activeSession?.modifiedAt) return ''
@@ -71,11 +83,15 @@ export function AppShell() {
     return t('session.timeDays', { n: Math.floor(diff / 86400000) })
   })()
   const settingsOpen = useUIStore((s) => s.settingsOpen)
+  const { panelRef: sidebarPanelRef, onLayoutChanged } = usePanelWidthPersistence(setSidebarWidth, effectiveSidebarOpen && !isMobileShell && !settingsOpen)
   // The settings window is modal: keep keyboard and screen readers out of the page behind it.
-  const behindSettingsProps: { inert?: '' } = settingsOpen ? { inert: '' } : {}
-  const sidebarHiddenProps: HTMLAttributes<HTMLDivElement> & { inert?: '' } =
-    isMobileShell && !effectiveSidebarOpen
-      ? { 'aria-hidden': true, inert: '' }
+  const behindSettingsProps: HTMLAttributes<HTMLDivElement> = settingsOpen ? { inert: true } : {}
+  // The desktop app hides a collapsed sidebar and toggles it from the title row.
+  const titlebarToggle = desktopShell && !isMobileShell
+  const macTitlebar = titlebarToggle && isMacOverlayTitlebar()
+  const sidebarHiddenProps: HTMLAttributes<HTMLDivElement> =
+    (isMobileShell || titlebarToggle) && !effectiveSidebarOpen
+      ? { 'aria-hidden': true, inert: true }
       : behindSettingsProps
 
   const firstLaunch = useFirstLaunchGate(ready && !startupError && !h5StartupError)
@@ -122,7 +138,7 @@ export function AppShell() {
         })().catch(() => {})
       } catch (error) {
         if (!cancelled) {
-          if (!tauriRuntime && isH5ConnectionRequiredError(error)) {
+          if (!desktopShell && isH5ConnectionRequiredError(error)) {
             setH5StartupError(error)
             setStartupError(null)
           } else {
@@ -139,18 +155,15 @@ export function AppShell() {
     return () => {
       cancelled = true
     }
-  }, [bootstrapNonce, fetchSettings, tauriRuntime])
+  }, [bootstrapNonce, fetchSettings, desktopShell])
 
   useEffect(() => {
-    if (!tauriRuntime) return
+    if (!desktopShell) return
     let unlisten: (() => void) | undefined
-    import('@tauri-apps/api/event')
-      .then(({ listen }) =>
-        listen<string>('native-menu-navigate', (event) => {
-          const target = event.payload as SettingsTab | 'settings'
-          useUIStore.getState().openSettings(target === 'about' ? 'about' : undefined)
-        }),
-      )
+    onMenuNavigate((event) => {
+      const target = event.payload as SettingsTab | 'settings'
+      useUIStore.getState().openSettings(target === 'about' ? 'about' : undefined)
+    })
       .then((fn) => { unlisten = fn })
       .catch(() => {})
     return () => { unlisten?.() }
@@ -214,7 +227,7 @@ export function AppShell() {
     toggleSidebar()
   }
 
-  if (!tauriRuntime && h5StartupError) {
+  if (!desktopShell && h5StartupError) {
     return (
       <H5ConnectionView
         initialServerUrl={h5StartupError.serverUrl}
@@ -240,8 +253,9 @@ export function AppShell() {
     return <FirstLaunch onFinish={firstLaunch.finish} />
   }
 
+  const SidebarIcon = effectiveSidebarOpen ? XIcon : MenuIcon
   return (
-    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}`}>
+    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
       {isMobileShell && effectiveSidebarMounted ? (
         <button
           type="button"
@@ -252,30 +266,45 @@ export function AppShell() {
           onClick={() => setEffectiveSidebarOpen(false)}
         />
       ) : null}
+      <ResizablePanelGroup orientation="horizontal" disabled={isMobileShell || settingsOpen} onLayoutChanged={onLayoutChanged}>
+      <ResizablePanel id="sidebar-panel" panelRef={sidebarPanelRef} groupResizeBehavior="preserve-pixel-size"
+        defaultSize={isMobileShell ? 0 : effectiveSidebarOpen ? sidebarWidth : titlebarToggle ? 0 : sidebarRailWidth}
+        minSize={isMobileShell || !effectiveSidebarOpen ? 0 : SIDEBAR_MIN_WIDTH}
+        maxSize={isMobileShell ? 0 : effectiveSidebarOpen ? SIDEBAR_MAX_WIDTH : titlebarToggle ? 0 : sidebarRailWidth}
+        style={{ overflow: 'visible' }}>
       <div
         id="sidebar-shell"
         data-testid="sidebar-shell"
         data-state={effectiveSidebarVisible ? 'open' : 'closed'}
         data-mobile={isMobileShell ? 'true' : 'false'}
         className={`sidebar-shell${isMobileShell ? ' sidebar-shell--mobile' : ''}`}
-        style={isMobileShell ? undefined : { '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+        style={isMobileShell ? undefined : { width: '100%', height: '100%', '--sidebar-width': effectiveSidebarOpen ? '100%' : `${sidebarWidth}px` } as React.CSSProperties}
         {...sidebarHiddenProps}
       >
         {effectiveSidebarMounted ? (
           <Sidebar isMobile={isMobileShell} onRequestClose={() => setEffectiveSidebarOpen(false)} />
         ) : null}
       </div>
-      {!isMobileShell && effectiveSidebarOpen ? (
-        <SidebarResizeHandle width={sidebarWidth} setWidth={setSidebarWidth} inert={settingsOpen} />
-      ) : null}
+      </ResizablePanel>
+      {!isMobileShell && effectiveSidebarOpen ? <ResizableHandle aria-label={t('sidebar.resize')} disabled={settingsOpen} className="w-1.5" /> : null}
+      <ResizablePanel id="main-panel" minSize={0} className="flex min-w-0">
       <main
         id="content-area"
         data-sidebar-state={effectiveSidebarVisible ? 'open' : 'closed'}
         className={`min-w-0 flex-1 flex flex-col overflow-hidden${isMobileShell ? ' app-shell-main--mobile' : ''}`}
       >
         {/* Kept outside the inert area and above the settings overlay so the
-            window can still be moved, minimised or closed while settings is open. */}
-        {tauriRuntime && !isMobileShell ? <WindowDragStrip /> : null}
+            window can still be moved, minimised or closed while settings is open.
+            On macOS a session's header is the title row itself, so the strip is
+            only needed there while settings covers that header; it then floats
+            over the header instead of pushing the page down. */}
+        {titlebarToggle && (!(macTitlebar && pageHasSessionHeader) || settingsOpen) ? (
+          <WindowDragStrip
+            tall={!pageHasSessionHeader}
+            mac={macTitlebar}
+            floating={macTitlebar && pageHasSessionHeader}
+          />
+        ) : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" {...behindSettingsProps}>
         {isMobileShell ? (
           <div
@@ -291,9 +320,7 @@ export function AppShell() {
               onClick={toggleEffectiveSidebar}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
             >
-              <span className="material-symbols-outlined text-[20px]">
-                {effectiveSidebarOpen ? 'close' : 'menu'}
-              </span>
+              <SidebarIcon aria-hidden="true" size={20} />
             </button>
             {isActiveChatTab ? (
               <div className="min-w-0 flex-1">
@@ -310,7 +337,11 @@ export function AppShell() {
                   {activeSession?.messageCount !== undefined && activeSession.messageCount > 0 ? (
                     <>
                       {activeTab?.status === 'running' ? <span aria-hidden="true">·</span> : null}
-                      <span>{t('session.messages', { count: activeSession.messageCount })}</span>
+                      <span>
+                        {activeSession.messageCountExact === false
+                          ? t('session.messagesAtLeast', { count: activeSession.messageCount })
+                          : t('session.messages', { count: activeSession.messageCount })}
+                      </span>
                     </>
                   ) : null}
                   {mobileSessionUpdated ? (
@@ -327,8 +358,16 @@ export function AppShell() {
         <ContentRouter />
         </div>
       </main>
+      </ResizablePanel>
+      </ResizablePanelGroup>
+      {macTitlebar ? (
+        <TitlebarSidebarToggle
+          className="window-no-drag fixed z-[60]"
+          style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
+        />
+      ) : null}
+      {desktopShell ? <BrowserGuestLayer /> : null}
       <SettingsModal />
-      <ToastContainer />
       <CommandPalette />
       <UpdateChecker />
     </div>
@@ -337,83 +376,25 @@ export function AppShell() {
 
 /**
  * Window drag area above the page content (the tab bar used to provide it).
- * macOS draws its traffic lights over the sidebar, so a slim strip is enough;
- * Windows has no native frame and needs room for the window buttons.
+ * On macOS it is the title row of pages without a session header, lined up with
+ * the traffic lights; the sidebar toggle floats over it. Elsewhere it holds the
+ * sidebar toggle and, on Windows, the window buttons: slim above a session,
+ * whose header also moves the window, and as tall as that header otherwise.
  */
-function WindowDragStrip() {
+function WindowDragStrip({ tall, mac, floating = false }: { tall: boolean; mac: boolean; floating?: boolean }) {
   return (
     <div
       data-testid="window-drag-strip"
-      className={`relative z-[60] flex shrink-0 items-stretch select-none ${showWindowControls ? 'h-8' : 'h-3'}`}
+      style={mac ? { height: 'var(--titlebar-height)' } : undefined}
+      className={`window-drag-region ${floating ? 'fixed inset-x-0 top-0' : 'relative'} z-[60] flex shrink-0 items-stretch select-none ${mac ? '' : tall ? 'h-11' : 'h-8'}`}
     >
-      <div data-tauri-drag-region aria-hidden="true" className="min-w-0 flex-1" />
+      {mac ? null : (
+        <div className="flex items-center pl-3">
+          <TitlebarSidebarToggle />
+        </div>
+      )}
+      <div aria-hidden="true" className="min-w-0 flex-1" />
       <WindowControls />
     </div>
-  )
-}
-
-const SIDEBAR_RESIZE_STEP = 10
-
-function SidebarResizeHandle({ width, setWidth, inert = false }: { width: number; setWidth: (w: number) => void; inert?: boolean }) {
-  const [dragState, setDragState] = useState<{ startX: number; startWidth: number } | null>(null)
-  const dragStateRef = useRef(dragState)
-
-  useEffect(() => {
-    dragStateRef.current = dragState
-  }, [dragState])
-
-  useEffect(() => {
-    if (!dragState) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const current = dragStateRef.current
-      if (!current) return
-      setWidth(current.startWidth + (event.clientX - current.startX))
-    }
-
-    const handlePointerUp = () => {
-      setDragState(null)
-    }
-
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerUp)
-
-    return () => {
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerUp)
-    }
-  }, [dragState, setWidth])
-
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-valuenow={width}
-      aria-valuemin={SIDEBAR_MIN_WIDTH}
-      aria-valuemax={SIDEBAR_MAX_WIDTH}
-      tabIndex={inert ? -1 : 0}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return
-        event.preventDefault()
-        setDragState({ startX: event.clientX, startWidth: width })
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'ArrowRight') {
-          event.preventDefault()
-          setWidth(width + SIDEBAR_RESIZE_STEP)
-        }
-        if (event.key === 'ArrowLeft') {
-          event.preventDefault()
-          setWidth(width - SIDEBAR_RESIZE_STEP)
-        }
-      }}
-      className="group relative z-10 flex w-1.5 shrink-0 cursor-col-resize items-stretch justify-center outline-none transition-colors hover:bg-[var(--color-border-focus)]/30 focus-visible:bg-[var(--color-surface-container)]"
-    />
   )
 }

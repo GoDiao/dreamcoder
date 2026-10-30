@@ -1,0 +1,88 @@
+.expandable-search {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 32px;
+  width: 32px;
+  color: var(--muted, #737373);
+  transition: width 200ms ease;
+  -webkit-app-region: no-drag;
+}
+.expandable-search.is-expanded {
+  width: var(--search-expanded-width, 220px);
+}
+.expandable-search-field {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  transition: background 200ms ease;
+}
+.is-expanded > .expandable-search-field {
+  background: var(--surface, #f4f4f4);
+}
+.expandable-search-field > .expandable-search-trigger,
+.expandable-search-field > .expandable-search-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.expandable-search-trigger:hover,
+.expandable-search-close:hover,
+.expandable-search-trigger:focus-visible,
+.expandable-search-close:focus-visible {
+  color: var(--text, #222);
+  background: var(--hover, #e9e9e9);
+}
+.expandable-search-field > input,
+.expandable-search-field > input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text, #222);
+  font: inherit;
+  font-size: 13px;
+}
+.expandable-search:not(.is-expanded) input {
+  visibility: hidden;
+}
+.expandable-search-field > input::-webkit-search-cancel-button {
+  display: none;
+}
+.expandable-search-results {
+  position: absolute;
+  z-index: 70;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(540px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 72px));
+  overflow: auto;
+  border: 1px solid var(--line, #dedede);
+  border-radius: 10px;
+  background: var(--paper, #fff);
+  color: var(--text, #222);
+  box-shadow: 0 12px 36px #0002;
+}
+@media (prefers-reduced-motion: reduce) {
+  .expandable-search,
+  .expandable-search-field {
+    transition: none;
+  }
+}

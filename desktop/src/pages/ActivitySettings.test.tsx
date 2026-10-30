@@ -107,14 +107,24 @@ describe('ActivitySettings', () => {
       name: /May 9, 2026: 4 sessions, 128K tokens/i,
     })
 
-    fireEvent.mouseEnter(todayCell)
+    act(() => todayCell.focus())
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     const tooltip = screen.getByRole('tooltip')
     expect(tooltip).toHaveTextContent('May 9, 2026')
     expect(tooltip).toHaveTextContent('4 sessions · 128K tokens')
     expect(tooltip).not.toHaveTextContent(/messages|tools/i)
-    expect(tooltip.className).toContain('--color-activity-tooltip-surface')
-    expect(tooltip.className).toContain('--color-activity-tooltip-border')
-    expect(todayCell.className).toContain('--color-activity-cell-border')
     expect(screen.queryByText('Selected day')).not.toBeInTheDocument()
+    fireEvent.keyDown(todayCell, { key: 'Escape' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('localizes the token metrics', async () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    render(<ActivitySettings />)
+
+    await flushActivityLoad()
+
+    expect(screen.getByText('128K token')).toBeInTheDocument()
   })
 })

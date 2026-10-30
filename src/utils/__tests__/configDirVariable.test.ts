@@ -10,14 +10,14 @@ const CLAUDE_VARIABLE = ['CLAUDE', 'CONFIG', 'DIR'].join('_')
 const VARIABLE_USE = new RegExp(`(?<![\\\\/])\\b${CLAUDE_VARIABLE}\\b`)
 
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..')
-const SCANNED_DIRS = ['src', 'scripts', 'desktop/src', 'desktop/src-tauri/src', 'desktop/scripts']
+const SCANNED_DIRS = ['src', 'scripts', 'desktop/src', 'desktop/electron', 'desktop/scripts']
 const SCANNED_EXTENSIONS = ['.ts', '.tsx', '.rs', '.sh']
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'target'])
 
 // Each entry is a file and a substring of the one line allowed to use the name.
 const ALLOWED: Array<{ file: string; line: string }> = [
   // The portable folder next to the executable keeps its old name.
-  { file: 'desktop/src-tauri/src/lib.rs', line: 'pub const PORTABLE_DIR_NAME' },
+  { file: 'desktop/electron/appMode.ts', line: 'export const PORTABLE_DIR_NAME' },
   // Locating Claude Code's directory to inherit its customizations.
   { file: 'src/utils/envUtils.ts', line: 'const CLAUDE_CODE_CONFIG_DIR_ENV' },
 ]

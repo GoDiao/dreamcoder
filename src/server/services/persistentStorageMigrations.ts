@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { normalizeLegacyDeepSeekManagedEnv } from '../../utils/providerManagedEnvCompat.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-export const CURRENT_PROVIDER_INDEX_SCHEMA_VERSION = 1
+export const CURRENT_PROVIDER_INDEX_SCHEMA_VERSION = 2
 
 type MigrationReport = {
   migratedEntries: string[]
@@ -37,7 +37,7 @@ function isRecord(value: unknown): value is JsonObject {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
-function isProviderModels(value: unknown): value is JsonObject {
+function isLegacyProviderModels(value: unknown): value is JsonObject {
   return (
     isRecord(value) &&
     typeof value.main === 'string' &&
@@ -45,6 +45,10 @@ function isProviderModels(value: unknown): value is JsonObject {
     typeof value.sonnet === 'string' &&
     typeof value.opus === 'string'
   )
+}
+
+function isProviderModels(value: unknown): value is LegacyProviderModel[] {
+  return Array.isArray(value) && value.every(isLegacyProviderModel)
 }
 
 function isSavedProvider(value: unknown): value is JsonObject {
@@ -55,7 +59,7 @@ function isSavedProvider(value: unknown): value is JsonObject {
     typeof value.name === 'string' &&
     typeof value.apiKey === 'string' &&
     typeof value.baseUrl === 'string' &&
-    isProviderModels(value.models)
+    (isLegacyProviderModels(value.models) || isProviderModels(value.models))
   )
 }
 
@@ -129,7 +133,29 @@ function migrateProvidersIndex(value: unknown): JsonObject {
   }
 
   const { activeProviderId: _legacyActiveProviderId, ...rest } = value
-  const providers = value.providers.filter(isSavedProvider)
+  const providers = value.providers.filter(isSavedProvider).map((provider) => {
+    if (isProviderModels(provider.models)) {
+      return {
+        ...provider,
+        models: dedupeModels(provider.models),
+        ...(typeof provider.fastModel === 'string' && provider.models.some((model) => model.id === provider.fastModel)
+          ? { fastModel: provider.fastModel }
+          : {}),
+      }
+    }
+
+    const legacyModels = provider.models as JsonObject
+    const models = dedupeModels(['main', 'sonnet', 'opus', 'haiku'].map((role) => ({
+      id: typeof legacyModels[role] === 'string' ? legacyModels[role] as string : '',
+    })))
+    const main = typeof legacyModels.main === 'string' ? legacyModels.main : ''
+    const haiku = typeof legacyModels.haiku === 'string' ? legacyModels.haiku : ''
+    return {
+      ...provider,
+      models,
+      ...(haiku && haiku !== main ? { fastModel: haiku } : {}),
+    }
+  })
   const rawActiveId =
     typeof value.activeId === 'string'
       ? value.activeId
@@ -146,6 +172,17 @@ function migrateProvidersIndex(value: unknown): JsonObject {
     activeId,
     providers,
   }
+}
+
+function dedupeModels(models: LegacyProviderModel[]): LegacyProviderModel[] {
+  const seen = new Set<string>()
+  return models.flatMap((model) => {
+    const id = model.id.trim()
+    if (!id || seen.has(id)) return []
+    seen.add(id)
+    const name = model.name?.trim()
+    return [{ id, ...(name ? { name } : {}) }]
+  })
 }
 
 function migrateManagedSettings(value: unknown): JsonObject {
@@ -216,6 +253,10 @@ function migrateLegacyRootProvidersConfig(value: unknown): JsonObject | null {
     .filter(isLegacyRootProvider)
     .map((provider) => {
       const main = legacyProviderModelId(provider, value.activeModel)
+      const models = dedupeModels([
+        ...provider.models.filter((model) => model.id === main),
+        ...provider.models.filter((model) => model.id !== main),
+      ])
       return {
         id: provider.id,
         presetId: 'custom',
@@ -223,12 +264,7 @@ function migrateLegacyRootProvidersConfig(value: unknown): JsonObject | null {
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         apiFormat: 'anthropic',
-        models: {
-          main,
-          haiku: main,
-          sonnet: main,
-          opus: main,
-        },
+        models,
         ...(provider.notes !== undefined && { notes: provider.notes }),
       }
     })
@@ -260,16 +296,21 @@ function buildManagedSettingsForMigratedProvider(provider: JsonObject | undefine
   if (!provider || !isProviderModels(provider.models)) return null
   const apiKey = typeof provider.apiKey === 'string' ? provider.apiKey : ''
   const baseUrl = typeof provider.baseUrl === 'string' ? provider.baseUrl : ''
-  if (!apiKey || !baseUrl) return null
+  const main = provider.models[0]?.id ?? ''
+  if (!apiKey || !baseUrl || !main) return null
+  const fast = typeof provider.fastModel === 'string' && provider.models.some((model) => model.id === provider.fastModel)
+    ? provider.fastModel
+    : main
 
   return {
     env: {
       ANTHROPIC_BASE_URL: baseUrl,
       ANTHROPIC_AUTH_TOKEN: apiKey,
-      ANTHROPIC_MODEL: provider.models.main,
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: provider.models.haiku,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: provider.models.sonnet,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: provider.models.opus,
+      ANTHROPIC_MODEL: main,
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: fast,
+      ANTHROPIC_SMALL_FAST_MODEL: fast,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: main,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: main,
     },
   }
 }

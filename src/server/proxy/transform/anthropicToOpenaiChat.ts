@@ -35,6 +35,8 @@ export function anthropicToOpenaiChat(
     stream: body.stream,
   }
 
+  if (body.stream) result.stream_options = { include_usage: true }
+
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
 

@@ -1,3 +1,4 @@
+import { luminance } from './testColors'
 import { describe, expect, it } from 'vitest'
 
 import css from './globals.css?raw'
@@ -116,12 +117,6 @@ function auroraColor(token: string): string {
   return alias ? auroraColor(alias[1]!) : value
 }
 
-function luminance(color: string): number {
-  const channels = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16) / 255)
-  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-  return linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
-}
-
 it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary buttons', () => {
   const pairs = [
     ['--color-text-primary', '--color-surface'],
@@ -132,12 +127,18 @@ it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary but
     ['--color-btn-primary-fg', '--color-primary'],
     ['--color-btn-primary-fg', '--color-primary-container'],
     ['--color-on-error', '--color-error'],
-    ...['fg', 'comment', 'string', 'keyword', 'function', 'number', 'property', 'type', 'punctuation']
-      .map((syntax) => [`--color-code-${syntax}`, '--color-code-bg']),
+    ['--color-code-fg', '--color-code-bg'],
   ]
   for (const [foreground, background] of pairs) {
     const values = [luminance(auroraColor(foreground!)), luminance(auroraColor(background!))]
     const contrast = (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)
     expect(contrast, `${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5)
   }
+})
+
+describe('window drag regions', () => {
+  it('drag the window from title areas but leave their controls clickable', () => {
+    expect(normalizedCss).toMatch(/\.window-drag-region \{\s*-webkit-app-region: drag;\s*app-region: drag;\s*\}/)
+    expect(normalizedCss).toMatch(/\.window-drag-region :is\(button, input, textarea, select, a, \[role="button"\][^)]*\),\s*\.window-no-drag \{\s*-webkit-app-region: no-drag;\s*app-region: no-drag;\s*\}/)
+  })
 })

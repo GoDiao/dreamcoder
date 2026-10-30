@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { sendToSession, getActiveSessionIds } from '../ws/handler.js'
+import { sendToTeam, setTeamMembership, type TeamRole } from '../ws/handler.js'
 import type { ServerMessage, TeamMemberStatus } from '../ws/protocol.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
@@ -42,7 +42,7 @@ export class TeamWatcher {
       entries = fs.readdirSync(teamsDir, { withFileTypes: true })
     } catch {
       for (const [name] of this.lastSnapshots) {
-        this.broadcast({ type: 'team_deleted', teamName: name })
+        this.deleteTeam(name)
       }
       this.lastSnapshots.clear()
       return
@@ -64,6 +64,7 @@ export class TeamWatcher {
       }
 
       const lastContent = this.lastSnapshots.get(teamName)
+      setTeamMembership(teamName, this.extractSessionRoles(content))
 
       if (lastContent === undefined) {
         this.lastSnapshots.set(teamName, content)
@@ -89,9 +90,30 @@ export class TeamWatcher {
     for (const [name] of this.lastSnapshots) {
       if (!currentTeamNames.has(name)) {
         this.lastSnapshots.delete(name)
-        this.broadcast({ type: 'team_deleted', teamName: name })
+        this.deleteTeam(name)
       }
     }
+  }
+
+  extractSessionRoles(content: string): Map<string, TeamRole> {
+    const roles = new Map<string, TeamRole>()
+    let config: Record<string, unknown>
+    try {
+      config = JSON.parse(content) as Record<string, unknown>
+    } catch {
+      return roles
+    }
+    const members = Array.isArray(config.members) ? config.members as Array<Record<string, unknown>> : []
+    for (const member of members) {
+      if (typeof member?.sessionId === 'string' && member.sessionId) roles.set(member.sessionId, 'member')
+    }
+    if (typeof config.leadSessionId === 'string' && config.leadSessionId) roles.set(config.leadSessionId, 'lead')
+    return roles
+  }
+
+  private deleteTeam(teamName: string): void {
+    this.broadcast({ type: 'team_deleted', teamName })
+    setTeamMembership(teamName, new Map())
   }
 
   extractMemberStatuses(config: Record<string, unknown>): TeamMemberStatus[] {
@@ -265,11 +287,8 @@ export class TeamWatcher {
     }
   }
 
-  private broadcast(message: ServerMessage): void {
-    const sessionIds = getActiveSessionIds()
-    for (const id of sessionIds) {
-      sendToSession(id, message)
-    }
+  private broadcast(message: ServerMessage & { teamName: string }): void {
+    sendToTeam(message.teamName, message)
   }
 }
 

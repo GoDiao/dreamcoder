@@ -212,8 +212,8 @@ async function testRealLLMChat() {
 
   console.log('   Message sent, waiting for response...')
 
-  const statusMsg = await client.waitForType('status', 10000)
-  console.log(`   Got status: ${statusMsg.state} ${statusMsg.verb || ''}`)
+  const patchMsg = await client.waitForType('session_patch', 10000)
+  console.log(`   Got state change: ${Object.keys(patchMsg.changes ?? {}).join(', ')}`)
 
   const responseMsg = await client.waitForAny(
     ['content_delta', 'content_start', 'error', 'message_complete'],

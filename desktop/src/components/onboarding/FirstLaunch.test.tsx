@@ -22,7 +22,7 @@ const createdProvider: SavedProvider = {
   apiKey: 'test-key',
   baseUrl: 'https://example.invalid/anthropic',
   apiFormat: 'anthropic',
-  models: { main: 'model-main', haiku: '', sonnet: '', opus: '' },
+  models: [{ id: 'model-main' }],
 }
 
 vi.mock('../settings/ProviderFormModal', () => ({
@@ -57,12 +57,7 @@ const deepseekPreset: ProviderPreset = {
   name: 'DeepSeek',
   baseUrl: 'https://example.invalid/anthropic',
   apiFormat: 'anthropic',
-  defaultModels: {
-    main: 'model-main',
-    haiku: '',
-    sonnet: '',
-    opus: '',
-  },
+  defaultModels: [{ id: 'model-main' }],
   needsApiKey: true,
   websiteUrl: 'https://example.invalid',
 }

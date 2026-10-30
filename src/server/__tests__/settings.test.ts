@@ -305,6 +305,11 @@ describe('SettingsService', () => {
     await expect(svc.setPermissionMode('invalid')).rejects.toThrow('Invalid permission mode')
   })
 
+  it('does not offer dontAsk as the default for new sessions', async () => {
+    const svc = new SettingsService()
+    await expect(svc.setPermissionMode('dontAsk')).rejects.toThrow('Invalid permission mode')
+  })
+
   it('should preserve other settings when updating permission mode', async () => {
     const svc = new SettingsService()
     await svc.updateUserSettings({ theme: 'dark' })
@@ -513,7 +518,7 @@ describe('Models API', () => {
     expect(res.status).toBe(400)
   })
 
-  it('GET /api/models/current should prefer dreamcoder managed model over global user model when provider is active', async () => {
+  it('GET /api/models/current should use the active provider main model over stale saved model keys', async () => {
     const settingsSvc = new SettingsService()
     await settingsSvc.updateUserSettings({ model: 'kimi-k2.6' })
 
@@ -524,25 +529,29 @@ describe('Models API', () => {
       baseUrl: 'https://open.bigmodel.cn/api/anthropic',
       apiKey: 'test-key',
       apiFormat: 'anthropic',
-      models: {
-        main: 'glm-5.1',
-        haiku: 'glm-4.5-air',
-        sonnet: 'glm-5-turbo',
-        opus: 'glm-5.1',
-      },
+      models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+      fastModel: 'glm-4.5-air',
     })
     await providerSvc.activateProvider(provider.id)
-    await providerSvc.updateManagedSettings({ model: 'glm-5-turbo' })
+    await providerSvc.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
 
     const { req, url, segments } = makeRequest('GET', '/api/models/current')
     const res = await handleModelsApi(req, url, segments)
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.model.id).toBe('glm-5-turbo')
+    expect(body.model.id).toBe('glm-5.1')
+    expect(body.model.context).toBe('')
+
+    await providerSvc.updateProvider(provider.id, {
+      models: [{ id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }, { id: 'glm-5.1' }],
+    })
+    const after = makeRequest('GET', '/api/models/current')
+    const afterBody = await (await handleModelsApi(after.req, after.url, after.segments)).json()
+    expect(afterBody.model.id).toBe('glm-5-turbo')
   })
 
-  it('PUT /api/models/current should persist to dreamcoder managed settings when provider is active', async () => {
+  it('PUT /api/models/current should not write a global model key when provider is active', async () => {
     const settingsSvc = new SettingsService()
     const providerSvc = new ProviderService()
     const provider = await providerSvc.addProvider({
@@ -551,24 +560,21 @@ describe('Models API', () => {
       baseUrl: 'https://open.bigmodel.cn/api/anthropic',
       apiKey: 'test-key',
       apiFormat: 'anthropic',
-      models: {
-        main: 'glm-5.1',
-        haiku: 'glm-4.5-air',
-        sonnet: 'glm-5-turbo',
-        opus: 'glm-5.1',
-      },
+      models: [{ id: 'glm-5.1' }, { id: 'glm-5-turbo' }, { id: 'glm-4.5-air' }],
+      fastModel: 'glm-4.5-air',
     })
     await providerSvc.activateProvider(provider.id)
 
     const putReq = makeRequest('PUT', '/api/models/current', {
-      modelId: 'glm-5-turbo',
+      modelId: 'qwen3.6:27b',
     })
     const putRes = await handleModelsApi(putReq.req, putReq.url, putReq.segments)
     expect(putRes.status).toBe(200)
+    expect((await putRes.json()).model).toBe('qwen3.6:27b')
 
     const managedSettings = await providerSvc.getManagedSettings()
-    expect(managedSettings.model).toBe('glm-5-turbo')
-    expect((managedSettings.env as Record<string, string>).CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
+    expect(managedSettings.model).toBeUndefined()
+    expect(managedSettings.modelContext).toBeUndefined()
 
     const globalSettings = await settingsSvc.getUserSettings()
     expect(globalSettings.model).toBeUndefined()
@@ -677,7 +683,18 @@ describe('Status API', () => {
     const body = await res.json()
     expect(body.platform).toBeDefined()
     expect(body.arch).toBeDefined()
-    expect(body.configDir).toBeDefined()
+    expect(body.configDir).toBe(tmpDir)
+    expect(body.defaultConfigDir).toBe(path.join(os.homedir(), '.dreamcoder').normalize('NFC'))
+  })
+
+  it('reports the same active and default directory without an override', async () => {
+    delete process.env.DREAMCODER_CONFIG_DIR
+    const { req, url, segments } = makeRequest('GET', '/api/status/diagnostics')
+    const response = await handleStatusApi(req, url, segments)
+    process.env.DREAMCODER_CONFIG_DIR = tmpDir
+    const body = await response.json()
+    expect(body.configDir).toBe(path.join(os.homedir(), '.dreamcoder').normalize('NFC'))
+    expect(body.defaultConfigDir).toBe(body.configDir)
   })
 
   it('GET /api/status/usage should return token usage', async () => {

@@ -1,0 +1,165 @@
+[
+  {
+    "kind": "page",
+    "name": "页面",
+    "description": "按顺序组织文字、图片和组件，可嵌入页面或白板，也可展开编辑。",
+    "scenarios": [
+      "文章、报告和说明页面。",
+      "在白板上放入一份可编辑的文档。"
+    ],
+    "effects": [
+      "原生文字编辑与纵向阅读。",
+      "与白板互相嵌套，展开后编辑同一份内容。"
+    ],
+    "version": "1.0.0",
+    "insertion": {
+      "nodeType": "surface",
+      "surfaceKind": "page"
+    },
+    "defaultData": {
+      "title": "Page"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "content": {
+          "type": "array",
+          "maxItems": 12000,
+          "items": {
+            "type": "object"
+          }
+        },
+        "layout": {
+          "type": "object"
+        },
+        "surfaceViews": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "空白页面",
+        "data": {
+          "title": "Page"
+        }
+      },
+      {
+        "name": "内容示例",
+        "data": {
+          "title": "内容示例",
+          "content": [
+            {
+              "type": "richText",
+              "attrs": {
+                "id": "example-content",
+                "name": "内容"
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "文字、图片和组件都可以放在这里。"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "board",
+    "name": "白板",
+    "description": "在独立空间中摆放组件和绘画，可嵌入页面或其他白板。",
+    "scenarios": [
+      "在文档中嵌入一块分析白板。",
+      "组织页面、图片和组件之间的空间关系。"
+    ],
+    "effects": [
+      "独立平移、缩放、吸附与绘画。",
+      "支持在内部放入页面，并逐层展开。"
+    ],
+    "version": "1.0.0",
+    "insertion": {
+      "nodeType": "surface",
+      "surfaceKind": "board"
+    },
+    "defaultData": {
+      "title": "Board"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "content": {
+          "type": "array",
+          "maxItems": 12000,
+          "items": {
+            "type": "object"
+          }
+        },
+        "layout": {
+          "type": "object"
+        },
+        "surfaceViews": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "空白白板",
+        "data": {
+          "title": "Board"
+        }
+      },
+      {
+        "name": "内容示例",
+        "data": {
+          "title": "内容示例",
+          "content": [
+            {
+              "type": "richText",
+              "attrs": {
+                "id": "example-content",
+                "name": "内容"
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "文字、图片和组件都可以放在这里。"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "layout": {
+            "example-content": {
+              "x": 0,
+              "y": 0,
+              "width": 360
+            }
+          }
+        }
+      }
+    ]
+  }
+]

@@ -228,9 +228,9 @@ describe('remote H5 auth and CORS integration', () => {
     await expect(assetResponse.text()).resolves.toContain('window.__h5')
   })
 
-  test('finds Tauri packaged H5 resources under Resources/_up_/dist', async () => {
-    const appRoot = path.join(tmpDir, 'Fake.app', 'Contents', 'MacOS')
-    const mappedDistDir = path.join(tmpDir, 'Fake.app', 'Contents', 'Resources', '_up_', 'dist')
+  test('finds packaged H5 resources next to the sidecar folder', async () => {
+    const appRoot = path.join(tmpDir, 'Fake.app', 'Contents', 'Resources', 'bin')
+    const mappedDistDir = path.join(tmpDir, 'Fake.app', 'Contents', 'Resources', 'dist')
     delete process.env.CLAUDE_H5_DIST_DIR
     process.env.CLAUDE_APP_ROOT = appRoot
 
@@ -266,15 +266,15 @@ describe('remote H5 auth and CORS integration', () => {
     })
   })
 
-  test('allows the Tauri desktop WebView origin to control the local sidecar without H5 token', async () => {
+  test('allows the desktop app origin to control the local sidecar without H5 token', async () => {
     const response = await fetch(`${baseUrl}/api/status`, {
       headers: {
-        Origin: 'http://tauri.localhost',
+        Origin: 'dreamcoder://localhost',
       },
     })
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://tauri.localhost')
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('dreamcoder://localhost')
     await expect(response.json()).resolves.toMatchObject({
       status: 'ok',
     })
@@ -713,12 +713,12 @@ describe('remote H5 auth and CORS integration', () => {
     })
   })
 
-  test('keeps Tauri loopback REST requests tokenless when H5 access is enabled', async () => {
+  test('keeps desktop app loopback REST requests tokenless when H5 access is enabled', async () => {
     await enableH5Access()
 
     const response = await fetch(`${baseUrl}/api/status`, {
       headers: {
-        Origin: 'http://tauri.localhost',
+        Origin: 'dreamcoder://localhost',
       },
     })
 

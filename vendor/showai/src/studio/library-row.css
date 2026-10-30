@@ -1,0 +1,156 @@
+.studio-tree-row {
+  --row-menu-size: 28px;
+  --row-menu-inset: 4px;
+  position: relative;
+}
+.studio-context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.studio-tree-row[data-library-draggable="true"] .studio-tree-main {
+  cursor: grab;
+}
+.studio-tree-row[data-library-draggable="true"] {
+  touch-action: none;
+}
+.library-drag-active,
+.library-drag-active * {
+  user-select: none !important;
+}
+.studio-tree-row > .studio-tree-main {
+  padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  transition: padding-right 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.studio-tree-row[data-pinned="true"] > .studio-tree-main {
+  padding-right: var(--row-menu-inset);
+}
+.studio-tree-pin-slot {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--row-menu-size);
+  height: 18px;
+}
+.studio-tree-row > .studio-row-menu {
+  position: absolute;
+  top: 50%;
+  right: var(--row-menu-inset);
+  width: var(--row-menu-size);
+  margin: 0;
+  transform: translateY(-50%);
+  z-index: 1;
+  transition:
+    opacity 120ms ease,
+    background 100ms ease;
+}
+.studio-tree-row:is(
+    :hover,
+    :focus-within,
+    :has(> .studio-row-menu[aria-expanded="true"])
+  )
+  > .studio-row-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 40ms, 0ms;
+}
+.studio-tree-row[data-pinned="true"]:is(
+    :hover,
+    :focus-within,
+    :has(> .studio-row-menu[aria-expanded="true"])
+  )
+  > .studio-tree-main {
+  padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+}
+@media (hover: none) {
+  .studio-tree-row[data-pinned="true"] > .studio-tree-main {
+    padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  }
+  .studio-tree-row > .studio-row-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-tree-row > .studio-tree-main,
+  .studio-tree-row > .studio-row-menu {
+    transition: none;
+  }
+}
+.studio-context-menu-control {
+  padding: 8px;
+  min-width: 0;
+}
+.studio-context-menu-control-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.studio-context-menu-control-label > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* The placeholder is a translucent copy in normal flow; siblings truly reflow. */
+.library-drag-placeholder {
+  opacity: 0.24;
+  pointer-events: none;
+  user-select: none;
+}
+.library-drag-placeholder .studio-row-menu {
+  visibility: hidden;
+}
+.library-drag-ghost,
+.studio-page-list.library-drag-ghost {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 10000;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+  opacity: 0.78;
+  background: var(--paper, var(--bg));
+  border-radius: 7px;
+  box-shadow: 0 7px 20px #00000012;
+  will-change: transform;
+}
+.library-drag-ghost > :is(.studio-tree-row, .studio-page-list-row) {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+.library-drag-ghost .studio-row-menu {
+  visibility: hidden;
+}
+.library-drag-active .studio-page-list-row {
+  touch-action: none;
+}
+.library-drag-active [data-library-id] {
+  will-change: transform;
+}
+.studio-context-menu-group {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.studio-context-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.studio-context-menu-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: normal;
+  max-width: 260px;
+}
+

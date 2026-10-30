@@ -6,19 +6,11 @@ import { normalizeJsonObject, readRecoverableJsonFile } from './recoverableJsonF
 import { ensurePersistentStorageUpgraded } from './persistentStorageMigrations.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-
-const VALID_PERMISSION_MODES = [
-  'default',
-  'acceptEdits',
-  'plan',
-  'bypassPermissions',
-  'dontAsk',
-] as const
-
-export type PermissionMode = (typeof VALID_PERMISSION_MODES)[number]
+import { DEFAULT_PERMISSION_MODES, type DefaultPermissionMode } from '../ws/protocol.js'
+import { isDefaultPermissionMode } from './permissionModes.js'
 
 export class SettingsService {
-  private static writeLocks = new Map<string, Promise<void>>()
+  private static writeLocks = new Map<string, Promise<unknown>>()
   private projectRoot?: string
 
   constructor(projectRoot?: string) {
@@ -144,18 +136,16 @@ export class SettingsService {
     })
   }
 
-  async getPermissionMode(): Promise<string> {
+  async getPermissionMode(): Promise<DefaultPermissionMode> {
     const settings = await this.getUserSettings()
     const mode = settings.defaultMode
-    return typeof mode === 'string' && VALID_PERMISSION_MODES.includes(mode as PermissionMode)
-      ? mode
-      : 'default'
+    return isDefaultPermissionMode(mode) ? mode : 'default'
   }
 
   async setPermissionMode(mode: string): Promise<void> {
-    if (!VALID_PERMISSION_MODES.includes(mode as PermissionMode)) {
+    if (!isDefaultPermissionMode(mode)) {
       throw ApiError.badRequest(
-        `Invalid permission mode: "${mode}". Valid modes: ${VALID_PERMISSION_MODES.join(', ')}`,
+        `Invalid permission mode: "${mode}". Valid modes: ${DEFAULT_PERMISSION_MODES.join(', ')}`,
       )
     }
     await this.updateUserSettings({ defaultMode: mode })

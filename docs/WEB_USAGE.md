@@ -2,7 +2,7 @@
 
 English | [Chinese](WEB_USAGE_zh.md)
 
-This guide covers local development on Ubuntu 24.04, with Bun running the backend and Node.js/npm running the Vite frontend. Daily use does not require reinstalling dependencies, rebuilding the frontend, or compiling Tauri and the sidecar.
+This guide covers local development on Ubuntu 24.04, with Bun running the backend and Node.js/npm running the Vite frontend. Daily use does not require reinstalling dependencies, rebuilding the frontend, or building the desktop app and the sidecar.
 
 Ensure `bun`, `node`, and `npm` are available on your `PATH`. Node.js 24 LTS is recommended; the tested versions were Node.js `v24.22.0`, npm `11.19.1`, and Bun `1.4.2`. Replace `/path/to/dreamcoder` with your checkout directory.
 

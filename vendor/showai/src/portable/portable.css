@@ -1,0 +1,387 @@
+@charset "UTF-8";
+.portable-draft-note {
+  padding: 10px 24px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+:root {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  --bg: #fff;
+  --surface: #fff;
+  --text: #292d29;
+  --text-secondary: #70756f;
+  --muted: #8a8f87;
+  --border: #e6e8e1;
+  --accent: #34644e;
+  --accent-soft: #edf3ea;
+  --hover: #f2f4ef;
+  --editor-bg: #fff;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #191d1a;
+  --surface: #202621;
+  --text: #e6eae3;
+  --text-secondary: #a0aaa0;
+  --muted: #8c978c;
+  --border: #363f35;
+  --accent: #a0c7a3;
+  --accent-soft: #283b2d;
+  --hover: #293029;
+  --editor-bg: #191d1a;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+}
+button:hover {
+  background: var(--hover);
+}
+button,
+a,
+input,
+select {
+  outline-offset: 4px;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+}
+a {
+  color: var(--accent);
+}
+html {
+  scroll-behavior: smooth;
+}
+.portable-options {
+  position: fixed;
+  right: 24px;
+  top: 20px;
+  z-index: 30;
+}
+.portable-options-trigger {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+.portable-options-menu {
+  position: absolute;
+  right: 0;
+  top: 43px;
+  width: 178px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px #17221512;
+  animation: menu-appear 120ms ease-out;
+}
+.portable-options-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: left;
+}
+.portable-options-menu svg {
+  color: var(--text-secondary);
+}
+/* The conversation reference menu opens at the pointer with the same items. */
+.portable-context-menu {
+  position: fixed;
+  right: auto;
+  z-index: 40;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+}
+.portable-reference-status {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 40;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px #17221512;
+  color: var(--text-secondary);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.portable-document {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 90px 44px 96px;
+}
+.portable-title {
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  font-size: 42px;
+  line-height: 1.22;
+  margin: 0 0 32px;
+  overflow-wrap: anywhere;
+}
+.portable-page-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  margin-bottom: 32px;
+}
+.portable-page-icon {
+  flex-shrink: 0;
+}
+.portable-page-heading .portable-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.portable-partial .portable-document {
+  padding: 24px;
+}
+.portable-partial .surface-reading-heading:empty {
+  display: none;
+}
+/* Conversation components sit directly in the host's message column. */
+.portable-component .portable-document {
+  padding: 4px 0;
+}
+/* Reader typography is independent of the editing application. */
+.portable-content {
+  overflow-wrap: anywhere;
+}
+.portable-content > :first-child {
+  margin-top: 0;
+}
+.portable-content p {
+  white-space: pre-wrap;
+}
+.portable-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 22px auto;
+  border-radius: 5px;
+  object-fit: contain;
+}
+.portable-table-scroll > table {
+  table-layout: fixed;
+}
+.portable-table-scroll > table > tbody > tr > th,
+.portable-table-scroll > table > tbody > tr > td {
+  min-width: 70px;
+}
+.portable-callout {
+  display: flex;
+  gap: 11px;
+  margin: 22px 0;
+  border-radius: 6px;
+  padding: 14px 17px;
+  background: var(--accent-soft);
+}
+.portable-callout.tone-sage {
+  background: color-mix(in srgb, #a9c495 18%, var(--surface));
+}
+.portable-callout.tone-sand {
+  background: color-mix(in srgb, #d5b677 19%, var(--surface));
+}
+.portable-callout.tone-blue {
+  background: color-mix(in srgb, #93b9cd 18%, var(--surface));
+}
+.portable-callout.tone-rose {
+  background: color-mix(in srgb, #cb9493 16%, var(--surface));
+}
+.portable-callout-icon {
+  flex: 0 0 24px;
+  font-size: 18px;
+}
+.portable-callout > div {
+  min-width: 0;
+  flex: 1;
+}
+.portable-callout > div > :first-child {
+  margin-top: 0;
+}
+.portable-callout > div > :last-child {
+  margin-bottom: 0;
+}
+.portable-toggle {
+  margin: 17px 0;
+}
+.portable-toggle summary {
+  cursor: pointer;
+  font-weight: 550;
+}
+.portable-toggle summary::marker {
+  color: var(--accent);
+}
+.portable-toggle-body {
+  border-left: 1px solid var(--border);
+  margin: 8px 0 0 7px;
+  padding-left: 21px;
+}
+.portable-widget {
+  margin: 25px 0;
+}
+.portable-error {
+  max-width: 600px;
+  margin: 15vh auto;
+  padding: 30px;
+}
+.portable-error h1 {
+  font-size: 24px;
+  font-weight: 500;
+}
+.portable-error p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+.portable-network-note {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: -12px 0 20px;
+}
+.portable-network-error {
+  padding: 12px 14px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  background: color-mix(in srgb, var(--danger) 6%, var(--paper));
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.portable-network-error p {
+  margin: 0;
+}
+.portable-network-error details {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.portable-network-error summary {
+  cursor: pointer;
+  width: fit-content;
+}
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 700px) {
+  .portable-options {
+    right: 14px;
+    top: 12px;
+  }
+  .portable-document {
+    padding: 76px 22px 64px;
+  }
+  .portable-title {
+    font-size: 32px;
+    margin-bottom: 24px;
+  }
+  .portable-page-heading {
+    margin-bottom: 24px;
+  }
+  .portable-table-scroll > table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+@media print {
+  .portable-options,
+  .portable-context-menu,
+  .portable-reference-status {
+    display: none !important;
+  }
+  .portable-document {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .portable-title {
+    font-size: 30px;
+  }
+  .portable-content {
+    font-size: 11pt;
+  }
+  body,
+  :root {
+    --bg: #fff;
+    --surface: #fff;
+    --text: #111;
+    --text-secondary: #444;
+    --border: #ddd;
+    background: white !important;
+    color: black !important;
+  }
+  a {
+    color: inherit;
+  }
+  button {
+    border: 0;
+  }
+  table,
+  figure,
+  .widget-block {
+    break-inside: avoid;
+  }
+}
+.portable-link-target {
+  animation: portable-link-target 1.6s ease-out;
+  border-radius: 6px;
+}
+@keyframes portable-link-target {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #50745e) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}

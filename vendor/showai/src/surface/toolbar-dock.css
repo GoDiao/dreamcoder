@@ -1,0 +1,562 @@
+.surface-toolbar.board-dockable-toolbar {
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  max-height: none;
+  overflow: visible;
+}
+.board-toolbar-primary,
+.board-toolbar-properties,
+.board-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 4px 20px #0000000a;
+}
+.board-toolbar-primary {
+  width: max-content;
+  max-width: calc(var(--board-toolbar-width, 100dvw) - 24px);
+  flex-wrap: nowrap;
+}
+.board-view-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line, var(--border));
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.board-toolbar-primary > .surface-extra-actions > .surface-toolbar-divider {
+  display: none;
+}
+.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"],
+    [data-dock="top"]
+  )
+  .board-tool-shortcuts {
+  display: none;
+}
+.board-dockable-toolbar[data-dock="bottom"] .board-tool-shortcuts {
+  bottom: calc(100% + 5px);
+}
+.board-toolbar-properties .board-style-section > button {
+  min-height: 24px;
+  height: 24px;
+  padding: 2px 4px;
+}
+.board-toolbar-primary > .surface-extra-actions {
+  min-width: 0;
+}
+.board-toolbar-primary .board-tool-stack {
+  --board-tool-width: clamp(
+    24px,
+    calc(
+      (var(--board-toolbar-width, 100dvw) - 90px) /
+        var(--board-tool-count, 11) - 2px
+    ),
+    34px
+  );
+}
+.board-toolbar-properties {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-height: calc(var(--board-properties-reserve) - 8px);
+  box-sizing: border-box;
+  justify-content: center;
+}
+.board-toolbar-properties:empty {
+  display: none;
+}
+.board-toolbar-actions {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: calc(var(--board-toolbar-width, 100dvw) - 24px);
+  flex-wrap: wrap;
+}
+.board-toolbar-actions:not(
+  :has(button, summary, [role="status"], > .board-component-actions:not(:empty))
+) {
+  display: none;
+}
+.board-dockable-toolbar[data-dragging] {
+  opacity: 0.85;
+  user-select: none;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-primary {
+  flex-direction: column;
+  width: 54px;
+  max-width: 54px;
+  box-sizing: border-box;
+  max-height: calc(
+    var(--board-toolbar-height, 100dvh) - var(--board-properties-reserve) - 24px
+  );
+  padding-inline: 4px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-tool-stack {
+  flex: 0 1 auto;
+  min-height: 72px;
+  width: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  --board-tool-width: 34px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-tool-buttons {
+  grid-template-columns: var(--board-tool-width);
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-tool-buttons
+  button {
+  width: var(--board-tool-width);
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-properties {
+  width: 54px;
+  justify-content: start;
+  flex-direction: column;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-actions {
+  top: 0;
+  bottom: auto;
+  width: 54px;
+  box-sizing: border-box;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  max-height: calc(var(--board-toolbar-height, 100dvh) - 24px);
+  overflow-y: auto;
+}
+.board-dockable-toolbar[data-dock="left"] .board-toolbar-actions {
+  left: calc(100% + 8px);
+}
+.board-dockable-toolbar[data-dock="right"] .board-toolbar-actions {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.board-dockable-toolbar[data-dock="top"] .board-toolbar-actions {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+.board-dockable-toolbar[data-dock="top"]:has(
+    .board-toolbar-actions button,
+    .board-toolbar-actions summary,
+    .board-toolbar-actions [role="status"],
+    .board-toolbar-actions > .board-component-actions:not(:empty)
+  )
+  .board-toolbar-properties {
+  top: calc(100% + 56px);
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  :is(.board-style-controls, .board-writing-options) {
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-slider {
+  width: 36px;
+  height: 84px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  :is(
+    .board-stroke-track,
+    .board-stroke-slider input[type="range"],
+    .board-stroke-value-rail
+  ) {
+  position: absolute;
+  inset: auto;
+  width: 80px;
+  height: 24px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-slider
+  input {
+  cursor: ns-resize;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-value-rail
+  output {
+  transform: translateX(-50%) rotate(90deg);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .surface-toolbar-divider {
+  height: 1px;
+  width: 24px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-tool-shortcuts {
+  display: none;
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="top"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="left"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: 0;
+  right: auto;
+  left: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="right"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: 0;
+  left: auto;
+  right: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="top"] .board-align-options {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-align-options {
+  bottom: auto;
+  top: 0;
+  transform: none;
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="left"] .board-align-options {
+  left: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="right"]
+  .board-align-options {
+  left: auto;
+  right: calc(100% + 12px);
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-style-section {
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-toolbar-properties
+  .board-stroke-slider {
+  height: 56px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-toolbar-properties
+  :is(
+    .board-stroke-track,
+    .board-stroke-slider input[type="range"],
+    .board-stroke-value-rail
+  ) {
+  width: 52px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-style-section
+  + .board-style-section {
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  padding-inline-start: 0;
+  padding-top: 6px;
+  width: 36px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"]):has(
+    .board-pressure-toggle
+  ) {
+  --toolbar-reserve: 320px;
+}
+.board-dockable-toolbar[data-dock="top"] .board-color-menu {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.board-dockable-toolbar[data-dock="left"] .board-color-menu {
+  bottom: auto;
+  top: 0;
+  right: auto;
+  left: calc(100% + 12px);
+}
+.board-dockable-toolbar[data-dock="right"] .board-color-menu {
+  bottom: auto;
+  top: 0;
+  left: auto;
+  right: calc(100% + 12px);
+}
+
+.board-toolbar-inline-properties {
+  display: flex;
+  align-items: center;
+  border-inline-start: 1px solid var(--line, var(--border));
+  margin-left: 4px;
+  min-width: 0;
+}
+.board-toolbar-inline-properties .board-style-controls {
+  gap: 6px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-inline-properties {
+  flex-direction: column;
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  margin: 4px 0 0;
+}
+.board-toolbar-primary {
+  overflow: visible;
+}
+@media (max-width: 800px) {
+  .board-toolbar-inline-properties .board-style-section {
+    font-size: 10px;
+    gap: 3px;
+  }
+  .board-toolbar-inline-properties .board-stroke-slider {
+    width: 64px;
+  }
+}
+
+/* iPad: a fixed primary strip and one equally long parallel settings strip. */
+.board-dockable-toolbar[data-mobile] .board-tool-shortcuts {
+  display: none;
+}
+.board-toolbar-primary {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+.board-dockable-toolbar[data-dragging] .board-toolbar-primary {
+  cursor: grabbing;
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-primary .board-tool-stack {
+  --board-tool-width: clamp(
+    36px,
+    calc(
+      (var(--board-toolbar-width) - 44px) / var(--board-tool-count, 8) - 2px
+    ),
+    44px
+  );
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px 12px 0 0;
+  border-width: 1px 1px 0;
+  background: var(--paper, var(--bg));
+  box-shadow: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary:not(
+    :has(button, summary, input, select, [role="status"])
+  ) {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile]
+  :is(
+    .board-toolbar-settings,
+    .board-toolbar-secondary .board-toolbar-actions
+  ) {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  gap: 4px;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  .board-toolbar-actions:not(
+    :has(
+      button,
+      summary,
+      [role="status"],
+      > .board-component-actions:not(:empty)
+    )
+  ) {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary button {
+  flex-shrink: 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"] .board-toolbar-secondary {
+  top: 100%;
+  bottom: auto;
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-secondary {
+  top: 0;
+  bottom: auto;
+  flex-direction: column;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]
+  .board-toolbar-secondary {
+  left: 100%;
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]
+  .board-toolbar-secondary {
+  left: auto;
+  right: 100%;
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  :is(
+    .board-toolbar-settings,
+    .board-toolbar-secondary .board-toolbar-actions
+  ) {
+  flex-direction: column;
+}
+/* Tool buttons sit inside a scroll container. Give that container and its
+   controls the drag gesture too, so WebKit cannot cancel it to start scrolling. */
+.board-toolbar-primary
+  :is(.board-tool-stack, .board-tool-buttons, button, summary) {
+  touch-action: none;
+}
+
+/* One joined panel; the primary strip's shared border is the divider. */
+.board-dockable-toolbar[data-mobile] .board-toolbar-primary {
+  box-shadow: none;
+}
+.board-dockable-toolbar[data-mobile]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 0 0 12px 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 12px 12px 0 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"] .board-toolbar-secondary {
+  border-width: 0 1px 1px;
+  border-radius: 0 0 12px 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 12px 0 0 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]
+  .board-toolbar-secondary {
+  border-width: 1px 1px 1px 0;
+  border-radius: 0 12px 12px 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 0 12px 12px 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]
+  .board-toolbar-secondary {
+  border-width: 1px 0 1px 1px;
+  border-radius: 12px 0 0 12px;
+}
+
+/* Flatten the existing action groups into evenly spaced settings slots. */
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
+  justify-content: space-evenly;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  :is(.board-toolbar-settings, .board-style-controls, .board-toolbar-actions) {
+  display: contents;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  :is(.board-toolbar-settings, .board-toolbar-actions):empty {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile] .board-ruler-controls {
+  border-inline-start: 1px solid var(--line, var(--border));
+  padding-inline-start: 8px;
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  .board-ruler-controls {
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  padding-inline-start: 0;
+  padding-top: 6px;
+  width: 36px;
+}

@@ -1,8 +1,8 @@
 import React from 'react'
 import { t } from '../i18n'
 import { reportReactError } from '../lib/diagnosticsCapture'
-import { Button } from './shared/Button'
-import { DoctorPanel } from './doctor/DoctorPanel'
+import { Button } from './shared/ui/button'
+import { LazyDoctorPanel } from './doctor/LazyDoctorPanel'
 
 type Props = {
   children: React.ReactNode
@@ -41,12 +41,12 @@ function ErrorBoundaryFallback() {
           {t('errorBoundary.description')}
         </div>
         <div className="mt-4 flex justify-center">
-          <Button type="button" variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          <Button type="button" variant="outline" size="sm" onClick={() => window.location.reload()}>
             {t('common.retry')}
           </Button>
         </div>
         <div className="mt-4 text-left">
-          <DoctorPanel compact />
+          <LazyDoctorPanel compact />
         </div>
       </div>
     </div>

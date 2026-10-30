@@ -40,7 +40,6 @@ const excludedDirectoryNames = new Set([
   '.omx',
   '.parcel-cache',
   '.svelte-kit',
-  '.tauri',
   '.turbo',
   '.vite',
   '.vite-temp',
@@ -55,8 +54,8 @@ const excludedDirectoryNames = new Set([
 ])
 
 const excludedRelativePaths = new Set([
-  'desktop/src-tauri/binaries',
-  'desktop/src-tauri/icons',
+  'desktop/binaries',
+  'desktop/electron/build',
 ])
 
 const files: FileStat[] = []
@@ -180,8 +179,8 @@ function areaForPath(path: string) {
     return 'desktop frontend'
   }
 
-  if (path.startsWith('desktop/src-tauri/')) {
-    return 'desktop tauri'
+  if (path.startsWith('desktop/electron/')) {
+    return 'desktop electron'
   }
 
   if (path.startsWith('desktop/')) {

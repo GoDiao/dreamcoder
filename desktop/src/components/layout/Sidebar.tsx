@@ -1,6 +1,12 @@
+import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, FolderPlus, GitBranch, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
+import { Button } from '../shared/ui/button'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { ChevronDown, ChevronRight, FolderOpen, GitBranch, ListChecks, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Trash2, X } from 'lucide-react'
+import { pickDirectory } from '../../lib/shell'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
+import { useShallow } from 'zustand/react/shallow'
 import { DreamCoderIcon } from '../shared/DreamCoderIcon'
+import { useNewSessionStore } from '../../stores/newSessionStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
@@ -11,13 +17,13 @@ import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
 import { SidebarMoreMenu } from './SidebarMoreMenu'
-import { useMenuNavigation } from '../../hooks/useMenuNavigation'
+import { ActionMenu, RowActionMenu } from '../shared/ActionMenu'
 import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarProjectSortBy } from './ProjectManagementDialog'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 const SESSION_LIST_AUTO_REFRESH_MS = 30_000
 const SESSION_LIST_FOCUS_REFRESH_MIN_MS = 5_000
@@ -28,7 +34,6 @@ const PROJECT_ORGANIZATION_STORAGE_KEY = 'dreamcoder-sidebar-project-organizatio
 const PROJECT_SORT_STORAGE_KEY = 'dreamcoder-sidebar-project-sort'
 const PROJECT_GROUP_VISIBLE_COUNT = 6
 const PROJECT_GROUP_SCROLL_COUNT = 12
-const SESSION_MENU_WIDTH = 180
 
 
 type ProjectGroup = {
@@ -65,13 +70,16 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
-  const chatSessions = useChatStore((s) => s.sessions)
+  const runningChatSessionIds = useChatStore(useShallow((s) => {
+    const ids = new Set<string>()
+    for (const [sessionId, session] of Object.entries(s.sessions)) {
+      if (session.chatState !== 'idle') ids.add(sessionId)
+    }
+    return ids
+  }))
   const closeTab = useTabStore((s) => s.closeTab)
   const disconnectSession = useChatStore((s) => s.disconnectSession)
   const [searchQuery, setSearchQuery] = useState('')
-  const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
-  const [projectContextMenu, setProjectContextMenu] = useState<{ key: string; x: number; y: number } | null>(null)
-  const [createProjectMenu, setCreateProjectMenu] = useState<{ x: number; y: number } | null>(null)
   const [projectManagementOpen, setProjectManagementOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [reportProblemOpen, setReportProblemOpen] = useState(false)
@@ -91,56 +99,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null)
   const [projectDropTarget, setProjectDropTarget] = useState<{ key: string; position: 'before' | 'after' } | null>(null)
   const suppressProjectClickRef = useRef<string | null>(null)
-  const sessionMenuRef = useRef<HTMLDivElement>(null)
-  const sessionMenuTriggerRef = useRef<HTMLElement | null>(null)
-  const projectMenuRef = useRef<HTMLDivElement>(null)
-  const createProjectMenuRef = useRef<HTMLDivElement>(null)
-  const closeSessionMenu = useCallback(() => setContextMenu(null), [])
-  const closeProjectMenu = useCallback(() => setProjectContextMenu(null), [])
-  const closeCreateProjectMenu = useCallback(() => setCreateProjectMenu(null), [])
-  const sessionMenuNav = useMenuNavigation({
-    openKey: contextMenu?.id,
-    menuRef: sessionMenuRef,
-    onClose: closeSessionMenu,
-    triggerRef: sessionMenuTriggerRef,
-  })
-  const projectMenuNav = useMenuNavigation({
-    openKey: projectContextMenu?.key,
-    menuRef: projectMenuRef,
-    onClose: closeProjectMenu,
-  })
-  const createProjectMenuNav = useMenuNavigation({
-    openKey: Boolean(createProjectMenu),
-    menuRef: createProjectMenuRef,
-    onClose: closeCreateProjectMenu,
-  })
   const sidebarPreferenceRevisionRef = useRef(0)
   const refreshSessionsNow = useSessionListAutoRefresh(fetchSessions)
-
-  useEffect(() => {
-    if (!contextMenu) return
-    if (!sidebarOpen) setContextMenu(null)
-  }, [sidebarOpen])
-
-  useEffect(() => {
-    if (!contextMenu && !projectContextMenu && !createProjectMenu) return
-    const close = () => {
-      setContextMenu(null)
-      setProjectContextMenu(null)
-      setCreateProjectMenu(null)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      close()
-    }
-    document.addEventListener('click', close)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('click', close)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [contextMenu, projectContextMenu, createProjectMenu])
 
   const filteredSessions = useMemo(() => {
     let result = sessions
@@ -185,22 +145,21 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     [sessions],
   )
   const runningSessionIds = useMemo(() => {
-    const ids = new Set<string>()
+    const ids = new Set(runningChatSessionIds)
     for (const tab of tabs) {
       if (tab.type === 'session' && tab.status === 'running') ids.add(tab.sessionId)
     }
-    for (const [sessionId, sessionState] of Object.entries(chatSessions)) {
-      if (sessionState.chatState !== 'idle') ids.add(sessionId)
-    }
     return ids
-  }, [chatSessions, tabs])
+  }, [runningChatSessionIds, tabs])
   const pendingBatchDeleteSessions = useMemo(
     () => (pendingBatchDeleteSessionIds ?? [])
       .map((sessionId) => sessionsById.get(sessionId))
       .filter((session): session is SessionListItem => Boolean(session)),
     [pendingBatchDeleteSessionIds, sessionsById],
   )
-  const expanded = isMobile ? true : sidebarOpen
+  // The mobile drawer and the desktop app slide the whole sidebar out of view
+  // instead of narrowing it to the icon rail, so their layout stays expanded.
+  const expanded = isMobile || isDesktop ? true : sidebarOpen
   const closeMobileDrawer = useCallback(() => {
     if (isMobile) onRequestClose?.()
   }, [isMobile, onRequestClose])
@@ -263,37 +222,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     }
   }, [applySidebarProjectPreferences])
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, id: string) => {
-    e.preventDefault()
-    if (isBatchMode) return
-    setProjectContextMenu(null)
-    setCreateProjectMenu(null)
-    sessionMenuTriggerRef.current = null
-    setContextMenu({ id, x: e.clientX, y: e.clientY })
-  }, [isBatchMode])
-
-  const toggleSessionMenu = useCallback((event: React.MouseEvent<HTMLElement>, id: string) => {
-    // The document-level click listener would otherwise close the menu in the same click.
-    event.stopPropagation()
-    setProjectContextMenu(null)
-    setCreateProjectMenu(null)
-    if (contextMenu?.id === id) {
-      setContextMenu(null)
-      return
-    }
-    const rect = event.currentTarget.getBoundingClientRect()
-    sessionMenuTriggerRef.current = event.currentTarget
-    setContextMenu({ id, x: rect.right - SESSION_MENU_WIDTH, y: rect.bottom + 4 })
-  }, [contextMenu])
-
-  const handleProjectContextMenu = useCallback((event: React.MouseEvent, projectKey: string) => {
-    event.preventDefault()
-    if (isBatchMode) return
-    setContextMenu(null)
-    setCreateProjectMenu(null)
-    setProjectContextMenu({ key: projectKey, x: event.clientX, y: event.clientY })
-  }, [isBatchMode])
-
   const handleProjectDragStart = useCallback((event: React.DragEvent, projectKey: string) => {
     if (isBatchMode) {
       event.preventDefault()
@@ -348,36 +276,11 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     clearProjectDragState()
   }, [clearProjectDragState, draggingProjectKey, hiddenProjectKeys, orderedProjectGroups, persistSidebarProjectPreferences, pinnedProjectKeys, projectDropTarget, projectOrganization, projectSortBy])
 
-  const createSessionForWorkDir = useCallback(async (workDir?: string) => {
-    try {
-      const sessionId = await useSessionStore.getState().createSession(workDir)
-      restoreHiddenProjectForWorkDir(workDir)
-      useTabStore.getState().openTab(sessionId, t('sidebar.newSession'))
-      useChatStore.getState().connectToSession(sessionId)
-      closeMobileDrawer()
-    } catch (error) {
-      addToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : t('sidebar.sessionListFailed'),
-      })
-    }
-  }, [addToast, closeMobileDrawer, restoreHiddenProjectForWorkDir, t])
-
-  const toggleCreateProjectMenu = useCallback((event: React.MouseEvent) => {
-    event.stopPropagation()
-    if (createProjectMenu) {
-      setCreateProjectMenu(null)
-      return
-    }
-    const rect = event.currentTarget.getBoundingClientRect()
-    const width = 250
-    setProjectContextMenu(null)
-    setContextMenu(null)
-    setCreateProjectMenu({
-      x: Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10)),
-      y: rect.bottom + 8,
-    })
-  }, [createProjectMenu])
+  const openNewSession = useCallback((workDir?: string) => {
+    useNewSessionStore.getState().open(workDir)
+    restoreHiddenProjectForWorkDir(useNewSessionStore.getState().workDir || undefined)
+    closeMobileDrawer()
+  }, [closeMobileDrawer, restoreHiddenProjectForWorkDir])
 
   const updateProjectOrganization = useCallback((organization: SidebarProjectOrganization) => {
     setProjectOrganizationState(organization)
@@ -406,8 +309,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [hiddenProjectKeys, persistSidebarProjectPreferences, pinnedProjectKeys, projectOrganization])
 
   const createSessionFromExistingFolder = useCallback(async () => {
-    setCreateProjectMenu(null)
-    if (!isTauri) {
+    if (!isDesktop) {
       addToast({
         type: 'error',
         message: t('sidebar.chooseProjectFolderUnavailable'),
@@ -415,14 +317,13 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       return
     }
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
+      const selected = await pickDirectory({
         directory: true,
         multiple: false,
         title: t('sidebar.useExistingFolder'),
       })
       if (typeof selected === 'string' && selected.trim()) {
-        await createSessionForWorkDir(selected)
+        openNewSession(selected)
       }
     } catch (error) {
       addToast({
@@ -430,10 +331,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         message: error instanceof Error ? error.message : t('sidebar.sessionListFailed'),
       })
     }
-  }, [addToast, createSessionForWorkDir, t])
+  }, [addToast, openNewSession, t])
 
   const togglePinnedProject = useCallback((projectKey: string) => {
-    setProjectContextMenu(null)
     setPinnedProjectKeys((current) => {
       const next = new Set(current)
       if (next.has(projectKey)) {
@@ -463,7 +363,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   const toggleHiddenProject = useCallback((project: ProjectGroup) => {
     const wasHidden = hiddenProjectKeys.has(project.key)
-    setProjectContextMenu(null)
     setHiddenProjectKeys((current) => {
       const next = new Set(current)
       if (next.has(project.key)) {
@@ -483,7 +382,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [addToast, hiddenProjectKeys, persistSidebarProjectPreferences, pinnedProjectKeys, projectOrder, projectOrganization, projectSortBy, t])
 
   const openProjectInFinder = useCallback(async (project: ProjectGroup) => {
-    setProjectContextMenu(null)
     try {
       if (!project.workDir) {
         throw new Error(t('sidebar.openInFinderUnavailable'))
@@ -506,7 +404,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [addToast, t])
 
   const handleDelete = useCallback((id: string) => {
-    setContextMenu(null)
     setPendingDeleteSessionId(id)
   }, [])
 
@@ -618,7 +515,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   }, [])
 
   const handleStartRename = useCallback((id: string, currentTitle: string) => {
-    setContextMenu(null)
     setRenamingId(id)
     setRenameValue(currentTitle)
   }, [])
@@ -631,23 +527,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     setRenameValue('')
   }, [renamingId, renameValue, renameSession])
 
-  const startDraggingRef = useRef<(() => Promise<void>) | null>(null)
-
-  useEffect(() => {
-    if (!isTauri) return
-    import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => {
-        const win = getCurrentWindow()
-        startDraggingRef.current = () => win.startDragging()
-      })
-      .catch(() => {})
-  }, [])
-
-  const handleSidebarDrag = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [role="button"]')) return
-    startDraggingRef.current?.()
-  }, [])
 
   useEffect(() => {
     if (!isBatchMode) return
@@ -674,12 +553,15 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   return (
     <aside
-      onMouseDown={handleSidebarDrag}
       className="sidebar-panel relative h-full flex flex-col bg-[var(--color-surface-sidebar)] border-r border-[var(--color-border)] select-none"
       data-state={expanded ? 'open' : 'closed'}
       aria-label="Sidebar"
     >
-      <div className={`px-3 pb-2 ${isTauri && !isWindows ? 'pt-[44px]' : 'pt-3'}`}>
+      {/* On macOS the top band is the title row: traffic lights and the sidebar toggle. */}
+      <div
+        className={`window-drag-region px-3 pb-2 ${isDesktop && !isWindows ? '' : 'pt-3'}`}
+        style={isDesktop && !isWindows ? { paddingTop: 'var(--titlebar-height)' } : undefined}
+      >
         <div className={`flex ${expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2'}`}>
           <div className={`flex min-w-0 items-center ${expanded ? 'gap-2.5' : 'justify-center'}`}>
             <DreamCoderIcon size={32} />
@@ -695,38 +577,37 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             </div>
           </div>
           <div className={`flex items-center ${expanded ? 'gap-1.5' : 'flex-col gap-2'}`}>
-            <a
+            <HintTooltip content={t('settings.about.repo')}><a
               href="https://github.com/GoDiao/dreamcoder"
               target="_blank"
               rel="noopener noreferrer"
               className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} inline-flex items-center justify-center rounded-md p-1 text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]`}
-              title="GitHub"
+              aria-label={t('settings.about.repo')}
               tabIndex={expanded ? undefined : -1}
               aria-hidden={!expanded}
             >
               <GitHubIcon />
-            </a>
+            </a></HintTooltip>
             {isMobile ? (
-              <button
+              <HintTooltip content={t('sidebar.collapse')}><button
                 type="button"
                 onClick={closeMobileDrawer}
                 className="sidebar-toggle-button flex h-11 w-11 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-sidebar)]"
                 aria-label={t('sidebar.collapse')}
-                title={t('sidebar.collapse')}
               >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            ) : (
-              <button
+                <X aria-hidden="true" size={20} />
+              </button></HintTooltip>
+            ) : isDesktop ? null : (
+              // The desktop app's toggle is in the title row (TitlebarSidebarToggle).
+              <HintTooltip content={expanded ? t('sidebar.collapse') : t('sidebar.expand')}><button
                 type="button"
                 onClick={toggleSidebar}
                 data-testid={expanded ? 'sidebar-collapse-button' : 'sidebar-expand-button'}
                 className={`sidebar-toggle-button ${expanded ? 'sidebar-toggle-button--open h-8 w-8' : 'sidebar-toggle-button--collapsed h-8 w-8'} flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-sidebar)]`}
                 aria-label={expanded ? t('sidebar.collapse') : t('sidebar.expand')}
-                title={expanded ? t('sidebar.collapse') : t('sidebar.expand')}
               >
                 <SidebarToggleIcon collapsed={!expanded} />
-              </button>
+              </button></HintTooltip>
             )}
           </div>
         </div>
@@ -738,13 +619,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
           collapsed={!expanded}
           label={t('sidebar.newSession')}
           touchFriendly={isMobile}
-          onClick={() => {
-            const currentTabId = useTabStore.getState().activeTabId
-            const currentSession = currentTabId
-              ? useSessionStore.getState().sessions.find((s) => s.id === currentTabId)
-              : null
-            void createSessionForWorkDir(currentSession?.workDir || currentSession?.projectRoot || undefined)
-          }}
+          onClick={() => openNewSession()}
           icon={<Plus className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />}
         >
           {t('sidebar.newSession')}
@@ -793,15 +668,14 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                   <span className="min-w-0 text-xs font-medium text-[var(--color-text-primary)]">
                     {t('sidebar.batchSelectedCount', { count: selectedCount })}
                   </span>
-                  <button
+                  <HintTooltip content={t('sidebar.batchExit')}><button
                     type="button"
                     onClick={handleExitBatchMode}
                     className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
                     aria-label={t('sidebar.batchExit')}
-                    title={t('sidebar.batchExit')}
                   >
-                    <span className="material-symbols-outlined text-[17px]">close</span>
-                  </button>
+                    <X aria-hidden="true" size={17} />
+                  </button></HintTooltip>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
                   <button
@@ -833,7 +707,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             )}
             <div className="sidebar-scroll-area min-h-0 flex-1 overflow-y-auto px-3 pb-20">
               {error && (
-                <div className="mx-1 mt-2 rounded-[var(--radius-md)] border border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-3 py-2">
+                <div className="mx-1 mt-2 rounded-md border border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-3 py-2">
                   <div className="text-xs font-medium text-[var(--color-error)]">{t('sidebar.sessionListFailed')}</div>
                   <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] break-words">{error}</div>
                   <button
@@ -857,8 +731,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                 <ProjectHeaderActions
                   title={t('sidebar.projects')}
                   createLabel={t('sidebar.newProject')}
-                  createMenuOpen={createProjectMenu !== null}
-                  onOpenCreate={toggleCreateProjectMenu}
+                  onCreateBlank={() => openNewSession('')}
+                  onUseExisting={() => void createSessionFromExistingFolder()}
                 />
               )}
               {visibleProjectGroups.map((project) => {
@@ -889,13 +763,18 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                     {dropBefore && (
                       <div className="pointer-events-none absolute -top-1 left-1 right-1 z-10 h-0.5 rounded-full bg-[var(--color-brand)]" />
                     )}
+                    <RowActionMenu disabled={isBatchMode} actions={[
+                      { id: 'pin', label: t(isProjectPinned ? 'sidebar.unpinProject' : 'sidebar.pinProject'), icon: isProjectPinned ? <PinOff size={18} /> : <Pin size={18} />, onSelect: () => togglePinnedProject(project.key) },
+                      { id: 'open', label: t('sidebar.openInFinder'), icon: <FolderOpen size={18} />, onSelect: () => void openProjectInFinder(project) },
+                      { id: 'hide', label: t('sidebar.hideProjectFromSidebar'), icon: <X size={18} />, danger: true, onSelect: () => toggleHiddenProject(project) },
+                    ]}>
+                      {(_, menuOpen) => (
                     <div
                       className={`sidebar-row group/project-row flex items-center ${isMobile ? 'sidebar-row--touch' : ''}`}
                       data-testid={`sidebar-project-row-${domSafeProjectKey(project.key)}`}
-                      data-menu-open={projectContextMenu?.key === project.key ? 'true' : undefined}
-                      onContextMenu={(event) => handleProjectContextMenu(event, project.key)}
+                      data-menu-open={menuOpen ? 'true' : undefined}
                     >
-                      <button
+                      <HintTooltip content={project.subtitle || project.title}><button
                         type="button"
                         draggable={!isBatchMode}
                         onDragStart={(event) => handleProjectDragStart(event, project.key)}
@@ -904,7 +783,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                         className={`flex min-w-0 flex-1 cursor-grab items-center gap-1.5 bg-transparent px-1.5 text-left active:cursor-grabbing focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                         aria-expanded={!projectCollapsed}
                         aria-label={t(projectCollapsed ? 'sidebar.expandProject' : 'sidebar.collapseProject', { project: project.title })}
-                        title={project.subtitle || project.title}
                       >
                         <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-text-tertiary)]">
                           {projectCollapsed
@@ -917,7 +795,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                         {isProjectPinned && (
                           <Pin className="h-3 w-3 flex-shrink-0 text-[var(--color-text-tertiary)]" strokeWidth={1.8} aria-hidden="true" />
                         )}
-                      </button>
+                      </button></HintTooltip>
                       {isBatchMode ? (
                         <button
                           type="button"
@@ -934,20 +812,21 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                             : t('sidebar.batchSelectAll')}
                         </button>
                       ) : (
-                        <button
+                        <HintTooltip content={t('sidebar.newSessionInProject', { project: project.title })}><button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            void createSessionForWorkDir(project.workDir)
+                            void openNewSession(project.workDir)
                           }}
                           className="sidebar-row-action"
                           aria-label={t('sidebar.newSessionInProject', { project: project.title })}
-                          title={t('sidebar.newSessionInProject', { project: project.title })}
                         >
                           <Plus className="h-[14px] w-[14px]" strokeWidth={2} aria-hidden="true" />
-                        </button>
+                        </button></HintTooltip>
                       )}
                     </div>
+                      )}
+                    </RowActionMenu>
                     <div className="motion-collapse mt-0.5 pl-0" data-state={projectCollapsed ? 'closed' : 'open'}>
                       <div>
                         <div
@@ -957,10 +836,15 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                           {visibleItems.map((session) => {
                             const isSelected = selectedSessionIds.has(session.id)
                             const isCurrent = session.id === activeTabId
-                            const menuOpen = contextMenu?.id === session.id
-                            const title = session.title || 'Untitled'
+                            const title = session.title || t('session.untitled')
                             return (
-                            <div key={session.id} className="relative mb-0.5 last:mb-0">
+                            <RowActionMenu key={session.id} disabled={isBatchMode || (!sidebarOpen && !isMobile)} triggerLabel={t('sidebar.sessionActions', { title })} triggerClassName="sidebar-row-action sidebar-session-more" testId="sidebar-session-menu" actions={[
+                              { id: 'rename', label: t('common.rename'), icon: <Pencil size={15} />, afterClose: true, onSelect: () => handleStartRename(session.id, title) },
+                              { id: 'batch', label: t('sidebar.batchManage'), icon: <ListChecks size={15} />, onSelect: enterBatchMode },
+                              { id: 'delete', label: t('common.delete'), icon: <Trash2 size={15} />, danger: true, separatorBefore: true, afterClose: true, onSelect: () => handleDelete(session.id) },
+                            ]}>
+                              {(menuTrigger, menuOpen) => (
+                            <div className="relative mb-0.5 last:mb-0">
                               {renamingId === session.id ? (
                                 <input
                                   autoFocus
@@ -982,7 +866,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                   data-testid={`sidebar-session-row-${session.id}`}
                                   data-current={isSelected || isCurrent ? 'true' : undefined}
                                   data-menu-open={menuOpen ? 'true' : undefined}
-                                  onContextMenu={(e) => handleContextMenu(e, session.id)}
                                   className={`sidebar-row sidebar-session-row flex items-center ${isMobile ? 'sidebar-row--touch' : ''} ${
                                     isSelected
                                       ? 'sidebar-session-row--selected text-[var(--color-text-primary)]'
@@ -991,7 +874,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                       : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                                   }`}
                                 >
-                                  <button
+                                  <HintTooltip content={title}><button
                                     type="button"
                                     onClick={(event) => {
                                       if (isBatchMode) {
@@ -1002,7 +885,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                       useChatStore.getState().connectToSession(session.id)
                                       closeMobileDrawer()
                                     }}
-                                    title={title}
+                                    aria-label={title}
                                     className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                                     aria-pressed={isBatchMode ? isSelected : undefined}
                                   >
@@ -1016,41 +899,30 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                         aria-hidden="true"
                                       >
                                         {isSelected && (
-                                          <span className="material-symbols-outlined text-[12px]">check</span>
+                                          <CheckIcon aria-hidden="true" size={12} />
                                         )}
                                       </span>
                                     ) : null}
                                     <span className="min-w-0 flex-1 truncate">{title}</span>
                                     {!session.workDirExists && (
-                                      <span
+                                      <HintTooltip content={session.workDir ?? ''}><span
                                         className="flex-shrink-0 text-[10px] text-[var(--color-warning)]"
-                                        title={session.workDir ?? ''}
                                       >
                                         {t('sidebar.missingDir')}
-                                      </span>
+                                      </span></HintTooltip>
                                     )}
                                     <SessionRowMeta
                                       isRunning={runningSessionIds.has(session.id)}
                                       isWorktree={isWorktreeSession(session)}
                                       t={t}
                                     />
-                                  </button>
-                                  {!isBatchMode && (
-                                    <button
-                                      type="button"
-                                      onClick={(event) => toggleSessionMenu(event, session.id)}
-                                      className="sidebar-row-action sidebar-session-more"
-                                      aria-label={t('sidebar.sessionActions', { title })}
-                                      title={t('sidebar.sessionActions', { title })}
-                                      aria-haspopup="menu"
-                                      aria-expanded={menuOpen}
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                                    </button>
-                                  )}
+                                  </button></HintTooltip>
+                                  {menuTrigger}
                                 </div>
                               )}
                             </div>
+                              )}
+                            </RowActionMenu>
                             )
                           })}
                         </div>
@@ -1098,109 +970,6 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         </div>
       )}
 
-      {contextMenu && (
-        <div
-          ref={sessionMenuRef}
-          role="menu"
-          className="motion-menu fixed z-50 overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] p-1 shadow-[var(--shadow-dropdown)]"
-          data-state="open"
-          data-testid="sidebar-session-menu"
-          style={{ ...positionFloatingMenu(contextMenu.x, contextMenu.y, SESSION_MENU_WIDTH, 130), width: SESSION_MENU_WIDTH }}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={sessionMenuNav.onKeyDown}
-        >
-          <SessionMenuItem
-            icon={<Pencil size={15} aria-hidden="true" />}
-            onClick={() => {
-              const session = sessions.find((s) => s.id === contextMenu.id)
-              handleStartRename(contextMenu.id, session?.title || '')
-            }}
-          >
-            {t('common.rename')}
-          </SessionMenuItem>
-          <SessionMenuItem
-            icon={<ListChecks size={15} aria-hidden="true" />}
-            onClick={() => {
-              setContextMenu(null)
-              enterBatchMode()
-            }}
-          >
-            {t('sidebar.batchManage')}
-          </SessionMenuItem>
-          <div className="my-1 h-px bg-[var(--color-border-separator)]" role="separator" />
-          <SessionMenuItem
-            icon={<Trash2 size={15} aria-hidden="true" />}
-            danger
-            onClick={() => handleDelete(contextMenu.id)}
-          >
-            {t('common.delete')}
-          </SessionMenuItem>
-        </div>
-      )}
-
-      {projectContextMenu && (() => {
-        const project = orderedProjectGroups.find((group) => group.key === projectContextMenu.key)
-        if (!project) return null
-        const pinned = pinnedProjectKeys.has(project.key)
-        const hidden = hiddenProjectKeys.has(project.key)
-        return (
-          <div
-            ref={projectMenuRef}
-            role="menu"
-            className="motion-menu fixed z-50 min-w-[230px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
-            data-state="open"
-            style={positionFloatingMenu(projectContextMenu.x, projectContextMenu.y, 230, 160)}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={projectMenuNav.onKeyDown}
-          >
-            <ProjectMenuItem
-              icon={pinned ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
-              onClick={() => togglePinnedProject(project.key)}
-            >
-              {t(pinned ? 'sidebar.unpinProject' : 'sidebar.pinProject')}
-            </ProjectMenuItem>
-            <ProjectMenuItem
-              icon={<FolderOpen size={18} aria-hidden="true" />}
-              onClick={() => void openProjectInFinder(project)}
-            >
-              {t('sidebar.openInFinder')}
-            </ProjectMenuItem>
-            <ProjectMenuItem
-              icon={hidden ? <RotateCcw size={18} aria-hidden="true" /> : <X size={18} aria-hidden="true" />}
-              onClick={() => toggleHiddenProject(project)}
-              danger={!hidden}
-            >
-              {t(hidden ? 'sidebar.restoreProjectToSidebar' : 'sidebar.hideProjectFromSidebar')}
-            </ProjectMenuItem>
-          </div>
-        )
-      })()}
-
-      {createProjectMenu && (
-        <div
-          ref={createProjectMenuRef}
-          role="menu"
-          className="motion-menu fixed z-50 overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-2 shadow-[var(--shadow-dropdown)]"
-          data-state="open"
-          style={{ left: createProjectMenu.x, top: createProjectMenu.y, width: 250 }}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={createProjectMenuNav.onKeyDown}
-        >
-          <HeaderMenuItem
-            icon={<SquarePen size={18} aria-hidden="true" />}
-            onClick={() => {
-              setCreateProjectMenu(null)
-              void createSessionForWorkDir()
-            }}
-          >
-            {t('sidebar.newBlankProject')}
-          </HeaderMenuItem>
-          <HeaderMenuItem icon={<FolderOpen size={18} aria-hidden="true" />} onClick={() => void createSessionFromExistingFolder()}>
-            {t('sidebar.useExistingFolder')}
-          </HeaderMenuItem>
-        </div>
-      )}
-
       <ProjectManagementDialog
         open={projectManagementOpen}
         onClose={() => setProjectManagementOpen(false)}
@@ -1240,7 +1009,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         body={pendingDeleteSessionId ? t('sidebar.confirmDelete') : ''}
         confirmLabel={t('common.delete')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
       />
       <ConfirmDialog
         open={pendingBatchDeleteSessionIds !== null}
@@ -1275,7 +1044,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         )}
         confirmLabel={t('common.delete')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="danger"
+        confirmVariant="destructive"
         loading={isBatchDeleting}
       />
     </aside>
@@ -1336,89 +1105,25 @@ function isDocumentVisible(): boolean {
   return typeof document === 'undefined' || document.visibilityState !== 'hidden'
 }
 
-function ProjectHeaderActions({
-  title,
-  createLabel,
-  createMenuOpen,
-  onOpenCreate,
-}: {
+function ProjectHeaderActions({ title, createLabel, onCreateBlank, onUseExisting }: {
   title: string
   createLabel: string
-  createMenuOpen: boolean
-  onOpenCreate: (event: React.MouseEvent) => void
+  onCreateBlank: () => void
+  onUseExisting: () => void
 }) {
+  const t = useTranslation()
   return (
-    <div
-      data-testid="sidebar-projects-header"
-      className="flex items-center justify-between pb-1 pl-2 pr-1 pt-1"
-    >
-      <div className="text-ui-aux font-semibold tracking-normal text-[var(--color-text-tertiary)]">
-        {title}
-      </div>
-      <button
-        type="button"
-        onClick={onOpenCreate}
-        aria-haspopup="menu"
-        aria-expanded={createMenuOpen}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-        aria-label={createLabel}
-        title={createLabel}
-      >
-        <Plus className="h-[15px] w-[15px]" strokeWidth={2} aria-hidden="true" />
-      </button>
+    <div data-testid="sidebar-projects-header" className="flex items-center justify-between pb-1 pl-2 pr-1 pt-1">
+      <div className="text-ui-aux font-semibold text-[var(--color-text-tertiary)]">{title}</div>
+      <ActionMenu label={createLabel} actions={[
+        { id: 'blank', label: t('sidebar.newBlankProject'), icon: <FolderPlus size={18} />, onSelect: onCreateBlank },
+        { id: 'existing', label: t('sidebar.useExistingFolder'), icon: <FolderOpen size={18} />, onSelect: onUseExisting },
+      ]} trigger={
+        <Button variant="ghost" size="icon-sm" aria-label={createLabel} className="text-ui-muted-foreground">
+          <SquarePen size={15} aria-hidden="true" />
+        </Button>
+      } />
     </div>
-  )
-}
-
-function HeaderMenuItem({
-  icon,
-  children,
-  onClick,
-}: {
-  icon: React.ReactNode
-  children: React.ReactNode
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)]"
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--color-text-secondary)]">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-    </button>
-  )
-}
-
-function SessionMenuItem({
-  icon,
-  children,
-  onClick,
-  danger = false,
-}: {
-  icon: React.ReactNode
-  children: React.ReactNode
-  onClick: () => void
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-left text-ui-nav transition-colors focus-visible:outline-none ${
-        danger
-          ? 'text-[var(--color-error)] hover:bg-[var(--color-error)]/10 focus-visible:bg-[var(--color-error)]/10'
-          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] focus-visible:bg-[var(--color-surface-hover)]'
-      }`}
-    >
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center">{icon}</span>
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-    </button>
   )
 }
 
@@ -1738,47 +1443,6 @@ function domSafeProjectKey(projectKey: string): string {
   return projectKey.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown'
 }
 
-function positionFloatingMenu(clientX: number, clientY: number, width: number, height: number): React.CSSProperties {
-  if (typeof window === 'undefined') return { left: clientX, top: clientY }
-  return {
-    left: Math.max(8, Math.min(clientX, window.innerWidth - width - 8)),
-    top: Math.max(8, Math.min(clientY, window.innerHeight - height - 8)),
-  }
-}
-
-function ProjectMenuItem({
-  icon,
-  children,
-  onClick,
-  disabled = false,
-  danger = false,
-}: {
-  icon: React.ReactNode
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      onClick={disabled ? undefined : onClick}
-      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:bg-[var(--color-surface-hover)] disabled:cursor-default disabled:opacity-45 ${
-        danger
-          ? 'text-[var(--color-error)] enabled:hover:bg-[var(--color-error)]/10'
-          : 'text-[var(--color-text-primary)] enabled:hover:bg-[var(--color-surface-hover)]'
-      }`}
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center text-current">
-        {icon}
-      </span>
-      <span className="min-w-0 truncate">{children}</span>
-    </button>
-  )
-}
-
 function SessionRowMeta({
   isRunning,
   isWorktree,
@@ -1788,28 +1452,20 @@ function SessionRowMeta({
   isWorktree: boolean
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
-  if (!isRunning && !isWorktree) return null
-
   return (
-    <span className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
-      {isRunning && (
-        <span
+    <span hidden={!isRunning && !isWorktree} className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
+        <HintTooltip content={t('sidebar.sessionRunning')}><span hidden={!isRunning}
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-success)]"
-          aria-label={t('sidebar.sessionRunning')}
-          title={t('sidebar.sessionRunning')}
+          aria-label={isRunning ? t('sidebar.sessionRunning') : undefined}
         >
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2.2} aria-hidden="true" />
-        </span>
-      )}
-      {isWorktree && (
-        <span
+        </span></HintTooltip>
+        <HintTooltip content={t('sidebar.worktree')}><span hidden={!isWorktree}
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
-          title={t('sidebar.worktree')}
         >
           <GitBranch className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-          <span className="sr-only">{t('sidebar.worktree')}</span>
-        </span>
-      )}
+          {isWorktree && <span className="sr-only">{t('sidebar.worktree')}</span>}
+        </span></HintTooltip>
     </span>
   )
 }
@@ -1832,13 +1488,12 @@ function NavItem({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <HintTooltip content={collapsed ? label : undefined}><button
       onClick={onClick}
       aria-label={label}
-      title={collapsed ? label : undefined}
       className={`
         flex items-center transition-colors duration-200
-        ${collapsed ? 'h-10 w-10 justify-center rounded-[var(--radius-md)] px-0 py-0' : `w-full gap-2.5 rounded-[12px] px-3 ${touchFriendly ? 'py-3' : 'py-2.5'} text-sm`}
+        ${collapsed ? 'h-10 w-10 justify-center rounded-md px-0 py-0' : `w-full gap-2.5 rounded-[12px] px-3 ${touchFriendly ? 'py-3' : 'py-2.5'} text-sm`}
         ${active
           ? 'bg-[var(--color-sidebar-item-active)] font-medium text-[var(--color-text-primary)]'
           : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]'
@@ -1851,7 +1506,7 @@ function NavItem({
       <span className={`sidebar-copy ${collapsed ? 'sidebar-copy--hidden' : 'sidebar-copy--visible'}`}>
         {children}
       </span>
-    </button>
+    </button></HintTooltip>
   )
 }
 

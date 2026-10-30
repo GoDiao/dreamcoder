@@ -1,6 +1,11 @@
+import { Button } from '../shared/ui/button'
+import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceLine, TraceIcon, TraceTitle, TraceDescription } from '../shared/ui/trace'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../shared/ui/collapsible'
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { memo, useEffect, useState } from 'react'
-import { BookMarked, Check, ChevronDown, ChevronRight, CircleAlert, CircleDot, Settings, Square } from 'lucide-react'
+import { Bot, BookMarked, Check, ChevronDown, ChevronRight, CircleAlert, CircleDot, Settings, Square } from 'lucide-react'
 import { ToolCallBlock } from './ToolCallBlock'
+import { ThinkingBlock } from './ThinkingBlock'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { Modal } from '../shared/Modal'
 import { useTranslation } from '../../i18n'
@@ -12,6 +17,8 @@ import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
 
 type ToolCall = Extract<UIMessage, { type: 'tool_use' }>
 type ToolResult = Extract<UIMessage, { type: 'tool_result' }>
+type ThinkingMessage = Extract<UIMessage, { type: 'thinking' }>
+type ActivityStep = ToolCall | ThinkingMessage
 type MemoryToolAction = 'saved' | 'referenced'
 
 type MemoryToolFile = {
@@ -32,6 +39,8 @@ type Props = {
   resultMap: Map<string, ToolResult>
   childToolCallsByParent: Map<string, ToolCall[]>
   agentTaskNotifications: Record<string, AgentTaskNotification>
+  steps?: ActivityStep[]
+  activeThinkingId?: string | null
   isStreaming?: boolean
 }
 
@@ -47,7 +56,11 @@ const TOOL_VERBS: Record<string, (count: number, t: (key: TranslationKey, params
   WebFetch: (n, t) => n === 1 ? t('toolGroup.fetchedOne') : t('toolGroup.fetchedMany', { count: n }),
 }
 
-function generateSummary(toolCalls: ToolCall[], t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+function generateSummary(
+  toolCalls: ToolCall[],
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  thinkingCount = 0,
+): string {
   const counts = new Map<string, number>()
   for (const tc of toolCalls) {
     counts.set(tc.toolName, (counts.get(tc.toolName) ?? 0) + 1)
@@ -58,6 +71,9 @@ function generateSummary(toolCalls: ToolCall[], t: (key: TranslationKey, params?
     const verbFn = TOOL_VERBS[name]
     const label = getCuaToolDisplay(name, undefined, t)?.title ?? name
     parts.push(verbFn ? verbFn(count, t) : `${label} (${count})`)
+  }
+  if (thinkingCount > 0) {
+    parts.push(thinkingCount === 1 ? t('toolGroup.thoughtOne') : t('toolGroup.thoughtMany', { count: thinkingCount }))
   }
 
   return parts.join(', ')
@@ -81,9 +97,12 @@ function groupHasErrors(
   resultMap: Map<string, ToolResult>,
   childToolCallsByParent: Map<string, ToolCall[]>,
 ): boolean {
-  return toolCalls.some((tc) => {
-    return toolCallHasError(tc, resultMap, childToolCallsByParent)
-  })
+  const succeeded = (toolCall: ToolCall) =>
+    resultMap.has(toolCall.toolUseId) && !toolCallHasError(toolCall, resultMap, childToolCallsByParent)
+  return toolCalls.some((toolCall, index) =>
+    toolCallHasError(toolCall, resultMap, childToolCallsByParent)
+    && !toolCalls.slice(index + 1).some((later) => later.toolName === toolCall.toolName && succeeded(later)),
+  )
 }
 
 function isToolCallResolved(
@@ -113,13 +132,16 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   resultMap,
   childToolCallsByParent,
   agentTaskNotifications,
+  steps = toolCalls,
+  activeThinkingId = null,
   isStreaming,
 }: Props) {
   const memoryActivity = getMemoryToolActivity(toolCalls, resultMap)
   if (memoryActivity) {
     const memoryToolCalls = toolCalls.filter(isMemoryToolCall)
     const regularToolCalls = toolCalls.filter((toolCall) => !isMemoryToolCall(toolCall))
-    if (regularToolCalls.length > 0) {
+    const regularSteps = steps.filter((step) => step.type === 'thinking' || !isMemoryToolCall(step))
+    if (regularSteps.length > 0) {
       return (
         <div className="mb-2 space-y-2">
           <MemoryToolActivityGroup
@@ -134,6 +156,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
             resultMap={resultMap}
             childToolCallsByParent={childToolCallsByParent}
             agentTaskNotifications={agentTaskNotifications}
+            steps={regularSteps}
+            activeThinkingId={activeThinkingId}
             isStreaming={isStreaming}
           />
         </div>
@@ -156,6 +180,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
       resultMap={resultMap}
       childToolCallsByParent={childToolCallsByParent}
       agentTaskNotifications={agentTaskNotifications}
+      steps={steps}
+      activeThinkingId={activeThinkingId}
       isStreaming={isStreaming}
     />
   )
@@ -166,9 +192,11 @@ function ToolCallGroupContent({
   resultMap,
   childToolCallsByParent,
   agentTaskNotifications,
+  steps = toolCalls,
+  activeThinkingId = null,
   isStreaming,
 }: Props) {
-  const allAgents = toolCalls.every((toolCall) => toolCall.toolName === 'Agent')
+  const allAgents = toolCalls.length > 0 && toolCalls.every((toolCall) => toolCall.toolName === 'Agent')
 
   if (allAgents) {
     return (
@@ -182,7 +210,7 @@ function ToolCallGroupContent({
     )
   }
 
-  if (toolCalls.length === 1) {
+  if (toolCalls.length === 1 && steps.length === 1) {
     const tc = toolCalls[0]!
     return (
       <ToolCallTree
@@ -199,6 +227,8 @@ function ToolCallGroupContent({
       resultMap={resultMap}
       childToolCallsByParent={childToolCallsByParent}
       agentTaskNotifications={agentTaskNotifications}
+      steps={steps}
+      activeThinkingId={activeThinkingId}
       isStreaming={isStreaming}
     />
   )
@@ -232,39 +262,37 @@ function MemoryToolActivityGroup({
 
   return (
     <div className="mb-2">
-      <div
+      <Collapsible
+        open={expanded}
+        onOpenChange={setExpanded}
         data-testid="memory-tool-activity-card"
         className="overflow-hidden rounded-lg border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)]"
       >
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]/50"
-        >
-          {expanded ? (
-            <ChevronDown size={15} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-          ) : (
-            <ChevronRight size={15} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-          )}
-          <BookMarked size={15} className="shrink-0 text-[var(--color-memory-accent)]" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
-            {t(titleKey, { count: activity.files.length })}
-          </span>
-          {isStreaming ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-memory-accent)] animate-pulse-dot" />
-          ) : null}
-        </button>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="row"
+            type="button"
+            className="px-3 py-2 hover:bg-[var(--color-surface-hover)]/50"
+          >
+            <ChevronRight size={15} className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
+            <BookMarked size={15} className="shrink-0 text-[var(--color-memory-accent)]" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+              {t(titleKey, { count: activity.files.length })}
+            </span>
+            {isStreaming ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-memory-accent)] animate-pulse-dot" />
+            ) : null}
+          </Button>
+        </CollapsibleTrigger>
 
-        {expanded ? (
+        <CollapsibleContent>
           <div className="border-t border-[var(--color-border)]/55 px-3 py-2.5">
             <div className="space-y-1.5">
               {visibleFiles.map((file) => (
-                <button
-                  key={file.path}
+                <HintTooltip key={file.path} content={file.path}><Button variant="ghost" size="row"
                   type="button"
-                  title={file.path}
+                  aria-label={file.path}
                   onClick={() => openMemorySettings(file.path)}
-                  className="group flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  className="group items-start gap-2 rounded-md px-2 py-1.5"
                 >
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-[var(--color-memory-border)] bg-[var(--color-memory-icon-bg)] text-[var(--color-text-tertiary)] group-hover:text-[var(--color-memory-accent)]">
                     <Settings size={12} aria-hidden="true" />
@@ -286,7 +314,7 @@ function MemoryToolActivityGroup({
                       </span>
                     ) : null}
                   </span>
-                </button>
+                </Button></HintTooltip>
               ))}
               {hiddenCount > 0 ? (
                 <div className="px-2 py-1 text-[12px] text-[var(--color-text-tertiary)]">
@@ -295,14 +323,14 @@ function MemoryToolActivityGroup({
               ) : null}
             </div>
 
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => setDetailsExpanded((value) => !value)}
               className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--color-border)] px-2 text-[11px] font-medium text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
             >
               {detailsExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               {t('chat.memoryTechnicalDetails')}
-            </button>
+            </Button>
 
             {detailsExpanded ? (
               <div className="mt-2 space-y-1">
@@ -318,8 +346,8 @@ function MemoryToolActivityGroup({
               </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   )
 }
@@ -355,28 +383,22 @@ function AgentToolGroup({
   }, [isStreaming])
 
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-        className={TOOL_SUMMARY_CLASS}
-      >
-        <ChevronRight size={13} aria-hidden="true" className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+    <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="mb-2">
+      <TraceCollapsibleTrigger className="min-h-7 w-full gap-2 text-ui-aux">
         {isAnyRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
         {!isAnyRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
         {!isAnyRunning && !errorPresent && allComplete && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
         {!isAnyRunning && !errorPresent && !allComplete && !anyStopped && <CircleDot size={13} aria-hidden="true" className="shrink-0" />}
         {!isAnyRunning && !errorPresent && !allComplete && anyStopped && <Square size={12} aria-hidden="true" className="shrink-0" />}
-        <span className="min-w-0 truncate">
+        <TraceLine status={isAnyRunning ? 'running' : errorPresent ? 'error' : undefined}><TraceTitle>
           {toolCalls.length === 1 ? t('toolGroup.agentOne') : t('toolGroup.agentMany', { count: toolCalls.length })}
-        </span>
+        </TraceTitle></TraceLine>
         {isAnyRunning && (
           <span className="shrink-0 text-[var(--color-text-tertiary)] before:mr-1 before:content-['·']">{t('agentStatus.running')}</span>
         )}
-      </button>
+      </TraceCollapsibleTrigger>
 
-      {expanded && (
+      <CollapsibleContent>
         <div className="relative mt-2 pl-5">
           <div className="absolute bottom-6 left-[11px] top-4 w-px rounded-full bg-[var(--color-border)]/45" />
           <div className="space-y-2">
@@ -397,57 +419,49 @@ function AgentToolGroup({
             ))}
           </div>
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </TraceCollapsible>
   )
 }
 
-function ToolCallGroupMulti({ toolCalls, resultMap, childToolCallsByParent, isStreaming }: Props) {
+function ToolCallGroupMulti({
+  toolCalls,
+  resultMap,
+  childToolCallsByParent,
+  steps = toolCalls,
+  activeThinkingId = null,
+  isStreaming,
+}: Props) {
   const [expanded, setExpanded] = useState(false)
   const t = useTranslation()
-  const summary = generateSummary(toolCalls, t)
+  const summary = generateSummary(toolCalls, t, steps.length - toolCalls.length)
   const errorPresent = groupHasErrors(toolCalls, resultMap, childToolCallsByParent)
   const hasUnresolvedTools = hasUnresolvedToolCalls(toolCalls, resultMap, childToolCallsByParent)
-  const isRunning = !!isStreaming || hasUnresolvedTools
-  const hasNestedToolCalls = toolCalls.some((tc) => (childToolCallsByParent.get(tc.toolUseId)?.length ?? 0) > 0)
-
-  useEffect(() => {
-    if (isRunning || hasNestedToolCalls) {
-      setExpanded(true)
-    }
-  }, [hasNestedToolCalls, isRunning])
+  const isRunning = !!isStreaming || hasUnresolvedTools || activeThinkingId !== null
 
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
-        className={TOOL_SUMMARY_CLASS}
-      >
-        <ChevronRight size={13} aria-hidden="true" className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+    <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="mb-2">
+      <TraceCollapsibleTrigger className="min-h-7 w-full gap-2 text-ui-aux">
         {!isRunning && !errorPresent && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
         {!isRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
         {isRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
-        <span className="min-w-0 truncate">{summary}</span>
-      </button>
+        <TraceLine status={isRunning ? 'running' : errorPresent ? 'error' : undefined}><TraceTitle>{summary}</TraceTitle></TraceLine>
+      </TraceCollapsibleTrigger>
 
-      {expanded && (
-        <div className="mb-1 ml-[6px] mt-1.5 space-y-1 border-l border-[var(--color-border)] pl-[18px]">
-          {toolCalls.map((tc) => {
-            return (
-              <ToolCallTree
-                key={tc.id}
-                toolCall={tc}
-                resultMap={resultMap}
-                childToolCallsByParent={childToolCallsByParent}
-                compact
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
+      <TraceCollapsibleContent className="ml-[6px] mt-1.5 space-y-1 pl-[18px]">
+        {steps.map((step) => step.type === 'thinking'
+          ? <ThinkingBlock key={step.id} content={step.content} isActive={step.id === activeThinkingId} />
+          : (
+            <ToolCallTree
+              key={step.id}
+              toolCall={step}
+              resultMap={resultMap}
+              childToolCallsByParent={childToolCallsByParent}
+              compact
+            />
+          ))}
+      </TraceCollapsibleContent>
+    </TraceCollapsible>
   )
 }
 
@@ -503,18 +517,16 @@ function AgentCallCard({
   const description = typeof input.description === 'string' ? input.description : ''
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-surface-container-lowest)]">
+    <Collapsible open={expanded} onOpenChange={setExpanded} className="overflow-hidden rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-surface-container-lowest)]">
       <div className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)]/50">
-        <span className="material-symbols-outlined text-[18px] text-[var(--color-outline)]">smart_toy</span>
+        <TraceIcon><Bot /></TraceIcon>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">Agent</span>
+          <TraceLine status={status === 'running' || status === 'starting' ? 'running' : status === 'failed' ? 'error' : undefined}>
+            <TraceTitle>Agent</TraceTitle>
             {description && (
-              <span className="truncate text-[12px] text-[var(--color-text-secondary)]">
-                {description}
-              </span>
+              <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>
             )}
-          </div>
+          </TraceLine>
           {!expanded && outputSummary && (
             <div className="mt-1 line-clamp-2 text-[11px] text-[var(--color-text-tertiary)]">
               {outputSummary}
@@ -539,7 +551,7 @@ function AgentCallCard({
           )}
         </div>
         {outputSummary && (
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={(event) => {
               event.stopPropagation()
@@ -548,24 +560,23 @@ function AgentCallCard({
             className="shrink-0 rounded-md border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
           >
             {t('agentStatus.viewResult')}
-          </button>
+          </Button>
         )}
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClassName}`}>
           {statusLabel}
         </span>
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-outline)] transition-colors hover:bg-[var(--color-surface-hover)]"
-          aria-label={expanded ? 'Collapse agent' : 'Expand agent'}
-        >
-          <span className="material-symbols-outlined text-[16px]">
-          {expanded ? 'expand_less' : 'expand_more'}
-          </span>
-        </button>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="icon-sm"
+            type="button"
+            className="rounded-full text-[var(--color-outline)] hover:bg-[var(--color-surface-hover)]"
+            aria-label={t(expanded ? 'agentStatus.collapse' : 'agentStatus.expand')}
+          >
+            <ChevronDown className="group-data-[state=open]/button:rotate-180" aria-hidden="true" />
+          </Button>
+        </CollapsibleTrigger>
       </div>
 
-      {expanded && (
+      <CollapsibleContent>
         <div className="border-t border-[var(--color-border)]/60 px-3 py-3">
           {errorText && (
             <div className="mb-3 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/60 px-3 py-2 text-[11px] text-[var(--color-error)]">
@@ -594,7 +605,7 @@ function AgentCallCard({
             </div>
           )}
         </div>
-      )}
+      </CollapsibleContent>
       <Modal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
@@ -605,7 +616,7 @@ function AgentCallCard({
           <MarkdownRenderer content={previewText || errorText} />
         </div>
       </Modal>
-    </div>
+    </Collapsible>
   )
 }
 
@@ -651,9 +662,6 @@ function ToolCallTree({
     </div>
   )
 }
-
-const TOOL_SUMMARY_CLASS =
-  'flex min-h-7 w-full items-center gap-2 rounded-md text-left text-ui-aux text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]'
 
 function openMemorySettings(path?: string) {
   const ui = useUIStore.getState()

@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useChatStore } from '../stores/chatStore'
 import { useTabStore, type Tab } from '../stores/tabStore'
-import { useTerminalPanelStore } from '../stores/terminalPanelStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 
 /** Recently opened sessions kept connected so switching back is instant. */
@@ -46,8 +45,7 @@ export function useReleaseIdleSessions() {
     if (released.length === 0) return
     for (const id of released) {
       useChatStore.getState().disconnectSession(id)
-      useWorkspacePanelStore.getState().clearSession(id)
-      useTerminalPanelStore.getState().clearSession(id)
+      useWorkspacePanelStore.getState().releaseSession(id)
     }
     useTabStore.getState().dropTabs(released)
   }, [tabs, activeTabId])

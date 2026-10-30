@@ -1,5 +1,7 @@
 import { create } from 'zustand'
+import { toast as sonnerToast } from 'sonner'
 import { isThemeMode, THEME_MODES, type ThemeMode } from '../types/settings'
+import { themeColorScheme } from '../theme/colorScheme'
 
 const THEME_STORAGE_KEY = 'dreamcoder-theme'
 const SIDEBAR_WIDTH_STORAGE_KEY = 'dreamcoder-sidebar-width'
@@ -30,7 +32,7 @@ function getStoredTheme(): ThemeMode {
 export function applyTheme(theme: ThemeMode) {
   if (typeof document === 'undefined') return
   document.documentElement.setAttribute('data-theme', theme)
-  document.documentElement.style.colorScheme = theme === 'dark' || theme === 'midnight' || theme === 'aurora' ? 'dark' : 'light'
+  document.documentElement.style.colorScheme = themeColorScheme(theme)
 }
 
 export function initializeTheme() {
@@ -38,10 +40,8 @@ export function initializeTheme() {
 }
 
 export type Toast = {
-  id: string
   type: 'success' | 'error' | 'warning' | 'info'
   message: string
-  duration?: number
 }
 
 export type SettingsTab =
@@ -50,7 +50,6 @@ export type SettingsTab =
   | 'activity'
   | 'general'
   | 'h5Access'
-  | 'terminal'
   | 'mcp'
   | 'agents'
   | 'skills'
@@ -69,7 +68,6 @@ type UIStore = {
   settingsTab: SettingsTab
   pendingMemoryPath: string | null
   activeModal: string | null
-  toasts: Toast[]
 
   setTheme: (theme: ThemeMode) => void
   toggleTheme: () => void
@@ -82,11 +80,8 @@ type UIStore = {
   setPendingMemoryPath: (path: string | null) => void
   openModal: (id: string) => void
   closeModal: () => void
-  addToast: (toast: Omit<Toast, 'id'>) => void
-  removeToast: (id: string) => void
+  addToast: (toast: Toast) => void
 }
-
-let toastCounter = 0
 
 export const useUIStore = create<UIStore>((set) => ({
   theme: getStoredTheme(),
@@ -96,7 +91,6 @@ export const useUIStore = create<UIStore>((set) => ({
   settingsTab: 'providers',
   pendingMemoryPath: null,
   activeModal: null,
-  toasts: [],
 
   setTheme: (theme) => {
     applyTheme(theme)
@@ -128,16 +122,7 @@ export const useUIStore = create<UIStore>((set) => ({
   openModal: (id) => set({ activeModal: id }),
   closeModal: () => set({ activeModal: null }),
 
-  addToast: (toast) => {
-    const id = `toast-${++toastCounter}`
-    set((s) => ({ toasts: [...s.toasts, { ...toast, id }] }))
-    const duration = toast.duration ?? 4000
-    if (duration > 0) {
-      setTimeout(() => {
-        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
-      }, duration)
-    }
+  addToast: ({ type, message }) => {
+    sonnerToast[type](message)
   },
-
-  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))

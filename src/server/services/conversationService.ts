@@ -21,6 +21,8 @@ import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
 import { SettingsService } from './settingsService.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
+import { permissionModeCliArgs } from './permissionModes.js'
+import { SHOW_UI_ENABLED_ENV } from '../../tools/ShowUITool/constants.js'
 
 const MAX_CAPTURED_PROCESS_LINES = 80
 const MAX_CAPTURED_SDK_MESSAGES = 40
@@ -39,9 +41,10 @@ type AttachmentRef = {
 
 type SessionProcess = {
   proc: ReturnType<typeof Bun.spawn>
+  generation: number
   outputCallbacks: Array<(msg: any) => void>
   workDir: string
-  permissionMode: string
+  launchPermissionMode: string
   sdkToken: string
   sdkSocket: { send(data: string): void } | null
   pendingOutbound: string[]
@@ -52,24 +55,25 @@ type SessionProcess = {
   outputDrain: Promise<void>
   sdkMessages: any[]
   initMessage: any | null
-  pendingPermissionRequests: Map<
-    string,
-    {
-      toolName: string
-      toolUseId?: string
-      description?: string
-      input: Record<string, unknown>
-      permissionSuggestions?: unknown[]
-    }
-  >
 }
 
-export type PendingPermissionRequest = {
-  requestId: string
+export type ProcessExitEvent = { sessionId: string; generation: number }
+
+export type ProcessExitListener = (event: ProcessExitEvent) => void
+
+export type ProcessLifecycleEvent = {
+  sessionId: string
+  generation: number
+  phase: 'starting' | 'running' | 'stopped' | 'failed'
+  permissionMode?: string
+  error?: { code: string; message: string }
+}
+
+export type ProcessLifecycleListener = (event: ProcessLifecycleEvent) => void
+
+export type PermissionReplyContext = {
   toolName: string
-  toolUseId?: string
-  input: Record<string, unknown>
-  description?: string
+  suggestions?: unknown[]
 }
 
 type SessionStartOptions = {
@@ -100,6 +104,9 @@ export class ConversationStartupError extends Error {
 
 export class ConversationService {
   private sessions = new Map<string, SessionProcess>()
+  private generations = new Map<string, number>()
+  private lifecycleListeners = new Set<ProcessLifecycleListener>()
+  private exitListeners = new Set<ProcessExitListener>()
   private deletedSessions = new Set<string>()
   private providerService = new ProviderService()
 
@@ -140,20 +147,93 @@ export class ConversationService {
     ])
   }
 
+  onProcessExited(listener: ProcessExitListener): () => void {
+    this.exitListeners.add(listener)
+    return () => {
+      this.exitListeners.delete(listener)
+    }
+  }
+
+  private emitProcessExited(event: ProcessExitEvent): void {
+    for (const listener of this.exitListeners) {
+      try {
+        listener(event)
+      } catch (err) {
+        console.error('[ConversationService] Process exit listener failed:', err)
+      }
+    }
+  }
+
+  onProcessEvent(listener: ProcessLifecycleListener): () => void {
+    this.lifecycleListeners.add(listener)
+    return () => {
+      this.lifecycleListeners.delete(listener)
+    }
+  }
+
+  getGeneration(sessionId: string): number {
+    return this.sessions.get(sessionId)?.generation ?? 0
+  }
+
+  private emitProcessEvent(event: ProcessLifecycleEvent): void {
+    for (const listener of this.lifecycleListeners) {
+      try {
+        listener(event)
+      } catch (err) {
+        console.error('[ConversationService] Process lifecycle listener failed:', err)
+      }
+    }
+  }
+
+  forgetSession(sessionId: string): void {
+    if (!this.sessions.has(sessionId)) this.generations.delete(sessionId)
+  }
+
+  private nextGeneration(sessionId: string): number {
+    const generation = (this.generations.get(sessionId) ?? 0) + 1
+    this.generations.set(sessionId, generation)
+    return generation
+  }
+
   async startSession(
     sessionId: string,
     workDir: string,
     sdkUrl: string,
     options?: SessionStartOptions,
-  ): Promise<void> {
+  ): Promise<number> {
+    if (this.sessions.has(sessionId)) return this.getGeneration(sessionId)
+    const generation = this.nextGeneration(sessionId)
+    try {
+      return await this.launchSession(sessionId, workDir, sdkUrl, generation, options)
+    } catch (err) {
+      if (this.sessions.get(sessionId)?.generation !== generation) {
+        this.emitProcessEvent({
+          sessionId,
+          generation,
+          phase: 'failed',
+          error: {
+            code: err instanceof ConversationStartupError ? err.code : 'CLI_START_FAILED',
+            message: err instanceof Error ? err.message : String(err),
+          },
+        })
+      }
+      throw err
+    }
+  }
+
+  private async launchSession(
+    sessionId: string,
+    workDir: string,
+    sdkUrl: string,
+    generation: number,
+    options?: SessionStartOptions,
+  ): Promise<number> {
     if (this.deletedSessions.has(sessionId)) {
       throw new ConversationStartupError(
         `Session was deleted before startup completed: ${sessionId}`,
         'SESSION_DELETED',
       )
     }
-    if (this.sessions.has(sessionId)) return
-
     const launchInfo = await sessionService.getSessionLaunchInfo(sessionId)
     const shouldResume = !!launchInfo && launchInfo.transcriptMessageCount > 0
     const shouldReplacePlaceholder =
@@ -259,11 +339,15 @@ export class ConversationService {
       )
     }
 
+    const launchPermissionMode = process.env.CLAUDE_DANGEROUS_MODE === '1'
+      ? 'bypassPermissions'
+      : options?.permissionMode || 'default'
     const session: SessionProcess = {
       proc,
+      generation,
       outputCallbacks: [],
       workDir: launchWorkDir,
-      permissionMode: options?.permissionMode || 'default',
+      launchPermissionMode,
       sdkToken: this.getSdkTokenFromUrl(sdkUrl),
       sdkSocket: null,
       pendingOutbound: [],
@@ -274,9 +358,9 @@ export class ConversationService {
       outputDrain: Promise.resolve(),
       sdkMessages: [],
       initMessage: null,
-      pendingPermissionRequests: new Map(),
     }
     this.sessions.set(sessionId, session)
+    this.emitProcessEvent({ sessionId, generation, phase: 'starting', permissionMode: launchPermissionMode })
 
     session.outputDrain = Promise.all([
       this.readProcessOutputStream(sessionId, proc.stdout, 'stdout'),
@@ -284,7 +368,9 @@ export class ConversationService {
     ]).then(() => undefined)
 
     proc.exited.then((code) => {
-      void this.handleProcessExit(sessionId, proc, code)
+      void this.handleProcessExit(sessionId, proc, code).finally(() => {
+        this.emitProcessExited({ sessionId, generation })
+      })
     })
 
     const STARTUP_GRACE_MS = 3000
@@ -299,12 +385,17 @@ export class ConversationService {
     if (startupExitCode !== null) {
       await this.waitForProcessOutputDrain(session)
       const startupError = this.buildStartupError(sessionId, startupExitCode)
-      this.sessions.delete(sessionId)
+      if (this.sessions.get(sessionId) === session) this.sessions.delete(sessionId)
 
       if (this.clearStaleLock(sessionId)) {
         console.log(
           `[ConversationService] Removed stale lock for ${sessionId}, retrying...`,
         )
+        this.emitProcessEvent({
+          sessionId,
+          generation,
+          phase: 'stopped',
+        })
         return this.startSession(sessionId, workDir, sdkUrl, options)
       }
 
@@ -328,6 +419,12 @@ export class ConversationService {
           sdkMessages: this.summarizeSdkMessages(session.sdkMessages),
         },
       })
+      this.emitProcessEvent({
+        sessionId,
+        generation,
+        phase: 'failed',
+        error: { code: startupError.code, message: startupError.message },
+      })
       throw startupError
     }
 
@@ -342,6 +439,10 @@ export class ConversationService {
     }
 
     console.log(`[ConversationService] CLI started successfully for ${sessionId}`)
+    if (this.sessions.get(sessionId) === session) {
+      this.emitProcessEvent({ sessionId, generation, phase: 'running', permissionMode: launchPermissionMode })
+    }
+    return generation
   }
 
   onOutput(sessionId: string, callback: (msg: any) => void): void {
@@ -356,6 +457,10 @@ export class ConversationService {
     if (session) {
       session.outputCallbacks = []
     }
+  }
+
+  hasOutputCallback(sessionId: string, callback: (msg: any) => void): boolean {
+    return this.sessions.get(sessionId)?.outputCallbacks.includes(callback) ?? false
   }
 
   removeOutputCallback(sessionId: string, callback: (msg: any) => void): void {
@@ -376,6 +481,7 @@ export class ConversationService {
     sessionId: string,
     content: string,
     attachments?: AttachmentRef[],
+    uuid?: string,
   ): boolean {
     return this.sendSdkMessage(sessionId, {
       type: 'user',
@@ -385,6 +491,7 @@ export class ConversationService {
       },
       parent_tool_use_id: null,
       session_id: '',
+      ...(uuid ? { uuid } : {}),
     })
   }
 
@@ -394,13 +501,8 @@ export class ConversationService {
     allowed: boolean,
     rule?: string,
     updatedInput?: Record<string, unknown>,
+    pendingRequest?: PermissionReplyContext,
   ): boolean {
-    const session = this.sessions.get(sessionId)
-    const pendingRequest = session?.pendingPermissionRequests.get(requestId)
-    if (session) {
-      session.pendingPermissionRequests.delete(requestId)
-    }
-
     return this.sendSdkMessage(sessionId, {
       type: 'control_response',
       response: {
@@ -414,7 +516,7 @@ export class ConversationService {
                 ? {
                     updatedPermissions: [
                       ...normalizeSessionPermissionUpdates(
-                        pendingRequest.permissionSuggestions,
+                        pendingRequest.suggestions,
                         pendingRequest.toolName,
                       ),
                     ],
@@ -426,15 +528,17 @@ export class ConversationService {
     })
   }
 
-  setPermissionMode(sessionId: string, mode: string): boolean {
-    return this.sendSdkMessage(sessionId, {
+  setPermissionMode(sessionId: string, mode: string): string | null {
+    const requestId = crypto.randomUUID()
+    const sent = this.sendSdkMessage(sessionId, {
       type: 'control_request',
-      request_id: crypto.randomUUID(),
+      request_id: requestId,
       request: {
         subtype: 'set_permission_mode',
         mode,
       },
     })
+    return sent ? requestId : null
   }
 
   setMaxThinkingTokens(sessionId: string, maxThinkingTokens: number | null): boolean {
@@ -562,24 +666,6 @@ export class ConversationService {
     session.workDir = workDir
   }
 
-  getSessionPermissionMode(sessionId: string): string {
-    const session = this.sessions.get(sessionId)
-    return session?.permissionMode || 'default'
-  }
-
-  getPendingPermissionRequests(sessionId: string): PendingPermissionRequest[] {
-    const session = this.sessions.get(sessionId)
-    if (!session) return []
-
-    return Array.from(session.pendingPermissionRequests.entries()).map(([requestId, request]) => ({
-      requestId,
-      toolName: request.toolName,
-      ...(request.toolUseId ? { toolUseId: request.toolUseId } : {}),
-      input: request.input,
-      ...(request.description ? { description: request.description } : {}),
-    }))
-  }
-
   authorizeSdkConnection(
     sessionId: string,
     token: string | null | undefined,
@@ -605,16 +691,16 @@ export class ConversationService {
     return true
   }
 
-  detachSdkConnection(sessionId: string): void {
+  detachSdkConnection(sessionId: string, token: string | null | undefined): void {
     const session = this.sessions.get(sessionId)
-    if (session) {
+    if (session && token === session.sdkToken) {
       session.sdkSocket = null
     }
   }
 
-  handleSdkPayload(sessionId: string, rawPayload: string): void {
+  handleSdkPayload(sessionId: string, rawPayload: string, token: string | null | undefined): void {
     const session = this.sessions.get(sessionId)
-    if (!session) return
+    if (!session || token !== session.sdkToken) return
 
     const lines = rawPayload
       .split('\n')
@@ -641,46 +727,7 @@ export class ConversationService {
         if (msg?.type === 'system' && msg.subtype === 'init') {
           session.initMessage = msg
         }
-        if (
-          msg?.type === 'control_request' &&
-          msg.request?.subtype === 'can_use_tool' &&
-          typeof msg.request_id === 'string'
-        ) {
-          session.pendingPermissionRequests.set(msg.request_id, {
-            toolName:
-              typeof msg.request.tool_name === 'string'
-                ? msg.request.tool_name
-                : 'Unknown',
-            toolUseId:
-              typeof msg.request.tool_use_id === 'string' && msg.request.tool_use_id.trim()
-                ? msg.request.tool_use_id
-                : undefined,
-            input:
-              msg.request.input && typeof msg.request.input === 'object'
-                ? (msg.request.input as Record<string, unknown>)
-                : {},
-            description:
-              typeof msg.request.description === 'string' && msg.request.description.trim()
-                ? msg.request.description
-                : undefined,
-            permissionSuggestions: Array.isArray(msg.request.permission_suggestions)
-              ? msg.request.permission_suggestions
-              : undefined,
-          })
-        }
-        if (
-          (msg?.type === 'control_cancel_request' || msg?.type === 'control_response') &&
-          typeof msg.request_id === 'string'
-        ) {
-          session.pendingPermissionRequests.delete(msg.request_id)
-        }
-        if (
-          msg?.type === 'control_response' &&
-          typeof msg.response?.request_id === 'string'
-        ) {
-          session.pendingPermissionRequests.delete(msg.response.request_id)
-        }
-        for (const cb of session.outputCallbacks) {
+        for (const cb of [...session.outputCallbacks]) {
           cb(msg)
         }
       } catch {
@@ -691,12 +738,13 @@ export class ConversationService {
     }
   }
 
-  stopSession(sessionId: string): void {
+  stopSession(sessionId: string, generation?: number): void {
     const session = this.sessions.get(sessionId)
-    if (session) {
-      session.proc.kill()
-      this.sessions.delete(sessionId)
-    }
+    if (!session) return
+    if (generation !== undefined && session.generation !== generation) return
+    session.proc.kill()
+    this.sessions.delete(sessionId)
+    this.emitProcessEvent({ sessionId, generation: session.generation, phase: 'stopped' })
   }
 
   async stopSessionAndWait(sessionId: string, timeoutMs = 2_000): Promise<void> {
@@ -704,6 +752,7 @@ export class ConversationService {
     if (!session) return
 
     this.sessions.delete(sessionId)
+    this.emitProcessEvent({ sessionId, generation: session.generation, phase: 'stopped' })
     session.proc.kill()
 
     await Promise.race([
@@ -825,6 +874,7 @@ export class ConversationService {
         return
       }
       await this.waitForProcessOutputDrain(activeSession)
+      if (this.sessions.get(sessionId) !== activeSession) return
       const exitError = this.buildRuntimeExitMessage(sessionId, code)
       void diagnosticsService.recordEvent({
         type: 'cli_runtime_exit',
@@ -834,12 +884,12 @@ export class ConversationService {
         details: {
           exitCode: code,
           workDir: activeSession.workDir,
-          permissionMode: activeSession.permissionMode,
+          permissionMode: activeSession.launchPermissionMode,
           capturedOutput: this.buildCapturedProcessOutputDetail(activeSession),
           sdkMessages: this.summarizeSdkMessages(activeSession.sdkMessages),
         },
       })
-      for (const cb of activeSession.outputCallbacks) {
+      for (const cb of [...activeSession.outputCallbacks]) {
         cb({
           type: 'result',
           subtype: 'error',
@@ -850,6 +900,12 @@ export class ConversationService {
         })
       }
       this.sessions.delete(sessionId)
+      this.emitProcessEvent({
+        sessionId,
+        generation: activeSession.generation,
+        phase: 'failed',
+        error: { code: 'CLI_EXITED', message: exitError },
+      })
     }
   }
 
@@ -857,17 +913,7 @@ export class ConversationService {
     mode: string | undefined,
     dangerousMode: boolean,
   ): string[] {
-    if (dangerousMode) {
-      return ['--dangerously-skip-permissions']
-    }
-
-    const resolvedMode = mode || 'default'
-    if (resolvedMode === 'bypassPermissions') {
-      return ['--dangerously-skip-permissions']
-    }
-
-    const args = ['--permission-mode', resolvedMode]
-    return args
+    return permissionModeCliArgs(dangerousMode ? 'bypassPermissions' : mode)
   }
 
   private getRuntimeArgs(options: SessionStartOptions | undefined): string[] {
@@ -899,6 +945,7 @@ export class ConversationService {
       'ANTHROPIC_AUTH_TOKEN',
       'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+      'ANTHROPIC_SMALL_FAST_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
       'ANTHROPIC_DEFAULT_SONNET_MODEL',
       'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
@@ -932,14 +979,11 @@ export class ConversationService {
 
     const explicitProviderEnv =
       typeof options?.providerId === 'string'
-        ? await this.providerService.getProviderRuntimeEnv(options.providerId)
+        ? await this.providerService.getProviderRuntimeEnv(options.providerId, options.model)
         : null
     const userSettings = await new SettingsService().getUserSettings()
     const networkEnv = buildNetworkEnvironment(normalizeNetworkSettings(userSettings))
     applyAgentTeamsSetting(cleanEnv, userSettings)
-    if (explicitProviderEnv && options?.model?.trim()) {
-      explicitProviderEnv.ANTHROPIC_MODEL = options.model.trim()
-    }
     const attributionHeaderEnv = attributionHeaderEnvForModel(
       options?.model?.trim() ||
         explicitProviderEnv?.ANTHROPIC_MODEL ||
@@ -956,6 +1000,8 @@ export class ConversationService {
       ...cleanEnv,
       CLAUDE_CODE_ENABLE_TASKS: '1',
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
+      CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: '1',
+      [SHOW_UI_ENABLED_ENV]: '1',
       CLAUDE_CODE_DIAGNOSTICS_FILE: cliDiagnosticsPath,
       CLAUDE_COWORK_MEMORY_PATH_OVERRIDE: this.resolveDesktopAutoMemoryPath(workDir),
       CALLER_DIR: workDir,

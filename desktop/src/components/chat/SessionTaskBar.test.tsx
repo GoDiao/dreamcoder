@@ -12,10 +12,11 @@ vi.mock('../../api/cliTasks', () => ({
 }))
 
 vi.mock('../../i18n', () => ({
-  useTranslation: () => (key: string) => {
+  useTranslation: () => (key: string, params?: Record<string, number>) => {
     const translations: Record<string, string> = {
       'tasks.title': 'Tasks',
       'tasks.dismissCompleted': 'Hide completed tasks',
+      'tasks.progress': `${params?.done} of ${params?.total} done`,
     }
 
     return translations[key] ?? key
@@ -36,6 +37,30 @@ describe('SessionTaskBar', () => {
   afterEach(() => {
     cleanup()
     useCLITaskStore.getState().clearTasks()
+  })
+
+  it('keeps expansion in the store and updates progress as tasks complete', () => {
+    useCLITaskStore.getState().setTasksFromTodos([
+      { content: 'first', status: 'completed' },
+      { content: 'second', status: 'in_progress', activeForm: 'working' },
+    ])
+    render(<SessionTaskBar />)
+    const trigger = screen.getByRole('button', { name: 'Tasks' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('working')).toBeNull()
+    expect(screen.getByText('1 of 2 done')).toBeInTheDocument()
+    expect(screen.getByText('Tasks').closest('[data-slot="trace-line"]')).toHaveAttribute('data-status', 'running')
+    fireEvent.click(trigger)
+    expect(useCLITaskStore.getState().expanded).toBe(true)
+    expect(screen.getByText('working')).toBeVisible()
+    act(() => useCLITaskStore.getState().setTasksFromTodos([
+      { content: 'first', status: 'completed' },
+      { content: 'second', status: 'completed' },
+    ]))
+    expect(screen.queryByText('working')).toBeNull()
+    expect(screen.getByText('2 of 2 done')).toBeInTheDocument()
+    expect(screen.getByText('Tasks').closest('[data-slot="trace-line"]')).not.toHaveAttribute('data-status')
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('only shows the dismiss button once every task is completed', () => {

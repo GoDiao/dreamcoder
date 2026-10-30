@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useSettingsStore } from '../../stores/settingsStore'
+import { prepareAppModeRestart, relaunchApp, pickDirectory } from '../../lib/shell'
+import { DEFAULT_AUTO_COMPACT_PERCENT, useSettingsStore } from '../../stores/settingsStore'
 import { useTranslation } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { Input } from '../shared/Input'
-import { Button } from '../shared/Button'
-import { Switch } from '../shared/Switch'
+import { LabeledInput } from '../shared/LabeledInput'
+import { Button } from '../shared/ui/button'
+import { Switch } from '../shared/ui/switch'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { SettingsGroup, SettingsRow } from './SettingsRow'
 import { SettingsSelect } from './SettingsSelect'
@@ -13,7 +14,7 @@ import { terminalApi } from '../../api/terminal'
 import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
-import { isTauriRuntime } from '../../lib/desktopRuntime'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { isValidHttpProxyUrl } from '../../lib/validation'
 import { TerminalShellSettings } from './TerminalShellSettings'
 import { ProxyConfigForm } from './ProxyConfigForm'
@@ -30,12 +31,16 @@ const NETWORK_TIMEOUT_MIN_SECONDS = 5
 const NETWORK_TIMEOUT_MAX_SECONDS = 600
 const NETWORK_TIMEOUT_STEP_SECONDS = 30
 
+const AUTO_COMPACT_PERCENTS = [50, 60, 70, 80, 90, 95]
+
 export function GeneralSettings() {
   const {
     effortLevel,
     setEffort,
     thinkingEnabled,
     setThinkingEnabled,
+    autoCompactPercent,
+    setAutoCompactPercent,
     locale,
     setLocale,
     theme,
@@ -104,7 +109,7 @@ export function GeneralSettings() {
   }, [])
 
   useEffect(() => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     void fetchAppMode()
   }, [fetchAppMode])
 
@@ -112,6 +117,12 @@ export function GeneralSettings() {
     setPortableDirDraft(appMode.portableDir ?? appMode.defaultPortableDir ?? '')
   }, [appMode.defaultPortableDir, appMode.portableDir])
 
+  const AUTO_COMPACT_OPTIONS = [...new Set([...AUTO_COMPACT_PERCENTS, autoCompactPercent])].sort((a, b) => a - b).map((percent) => ({
+    value: String(percent),
+    label: percent === DEFAULT_AUTO_COMPACT_PERCENT
+      ? t('settings.general.autoCompactDefaultOption', { percent })
+      : `${percent}%`,
+  }))
   const EFFORT_OPTIONS: Array<{ value: EffortLevel; label: string }> = [
     { value: 'low', label: 'Low' },
     { value: 'medium', label: 'Medium' },
@@ -172,7 +183,9 @@ export function GeneralSettings() {
     denied: t('settings.general.notificationsStatusDenied'),
     default: t('settings.general.notificationsStatusDefault'),
     unsupported: t('settings.general.notificationsStatusUnsupported'),
+    unknown: t('settings.general.notificationsStatusUnknown'),
   }
+  const notificationSettingsOnly = notificationPermission === 'denied' || notificationPermission === 'unknown'
 
   const handleDesktopNotificationsToggle = async (enabled: boolean) => {
     await setDesktopNotificationsEnabled(enabled)
@@ -182,7 +195,7 @@ export function GeneralSettings() {
     try {
       const permission = await requestDesktopNotificationPermission()
       setNotificationPermission(permission)
-      if (permission === 'granted') {
+      if (permission === 'granted' || permission === 'unknown') {
         void notifyDesktop({
           title: t('settings.general.notificationsTestTitle'),
           body: t('settings.general.notificationsTestBody'),
@@ -199,7 +212,7 @@ export function GeneralSettings() {
   const handleNotificationPermissionAction = async () => {
     setNotificationActionRunning(true)
     try {
-      if (notificationPermission === 'denied') {
+      if (notificationSettingsOnly) {
         await openDesktopNotificationSettings()
       } else {
         const permission = await requestDesktopNotificationPermission()
@@ -295,8 +308,7 @@ export function GeneralSettings() {
   const openPortableDirPicker = async () => {
     setModeError(null)
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
+      const selected = await pickDirectory({
         directory: true,
         multiple: false,
         title: t('settings.general.storageChooseDirTitle'),
@@ -341,10 +353,8 @@ export function GeneralSettings() {
     setModeError(null)
     try {
       await setAppModeAction(pendingMode, pendingPortableDir)
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('prepare_for_app_mode_restart')
-      const { relaunch } = await import('@tauri-apps/plugin-process')
-      await relaunch()
+      await prepareAppModeRestart()
+      await relaunchApp()
     } catch (error) {
       setModeError(
         error instanceof Error
@@ -378,7 +388,7 @@ export function GeneralSettings() {
     modeActionRunning ||
     (storageChoice === appMode.mode &&
       (storageChoice === 'default' || portableDirDraft.trim() === (appMode.portableDir ?? '')))
-  const showShellRow = isTauriRuntime() && terminalApi.isAvailable()
+  const showShellRow = isDesktopRuntime() && terminalApi.isAvailable()
 
   return (
     <div>
@@ -437,9 +447,21 @@ export function GeneralSettings() {
           description={t('settings.general.thinkingDescription')}
           control={
             <Switch
-              label={t('settings.general.thinkingEnabled')}
+              aria-label={t('settings.general.thinkingEnabled')}
               checked={thinkingEnabled}
-              onChange={(checked) => void setThinkingEnabled(checked)}
+              onCheckedChange={(checked) => void setThinkingEnabled(checked)}
+            />
+          }
+        />
+        <SettingsRow
+          title={t('settings.general.autoCompactTitle')}
+          description={t('settings.general.autoCompactDescription')}
+          control={
+            <SettingsSelect<string>
+              label={t('settings.general.autoCompactTitle')}
+              options={AUTO_COMPACT_OPTIONS}
+              value={String(autoCompactPercent)}
+              onChange={(value) => void setAutoCompactPercent(Number(value))}
             />
           }
         />
@@ -451,9 +473,9 @@ export function GeneralSettings() {
           description={t('settings.general.notificationsDescription')}
           control={
             <Switch
-              label={t('settings.general.notificationsEnabled')}
+              aria-label={t('settings.general.notificationsEnabled')}
               checked={desktopNotificationsEnabled}
-              onChange={(checked) => void handleDesktopNotificationsToggle(checked)}
+              onCheckedChange={(checked) => void handleDesktopNotificationsToggle(checked)}
             />
           }
         />
@@ -465,12 +487,12 @@ export function GeneralSettings() {
               notificationPermission !== 'granted' && notificationPermission !== 'unsupported' ? (
                 <Button
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="whitespace-nowrap"
                   disabled={notificationActionRunning}
                   onClick={() => void handleNotificationPermissionAction()}
                 >
-                  {notificationPermission === 'denied'
+                  {notificationSettingsOnly
                     ? t('settings.general.notificationsOpenSettings')
                     : t('settings.general.notificationsAuthorize')}
                 </Button>
@@ -486,9 +508,9 @@ export function GeneralSettings() {
           description={t('settings.general.agentTeamsDescription')}
           control={
             <Switch
-              label={t('settings.general.agentTeamsTitle')}
+              aria-label={t('settings.general.agentTeamsTitle')}
               checked={agentTeamsEnabled}
-              onChange={(checked) => void setAgentTeamsEnabled(checked)}
+              onCheckedChange={(checked) => void setAgentTeamsEnabled(checked)}
             />
           }
         />
@@ -545,7 +567,7 @@ export function GeneralSettings() {
                 <Button
                   type="button"
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="w-12 px-0"
                   aria-label={t('settings.general.networkTimeoutDecrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) - NETWORK_TIMEOUT_STEP_SECONDS)}
@@ -576,10 +598,10 @@ export function GeneralSettings() {
                       }
                       setNetworkSaveError(null)
                     }}
-                    className={`h-9 w-full rounded-[var(--radius-md)] border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
+                    className={`h-9 w-full rounded-md border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
                       networkTimeoutError
                         ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
-                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:shadow-[var(--shadow-focus-ring)]'
+                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:ring-3 focus:ring-ui-ring/50'
                     }`}
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-tertiary)]">
@@ -589,7 +611,7 @@ export function GeneralSettings() {
                 <Button
                   type="button"
                   size="xs"
-                  variant="secondary"
+                  variant="outline"
                   className="w-12 px-0"
                   aria-label={t('settings.general.networkTimeoutIncrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) + NETWORK_TIMEOUT_STEP_SECONDS)}
@@ -622,10 +644,10 @@ export function GeneralSettings() {
           />
           <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
             <div>
-              <Input
+              <LabeledInput
                 id="web-search-tavily-key"
-                type="password"
                 label={t('settings.general.webSearchTavilyKey')}
+                type="password"
                 value={webSearchDraft.tavilyApiKey ?? ''}
                 placeholder="tvly-..."
                 autoComplete="off"
@@ -650,10 +672,10 @@ export function GeneralSettings() {
               </div>
             </div>
             <div>
-              <Input
+              <LabeledInput
                 id="web-search-brave-key"
-                type="password"
                 label={t('settings.general.webSearchBraveKey')}
+                type="password"
                 value={webSearchDraft.braveApiKey ?? ''}
                 placeholder={t('settings.general.webSearchBravePlaceholder')}
                 autoComplete="off"
@@ -681,7 +703,7 @@ export function GeneralSettings() {
           <div className="mt-4 flex justify-end">
             <Button
               size="xs"
-              variant="secondary"
+              variant="outline"
               className="whitespace-nowrap"
               disabled={!webSearchDirty}
               onClick={() => void setWebSearch(webSearchDraft)}
@@ -695,9 +717,9 @@ export function GeneralSettings() {
             description={t('settings.general.webFetchPreflightDescription')}
             control={
               <Switch
-                label={t('settings.general.webFetchPreflightEnabled')}
+                aria-label={t('settings.general.webFetchPreflightEnabled')}
                 checked={skipWebFetchPreflight}
-                onChange={(checked) => void setSkipWebFetchPreflight(checked)}
+                onCheckedChange={(checked) => void setSkipWebFetchPreflight(checked)}
               />
             }
           />
@@ -709,7 +731,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && (
+        {isDesktopRuntime() && (
           <SettingsDisclosureRow title={t('settings.general.storageTitle')} summary={storageSummary}>
             <SettingsRow
               title={t('settings.general.storageMode')}
@@ -738,7 +760,7 @@ export function GeneralSettings() {
               <div className="mt-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
-                    <Input
+                    <LabeledInput
                       id="portable-data-dir"
                       label={t('settings.general.storagePortableDirLabel')}
                       value={portableDirDraft}
@@ -753,7 +775,7 @@ export function GeneralSettings() {
                   <Button
                     type="button"
                     size="xs"
-                    variant="secondary"
+                    variant="outline"
                     className="mb-1 flex-shrink-0 whitespace-nowrap"
                     onClick={() => void openPortableDirPicker()}
                   >
@@ -804,7 +826,7 @@ export function GeneralSettings() {
               <Button
                 type="button"
                 size="xs"
-                variant="secondary"
+                variant="outline"
                 disabled={storageApplyDisabled}
                 onClick={() => openModeSwitchConfirm(storageChoice)}
               >
@@ -816,7 +838,7 @@ export function GeneralSettings() {
           </SettingsDisclosureRow>
         )}
 
-        {isTauriRuntime() && <ClaudeCodeImportSettings />}
+        {isDesktopRuntime() && <ClaudeCodeImportSettings />}
       </SettingsGroup>
 
       <ConfirmDialog
@@ -841,7 +863,7 @@ export function GeneralSettings() {
         )}
         confirmLabel={t('settings.general.modeSwitchConfirm')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="primary"
+        confirmVariant="default"
         loading={modeActionRunning}
       />
     </div>

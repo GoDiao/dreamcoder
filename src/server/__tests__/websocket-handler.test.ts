@@ -7,14 +7,19 @@ import {
   __resetWebSocketHandlerStateForTests,
   closeSessionConnection,
   getActiveSessionIds,
+  getSessionState,
   getSlashCommands,
   handleWebSocket,
+  resolveSessionPermissionMode,
   translateCliMessage,
   updateSessionSlashCommands,
   type WebSocketData,
 } from '../ws/handler.js'
 import { conversationService } from '../services/conversationService.js'
 import { sessionService } from '../services/sessionService.js'
+import { SettingsService } from '../services/settingsService.js'
+import { getSessionRuntime } from '../ws/sessionRuntime.js'
+import { sessionStateStore } from '../session/state/store.js'
 
 function makeClientSocket(sessionId: string) {
   const sent: string[] = []
@@ -23,6 +28,7 @@ function makeClientSocket(sessionId: string) {
       sessionId,
       connectedAt: Date.now(),
       channel: 'client',
+      clientKind: 'desktop',
       sdkToken: null,
       serverPort: 0,
       serverHost: '127.0.0.1',
@@ -60,7 +66,6 @@ describe('WebSocket handler session isolation', () => {
   it('closes and removes an active client socket when a session is deleted', () => {
     const sessionId = `delete-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
-    const clearCallbacks = spyOn(conversationService, 'clearOutputCallbacks')
 
     handleWebSocket.open(ws)
 
@@ -68,17 +73,20 @@ describe('WebSocket handler session isolation', () => {
 
     expect(getActiveSessionIds()).not.toContain(sessionId)
     expect(ws.close).toHaveBeenCalledWith(1000, 'session deleted')
-    expect(clearCallbacks).toHaveBeenCalledWith(sessionId)
+    expect(getSessionState(sessionId)).toBeUndefined()
   })
 
-  it('replays pending permission requests when a client reconnects', () => {
+  it('replays pending permission requests when a client reconnects', async () => {
     const sessionId = `permission-reconnect-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
     spyOn(conversationService, 'hasSession').mockReturnValue(true)
     spyOn(conversationService, 'onOutput').mockImplementation(() => {})
     spyOn(conversationService, 'removeOutputCallback').mockImplementation(() => {})
-    spyOn(conversationService, 'getPendingPermissionRequests').mockReturnValue([
-      {
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue(null)
+    sessionStateStore.apply(sessionId, {
+      type: 'permission_request_opened',
+      at: 1,
+      request: {
         requestId: 'request-ask-1',
         toolName: 'AskUserQuestion',
         toolUseId: 'tool-ask-1',
@@ -93,12 +101,13 @@ describe('WebSocket handler session isolation', () => {
         },
         description: 'Answer questions?',
       },
-    ])
+    })
 
     handleWebSocket.open(ws)
+    await waitFor(() => ws.sent.some((payload) => JSON.parse(payload).type === 'session_snapshot'))
 
-    expect(ws.sent.map((payload) => JSON.parse(payload))).toContainEqual({
-      type: 'permission_request',
+    const snapshot = ws.sent.map((payload) => JSON.parse(payload)).find((msg) => msg.type === 'session_snapshot')
+    expect(snapshot.state.pendingPermissions).toContainEqual({
       requestId: 'request-ask-1',
       toolName: 'AskUserQuestion',
       toolUseId: 'tool-ask-1',
@@ -119,14 +128,11 @@ describe('WebSocket handler session isolation', () => {
     const sessionId = `permission-disconnect-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
     const setTimeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation(() => 0 as any)
-    spyOn(conversationService, 'getPendingPermissionRequests').mockReturnValue([
-      {
-        requestId: 'request-ask-1',
-        toolName: 'AskUserQuestion',
-        toolUseId: 'tool-ask-1',
-        input: { questions: [] },
-      },
-    ])
+    sessionStateStore.apply(sessionId, {
+      type: 'permission_request_opened',
+      at: 1,
+      request: { requestId: 'request-ask-1', toolName: 'AskUserQuestion', toolUseId: 'tool-ask-1', input: { questions: [] } },
+    })
 
     handleWebSocket.open(ws)
     setTimeoutSpy.mockClear()
@@ -167,6 +173,19 @@ describe('WebSocket handler session runtime lifetime', () => {
 
     expect(translateCliMessage({ type: 'result', is_error: true, result: 'boom' }, sessionId))
       .toContainEqual({ type: 'error', message: 'boom', code: 'CLI_ERROR' })
+  })
+
+  it('sends a tool call that arrives only in the final message after a stream fell back to a non-streaming request', () => {
+    const sessionId = `fallback-${crypto.randomUUID()}`
+    translateCliMessage({ type: 'stream_event', event: { type: 'message_start' } }, sessionId)
+    translateCliMessage({ type: 'stream_event', event: { type: 'content_block_start', index: 0, content_block: { type: 'thinking' } } }, sessionId)
+
+    const messages = translateCliMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'call-1', name: 'ShowUI', input: { pageId: 'p' } }] },
+    }, sessionId)
+
+    expect(messages).toContainEqual({ type: 'tool_use_complete', toolName: 'ShowUI', toolUseId: 'call-1', input: { pageId: 'p' }, parentToolUseId: undefined })
   })
 
   it('test reset clears every per-session runtime state', () => {
@@ -263,7 +282,7 @@ describe('WebSocket permission mode updates', () => {
 
   it('rejects an unknown permission mode instead of forwarding it to the CLI', () => {
     const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
-    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue(true)
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue('request-1')
 
     handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'yolo' }))
 
@@ -273,12 +292,131 @@ describe('WebSocket permission mode updates', () => {
     )
   })
 
-  it('forwards a known permission mode', () => {
+  it('forwards a known mode to a running CLI without touching the default for new sessions', async () => {
     const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
-    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue(true)
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    sessionStateStore.apply(ws.data.sessionId, { type: 'permission_effective_reported', mode: 'default' })
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue('request-1')
+    const save = spyOn(sessionService, 'appendSessionPermissionMode').mockResolvedValue()
+    const setDefault = spyOn(SettingsService.prototype, 'setPermissionMode')
 
+    handleWebSocket.open(ws)
     handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'plan' }))
+    await Bun.sleep(0)
 
     expect(setPermissionMode).toHaveBeenCalledWith(ws.data.sessionId, 'plan')
+    expect(save).toHaveBeenCalledWith(ws.data.sessionId, 'plan')
+    expect(setDefault).not.toHaveBeenCalled()
+    expect(ws.sent.map((payload) => JSON.parse(payload))).toContainEqual(expect.objectContaining({
+      type: 'session_patch',
+      changes: { permission: { desired: 'plan', effective: 'default' } },
+    }))
+  })
+
+  it('saves the mode of a session whose CLI is not running, for its next start', async () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue('request-1')
+    const save = spyOn(sessionService, 'appendSessionPermissionMode').mockResolvedValue()
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue(null)
+
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'acceptEdits' }))
+    await Bun.sleep(0)
+
+    expect(setPermissionMode).not.toHaveBeenCalled()
+    expect(save).toHaveBeenCalledWith(ws.data.sessionId, 'acceptEdits')
+    expect(await resolveSessionPermissionMode(ws.data.sessionId)).toBe('acceptEdits')
+  })
+
+  it('keeps a mode picked while the transcript is still being read', async () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    let finishRead: (info: Awaited<ReturnType<typeof sessionService.getSessionRestoreInfo>>) => void = () => {}
+    spyOn(sessionService, 'getSessionRestoreInfo').mockReturnValue(
+      new Promise((resolve) => { finishRead = resolve }),
+    )
+    spyOn(sessionService, 'appendSessionPermissionMode').mockResolvedValue()
+
+    const resolving = resolveSessionPermissionMode(ws.data.sessionId)
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'plan' }))
+    finishRead({ permissionMode: 'default', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true })
+
+    expect(await resolving).toBe('plan')
+    expect(await resolveSessionPermissionMode(ws.data.sessionId)).toBe('plan')
+  })
+
+  it('applies a mode picked while the CLI is restarting once the restart is done', async () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    const hasSession = spyOn(conversationService, 'hasSession').mockReturnValue(false)
+    sessionStateStore.apply(ws.data.sessionId, { type: 'permission_effective_reported', mode: 'default' })
+    const setPermissionMode = spyOn(conversationService, 'setPermissionMode').mockReturnValue('request-1')
+    spyOn(sessionService, 'appendSessionPermissionMode').mockResolvedValue()
+    let finishRestart: () => void = () => {}
+    getSessionRuntime(ws.data.sessionId).runtimeTransition = new Promise<void>((resolve) => { finishRestart = resolve })
+
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'plan' }))
+    await Bun.sleep(0)
+    expect(setPermissionMode).not.toHaveBeenCalled()
+
+    hasSession.mockReturnValue(true)
+    finishRestart()
+    await waitFor(() => setPermissionMode.mock.calls.length > 0)
+    expect(setPermissionMode).toHaveBeenCalledWith(ws.data.sessionId, 'plan')
+  })
+
+  it('reads a session\'s mode from its transcript before the default for new sessions', async () => {
+    const sessionId = `permission-mode-${crypto.randomUUID()}`
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue({
+      permissionMode: 'plan', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true,
+    })
+    spyOn(SettingsService.prototype, 'getPermissionMode').mockResolvedValue('acceptEdits')
+
+    expect(await resolveSessionPermissionMode(sessionId)).toBe('plan')
+  })
+
+  it('falls back to the default for new sessions when the transcript has no mode', async () => {
+    const sessionId = `permission-mode-${crypto.randomUUID()}`
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue(null)
+    spyOn(SettingsService.prototype, 'getPermissionMode').mockResolvedValue('acceptEdits')
+
+    expect(await resolveSessionPermissionMode(sessionId)).toBe('acceptEdits')
+  })
+
+  it('tells a connecting client the session\'s mode', async () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue({
+      permissionMode: 'plan', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true,
+    })
+
+    handleWebSocket.open(ws)
+    await waitFor(() => ws.sent.some((payload) => JSON.parse(payload).type === 'session_snapshot'))
+
+    const snapshot = ws.sent.map((payload) => JSON.parse(payload)).find((msg) => msg.type === 'session_snapshot')
+    expect(snapshot.state.permission.desired).toBe('plan')
+  })
+
+  it('records a mode change the CLI reports and tells clients, instead of reporting thinking', () => {
+    const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
+    const sessionId = ws.data.sessionId
+    handleWebSocket.open(ws)
+    sessionStateStore.apply(sessionId, { type: 'permission_effective_reported', mode: 'default' })
+    ws.sent.length = 0
+
+    expect(
+      translateCliMessage({ type: 'system', subtype: 'status', status: null, permissionMode: 'acceptEdits' }, sessionId),
+    ).toEqual([])
+    expect(getSessionState(sessionId)?.permission).toEqual({ desired: 'acceptEdits', effective: 'acceptEdits' })
+    expect(ws.sent.map((payload) => JSON.parse(payload))).toContainEqual(expect.objectContaining({
+      type: 'session_patch',
+      changes: { permission: { desired: 'acceptEdits', effective: 'acceptEdits' } },
+    }))
+  })
+
+  it('still treats a bare null status as the end of compaction', () => {
+    const sessionId = `permission-mode-${crypto.randomUUID()}`
+
+    sessionStateStore.apply(sessionId, { type: 'turn_started', at: 1 })
+    sessionStateStore.apply(sessionId, { type: 'turn_activity_reported', activity: 'compacting' })
+
+    expect(translateCliMessage({ type: 'system', subtype: 'status', status: null }, sessionId)).toEqual([])
+    expect(getSessionState(sessionId)?.turn.activity).toBe('thinking')
   })
 })

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Profiler } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
@@ -120,6 +121,7 @@ vi.mock('../../i18n', () => ({
 }))
 
 import { Sidebar } from './Sidebar'
+import { useNewSessionStore } from '../../stores/newSessionStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
@@ -174,9 +176,19 @@ function projectGroupNames(): string[] {
     })
 }
 
-function openProjectManagement() {
-  fireEvent.click(screen.getByRole('button', { name: 'More' }))
+function clickMenuTrigger(trigger: HTMLElement) {
+  fireEvent(trigger, Object.assign(new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }), { pointerType: 'mouse' }))
+}
+
+async function openProjectManagement() {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'ArrowDown' })
   fireEvent.click(screen.getByRole('menuitem', { name: 'Projects & sessions' }))
+  if (vi.isFakeTimers()) {
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  } else {
+    await screen.findByRole('dialog')
+  }
 }
 
 describe('Sidebar', () => {
@@ -221,6 +233,7 @@ describe('Sidebar', () => {
     window.localStorage.removeItem(PROJECT_ORGANIZATION_STORAGE_KEY)
     window.localStorage.removeItem(PROJECT_SORT_STORAGE_KEY)
 
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useTabStore.setState({ tabs: [], activeTabId: null })
     useSessionStore.setState({
       sessions: [],
@@ -235,6 +248,7 @@ describe('Sidebar', () => {
       deleteSessions,
     })
     useChatStore.setState({
+      sessions: {},
       connectToSession,
       disconnectSession,
     } as Partial<ReturnType<typeof useChatStore.getState>>)
@@ -247,6 +261,7 @@ describe('Sidebar', () => {
   afterEach(() => {
     vi.useRealTimers()
     cleanup()
+    useNewSessionStore.setState(useNewSessionStore.getInitialState(), true)
     useTabStore.setState({ tabs: [], activeTabId: null })
     window.localStorage.removeItem(PROJECT_ORDER_STORAGE_KEY)
     window.localStorage.removeItem(PROJECT_PINNED_STORAGE_KEY)
@@ -255,7 +270,7 @@ describe('Sidebar', () => {
     window.localStorage.removeItem(PROJECT_SORT_STORAGE_KEY)
   })
 
-  it('opens a new tab when creating a session from the sidebar', async () => {
+  it('opens a local draft without creating a session or tab', async () => {
     createSession.mockResolvedValue('session-new-1')
 
     render(<Sidebar />)
@@ -264,16 +279,11 @@ describe('Sidebar', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New Session' }))
     })
 
-    await waitFor(() => {
-      expect(createSession).toHaveBeenCalled()
-      expect(connectToSession).toHaveBeenCalledWith('session-new-1')
-    })
-
-    expect(useTabStore.getState().tabs).toEqual([
-      { sessionId: 'session-new-1', title: 'New Session', type: 'session', status: 'idle' },
-    ])
-    expect(useTabStore.getState().activeTabId).toBe('session-new-1')
-    expect(screen.getByRole('complementary')).not.toHaveAttribute('data-tauri-drag-region')
+    expect(createSession).not.toHaveBeenCalled()
+    expect(connectToSession).not.toHaveBeenCalled()
+    expect(useTabStore.getState().tabs).toEqual([])
+    expect(useTabStore.getState().activeTabId).toBeNull()
+    expect(screen.getByRole('complementary')).not.toHaveClass('window-drag-region')
   })
 
   it('groups sessions by project and expands overflow rows', () => {
@@ -434,8 +444,9 @@ describe('Sidebar', () => {
     })
 
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith('/workspace/alpha')
-      expect(connectToSession).toHaveBeenCalledWith('session-alpha-new')
+      expect(useNewSessionStore.getState().workDir).toBe('/workspace/alpha')
+      expect(createSession).not.toHaveBeenCalled()
+      expect(connectToSession).not.toHaveBeenCalled()
     })
   })
 
@@ -450,7 +461,7 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     expect(screen.getByTestId('sidebar-projects-header')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'New project' }))
+    clickMenuTrigger(screen.getByRole('button', { name: 'New project' }))
     expect(screen.getByRole('menuitem', { name: 'New blank project' })).toBeInTheDocument()
 
     await act(async () => {
@@ -458,8 +469,9 @@ describe('Sidebar', () => {
     })
 
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith(undefined)
-      expect(connectToSession).toHaveBeenCalledWith('session-blank-project')
+      expect(useNewSessionStore.getState().workDir).toBe('')
+      expect(createSession).not.toHaveBeenCalled()
+      expect(connectToSession).not.toHaveBeenCalled()
     })
   })
 
@@ -478,7 +490,7 @@ describe('Sidebar', () => {
 
     expect(projectGroupNames().slice(0, 2)).toEqual(['alpha', 'beta'])
 
-    openProjectManagement()
+    await openProjectManagement()
     fireEvent.click(screen.getByRole('radio', { name: 'Created time' }))
 
     await waitFor(() => {
@@ -637,11 +649,11 @@ describe('Sidebar', () => {
     expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.queryByText('beta')).not.toBeInTheDocument()
 
-    openProjectManagement()
+    await openProjectManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Restore hidden projects (1)' }))
 
     await waitFor(() => {
-      expect(within(screen.getByRole('complementary')).getByText('beta')).toBeInTheDocument()
+      expect(within(screen.getByRole('complementary', { hidden: true })).getByText('beta')).toBeInTheDocument()
     })
     expect(JSON.parse(window.localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')).toEqual([])
     expect(desktopUiPreferencesApiMock.updateSidebarPreferences).toHaveBeenCalledWith({
@@ -677,7 +689,8 @@ describe('Sidebar', () => {
     })
 
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith('/workspace/beta')
+      expect(useNewSessionStore.getState().workDir).toBe('/workspace/beta')
+      expect(createSession).not.toHaveBeenCalled()
       expect(screen.getByText('beta')).toBeInTheDocument()
     })
     expect(JSON.parse(window.localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')).toEqual([])
@@ -839,7 +852,8 @@ describe('Sidebar', () => {
     })
 
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith('D:\\workspace\\code\\dreamcoder')
+      expect(useNewSessionStore.getState().workDir).toBe('D:\\workspace\\code\\dreamcoder')
+      expect(createSession).not.toHaveBeenCalled()
     })
     expect(JSON.parse(window.localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')).toEqual(['D:\\'])
     expect(desktopUiPreferencesApiMock.updateSidebarPreferences).not.toHaveBeenCalled()
@@ -871,15 +885,90 @@ describe('Sidebar', () => {
     const runningRow = screen.getByRole('button', { name: /^Running Worktree/ })
     expect(within(runningRow).getByLabelText('Session running')).toBeInTheDocument()
     expect(within(runningRow).getByText('worktree')).toHaveClass('sr-only')
-    expect(runningRow).toHaveAttribute('title', 'Running Worktree')
+    expect(runningRow).toHaveAttribute('aria-label', 'Running Worktree')
     expect(screen.queryByText(/ago$/)).not.toBeInTheDocument()
 
     const idleRow = screen.getByRole('button', { name: /^Idle Source/ })
     expect(within(idleRow).queryByLabelText('Session running')).not.toBeInTheDocument()
-    expect(idleRow).toHaveAttribute('title', 'Idle Source')
+    expect(idleRow).toHaveAttribute('aria-label', 'Idle Source')
   })
 
-  it('shows a toast when session creation fails', async () => {
+  it('does not re-render for streamed text or idle session changes', async () => {
+    vi.useFakeTimers()
+    useSessionStore.setState({
+      sessions: [makeSession('running', 'Running session', '/workspace/repo', '2026-05-19T12:00:00.000Z')],
+    })
+    useChatStore.setState({
+      sessions: { running: { ...useChatStore.getState().getSession('running'), chatState: 'streaming' } },
+    })
+    const onRender = vi.fn()
+    await act(async () => {
+      render(<Profiler id="sidebar" onRender={onRender}><Sidebar /></Profiler>)
+    })
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.getState().handleServerMessage('running', { type: 'content_delta', text: 'Hello' })
+      vi.advanceTimersByTime(50)
+    })
+
+    expect(useChatStore.getState().getSession('running').streamingText).toBe('Hello')
+    expect(onRender).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Session running')).toBeInTheDocument()
+
+    act(() => {
+      useChatStore.setState((state) => ({
+        sessions: { idle: state.getSession('idle'), ...state.sessions },
+      }))
+    })
+
+    expect(onRender).not.toHaveBeenCalled()
+  })
+
+  it('updates running indicators only when running session membership changes', async () => {
+    useSessionStore.setState({
+      sessions: [
+        makeSession('first', 'First session', '/workspace/repo', '2026-05-19T12:00:00.000Z'),
+        makeSession('second', 'Second session', '/workspace/repo', '2026-05-19T11:00:00.000Z'),
+      ],
+    })
+    const first = useChatStore.getState().getSession('first')
+    const second = useChatStore.getState().getSession('second')
+    const onRender = vi.fn()
+    await act(async () => {
+      render(<Profiler id="sidebar" onRender={onRender}><Sidebar /></Profiler>)
+    })
+    onRender.mockClear()
+    expect(screen.queryByLabelText('Session running')).not.toBeInTheDocument()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first: { ...first, chatState: 'thinking' }, second } })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(within(screen.getByRole('button', { name: /^First session/ })).getByLabelText('Session running')).toBeInTheDocument()
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first: { ...first, chatState: 'tool_executing' }, second } })
+    })
+    expect(onRender).not.toHaveBeenCalled()
+
+    act(() => {
+      useChatStore.setState({ sessions: { first, second: { ...second, chatState: 'streaming' } } })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(within(screen.getByRole('button', { name: /^First session/ })).queryByLabelText('Session running')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^Second session/ })).getByLabelText('Session running')).toBeInTheDocument()
+    onRender.mockClear()
+
+    act(() => {
+      useChatStore.setState({ sessions: {} })
+    })
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(screen.queryByLabelText('Session running')).not.toBeInTheDocument()
+  })
+
+  it('can open a draft even when the creation service is unavailable', async () => {
     createSession.mockRejectedValue(new Error('boom'))
 
     render(<Sidebar />)
@@ -888,12 +977,8 @@ describe('Sidebar', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New Session' }))
     })
 
-    await waitFor(() => {
-      expect(addToast).toHaveBeenCalledWith({
-        type: 'error',
-        message: 'boom',
-      })
-    })
+    expect(createSession).not.toHaveBeenCalled()
+    expect(addToast).not.toHaveBeenCalled()
 
     expect(useTabStore.getState().tabs).toEqual([])
   })
@@ -926,7 +1011,7 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(deleteSession).not.toHaveBeenCalled()
-    const dialog = screen.getByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
     expect(screen.getByText('Delete this session? This cannot be undone.')).toBeInTheDocument()
 
@@ -984,7 +1069,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for First Session' }))
+    clickMenuTrigger(screen.getByRole('button', { name: 'Actions for First Session' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Batch manage' }))
     fireEvent.click(screen.getByRole('button', { name: /^First Session/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Second Session/ }))
@@ -992,7 +1077,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete selected (2)' }))
-    const dialog = screen.getByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText('Delete 2 sessions? This cannot be undone.')).toBeInTheDocument()
     expect(within(dialog).getByText('First Session')).toBeInTheDocument()
     expect(within(dialog).getByText('Second Session')).toBeInTheDocument()
@@ -1013,7 +1098,7 @@ describe('Sidebar', () => {
     })
   })
 
-  it('renders batch-selected sessions as separated selected rows', () => {
+  it('renders batch-selected sessions as separated selected rows', async () => {
     const now = new Date().toISOString()
     useSessionStore.setState({
       sessions: [
@@ -1056,7 +1141,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    openProjectManagement()
+    await openProjectManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Batch manage' }))
     fireEvent.click(screen.getByRole('button', { name: /^First Session/ }))
 
@@ -1145,24 +1230,28 @@ describe('Sidebar', () => {
     })
 
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalled()
+      expect(createSession).not.toHaveBeenCalled()
     })
     expect(onRequestClose).toHaveBeenCalledTimes(2)
   })
 
-  it('opens settings from the More menu', () => {
+  it('opens settings from the More menu', async () => {
     useUIStore.setState({ settingsOpen: false } as Partial<ReturnType<typeof useUIStore.getState>>)
     render(<Sidebar />)
 
     const trigger = screen.getByRole('button', { name: 'More' })
-    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('menuitem', { name: 'Projects & sessions' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }))
+    const settings = screen.getByRole('menuitem', { name: 'Settings' })
+    fireEvent(settings, Object.assign(new MouseEvent('pointermove', { bubbles: true }), { pointerType: 'mouse' }))
+    expect(settings).toHaveFocus()
+    expect(settings).toHaveAttribute('data-highlighted')
+    fireEvent.click(settings)
 
-    expect(useUIStore.getState().settingsOpen).toBe(true)
+    await waitFor(() => expect(useUIStore.getState().settingsOpen).toBe(true))
     expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
     // The trigger holds focus before settings opens, so the modal returns focus there.
     expect(document.activeElement).toBe(trigger)
@@ -1172,7 +1261,7 @@ describe('Sidebar', () => {
     useSettingsStore.setState({ locale: 'zh' })
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Projects & sessions' }))
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Language · 中文' }))
@@ -1187,7 +1276,7 @@ describe('Sidebar', () => {
     useSettingsStore.setState({ locale: 'zh' })
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Language · 中文' }))
 
     expect(screen.getByRole('menuitemradio', { name: '中文' })).toHaveAttribute('aria-checked', 'true')
@@ -1203,23 +1292,25 @@ describe('Sidebar', () => {
     expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
   })
 
-  it('closes the More menu on an outside click', () => {
+  it('closes the More menu on an outside click', async () => {
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'ArrowDown' })
     expect(screen.getByTestId('sidebar-more-menu')).toBeInTheDocument()
 
-    fireEvent.click(document.body)
-    expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
+    await waitFor(() => {
+      fireEvent.pointerDown(document.body, { button: 0, pointerType: 'mouse' })
+      expect(screen.queryByTestId('sidebar-more-menu')).not.toBeInTheDocument()
+    })
   })
 
-  it('lists the registered keyboard shortcuts', () => {
+  it('lists the registered keyboard shortcuts', async () => {
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Keyboard shortcuts' }))
 
-    const dialog = screen.getByTestId('shortcuts-dialog')
+    const dialog = await screen.findByTestId('shortcuts-dialog')
     expect(within(dialog).getByText('Switch session')).toBeInTheDocument()
     expect(within(dialog).getByText('Stop generating')).toBeInTheDocument()
     expect(within(dialog).getByText('K')).toBeInTheDocument()
@@ -1235,7 +1326,7 @@ describe('Sidebar', () => {
     })
 
     render(<Sidebar />)
-    openProjectManagement()
+    await openProjectManagement()
 
     expect(screen.getByRole('radio', { name: 'Recent projects' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('radio', { name: 'By time' })).toBeInTheDocument()
@@ -1249,12 +1340,12 @@ describe('Sidebar', () => {
 
     fireEvent.click(within(screen.getByTestId('project-management-row-alpha')).getByRole('button', { name: 'Hide from Sidebar' }))
     await waitFor(() => {
-      expect(within(screen.getByRole('complementary')).queryByText('alpha')).not.toBeInTheDocument()
+      expect(within(screen.getByRole('complementary', { hidden: true })).queryByText('alpha')).not.toBeInTheDocument()
     })
     expect(within(screen.getByTestId('project-management-row-alpha')).getByRole('button', { name: 'Restore to Sidebar' })).toBeInTheDocument()
   })
 
-  it('opens the session row menu from the row button and keeps it open on the same click', () => {
+  it('opens the session row menu from its button and supports pointer dismissal and rename', async () => {
     useSessionStore.setState({
       sessions: [makeSession('session-1', 'Open Session', '/workspace/project', new Date().toISOString())],
     })
@@ -1265,49 +1356,50 @@ describe('Sidebar', () => {
     expect(moreButton).toHaveClass('sidebar-session-more')
     expect(moreButton.parentElement).toBe(screen.getByTestId('sidebar-session-row-session-1'))
 
-    fireEvent.click(moreButton)
+    clickMenuTrigger(moreButton)
     expect(moreButton).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByTestId('sidebar-session-row-session-1')).toHaveAttribute('data-menu-open', 'true')
     expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Batch manage' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
 
-    fireEvent.click(moreButton)
+    clickMenuTrigger(moreButton)
     expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
 
-    fireEvent.click(moreButton)
-    fireEvent.click(document.body)
-    expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
+    clickMenuTrigger(moreButton)
+    await waitFor(() => {
+      fireEvent.pointerDown(document.body, { button: 0, pointerType: 'mouse' })
+      expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
+    })
 
-    fireEvent.click(moreButton)
+    clickMenuTrigger(moreButton)
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
-    expect(screen.getByRole('textbox', { name: 'Rename' })).toHaveValue('Open Session')
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toHaveValue('Open Session')
   })
 
-  it('supports keyboard navigation in the session row menu and returns focus to its button', () => {
+  it('supports keyboard navigation in the session row menu and returns focus to its button', async () => {
     useSessionStore.setState({
       sessions: [makeSession('session-1', 'Open Session', '/workspace/project', new Date().toISOString())],
     })
     render(<Sidebar />)
 
     const moreButton = screen.getByRole('button', { name: 'Actions for Open Session' })
-    moreButton.focus()
-    fireEvent.click(moreButton)
-    const menu = screen.getByTestId('sidebar-session-menu')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    act(() => moreButton.focus())
+    fireEvent.keyDown(moreButton, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' })))
 
-    fireEvent.keyDown(menu, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Batch manage' }))
-    fireEvent.keyDown(menu, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
-    fireEvent.keyDown(menu, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
-    fireEvent.keyDown(menu, { key: 'ArrowUp' })
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Batch manage' })))
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' })))
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' })))
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' })))
 
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
     expect(screen.queryByTestId('sidebar-session-menu')).not.toBeInTheDocument()
-    expect(document.activeElement).toBe(moreButton)
+    await waitFor(() => expect(document.activeElement).toBe(moreButton))
   })
 
   it('enters batch mode from the session row menu', () => {
@@ -1317,7 +1409,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Open Session' }))
+    clickMenuTrigger(screen.getByRole('button', { name: 'Actions for Open Session' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Batch manage' }))
 
     expect(useSessionStore.getState().isBatchMode).toBe(true)
@@ -1343,7 +1435,7 @@ describe('Sidebar', () => {
 
     expect(fetchSessions).toHaveBeenCalledTimes(1)
 
-    openProjectManagement()
+    await openProjectManagement()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh sessions' }))
       await Promise.resolve()

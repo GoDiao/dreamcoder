@@ -5,19 +5,41 @@
  */
 import type { BackgroundTaskEvent, TaskNotification, TaskUsage } from '../transcript/classify.js'
 import type { TranscriptItem } from '../transcript/items.js'
+import type { SessionState, SessionStatePatch } from '../session/state/types.js'
 
 export type { BackgroundTaskEvent, TaskNotification, TaskUsage }
 export type { GoalEventAction } from '../transcript/classify.js'
 export type { MemoryEventFile, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
+export type {
+  ActiveGoal,
+  BackgroundTaskSummary,
+  PendingPermission,
+  ProcessDetail,
+  ProcessPhase,
+  RuntimeSelection,
+  SessionState,
+  SessionStateKey,
+  SessionStatePatch,
+  TurnActivity,
+  TurnPhase,
+  UiPageSummary,
+} from '../session/state/types.js'
 
 /** The permission modes a client may set; mirrors the CLI's `ExternalPermissionMode`. */
 export type PermissionMode = 'acceptEdits' | 'bypassPermissions' | 'default' | 'dontAsk' | 'plan'
 
 export const PERMISSION_MODES: readonly PermissionMode[] = ['acceptEdits', 'bypassPermissions', 'default', 'dontAsk', 'plan']
 
+export type ClientKind = 'desktop' | 'h5'
+
+export type DefaultPermissionMode = Exclude<PermissionMode, 'dontAsk'>
+
+export const DEFAULT_PERMISSION_MODES: readonly DefaultPermissionMode[] = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
+
 export type ClientMessage =
   | { type: 'prewarm_session' }
-  | { type: 'user_message'; content: string; attachments?: AttachmentRef[] }
+  | { type: 'user_message'; content: string; attachments?: AttachmentRef[]; id?: string }
+  | { type: 'request_snapshot' }
   | {
       type: 'permission_response'
       requestId: string
@@ -48,21 +70,17 @@ export type LiveTranscriptItem = Extract<TranscriptItem, { type: 'goal_event' | 
 
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }
+  | { type: 'session_snapshot'; state: SessionState }
+  | { type: 'session_patch'; version: number; changes: SessionStatePatch }
+  | { type: 'user_message'; id: string; content: string }
+  | { type: 'message_id'; id: string }
   | { type: 'content_start'; blockType: 'text' | 'tool_use'; toolName?: string; toolUseId?: string; parentToolUseId?: string }
   | { type: 'content_delta'; text?: string; toolInput?: string }
   | { type: 'tool_use_complete'; toolName: string; toolUseId: string; input: unknown; parentToolUseId?: string }
   | { type: 'tool_result'; toolUseId: string; content: unknown; isError: boolean; parentToolUseId?: string }
-  | {
-      type: 'permission_request'
-      requestId: string
-      toolName: string
-      toolUseId?: string
-      input: unknown
-      description?: string
-    }
+  | { type: 'permission_resolved'; requestId: string; allowed: boolean; by: ClientKind }
   | { type: 'message_complete'; usage: TokenUsage }
   | { type: 'thinking'; text: string }
-  | { type: 'status'; state: ChatState; verb?: string; elapsed?: number; tokens?: number }
   | {
       type: 'api_retry'
       attempt: number
@@ -81,7 +99,6 @@ export type ServerMessage =
   | { type: 'team_created'; teamName: string }
   | { type: 'team_deleted'; teamName: string }
   | { type: 'task_update'; taskId: string; status: string; progress?: string }
-  | { type: 'session_title_updated'; sessionId: string; title: string }
 
 export type TokenUsage = {
   input_tokens: number

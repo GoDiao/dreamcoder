@@ -1,6 +1,6 @@
 import type { Terminal as XTermTerminal, IDisposable } from '@xterm/xterm'
 import type { FitAddon as XTermFitAddon } from '@xterm/addon-fit'
-import { terminalApi } from '../api/terminal'
+import type { TerminalConnection } from '../api/terminal'
 
 export type TerminalStatus = 'idle' | 'starting' | 'running' | 'exited' | 'error' | 'unavailable'
 
@@ -13,8 +13,7 @@ export type TerminalRuntime = {
   id: string
   terminal: XTermTerminal | null
   fit: XTermFitAddon | null
-  nativeSessionId: number | null
-  unlisteners: Array<() => void>
+  connection: TerminalConnection | null
   dataDisposable: IDisposable | null
   status: TerminalStatus
   error: string | null
@@ -50,8 +49,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
     id,
     terminal: null,
     fit: null,
-    nativeSessionId: null,
-    unlisteners: [],
+    connection: null,
     dataDisposable: null,
     status: initialStatus,
     error: null,
@@ -66,7 +64,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
 
 export function updateTerminalRuntime(
   runtime: TerminalRuntime,
-  patch: Partial<Pick<TerminalRuntime, 'terminal' | 'fit' | 'nativeSessionId' | 'status' | 'error' | 'warning' | 'shellInfo'>>,
+  patch: Partial<Pick<TerminalRuntime, 'terminal' | 'fit' | 'connection' | 'status' | 'error' | 'warning' | 'shellInfo'>>,
 ) {
   Object.assign(runtime, patch)
   notifyTerminalRuntime(runtime)
@@ -105,16 +103,11 @@ export function destroyTerminalRuntime(id: string) {
   runtimes.delete(id)
   xtermMemLog('destroy', id)
 
-  const sessionId = runtime.nativeSessionId
-  runtime.nativeSessionId = null
-  if (sessionId) {
-    void terminalApi.kill(sessionId).catch(() => {})
-  }
+  runtime.connection?.close()
+  runtime.connection = null
 
   runtime.dataDisposable?.dispose()
   runtime.dataDisposable = null
-  runtime.unlisteners.forEach((unlisten) => unlisten())
-  runtime.unlisteners = []
   runtime.terminal?.dispose()
   runtime.terminal = null
   runtime.fit = null

@@ -9,23 +9,35 @@ type Language = Lang;
 
 const copy = {
   zh: {
+    navPages: '页面与浏览器',
     navFeatures: '功能',
     navTutorial: '源码导读',
     navAccess: '手机接续',
     navPlatforms: '平台与安装',
     eyebrow: '开源 · 本地运行 · 多模型',
     title: '把 AI 编程会话，放进一个看得清的工作台。',
-    intro: 'DreamCoder 在桌面管理 Claude Code 工作流。配置你选择的模型服务，查看会话、终端与工具调用；开启 H5 后，还能在同一局域网内从手机浏览器接续会话。',
+    intro: 'DreamCoder 在桌面管理 Claude Code 工作流。配置你选择的模型服务，查看会话、终端与工具调用；AI 可以直接在对话里给出可交互的页面，内置浏览器在对话旁边打开你的开发服务器。开启 H5 后，还能在同一局域网内从手机浏览器接续会话。',
     source: '查看源码与构建指南',
     releases: '查看发布状态',
-    releaseNote: 'v0.5.0 起在 Releases 页面提供 macOS（Apple Silicon）和 Windows x64 安装包，暂未签名；也可以按 README 从源码运行。',
+    releaseNote: '桌面端从 v0.8 起基于 Electron，目前是 beta 版。Releases 页面提供 macOS（Apple Silicon）和 Windows x64 安装包，暂未签名；也可以按 README 从源码运行。',
     screenshotLabel: '真实桌面界面',
+    pagesEyebrow: '不只是文字',
+    pagesTitle: '图表、示意图和演示，直接显示在对话里。',
+    pagesBody: '当图表、示意图或分步讲解比文字更清楚时，AI 会用组件搭出页面：四十多种 G2 图表、流程图、时序图与架构图、思维导图、分步演示、对比矩阵、3D 场景等。每次修改都是新的版本，可以放大查看或在侧栏打开。页面跟随应用的浅色或深色主题，在沙箱里运行，访问不了网络、应用和你的文件。',
+    pages: [
+      { image: 'pages-1', alt: '带指标和图表的小型仪表盘页面' },
+      { image: 'pages-2', alt: '分步演示页面' },
+    ],
+    pagesHeroAlt: '可调俯仰、横滚、偏航的 3D 飞机页面',
+    browserTitle: '内置浏览器',
+    browserBody: '侧栏的浏览器标签页可以打开本地开发服务器、项目里的 HTML 文件或 https 网站，就在对话旁边。登录状态在重启后保留，可以用“清除浏览数据”清掉；其他类型的链接交给系统浏览器打开。仅桌面端提供。',
+    browserAlt: '侧栏标签页中的内置浏览器',
     featureEyebrow: '三个日常入口',
     featureTitle: '模型、会话、工具，都在桌面上。',
     features: [
-      { number: '01', title: '选择模型服务', description: '配置 Anthropic 或 OpenAI 兼容接口。提供 DeepSeek、通义千问、Kimi、智谱 GLM、LM Studio、Ollama 等预设，也支持自定义端点。实际可用模型取决于服务商和配置。', image: '/assets/setting_provider.png', alt: 'DreamCoder Provider 设置界面' },
-      { number: '02', title: '跟进编程过程', description: '在一个界面查看会话、终端、文件变更和工具调用。开启 Computer Use 后，DreamCoder 可以在后台按界面元素操作应用和浏览器，点击、输入之前会先问你。', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use 设置界面' },
-      { number: '03', title: '管理 MCP 扩展', description: '在设置界面管理 MCP 服务器，按项目需要接入工具。', image: '/assets/setting_skills.png', alt: 'DreamCoder MCP 设置界面' },
+      { number: '01', title: '选择模型服务', description: '配置 Anthropic 或 OpenAI 兼容接口。提供 DeepSeek、通义千问、Kimi、智谱 GLM、LM Studio、Ollama 等预设，也支持自定义端点。实际可用模型取决于服务商和配置。', image: 'setting_provider', alt: 'DreamCoder Provider 设置界面' },
+      { number: '02', title: '跟进编程过程', description: '在一个界面查看会话、终端、文件变更和工具调用。开启 Computer Use 后，DreamCoder 可以在后台按界面元素操作应用和浏览器，点击、输入之前会先问你。', image: 'setting_computeruse', alt: 'DreamCoder Computer Use 设置界面' },
+      { number: '03', title: '管理 MCP 扩展', description: '在设置里浏览和安装 MCP 服务器，按项目需要接入文件系统、Git、网页抓取等工具。', image: 'setting_skills', alt: 'DreamCoder MCP 设置界面' },
     ],
     tutorialEyebrow: '源码导读',
     tutorialTitle: '沿一次代码修改，读懂编程智能体。',
@@ -39,9 +51,9 @@ const copy = {
     platformsEyebrow: '当前状态',
     platformsTitle: '下载安装包，或从源码运行。',
     windows: 'Windows x64',
-    windowsBody: '维护者日常验证。Releases 提供未签名的 -setup.exe 安装包。',
+    windowsBody: 'Electron 版尚未在真机上验证，欢迎在 GitHub 上反馈。Releases 提供未签名的 -setup.exe 安装包。',
     mac: 'macOS arm64',
-    macBody: '维护者日常使用。Releases 提供未签名的 .dmg 安装包。',
+    macBody: '维护者的日常开发平台。Releases 提供未签名的 .dmg 安装包。',
     linux: 'Linux x64',
     linuxBody: '尚未纳入日常实机验证，现有内存问题仍在调查。',
     download: '下载',
@@ -53,23 +65,35 @@ const copy = {
     footer: 'DreamCoder · MIT License',
   },
   en: {
+    navPages: 'Pages & browser',
     navFeatures: 'Features',
     navTutorial: 'Walkthrough',
     navAccess: 'Phone access',
     navPlatforms: 'Platforms & setup',
     eyebrow: 'Open source · Locally run · Multi-provider',
     title: 'A clear workspace for your AI coding sessions.',
-    intro: 'DreamCoder manages Claude Code workflows on your desktop. Configure your chosen model provider, follow sessions, terminal and tool activity, then continue from a phone browser on the same LAN after enabling H5 Access.',
+    intro: 'DreamCoder manages Claude Code workflows on your desktop. Configure your chosen model provider and follow sessions, terminal and tool activity. The AI can answer with interactive pages right in the conversation, and a built-in browser opens your dev server next to it. With H5 Access on, continue from a phone browser on the same LAN.',
     source: 'Source and build guide',
     releases: 'Release status',
-    releaseNote: 'From v0.5.0, Releases has unsigned installers for macOS (Apple Silicon) and Windows x64. You can also run from source with the README.',
+    releaseNote: 'From v0.8 the desktop app runs on Electron and is in beta. Releases has unsigned installers for macOS (Apple Silicon) and Windows x64. You can also run from source with the README.',
     screenshotLabel: 'Actual desktop interface',
+    pagesEyebrow: 'More than text',
+    pagesTitle: 'Charts, diagrams and walkthroughs, right in the conversation.',
+    pagesBody: 'When a chart, a diagram or a step-by-step explanation says it better than text, the AI builds a page from components: over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, walkthroughs, comparison matrices, 3D scenes and more. Each change is a new revision that can be enlarged or opened in the side panel. Pages follow the app\'s light or dark theme and run in a sandbox that cannot reach the network, the app or your files.',
+    pages: [
+      { image: 'pages-1', alt: 'A small dashboard page with metrics and charts' },
+      { image: 'pages-2', alt: 'A step-by-step walkthrough page' },
+    ],
+    pagesHeroAlt: 'A 3D airplane page with pitch, roll and yaw controls',
+    browserTitle: 'A built-in browser',
+    browserBody: 'A browser tab in the side panel opens a local dev server, an HTML file in the project or an https site, next to the conversation. Sign-ins are kept across restarts and cleared with "Clear browsing data"; other link types go to the system browser. Desktop app only.',
+    browserAlt: 'The built-in browser in a side panel tab',
     featureEyebrow: 'Three everyday entry points',
     featureTitle: 'Models, sessions, and tools on your desktop.',
     features: [
-      { number: '01', title: 'Choose a model provider', description: 'Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama, plus custom endpoints. Model availability depends on your provider and configuration.', image: '/assets/setting_provider.png', alt: 'DreamCoder Provider settings' },
-      { number: '02', title: 'Follow the coding process', description: 'Review sessions, terminal activity, file changes, and tool calls in one place. With Computer Use on, DreamCoder can operate apps and browsers in the background through their UI elements, asking before it clicks or types.', image: '/assets/setting_computeruse.png', alt: 'DreamCoder Computer Use settings' },
-      { number: '03', title: 'Manage MCP extensions', description: 'Manage MCP servers in Settings and connect the tools your project needs.', image: '/assets/setting_skills.png', alt: 'DreamCoder MCP settings' },
+      { number: '01', title: 'Choose a model provider', description: 'Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama, plus custom endpoints. Model availability depends on your provider and configuration.', image: 'setting_provider', alt: 'DreamCoder Provider settings' },
+      { number: '02', title: 'Follow the coding process', description: 'Review sessions, terminal activity, file changes, and tool calls in one place. With Computer Use on, DreamCoder can operate apps and browsers in the background through their UI elements, asking before it clicks or types.', image: 'setting_computeruse', alt: 'DreamCoder Computer Use settings' },
+      { number: '03', title: 'Manage MCP extensions', description: 'Browse and install MCP servers in Settings to connect the tools your project needs, such as the file system, Git and web fetching.', image: 'setting_skills', alt: 'DreamCoder MCP settings' },
     ],
     tutorialEyebrow: 'Source code walkthrough',
     tutorialTitle: 'Learn how a coding agent works, one code change at a time.',
@@ -83,9 +107,9 @@ const copy = {
     platformsEyebrow: 'Current status',
     platformsTitle: 'Download an installer or run from source.',
     windows: 'Windows x64',
-    windowsBody: 'Regularly tested by the maintainer. Releases has an unsigned -setup.exe installer.',
+    windowsBody: 'The Electron app has not been tested on real machines yet; reports on GitHub are welcome. Releases has an unsigned -setup.exe installer.',
     mac: 'macOS arm64',
-    macBody: 'Used daily by the maintainer. Releases has an unsigned .dmg installer.',
+    macBody: 'The maintainer\'s daily development platform. Releases has an unsigned .dmg installer.',
     linux: 'Linux x64',
     linuxBody: 'Not part of daily device validation; a memory issue remains under investigation.',
     download: 'Download',
@@ -101,19 +125,18 @@ const copy = {
 const github = 'https://github.com/GoDiao/dreamcoder';
 const atomgit = 'https://atomgit.com/GoDiao/DreamCoder';
 const base = import.meta.env.BASE_URL;
-const latestRelease = `${github}/releases/latest`;
+const releases = `${github}/releases`;
+const asset = (name: string) => `${base}assets/${name}.png`;
 
 type Installers = { version: string; mac?: string; windows?: string };
 
-// Links the newest release's installers directly; until the GitHub API
-// answers (or if it fails), the buttons open the latest release page.
-function useLatestInstallers(): Installers | null {
+function useNewestInstallers(): Installers | null {
   const [installers, setInstallers] = useState<Installers | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('https://api.github.com/repos/GoDiao/dreamcoder/releases/latest', { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((release: { tag_name: string; assets: { name: string; browser_download_url: string }[] } | null) => {
+    fetch('https://api.github.com/repos/GoDiao/dreamcoder/releases?per_page=1', { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : []))
+      .then(([release]: { tag_name: string; assets: { name: string; browser_download_url: string }[] }[]) => {
         if (!release) return;
         const find = (suffix: string) => release.assets.find((asset) => asset.name.endsWith(suffix))?.browser_download_url;
         setInstallers({ version: release.tag_name, mac: find('_aarch64.dmg'), windows: find('-setup.exe') });
@@ -132,7 +155,7 @@ function readRoute(): { doc: DocId | null; lang: Language | null } {
 }
 
 export default function App() {
-  const installers = useLatestInstallers();
+  const installers = useNewestInstallers();
   const [doc, setDoc] = useState<DocId | null>(() => readRoute().doc);
   const [lang, setLang] = useState<Language>(() => readRoute().lang ?? (window.localStorage.getItem('dreamcoder-site-language') === 'en' ? 'en' : 'zh'));
   const t = copy[lang];
@@ -186,6 +209,7 @@ export default function App() {
             DreamCoder
           </a>
           <div className="hidden items-center gap-7 text-xs font-medium md:flex">
+            <a className="hover:text-brand-caramel" href={`${base}#pages`}>{t.navPages}</a>
             <a className="hover:text-brand-caramel" href={`${base}#features`}>{t.navFeatures}</a>
             <a className="hover:text-brand-caramel" href={`${base}#tutorial`}>{t.navTutorial}</a>
             <a className="hover:text-brand-caramel" href={`${base}#access`}>{t.navAccess}</a>
@@ -219,34 +243,55 @@ export default function App() {
               <p className="mt-7 max-w-xl text-base leading-8 text-brand-text-body">{t.intro}</p>
               <div className="mt-9 flex flex-wrap gap-3">
                 <a href={sourceGuide} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md bg-brand-text-title px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-caramel">{t.source}<ArrowRight size={16} /></a>
-                <a href={`${github}/releases`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md border border-brand-border px-5 py-3 text-sm font-semibold text-brand-text-title transition hover:bg-brand-bg-secondary">{t.releases}<ExternalLink size={15} /></a>
+                <a href={releases} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md border border-brand-border px-5 py-3 text-sm font-semibold text-brand-text-title transition hover:bg-brand-bg-secondary">{t.releases}<ExternalLink size={15} /></a>
               </div>
               <p className="mt-5 max-w-md border-l-2 border-brand-caramel pl-3 text-xs leading-6 text-brand-text-muted">{t.releaseNote}</p>
             </div>
             <figure className="relative">
               <div className="absolute -inset-4 rotate-2 rounded-xl bg-brand-bg-secondary" aria-hidden="true" />
-              <img src={`${import.meta.env.BASE_URL}assets/main.png`} alt={t.screenshotLabel} className="relative w-full rounded-lg border border-brand-border shadow-xl" />
+              <img src={asset('main')} alt={t.screenshotLabel} className="relative w-full rounded-lg border border-brand-border shadow-xl" />
               <figcaption className="relative mt-3 font-mono text-[11px] text-brand-text-muted">{t.screenshotLabel}</figcaption>
             </figure>
           </div>
         </section>
 
-        <section id="features" className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-caramel">{t.featureEyebrow}</p>
-          <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.featureTitle}</h2>
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            {t.features.map((feature) => (
-              <article key={feature.number} className="overflow-hidden rounded-lg border border-brand-border bg-white/70">
-                <div className="border-b border-brand-border p-6">
-                  <span className="font-mono text-xs text-brand-caramel">{feature.number}</span>
-                  <h3 className="mt-3 font-serif text-2xl font-semibold">{feature.title}</h3>
-                  <p className="mt-3 min-h-24 text-sm leading-7 text-brand-text-muted">{feature.description}</p>
-                </div>
-                <div className="bg-brand-bg-secondary p-3">
-                  <img src={`${import.meta.env.BASE_URL}${feature.image.slice(1)}`} alt={feature.alt} loading="lazy" className="aspect-[16/10] w-full rounded border border-brand-border object-cover object-left-top" />
-                </div>
-              </article>
+        <section id="pages" className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-caramel">{t.pagesEyebrow}</p>
+          <h2 className="mt-3 max-w-3xl font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.pagesTitle}</h2>
+          <p className="mt-5 max-w-3xl text-sm leading-8">{t.pagesBody}</p>
+          <img src={asset('pages-3')} alt={t.pagesHeroAlt} loading="lazy" className="mt-12 w-full rounded-lg border border-brand-border shadow-xl" />
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {t.pages.map((page) => (
+              <img key={page.image} src={asset(page.image)} alt={page.alt} loading="lazy" className="w-full rounded-lg border border-brand-border" />
             ))}
+          </div>
+          <div className="mt-20 grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-16">
+            <div>
+              <h3 className="font-serif text-3xl font-semibold text-brand-text-title">{t.browserTitle}</h3>
+              <p className="mt-4 text-sm leading-8">{t.browserBody}</p>
+            </div>
+            <img src={asset('browser')} alt={t.browserAlt} loading="lazy" className="w-full rounded-lg border border-brand-border shadow-xl" />
+          </div>
+        </section>
+
+        <section id="features" className="border-t border-brand-border">
+          <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-caramel">{t.featureEyebrow}</p>
+            <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.featureTitle}</h2>
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              {t.features.map((feature) => (
+                <article key={feature.number} className="overflow-hidden rounded-lg border border-brand-border bg-white/70">
+                  <div className="border-b border-brand-border p-6">
+                    <span className="font-mono text-xs text-brand-caramel">{feature.number}</span>
+                    <h3 className="mt-3 font-serif text-2xl font-semibold">{feature.title}</h3>
+                    <p className="mt-3 min-h-24 text-sm leading-7 text-brand-text-muted">{feature.description}</p>
+                  </div>
+                  <div className="bg-brand-bg-secondary p-3">
+                    <img src={asset(feature.image)} alt={feature.alt} loading="lazy" className="aspect-[16/10] w-full rounded border border-brand-border object-cover object-left-top" />
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -290,11 +335,11 @@ export default function App() {
           <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.platformsTitle}</h2>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
-              { icon: Monitor, name: t.windows, detail: t.windowsBody, installer: installers?.windows, label: `${t.download} .exe` },
               { icon: Laptop, name: t.mac, detail: t.macBody, installer: installers?.mac, label: `${t.download} .dmg` },
+              { icon: Monitor, name: t.windows, detail: t.windowsBody, installer: installers?.windows, label: `${t.download} .exe` },
               { icon: Terminal, name: t.linux, detail: t.linuxBody, source: true, label: t.buildFromSource },
             ].map(({ icon: Icon, name, detail, installer, source, label }) => {
-              const href = source ? sourceGuide : installer ?? latestRelease;
+              const href = source ? sourceGuide : installer ?? releases;
               return (
               <div key={name} className="flex flex-col rounded-lg border border-brand-border bg-white/70 p-6">
                 <Icon size={23} strokeWidth={1.5} className="text-brand-caramel" />

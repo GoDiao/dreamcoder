@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { getAppWindow } from '../../lib/shell'
+import { isDesktopRuntime } from '../../lib/desktopRuntime'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
 
-export const showWindowControls = isTauri && isWindows
+export const showWindowControls = isDesktop && isWindows
 
 export function WindowControls() {
   const [maximized, setMaximized] = useState(false)
@@ -19,10 +21,9 @@ export function WindowControls() {
     if (!showWindowControls) return
     let unlisten: (() => void) | undefined
 
-    import('@tauri-apps/api/window')
-      .then(async ({ getCurrentWindow }) => {
-        const w = getCurrentWindow()
-        setWin(w as any)
+    getAppWindow()
+      .then(async (w) => {
+        setWin(w)
         setMaximized(await w.isMaximized())
         unlisten = await w.onResized(async () => {
           setMaximized(await w.isMaximized())

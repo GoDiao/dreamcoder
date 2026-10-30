@@ -1,11 +1,17 @@
+import { Check, BadgeCheck, ChevronDown, FolderOpen, Search, X } from 'lucide-react'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../shared/ui/card'
+import { CodeBlock, CodeBlockContent, CodeBlockLine } from '../shared/ui/code-block'
+import { CodeViewer } from './CodeViewer'
+import { getToolIcon } from './toolIcons'
 import { useState } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { DiffViewer } from './DiffViewer'
-import { getCuaToolDisplay, type CuaToolIcon } from '../../lib/cuaToolDisplay'
+import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
+import type { PermissionResolution } from '../../types/chat'
 
 type Props = {
   sessionId?: string | null
@@ -13,30 +19,7 @@ type Props = {
   toolName: string
   input: unknown
   description?: string
-}
-
-const TOOL_META: Record<string, { icon: string; label: string; color: string }> = {
-  Bash: { icon: 'terminal', label: 'Bash', color: 'var(--color-warning)' },
-  Edit: { icon: 'edit_note', label: 'Edit File', color: 'var(--color-brand)' },
-  Write: { icon: 'edit_document', label: 'Write File', color: 'var(--color-success)' },
-  Read: { icon: 'description', label: 'Read File', color: 'var(--color-secondary)' },
-  Glob: { icon: 'search', label: 'Glob Search', color: 'var(--color-secondary)' },
-  Grep: { icon: 'find_in_page', label: 'Grep Search', color: 'var(--color-secondary)' },
-  Agent: { icon: 'smart_toy', label: 'Agent', color: 'var(--color-tertiary)' },
-  WebSearch: { icon: 'travel_explore', label: 'Web Search', color: 'var(--color-secondary)' },
-  WebFetch: { icon: 'cloud_download', label: 'Web Fetch', color: 'var(--color-secondary)' },
-  NotebookEdit: { icon: 'note', label: 'Notebook Edit', color: 'var(--color-brand)' },
-  Skill: { icon: 'auto_awesome', label: 'Skill', color: 'var(--color-tertiary)' },
-}
-
-const CUA_MATERIAL_ICONS: Record<CuaToolIcon, string> = {
-  pointer: 'ads_click',
-  keyboard: 'keyboard',
-  screen: 'screenshot_monitor',
-  app: 'apps',
-  browser: 'language',
-  clipboard: 'content_paste',
-  other: 'computer',
+  resolution?: PermissionResolution
 }
 
 function extractToolDetails(toolName: string, input: unknown, t: (key: TranslationKey, params?: Record<string, string | number>) => string): { primary: string; secondary?: string } {
@@ -105,66 +88,57 @@ function renderPermissionPreview(toolName: string, input: unknown) {
 
   if (toolName === 'Bash' && typeof obj.command === 'string') {
     return (
-      <div className="overflow-x-auto rounded-[var(--radius-md)] bg-[var(--color-terminal-bg)] px-3 py-2.5">
-        <pre className="font-[var(--font-mono)] text-[11px] leading-[1.3] text-[var(--color-terminal-fg)] whitespace-pre-wrap break-words">
-          <span className="text-[var(--color-terminal-accent)] select-none">$ </span>{obj.command}
-        </pre>
-      </div>
+      <CodeBlock size="sm">
+        <CodeBlockContent wrap><CodeBlockLine><span className="select-none">$ </span>{obj.command}</CodeBlockLine></CodeBlockContent>
+      </CodeBlock>
     )
   }
 
   return null
 }
 
-export function PermissionDialog({ sessionId, requestId, toolName, input, description }: Props) {
-  const { respondToPermission } = useChatStore()
+function resolutionLabelKey(resolution: PermissionResolution | undefined): TranslationKey {
+  if (!resolution?.remote) return 'permission.responded'
+  if (resolution.outcome === 'withdrawn') return 'permission.withdrawn'
+  return resolution.outcome === 'allowed' ? 'permission.allowedElsewhere' : 'permission.deniedElsewhere'
+}
+
+export function PermissionDialog({ sessionId, requestId, toolName, input, description, resolution }: Props) {
+  const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
-  const pendingPermission = useChatStore((s) => targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined)
+  const isPending = useChatStore((s) =>
+    targetSessionId ? s.sessions[targetSessionId]?.pendingPermission?.requestId === requestId : false,
+  )
   const t = useTranslation()
-  const isPending = pendingPermission?.requestId === requestId
   const [showRaw, setShowRaw] = useState(false)
 
   const cua = getCuaToolDisplay(toolName, input, t)
-  const meta = cua
-    ? { icon: CUA_MATERIAL_ICONS[cua.icon], label: cua.title, color: 'var(--color-tertiary)' }
-    : TOOL_META[toolName] || { icon: 'shield', label: toolName, color: 'var(--color-text-tertiary)' }
+  const Icon = getToolIcon(toolName, cua?.icon)
   const details = cua ? { primary: cua.summary } : extractToolDetails(toolName, input, t)
   const rawInput = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
   const preview = cua ? null : renderPermissionPreview(toolName, input)
   const title = cua ? cua.permissionTitle : getPermissionTitle(toolName, input, t)
   // CLI-supplied descriptions for MCP tools quote the raw `mcp__cua__…` name; hide those.
   const shownDescription = cua && description && /mcp__|\bMCP\b/i.test(description) ? undefined : description
-  const detailIcon = cua ? meta.icon : toolName === 'Glob' || toolName === 'Grep' ? 'search' : 'folder_open'
+  const DetailIcon = cua ? Icon : toolName === 'Glob' || toolName === 'Grep' ? Search : FolderOpen
   const allowRawToggle = !preview
 
   return (
-    <div className={`mb-4 overflow-hidden rounded-[var(--radius-lg)] border ${
+    <Card size="sm" className={`mb-4 gap-0 py-0 border ${
       isPending
         ? 'border-[var(--color-warning)] bg-[var(--color-surface-container-lowest)]'
         : 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-low)] opacity-70'
     }`}>
-      <div className={`flex items-center gap-3 px-4 py-3 ${
+      <CardHeader className={`flex flex-row items-center gap-3 px-4 py-3 ${
         isPending
           ? 'bg-[var(--color-surface-container)]'
           : 'bg-[var(--color-surface-container-low)]'
       }`}>
-        <div
-          className="flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)]"
-          style={{ backgroundColor: `${meta.color}18` }}
-        >
-          <span
-            className="material-symbols-outlined text-[18px]"
-            style={{ color: meta.color }}
-          >
-            {meta.icon}
-          </span>
-        </div>
+        <Icon className="size-5 shrink-0 text-ui-muted-foreground" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-              {title}
-            </span>
+            <CardTitle>{title}</CardTitle>
             {isPending && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-warning)]/15 text-[var(--color-warning)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] animate-pulse-dot" />
@@ -173,24 +147,22 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             )}
             {!isPending && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]">
-                {t('permission.responded')}
+                {t(resolutionLabelKey(resolution))}
               </span>
             )}
           </div>
           {shownDescription && (
-            <p className="mt-0.5 text-xs text-[var(--color-text-secondary)] truncate">{shownDescription}</p>
+            <CardDescription className="truncate">{shownDescription}</CardDescription>
           )}
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="border-t border-[var(--color-outline-variant)]/20 px-4 py-3">
+      <CardContent className="border-t border-ui-border px-4 py-3">
         {preview ? (
           <div className="space-y-2">
             {details.primary && toolName !== 'Bash' ? (
-              <div className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
-                <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)] flex-shrink-0">
-                  folder_open
-                </span>
+              <div className="flex items-center gap-2 rounded-md bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
+                <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{details.primary}</span>
               </div>
             ) : null}
@@ -198,10 +170,8 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
           </div>
         ) : details.primary ? (
           <div className="mb-2">
-            <div className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
-              <span className="material-symbols-outlined text-[14px] text-[var(--color-outline)] flex-shrink-0">
-                {detailIcon}
-              </span>
+            <div className="flex items-center gap-2 rounded-md bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
+              <DetailIcon className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">{details.primary}</span>
             </div>
           </div>
@@ -212,59 +182,48 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         )}
 
         {allowRawToggle && (
-          <button
+          <Button variant="ghost" size="xs" aria-expanded={showRaw}
             onClick={() => setShowRaw(!showRaw)}
             className="mt-2 flex cursor-pointer items-center gap-1 text-[11px] text-[var(--color-text-accent)] hover:underline"
           >
-            <span className="material-symbols-outlined text-[14px]">
-              {showRaw ? 'expand_less' : 'expand_more'}
-            </span>
+            <ChevronDown className={showRaw ? 'rotate-180' : undefined} aria-hidden="true" />
             {showRaw ? t('permission.hideDetails') : t('permission.showFullInput')}
-          </button>
+          </Button>
         )}
 
         {allowRawToggle && showRaw && (
-          <pre className="mt-2 max-h-[220px] overflow-y-auto overflow-x-auto rounded-[var(--radius-md)] bg-[var(--color-terminal-bg)] px-3 py-2.5 font-[var(--font-mono)] text-[11px] leading-[1.3] text-[var(--color-terminal-fg)] whitespace-pre-wrap break-words">
-            {rawInput}
-          </pre>
+          <CodeViewer code={rawInput} language={typeof input === 'string' ? 'text' : 'json'} />
         )}
-      </div>
+      </CardContent>
 
       {isPending && (
-        <div className="flex items-center gap-2 border-t border-[var(--color-outline-variant)]/20 bg-[var(--color-surface-container-low)] px-4 py-3">
+        <CardFooter className="gap-2 px-4 py-3">
           <Button
-            variant="primary"
             size="sm"
             onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true)}
-            icon={
-              <span className="material-symbols-outlined text-[14px]">check</span>
-            }
           >
+            <Check data-icon="inline-start" aria-hidden="true" />
             {t('permission.allow')}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true, { rule: 'always' })}
-            icon={
-              <span className="material-symbols-outlined text-[14px]">verified</span>
-            }
           >
+            <BadgeCheck data-icon="inline-start" aria-hidden="true" />
             {t('permission.allowForSession')}
           </Button>
           <div className="flex-1" />
           <Button
-            variant="danger"
+            variant="destructive"
             size="sm"
             onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, false)}
-            icon={
-              <span className="material-symbols-outlined text-[14px]">close</span>
-            }
           >
+            <X data-icon="inline-start" aria-hidden="true" />
             {t('permission.deny')}
           </Button>
-        </div>
+        </CardFooter>
       )}
-    </div>
+    </Card>
   )
 }

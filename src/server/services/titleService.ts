@@ -6,6 +6,7 @@ import { resolveUpstreamTarget, sendToUpstream } from '../upstream/client.js'
 
 const TITLE_MAX_LEN = 50
 const TITLE_MAX_OUTPUT_TOKENS = 100
+const TITLE_LOG_EXCERPT_LEN = 200
 
 const TITLE_SYSTEM_PROMPT = `Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session. The title should be clear enough that the user recognizes the session in a list. Use sentence case: capitalize only the first word and proper nouns.
 
@@ -31,16 +32,31 @@ export function deriveTitle(raw: string): string | undefined {
     : flat
 }
 
+function excerptForLog(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length > TITLE_LOG_EXCERPT_LEN ? flat.slice(0, TITLE_LOG_EXCERPT_LEN) + '\u2026' : flat
+}
+
 export async function generateTitle(
   conversationText: string,
   providerId?: string | null,
+  selectedModel?: string,
+  sessionId?: string,
 ): Promise<string | null> {
   const trimmed = cleanSessionTitleSource(conversationText)
   if (!trimmed) return null
 
+  let loggedProviderId = providerId ?? undefined
+  let loggedModel = selectedModel
+  const fail = (reason: string): null => {
+    console.warn(
+      `[Title] No AI title for session ${sessionId ?? 'unknown'} (provider ${loggedProviderId ?? 'none'}, model ${loggedModel ?? 'none'}): ${reason}`,
+    )
+    return null
+  }
+
   try {
     const providerService = new ProviderService()
-    if (providerId === null) return null
 
     let resolvedProvider = providerId
       ? await providerService.getProvider(providerId)
@@ -53,27 +69,37 @@ export async function generateTitle(
         : null
     }
 
-    if (!resolvedProvider) return null
+    if (!resolvedProvider) return fail('no provider')
+    loggedProviderId = resolvedProvider.id
     const target = resolveUpstreamTarget(resolvedProvider)
-    if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) return null
+    if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) {
+      return fail('provider has no base URL or API key')
+    }
+    const titleModel = resolvedProvider.fastModel || selectedModel || resolvedProvider.models[0]?.id
+    loggedModel = titleModel
+    if (!titleModel) return fail('no model to use')
 
     const shouldDisableThinking = await shouldDisableThinkingForTitle()
     const result = await sendToUpstream(target, {
-      model: resolvedProvider.models.haiku || resolvedProvider.models.main,
+      model: titleModel,
       max_tokens: TITLE_MAX_OUTPUT_TOKENS,
       system: TITLE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],
       ...(shouldDisableThinking && { thinking: { type: 'disabled' } }),
     }, { timeoutMs: 15_000 })
 
-    if (!result.ok || !('message' in result)) return null
+    if (!result.ok) {
+      return fail(excerptForLog(result.error))
+    }
+    if (!('message' in result)) return fail('upstream returned a stream')
     const block = result.message.content.find((b) => b.type === 'text')
     const text = block?.type === 'text' ? block.text : undefined
-    if (!text) return null
+    if (!text) return fail('no text in reply')
 
-    return parseGeneratedTitleText(text)
-  } catch {
-    return null
+    const title = parseGeneratedTitleText(text)
+    return title ?? fail(`reply is not a title: ${excerptForLog(text)}`)
+  } catch (error) {
+    return fail(`unexpected error: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

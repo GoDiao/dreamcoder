@@ -1,0 +1,660 @@
+/* Calendar view of the database block: month grid, week list or time grid, and
+ * a daily heatmap. Neutral colors follow the shared .sb-block tokens; the five
+ * category tones match the .sb-tag palette used by select cells. */
+.sb-block.sb-database .sb-dbc {
+  --dbc-0: #6b7c53;
+  --dbc-0-soft: #e9eee2;
+  --dbc-1: #5b7a9a;
+  --dbc-1-soft: #e8eef4;
+  --dbc-2: #9a804d;
+  --dbc-2-soft: #f3edde;
+  --dbc-3: #986e91;
+  --dbc-3-soft: #f0e8ee;
+  --dbc-4: #a3765d;
+  --dbc-4-soft: #f3e7e0;
+  --dbc-n: var(--sb-muted);
+  --dbc-n-soft: var(--sb-soft);
+  --dbc-a: var(--sb-accent);
+  --dbc-a-soft: var(--sb-accent-soft);
+  --dbc-today: #c4673f;
+  --dbc-hour: 30px;
+  container-type: inline-size;
+  padding: 10px 0 4px;
+}
+:root[data-theme="dark"] .sb-block.sb-database .sb-dbc {
+  --dbc-0: #c1d2ae;
+  --dbc-0-soft: #34432d;
+  --dbc-1: #b1c8df;
+  --dbc-1-soft: #2d3e4b;
+  --dbc-2: #d5c59e;
+  --dbc-2-soft: #443d2b;
+  --dbc-3: #d1b3ca;
+  --dbc-3-soft: #443142;
+  --dbc-4: #d9bfa9;
+  --dbc-4-soft: #49372d;
+  --dbc-today: #e79a76;
+}
+.sb-block.sb-database .sb-dbc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.sb-block.sb-database .sb-dbc-modes {
+  display: inline-flex;
+  border: 1px solid var(--sb-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sb-block.sb-database .sb-dbc-modes > button {
+  font-size: 10px;
+  padding: 3px 10px;
+  color: var(--sb-muted);
+  border-radius: 0;
+}
+.sb-block.sb-database .sb-dbc-modes > button + button {
+  border-left: 1px solid var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-modes > button.is-active {
+  background: var(--sb-accent-soft);
+  color: var(--sb-accent);
+  font-weight: 600;
+}
+.sb-block.sb-database .sb-dbc-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sb-block.sb-database .sb-dbc-nav > strong {
+  font-size: 11px;
+  min-width: 96px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-today {
+  font-size: 10px;
+  padding: 2px 9px;
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+  color: var(--sb-muted);
+  margin-left: 4px;
+}
+.sb-block.sb-database .sb-dbc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.sb-block.sb-database .sb-dbc-legend > button {
+  --dbc-c: var(--sb-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--sb-line);
+  background: var(--sb-surface);
+}
+.sb-block.sb-database .sb-dbc-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dbc-c);
+}
+.sb-block.sb-database .sb-dbc-legend b {
+  font-weight: 600;
+  color: var(--sb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-legend > button.is-active {
+  border-color: var(--dbc-c);
+  background: var(--dbc-c-soft, var(--sb-accent-soft));
+  color: var(--dbc-c);
+}
+.sb-block.sb-database .sb-calendar-settings > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Record chips shared by every mode. */
+.sb-block.sb-database .sb-dbc-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: left;
+  padding: 2px 5px;
+  margin-top: 2px;
+  border-radius: 4px;
+  border-left: 3px solid var(--dbc-c);
+  background: var(--dbc-c-soft);
+  color: var(--sb-text);
+  transition:
+    opacity 0.15s,
+    box-shadow 0.15s;
+}
+.sb-block.sb-database .sb-dbc-chip:not(:disabled):hover {
+  background: var(--dbc-c-soft);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--sb-text) 18%, transparent);
+}
+.sb-block.sb-database .sb-dbc-chip.is-selected {
+  box-shadow: 0 0 0 2px var(--dbc-c);
+}
+.sb-block.sb-database .sb-dbc-chip.is-faded {
+  opacity: 0.25;
+}
+.sb-block.sb-database .sb-dbc-chip.continues-before {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-style: dashed;
+}
+.sb-block.sb-database .sb-dbc-chip.is-done .sb-dbc-chip-title {
+  text-decoration: line-through;
+  color: var(--sb-muted);
+}
+.sb-block.sb-database .sb-dbc-chip[draggable="true"] {
+  cursor: grab;
+}
+.sb-block.sb-database .sb-dbc-chip-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-block.sb-database .sb-dbc-time {
+  flex: none;
+  color: var(--dbc-c);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-check {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid var(--dbc-c);
+  font-size: 8px;
+  line-height: 9px;
+  text-align: center;
+  color: var(--sb-surface);
+}
+.sb-block.sb-database .sb-dbc-chip.is-done .sb-dbc-check {
+  background: var(--dbc-c);
+}
+.sb-block.sb-database .sb-dbc-muted {
+  color: var(--sb-muted);
+  font-size: 10px;
+}
+.sb-block.sb-database .sb-dbc-add {
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+}
+.sb-block.sb-database .sb-dbc-day:hover .sb-dbc-add,
+.sb-block.sb-database .sb-dbc-weekday-head:hover .sb-dbc-add,
+.sb-block.sb-database .sb-dbc-heat-day .sb-dbc-add,
+.sb-block.sb-database .sb-dbc-add:focus-visible {
+  opacity: 1;
+}
+
+/* Month grid. */
+.sb-block.sb-database .sb-dbc-month {
+  border: 1px solid var(--sb-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sb-block.sb-database .sb-dbc-weekdays,
+.sb-block.sb-database .sb-dbc-week-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.sb-block.sb-database .sb-dbc-weekdays > span {
+  font-size: 9px;
+  color: var(--sb-muted);
+  padding: 4px 6px;
+  background: var(--sb-soft);
+  border-bottom: 1px solid var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-day {
+  min-height: 78px;
+  padding: 3px 4px 5px;
+  border-right: 1px solid var(--sb-line);
+  border-bottom: 1px solid var(--sb-line);
+  min-width: 0;
+}
+.sb-block.sb-database .sb-dbc-week-row > .sb-dbc-day:nth-child(7) {
+  border-right: 0;
+}
+.sb-block.sb-database .sb-dbc-week-row:last-child > .sb-dbc-day {
+  border-bottom: 0;
+}
+.sb-block.sb-database .sb-dbc-day.is-outside {
+  background: var(--sb-soft);
+}
+.sb-block.sb-database .sb-dbc-day.is-outside .sb-dbc-day-number {
+  color: var(--sb-muted);
+  opacity: 0.7;
+}
+.sb-block.sb-database .sb-dbc-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sb-block.sb-database .sb-dbc-day-number {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 999px;
+}
+.sb-block.sb-database .sb-dbc-day.is-today .sb-dbc-day-number {
+  background: var(--dbc-today);
+  color: var(--sb-surface);
+  font-weight: 700;
+}
+.sb-block.sb-database .sb-dbc-more {
+  font-size: 9px;
+  color: var(--sb-muted);
+  padding: 1px 4px;
+  margin-top: 2px;
+  border-radius: 3px;
+}
+
+/* Agenda list: shown instead of the grids at narrow widths. */
+.sb-block.sb-database .sb-dbc-agenda {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sb-block.sb-database .sb-dbc-agenda > li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-agenda-day {
+  font-size: 10px;
+  color: var(--sb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-agenda-day > b {
+  margin-left: 5px;
+  color: var(--dbc-today);
+}
+.sb-block.sb-database .sb-dbc-agenda > li.is-today .sb-dbc-agenda-day {
+  color: var(--dbc-today);
+  font-weight: 600;
+}
+.sb-block.sb-database .sb-dbc-agenda-items > .sb-dbc-chip:first-child {
+  margin-top: 0;
+}
+.sb-block.sb-database .sb-dbc-agenda-empty {
+  font-size: 10px;
+  color: var(--sb-muted);
+}
+
+/* Week list and time grid. */
+.sb-block.sb-database .sb-dbc-weekgrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--sb-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sb-block.sb-database .sb-dbc-weekgrid.is-timed {
+  grid-template-columns: 38px repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+}
+/* Subgrid keeps the hour axis aligned with the day headers and all-day rows. */
+.sb-block.sb-database .sb-dbc-weekgrid.is-timed > .sb-dbc-weekday,
+.sb-block.sb-database .sb-dbc-weekgrid.is-timed > .sb-dbc-axis {
+  grid-row: 1 / 4;
+  grid-template-rows: subgrid;
+}
+.sb-block.sb-database .sb-dbc-weekday {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  border-left: 1px solid var(--sb-line);
+  min-width: 0;
+  min-height: 140px;
+}
+.sb-block.sb-database
+  .sb-dbc-weekgrid:not(.is-timed)
+  > .sb-dbc-weekday:first-child {
+  border-left: 0;
+}
+.sb-block.sb-database .sb-dbc-weekday.is-today {
+  background: color-mix(in srgb, var(--dbc-today) 6%, transparent);
+}
+.sb-block.sb-database .sb-dbc-weekday-head,
+.sb-block.sb-database .sb-dbc-axis-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 5px;
+  min-height: 28px;
+  font-size: 9px;
+  color: var(--sb-muted);
+  border-bottom: 1px solid var(--sb-line);
+  background: var(--sb-soft);
+}
+.sb-block.sb-database .sb-dbc-weekday-head > strong {
+  font-size: 10px;
+  color: var(--sb-text);
+}
+.sb-block.sb-database .sb-dbc-weekday.is-today .sb-dbc-weekday-head > * {
+  color: var(--dbc-today);
+}
+.sb-block.sb-database .sb-dbc-weekday-head > .sb-dbc-add {
+  margin-left: auto;
+  align-self: center;
+}
+.sb-block.sb-database .sb-dbc-weekday-list {
+  padding: 2px 4px 4px;
+  min-height: 24px;
+}
+.sb-block.sb-database .is-timed .sb-dbc-weekday-list {
+  border-bottom: 1px solid var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-axis {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+.sb-block.sb-database .sb-dbc-axis-allday {
+  font-size: 8px;
+  color: var(--sb-muted);
+  padding: 4px 3px;
+  min-height: 24px;
+  border-bottom: 1px solid var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-axis-hours,
+.sb-block.sb-database .sb-dbc-hours {
+  position: relative;
+  height: calc(var(--dbc-hours) * var(--dbc-hour));
+}
+.sb-block.sb-database .sb-dbc-hours {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--sb-line) 0,
+    var(--sb-line) 1px,
+    transparent 1px,
+    transparent var(--dbc-hour)
+  );
+}
+.sb-block.sb-database .sb-dbc-axis-hours > span {
+  position: absolute;
+  right: 4px;
+  font-size: 8px;
+  color: var(--sb-muted);
+  transform: translateY(-50%);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-axis-hours > span:first-child {
+  transform: none;
+}
+.sb-block.sb-database .sb-dbc-slot {
+  position: absolute;
+  padding: 1px 2px;
+}
+.sb-block.sb-database .sb-dbc-slot > .sb-dbc-chip {
+  height: 100%;
+  margin: 0;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  overflow: hidden;
+}
+.sb-block.sb-database .sb-dbc-slot .sb-dbc-chip-title {
+  white-space: normal;
+}
+.sb-block.sb-database .sb-dbc-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--dbc-today);
+  z-index: 2;
+  pointer-events: none;
+}
+.sb-block.sb-database .sb-dbc-now > b {
+  position: absolute;
+  right: 2px;
+  top: -14px;
+  font-size: 8px;
+  color: var(--dbc-today);
+  background: var(--sb-surface);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+/* Heatmap. */
+.sb-block.sb-database .sb-dbc-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 0 0 10px;
+}
+.sb-block.sb-database .sb-dbc-stats > div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.sb-block.sb-database .sb-dbc-stats dt {
+  font-size: 9px;
+  color: var(--sb-muted);
+}
+.sb-block.sb-database .sb-dbc-stats dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--dbc-c);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-database .sb-dbc-stats dd > small {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--sb-muted);
+}
+.sb-block.sb-database .sb-dbc-heat-scroll {
+  overflow-x: auto;
+  padding: 2px;
+}
+.sb-block.sb-database .sb-dbc-heat-grid {
+  display: grid;
+  grid-template-columns: 24px repeat(var(--dbc-weeks), 12px);
+  grid-template-rows: 14px repeat(7, 12px);
+  gap: 3px;
+  width: max-content;
+}
+.sb-block.sb-database .sb-dbc-heat-month,
+.sb-block.sb-database .sb-dbc-heat-weekday {
+  font-size: 8px;
+  color: var(--sb-muted);
+  white-space: nowrap;
+  line-height: 12px;
+  overflow: visible;
+}
+.sb-block.sb-database .sb-dbc-heat-corner {
+  grid-row: 1;
+  grid-column: 1;
+}
+.sb-block.sb-database .sb-dbc-heat-month {
+  grid-row: 1;
+}
+.sb-block.sb-database .sb-dbc-heat-weekday {
+  grid-column: 1;
+}
+.sb-block.sb-database .sb-dbc-heat-cell,
+.sb-block.sb-database .sb-dbc-heat-legend > i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--sb-soft);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--sb-line) 70%, transparent);
+}
+.sb-block.sb-database .sb-dbc-heat-cell.level-1,
+.sb-block.sb-database .sb-dbc-heat-legend > i.level-1 {
+  background: color-mix(in srgb, var(--dbc-c) 28%, var(--sb-soft));
+}
+.sb-block.sb-database .sb-dbc-heat-cell.level-2,
+.sb-block.sb-database .sb-dbc-heat-legend > i.level-2 {
+  background: color-mix(in srgb, var(--dbc-c) 50%, var(--sb-soft));
+}
+.sb-block.sb-database .sb-dbc-heat-cell.level-3,
+.sb-block.sb-database .sb-dbc-heat-legend > i.level-3 {
+  background: color-mix(in srgb, var(--dbc-c) 75%, var(--sb-soft));
+}
+.sb-block.sb-database .sb-dbc-heat-cell.level-4,
+.sb-block.sb-database .sb-dbc-heat-legend > i.level-4 {
+  background: var(--dbc-c);
+}
+.sb-block.sb-database .sb-dbc-heat-cell:not(:disabled):hover {
+  box-shadow: inset 0 0 0 1px var(--sb-text);
+}
+.sb-block.sb-database .sb-dbc-heat-cell.is-future {
+  opacity: 0.35;
+}
+.sb-block.sb-database .sb-dbc-heat-cell.is-today {
+  box-shadow: inset 0 0 0 2px var(--dbc-today);
+}
+.sb-block.sb-database .sb-dbc-heat-cell.is-picked {
+  outline: 2px solid var(--sb-text);
+  outline-offset: 1px;
+}
+.sb-block.sb-database .sb-dbc-heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  font-size: 9px;
+  color: var(--sb-muted);
+}
+.sb-block.sb-database .sb-dbc-heat-legend > span {
+  margin: 0 3px;
+}
+.sb-block.sb-database .sb-dbc-heat-day {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: start;
+  gap: 4px 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--sb-line);
+}
+.sb-block.sb-database .sb-dbc-heat-day > strong {
+  font-size: 10px;
+  line-height: 20px;
+}
+.sb-block.sb-database .sb-dbc-heat-day .sb-dbc-agenda-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sb-block.sb-database .sb-dbc-heat-day .sb-dbc-chip {
+  width: auto;
+  margin: 0;
+}
+
+/* Selected record. */
+.sb-block.sb-database .sb-dbc-detail {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--sb-line);
+  border-top: 3px solid var(--dbc-c);
+  border-radius: 6px;
+  background: var(--sb-surface);
+  animation: sb-reveal 0.15s ease-out;
+}
+.sb-block.sb-database .sb-dbc-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sb-block.sb-database .sb-dbc-detail-head > strong {
+  font-size: 12px;
+}
+.sb-block.sb-database .sb-dbc-detail-head > .sb-icon-button:first-of-type {
+  margin-left: auto;
+}
+.sb-block.sb-database .sb-dbc-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 14px;
+  margin: 8px 0 0;
+}
+.sb-block.sb-database .sb-dbc-fields dt {
+  font-size: 9px;
+  color: var(--sb-muted);
+}
+.sb-block.sb-database .sb-dbc-fields dd {
+  margin: 0;
+  min-width: 0;
+}
+.sb-block.sb-database .sb-dbc-fields .sb-tag {
+  margin: 0;
+}
+.sb-block.sb-database .sb-dbc-undated {
+  margin: 8px 0 0;
+}
+.sb-block.sb-database .sb-dbc-empty-glyph {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+@container (max-width: 560px) {
+  .sb-block.sb-database .sb-dbc-month,
+  .sb-block.sb-database .sb-dbc-weekgrid {
+    display: none;
+  }
+  .sb-block.sb-database .sb-dbc-agenda {
+    display: block;
+  }
+  .sb-block.sb-database .sb-dbc-agenda > li {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+  .sb-block.sb-database .sb-dbc-nav > strong {
+    min-width: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-block.sb-database .sb-dbc-detail {
+    animation: none;
+  }
+  .sb-block.sb-database .sb-dbc-chip {
+    transition: none;
+  }
+}
+@media print {
+  .sb-block.sb-database .sb-dbc-nav > button,
+  .sb-block.sb-database .sb-dbc-modes,
+  .sb-block.sb-database .sb-dbc-add,
+  .sb-block.sb-database .sb-dbc-detail .sb-icon-button {
+    display: none;
+  }
+  .sb-block.sb-database .sb-dbc-heat-scroll {
+    overflow: visible;
+  }
+  /* The agenda lists every record, including those folded behind "more". */
+  .sb-block.sb-database .sb-dbc-agenda {
+    display: block;
+    margin-top: 10px;
+  }
+  .sb-block.sb-database .sb-dbc-chip-title {
+    white-space: normal;
+  }
+}

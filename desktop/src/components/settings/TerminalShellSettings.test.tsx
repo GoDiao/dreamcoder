@@ -13,20 +13,40 @@ vi.mock('../../api/terminal', () => ({ terminalApi: {
 describe('default shell preferences', () => {
   beforeEach(() => {
     native.available = true
+    native.detect.mockReset()
     native.detect.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
     useSettingsStore.setState({
       locale: 'en',
-      desktopTerminal: { startupShell: 'system', customShellPath: '' },
+      desktopTerminal: { startupShell: 'system', customShellPath: '', bashPath: null },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
   })
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+  })
+
+  it('shows the Bash path setting only on Windows', async () => {
+    native.detect.mockResolvedValue({ platform: 'windows', shell: 'cmd.exe' })
+    render(<TerminalShellSettings />)
+    expect(await screen.findByPlaceholderText('Bash Path')).toBeInTheDocument()
+    cleanup()
+    native.detect.mockResolvedValue({ platform: 'macos', shell: '/bin/zsh' })
+    render(<TerminalShellSettings />)
+    expect(await screen.findByRole('button', { name: 'Save shell' })).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Bash Path')).not.toBeInTheDocument()
+  })
+
+  it('asks the sidecar for the default shell', async () => {
+    render(<TerminalShellSettings />)
+    await waitFor(() => expect(native.detect).toHaveBeenCalledWith())
+  })
 
   it.each(['macos', 'linux'])('shows detection and Unix choices on %s', async (platform) => {
     native.detect.mockResolvedValue({ platform, shell: '/usr/bin/fish' })
     render(<TerminalShellSettings />)
     await waitFor(() => expect(native.detect).toHaveBeenCalled())
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByText('/usr/bin/fish')).toBeInTheDocument()
     for (const shell of ['zsh', 'bash', 'fish']) {
       expect(screen.getByRole('menuitemradio', { name: shell })).toBeInTheDocument()
@@ -41,14 +61,14 @@ describe('default shell preferences', () => {
   it('keeps Windows shell choices using the native host platform', async () => {
     native.detect.mockResolvedValue({ platform: 'windows', shell: 'cmd.exe' })
     render(<TerminalShellSettings />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByText('cmd.exe')).toBeInTheDocument()
     expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
     expect(screen.queryByRole('menuitemradio', { name: 'fish' })).not.toBeInTheDocument()
   })
 
   it('validates custom Unix paths and persists a trimmed absolute path', async () => {
-    useSettingsStore.setState({ desktopTerminal: { startupShell: 'custom', customShellPath: '' } })
+    useSettingsStore.setState({ desktopTerminal: { startupShell: 'custom', customShellPath: '', bashPath: null } })
     render(<TerminalShellSettings />)
     await screen.findByRole('button', { name: 'Default shell' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save shell' })) })
@@ -79,8 +99,9 @@ describe('default shell preferences', () => {
     expect(screen.queryByRole('button', { name: 'Default shell' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Detecting the host shell')
     await act(async () => { resolveHost({ platform: 'windows', shell: 'cmd.exe' }) })
-    fireEvent.click(await screen.findByRole('button', { name: 'Default shell' }))
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Default shell' }), { key: 'ArrowDown' })
     expect(screen.getByRole('menuitemradio', { name: /^Command Prompt/ })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(screen.getAllByRole('button', { name: 'Default shell' })).toHaveLength(1)
   })
 
