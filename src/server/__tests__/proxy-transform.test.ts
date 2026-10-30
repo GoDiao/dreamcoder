@@ -591,6 +591,30 @@ describe('anthropicToOpenaiResponses', () => {
     ])
   })
 
+  test('tool_choice type=tool uses the flat Responses function shape', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{ role: 'user', content: 'Hi' }],
+      tool_choice: { type: 'tool', name: 'get_weather' },
+    }
+    const result = anthropicToOpenaiResponses(req)
+    expect(result.tool_choice).toEqual({ type: 'function', name: 'get_weather' })
+  })
+
+  test('tool_choice any, auto and none map to the Responses string values', () => {
+    const choose = (tool_choice: AnthropicRequest['tool_choice']) =>
+      anthropicToOpenaiResponses({
+        model: 'gpt-4o',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'Hi' }],
+        tool_choice,
+      }).tool_choice
+    expect(choose({ type: 'any' })).toBe('required')
+    expect(choose({ type: 'auto' })).toBe('auto')
+    expect(choose({ type: 'none' })).toBe('none')
+  })
+
   test('single assistant text part is flattened to a string', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4o',

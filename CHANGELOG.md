@@ -7,6 +7,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Fixed
 
 - Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195). Thanks @pcbeingused333.
+- A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
 
 ## [0.8.0-beta.2] — 2026-10-29
 
