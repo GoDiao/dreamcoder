@@ -19,7 +19,6 @@ const exists = (p: string) =>
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'team-shutdown-'))
   process.env.DREAMCODER_CONFIG_DIR = tmpDir
-  // init() starts background auth lookups that throw without a credential.
   process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 

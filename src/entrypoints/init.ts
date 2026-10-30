@@ -188,10 +188,6 @@ export const init = memoize(async (): Promise<void> => {
     // Register LSP manager cleanup (initialization happens in main.tsx after --plugin-dir is processed)
     registerCleanup(shutdownLspServerManager)
 
-    // Teams are deleted only by an explicit TeamDelete, never on process exit:
-    // the server stops the CLI on Stop, /clear, restart and app quit, and a
-    // restarted or resumed session must find its team and task list on disk.
-
     // Initialize scratchpad directory if enabled
     if (isScratchpadEnabled()) {
       const scratchpadStart = Date.now()
