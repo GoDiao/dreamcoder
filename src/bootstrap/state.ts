@@ -141,11 +141,7 @@ type State = {
   // SessionCronTask below (not importing from cronTasks.ts keeps
   // bootstrap a leaf of the import DAG).
   sessionCronTasks: SessionCronTask[]
-  // Teams created this session via TeamCreate. cleanupSessionTeams()
-  // removes these on gracefulShutdown so subagent-created teams don't
-  // persist on disk forever (gh-32730). TeamDelete removes entries to
-  // avoid double-cleanup. Lives here (not teamHelpers.ts) so
-  // resetStateForTests() clears it between tests.
+  // Lives here (not teamHelpers.ts) so resetStateForTests() clears it between tests.
   sessionCreatedTeams: Set<string>
   // Session-only trust flag for home directory (not persisted to disk)
   // When running from home dir, trust dialog is shown but not saved to disk.

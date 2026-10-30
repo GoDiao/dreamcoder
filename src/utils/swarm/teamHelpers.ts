@@ -591,7 +591,7 @@ async function destroyWorktree(worktreePath: string): Promise<void> {
 }
 
 /**
- * Mark a team as created this session so it gets cleaned up on exit.
+ * Mark a team as created this session.
  * Call this right after the initial writeTeamFile. TeamDelete should
  * call unregisterTeamForSessionCleanup to prevent double-cleanup.
  * Backing Set lives in bootstrap/state.ts so resetStateForTests()
@@ -611,7 +611,6 @@ export function unregisterTeamForSessionCleanup(teamName: string): void {
 
 /**
  * Clean up all teams created this session that weren't explicitly deleted.
- * Registered with gracefulShutdown from init.ts.
  */
 export async function cleanupSessionTeams(): Promise<void> {
   const sessionCreatedTeams = getSessionCreatedTeams()
