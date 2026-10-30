@@ -1,0 +1,351 @@
+/* layer-diagram: neutral colors follow the design tokens; tones carry a light and a dark hue. */
+/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
+ * for structural elements, and the rules below (0,3,0) set this block's own values. */
+.sb-block.ly-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
+  margin: 0;
+}
+.sb-block.ly-block li:not(svg) {
+  padding: 0;
+}
+.sb-block.ly-block pre:not(svg) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+}
+/* Doubled class so the shared .sb-block font and size do not override these. */
+.sb-block.ly-block {
+  --ly-text: var(--sb-text);
+  --ly-muted: var(--sb-muted);
+  --ly-faint: color-mix(in srgb, var(--sb-muted) 70%, transparent);
+  --ly-line: var(--sb-line);
+  --ly-paper: var(--sb-surface);
+  --ly-soft: var(--sb-soft);
+  --ly-accent: var(--sb-accent);
+  --ly-accent-soft: var(--sb-accent-soft);
+  --ly-teal: #0d8579;
+  --ly-teal-soft: #e6f4f2;
+  --ly-orange: #bf6528;
+  --ly-orange-soft: #fbefe6;
+  --ly-violet: #7348d0;
+  --ly-violet-soft: #f2edfc;
+  --ly-rose: #c4415a;
+  --ly-rose-soft: #fbebee;
+  --ly-slate: #526476;
+  --ly-slate-soft: #edf1f4;
+  --t: var(--ly-accent);
+  --ts: var(--ly-accent-soft);
+  color: var(--ly-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  padding: 8px 0;
+  container-type: inline-size;
+  overflow-wrap: anywhere;
+}
+:root[data-theme="dark"] .sb-block.ly-block,
+[data-theme="dark"] .sb-block.ly-block {
+  --ly-teal: #4fc4b6;
+  --ly-teal-soft: #163734;
+  --ly-orange: #e79c64;
+  --ly-orange-soft: #3b2b1e;
+  --ly-violet: #b497ff;
+  --ly-violet-soft: #2e2648;
+  --ly-rose: #f0839a;
+  --ly-rose-soft: #3e222a;
+  --ly-slate: #a2b2c2;
+  --ly-slate-soft: #242d35;
+}
+.sb-block.ly-block * {
+  box-sizing: border-box;
+}
+.sb-block.ly-block [data-tone="accent"] {
+  --t: var(--ly-accent);
+  --ts: var(--ly-accent-soft);
+}
+.sb-block.ly-block [data-tone="teal"] {
+  --t: var(--ly-teal);
+  --ts: var(--ly-teal-soft);
+}
+.sb-block.ly-block [data-tone="orange"] {
+  --t: var(--ly-orange);
+  --ts: var(--ly-orange-soft);
+}
+.sb-block.ly-block [data-tone="violet"] {
+  --t: var(--ly-violet);
+  --ts: var(--ly-violet-soft);
+}
+.sb-block.ly-block [data-tone="rose"] {
+  --t: var(--ly-rose);
+  --ts: var(--ly-rose-soft);
+}
+.sb-block.ly-block [data-tone="slate"] {
+  --t: var(--ly-slate);
+  --ts: var(--ly-slate-soft);
+}
+
+.sb-block.ly-block .ly-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 10px;
+}
+.sb-block.ly-block .ly-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-caption {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ly-muted);
+  line-height: 1.6;
+}
+.sb-block.ly-block .ly-hint {
+  flex: none;
+  font-size: 12px;
+  color: var(--ly-faint);
+  white-space: nowrap;
+}
+.sb-block.ly-block code {
+  font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 0.88em;
+  background: var(--ly-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.sb-block.ly-block .ly-band {
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--ly-line);
+  border-radius: 10px;
+  background: var(--ly-soft);
+  transition: border-color 0.18s ease;
+}
+.sb-block.ly-block .ly-band[data-active] {
+  border-color: color-mix(in srgb, var(--t) 45%, var(--ly-line));
+}
+.sb-block.ly-block .ly-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.sb-block.ly-block .ly-index {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: var(--ts);
+  color: var(--t);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.ly-block .ly-head h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-head small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ly-muted);
+}
+.sb-block.ly-block .ly-modules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sb-block.ly-block .ly-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ly-text);
+  background: var(--ly-paper);
+  border: 1px solid var(--ly-line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.sb-block.ly-block .ly-chip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t);
+  opacity: 0.75;
+  flex: none;
+}
+.sb-block.ly-block .ly-chip:hover {
+  border-color: color-mix(in srgb, var(--t) 55%, var(--ly-line));
+}
+.sb-block.ly-block .ly-chip[aria-pressed="true"] {
+  background: var(--ts);
+  border-color: var(--t);
+  box-shadow: 0 0 0 1px var(--t) inset;
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-chip[aria-pressed="true"] i {
+  opacity: 1;
+}
+.sb-block.ly-block .ly-chip:focus-visible,
+.sb-block.ly-block a:focus-visible {
+  outline: 2px solid var(--ly-accent);
+  outline-offset: 2px;
+}
+.sb-block.ly-block .ly-none {
+  font-size: 13px;
+  color: var(--ly-faint);
+}
+.sb-block.ly-block .ly-link {
+  height: 22px;
+  padding-left: 23px;
+  display: flex;
+  align-items: center;
+}
+.sb-block.ly-block .ly-link svg {
+  display: block;
+  fill: none;
+  stroke: var(--ly-faint);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sb-block.ly-block .ly-panel {
+  margin-top: 14px;
+  border: 1px solid var(--ly-line);
+  border-radius: 10px;
+  background: var(--ly-paper);
+  padding: 16px 20px;
+  min-height: 76px;
+}
+.sb-block.ly-block .ly-panel[data-empty] {
+  display: flex;
+  align-items: center;
+  border-style: dashed;
+}
+.sb-block.ly-block .ly-panel > p {
+  margin: 0;
+  color: var(--ly-muted);
+  font-size: 13px;
+}
+.sb-block.ly-block .ly-crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ly-muted);
+  line-height: 1.5;
+}
+.sb-block.ly-block .ly-crumb span:first-child {
+  color: var(--t);
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-crumb b {
+  font-weight: 400;
+  color: var(--ly-faint);
+}
+.sb-block.ly-block .ly-panel h4 {
+  margin: 2px 0 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-path {
+  display: inline-block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--ly-line);
+  word-break: break-all;
+}
+.sb-block.ly-block .ly-md p {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.sb-block.ly-block .ly-md p:last-child {
+  margin-bottom: 0;
+}
+.sb-block.ly-block .ly-md strong {
+  font-weight: 650;
+}
+.sb-block.ly-block .ly-md a {
+  color: var(--ly-accent);
+  text-underline-offset: 3px;
+}
+
+/* ---------- static list, only in print */
+.sb-block.ly-block .ly-static {
+  display: none;
+}
+
+@container (max-width: 640px) {
+  .sb-block.ly-block .ly-hint {
+    display: none;
+  }
+  .sb-block.ly-block .ly-band {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .sb-block.ly-block .ly-link {
+    padding-left: 21px;
+  }
+  .sb-block.ly-block .ly-panel {
+    padding: 14px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-block.ly-block .ly-band,
+  .sb-block.ly-block .ly-chip {
+    transition: none;
+  }
+}
+@media print {
+  .sb-block.ly-block .ly-hint,
+  .sb-block.ly-block .ly-panel {
+    display: none;
+  }
+  .sb-block.ly-block .ly-band {
+    break-inside: avoid;
+  }
+  .sb-block.ly-block .ly-static {
+    display: block;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .sb-block.ly-block .ly-static-layer {
+    margin-bottom: 8px;
+  }
+  .sb-block.ly-block .ly-static ul {
+    margin: 4px 0 0;
+    padding-left: 20px;
+  }
+  .sb-block.ly-block .ly-static li {
+    break-inside: avoid;
+    margin-bottom: 4px;
+  }
+  .sb-block.ly-block .ly-static code {
+    margin-left: 6px;
+  }
+}

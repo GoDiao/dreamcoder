@@ -1,3 +1,5 @@
+export const UI_PAGE_ROUTE_PREFIX = '/ui-pages/'
+
 export type H5RequestKind = 'local-trusted' | 'internal-sdk' | 'h5-browser'
 export type H5RequestContext = {
   clientAddress: string | null
@@ -5,9 +7,7 @@ export type H5RequestContext = {
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 const LOCAL_ORIGINS = new Set([
-  'http://tauri.localhost',
-  'https://tauri.localhost',
-  'tauri://localhost',
+  'dreamcoder://localhost',
 ])
 
 export function normalizeHostname(hostname: string): string {
@@ -99,11 +99,16 @@ export function shouldBlockDisabledH5Access({
   return classifyH5Request(request, url, context) === 'h5-browser'
 }
 
+export function isDesktopOnlyPath(pathname: string): boolean {
+  return pathname === '/terminal' || pathname === '/api/terminal' || pathname.startsWith('/api/terminal/')
+}
+
 function isH5ProtectedCapabilityPath(pathname: string): boolean {
   return pathname.startsWith('/api/') ||
     pathname.startsWith('/proxy/') ||
     pathname.startsWith('/ws/') ||
-    pathname.startsWith('/sdk/')
+    pathname.startsWith('/sdk/') ||
+    pathname.startsWith(UI_PAGE_ROUTE_PREFIX)
 }
 
 function isH5BrowserCapabilityPath(pathname: string): boolean {

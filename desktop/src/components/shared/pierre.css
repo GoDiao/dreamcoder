@@ -1,0 +1,25 @@
+.pierre-diff-surface {
+  display: block;
+  --diffs-font-family: var(--font-mono);
+  --diffs-header-font-family: var(--font-body);
+  --diffs-font-size: 12px;
+  --diffs-line-height: 20px;
+  --diffs-fg-number-override: var(--color-text-tertiary);
+  --diffs-bg-context-override: var(--color-code-bg);
+  --diffs-bg-context-gutter-override: var(--color-code-bg);
+  --diffs-bg-buffer-override: var(--color-surface-container-low);
+  --diffs-bg-separator-override: var(--color-diff-title-bg);
+  --diffs-bg-hover-override: var(--color-surface-hover);
+  --diffs-bg-addition-override: var(--color-diff-added-bg);
+  --diffs-bg-addition-number-override: var(--color-diff-added-gutter);
+  --diffs-bg-addition-emphasis-override: var(--color-diff-added-word);
+  --diffs-fg-number-addition-override: var(--color-diff-added-text);
+  --diffs-addition-color-override: var(--color-diff-added-text);
+  --diffs-bg-deletion-override: var(--color-diff-removed-bg);
+  --diffs-bg-deletion-number-override: var(--color-diff-removed-gutter);
+  --diffs-bg-deletion-emphasis-override: var(--color-diff-removed-word);
+  --diffs-fg-number-deletion-override: var(--color-diff-removed-text);
+  --diffs-deletion-color-override: var(--color-diff-removed-text);
+  --diffs-bg-selection-override: var(--color-diff-highlight-bg);
+  --diffs-bg-selection-number-override: var(--color-diff-highlight-gutter);
+}

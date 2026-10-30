@@ -1,0 +1,761 @@
+/* One reading style for Markdown, editable prose and delivered pages. */
+:root {
+  --reading-text: #494650;
+  --reading-heading: #383042;
+  --reading-accent: #120a8f;
+  --reading-highlight: #e6e1fc;
+  --reading-code: #f0eef9;
+}
+:root[data-theme="dark"] {
+  --reading-text: #d4d1dd;
+  --reading-heading: #e4dfec;
+  --reading-accent: #bbb3ff;
+  --reading-highlight: #37304f;
+  --reading-code: #29243a;
+}
+/* Every rule below keeps the :is(…) container prefix (0,2,x): the workbench,
+ * text component and portable reader then share one set of values regardless of
+ * stylesheet order, while blocks scoped under .sb-block.<root> (0,3,0) still win. */
+:is(.document-content, .portable-editor .tiptap, .portable-content, .sb-text) {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.8;
+  letter-spacing: 0;
+  color: var(--reading-text);
+}
+.sb-text > .sb-rich-text {
+  font: inherit;
+  line-height: inherit;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--reading-heading);
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  scroll-margin-top: 80px;
+}
+/* Each level is clearly smaller than the one above, and sits closer to the text it introduces. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  h1 {
+  font-size: 28px;
+  line-height: 1.35;
+  margin: 40px 0 14px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  h2 {
+  font-size: 22px;
+  line-height: 1.4;
+  margin: 34px 0 12px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  h3 {
+  font-size: 18px;
+  line-height: 1.45;
+  margin: 26px 0 8px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(h4, h5, h6) {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 20px 0 6px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(h1, h2, h3, h4, h5, h6)
+  + :is(h2, h3, h4, h5, h6) {
+  margin-top: 14px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  p {
+  margin: 0 0 14px;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  mark:not(:where(.sb-block *, .showai-custom-block *)),
+.sb-text .sb-rich-text mark {
+  --showai-highlight-start: 43%;
+  color: inherit;
+  background: linear-gradient(
+    transparent var(--showai-highlight-start),
+    var(--showai-highlight-color, var(--reading-highlight))
+      var(--showai-highlight-start)
+  );
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 1px;
+  border-radius: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  mark[data-highlight-mode="full"] {
+  --showai-highlight-start: 0%;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  strong:not(:where(.sb-block *, .showai-custom-block *)),
+.sb-text .sb-rich-text strong {
+  font-weight: 600;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  mark {
+  /* Legacy HTML may still carry an inline full-height background. */
+  background-color: transparent !important;
+}
+:root[data-theme="dark"]
+  :is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  mark {
+  background-image: linear-gradient(
+    transparent var(--showai-highlight-start, 43%),
+    color-mix(
+        in srgb,
+        var(--showai-highlight-color, var(--reading-highlight)) 22%,
+        transparent
+      )
+      var(--showai-highlight-start, 43%)
+  );
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  em {
+  color: var(--reading-accent);
+  font-style: normal;
+  font-weight: 550;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  a {
+  color: var(--reading-accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  blockquote {
+  border-left: 3px solid
+    color-mix(in srgb, var(--reading-accent) 45%, transparent);
+  background: none;
+  color: var(--reading-text);
+  padding: 2px 0 2px 16px;
+  margin: 18px 0;
+  border-radius: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  blockquote
+  p {
+  margin: 0 0 8px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul, ol) {
+  padding-left: 1.5em;
+  margin: 0 0 14px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li {
+  margin: 4px 0;
+  padding-left: 0.2em;
+}
+/* A list item's paragraphs and nested lists belong to the item, not to the page rhythm. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li
+  > p {
+  margin: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li
+  > :is(ul, ol) {
+  margin: 4px 0 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  ol {
+  font-variant-numeric: tabular-nums;
+}
+/* Task lists: the editor renders <label><input></label><div>, the reader <input><div>. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list) {
+  list-style: none;
+  padding-left: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-left: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 1.8em;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"] {
+  /* One drawn box for the editable editor and the read-only reader, so a
+     disabled reader checkbox does not fall back to the greyed system look. */
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1.5px solid color-mix(in srgb, var(--reading-text) 40%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  /* The tick is drawn with borders: component bundles may not load image assets. */
+  --task-tick: #ffffff;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked {
+  border-color: var(--reading-accent);
+  background-color: var(--reading-accent);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked::before {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 8px;
+  margin: 1px 0 0 4px;
+  border: solid var(--task-tick);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:disabled {
+  cursor: default;
+}
+:root[data-theme="dark"]
+  :is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked {
+  /* The dark accent is light, so the tick turns dark. */
+  --task-tick: #201c2e;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--reading-accent);
+  outline-offset: 2px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  .portable-task-list
+  > li
+  > input[type="checkbox"] {
+  /* Centre the box on the first line, as the editor's label does. */
+  margin-top: calc(0.9em - 7.5px);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > div {
+  flex: 1;
+  min-width: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > div
+  > p {
+  margin: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li[data-checked="true"]
+  > div
+  > p {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li::marker {
+  color: var(--reading-accent);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--reading-accent);
+  background: var(--reading-code);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+/* Code keeps its own lines and scrolls sideways, in the editor and the reader alike. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  pre,
+.sb-code pre {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--reading-text);
+  padding: 16px 20px;
+  margin: 18px 0;
+  font: 13.5px/1.7 var(--font-mono);
+  white-space: pre;
+  tab-size: 2;
+  overflow-x: auto;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  pre
+  code {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 28px 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  > :first-child {
+  margin-top: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  > :last-child {
+  margin-bottom: 0;
+}
+/* Nested containers trim their own edges, so a one-paragraph callout or cell has
+ * no trailing gap: editor callouts/toggles, reader callouts/toggles, quotes,
+ * list items and table cells. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(
+    blockquote,
+    li,
+    th,
+    td,
+    .callout-content > div,
+    .toggle-body > div > div,
+    .portable-callout > div,
+    .portable-toggle-body
+  )
+  > :last-child {
+  margin-bottom: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(
+    blockquote,
+    li,
+    th,
+    td,
+    .callout-content > div,
+    .toggle-body > div > div,
+    .portable-callout > div,
+    .portable-toggle-body
+  )
+  > :first-child {
+  margin-top: 0;
+}
+.document-content .document-image,
+.portable-editor .document-image,
+.portable-image,
+.sb-rich-text img,
+.sb-image img {
+  border-radius: 14px;
+}
+/* Rich-text tables: light rules, a tinted header and compact cells. Block tables
+ * (.sb-block) keep their own styles. */
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(.tableWrapper, .portable-table-scroll):not(.sb-block *) {
+  overflow-x: auto;
+  margin: 18px 0;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  table:not(.sb-block table),
+.sb-rich-text table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 15px;
+  line-height: 1.6;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td)),
+.sb-rich-text :is(th, td) {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: start;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  th:not(.sb-block th),
+.sb-rich-text th {
+  background: var(--surface);
+  color: var(--reading-heading);
+  font-weight: 600;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td))
+  > p,
+.sb-rich-text :is(th, td) > p {
+  margin: 0;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td))
+  > p
+  + p,
+.sb-rich-text :is(th, td) > p + p {
+  margin-top: 6px;
+}
+/* The table block keeps its established look. */
+.sb-table table {
+  font-size: inherit;
+  line-height: inherit;
+}
+.sb-table :is(th, td) {
+  padding: 12px 16px;
+  border-color: var(--line);
+}
+.sb-table th {
+  background: var(--surface);
+  font-weight: 600;
+}
+.sb-primitive {
+  font-family: var(--font-sans);
+}
+.sb-image figcaption,
+.sb-primitive-editor {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sb-image-empty {
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.sb-primitive-editor :is(input, textarea) {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--paper);
+  color: var(--text);
+}
+.sb-code textarea {
+  font-family: var(--font-mono);
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+.sb-block {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  border-radius: 16px;
+}
+.sb-header {
+  padding: 20px 24px 16px;
+}
+.sb-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sb-description {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sb-block :is(.sb-button, .sb-icon-button) {
+  border-radius: 8px;
+}
+.sb-block .sb-button {
+  min-height: 36px;
+  font-size: 14px;
+}
+.sb-metric-value {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sb-bookmark-copy > strong {
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.sb-bookmark-copy > p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.portable-document {
+  max-width: 1000px;
+  padding: 80px 64px 96px;
+}
+.portable-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-bottom: 32px;
+}
+.portable-options-trigger {
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+.portable-options-menu {
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+}
+.portable-options-menu button {
+  border-radius: 8px;
+  min-height: 40px;
+  font-size: 14px;
+}
+.portable-toggle summary {
+  font-weight: 600;
+}
+@media (max-width: 700px) {
+  .portable-document {
+    padding: 76px 24px 64px;
+  }
+  .portable-title {
+    font-size: 28px;
+  }
+  .sb-header {
+    padding: 16px;
+  }
+  :is(
+      .document-content,
+      .portable-editor .tiptap,
+      .portable-content,
+      .sb-rich-text
+    )
+    pre,
+  .sb-code pre {
+    padding: 16px;
+  }
+}
+@media print {
+  .portable-document {
+    max-width: none;
+    padding: 0;
+  }
+  .sb-block {
+    --sb-accent: #222222;
+  }
+}
+
+/* Flow groups share one reading rhythm. Trim only the document's outer edges:
+ * a preceding/following sibling at any ancestor makes this an internal boundary. */
+.document-content
+  .page-document-flow
+  > :first-child:not(.document-content :not(:first-child) *) {
+  margin-top: 0;
+}
+.document-content
+  .page-document-flow
+  > :last-child:not(.document-content :not(:last-child) *) {
+  margin-bottom: 0;
+}

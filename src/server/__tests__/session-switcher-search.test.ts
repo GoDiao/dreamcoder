@@ -167,10 +167,10 @@ describe('session list assistant search text', () => {
         headLines: number,
         tailLines: number,
         includeLastAssistantMessage: boolean,
-      ) => Promise<{ entries: unknown[]; messageCount: number; lastAssistantMessage: string }>
+      ) => Promise<{ entries: unknown[]; messageCount: number; lastAssistantMessage: string; messageCountExact: boolean }>
     }
     expect(await scanner.scanSessionFileHead(path.join(configDir, 'missing.jsonl'), 100, 100, true))
-      .toEqual({ entries: [], messageCount: 0, lastAssistantMessage: '' })
+      .toEqual({ entries: [], messageCount: 0, lastAssistantMessage: '', messageCountExact: true })
     await expect(scanner.scanSessionFileHead(configDir, 100, 100, true)).rejects.toThrow()
   })
 })

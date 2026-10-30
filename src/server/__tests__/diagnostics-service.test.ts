@@ -103,7 +103,7 @@ describe('DiagnosticsService', () => {
           apiKey: 'sk-provider-secret',
           baseUrl: 'https://api.example.com/anthropic',
           apiFormat: 'anthropic',
-          models: { main: 'main-model', haiku: 'haiku-model', sonnet: 'sonnet-model', opus: 'opus-model' },
+          models: [{ id: 'main-model' }, { id: 'haiku-model' }, { id: 'sonnet-model' }, { id: 'opus-model' }],
         }],
       }),
       'utf-8',

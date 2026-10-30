@@ -1,8 +1,8 @@
 import { Copy, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from '../../i18n'
-import { Button } from '../shared/Button'
-import { DoctorPanel } from '../doctor/DoctorPanel'
+import { Button } from '../shared/ui/button'
+import { LazyDoctorPanel } from '../doctor/LazyDoctorPanel'
 import { copyTextToClipboard } from '../chat/clipboard'
 
 const LOG_MARKER = '\n\nRecent server logs:\n'
@@ -79,25 +79,25 @@ export function StartupErrorView({ error }: StartupErrorViewProps) {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               size="sm"
-              icon={<Copy className="h-4 w-4" aria-hidden="true" />}
               onClick={handleCopy}
             >
+              <Copy data-icon="inline-start" className="h-4 w-4" aria-hidden="true" />
               {copied ? t('app.copiedDiagnostics') : t('app.copyDiagnostics')}
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
               onClick={() => window.location.reload()}
             >
+              <RefreshCw data-icon="inline-start" className="h-4 w-4" aria-hidden="true" />
               {t('common.retry')}
             </Button>
           </div>
 
-          <DoctorPanel compact />
+          <LazyDoctorPanel compact />
         </div>
       </section>
     </div>

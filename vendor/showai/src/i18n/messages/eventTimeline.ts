@@ -1,0 +1,41 @@
+import { defineMessages } from "../index";
+
+// Event timeline built-in.
+export default defineMessages("eventTimeline", {
+  "zh-CN": {
+    title: "事件时间线",
+    position: "位置",
+    chart: "{series} 随{axis}变化，标出 {count} 个事件",
+    chartNoSeries: "沿{axis}排列的 {count} 个事件",
+    summary: "要点",
+    scrub: "拖动查看各时间点",
+    scrubValue: "{point}，{event}",
+    noEvent: "尚无事件",
+    previous: "上一个事件",
+    next: "下一个事件",
+    phases: "阶段",
+    jumpToPhase: "跳到阶段 {label}（{from}–{to}）",
+    events: "事件 · {count}",
+    seriesWithUnit: "{label}（{unit}）",
+    future: "尚未发生",
+    noValue: "无数据",
+  },
+  en: {
+    title: "Event timeline",
+    position: "Position",
+    chart: "{series} over {axis}, with {count} events marked",
+    chartNoSeries: "{count} events along {axis}",
+    summary: "Highlights",
+    scrub: "Drag to step through the timeline",
+    scrubValue: "{point}, {event}",
+    noEvent: "No event yet",
+    previous: "Previous event",
+    next: "Next event",
+    phases: "Phases",
+    jumpToPhase: "Jump to phase {label} ({from}–{to})",
+    events: "Events · {count}",
+    seriesWithUnit: "{label} ({unit})",
+    future: "Not yet reached",
+    noValue: "No data",
+  },
+});

@@ -129,7 +129,7 @@ function convertToolChoice(choice: unknown): unknown {
     if (c.type === 'any') return 'required'
     if (c.type === 'none') return 'none'
     if (c.type === 'tool' && typeof c.name === 'string') {
-      return { type: 'function', function: { name: c.name } }
+      return { type: 'function', name: c.name }
     }
   }
   return 'auto'

@@ -49,7 +49,7 @@ describe('persistent storage upgrade migrations', () => {
           name: 'Legacy Provider',
           apiKey: 'token',
           baseUrl: 'https://example.test',
-          models: { main: 'model-main', haiku: '', sonnet: '', opus: '' },
+          models: { main: 'model-main', haiku: 'model-fast', sonnet: 'model-sonnet', opus: 'model-main' },
           extraFutureField: 'keep-me',
         }],
       }, null, 2),
@@ -73,9 +73,22 @@ describe('persistent storage upgrade migrations', () => {
     expect(migrated.activeProviderId).toBeUndefined()
     expect(migrated.rootFutureField).toEqual({ keep: true })
     expect(migrated.providers?.[0]?.extraFutureField).toBe('keep-me')
+    expect(migrated.providers?.[0]?.models).toEqual([
+      { id: 'model-main' },
+      { id: 'model-sonnet' },
+      { id: 'model-fast' },
+    ])
+    expect(migrated.providers?.[0]?.fastModel).toBe('model-fast')
 
     const backups = (await listFiles(dreamcoderDir)).filter((file) => file.startsWith('providers.json.bak-before-migration-'))
     expect(backups.length).toBe(1)
+
+    resetPersistentStorageMigrationsForTests()
+    const secondReport = await ensurePersistentStorageUpgraded()
+    expect(secondReport.migratedEntries).not.toContain('dreamcoder/providers.json')
+    const backupsAfterSecondRun = (await listFiles(dreamcoderDir))
+      .filter((file) => file.startsWith('providers.json.bak-before-migration-'))
+    expect(backupsAfterSecondRun.length).toBe(1)
 
     const service = new ProviderService()
     const { providers, activeId } = await service.listProviders()
@@ -89,6 +102,44 @@ describe('persistent storage upgrade migrations', () => {
     }
     expect(rewritten.rootFutureField).toEqual({ keep: true })
     expect(rewritten.providers?.[0]?.extraFutureField).toBe('keep-me')
+  })
+
+  test('migrates empty and duplicate legacy model slots without inventing a fast model', async () => {
+    const dreamcoderDir = path.join(tempDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
+    const provider = (id: string, models: Record<string, string>) => ({
+      id,
+      presetId: 'custom',
+      name: id,
+      apiKey: 'token',
+      baseUrl: 'https://example.test',
+      models,
+    })
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'providers.json'),
+      JSON.stringify({
+        activeId: null,
+        providers: [
+          provider('empty-fast', { main: 'm', haiku: '', sonnet: '', opus: '' }),
+          provider('duplicates', { main: 'm', haiku: 'm', sonnet: 's', opus: 'm' }),
+          provider('all-empty', { main: '', haiku: '', sonnet: '', opus: '' }),
+        ],
+      }, null, 2),
+      'utf-8',
+    )
+
+    const report = await ensurePersistentStorageUpgraded()
+    expect(report.failures).toEqual([])
+
+    const migrated = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'providers.json'), 'utf-8')) as {
+      providers: Array<{ models: Array<{ id: string }>; fastModel?: string }>
+    }
+    expect(migrated.providers[0]).toMatchObject({ models: [{ id: 'm' }] })
+    expect(migrated.providers[0]?.fastModel).toBeUndefined()
+    expect(migrated.providers[1]).toMatchObject({ models: [{ id: 'm' }, { id: 's' }] })
+    expect(migrated.providers[1]?.fastModel).toBeUndefined()
+    expect(migrated.providers[2]).toMatchObject({ models: [] })
+    expect(migrated.providers[2]?.fastModel).toBeUndefined()
   })
 
   test('imports legacy root providers config into dreamcoder storage without deleting the source', async () => {
@@ -131,7 +182,7 @@ describe('persistent storage upgrade migrations', () => {
         id?: string
         presetId?: string
         apiFormat?: string
-        models?: Record<string, string>
+        models?: Array<{ id: string; name?: string }>
         notes?: string
       }>
     }
@@ -141,12 +192,10 @@ describe('persistent storage upgrade migrations', () => {
       presetId: 'custom',
       apiFormat: 'anthropic',
       notes: 'keep note',
-      models: {
-        main: 'legacy-sonnet',
-        haiku: 'legacy-sonnet',
-        sonnet: 'legacy-sonnet',
-        opus: 'legacy-sonnet',
-      },
+      models: [
+        { id: 'legacy-sonnet', name: 'Legacy Sonnet' },
+        { id: 'legacy-haiku', name: 'Legacy Haiku' },
+      ],
     })
 
     const managedSettings = JSON.parse(await fs.readFile(path.join(tempDir, 'dreamcoder', 'settings.json'), 'utf-8')) as {
@@ -161,7 +210,7 @@ describe('persistent storage upgrade migrations', () => {
     const service = new ProviderService()
     const { providers, activeId } = await service.listProviders()
     expect(activeId).toBe('legacy-provider')
-    expect(providers[0]?.models.main).toBe('legacy-sonnet')
+    expect(providers[0]?.models[0]?.id).toBe('legacy-sonnet')
   })
 
   test('does not overwrite current dreamcoder provider storage with a legacy root config', async () => {

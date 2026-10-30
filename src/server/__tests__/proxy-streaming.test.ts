@@ -1,6 +1,10 @@
 import { describe, test, expect } from 'bun:test'
 import { openaiChatStreamToAnthropic } from '../proxy/streaming/openaiChatStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiResponsesStreamToAnthropic.js'
+import {
+  OpenAIResponsesStreamError,
+  openaiResponsesStreamToAnthropicResponse,
+} from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -106,6 +110,61 @@ describe('openaiChatStreamToAnthropic', () => {
 
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
+  })
+
+  test('tool call finished with stop (Gemini) ends with tool_use', async () => {
+    const sseChunks = [
+      'data: {"id":"c3","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"NYC\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c3","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const msgDelta = events.find((e) => e.event === 'message_delta')!
+    expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
+  })
+
+  test('parallel tool calls without an index stay separate tool_use blocks', async () => {
+    const sseChunks = [
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"id":"call_paris","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"Paris\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_london","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c4","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const toolStarts = events.filter(
+      (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
+    )
+    expect(toolStarts.map((e) => (e.data.content_block as Record<string, unknown>).id)).toEqual(['call_paris', 'call_london'])
+
+    const args = events
+      .filter((e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta')
+      .map((e) => (e.data.delta as Record<string, unknown>).partial_json)
+    expect(args).toEqual(['{"city":"Paris"}', '{"city":"London"}'])
+  })
+
+  test('argument fragments without an index continue the latest tool call', async () => {
+    const sseChunks = [
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"function":{"arguments":"{\\"city\\""}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":\\"NYC\\"}"}}]},"finish_reason":null}]}\n\n',
+      'data: {"id":"c5","object":"chat.completion.chunk","created":0,"model":"gemini","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+
+    const toolStarts = events.filter(
+      (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
+    )
+    expect(toolStarts).toHaveLength(1)
+    const args = events
+      .filter((e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta')
+      .map((e) => (e.data.delta as Record<string, unknown>).partial_json)
+    expect(args.join('')).toBe('{"city":"NYC"}')
   })
 
   test('tool call streaming preserves object arguments from local proxies', async () => {
@@ -479,6 +538,75 @@ describe('openaiResponsesStreamToAnthropic', () => {
       output_tokens: 5,
       cache_read_input_tokens: 80,
     })
+  })
+})
+
+describe('openaiResponsesStreamToAnthropicResponse', () => {
+  const output = [
+    { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'partial' }] },
+    { type: 'function_call', call_id: 'call_1', name: 'Read', arguments: '{"path":"a"}' },
+  ]
+
+  test.each([
+    ['response.completed', 'completed', 'tool_use'],
+    ['response.incomplete', 'incomplete', 'max_tokens'],
+  ])('keeps the final response of a %s event', async (event, status, stopReason) => {
+    const response = {
+      id: 'resp_1',
+      model: 'gpt-5.6-terra',
+      status,
+      output,
+      usage: { input_tokens: 12, output_tokens: 7 },
+    }
+    const result = await openaiResponsesStreamToAnthropicResponse(
+      makeStream([`event: ${event}\ndata: ${JSON.stringify({ type: event, response })}\n\n`]),
+      'm',
+    )
+
+    expect(result.stop_reason).toBe(stopReason)
+    expect(result.usage).toEqual({ input_tokens: 12, output_tokens: 7 })
+    expect(result.content.map(block => block.type)).toEqual(['text', 'tool_use'])
+  })
+})
+
+describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
+  test.each([
+    [
+      'response.failed',
+      { type: 'response.failed', response: { id: 'resp_1', status: 'failed', error: { message: 'model overloaded' } } },
+      'model overloaded',
+    ],
+    ['error', { type: 'error', error: { message: 'rate limited' } }, 'rate limited'],
+    ['error', { type: 'error' }, 'Upstream Responses stream failed'],
+  ])('rejects on a %s event instead of returning an empty reply', async (event, payload, message) => {
+    const result = openaiResponsesStreamToAnthropicResponse(
+      makeStream([
+        'event: response.created\ndata: {"type":"response.created","id":"resp_1","status":"in_progress"}\n\n',
+        `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
+      ]),
+      'm',
+    )
+
+    await expect(result).rejects.toBeInstanceOf(OpenAIResponsesStreamError)
+    await expect(result).rejects.toThrow(message)
+  })
+
+  test('keeps a completed response that follows an earlier error event', async () => {
+    const response = {
+      id: 'resp_1',
+      model: 'm',
+      status: 'completed',
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
+    }
+    const result = await openaiResponsesStreamToAnthropicResponse(
+      makeStream([
+        'event: error\ndata: {"type":"error","error":{"message":"transient"}}\n\n',
+        `event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response })}\n\n`,
+      ]),
+      'm',
+    )
+
+    expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
   })
 })
 

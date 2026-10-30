@@ -18,6 +18,13 @@ describe('anthropicToOpenaiChat', () => {
     expect(result.messages).toEqual([{ role: 'user', content: 'Hello' }])
   })
 
+  test('streaming requests ask for token usage', () => {
+    const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
+    expect(anthropicToOpenaiChat({ ...base, stream: true }).stream_options).toEqual({ include_usage: true })
+    expect(anthropicToOpenaiChat(base).stream_options).toBeUndefined()
+    expect(anthropicToOpenaiChat({ ...base, stream: false }).stream_options).toBeUndefined()
+  })
+
   test('system prompt string', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4',
@@ -342,6 +349,23 @@ describe('openaiChatToAnthropic', () => {
     }
   })
 
+  test('tool_calls finished with stop (Gemini) still ends with tool_use', () => {
+    const res = {
+      id: 'x', object: 'chat.completion', created: 0, model: 'gemini',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"NYC"}' } }],
+        },
+        finish_reason: 'stop',
+      }],
+    } as OpenAIChatResponse
+
+    expect(openaiChatToAnthropic(res, 'gemini').stop_reason).toBe('tool_use')
+  })
+
   test('finish_reason mapping', () => {
     const make = (reason: string) => ({
       id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4',
@@ -565,6 +589,30 @@ describe('anthropicToOpenaiResponses', () => {
       { type: 'output_text', text: 'Hello.' },
       { type: 'output_text', text: 'Anything else?' },
     ])
+  })
+
+  test('tool_choice type=tool uses the flat Responses function shape', () => {
+    const req: AnthropicRequest = {
+      model: 'gpt-4o',
+      max_tokens: 100,
+      messages: [{ role: 'user', content: 'Hi' }],
+      tool_choice: { type: 'tool', name: 'get_weather' },
+    }
+    const result = anthropicToOpenaiResponses(req)
+    expect(result.tool_choice).toEqual({ type: 'function', name: 'get_weather' })
+  })
+
+  test('tool_choice any, auto and none map to the Responses string values', () => {
+    const choose = (tool_choice: AnthropicRequest['tool_choice']) =>
+      anthropicToOpenaiResponses({
+        model: 'gpt-4o',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'Hi' }],
+        tool_choice,
+      }).tool_choice
+    expect(choose({ type: 'any' })).toBe('required')
+    expect(choose({ type: 'auto' })).toBe('auto')
+    expect(choose({ type: 'none' })).toBe('none')
   })
 
   test('single assistant text part is flattened to a string', () => {

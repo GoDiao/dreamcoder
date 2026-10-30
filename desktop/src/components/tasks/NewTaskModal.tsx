@@ -1,9 +1,15 @@
+import { ClockIcon, InfoIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
 import { useSessionStore } from '../../stores/sessionStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { Modal } from '../shared/Modal'
-import { Input } from '../shared/Input'
-import { Button } from '../shared/Button'
+import { FormSelect } from '../shared/FormSelect'
+import { Checkbox } from '../shared/ui/checkbox'
+import { Field, FieldLabel } from '../shared/ui/field'
+import { Input } from '../shared/ui/input'
+import { LabeledInput } from '../shared/LabeledInput'
+import { Button } from '../shared/ui/button'
 import { PromptEditor } from './PromptEditor'
 import { DayOfWeekPicker } from './DayOfWeekPicker'
 import { useTranslation } from '../../i18n'
@@ -54,7 +60,8 @@ function buildCron(
 
 export function NewTaskModal({ open, onClose, editTask }: Props) {
   const t = useTranslation()
-  const { createTask, updateTask } = useTaskStore()
+  const createTask = useTaskStore((state) => state.createTask)
+  const updateTask = useTaskStore((state) => state.updateTask)
   const sessions = useSessionStore((s) => s.sessions)
   const activeSessionId = useSessionStore((s) => s.activeSessionId)
   const activeSession = sessions.find((s) => s.id === activeSessionId)
@@ -79,7 +86,10 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
   const [time, setTime] = useState(parsed?.time || '09:00')
   const [model, setModel] = useState(editTask?.model || '')
   const [providerId, setProviderId] = useState<string | null | undefined>(editTask?.providerId)
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>((editTask?.permissionMode as PermissionMode) || 'default')
+  const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
+    (editTask?.permissionMode as PermissionMode | undefined) ?? defaultPermissionMode,
+  )
   const [folderPath, setFolderPath] = useState(editTask?.folderPath || defaultWorkDir)
   const [useWorktree, setUseWorktree] = useState(editTask?.useWorktree || false)
   const [notifyEnabled, setNotifyEnabled] = useState(
@@ -118,7 +128,7 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         prompt: prompt.trim(),
         model: model || undefined,
         providerId,
-        permissionMode: permissionMode !== 'default' ? permissionMode : undefined,
+        permissionMode,
         folderPath: folderPath.trim() || undefined,
         useWorktree: useWorktree || undefined,
         notification: notifyEnabled
@@ -138,8 +148,6 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
     }
   }
 
-  const selectClass = 'w-full h-10 px-3 pr-8 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] appearance-none cursor-pointer'
-
   return (
     <Modal
       open={open}
@@ -147,22 +155,22 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
       title={isEdit ? t('tasks.editTitle') : t('newTask.title')}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit} loading={isSubmitting}>
             {isEdit ? t('tasks.saveChanges') : t('newTask.create')}
           </Button>
         </>
       }
     >
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] mb-5">
-        <span className="material-symbols-outlined text-[18px] text-[var(--color-text-secondary)]">info</span>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-[var(--color-surface-container)] mb-5">
+        <InfoIcon className="shrink-0 text-[var(--color-text-secondary)]" aria-hidden="true" size={18} />
         <span className="text-xs text-[var(--color-text-secondary)]">
           {t('newTask.localWarning')}
         </span>
       </div>
 
       <div className="flex flex-col gap-4">
-        <Input
+        <LabeledInput
           label={t('newTask.name')}
           required
           value={name}
@@ -170,7 +178,7 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           placeholder={t('newTask.namePlaceholder')}
         />
 
-        <Input
+        <LabeledInput
           label={t('newTask.description')}
           required
           value={description}
@@ -194,70 +202,22 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           onUseWorktreeChange={setUseWorktree}
         />
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('newTask.frequency')}</label>
-          <div className="relative">
-            <select
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value as FrequencyKey)}
-              className={selectClass}
-            >
-              {FREQUENCY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-              expand_more
-            </span>
-          </div>
-        </div>
+        <Field>
+          <FieldLabel htmlFor="new-task-frequency">{t('newTask.frequency')}</FieldLabel>
+          <FormSelect id="new-task-frequency" label={t('newTask.frequency')} value={frequency} onChange={setFrequency} options={FREQUENCY_OPTIONS} />
+        </Field>
 
         {frequency === 'everyNMinutes' && (
-          <div className="relative">
-            <select
-              value={minuteInterval}
-              onChange={(e) => setMinuteInterval(Number(e.target.value))}
-              className={selectClass}
-            >
-              {MINUTE_INTERVALS.map((n) => (
-                <option key={n} value={n}>{t('newTask.intervalMinutes', { n })}</option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-              expand_more
-            </span>
-          </div>
+          <FormSelect label={t('newTask.everyNMinutes')} value={String(minuteInterval)} onChange={(value) => setMinuteInterval(Number(value))} options={MINUTE_INTERVALS.map((n) => ({ value: String(n), label: t('newTask.intervalMinutes', { n }) }))} />
         )}
 
         {frequency === 'everyNHours' && (
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <select
-                value={hourInterval}
-                onChange={(e) => setHourInterval(Number(e.target.value))}
-                className={selectClass}
-              >
-                {HOUR_INTERVALS.map((n) => (
-                  <option key={n} value={n}>{t('newTask.intervalHours', { n })}</option>
-                ))}
-              </select>
-              <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                expand_more
-              </span>
+            <div className="flex-1">
+              <FormSelect label={t('newTask.everyNHours')} value={String(hourInterval)} onChange={(value) => setHourInterval(Number(value))} options={HOUR_INTERVALS.map((n) => ({ value: String(n), label: t('newTask.intervalHours', { n }) }))} />
             </div>
-            <div className="relative flex-1">
-              <select
-                value={minuteOffset}
-                onChange={(e) => setMinuteOffset(Number(e.target.value))}
-                className={selectClass}
-              >
-                {MINUTE_OFFSETS.map((m) => (
-                  <option key={m} value={m}>{t('newTask.atMinute', { m: m.toString().padStart(2, '0') })}</option>
-                ))}
-              </select>
-              <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                expand_more
-              </span>
+            <div className="flex-1">
+              <FormSelect label={t('newTask.minuteOffset')} value={String(minuteOffset)} onChange={(value) => setMinuteOffset(Number(value))} options={MINUTE_OFFSETS.map((m) => ({ value: String(m), label: t('newTask.atMinute', { m: m.toString().padStart(2, '0') }) }))} />
             </div>
           </div>
         )}
@@ -267,30 +227,19 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         )}
 
         {frequency === 'monthly' && (
-          <div className="relative">
-            <select
-              value={monthDay}
-              onChange={(e) => setMonthDay(Number(e.target.value))}
-              className={selectClass}
-            >
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>{t('newTask.onMonthDay', { d })}</option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-              expand_more
-            </span>
-          </div>
+          <FormSelect label={t('newTask.monthDay')} value={String(monthDay)} onChange={(value) => setMonthDay(Number(value))} options={Array.from({ length: 28 }, (_, i) => i + 1).map((d) => ({ value: String(d), label: t('newTask.onMonthDay', { d }) }))} />
         )}
 
         {frequency === 'customCron' && (
           <div className="flex flex-col gap-1">
-            <input
+            <Input
+              aria-label={t('newTask.customCron')}
+              aria-invalid={!!customCron.trim() && !isValidCron(customCron)}
               type="text"
               value={customCron}
               onChange={(e) => setCustomCron(e.target.value)}
               placeholder={t('newTask.cronFormatHint')}
-              className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] font-[var(--font-mono)] outline-none focus:border-[var(--color-border-focus)]"
+              className="font-mono"
             />
             <span className="text-xs text-[var(--color-text-tertiary)]">{t('newTask.cronFormatHint')}</span>
             {customCron.trim() && !isValidCron(customCron) && (
@@ -300,24 +249,21 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         )}
 
         {showTime && (
-          <div className="flex flex-col gap-1">
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-auto h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
-              style={{ maxWidth: 120 }}
-            />
-          </div>
+          <Input
+            aria-label={t('newTask.time')}
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="w-auto"
+            style={{ maxWidth: 120 }}
+          />
         )}
 
-        <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] p-3">
           <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={notifyEnabled}
-              onChange={(e) => setNotifyEnabled(e.target.checked)}
-              className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-brand)]"
+              onCheckedChange={(checked) => setNotifyEnabled(checked === true)}
             />
             <div>
               <span className="text-sm font-medium text-[var(--color-text-primary)]">{t('newTask.notifyOnComplete')}</span>
@@ -326,8 +272,8 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           </label>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--color-surface-container)] text-xs text-[var(--color-text-secondary)]">
-          <span className="material-symbols-outlined text-[16px]">schedule</span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--color-surface-container)] text-xs text-[var(--color-text-secondary)]">
+          <ClockIcon aria-hidden="true" size={16} />
           <span>
             {frequency === 'customCron' && customCron.trim() && !isValidCron(customCron)
               ? t('newTask.invalidCron')

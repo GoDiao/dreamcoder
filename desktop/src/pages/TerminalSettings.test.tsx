@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsStore } from '../stores/settingsStore'
 import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
@@ -23,15 +23,17 @@ const terminalMocks = vi.hoisted(() => {
     available: false,
     terminalInstance,
     fitInstance,
-    spawn: vi.fn(),
+    open: vi.fn(),
     write: vi.fn(),
     resize: vi.fn(),
-    kill: vi.fn(),
-    onOutput: vi.fn(),
-    onExit: vi.fn(),
+    close: vi.fn(),
+    lastInput: null as null | {
+      onOutput: (data: string) => void
+      onExit: (exit: { code: number; signal: string | null }) => void
+      onError: (message: string) => void
+      onDisconnect: () => void
+    },
     detectDefaultShell: vi.fn(),
-    getBashPath: vi.fn(),
-    setBashPath: vi.fn(),
   }
 })
 
@@ -44,23 +46,24 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 vi.mock('../api/terminal', () => ({
+  TerminalDisconnectedError: class TerminalDisconnectedError extends Error {},
   terminalApi: {
     isAvailable: () => terminalMocks.available,
-    spawn: terminalMocks.spawn,
-    write: terminalMocks.write,
-    resize: terminalMocks.resize,
-    kill: terminalMocks.kill,
-    onOutput: terminalMocks.onOutput,
-    onExit: terminalMocks.onExit,
+    open: terminalMocks.open,
     detectDefaultShell: terminalMocks.detectDefaultShell,
-    getBashPath: terminalMocks.getBashPath,
-    setBashPath: terminalMocks.setBashPath,
   },
 }))
 
 import { TerminalSettings } from './TerminalSettings'
 
 describe('TerminalSettings', () => {
+  afterEach(() => {
+    cleanup()
+    useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   beforeEach(() => {
     vi.restoreAllMocks()
     useSettingsStore.setState({ locale: 'en' })
@@ -68,19 +71,17 @@ describe('TerminalSettings', () => {
       desktopTerminal: {
         startupShell: 'system',
         customShellPath: '',
+        bashPath: null,
       },
       setDesktopTerminal: vi.fn().mockResolvedValue(undefined),
     })
     terminalMocks.available = false
-    terminalMocks.spawn.mockReset()
+    terminalMocks.open.mockReset()
     terminalMocks.write.mockReset()
     terminalMocks.resize.mockReset()
-    terminalMocks.kill.mockReset()
-    terminalMocks.onOutput.mockReset()
-    terminalMocks.onExit.mockReset()
+    terminalMocks.close.mockReset()
+    terminalMocks.lastInput = null
     terminalMocks.detectDefaultShell.mockImplementation(async () => ({ shell: '/bin/zsh', platform: /Win/i.test(navigator.platform) ? 'windows' : 'macos' }))
-    terminalMocks.getBashPath.mockReset()
-    terminalMocks.setBashPath.mockReset()
     terminalMocks.terminalInstance.loadAddon.mockClear()
     terminalMocks.terminalInstance.open.mockClear()
     terminalMocks.terminalInstance.dispose.mockClear()
@@ -89,40 +90,41 @@ describe('TerminalSettings', () => {
     terminalMocks.terminalInstance.writeln.mockClear()
     terminalMocks.terminalInstance.clear.mockClear()
     terminalMocks.fitInstance.fit.mockClear()
-    terminalMocks.onOutput.mockResolvedValue(vi.fn())
-    terminalMocks.onExit.mockResolvedValue(vi.fn())
-    terminalMocks.getBashPath.mockResolvedValue(null)
-    terminalMocks.setBashPath.mockResolvedValue(undefined)
-    terminalMocks.write.mockResolvedValue(undefined)
-    terminalMocks.resize.mockResolvedValue(undefined)
-    terminalMocks.kill.mockResolvedValue(undefined)
-    terminalMocks.spawn.mockResolvedValue({
-      session_id: 7,
-      shell: '/bin/zsh',
-      cwd: '/Users/test',
+    terminalMocks.open.mockImplementation(async (input) => {
+      terminalMocks.lastInput = input
+      return {
+        shell: '/bin/zsh',
+        cwd: '/Users/test',
+        warning: null,
+        write: terminalMocks.write,
+        resize: terminalMocks.resize,
+        close: terminalMocks.close,
+      }
     })
     vi.stubGlobal('ResizeObserver', class {
       observe = vi.fn()
+      unobserve = vi.fn()
       disconnect = vi.fn()
     })
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   })
 
-  it('shows a desktop-runtime empty state outside Tauri', () => {
+  it('shows a desktop-runtime empty state outside the desktop app', () => {
     render(<TerminalSettings />)
 
     expect(screen.getByTestId('settings-terminal-toolbar')).toHaveTextContent('Terminal')
     expect(screen.getByText('Desktop runtime required')).toBeInTheDocument()
-    expect(terminalMocks.spawn).not.toHaveBeenCalled()
+    expect(terminalMocks.open).not.toHaveBeenCalled()
   })
 
-  it('starts a host terminal session when Tauri is available', async () => {
+  it('starts a host terminal session in the desktop app', async () => {
     terminalMocks.available = true
 
     render(<TerminalSettings />)
 
     await waitFor(() => {
-      expect(terminalMocks.spawn).toHaveBeenCalledWith({ cols: 80, rows: 24 })
+      expect(terminalMocks.open).toHaveBeenCalledWith(expect.objectContaining({ cols: 80, rows: 24 }))
+      expect(terminalMocks.open.mock.calls[0]?.[0]).not.toHaveProperty('cwd')
     })
     expect(screen.getByText('/bin/zsh')).toBeInTheDocument()
     expect(screen.getByText('/Users/test')).toBeInTheDocument()
@@ -135,22 +137,23 @@ describe('TerminalSettings', () => {
 
     render(<TerminalSettings />)
 
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
     expect(screen.getByTestId('settings-terminal-toolbar')).toHaveTextContent('/bin/zsh')
     expect(screen.getByTestId('settings-terminal-frame')).toBeInTheDocument()
     expect(screen.queryByText('Host shell')).not.toBeInTheDocument()
   })
 
-  it('shows setup guidance from the terminal info button', () => {
+  it('shows setup guidance from the terminal info button', async () => {
     render(<TerminalSettings />)
 
     const button = screen.getByRole('button', { name: 'Terminal setup help' })
-    const help = screen.getByRole('tooltip')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     expect(button).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(button)
 
     expect(button).toHaveAttribute('aria-expanded', 'true')
+    const help = await screen.findByRole('tooltip')
     expect(help).toHaveTextContent('plugin, skill, and MCP setup')
     expect(help).toHaveTextContent('claude plugin install')
   })
@@ -174,7 +177,7 @@ describe('TerminalSettings', () => {
     document.body.appendChild(container)
 
     render(<TerminalSettings />, { container })
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
 
     fireEvent.wheel(screen.getByTestId('settings-terminal-frame'), { deltaY: 48 })
 
@@ -188,102 +191,116 @@ describe('TerminalSettings', () => {
     render(<TerminalSettings cwd="/tmp/current-project" />)
 
     await waitFor(() => {
-      expect(terminalMocks.spawn).toHaveBeenCalledWith({
+      expect(terminalMocks.open).toHaveBeenCalledWith(expect.objectContaining({
         cols: 80,
         rows: 24,
         cwd: '/tmp/current-project',
-      })
+      }))
     })
   })
 
-  it('writes matching terminal output events into xterm', async () => {
+  it('relays output, input and exit through the terminal connection', async () => {
     terminalMocks.available = true
-    let outputHandler: ((payload: { session_id: number; data: string }) => void) | undefined
-    terminalMocks.onOutput.mockImplementation(async (handler) => {
-      outputHandler = handler
-      return vi.fn()
+    let sendInput: ((data: string) => void) | undefined
+    terminalMocks.terminalInstance.onData.mockImplementation((handler: (data: string) => void) => {
+      sendInput = handler
+      return { dispose: vi.fn() }
     })
 
     render(<TerminalSettings />)
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByText('Running')).toBeInTheDocument())
 
     act(() => {
-      outputHandler?.({ session_id: 7, data: 'hello\r\n' })
-      outputHandler?.({ session_id: 8, data: 'ignored\r\n' })
+      terminalMocks.lastInput?.onOutput('hello\r\n')
+      sendInput?.('ls\r')
     })
-
     expect(terminalMocks.terminalInstance.write).toHaveBeenCalledWith('hello\r\n')
-    expect(terminalMocks.terminalInstance.write).not.toHaveBeenCalledWith('ignored\r\n')
+    expect(terminalMocks.write).toHaveBeenCalledWith('ls\r')
+
+    act(() => terminalMocks.lastInput?.onExit({ code: 2, signal: null }))
+    expect(terminalMocks.terminalInstance.writeln).toHaveBeenCalledWith('\r\n[process exited: 2]')
+    expect(screen.getByText('Exited')).toBeInTheDocument()
+  })
+
+  it('shows a translated message when the connection drops after the shell started', async () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    terminalMocks.available = true
+    render(<TerminalSettings />)
+    await waitFor(() => expect(screen.getByText('运行中')).toBeInTheDocument())
+
+    act(() => terminalMocks.lastInput?.onDisconnect())
+
+    expect(await screen.findByText('终端连接已断开。')).toBeInTheDocument()
+  })
+
+  it('shows the start error when the shell cannot start', async () => {
+    terminalMocks.available = true
+    terminalMocks.open.mockRejectedValueOnce(new Error('terminal cwd does not exist: /missing'))
+
+    render(<TerminalSettings cwd="/missing" />)
+
+    expect(await screen.findByText('terminal cwd does not exist: /missing')).toBeInTheDocument()
+    expect(terminalMocks.terminalInstance.dispose).toHaveBeenCalled()
   })
 
   it('can preserve and reattach a running terminal runtime across unmounts', async () => {
     terminalMocks.available = true
 
     const first = render(<TerminalSettings runtimeId="shared-runtime" preserveOnUnmount />)
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(1))
 
     first.unmount()
-    expect(terminalMocks.kill).not.toHaveBeenCalled()
+    expect(terminalMocks.close).not.toHaveBeenCalled()
 
     render(<TerminalSettings runtimeId="shared-runtime" />)
 
     await waitFor(() => {
       expect(terminalMocks.terminalInstance.open).toHaveBeenCalledTimes(2)
     })
-    expect(terminalMocks.spawn).toHaveBeenCalledTimes(1)
+    expect(terminalMocks.open).toHaveBeenCalledTimes(1)
 
     destroyTerminalRuntime('shared-runtime')
   })
 
-  it('keeps the shell preference editor on the General page only', () => {
-    render(<TerminalSettings showPreferences />)
-    expect(screen.queryByText('Startup shell')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save shell' })).not.toBeInTheDocument()
-  })
-
   it('shows fallback details while keeping the terminal running and clears them on restart', async () => {
     terminalMocks.available = true
-    terminalMocks.spawn.mockResolvedValueOnce({
-      session_id: 7, shell: '/bin/zsh', cwd: '/Users/test', warning: 'terminal shell fish is not installed or executable',
+    terminalMocks.open.mockResolvedValueOnce({
+      shell: '/bin/zsh',
+      cwd: '/Users/test',
+      warning: 'terminal shell fish is not installed or executable',
+      write: terminalMocks.write,
+      resize: terminalMocks.resize,
+      close: terminalMocks.close,
     })
     render(<TerminalSettings />)
     expect(await screen.findByRole('status')).toHaveTextContent('Your preferred shell is unavailable. Using /bin/zsh for this session.')
     expect(screen.getByRole('status')).toHaveTextContent('fish is not installed')
     expect(screen.getByText('Running')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Restart$/ }))
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('saves a custom Windows bash path from the terminal settings panel', async () => {
-    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32')
+  it('keeps a running terminal when settings change and closes it before a restart', async () => {
     terminalMocks.available = true
-    terminalMocks.getBashPath.mockResolvedValue('C:\\Program Files\\Git\\bin\\bash.exe')
+    render(<TerminalSettings />)
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(1))
+    const settings = { startupShell: 'custom' as const, customShellPath: '/opt/shell', bashPath: '/opt/bash' }
 
-    render(<TerminalSettings showPreferences />)
+    await act(async () => { useSettingsStore.setState({ desktopTerminal: settings }) })
+    expect(terminalMocks.open).toHaveBeenCalledTimes(1)
+    expect(terminalMocks.close).not.toHaveBeenCalled()
 
-    const input = await screen.findByDisplayValue('C:\\Program Files\\Git\\bin\\bash.exe')
-    fireEvent.change(input, { target: { value: ' C:\\Tools\\Git\\bin\\bash.exe ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => {
-      expect(terminalMocks.setBashPath).toHaveBeenCalledWith('C:\\Tools\\Git\\bin\\bash.exe')
-    })
-    expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Restart$/ }))
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(2))
+    expect(terminalMocks.close).toHaveBeenCalledTimes(1)
   })
 
-  it('shows an invalid path message when native bash path validation fails', async () => {
-    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32')
+  it('resizes the connection when the terminal is fitted', async () => {
     terminalMocks.available = true
-    terminalMocks.setBashPath.mockRejectedValue(new Error('terminal bash path does not exist'))
-
-    render(<TerminalSettings showPreferences />)
-
-    const input = await screen.findByPlaceholderText('Bash Path')
-    fireEvent.change(input, { target: { value: 'C:\\missing\\bash.exe' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    expect(await screen.findByText('Path does not exist. Select a valid Bash executable.')).toBeInTheDocument()
+    render(<TerminalSettings />)
+    await waitFor(() => expect(screen.getByText('Running')).toBeInTheDocument())
+    expect(terminalMocks.resize).toHaveBeenCalledWith(80, 24)
   })
 
   it('renders the docked panel layout with icon actions, leading tabs and a meta line', async () => {
@@ -300,23 +317,23 @@ describe('TerminalSettings', () => {
       />,
     )
 
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
     expect(screen.getByText('tabs-slot')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-meta')).toHaveTextContent('dreamcoder · main')
     expect(screen.queryByText('Terminal')).not.toBeInTheDocument()
     await waitFor(() => expect(onShellChange).toHaveBeenCalledWith('/bin/zsh'))
 
     const clear = screen.getByRole('button', { name: 'Clear' })
-    expect(clear).toHaveAttribute('title', 'Clear')
+    expect(clear).toHaveAttribute('aria-label', 'Clear')
     fireEvent.click(clear)
     expect(terminalMocks.terminalInstance.clear).toHaveBeenCalled()
 
     const restart = screen.getByRole('button', { name: 'Restart' })
-    expect(restart).toHaveAttribute('title', 'Restart')
+    expect(restart).toHaveAttribute('aria-label', 'Restart')
     await act(async () => {
       fireEvent.click(restart)
     })
-    await waitFor(() => expect(terminalMocks.spawn).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(2))
     destroyTerminalRuntime('docked-runtime')
   })
 })

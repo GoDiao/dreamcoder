@@ -130,4 +130,31 @@ describe('buildOpenAICodexFetch', () => {
       content: [{ type: 'text', text: 'streamed ok' }],
     })
   })
+
+  test('returns an error when a streamed Codex response fails for a non-streaming caller', async () => {
+    const fetchOverride: typeof fetch = async () =>
+      new Response([
+        'event: response.failed',
+        'data: {"type":"response.failed","response":{"id":"resp_789","status":"failed","error":{"message":"model overloaded"}}}',
+        '',
+      ].join('\n'), {
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+
+    const openAIFetch = buildOpenAICodexFetch(fetchOverride, 'test')
+    const response = await openAIFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: 'gpt-5.5',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'Say ok' }],
+      }),
+    })
+
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toEqual({
+      type: 'error',
+      error: { type: 'api_error', message: 'model overloaded' },
+    })
+  })
 })

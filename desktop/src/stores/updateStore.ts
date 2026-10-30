@@ -1,6 +1,12 @@
 import { create } from 'zustand'
-import type { Update } from '@tauri-apps/plugin-updater'
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import {
+  prepareUpdateInstall,
+  cancelUpdateInstall,
+  relaunchApp,
+  type ShellUpdate,
+  checkForAppUpdate,
+} from '../lib/shell'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import type { UpdateProxySettings } from '../types/settings'
 import { useSettingsStore } from './settingsStore'
 
@@ -30,12 +36,12 @@ type UpdateStore = {
   checkedAt: number | null
   shouldPrompt: boolean
   initialize: () => Promise<void>
-  checkForUpdates: (options?: CheckOptions) => Promise<Update | null>
+  checkForUpdates: (options?: CheckOptions) => Promise<ShellUpdate | null>
   installUpdate: () => Promise<void>
   dismissPrompt: () => void
 }
 
-let pendingUpdate: Update | null = null
+let pendingUpdate: ShellUpdate | null = null
 let pendingUpdateProxyKey: string | null = null
 let startupCheckPromise: Promise<void> | null = null
 
@@ -78,7 +84,7 @@ function getUpdateCheckOptions() {
   return proxy ? { proxy } : undefined
 }
 
-async function setPendingUpdate(next: Update | null, proxyKey: string | null) {
+async function setPendingUpdate(next: ShellUpdate | null, proxyKey: string | null) {
   const previous = pendingUpdate
   pendingUpdate = next
   pendingUpdateProxyKey = next ? proxyKey : null
@@ -107,7 +113,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   shouldPrompt: false,
 
   initialize: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
     if (!startupCheckPromise) {
       startupCheckPromise = (async () => {
         await new Promise((resolve) => setTimeout(resolve, 5000))
@@ -121,7 +127,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   },
 
   checkForUpdates: async ({ silent = false } = {}) => {
-    if (!isTauriRuntime()) return null
+    if (!isDesktopRuntime()) return null
 
     set((state) => ({
       ...state,
@@ -130,9 +136,8 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
     }))
 
     try {
-      const { check } = await import('@tauri-apps/plugin-updater')
       const updateProxyKey = getUpdateProxyKey()
-      const update = await check(getUpdateCheckOptions())
+      const update = await checkForAppUpdate(getUpdateCheckOptions())
       await setPendingUpdate(update, updateProxyKey)
 
       const checkedAt = Date.now()
@@ -190,7 +195,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
   },
 
   installUpdate: async () => {
-    if (!isTauriRuntime()) return
+    if (!isDesktopRuntime()) return
 
     let update = pendingUpdate
     if (update && pendingUpdateProxyKey !== getUpdateProxyKey()) {
@@ -215,8 +220,6 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
     let prepareInstallAttempted = false
     try {
       writeDismissedUpdateVersion(null)
-      const { invoke } = await import('@tauri-apps/api/core')
-      const { relaunch } = await import('@tauri-apps/plugin-process')
       let totalBytes: number | null = null
       let downloadedBytes = 0
 
@@ -252,7 +255,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
       })
 
       prepareInstallAttempted = true
-      await invoke('prepare_for_update_install')
+      await prepareUpdateInstall()
       await update.install()
 
       set((state) => ({
@@ -261,12 +264,11 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
         progressPercent: 100,
       }))
 
-      await relaunch()
+      await relaunchApp()
     } catch (error) {
       if (prepareInstallAttempted) {
         try {
-          const { invoke } = await import('@tauri-apps/api/core')
-          await invoke('cancel_update_install')
+          await cancelUpdateInstall()
         } catch {
         }
       }

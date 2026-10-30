@@ -1,0 +1,507 @@
+/* Additions for the playground block: stepper, toggle, choice, presets, results,
+ * breakdown and ranking. The legacy slider and result keep their block.css styles. */
+.sb-block.sb-playground {
+  --pg-c1: #4b6fae;
+  --pg-c2: #c98a3a;
+  --pg-c3: #3f8b78;
+  --pg-c4: #8a62b0;
+  --pg-c5: #c0584f;
+  --pg-c6: #5d9a45;
+  --pg-c7: #b56a8f;
+  --pg-c8: #7a8590;
+  --pg-good: #2f6b4f;
+  --pg-bad: #b0473f;
+  container-type: inline-size;
+}
+:root[data-theme="dark"] .sb-block.sb-playground,
+[data-theme="dark"] .sb-block.sb-playground {
+  --pg-c1: #86a6e0;
+  --pg-c2: #e2ab65;
+  --pg-c3: #6fc0aa;
+  --pg-c4: #b597d6;
+  --pg-c5: #e48b83;
+  --pg-c6: #94c77d;
+  --pg-c7: #d99abb;
+  --pg-c8: #a7b0b9;
+  --pg-good: #7cc3a0;
+  --pg-bad: #e48b83;
+}
+.sb-block.sb-playground .pg-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sb-block.sb-playground .pg-hint {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--sb-muted);
+}
+.sb-block.sb-playground .pg-editor-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--sb-muted);
+}
+
+/* Presets */
+.sb-block.sb-playground .pg-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: -6px;
+}
+.sb-block.sb-playground .pg-chip {
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sb-text);
+  background: var(--sb-surface);
+}
+.sb-block.sb-playground .pg-chip[aria-pressed="true"] {
+  background: var(--sb-accent);
+  border-color: var(--sb-accent);
+  color: var(--sb-surface);
+}
+
+/* Stepper and toggle share a label-left, control-right row. */
+.sb-block.sb-playground .pg-stepper-row,
+.sb-block.sb-playground .pg-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+}
+.sb-block.sb-playground .pg-toggle-copy {
+  min-width: 0;
+}
+.sb-block.sb-playground .pg-stepper {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+  background: var(--sb-surface);
+  overflow: hidden;
+}
+.sb-block.sb-playground .pg-stepper button {
+  width: 32px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--sb-text);
+}
+.sb-block.sb-playground .pg-stepper output {
+  min-width: 52px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .pg-stepper small {
+  margin-left: 3px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--sb-muted);
+}
+.sb-block.sb-playground .pg-switch {
+  flex: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--sb-line);
+}
+.sb-block.sb-playground .pg-switch span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sb-surface);
+  box-shadow: 0 1px 2px #0003;
+  transition: transform 0.15s;
+}
+.sb-block.sb-playground .pg-switch[aria-checked="true"],
+.sb-block.sb-playground
+  .sb-block
+  .pg-switch[aria-checked="true"]:not(:disabled):hover {
+  background: var(--sb-accent);
+}
+.sb-block.sb-playground .pg-switch[aria-checked="true"] span {
+  transform: translateX(16px);
+}
+
+/* Choice cards */
+.sb-block.sb-playground .pg-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 7px;
+}
+.sb-block.sb-playground .pg-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--sb-line);
+  border-radius: 8px;
+  background: var(--sb-surface);
+  text-align: left;
+  min-width: 0;
+}
+.sb-block.sb-playground .pg-choice[aria-checked="true"] {
+  border-color: var(--sb-accent);
+  background: var(--sb-accent-soft);
+}
+.sb-block.sb-playground .pg-choice b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.sb-block.sb-playground .pg-choice span {
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--sb-muted);
+}
+
+/* Results */
+.sb-block.sb-playground .sb-calculation-result.pg-results {
+  justify-content: flex-start;
+  gap: 12px;
+}
+.sb-block.sb-playground .pg-headline,
+.sb-block.sb-playground .pg-figure {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
+.sb-block.sb-playground .pg-headline > strong {
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--sb-accent);
+  letter-spacing: -1px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .pg-headline small,
+.sb-block.sb-playground .pg-figure small {
+  font-size: 10px;
+  color: var(--sb-muted);
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-left: 4px;
+}
+.sb-block.sb-playground .pg-figure {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-line);
+}
+.sb-block.sb-playground .pg-figure > b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sb-text);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .pg-figure > .pg-hint,
+.sb-block.sb-playground .pg-figure > .pg-target {
+  flex-basis: 100%;
+}
+.sb-block.sb-playground .pg-target {
+  width: 100%;
+  margin-top: 8px;
+}
+.sb-block.sb-playground .pg-target-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sb-line);
+}
+.sb-block.sb-playground .pg-target-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  transition:
+    width 0.25s ease,
+    background 0.25s;
+}
+.sb-block.sb-playground .is-hit .pg-target-fill {
+  background: var(--pg-good);
+}
+.sb-block.sb-playground .is-miss .pg-target-fill {
+  background: var(--pg-bad);
+}
+.sb-block.sb-playground .pg-target-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--sb-text);
+}
+.sb-block.sb-playground .pg-target-copy {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 10px;
+  margin-top: 6px;
+  font-size: 10px;
+}
+.sb-block.sb-playground .pg-target-copy b {
+  font-size: 11px;
+}
+.sb-block.sb-playground .is-hit .pg-target-copy b {
+  color: var(--pg-good);
+}
+.sb-block.sb-playground .is-miss .pg-target-copy b {
+  color: var(--pg-bad);
+}
+.sb-block.sb-playground .pg-note {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--sb-muted);
+}
+.sb-block.sb-playground .pg-note-wide {
+  padding: 0 22px 20px;
+}
+.sb-block.sb-playground .pg-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--sb-muted);
+}
+
+/* Breakdown */
+.sb-block.sb-playground .pg-breakdown {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-line);
+}
+.sb-block.sb-playground .pg-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sb-line);
+}
+.sb-block.sb-playground .pg-bar span {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+/* A negative part (a cost or loss inside a total) is drawn hatched. */
+.sb-block.sb-playground .pg-bar .is-negative,
+.sb-block.sb-playground .pg-table i.is-negative {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    color-mix(in srgb, var(--sb-surface) 70%, transparent) 3px 5px
+  ) !important;
+}
+.sb-block.sb-playground .pg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  color: var(--sb-text);
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .pg-table thead th {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--sb-muted);
+  text-align: right;
+  padding: 0 0 3px 8px;
+}
+.sb-block.sb-playground .pg-table thead th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.sb-block.sb-playground .pg-table tbody th {
+  font-weight: 400;
+  text-align: left;
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sb-block.sb-playground .pg-table td {
+  text-align: right;
+  padding: 3px 0 3px 8px;
+  white-space: nowrap;
+}
+.sb-block.sb-playground .pg-table td:nth-child(2) {
+  font-weight: 600;
+}
+.sb-block.sb-playground .pg-table td:last-child {
+  color: var(--sb-muted);
+}
+.sb-block.sb-playground .pg-table i {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* Ranking */
+.sb-block.sb-playground .pg-ranking-body {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
+}
+.sb-block.sb-playground .pg-ranking-wide {
+  padding: 0 22px 24px;
+}
+.sb-block.sb-playground .pg-ranking {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sb-block.sb-playground .pg-ranking-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sb-block.sb-playground .pg-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 10px;
+}
+.sb-block.sb-playground .pg-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sb-block.sb-playground .pg-legend li.is-off {
+  opacity: 0.45;
+}
+.sb-block.sb-playground .pg-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.sb-block.sb-playground .pg-legend b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .pg-rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sb-block.sb-playground .pg-rank-list li {
+  display: grid;
+  grid-template-columns: 22px minmax(90px, 0.9fr) minmax(0, 1.4fr) 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--sb-line);
+  background: var(--sb-surface);
+}
+.sb-block.sb-playground .pg-rank-number {
+  font-size: 11px;
+  color: var(--sb-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .is-first .pg-rank-number {
+  color: var(--sb-surface);
+  background: var(--sb-accent);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+}
+.sb-block.sb-playground .pg-rank-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sb-block.sb-playground .pg-rank-copy b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.sb-block.sb-playground .pg-rank-copy span {
+  font-size: 10px;
+  color: var(--sb-muted);
+  line-height: 1.4;
+}
+.sb-block.sb-playground .pg-rank-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sb-soft);
+}
+.sb-block.sb-playground .pg-rank-bar span {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.sb-block.sb-playground .pg-rank-score {
+  text-align: right;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sb-block.sb-playground .is-first .pg-rank-score {
+  color: var(--sb-accent);
+}
+
+@container (max-width: 560px) {
+  /* block.css stacks inputs and results only by viewport width; follow the block's own width too. */
+  .sb-block.sb-playground .sb-playground-body {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 13px 15px 18px;
+  }
+  .sb-block.sb-playground .pg-ranking-body {
+    grid-template-columns: 1fr;
+  }
+  .sb-block.sb-playground .pg-ranking-wide,
+  .sb-block.sb-playground .pg-note-wide {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  .sb-block.sb-playground .pg-choices {
+    grid-template-columns: 1fr;
+  }
+  .sb-block.sb-playground .pg-rank-list li {
+    grid-template-columns: 22px minmax(0, 1fr) 36px;
+  }
+  .sb-block.sb-playground .pg-rank-bar {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+}
+@media print {
+  .sb-block.sb-playground .pg-presets {
+    display: none;
+  }
+  .sb-block.sb-playground .pg-bar,
+  .sb-block.sb-playground .pg-rank-bar,
+  .sb-block.sb-playground .pg-target-track,
+  .sb-block.sb-playground .pg-legend i,
+  .sb-block.sb-playground .pg-table i {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

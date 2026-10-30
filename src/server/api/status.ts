@@ -2,7 +2,7 @@ import { version as packageVersion } from '../../../package.json'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { getClaudeConfigHomeDir, getDefaultConfigDir } from '../../utils/envUtils.js'
 
 const startedAt = Date.now()
 
@@ -72,6 +72,7 @@ function handleDiagnostics(): Response {
     platform: process.platform,
     arch: process.arch,
     configDir: getConfigDir(),
+    defaultConfigDir: getDefaultConfigDir(),
     memory: {
       rss: process.memoryUsage.rss(),
       heapUsed: process.memoryUsage().heapUsed,

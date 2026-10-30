@@ -1,0 +1,71 @@
+.editor-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 29px;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--muted);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.editor-tool svg {
+  stroke-width: 1.65;
+}
+.editor-tool:hover,
+.editor-tool.is-active {
+  color: var(--accent);
+  background: var(--editor-soft);
+}
+.editor-tool:disabled {
+  opacity: 0.32;
+}
+
+.editor-bubble {
+  --editor-line: var(--line, #e8ece5);
+  --editor-soft: var(--accent-soft, #edf2e9);
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--line, #e8ece5);
+  border-radius: 6px;
+  background: var(--paper, #fff);
+  color: var(--text, #343a35);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: normal;
+  box-shadow: 0 5px 20px #2434291c;
+  animation: editor-menu-appear 0.13s ease;
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+}
+
+@keyframes editor-menu-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-bubble {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media print {
+  .editor-bubble {
+    display: none !important;
+  }
+}

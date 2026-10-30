@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { providersApi } from '../api/providers'
-import { useChatStore } from './chatStore'
-import { useSessionRuntimeStore } from './sessionRuntimeStore'
+import { sessionRuntimeSelection, useChatStore } from './chatStore'
 import { useSettingsStore } from './settingsStore'
 import type {
   SavedProvider,
@@ -9,6 +8,8 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
+  DiscoveredProviderModel,
+  DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
 import type { RuntimeSelection } from '../types/runtime'
@@ -30,12 +31,13 @@ type ProviderStore = {
   activateProvider: (id: string) => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
+  discoverModels: (input: DiscoverProviderModelsInput) => Promise<DiscoveredProviderModel[]>
 }
 
 function providerModelIds(provider: SavedProvider): Set<string> {
   return new Set(
-    Object.values(provider.models)
-      .map((modelId) => modelId.trim())
+    provider.models
+      .map((model) => model.id.trim())
       .filter(Boolean),
   )
 }
@@ -51,7 +53,7 @@ function resolveRuntimeRefreshSelection(
       providerId: provider.id,
       modelId: modelIds.has(currentSelection.modelId)
         ? currentSelection.modelId
-        : provider.models.main,
+        : provider.models[0]?.id ?? '',
       ...(currentSelection.effort ? { effort: currentSelection.effort } : {}),
     }
   }
@@ -61,7 +63,7 @@ function resolveRuntimeRefreshSelection(
   if (!currentSelection?.modelId && activeId === provider.id) {
     return {
       providerId: provider.id,
-      modelId: provider.models.main,
+      modelId: provider.models[0]?.id ?? '',
       ...(currentSelection?.effort ? { effort: currentSelection.effort } : {}),
     }
   }
@@ -71,7 +73,6 @@ function resolveRuntimeRefreshSelection(
 
 function refreshConnectedSessionsForProvider(provider: SavedProvider, activeId: string | null) {
   const chatStore = useChatStore.getState()
-  const runtimeStore = useSessionRuntimeStore.getState()
 
   for (const [sessionId, session] of Object.entries(chatStore.sessions)) {
     if (session.connectionState !== 'connected' || session.chatState !== 'idle') {
@@ -81,11 +82,10 @@ function refreshConnectedSessionsForProvider(provider: SavedProvider, activeId: 
     const selection = resolveRuntimeRefreshSelection(
       provider,
       activeId,
-      runtimeStore.selections[sessionId],
+      sessionRuntimeSelection(session),
     )
     if (!selection) continue
 
-    runtimeStore.setSelection(sessionId, selection)
     chatStore.setSessionRuntime(sessionId, selection)
   }
 }
@@ -132,6 +132,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     const { provider } = await providersApi.update(id, input)
     await get().fetchProviders()
     refreshConnectedSessionsForProvider(provider, get().activeId)
+    if (provider.id === get().activeId) await useSettingsStore.getState().fetchAll()
     return provider
   },
 
@@ -143,11 +144,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   activateProvider: async (id) => {
     await providersApi.activate(id)
     await get().fetchProviders()
-    const settings = useSettingsStore.getState()
-    const provider = get().providers.find((p) => p.id === id)
-    if (!provider) return
-    await settings.setModel(provider.models.main)
-    await settings.fetchAll()
+    await useSettingsStore.getState().fetchAll()
   },
 
   testProvider: async (id, overrides?) => {
@@ -158,5 +155,10 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   testConfig: async (input) => {
     const { result } = await providersApi.testConfig(input)
     return result
+  },
+
+  discoverModels: async (input) => {
+    const { models } = await providersApi.discoverModels(input)
+    return models
   },
 }))

@@ -19,8 +19,9 @@ import {
   resolveProviderApiKey,
   stripContextSuffix,
 } from '../services/providerRuntimeEnv.js'
-import type { ApiFormat, ProviderAuthStrategy, SavedProvider } from '../types/provider.js'
+import type { ApiFormat, ProviderAuthStrategy, DiscoveredProviderModel, SavedProvider } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl } from './baseUrl.js'
+import { fillContextWindows } from './contextWindows/index.js'
 
 export type UpstreamTarget = {
   baseUrl: string
@@ -32,6 +33,10 @@ export type UpstreamTarget = {
 export type UpstreamResult =
   | { ok: true; httpStatus: number; message: AnthropicResponse }
   | { ok: true; httpStatus: number; stream: ReadableStream<Uint8Array> }
+  | { ok: false; httpStatus?: number; error: string }
+
+export type UpstreamModelsResult =
+  | { ok: true; httpStatus: number; models: DiscoveredProviderModel[] }
   | { ok: false; httpStatus?: number; error: string }
 
 type UpstreamRequest = {
@@ -109,6 +114,89 @@ export async function sendToUpstream(
   } catch (err) {
     return { ok: false, httpStatus: 502, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: string): Promise<UpstreamModelsResult> {
+  const networkSettings = await loadNetworkSettings()
+  const base = normalizeUpstreamBaseUrl(target.baseUrl)
+  const headers = target.apiFormat === 'anthropic'
+    ? {
+        'anthropic-version': '2023-06-01',
+        ...buildAnthropicAuthHeaders(target.apiKey, target.authStrategy),
+      }
+    : { Authorization: `Bearer ${target.apiKey}` }
+
+  const seen = new Set<string>()
+  const models: DiscoveredProviderModel[] = []
+  const listed: Record<string, unknown>[] = []
+  const maxPages = target.apiFormat === 'anthropic' ? 10 : 1
+  let afterId = ''
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const url = new URL(`${base}/v1/models`)
+    if (target.apiFormat === 'anthropic') {
+      url.searchParams.set('limit', '1000')
+      if (afterId) url.searchParams.set('after_id', afterId)
+    }
+
+    let response: Response
+    try {
+      response = await fetchWithTimeout(url.toString(), {
+        method: 'GET',
+        headers,
+        ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
+      }, networkSettings.aiRequestTimeoutMs, false)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'TimeoutError') {
+        return { ok: false, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)` }
+      }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      return {
+        ok: false,
+        httpStatus: response.status,
+        error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
+      }
+    }
+
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null
+    const data = body && Array.isArray(body.data) ? body.data : null
+    if (!data) {
+      return { ok: false, httpStatus: 502, error: 'Upstream model response is missing a data array' }
+    }
+
+    for (const entry of data) {
+      if (!entry || typeof entry !== 'object') continue
+      const record = entry as Record<string, unknown>
+      const id = typeof record.id === 'string' ? record.id.trim() : ''
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      listed.push(record)
+      const rawName = typeof record.display_name === 'string'
+        ? record.display_name
+        : typeof record.name === 'string'
+          ? record.name
+          : ''
+      const name = rawName.trim()
+      models.push({ id, ...(name && name !== id ? { name } : {}) })
+    }
+
+    if (target.apiFormat !== 'anthropic' || body?.has_more !== true) {
+      await fillContextWindows(models, { baseUrl: target.baseUrl, apiKey: target.apiKey, presetId, listed, networkSettings })
+      return { ok: true, httpStatus: response.status, models }
+    }
+
+    const lastId = typeof body.last_id === 'string' ? body.last_id.trim() : ''
+    if (!lastId || lastId === afterId) {
+      return { ok: false, httpStatus: 502, error: 'Upstream model pagination is missing a usable last_id' }
+    }
+    afterId = lastId
+  }
+
+  return { ok: false, httpStatus: 502, error: `Upstream model pagination exceeded ${maxPages} pages` }
 }
 
 function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest): UpstreamRequest {

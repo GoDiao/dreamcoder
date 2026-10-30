@@ -69,28 +69,31 @@ describe('provider presets API', () => {
     expect(lmstudio?.baseUrl).toBe('http://localhost:1234')
     expect(lmstudio?.apiFormat).toBe('anthropic')
     expect(lmstudio?.authStrategy).toBe('auth_token_empty_api_key')
-    expect(lmstudio?.defaultModels.main).toBe('qwen/qwen3.6-27b')
+    expect(lmstudio?.defaultModels).toEqual([{ id: 'qwen/qwen3.6-27b' }])
     expect(ollama?.baseUrl).toBe('http://localhost:11434')
     expect(ollama?.apiFormat).toBe('anthropic')
     expect(ollama?.authStrategy).toBe('auth_token_empty_api_key')
-    expect(ollama?.defaultModels.main).toBe('qwen3.6:27b')
+    expect(ollama?.defaultModels).toEqual([{ id: 'qwen3.6:27b' }])
     expect(deepseek?.authStrategy).toBe('auth_token')
-    expect(deepseek?.defaultModels.main).toBe('deepseek-v4-pro')
-    expect(deepseek?.defaultModels.haiku).toBe('deepseek-v4-flash')
-    expect(deepseek?.defaultModels.sonnet).toBe('deepseek-v4-pro')
-    expect(deepseek?.defaultModels.opus).toBe('deepseek-v4-pro')
+    expect(deepseek?.defaultModels).toEqual([
+      { id: 'deepseek-v4-pro' },
+      { id: 'deepseek-v4-flash' },
+    ])
+    expect(deepseek?.defaultFastModel).toBe('deepseek-v4-flash')
     expect(deepseek?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
     expect(deepseek?.defaultEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe(
       'thinking,effort,adaptive_thinking,max_effort',
     )
     expect(zhipu?.authStrategy).toBe('auth_token')
-    expect(zhipu?.defaultModels.main).toBe('glm-5.1')
-    expect(zhipu?.defaultModels.haiku).toBe('glm-4.5-air')
-    expect(zhipu?.defaultModels.sonnet).toBe('glm-5-turbo')
-    expect(zhipu?.defaultModels.opus).toBe('glm-5.1')
+    expect(zhipu?.defaultModels).toEqual([
+      { id: 'glm-5.1' },
+      { id: 'glm-5-turbo' },
+      { id: 'glm-4.5-air' },
+    ])
+    expect(zhipu?.defaultFastModel).toBe('glm-4.5-air')
     expect(kimi?.baseUrl).toBe('https://api.kimi.com/coding')
     expect(kimi?.authStrategy).toBe('auth_token')
-    expect(kimi?.defaultModels.main).toBe('kimi-k2.6')
+    expect(kimi?.defaultModels).toEqual([{ id: 'kimi-k2.6' }])
     expect(kimi?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
   })
 

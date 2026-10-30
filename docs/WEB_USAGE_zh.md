@@ -2,7 +2,7 @@
 
 [English](WEB_USAGE.md) | 简体中文
 
-适用于 Ubuntu 24.04 本地开发环境：Bun 启动后端，Node.js 和 npm 启动 Vite 前端。日常使用无需重新安装依赖或构建，也无需编译 Tauri 和 sidecar。
+适用于 Ubuntu 24.04 本地开发环境：Bun 启动后端，Node.js 和 npm 启动 Vite 前端。日常使用无需重新安装依赖或构建，也无需构建桌面端和 sidecar。
 
 请确保 `bun`、`node` 和 `npm` 已在 `PATH` 中。建议使用 Node.js 24 LTS；本次验证版本为 Node.js `v24.22.0`、npm `11.19.1` 和 Bun `1.4.2`。下列命令中的 `/path/to/dreamcoder` 是占位路径，请替换为自己的仓库目录。
 

@@ -269,12 +269,7 @@ describe('ConversationService', () => {
       apiKey: 'provider-key',
       baseUrl: 'https://api.packy.example',
       apiFormat: 'openai_chat',
-      models: {
-        main: 'kimi-k2.6',
-        haiku: '',
-        sonnet: '',
-        opus: '',
-      },
+      models: [{ id: 'kimi-k2.6' }],
     })
 
     const service = new ConversationService() as any
@@ -301,12 +296,13 @@ describe('ConversationService', () => {
       apiKey: 'provider-key',
       baseUrl: 'https://api.switchable.example',
       apiFormat: 'openai_chat',
-      models: {
-        main: 'old-provider-main',
-        haiku: 'new-provider-haiku',
-        sonnet: 'new-provider-sonnet',
-        opus: 'new-provider-opus',
-      },
+      models: [
+        { id: 'old-provider-main' },
+        { id: 'new-provider-haiku' },
+        { id: 'new-provider-sonnet' },
+        { id: 'new-provider-opus' },
+      ],
+      fastModel: 'new-provider-haiku',
     })
 
     const service = new ConversationService() as any
@@ -317,6 +313,10 @@ describe('ConversationService', () => {
 
     expect(env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:3456/proxy/providers/${provider.id}`)
     expect(env.ANTHROPIC_MODEL).toBe('new-provider-sonnet')
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('new-provider-sonnet')
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('new-provider-sonnet')
+    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('new-provider-haiku')
+    expect(env.ANTHROPIC_SMALL_FAST_MODEL).toBe('new-provider-haiku')
     expect(env.CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
   })
 
@@ -328,12 +328,8 @@ describe('ConversationService', () => {
       apiKey: 'provider-key',
       baseUrl: 'https://api.deepseek.com/anthropic',
       apiFormat: 'anthropic',
-      models: {
-        main: 'deepseek-v4-pro',
-        haiku: 'deepseek-v4-flash',
-        sonnet: 'deepseek-v4-pro',
-        opus: 'deepseek-v4-pro',
-      },
+      models: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-v4-flash' }],
+      fastModel: 'deepseek-v4-flash',
     })
 
     const service = new ConversationService() as any
@@ -377,6 +373,8 @@ describe('ConversationService', () => {
     expect(env.DREAMCODER_COMPUTER_USE_HOST_BUNDLE_ID).toBeUndefined()
     expect(env.DREAMCODER_DESKTOP_SERVER_URL).toBe('http://127.0.0.1:3456')
     expect(env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING).toBe('1')
+    expect(env.CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS).toBe('1')
+    expect(env.DREAMCODER_SHOW_UI).toBe('1')
   })
 
   test('uses bun entrypoint fallback on Windows dev mode', () => {

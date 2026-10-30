@@ -1,12 +1,18 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { setIsInteractive, switchSession } from '../../bootstrap/state.js'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
+import { getIsInteractive, setIsInteractive, switchSession } from '../../bootstrap/state.js'
 import type { SessionId } from '../../types/ids.js'
 import type { LocalJSXCommandContext } from '../../types/command.js'
 import { createCommandInputMessage } from '../../utils/messages.js'
 import { call } from './goal.js'
 
-afterEach(() => {
+const interactiveBeforeFile = getIsInteractive()
+
+beforeEach(() => {
   setIsInteractive(true)
+})
+
+afterAll(() => {
+  setIsInteractive(interactiveBeforeFile)
 })
 
 async function runGoal(args: string, context: Partial<LocalJSXCommandContext> = {}) {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useClaudeCodeImportStore } from '../../stores/claudeCodeImportStore'
 import { useTranslation } from '../../i18n'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import { SettingsRow } from './SettingsRow'
 
 /** Import from Claude Code as a row in General > Advanced, available at any time. */
@@ -43,7 +43,7 @@ export function ClaudeCodeImportSettings() {
       }
       control={
         status.claudeCodeDir ? (
-          <Button size="xs" variant="secondary" loading={running} disabled={running} onClick={() => void startImport()}>
+          <Button size="xs" variant="outline" loading={running} disabled={running} onClick={() => void startImport()}>
             {t('claudeCodeImport.importShort')}
           </Button>
         ) : null

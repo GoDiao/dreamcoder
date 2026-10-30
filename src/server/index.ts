@@ -1,5 +1,6 @@
 import { handleApiRequest } from './router.js'
-import { handleWebSocket, type WebSocketData } from './ws/handler.js'
+import { serverWebSocket, type ServerSocketData } from './ws/serverSocket.js'
+import { createTerminalSocketData } from './ws/terminalSocket.js'
 import { resolveCors, type CorsResolution } from './middleware/cors.js'
 import { requireAuth, requireH5Token } from './middleware/auth.js'
 import { teamWatcher } from './services/teamWatcher.js'
@@ -11,7 +12,8 @@ import { enableConfigs } from '../utils/config.js'
 import { diagnosticsService } from './services/diagnosticsService.js'
 import { ensurePersistentStorageUpgraded } from './services/persistentStorageMigrations.js'
 import { handleStaticH5Request } from './staticH5.js'
-import { classifyH5Request, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
+import { handleUiPageRequest, isUiPageRequest } from './uiPageHost.js'
+import { classifyH5Request, isDesktopOnlyPath, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
 import { H5AccessService } from './services/h5AccessService.js'
 
 function readArgValue(flag: string): string | undefined {
@@ -81,6 +83,16 @@ function h5AccessDisabledResponse(): Response {
   )
 }
 
+function desktopOnlyRejectedResponse(): Response {
+  return Response.json(
+    {
+      error: 'Forbidden',
+      message: 'This feature is only available in the local desktop app.',
+    },
+    { status: 403 },
+  )
+}
+
 function isH5AccessControlRequest(
   req: Request,
   url: URL,
@@ -124,10 +136,10 @@ export function startServer(port = PORT, host = HOST) {
     process.env.SERVER_AUTH_REQUIRED === '1'
   const h5AccessService = new H5AccessService()
 
-  let server: ReturnType<typeof Bun.serve<WebSocketData>>
+  let server: ReturnType<typeof Bun.serve<ServerSocketData>>
 
   try {
-    server = Bun.serve<WebSocketData>({
+    server = Bun.serve<ServerSocketData>({
       port,
       hostname: host,
       idleTimeout: 60,
@@ -169,11 +181,31 @@ export function startServer(port = PORT, host = HOST) {
           return h5AccessDisabledResponse()
         }
 
+        if (isDesktopOnlyPath(url.pathname) && classifyH5Request(req, url, h5RequestContext) !== 'local-trusted') {
+          return desktopOnlyRejectedResponse()
+        }
+
         if (req.method === 'OPTIONS') {
           if (cors.rejected) {
             return corsRejectedResponse(cors)
           }
           return new Response(null, { status: 204, headers: cors.headers })
+        }
+
+        if (url.pathname === '/terminal') {
+          if (cors.rejected) {
+            return corsRejectedResponse(cors)
+          }
+
+          if (forceAuth) {
+            const authError = await requireAuth(req, url.searchParams.get('token'))
+            if (authError) {
+              return withCors(authError, cors)
+            }
+          }
+
+          if (server.upgrade(req, { data: createTerminalSocketData(url) })) return undefined
+          return new Response('WebSocket upgrade failed', { status: 400 })
         }
 
         if (url.pathname.startsWith('/ws/')) {
@@ -202,6 +234,7 @@ export function startServer(port = PORT, host = HOST) {
               sessionId,
               connectedAt: Date.now(),
               channel: 'client',
+              clientKind: url.searchParams.get('client') === 'h5' ? 'h5' : 'desktop',
               sdkToken: null,
               serverPort: port,
               serverHost: localConnectHost,
@@ -236,6 +269,7 @@ export function startServer(port = PORT, host = HOST) {
               sessionId,
               connectedAt: Date.now(),
               channel: 'sdk',
+              clientKind: 'desktop',
               sdkToken: url.searchParams.get('token'),
               serverPort: port,
               serverHost: localConnectHost,
@@ -278,6 +312,10 @@ export function startServer(port = PORT, host = HOST) {
               { status: 500 },
             ), cors)
           }
+        }
+
+        if (isUiPageRequest(url)) {
+          return handleUiPageRequest(req, url)
         }
 
         if (url.pathname.startsWith('/proxy/')) {
@@ -333,7 +371,7 @@ export function startServer(port = PORT, host = HOST) {
         return new Response('Not Found', { status: 404 })
       },
 
-      websocket: handleWebSocket,
+      websocket: serverWebSocket,
     })
   } catch (error) {
     const message = error instanceof Error && error.message

@@ -1,76 +1,132 @@
-import { isTauriRuntime } from '../lib/desktopRuntime'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
+import { api, getAuthToken, getBaseUrl } from './client'
 
-export type TerminalSpawnResult = {
-  session_id: number
+export type TerminalShellDetection = { shell: string; platform: 'windows' | 'macos' | 'linux' }
+export type TerminalExit = { code: number; signal: string | null }
+
+export type TerminalServerMessage =
+  | { type: 'started'; shell: string; cwd: string; warning: string | null }
+  | { type: 'output'; data: string }
+  | { type: 'exit'; code: number; signal: string | null }
+  | { type: 'error'; message: string }
+
+export type TerminalClientMessage =
+  | { type: 'input'; data: string }
+  | { type: 'resize'; cols: number; rows: number }
+
+export type TerminalConnection = {
   shell: string
   cwd: string
-  warning?: string | null
+  warning: string | null
+  write(data: string): void
+  resize(cols: number, rows: number): void
+  close(): void
 }
 
-export type TerminalOutputPayload = {
-  session_id: number
-  data: string
+export type OpenTerminalInput = {
+  cols: number
+  rows: number
+  cwd?: string
+  onOutput(data: string): void
+  onExit(exit: TerminalExit): void
+  onError(message: string): void
+  onDisconnect(): void
 }
 
-export type TerminalExitPayload = {
-  session_id: number
-  code: number
-  signal?: string | null
+export class TerminalDisconnectedError extends Error {
+  constructor() {
+    super('Terminal connection closed.')
+    this.name = 'TerminalDisconnectedError'
+  }
 }
 
-export type TerminalShellDetection = {
-  shell: string
-  platform: 'windows' | 'macos' | 'linux'
-}
-
-type Unlisten = () => void
-
-async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauriRuntime()) {
+function requireDesktop() {
+  if (!isDesktopRuntime()) {
     throw new Error('Terminal is available in the desktop app runtime.')
   }
-  const api = await import('@tauri-apps/api/core')
-  return api.invoke<T>(command, args)
+}
+
+export function buildTerminalSocketUrl(input: { cols: number; rows: number; cwd?: string }) {
+  const url = new URL(getBaseUrl())
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  const basePath = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '')
+  url.pathname = `${basePath}/terminal`
+  url.search = ''
+  url.searchParams.set('cols', String(input.cols))
+  url.searchParams.set('rows', String(input.rows))
+  if (input.cwd) url.searchParams.set('cwd', input.cwd)
+  const token = getAuthToken()
+  if (token) url.searchParams.set('token', token)
+  return url.toString()
+}
+
+async function openTerminal(input: OpenTerminalInput): Promise<TerminalConnection> {
+  requireDesktop()
+  return new Promise<TerminalConnection>((resolve, reject) => {
+    const ws = new WebSocket(buildTerminalSocketUrl(input))
+    let started = false
+    let finished = false
+
+    const send = (message: TerminalClientMessage) => {
+      if (ws.readyState !== WebSocket.OPEN) throw new TerminalDisconnectedError()
+      ws.send(JSON.stringify(message))
+    }
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(String(event.data)) as TerminalServerMessage
+      switch (message.type) {
+        case 'started':
+          started = true
+          resolve({
+            shell: message.shell,
+            cwd: message.cwd,
+            warning: message.warning,
+            write: (data) => send({ type: 'input', data }),
+            resize: (cols, rows) => send({ type: 'resize', cols, rows }),
+            close: () => {
+              finished = true
+              ws.close()
+            },
+          })
+          break
+        case 'output':
+          input.onOutput(message.data)
+          break
+        case 'exit':
+          finished = true
+          input.onExit({ code: message.code, signal: message.signal })
+          break
+        case 'error':
+          if (started) input.onError(message.message)
+          else {
+            finished = true
+            reject(new Error(message.message))
+          }
+          break
+      }
+    }
+
+    ws.onclose = () => {
+      if (!started) reject(new TerminalDisconnectedError())
+      else if (!finished) input.onDisconnect()
+      finished = true
+    }
+  })
 }
 
 export const terminalApi = {
-  isAvailable: isTauriRuntime,
+  isAvailable: isDesktopRuntime,
 
-  spawn(input: { cols: number; rows: number; cwd?: string }) {
-    return invoke<TerminalSpawnResult>('terminal_spawn', input)
+  open: openTerminal,
+
+  async detectDefaultShell() {
+    requireDesktop()
+    return api.get<TerminalShellDetection>('/api/terminal/default-shell')
   },
 
-  write(sessionId: number, data: string) {
-    return invoke<void>('terminal_write', { sessionId, data })
-  },
-
-  resize(sessionId: number, cols: number, rows: number) {
-    return invoke<void>('terminal_resize', { sessionId, cols, rows })
-  },
-
-  kill(sessionId: number) {
-    return invoke<void>('terminal_kill', { sessionId })
-  },
-
-  async onOutput(handler: (payload: TerminalOutputPayload) => void): Promise<Unlisten> {
-    const events = await import('@tauri-apps/api/event')
-    return events.listen<TerminalOutputPayload>('terminal-output', (event) => handler(event.payload))
-  },
-
-  async onExit(handler: (payload: TerminalExitPayload) => void): Promise<Unlisten> {
-    const events = await import('@tauri-apps/api/event')
-    return events.listen<TerminalExitPayload>('terminal-exit', (event) => handler(event.payload))
-  },
-
-  detectDefaultShell() {
-    return invoke<TerminalShellDetection>('detect_default_terminal_shell')
-  },
-
-  getBashPath() {
-    return invoke<string | null>('get_terminal_bash_path', undefined)
-  },
-
-  setBashPath(path: string | null) {
-    return invoke<void>('set_terminal_bash_path', { path })
+  async validateBashPath(path: string | null) {
+    requireDesktop()
+    const result = await api.post<{ path: string | null }>('/api/terminal/validate-bash-path', { path })
+    return result.path
   },
 }

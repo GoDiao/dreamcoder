@@ -61,24 +61,12 @@ function createArgv0ShellFunction(
  * @returns Object with type and the shell snippet to use
  */
 export function createRipgrepShellIntegration(): {
-  type: 'alias' | 'function'
+  type: 'alias'
   snippet: string
 } | null {
   const rgCommand = ripgrepCommand()
   if (!rgCommand.rgPath) {
     return null
-  }
-
-  // For embedded ripgrep (bun-internal), we need a shell function that sets argv0
-  if (rgCommand.argv0) {
-    return {
-      type: 'function',
-      snippet: createArgv0ShellFunction(
-        'rg',
-        rgCommand.argv0,
-        rgCommand.rgPath,
-      ),
-    }
   }
 
   // If the selected command is the system rg from PATH, the snapshot should not
@@ -297,20 +285,10 @@ async function getClaudeCodeSnapshotContent(): Promise<string> {
       echo "if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then" >> "$SNAPSHOT_FILE"
   `
 
-    if (rgIntegration.type === 'function') {
-      // For embedded ripgrep, write the function definition using heredoc
-      content += `
-      cat >> "$SNAPSHOT_FILE" << 'RIPGREP_FUNC_END'
-  ${rgIntegration.snippet}
-RIPGREP_FUNC_END
-    `
-    } else {
-      // For regular ripgrep, write a simple alias
-      const escapedSnippet = rgIntegration.snippet.replace(/'/g, "'\\''")
-      content += `
+    const escapedSnippet = rgIntegration.snippet.replace(/'/g, "'\\''")
+    content += `
       echo '  alias rg='"'${escapedSnippet}'" >> "$SNAPSHOT_FILE"
     `
-    }
 
     content += `
       echo "fi" >> "$SNAPSHOT_FILE"

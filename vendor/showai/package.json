@@ -1,0 +1,40 @@
+{
+  "name": "@dreamcoder/showai",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@antv/g-svg": "2.1.1",
+    "@antv/g2": "5.4.8",
+    "@antv/g2-extension-plot": "0.2.2",
+    "@dagrejs/dagre": "3.1.1",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-code-block-lowlight": "3.31.4",
+    "@tiptap/extension-highlight": "3.31.4",
+    "@tiptap/extension-image": "3.31.4",
+    "@tiptap/extension-placeholder": "3.31.4",
+    "@tiptap/extension-table": "3.31.4",
+    "@tiptap/extension-task-item": "3.31.4",
+    "@tiptap/extension-task-list": "3.31.4",
+    "@tiptap/extension-text-align": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@xyflow/react": "12.12.0",
+    "d3-interpolate": "3.0.1",
+    "d3-regression": "2.2.0",
+    "katex": "0.19.0",
+    "lowlight": "3.3.0",
+    "lucide-react": "1.51.0",
+    "marked": "18.0.14",
+    "pdfjs-dist": "6.4.299",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "three": "0.186.1",
+    "topojson-client": "3.1.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "esbuild": "0.28.2"
+  }
+}

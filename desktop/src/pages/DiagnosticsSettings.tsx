@@ -3,8 +3,8 @@ import { RefreshCw } from 'lucide-react'
 import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
 import { SettingsListRow, SettingsSection, SettingsSummary } from '../components/settings/SettingsSummary'
 import { diagnosticsApi, type DiagnosticEvent, type DiagnosticsStatus } from '../api/diagnostics'
-import { Button } from '../components/shared/Button'
-import { copyTextToClipboard } from '../components/chat/clipboard'
+import { Button } from '../components/shared/ui/button'
+import { useCopyAndNotify } from '../hooks/useCopyAndNotify'
 import { useTranslation } from '../i18n'
 import { formatBytes } from '../lib/formatBytes'
 import { useUIStore } from '../stores/uiStore'
@@ -13,6 +13,7 @@ import { DoctorPanel } from '../components/doctor/DoctorPanel'
 export function DiagnosticsSettings() {
   const t = useTranslation()
   const addToast = useUIStore((s) => s.addToast)
+  const copyAndNotify = useCopyAndNotify()
   const [status, setStatus] = useState<DiagnosticsStatus | null>(null)
   const [events, setEvents] = useState<DiagnosticEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -84,12 +85,7 @@ export function DiagnosticsSettings() {
 
   const handleCopySummary = async () => {
     const text = recentErrorSummary || t('settings.diagnostics.noRecentErrors')
-    const copied = await copyTextToClipboard(text)
-    if (copied) {
-      addToast({ type: 'success', message: t('settings.diagnostics.summaryCopied') })
-      return
-    }
-    addToast({ type: 'error', message: t('settings.diagnostics.copyFailed') })
+    await copyAndNotify(text, t('settings.diagnostics.summaryCopied'))
   }
 
   const handleClear = async () => {
@@ -117,7 +113,8 @@ export function DiagnosticsSettings() {
         title={t('settings.diagnostics.title')}
         description={t('settings.diagnostics.description')}
         actions={
-          <Button variant="secondary" size="xs" onClick={load} loading={isLoading} icon={<RefreshCw size={13} aria-hidden="true" />}>
+          <Button variant="outline" size="xs" onClick={load} loading={isLoading}>
+            <RefreshCw data-icon="inline-start" size={13} aria-hidden="true" />
             {t('settings.diagnostics.refresh')}
           </Button>
         }
@@ -143,19 +140,19 @@ export function DiagnosticsSettings() {
         title={t('settings.diagnostics.logDirectory')}
         description={<span className="break-all font-mono">{status?.logDir ?? '-'}</span>}
         actions={
-          <Button variant="secondary" size="xs" onClick={handleOpenDir}>
+          <Button variant="outline" size="xs" onClick={handleOpenDir}>
             {t('settings.diagnostics.openDirectory')}
           </Button>
         }
       />
       <div className="mt-[18px] flex flex-wrap items-center gap-1.5">
-        <Button variant="secondary" size="xs" onClick={handleExport} loading={isExporting}>
+        <Button variant="outline" size="xs" onClick={handleExport} loading={isExporting}>
           {t('settings.diagnostics.exportBundle')}
         </Button>
-        <Button variant="secondary" size="xs" onClick={handleCopySummary}>
+        <Button variant="outline" size="xs" onClick={handleCopySummary}>
           {t('settings.diagnostics.copySummary')}
         </Button>
-        <Button variant="secondary" size="xs" onClick={handleClear} loading={isClearing} className="text-[var(--color-error)] hover:text-[var(--color-error)]">
+        <Button variant="outline" size="xs" onClick={handleClear} loading={isClearing} className="text-[var(--color-error)] hover:text-[var(--color-error)]">
           {t('settings.diagnostics.clearLogs')}
         </Button>
         {lastExportPath && (

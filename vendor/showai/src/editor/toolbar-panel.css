@@ -1,0 +1,41 @@
+.editor-toolbar-panel {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  width: 280px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line, #e8e8eb);
+  border-radius: 12px;
+  background: var(--paper, white);
+  color: var(--text, #343a35);
+  font: 12px/1.4 var(--font-ui, system-ui, sans-serif);
+  box-shadow: 0 8px 32px #25233520;
+}
+.editor-toolbar-panel .editor-modal {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  animation: none;
+}
+.editor-toolbar-panel .editor-modal-heading {
+  gap: 8px;
+}
+.editor-toolbar-panel .editor-modal-symbol {
+  display: none;
+}
+.editor-toolbar-panel .editor-modal-heading h3 {
+  font-size: 14px;
+}
+.editor-toolbar-panel .editor-modal-actions {
+  margin-top: 12px;
+}
+@media print {
+  .editor-toolbar-panel {
+    display: none !important;
+  }
+}

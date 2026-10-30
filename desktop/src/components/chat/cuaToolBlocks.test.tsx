@@ -83,7 +83,7 @@ describe('cua tool display in chat blocks', () => {
         result={{ content: 'Screen Recording is NOT granted for this process. Run `cua-driver permissions grant`.', isError: true }}
       />,
     )
-    const summary = screen.getByTitle(/Screen Recording is NOT granted/)
+    const summary = screen.getByText(/Screen Recording is NOT granted/)
     expect(summary.className).toContain('truncate')
     expect(summary.className).not.toContain('shrink-0')
   })
