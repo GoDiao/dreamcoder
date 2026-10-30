@@ -45,7 +45,7 @@ describe('terminal shell environment', () => {
     await rm(tmpDir, { recursive: true, force: true })
   })
 
-  it('captures exported variables from an interactive user shell', async () => {
+  it.skipIf(process.platform === 'win32')('captures exported variables from an interactive user shell', async () => {
     const shellPath = path.join(tmpDir, 'zsh')
     const nodeBin = path.join(tmpDir, 'node-bin')
     const nvmDir = path.join(tmpDir, '.nvm')
@@ -74,18 +74,18 @@ describe('terminal shell environment', () => {
   it('merges shell PATH before base PATH while preserving app env overrides', () => {
     const merged = mergeTerminalShellEnvironment(
       {
-        PATH: '/usr/bin:/bin',
+        PATH: ['/usr/bin', '/bin'].join(path.delimiter),
         DREAMCODER_DESKTOP_SERVER_URL: 'http://127.0.0.1:3456',
         TOOL_HOME: '/base/tool',
       },
       {
-        PATH: '/opt/homebrew/bin:/usr/bin',
+        PATH: ['/opt/homebrew/bin', '/usr/bin'].join(path.delimiter),
         NVM_DIR: '/Users/test/.nvm',
         TOOL_HOME: '/shell/tool',
       },
     )
 
-    expect(merged.PATH).toBe('/opt/homebrew/bin:/usr/bin:/bin')
+    expect(merged.PATH).toBe(['/opt/homebrew/bin', '/usr/bin', '/bin'].join(path.delimiter))
     expect(merged.NVM_DIR).toBe('/Users/test/.nvm')
     expect(merged.TOOL_HOME).toBe('/base/tool')
     expect(merged.DREAMCODER_DESKTOP_SERVER_URL).toBe('http://127.0.0.1:3456')

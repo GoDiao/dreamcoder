@@ -183,8 +183,8 @@ describe('Import from Claude Code', () => {
     expect(second.copied).toBe(0)
     expect(second.skipped).toBe(second.total)
     const afterSecond = await snapshot(dreamcoderDir)
-    delete afterFirst['dreamcoder/claude-code-import.json']
-    delete afterSecond['dreamcoder/claude-code-import.json']
+    delete afterFirst[path.join('dreamcoder', 'claude-code-import.json')]
+    delete afterSecond[path.join('dreamcoder', 'claude-code-import.json')]
     expect(afterSecond).toEqual(afterFirst)
   })
 

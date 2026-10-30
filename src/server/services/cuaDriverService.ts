@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, constants, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { delimiter, dirname, join } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import type { ComputerUseConfig } from '../../utils/computerUse/preauthorizedConfig.js'
 
@@ -140,7 +140,7 @@ export function getStandardCuaDriverPaths(
     return paths
   }
   if (platform === 'linux') {
-    return [join(homeDir, '.local', 'bin', 'cua-driver')]
+    return [posix.join(homeDir, '.local', 'bin', 'cua-driver')]
   }
   return []
 }
@@ -149,18 +149,22 @@ function winJoin(...parts: string[]): string {
   return parts.map((p, i) => (i === 0 ? p.replace(/[\\/]+$/, '') : p)).join('\\')
 }
 
+function platformJoin(platform: NodeJS.Platform, ...parts: string[]): string {
+  return platform === 'win32' ? winJoin(...parts) : posix.join(...parts)
+}
+
 function getPathCandidates(
   platform: NodeJS.Platform,
   env: Record<string, string | undefined>,
   command = 'cua-driver',
 ): string[] {
   const pathValue = env.PATH ?? env.Path ?? ''
-  const sep = platform === 'win32' ? ';' : delimiter
+  const sep = platform === 'win32' ? ';' : posix.delimiter
   const name = platform === 'win32' ? `${command}.exe` : command
   return pathValue
     .split(sep)
     .filter(Boolean)
-    .map(dir => (platform === 'win32' ? winJoin(dir, name) : join(dir, name)))
+    .map(dir => platformJoin(platform, dir, name))
 }
 
 export type ResolvedCuaDriver = {
@@ -500,7 +504,7 @@ export class CuaDriverService {
               'The download may be incomplete or tampered with; the installer was not run.',
           )
         }
-        await this.deps.writeFile(join(dir, file.name), data)
+        await this.deps.writeFile(platformJoin(this.deps.platform, dir, file.name), data)
       }
 
       progress.phase = 'installing'
@@ -536,7 +540,7 @@ export class CuaDriverService {
           : [
               'bash',
               [
-                join(dir, '_install-rust.sh'),
+                platformJoin(this.deps.platform, dir, '_install-rust.sh'),
                 '--no-modify-path',
                 ...(requireSignature ? ['--require-signature'] : []),
               ],

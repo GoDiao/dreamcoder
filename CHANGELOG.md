@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows source setup and tests now handle POSIX fixtures, normalized project keys, junctions, and ripgrep archives without platform-specific failures.
+
 ## [0.8.0-beta.2] — 2026-10-29
 
 A second pre-release of the Electron desktop app. Windows has still not been tested on real machines; reports are welcome in the Windows testing issue (#188).
