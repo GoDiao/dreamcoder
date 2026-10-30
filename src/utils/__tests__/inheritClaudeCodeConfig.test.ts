@@ -130,7 +130,7 @@ describe('inheriting Claude Code customizations', () => {
 
     test('is skipped when a symlink points at DreamCoder directory', async () => {
       const link = path.join(tmp, 'link-to-dreamcoder')
-      await fs.symlink(dreamcoderDir, link)
+      await fs.symlink(dreamcoderDir, link, process.platform === 'win32' ? 'junction' : 'dir')
       process.env[CLAUDE_CODE_VARIABLE] = link
       expect(getInheritedClaudeCodeDir()).toBeUndefined()
     })

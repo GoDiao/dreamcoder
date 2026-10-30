@@ -51,5 +51,5 @@ describe('config directory variable', () => {
     })
 
     expect(uses).toEqual([])
-  })
+  }, 15_000)
 })

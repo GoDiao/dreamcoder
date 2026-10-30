@@ -99,7 +99,7 @@ export async function installRipgrep(
     await Bun.write(archivePath, archive)
     const binaryName = windows ? 'rg.exe' : 'rg'
     const entry = `${basename}/${binaryName}`
-    const proc = Bun.spawn([tarCommand(), '-xf', archivePath, '-C', staging, entry], {
+    const proc = Bun.spawn([tarCommand(), '-m', '-xf', archivePath, '-C', staging, entry], {
       stdout: 'pipe',
       stderr: 'pipe',
     })

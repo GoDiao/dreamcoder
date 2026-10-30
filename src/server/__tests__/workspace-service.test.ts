@@ -299,11 +299,11 @@ describe('WorkspaceService', () => {
     const outsideDir = await makeTempDir('workspace-service-symlink-outside-')
     const outsideFile = path.join(outsideDir, 'secret.txt')
     await fs.writeFile(outsideFile, 'top secret\n')
-    await fs.symlink(outsideFile, path.join(workDir, 'escape.txt'))
+    await fs.symlink(outsideDir, path.join(workDir, 'escape'), process.platform === 'win32' ? 'junction' : 'dir')
 
     const service = new WorkspaceService(async () => workDir)
 
-    await expect(service.readFile('session-1', 'escape.txt')).rejects.toThrow(/outside workspace/)
+    await expect(service.readFile('session-1', 'escape/secret.txt')).rejects.toThrow(/outside workspace/)
   })
 
   it('returns error for an untracked symlink that escapes the workspace root', async () => {
@@ -319,7 +319,7 @@ describe('WorkspaceService', () => {
     git(repoDir, 'commit', '-m', 'initial')
 
     await fs.writeFile(outsideFile, 'top secret\n')
-    await fs.symlink(outsideFile, path.join(repoDir, 'escape.txt'))
+    await fs.symlink(outsideDir, path.join(repoDir, 'escape'), process.platform === 'win32' ? 'junction' : 'dir')
 
     const service = new WorkspaceService(async () => repoDir)
 
@@ -327,11 +327,11 @@ describe('WorkspaceService', () => {
     expect(status.state).toBe('error')
     expect(status.error).toMatch(/outside workspace/)
 
-    await expect(service.getDiff('session-1', 'escape.txt')).resolves.toMatchObject({
+    await expect(service.getDiff('session-1', 'escape/secret.txt')).resolves.toMatchObject({
       state: 'error',
-      path: 'escape.txt',
+      path: 'escape/secret.txt',
     })
-    const diffOutcome = await service.getDiff('session-1', 'escape.txt')
+    const diffOutcome = await service.getDiff('session-1', 'escape/secret.txt')
     expect(diffOutcome.error).toMatch(/outside workspace/)
   })
 
