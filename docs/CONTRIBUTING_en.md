@@ -158,8 +158,8 @@ cd desktop && bun install
 bun run electron:install
 
 # Step 4: compile the sidecar binary
-#   Produces desktop/binaries/dreamcoder-sidecar-<target>, which the main
-#   process starts as the local server.
+#   Produces desktop/binaries/<target>/dreamcoder-sidecar (plus rg next to it,
+#   as in the packaged app), which the main process starts as the local server.
 bun run build:sidecars
 
 # Step 5: launch dev mode
@@ -206,10 +206,10 @@ match the pinned binary hash. To update ripgrep, verify both hashes for every
 target and refresh `THIRD_PARTY_NOTICES.md` and the installer smoke-test version.
 
 Source runs read `vendor/ripgrep/<arch>-<platform>/rg` (`rg.exe` on Windows).
-Builds also stage `desktop/binaries/rg-<target-triple>` (plus `.exe` on
-Windows). The installers drop the target suffix: `rg` sits beside
-`dreamcoder-sidecar` in `Resources/bin` on macOS and `resources\bin` on
-Windows. License notices are included as a resource. Both binary directories
+Builds also stage `desktop/binaries/<target-triple>/rg` (plus `.exe` on
+Windows), beside `dreamcoder-sidecar`. The installers copy that directory:
+`rg` sits beside `dreamcoder-sidecar` in `Resources/bin` on macOS and
+`resources\bin` on Windows. License notices are included as a resource. Both binary directories
 are Git-ignored.
 
 Resolution is: `USE_BUILTIN_RIPGREP=0` forces system ripgrep; otherwise the

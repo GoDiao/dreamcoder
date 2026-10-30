@@ -15,6 +15,11 @@ export type SidecarPaths = {
   h5DistDir: string
 }
 
+export function devSidecarPaths(desktopRoot: string, triple: string, exe: string): Pick<SidecarPaths, 'binary' | 'appRoot'> {
+  const binDir = path.join(desktopRoot, 'binaries', triple)
+  return { binary: path.join(binDir, `dreamcoder-sidecar${exe}`), appRoot: binDir }
+}
+
 export type SidecarRuntime = {
   url: string
   child: ChildProcess

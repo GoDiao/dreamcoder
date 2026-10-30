@@ -39,7 +39,7 @@ import {
 } from './browser'
 import { isAllowedFrameNavigation } from './frameNavigation'
 import { writeSessionExport } from './sessionExport'
-import { startSidecar, type SidecarPaths, type SidecarRuntime } from './sidecar'
+import { devSidecarPaths, startSidecar, type SidecarPaths, type SidecarRuntime } from './sidecar'
 import {
   MIN_WINDOW_HEIGHT,
   MIN_WINDOW_WIDTH,
@@ -117,11 +117,9 @@ function resolvePaths(): AppPaths {
     }
   }
   const desktopRoot = path.resolve(app.getAppPath(), '..')
-  const binDir = path.join(desktopRoot, 'binaries')
   const dist = path.join(desktopRoot, 'dist')
   return {
-    binary: path.join(binDir, `dreamcoder-sidecar-${hostTriple()}${exe}`),
-    appRoot: binDir,
+    ...devSidecarPaths(desktopRoot, hostTriple(), exe),
     h5DistDir: dist,
     webDist: dist,
     trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', 'tray.png'),

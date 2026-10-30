@@ -122,14 +122,18 @@ export function hostRipgrepTarget(): string {
   return host[0].replace('-unknown-linux-musl', '-unknown-linux-gnu')
 }
 
+export function devBinariesDir(repoRoot: string, targetTriple: string): string {
+  return path.join(repoRoot, 'desktop', 'binaries', targetTriple)
+}
+
 export async function prepareRipgrep(repoRoot: string, targetTriple: string): Promise<void> {
   const target = getRipgrepTarget(targetTriple)
   const extension = target.platform.endsWith('-win32') ? '.exe' : ''
   const vendorPath = path.join(repoRoot, 'vendor', 'ripgrep', target.platform, `rg${extension}`)
   await installRipgrep(target, vendorPath)
-  const binaries = path.join(repoRoot, 'desktop', 'binaries')
+  const binaries = devBinariesDir(repoRoot, targetTriple)
   await mkdir(binaries, { recursive: true })
-  const bundledPath = path.join(binaries, `rg-${targetTriple}${extension}`)
+  const bundledPath = path.join(binaries, `rg${extension}`)
   if (!await matchesChecksum(bundledPath, target.binarySha256)) {
     await copyFile(vendorPath, bundledPath)
   }

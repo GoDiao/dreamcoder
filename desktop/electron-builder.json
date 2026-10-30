@@ -49,12 +49,8 @@
     "artifactName": "${productName}_${version}_aarch64.${ext}",
     "extraResources": [
       {
-        "from": "binaries/dreamcoder-sidecar-aarch64-apple-darwin",
-        "to": "bin/dreamcoder-sidecar"
-      },
-      {
-        "from": "binaries/rg-aarch64-apple-darwin",
-        "to": "bin/rg"
+        "from": "binaries/aarch64-apple-darwin",
+        "to": "bin"
       }
     ]
   },
@@ -89,12 +85,8 @@
     "artifactName": "${productName}_${version}_x64-setup.${ext}",
     "extraResources": [
       {
-        "from": "binaries/dreamcoder-sidecar-x86_64-pc-windows-msvc.exe",
-        "to": "bin/dreamcoder-sidecar.exe"
-      },
-      {
-        "from": "binaries/rg-x86_64-pc-windows-msvc.exe",
-        "to": "bin/rg.exe"
+        "from": "binaries/x86_64-pc-windows-msvc",
+        "to": "bin"
       }
     ]
   },
