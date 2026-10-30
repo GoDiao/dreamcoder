@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 
@@ -143,4 +143,23 @@ describe('LocalSlashCommandPanel memory context', () => {
       expect(useUIStore.getState().pendingMemoryPath).toBeNull()
     })
   })
+})
+
+it('provides keyboard navigation and associated panels for inspector tabs', async () => {
+  const settings = useSettingsStore.getState()
+  useSettingsStore.setState({ locale: 'en' })
+  sessionsApiMock.getInspection.mockResolvedValue(inspectionWithContext(baseContext))
+  try {
+    render(<LocalSlashCommandPanel command="context" sessionId="session-1" onClose={() => {}} />)
+    const tabs = await screen.findAllByRole('tab')
+    const active = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')!
+    act(() => active.focus())
+    fireEvent.keyDown(active, { key: 'ArrowLeft' })
+    await waitFor(() => expect(active).toHaveAttribute('aria-selected', 'false'))
+    const next = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')!
+    expect(next).toHaveFocus()
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', next.id)
+  } finally {
+    useSettingsStore.setState(settings, true)
+  }
 })

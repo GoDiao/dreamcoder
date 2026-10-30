@@ -114,12 +114,14 @@ function runtimeMirror(selection: RuntimeSelection): SessionState {
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
+    uiPages: [],
     team: null,
     clientCount: 1,
   } satisfies SessionState
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   useSettingsStore.setState({ locale: 'en' })
   useProviderStore.setState({
     providers: [TEST_PROVIDER],
@@ -215,8 +217,8 @@ describe('Content-only pages render without errors', () => {
   it('EmptySession shows draft context usage before a session is created', async () => {
     render(<EmptySession />)
 
-    const indicator = await screen.findByLabelText('Context usage not calculated')
-    expect(indicator).toHaveTextContent('--')
+    await screen.findByLabelText('Context usage not calculated')
+    expect(screen.getByTestId('context-usage-ring').getAttribute('style')).not.toContain('conic-gradient')
     expect(vi.mocked(sessionsApi.getInspection)).not.toHaveBeenCalled()
   })
 
@@ -249,8 +251,8 @@ describe('Content-only pages render without errors', () => {
     fireEvent.click(screen.getByLabelText('Context usage not calculated'))
 
     expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
-    expect(screen.getAllByText('kimi-k2.6')).toHaveLength(2)
-    expect(screen.getAllByText('Context usage will be calculated after the session starts.')).toHaveLength(2)
+    expect(screen.getByText('kimi-k2.6')).toBeVisible()
+    expect(screen.getByText('Context usage will be calculated after the session starts.')).toBeVisible()
   })
 
   it('EmptySession plus menu exposes uploads and slash commands before chat starts', async () => {
@@ -260,7 +262,7 @@ describe('Content-only pages render without errors', () => {
       await Promise.resolve()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Open composer tools' }))
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Open composer tools' }), { key: 'Enter' })
       await Promise.resolve()
     })
     expect(screen.getByText('Add files or photos')).toBeInTheDocument()
@@ -445,7 +447,7 @@ describe('Content-only pages render without errors', () => {
 
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Available MCP tools')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('deepwiki'))
+    fireEvent.click(await screen.findByRole('button', { name: /deepwiki/ }))
     expect(useUIStore.getState().settingsOpen).toBe(true)
     expect(useUIStore.getState().settingsTab).toBe('mcp')
 
@@ -512,7 +514,7 @@ describe('Content-only pages render without errors', () => {
 
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Available skills')).toBeInTheDocument()
-    expect(screen.getByText('/lark-mail')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /\/lark-mail/ })).toBeInTheDocument()
 
     resetPageStores()
   })
@@ -671,7 +673,7 @@ describe('Content-only pages render without errors', () => {
       sendMessage,
     })
 
-    const { container } = render(<ActiveSession />)
+    render(<ActiveSession />)
     const textarea = screen.getByRole('textbox')
     fireEvent.change(textarea, { target: { value: '/status', selectionStart: 7 } })
     fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
@@ -679,10 +681,10 @@ describe('Content-only pages render without errors', () => {
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Session inspector')).toBeInTheDocument()
     expect(vi.mocked(sessionsApi.getInspection)).toHaveBeenCalledWith(SESSION_ID, { includeContext: false })
-    expect(container.innerHTML).toContain('bg-[var(--color-inspector-surface)]')
-    expect(container.innerHTML).not.toContain('bg-[#fbfaf6]')
-    expect(container.innerHTML).not.toContain('bg-[#f4f2ed]')
-    expect(container.innerHTML).not.toContain('border-[#d8b3a8]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).toContain('bg-[var(--color-inspector-surface)]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#fbfaf6]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#f4f2ed]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('border-[#d8b3a8]')
 
     resetPageStores()
   })
@@ -754,8 +756,10 @@ describe('Content-only pages render without errors', () => {
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage 42%')).toBeInTheDocument()
-    expect(screen.getByText('120,000')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage 42%' })
+    fireEvent.focus(indicator)
+    await screen.findByText(/\/ 120,000$/)
+    expect(screen.getByText(/\/ 120,000$/)).toBeInTheDocument()
     expect(vi.mocked(sessionsApi.getInspection)).toHaveBeenCalledWith(SESSION_ID, {
       includeContext: true,
       contextOnly: true,
@@ -808,8 +812,8 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage loading')
-    expect(indicator).toHaveTextContent('--')
-    expect(indicator).toHaveClass('h-8')
+    expect(screen.queryByTestId('context-usage-ring')).not.toBeInTheDocument()
+    expect(indicator).toHaveAttribute('data-size', 'icon-sm')
 
     resetPageStores()
   })
@@ -869,7 +873,9 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage not calculated')
-    expect(indicator).toHaveTextContent('--')
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
+    expect(screen.getByTestId('context-usage-ring').getAttribute('style')).not.toContain('conic-gradient')
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.getByText('Context usage will be calculated after the session starts.')).toBeInTheDocument()
     expect(screen.queryByText('CLI session is not running')).not.toBeInTheDocument()
@@ -946,7 +952,9 @@ describe('Content-only pages render without errors', () => {
     render(<ActiveSession />)
 
     const indicator = await screen.findByLabelText('Context usage 22%')
-    expect(indicator).toHaveTextContent('22%')
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
+    expect(indicator).toHaveAccessibleName(/22%/)
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.queryByText('Context usage will be calculated after the session starts.')).not.toBeInTheDocument()
 
@@ -1025,9 +1033,11 @@ describe('Content-only pages render without errors', () => {
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage 7%')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage 7%' })
+    fireEvent.focus(indicator)
+    await screen.findByText('deepseek-v4-pro')
     expect(screen.getByText('deepseek-v4-pro')).toBeInTheDocument()
-    expect(screen.getByText('1,000,000')).toBeInTheDocument()
+    expect(screen.getByText(/\/ 1,000,000$/)).toBeInTheDocument()
     expect(screen.getByText('Estimate')).toBeInTheDocument()
     expect(screen.queryByText('Autocompact buffer')).not.toBeInTheDocument()
 
@@ -1088,7 +1098,9 @@ describe('Content-only pages render without errors', () => {
 
     render(<ActiveSession />)
 
-    expect(await screen.findByLabelText('Context usage unavailable')).toBeInTheDocument()
+    const indicator = await screen.findByRole('button', { name: 'Context usage unavailable' })
+    fireEvent.focus(indicator)
+    await screen.findByText('kimi-k2.6')
     expect(screen.getAllByText('kimi-k2.6').length).toBeGreaterThan(0)
     expect(screen.queryByText('Unknown model')).not.toBeInTheDocument()
 
@@ -1250,11 +1262,11 @@ describe('AppShell layout renders chrome', () => {
 })
 
 describe('Design system compliance', () => {
-  it('Pages use Material Symbols Outlined icons', () => {
+  it('Pages use lucide icons', () => {
     const pages = [EmptySession]
     for (const Page of pages) {
       const { container, unmount } = render(<Page />)
-      const icons = container.querySelectorAll('.material-symbols-outlined')
+      const icons = container.querySelectorAll('svg.lucide')
       expect(icons.length).toBeGreaterThan(0)
       unmount()
     }

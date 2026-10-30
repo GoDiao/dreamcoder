@@ -103,6 +103,7 @@ describe('TerminalSettings', () => {
     })
     vi.stubGlobal('ResizeObserver', class {
       observe = vi.fn()
+      unobserve = vi.fn()
       disconnect = vi.fn()
     })
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
@@ -142,16 +143,17 @@ describe('TerminalSettings', () => {
     expect(screen.queryByText('Host shell')).not.toBeInTheDocument()
   })
 
-  it('shows setup guidance from the terminal info button', () => {
+  it('shows setup guidance from the terminal info button', async () => {
     render(<TerminalSettings />)
 
     const button = screen.getByRole('button', { name: 'Terminal setup help' })
-    const help = screen.getByRole('tooltip')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     expect(button).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(button)
 
     expect(button).toHaveAttribute('aria-expanded', 'true')
+    const help = await screen.findByRole('tooltip')
     expect(help).toHaveTextContent('plugin, skill, and MCP setup')
     expect(help).toHaveTextContent('claude plugin install')
   })
@@ -322,12 +324,12 @@ describe('TerminalSettings', () => {
     await waitFor(() => expect(onShellChange).toHaveBeenCalledWith('/bin/zsh'))
 
     const clear = screen.getByRole('button', { name: 'Clear' })
-    expect(clear).toHaveAttribute('title', 'Clear')
+    expect(clear).toHaveAttribute('aria-label', 'Clear')
     fireEvent.click(clear)
     expect(terminalMocks.terminalInstance.clear).toHaveBeenCalled()
 
     const restart = screen.getByRole('button', { name: 'Restart' })
-    expect(restart).toHaveAttribute('title', 'Restart')
+    expect(restart).toHaveAttribute('aria-label', 'Restart')
     await act(async () => {
       fireEvent.click(restart)
     })

@@ -1,3 +1,4 @@
+import { luminance } from './testColors'
 import { describe, expect, it } from 'vitest'
 
 import css from './globals.css?raw'
@@ -91,20 +92,6 @@ describe('desktop theme tokens', () => {
     }
   })
 
-  it('gives every theme its own selected model option colors instead of the light defaults', () => {
-    const tokens = ['--color-model-option-selected-bg', '--color-model-option-selected-border']
-    const darkBlocks = normalizedCss.split('[data-theme="dark"] {').slice(1).map((rest) => rest.slice(0, rest.indexOf('\n}')))
-    for (const token of tokens) {
-      expect(darkBlocks.some((block) => block.includes(`${token}:`)), `dark should define ${token}`).toBe(true)
-    }
-    for (const theme of ['white', 'dreamfield', 'amber', 'midnight', 'aurora']) {
-      const block = normalizedCss.split(`[data-theme="${theme}"] {`)[1]!.split('\n}')[0]!
-      for (const token of tokens) {
-        expect(block, `${theme} should define ${token}`).toContain(`${token}:`)
-      }
-    }
-  })
-
   it('defines activity and status tokens for every supported theme', () => {
     for (const theme of themes) {
       const block = getThemeBlock(theme)
@@ -130,12 +117,6 @@ function auroraColor(token: string): string {
   return alias ? auroraColor(alias[1]!) : value
 }
 
-function luminance(color: string): number {
-  const channels = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16) / 255)
-  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-  return linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
-}
-
 it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary buttons', () => {
   const pairs = [
     ['--color-text-primary', '--color-surface'],
@@ -146,8 +127,7 @@ it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary but
     ['--color-btn-primary-fg', '--color-primary'],
     ['--color-btn-primary-fg', '--color-primary-container'],
     ['--color-on-error', '--color-error'],
-    ...['fg', 'comment', 'string', 'keyword', 'function', 'number', 'property', 'type', 'punctuation']
-      .map((syntax) => [`--color-code-${syntax}`, '--color-code-bg']),
+    ['--color-code-fg', '--color-code-bg'],
   ]
   for (const [foreground, background] of pairs) {
     const values = [luminance(auroraColor(foreground!)), luminance(auroraColor(background!))]

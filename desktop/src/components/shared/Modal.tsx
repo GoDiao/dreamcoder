@@ -1,41 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-
-type EscapeLayer = { onEscape: () => void }
-
-const escapeLayers: EscapeLayer[] = []
-
-/**
- * Closes the topmost open layer (modal, settings window...) on Escape.
- * Listens on window so menus and dropdowns, which listen on document or in
- * React handlers, run first; a layer is skipped when they called
- * preventDefault, and only the most recently opened layer reacts.
- */
-export function useEscapeLayer(active: boolean, onEscape: () => void) {
-  const onEscapeRef = useRef(onEscape)
-
-  useEffect(() => {
-    onEscapeRef.current = onEscape
-  }, [onEscape])
-
-  useEffect(() => {
-    if (!active) return
-    const layer: EscapeLayer = { onEscape: () => onEscapeRef.current() }
-    escapeLayers.push(layer)
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
-      if (escapeLayers[escapeLayers.length - 1] !== layer) return
-      event.preventDefault()
-      layer.onEscape()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      const index = escapeLayers.indexOf(layer)
-      if (index >= 0) escapeLayers.splice(index, 1)
-    }
-  }, [active])
-}
+import type { ReactNode } from 'react'
+import { useTranslation } from '../../i18n'
+import { useOverlayReturnFocus } from '../../hooks/useOverlayReturnFocus'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
 type ModalProps = {
   open: boolean
@@ -44,83 +10,20 @@ type ModalProps = {
   children: ReactNode
   width?: number
   footer?: ReactNode
-  onExited?: () => void
 }
 
-export function Modal({ open, onClose, title, children, width = 560, footer, onExited }: ModalProps) {
-  const [mounted, setMounted] = useState(open)
-  const [visible, setVisible] = useState(false)
-  const onExitedRef = useRef(onExited)
-
-  useEffect(() => {
-    onExitedRef.current = onExited
-  }, [onExited])
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true)
-      const frame = window.requestAnimationFrame(() => setVisible(true))
-      return () => window.cancelAnimationFrame(frame)
-    }
-    if (!mounted) return
-    setVisible(false)
-    const timer = window.setTimeout(() => {
-      setMounted(false)
-      onExitedRef.current?.()
-    }, 180)
-    return () => window.clearTimeout(timer)
-  }, [mounted, open])
-
-  const handleClose = useCallback(() => {
-    if (!open) return
-    onClose()
-  }, [onClose, open])
-
-  useEscapeLayer(open, handleClose)
-
-  if (!mounted) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="motion-modal-backdrop absolute inset-0 bg-[var(--color-overlay-scrim)]"
-        data-state={visible ? 'open' : 'closed'}
-        onClick={handleClose}
-      />
-
-      <div
-        className="motion-modal-panel glass-panel relative rounded-[var(--radius-xl)] max-h-[85vh] flex flex-col"
-        data-state={visible ? 'open' : 'closed'}
-        style={{ width, maxWidth: 'calc(100vw - 48px)' }}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        {title && (
-          <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-0">
-            <h2 className="text-xl font-bold text-[var(--color-text-primary)]">{title}</h2>
-            <button
-              type="button"
-              onClick={handleClose}
-              aria-label="Close dialog"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-            >
-              <span className="material-symbols-outlined text-[18px]">close</span>
-            </button>
-          </div>
-        )}
-
-        <div className="px-6 py-4 overflow-y-auto flex-1">
-          {children}
-        </div>
-
-        {footer && (
-          <div className="px-6 pb-6 pt-0 flex justify-end gap-2">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+export function Modal({ open, onClose, title, children, width = 560, footer }: ModalProps) {
+  const t = useTranslation()
+  const focus = useOverlayReturnFocus()
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
+      <DialogContent {...focus} aria-describedby={undefined} className="glass-panel flex max-h-[85dvh] flex-col gap-0 p-0 sm:max-w-none" style={{ width, maxWidth: 'calc(100vw - 32px)' }}>
+        <DialogHeader className={title ? 'shrink-0 px-6 pt-6 pr-12' : 'sr-only'}>
+          <DialogTitle>{title ?? t('common.dialog')}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 px-6 pb-6">{footer}</div>}
+      </DialogContent>
+    </Dialog>
   )
 }

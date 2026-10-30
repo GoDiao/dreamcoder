@@ -5,6 +5,7 @@ import '@testing-library/jest-dom'
 import { Settings } from '../pages/Settings'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
+import { toast } from 'sonner'
 
 const diagnosticsApiMock = vi.hoisted(() => ({
   getStatus: vi.fn(),
@@ -130,7 +131,7 @@ describe('Settings > Diagnostics tab', () => {
     })
 
     useSettingsStore.setState({ locale: 'en' })
-    useUIStore.setState({ settingsTab: 'providers', toasts: [] })
+    useUIStore.setState({ settingsTab: 'providers' })
   })
 
   it('shows diagnostics status, actions, and recent events', async () => {
@@ -185,8 +186,7 @@ describe('Settings > Diagnostics tab', () => {
         expect(execCommand).toHaveBeenCalledWith('copy')
       })
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('capturedOutput'))
-      const toasts = useUIStore.getState().toasts
-      expect(toasts[toasts.length - 1]?.message).toBe('Error summary copied.')
+      expect(toast.success).toHaveBeenLastCalledWith('Error summary copied.')
     } finally {
       Object.defineProperty(document, 'execCommand', {
         configurable: true,
@@ -213,8 +213,7 @@ describe('Settings > Diagnostics tab', () => {
       expect(doctorRepairMock.runDoctorRepair).toHaveBeenCalled()
     })
 
-    const toasts = useUIStore.getState().toasts
-    expect(toasts[toasts.length - 1]?.message).toContain('Doctor')
+    expect(toast.success).toHaveBeenLastCalledWith(expect.stringContaining('Doctor'))
     expect(window.localStorage.getItem('dreamcoder-chat-history')).toBe('keep')
   })
 })

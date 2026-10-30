@@ -1,12 +1,14 @@
+import { ArrowLeftIcon, BrainIcon, ChevronRight, CircleAlertIcon, FileTextIcon, LayersIcon, WrenchIcon, ZapIcon } from 'lucide-react'
+import { Button } from '../shared/ui/button'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
-import { ChevronRight } from 'lucide-react'
 import { SettingsPageHeader } from './SettingsPageHeader'
-import { SettingsSection, SettingsSummary } from './SettingsSummary'
+import { DetailStat, SettingsSection, SettingsSummary } from './SettingsSummary'
 import type { AgentDefinition, AgentSource } from '../../api/agents'
 
 const AGENT_COLORS: Record<string, string> = {
@@ -43,28 +45,6 @@ function MetaPill({ children }: { children: ReactNode }) {
   )
 }
 
-function DetailStat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: string
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
-        <span className="material-symbols-outlined text-[14px]">{icon}</span>
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-base font-semibold text-[var(--color-text-primary)] break-all">
-        {value}
-      </div>
-    </div>
-  )
-}
-
 function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: () => void }) {
   const t = useTranslation()
   const sourceLabel = t(`settings.agents.source.${agent.source}`)
@@ -76,7 +56,7 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
           onClick={onBack}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]"
         >
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <ArrowLeftIcon aria-hidden="true" size={16} />
           {t('settings.agents.backToList')}
         </button>
       </div>
@@ -129,22 +109,22 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
             <DetailStat
               label={t('settings.agents.summary.source')}
               value={sourceLabel}
-              icon="layers"
+              icon={LayersIcon}
             />
             <DetailStat
               label={t('settings.agents.summary.model')}
               value={agent.modelDisplay || '—'}
-              icon="psychology"
+              icon={BrainIcon}
             />
             <DetailStat
               label={t('settings.agents.summary.tools')}
               value={String(agent.tools?.length ?? 0)}
-              icon="build"
+              icon={WrenchIcon}
             />
             <DetailStat
               label={t('settings.agents.summary.status')}
               value={agent.isActive ? t('settings.agents.status.active') : t('settings.agents.status.available')}
-              icon="bolt"
+              icon={ZapIcon}
             />
           </div>
         </div>
@@ -153,9 +133,7 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
       {agent.tools && agent.tools.length > 0 && (
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)]">
-              build
-            </span>
+            <WrenchIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={18} />
             <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
               {t('settings.agents.tools')}
             </h4>
@@ -199,9 +177,7 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
               </div>
             ) : (
               <div className="px-6 py-10 text-center">
-                <span className="material-symbols-outlined text-[32px] text-[var(--color-text-tertiary)] mb-2 block">
-                  article
-                </span>
+                <FileTextIcon className="mx-auto shrink-0 text-[var(--color-text-tertiary)] mb-2 block" aria-hidden="true" size={32} />
                 <p className="text-sm text-[var(--color-text-tertiary)]">
                   {t('settings.agents.noSystemPrompt')}
                 </p>
@@ -266,12 +242,10 @@ export function AgentsSettings() {
     <div className="w-full min-w-0">
       <SettingsPageHeader title={t('settings.agents.title')} description={t('settings.agents.description')} />
       {isLoading && allAgents.length === 0 ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin w-5 h-5 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-        </div>
+        <LoadingBlock />
       ) : error ? (
         <div className="text-center py-12 px-4">
-          <span className="material-symbols-outlined text-[40px] text-[var(--color-error)] mb-3 block">error_outline</span>
+          <CircleAlertIcon className="mx-auto shrink-0 text-[var(--color-error)] mb-3 block" aria-hidden="true" size={40} />
           <p className="text-sm text-[var(--color-error)] mb-2">{error}</p>
           <button
             onClick={() => void fetchAgents(currentWorkDir)}
@@ -303,11 +277,12 @@ export function AgentsSettings() {
             return (
               <SettingsSection key={source} title={sourceLabel} count={group.length}>
                 {group.map((agent) => (
-                  <button
+                  <Button
                     key={`${agent.source}-${agent.agentType}`}
-                    type="button"
+                    variant="ghost"
+                    size="row"
                     onClick={() => selectAgent(agent, 'agents')}
-                    className="group flex w-full min-w-0 items-center gap-3 border-b border-[var(--color-border-separator)] py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="group gap-3 rounded-none border-0 border-b border-[var(--color-border-separator)] px-0 py-2.5"
                   >
                     <span
                       aria-hidden="true"
@@ -346,7 +321,7 @@ export function AgentsSettings() {
                       </span>
                     </span>
                     <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
-                  </button>
+                  </Button>
                 ))}
               </SettingsSection>
             )

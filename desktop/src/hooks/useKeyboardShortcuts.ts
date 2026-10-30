@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useSessionStore } from '../stores/sessionStore'
+import { useNewSessionStore } from '../stores/newSessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
@@ -10,7 +10,7 @@ import {
 import { useSettingsStore } from '../stores/settingsStore'
 
 export function useKeyboardShortcuts() {
-  const setActiveSession = useSessionStore((s) => s.setActiveSession)
+  const openNewSession = useNewSessionStore((s) => s.open)
   const openModal = useUIStore((s) => s.openModal)
   const closeModal = useUIStore((s) => s.closeModal)
   const activeModal = useUIStore((s) => s.activeModal)
@@ -36,7 +36,7 @@ export function useKeyboardShortcuts() {
       if (meta && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         e.stopPropagation()
-        if (!e.repeat && !activeModalRef.current && !document.querySelector('[role="dialog"][aria-modal="true"]')) {
+        if (!e.repeat && !activeModalRef.current && !document.querySelector('[aria-modal="true"]')) {
           openModal('command-palette')
         }
         return
@@ -63,7 +63,7 @@ export function useKeyboardShortcuts() {
 
       if (meta && e.key === 'n') {
         e.preventDefault()
-        setActiveSession(null)
+        openNewSession()
       }
 
       if (e.key === 'Escape') {
@@ -86,5 +86,5 @@ export function useKeyboardShortcuts() {
       document.removeEventListener('keydown', handleQuickSwitcher, true)
       document.removeEventListener('keydown', handler)
     }
-  }, [closeModal, openModal, setActiveSession, setUiZoom, stopGeneration])
+  }, [closeModal, openModal, openNewSession, setUiZoom, stopGeneration])
 }

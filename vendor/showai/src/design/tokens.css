@@ -1,0 +1,194 @@
+/* Shared by the desktop, exported reader and compiled component SDK.
+ * Layout reference: https://github.com/nexu-io/open-design/blob/main/design-systems/airbnb/DESIGN-zh.md
+ * User-selected accent anchor: RGB(18, 10, 143). Fonts use local fallbacks. */
+:root,
+.studio,
+.studio.settings-view,
+.studio-modal-shade,
+.studio-context-menu,
+[data-showai-inline-root] {
+  --font-sans:
+    "Airbnb Cereal VF", "Circular", -apple-system, BlinkMacSystemFont,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --brand: #120a8f;
+  --action: #120a8f;
+  --action-hover: #0d076b;
+  --text: #222222;
+  --muted: #6a6a6a;
+  --subtle: #929292;
+  --paper: #ffffff;
+  --surface: #fafafa;
+  --line: #dddddd;
+  --hover: #f7f7f7;
+  --accent: var(--action);
+  --accent-soft: #eeedf9;
+  --brand-accent: var(--brand);
+  --danger: #c13515;
+  /* Problem tones: text/icon colour; backgrounds mix them into --paper. */
+  --warning: #9a6400;
+  --info: #2f5f9e;
+  --success: #2f7a4a;
+  --selected: #f2f2f2;
+  --bg: var(--paper);
+  --border: var(--line);
+  --text-secondary: var(--muted);
+  --editor-bg: var(--paper);
+  --radius-control: 8px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-pill: 999px;
+  --space-unit: 8px;
+  --shadow: 0 0 0 1px #00000005, 0 2px 6px #0000000a, 0 4px 8px #00000014;
+  --shadow-dialog: 0 16px 64px #00000024;
+  --studio-topbar-height: 56px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-synthesis: none;
+  color-scheme: light;
+  color: var(--text);
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:root[data-theme="dark"],
+:root[data-theme="dark"] .studio,
+:root[data-theme="dark"] .studio.settings-view,
+:root[data-theme="dark"] .studio-modal-shade,
+:root[data-theme="dark"] .studio-context-menu,
+[data-showai-inline-root][data-theme="dark"] {
+  --text: #f7f7f7;
+  --muted: #b0b0b0;
+  --subtle: #929292;
+  --paper: #181818;
+  --surface: #222222;
+  --line: #414141;
+  --hover: #2c2c2c;
+  --accent: #aaa4ff;
+  --brand-accent: #aaa4ff;
+  --accent-soft: #25233f;
+  --selected: #2c2c2c;
+  --danger: #ff9c86;
+  --warning: #f0bf63;
+  --info: #93b8ef;
+  --success: #86d3a0;
+  --shadow: 0 0 0 1px #ffffff08, 0 2px 6px #00000030, 0 4px 8px #00000040;
+  --shadow-dialog: 0 16px 64px #00000066;
+  color-scheme: dark;
+}
+/* Motion: things enter on a strong ease-out, move on ease-in-out, and stay
+ * short enough that repeated use never feels slow. Patterns adapted from
+ * motion-primitives and Magic UI (both MIT); see resources/licenses/motion-ui.txt. */
+:root,
+[data-showai-inline-root] {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+@keyframes showai-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+/* Overlays grow from slightly below full size, never from zero. */
+@keyframes showai-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes showai-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@keyframes showai-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* A highlight sweeping across text marks work in progress. */
+.showai-text-shimmer {
+  color: transparent;
+  background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--muted) 35%,
+      var(--text) 50%,
+      var(--muted) 65%,
+      var(--muted) 100%
+    )
+    0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: showai-shimmer 2s linear infinite;
+}
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+button {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus,
+textarea:focus {
+  outline: none;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--subtle);
+}
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

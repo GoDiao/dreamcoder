@@ -1,3 +1,6 @@
+import { Input } from '../shared/ui/input'
+import { Button } from '../shared/ui/button'
+import { FolderOpenIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from '../../i18n'
 import { terminalApi } from '../../api/terminal'
@@ -77,7 +80,7 @@ export function BashPathSettings() {
   }
 
   return (
-    <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
+    <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
       <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-primary)]">
         {t('settings.terminal.bashPathLabel')}
       </label>
@@ -85,38 +88,38 @@ export function BashPathSettings() {
         {t('settings.terminal.bashPathDescription')}
       </p>
       <div className="flex gap-2">
-        <input
+        <Input
+          aria-label={t('settings.terminal.bashPathLabel')}
+          aria-invalid={invalid}
           type="text"
           value={bashPath || ''}
           disabled={saving}
           onChange={(e) => { setBashPathDraft(e.target.value); setInvalid(false); setSaved(false); setSaveError(null) }}
           placeholder={t('settings.terminal.bashPathLabel')}
-          className="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-mono text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)]"
+          className="min-w-0 flex-1 font-mono"
         />
-        <button
+        <Button variant="outline"
           type="button"
           onClick={handleBrowse}
+          aria-label={t('settings.terminal.bashPathBrowse')}
           disabled={saving}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)]"
         >
-          <span className="material-symbols-outlined text-[16px]">folder_open</span>
-        </button>
-        <button
+          <FolderOpenIcon aria-hidden="true" size={16} />
+        </Button>
+        <Button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-text-primary)] px-3 text-xs font-medium text-[var(--color-surface)] transition-colors hover:opacity-90 disabled:opacity-50"
         >
           {saved ? t('settings.terminal.bashPathSaved') : t('settings.terminal.bashPathSave')}
-        </button>
-        <button
+        </Button>
+        <Button variant="outline"
           type="button"
           onClick={handleReset}
           disabled={saving || bashPath === null}
-          className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
         >
           {t('settings.terminal.bashPathReset')}
-        </button>
+        </Button>
       </div>
       {saveError && (
         <p role="alert" className="mt-1.5 text-xs text-[var(--color-error)]">{saveError}</p>

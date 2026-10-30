@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Modal } from './Modal'
 
@@ -31,7 +31,7 @@ describe('Modal', () => {
     expect(dialog.classList.contains('glass-panel-focus')).toBe(false)
   })
 
-  it('closes when the backdrop is clicked', () => {
+  it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     render(
       <Modal open onClose={onClose}>
@@ -39,10 +39,10 @@ describe('Modal', () => {
       </Modal>,
     )
 
-    const backdrop = screen.getByRole('dialog').previousElementSibling
-    expect(backdrop).not.toBeNull()
-    fireEvent.click(backdrop!)
-
-    expect(onClose).toHaveBeenCalledTimes(1)
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]')!
+    await waitFor(() => {
+      fireEvent.pointerDown(overlay, { pointerType: 'mouse', button: 0 })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
   })
 })

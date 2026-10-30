@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { Button } from '../shared/Button'
-import { Input } from '../shared/Input'
+import { Button } from '../shared/ui/button'
+import { LabeledInput } from '../shared/LabeledInput'
 import { McpEditorFields, McpEditorLayout, McpEditorSection } from './McpServerEditor'
 import { useTranslation } from '../../i18n'
 import { catalogScopeIsShadowed, prepareCatalogInstall } from '../../lib/mcpCatalogInstall'
@@ -112,15 +112,15 @@ export function McpCatalogInstall({ entry, servers, onCancel, onManual, onConfir
                     const required = variable.source !== 'optional' || entry.args.some((arg) => arg.includes(`{env:${variable.name}}`))
                     return (
                       <div key={variable.name} className="space-y-1">
-                        <Input
+                        <LabeledInput
                           label={variable.name}
+                          required={required}
+                          describedBy={`catalog-env-${variable.name}`}
                           type="password"
                           value={values[variable.name] ?? ''}
                           onChange={(event) => setValues((current) => ({ ...current, [variable.name]: event.target.value }))}
-                          required={required}
                           autoComplete="off"
                           spellCheck={false}
-                          aria-describedby={`catalog-env-${variable.name}`}
                         />
                         <p id={`catalog-env-${variable.name}`} className="text-xs text-[var(--color-text-secondary)]">
                           {variable.description} {!required && t('settings.mcp.install.optional')}

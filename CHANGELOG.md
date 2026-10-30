@@ -4,11 +4,35 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0-beta.2] — 2026-10-29
+
+A second pre-release of the Electron desktop app. Windows has still not been tested on real machines; reports are welcome in the Windows testing issue (#188).
+
+### Added
+
+- **The agent can show pages in the conversation** (#202). When a chart, a diagram or a walkthrough explains better than text, the agent builds a page from [ShowAI](https://github.com/Renaissance-Mind/ShowAI) components: charts and over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, step-by-step walkthroughs, comparison matrices, roadmaps, 3D scenes, PDFs and more, plus HTML it writes itself for what no component can draw. The page appears in a card in the conversation; each change is a new revision, and the card can be enlarged or opened in the side panel. Pages follow the app's light or dark theme and run in a sandbox that cannot reach the network, the app or your files. The page reader makes the macOS `.dmg` about 6 MB larger.
+- **A built-in browser** (#201). A side panel tab opens a local dev server, an HTML file in the project or an https site. Sign-ins are kept across restarts and cleared with "Clear browsing data"; other link types are offered to the system browser. Desktop app only.
+- **The side panel is a strip of tabs.** Changes, the file tree, single files, web pages, terminals and pages each open as a tab, from the new tab page or from the chat. Each session keeps its own tabs, and they come back after a restart, except terminals. The panel now runs the full window height with its tabs in the title row; one button at the top right opens and closes it, and the separate terminal button is gone. The H5 page offers file and page tabs only.
+
+### Changed
+
+- **The desktop interface is rebuilt on shadcn/ui** (#191). The app now runs on React 19, and buttons, dialogs, menus, notifications and panels share one set of components in all seven themes. Dialogs keep focus inside and return it when closed, and menus and the file tree work from the keyboard. Icons are lucide SVGs instead of the Material Symbols font. The H5 page needs Safari 17.5 or later.
+  - Code blocks are highlighted with Shiki in light and dark themes and show plain text while highlighting loads. Chat and workspace diffs are rendered with Pierre, with line comments and quoting of selected lines.
+  - A new conversation stays a local draft until the first message or attachment is sent. Opening a new conversation from the sidebar, a project or the keyboard shortcut no longer creates an empty session.
+  - The context button under the input shows usage as a ring; hover it for the breakdown. The task list shows how many steps are done.
+  - The model and effort are picked from two separate lists under the input. Typing while no text field has focus goes to the message input.
+
 ### Fixed
 
+- Tool calls that arrived after a reply fell back to a non-streaming request were missing from the conversation; they are now shown.
+- Read no longer rejects a text file when a model sends an empty page range.
+- A group of tool calls is no longer marked as failed when a failed call was followed by a successful call of the same tool; the failed call is still shown inside the group.
 - Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195).
 - Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).
 - When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
+- **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle.
+- Streamed replies from providers using the OpenAI Chat Completions format show their token usage and cost instead of 0 (#203). The request now asks for usage with `stream_options`, which backends such as Qwen (DashScope) and vLLM need before they report it.
+- An in-process teammate can no longer call `EnterWorktree` or `ExitWorktree` (#198). Teammates share one process with the lead, so entering a worktree moved the lead and every other teammate into it, and their reads, writes and commands ran there.
 
 ## [0.8.0-beta.1] — 2026-10-26
 

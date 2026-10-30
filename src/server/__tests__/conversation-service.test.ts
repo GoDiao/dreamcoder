@@ -374,6 +374,7 @@ describe('ConversationService', () => {
     expect(env.DREAMCODER_DESKTOP_SERVER_URL).toBe('http://127.0.0.1:3456')
     expect(env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING).toBe('1')
     expect(env.CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS).toBe('1')
+    expect(env.DREAMCODER_SHOW_UI).toBe('1')
   })
 
   test('uses bun entrypoint fallback on Windows dev mode', () => {

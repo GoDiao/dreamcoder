@@ -13,6 +13,9 @@ git clone https://github.com/<your-name>/dreamcoder.git && cd dreamcoder
 # 2. 装根工作区依赖（sidecar 运行时）
 bun install
 
+# ShowAI 页面阅读器及其依赖（vendor/showai）
+(cd vendor/showai && bun install)
+
 # 3. 装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
@@ -144,6 +147,9 @@ cd dreamcoder
 # Step 1: 安装根工作区依赖（sidecar：Anthropic SDK / AWS SDK / ink 等）
 bun install
 
+# ShowAI 页面阅读器及其依赖（vendor/showai）
+(cd vendor/showai && bun install)
+
 # Step 2: 安装桌面端依赖（Electron + React 前端）
 cd desktop && bun install
 
@@ -168,6 +174,12 @@ bun run electron:dev
 > `bun run electron:pack` 构建当前平台的安装包，产物在 `desktop/electron-release/`。
 >
 > 更多常见问题见 [TROUBLESHOOTING_zh.md](TROUBLESHOOTING_zh.md)。
+
+### 桌面 UI 组件
+
+桌面端使用 Radix 版本的 shadcn/ui，由 `desktop/components.json` 生成到 `desktop/src/components/shared/ui`。
+调用方直接使用这些组件；`desktop/src/components/shared` 里的组合组件只增加行为，不做改名或转发。
+[组件说明](../desktop/src/components/README.md)列出了全部组件、本地改动（`ui-` 命名空间的主题 token、Shiki、Pierre、H5 最低 Safari 17.5）以及用 shadcn CLI 更新组件的方法。
 
 ### 随包提供 ripgrep
 

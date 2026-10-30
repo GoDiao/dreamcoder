@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
+import { toast } from 'sonner'
 import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import type { PerSessionState } from '../../stores/chatStore'
 
@@ -980,6 +981,8 @@ describe('MessageList nested tool calls', () => {
     expect(screen.getByText('Saved 1 memory item(s)')).toBeTruthy()
     expect(screen.getByText('preferences.md')).toBeTruthy()
     expect(screen.getByText('Tool details')).toBeTruthy()
+    const preview = screen.getByRole('button', { name: '/Users/test/.claude/projects/example/memory/preferences.md' })
+    expect(preview).toBeTruthy()
     const memoryCardClassName = screen.getByTestId('memory-tool-activity-card').className
     expect(memoryCardClassName).toContain('border-[var(--color-memory-border)]')
     expect(memoryCardClassName).toContain('bg-[var(--color-memory-surface)]')
@@ -1606,10 +1609,10 @@ describe('MessageList nested tool calls', () => {
 
     const userText = screen.getByText('Please inspect the workspace selection behavior.')
     await selectMessageText(userText, 'workspace selection behavior')
-    const floatingAddButton = screen.getByRole('button', { name: 'Add to chat' })
+    const floatingAddButton = screen.getByRole('button', { name: 'Reply' })
 
-    expect(floatingAddButton.style.left).toBe('141px')
-    expect(floatingAddButton.style.top).toBe('26px')
+    expect(screen.getByRole('dialog', { name: 'Reply' }).parentElement?.parentElement).toBe(document.body)
+    expect(userText.closest('[data-message-shell]')?.contains(floatingAddButton)).toBe(false)
 
     fireEvent.click(floatingAddButton)
 
@@ -1644,7 +1647,7 @@ describe('MessageList nested tool calls', () => {
 
     const assistantText = screen.getByText(/First inspect the file tree/)
     await selectMessageText(assistantText, 'quote the selected lines')
-    fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
 
     expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB]).toMatchObject([
       {
@@ -1658,7 +1661,7 @@ describe('MessageList nested tool calls', () => {
     ])
   })
 
-  it('dismisses the selected-message action when clicking outside the popover', async () => {
+  it('closes the selected-message action but keeps the selection when pressing outside the popover', async () => {
     useChatStore.setState({
       sessions: {
         [ACTIVE_TAB]: makeSessionState({
@@ -1676,15 +1679,31 @@ describe('MessageList nested tool calls', () => {
 
     const assistantText = screen.getByText(/Clicking outside should clear/)
     await selectMessageText(assistantText, 'selected reply')
-    expect(screen.getByRole('button', { name: 'Add to chat' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
 
     await act(async () => {
       fireEvent.pointerDown(document.body)
       await Promise.resolve()
     })
 
-    expect(screen.queryByRole('button', { name: 'Add to chat' })).toBeNull()
-    expect(window.getSelection()?.toString()).toBe('')
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    expect(window.getSelection()?.toString()).toBe('selected reply')
+  })
+
+  it.each(['scroll', 'resize', 'escape'])('dismisses a reply selection on %s', async (action) => {
+    useChatStore.setState({ sessions: {
+      [ACTIVE_TAB]: makeSessionState({ messages: [{ id: 'assistant-1', type: 'assistant_text', content: 'Reply to this selection.', timestamp: 1 }] }),
+    } })
+    render(<MessageList />)
+    await selectMessageText(screen.getByText('Reply to this selection.'), 'this selection')
+    const button = screen.getByRole('button', { name: 'Reply' })
+    await act(async () => {
+      if (action === 'escape') fireEvent.keyDown(button, { key: 'Escape' })
+      else fireEvent(window, new Event(action))
+    })
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB] ?? []).toEqual([])
+    expect(window.getSelection()?.toString()).toBe('this selection')
   })
 
   it('keeps only the latest selected-message action when selecting across messages', async () => {
@@ -1714,7 +1733,7 @@ describe('MessageList nested tool calls', () => {
     const firstText = screen.getByText(/First assistant reply/)
     const secondText = screen.getByText(/Second assistant reply/)
     await selectMessageText(firstText, 'First assistant reply')
-    expect(screen.getAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1)
 
     await act(async () => {
       fireEvent.pointerDown(secondText)
@@ -1722,8 +1741,8 @@ describe('MessageList nested tool calls', () => {
     })
     await selectMessageText(secondText, 'Second assistant reply')
 
-    expect(screen.getAllByRole('button', { name: 'Add to chat' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
+    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
     expect(useWorkspaceChatContextStore.getState().referencesBySession[ACTIVE_TAB]).toMatchObject([
       {
         messageId: 'assistant-2',
@@ -2855,7 +2874,7 @@ describe('MessageList nested tool calls', () => {
     expect(branchButtons[1]!.closest('[data-message-actions]')).toBe(
       screen.getByRole('button', { name: 'Copy reply' }).closest('[data-message-actions]')
     )
-    expect(branchButtons[1]?.getAttribute('title')).toBe('Fork a new conversation')
+    expect(branchButtons[1]?.getAttribute('aria-label')).toBe('Fork a new conversation')
 
     fireEvent.click(branchButtons[1]!)
 
@@ -2870,11 +2889,7 @@ describe('MessageList nested tool calls', () => {
       title: 'Branched session',
       type: 'session',
     })
-    const toasts = useUIStore.getState().toasts
-    expect(toasts[toasts.length - 1]).toMatchObject({
-      type: 'success',
-      message: 'Created forked conversation "Branched session".',
-    })
+    expect(toast.success).toHaveBeenLastCalledWith('Created forked conversation "Branched session".')
   })
 
   it('hides branch actions while the current session is still running', () => {
@@ -3121,7 +3136,7 @@ describe('MessageList nested tool calls', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
     const diffSurface = await screen.findByTestId('workspace-code')
-    expect(diffSurface.textContent).toContain('+new')
+    await waitFor(() => expect(diffSurface.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-code]')?.textContent).toContain('new'))
     expect(sessionsApi.getTurnCheckpointDiff).toHaveBeenCalledWith(
       ACTIVE_TAB,
       'user-1',
@@ -3473,7 +3488,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList />)
 
-    const historicalCard = (await screen.findByText('src/first.ts')).closest('section')
+    const historicalCard = (await screen.findAllByRole('region', { name: 'Turn changed files' })).find((card) => within(card).queryByText('src/first.ts'))
     expect(historicalCard).toBeTruthy()
     fireEvent.click(
       within(historicalCard as HTMLElement).getByRole('button', {
@@ -3482,7 +3497,7 @@ describe('MessageList nested tool calls', () => {
     )
 
     expect(sessionsApi.rewind).not.toHaveBeenCalled()
-    const dialog = await screen.findByRole('dialog', { name: 'Rewind to before this turn?' })
+    const dialog = await screen.findByRole('alertdialog', { name: 'Rewind to before this turn?' })
     expect(
       within(dialog).getByText(
         'This will rewind the conversation to before this turn and restore tracked files for that checkpoint.',

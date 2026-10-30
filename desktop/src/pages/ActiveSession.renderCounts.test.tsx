@@ -19,6 +19,7 @@ vi.mock('../api/sessions', () => ({
 
 vi.mock('../hooks/useMobileViewport', () => ({
   useMobileViewport: () => false,
+  useViewportQuery: () => false,
 }))
 
 vi.mock('../components/chat/MessageList', () => ({

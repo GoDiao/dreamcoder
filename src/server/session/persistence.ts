@@ -1,3 +1,4 @@
+import { listUiPages } from '../../utils/uiPages.js'
 import { diagnosticsService } from '../services/diagnosticsService.js'
 import { sessionService } from '../services/sessionService.js'
 import { conversationService } from '../services/conversationService.js'
@@ -9,6 +10,8 @@ const settingsService = new SettingsService()
 
 export async function restoreSessionFields(sessionId: string): Promise<RestoredSessionFields | null> {
   const info = await sessionService.getSessionRestoreInfo(sessionId).catch(() => null)
+  const dataDir = await sessionService.getSessionDataDir(sessionId).catch(() => null)
+  const uiPages = dataDir ? await listUiPages(dataDir) : []
   const permissionMode = info?.permissionMode ?? await settingsService.getPermissionMode().catch(() => 'default' as const)
   return {
     permissionMode,
@@ -20,6 +23,7 @@ export async function restoreSessionFields(sessionId: string): Promise<RestoredS
       ...(info?.repository ? { repository: info.repository } : {}),
       workDirExists: info?.workDirExists ?? false,
     },
+    uiPages,
   }
 }
 

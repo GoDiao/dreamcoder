@@ -1,0 +1,609 @@
+.container-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  background: var(--paper, var(--bg));
+  color: var(--text, var(--ink));
+}
+.container-workspace-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 4px 18px;
+  border-bottom: 1px solid var(--line, var(--border));
+  flex-shrink: 0;
+  z-index: 30;
+  background: var(--paper, var(--bg));
+}
+.container-workspace-bar nav {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.container-workspace-bar nav > span {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.container-workspace button,
+.container-workspace summary {
+  font: inherit;
+}
+.container-workspace-bar button,
+.container-menu summary,
+.container-menu button,
+.container-activation button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.container-workspace-bar nav button span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.container-workspace button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.container-workspace button:focus-visible,
+.container-workspace summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.container-workspace-bar button:hover,
+.container-menu summary:hover,
+.container-menu button:hover,
+.container-activation button:hover {
+  background: var(--hover, #00000006);
+}
+.container-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.container-page {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+  background: var(--paper, var(--bg));
+}
+.container-page-column {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 40px 96px;
+  min-width: 0;
+}
+.container-page[data-width-mode="wide"] > .container-page-column {
+  max-width: 1500px;
+}
+.container-page[data-width-mode="full"] > .container-page-column {
+  max-width: none;
+}
+.container-page-heading {
+  margin: 12px 0 24px;
+}
+.page-document-flow {
+  border: 0;
+  padding: 0;
+}
+.page-document-module {
+  margin: 20px 0;
+  font-size: 14px;
+}
+.page-document-module .document-content {
+  min-height: 80px;
+}
+.container-page-heading h1,
+.container-page-heading .surface-page-title {
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--text, var(--ink));
+  width: 100%;
+  max-width: 100%;
+}
+.container-page .surface-layout-flow > .surface-object {
+  margin: 22px 0;
+}
+.container-page .surface-layout-flow > .surface-object.is-region {
+  margin: 18px 0;
+}
+.container-page
+  .surface-layout-flow
+  > .surface-object.is-region
+  > .surface-object-content {
+  padding: 14px 20px;
+}
+.container-menu {
+  position: relative;
+}
+.container-menu summary {
+  list-style: none;
+  user-select: none;
+}
+.container-menu summary::-webkit-details-marker {
+  display: none;
+}
+.container-menu > div {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  min-width: 170px;
+  padding: 6px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 8px 24px #00000010;
+}
+.container-menu > div > button {
+  display: flex;
+  width: 100%;
+  white-space: nowrap;
+}
+.surface-toolbar .container-menu > div {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+.container-board {
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  background: var(--paper, var(--bg));
+  isolation: isolate;
+}
+.container-board-scene {
+  height: 100%;
+  min-height: 0;
+}
+.container-board-scene.is-passive {
+  pointer-events: none;
+}
+.container-board-enter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.container-board-enter:hover,
+.container-board-enter:focus-visible {
+  background: #ffffff24;
+  color: var(--muted);
+}
+.container-activation {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  background: var(--paper, var(--bg));
+}
+.container-activation button[aria-pressed="true"] {
+  color: var(--accent);
+}
+.surface-object.is-container > .surface-object-content {
+  padding: 0;
+  height: calc(100% - 32px);
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0 0 8px 8px;
+}
+.surface-object.is-container {
+  border-color: var(--line, var(--border));
+}
+.surface-object.is-container:not([style*="height:"]) > .surface-object-content {
+  height: auto;
+}
+.surface-object.is-container > .surface-object-content > .page-outline-shell > .container-page {
+  min-height: 120px;
+}
+.surface-object.is-container .container-page-column {
+  padding: 20px 24px 56px;
+}
+.surface-object.is-container
+  > .surface-object-content
+  > .page-outline-shell
+  > .container-page[data-frameless="true"] {
+  min-height: 0;
+}
+.surface-object.is-container
+  .container-page[data-frameless="true"]
+  > .container-page-column {
+  padding: 4px 8px;
+}
+.surface-object.is-drawing > .surface-object-content {
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.surface-object.is-drawing {
+  border: 0;
+  border-radius: 0;
+}
+.surface-object.is-drawing > .surface-object-header {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  min-width: 150px;
+  background: var(--paper, var(--bg));
+  display: none;
+  z-index: 5;
+}
+.surface-object.is-drawing.is-hovered > .surface-object-header,
+.surface-object.is-drawing.is-selected > .surface-object-header {
+  display: flex;
+}
+.board-drawing {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.surface-object.is-drawing > .surface-object-content {
+  position: relative;
+}
+.board-drawing-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text, var(--ink));
+  font-family: inherit;
+  font-weight: 500;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: none;
+}
+.board-drawing-label > span {
+  max-width: 100%;
+}
+.board-drawing-label[data-tool="arrow"] {
+  width: max-content;
+  max-width: 240px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--paper, var(--bg));
+  transform: translate(-50%, -50%);
+}
+.board-drawing-label[data-editing] {
+  pointer-events: auto;
+}
+.board-drawing-label[data-tool="arrow"][data-editing] {
+  min-width: 96px;
+}
+.board-drawing-label textarea {
+  display: block;
+  width: 100%;
+  min-height: 1lh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  caret-color: #467de3;
+}
+.board-drawing-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 16;
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+}
+.board-pen-color {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+}
+.container-board .surface-toolbar {
+  max-width: calc(100% - 20px);
+  gap: 2px;
+  overflow: visible;
+  z-index: 25;
+}
+.container-board .surface-toolbar button[aria-pressed="true"] {
+  background: var(--hover, #00000009);
+  color: var(--accent);
+}
+.container-board .surface-toolbar button {
+  flex-shrink: 0;
+}
+.container-board .surface-empty {
+  pointer-events: none;
+}
+.container-inspector {
+  position: absolute;
+  right: 12px;
+  top: 46px;
+  bottom: auto;
+  max-height: calc(100% - 70px);
+  z-index: 50;
+  box-shadow: 0 8px 32px #00000010;
+}
+@media (max-width: 650px) {
+  .container-page-column {
+    padding: 20px 18px 80px;
+  }
+  .container-workspace-bar {
+    padding: 4px 8px;
+  }
+  .container-workspace-bar nav button span {
+    max-width: 110px;
+  }
+  .container-board .surface-toolbar {
+    gap: 0;
+    padding: 4px;
+  }
+  .container-board .surface-toolbar button {
+    padding: 5px;
+    min-width: 24px;
+  }
+  .container-board .surface-toolbar .surface-toolbar-divider {
+    margin: 0 2px;
+  }
+}
+@media print {
+  .container-workspace,
+  .container-main,
+  .container-page,
+  .container-page-column {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    max-width: none !important;
+  }
+  .container-workspace-bar,
+  .container-activation,
+  .container-board-enter,
+  .board-drawing-input,
+  .container-inspector,
+  .surface-object-header {
+    display: none !important;
+  }
+  .container-page-column {
+    padding: 0 !important;
+  }
+  .surface-object.is-container {
+    height: auto !important;
+    break-inside: auto;
+  }
+  .surface-object.is-container > .surface-object-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .container-board,
+  .container-board-scene,
+  .container-board .page-surface,
+  .container-board .surface-scroll {
+    height: auto !important;
+    position: static !important;
+    overflow: visible !important;
+  }
+  .container-board .surface-object.is-drawing {
+    position: relative !important;
+    min-height: 60px;
+  }
+}
+.surface-editor-shell > .container-workspace {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+.portable-app:has(> .container-workspace) {
+  height: 100dvh;
+}
+.portable-app > .container-workspace {
+  height: 100%;
+}
+.container-inspector {
+  margin: 0;
+  width: 250px;
+  right: 12px;
+  top: 46px;
+  position: absolute;
+}
+@media print {
+  .portable-app:has(> .container-workspace) {
+    height: auto !important;
+  }
+}
+.container-page .surface-layout-flow > div:not(:last-child) .document-content {
+  min-height: 0;
+}
+.container-board .surface-toolbar {
+  width: max-content;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.container-file-error {
+  position: absolute;
+  bottom: 50px;
+  left: 12px;
+  right: 12px;
+  padding: 8px 12px;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  font-size: 12px;
+  border-radius: 6px;
+  z-index: 60;
+}
+@media print {
+  .container-board .page-surface {
+    position: relative !important;
+    height: var(--board-print-height, 420px) !important;
+    min-height: 0 !important;
+    break-inside: avoid;
+  }
+  .container-board .surface-scroll {
+    position: absolute !important;
+    inset: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  .container-board .surface-world {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    transform: var(--board-print-transform, none) !important;
+    transform-origin: 0 0 !important;
+  }
+  .container-board .surface-world > .surface-object {
+    position: absolute !important;
+    margin: 0 !important;
+  }
+  .container-board .surface-world > .surface-object.is-container,
+  .container-board .surface-world > .surface-object.is-drawing {
+    height: var(--frame-height, 460px) !important;
+    min-height: 0 !important;
+  }
+  .container-board .surface-object.is-container > .surface-object-header {
+    display: flex !important;
+  }
+  .container-board
+    .surface-object.is-container
+    > .surface-object-header
+    button {
+    display: none !important;
+  }
+  .container-board .surface-object.is-container > .surface-object-content {
+    height: calc(100% - 32px) !important;
+    overflow: hidden !important;
+  }
+  .container-board
+    .surface-object.is-container
+    > .surface-object-content
+    > .page-outline-shell
+    > .container-page {
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+}
+.container-workspace {
+  isolation: isolate;
+}
+@media print {
+  .container-board .surface-world > .surface-object,
+  .container-board .surface-layout-free > .surface-object {
+    position: absolute !important;
+    left: var(--frame-x, 0px) !important;
+    top: var(--frame-y, 0px) !important;
+    width: var(--frame-width, 360px) !important;
+  }
+  .container-board .surface-layout-free {
+    position: relative !important;
+    min-height: var(--free-height, 200px) !important;
+  }
+}
+
+/* Geometry owns drawing hits; transparent SVG viewports never cover other objects. */
+.surface-object[data-board-drawing="true"],
+.surface-object[data-board-drawing="true"] > .surface-object-content {
+  pointer-events: none;
+}
+.surface-object[data-board-drawing="true"] [data-surface-ui] {
+  pointer-events: auto;
+}
+.surface-object.is-drawing:focus-within {
+  z-index: auto;
+}
+.surface-object.is-drawing:not(.is-selected) > .board-resize-handle {
+  display: none;
+}
+.board-object-outline {
+  position: absolute;
+  pointer-events: none;
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
+}
+.surface-object[data-erasing="true"] .board-drawing-selection,
+.surface-object[data-erasing="true"]
+  > :is(.board-resize-handle, .surface-object-rotate, .board-lock-badge) {
+  display: none;
+}
+.board-drawing-selection {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.surface-object.is-drawing > .board-resize-handle::after,
+.board-group-outline[data-drawing-selection="true"]
+  > .board-resize-handle::after {
+  border-radius: 50%;
+}
+.surface-object.is-drawing.is-hovered:not(.is-selected) .board-drawing {
+  filter: none;
+}
+@media print {
+  .board-object-outline,
+  .board-drawing-selection {
+    display: none;
+  }
+}
+
+.page-surface.has-drawing-hit {
+  cursor: move;
+}
+
+/* The workspace Board fills the window; a focus ring around all of it only
+   adds noise. Embedded Boards keep their ring. */
+.container-board.is-root
+  > .container-board-scene
+  > .page-surface:focus-visible {
+  outline: none;
+}
+
+/* A selected Page moves as a whole, including over its nested editor/iframe. */
+.board-selection-drag-area {
+  outline: none;
+  pointer-events: auto;
+  z-index: 2;
+  touch-action: none;
+  cursor: move;
+}

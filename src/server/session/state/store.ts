@@ -144,6 +144,7 @@ export class SessionStateStore {
       workspace: touched.has('workspace') && current.workspace.workDir
         ? { ...fields.workspace, workDir: current.workspace.workDir, workDirExists: current.workspace.workDirExists }
         : fields.workspace,
+      uiPages: fields.uiPages,
     }
   }
 }

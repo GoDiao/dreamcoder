@@ -191,9 +191,9 @@ describe('components still update on the fields they use', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '/deploy', selectionStart: 7 } })
     expect(screen.getAllByRole('button').some((button) => button.textContent?.startsWith('/deploy-now'))).toBe(true)
 
-    expect(screen.queryByTitle('Stop generation (Cmd+.)')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
     patchSession({ chatState: 'streaming' })
-    expect(screen.getByTitle('Stop generation (Cmd+.)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
   })
 
   it('StreamingIndicator follows statusVerb, tokenUsage and apiRetry', () => {

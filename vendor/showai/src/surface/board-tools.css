@@ -1,0 +1,268 @@
+.board-tool-stack {
+  position: relative;
+  --board-tool-width: 34px;
+}
+.board-tool-buttons,
+.board-tool-keys {
+  box-sizing: border-box;
+  width: 100%;
+  grid-template-columns: repeat(var(--board-tool-count), minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(
+    var(--board-tool-count),
+    var(--board-tool-width)
+  );
+  gap: 2px;
+}
+.surface-toolbar .board-tool-buttons button {
+  width: var(--board-tool-width);
+  min-width: 0;
+  padding-inline: 0;
+}
+.board-tool-shortcuts {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.board-tool-keys {
+  padding-block: 5px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 3px 12px #00000008;
+}
+.board-tool-keys kbd {
+  text-align: center;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.surface-toolbar .board-tool-disclosure {
+  min-width: 24px;
+  min-height: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 5px;
+  background: var(--paper, var(--bg));
+  margin-bottom: 2px;
+}
+@media (max-width: 650px) {
+  .board-tool-stack {
+    --board-tool-width: 24px;
+  }
+}
+
+@media (pointer: coarse) {
+  .board-tool-shortcuts {
+    display: none;
+  }
+  .board-tool-stack {
+    --board-tool-width: 36px;
+  }
+}
+.board-writing-options {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.board-writing-options details > summary {
+  display: flex;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.board-writing-options details[open] > div {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  padding: 12px;
+  min-width: 190px;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  box-shadow: 0 4px 20px #0002;
+}
+.board-writing-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.page-surface[data-board-tool="pan"] {
+  cursor: grab;
+}
+.page-surface[data-board-tool="eraser"] .board-drawing-input {
+  cursor: crosshair;
+}
+.board-style-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.board-style-section + .board-style-section {
+  border-inline-start: 1px solid var(--line, var(--border));
+  padding-inline-start: 8px;
+}
+.board-label-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 4px;
+  color: var(--muted, inherit);
+}
+.board-label-size select {
+  height: 26px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, inherit);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.board-label-size select:hover,
+.board-label-size select:focus-visible {
+  background: var(--hover, color-mix(in srgb, currentColor 8%, transparent));
+}
+.board-width-controls,
+.board-width-controls > label,
+.board-pressure-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.board-color-picker {
+  position: relative;
+}
+.board-color-picker > summary {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px var(--paper, var(--bg)),
+    0 0 0 1px var(--line, var(--border));
+  cursor: pointer;
+  list-style: none;
+}
+.board-color-picker > summary::-webkit-details-marker {
+  display: none;
+}
+.board-color-menu {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 12px);
+  right: 0;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  box-shadow: 0 5px 20px #0002;
+}
+.board-color-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 8px;
+}
+.surface-toolbar .board-color-presets button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #8885;
+}
+.surface-toolbar .board-color-presets button[aria-pressed="true"] {
+  outline: 2px solid var(--accent, #467de3);
+  outline-offset: 2px;
+}
+.board-color-menu .board-full-palette {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--line, var(--border));
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 12px;
+}
+.surface-toolbar .board-pressure-toggle {
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 6px;
+  padding: 4px;
+}
+.board-pressure-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+.board-pressure-toggle[aria-pressed="true"] {
+  background: var(--hover);
+  color: var(--accent, #467de3);
+}
+
+/* Swatches and labels share the tool buttons' 32px content height. */
+.surface-toolbar .board-color-picker > summary {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 50%;
+}
+.surface-toolbar
+  :is(.board-color-empty, .board-color-picker > summary[data-empty]) {
+  background-color: #fff;
+  background-image: linear-gradient(
+    135deg,
+    transparent 46%,
+    #df4545 47%,
+    #df4545 53%,
+    transparent 54%
+  );
+}
+.board-toolbar-inline-properties .board-style-controls {
+  height: 32px;
+  box-sizing: border-box;
+  padding-block: 0;
+}
+.board-toolbar-inline-properties .board-style-section {
+  font-size: 11px;
+  line-height: 16px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-width-controls
+  > label {
+  flex-direction: column;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-inline-properties
+  .board-style-controls {
+  height: auto;
+}
+
+@media (pointer: coarse) {
+  .board-color-presets {
+    grid-template-columns: repeat(4, 36px);
+  }
+  .surface-toolbar .board-color-presets button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}

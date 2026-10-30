@@ -9,6 +9,7 @@ import {
   Notification,
   protocol,
   screen,
+  session,
   shell,
   Tray,
   type MenuItemConstructorOptions,
@@ -17,16 +18,26 @@ import {
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { ElectronDialogFilter, ElectronOpenDialogInput } from '../src/lib/shell/electronBridge'
+import { BROWSER_PARTITION, type ElectronDialogFilter, type ElectronOpenDialogInput } from '../src/lib/shell/electronBridge'
 import {
   appModeLocations,
   clearPortableEnvForRestart,
   CONFIG_DIR_ENV,
   currentAppMode,
   determineStartupPortableDir,
+  electronUserDataDir,
   PORTABLE_MARKER_ENV,
   setAppMode,
 } from './appMode'
+import {
+  classifyUrl,
+  installBrowser,
+  PROJECT_SCHEME,
+  ProjectRoots,
+  resolveBrowserInput,
+  systemTargetFor,
+} from './browser'
+import { isAllowedFrameNavigation } from './frameNavigation'
 import { writeSessionExport } from './sessionExport'
 import { devSidecarPaths, startSidecar, type SidecarPaths, type SidecarRuntime } from './sidecar'
 import {
@@ -51,6 +62,7 @@ const CONTENT_SECURITY_POLICY = [
   "font-src 'self' data:",
   "connect-src 'self' ws://127.0.0.1:* http://127.0.0.1:* ws://localhost:* http://localhost:*",
   "media-src 'self' blob:",
+  "frame-src http://127.0.0.1:* http://localhost:*",
 ].join('; ')
 const WINDOW_STATE_SAVE_DELAY_MS = 300
 const IS_MAC = process.platform === 'darwin'
@@ -58,6 +70,7 @@ const IS_WINDOWS = process.platform === 'win32'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  { scheme: PROJECT_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ])
 
 const locations = appModeLocations(process.execPath, app.getPath('userData'))
@@ -67,9 +80,10 @@ if (startupPortableDir) {
   process.env[PORTABLE_MARKER_ENV] = '1'
 }
 if (process.env[CONFIG_DIR_ENV]) {
-  app.setPath('userData', path.join(process.env[CONFIG_DIR_ENV], 'Electron'))
+  app.setPath('userData', electronUserDataDir(process.env[CONFIG_DIR_ENV]))
 }
 
+const projectRoots = new ProjectRoots()
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let sidecar: SidecarRuntime | null = null
@@ -271,6 +285,29 @@ const handlers: Record<string, Handler> = {
     await shell.openExternal(url)
     return true
   },
+  browser_resolve: (args) => resolveBrowserInput(
+    String(args.input),
+    typeof args.projectRoot === 'string' ? args.projectRoot : null,
+    projectRoots,
+  ),
+  browser_open_in_system: async (args) => {
+    const target = await systemTargetFor(String(args.url), projectRoots)
+    if (!target) throw new Error(`refusing to open ${String(args.url)}`)
+    if (target.kind === 'url') return shell.openExternal(target.value)
+    const failure = await shell.openPath(target.value)
+    if (failure) throw new Error(failure)
+  },
+  browser_open_protocol: (args) => {
+    const url = String(args.url)
+    if (classifyUrl(url, projectRoots) !== 'external') throw new Error(`refusing to open ${url}`)
+    return shell.openExternal(url)
+  },
+  browser_clear_data: async () => {
+    const browserSession = session.fromPartition(BROWSER_PARTITION)
+    await browserSession.clearStorageData()
+    await browserSession.clearCache()
+    await browserSession.clearAuthCache()
+  },
   request_attention: () => {
     if (IS_MAC) app.dock?.bounce('critical')
     else window().flashFrame(true)
@@ -358,13 +395,25 @@ function createWindow(startUrl: string) {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
+  })
+  installBrowser({
+    host: win.webContents,
+    session: session.fromPartition(BROWSER_PARTITION),
+    roots: projectRoots,
+    readFile: (file) => net.fetch(pathToFileURL(file).toString()),
+    notify: emit,
   })
   const restoreMaximized = restoreWindowBounds(win)
   const startOrigin = new URL(startUrl).origin
   win.webContents.setWindowOpenHandler(({ url }) => {
     void openExternal(url).catch((error) => console.error('[electron] open external failed', error))
     return { action: 'deny' }
+  })
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame || isAllowedFrameNavigation(event.url)) return
+    event.preventDefault()
   })
   win.webContents.on('will-navigate', (event, url) => {
     if (new URL(url).origin === startOrigin) return

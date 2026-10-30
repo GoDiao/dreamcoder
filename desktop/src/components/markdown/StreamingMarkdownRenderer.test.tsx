@@ -58,14 +58,14 @@ describe('StreamingMarkdownRenderer', () => {
     expect(container.querySelector('tbody tr:last-child td')).toHaveTextContent('valid')
   })
 
-  it('renders an unclosed code fence as code with the lightweight highlighter', () => {
+  it('renders an unclosed code fence as code with the shared highlighter', () => {
     const { getByTestId } = render(
       <StreamingMarkdownRenderer content={'Example:\n\n```ts\nconst a = 1\nconst b'} />,
     )
     const code = getByTestId('code-viewer')
     expect(code).toHaveTextContent('const a = 1 const b')
     expect(code).toHaveAttribute('data-language', 'ts')
-    expect(code).toHaveAttribute('data-highlighter', 'prism')
+    expect(code).toHaveAttribute('data-highlighter', 'shiki')
   })
 
   it('shows half-written math as text and renders it once it closes', () => {

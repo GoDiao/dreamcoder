@@ -72,6 +72,7 @@ import type { PermissionDecision } from '../../utils/permissions/PermissionResul
 import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.js'
 import { readFileInRange } from '../../utils/readFileInRange.js'
 import { semanticNumber } from '../../utils/semanticNumber.js'
+import { semanticOptionalString } from '../../utils/semanticOptionalString.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
 import { getDefaultFileReadingLimits } from './limits.js'
@@ -233,12 +234,9 @@ const inputSchema = lazySchema(() =>
     limit: semanticNumber(z.number().int().positive().optional()).describe(
       'The number of lines to read. Only provide if the file is too large to read at once.',
     ),
-    pages: z
-      .string()
-      .optional()
-      .describe(
-        `Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files. Maximum ${PDF_MAX_PAGES_PER_READ} pages per request.`,
-      ),
+    pages: semanticOptionalString(z.string().optional()).describe(
+      `Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files. Maximum ${PDF_MAX_PAGES_PER_READ} pages per request.`,
+    ),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>

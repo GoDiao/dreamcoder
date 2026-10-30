@@ -1,5 +1,7 @@
+import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import type { CSSProperties } from 'react'
 import { PanelLeft } from 'lucide-react'
+import { Button } from '../shared/ui/button'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 
@@ -18,19 +20,20 @@ export function TitlebarSidebarToggle({ className = '', style }: { className?: s
   const label = sidebarOpen ? t('sidebar.collapse') : t('sidebar.expand')
 
   return (
-    <button
+    <HintTooltip content={label}><Button
+      variant="ghost"
+      size="icon-sm"
       type="button"
       data-testid="titlebar-sidebar-toggle"
       onClick={toggleSidebar}
       aria-label={label}
       aria-expanded={sidebarOpen}
       aria-controls="sidebar-shell"
-      title={label}
       disabled={settingsOpen}
       style={style}
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:invisible ${className}`}
+      className={`rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:invisible ${className}`}
     >
       <PanelLeft size={17} strokeWidth={1.9} aria-hidden="true" />
-    </button>
+    </Button></HintTooltip>
   )
 }

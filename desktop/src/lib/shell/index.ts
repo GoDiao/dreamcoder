@@ -1,5 +1,12 @@
 import type { AppMode, AppModeConfig } from '../../types/settings'
-import { ELECTRON_BRIDGE_KEY, type ElectronDialogFilter, type ElectronOpenDialogInput, type ElectronShellBridge } from './electronBridge'
+import {
+  ELECTRON_BRIDGE_KEY,
+  type BrowserRefusal,
+  type BrowserResolveResult,
+  type ElectronDialogFilter,
+  type ElectronOpenDialogInput,
+  type ElectronShellBridge,
+} from './electronBridge'
 
 export type Unlisten = () => void
 
@@ -110,6 +117,37 @@ export function pickExportPath(options: { defaultPath: string; filters: Electron
 
 export function openExternalLink(url: string) {
   return invoke<void>('open_external', { url })
+}
+
+export type BrowserBlockedEvent = { guestId: number; url: string; reason: BrowserRefusal }
+export type BrowserShortcutEvent = Pick<KeyboardEventInit, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>
+
+export function resolveBrowserInput(input: { input: string; projectRoot: string | null }) {
+  return invoke<BrowserResolveResult>('browser_resolve', input)
+}
+
+export function openBrowserUrlInSystem(url: string) {
+  return invoke<void>('browser_open_in_system', { url })
+}
+
+export function openBrowserExternalProtocol(url: string) {
+  return invoke<void>('browser_open_protocol', { url })
+}
+
+export function clearBrowserData() {
+  return invoke<void>('browser_clear_data')
+}
+
+export function onBrowserBlocked(handler: (event: BrowserBlockedEvent) => void): Promise<Unlisten> {
+  return listen<BrowserBlockedEvent>('browser-blocked', handler)
+}
+
+export function onBrowserExternalRequest(handler: (event: { url: string }) => void): Promise<Unlisten> {
+  return listen<{ url: string }>('browser-external-request', handler)
+}
+
+export function onBrowserShortcut(handler: (event: BrowserShortcutEvent) => void): Promise<Unlisten> {
+  return listen<BrowserShortcutEvent>('browser-shortcut', handler)
 }
 
 export async function getAppWindow(): Promise<AppWindow> {

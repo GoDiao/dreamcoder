@@ -171,6 +171,10 @@ describe('ProviderFormModal create mode', () => {
   })
 
   it('picks a discovered model with the keyboard', async () => {
+    discoverModelsMock.mockResolvedValueOnce([
+      { id: 'model-old', name: 'Old Model' },
+      { id: 'model-new', name: 'New Model' },
+    ])
     render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
 
     await act(async () => {
@@ -184,7 +188,49 @@ describe('ProviderFormModal create mode', () => {
 
     expect(input).toHaveValue('model-new')
     expect(screen.getByDisplayValue('New Model')).toBeInTheDocument()
-    expect(input).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('listbox', { name: 'Model ID' })).not.toBeInTheDocument()
+  })
+
+  it('keeps typed text that prefixes a listed model when Enter is pressed', async () => {
+    discoverModelsMock.mockResolvedValueOnce([{ id: 'model-new-large', name: 'New Large Model' }])
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'model-new' } })
+    const options = screen.getAllByRole('option')
+    expect(options[0]).toHaveTextContent('Use "model-new"')
+    expect(options[1]).toHaveTextContent('New Large Model')
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(input).toHaveValue('model-new')
+    expect(screen.queryByDisplayValue('New Large Model')).not.toBeInTheDocument()
+    expect(screen.queryByRole('listbox', { name: 'Model ID' })).not.toBeInTheDocument()
+  })
+
+  it('does not offer the typed id when it already matches a listed model', async () => {
+    discoverModelsMock.mockResolvedValueOnce([
+      { id: 'model-new-large', name: 'New Large Model' },
+      { id: 'model-new', name: 'New Model' },
+    ])
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+    })
+    const input = screen.getByRole('combobox', { name: 'Model ID' })
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'model-new' } })
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(2)
+    expect(options[0]).toHaveTextContent('New Model')
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(input).toHaveValue('model-new')
+    expect(screen.getByDisplayValue('New Model')).toBeInTheDocument()
   })
 
   it('closes the model suggestions instead of the modal when Escape reaches an option', async () => {
@@ -197,7 +243,6 @@ describe('ProviderFormModal create mode', () => {
     const input = screen.getByRole('combobox', { name: 'Model ID' })
     fireEvent.focus(input)
     const option = screen.getByRole('option', { name: /New Model/ })
-    expect(option).toHaveAttribute('tabindex', '-1')
 
     fireEvent.keyDown(option, { key: 'Escape' })
 
@@ -411,7 +456,7 @@ describe('ProviderFormModal edit mode', () => {
       />,
     )
 
-    expect(screen.getByLabelText('Fast model')).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Fast model' })).toHaveTextContent('Use selected model')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -419,6 +464,19 @@ describe('ProviderFormModal edit mode', () => {
       providerWithoutFast.id,
       expect.objectContaining({ fastModel: null }),
     ))
+  })
+
+  it('labels the API format and auth variable selects', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
+
+    const apiFormat = screen.getByRole('combobox', { name: 'API Format' })
+    const authStrategy = screen.getByRole('combobox', { name: 'Auth Variable' })
+    expect(apiFormat).toHaveTextContent('Anthropic Messages (native)')
+    expect(screen.getByLabelText('API Format')).toBe(apiFormat)
+    expect(screen.getByLabelText('Auth Variable')).toBe(authStrategy)
+    expect(authStrategy).toHaveTextContent('Bearer Token (ANTHROPIC_AUTH_TOKEN)')
+    expect(authStrategy).toHaveAccessibleDescription('Most third-party Anthropic-compatible services using Authorization Bearer.')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
   })
 
   it('enables saving after deleting a model with an invalid context window', async () => {
@@ -484,7 +542,8 @@ describe('ProviderFormModal edit mode', () => {
       <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
     )
 
-    fireEvent.change(screen.getByLabelText('Fast model'), { target: { value: '' } })
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Fast model' }), { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByRole('option', { name: 'Use selected model' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -563,8 +622,8 @@ describe('ProviderFormModal edit mode', () => {
     const hint = 'Model IDs can differ between API formats. Fetch models again and check the list below.'
     expect(screen.queryByText(hint)).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Anthropic Messages/ }))
-    fireEvent.click(screen.getByRole('button', { name: /OpenAI Chat Completions/ }))
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'API Format' }), { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('option', { name: /OpenAI Chat Completions/ }))
     expect(screen.getByText(hint)).toBeInTheDocument()
 
     await act(async () => {

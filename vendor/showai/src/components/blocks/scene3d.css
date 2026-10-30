@@ -1,0 +1,210 @@
+/* scene-3d: a Three.js viewport with projected HTML labels and parameter sliders.
+ * Neutral colors follow the shared block tokens so the block follows light and dark themes. */
+.s3-stage {
+  position: relative;
+  min-height: 200px;
+  border: 1px solid var(--sb-line);
+  border-radius: 8px;
+  background: var(--sb-soft);
+  overflow: hidden;
+}
+.s3-viewport {
+  position: absolute;
+  inset: 0;
+}
+.s3-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+.s3-block[data-viewport-locked="false"] .s3-canvas {
+  cursor: grab;
+}
+.s3-block[data-viewport-locked="false"] .s3-canvas:active {
+  cursor: grabbing;
+}
+.s3-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.s3-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 180px;
+  padding: 2px 7px;
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-surface) 88%, transparent);
+  color: var(--sb-text);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  will-change: transform;
+}
+.s3-print {
+  display: none;
+}
+.s3-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 24px;
+  color: var(--sb-muted);
+  text-align: center;
+}
+.s3-error {
+  color: var(--sb-text);
+  background: var(--sb-soft);
+}
+.s3-error p {
+  margin: 0;
+}
+.s3-error ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.s3-error li {
+  padding: 1px 8px;
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+}
+.s3-reset {
+  position: absolute;
+  top: 8px;
+  right: 46px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--sb-line);
+  border-radius: 6px;
+  background: var(--sb-surface);
+  color: var(--sb-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.s3-reset:hover {
+  background: var(--sb-hover);
+  color: var(--sb-text);
+}
+.s3-hint {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  color: var(--sb-muted);
+  font-size: 10px;
+  pointer-events: none;
+}
+.s3-parameters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 24px;
+  padding: 14px 4px 4px;
+}
+.s3-parameter {
+  min-width: 0;
+}
+.s3-parameter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.s3-parameter-head label {
+  font-weight: 600;
+}
+.s3-parameter-head output {
+  color: var(--sb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.s3-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--sb-line);
+  border-radius: 999px;
+  background: var(--sb-surface);
+  color: var(--sb-muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.s3-demo:hover,
+.s3-demo[aria-pressed="true"] {
+  border-color: var(--sb-accent);
+  color: var(--sb-accent);
+}
+.s3-parameter input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin: 10px 0 6px;
+  appearance: none;
+  border-radius: 5px;
+  background: linear-gradient(
+    to right,
+    var(--sb-accent) var(--range-progress),
+    var(--sb-line) var(--range-progress)
+  );
+  cursor: pointer;
+}
+.s3-parameter input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  background: var(--sb-surface);
+  border: 2px solid var(--sb-accent);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #0002;
+}
+.s3-parameter input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--sb-surface);
+  border: 2px solid var(--sb-accent);
+  border-radius: 50%;
+}
+.s3-parameter-description {
+  margin: 0;
+  color: var(--sb-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.s3-reset:focus-visible,
+.s3-demo:focus-visible,
+.s3-parameter input[type="range"]:focus-visible {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 2px;
+}
+@media print {
+  .s3-canvas,
+  .s3-reset,
+  .s3-hint,
+  .s3-demo,
+  .s3-block .viewport-lock-button {
+    display: none !important;
+  }
+  .s3-print {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}

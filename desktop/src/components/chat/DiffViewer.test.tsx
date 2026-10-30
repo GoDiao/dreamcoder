@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { DiffViewer } from './DiffViewer'
 
@@ -19,7 +19,7 @@ describe('DiffViewer', () => {
     expect(screen.getByRole('status', { name: 'Loading diff' })).toHaveStyle({ height: '60px' })
 
     const body = container.querySelector('.max-h-\\[400px\\]') as HTMLElement
-    await within(body).findByText('world', { exact: false })
+    await waitFor(() => expect(body.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-code]')?.textContent).toContain('world'), { timeout: 4000 })
     expect(screen.queryByRole('status', { name: 'Loading diff' })).not.toBeInTheDocument()
   })
 })

@@ -1,0 +1,236 @@
+.showai-custom-block {
+  position: relative;
+}
+.custom-props-trigger {
+  position: absolute;
+  right: 8px;
+  top: -13px;
+  z-index: 2;
+  width: 28px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  color: var(--text-secondary, #657465);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.showai-custom-block:hover > .custom-props-trigger,
+.showai-custom-block:focus-within > .custom-props-trigger {
+  opacity: 1;
+}
+.custom-props-trigger:focus-visible {
+  outline: 2px solid var(--accent, #547c63);
+  outline-offset: 3px;
+}
+.custom-props-editor {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  color: var(--text, #292d29);
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+.custom-props-editor label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.custom-props-editor textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  max-height: 400px;
+  padding: 10px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: inherit;
+  font:
+    12px/1.65 ui-monospace,
+    monospace;
+}
+.custom-props-error {
+  color: var(--danger, #c13515);
+  white-space: pre-line;
+  margin: 9px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.custom-props-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.custom-props-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.custom-props-actions button.is-primary {
+  color: #fff;
+  background: var(--accent, #547c63);
+  border-color: transparent;
+}
+.custom-props-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (hover: none) {
+  .custom-props-trigger {
+    opacity: 1;
+  }
+}
+@media print {
+  .custom-props-trigger,
+  .custom-props-editor {
+    display: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .custom-props-trigger {
+    transition: none;
+  }
+}
+/* Workbench player for local files a component links to; matches the gallery lightbox. */
+.showai-local-media {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 65px;
+  background: #101611f2;
+  backdrop-filter: blur(12px);
+  color: #f1f5ee;
+  font: 13px/1.5 "Avenir Next", "PingFang SC", system-ui, sans-serif;
+}
+.showai-local-media figure {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.showai-local-media video,
+.showai-local-media img {
+  max-width: 100%;
+  max-height: calc(100dvh - 190px);
+  object-fit: contain;
+  display: block;
+  background: #000;
+  border-radius: 6px;
+}
+.showai-local-media audio {
+  width: min(560px, 80vw);
+}
+.showai-local-media figcaption {
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: center;
+  padding: 15px 0 0;
+  overflow-wrap: anywhere;
+}
+.showai-local-media figcaption > span {
+  display: block;
+  color: #a8b2a7;
+  font-size: 10px;
+  padding-top: 5px;
+}
+.showai-local-media-close {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff15;
+  border-radius: 50%;
+  background: #ffffff0b;
+  color: #f1f5ee;
+  cursor: pointer;
+}
+.showai-local-media-close:hover {
+  background: #ffffff20;
+}
+.showai-local-media-note {
+  margin: 0 0 12px;
+  font-size: 14px;
+  text-align: center;
+}
+.showai-local-media-path {
+  user-select: all;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.showai-local-media figcaption > .showai-local-media-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 10px;
+}
+.showai-local-media-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  background: #ffffff0f;
+  color: #f1f5ee;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.showai-local-media-actions > button:hover {
+  background: #ffffff20;
+}
+.showai-local-media-close:focus-visible,
+.showai-local-media-actions > button:focus-visible {
+  outline: 2px solid #b8ceba;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .showai-local-media {
+    backdrop-filter: none;
+  }
+}
+.custom-props-note {
+  margin: 0 0 10px;
+  color: var(--muted, #6b726b);
+}
+.custom-props-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  color: #fff;
+  background: var(--accent, #547c63);
+  cursor: pointer;
+}
+.custom-props-advanced > summary {
+  cursor: pointer;
+  color: var(--muted, #6b726b);
+  margin-bottom: 8px;
+}

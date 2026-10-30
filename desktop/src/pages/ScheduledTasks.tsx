@@ -1,8 +1,10 @@
+import { ClockIcon } from 'lucide-react'
+import { LoadingBlock } from '../components/shared/LoadingBlock'
 import { useEffect, useState } from 'react'
 import { useTaskStore } from '../stores/taskStore'
 import { useUIStore } from '../stores/uiStore'
 import { useTranslation } from '../i18n'
-import { Button } from '../components/shared/Button'
+import { Button } from '../components/shared/ui/button'
 import { TaskList } from '../components/tasks/TaskList'
 import { TaskEmptyState } from '../components/tasks/TaskEmptyState'
 import { NewTaskModal } from '../components/tasks/NewTaskModal'
@@ -33,17 +35,15 @@ export function ScheduledTasks() {
           <Button onClick={() => openModal('new-task')}>{t('tasks.newTask')}</Button>
         </div>
 
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/15 mb-6">
-          <span className="material-symbols-outlined text-[18px] text-[var(--color-warning)]">schedule</span>
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/15 mb-6">
+          <ClockIcon className="shrink-0 text-[var(--color-warning)]" aria-hidden="true" size={18} />
           <span className="text-xs text-[var(--color-text-secondary)]">
             {t('scheduledPage.desktopNotice')}
           </span>
         </div>
 
         {!initialized && isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin w-6 h-6 border-2 border-[var(--color-brand)] border-t-transparent rounded-full" />
-          </div>
+          <LoadingBlock className="py-16" spinnerClassName="size-6" />
         ) : tasks.length === 0 ? (
           <TaskEmptyState onCreateTask={() => openModal('new-task')} />
         ) : (

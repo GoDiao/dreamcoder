@@ -7,10 +7,10 @@ import {
   type PermissionState,
 } from '../api/computerUse'
 import { useTranslation } from '../i18n'
-import { Button } from '../components/shared/Button'
+import { Button } from '../components/shared/ui/button'
 import { ConfirmDialog } from '../components/shared/ConfirmDialog'
-import { Input } from '../components/shared/Input'
-import { Switch } from '../components/shared/Switch'
+import { Input } from '../components/shared/ui/input'
+import { Switch } from '../components/shared/ui/switch'
 import { SettingsRow } from '../components/settings/SettingsRow'
 import { SettingsPageHeader } from '../components/settings/SettingsPageHeader'
 
@@ -60,7 +60,7 @@ function Notice({ tone, children }: { tone: 'warn' | 'error' | 'info'; children:
         ? 'border-amber-500/40 bg-amber-500/5'
         : 'border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-xs leading-[1.6] text-[var(--color-text-secondary)] ${border}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-md border px-3 py-2.5 text-xs leading-[1.6] text-[var(--color-text-secondary)] ${border}`}>
       {children}
     </div>
   )
@@ -217,7 +217,7 @@ export function ComputerUseSettings() {
           <div className="font-medium text-[var(--color-text-primary)]">{t('settings.computerUse.checkFailed')}</div>
           <div className="mt-1 [overflow-wrap:anywhere]">{checkError}</div>
         </Notice>
-        <Button size="xs" variant="secondary" onClick={() => void fetchStatus()}>
+        <Button size="xs" variant="outline" onClick={() => void fetchStatus()}>
           {t('settings.computerUse.recheck')}
         </Button>
       </div>
@@ -232,7 +232,7 @@ export function ComputerUseSettings() {
         <SettingsPageHeader title={t('settings.computerUse.title')} description={t('settings.computerUse.description')} />
         <SettingsRow
           title={t('settings.computerUse.enableRow')}
-          control={<Switch checked={false} disabled onChange={() => {}} label={t('settings.computerUse.enableRow')} />}
+          control={<Switch checked={false} disabled aria-label={t('settings.computerUse.enableRow')} />}
         />
         <Notice tone="info">{t('settings.computerUse.unsupported', { platform: status.platform })}</Notice>
       </div>
@@ -297,7 +297,7 @@ export function ComputerUseSettings() {
         label={t(`settings.computerUse.${key}`)}
         detail={detail}
         action={state !== 'granted' ? (
-          <Button size="xs" variant="secondary" onClick={() => void grantPermissions()} disabled={controlsDisabled}>
+          <Button size="xs" variant="outline" onClick={() => void grantPermissions()} disabled={controlsDisabled}>
             {t('settings.computerUse.grant')}
           </Button>
         ) : undefined}
@@ -322,8 +322,8 @@ export function ComputerUseSettings() {
             <Switch
               checked={status.enabled}
               disabled={controlsDisabled}
-              onChange={toggleEnabled}
-              label={t('settings.computerUse.enableRow')}
+              onCheckedChange={toggleEnabled}
+              aria-label={t('settings.computerUse.enableRow')}
             />
           )}
         />
@@ -370,7 +370,7 @@ export function ComputerUseSettings() {
             action={status.telemetry === 'enabled' ? (
               <Button
                 size="xs"
-                variant="secondary"
+                variant="outline"
                 onClick={() => void runAction(() => computerUseApi.disableTelemetry())}
                 disabled={controlsDisabled}
               >
@@ -382,7 +382,7 @@ export function ComputerUseSettings() {
       </section>
 
       {installRunning && install?.output.length ? (
-        <pre className="max-h-40 overflow-auto rounded-[var(--radius-md)] bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+        <pre className="max-h-40 overflow-auto rounded-md bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
           {install.output.join('\n')}
         </pre>
       ) : null}
@@ -398,7 +398,7 @@ export function ComputerUseSettings() {
             <Button size="xs" onClick={() => setConfirm(lastInstall)} disabled={controlsDisabled}>
               {t('settings.computerUse.retry')}
             </Button>
-            <Button size="xs" variant="secondary" onClick={() => setShowAdvanced(true)}>
+            <Button size="xs" variant="outline" onClick={() => setShowAdvanced(true)}>
               {t('settings.computerUse.useExistingPath')}
             </Button>
           </div>
@@ -411,10 +411,10 @@ export function ComputerUseSettings() {
         <Notice tone="warn">
           <div>{t('settings.computerUse.stillNotGranted')}</div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="xs" variant="secondary" onClick={() => void computerUseApi.openSettings('Privacy_Accessibility')}>
+            <Button size="xs" variant="outline" onClick={() => void computerUseApi.openSettings('Privacy_Accessibility')}>
               {t('settings.computerUse.openAccessibility')}
             </Button>
-            <Button size="xs" variant="secondary" onClick={() => void computerUseApi.openSettings('Privacy_ScreenCapture')}>
+            <Button size="xs" variant="outline" onClick={() => void computerUseApi.openSettings('Privacy_ScreenCapture')}>
               {t('settings.computerUse.openScreenRecording')}
             </Button>
           </div>
@@ -435,14 +435,14 @@ export function ComputerUseSettings() {
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button size="xs" variant="secondary" onClick={() => void fetchStatus()} disabled={installRunning} loading={checkState === 'loading'}>
+        <Button size="xs" variant="outline" onClick={() => void fetchStatus()} disabled={installRunning} loading={checkState === 'loading'}>
           {t('settings.computerUse.recheck')}
         </Button>
-        <Button size="xs" variant="secondary" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced}>
+        <Button size="xs" variant="outline" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced}>
           {t('settings.computerUse.advanced')}
         </Button>
         {hasDriver ? (
-          <Button size="xs" variant="secondary" onClick={() => void runDoctor()} loading={doctorRunning} disabled={doctorRunning}>
+          <Button size="xs" variant="outline" onClick={() => void runDoctor()} loading={doctorRunning} disabled={doctorRunning}>
             {t('settings.computerUse.doctor')}
           </Button>
         ) : null}
@@ -465,19 +465,19 @@ export function ComputerUseSettings() {
                 aria-label={t('settings.computerUse.customPath')}
               />
             </div>
-            <Button size="xs" variant="secondary" onClick={() => void choosePath()} disabled={controlsDisabled}>
+            <Button size="xs" variant="outline" onClick={() => void choosePath()} disabled={controlsDisabled}>
               {t('settings.computerUse.browse')}
             </Button>
             <Button
               size="xs"
-              variant="secondary"
+              variant="outline"
               onClick={() => void savePath(pathDraft)}
               disabled={controlsDisabled || pathDraft.trim() === (status.driverPath ?? '')}
             >
               {t('common.save')}
             </Button>
             {status.driverPath ? (
-              <Button size="xs" variant="secondary" onClick={() => { setPathDraft(''); void savePath('') }} disabled={controlsDisabled}>
+              <Button size="xs" variant="outline" onClick={() => { setPathDraft(''); void savePath('') }} disabled={controlsDisabled}>
                 {t('settings.computerUse.clearPath')}
               </Button>
             ) : null}
@@ -487,7 +487,7 @@ export function ComputerUseSettings() {
 
       {doctorOutput !== null ? (
         <section aria-label={t('settings.computerUse.doctor')}>
-          <pre className="max-h-72 overflow-auto rounded-[var(--radius-md)] bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          <pre className="max-h-72 overflow-auto rounded-md bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
             {doctorOutput}
           </pre>
         </section>
@@ -501,7 +501,7 @@ export function ComputerUseSettings() {
             path: status.legacyRuntime.path,
           })}
           control={(
-            <Button size="xs" variant="secondary" onClick={() => setConfirm('cleanup')} disabled={controlsDisabled}>
+            <Button size="xs" variant="outline" onClick={() => setConfirm('cleanup')} disabled={controlsDisabled}>
               {t('settings.computerUse.legacyRuntimeCleanup')}
             </Button>
           )}
@@ -532,7 +532,7 @@ export function ComputerUseSettings() {
         )}
         confirmLabel={t('settings.computerUse.install')}
         cancelLabel={t('common.cancel')}
-        confirmVariant="primary"
+        confirmVariant="default"
       />
       <ConfirmDialog
         open={confirm === 'cleanup'}

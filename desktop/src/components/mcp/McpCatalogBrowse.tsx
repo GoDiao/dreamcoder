@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mcpApi } from '../../api/mcp'
 import { useTranslation } from '../../i18n'
-import { Button } from '../shared/Button'
+import { Button } from '../shared/ui/button'
 import type { McpCatalogEntry } from '../../types/mcp'
 import { SearchField } from '../shared/SearchField'
 import { SettingsSelect } from '../settings/SettingsSelect'
@@ -125,7 +125,7 @@ function CatalogEntry({ entry, installed, onInstall }: { entry: McpCatalogEntry;
         )}
       </dl>
       <div className="mt-3">
-        <Button variant="secondary" size="xs" onClick={onInstall} aria-label={t('settings.mcp.install.actionFor', { name: entry.name })}>
+        <Button variant="outline" size="xs" onClick={onInstall} aria-label={t('settings.mcp.install.actionFor', { name: entry.name })}>
           {t('settings.mcp.install.action')}
         </Button>
       </div>
