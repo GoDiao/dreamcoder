@@ -165,14 +165,19 @@ describe('DiagnosticsService', () => {
         duplicate.exited,
       ])
 
-      expect(exitCode).toBe(1)
-      expect(stdout).toBe('')
-      expect(stderr).toContain('[Server] Uncaught exception:')
-      expect(stderr).toContain(`Failed to start server. Is port ${port} in use?`)
-
       const raw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
-      expect(raw).toContain('server_uncaught_exception')
-      expect(raw).toContain(`Failed to start server. Is port ${port} in use?`)
+      const event = raw
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string; summary: string })
+        .find((entry) => entry.type === 'server_uncaught_exception')
+
+      expect({ exitCode, stdout, stderr, summary: event?.summary }).toMatchObject({
+        exitCode: 1,
+        stdout: '',
+        stderr: expect.stringContaining('[Server] Uncaught exception:'),
+        summary: `Failed to start server. Is port ${port} in use?`,
+      })
     } finally {
       server.kill()
       await server.exited.catch(() => undefined)

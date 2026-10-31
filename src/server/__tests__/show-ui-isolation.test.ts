@@ -73,7 +73,7 @@ async function launchBrowser(userDataDir: string): Promise<{ process: ChildProce
   ], { stdio: ['ignore', 'ignore', 'pipe'] })
   const endpoint = await new Promise<string>((resolve, reject) => {
     let buffer = ''
-    const timer = setTimeout(() => reject(new Error('browser did not start')), 20000)
+    const timer = setTimeout(() => reject(new Error(`browser did not start; stderr: ${JSON.stringify(buffer)}`)), 20000)
     child.stderr!.on('data', (chunk) => {
       buffer += String(chunk)
       const match = /DevTools listening on (ws:\/\/\S+)/.exec(buffer)
@@ -82,7 +82,8 @@ async function launchBrowser(userDataDir: string): Promise<{ process: ChildProce
         resolve(match[1]!)
       }
     })
-    child.on('exit', () => reject(new Error('browser exited')))
+    child.on('error', (error) => reject(new Error(`browser failed to spawn: ${error.message}`)))
+    child.on('exit', (code, signal) => reject(new Error(`browser exited with code ${code} and signal ${signal}; stderr: ${JSON.stringify(buffer)}`)))
   })
   return { process: child, endpoint }
 }
