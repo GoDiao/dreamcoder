@@ -102,6 +102,7 @@ export const en = {
   'sidebar.batchExit': 'Cancel batch mode',
   'sidebar.batchDeleteSucceeded': 'Deleted {count} sessions.',
   'sidebar.batchDeleteFailed': '{count} sessions could not be deleted.',
+  'sidebar.deleteFailed': 'The session could not be deleted.',
   'sidebar.allProjects': 'All projects',
   'sidebar.other': 'Other',
   'sidebar.timeGroup.today': 'Today',

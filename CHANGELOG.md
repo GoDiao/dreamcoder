@@ -21,6 +21,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- A deleted session no longer comes back in the sidebar when a session list requested before the delete arrives after it (#217). Deleting a session the server has already removed (`404`) now clears it from the sidebar and closes its tab, and any other delete failure shows an error instead of leaving the dialog open.
 - With the side panel open, the Context ring under the input opens a hover card next to the button on desktop again; it opened a full-width bottom drawer because the narrow chat column was treated like a phone. The drawer is now used only on a phone-sized viewport.
 - Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195). Thanks @pcbeingused333.
 - A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
