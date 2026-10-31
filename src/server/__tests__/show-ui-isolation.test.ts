@@ -82,6 +82,7 @@ async function launchBrowser(userDataDir: string): Promise<{ process: ChildProce
         resolve(match[1]!)
       }
     })
+    child.on('error', (error) => reject(new Error(`browser failed to spawn: ${error.message}`)))
     child.on('exit', (code, signal) => reject(new Error(`browser exited with code ${code} and signal ${signal}; stderr: ${JSON.stringify(buffer)}`)))
   })
   return { process: child, endpoint }
