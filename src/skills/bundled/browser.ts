@@ -37,7 +37,7 @@ Do not use it for anything a plain HTTP request or a file read answers. Pages lo
 
 Each action waits for the page to settle before it returns, so never sleep for a fixed time; if the page is still loading, snapshot again. An element id stays valid for as long as that element stays on the page, so one snapshot can serve several actions in a row. Snapshot again to see what an action changed. After the page navigates, all ids are gone: take a new snapshot before acting. If an action fails because the element was removed, is hidden or covered, snapshot again instead of guessing an id.
 
-On later snapshots pass \`delta: true\` with the baseline from the previous snapshot header to get only what changed. On a large page pass \`region\` with an element id to read just that part.
+On later snapshots pass \`delta: true\` with the baseline from the previous snapshot header to get only what changed. On a large page pass \`region\` with an element id to read just that part. When the page has iframes, the elements are grouped under \`--- iframe [12] ... ---\` headers and every iframe gets its own share of the list; if a header is followed by "more interactive elements in this frame not shown", pass \`region\` with the number in that header to read only that iframe.
 
 ## Long pages
 
