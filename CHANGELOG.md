@@ -21,6 +21,8 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226).
+
 - The agent's browser snapshot works on pages that embed many iframes, such as a canvas of boards. Clicks, marks and picks land on the right spot inside an iframe that the page draws smaller or larger with a CSS transform or zoom (they missed before). The list of interactive elements is grouped under a header per iframe with its number, title, parent and origin, every iframe gets a share of the element limit instead of the later ones being cut off entirely, a cut iframe says how many elements it left out, and `region` with the number from a header reads only that iframe. Rotated or skewed iframes are not covered.
 - A deleted session no longer comes back in the sidebar when a session list requested before the delete arrives after it (#217). Deleting a session the server has already removed (`404`) now clears it from the sidebar and closes its tab, and any other delete failure shows an error instead of leaving the dialog open. Thanks @mayuriphad.
 - With the side panel open, the Context ring under the input opens a hover card next to the button on desktop again; it opened a full-width bottom drawer because the narrow chat column was treated like a phone. The drawer is now used only on a phone-sized viewport.
