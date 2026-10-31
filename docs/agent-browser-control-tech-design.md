@@ -124,13 +124,14 @@ CLI ──HTTP MCP（每会话一个令牌）──▶ sidecar 的 browser 服�
 - **隔离世界**：用 `Page.createIsolatedWorld` 运行，编号表存在隔离世界里，页面脚本读不到变量，也不往元素上写属性（页面仍能观察到 DOM 变化）。每个新文档都要重建隔离世界，编号表随文档代数失效。
 - **可见性**：自身尺寸、`display`、`visibility`、祖先透明度、`aria-hidden`、`inert`、被滚动容器裁掉的元素；「在视口内」要考虑嵌套滚动容器。
 - **Shadow DOM**：遍历开放的 shadow root。
-- **iframe**：同源 iframe 通过 `contentDocument` 遍历；**跨域 iframe 第一版不支持**，快照里标出「此处有未读取的 iframe」，避免 Agent 以为页面上没有这个元素。
+- **iframe**：同源 iframe 通过 `contentDocument` 遍历；**跨域 iframe 第一版不支持**，快照里标出「此处有未读取的 iframe」，避免 Agent 以为页面上没有这个元素。页面有 iframe 时，「Interactive elements」按所属 frame 分段：页面自身的元素在最前，没有段头；每个 iframe 一段，段头是 `--- iframe [12] "标题" | inside page | origin dreamcoder-project://abc ---`。`[12]` 是这个 iframe 元素自己的编号（元素编号表里的普通一项，稳定、全局唯一，在列出元素之后才分配，所以元素原有的编号不变）；标题取 iframe 的 `title`，没有就取 `name`，都没有则省略；`inside` 写外层是 `page` 还是 `iframe [N]`；`origin` 写该文档的来源，`srcdoc`、`data`、`blob` 直接写类型，`about:blank` 照写。元素编号仍是全局的，工具只接收编号，不接收 frame 序号；段头里的编号就是 `region` 要用的编号（见「区域读取」）。分段只在页面确有 iframe 时出现，没有 iframe 的页面输出与以前一致。
+- **iframe 的 CSS 缩放**：页面把 iframe 放进带 `transform: scale()`、`zoom` 的容器（画布的平移缩放就是这样）时，iframe 里元素自己的坐标是未缩放的。每一层 iframe 的缩放系数取 `getBoundingClientRect().width / offsetWidth`（高度同理，除数为 0 或矩形为 0 时取 1），内部坐标乘以系数再加上该层的位置，边框宽度 `clientLeft`、`clientTop` 同样乘系数，多层嵌套逐层连乘（思路参考 OpenCode 的 `chromium.ts`，代码自己写）。页面程序里只有一个换算（`placementOf` 与 `toTop`），标记绘制、可见性裁剪、`locate` 的点击点、遮挡检测、`styles` 的 `box`、点选的矩形都走它。**不覆盖旋转与倾斜**：系数只看宽高比，不解析 transform 矩阵，旋转或倾斜的 iframe 里坐标仍会错；iframe 的 padding 也没有计入。
 - **名称与角色**：`aria-labelledby`、`<label for>`、`title`、`alt`、`placeholder`、`<select>` 的选项、`contenteditable`。
 - **敏感字段**：`type=password` 与 `autocomplete=cc-*` 两条硬规则，值显示为 `••••`。不用名称正则，避免误伤。
 - **编号生命周期**：元素存在期间编号不变；导航后整体失效；编号带文档代数，动作前核对，对不上就拒绝并要求重新取快照。
 - **失效处理**：元素已被移除、不可点击、被别的元素遮挡时，返回结构化错误，写明下一步该做什么。
-- **预算与截断**：元素上限、主文本预算（先放 8000 字符，之后按实际使用调）、总字符上限；被丢弃的元素数和被截断的文字量必须在输出里报告。
-- **区域读取**：`snapshot` 带一个按元素编号的区域参数，只读该区域的文本，不新增工具。
+- **预算与截断**：元素上限、主文本预算（先放 8000 字符，之后按实际使用调）、总字符上限；被丢弃的元素数和被截断的文字量必须在输出里报告。元素上限在各 frame 之间分配，而不是对全部元素按顺序切：分三轮，先对话框内的元素，再视口内的，最后其余；每一轮里，还有元素的 frame 平分剩下的额度，用不完的额度再平分给仍有元素的 frame（最大最小公平分配，除不尽的零头给文档顺序靠前的 frame）。所以一个 frame 的元素再多，也不会把后面的 frame 整块挤掉，而「对话框优先、视口内优先」的全局次序保持不变（对话框与视口内的元素比别处的画板更先拿到额度）。每个 frame 内部仍按「对话框、视口内、其余、文档顺序」排。被截掉的元素在对应段末写 `(+N more interactive elements in this frame not shown; pass region=ID to read only this frame)`，页面自身那一段写 `(+N more interactive elements in the page itself not shown)`，末尾仍是总数 `(+N more interactive elements not shown)`。额度为 0 的 frame 也有段头和计数，Agent 知道它存在。只有一个 frame 的页面输出与以前一致。已知取舍：元素按 frame 分组输出，不再按全局排名交错；元素编号仍按全局排名顺序分配，编号不变。
+- **区域读取**：`snapshot` 带一个按元素编号的区域参数，只读该区域的文本，不新增工具。`region` 也可以是 iframe 的编号（段头里的 `[N]`）：只读那个 iframe（含它里面嵌的 iframe），页面文字取它文档的 `main` 或 body。这样读被截掉的 frame 不需要新参数，也没有「frame 序号」这第二套编号。
 - **性能**：先用廉价条件过滤，再对候选元素取样式，避免对几千个元素逐个 `getComputedStyle`。
 - **页面内容包裹**：输出外层用带随机标记的「不可信数据」块。
 
@@ -298,7 +299,7 @@ CLI ──HTTP MCP（每会话一个令牌）──▶ sidecar 的 browser 服�
 - **授权通道**：通过开放的 WebSocket 或 HTTP 接口发授权回复与信任列表写入，必须被拒；只有认证通道的回复生效。
 - **用户点选**：选中文字与点选元素的引用格式（含每个新字段的 JSON 往返、伪造的围栏结束行、伪造的标签与 `Comment:` 行）、围栏与出处、会话恢复时的反向解析（页面文字伪造标签行也不会被当成元数据）、敏感字段不带出、截断标注；引用类型进入输入框和 transcript 的展示；页面程序的 `pick` 与 `marks` 操作（jsdom，含敏感与值剥离、标签回退、选择器、标记的绘制、定位、存活、移除）；React 信息函数及其净化；sidecar 的 `pick`/`marks`（假的中继）与通道请求应答；主进程的点选模式、计数取消、Escape、导航、隐藏、`user_picking` 与超时；渲染进程的开关、占位阻止发送、标记同步与 `stale`。
 - **主进程补充**：对话框自动处理、console 与 network 的缓冲上限与请求头遮蔽、导航时 network 保留新文档的请求（含重定向各跳）、attach 失败的错误、页面崩溃后的挂起与恢复、网址解析只在主进程。
-- **快照模块**：用 `desktop` 里已有的 `jsdom` 测名称与角色计算、敏感字段遮蔽、编号稳定性、排序、delta、截断报告，以及 `find`、`textFrom` 的输出和 `scroll` 的目标选择（几何用桩）。jsdom 没有真实布局，可见性、视口、滚动容器、隔离世界与 iframe 的判断测不了，这部分只能在真实 Electron 里验证，PR 里标明。
+- **快照模块**：用 `desktop` 里已有的 `jsdom` 测名称与角色计算、敏感字段遮蔽、编号稳定性、排序、delta、截断报告，以及 `find`、`textFrom` 的输出和 `scroll` 的目标选择（几何用桩），还有 iframe 的缩放换算（`offsetWidth`、矩形用桩）、按 frame 分段的段头与额度分配、`region` 指向 iframe。jsdom 没有真实布局，可见性、视口、滚动容器、隔离世界与 iframe 的判断测不了，这部分只能在真实 Electron 里验证，PR 里标明。
 - **桌面**：vitest 测提示条与「停止」、授权弹窗、设置页的信任列表。
 - **删除**：测试保留名检查和启动路径不再出现 `chrome` 选项。
 - **内置技能与提示词**：内置浏览器技能出现在技能列表里；验证类 Agent、`batch` 的提示词里不再出现 `claude-in-chrome`、`playwright` 之类不存在的工具名。

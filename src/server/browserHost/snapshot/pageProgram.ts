@@ -70,6 +70,7 @@ export function pageProgram(op: 'marks', args: PageMarksArgs): PageMarksResult
 export function pageProgram(op: 'marksHidden', args: PageMarksHiddenArgs): PageMarksHiddenResult
 export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: Element): PageProgramResult {
   type Box = { l: number; t: number; r: number; b: number }
+  type Placement = { x: number; y: number; sx: number; sy: number }
   type Style = {
     display: string
     visibility: string
@@ -91,7 +92,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
   }
   type MarkBox = { el: Element; box: HTMLElement; chip: HTMLElement }
   type Marks = { host: HTMLElement; entries: Map<number, MarkBox>; stop: () => void }
-  type Entry = { id: number; line: string; role: string; name: string; offscreen: boolean }
+  type Entry = { id: number; line: string; role: string; name: string; offscreen: boolean; win: Window }
   type Ranked = { el: Element; index: number; dialog: boolean; visible: boolean; rank: number }
   type TextPiece = { owner: Element; value: string }
   type Match = { text: string; at: number; block: Element }
@@ -247,7 +248,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     styles: new Map<Element, Style>(),
     infos: new Map<Element, Info>(),
     clips: new Map<Element, Box>(),
-    offsets: new Map<Window, { x: number; y: number }>(),
+    placements: new Map<Window, Placement>(),
     hidden: new Map<Element, boolean>(),
     blocks: new Map<Element, Element>(),
   }
@@ -255,7 +256,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     caches.styles.clear()
     caches.infos.clear()
     caches.clips.clear()
-    caches.offsets.clear()
+    caches.placements.clear()
     caches.hidden.clear()
     caches.blocks.clear()
   }
@@ -335,24 +336,38 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
       }
     })
 
-  const offsetOf = (win: Window): { x: number; y: number } => {
-    const cached = caches.offsets.get(win)
+  const placementOf = (win: Window): Placement => {
+    const cached = caches.placements.get(win)
     if (cached) return cached
     const frame = win.frameElement
-    let offset = { x: 0, y: 0 }
+    let placement: Placement = { x: 0, y: 0, sx: 1, sy: 1 }
     if (frame) {
-      const outer = offsetOf(winOf(frame))
+      const outer = placementOf(winOf(frame))
       const rect = frame.getBoundingClientRect()
-      offset = { x: outer.x + rect.left + frame.clientLeft, y: outer.y + rect.top + frame.clientTop }
+      const layoutWidth = (frame as HTMLElement).offsetWidth
+      const layoutHeight = (frame as HTMLElement).offsetHeight
+      const scaleX = layoutWidth > 0 && rect.width > 0 ? rect.width / layoutWidth : 1
+      const scaleY = layoutHeight > 0 && rect.height > 0 ? rect.height / layoutHeight : 1
+      placement = {
+        x: outer.x + outer.sx * (rect.left + frame.clientLeft * scaleX),
+        y: outer.y + outer.sy * (rect.top + frame.clientTop * scaleY),
+        sx: outer.sx * scaleX,
+        sy: outer.sy * scaleY,
+      }
     }
-    caches.offsets.set(win, offset)
-    return offset
+    caches.placements.set(win, placement)
+    return placement
   }
-  const topRect = (el: Element): Box => {
-    const rect = el.getBoundingClientRect()
-    const offset = offsetOf(winOf(el))
-    return { l: rect.left + offset.x, t: rect.top + offset.y, r: rect.right + offset.x, b: rect.bottom + offset.y }
+  const toTop = (win: Window, rect: { left: number; top: number; right: number; bottom: number }): Box => {
+    const at = placementOf(win)
+    return {
+      l: at.x + rect.left * at.sx,
+      t: at.y + rect.top * at.sy,
+      r: at.x + rect.right * at.sx,
+      b: at.y + rect.bottom * at.sy,
+    }
   }
+  const topRect = (el: Element): Box => toTop(winOf(el), el.getBoundingClientRect())
   const intersect = (a: Box, b: Box): Box => ({
     l: Math.max(a.l, b.l),
     t: Math.max(a.t, b.t),
@@ -658,14 +673,53 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
         return { el, index, dialog, visible, rank: dialog ? 0 : visible ? 1 : 2 }
       })
       .sort((a, b) => a.rank - b.rank || a.index - b.index)
-    const kept = ranked.slice(0, Math.max(0, options.maxItems))
+    const frameOrder: Window[] = []
+    const byFrame = new Map<Window, Ranked[]>()
+    for (const el of candidates) {
+      const win = winOf(el)
+      if (!byFrame.has(win)) {
+        byFrame.set(win, [])
+        frameOrder.push(win)
+      }
+    }
+    for (const entry of ranked) (byFrame.get(winOf(entry.el)) as Ranked[]).push(entry)
+    const selected = new Set<Ranked>()
+    let room = Math.max(0, options.maxItems)
+    for (const rank of [0, 1, 2]) {
+      const pools = frameOrder.map((win) => (byFrame.get(win) as Ranked[]).filter((entry) => entry.rank === rank))
+      const taken = pools.map(() => 0)
+      let open = pools.map((_, index) => index).filter((index) => (pools[index] as Ranked[]).length > 0)
+      while (room > 0 && open.length > 0) {
+        const each = Math.floor(room / open.length)
+        const grants = each > 0 ? each : 1
+        const still: number[] = []
+        for (const index of open) {
+          if (room <= 0) break
+          const give = Math.min(grants, (pools[index] as Ranked[]).length - (taken[index] as number), room)
+          taken[index] = (taken[index] as number) + give
+          room -= give
+          if ((taken[index] as number) < (pools[index] as Ranked[]).length) still.push(index)
+        }
+        open = each > 0 ? still : []
+      }
+      pools.forEach((pool, index) => {
+        for (const entry of pool.slice(0, taken[index])) selected.add(entry)
+      })
+    }
+    const kept = ranked.filter((entry) => selected.has(entry))
 
     const query = options.find === null ? null : clean(options.find, Infinity)
     const needle = query === null ? null : query.toLowerCase()
     const readFrom = needle === null ? Math.max(0, Math.floor(options.textFrom)) : 0
     const special = needle !== null || readFrom > 0
 
-    const textRoot = regionEl || document.querySelector('main,[role=main]') || document.body
+    const regionFrameDoc =
+      regionEl && (regionEl.localName === 'iframe' || regionEl.localName === 'frame')
+        ? (regionEl as HTMLIFrameElement).contentDocument
+        : null
+    const textRoot = regionFrameDoc
+      ? regionFrameDoc.querySelector('main,[role=main]') || regionFrameDoc.body
+      : regionEl || document.querySelector('main,[role=main]') || document.body
     const rawText = textRoot ? clean(textOf(textRoot), Infinity) : ''
     const found =
       needle !== null && textRoot && rawText.toLowerCase().includes(needle)
@@ -713,8 +767,56 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
         JSON.stringify(name) +
         (value ? ' value=' + JSON.stringify(value) : '') +
         (flags.length > 0 ? ' ' + flags.join(' ') : '')
-      return { id, line, role, name, offscreen: !visible }
+      return { id, line, role, name, offscreen: !visible, win: winOf(el) }
     })
+
+    const framed = frameOrder.some((win) => win.frameElement)
+    const omittedIn = (win: Window): number =>
+      (byFrame.get(win) as Ranked[]).length - entries.filter((entry) => entry.win === win).length
+    const originOf = (frameEl: Element, win: Window): string => {
+      const url = win.document.URL
+      if (url === 'about:srcdoc' || frameEl.hasAttribute('srcdoc')) return 'srcdoc'
+      const scheme = url.slice(0, Math.max(0, url.indexOf(':')))
+      if (scheme === 'data' || scheme === 'blob') return scheme
+      if (scheme === 'about') return url
+      const origin = win.location.origin
+      return origin && origin !== 'null' ? origin : scheme
+    }
+    const frameHeader = (win: Window): string => {
+      const frameEl = win.frameElement as Element
+      const owner = winOf(frameEl)
+      const title = clean(frameEl.getAttribute('title') || frameEl.getAttribute('name') || '', NAME_MAX)
+      return (
+        '--- iframe [' +
+        idFor(frameEl) +
+        ']' +
+        (title ? ' ' + JSON.stringify(title) : '') +
+        ' | inside ' +
+        (owner.frameElement ? 'iframe [' + idFor(owner.frameElement) + ']' : 'page') +
+        ' | origin ' +
+        originOf(frameEl, win) +
+        ' ---'
+      )
+    }
+    const listEntries = (list: Entry[], withOmitted: boolean): string[] => {
+      if (!framed) return list.map((entry) => entry.line)
+      const lines: string[] = []
+      for (const win of frameOrder) {
+        const own = list.filter((entry) => entry.win === win)
+        const omitted = withOmitted ? omittedIn(win) : 0
+        if (own.length === 0 && omitted === 0) continue
+        if (win.frameElement) lines.push(frameHeader(win))
+        for (const entry of own) lines.push(entry.line)
+        if (omitted > 0) {
+          lines.push(
+            win.frameElement
+              ? '(+' + omitted + ' more interactive elements in this frame not shown; pass region=' + idFor(win.frameElement) + ' to read only this frame)'
+              : '(+' + omitted + ' more interactive elements in the page itself not shown)',
+          )
+        }
+      }
+      return lines
+    }
 
     let mainText = rawText
     const dialog = regionEl ? undefined : dialogs[dialogs.length - 1]
@@ -815,7 +917,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
           ? ['## Page text' + (readFrom > 0 ? ' (from character ' + readFrom + ')' : ''), ...shownText]
           : matchSection),
         '## Interactive elements',
-        ...(entries.length > 0 ? entries.map((entry) => entry.line) : ['(none)']),
+        ...(entries.length > 0 || (framed && ranked.length > 0) ? listEntries(entries, true) : ['(none)']),
       ]
     } else {
       const current = new Set(entries.map((entry) => entry.id))
@@ -831,7 +933,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
           ' removed, page text ' +
           (textChanged ? 'changed' : 'unchanged'),
         ...(textChanged ? ['## Page text', ...shownText] : []),
-        ...(changed.length > 0 ? ['## Interactive elements (changed or new)', ...changed.map((entry) => entry.line)] : []),
+        ...(changed.length > 0 ? ['## Interactive elements (changed or new)', ...listEntries(changed, false)] : []),
         ...(removed.length > 0 ? ['removed: ' + removed.join(',')] : []),
       ]
     }
@@ -892,9 +994,9 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     let current: Element = el
     for (;;) {
       const win = winOf(current)
-      const offset = offsetOf(win)
-      const localX = x - offset.x
-      const localY = y - offset.y
+      const at = placementOf(win)
+      const localX = (x - at.x) / at.sx
+      const localY = (y - at.y) / at.sy
       const root = current.getRootNode() as TreeRoot
       let hit = root.elementFromPoint(localX, localY)
       if (!hit && root.nodeType === 11) hit = current.ownerDocument.elementFromPoint(localX, localY)
@@ -925,10 +1027,7 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     el.scrollIntoView({ block: 'center', inline: 'center' })
     resetCaches()
     const first = Array.from<DOMRect>(el.getClientRects()).find((rect) => rect.width > 0 && rect.height > 0)
-    const offset = offsetOf(winOf(el))
-    const own: Box = first
-      ? { l: first.left + offset.x, t: first.top + offset.y, r: first.right + offset.x, b: first.bottom + offset.y }
-      : topRect(el)
+    const own: Box = first ? toTop(winOf(el), first) : topRect(el)
     const area = intersect(own, limitOf(el))
     if (area.r <= area.l || area.b <= area.t) {
       return {
