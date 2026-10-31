@@ -231,7 +231,7 @@ describe('sessionStore', () => {
   })
 
   it.each(['single', 'batch'] as const)('does not re-add a session from a refresh requested before a %s deletion', async (mode) => {
-    const deleted = session('deleted-while-listing')
+    const deleted = session(`deleted-while-listing-${mode}`)
     const kept = session('kept')
     useSessionStore.setState({ sessions: [deleted, kept] })
     const refresh = createDeferred<{ sessions: SessionListItem[]; total: number }>()
