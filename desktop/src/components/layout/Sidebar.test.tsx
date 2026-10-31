@@ -1028,6 +1028,45 @@ describe('Sidebar', () => {
     expect(useTabStore.getState().activeTabId).toBeNull()
   })
 
+  it('shows an error toast and keeps the tab when deleting a session fails', async () => {
+    deleteSession.mockRejectedValue(new Error('delete failed'))
+    useSessionStore.setState({
+      sessions: [
+        {
+          id: 'session-1',
+          title: 'Open Session',
+          createdAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+          messageCount: 1,
+          projectPath: '/workspace/project',
+          workDir: '/workspace/project',
+          workDirExists: true,
+        },
+      ],
+    })
+    useTabStore.setState({
+      tabs: [{ sessionId: 'session-1', title: 'Open Session', type: 'session', status: 'idle' }],
+      activeTabId: 'session-1',
+    })
+
+    render(<Sidebar />)
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Open Session/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    const dialog = await screen.findByRole('alertdialog')
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    })
+
+    await waitFor(() => {
+      expect(addToast).toHaveBeenCalledWith({ type: 'error', message: 'delete failed' })
+    })
+    expect(disconnectSession).not.toHaveBeenCalled()
+    expect(useTabStore.getState().tabs).toHaveLength(1)
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
   it('selects and deletes multiple sessions from batch mode', async () => {
     deleteSessions.mockResolvedValue({
       ok: true,

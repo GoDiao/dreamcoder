@@ -104,6 +104,7 @@ export const zh: Record<TranslationKey, string> = {
   'sidebar.batchExit': '退出批量管理',
   'sidebar.batchDeleteSucceeded': '已删除 {count} 个会话。',
   'sidebar.batchDeleteFailed': '有 {count} 个会话删除失败。',
+  'sidebar.deleteFailed': '会话删除失败。',
   'sidebar.allProjects': '所有项目',
   'sidebar.other': '其他',
   'sidebar.timeGroup.today': '今天',

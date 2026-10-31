@@ -409,11 +409,20 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   const confirmDelete = useCallback(async () => {
     if (!pendingDeleteSessionId) return
-    await deleteSession(pendingDeleteSessionId)
+    try {
+      await deleteSession(pendingDeleteSessionId)
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : t('sidebar.deleteFailed'),
+      })
+      setPendingDeleteSessionId(null)
+      return
+    }
     disconnectSession(pendingDeleteSessionId)
     closeTab(pendingDeleteSessionId)
     setPendingDeleteSessionId(null)
-  }, [closeTab, deleteSession, disconnectSession, pendingDeleteSessionId])
+  }, [addToast, closeTab, deleteSession, disconnectSession, pendingDeleteSessionId, t])
 
   const handleBatchSessionClick = useCallback((event: React.MouseEvent, id: string) => {
     if (event.shiftKey && lastSelectedSessionId) {
