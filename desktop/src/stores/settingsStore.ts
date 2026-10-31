@@ -6,9 +6,12 @@ import { statusApi } from '../api/status'
 import { modelsApi } from '../api/models'
 import { h5AccessApi } from '../api/h5Access'
 import {
+  DEFAULT_BROWSER_SEARCH_ENGINE,
+  isBrowserSearchEngineId,
   isThemeMode,
   type AppMode,
   type AppModeConfig,
+  type BrowserSearchEngineId,
   type DesktopTerminalSettings,
   type DesktopTerminalStartupShell,
   type H5AccessDiagnostics,
@@ -81,6 +84,7 @@ type SettingsStore = {
   theme: ThemeMode
   skipWebFetchPreflight: boolean
   desktopNotificationsEnabled: boolean
+  browserSearchEngine: BrowserSearchEngineId
   agentTeamsEnabled: boolean
   desktopTerminal: DesktopTerminalSettings
   webSearch: WebSearchSettings
@@ -110,6 +114,7 @@ type SettingsStore = {
   setSkipWebFetchPreflight: (enabled: boolean) => Promise<void>
   setAgentTeamsEnabled: (enabled: boolean) => Promise<void>
   setDesktopNotificationsEnabled: (enabled: boolean) => Promise<void>
+  setBrowserSearchEngine: (engine: BrowserSearchEngineId) => Promise<void>
   setDesktopTerminal: (settings: Partial<DesktopTerminalSettings>) => Promise<void>
   setWebSearch: (settings: WebSearchSettings) => Promise<void>
   setUpdateProxy: (settings: UpdateProxySettings) => Promise<void>
@@ -170,6 +175,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   theme: useUIStore.getState().theme,
   skipWebFetchPreflight: true,
   desktopNotificationsEnabled: false,
+  browserSearchEngine: DEFAULT_BROWSER_SEARCH_ENGINE,
   agentTeamsEnabled: false,
   desktopTerminal: DEFAULT_DESKTOP_TERMINAL_SETTINGS,
   webSearch: { mode: 'auto', tavilyApiKey: '', braveApiKey: '' },
@@ -228,6 +234,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         theme,
         skipWebFetchPreflight: userSettings.skipWebFetchPreflight !== false,
         desktopNotificationsEnabled: userSettings.desktopNotificationsEnabled === true,
+        browserSearchEngine: isBrowserSearchEngineId(userSettings.browserSearchEngine) ? userSettings.browserSearchEngine : DEFAULT_BROWSER_SEARCH_ENGINE,
         agentTeamsEnabled: userSettings.agentTeamsEnabled === true,
         desktopTerminal: normalizeDesktopTerminalSettings(userSettings.desktopTerminal),
         webSearch: normalizeWebSearchSettings(userSettings.webSearch),
@@ -358,6 +365,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       if (get().desktopNotificationsEnabled === enabled) {
         set({ desktopNotificationsEnabled: prev })
       }
+    }
+  },
+
+  setBrowserSearchEngine: async (engine) => {
+    const prev = get().browserSearchEngine
+    set({ browserSearchEngine: engine })
+    try {
+      await settingsApi.updateUser({ browserSearchEngine: engine })
+    } catch (error) {
+      set({ browserSearchEngine: prev })
+      throw error
     }
   },
 

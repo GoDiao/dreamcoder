@@ -1,4 +1,5 @@
-import type { AppMode, AppModeConfig } from '../../types/settings'
+import type { BrowserGrantDecision, BrowserPickValue } from '../../../../src/server/browserHost/protocol'
+import type { AppMode, AppModeConfig, BrowserSearchEngineId } from '../../types/settings'
 import {
   ELECTRON_BRIDGE_KEY,
   type BrowserRefusal,
@@ -122,7 +123,7 @@ export function openExternalLink(url: string) {
 export type BrowserBlockedEvent = { guestId: number; url: string; reason: BrowserRefusal }
 export type BrowserShortcutEvent = Pick<KeyboardEventInit, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>
 
-export function resolveBrowserInput(input: { input: string; projectRoot: string | null }) {
+export function resolveBrowserInput(input: { input: string; projectRoot: string | null; searchEngine: BrowserSearchEngineId }) {
   return invoke<BrowserResolveResult>('browser_resolve', input)
 }
 
@@ -138,12 +139,116 @@ export function clearBrowserData() {
   return invoke<void>('browser_clear_data')
 }
 
+export type BrowserSelectionEvent = { guestId: number; text: string; truncated: boolean; title: string; url: string }
+export type BrowserMenuLabels = { addToChat: string; copy: string }
+
+export type BrowserPickState = { tabId: string; active: boolean }
+export type BrowserPickStarted = { tabId: string; sessionId: string; pickId: string }
+export type BrowserPickDone =
+  | { tabId: string; sessionId: string; pickId: string; ok: true; generation: number; value: BrowserPickValue }
+  | { tabId: string; sessionId: string; pickId: string; ok: false; cancelled: boolean; error?: string }
+export type BrowserMarkRequest = { ref: string; generation: number }
+
+export type BrowserViewRegistration = { sessionId: string; tabId: string; webContentsId: number }
+export type BrowserViewState = { tabId: string; shown: boolean; active: boolean; foreground: boolean }
+export type BrowserOpenTabRequest = { requestId: string; sessionId: string; url: string | null }
+export type BrowserActivateRequest = { requestId: string; tabId: string }
+export type { BrowserGrantDecision }
+
+function hasBridge() {
+  return typeof window !== 'undefined' && ELECTRON_BRIDGE_KEY in window
+}
+
+function invokeInDesktop(command: string, args: Record<string, unknown>) {
+  return hasBridge() ? invoke<void>(command, args) : Promise.resolve()
+}
+
+function listenInDesktop<T>(event: string, handler: (payload: T) => void): Promise<Unlisten> {
+  return hasBridge() ? listen<T>(event, handler) : Promise.resolve(() => {})
+}
+
+export function setBrowserMenuLabels(labels: BrowserMenuLabels) {
+  return invokeInDesktop('browser_set_menu_labels', labels)
+}
+
+export function registerBrowserView(input: BrowserViewRegistration) {
+  return invokeInDesktop('browser_view_register', input)
+}
+
+export function updateBrowserView(input: BrowserViewState) {
+  return invokeInDesktop('browser_view_update', input)
+}
+
+export function unregisterBrowserView(input: { tabId: string }) {
+  return invokeInDesktop('browser_view_unregister', input)
+}
+
+export function setBrowserPickMode(input: { tabId: string; active: boolean }) {
+  return invokeInDesktop('browser_pick_set', input)
+}
+
+export function syncBrowserMarks(input: { tabId: string; refs: BrowserMarkRequest[] }) {
+  return hasBridge() ? invoke<string[]>('browser_marks_sync', input) : Promise.resolve(input.refs.map((request) => request.ref))
+}
+
+export function stopBrowserControl(input: { sessionId: string }) {
+  return invokeInDesktop('browser_stop', input)
+}
+
+export function finishBrowserOpenTab(input: { requestId: string; tabId: string }) {
+  return invokeInDesktop('browser_open_tab_done', input)
+}
+
+export function finishBrowserActivate(input: { requestId: string; shown: boolean }) {
+  return invokeInDesktop('browser_activate_done', input)
+}
+
+export function replyBrowserGrant(input: { requestId: string; decision: BrowserGrantDecision }) {
+  return invoke<void>('browser_grant_reply', input)
+}
+
+export function listTrustedBrowserOrigins() {
+  return invoke<string[]>('browser_trust_list')
+}
+
+export function trustBrowserOrigin(origin: string) {
+  return invoke<string[]>('browser_trust_add', { origin })
+}
+
+export function untrustBrowserOrigin(origin: string) {
+  return invoke<string[]>('browser_trust_remove', { origin })
+}
+
+export function onBrowserOpenTabRequest(handler: (request: BrowserOpenTabRequest) => void) {
+  return listenInDesktop<BrowserOpenTabRequest>('browser-open-tab-request', handler)
+}
+
+export function onBrowserActivateRequest(handler: (request: BrowserActivateRequest) => void) {
+  return listenInDesktop<BrowserActivateRequest>('browser-activate-request', handler)
+}
+
 export function onBrowserBlocked(handler: (event: BrowserBlockedEvent) => void): Promise<Unlisten> {
   return listen<BrowserBlockedEvent>('browser-blocked', handler)
 }
 
 export function onBrowserExternalRequest(handler: (event: { url: string }) => void): Promise<Unlisten> {
   return listen<{ url: string }>('browser-external-request', handler)
+}
+
+export function onBrowserSelection(handler: (event: BrowserSelectionEvent) => void) {
+  return listenInDesktop<BrowserSelectionEvent>('browser-selection', handler)
+}
+
+export function onBrowserPickState(handler: (event: BrowserPickState) => void) {
+  return listenInDesktop<BrowserPickState>('browser-pick-state', handler)
+}
+
+export function onBrowserPickStarted(handler: (event: BrowserPickStarted) => void) {
+  return listenInDesktop<BrowserPickStarted>('browser-pick-started', handler)
+}
+
+export function onBrowserPickDone(handler: (event: BrowserPickDone) => void) {
+  return listenInDesktop<BrowserPickDone>('browser-pick-done', handler)
 }
 
 export function onBrowserShortcut(handler: (event: BrowserShortcutEvent) => void): Promise<Unlisten> {

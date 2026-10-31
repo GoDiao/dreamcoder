@@ -25,6 +25,8 @@ import { sessionsApi, type SessionGitInfo } from '../../api/sessions'
 import { PermissionModeSelector } from '../controls/PermissionModeSelector'
 import { ModelSelector } from '../controls/ModelSelector'
 import type { AttachmentRef } from '../../types/chat'
+import { refreshBrowserMarksBeforeSend } from '../../lib/browserMarks'
+import { browserReferenceAttachment } from '../../lib/browserReferenceView'
 import { AttachmentGallery } from './AttachmentGallery'
 import { ComposerDropOverlay } from './ComposerDropOverlay'
 import { RepositoryLaunchControls, type RepositoryLaunchError } from '../shared/RepositoryLaunchControls'
@@ -65,7 +67,15 @@ type ChatInputProps = {
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
 const EMPTY_SLASH_COMMANDS: PerSessionState['slashCommands'] = []
 
-function workspaceReferenceToAttachment(reference: WorkspaceChatReference): Attachment {
+function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendingLabel: string): Attachment {
+  if (reference.kind === 'browser' && reference.browser) {
+    if (reference.browser.pendingPickId) return { id: reference.id, type: 'file', name: pendingLabel }
+    return {
+      id: reference.id,
+      ...browserReferenceAttachment({ browser: reference.browser, note: reference.note }),
+      previewUrl: reference.browser.element?.screenshot?.data,
+    }
+  }
   return {
     id: reference.id,
     name: reference.name,
@@ -196,12 +206,13 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     !launchTransitioning &&
     (!showLaunchControls || launchReady || !!pendingSlashUiAction) &&
     (input.trim().length > 0 || (!isMemberSession && (attachments.length > 0 || hasWorkspaceReferences)))
+  const pickingLabel = t('browser.picking')
   const composerAttachments = useMemo(
     () => [
       ...attachments,
-      ...workspaceReferences.map(workspaceReferenceToAttachment),
+      ...workspaceReferences.map((reference) => workspaceReferenceToAttachment(reference, pickingLabel)),
     ],
-    [attachments, workspaceReferences],
+    [attachments, workspaceReferences, pickingLabel],
   )
   const slashCommandCount = slashCommands.length
 
@@ -531,13 +542,27 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       return
     }
 
+    const blockedByPendingPick = (items: WorkspaceChatReference[]) => {
+      const pending = items.some((reference) => reference.browser?.pendingPickId)
+      if (pending) useUIStore.getState().addToast({ type: 'warning', message: t('chat.browserPickPending') })
+      return pending
+    }
+
+    if (hasWorkspaceReferences && blockedByPendingPick(workspaceReferences)) return
+
+    if (hasWorkspaceReferences && workspaceReferences.some((reference) => reference.browser?.element)) {
+      await refreshBrowserMarksBeforeSend(activeTabId!)
+    }
+    const references = useWorkspaceChatContextStore.getState().referencesBySession[activeTabId!] ?? EMPTY_WORKSPACE_REFERENCES
+    if (blockedByPendingPick(references)) return
+
     const workspaceReferencePrompt = !isMemberSession
-      ? formatWorkspaceReferencePrompt(workspaceReferences)
+      ? formatWorkspaceReferencePrompt(references)
       : ''
     const contentForModel = [workspaceReferencePrompt, text].filter(Boolean).join('\n\n')
     const displayContent = text || (
-      workspaceReferences.length > 0
-        ? t('chat.contextReferencesOnly', { count: workspaceReferences.length })
+      references.length > 0
+        ? t('chat.contextReferencesOnly', { count: references.length })
         : ''
     )
     const uploadAttachmentPayload: AttachmentRef[] = attachments.map((attachment) => ({
@@ -551,8 +576,14 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       note: attachment.note,
       quote: attachment.quote,
     }))
-    const workspaceAttachmentPayload: AttachmentRef[] = workspaceReferences
-      .filter((reference) => reference.kind !== 'chat-selection')
+    const browserScreenshotPayload: AttachmentRef[] = references.flatMap((reference) => {
+      const screenshot = reference.browser?.element?.screenshot
+      return reference.kind === 'browser' && screenshot
+        ? [{ type: 'image' as const, name: `${reference.id.slice(0, 40)}.${screenshot.mimeType.split('/')[1] ?? 'png'}`, data: screenshot.data, mimeType: screenshot.mimeType }]
+        : []
+    })
+    const workspaceAttachmentPayload: AttachmentRef[] = references
+      .filter((reference) => reference.kind !== 'chat-selection' && reference.kind !== 'browser')
       .map((reference) => ({
         type: 'file' as const,
         name: reference.name,
@@ -565,16 +596,21 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       }))
     const visibleAttachmentPayload: AttachmentRef[] = [
       ...uploadAttachmentPayload,
-      ...workspaceReferences.map((reference) => ({
-        type: 'file' as const,
-        name: reference.name,
-        path: reference.kind === 'chat-selection' ? undefined : reference.path,
-        isDirectory: reference.isDirectory,
-        lineStart: reference.lineStart,
-        lineEnd: reference.lineEnd,
-        note: reference.note,
-        quote: reference.quote,
-      })),
+      ...references.map((reference): AttachmentRef => {
+        if (reference.kind === 'browser' && reference.browser) {
+          return browserReferenceAttachment({ browser: reference.browser, note: reference.note })
+        }
+        return {
+          type: 'file' as const,
+          name: reference.name,
+          path: reference.kind === 'chat-selection' ? undefined : reference.path,
+          isDirectory: reference.isDirectory,
+          lineStart: reference.lineStart,
+          lineEnd: reference.lineEnd,
+          note: reference.note,
+          quote: reference.quote,
+        }
+      }),
     ]
 
     let targetSessionId = activeTabId!
@@ -608,7 +644,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       }
     }
 
-    sendMessage(targetSessionId, contentForModel, [...uploadAttachmentPayload, ...workspaceAttachmentPayload], {
+    sendMessage(targetSessionId, contentForModel, [...uploadAttachmentPayload, ...workspaceAttachmentPayload, ...browserScreenshotPayload], {
       displayContent,
       displayAttachments: visibleAttachmentPayload,
     })
@@ -1065,7 +1101,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                       messageCount={messageCount}
                       runtimeSelectionKey={runtimeSelectionKey}
                       fallbackModelLabel={runtimeModelLabel}
-                      compact={useCompactControls}
+                      mobile={isMobileComposer}
                     />
                   </>
                 ) : null}

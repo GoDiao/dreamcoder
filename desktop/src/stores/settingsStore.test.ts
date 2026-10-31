@@ -1187,3 +1187,90 @@ describe('settingsStore auto-compact percent', () => {
     expect(useSettingsStore.getState().autoCompactPercent).toBe(60)
   })
 })
+
+describe('settingsStore browser search engine', () => {
+  const getUser = vi.fn()
+  const updateUser = vi.fn()
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    window.localStorage.clear()
+    vi.doMock('../api/settings', () => ({
+      settingsApi: {
+        getUser,
+        updateUser,
+        getPermissionMode: vi.fn().mockResolvedValue({ mode: 'default' }),
+        setPermissionMode: vi.fn(),
+        getCliLauncherStatus: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/models', () => ({
+      modelsApi: {
+        list: vi.fn().mockResolvedValue({ models: [] }),
+        getCurrent: vi.fn().mockResolvedValue({ model: null }),
+        setCurrent: vi.fn(),
+        getEffort: vi.fn().mockResolvedValue({ level: 'medium' }),
+        setEffort: vi.fn(),
+      },
+    }))
+    vi.doMock('../api/h5Access', () => ({
+      h5AccessApi: {
+        get: vi.fn().mockResolvedValue({
+          settings: { enabled: false, tokenPreview: null, allowedOrigins: [], publicBaseUrl: null },
+        }),
+        enable: vi.fn(),
+        disable: vi.fn(),
+        regenerate: vi.fn(),
+        update: vi.fn(),
+      },
+    }))
+  })
+
+  afterEach(() => {
+    vi.doUnmock('../api/settings')
+    vi.doUnmock('../api/models')
+    vi.doUnmock('../api/h5Access')
+  })
+
+  it('lists the same engines as the server', async () => {
+    const protocol = await import('../../../src/server/ws/protocol')
+    const settings = await import('../types/settings')
+
+    expect([...settings.BROWSER_SEARCH_ENGINE_IDS]).toEqual([...protocol.BROWSER_SEARCH_ENGINE_IDS])
+    expect(settings.DEFAULT_BROWSER_SEARCH_ENGINE).toBe(protocol.DEFAULT_BROWSER_SEARCH_ENGINE)
+  })
+
+  it('starts on Bing and loads the saved engine from user settings', async () => {
+    getUser.mockResolvedValue({ browserSearchEngine: 'duckduckgo' })
+    const { useSettingsStore } = await import('./settingsStore')
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('bing')
+
+    await useSettingsStore.getState().fetchAll()
+
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('duckduckgo')
+  })
+
+  it.each([undefined, 'yahoo', 3])('falls back to Bing when the saved engine is %p', async (saved) => {
+    getUser.mockResolvedValue({ browserSearchEngine: saved })
+    const { useSettingsStore } = await import('./settingsStore')
+    useSettingsStore.setState({ browserSearchEngine: 'google' })
+
+    await useSettingsStore.getState().fetchAll()
+
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('bing')
+  })
+
+  it('saves a new engine to the server and rolls back when the save fails', async () => {
+    updateUser.mockResolvedValueOnce({ ok: true })
+    const { useSettingsStore } = await import('./settingsStore')
+
+    await useSettingsStore.getState().setBrowserSearchEngine('baidu')
+    expect(updateUser).toHaveBeenLastCalledWith({ browserSearchEngine: 'baidu' })
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('baidu')
+
+    updateUser.mockRejectedValueOnce(new Error('rejected'))
+    await expect(useSettingsStore.getState().setBrowserSearchEngine('google')).rejects.toThrow('rejected')
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('baidu')
+  })
+})

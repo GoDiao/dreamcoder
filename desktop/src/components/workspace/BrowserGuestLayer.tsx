@@ -1,12 +1,27 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from '../../i18n'
-import { replayBrowserShortcut, setBrowserGuestLayer, showBlockedNavigation } from '../../lib/browserGuests'
+import { handleActivateRequest, handleOpenTabRequest } from '../../lib/browserControlRequests'
+import { startBrowserMarkSync } from '../../lib/browserMarks'
+import { handleBrowserPickDone, handleBrowserPickStarted, handleBrowserPickState } from '../../lib/browserPicks'
 import {
+  addBrowserSelectionToChat,
+  replayBrowserShortcut,
+  setBrowserGuestLayer,
+  showBlockedNavigation,
+} from '../../lib/browserGuests'
+import {
+  onBrowserActivateRequest,
   onBrowserBlocked,
   onBrowserExternalRequest,
+  onBrowserOpenTabRequest,
+  onBrowserPickDone,
+  onBrowserPickStarted,
+  onBrowserPickState,
+  onBrowserSelection,
   onBrowserShortcut,
   openBrowserExternalProtocol,
+  setBrowserMenuLabels,
   type Unlisten,
 } from '../../lib/shell'
 import { useBrowserStore } from '../../stores/browserStore'
@@ -24,13 +39,29 @@ export function BrowserGuestLayer() {
   const externalUrl = useBrowserStore((state) => state.externalRequestUrl)
   const setExternalRequestUrl = useBrowserStore((state) => state.setExternalRequestUrl)
 
+  const addToChatLabel = t('workspace.addToChat')
+  const copyLabel = t('common.copy')
+  useEffect(() => {
+    setBrowserMenuLabels({ addToChat: addToChatLabel, copy: copyLabel }).catch((error: unknown) => {
+      console.warn('[browser] setting the page menu labels failed', error)
+    })
+  }, [addToChatLabel, copyLabel])
+
   useEffect(() => subscribe([
     onBrowserBlocked(showBlockedNavigation),
+    onBrowserSelection(addBrowserSelectionToChat),
+    onBrowserPickState(handleBrowserPickState),
+    onBrowserPickStarted(handleBrowserPickStarted),
+    onBrowserPickDone(handleBrowserPickDone),
     onBrowserShortcut(replayBrowserShortcut),
+    onBrowserOpenTabRequest(handleOpenTabRequest),
+    onBrowserActivateRequest(handleActivateRequest),
     onBrowserExternalRequest(({ url }) => {
       if (!useBrowserStore.getState().externalRequestUrl) setExternalRequestUrl(url)
     }),
   ]), [setExternalRequestUrl])
+
+  useEffect(() => startBrowserMarkSync(), [])
 
   const openExternal = async () => {
     const url = externalUrl

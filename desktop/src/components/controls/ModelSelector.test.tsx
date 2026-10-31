@@ -37,6 +37,8 @@ function mirrorRuntime(sessionId: string, selection: RuntimeSelection) {
           process: { phase: 'running', generation: 1 },
           turn: { phase: 'idle' },
           pendingPermissions: [],
+          pendingBrowserGrants: [],
+          browserActivity: null,
           slashCommands: [],
           activeGoal: null,
           backgroundTasks: [],

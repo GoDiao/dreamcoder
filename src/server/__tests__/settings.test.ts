@@ -381,6 +381,31 @@ describe('Settings API', () => {
     expect(body2.model).toBe('claude-opus-4-7')
   })
 
+  it('PUT /api/settings/user should persist the browser search engine', async () => {
+    const put = makeRequest('PUT', '/api/settings/user', { browserSearchEngine: 'duckduckgo' })
+    expect((await handleSettingsApi(put.req, put.url, put.segments)).status).toBe(200)
+
+    const get = makeRequest('GET', '/api/settings/user')
+    const body = await (await handleSettingsApi(get.req, get.url, get.segments)).json()
+    expect(body.browserSearchEngine).toBe('duckduckgo')
+
+    const raw = JSON.parse(await fs.readFile(path.join(tmpDir, 'settings.json'), 'utf-8'))
+    expect(raw.browserSearchEngine).toBe('duckduckgo')
+  })
+
+  it.each(['yahoo', '', 7, null, 'Bing'])('PUT /api/settings/user should reject the browser search engine %p', async (engine) => {
+    const ok = makeRequest('PUT', '/api/settings/user', { browserSearchEngine: 'google' })
+    await handleSettingsApi(ok.req, ok.url, ok.segments)
+
+    const bad = makeRequest('PUT', '/api/settings/user', { browserSearchEngine: engine, theme: 'dark' })
+    const res = await handleSettingsApi(bad.req, bad.url, bad.segments)
+    expect(res.status).toBe(400)
+
+    const settings = await new SettingsService().getUserSettings()
+    expect(settings.browserSearchEngine).toBe('google')
+    expect(settings.theme).toBeUndefined()
+  })
+
   it('PUT /api/settings/user should sync thinking changes to active CLI sessions', async () => {
     const syncSpy = spyOn(conversationService, 'setMaxThinkingTokensForActiveSessions')
       .mockImplementation(() => 0)

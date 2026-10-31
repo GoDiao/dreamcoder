@@ -19,6 +19,7 @@ import { ToolCallBlock } from './ToolCallBlock'
 import { ToolCallGroup } from './ToolCallGroup'
 import { ToolResultBlock } from './ToolResultBlock'
 import { PermissionDialog } from './PermissionDialog'
+import { BrowserGrantRequests } from './BrowserGrantRequests'
 import { AskUserQuestion } from './AskUserQuestion'
 import { ShowUIBlock, uiPageOfCall } from './ShowUIBlock'
 import { StreamingIndicator } from './StreamingIndicator'
@@ -1958,6 +1959,8 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           ) : null}
 
           <StreamingReply sessionId={resolvedSessionId} onGrow={scheduleStickToBottom} />
+
+          <BrowserGrantRequests sessionId={resolvedSessionId} />
 
           {chatState === 'compacting' && !hasCompactingDivider && (
             <CompactStatusDivider state="compacting" />

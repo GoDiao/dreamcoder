@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { browserHostChannel } from '../browserHost/hostChannel.js'
+import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from '../browserHost/names.js'
+import { browserSessionTokens } from '../browserHost/sessionTokens.js'
+import { FakeDesktop } from '../browserHost/testSupport.js'
 import { ConversationService } from '../services/conversationService.js'
 import { ProviderService } from '../services/providerService.js'
 import { resetTerminalShellEnvironmentCacheForTests } from '../../utils/terminalShellEnvironment.js'
@@ -236,6 +240,31 @@ describe('ConversationService', () => {
     expect(env.API_TIMEOUT_MS).toBe('180000')
     expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
     expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+  })
+
+  test('buildChildEnv gives a session of a connected desktop a browser endpoint and its own token', async () => {
+    const desktop = new FakeDesktop(browserHostChannel)
+    try {
+      const service = new ConversationService() as any
+      const sdkUrl = 'ws://127.0.0.1:4000/sdk/session-a?token=x'
+      const env = (await service.buildChildEnv(tmpDir, sdkUrl, undefined, 'session-a')) as Record<string, string>
+      expect(env[BROWSER_MCP_URL_ENV]).toBe('http://127.0.0.1:4000/browser-mcp')
+      expect(browserSessionTokens.resolve(env[BROWSER_MCP_TOKEN_ENV]!)).toBe('session-a')
+      const other = (await service.buildChildEnv(tmpDir, sdkUrl, undefined, 'session-b')) as Record<string, string>
+      expect(other[BROWSER_MCP_TOKEN_ENV]).not.toBe(env[BROWSER_MCP_TOKEN_ENV])
+      browserSessionTokens.revoke('session-a')
+      browserSessionTokens.revoke('session-b')
+    } finally {
+      desktop.disconnect()
+      browserHostChannel.setToken(null)
+    }
+  })
+
+  test('buildChildEnv gives no browser endpoint when no desktop browser is connected', async () => {
+    const service = new ConversationService() as any
+    const env = (await service.buildChildEnv(tmpDir, 'ws://127.0.0.1:4000/sdk/session-a?token=x', undefined, 'session-a')) as Record<string, string>
+    expect(env[BROWSER_MCP_URL_ENV]).toBeUndefined()
+    expect(env[BROWSER_MCP_TOKEN_ENV]).toBeUndefined()
   })
 
   test('buildChildEnv turns on agent teams only when the desktop setting is on', async () => {

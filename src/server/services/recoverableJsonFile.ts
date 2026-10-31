@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises'
+import * as path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -86,4 +87,16 @@ export async function readRecoverableJsonFile<T>({
   }
 
   return normalized
+}
+
+export async function writeJsonFileAtomic(filePath: string, value: unknown): Promise<void> {
+  const tmpFile = `${filePath}.tmp.${process.pid}.${Date.now()}.${randomBytes(6).toString('hex')}`
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  try {
+    await fs.writeFile(tmpFile, JSON.stringify(value, null, 2) + '\n', 'utf-8')
+    await fs.rename(tmpFile, filePath)
+  } catch (error) {
+    await fs.unlink(tmpFile).catch(() => {})
+    throw error
+  }
 }

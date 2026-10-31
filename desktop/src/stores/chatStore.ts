@@ -701,6 +701,10 @@ export function useSessionField<K extends keyof PerSessionState>(
   return useChatStore((state) => (sessionId ? state.sessions[sessionId]?.[key] : undefined))
 }
 
+export function useBrowserActivityTabId(sessionId: string | null | undefined): string | null {
+  return useChatStore((state) => (sessionId ? state.sessions[sessionId]?.mirror?.browserActivity?.tabId ?? null : null))
+}
+
 export function useSessionRuntimeSelection(sessionId: string | null | undefined): RuntimeSelection | undefined {
   return useChatStore(useShallow((state) => (sessionId ? sessionRuntimeSelection(state.sessions[sessionId]) : undefined)))
 }

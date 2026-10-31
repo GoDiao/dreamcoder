@@ -111,6 +111,8 @@ function runtimeMirror(selection: RuntimeSelection): SessionState {
     process: { phase: 'running', generation: 1 },
     turn: { phase: 'idle' },
     pendingPermissions: [],
+    pendingBrowserGrants: [],
+    browserActivity: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
@@ -237,14 +239,14 @@ describe('Content-only pages render without errors', () => {
     expect(html).not.toContain('animate-spin')
   })
 
-  it('ContextUsageIndicator opens tap details in compact mobile mode', async () => {
+  it('ContextUsageIndicator opens tap details in mobile mode', async () => {
     render(
       <ContextUsageIndicator
         chatState="idle"
         messageCount={0}
         fallbackModelLabel="kimi-k2.6"
         draft
-        compact
+        mobile
       />,
     )
 

@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   reloadAllBrowsers: vi.fn(),
   clearBrowserData: vi.fn(),
   openBrowserUrlInSystem: vi.fn(),
+  stopBrowserControl: vi.fn(),
+  toggleBrowserPick: vi.fn(),
+  stopBrowserPick: vi.fn(),
+  updateUserSettings: vi.fn(),
 }))
 
 vi.mock('../../lib/browserGuests', () => ({
@@ -29,13 +33,25 @@ vi.mock('../../lib/browserGuests', () => ({
   reloadAllBrowsers: mocks.reloadAllBrowsers,
 }))
 
+vi.mock('../../lib/browserPicks', () => ({
+  toggleBrowserPick: mocks.toggleBrowserPick,
+  stopBrowserPick: mocks.stopBrowserPick,
+}))
+
 vi.mock('../../lib/shell', () => ({
   clearBrowserData: mocks.clearBrowserData,
   openBrowserUrlInSystem: mocks.openBrowserUrlInSystem,
+  stopBrowserControl: mocks.stopBrowserControl,
+}))
+
+vi.mock('../../api/settings', () => ({
+  settingsApi: { updateUser: mocks.updateUserSettings },
 }))
 
 import { toast } from 'sonner'
 import { useBrowserStore } from '../../stores/browserStore'
+import { useSettingsStore } from '../../stores/settingsStore'
+import { useChatStore } from '../../stores/chatStore'
 import { BrowserView } from './BrowserView'
 
 function tab(id: string, url = '') {
@@ -44,6 +60,7 @@ function tab(id: string, url = '') {
 
 describe('BrowserView', () => {
   const initialState = useBrowserStore.getInitialState()
+  const initialSettings = useSettingsStore.getInitialState()
 
   beforeEach(() => {
     mocks.placeBrowserGuest.mockReturnValue(mocks.release)
@@ -51,11 +68,14 @@ describe('BrowserView', () => {
     mocks.submitBrowserInput.mockResolvedValue(undefined)
     mocks.clearBrowserData.mockResolvedValue(undefined)
     mocks.openBrowserUrlInSystem.mockResolvedValue(undefined)
+    mocks.updateUserSettings.mockResolvedValue({ ok: true })
   })
 
   afterEach(() => {
     cleanup()
     useBrowserStore.setState(initialState, true)
+    useSettingsStore.setState(initialSettings, true)
+    useChatStore.setState(useChatStore.getInitialState(), true)
     vi.clearAllMocks()
   })
 
@@ -107,6 +127,80 @@ describe('BrowserView', () => {
     expect(mocks.browserGoForward).toHaveBeenCalledWith('t1')
     expect(mocks.browserReload).toHaveBeenCalledWith('t1')
     expect(screen.queryByText(/Open a local dev server/)).toBeNull()
+  })
+
+  describe('pick element toggle', () => {
+    it('is disabled until the page is ready and the tab has an address', () => {
+      const { rerender } = render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      const toggle = screen.getByRole('button', { name: 'Pick an element to add to the chat' })
+      expect(toggle).toBeDisabled()
+
+      act(() => useBrowserStore.getState().patchPage('t1', { ready: true }))
+      expect(toggle).toBeEnabled()
+
+      rerender(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+      expect(toggle).toBeDisabled()
+    })
+
+    it('toggles pick mode for its own tab', () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Pick an element to add to the chat' }))
+      expect(mocks.toggleBrowserPick).toHaveBeenCalledWith('t1')
+    })
+
+    it('shows that picking is on from the main process state and says how to stop', () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      expect(screen.getByRole('button', { name: 'Pick an element to add to the chat' })).toHaveAttribute('aria-pressed', 'false')
+
+      act(() => useBrowserStore.getState().setPickActive('t1', true))
+      const stop = screen.getByRole('button', { name: 'Stop picking elements' })
+      expect(stop).toHaveAttribute('aria-pressed', 'true')
+
+      act(() => useBrowserStore.getState().setPickActive('t1', false))
+      expect(screen.getByRole('button', { name: 'Pick an element to add to the chat' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('can still be switched off while the page is not ready', () => {
+      useBrowserStore.getState().setPickActive('t1', true)
+      render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      expect(screen.getByRole('button', { name: 'Stop picking elements' })).toBeEnabled()
+    })
+
+    it('does not show picking that is on for another tab', () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      useBrowserStore.getState().setPickActive('t2', true)
+      render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      expect(screen.getByRole('button', { name: 'Pick an element to add to the chat' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('stops picking on Escape in the app, only while picking is on', () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(mocks.stopBrowserPick).not.toHaveBeenCalled()
+
+      act(() => useBrowserStore.getState().setPickActive('t1', true))
+      fireEvent.keyDown(document.body, { key: 'a' })
+      expect(mocks.stopBrowserPick).not.toHaveBeenCalled()
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(mocks.stopBrowserPick).toHaveBeenCalledWith('t1')
+
+      act(() => useBrowserStore.getState().setPickActive('t1', false))
+      mocks.stopBrowserPick.mockClear()
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(mocks.stopBrowserPick).not.toHaveBeenCalled()
+    })
+
+    it('stops listening for Escape when the view goes away', () => {
+      useBrowserStore.getState().setPickActive('t1', true)
+      const { unmount } = render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+      unmount()
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(mocks.stopBrowserPick).not.toHaveBeenCalled()
+    })
   })
 
   it('offers stop while a page loads', () => {
@@ -175,6 +269,9 @@ describe('BrowserView', () => {
     const trigger = screen.getByRole('button', { name: 'Browser actions' })
     act(() => trigger.focus())
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const first = await screen.findByRole('menuitem', { name: 'Search engine' })
+    await waitFor(() => expect(first).toHaveFocus())
+    fireEvent.keyDown(first, { key: 'ArrowDown' })
     const item = await screen.findByRole('menuitem', { name: 'Clear browsing data' })
     await waitFor(() => expect(item).toHaveFocus())
     fireEvent.keyDown(item, { key: 'Enter' })
@@ -187,5 +284,91 @@ describe('BrowserView', () => {
     await waitFor(() => expect(mocks.clearBrowserData).toHaveBeenCalledOnce())
     expect(mocks.reloadAllBrowsers).toHaveBeenCalledOnce()
     expect(toast.success).toHaveBeenCalledWith('Browsing data cleared.')
+  })
+
+  async function openSearchEngineMenu() {
+    const trigger = screen.getByRole('button', { name: 'Browser actions' })
+    act(() => trigger.focus())
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const parent = await screen.findByRole('menuitem', { name: 'Search engine' })
+    await waitFor(() => expect(parent).toHaveFocus())
+    fireEvent.keyDown(parent, { key: 'ArrowRight' })
+  }
+
+  it('offers the search engines with the saved one checked', async () => {
+    useSettingsStore.setState({ browserSearchEngine: 'baidu' })
+    render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+    await openSearchEngineMenu()
+
+    const choices = await screen.findAllByRole('menuitemradio')
+    expect(choices.map((choice) => choice.textContent)).toEqual(['Bing', 'Google', 'DuckDuckGo', 'Baidu'])
+    expect(choices.map((choice) => choice.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'true'])
+  })
+
+  it('tells the user the address bar also searches', () => {
+    render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+
+    expect(screen.getByRole('textbox', { name: 'Address' })).toHaveAttribute('placeholder', expect.stringContaining('Search'))
+  })
+
+  it('saves the chosen search engine and checks it the next time the menu opens', async () => {
+    render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+    await openSearchEngineMenu()
+    expect(await screen.findByRole('menuitemradio', { name: 'Bing' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.keyDown(screen.getByRole('menuitemradio', { name: 'DuckDuckGo' }), { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.updateUserSettings).toHaveBeenCalledExactlyOnceWith({ browserSearchEngine: 'duckduckgo' }))
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('duckduckgo')
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+
+    await openSearchEngineMenu()
+    expect(await screen.findByRole('menuitemradio', { name: 'DuckDuckGo' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Bing' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('keeps the previous engine and reports the error when saving fails', async () => {
+    mocks.updateUserSettings.mockRejectedValue(new Error('Invalid browserSearchEngine'))
+    render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+    await openSearchEngineMenu()
+
+    fireEvent.keyDown(await screen.findByRole('menuitemradio', { name: 'Google' }), { key: 'Enter' })
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Invalid browserSearchEngine'))
+    expect(useSettingsStore.getState().browserSearchEngine).toBe('bing')
+  })
+
+  it('shows the activity bar above only the tab the agent operates', () => {
+    useChatStore.setState({
+      sessions: {
+        s1: {
+          ...useChatStore.getState().getSession('s1'),
+          mirror: {
+            id: 's1',
+            version: 1,
+            permission: { desired: 'default', effective: 'default' },
+            runtime: { desired: null, effective: null },
+            title: { text: null, source: null },
+            workspace: { workDir: '/repo', projectRoot: '/repo', workDirExists: true },
+            process: { phase: 'running', generation: 1 },
+            turn: { phase: 'idle' },
+            pendingPermissions: [],
+            pendingBrowserGrants: [],
+            browserActivity: { tabId: 't1' },
+            slashCommands: [],
+            activeGoal: null,
+            backgroundTasks: [],
+            uiPages: [],
+            team: null,
+            clientCount: 1,
+          },
+        },
+      },
+    })
+    const { rerender } = render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
+    expect(screen.getByTestId('browser-activity')).toBeInTheDocument()
+
+    rerender(<BrowserView sessionId="s1" tab={tab('t2')} projectRoot="/repo" />)
+    expect(screen.queryByTestId('browser-activity')).not.toBeInTheDocument()
   })
 })

@@ -80,7 +80,7 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/pages-1.png" alt="A small dashboard page with metrics and a chart" width="49%">
 </picture>
 
-*   **Built-in browser**: Open a local dev server, an HTML file in the project or an https site in a side panel tab, next to the conversation. Sign-ins are kept across restarts. Desktop app only.
+*   **Built-in browser**: Open a local dev server, an HTML file in the project or an https site in a side panel tab, next to the conversation. Sign-ins are kept across restarts. The agent can operate the page itself (read it, click, type, take screenshots, read the console and network), only in the browser of its own session; on external sites it asks first, and you can trust sites under Settings → Permissions. You can also select text or pick an element on the page and add it to the chat. Desktop app only.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/browser.png">

@@ -10,6 +10,7 @@ import {
   PROJECT_SCHEME,
   ProjectRoots,
   resolveBrowserInput,
+  searchUrl,
   serveProjectRequest,
   systemTargetFor,
   type BrowserSessionLike,
@@ -121,6 +122,73 @@ describe('resolveBrowserInput', () => {
   })
 })
 
+describe('searching from the address bar', () => {
+  const search = { engine: 'bing' }
+  const bing = (query: string) => ({ ok: true, url: `https://www.bing.com/search?q=${query}` })
+
+  it('searches for words, phrases and text that does not look like a host', async () => {
+    await expect(resolveBrowserInput('weather', project, roots, search)).resolves.toEqual(bing('weather'))
+    await expect(resolveBrowserInput('react hooks', project, roots, search)).resolves.toEqual(bing('react%20hooks'))
+    await expect(resolveBrowserInput('天气', project, roots, search)).resolves.toEqual(bing('%E5%A4%A9%E6%B0%94'))
+    await expect(resolveBrowserInput('  react hooks  ', null, roots, search)).resolves.toEqual(bing('react%20hooks'))
+    await expect(resolveBrowserInput('example.com cats', project, roots, search)).resolves.toEqual(bing('example.com%20cats'))
+    await expect(resolveBrowserInput('index', project, roots, search)).resolves.toEqual(bing('index'))
+  })
+
+  it('keeps hosts, localhost, ip literals and host:port as addresses', async () => {
+    await expect(resolveBrowserInput('example.com', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://example.com/' })
+    await expect(resolveBrowserInput('example.com/a?b=1', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://example.com/a?b=1' })
+    await expect(resolveBrowserInput('localhost', project, roots, search)).resolves.toEqual({ ok: true, url: 'http://localhost/' })
+    await expect(resolveBrowserInput('localhost/app', project, roots, search)).resolves.toEqual({ ok: true, url: 'http://localhost/app' })
+    await expect(resolveBrowserInput('localhost:3000', project, roots, search)).resolves.toEqual({ ok: true, url: 'http://localhost:3000/' })
+    await expect(resolveBrowserInput('192.168.1.5', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://192.168.1.5/' })
+    await expect(resolveBrowserInput('127.0.0.1:5173', project, roots, search)).resolves.toEqual({ ok: true, url: 'http://127.0.0.1:5173/' })
+    await expect(resolveBrowserInput('[2001:db8::1]', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://[2001:db8::1]/' })
+    await expect(resolveBrowserInput('[::1]:8443/x', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://[::1]:8443/x' })
+    await expect(resolveBrowserInput('devbox:8080', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://devbox:8080/' })
+  })
+
+  it('does not search for file paths, inputs with a scheme or files in the project', async () => {
+    const expected = await projectUrl('index.html')
+    await expect(resolveBrowserInput('./index.html', project, roots, search)).resolves.toEqual({ ok: true, url: expected })
+    await expect(resolveBrowserInput('index.html', project, roots, search)).resolves.toEqual({ ok: true, url: expected })
+    await expect(resolveBrowserInput('./missing.html', project, roots, search)).resolves.toEqual({ ok: false, reason: 'notFound' })
+    await expect(resolveBrowserInput('../outside/secret.html', project, roots, search)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
+    await expect(resolveBrowserInput('notes.txt', project, roots, search)).resolves.toEqual({ ok: false, reason: 'notHtml' })
+    await expect(resolveBrowserInput('https://example.com/a b', project, roots, search)).resolves.toEqual({ ok: true, url: 'https://example.com/a%20b' })
+    await expect(resolveBrowserInput('http://example.com', project, roots, search)).resolves.toEqual({ ok: false, reason: 'scheme' })
+    await expect(resolveBrowserInput('javascript:alert(1)', project, roots, search)).resolves.toEqual({ ok: false, reason: 'scheme' })
+    await expect(resolveBrowserInput('   ', project, roots, search)).resolves.toEqual({ ok: false, reason: 'scheme' })
+  })
+
+  it('encodes the query for each engine', () => {
+    expect(searchUrl('天气 a&b=c#d+e', 'bing')).toBe('https://www.bing.com/search?q=%E5%A4%A9%E6%B0%94%20a%26b%3Dc%23d%2Be')
+    expect(searchUrl('天气 a&b=c#d+e', 'google')).toBe('https://www.google.com/search?q=%E5%A4%A9%E6%B0%94%20a%26b%3Dc%23d%2Be')
+    expect(searchUrl('天气 a&b=c#d+e', 'duckduckgo')).toBe('https://duckduckgo.com/?q=%E5%A4%A9%E6%B0%94%20a%26b%3Dc%23d%2Be')
+    expect(searchUrl('天气 a&b=c#d+e', 'baidu')).toBe('https://www.baidu.com/s?wd=%E5%A4%A9%E6%B0%94%20a%26b%3Dc%23d%2Be')
+  })
+
+  it.each(['google', 'duckduckgo', 'baidu'])('resolves a search through %s as an allowed https page', async (engine) => {
+    const result = await resolveBrowserInput('react hooks', project, roots, { engine })
+    expect(result).toEqual({ ok: true, url: searchUrl('react hooks', engine) })
+    expect(result.ok && classifyUrl(result.url, roots)).toBe('allow')
+  })
+
+  it.each([undefined, null, '', 'yahoo', 'BING', 42, { id: 'google' }])('falls back to the default engine for %p', async (engine) => {
+    await expect(resolveBrowserInput('react hooks', project, roots, { engine })).resolves.toEqual(bing('react%20hooks'))
+  })
+
+  it('never searches when the caller does not ask for it', async () => {
+    for (const input of ['天气', 'react hooks', 'weather', 'two words', 'index']) {
+      await expect(resolveBrowserInput(input, project, roots)).resolves.toEqual({ ok: false, reason: 'scheme' })
+      await expect(resolveBrowserInput(input, null, roots)).resolves.toEqual({ ok: false, reason: 'scheme' })
+    }
+    await expect(resolveBrowserInput('example.com', project, roots)).resolves.toEqual({ ok: true, url: 'https://example.com/' })
+    await expect(resolveBrowserInput('localhost:3000', project, roots)).resolves.toEqual({ ok: true, url: 'http://localhost:3000/' })
+    await expect(resolveBrowserInput('index.html', project, roots)).resolves.toMatchObject({ ok: true })
+  })
+})
+
 describe('project files', () => {
   const read = async (file: string) => new Response(`read:${path.basename(file)}`)
 
@@ -185,12 +253,24 @@ function fakeSession() {
   return { session, handlers }
 }
 
-function install() {
+const MENU_LABELS = { addToChat: 'Add to chat', copy: 'Copy' }
+
+function install(options: { labels?: typeof MENU_LABELS | null } = {}) {
   const host = fakeHost()
   const { session, handlers } = fakeSession()
   const notify = vi.fn()
-  installBrowser({ host, session, roots, readFile: async () => new Response('file'), notify })
-  return { host, handlers, notify }
+  const popupMenu = vi.fn()
+  const labels = options.labels === undefined ? MENU_LABELS : options.labels
+  installBrowser({
+    host,
+    session,
+    roots,
+    readFile: async () => new Response('file'),
+    notify,
+    popupMenu,
+    menuLabels: () => labels,
+  })
+  return { host, handlers, notify, popupMenu }
 }
 
 describe('will-attach-webview', () => {
@@ -275,6 +355,10 @@ function attachGuest(host: ReturnType<typeof fakeHost>) {
     setWindowOpenHandler: (handler) => { windowOpen = handler },
     on: (event, listener) => { guestHandlers.set(event, listener) },
     loadURL: vi.fn(),
+    getURL: () => 'https://example.com/page',
+    getTitle: () => 'Example\n page',
+    copy: vi.fn(),
+    executeJavaScriptInIsolatedWorld: vi.fn(async () => false),
   }
   host.emit('did-attach-webview', {}, guest)
   const call = (event: string, ...args: unknown[]) =>
@@ -372,5 +456,98 @@ describe('user agent', () => {
 
     expect(handlers.userAgent).toBe('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.41 Safari/537.36')
     expect(chromeUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36')).toBe('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36')
+  })
+})
+
+describe('guest selection menu', () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('offers Add to chat and Copy for a selection and reports the cleaned capture', async () => {
+    const { host, notify, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+
+    call('context-menu', {}, { selectionText: '  one   two\r\n\r\n\r\n\r\nthree  ', frame: { parent: null } })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { label: string; click(): void }[]
+    expect(items.map((item) => item.label)).toEqual(['Add to chat', 'Copy'])
+    items[0]?.click()
+    expect(notify).toHaveBeenCalledWith('browser-selection', {
+      guestId: 7,
+      text: 'one two\n\nthree',
+      truncated: false,
+      title: 'Example page',
+      url: 'https://example.com/page',
+    })
+    items[1]?.click()
+    expect(guest.copy).toHaveBeenCalledOnce()
+  })
+
+  it('cuts a long selection and says so', async () => {
+    const { host, notify, popupMenu } = install()
+    const { call } = attachGuest(host)
+
+    call('context-menu', {}, { selectionText: 'x'.repeat(5000), frame: { parent: null } })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { click(): void }[]
+    items[0]?.click()
+    const payload = notify.mock.calls[0]?.[1] as { text: string; truncated: boolean }
+    expect(payload.text).toHaveLength(4000)
+    expect(payload.truncated).toBe(true)
+  })
+
+  it('leaves out Add to chat when the selection touches a sensitive field', async () => {
+    const { host, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+    vi.mocked(guest.executeJavaScriptInIsolatedWorld).mockResolvedValue(true)
+
+    call('context-menu', {}, { selectionText: 'secret', frame: { parent: null } })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { label: string }[]
+    expect(items.map((item) => item.label)).toEqual(['Copy'])
+  })
+
+  it('treats a failed check as sensitive', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { host, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+    vi.mocked(guest.executeJavaScriptInIsolatedWorld).mockRejectedValue(new Error('gone'))
+
+    call('context-menu', {}, { selectionText: 'text', frame: { parent: null } })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { label: string }[]
+    expect(items.map((item) => item.label)).toEqual(['Copy'])
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+
+  it('does not offer a selection made inside a subframe', async () => {
+    const { host, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+
+    call('context-menu', {}, { selectionText: 'text', frame: { parent: {} } })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { label: string }[]
+    expect(items.map((item) => item.label)).toEqual(['Copy'])
+    expect(guest.executeJavaScriptInIsolatedWorld).not.toHaveBeenCalled()
+  })
+
+  it('shows no menu without a selection or before the labels are known', async () => {
+    const empty = install()
+    const first = attachGuest(empty.host)
+    first.call('context-menu', {}, { selectionText: '   ', frame: { parent: null } })
+    await flush()
+    expect(empty.popupMenu).not.toHaveBeenCalled()
+    expect(first.guest.executeJavaScriptInIsolatedWorld).not.toHaveBeenCalled()
+
+    const unlabeled = install({ labels: null })
+    const second = attachGuest(unlabeled.host)
+    second.call('context-menu', {}, { selectionText: 'text', frame: { parent: null } })
+    await flush()
+    expect(unlabeled.popupMenu).not.toHaveBeenCalled()
   })
 })
