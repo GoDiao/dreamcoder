@@ -17,7 +17,6 @@ import {
 import {
   createFetchWithInit,
   type FetchLike,
-  type Transport,
 } from '@modelcontextprotocol/sdk/shared/transport.js'
 import {
   CallToolResultSchema,
@@ -229,18 +228,9 @@ function getMcpToolTimeoutMs(): number {
   )
 }
 
-import { isClaudeInChromeMCPServer } from '../../utils/claudeInChrome/common.js'
-
-// Lazy: toolRendering.tsx pulls React/ink; only needed when Claude-in-Chrome MCP server is connected
-/* eslint-disable @typescript-eslint/no-require-imports */
-const claudeInChromeToolRendering =
-  (): typeof import('../../utils/claudeInChrome/toolRendering.js') =>
-    require('../../utils/claudeInChrome/toolRendering.js')
-
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-/* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 
 const MCP_AUTH_CACHE_TTL_MS = 15 * 60 * 1000 // 15 min
@@ -598,9 +588,6 @@ export const connectToServer = memoize(
     const redactEnvironment = createMcpEnvironmentRedactor(
       'env' in serverRef ? serverRef.env : undefined,
     )
-    let inProcessServer:
-      | { connect(t: Transport): Promise<void>; close(): Promise<void> }
-      | undefined
     try {
       let transport
 
@@ -894,26 +881,6 @@ export const connectToServer = memoize(
           transportOptions,
         )
         logMCPDebug(name, `claude.ai proxy transport created successfully`)
-      } else if (
-        (serverRef.type === 'stdio' || !serverRef.type) &&
-        isClaudeInChromeMCPServer(name)
-      ) {
-        // Run the Chrome MCP server in-process to avoid spawning a ~325 MB subprocess
-        const { createChromeContext } = await import(
-          '../../utils/claudeInChrome/mcpServer.js'
-        )
-        const { createClaudeForChromeMcpServer } = await import(
-          '@ant/claude-for-chrome-mcp'
-        )
-        const { createLinkedTransportPair } = await import(
-          './InProcessTransport.js'
-        )
-        const context = createChromeContext(serverRef.env)
-        inProcessServer = createClaudeForChromeMcpServer(context)
-        const [clientTransport, serverTransport] = createLinkedTransportPair()
-        await inProcessServer.connect(serverTransport)
-        transport = clientTransport
-        logMCPDebug(name, `In-process Chrome MCP server started`)
       } else if (serverRef.type === 'stdio' || !serverRef.type) {
         const finalCommand =
           process.env.CLAUDE_CODE_SHELL_PREFIX || serverRef.command
@@ -1024,9 +991,6 @@ export const connectToServer = memoize(
             name,
             `Connection timeout triggered after ${elapsed}ms (limit: ${getConnectionTimeoutMs()}ms)`,
           )
-          if (inProcessServer) {
-            inProcessServer.close().catch(() => {})
-          }
           transport.close().catch(() => {})
           reject(
             new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
@@ -1115,9 +1079,6 @@ export const connectToServer = memoize(
           logEvent('tengu_mcp_ide_server_connection_failed', {
             connectionDurationMs: elapsed,
           })
-        }
-        if (inProcessServer) {
-          inProcessServer.close().catch(() => {})
         }
         transport.close().catch(() => {})
         if (stderrOutput) {
@@ -1374,21 +1335,6 @@ export const connectToServer = memoize(
       }
 
       const cleanup = async () => {
-        // In-process servers (e.g. Chrome MCP) don't have child processes or stderr
-        if (inProcessServer) {
-          try {
-            await inProcessServer.close()
-          } catch (error) {
-            logMCPDebug(name, `Error closing in-process server: ${error}`)
-          }
-          try {
-            await client.close()
-          } catch (error) {
-            logMCPDebug(name, `Error closing client: ${error}`)
-          }
-          return
-        }
-
         // Remove stderr event listener to prevent memory leaks
         if (stderrHandler && (serverRef.type === 'stdio' || !serverRef.type)) {
           const stdioTransport = transport as StdioClientTransport
@@ -1599,9 +1545,6 @@ export const connectToServer = memoize(
       )
       logMCPError(name, `Connection failed: ${safeErrorMessage}`)
 
-      if (inProcessServer) {
-        inProcessServer.close().catch(() => {})
-      }
       return {
         name,
         type: 'failed' as const,
@@ -1947,12 +1890,6 @@ export const fetchToolsForClient = memoizeWithLRU(
               const displayName = tool.annotations?.title || tool.name
               return `${client.name} - ${displayName} (MCP)`
             },
-            ...(isClaudeInChromeMCPServer(client.name) &&
-            (client.config.type === 'stdio' || !client.config.type)
-              ? claudeInChromeToolRendering().getClaudeInChromeMCPToolOverrides(
-                  tool.name,
-                )
-              : {}),
           }
         })
         .filter(isIncludedMcpTool)

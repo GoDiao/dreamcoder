@@ -39,6 +39,19 @@ export type PendingPermission = {
   suggestions?: unknown[]
 }
 
+export type PendingBrowserGrant = {
+  requestId: string
+  origin: string
+  action: string
+  requestedAt: number
+  allowOnce: boolean
+  allowSession: boolean
+}
+
+export type BrowserActivity = {
+  tabId: string
+}
+
 export type ActiveGoal = {
   action: GoalEventAction
   status?: string
@@ -98,6 +111,8 @@ export type SessionState = {
     activity?: TurnActivity
   }
   pendingPermissions: PendingPermission[]
+  pendingBrowserGrants: PendingBrowserGrant[]
+  browserActivity: BrowserActivity | null
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
@@ -138,6 +153,9 @@ export type SessionStateEvent =
   | { type: 'permission_request_opened'; request: PendingPermission; at: number }
   | { type: 'permission_request_resolved'; requestId: string; allowed: boolean; by: ClientKind }
   | { type: 'permission_request_cancelled'; requestId: string }
+  | { type: 'browser_grant_requested'; grant: PendingBrowserGrant }
+  | { type: 'browser_grant_closed'; requestId: string }
+  | { type: 'browser_activity_changed'; activity: BrowserActivity | null }
   | { type: 'slash_commands_reported'; commands: SessionSlashCommand[] }
   | { type: 'goal_reported'; goal: Omit<ActiveGoal, 'updatedAt'>; at: number }
   | { type: 'background_task_reported'; task: BackgroundTaskEvent; at: number }

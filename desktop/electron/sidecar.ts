@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { createConnection, createServer } from 'node:net'
 import path from 'node:path'
@@ -23,6 +24,7 @@ export function devSidecarPaths(desktopRoot: string, triple: string, exe: string
 export type SidecarRuntime = {
   url: string
   child: ChildProcess
+  token: string
 }
 
 function reservePort(): Promise<number> {
@@ -87,10 +89,11 @@ function sidecarEnv(paths: SidecarPaths, appVersion: string): NodeJS.ProcessEnv 
 export async function startSidecar(paths: SidecarPaths, appVersion: string): Promise<SidecarRuntime> {
   const port = await reservePort()
   const logs: string[] = []
+  const token = randomBytes(32).toString('hex')
   const child = spawn(
     paths.binary,
     ['server', '--app-root', paths.appRoot, '--host', BIND_HOST, '--port', String(port)],
-    { env: sidecarEnv(paths, appVersion), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+    { env: sidecarEnv(paths, appVersion), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
   )
   const record = (stream: string) => (chunk: Buffer) => {
     for (const line of chunk.toString('utf8').split('\n')) {
@@ -100,6 +103,8 @@ export async function startSidecar(paths: SidecarPaths, appVersion: string): Pro
       if (logs.length > STARTUP_LOG_LIMIT) logs.shift()
     }
   }
+  child.stdin?.on('error', (error) => console.error('[claude-server] writing to sidecar stdin failed', error))
+  child.stdin?.write(`${token}\n`)
   child.stdout?.on('data', record('stdout'))
   child.stderr?.on('data', record('stderr'))
   let spawnError: Error | null = null
@@ -119,5 +124,5 @@ export async function startSidecar(paths: SidecarPaths, appVersion: string): Pro
     throw new Error(`${message}\n\nRecent server logs:\n${logs.join('\n') || 'No server stdout/stderr was captured before the timeout.'}`)
   }
 
-  return { url: `http://${CONTROL_HOST}:${port}`, child }
+  return { url: `http://${CONTROL_HOST}:${port}`, child, token }
 }

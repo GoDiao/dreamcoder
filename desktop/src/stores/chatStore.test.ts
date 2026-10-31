@@ -175,6 +175,8 @@ function mirrorState(overrides: Partial<SessionState> = {}): SessionState {
     process: { phase: 'running', generation: 1 },
     turn: { phase: 'idle' },
     pendingPermissions: [],
+    pendingBrowserGrants: [],
+    browserActivity: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

@@ -226,6 +226,8 @@ type SessionState = {
     activity?: 'thinking' | 'streaming' | 'tool' | 'compacting'
   }
   pendingPermissions: PendingPermission[]
+  pendingBrowserGrants: PendingBrowserGrant[]
+  browserActivity: BrowserActivity | null
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
@@ -251,6 +253,8 @@ type RuntimeSelection = { providerId: string | null; modelId: string; effort?: s
 | `process` | 仅 ProcessSupervisor | 否 | — |
 | `turn` | 仅 OutputPipeline | 否 | — |
 | `pendingPermissions` | OutputPipeline（出现、撤销）、CommandRouter（已处理） | 否，CLI 退出即失效 | — |
+| `pendingBrowserGrants` | 浏览器授权（出现、撤销） | 否，CLI 退出即失效 | — |
+| `browserActivity` | 浏览器服务（调用开始、结束） | 否 | — |
 | `slashCommands` | OutputPipeline（`init`）、插件重载 | 否 | — |
 | `activeGoal` | OutputPipeline | 由 transcript 推导（现状） | 本地命令输出条目 |
 | `backgroundTasks` | OutputPipeline | 由 transcript 推导（现状） | — |

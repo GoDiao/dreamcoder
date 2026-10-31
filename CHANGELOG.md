@@ -4,8 +4,24 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **The agent can operate the built-in browser** (#189). The agent gets fourteen tools (`navigate`, `snapshot`, `scroll`, `click`, `type`, `press_key`, `screenshot`, `console`, `network`, `back`, `wait_for`, `styles`, `evaluate`, `emulate`) that work only on the side browser of its own session; there is no remote debugging port and no control of your own Chrome. Pages are read as a compact snapshot of text and numbered interactive elements, with delta updates for later reads; on long pages the agent can `scroll`, search the page text with `find`, and read on with `textFrom`; it can wait for text to appear, read an element's computed CSS, run a script in the page (which asks first on external sites), and emulate a viewport size or dark mode for the length of the turn. Local pages (localhost, project files) can be operated freely, except that a local page embedding another site asks permission for each embedded site, once for each action and never remembered; on external https sites reading (including scrolling) is free and each origin asks before the agent clicks, types, presses keys or navigates, with "Deny", "Allow once" or "Trust for this session". Sites you always trust are managed under Settings → Permissions. A bar in the panel shows when the agent is operating the page and has a Stop button. A built-in `browser` skill explains the tools, and the verification agent and `/batch` now point at them. Page text in the results of clicks and typing, and in dialog text, is marked as untrusted too. The browser tab keeps working when its page crashes and is reloaded. Desktop app only.
+- **Add selected text from the built-in browser to the chat** (#189). Select text on a page, right-click and choose "Add to chat": the text, with the page title and address, appears as a reference in the message box and goes to the agent as untrusted page content that it must not treat as your instructions. A selection that touches a password or card field, or lies inside an embedded frame, cannot be added. Selections are cut at 4000 characters and marked as cut. Restored sessions show these references as cards again.
+- **Pick an element in the built-in browser and add it to the chat** (#189). Turn on "Pick an element" in the browser toolbar and click elements on the page: each stays outlined in orange, with a small label, until you send the message, and you can pick several. A picked element goes to the chat with a screenshot and its details (tag, classes, role, name, text, selector, link address, key styles, its HTML and its neighbours' HTML, and React component info) as untrusted page content that the agent must not treat as your instructions. Password and card fields, and anything that contains one, are never carried, only where the element is. The agent cannot click, type or press keys on the page while you are picking. Elements that were on a page you left are marked as gone.
+
+### Changed
+
+- The built-in browser's address bar searches when the input is not an address: a phrase with spaces or a single word without a dot goes to the search engine you pick in the browser's "More" menu (Bing by default, or Google, DuckDuckGo, Baidu). The agent's own navigation never turns text into a search; it still needs a URL.
+- Opening the side panel in a session with no tabs now shows the new tab page, so you choose between changes, files, a web page or a terminal, instead of opening the changes or the file tree for you.
+
+### Removed
+
+- The Claude in Chrome integration and its `/chrome` command, which controlled the user's own Chrome through an extension. The built-in browser replaces it.
+
 ### Fixed
 
+- With the side panel open, the Context ring under the input opens a hover card next to the button on desktop again; it opened a full-width bottom drawer because the narrow chat column was treated like a phone. The drawer is now used only on a phone-sized viewport.
 - Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195). Thanks @pcbeingused333.
 - A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
 - Stopping or restarting a lead session no longer deletes its team and task list (#199). Teams are removed only by `TeamDelete`, not when the CLI process exits (Stop, `/clear`, restart, app quit). Thanks @pcbeingused333.

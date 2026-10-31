@@ -15,7 +15,7 @@ type Props = {
   runtimeSelectionKey?: string
   fallbackModelLabel?: string
   draft?: boolean
-  compact?: boolean
+  mobile?: boolean
 }
 
 const ACTIVE_REFRESH_MS = 30_000
@@ -70,7 +70,7 @@ export function ContextUsageIndicator({
   runtimeSelectionKey = '',
   fallbackModelLabel,
   draft = false,
-  compact = false,
+  mobile = false,
 }: Props) {
   const t = useTranslation()
   const [context, setContext] = useState<SessionContextSnapshot | null>(null)
@@ -287,7 +287,7 @@ export function ContextUsageIndicator({
       type="button"
       aria-label={ariaLabel}
       onClick={() => {
-        if (compact) {
+        if (mobile) {
           setMobileDetailsOpen(true)
         }
         void refresh('manual')
@@ -305,7 +305,7 @@ export function ContextUsageIndicator({
     </Button>
   )
 
-  if (compact) {
+  if (mobile) {
     return (
       <>
         {trigger}

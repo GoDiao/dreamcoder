@@ -6,7 +6,6 @@ import { dirname, join, parse } from 'path'
 import { getPlatform } from 'src/utils/platform.js'
 import type { PluginError } from '../../types/plugin.js'
 import { getPluginErrorMessage } from '../../types/plugin.js'
-import { isClaudeInChromeMCPServer } from '../../utils/claudeInChrome/common.js'
 import {
   getCurrentProjectConfig,
   getGlobalConfig,
@@ -639,13 +638,13 @@ export async function addMcpConfig(
     )
   }
 
-  // Block reserved server name "claude-in-chrome"
-  if (isClaudeInChromeMCPServer(name)) {
+  const { isCuaMCPServer } = await import('../../utils/computerUse/common.js')
+  if (isCuaMCPServer(name)) {
     throw new Error(`Cannot add MCP server "${name}": this name is reserved.`)
   }
 
-  const { isCuaMCPServer } = await import('../../utils/computerUse/common.js')
-  if (isCuaMCPServer(name)) {
+  const { isBrowserControlMCPServer } = await import('../../utils/browserControl/common.js')
+  if (isBrowserControlMCPServer(name)) {
     throw new Error(`Cannot add MCP server "${name}": this name is reserved.`)
   }
 

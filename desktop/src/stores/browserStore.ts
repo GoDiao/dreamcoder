@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { BrowserRefusal } from '../lib/shell/electronBridge'
 
 type BrowserPage = {
+  ready: boolean
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
@@ -14,14 +15,17 @@ type BrowserNotice =
 type BrowserStore = {
   pageByTab: Record<string, BrowserPage | undefined>
   noticeByTab: Record<string, BrowserNotice | undefined>
+  pickActiveByTab: Record<string, boolean | undefined>
   externalRequestUrl: string | null
   patchPage: (tabId: string, patch: Partial<BrowserPage>) => void
   setNotice: (tabId: string, notice: BrowserNotice | null) => void
+  setPickActive: (tabId: string, active: boolean) => void
   setExternalRequestUrl: (url: string | null) => void
   clearTab: (tabId: string) => void
 }
 
 export const EMPTY_BROWSER_PAGE: BrowserPage = {
+  ready: false,
   loading: false,
   canGoBack: false,
   canGoForward: false,
@@ -35,6 +39,7 @@ function withoutKey<T>(record: Record<string, T>, key: string) {
 export const useBrowserStore = create<BrowserStore>((set) => ({
   pageByTab: {},
   noticeByTab: {},
+  pickActiveByTab: {},
   externalRequestUrl: null,
 
   patchPage: (tabId, patch) =>
@@ -52,11 +57,17 @@ export const useBrowserStore = create<BrowserStore>((set) => ({
         : withoutKey(state.noticeByTab, tabId),
     })),
 
+  setPickActive: (tabId, active) =>
+    set((state) => ({
+      pickActiveByTab: active ? { ...state.pickActiveByTab, [tabId]: true } : withoutKey(state.pickActiveByTab, tabId),
+    })),
+
   setExternalRequestUrl: (url) => set({ externalRequestUrl: url }),
 
   clearTab: (tabId) =>
     set((state) => ({
       pageByTab: withoutKey(state.pageByTab, tabId),
       noticeByTab: withoutKey(state.noticeByTab, tabId),
+      pickActiveByTab: withoutKey(state.pickActiveByTab, tabId),
     })),
 }))

@@ -3,7 +3,18 @@ import { MoreHorizontal } from 'lucide-react'
 import { useMenuAction } from '../../hooks/useMenuAction'
 import { Tooltip } from './Tooltip'
 import { Button } from './ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 
 export type MenuAction = {
@@ -17,20 +28,51 @@ export type MenuAction = {
   afterClose?: boolean
 }
 
-function ActionItems({ actions, context = false, run }: { actions: MenuAction[]; context?: boolean; run: (action: MenuAction) => void }) {
+export type MenuChoiceGroup = {
+  id: string
+  label: string
+  icon?: ReactNode
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  separatorBefore?: boolean
+}
+
+function ChoiceSubmenu({ group }: { group: MenuChoiceGroup }) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        {group.icon}<span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{group.label}</span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent collisionPadding={8}>
+        <DropdownMenuRadioGroup value={group.value} onValueChange={group.onChange}>
+          {group.options.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  )
+}
+
+function ActionItems({ actions, context = false, run }: { actions: (MenuAction | MenuChoiceGroup)[]; context?: boolean; run: (action: MenuAction) => void }) {
   const Item = context ? ContextMenuItem : DropdownMenuItem
   const Separator = context ? ContextMenuSeparator : DropdownMenuSeparator
   return actions.map((action) => (
     <Fragment key={action.id}>
       {action.separatorBefore && <Separator />}
-      <Item variant={action.danger ? 'destructive' : 'default'} disabled={action.disabled} onSelect={() => run(action)}>
-        {action.icon}<span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{action.label}</span>
-      </Item>
+      {'options' in action ? (
+        <ChoiceSubmenu group={action} />
+      ) : (
+        <Item variant={action.danger ? 'destructive' : 'default'} disabled={action.disabled} onSelect={() => run(action)}>
+          {action.icon}<span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{action.label}</span>
+        </Item>
+      )}
     </Fragment>
   ))
 }
 
-export function ActionMenu({ actions, trigger, label }: { actions: MenuAction[]; trigger: ReactElement; label: string }) {
+export function ActionMenu({ actions, trigger, label }: { actions: (MenuAction | MenuChoiceGroup)[]; trigger: ReactElement; label: string }) {
   const menu = useMenuAction()
   return (
     <DropdownMenu>

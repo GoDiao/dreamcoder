@@ -12,6 +12,8 @@ function reduce(state: SessionState, ...events: SessionStateEvent[]): SessionSta
 
 const request = { requestId: 'req-1', toolName: 'Bash', input: { command: 'ls' } }
 
+const browserGrant = { requestId: 'grant-1', origin: 'https://example.com', action: 'Click element [1]', requestedAt: 7, allowOnce: true, allowSession: true }
+
 describe('session state reducer', () => {
   it('bumps the version and reports only the changed top-level fields', () => {
     const state = createSessionState('s1')
@@ -114,6 +116,61 @@ describe('session state reducer', () => {
     const resolved = reduce(opened, { type: 'permission_request_resolved', requestId: 'req-1', allowed: true, by: 'h5' })
     expect(resolved.turn.phase).toBe('running')
     expect(resolved.pendingPermissions).toEqual([])
+  })
+
+  it('opens and closes a browser grant without touching the turn', () => {
+    const opened = reduce(createSessionState('s1'), { type: 'turn_started', at: 5 }, { type: 'browser_grant_requested', grant: browserGrant })
+    expect(opened.pendingBrowserGrants).toEqual([browserGrant])
+    expect(opened.turn.phase).toBe('running')
+
+    const closed = reduce(opened, { type: 'browser_grant_closed', requestId: 'grant-1' })
+    expect(closed.pendingBrowserGrants).toEqual([])
+  })
+
+  it('replaces a browser grant that is opened twice and ignores closing an unknown one', () => {
+    const state = reduce(
+      createSessionState('s1'),
+      { type: 'browser_grant_requested', grant: browserGrant },
+      { type: 'browser_grant_requested', grant: { ...browserGrant, allowOnce: false } },
+    )
+    expect(state.pendingBrowserGrants).toEqual([{ ...browserGrant, allowOnce: false }])
+
+    const result = reduceSessionState(state, { type: 'browser_grant_closed', requestId: 'other' })
+    expect(result.patch).toEqual({})
+    expect(result.state).toBe(state)
+  })
+
+  it('drops pending browser grants when the process ends, starts again or the conversation is cleared', () => {
+    const open = reduce(createSessionState('s1'), { type: 'browser_grant_requested', grant: browserGrant })
+    expect(reduce(open, { type: 'process_phase_changed', phase: 'stopped', generation: 1 }).pendingBrowserGrants).toEqual([])
+    expect(reduce(open, { type: 'process_phase_changed', phase: 'failed', generation: 1 }).pendingBrowserGrants).toEqual([])
+    expect(reduce(open, { type: 'process_phase_changed', phase: 'starting', generation: 1 }).pendingBrowserGrants).toEqual([])
+    expect(reduce(open, { type: 'conversation_cleared' }).pendingBrowserGrants).toEqual([])
+    expect(reduce(open, { type: 'process_phase_changed', phase: 'running', generation: 1 }).pendingBrowserGrants).toEqual([browserGrant])
+  })
+
+  it('sets and clears browser activity and reports no change for a repeat', () => {
+    const active = reduce(createSessionState('s1'), { type: 'browser_activity_changed', activity: { tabId: 't1' } })
+    expect(active.browserActivity).toEqual({ tabId: 't1' })
+
+    const repeated = reduceSessionState(active, { type: 'browser_activity_changed', activity: { tabId: 't1' } })
+    expect(repeated.patch).toEqual({})
+    expect(repeated.state).toBe(active)
+
+    const moved = reduceSessionState(active, { type: 'browser_activity_changed', activity: { tabId: 't2' } })
+    expect(moved.patch).toEqual({ browserActivity: { tabId: 't2' } })
+
+    const cleared = reduceSessionState(active, { type: 'browser_activity_changed', activity: null })
+    expect(cleared.patch).toEqual({ browserActivity: null })
+  })
+
+  it('drops browser activity when the process ends, starts again or the conversation is cleared', () => {
+    const active = reduce(createSessionState('s1'), { type: 'browser_activity_changed', activity: { tabId: 't1' } })
+    expect(reduce(active, { type: 'process_phase_changed', phase: 'stopped', generation: 1 }).browserActivity).toBeNull()
+    expect(reduce(active, { type: 'process_phase_changed', phase: 'failed', generation: 1 }).browserActivity).toBeNull()
+    expect(reduce(active, { type: 'process_phase_changed', phase: 'starting', generation: 1 }).browserActivity).toBeNull()
+    expect(reduce(active, { type: 'conversation_cleared' }).browserActivity).toBeNull()
+    expect(reduce(active, { type: 'process_phase_changed', phase: 'running', generation: 1 }).browserActivity).toEqual({ tabId: 't1' })
   })
 
   it('keeps a queued restart until the next process starts', () => {

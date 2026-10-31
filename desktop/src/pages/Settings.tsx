@@ -28,6 +28,8 @@ import { PluginList } from '../components/plugins/PluginList'
 import { PluginDetail } from '../components/plugins/PluginDetail'
 import { ComputerUseSettings } from './ComputerUseSettings'
 import { H5AccessSettings } from '../components/settings/H5AccessSettings'
+import { BrowserTrustSettings } from '../components/settings/BrowserTrustSettings'
+import { isDesktopRuntime } from '../lib/desktopRuntime'
 import { McpSettings } from './McpSettings'
 import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { ActivitySettings } from './ActivitySettings'
@@ -256,6 +258,8 @@ function PermissionSettings() {
           )
         })}
       </div>
+
+      {isDesktopRuntime() ? <BrowserTrustSettings /> : null}
     </div>
   )
 }

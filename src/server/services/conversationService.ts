@@ -17,6 +17,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
+import { browserMcpChildEnv } from '../browserHost/childEnv.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
 import { SettingsService } from './settingsService.js'
@@ -306,7 +307,7 @@ export class ConversationService {
       `[ConversationService] Starting CLI for ${sessionId}, cwd: ${launchWorkDir} (process.cwd()=${process.cwd()}, CALLER_DIR will be pinned to workDir)`,
     )
 
-    const childEnv = await this.buildChildEnv(launchWorkDir, sdkUrl, options)
+    const childEnv = await this.buildChildEnv(launchWorkDir, sdkUrl, options, sessionId)
 
     let proc: ReturnType<typeof Bun.spawn>
     try {
@@ -938,6 +939,7 @@ export class ConversationService {
     workDir: string,
     sdkUrl?: string,
     options?: SessionStartOptions,
+    sessionId?: string,
   ): Promise<Record<string, string>> {
     const PROVIDER_ENV_KEYS = [
       'ANTHROPIC_API_KEY',
@@ -1009,6 +1011,7 @@ export class ConversationService {
       ...(desktopServerUrl
         ? { DREAMCODER_DESKTOP_SERVER_URL: desktopServerUrl }
         : {}),
+      ...(sessionId ? browserMcpChildEnv(sessionId, desktopServerUrl) : {}),
       ...(sdkUrl
         ? {
             DREAMCODER_DESKTOP_AWAIT_MCP: '1',

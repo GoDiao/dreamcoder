@@ -1,6 +1,10 @@
 import { useBrowserStore } from '../stores/browserStore'
+import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
+import { browserReferenceName, normalizeBrowserSelection, type BrowserReferenceData } from './browserReferences'
+import { useSettingsStore } from '../stores/settingsStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
-import { resolveBrowserInput, type BrowserBlockedEvent, type BrowserShortcutEvent } from './shell'
+import { registerGuestView, reportViewState, unregisterGuestView } from './browserViewReporter'
+import { resolveBrowserInput, type BrowserBlockedEvent, type BrowserSelectionEvent, type BrowserShortcutEvent } from './shell'
 import { BROWSER_PARTITION } from './shell/electronBridge'
 
 type WebviewElement = HTMLElement & {
@@ -110,6 +114,8 @@ function createGuest(sessionId: string, tabId: string, url: string) {
     if (guest.ready) return
     guest.ready = true
     guest.webContentsId = webview.getWebContentsId()
+    store.patchPage(tabId, { ready: true })
+    registerGuestView(sessionId, tabId, guest.webContentsId, () => isBrowserGuestShown(tabId))
     syncPage(guest)
   })
   webview.addEventListener('did-start-loading', () => store.patchPage(tabId, { loading: true }))
@@ -118,6 +124,7 @@ function createGuest(sessionId: string, tabId: string, url: string) {
   webview.addEventListener('did-navigate-in-page', () => syncPage(guest))
   webview.addEventListener('did-navigate', (event) => {
     const { url: navigatedUrl } = event as Event & { url: string }
+    useWorkspaceChatContextStore.getState().markBrowserElementsStale(sessionId, tabId)
     if (navigatedUrl.startsWith(ERROR_PAGE_PROTOCOL)) return
     store.setNotice(tabId, null)
     useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { url: navigatedUrl })
@@ -136,6 +143,10 @@ function createGuest(sessionId: string, tabId: string, url: string) {
 
 export function hasBrowserGuest(tabId: string) {
   return guests.get(tabId)?.slot.isConnected ?? false
+}
+
+export function isBrowserGuestShown(tabId: string) {
+  return guests.get(tabId)?.slot.dataset.shown === 'true'
 }
 
 export function openBrowserUrl(sessionId: string, tabId: string, url: string) {
@@ -157,7 +168,7 @@ export function openBrowserUrl(sessionId: string, tabId: string, url: string) {
 
 export async function submitBrowserInput(sessionId: string, tabId: string, input: string, projectRoot: string | null) {
   const store = useBrowserStore.getState()
-  const result = await resolveBrowserInput({ input, projectRoot })
+  const result = await resolveBrowserInput({ input, projectRoot, searchEngine: useSettingsStore.getState().browserSearchEngine })
   if (!result.ok) {
     store.setNotice(tabId, { kind: 'refused', reason: result.reason, url: input })
     return
@@ -205,13 +216,17 @@ export function placeBrowserGuest(tabId: string, stage: HTMLElement, visible: bo
 
 export function closeBrowser(tabId: string) {
   const guest = guests.get(tabId)
-  if (guest) disposeGuest(guest)
+  if (guest) {
+    useWorkspaceChatContextStore.getState().markBrowserElementsStale(guest.sessionId, tabId)
+    disposeGuest(guest)
+  }
   placements.get(tabId)?.observer?.disconnect()
   placements.delete(tabId)
   useBrowserStore.getState().clearTab(tabId)
 }
 
 function disposeGuest(guest: Guest) {
+  if (guests.get(guest.tabId) === guest) unregisterGuestView(guest.tabId)
   guest.slot.remove()
   if (guests.get(guest.tabId) === guest) guests.delete(guest.tabId)
 }
@@ -224,6 +239,8 @@ function setShown(slot: HTMLElement, shown: boolean) {
   slot.dataset.shown = shown ? 'true' : 'false'
   slot.style.visibility = shown ? 'visible' : 'hidden'
   slot.style.pointerEvents = shown && !gestureActive ? 'auto' : 'none'
+  const tabId = slot.dataset.browserSlot
+  if (tabId) reportViewState(tabId)
 }
 
 function applyPlacement(tabId: string) {
@@ -275,4 +292,23 @@ export function showBlockedNavigation(event: BrowserBlockedEvent) {
 
 export function replayBrowserShortcut(event: BrowserShortcutEvent) {
   document.body.dispatchEvent(new KeyboardEvent('keydown', { ...event, bubbles: true, cancelable: true }))
+}
+
+export function addBrowserSelectionToChat(event: BrowserSelectionEvent) {
+  const guest = [...guests.values()].find((candidate) => candidate.webContentsId === event.guestId)
+  const capture = normalizeBrowserSelection(event)
+  if (!guest || !capture) return
+  const browser: BrowserReferenceData = {
+    url: capture.url,
+    title: capture.title,
+    tabId: guest.tabId,
+    text: capture.text,
+    truncated: capture.truncated,
+  }
+  useWorkspaceChatContextStore.getState().addReference(guest.sessionId, {
+    kind: 'browser',
+    path: capture.url,
+    name: browserReferenceName(browser),
+    browser,
+  })
 }

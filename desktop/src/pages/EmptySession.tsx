@@ -621,7 +621,7 @@ export function EmptySession() {
                       runtimeSelectionKey={draftRuntimeSelectionKey}
                       fallbackModelLabel={draftModelLabel}
                       draft
-                      compact={isMobileComposer}
+                      mobile={isMobileComposer}
                     />
                   </>
                 )}

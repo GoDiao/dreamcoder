@@ -30,14 +30,31 @@ describe('browserStore', () => {
   })
 
   it('forgets a tab without touching the others', () => {
-    const { patchPage, setNotice, clearTab } = useBrowserStore.getState()
+    const { patchPage, setNotice, setPickActive, clearTab } = useBrowserStore.getState()
     patchPage('a', { loading: true })
     patchPage('b', { loading: true })
     setNotice('a', { kind: 'refused', reason: 'notFound' })
+    setPickActive('a', true)
+    setPickActive('b', true)
     clearTab('a')
 
     const state = useBrowserStore.getState()
     expect(Object.keys(state.pageByTab)).toEqual(['b'])
     expect(state.noticeByTab).toEqual({})
+    expect(state.pickActiveByTab).toEqual({ b: true })
+  })
+
+  it('tracks whether a tab is in pick mode', () => {
+    const { setPickActive } = useBrowserStore.getState()
+    setPickActive('a', true)
+    setPickActive('b', true)
+    setPickActive('a', false)
+
+    expect(useBrowserStore.getState().pickActiveByTab).toEqual({ b: true })
+  })
+
+  it('starts a page as not ready', () => {
+    useBrowserStore.getState().patchPage('a', { loading: true })
+    expect(useBrowserStore.getState().pageByTab.a?.ready).toBe(false)
   })
 })

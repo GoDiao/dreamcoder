@@ -89,21 +89,21 @@ describe('ContextUsageIndicator request behavior', () => {
     await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
   })
 
-  it('shows the same context details in the compact drawer', async () => {
+  it('shows the same context details in the mobile drawer', async () => {
     sessionsApiMock.getInspection.mockResolvedValue(baseInspection)
-    render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} compact />)
+    render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} mobile />)
     const trigger = await screen.findByRole('button', { name: /21%/ })
     fireEvent.click(trigger)
     expect(await screen.findByRole('dialog', { name: 'Context' })).toBeVisible()
     expect(screen.getByRole('progressbar', { name: 'Messages' })).toHaveAttribute('aria-valuenow', '21')
   })
 
-  it('switches between the hover card and the compact drawer without a controlled-state warning', async () => {
+  it('switches between the hover card and the mobile drawer without a controlled-state warning', async () => {
     sessionsApiMock.getInspection.mockResolvedValue(baseInspection)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const view = render(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} />)
     await screen.findByRole('button', { name: /21%/ })
-    view.rerender(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} compact />)
+    view.rerender(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} mobile />)
     view.rerender(<ContextUsageIndicator sessionId="session-1" chatState="idle" messageCount={1} />)
     expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('from controlled to uncontrolled'))
     expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('from uncontrolled to controlled'))
