@@ -140,6 +140,13 @@ function load(html: string, title = 'Test page'): void {
   ;(document as unknown as { elementFromPoint: unknown }).elementFromPoint = hitTest(document)
 }
 
+function sizeFrame(frame: HTMLIFrameElement, layoutWidth: number, layoutHeight: number, border = 0): void {
+  Object.defineProperty(frame, 'offsetWidth', { value: layoutWidth, configurable: true })
+  Object.defineProperty(frame, 'offsetHeight', { value: layoutHeight, configurable: true })
+  Object.defineProperty(frame, 'clientLeft', { value: border, configurable: true })
+  Object.defineProperty(frame, 'clientTop', { value: border, configurable: true })
+}
+
 function fillFrame(frame: HTMLIFrameElement, html: string): void {
   const doc = frame.contentDocument as Document
   doc.body.innerHTML = html
@@ -663,6 +670,179 @@ describe('page program: shadow DOM and frames', () => {
   })
 })
 
+describe('page program: frame sections', () => {
+  function frameWith(html: string, box = '0,0,300,200', attributes = ''): HTMLIFrameElement {
+    const frame = document.createElement('iframe')
+    frame.setAttribute('data-box', box)
+    for (const part of attributes.split(' ').filter(Boolean)) {
+      const [name = '', value = ''] = part.split('=')
+      frame.setAttribute(name, value)
+    }
+    document.body.appendChild(frame)
+    layout(document)
+    fillFrame(frame, html)
+    return frame
+  }
+
+  function buttons(count: number, prefix: string): string {
+    return Array.from({ length: count }, (_, i) => `<button data-box="0,${i * 22},50,20">${prefix}${i}</button>`).join('')
+  }
+
+  test('a page without iframes prints no section headers', () => {
+    load('<button data-box="0,0,50,20">Go</button>')
+    expect(snap().text).not.toContain('---')
+  })
+
+  test('puts each iframe in its own section with its id, title, parent and origin', () => {
+    load('<button data-box="0,0,50,20">Top</button>')
+    frameWith('<button data-box="0,0,50,20">Left</button>', '0,100,300,200', 'title=Left_board')
+    frameWith('<button data-box="0,0,50,20">Right</button>', '400,100,300,200', 'name=right')
+    const result = snap()
+    const all = lines(result)
+    const left = all.findIndex((line) => line.startsWith('--- iframe') && line.includes('"Left_board"'))
+    const right = all.findIndex((line) => line.startsWith('--- iframe') && line.includes('"right"'))
+    expect(all[left - 1]).toBe('[1] button "Top"')
+    expect(all[left]).toMatch(/^--- iframe \[\d+\] "Left_board" \| inside page \| origin about:blank ---$/)
+    expect(all[left + 1]).toBe('[2] button "Left"')
+    expect(all[right + 1]).toBe('[3] button "Right"')
+    expect(result.items.map((item) => item.id)).toEqual([1, 2, 3])
+  })
+
+  test('names srcdoc and data frames instead of printing an origin that is not one', () => {
+    load('')
+    frameWith('<button data-box="0,0,50,20">A</button>', '0,0,300,200', 'srcdoc=x')
+    const text = snap().text
+    expect(text).toMatch(/--- iframe \[\d+\] \| inside page \| origin srcdoc ---/)
+  })
+
+  test('says which iframe an iframe sits in', () => {
+    load('')
+    const outer = frameWith('', '0,0,400,300')
+    const inner = document.createElement('iframe')
+    inner.setAttribute('data-box', '0,0,200,100')
+    ;(outer.contentDocument as Document).body.appendChild(inner)
+    layout(outer.contentDocument as Document)
+    fillFrame(inner, '<button data-box="0,0,50,20">Deep</button>')
+    const headers = lines(snap()).filter((line) => line.startsWith('--- iframe'))
+    expect(headers).toHaveLength(1)
+    expect(headers[0]).toMatch(/^--- iframe \[(\d+)\] \| inside iframe \[\d+\] \|/)
+  })
+
+  test('keeps element numbers global and unchanged by sections', () => {
+    load('<button data-box="0,0,50,20">Top</button>')
+    frameWith('<button data-box="0,0,50,20">Inner</button>', '0,100,300,200')
+    const first = snap()
+    const second = snap()
+    expect(first.items.map((item) => [item.id, item.name])).toEqual([
+      [1, 'Top'],
+      [2, 'Inner'],
+    ])
+    expect(second.items.map((item) => item.id)).toEqual([1, 2])
+  })
+
+  test('a delta lists changed elements under their section header', () => {
+    load('<button data-box="0,0,50,20">Top</button>')
+    const frame = frameWith('<button data-box="0,0,50,20">Inner</button>', '0,100,300,200')
+    const first = snap({ delta: true })
+    ;((frame.contentDocument as Document).querySelector('button') as Element).setAttribute('disabled', '')
+    const second = snap({ delta: true, baseline: first.baseline })
+    const all = lines(second)
+    const at = all.findIndex((line) => line.startsWith('--- iframe'))
+    expect(second.full).toBe(false)
+    expect(all[at + 1]).toBe('[2] button "Inner" disabled')
+    expect(all).not.toContain('[1] button "Top"')
+  })
+
+  test('gives every frame a share of the budget and hands unused shares to the others', () => {
+    load(buttons(1, 'Page'))
+    frameWith(buttons(10, 'A'), '0,100,300,300')
+    frameWith(buttons(2, 'B'), '400,100,300,300')
+    const result = snap({ maxItems: 8 })
+    const names = result.items.map((item) => item.name)
+    expect(names.filter((name) => name.startsWith('Page'))).toHaveLength(1)
+    expect(names.filter((name) => name.startsWith('B'))).toHaveLength(2)
+    expect(names.filter((name) => name.startsWith('A'))).toEqual(['A0', 'A1', 'A2', 'A3', 'A4'])
+    expect(result.itemsDropped).toBe(5)
+  })
+
+  test('every one of twenty frames keeps elements when the budget is short', () => {
+    load('')
+    const compact = (prefix: string) =>
+      Array.from({ length: 10 }, (_, i) => `<button data-box="0,${i * 12},50,10">${prefix}${i}</button>`).join('')
+    for (let i = 0; i < 20; i += 1) frameWith(compact(`F${i}_`), `${(i % 5) * 200},${Math.floor(i / 5) * 160},190,150`)
+    const result = snap({ maxItems: 150 })
+    const perFrame = new Map<string, number>()
+    for (const item of result.items) {
+      const key = item.name.split('_')[0] as string
+      perFrame.set(key, (perFrame.get(key) ?? 0) + 1)
+    }
+    expect(perFrame.size).toBe(20)
+    expect(result.items).toHaveLength(150)
+    expect(Math.min(...perFrame.values())).toBe(7)
+    expect(Math.max(...perFrame.values())).toBe(8)
+    expect(result.itemsDropped).toBe(50)
+  })
+
+  test('shows the viewport elements of every frame before offscreen ones', () => {
+    load('<button data-box="0,5000,50,20">Page far</button>')
+    frameWith('<button data-box="0,0,50,20">Frame near</button><button data-box="0,5000,50,20">Frame far</button>', '0,100,300,200')
+    const result = snap({ maxItems: 2 })
+    expect(result.items.map((item) => item.name).sort()).toEqual(['Frame near', 'Page far'].sort())
+  })
+
+  test('says in each section how many elements it left out', () => {
+    load(buttons(1, 'Page'))
+    frameWith(buttons(10, 'A'), '0,100,300,300')
+    const result = snap({ maxItems: 4 })
+    const all = lines(result)
+    const header = all.findIndex((line) => line.startsWith('--- iframe'))
+    const id = (all[header] as string).match(/\[(\d+)\]/)?.[1]
+    expect(all[header + 1]).toBe('[2] button "A0"')
+    expect(all[header + 3]).toBe('[4] button "A2"')
+    expect(all[header + 4]).toBe(`(+7 more interactive elements in this frame not shown; pass region=${id} to read only this frame)`)
+    expect(all).toContain('(+7 more interactive elements not shown)')
+  })
+
+  test('says in the page section how many elements it left out', () => {
+    load(buttons(6, 'Page'))
+    frameWith(buttons(1, 'A'), '400,0,300,300')
+    const all = lines(snap({ maxItems: 3 }))
+    expect(all).toContain('(+4 more interactive elements in the page itself not shown)')
+  })
+
+  test('a frame with no room left still gets a header and a count', () => {
+    load('')
+    for (let i = 0; i < 3; i += 1) frameWith(buttons(2, `F${i}_`), `${i * 310},0,300,200`)
+    const all = lines(snap({ maxItems: 2 }))
+    expect(all.filter((line) => line.startsWith('--- iframe'))).toHaveLength(3)
+    expect(all.filter((line) => line.includes('more interactive elements in this frame not shown'))).toHaveLength(3)
+  })
+
+  test('reads just one iframe when the region is the id from its header', () => {
+    load(buttons(1, 'Page'))
+    frameWith(buttons(3, 'A'), '0,100,300,300', 'title=First')
+    frameWith(buttons(3, 'B'), '400,100,300,300', 'title=Second')
+    const full = snap()
+    const headers = lines(full).filter((line) => line.startsWith('--- iframe'))
+    const secondId = Number((headers[1] as string).match(/\[(\d+)\]/)?.[1])
+    const result = snap({ region: secondId })
+    expect(result.items.map((item) => item.name)).toEqual(['B0', 'B1', 'B2'])
+    expect(result.text).toContain(`Region: [${secondId}]`)
+    expect(lines(result).filter((line) => line.startsWith('--- iframe'))).toHaveLength(1)
+  })
+
+  test('reads the page text of the iframe the region points at', () => {
+    load('<p data-box="0,0,100,20">Outer words</p>')
+    const frame = frameWith('<p data-box="0,0,100,20">Frame words</p><button data-box="0,30,50,20">Go</button>', '0,100,300,200')
+    const full = snap()
+    const id = Number((lines(full).find((line) => line.startsWith('--- iframe')) as string).match(/\[(\d+)\]/)?.[1])
+    expect(frame.isConnected).toBe(true)
+    const result = snap({ region: id })
+    expect(result.text).toContain('Frame words')
+    expect(result.text).not.toContain('Outer words')
+  })
+})
+
 describe('page program: page text', () => {
   test('uses main when present and collapses whitespace', () => {
     load(`
@@ -1062,6 +1242,58 @@ describe('page program: locate', () => {
     fillFrame(inner, '<button data-box="10,20,40,20">Deep</button>')
     const found = locate(idOf(snap(), 'Deep'))
     expect(found).toEqual({ ok: true, x: 100 + 20 + 10 + 20, y: 50 + 30 + 20 + 10, role: 'button', name: 'Deep' })
+  })
+
+  test('scales the coordinates inside an iframe that is drawn smaller than its layout size', () => {
+    load('<iframe data-box="100,50,200,150"></iframe>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 400, 300)
+    fillFrame(frame, '<button data-box="10,20,40,20">Go</button>')
+    expect(locate(idOf(snap(), 'Go'))).toEqual({ ok: true, x: 115, y: 65, role: 'button', name: 'Go' })
+  })
+
+  test('scales the frame border and uses each axis separately', () => {
+    load('<iframe data-box="100,50,200,300"></iframe>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 400, 300, 4)
+    fillFrame(frame, '<button data-box="10,20,40,20">Go</button>')
+    expect(locate(idOf(snap(), 'Go'))).toEqual({ ok: true, x: 100 + 2 + 15, y: 50 + 4 + 30, role: 'button', name: 'Go' })
+  })
+
+  test('multiplies the scale of nested iframes', () => {
+    load('<iframe data-box="100,50,200,150"></iframe>')
+    const outer = el<HTMLIFrameElement>('iframe')
+    sizeFrame(outer, 400, 300)
+    fillFrame(outer, '<iframe data-box="20,30,300,200"></iframe>')
+    const inner = (outer.contentDocument as Document).querySelector('iframe') as HTMLIFrameElement
+    sizeFrame(inner, 600, 400)
+    fillFrame(inner, '<button data-box="10,20,40,20">Deep</button>')
+    expect(locate(idOf(snap(), 'Deep'))).toEqual({ ok: true, x: 117.5, y: 72.5, role: 'button', name: 'Deep' })
+  })
+
+  test('treats a frame without a layout size as unscaled', () => {
+    load('<iframe data-box="100,50,200,150"></iframe>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 0, 0)
+    fillFrame(frame, '<button data-box="10,20,40,20">Go</button>')
+    expect(locate(idOf(snap(), 'Go'))).toEqual({ ok: true, x: 130, y: 80, role: 'button', name: 'Go' })
+  })
+
+  test('reports the box of an element in a scaled iframe in page coordinates', () => {
+    load('<iframe data-box="100,50,200,150"></iframe>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 400, 300)
+    fillFrame(frame, '<button data-box="10,20,40,20">Go</button>')
+    const result = styles(idOf(snap(), 'Go'), ['display'])
+    expect(result).toMatchObject({ ok: true, box: { x: 105, y: 60, width: 20, height: 10 } })
+  })
+
+  test('finds an element of the page that covers the scaled click point', () => {
+    load('<iframe data-box="100,50,200,150"></iframe><div data-box="125,50,10,150">Over</div>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 400, 300)
+    fillFrame(frame, '<button data-box="10,20,100,20">Wide</button>')
+    expect(locate(idOf(snap(), 'Wide'))).toMatchObject({ ok: false, reason: 'covered' })
   })
 
   test('works for an element in a shadow root', () => {
@@ -2677,6 +2909,24 @@ describe('page program: marks', () => {
     expect(mark?.box.style.left).toBe('108px')
     expect(mark?.box.style.top).toBe('318px')
     expect(mark?.box.style.display).toBe('block')
+  })
+
+  test('places the mark of an element inside a scaled frame at its drawn position', () => {
+    load('<iframe data-box="100,300,300,200"></iframe>')
+    const frame = el<HTMLIFrameElement>('iframe')
+    sizeFrame(frame, 600, 400)
+    fillFrame(frame, '<button class="deep" data-box="10,20,80,30">Deep</button>')
+    const inner = (frame.contentDocument as Document).querySelector('button') as Element
+    const win = jsdomWindow() as unknown as { eval(source: string): unknown }
+    ;(win as unknown as Record<string, unknown>).__markTarget = inner
+    const ref = Number((JSON.parse(String(win.eval(`JSON.stringify((${programSource()})("pick", {}, window.__markTarget))`))) as PickResult).ref)
+    delete (win as unknown as Record<string, unknown>).__markTarget
+    marksOp([ref])
+    const [mark] = overlay()?.marks as Mark[]
+    expect(mark?.box.style.left).toBe('103px')
+    expect(mark?.box.style.top).toBe('308px')
+    expect(mark?.box.style.width).toBe('44px')
+    expect(mark?.box.style.height).toBe('19px')
   })
 
   test('hides and shows the overlay without losing the marks', () => {
