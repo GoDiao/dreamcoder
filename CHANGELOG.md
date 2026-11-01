@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Context usage no longer treats screenshot base64 as text** (#230). The estimate-only path and the Messages breakdown now use the same per-block estimator that already scores images and documents as 2000 tokens, so a session with many browser screenshots no longer shows a nearly full context bar when the provider still reports a modest input size.
+
 ## [0.8.0] — 2026-11-01
 
 The first stable release of the Electron desktop app. These notes cover everything since 0.7.0, including 0.8.0-beta.1 and 0.8.0-beta.2.
