@@ -49,6 +49,7 @@ import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { useTypeToFocus } from '../../hooks/useTypeToFocus'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import {
+  clipboardImageFiles,
   filesToComposerAttachments,
   selectNativeFileAttachments,
   type ComposerAttachment,
@@ -735,36 +736,10 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     if (isMemberSession) return
     const items = event.clipboardData?.items
     if (!items) return
-
-    let hasImage = false
-    for (let i = 0; i < items.length; i += 1) {
-      const item = items[i]
-      if (!item || !item.type.startsWith('image/')) continue
-
-      hasImage = true
-      event.preventDefault()
-      const file = item.getAsFile()
-      if (!file) continue
-
-      const id = `att-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const reader = new FileReader()
-      reader.onload = () => {
-        setComposerAttachments((prev) => [
-          ...prev,
-          {
-            id,
-            name: `pasted-image-${Date.now()}.png`,
-            type: 'image',
-            mimeType: file.type || 'image/png',
-            previewUrl: reader.result as string,
-            data: reader.result as string,
-          },
-        ])
-      }
-      reader.readAsDataURL(file)
-    }
-
-    if (!hasImage) return
+    const files = clipboardImageFiles(items)
+    if (files.length === 0) return
+    event.preventDefault()
+    appendFiles(files)
   }
 
   const appendFiles = useCallback((files: FileList | File[]) => {

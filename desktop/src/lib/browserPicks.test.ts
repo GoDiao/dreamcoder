@@ -5,7 +5,13 @@ const shellMocks = vi.hoisted(() => ({
   canvasBoardLabel: vi.fn(async (): Promise<string | null> => null),
 }))
 
+const imageMocks = vi.hoisted(() => ({
+  prepareImageDataUrl: vi.fn(async (data: string, mimeType: string) => ({ data, mimeType })),
+}))
+
 vi.mock('./browserGuests', () => ({ canvasBoardLabel: shellMocks.canvasBoardLabel }))
+
+vi.mock('./composerAttachments', () => ({ prepareImageDataUrl: imageMocks.prepareImageDataUrl }))
 
 vi.mock('./shell', () => ({
   setBrowserPickMode: shellMocks.setBrowserPickMode,
@@ -124,6 +130,22 @@ describe('browser picks', () => {
       })
       expect(first?.browser?.pendingPickId).toBeUndefined()
       expect(references()[1]?.browser?.pendingPickId).toBe('p2')
+    })
+
+    it('processes an element screenshot before storing the browser reference', async () => {
+      imageMocks.prepareImageDataUrl.mockResolvedValueOnce({
+        data: 'data:image/webp;base64,U01BTEw=',
+        mimeType: 'image/webp',
+      })
+      handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
+
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+
+      expect(imageMocks.prepareImageDataUrl).toHaveBeenCalledWith('data:image/webp;base64,QUJD', 'image/webp')
+      expect(references()[0]?.browser?.element?.screenshot).toEqual({
+        data: 'data:image/webp;base64,U01BTEw=',
+        mimeType: 'image/webp',
+      })
     })
 
     it('names the artifact and board in front of the element when the pick is inside a canvas board', async () => {

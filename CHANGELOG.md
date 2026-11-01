@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Images attached from uploads, paste or the built-in browser are kept unchanged within the client limits and resized or compressed when they exceed 2000×2000 pixels or 3.75 MB. Sent images now use compact thumbnails that still open in the gallery (#218).
+
 ## [0.8.0] — 2026-11-01
 
 The first stable release of the Electron desktop app. These notes cover everything since 0.7.0, including 0.8.0-beta.1 and 0.8.0-beta.2.

@@ -4,6 +4,7 @@ import { useBrowserStore } from '../stores/browserStore'
 import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
 import { canvasBoardLabel } from './browserGuests'
 import { browserReferenceFromPick, browserReferenceName } from './browserReferences'
+import { prepareImageDataUrl } from './composerAttachments'
 import {
   setBrowserPickMode,
   type BrowserPickDone,
@@ -61,6 +62,15 @@ export async function handleBrowserPickDone(event: BrowserPickDone) {
     console.warn('[browser] the page described the picked element in a way that cannot be used')
     toast.error(t('browser.pickFailed'))
     return
+  }
+  const screenshot = browser.element?.screenshot
+  if (screenshot) {
+    try {
+      browser.element!.screenshot = await prepareImageDataUrl(screenshot.data, screenshot.mimeType)
+    } catch (error) {
+      browser.element!.screenshot = undefined
+      console.warn('[browser] could not prepare the picked element screenshot', error)
+    }
   }
   const board = await canvasBoardLabel(event.tabId, browser.url)
   store.replaceReference(event.sessionId, id, {
