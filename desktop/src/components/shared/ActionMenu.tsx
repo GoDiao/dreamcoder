@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -15,7 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 
 export type MenuAction = {
   id: string
@@ -25,6 +26,7 @@ export type MenuAction = {
   danger?: boolean
   disabled?: boolean
   separatorBefore?: boolean
+  heading?: string
   afterClose?: boolean
 }
 
@@ -58,9 +60,11 @@ function ChoiceSubmenu({ group }: { group: MenuChoiceGroup }) {
 function ActionItems({ actions, context = false, run }: { actions: (MenuAction | MenuChoiceGroup)[]; context?: boolean; run: (action: MenuAction) => void }) {
   const Item = context ? ContextMenuItem : DropdownMenuItem
   const Separator = context ? ContextMenuSeparator : DropdownMenuSeparator
+  const Label = context ? ContextMenuLabel : DropdownMenuLabel
   return actions.map((action) => (
     <Fragment key={action.id}>
       {action.separatorBefore && <Separator />}
+      {'heading' in action && action.heading && <Label>{action.heading}</Label>}
       {'options' in action ? (
         <ChoiceSubmenu group={action} />
       ) : (

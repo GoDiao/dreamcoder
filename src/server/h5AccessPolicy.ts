@@ -22,6 +22,10 @@ export function isLoopbackHost(hostname: string): boolean {
   return LOCAL_HOSTS.has(normalized)
 }
 
+export function isLocalNonBrowserRequest(clientAddress: string | null, origin: string | null): boolean {
+  return Boolean(clientAddress) && isLoopbackHost(clientAddress!) && !origin
+}
+
 function isLocalOrigin(origin: string | null): boolean {
   if (!origin) return true
   if (LOCAL_ORIGINS.has(origin)) return true

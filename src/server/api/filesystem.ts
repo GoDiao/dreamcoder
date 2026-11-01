@@ -11,7 +11,7 @@ import { isWithinRegisteredFilesystemRoot } from '../services/filesystemAccessRo
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
-} from '../services/windowsDrivePath.js'
+} from '../../utils/windowsDrivePath.js'
 
 type FilesystemEntry = {
   name: string

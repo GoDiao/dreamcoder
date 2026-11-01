@@ -11,6 +11,7 @@ const {
   handleTeamCreatedMock,
   handleTeamUpdateMock,
   handleTeamDeletedMock,
+  noteArtifactActivityMock,
   fetchSessionTasksMock,
   clearTasksMock,
   setTasksFromTodosMock,
@@ -30,6 +31,7 @@ const {
   handleTeamCreatedMock: vi.fn(),
   handleTeamUpdateMock: vi.fn(),
   handleTeamDeletedMock: vi.fn(),
+  noteArtifactActivityMock: vi.fn(),
   fetchSessionTasksMock: vi.fn(),
   clearTasksMock: vi.fn(),
   setTasksFromTodosMock: vi.fn(),
@@ -94,6 +96,10 @@ vi.mock('./teamStore', () => ({
       handleTeamDeleted: handleTeamDeletedMock,
     }),
   },
+}))
+
+vi.mock('./artifactStore', () => ({
+  useArtifactStore: { getState: () => ({ noteArtifactActivity: noteArtifactActivityMock }) },
 }))
 
 vi.mock('./tabStore', () => ({
@@ -1272,6 +1278,39 @@ describe('chatStore history mapping', () => {
       body: 'AskUserQuestion 请求执行，正在等待允许。',
       target: { type: 'session', sessionId: TEST_SESSION_ID },
     })
+  })
+
+  it('keeps ChooseDesignTemplate permission requests out of the message list like AskUserQuestion', () => {
+    const input = { candidates: [{ id: 'saas', reason: 'a landing page' }, { id: 'app-a', reason: 'an app' }] }
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: {
+          messages: [{ id: 'pick-1', type: 'tool_use', toolName: 'ChooseDesignTemplate', toolUseId: 'tool-pick-1', input, timestamp: 1 }],
+          chatState: 'idle',
+          connectionState: 'connected',
+          streamingText: '',
+          streamingToolInput: '',
+          activeToolUseId: null,
+          activeToolName: null,
+          activeThinkingId: null,
+          pendingPermission: null,
+          tokenUsage: { input_tokens: 0, output_tokens: 0 },
+          statusVerb: '',
+          slashCommands: [],
+          agentTaskNotifications: {},
+        },
+      },
+    })
+
+    sendSnapshot(mirrorState({
+      turn: { phase: 'awaiting_permission', startedAt: 1 },
+      pendingPermissions: [{ requestId: 'perm-pick-1', toolName: 'ChooseDesignTemplate', toolUseId: 'tool-pick-1', input }],
+    }))
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]
+    expect(session?.pendingPermission).toMatchObject({ requestId: 'perm-pick-1', toolName: 'ChooseDesignTemplate', toolUseId: 'tool-pick-1' })
+    expect(session?.messages).toHaveLength(1)
+    expect(session?.messages[0]).toMatchObject({ type: 'tool_use', toolUseId: 'tool-pick-1' })
   })
 
   it('sends permission mode updates to the active session only', () => {
@@ -2933,5 +2972,31 @@ describe('chatStore permission requests shared across clients', () => {
 
     expect(session().messages).toEqual([])
     expect(session().chatState).toBe('tool_executing')
+  })
+})
+
+describe('chatStore artifact activity', () => {
+  beforeEach(() => {
+    noteArtifactActivityMock.mockClear()
+    useChatStore.setState({ ...initialState, sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'thinking' }) } })
+  })
+
+  it('tells the artifact store when the CLI reports a written artifact', () => {
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
+      type: 'artifact_written',
+      path: '/repo/dc_artifacts/report/index.html',
+      toolName: 'Write',
+    })
+
+    expect(noteArtifactActivityMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells the artifact store when a turn completes, to catch files written by Bash', () => {
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
+      type: 'message_complete',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+
+    expect(noteArtifactActivityMock).toHaveBeenCalledTimes(1)
   })
 })

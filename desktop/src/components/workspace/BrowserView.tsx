@@ -1,6 +1,9 @@
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, MoreHorizontal, MousePointerClick, RotateCw, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
+import { useArtifactExportActions } from '../../hooks/useArtifactExportActions'
+import { useArtifactThumbnail } from '../../hooks/useArtifactThumbnail'
+import { useCanvasTab } from '../../hooks/useCanvasTab'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import {
   browserGoBack,
@@ -8,14 +11,18 @@ import {
   browserReload,
   browserStop,
   hasBrowserGuest,
+  isProjectPageUrl,
   openBrowserUrl,
   placeBrowserGuest,
   reloadAllBrowsers,
+  resolveStoredBrowserUrl,
   submitBrowserInput,
 } from '../../lib/browserGuests'
+import { errorMessage } from '../../lib/errorMessage'
 import { stopBrowserPick, toggleBrowserPick } from '../../lib/browserPicks'
 import { clearBrowserData, openBrowserUrlInSystem } from '../../lib/shell'
 import type { BrowserRefusal } from '../../lib/shell/electronBridge'
+import { parseDesignCandidates, respondWithDesignChoice, useDesignChoiceRequest } from '../../lib/designChoice'
 import { useBrowserStore } from '../../stores/browserStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { BROWSER_SEARCH_ENGINE_IDS, isBrowserSearchEngineId, type BrowserSearchEngineId } from '../../types/settings'
@@ -41,10 +48,6 @@ const SEARCH_ENGINE_LABELS: Record<BrowserSearchEngineId, TranslationKey> = {
   google: 'browser.search.google',
   duckduckgo: 'browser.search.duckduckgo',
   baidu: 'browser.search.baidu',
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
 }
 
 type ToolbarButtonProps = {
@@ -87,6 +90,13 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
   const [draft, setDraft] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const { url } = tab
+  useArtifactThumbnail(tab.id, tab.artifact?.board === undefined ? tab.artifact : undefined)
+  useCanvasTab(tab.root !== undefined && tab.artifact?.canvas ? { tabId: tab.id, sessionId, root: tab.root, name: tab.artifact.name, artifact: tab.artifact } : null)
+  const designRequest = useDesignChoiceRequest(sessionId)
+  const templateId = tab.template?.id
+  const offeredTemplate = templateId !== undefined && designRequest !== null && parseDesignCandidates(designRequest.input).some((candidate) => candidate.id === templateId)
+  const exportActions = useArtifactExportActions({ tabId: tab.id, sessionId, title: tab.title || tab.artifact?.name || '' })
+  const exportable = tab.artifact !== undefined && !tab.artifact.canvas
 
   useEffect(() => {
     setDraft(url)
@@ -95,7 +105,20 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
-    if (url && !hasBrowserGuest(tab.id)) openBrowserUrl(sessionId, tab.id, url)
+    if (url && !hasBrowserGuest(tab.id)) {
+      if (isProjectPageUrl(url)) {
+        resolveStoredBrowserUrl(tab, projectRoot)
+          .then((resolved) => {
+            if (!hasBrowserGuest(tab.id)) openBrowserUrl(sessionId, tab.id, resolved)
+          })
+          .catch((error: unknown) => {
+            console.warn('[browser] could not reopen the stored project page', url, error)
+            setNotice(tab.id, { kind: 'refused', reason: 'notFound', url })
+          })
+      } else {
+        openBrowserUrl(sessionId, tab.id, url)
+      }
+    }
     return placeBrowserGuest(tab.id, stage, true)
   }, [sessionId, tab.id, url])
 
@@ -177,6 +200,11 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
         >
           <ExternalLink aria-hidden="true" />
         </ToolbarButton>
+        {offeredTemplate && designRequest && templateId && (
+          <Button type="button" size="xs" className="ml-1" onClick={() => respondWithDesignChoice(sessionId, designRequest, templateId)}>
+            {t('design.useTemplate')}
+          </Button>
+        )}
         <ActionMenu
           label={t('browser.moreActions')}
           trigger={
@@ -185,8 +213,10 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
             </Button>
           }
           actions={[
+            ...(exportable ? exportActions.map((action) => ({ ...action, disabled: !page?.ready })) : []),
             {
               id: 'search-engine',
+              separatorBefore: exportable,
               label: t('browser.search.engine'),
               icon: <Search aria-hidden="true" />,
               value: searchEngine,

@@ -54,7 +54,7 @@ describe('browser MCP endpoint', () => {
     expect(wrong.status).toBe(401)
   })
 
-  test('lists the fourteen tools with read-only hints', async () => {
+  test('lists the fifteen tools with read-only hints', async () => {
     const { deps, tokens } = setup()
     const token = tokens.issue('s1')
     const response = await handleBrowserMcpRequest(rpc(token, { jsonrpc: '2.0', id: 1, method: 'tools/list' }), deps)
@@ -62,7 +62,7 @@ describe('browser MCP endpoint', () => {
     const json = (await response.json()) as { result: { tools: Array<{ name: string; annotations?: { readOnlyHint?: boolean } }> } }
     expect(json.result.tools.map((tool) => tool.name).sort()).toEqual([...BROWSER_TOOL_NAMES].sort())
     const byName = Object.fromEntries(json.result.tools.map((tool) => [tool.name, tool.annotations?.readOnlyHint]))
-    expect(json.result.tools).toHaveLength(14)
+    expect(json.result.tools).toHaveLength(15)
     expect(byName.snapshot).toBe(true)
     expect(byName.scroll).toBe(true)
     expect(byName.wait_for).toBe(true)
@@ -70,6 +70,7 @@ describe('browser MCP endpoint', () => {
     expect(byName.emulate).toBe(false)
     expect(byName.click).toBe(false)
     expect(byName.evaluate).toBe(false)
+    expect(byName.close_tab).toBe(false)
   })
 
   test('runs a tool for the session the token belongs to, never another', async () => {

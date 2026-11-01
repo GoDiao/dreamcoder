@@ -11,6 +11,10 @@ import { NotebookEditTool } from './tools/NotebookEditTool/NotebookEditTool.js'
 import { WebFetchTool } from './tools/WebFetchTool/WebFetchTool.js'
 import { TaskStopTool } from './tools/TaskStopTool/TaskStopTool.js'
 import { BriefTool } from './tools/BriefTool/BriefTool.js'
+import { ArtifactCheckTool } from './tools/ArtifactCheckTool/ArtifactCheckTool.js'
+import { ArtifactCopyTool } from './tools/ArtifactCopyTool/ArtifactCopyTool.js'
+import { ChooseDesignTemplateTool } from './tools/ChooseDesignTemplateTool/ChooseDesignTemplateTool.js'
+import { UseDesignSystemTool } from './tools/UseDesignSystemTool/UseDesignSystemTool.js'
 import { ShowUITool } from './tools/ShowUITool/ShowUITool.js'
 // Dead code elimination: conditional import for ant-only tools
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
@@ -239,6 +243,10 @@ export function getAllBaseTools(): Tools {
     ...(MonitorTool ? [MonitorTool] : []),
     BriefTool,
     ShowUITool,
+    ArtifactCheckTool,
+    ArtifactCopyTool,
+    ChooseDesignTemplateTool,
+    UseDesignSystemTool,
     ...(SendUserFileTool ? [SendUserFileTool] : []),
     ...(PushNotificationTool ? [PushNotificationTool] : []),
     ...(SubscribePRTool ? [SubscribePRTool] : []),

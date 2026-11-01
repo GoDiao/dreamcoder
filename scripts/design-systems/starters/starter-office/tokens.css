@@ -1,0 +1,62 @@
+/* starter-office/tokens.css
+ * Design tokens for Office: Cool grey neutrals, a steady blue accent, compact type and small radii for business software, reports and internal tools.
+ */
+
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-warm: #eaeff6;
+  --fg: #0f172a;
+  --fg-2: #334155;
+  --muted: #64748b;
+  --meta: #94a3b8;
+  --border: #d5dce6;
+  --border-soft: #e6ebf2;
+  --accent: #1d4ed8;
+  --accent-on: #ffffff;
+  --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+  --accent-active: color-mix(in oklab, var(--accent), black 14%);
+  --success: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  --font-display: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+  --text-4xl: 46px;
+  --leading-body: 1.5;
+  --leading-tight: 1.15;
+  --tracking-display: -0.01em;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 72px;
+  --section-y-tablet: 52px;
+  --section-y-phone: 36px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.30);
+  --motion-fast: 130ms;
+  --motion-base: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --container-max: 1120px;
+  --container-gutter-desktop: 32px;
+  --container-gutter-tablet: 24px;
+  --container-gutter-phone: 16px;
+}

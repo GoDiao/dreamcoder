@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import { ApiError } from '../middleware/errorHandler.js'
 import { findCanonicalGitRoot, findGitRoot } from '../../utils/git.js'
 import { registerFilesystemAccessRoot } from './filesystemAccessRoots.js'
-import { normalizeDriveRootPathForPlatform } from './windowsDrivePath.js'
+import { normalizeDriveRootPathForPlatform } from '../../utils/windowsDrivePath.js'
 import {
   ensureWorktreesDirExcluded,
   performPostCreationSetup,
@@ -238,6 +238,17 @@ function parseWorktreeList(stdout: string): GitWorktreeRecord[] {
   return records
 }
 
+export async function listGitWorktrees(repoRoot: string): Promise<Array<{ path: string; branch: string | null }>> {
+  const result = await runGit(repoRoot, ['worktree', 'list', '--porcelain'])
+  if (result.code !== 0) return []
+  return Promise.all(
+    parseWorktreeList(result.stdout).map(async (worktree) => ({
+      path: await canonicalizeKnownPath(worktree.path),
+      branch: worktree.branch,
+    })),
+  )
+}
+
 function branchSort(a: RepositoryBranchInfo, b: RepositoryBranchInfo): number {
   if (a.current !== b.current) return a.current ? -1 : 1
   if (a.local !== b.local) return a.local ? -1 : 1
@@ -364,21 +375,14 @@ export async function getRepositoryContext(workDir: string): Promise<RepositoryC
   try {
     const repoRoot = findCanonicalGitRoot(gitRoot) ?? gitRoot
     registerFilesystemAccessRoot(repoRoot)
-    const [branchResult, defaultBranch, statusResult, worktreeResult] = await Promise.all([
+    const [branchResult, defaultBranch, statusResult, worktreeRecords] = await Promise.all([
       runGit(gitRoot, ['branch', '--show-current']),
       getDefaultBranch(gitRoot),
       runGit(gitRoot, ['--no-optional-locks', 'status', '--porcelain']),
-      runGit(repoRoot, ['worktree', 'list', '--porcelain']),
+      listGitWorktrees(repoRoot),
     ])
 
     const currentBranch = branchResult.stdout.trim() || null
-    const rawWorktreeRecords = worktreeResult.code === 0 ? parseWorktreeList(worktreeResult.stdout) : []
-    const worktreeRecords = await Promise.all(
-      rawWorktreeRecords.map(async (worktree) => ({
-        ...worktree,
-        path: await canonicalizeKnownPath(worktree.path),
-      })),
-    )
     const worktrees = worktreeRecords.map((worktree) => ({
       path: worktree.path,
       branch: worktree.branch,

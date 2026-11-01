@@ -321,6 +321,7 @@ export type PermissionDecisionReason =
   | {
       type: 'other'
       reason: string
+      hardDeny?: boolean
     }
 
 // ============================================================================

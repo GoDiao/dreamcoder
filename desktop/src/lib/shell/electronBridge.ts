@@ -12,6 +12,17 @@ export type ElectronShellBridge = {
 
 export type ElectronDialogFilter = { name: string; extensions: string[] }
 
+export const BROWSER_EXPORT_FORMATS = ['pdf', 'png', 'html'] as const
+export type BrowserExportFormat = (typeof BROWSER_EXPORT_FORMATS)[number]
+
+export type BrowserExportMessages = { externalLinks: string; proceed: string; cancel: string }
+
+export type BrowserExportResult =
+  | { status: 'saved'; path: string }
+  | { status: 'cancelled' }
+  | { status: 'failed'; reason: 'entry' | 'asset' | 'total'; limitBytes: number; items: Array<{ url: string; bytes: number }> }
+  | { status: 'failed'; reason: 'pageTooTall'; maxHeight: number }
+
 export type ElectronOpenDialogInput = {
   title?: string
   directory: boolean

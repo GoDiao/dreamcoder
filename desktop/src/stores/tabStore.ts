@@ -12,9 +12,10 @@ const memLog = (label: string) => {
 }
 
 export const SCHEDULED_TAB_ID = '__scheduled__'
+export const ARTIFACTS_TAB_ID = '__artifacts__'
 
 /** Tabs are the internal current-page router; there is no visible tab bar. */
-export type TabType = 'session' | 'scheduled'
+export type TabType = 'session' | 'scheduled' | 'artifacts'
 
 export type Tab = {
   sessionId: string
@@ -164,7 +165,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       memLog('restoreTabs:start')
       const restorableTabs = data.openTabs.filter((tab) => !isRetiredTab(tab))
       const pendingSessionIds = new Set(restorableTabs
-        .filter((tab) => tab.type !== 'scheduled')
+        .filter((tab) => tab.type !== 'scheduled' && tab.type !== 'artifacts')
         .map((tab) => tab.sessionId))
       const sessionTitles = new Map<string, string>()
       const pageSize = 200
@@ -180,10 +181,10 @@ export const useTabStore = create<TabStore>((set, get) => ({
       memLog(`restoreTabs:after-list (resolved ${sessionTitles.size} sessions)`)
 
       const validTabs: Tab[] = restorableTabs
-        .filter((t) => t.type === 'scheduled' || sessionTitles.has(t.sessionId))
+        .filter((t) => t.type === 'scheduled' || t.type === 'artifacts' || sessionTitles.has(t.sessionId))
         .map((t) => {
-          if (t.type === 'scheduled') {
-            return { sessionId: t.sessionId, title: t.title, type: 'scheduled' as const, status: 'idle' as const }
+          if (t.type === 'scheduled' || t.type === 'artifacts') {
+            return { sessionId: t.sessionId, title: t.title, type: t.type, status: 'idle' as const }
           }
           return {
             sessionId: t.sessionId,

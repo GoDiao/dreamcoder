@@ -18,6 +18,18 @@
       "to": "dist"
     },
     {
+      "from": "design-templates",
+      "to": "design-templates"
+    },
+    {
+      "from": "design-systems",
+      "to": "design-systems"
+    },
+    {
+      "from": "web-clone",
+      "to": "web-clone"
+    },
+    {
       "from": "electron/build/icons/tray.png",
       "to": "icons/tray.png"
     },

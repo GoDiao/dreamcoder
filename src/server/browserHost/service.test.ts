@@ -1,4 +1,7 @@
 import { describe, expect, spyOn, test } from 'bun:test'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { BrowserHostChannel, BrowserHostError } from './hostChannel.js'
 import type { BrowserHostCommand } from './protocol.js'
 import { BrowserService, redactHeaders, type BrowserGrants, type ToolResult } from './service.js'
@@ -237,9 +240,74 @@ describe('navigate', () => {
       return { tabId: 'fresh' }
     })
     const result = await service.navigate('s1', { url: 'localhost:3000' })
-    expect(textOf(result)).toContain('Opened a browser tab at http://localhost:3000/')
+    expect(textOf(result)).toContain('Opened a browser tab (id fresh) at http://localhost:3000/')
     expect(desktop.of('openTab')[0]?.command).toMatchObject({ kind: 'openTab', sessionId: 's1', url: 'http://localhost:3000/' })
     expect(desktop.of('navigate')).toHaveLength(0)
+  })
+})
+
+describe('navigate with artifacts and new tabs', () => {
+  test('opens a new tab even when the session already has one', async () => {
+    const { service, desktop } = setup()
+    desktop.on('resolve', () => ({ ok: true, url: 'http://localhost:3000/', origin: 'http://localhost:3000', local: true }))
+    desktop.on('openTab', () => {
+      queueMicrotask(() => desktop.setViews([makeView(), makeView({ tabId: 'second', active: false })]))
+      return { tabId: 'second' }
+    })
+    const result = await service.navigate('s1', { url: 'localhost:3000', newTab: true })
+    expect(textOf(result)).toContain('Opened a browser tab (id second)')
+    expect(desktop.of('navigate')).toHaveLength(0)
+  })
+
+  test('maps an artifact folder to its entry file and uses dc_artifacts as the protocol root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'navigate-artifact-'))
+    try {
+      const folder = join(root, 'dc_artifacts', 'report')
+      await mkdir(folder, { recursive: true })
+      await writeFile(join(folder, 'artifact.json'), JSON.stringify({ version: 1, id: 'r-id', kind: 'page', title: 'R', entry: 'main.html' }))
+      await writeFile(join(folder, 'main.html'), '<p>hi</p>')
+      const { service, desktop } = setup()
+      desktop.on('resolve', () => ({ ok: true, url: 'dreamcoder-project://id/report/main.html', origin: 'dreamcoder-project://id', local: true }))
+      desktop.on('navigate', () => ({ url: 'dreamcoder-project://id/report/main.html', generation: 2, loading: false }))
+      await service.navigate('s1', { url: folder })
+      expect(desktop.of('resolve')[0]?.command).toMatchObject({
+        kind: 'resolve',
+        input: join(folder, 'main.html'),
+        projectRoot: join(root, 'dc_artifacts'),
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('close_tab', () => {
+  test('closes a tab the agent opened and refuses one the user opened', async () => {
+    const { service, desktop } = setup()
+    desktop.setViews([])
+    desktop.on('resolve', () => ({ ok: true, url: 'http://localhost:3000/', origin: 'http://localhost:3000', local: true }))
+    desktop.on('openTab', () => {
+      queueMicrotask(() => desktop.setViews([makeView({ tabId: 'mine' }), makeView({ tabId: 'users', active: false })]))
+      return { tabId: 'mine' }
+    })
+    desktop.on('closeTab', () => ({ closed: true }))
+    await service.navigate('s1', { url: 'localhost:3000' })
+
+    const refused = await service.closeTab('s1', { tabId: 'users' })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('[browser.not_agent_tab]')
+    expect(desktop.of('closeTab')).toHaveLength(0)
+
+    const closed = await service.closeTab('s1', { tabId: 'mine' })
+    expect(closed.isError).toBeUndefined()
+    expect(desktop.of('closeTab')[0]?.command).toEqual({ kind: 'closeTab' })
+  })
+
+  test('refuses a tab that does not belong to the session', async () => {
+    const { service } = setup()
+    const result = await service.closeTab('s1', { tabId: 'nope' })
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('[browser.tab_unavailable]')
   })
 })
 
@@ -1705,6 +1773,58 @@ describe('emulate', () => {
       await service.emulate('s1', { width: 375, height: 667 })
       desktop.setViews([])
       desktop.setViews([makeView()])
+      expect(textOf(await service.snapshot('s1', {}))).not.toContain('Emulation')
+    })
+  })
+
+  describe('suspendEmulation and resumeEmulation', () => {
+    const methods = (desktop: FakeDesktop) => desktop.of('cdp').map((entry) => (entry.command as { method: string }).method)
+
+    test('clears the emulation of one tab and puts the same settings back afterwards', async () => {
+      const { service, desktop } = setup()
+      await service.emulate('s1', { width: 375, height: 667, mobile: true, deviceScaleFactor: 2, colorScheme: 'dark' })
+      desktop.commands.length = 0
+
+      expect(await service.suspendEmulation('s1', 't1')).toBe(true)
+      expect(methods(desktop)).toEqual(['Emulation.clearDeviceMetricsOverride', 'Emulation.setEmulatedMedia'])
+
+      desktop.commands.length = 0
+      expect(await service.resumeEmulation('s1', 't1')).toBe(true)
+      const calls = desktop.of('cdp').map((entry) => entry.command as { method: string; params: unknown })
+      expect(calls[0]).toMatchObject({ method: 'Emulation.setDeviceMetricsOverride', params: { width: 375, height: 667, deviceScaleFactor: 2, mobile: true } })
+      expect(calls[1]).toMatchObject({ method: 'Emulation.setEmulatedMedia', params: { features: [{ name: 'prefers-color-scheme', value: 'dark' }, { name: 'prefers-reduced-motion', value: '' }] } })
+      expect(textOf(await service.snapshot('s1', {}))).toContain('Emulation active')
+    })
+
+    test('keeps the record while suspended so the agent still sees what it set', async () => {
+      const { service } = setup()
+      await service.emulate('s1', { colorScheme: 'dark' })
+      await service.suspendEmulation('s1', 't1')
+      expect(textOf(await service.snapshot('s1', {}))).toContain('color scheme dark')
+    })
+
+    test('does nothing for a tab without an emulation, a second suspend, a resume without suspend or a tab of another session', async () => {
+      const { service, desktop } = setup()
+      expect(await service.suspendEmulation('s1', 't1')).toBe(false)
+      expect(await service.resumeEmulation('s1', 't1')).toBe(false)
+      await service.emulate('s1', { colorScheme: 'dark' })
+      desktop.commands.length = 0
+      expect(await service.resumeEmulation('s1', 't1')).toBe(false)
+      expect(await service.suspendEmulation('s2', 't1')).toBe(false)
+      expect(await service.suspendEmulation('s1', 'missing')).toBe(false)
+      expect(desktop.commands).toEqual([])
+      expect(await service.suspendEmulation('s1', 't1')).toBe(true)
+      expect(await service.suspendEmulation('s1', 't1')).toBe(false)
+    })
+
+    test('restores nothing when the emulation was reset while suspended', async () => {
+      const { service, desktop } = setup()
+      await service.emulate('s1', { width: 375, height: 667 })
+      await service.suspendEmulation('s1', 't1')
+      await service.resetEmulation('s1')
+      desktop.commands.length = 0
+      expect(await service.resumeEmulation('s1', 't1')).toBe(false)
+      expect(desktop.commands).toEqual([])
       expect(textOf(await service.snapshot('s1', {}))).not.toContain('Emulation')
     })
   })

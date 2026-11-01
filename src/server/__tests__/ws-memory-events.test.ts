@@ -51,7 +51,7 @@ describe('WebSocket memory events', () => {
 })
 
 describe('WebSocket AskUserQuestion events', () => {
-  it('forwards structured AskUserQuestion answers from CLI toolUseResult metadata', () => {
+  it('forwards structured AskUserQuestion answers from the CLI tool_use_result field', () => {
     expect(translateCliMessage({
       type: 'user',
       message: {
@@ -64,7 +64,7 @@ describe('WebSocket AskUserQuestion events', () => {
           },
         ],
       },
-      toolUseResult: {
+      tool_use_result: {
         questions: [{ question: 'Pick one?', options: [{ label: 'A' }] }],
         answers: { 'Pick one?': 'A' },
       },

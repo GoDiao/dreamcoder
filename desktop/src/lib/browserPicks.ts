@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 import { t } from '../i18n'
 import { useBrowserStore } from '../stores/browserStore'
 import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
+import { canvasBoardLabel } from './browserGuests'
 import { browserReferenceFromPick, browserReferenceName } from './browserReferences'
 import {
   setBrowserPickMode,
@@ -43,7 +44,7 @@ export function handleBrowserPickStarted({ tabId, sessionId, pickId }: BrowserPi
   })
 }
 
-export function handleBrowserPickDone(event: BrowserPickDone) {
+export async function handleBrowserPickDone(event: BrowserPickDone) {
   const store = useWorkspaceChatContextStore.getState()
   const id = pendingReferenceId(event.pickId)
   if (!event.ok) {
@@ -61,10 +62,11 @@ export function handleBrowserPickDone(event: BrowserPickDone) {
     toast.error(t('browser.pickFailed'))
     return
   }
+  const board = await canvasBoardLabel(event.tabId, browser.url)
   store.replaceReference(event.sessionId, id, {
     kind: 'browser',
     path: browser.url,
-    name: browserReferenceName(browser),
+    name: board ? `${board} · ${browserReferenceName(browser)}` : browserReferenceName(browser),
     browser,
   })
 }

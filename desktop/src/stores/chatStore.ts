@@ -2,11 +2,13 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import { wsManager } from '../api/websocket'
 import { sessionsApi } from '../api/sessions'
+import { useArtifactStore } from './artifactStore'
 import { useTeamStore } from './teamStore'
 import { useSessionStore } from './sessionStore'
 import { useCLITaskStore } from './cliTaskStore'
 import { isEffortLevel, useSessionRuntimeStore } from './sessionRuntimeStore'
 import { randomUUID } from '../lib/uuid'
+import { isInlineQuestionTool } from '../lib/inlineQuestionTools'
 import { useTabStore } from './tabStore'
 import { randomSpinnerVerb } from '../config/spinnerVerbs'
 import { notifyDesktop } from '../lib/desktopNotifications'
@@ -1418,6 +1420,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           apiRetry: null,
         }))
         useTabStore.getState().updateTabStatus(sessionId, 'idle')
+        useArtifactStore.getState().noteArtifactActivity()
         const appendedCompletionMessage = completionMessages !== session.messages
         const notification = wasAgentRunning && appendedCompletionMessage
           ? buildAgentCompletionNotification(sessionId, completionMessages, text)
@@ -1467,6 +1470,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         useTeamStore.getState().handleTeamDeleted(msg.teamName)
         break
       case 'task_update':
+        break
+      case 'artifact_written':
+        useArtifactStore.getState().noteArtifactActivity()
         break
       case 'system_notification':
         if (msg.subtype === 'slash_commands' && Array.isArray(msg.data)) {
@@ -1760,7 +1766,7 @@ function applyMirror(sessionId: string, next: SessionState): void {
     let streamingText = current.streamingText
 
     for (const request of openedRequests) {
-      if (request.toolName === 'AskUserQuestion' || hasPermissionRequestMessage(messages, request.requestId)) continue
+      if (isInlineQuestionTool(request.toolName) || hasPermissionRequestMessage(messages, request.requestId)) continue
       messages = appendMessage(messages, {
         id: nextId(),
         type: 'permission_request',

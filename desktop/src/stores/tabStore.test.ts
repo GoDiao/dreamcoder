@@ -154,6 +154,18 @@ describe('tabStore', () => {
     expect(useTabStore.getState().activeTabId).toBeNull()
   })
 
+  it('restores the Artifacts page without looking for a session of that name', async () => {
+    useTabStore.getState().openTab('__artifacts__', 'Artifacts', 'artifacts')
+    useTabStore.setState({ tabs: [], activeTabId: null })
+    const list = vi.spyOn(sessionsApi, 'list')
+
+    await useTabStore.getState().restoreTabs()
+
+    expect(list).not.toHaveBeenCalled()
+    expect(useTabStore.getState().tabs).toEqual([{ sessionId: '__artifacts__', title: 'Artifacts', type: 'artifacts', status: 'idle' }])
+    expect(useTabStore.getState().activeTabId).toBe('__artifacts__')
+  })
+
   it('keeps persisted tabs intact when a later page fails so restore can be retried', async () => {
     useTabStore.getState().openTab('recent', 'Recent')
     useTabStore.getState().openTab('old', 'Old')

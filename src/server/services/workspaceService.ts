@@ -9,7 +9,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
-} from './windowsDrivePath.js'
+} from '../../utils/windowsDrivePath.js'
 
 const MAX_PREVIEW_BYTES = 1024 * 1024
 const MAX_UNTRACKED_STAT_BYTES = 256 * 1024

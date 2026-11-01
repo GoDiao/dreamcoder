@@ -73,8 +73,9 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /** AskUserQuestion results keep the structured answers in `toolUseResult`. */
-function toolResultContent(content: unknown, toolUseResult: unknown): unknown {
+export function structuredToolResultContent(content: unknown, toolUseResult: unknown): unknown {
   const result = readRecord(toolUseResult)
+  if (typeof result?.choice === 'string') return { choice: result.choice }
   const answers = readRecord(result?.answers)
   if (!result || !answers || !Array.isArray(result.questions)) return content
   return { questions: result.questions, answers }
@@ -273,7 +274,7 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
             id: allocateId(`${msg.id}:${index}`),
             type: 'tool_result',
             toolUseId: block.tool_use_id ?? '',
-            content: toolResultContent(block.content, msg.toolUseResult),
+            content: structuredToolResultContent(block.content, msg.toolUseResult),
             isError: !!block.is_error,
             timestamp,
             parentToolUseId: msg.parentToolUseId,

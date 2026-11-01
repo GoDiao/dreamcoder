@@ -1,9 +1,10 @@
-import { AppWindow, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, Copy, Ellipsis, FileCode, FileDiffIcon, Folder, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Globe, ImageOffIcon, LayoutGrid, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, PanelRight, Plus, RefreshCw, SearchXIcon, SquareTerminal, X, type LucideIcon } from 'lucide-react'
+import { AppWindow, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, Copy, Ellipsis, FileCode, FileDiffIcon, Folder, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Globe, ImageOffIcon, LayoutGrid, Layers, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, PanelRight, Plus, RefreshCw, SearchXIcon, SquareTerminal, X, type LucideIcon } from 'lucide-react'
 import type { UiPageSummary } from '@protocol'
 import { toast } from 'sonner'
 import { getTextSelectionFromContainer, type WorkspaceTextSelection } from './workspaceSelection'
 import { WorkspaceQuotePopover } from './WorkspaceQuotePopover'
 import { PreviewLimitBar } from './PreviewLimitBar'
+import { PanelLoading, PanelMessage } from './PanelStates'
 import { WorkspaceTreeNavigation } from './WorkspaceTreeNavigation'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../shared/ui/collapsible'
 import { ActionMenu, RowActionMenu, type MenuAction } from '../shared/ActionMenu'
@@ -11,8 +12,6 @@ import { Input } from '../shared/ui/input'
 import { Button } from '../shared/ui/button'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../shared/ui/tabs'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../shared/ui/empty'
-import { Skeleton } from '../shared/ui/skeleton'
 import { useEffect, useMemo, useRef, useState, useId, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useHighlightedCode } from '../../hooks/useHighlightedCode'
 import type {
@@ -36,6 +35,7 @@ import {
 import { useChatStore } from '../../stores/chatStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { TerminalSettings } from '../../pages/TerminalSettings'
+import { ArtifactsView } from './ArtifactsView'
 import { BrowserView } from './BrowserView'
 import { UiPageFrame } from '../chat/UiPageFrame'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
@@ -184,53 +184,6 @@ function getLineRangeForText(value: string, text: string) {
   const startLine = value.slice(0, index).split('\n').length
   const endLine = startLine + text.split('\n').length - 1
   return { startLine, endLine }
-}
-
-function PanelMessage({
-  icon: Icon,
-  message,
-  tone = 'muted',
-  compact = false,
-}: {
-  icon: LucideIcon
-  message: string
-  tone?: 'muted' | 'error'
-  compact?: boolean
-}) {
-  const toneClass = tone === 'error' ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'
-
-  if (compact) {
-    return (
-      <Empty role={tone === 'error' ? 'alert' : 'status'} className={`flex-row justify-start gap-2 rounded-none p-0 px-4 py-2 text-left text-[11px] ${toneClass}`}>
-        <Icon className="shrink-0" aria-hidden="true" size={16} />
-        <EmptyDescription className={`min-w-0 text-[11px] leading-relaxed ${toneClass}`}>{message}</EmptyDescription>
-      </Empty>
-    )
-  }
-
-  return (
-    <Empty role={tone === 'error' ? 'alert' : 'status'} className="gap-2 px-4 py-8">
-      <EmptyHeader>
-        <EmptyMedia variant="icon" className={toneClass}><Icon aria-hidden="true" /></EmptyMedia>
-        <EmptyDescription className={`text-xs ${toneClass}`}>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  )
-}
-
-function PanelLoading({ label, compact = false }: { label: string; compact?: boolean }) {
-  return (
-    <div role="status" className={`flex flex-col gap-2 px-4 ${compact ? 'py-2' : 'py-4'}`}>
-      <span className="sr-only">{label}</span>
-      <Skeleton className="h-3 w-40" />
-      {!compact && (
-        <>
-          <Skeleton className="h-3 w-56" />
-          <Skeleton className="h-3 w-32" />
-        </>
-      )}
-    </div>
-  )
 }
 
 function CodeSurface({
@@ -994,6 +947,7 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
     ...(desktop ? [{ target: { kind: 'terminal' } as const, kind: 'terminal' as const, label: t('workspace.tabTerminal') }] : []),
     { target: { kind: 'files' }, kind: 'files', label: t('workspace.tabFiles') },
     { target: { kind: 'changes' }, kind: 'changes', label: t('workspace.tabChanges') },
+    ...(desktop ? [{ target: { kind: 'artifacts' } as const, kind: 'artifacts' as const, label: t('workspace.tabArtifacts') }] : []),
   ]
   const recents: Array<{ key: string; kind: WorkspaceTabKind; label: string; detail?: string; target: WorkspaceTabTarget }> = [
     ...uiPages.map((page) => ({
@@ -1071,6 +1025,7 @@ const TAB_ICONS: Record<WorkspaceTabKind, LucideIcon> = {
   launcher: LayoutGrid,
   changes: FileDiffIcon,
   files: FolderTree,
+  artifacts: Layers,
   file: FileCode,
   browser: Globe,
   terminal: SquareTerminal,
@@ -1085,6 +1040,8 @@ function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab) {
       return t('workspace.tabChanges')
     case 'files':
       return t('workspace.tabFiles')
+    case 'artifacts':
+      return t('workspace.tabArtifacts')
     case 'file':
       return getPathParts(tab.path).name
     case 'browser':
@@ -1153,6 +1110,8 @@ function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowCl
         return <ChangesView sessionId={sessionId} />
       case 'files':
         return <FilesView sessionId={sessionId} />
+      case 'artifacts':
+        return <ArtifactsView sessionId={sessionId} />
       case 'file':
         return <FileTabView sessionId={sessionId} path={tab.path} />
       case 'browser':

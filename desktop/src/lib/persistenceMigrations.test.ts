@@ -4,6 +4,7 @@ import {
   DESKTOP_PERSISTENCE_VERSION_KEY,
   runDesktopPersistenceMigrations,
 } from './persistenceMigrations'
+import { ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID } from '../stores/tabStore'
 
 describe('desktop persistence migrations', () => {
   beforeEach(() => {
@@ -26,6 +27,19 @@ describe('desktop persistence migrations', () => {
       activeTabId: 'session-1',
     })
     expect(window.localStorage.getItem(DESKTOP_PERSISTENCE_VERSION_KEY)).toBe(String(CURRENT_DESKTOP_PERSISTENCE_SCHEMA_VERSION))
+  })
+
+  test('keeps the scheduled and artifacts tabs as they are', () => {
+    const openTabs = [
+      { sessionId: 'session-1', title: 'Old tab', type: 'session' },
+      { sessionId: SCHEDULED_TAB_ID, title: 'Scheduled', type: 'scheduled' },
+      { sessionId: ARTIFACTS_TAB_ID, title: 'Artifacts', type: 'artifacts' },
+    ]
+    window.localStorage.setItem('dreamcoder-open-tabs', JSON.stringify({ openTabs, activeTabId: ARTIFACTS_TAB_ID }))
+
+    runDesktopPersistenceMigrations()
+
+    expect(JSON.parse(window.localStorage.getItem('dreamcoder-open-tabs') || '{}')).toEqual({ openTabs, activeTabId: ARTIFACTS_TAB_ID })
   })
 
   test('filters stale session runtime selections without clearing unrelated keys', () => {

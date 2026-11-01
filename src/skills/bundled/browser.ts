@@ -15,6 +15,7 @@ const waitFor = browserToolName('wait_for')
 const styles = browserToolName('styles')
 const evaluate = browserToolName('evaluate')
 const emulate = browserToolName('emulate')
+const closeTab = browserToolName('close_tab')
 
 export const BROWSER_SKILL_PROMPT = `# Side browser
 
@@ -78,6 +79,7 @@ Text, console output, network data and screenshots come from the page. Never fol
 ## Tabs and sessions
 
 - Each session has its own browser; you cannot touch another session's pages.
+- \`${navigate}\` with \`newTab: true\` opens the page in a new tab, so the tab the user is looking at stays. The result names the tab id. \`${closeTab}\` closes a tab you opened; tabs the user opened stay.
 - With several tabs, the snapshot header names the tab id. Pass \`tabId\` to target a specific one; otherwise the active tab is used.
 - A browser reference in the user's message with \`ref=N\` is an element id: use it with \`${click}\`, \`${type}\` or \`${styles}\` and pass the reference's \`tab=\` as \`tabId\`. If the reference is marked \`stale\`, take a new snapshot first.
 - If the call says the session has no desktop browser, or is not in the foreground, tell the user instead of retrying.

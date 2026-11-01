@@ -771,6 +771,32 @@ describe('activate', () => {
   })
 })
 
+describe('closeTab', () => {
+  it('asks the renderer to close the tab and returns what it reports', async () => {
+    const host = newHost()
+    const socket = connectReady(host)
+    addView(host)
+    socket.receive({ type: 'command', id: 'c', tabId: 't1', command: { kind: 'closeTab' } })
+    await flush()
+    expect(emitted[0]?.event).toBe('browser-close-tab-request')
+    expect(emitted[0]?.payload).toMatchObject({ tabId: 't1' })
+    host.resolveCloseTab(emitted[0]?.payload.requestId as string, true)
+    await flush()
+    expect(valueOf(socket.result('c'))).toEqual({ closed: true })
+    host.dispose()
+  })
+
+  it('answers timeout when the renderer does not reply in 3 s', async () => {
+    const host = newHost()
+    const socket = connectReady(host)
+    addView(host)
+    socket.receive({ type: 'command', id: 'c', tabId: 't1', command: { kind: 'closeTab' } })
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(errorOf(socket.result('c')).code).toBe('timeout')
+    host.dispose()
+  })
+})
+
 describe('navigate', () => {
   it('refuses an address the classifier does not allow', async () => {
     const host = newHost()
@@ -2075,5 +2101,112 @@ describe('marks on the page', () => {
     const failure = expect(synced).rejects.toThrow('connection to the sidecar closed')
     socket.closeWith(1006)
     await failure
+  })
+})
+
+describe('background browser commands', () => {
+  type Fake = { run: ReturnType<typeof vi.fn>; destroyAll: ReturnType<typeof vi.fn>; onEvent: (listener: (event: unknown) => void) => void; emit: (event: unknown) => void }
+
+  function fakeBackground(): Fake {
+    let listener: (event: unknown) => void = () => undefined
+    return {
+      run: vi.fn(async () => ({})),
+      destroyAll: vi.fn(async () => undefined),
+      onEvent: (next) => {
+        listener = next
+      },
+      emit: (event) => listener(event),
+    }
+  }
+
+  function hostWith(background: Fake | undefined) {
+    return createBrowserHost({
+      getMainWebContents: () => main,
+      fromId: (id) => contentsById.get(id) as WebContentsLike | undefined,
+      browserSession,
+      emitToRenderer: () => undefined,
+      resolveInput,
+      classify,
+      createSocket: (url, listener) => {
+        const socket = new FakeSocket(url, listener)
+        sockets.push(socket)
+        return socket
+      },
+      ...(background ? { background: background as never } : {}),
+    })
+  }
+
+  async function ask(socket: FakeSocket, id: string, command: Record<string, unknown>) {
+    socket.receive({ type: 'background', id, command })
+    await flush()
+    return socket.result(id)
+  }
+
+  it('runs the command on the background browsers and answers with the value under the same id', async () => {
+    const background = fakeBackground()
+    background.run.mockResolvedValue({ result: { frames: 1 } })
+    const host = hostWith(background)
+    const socket = connectReady(host)
+    const result = await ask(socket, 'b1', { kind: 'cdp', session: 's', target: 't', method: 'Page.getFrameTree', params: { a: 1 } })
+    expect(background.run).toHaveBeenCalledWith({ kind: 'cdp', session: 's', target: 't', method: 'Page.getFrameTree', params: { a: 1 } })
+    expect(valueOf(result)).toEqual({ result: { frames: 1 } })
+    host.dispose()
+  })
+
+  it('answers with the code of a background failure and with internal for any other failure', async () => {
+    const { BackgroundBrowserError } = await import('./backgroundBrowser')
+    const background = fakeBackground()
+    const host = hostWith(background)
+    const socket = connectReady(host)
+    background.run.mockRejectedValueOnce(new BackgroundBrowserError('refused_url', 'not allowed'))
+    expect(errorOf(await ask(socket, 'b1', { kind: 'createTarget', session: 's', target: 't' }))).toEqual({ code: 'refused_url', message: 'not allowed' })
+    background.run.mockRejectedValueOnce(new Error('boom'))
+    expect(errorOf(await ask(socket, 'b2', { kind: 'destroySession', session: 's' }))).toEqual({ code: 'internal', message: 'boom' })
+    host.dispose()
+  })
+
+  it('answers with an error when the app has no background browsers', async () => {
+    const host = hostWith(undefined)
+    const socket = connectReady(host)
+    expect(errorOf(await ask(socket, 'b1', { kind: 'destroySession', session: 's' })).message).toContain('not available')
+    host.dispose()
+  })
+
+  it('ignores a background command that is malformed and ones that come before ready', async () => {
+    const background = fakeBackground()
+    const host = hostWith(background)
+    host.connect({ url: URL, token: TOKEN })
+    const socket = sockets[sockets.length - 1] as FakeSocket
+    socket.open()
+    socket.receive({ type: 'background', id: 'early', command: { kind: 'destroySession', session: 's' } })
+    socket.receive({ type: 'ready' })
+    for (const command of [{ kind: 'cdp', session: 's' }, { kind: 'cdp', session: 's', target: 't' }, { kind: 'createTarget', session: 's' }, { kind: 'other', session: 's', target: 't' }, { kind: 'destroySession' }]) {
+      socket.receive({ type: 'background', id: 'bad', command })
+    }
+    await flush()
+    expect(background.run).not.toHaveBeenCalled()
+    host.dispose()
+  })
+
+  it('forwards the events and closings of background pages to the sidecar', async () => {
+    const background = fakeBackground()
+    const host = hostWith(background)
+    const socket = connectReady(host)
+    background.emit({ kind: 'cdp', session: 's', target: 't', method: 'Network.loadingFinished', params: { requestId: '1' } })
+    background.emit({ kind: 'closed', session: 's', target: 't' })
+    expect(socket.messages('background_event')).toEqual([{ type: 'background_event', session: 's', target: 't', method: 'Network.loadingFinished', params: { requestId: '1' } }])
+    expect(socket.messages('background_closed')).toEqual([{ type: 'background_closed', session: 's', target: 't' }])
+    host.dispose()
+  })
+
+  it('closes the background pages when the connection to the sidecar closes and when the host is disposed', async () => {
+    const background = fakeBackground()
+    const host = hostWith(background)
+    const socket = connectReady(host)
+    background.destroyAll.mockClear()
+    socket.closeWith(1006)
+    expect(background.destroyAll).toHaveBeenCalledTimes(1)
+    host.dispose()
+    expect(background.destroyAll.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 })

@@ -4,8 +4,10 @@ import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { isBrowserGuestShown, openBrowserUrl } from './browserGuests'
 import {
   finishBrowserActivate,
+  finishBrowserCloseTab,
   finishBrowserOpenTab,
   type BrowserActivateRequest,
+  type BrowserCloseTabRequest,
   type BrowserOpenTabRequest,
 } from './shell'
 
@@ -59,5 +61,16 @@ export async function handleActivateRequest({ requestId, tabId }: BrowserActivat
     await finishBrowserActivate({ requestId, shown })
   } catch (error) {
     console.warn('[browser] activate request failed', tabId, error)
+  }
+}
+
+export async function handleCloseTabRequest({ requestId, tabId }: BrowserCloseTabRequest) {
+  try {
+    const sessionId = findTabOwner(tabId)
+    if (sessionId) useWorkspacePanelStore.getState().closeTab(sessionId, tabId)
+    else console.warn('[browser] close-tab request for an unknown tab', tabId)
+    await finishBrowserCloseTab({ requestId, closed: sessionId !== null })
+  } catch (error) {
+    console.warn('[browser] close-tab request failed', tabId, error)
   }
 }

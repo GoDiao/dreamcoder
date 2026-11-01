@@ -17,7 +17,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
-import { browserMcpChildEnv } from '../browserHost/childEnv.js'
+import { browserMcpChildEnv, webCloneChildEnv } from '../browserHost/childEnv.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
 import { SettingsService } from './settingsService.js'
@@ -1012,6 +1012,7 @@ export class ConversationService {
         ? { DREAMCODER_DESKTOP_SERVER_URL: desktopServerUrl }
         : {}),
       ...(sessionId ? browserMcpChildEnv(sessionId, desktopServerUrl) : {}),
+      ...(sessionId ? webCloneChildEnv(sessionId, desktopServerUrl) : {}),
       ...(sdkUrl
         ? {
             DREAMCODER_DESKTOP_AWAIT_MCP: '1',

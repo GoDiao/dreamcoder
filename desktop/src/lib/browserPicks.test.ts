@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const shellMocks = vi.hoisted(() => ({
   setBrowserPickMode: vi.fn(),
+  canvasBoardLabel: vi.fn(async (): Promise<string | null> => null),
 }))
+
+vi.mock('./browserGuests', () => ({ canvasBoardLabel: shellMocks.canvasBoardLabel }))
 
 vi.mock('./shell', () => ({
   setBrowserPickMode: shellMocks.setBrowserPickMode,
@@ -102,10 +105,10 @@ describe('browser picks', () => {
       expect(references().map((reference) => reference.browser?.pendingPickId)).toEqual(['p1', 'p2'])
     })
 
-    it('fills the pending reference where it is, with the element and its screenshot', () => {
+    it('fills the pending reference where it is, with the element and its screenshot', async () => {
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p2' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
 
       expect(references()).toHaveLength(2)
       const [first] = references()
@@ -123,9 +126,17 @@ describe('browser picks', () => {
       expect(references()[1]?.browser?.pendingPickId).toBe('p2')
     })
 
-    it('keeps only the identity of a sensitive element', () => {
+    it('names the artifact and board in front of the element when the pick is inside a canvas board', async () => {
+      shellMocks.canvasBoardLabel.mockResolvedValueOnce('flow / Home')
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
-      handleBrowserPickDone({
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+      expect(shellMocks.canvasBoardLabel).toHaveBeenCalledWith('t', 'https://example.com/a')
+      expect(references()[0]?.name).toBe('flow / Home · button.buy')
+    })
+
+    it('keeps only the identity of a sensitive element', async () => {
+      handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
+      await handleBrowserPickDone({
         tabId: 't',
         sessionId: 's',
         pickId: 'p1',
@@ -138,43 +149,43 @@ describe('browser picks', () => {
       expect(references()[0]?.browser?.text).toBe('')
     })
 
-    it('removes the placeholder silently when the pick was cancelled', () => {
+    it('removes the placeholder silently when the pick was cancelled', async () => {
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: false, cancelled: true })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: false, cancelled: true })
       expect(references()).toEqual([])
       expect(toast.error).not.toHaveBeenCalled()
     })
 
-    it('removes the placeholder, logs and tells the user when the pick failed', () => {
+    it('removes the placeholder, logs and tells the user when the pick failed', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: false, cancelled: false, error: 'No node with given id' })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: false, cancelled: false, error: 'No node with given id' })
       expect(references()).toEqual([])
       expect(toast.error).toHaveBeenCalledWith('Could not pick that element.')
       expect(warn.mock.calls.flat()).toContain('No node with given id')
     })
 
-    it('treats a description that cannot be used as a failure instead of adding junk', () => {
+    it('treats a description that cannot be used as a failure instead of adding junk', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: { ...VALUE, selector: '' } })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: { ...VALUE, selector: '' } })
       expect(references()).toEqual([])
       expect(toast.error).toHaveBeenCalledWith('Could not pick that element.')
       expect(warn).toHaveBeenCalled()
     })
 
-    it('does not bring back a reference the user already removed', () => {
+    it('does not bring back a reference the user already removed', async () => {
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
       useWorkspaceChatContextStore.getState().removeReference('s', 'browser-pick:p1')
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: VALUE })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: VALUE })
       expect(references()).toEqual([])
     })
 
-    it('replaces an earlier pick of the same element in the same document', () => {
+    it('replaces an earlier pick of the same element in the same document', async () => {
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: VALUE })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 0, value: VALUE })
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p2' })
-      handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p2', ok: true, generation: 0, value: VALUE })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p2', ok: true, generation: 0, value: VALUE })
       expect(references()).toHaveLength(1)
     })
   })

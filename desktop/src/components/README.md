@@ -55,6 +55,8 @@ that only renames props or passes them through does not belong here.
 | --- | --- |
 | `LabeledInput` | Field, Label, `ui/input`, description and validation IDs wired together |
 | `LoadingBlock` | A centered Spinner for loading lists and detail pages |
+| `CardButton` | A button with the card surface, hover, disabled and focus styles; sizing and borders come from the caller |
+| `ViewerHeader` | The header of a full-screen page viewer: back button, title and actions, as the window's title row (drag region, title bar height on macOS) |
 | `SearchField` | Input Group, Input and lucide search/clear icons |
 | `SegmentedControl` | Single-selection Toggle Group |
 | `Dropdown` | Dropdown Menu radio items with optional descriptions, shared by settings selects and the workspace view switch |

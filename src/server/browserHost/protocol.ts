@@ -24,11 +24,20 @@ export type BrowserHostCommand =
   | { kind: 'inspect' }
   | { kind: 'openTab'; sessionId: string; url: string | null }
   | { kind: 'activate' }
+  | { kind: 'closeTab' }
   | { kind: 'navigate'; url: string }
   | { kind: 'history'; direction: 'back' }
   | { kind: 'cdp'; method: string; params?: Record<string, unknown> }
   | { kind: 'events'; channel: 'console' | 'network'; since: number; limit: number }
   | { kind: 'release' }
+
+export type BackgroundBrowserCommand =
+  | { kind: 'createTarget'; session: string; target: string }
+  | { kind: 'closeTarget'; session: string; target: string }
+  | { kind: 'cdp'; session: string; target: string; method: string; params?: Record<string, unknown> }
+  | { kind: 'destroySession'; session: string }
+
+export const BACKGROUND_CDP_BLOCKED_DOMAINS: readonly string[] = ['Browser', 'Target', 'SystemInfo', 'Storage']
 
 export type BrowserGrantDecision = 'deny' | 'once' | 'session'
 
@@ -93,6 +102,7 @@ export type BrowserHostMessage =
   | { type: 'ready' }
   | { type: 'command'; id: string; tabId: string | null; expectGeneration?: number; command: BrowserHostCommand }
   | { type: 'cancel'; id: string }
+  | { type: 'background'; id: string; command: BackgroundBrowserCommand }
   | BrowserTrustResult
   | BrowserPickResult
   | BrowserMarksResult
@@ -162,6 +172,7 @@ export type BrowserHostValueByKind = {
   inspect: BrowserInspectValue
   openTab: { tabId: string }
   activate: { shown: boolean }
+  closeTab: { closed: boolean }
   navigate: { url: string; generation: number; loading: boolean }
   history: { url: string; generation: number }
   cdp: { result: unknown }
@@ -181,6 +192,8 @@ export type BrowserHostEvent =
   | { type: 'trust'; id: string; op: BrowserTrustOp; origin?: string }
   | BrowserPickRequest
   | BrowserMarksRequest
+  | { type: 'background_event'; session: string; target: string; method: string; params: unknown }
+  | { type: 'background_closed'; session: string; target: string }
 
 export const CDP_INPUT_METHODS: readonly string[] = ['Input.dispatchMouseEvent', 'Input.dispatchKeyEvent', 'Input.insertText']
 
