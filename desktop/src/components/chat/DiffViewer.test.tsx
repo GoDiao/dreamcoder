@@ -19,10 +19,7 @@ describe('DiffViewer', () => {
     expect(screen.getByRole('status', { name: 'Loading diff' })).toHaveStyle({ height: '60px' })
 
     const body = container.querySelector('.max-h-\\[400px\\]') as HTMLElement
-    await waitFor(
-      () => expect(body.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-code]')?.textContent).toContain('world'),
-      { timeout: 15_000 },
-    )
+    await waitFor(() => expect(body.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-code]')?.textContent).toContain('world'), { timeout: 4000 })
     expect(screen.queryByRole('status', { name: 'Loading diff' })).not.toBeInTheDocument()
-  }, 20_000)
+  })
 })
