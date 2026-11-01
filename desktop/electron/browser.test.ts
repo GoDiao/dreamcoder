@@ -22,6 +22,8 @@ let project = ''
 let outside = ''
 let roots: ProjectRoots
 
+const escapeLink = process.platform === 'win32' ? 'link/secret.html' : 'link.html'
+
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'electron-browser-'))
   project = path.join(dir, 'project')
@@ -32,7 +34,8 @@ beforeEach(() => {
   writeFileSync(path.join(project, 'docs', 'my page.html'), '<h1>docs</h1>')
   writeFileSync(path.join(project, 'notes.txt'), 'notes')
   writeFileSync(path.join(outside, 'secret.html'), 'secret')
-  symlinkSync(path.join(outside, 'secret.html'), path.join(project, 'link.html'))
+  if (process.platform === 'win32') symlinkSync(outside, path.join(project, 'link'), 'junction')
+  else symlinkSync(path.join(outside, 'secret.html'), path.join(project, 'link.html'))
   roots = new ProjectRoots()
 })
 
@@ -112,7 +115,7 @@ describe('resolveBrowserInput', () => {
     await expect(resolveBrowserInput(secret, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('../outside/secret.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('../outside/missing.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
-    await expect(resolveBrowserInput('./link.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
+    await expect(resolveBrowserInput(`./${escapeLink}`, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput(`file://${secret}`, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('./missing.html', project, roots)).resolves.toEqual({ ok: false, reason: 'notFound' })
     await expect(resolveBrowserInput('./docs', project, roots)).resolves.toEqual({ ok: false, reason: 'notFound' })
@@ -204,7 +207,7 @@ describe('project files', () => {
     const reader = vi.fn(read)
     expect((await serveProjectRequest(`${origin}/%2e%2e%2foutside%2fsecret.html`, roots, reader)).status).toBe(403)
     expect((await serveProjectRequest(`${origin}/..%2foutside%2fsecret.html`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${origin}/link.html`, roots, reader)).status).toBe(403)
+    expect((await serveProjectRequest(`${origin}/${escapeLink}`, roots, reader)).status).toBe(403)
     expect((await serveProjectRequest(`${PROJECT_SCHEME}://unknown/index.html`, roots, reader)).status).toBe(403)
     expect((await serveProjectRequest(`${origin}/%00`, roots, reader)).status).toBe(403)
     expect((await serveProjectRequest(`${origin}/nope.html`, roots, reader)).status).toBe(404)

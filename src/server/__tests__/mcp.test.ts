@@ -162,14 +162,16 @@ describe('MCP API', () => {
       const rawConfig = JSON.parse(
         await fs.readFile(path.join(tmpDir, '.claude.json'), 'utf8'),
       )
+      const projectAKey = getProjectPathForConfig(projectA)
+      const projectBKey = getProjectPathForConfig(projectB)
 
-      expect(rawConfig.projects?.[projectA]?.mcpServers?.['scoped-server']).toBeUndefined()
-      expect(rawConfig.projects?.[projectA]?.disabledMcpServers ?? []).not.toContain('scoped-server')
-      expect(rawConfig.projects?.[projectB]?.mcpServers?.['scoped-server']).toMatchObject({
+      expect(rawConfig.projects?.[projectAKey]?.mcpServers?.['scoped-server']).toBeUndefined()
+      expect(rawConfig.projects?.[projectAKey]?.disabledMcpServers ?? []).not.toContain('scoped-server')
+      expect(rawConfig.projects?.[projectBKey]?.mcpServers?.['scoped-server']).toMatchObject({
         type: 'stdio',
         command: 'node',
       })
-      expect(rawConfig.projects?.[projectB]?.disabledMcpServers).toContain('scoped-server')
+      expect(rawConfig.projects?.[projectBKey]?.disabledMcpServers).toContain('scoped-server')
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV
@@ -246,7 +248,7 @@ describe('MCP API', () => {
     async function readStoredServers(scope: EditableScope) {
       const stored = JSON.parse(await fs.readFile(configFilePath(scope), 'utf8'))
       return scope === 'local'
-        ? stored.projects[projectRoot].mcpServers
+        ? stored.projects[getProjectPathForConfig(projectRoot)].mcpServers
         : stored.mcpServers
     }
 
@@ -561,7 +563,7 @@ describe('MCP API', () => {
       expect(projectPathsRes.status).toBe(200)
       const body = await projectPathsRes.json()
 
-      expect(body.projectPaths).toEqual([projectB])
+      expect(body.projectPaths).toEqual([getProjectPathForConfig(projectB)])
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV

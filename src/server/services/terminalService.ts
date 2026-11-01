@@ -87,7 +87,7 @@ export function detectPosixShell(
 export function shellSearchDirs(macos: boolean, pathValue: string | undefined): string[] {
   return [
     ...(macos ? ['/opt/homebrew/bin', '/usr/local/bin'] : []),
-    ...(pathValue ?? '').split(path.delimiter).filter((dir) => path.isAbsolute(dir)),
+    ...(pathValue ?? '').split(path.posix.delimiter).filter((dir) => path.posix.isAbsolute(dir)),
     '/usr/local/bin',
     '/usr/bin',
     '/bin',
@@ -101,7 +101,7 @@ export function resolvePosixOverride(
   executable: (filePath: string) => boolean,
 ): string | null {
   if (choice === 'zsh' || choice === 'bash' || choice === 'fish') {
-    const found = searchDirs.map((dir) => path.join(dir, choice)).find(executable)
+    const found = searchDirs.map((dir) => path.posix.join(dir, choice)).find(executable)
     if (!found) throw new Error(`terminal shell ${choice} is not installed or executable`)
     return found
   }

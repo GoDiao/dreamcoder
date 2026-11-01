@@ -5,7 +5,6 @@ import { logs } from '@opentelemetry/api-logs'
 // signal, but static imports would load all 6 (~1.2MB) on every startup.
 import {
   envDetector,
-  hostDetector,
   osDetector,
   resourceFromAttributes,
 } from '@opentelemetry/resources'
@@ -71,6 +70,19 @@ const DEFAULT_LOGS_EXPORT_INTERVAL_MS = 5000
 const DEFAULT_TRACES_EXPORT_INTERVAL_MS = 5000
 
 class TelemetryTimeoutError extends Error {}
+
+function normalizeHostArch(arch: string): string {
+  switch (arch) {
+    case 'arm':
+      return 'arm32'
+    case 'ppc':
+      return 'ppc32'
+    case 'x64':
+      return 'amd64'
+    default:
+      return arch
+  }
+}
 
 function telemetryTimeout(ms: number, message: string): Promise<never> {
   return new Promise((_, reject) => {
@@ -491,13 +503,9 @@ export async function initializeTelemetry() {
   )
 
   // Extract only host.arch from hostDetector
-  const hostDetected = hostDetector.detect()
-  const hostArchAttributes = hostDetected.attributes?.[SEMRESATTRS_HOST_ARCH]
-    ? {
-        [SEMRESATTRS_HOST_ARCH]: hostDetected.attributes[SEMRESATTRS_HOST_ARCH],
-      }
-    : {}
-  const hostArchResource = resourceFromAttributes(hostArchAttributes)
+  const hostArchResource = resourceFromAttributes({
+    [SEMRESATTRS_HOST_ARCH]: normalizeHostArch(process.arch),
+  })
 
   const envResource = resourceFromAttributes(
     envDetector.detect().attributes || {},
