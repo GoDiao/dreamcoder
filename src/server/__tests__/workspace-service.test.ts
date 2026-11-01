@@ -294,16 +294,25 @@ describe('WorkspaceService', () => {
     await expect(service.readTree('session-1', '../outside')).rejects.toThrow(/outside workspace/)
   })
 
+  async function linkOutside(parent: string, outsideDir: string, outsideFile: string): Promise<string> {
+    if (process.platform === 'win32') {
+      await fs.symlink(outsideDir, path.join(parent, 'escape'), 'junction')
+      return 'escape/secret.txt'
+    }
+    await fs.symlink(outsideFile, path.join(parent, 'escape.txt'))
+    return 'escape.txt'
+  }
+
   it('rejects symlink targets that escape the workspace root', async () => {
     const workDir = await makeTempDir('workspace-service-symlink-')
     const outsideDir = await makeTempDir('workspace-service-symlink-outside-')
     const outsideFile = path.join(outsideDir, 'secret.txt')
     await fs.writeFile(outsideFile, 'top secret\n')
-    await fs.symlink(outsideDir, path.join(workDir, 'escape'), process.platform === 'win32' ? 'junction' : 'dir')
+    const linked = await linkOutside(workDir, outsideDir, outsideFile)
 
     const service = new WorkspaceService(async () => workDir)
 
-    await expect(service.readFile('session-1', 'escape/secret.txt')).rejects.toThrow(/outside workspace/)
+    await expect(service.readFile('session-1', linked)).rejects.toThrow(/outside workspace/)
   })
 
   it('returns error for an untracked symlink that escapes the workspace root', async () => {
@@ -319,7 +328,7 @@ describe('WorkspaceService', () => {
     git(repoDir, 'commit', '-m', 'initial')
 
     await fs.writeFile(outsideFile, 'top secret\n')
-    await fs.symlink(outsideDir, path.join(repoDir, 'escape'), process.platform === 'win32' ? 'junction' : 'dir')
+    const linked = await linkOutside(repoDir, outsideDir, outsideFile)
 
     const service = new WorkspaceService(async () => repoDir)
 
@@ -327,11 +336,11 @@ describe('WorkspaceService', () => {
     expect(status.state).toBe('error')
     expect(status.error).toMatch(/outside workspace/)
 
-    await expect(service.getDiff('session-1', 'escape/secret.txt')).resolves.toMatchObject({
+    await expect(service.getDiff('session-1', linked)).resolves.toMatchObject({
       state: 'error',
-      path: 'escape/secret.txt',
+      path: linked,
     })
-    const diffOutcome = await service.getDiff('session-1', 'escape/secret.txt')
+    const diffOutcome = await service.getDiff('session-1', linked)
     expect(diffOutcome.error).toMatch(/outside workspace/)
   })
 
