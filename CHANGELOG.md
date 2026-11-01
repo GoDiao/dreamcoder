@@ -4,6 +4,12 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-01
+
+The first stable release of the Electron desktop app. These notes cover everything since 0.7.0, including 0.8.0-beta.1 and 0.8.0-beta.2.
+
+Thanks to everyone who contributed to this release: @AIR-Xie, @KingEmma7, @Sagar07Kr, @UnrealHenry, @mayuriphad and @pcbeingused333.
+
 ### Added
 
 - **Artifacts.** Pages, prototypes and canvases the agent makes are kept as folders in the project's `dc_artifacts/` (an HTML file and a manifest) instead of getting lost in the conversation, and the agent asks before creating one. A new Artifacts page in the sidebar lists the artifacts of every project with thumbnails, search and a project filter; open one full screen, continue it in a new chat, or add it to a conversation so the agent can read it. The same list is in each session's panel menu. A page can be exported as PDF, PNG or a standalone HTML file, and deleting a worktree moves its artifacts, with the design systems they use, to a global folder instead of deleting them.
@@ -13,9 +19,28 @@ All notable changes to DreamCoder will be documented in this file.
 - **The agent can operate the built-in browser** (#189). The agent gets fourteen tools (`navigate`, `snapshot`, `scroll`, `click`, `type`, `press_key`, `screenshot`, `console`, `network`, `back`, `wait_for`, `styles`, `evaluate`, `emulate`) that work only on the side browser of its own session; there is no remote debugging port and no control of your own Chrome. Pages are read as a compact snapshot of text and numbered interactive elements, with delta updates for later reads; on long pages the agent can `scroll`, search the page text with `find`, and read on with `textFrom`; it can wait for text to appear, read an element's computed CSS, run a script in the page (which asks first on external sites), and emulate a viewport size or dark mode for the length of the turn. Local pages (localhost, project files) can be operated freely, except that a local page embedding another site asks permission for each embedded site, once for each action and never remembered; on external https sites reading (including scrolling) is free and each origin asks before the agent clicks, types, presses keys or navigates, with "Deny", "Allow once" or "Trust for this session". Sites you always trust are managed under Settings → Permissions. A bar in the panel shows when the agent is operating the page and has a Stop button. A built-in `browser` skill explains the tools, and the verification agent and `/batch` now point at them. Page text in the results of clicks and typing, and in dialog text, is marked as untrusted too. The browser tab keeps working when its page crashes and is reloaded. Desktop app only.
 - **Add selected text from the built-in browser to the chat** (#189). Select text on a page, right-click and choose "Add to chat": the text, with the page title and address, appears as a reference in the message box and goes to the agent as untrusted page content that it must not treat as your instructions. A selection that touches a password or card field, or lies inside an embedded frame, cannot be added. Selections are cut at 4000 characters and marked as cut. Restored sessions show these references as cards again.
 - **Pick an element in the built-in browser and add it to the chat** (#189). Turn on "Pick an element" in the browser toolbar and click elements on the page: each stays outlined in orange, with a small label, until you send the message, and you can pick several. A picked element goes to the chat with a screenshot and its details (tag, classes, role, name, text, selector, link address, key styles, its HTML and its neighbours' HTML, and React component info) as untrusted page content that the agent must not treat as your instructions. Password and card fields, and anything that contains one, are never carried, only where the element is. The agent cannot click, type or press keys on the page while you are picking. Elements that were on a page you left are marked as gone.
+- **The agent can show pages in the conversation** (#202). When a chart, a diagram or a walkthrough explains better than text, the agent builds a page from [ShowAI](https://github.com/Renaissance-Mind/ShowAI) components: charts and over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, step-by-step walkthroughs, comparison matrices, roadmaps, 3D scenes, PDFs and more, plus HTML it writes itself for what no component can draw. The page appears in a card in the conversation; each change is a new revision, and the card can be enlarged or opened in the side panel. Pages follow the app's light or dark theme and run in a sandbox that cannot reach the network, the app or your files. The page reader makes the macOS `.dmg` about 6 MB larger.
+- **A built-in browser** (#201). A side panel tab opens a local dev server, an HTML file in the project or an https site. Sign-ins are kept across restarts and cleared with "Clear browsing data"; other link types are offered to the system browser. Desktop app only.
+- **The side panel is a strip of tabs.** Changes, the file tree, single files, web pages, terminals and pages each open as a tab, from the new tab page or from the chat. Each session keeps its own tabs, and they come back after a restart, except terminals. The panel now runs the full window height with its tabs in the title row; one button at the top right opens and closes it, and the separate terminal button is gone. The H5 page offers file and page tabs only.
 
 ### Changed
 
+- **The desktop app runs on Electron instead of Tauri** (#174). The interface now renders in Chromium on every platform. On macOS, long sessions are much faster: laying out a streaming reply takes about 1 ms per update instead of about 20 ms (265 ms at the slow end), and scrolling up through 1,000 messages no longer stalls. The installers are larger: the macOS `.dmg` is about 150 MB instead of 46 MB.
+  - Install the new version by hand, as before. On Windows it installs to a new folder, so uninstall the previous DreamCoder from Settings → Apps afterwards.
+  - Sessions, providers and settings carry over. The window position and portable mode start fresh, and so do the preferences the old window kept in its own storage: theme, interface language, zoom, sidebar width and open tabs. Set up portable mode again in Settings → General.
+  - On Windows and macOS the title bar areas still move the window; the empty middle of the sidebar no longer does.
+- **The desktop interface is rebuilt on shadcn/ui** (#191). The app now runs on React 19, and buttons, dialogs, menus, notifications and panels share one set of components in all seven themes. Dialogs keep focus inside and return it when closed, and menus and the file tree work from the keyboard. Icons are lucide SVGs instead of the Material Symbols font. The H5 page needs Safari 17.5 or later.
+  - Code blocks are highlighted with Shiki in light and dark themes and show plain text while highlighting loads. Chat and workspace diffs are rendered with Pierre, with line comments and quoting of selected lines.
+  - A new conversation stays a local draft until the first message or attachment is sent. Opening a new conversation from the sidebar, a project or the keyboard shortcut no longer creates an empty session.
+  - The context button under the input shows usage as a ring; hover it for the breakdown. The task list shows how many steps are done.
+  - The model and effort are picked from two separate lists under the input. Typing while no text field has focus goes to the message input.
+- **The terminal runs in the local server** (#173). Each terminal is a shell the DreamCoder server starts, so it behaves the same in every desktop build. Closing a terminal tab or quitting the app ends its shell. The terminal is available only in the desktop app, not on the H5 page.
+- Building from source no longer needs Rust: `bun run electron:install`, `bun run build:sidecars` and `bun run electron:dev` in `desktop/` (see CONTRIBUTING).
+- **Context windows beside each model** (#105). In Settings → Providers each model has its own context window field next to its name. Fetching models fills empty fields with the window the provider reports and never replaces a typed or saved value.
+  - Providers whose model list includes a context length, such as OpenRouter and Kimi, need no extra requests. Ollama, LM Studio, DeepSeek and Qwen are looked up from their own model APIs.
+  - The form can be saved only after the current settings have loaded. If they fail to load, the form says so instead of saving over them.
+- **Auto-compact at 90% of the context window** (#105). Long conversations are compacted at 90% of the model's context window, after the room kept for the summary, instead of about 33K tokens before it is full. A 1M model now compacts around 882K tokens instead of 967K, and a 200K model around 162K instead of 167K. Settings → General → Auto-compact sets a different percentage for every session. The provider form no longer has "Unknown Model Fallback Window": despite its name it replaced the window of every model of the provider when deciding when to compact. A value saved there is dropped.
+- Typing in a dialog no longer lights up the dialog's whole border; only the focused field is highlighted.
 - The built-in browser's address bar searches when the input is not an address: a phrase with spaces or a single word without a dot goes to the search engine you pick in the browser's "More" menu (Bing by default, or Google, DuckDuckGo, Baidu). The agent's own navigation never turns text into a search; it still needs a URL.
 - Opening the side panel in a session with no tabs now shows the new tab page, so you choose between changes, files, a web page or a terminal, instead of opening the changes or the file tree for you.
 
@@ -32,27 +57,6 @@ All notable changes to DreamCoder will be documented in this file.
 - A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
 - Stopping or restarting a lead session no longer deletes its team and task list (#199). Teams are removed only by `TeamDelete`, not when the CLI process exits (Stop, `/clear`, restart, app quit). Thanks @pcbeingused333.
 - On Windows, sending a message no longer flashes console windows. The background `git`, `where`, `reg` and `cmd` commands that DreamCoder runs were each opening a console window and taking focus from the app, which made the input method bar flicker while typing. They now run hidden.
-
-## [0.8.0-beta.2] — 2026-10-29
-
-A second pre-release of the Electron desktop app. Windows has still not been tested on real machines; reports are welcome in the Windows testing issue (#188).
-
-### Added
-
-- **The agent can show pages in the conversation** (#202). When a chart, a diagram or a walkthrough explains better than text, the agent builds a page from [ShowAI](https://github.com/Renaissance-Mind/ShowAI) components: charts and over forty G2 chart types, flowcharts, sequence and architecture diagrams, mind maps, step-by-step walkthroughs, comparison matrices, roadmaps, 3D scenes, PDFs and more, plus HTML it writes itself for what no component can draw. The page appears in a card in the conversation; each change is a new revision, and the card can be enlarged or opened in the side panel. Pages follow the app's light or dark theme and run in a sandbox that cannot reach the network, the app or your files. The page reader makes the macOS `.dmg` about 6 MB larger.
-- **A built-in browser** (#201). A side panel tab opens a local dev server, an HTML file in the project or an https site. Sign-ins are kept across restarts and cleared with "Clear browsing data"; other link types are offered to the system browser. Desktop app only.
-- **The side panel is a strip of tabs.** Changes, the file tree, single files, web pages, terminals and pages each open as a tab, from the new tab page or from the chat. Each session keeps its own tabs, and they come back after a restart, except terminals. The panel now runs the full window height with its tabs in the title row; one button at the top right opens and closes it, and the separate terminal button is gone. The H5 page offers file and page tabs only.
-
-### Changed
-
-- **The desktop interface is rebuilt on shadcn/ui** (#191). The app now runs on React 19, and buttons, dialogs, menus, notifications and panels share one set of components in all seven themes. Dialogs keep focus inside and return it when closed, and menus and the file tree work from the keyboard. Icons are lucide SVGs instead of the Material Symbols font. The H5 page needs Safari 17.5 or later.
-  - Code blocks are highlighted with Shiki in light and dark themes and show plain text while highlighting loads. Chat and workspace diffs are rendered with Pierre, with line comments and quoting of selected lines.
-  - A new conversation stays a local draft until the first message or attachment is sent. Opening a new conversation from the sidebar, a project or the keyboard shortcut no longer creates an empty session.
-  - The context button under the input shows usage as a ring; hover it for the breakdown. The task list shows how many steps are done.
-  - The model and effort are picked from two separate lists under the input. Typing while no text field has focus goes to the message input.
-
-### Fixed
-
 - Tool calls that arrived after a reply fell back to a non-streaming request were missing from the conversation; they are now shown.
 - Read no longer rejects a text file when a model sends an empty page range.
 - A group of tool calls is no longer marked as failed when a failed call was followed by a successful call of the same tool; the failed call is still shown inside the group.
@@ -61,27 +65,6 @@ A second pre-release of the Electron desktop app. Windows has still not been tes
 - **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle. Thanks @Sagar07Kr.
 - Streamed replies from providers using the OpenAI Chat Completions format show their token usage and cost instead of 0 (#203). The request now asks for usage with `stream_options`, which backends such as Qwen (DashScope) and vLLM need before they report it. Thanks @pcbeingused333.
 - An in-process teammate can no longer call `EnterWorktree` or `ExitWorktree` (#198). Teammates share one process with the lead, so entering a worktree moved the lead and every other teammate into it, and their reads, writes and commands ran there. Thanks @pcbeingused333.
-
-## [0.8.0-beta.1] — 2026-10-26
-
-A pre-release of the Electron desktop app. Windows has not been tested on real machines yet; reports are welcome in the Windows testing issue.
-
-### Changed
-
-- **The desktop app runs on Electron instead of Tauri** (#174). The interface now renders in Chromium on every platform. On macOS, long sessions are much faster: laying out a streaming reply takes about 1 ms per update instead of about 20 ms (265 ms at the slow end), and scrolling up through 1,000 messages no longer stalls. The installers are larger: the macOS `.dmg` is about 150 MB instead of 46 MB.
-  - Install the new version by hand, as before. On Windows it installs to a new folder, so uninstall the previous DreamCoder from Settings → Apps afterwards.
-  - Sessions, providers and settings carry over. The window position and portable mode start fresh, and so do the preferences the old window kept in its own storage: theme, interface language, zoom, sidebar width and open tabs. Set up portable mode again in Settings → General.
-  - On Windows and macOS the title bar areas still move the window; the empty middle of the sidebar no longer does.
-- **The terminal runs in the local server** (#173). Each terminal is a shell the DreamCoder server starts, so it behaves the same in every desktop build. Closing a terminal tab or quitting the app ends its shell. The terminal is available only in the desktop app, not on the H5 page.
-- Building from source no longer needs Rust: `bun run electron:install`, `bun run build:sidecars` and `bun run electron:dev` in `desktop/` (see CONTRIBUTING).
-- **Context windows beside each model** (#105). In Settings → Providers each model has its own context window field next to its name. Fetching models fills empty fields with the window the provider reports and never replaces a typed or saved value.
-  - Providers whose model list includes a context length, such as OpenRouter and Kimi, need no extra requests. Ollama, LM Studio, DeepSeek and Qwen are looked up from their own model APIs.
-  - The form can be saved only after the current settings have loaded. If they fail to load, the form says so instead of saving over them.
-- **Auto-compact at 90% of the context window** (#105). Long conversations are compacted at 90% of the model's context window, after the room kept for the summary, instead of about 33K tokens before it is full. A 1M model now compacts around 882K tokens instead of 967K, and a 200K model around 162K instead of 167K. Settings → General → Auto-compact sets a different percentage for every session. The provider form no longer has "Unknown Model Fallback Window": despite its name it replaced the window of every model of the provider when deciding when to compact. A value saved there is dropped.
-- Typing in a dialog no longer lights up the dialog's whole border; only the focused field is highlighted.
-
-### Fixed
-
 - Opening a memory file from a chat link no longer shows "An unexpected error occurred" when the file does not exist yet. The memory page selects the project and shows that it has no memory files.
 - The close button of the settings window no longer covers the buttons at the top right of a settings page, such as Add Provider.
 
