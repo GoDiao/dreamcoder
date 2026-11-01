@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, constants, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { delimiter, dirname, join } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import type { ComputerUseConfig } from '../../utils/computerUse/preauthorizedConfig.js'
 
@@ -140,7 +140,7 @@ export function getStandardCuaDriverPaths(
     return paths
   }
   if (platform === 'linux') {
-    return [join(homeDir, '.local', 'bin', 'cua-driver')]
+    return [posix.join(homeDir, '.local', 'bin', 'cua-driver')]
   }
   return []
 }
@@ -155,12 +155,12 @@ function getPathCandidates(
   command = 'cua-driver',
 ): string[] {
   const pathValue = env.PATH ?? env.Path ?? ''
-  const sep = platform === 'win32' ? ';' : delimiter
+  const sep = platform === 'win32' ? ';' : ':'
   const name = platform === 'win32' ? `${command}.exe` : command
   return pathValue
     .split(sep)
     .filter(Boolean)
-    .map(dir => (platform === 'win32' ? winJoin(dir, name) : join(dir, name)))
+    .map(dir => (platform === 'win32' ? winJoin(dir, name) : posix.join(dir, name)))
 }
 
 export type ResolvedCuaDriver = {
@@ -500,7 +500,7 @@ export class CuaDriverService {
               'The download may be incomplete or tampered with; the installer was not run.',
           )
         }
-        await this.deps.writeFile(join(dir, file.name), data)
+        await this.deps.writeFile((this.deps.platform === 'win32' ? winJoin : posix.join)(dir, file.name), data)
       }
 
       progress.phase = 'installing'
@@ -536,7 +536,7 @@ export class CuaDriverService {
           : [
               'bash',
               [
-                join(dir, '_install-rust.sh'),
+                posix.join(dir, '_install-rust.sh'),
                 '--no-modify-path',
                 ...(requireSignature ? ['--require-signature'] : []),
               ],

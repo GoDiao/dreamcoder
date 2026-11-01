@@ -1552,6 +1552,7 @@ export class WorkspaceService {
   ): Promise<GitCommandResult> {
     try {
       const result = await execFile('git', args, {
+        windowsHide: true,
         cwd: workDir,
         timeout: GIT_TIMEOUT_MS,
         maxBuffer: MAX_GIT_BUFFER_BYTES,

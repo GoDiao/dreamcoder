@@ -1570,7 +1570,7 @@ describe('WebSocket Chat Integration', () => {
       }
     } finally {
       if (sessionId) {
-        await conversationService.stopSession(sessionId)
+        await conversationService.stopSessionAndWait(sessionId)
       }
       await rmWithRetry(projectDir)
     }

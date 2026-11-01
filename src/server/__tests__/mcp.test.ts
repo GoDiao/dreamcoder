@@ -13,6 +13,7 @@ import {
   type GlobalConfig,
 } from '../../utils/config.js'
 import { getGlobalClaudeFile } from '../../utils/env.js'
+import { normalizePathForConfigKey } from '../../utils/path.js'
 import * as mcpHostPreflight from '../services/mcpHostPreflight.js'
 import { handleMcpApi } from '../api/mcp.js'
 import { conversationService } from '../services/conversationService.js'
@@ -163,13 +164,13 @@ describe('MCP API', () => {
         await fs.readFile(path.join(tmpDir, '.claude.json'), 'utf8'),
       )
 
-      expect(rawConfig.projects?.[projectA]?.mcpServers?.['scoped-server']).toBeUndefined()
-      expect(rawConfig.projects?.[projectA]?.disabledMcpServers ?? []).not.toContain('scoped-server')
-      expect(rawConfig.projects?.[projectB]?.mcpServers?.['scoped-server']).toMatchObject({
+      expect(rawConfig.projects?.[normalizePathForConfigKey(projectA)]?.mcpServers?.['scoped-server']).toBeUndefined()
+      expect(rawConfig.projects?.[normalizePathForConfigKey(projectA)]?.disabledMcpServers ?? []).not.toContain('scoped-server')
+      expect(rawConfig.projects?.[normalizePathForConfigKey(projectB)]?.mcpServers?.['scoped-server']).toMatchObject({
         type: 'stdio',
         command: 'node',
       })
-      expect(rawConfig.projects?.[projectB]?.disabledMcpServers).toContain('scoped-server')
+      expect(rawConfig.projects?.[normalizePathForConfigKey(projectB)]?.disabledMcpServers).toContain('scoped-server')
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV
@@ -246,7 +247,7 @@ describe('MCP API', () => {
     async function readStoredServers(scope: EditableScope) {
       const stored = JSON.parse(await fs.readFile(configFilePath(scope), 'utf8'))
       return scope === 'local'
-        ? stored.projects[projectRoot].mcpServers
+        ? stored.projects[normalizePathForConfigKey(projectRoot)].mcpServers
         : stored.mcpServers
     }
 
@@ -561,7 +562,7 @@ describe('MCP API', () => {
       expect(projectPathsRes.status).toBe(200)
       const body = await projectPathsRes.json()
 
-      expect(body.projectPaths).toEqual([projectB])
+      expect(body.projectPaths).toEqual([normalizePathForConfigKey(projectB)])
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV
