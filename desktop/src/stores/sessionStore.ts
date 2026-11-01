@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { ApiError } from '../api/client'
 import {
   sessionsApi,
   type BatchDeleteSessionsResponse,
@@ -20,6 +21,8 @@ type CreateSessionOptions = {
 }
 
 type BranchSessionResult = Pick<BranchSessionResponse, 'sessionId' | 'title' | 'workDir'>
+
+const deletedSessionIds = new Set<string>()
 
 type SessionStore = {
   sessions: SessionListItem[]
@@ -68,6 +71,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         const currentById = new Map(state.sessions.map((session) => [session.id, session]))
         const byId = new Map<string, SessionListItem>()
         for (const s of raw) {
+          if (deletedSessionIds.has(s.id)) continue
           const current = currentById.get(s.id)
           const candidate = preserveLocalTitle(current, s)
           const existing = byId.get(s.id)
@@ -164,7 +168,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   deleteSession: async (id: string) => {
-    await sessionsApi.delete(id)
+    try {
+      await sessionsApi.delete(id)
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 404)) throw err
+    }
+    deletedSessionIds.add(id)
     useSessionRuntimeStore.getState().clearSelection(id)
     useWorkspacePanelStore.getState().clearSession(id)
     set((s) => ({
@@ -178,6 +187,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const sessionIds = [...new Set(ids)].filter(Boolean)
     const result = await sessionsApi.batchDelete(sessionIds)
     for (const id of result.successes) {
+      deletedSessionIds.add(id)
       useSessionRuntimeStore.getState().clearSelection(id)
       useWorkspacePanelStore.getState().clearSession(id)
     }

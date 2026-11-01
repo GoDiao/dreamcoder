@@ -13,7 +13,13 @@ import { diagnosticsService } from './services/diagnosticsService.js'
 import { ensurePersistentStorageUpgraded } from './services/persistentStorageMigrations.js'
 import { handleStaticH5Request } from './staticH5.js'
 import { handleUiPageRequest, isUiPageRequest } from './uiPageHost.js'
-import { classifyH5Request, isDesktopOnlyPath, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
+import { classifyH5Request, isDesktopOnlyPath, isLoopbackHost, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
+import { browserHostChannel, createBrowserHostSocketData } from './browserHost/hostChannel.js'
+import { BROWSER_HOST_PATH } from './browserHost/protocol.js'
+import { BROWSER_MCP_PATH } from './browserHost/names.js'
+import { handleBrowserMcpRequest } from './browserHost/mcpEndpoint.js'
+import { getBrowserRuntime } from './browserHost/runtime.js'
+import { startBrowserHostTokenReader } from './browserHost/stdinToken.js'
 import { H5AccessService } from './services/h5AccessService.js'
 
 function readArgValue(flag: string): string | undefined {
@@ -183,6 +189,23 @@ export function startServer(port = PORT, host = HOST) {
 
         if (isDesktopOnlyPath(url.pathname) && classifyH5Request(req, url, h5RequestContext) !== 'local-trusted') {
           return desktopOnlyRejectedResponse()
+        }
+
+        if (url.pathname === BROWSER_HOST_PATH) {
+          if (!clientAddress || !isLoopbackHost(clientAddress) || origin) {
+            return new Response('Forbidden', { status: 403 })
+          }
+          getBrowserRuntime()
+          if (server.upgrade(req, { data: createBrowserHostSocketData() })) return undefined
+          return new Response('WebSocket upgrade failed', { status: 400 })
+        }
+
+        if (url.pathname === BROWSER_MCP_PATH) {
+          if (!clientAddress || !isLoopbackHost(clientAddress) || origin) {
+            return new Response('Forbidden', { status: 403 })
+          }
+          const { service, tokens } = getBrowserRuntime()
+          return handleBrowserMcpRequest(req, { service, tokens, version: process.env.APP_VERSION ?? '0.0.0' })
         }
 
         if (req.method === 'OPTIONS') {
@@ -383,6 +406,8 @@ export function startServer(port = PORT, host = HOST) {
   teamWatcher.start()
 
   cronScheduler.start()
+
+  if (!process.stdin.isTTY) void startBrowserHostTokenReader(browserHostChannel, Bun.stdin.stream())
 
   void ensureDesktopCliLauncherInstalled().catch((error) => {
     console.error(

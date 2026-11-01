@@ -874,7 +874,7 @@ describe('ActiveSession task polling', () => {
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'Open side panel' }))
     })
-    expect(useWorkspacePanelStore.getState().getActiveTab(sessionId)?.kind).toBe('files')
+    expect(useWorkspacePanelStore.getState().getActiveTab(sessionId)?.kind).toBe('launcher')
     expect(screen.queryByRole('button', { name: 'Open side panel' })).not.toBeInTheDocument()
     const panel = await screen.findByTestId('workspace-panel')
     expect(panel).toHaveAttribute('data-title', 'Terminal Session')

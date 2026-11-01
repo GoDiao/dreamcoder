@@ -7,9 +7,6 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@ant/claude-for-chrome-mcp": [
-        "./stubs/ant-claude-for-chrome-mcp.ts"
-      ],
       "color-diff-napi": [
         "./stubs/color-diff-napi.ts"
       ],

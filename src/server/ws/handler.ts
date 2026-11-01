@@ -35,6 +35,7 @@ import {
 } from './sessionRuntime.js'
 import { sessionStateStore, type SessionStateChange } from '../session/state/store.js'
 import type { RestartReason, RuntimeSelection, SessionState } from '../session/state/types.js'
+import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
@@ -327,6 +328,7 @@ async function handleUserMessage(
   message: Extract<ClientMessage, { type: 'user_message' }>
 ) {
   const { sessionId } = ws.data
+  getBrowserRuntime().service.resume(sessionId)
 
   const runtime = peekSessionRuntime(sessionId)
   if (runtime) {
@@ -748,6 +750,7 @@ function buildSdkUrl(endpoint: SessionEndpoint, sessionId: string): string {
 function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
   console.log(`[WS] Stop generation requested for session: ${sessionId}`)
+  getBrowserRuntime().service.stop(sessionId)
 
   getPipeline(sessionId).stream.stopRequested = true
 

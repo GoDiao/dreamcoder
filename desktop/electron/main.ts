@@ -12,12 +12,14 @@ import {
   session,
   shell,
   Tray,
+  webContents,
   type MenuItemConstructorOptions,
   type OpenDialogOptions,
 } from 'electron'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { BROWSER_GRANT_DECISIONS, BROWSER_HOST_PATH, type BrowserGrantDecision } from '../../src/server/browserHost/protocol'
 import { BROWSER_PARTITION, type ElectronDialogFilter, type ElectronOpenDialogInput } from '../src/lib/shell/electronBridge'
 import {
   appModeLocations,
@@ -36,7 +38,9 @@ import {
   ProjectRoots,
   resolveBrowserInput,
   systemTargetFor,
+  type SelectionMenuLabels,
 } from './browser'
+import { createBrowserHost, type BrowserHostHandle, type MarkRequest } from './browserHost'
 import { isAllowedFrameNavigation } from './frameNavigation'
 import { writeSessionExport } from './sessionExport'
 import { devSidecarPaths, startSidecar, type SidecarPaths, type SidecarRuntime } from './sidecar'
@@ -88,6 +92,7 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let sidecar: SidecarRuntime | null = null
 let sidecarError: string | null = null
+let browserHost: BrowserHostHandle | null = null
 let quitting = false
 const activeNotifications = new Set<Notification>()
 let saveTimer: NodeJS.Timeout | null = null
@@ -138,6 +143,8 @@ function serveDist(webDist: string) {
     return new Response(response.body, { status: response.status, headers })
   })
 }
+
+let browserMenuLabels: SelectionMenuLabels | null = null
 
 function window(): BrowserWindow {
   if (!mainWindow) throw new Error('main window is not open')
@@ -201,6 +208,8 @@ async function saveDialog(input: { defaultPath: string; filters: ElectronDialogF
 }
 
 function stopSidecar() {
+  browserHost?.dispose()
+  browserHost = null
   const child = sidecar?.child
   sidecar = null
   if (!child || child.exitCode !== null) return
@@ -228,6 +237,57 @@ function showNotification(input: { title: string; body?: string; clickPayload?: 
   })
   notification.show()
   return true
+}
+
+function startBrowserHost(runtime: SidecarRuntime) {
+  const host = createBrowserHost({
+    getMainWebContents: () => mainWindow?.webContents ?? null,
+    fromId: (id) => webContents.fromId(id),
+    browserSession: session.fromPartition(BROWSER_PARTITION),
+    emitToRenderer: emit,
+    resolveInput: (input, projectRoot) => resolveBrowserInput(input, projectRoot, projectRoots),
+    classify: (url) => classifyUrl(url, projectRoots),
+  })
+  host.connect({ url: `ws://${new URL(runtime.url).host}${BROWSER_HOST_PATH}`, token: runtime.token })
+  browserHost = host
+}
+
+function runningBrowserHost() {
+  if (!browserHost) throw new Error('browser control is not available')
+  return browserHost
+}
+
+function stringArg(args: Record<string, unknown>, key: string) {
+  const value = args[key]
+  if (typeof value !== 'string' || !value) throw new Error(`${key} must be a non-empty string`)
+  return value
+}
+
+function booleanArg(args: Record<string, unknown>, key: string) {
+  const value = args[key]
+  if (typeof value !== 'boolean') throw new Error(`${key} must be a boolean`)
+  return value
+}
+
+function grantDecisionArg(args: Record<string, unknown>) {
+  const value = args.decision
+  if (!(BROWSER_GRANT_DECISIONS as readonly unknown[]).includes(value)) throw new Error('decision must be deny, once or session')
+  return value as BrowserGrantDecision
+}
+
+function integerArg(args: Record<string, unknown>, key: string) {
+  const value = args[key]
+  if (typeof value !== 'number' || !Number.isInteger(value)) throw new Error(`${key} must be an integer`)
+  return value
+}
+
+function markRequestsArg(args: Record<string, unknown>): MarkRequest[] {
+  const value = args.refs
+  if (!Array.isArray(value)) throw new Error('refs must be an array')
+  return value.map((entry) => {
+    const record = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : {}
+    return { ref: stringArg(record, 'ref'), generation: integerArg(record, 'generation') }
+  })
 }
 
 type Handler = (args: Record<string, unknown>) => unknown
@@ -289,6 +349,7 @@ const handlers: Record<string, Handler> = {
     String(args.input),
     typeof args.projectRoot === 'string' ? args.projectRoot : null,
     projectRoots,
+    { engine: args.searchEngine },
   ),
   browser_open_in_system: async (args) => {
     const target = await systemTargetFor(String(args.url), projectRoots)
@@ -308,6 +369,30 @@ const handlers: Record<string, Handler> = {
     await browserSession.clearCache()
     await browserSession.clearAuthCache()
   },
+  browser_set_menu_labels: (args) => {
+    browserMenuLabels = { addToChat: stringArg(args, 'addToChat'), copy: stringArg(args, 'copy') }
+  },
+  browser_view_register: (args) => runningBrowserHost().registerView({
+    sessionId: stringArg(args, 'sessionId'),
+    tabId: stringArg(args, 'tabId'),
+    webContentsId: integerArg(args, 'webContentsId'),
+  }),
+  browser_view_update: (args) => runningBrowserHost().updateView({
+    tabId: stringArg(args, 'tabId'),
+    shown: booleanArg(args, 'shown'),
+    active: booleanArg(args, 'active'),
+    foreground: booleanArg(args, 'foreground'),
+  }),
+  browser_view_unregister: (args) => runningBrowserHost().unregisterView(stringArg(args, 'tabId')),
+  browser_pick_set: (args) => runningBrowserHost().setPickMode(stringArg(args, 'tabId'), booleanArg(args, 'active')),
+  browser_marks_sync: (args) => runningBrowserHost().syncMarks(stringArg(args, 'tabId'), markRequestsArg(args)),
+  browser_stop: (args) => runningBrowserHost().stopSession(stringArg(args, 'sessionId')),
+  browser_open_tab_done: (args) => runningBrowserHost().resolveOpenTab(stringArg(args, 'requestId'), stringArg(args, 'tabId')),
+  browser_activate_done: (args) => runningBrowserHost().resolveActivate(stringArg(args, 'requestId'), booleanArg(args, 'shown')),
+  browser_grant_reply: (args) => runningBrowserHost().replyGrant(stringArg(args, 'requestId'), grantDecisionArg(args)),
+  browser_trust_list: () => runningBrowserHost().trust('list'),
+  browser_trust_add: (args) => runningBrowserHost().trust('add', stringArg(args, 'origin')),
+  browser_trust_remove: (args) => runningBrowserHost().trust('remove', stringArg(args, 'origin')),
   request_attention: () => {
     if (IS_MAC) app.dock?.bounce('critical')
     else window().flashFrame(true)
@@ -404,6 +489,8 @@ function createWindow(startUrl: string) {
     roots: projectRoots,
     readFile: (file) => net.fetch(pathToFileURL(file).toString()),
     notify: emit,
+    popupMenu: (items) => Menu.buildFromTemplate(items).popup({ window: win }),
+    menuLabels: () => browserMenuLabels,
   })
   const restoreMaximized = restoreWindowBounds(win)
   const startOrigin = new URL(startUrl).origin
@@ -467,6 +554,7 @@ if (!app.requestSingleInstanceLock()) {
       console.error('[electron] sidecar failed to start', sidecarError)
     }
     createWindow(DEV_URL ?? `${APP_ORIGIN}/`)
+    if (sidecar) startBrowserHost(sidecar)
   })
 
   app.on('activate', showMainWindow)

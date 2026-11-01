@@ -1,6 +1,8 @@
 import { useTranslation } from '../../i18n'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import type { UIAttachment } from '../../types/chat'
+import { browserReferenceAttachment } from '../../lib/browserReferenceView'
+import { parseBrowserReferencePrompt } from '../../lib/browserReferences'
 import { AttachmentGallery } from './AttachmentGallery'
 import { MessageActionBar, type MessageBranchAction } from './MessageActionBar'
 
@@ -11,8 +13,16 @@ type Props = {
   timestamp?: number
 }
 
-export const UserMessage = memo(function UserMessage({ content, attachments, branchAction, timestamp }: Props) {
+export const UserMessage = memo(function UserMessage({ content: rawContent, attachments: rawAttachments, branchAction, timestamp }: Props) {
   const t = useTranslation()
+  const { content, attachments } = useMemo(() => {
+    const parsed = parseBrowserReferencePrompt(rawContent)
+    if (!parsed) return { content: rawContent, attachments: rawAttachments }
+    return {
+      content: parsed.rest,
+      attachments: [...parsed.references.map((reference) => browserReferenceAttachment(reference)), ...(rawAttachments ?? [])],
+    }
+  }, [rawContent, rawAttachments])
   const hasText = content.trim().length > 0
 
   return (

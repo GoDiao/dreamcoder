@@ -16,10 +16,12 @@ const mocks = vi.hoisted(() => ({
   getSlashCommands: vi.fn(),
   getRepositoryContext: vi.fn(),
   getRecentProjects: vi.fn(),
+  getInspection: vi.fn(),
   search: vi.fn(),
   browse: vi.fn(),
   wsSend: vi.fn(),
   dialogOpen: vi.fn(),
+  syncMarks: vi.fn(),
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -32,6 +34,7 @@ vi.mock('../../api/sessions', () => ({
     getSlashCommands: mocks.getSlashCommands,
     getRepositoryContext: mocks.getRepositoryContext,
     getRecentProjects: mocks.getRecentProjects,
+    getInspection: mocks.getInspection,
   },
 }))
 
@@ -55,6 +58,7 @@ vi.mock('../../api/websocket', () => ({
 vi.mock('../../lib/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/shell')>()),
   pickFiles: mocks.dialogOpen,
+  syncBrowserMarks: mocks.syncMarks,
   getFilePath: (file: File) => (file as File & { path?: string }).path,
 }))
 
@@ -75,9 +79,11 @@ import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTabStore } from '../../stores/tabStore'
+import { parseBrowserReferencePrompt } from '../../lib/browserReferences'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useUIStore } from '../../stores/uiStore'
+import { toast } from 'sonner'
 
 function okRepositoryContext() {
   return {
@@ -122,6 +128,7 @@ describe('ChatInput file mentions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.syncMarks.mockReset().mockImplementation(async ({ refs }: { refs: Array<{ ref: string }> }) => refs.map((request) => request.ref))
     delete (window as Window & { dreamcoderShell?: unknown }).dreamcoderShell
     viewportMocks.isMobile = false
     useSettingsStore.setState({ locale: 'en' })
@@ -173,6 +180,7 @@ describe('ChatInput file mentions', () => {
     mocks.delete.mockResolvedValue({ ok: true })
     mocks.list.mockResolvedValue({ sessions: [], total: 0 })
     mocks.getTranscript.mockResolvedValue({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })
+    mocks.getInspection.mockResolvedValue({ errors: {} })
     mocks.getSlashCommands.mockResolvedValue({ commands: [] })
   })
 
@@ -391,6 +399,60 @@ describe('ChatInput file mentions', () => {
     expect(screen.getByText('main')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Select branch:/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Run in a new worktree')).not.toBeInTheDocument()
+  })
+
+  it('shows the context details as a hover card, not a drawer, in the narrow desktop composer', async () => {
+    mocks.getInspection.mockResolvedValue({
+      active: true,
+      status: { sessionId, workDir: '/repo', cwd: '/repo', permissionMode: 'default', model: 'kimi-k2.6' },
+      context: {
+        categories: [{ name: 'Messages', tokens: 42_000, color: '#2D628F' }],
+        totalTokens: 42_000,
+        maxTokens: 200_000,
+        rawMaxTokens: 200_000,
+        percentage: 21,
+        gridRows: [],
+        model: 'kimi-k2.6',
+        memoryFiles: [],
+        mcpTools: [],
+        agents: [],
+      },
+    })
+
+    render(<ChatInput compact />)
+
+    const trigger = await screen.findByRole('button', { name: /21%/ })
+    fireEvent.click(trigger)
+    fireEvent.focus(trigger)
+
+    expect(await screen.findByRole('progressbar', { name: 'Context' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Context' })).toBeNull()
+  })
+
+  it('keeps the context details in a drawer on a phone', async () => {
+    viewportMocks.isMobile = true
+    mocks.getInspection.mockResolvedValue({
+      active: true,
+      status: { sessionId, workDir: '/repo', cwd: '/repo', permissionMode: 'default', model: 'kimi-k2.6' },
+      context: {
+        categories: [{ name: 'Messages', tokens: 42_000, color: '#2D628F' }],
+        totalTokens: 42_000,
+        maxTokens: 200_000,
+        rawMaxTokens: 200_000,
+        percentage: 21,
+        gridRows: [],
+        model: 'kimi-k2.6',
+        memoryFiles: [],
+        mcpTools: [],
+        agents: [],
+      },
+    })
+
+    render(<ChatInput />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /21%/ }))
+
+    expect(await screen.findByRole('dialog', { name: 'Context' })).toBeVisible()
   })
 
   it('names the missing working directory at the input and keeps sending disabled', async () => {
@@ -733,6 +795,212 @@ describe('ChatInput file mentions', () => {
       modelContent: '@"/repo/backend" 讲一下这个目录。',
       attachments: [{ name: 'backend/', path: '/repo/backend' }],
     })
+  })
+
+  function pickedElement(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: 'browser' as const,
+      path: 'https://example.com/a',
+      name: 'button.buy',
+      note: 'make it red',
+      browser: {
+        url: 'https://example.com/a',
+        title: 'Example',
+        tabId: 'tab-1',
+        text: 'Buy now',
+        truncated: false,
+        element: {
+          ref: '12',
+          generation: 0,
+          tag: 'button',
+          label: 'button.buy',
+          role: 'button',
+          name: 'Buy',
+          selector: 'main > button',
+          html: '<button class="buy">Buy now</button>',
+          sensitive: false,
+          stale: false,
+          screenshot: { data: 'data:image/webp;base64,AAAA', mimeType: 'image/webp' },
+          ...overrides,
+        },
+      },
+    }
+  }
+
+  it('sends a picked element as fenced context plus its screenshot, not as a file path', async () => {
+    mocks.syncMarks.mockResolvedValue(['12'])
+    useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
+
+    render(<ChatInput compact />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    const sent = mocks.wsSend.mock.calls[0]?.[1] as { content: string; attachments: Array<Record<string, unknown>> }
+    const parsed = parseBrowserReferencePrompt(sent.content)
+    expect(parsed?.rest).toBe('fix this')
+    expect(parsed?.references[0]).toMatchObject({
+      note: 'make it red',
+      hasScreenshot: true,
+      browser: { url: 'https://example.com/a', element: { ref: '12', selector: 'main > button', stale: false } },
+    })
+    expect(sent.attachments).toHaveLength(1)
+    expect(sent.attachments[0]).toMatchObject({ type: 'image', data: 'data:image/webp;base64,AAAA', mimeType: 'image/webp' })
+    expect(sent.attachments[0]?.name).toMatch(/\.webp$/)
+    expect(sent.attachments[0]).not.toHaveProperty('path')
+
+    const messages = useChatStore.getState().sessions[sessionId]?.messages ?? []
+    expect(messages[messages.length - 1]).toMatchObject({
+      type: 'user_text',
+      content: 'fix this',
+      attachments: [{ type: 'image', name: 'button.buy', data: 'data:image/webp;base64,AAAA' }],
+    })
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[sessionId]).toEqual([])
+  })
+
+  it('checks the picked elements once more right before sending and flags the ones that are gone', async () => {
+    mocks.syncMarks.mockResolvedValue([])
+    useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
+
+    render(<ChatInput compact />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    expect(mocks.syncMarks).toHaveBeenCalledWith({ tabId: 'tab-1', refs: [{ ref: '12', generation: 0 }] })
+    const sent = mocks.wsSend.mock.calls[0]?.[1] as { content: string }
+    expect(sent.content).toContain('[1] element tab=tab-1 ref=12 screenshot stale')
+    expect(parseBrowserReferencePrompt(sent.content)?.references[0]?.browser.element?.stale).toBe(true)
+  })
+
+  it('still sends when the final check of the picked elements fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mocks.syncMarks.mockRejectedValue(new Error('the sidecar is not connected'))
+    useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
+
+    render(<ChatInput compact />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    const sent = mocks.wsSend.mock.calls[0]?.[1] as { content: string }
+    expect(sent.content).not.toContain('stale')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('does not wait for the page when no element was picked', async () => {
+    useWorkspaceChatContextStore.getState().addReference(sessionId, {
+      kind: 'browser',
+      path: 'https://example.com/a',
+      name: 'Example',
+      browser: { url: 'https://example.com/a', title: 'Example', text: 'quoted', truncated: false },
+    })
+
+    render(<ChatInput compact />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(mocks.wsSend).toHaveBeenCalled()
+    expect(mocks.syncMarks).not.toHaveBeenCalled()
+  })
+
+  it('blocks sending while a picked element is still being read, and says why', async () => {
+    useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
+    useWorkspaceChatContextStore.getState().addReference(sessionId, {
+      id: 'browser-pick:p1',
+      kind: 'browser',
+      path: '',
+      name: '',
+      browser: { url: '', title: '', tabId: 'tab-1', text: '', truncated: false, pendingPickId: 'p1' },
+    })
+
+    render(<ChatInput compact />)
+
+    expect(screen.getByText('Picking…')).toBeInTheDocument()
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(mocks.wsSend).not.toHaveBeenCalled()
+    expect(toast.warning).toHaveBeenCalledWith('An element you picked is still being read. Send again in a moment.')
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[sessionId]).toHaveLength(2)
+
+    act(() => {
+      useWorkspaceChatContextStore.getState().replaceReference(sessionId, 'browser-pick:p1', null)
+    })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledTimes(1))
+  })
+
+  it('blocks sending when a pick starts while the picked elements are being checked, and keeps the draft', async () => {
+    let finishCheck: (alive: string[]) => void = () => undefined
+    mocks.syncMarks.mockReturnValue(new Promise<string[]>((resolve) => { finishCheck = resolve }))
+    useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
+
+    render(<ChatInput compact />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'fix this' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(mocks.syncMarks).toHaveBeenCalled())
+
+    act(() => {
+      useWorkspaceChatContextStore.getState().addReference(sessionId, {
+        id: 'browser-pick:p2',
+        kind: 'browser',
+        path: '',
+        name: '',
+        browser: { url: '', title: '', tabId: 'tab-1', text: '', truncated: false, pendingPickId: 'p2' },
+      })
+    })
+    await act(async () => {
+      finishCheck(['12'])
+    })
+
+    expect(mocks.wsSend).not.toHaveBeenCalled()
+    expect(toast.warning).toHaveBeenCalledWith('An element you picked is still being read. Send again in a moment.')
+    expect(input.value).toBe('fix this')
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[sessionId]).toHaveLength(2)
+  })
+
+  it('says on the card that a sensitive element was not carried, and sends no screenshot for it', async () => {
+    mocks.syncMarks.mockResolvedValue(['9'])
+    useWorkspaceChatContextStore.getState().addReference(sessionId, {
+      kind: 'browser',
+      path: 'https://example.com/login',
+      name: 'input.pw',
+      browser: {
+        url: 'https://example.com/login',
+        title: 'Log in',
+        tabId: 'tab-1',
+        text: '',
+        truncated: false,
+        element: { ref: '9', generation: 0, tag: 'input', label: 'input.pw', role: '', name: '', selector: 'form > input.pw', sensitive: true, stale: false },
+      },
+    })
+
+    render(<ChatInput compact />)
+
+    expect(screen.getByText('Password and card fields are never carried; only where the element is.')).toBeInTheDocument()
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'why is this red' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    const sent = mocks.wsSend.mock.calls[0]?.[1] as { content: string; attachments: unknown[] }
+    expect(sent.attachments).toEqual([])
+    expect(sent.content).toContain('[1] element tab=tab-1 ref=9 sensitive')
+    expect(sent.content).toContain('tag: input')
+    expect(sent.content).not.toContain('role:')
   })
 
   it('uses native desktop file paths instead of inlining selected files', async () => {

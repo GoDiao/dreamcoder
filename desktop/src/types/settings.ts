@@ -1,6 +1,13 @@
-import type { DefaultPermissionMode, PermissionMode } from '@protocol'
+import type { BrowserSearchEngineId, DefaultPermissionMode, PermissionMode } from '@protocol'
 
-export type { DefaultPermissionMode, PermissionMode }
+export type { BrowserSearchEngineId, DefaultPermissionMode, PermissionMode }
+
+export const BROWSER_SEARCH_ENGINE_IDS: readonly BrowserSearchEngineId[] = ['bing', 'google', 'duckduckgo', 'baidu']
+export const DEFAULT_BROWSER_SEARCH_ENGINE: BrowserSearchEngineId = 'bing'
+
+export function isBrowserSearchEngineId(value: unknown): value is BrowserSearchEngineId {
+  return typeof value === 'string' && (BROWSER_SEARCH_ENGINE_IDS as readonly string[]).includes(value)
+}
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
 export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora'] as const
@@ -87,6 +94,7 @@ export type UserSettings = {
   theme?: ThemeMode
   skipWebFetchPreflight?: boolean
   desktopNotificationsEnabled?: boolean
+  browserSearchEngine?: BrowserSearchEngineId
   /** Sets CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS for sessions started afterwards. */
   agentTeamsEnabled?: boolean
   webSearch?: WebSearchSettings

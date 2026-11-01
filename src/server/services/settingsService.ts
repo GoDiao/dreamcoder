@@ -6,7 +6,12 @@ import { normalizeJsonObject, readRecoverableJsonFile } from './recoverableJsonF
 import { ensurePersistentStorageUpgraded } from './persistentStorageMigrations.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { DEFAULT_PERMISSION_MODES, type DefaultPermissionMode } from '../ws/protocol.js'
+import {
+  BROWSER_SEARCH_ENGINE_IDS,
+  DEFAULT_PERMISSION_MODES,
+  isBrowserSearchEngineId,
+  type DefaultPermissionMode,
+} from '../ws/protocol.js'
 import { isDefaultPermissionMode } from './permissionModes.js'
 
 export class SettingsService {
@@ -116,6 +121,14 @@ export class SettingsService {
   }
 
   async updateUserSettings(settings: Record<string, unknown>): Promise<void> {
+    if (
+      Object.prototype.hasOwnProperty.call(settings, 'browserSearchEngine') &&
+      !isBrowserSearchEngineId(settings.browserSearchEngine)
+    ) {
+      throw ApiError.badRequest(
+        `Invalid browserSearchEngine. Valid engines: ${BROWSER_SEARCH_ENGINE_IDS.join(', ')}`,
+      )
+    }
     const filePath = this.getUserSettingsPath()
     await this.withWriteLock(filePath, async () => {
       const current = await this.readJsonFile(filePath)

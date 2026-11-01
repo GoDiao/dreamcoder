@@ -1,5 +1,4 @@
 import { feature } from 'bun:bundle'
-import { shouldAutoEnableClaudeInChrome } from 'src/utils/claudeInChrome/setup.js'
 
 /**
  * Initialize all bundled skills.
@@ -22,6 +21,7 @@ export function initBundledSkills(): void {
   require('./simplify.js').registerSimplifySkill()
   require('./batch.js').registerBatchSkill()
   require('./stuck.js').registerStuckSkill()
+  require('./browser.js').registerBrowserSkill()
   if (feature('KAIROS') || feature('KAIROS_DREAM')) {
     const { registerDreamSkill } = require('./dream.js')
     registerDreamSkill()
@@ -46,9 +46,6 @@ export function initBundledSkills(): void {
   if (feature('BUILDING_CLAUDE_APPS')) {
     const { registerClaudeApiSkill } = require('./claudeApi.js')
     registerClaudeApiSkill()
-  }
-  if (shouldAutoEnableClaudeInChrome()) {
-    require('./claudeInChrome.js').registerClaudeInChromeSkill()
   }
   if (feature('RUN_SKILL_GENERATOR')) {
     const { registerRunSkillGeneratorSkill } = require('./runSkillGenerator.js')

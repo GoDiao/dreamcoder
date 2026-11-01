@@ -163,19 +163,19 @@ describe('workspacePanelStore', () => {
     expect(panel('s')?.activeTabId).toBeNull()
   })
 
-  it('opens an empty panel on the changes, or on the files when nothing changed', () => {
+  it('opens an empty panel on the new tab page whether or not anything changed', () => {
     useWorkspacePanelStore.setState({ statusBySession: { clean: okStatus() } })
     const store = useWorkspacePanelStore.getState()
 
     store.togglePanel('dirty')
     store.togglePanel('clean')
-    expect(kinds('dirty')).toEqual(['changes'])
-    expect(kinds('clean')).toEqual(['files'])
+    expect(kinds('dirty')).toEqual(['launcher'])
+    expect(kinds('clean')).toEqual(['launcher'])
 
     store.togglePanel('dirty')
     expect(useWorkspacePanelStore.getState().isPanelOpen('dirty')).toBe(false)
     store.togglePanel('dirty')
-    expect(kinds('dirty')).toEqual(['changes'])
+    expect(kinds('dirty')).toEqual(['launcher'])
   })
 
   it('records the address, title and shell a tab reports', () => {

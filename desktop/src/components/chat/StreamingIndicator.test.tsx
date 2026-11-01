@@ -45,6 +45,8 @@ function sessionWithTurn(sessionId: string, turn: SessionState['turn']): PerSess
       process: { phase: 'running', generation: 1 },
       turn,
       pendingPermissions: [],
+      pendingBrowserGrants: [],
+      browserActivity: null,
       slashCommands: [],
       activeGoal: null,
       backgroundTasks: [],

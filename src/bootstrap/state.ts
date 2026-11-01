@@ -125,8 +125,6 @@ type State = {
   inMemoryErrorLog: Array<{ error: string; timestamp: string }>
   // Session-only plugins from --plugin-dir flag
   inlinePlugins: Array<string>
-  // Explicit --chrome / --no-chrome flag value (undefined = not set on CLI)
-  chromeFlagOverride: boolean | undefined
   // Use cowork_plugins directory instead of plugins (--cowork flag or env var)
   useCoworkPlugins: boolean
   // Session-only bypass permissions mode flag (not persisted)
@@ -141,11 +139,7 @@ type State = {
   // SessionCronTask below (not importing from cronTasks.ts keeps
   // bootstrap a leaf of the import DAG).
   sessionCronTasks: SessionCronTask[]
-  // Teams created this session via TeamCreate. cleanupSessionTeams()
-  // removes these on gracefulShutdown so subagent-created teams don't
-  // persist on disk forever (gh-32730). TeamDelete removes entries to
-  // avoid double-cleanup. Lives here (not teamHelpers.ts) so
-  // resetStateForTests() clears it between tests.
+  // Lives here (not teamHelpers.ts) so resetStateForTests() clears it between tests.
   sessionCreatedTeams: Set<string>
   // Session-only trust flag for home directory (not persisted to disk)
   // When running from home dir, trust dialog is shown but not saved to disk.
@@ -353,8 +347,6 @@ function getInitialState(): State {
     inMemoryErrorLog: [],
     // Session-only plugins from --plugin-dir flag
     inlinePlugins: [],
-    // Explicit --chrome / --no-chrome flag value (undefined = not set on CLI)
-    chromeFlagOverride: undefined,
     // Use cowork_plugins directory instead of plugins
     useCoworkPlugins: false,
     // Session-only bypass permissions mode flag (not persisted)
@@ -1250,14 +1242,6 @@ export function setInlinePlugins(plugins: Array<string>): void {
 
 export function getInlinePlugins(): Array<string> {
   return STATE.inlinePlugins
-}
-
-export function setChromeFlagOverride(value: boolean | undefined): void {
-  STATE.chromeFlagOverride = value
-}
-
-export function getChromeFlagOverride(): boolean | undefined {
-  return STATE.chromeFlagOverride
 }
 
 export function setUseCoworkPlugins(value: boolean): void {

@@ -15,6 +15,7 @@ import {
   updateSessionSlashCommands,
   type WebSocketData,
 } from '../ws/handler.js'
+import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { conversationService } from '../services/conversationService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
@@ -173,6 +174,32 @@ describe('WebSocket handler session runtime lifetime', () => {
 
     expect(translateCliMessage({ type: 'result', is_error: true, result: 'boom' }, sessionId))
       .toContainEqual({ type: 'error', message: 'boom', code: 'CLI_ERROR' })
+  })
+
+  it('stops browser control for the session on stop_generation and resumes it on the next user message', async () => {
+    const sessionId = `browser-stop-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    const { service } = getBrowserRuntime()
+    const stop = spyOn(service, 'stop').mockImplementation(() => {})
+    const resume = spyOn(service, 'resume').mockImplementation(() => {})
+    const hasSession = spyOn(conversationService, 'hasSession').mockReturnValue(false)
+    try {
+      handleWebSocket.open(ws)
+      handleWebSocket.message(ws, JSON.stringify({ type: 'stop_generation' }))
+      expect(stop).toHaveBeenCalledTimes(1)
+      expect(stop).toHaveBeenCalledWith(sessionId)
+      expect(resume).not.toHaveBeenCalled()
+
+      handleWebSocket.message(ws, JSON.stringify({ type: 'user_message', content: '/clear extra' }))
+      await waitFor(() => ws.sent.some((payload) => payload.includes('INVALID_SLASH_COMMAND_ARGS')))
+      expect(resume).toHaveBeenCalledTimes(1)
+      expect(resume).toHaveBeenCalledWith(sessionId)
+      expect(stop).toHaveBeenCalledTimes(1)
+    } finally {
+      stop.mockRestore()
+      resume.mockRestore()
+      hasSession.mockRestore()
+    }
   })
 
   it('sends a tool call that arrives only in the final message after a stream fell back to a non-streaming request', () => {

@@ -3,13 +3,20 @@ import { BROWSER_PARTITION } from './shell/electronBridge'
 
 const shellMocks = vi.hoisted(() => ({
   resolveBrowserInput: vi.fn(),
+  registerBrowserView: vi.fn(),
+  updateBrowserView: vi.fn(),
+  unregisterBrowserView: vi.fn(),
 }))
 
 vi.mock('./shell', () => ({
   resolveBrowserInput: shellMocks.resolveBrowserInput,
+  registerBrowserView: shellMocks.registerBrowserView,
+  updateBrowserView: shellMocks.updateBrowserView,
+  unregisterBrowserView: shellMocks.unregisterBrowserView,
 }))
 
 import {
+  addBrowserSelectionToChat,
   browserGoBack,
   browserReload,
   closeBrowser,
@@ -21,6 +28,8 @@ import {
   submitBrowserInput,
 } from './browserGuests'
 import { useBrowserStore } from '../stores/browserStore'
+import { useSettingsStore } from '../stores/settingsStore'
+import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 
 type FakeWebview = HTMLElement & {
@@ -88,6 +97,9 @@ let layer: HTMLDivElement
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver)
   FakeResizeObserver.instances = []
+  shellMocks.registerBrowserView.mockResolvedValue(undefined)
+  shellMocks.updateBrowserView.mockResolvedValue(undefined)
+  shellMocks.unregisterBrowserView.mockResolvedValue(undefined)
   layer = document.createElement('div')
   layer.getBoundingClientRect = () => rect(0, 0, 1200, 800)
   document.body.appendChild(layer)
@@ -119,6 +131,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   useBrowserStore.setState(useBrowserStore.getInitialState(), true)
   useWorkspacePanelStore.setState({ panelBySession: {} })
+  useSettingsStore.setState(useSettingsStore.getInitialState(), true)
   localStorage.clear()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
@@ -215,6 +228,7 @@ describe('browser guests', () => {
 
     expect(browserTab('a')).toEqual({ id: 'a', kind: 'browser', url: 'https://example.com/', title: 'Title' })
     expect(useBrowserStore.getState().pageByTab.a).toEqual({
+      ready: true,
       loading: false,
       canGoBack: true,
       canGoForward: false,
@@ -267,6 +281,95 @@ describe('browser guests', () => {
     })
   })
 
+  it('adds a selection from the main process to the session that owns the guest', () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    openBrowserUrl('t', 'b', 'https://b.test/')
+    makeReady('a', { id: 11 })
+    makeReady('b', { id: 22 })
+
+    addBrowserSelectionToChat({ guestId: 22, text: ' picked  text ', truncated: false, title: 'B page', url: 'https://b.test/x' })
+    addBrowserSelectionToChat({ guestId: 99, text: 'nobody', truncated: false, title: '', url: '' })
+    addBrowserSelectionToChat({ guestId: 11, text: '   ', truncated: false, title: '', url: '' })
+
+    const references = useWorkspaceChatContextStore.getState().referencesBySession
+    expect(references.s).toBeUndefined()
+    expect(references.t).toMatchObject([{
+      kind: 'browser',
+      path: 'https://b.test/x',
+      name: 'B page',
+      browser: { url: 'https://b.test/x', title: 'B page', tabId: 'b', text: 'picked text', truncated: false },
+    }])
+  })
+
+  it('marks the picked elements of a tab stale when the page navigates, but not on in-page changes or other tabs', () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    openBrowserUrl('s', 'b', 'https://b.test/')
+    const webview = makeReady('a')
+    makeReady('b', { id: 22 })
+    const pick = (tabId: string, ref: string) => ({
+      kind: 'browser' as const,
+      path: `https://${tabId}.test/`,
+      name: ref,
+      browser: {
+        url: `https://${tabId}.test/`,
+        title: '',
+        tabId,
+        text: '',
+        truncated: false,
+        element: { ref, generation: 0, tag: 'b', label: 'b', role: '', name: '', selector: ref, sensitive: false, stale: false },
+      },
+    })
+    useWorkspaceChatContextStore.getState().addReference('s', pick('a', '1'))
+    useWorkspaceChatContextStore.getState().addReference('s', pick('b', '2'))
+    const stale = () => (useWorkspaceChatContextStore.getState().referencesBySession.s ?? []).map((reference) => reference.browser?.element?.stale)
+
+    webview.dispatchEvent(new Event('did-navigate-in-page'))
+    expect(stale()).toEqual([false, false])
+
+    webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'https://example.com/next' }))
+    expect(stale()).toEqual([true, false])
+  })
+
+  it('marks the picked elements stale when the navigation lands on an error page', () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    const webview = makeReady('a')
+    useWorkspaceChatContextStore.getState().addReference('s', {
+      kind: 'browser',
+      path: 'https://example.com/',
+      name: '1',
+      browser: {
+        url: 'https://example.com/',
+        title: '',
+        tabId: 'a',
+        text: '',
+        truncated: false,
+        element: { ref: '1', generation: 0, tag: 'b', label: 'b', role: '', name: '', selector: '1', sensitive: false, stale: false },
+      },
+    })
+    webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'chrome-error://chromewebdata/' }))
+    expect(useWorkspaceChatContextStore.getState().referencesBySession.s?.[0]?.browser?.element?.stale).toBe(true)
+  })
+
+  it('marks the picked elements stale when their browser tab is closed', () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    makeReady('a')
+    useWorkspaceChatContextStore.getState().addReference('s', {
+      kind: 'browser',
+      path: 'https://example.com/',
+      name: '1',
+      browser: {
+        url: 'https://example.com/',
+        title: '',
+        tabId: 'a',
+        text: '',
+        truncated: false,
+        element: { ref: '1', generation: 0, tag: 'b', label: 'b', role: '', name: '', selector: '1', sensitive: false, stale: false },
+      },
+    })
+    closeBrowser('a')
+    expect(useWorkspaceChatContextStore.getState().referencesBySession.s?.[0]?.browser?.element?.stale).toBe(true)
+  })
+
   it('drives back and reload on ready guests only', () => {
     openBrowserUrl('s', 'a', 'https://example.com/')
     const { webview } = webviewOf('a')
@@ -290,13 +393,61 @@ describe('browser guests', () => {
   })
 })
 
+describe('browser view reports', () => {
+  it('registers the guest with the main process once it is ready', async () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    expect(shellMocks.registerBrowserView).not.toHaveBeenCalled()
+
+    const webview = makeReady('a', { id: 31 })
+    webview.dispatchEvent(new Event('dom-ready'))
+
+    expect(shellMocks.registerBrowserView).toHaveBeenCalledOnce()
+    expect(shellMocks.registerBrowserView).toHaveBeenCalledWith({ sessionId: 's', tabId: 'a', webContentsId: 31 })
+  })
+
+  it('unregisters the guest when the browser is closed, and not for a guest that never registered', () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    openBrowserUrl('s', 'b', 'https://b.test/')
+    makeReady('a')
+
+    closeBrowser('b')
+    expect(shellMocks.unregisterBrowserView).not.toHaveBeenCalled()
+    closeBrowser('a')
+    expect(shellMocks.unregisterBrowserView).toHaveBeenCalledOnce()
+    expect(shellMocks.unregisterBrowserView).toHaveBeenCalledWith({ tabId: 'a' })
+  })
+
+  it('reports when a registered guest becomes shown or hidden', async () => {
+    openBrowserUrl('s', 'a', 'https://example.com/')
+    makeReady('a')
+    await vi.waitFor(() => expect(shellMocks.updateBrowserView).toHaveBeenCalledOnce())
+    expect(shellMocks.updateBrowserView).toHaveBeenLastCalledWith({ tabId: 'a', shown: false, active: true, foreground: false })
+
+    const release = placeBrowserGuest('a', stageAt(0, 0, 400, 300), true)
+    expect(shellMocks.updateBrowserView).toHaveBeenLastCalledWith({ tabId: 'a', shown: true, active: true, foreground: false })
+
+    release()
+    expect(shellMocks.updateBrowserView).toHaveBeenLastCalledWith({ tabId: 'a', shown: false, active: true, foreground: false })
+    expect(shellMocks.updateBrowserView).toHaveBeenCalledTimes(3)
+  })
+})
+
 describe('browser input', () => {
   it('opens the address the main process resolved', async () => {
     shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'http://localhost:3000/' })
     await submitBrowserInput('s', 'a', 'localhost:3000', '/repo')
 
-    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith({ input: 'localhost:3000', projectRoot: '/repo' })
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith({ input: 'localhost:3000', projectRoot: '/repo', searchEngine: 'bing' })
     expect(webviewOf('a').webview.getAttribute('src')).toBe('http://localhost:3000/')
+  })
+
+  it('sends the engine chosen in settings with the input', async () => {
+    useSettingsStore.setState({ browserSearchEngine: 'baidu' })
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'https://www.baidu.com/s?wd=%E5%A4%A9%E6%B0%94' })
+    await submitBrowserInput('s', 'a', '天气', '/repo')
+
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith({ input: '天气', projectRoot: '/repo', searchEngine: 'baidu' })
+    expect(webviewOf('a').webview.getAttribute('src')).toBe('https://www.baidu.com/s?wd=%E5%A4%A9%E6%B0%94')
   })
 
   it('shows the refusal and opens nothing', async () => {

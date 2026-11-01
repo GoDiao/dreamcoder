@@ -19,6 +19,7 @@ vi.mock('../api/sessions', () => ({
   },
 }))
 
+import { ApiError } from '../api/client'
 import { useSessionStore } from './sessionStore'
 import { useBrowserStore } from './browserStore'
 import { useTabStore } from './tabStore'
@@ -227,6 +228,45 @@ describe('sessionStore', () => {
     await pendingRefresh
 
     expect(useSessionStore.getState().sessions).toEqual([recentSession])
+  })
+
+  it.each(['single', 'batch'] as const)('does not re-add a session from a refresh requested before a %s deletion', async (mode) => {
+    const deleted = session(`deleted-while-listing-${mode}`)
+    const kept = session('kept')
+    useSessionStore.setState({ sessions: [deleted, kept] })
+    const refresh = createDeferred<{ sessions: SessionListItem[]; total: number }>()
+    listMock.mockReturnValue(refresh.promise)
+    deleteMock.mockResolvedValue({ ok: true })
+    batchDeleteMock.mockResolvedValue({ successes: [deleted.id], failures: [] })
+    const pendingRefresh = useSessionStore.getState().fetchSessions()
+
+    if (mode === 'single') await useSessionStore.getState().deleteSession(deleted.id)
+    else await useSessionStore.getState().deleteSessions([deleted.id])
+    refresh.resolve({ sessions: [deleted, kept], total: 2 })
+    await pendingRefresh
+
+    expect(useSessionStore.getState().sessions).toEqual([kept])
+  })
+
+  it('removes a session the server no longer has when deleting it returns 404', async () => {
+    const gone = session('already-gone')
+    useSessionStore.setState({ sessions: [gone], activeSessionId: gone.id })
+    deleteMock.mockRejectedValue(new ApiError(404, { error: 'Session not found' }))
+
+    await useSessionStore.getState().deleteSession(gone.id)
+
+    expect(useSessionStore.getState().sessions).toEqual([])
+    expect(useSessionStore.getState().activeSessionId).toBeNull()
+  })
+
+  it('keeps the session and rethrows when deleting it fails for another reason', async () => {
+    const kept = session('delete-fails')
+    useSessionStore.setState({ sessions: [kept] })
+    deleteMock.mockRejectedValue(new ApiError(500, { error: 'boom' }))
+
+    await expect(useSessionStore.getState().deleteSession(kept.id)).rejects.toBeInstanceOf(ApiError)
+
+    expect(useSessionStore.getState().sessions).toEqual([kept])
   })
 
   it.each(['single', 'batch'] as const)('closes the browser of a session after a %s deletion', async (mode) => {

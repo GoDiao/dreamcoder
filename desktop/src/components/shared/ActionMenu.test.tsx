@@ -72,6 +72,33 @@ describe('RowActionMenu', () => {
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
+  it('shows a single-choice submenu with the current choice checked and reports a new choice', async () => {
+    const onChange = vi.fn()
+    const onSelect = vi.fn()
+    render(<ActionMenu label="Browser actions" trigger={<button>Browser actions</button>} actions={[
+      { id: 'engine', label: 'Search engine', value: 'google', onChange, options: [
+        { value: 'bing', label: 'Bing' },
+        { value: 'google', label: 'Google' },
+      ] },
+      { id: 'clear', label: 'Clear data', separatorBefore: true, onSelect },
+    ]} />)
+    const trigger = screen.getByRole('button', { name: 'Browser actions' })
+    act(() => trigger.focus())
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const parent = await screen.findByRole('menuitem', { name: 'Search engine' })
+    await waitFor(() => expect(parent).toHaveFocus())
+    fireEvent.keyDown(parent, { key: 'ArrowRight' })
+
+    expect(await screen.findByRole('menuitemradio', { name: 'Google' })).toHaveAttribute('aria-checked', 'true')
+    const bing = screen.getByRole('menuitemradio', { name: 'Bing' })
+    expect(bing).toHaveAttribute('aria-checked', 'false')
+    fireEvent.keyDown(bing, { key: 'Enter' })
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('bing')
+    expect(onSelect).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+  })
+
   it('disables both menu entry points during batch selection', () => {
     render(<Harness disabled />)
     expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()

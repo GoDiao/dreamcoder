@@ -253,10 +253,6 @@ async function isWorkspaceFile(sessionId: string, path: string) {
   return result.state === 'ok' || result.state === 'binary' || result.state === 'too_large'
 }
 
-function defaultTarget(status: WorkspaceStatusResult | undefined): WorkspaceTabTarget {
-  return status?.state === 'ok' && status.changedFiles.length === 0 ? { kind: 'files' } : { kind: 'changes' }
-}
-
 export function getShellDisplayName(shell: string | undefined) {
   if (!shell) return undefined
   const name = shell.split(/[\\/]/).pop()?.replace(/\.exe$/i, '')
@@ -443,7 +439,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       return
     }
     if (panel.tabs.length === 0) {
-      get().openTab(sessionId, defaultTarget(get().statusBySession[sessionId]))
+      get().openTab(sessionId, { kind: 'launcher' })
       return
     }
     set((state) => ({ panelBySession: patchSessionPanel(state.panelBySession, sessionId, { isOpen: true }) }))

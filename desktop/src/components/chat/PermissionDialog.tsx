@@ -9,6 +9,7 @@ import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { Button } from '../shared/ui/button'
+import { AwaitingApprovalBadge } from './AwaitingApprovalBadge'
 import { DiffViewer } from './DiffViewer'
 import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
 import type { PermissionResolution } from '../../types/chat'
@@ -139,12 +140,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <CardTitle>{title}</CardTitle>
-            {isPending && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-warning)]/15 text-[var(--color-warning)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] animate-pulse-dot" />
-                {t('permission.awaitingApproval')}
-              </span>
-            )}
+            {isPending && <AwaitingApprovalBadge />}
             {!isPending && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]">
                 {t(resolutionLabelKey(resolution))}

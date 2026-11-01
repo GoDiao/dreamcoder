@@ -6,6 +6,8 @@ export type {
   ClientMessage,
   GoalEventAction,
   MemoryEventFile,
+  BrowserActivity,
+  PendingBrowserGrant,
   PendingPermission,
   ServerMessage,
   SessionState,

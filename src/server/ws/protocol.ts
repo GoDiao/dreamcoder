@@ -13,6 +13,8 @@ export type { MemoryEventFile, TranscriptAttachment, TranscriptItem } from '../t
 export type {
   ActiveGoal,
   BackgroundTaskSummary,
+  BrowserActivity,
+  PendingBrowserGrant,
   PendingPermission,
   ProcessDetail,
   ProcessPhase,
@@ -35,6 +37,16 @@ export type ClientKind = 'desktop' | 'h5'
 export type DefaultPermissionMode = Exclude<PermissionMode, 'dontAsk'>
 
 export const DEFAULT_PERMISSION_MODES: readonly DefaultPermissionMode[] = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
+
+export const BROWSER_SEARCH_ENGINE_IDS = ['bing', 'google', 'duckduckgo', 'baidu'] as const
+
+export type BrowserSearchEngineId = (typeof BROWSER_SEARCH_ENGINE_IDS)[number]
+
+export const DEFAULT_BROWSER_SEARCH_ENGINE: BrowserSearchEngineId = 'bing'
+
+export function isBrowserSearchEngineId(value: unknown): value is BrowserSearchEngineId {
+  return typeof value === 'string' && (BROWSER_SEARCH_ENGINE_IDS as readonly string[]).includes(value)
+}
 
 export type ClientMessage =
   | { type: 'prewarm_session' }

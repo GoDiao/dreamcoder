@@ -4,9 +4,29 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **The agent can operate the built-in browser** (#189). The agent gets fourteen tools (`navigate`, `snapshot`, `scroll`, `click`, `type`, `press_key`, `screenshot`, `console`, `network`, `back`, `wait_for`, `styles`, `evaluate`, `emulate`) that work only on the side browser of its own session; there is no remote debugging port and no control of your own Chrome. Pages are read as a compact snapshot of text and numbered interactive elements, with delta updates for later reads; on long pages the agent can `scroll`, search the page text with `find`, and read on with `textFrom`; it can wait for text to appear, read an element's computed CSS, run a script in the page (which asks first on external sites), and emulate a viewport size or dark mode for the length of the turn. Local pages (localhost, project files) can be operated freely, except that a local page embedding another site asks permission for each embedded site, once for each action and never remembered; on external https sites reading (including scrolling) is free and each origin asks before the agent clicks, types, presses keys or navigates, with "Deny", "Allow once" or "Trust for this session". Sites you always trust are managed under Settings → Permissions. A bar in the panel shows when the agent is operating the page and has a Stop button. A built-in `browser` skill explains the tools, and the verification agent and `/batch` now point at them. Page text in the results of clicks and typing, and in dialog text, is marked as untrusted too. The browser tab keeps working when its page crashes and is reloaded. Desktop app only.
+- **Add selected text from the built-in browser to the chat** (#189). Select text on a page, right-click and choose "Add to chat": the text, with the page title and address, appears as a reference in the message box and goes to the agent as untrusted page content that it must not treat as your instructions. A selection that touches a password or card field, or lies inside an embedded frame, cannot be added. Selections are cut at 4000 characters and marked as cut. Restored sessions show these references as cards again.
+- **Pick an element in the built-in browser and add it to the chat** (#189). Turn on "Pick an element" in the browser toolbar and click elements on the page: each stays outlined in orange, with a small label, until you send the message, and you can pick several. A picked element goes to the chat with a screenshot and its details (tag, classes, role, name, text, selector, link address, key styles, its HTML and its neighbours' HTML, and React component info) as untrusted page content that the agent must not treat as your instructions. Password and card fields, and anything that contains one, are never carried, only where the element is. The agent cannot click, type or press keys on the page while you are picking. Elements that were on a page you left are marked as gone.
+
+### Changed
+
+- The built-in browser's address bar searches when the input is not an address: a phrase with spaces or a single word without a dot goes to the search engine you pick in the browser's "More" menu (Bing by default, or Google, DuckDuckGo, Baidu). The agent's own navigation never turns text into a search; it still needs a URL.
+- Opening the side panel in a session with no tabs now shows the new tab page, so you choose between changes, files, a web page or a terminal, instead of opening the changes or the file tree for you.
+
+### Removed
+
+- The Claude in Chrome integration and its `/chrome` command, which controlled the user's own Chrome through an extension. The built-in browser replaces it.
+
 ### Fixed
 
-- Windows source setup and tests now handle POSIX fixtures, normalized project keys, junctions, and ripgrep archives without platform-specific failures.
+- The agent's browser snapshot works on pages that embed many iframes, such as a canvas of boards. Clicks, marks and picks land on the right spot inside an iframe that the page draws smaller or larger with a CSS transform or zoom (they missed before). The list of interactive elements is grouped under a header per iframe with its number, title, parent and origin, every iframe gets a share of the element limit instead of the later ones being cut off entirely, a cut iframe says how many elements it left out, and `region` with the number from a header reads only that iframe. Rotated or skewed iframes are not covered.
+- A deleted session no longer comes back in the sidebar when a session list requested before the delete arrives after it (#217). Deleting a session the server has already removed (`404`) now clears it from the sidebar and closes its tab, and any other delete failure shows an error instead of leaving the dialog open. Thanks @mayuriphad.
+- With the side panel open, the Context ring under the input opens a hover card next to the button on desktop again; it opened a full-width bottom drawer because the narrow chat column was treated like a phone. The drawer is now used only on a phone-sized viewport.
+- Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195). Thanks @pcbeingused333.
+- A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
+- Stopping or restarting a lead session no longer deletes its team and task list (#199). Teams are removed only by `TeamDelete`, not when the CLI process exits (Stop, `/clear`, restart, app quit). Thanks @pcbeingused333.
 
 ## [0.8.0-beta.2] — 2026-10-29
 
@@ -31,12 +51,11 @@ A second pre-release of the Electron desktop app. Windows has still not been tes
 - Tool calls that arrived after a reply fell back to a non-streaming request were missing from the conversation; they are now shown.
 - Read no longer rejects a text file when a model sends an empty page range.
 - A group of tool calls is no longer marked as failed when a failed call was followed by a successful call of the same tool; the failed call is still shown inside the group.
-- Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195).
-- Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193).
-- When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176).
-- **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle.
-- Streamed replies from providers using the OpenAI Chat Completions format show their token usage and cost instead of 0 (#203). The request now asks for usage with `stream_options`, which backends such as Qwen (DashScope) and vLLM need before they report it.
-- An in-process teammate can no longer call `EnterWorktree` or `ExitWorktree` (#198). Teammates share one process with the lead, so entering a worktree moved the lead and every other teammate into it, and their reads, writes and commands ran there.
+- Sessions with an effort level selected before a model now generate an AI title through the active provider instead of keeping the placeholder (#193). Thanks @UnrealHenry.
+- When the AI title of a session cannot be generated, the server log now says why (session, provider, model and reason: upstream status and error excerpt, no text in reply, reply is not a title) instead of keeping the placeholder silently (#176). Thanks @pcbeingused333.
+- **In-process teammates claim the team's tasks** (#163). Once the lead creates a team, its tasks are stored in the team's task list, but in-process teammates looked for them in a list named after the lead's session, so they never claimed one and the tasks stayed unowned. Teammates now read the same task list as the lead, both when they start and while they are idle. Thanks @Sagar07Kr.
+- Streamed replies from providers using the OpenAI Chat Completions format show their token usage and cost instead of 0 (#203). The request now asks for usage with `stream_options`, which backends such as Qwen (DashScope) and vLLM need before they report it. Thanks @pcbeingused333.
+- An in-process teammate can no longer call `EnterWorktree` or `ExitWorktree` (#198). Teammates share one process with the lead, so entering a worktree moved the lead and every other teammate into it, and their reads, writes and commands ran there. Thanks @pcbeingused333.
 
 ## [0.8.0-beta.1] — 2026-10-26
 

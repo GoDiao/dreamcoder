@@ -111,14 +111,99 @@ describe('electron shell', () => {
   })
   it('sends browser commands to the main process', async () => {
     const { bridge } = installBridge(async () => ({ ok: true, url: 'http://localhost:3000/' }))
-    await expect(electronShell.resolveBrowserInput({ input: 'localhost:3000', projectRoot: '/repo' })).resolves.toEqual({ ok: true, url: 'http://localhost:3000/' })
-    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_resolve', { input: 'localhost:3000', projectRoot: '/repo' })
+    await expect(electronShell.resolveBrowserInput({ input: 'localhost:3000', projectRoot: '/repo', searchEngine: 'google' })).resolves.toEqual({ ok: true, url: 'http://localhost:3000/' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_resolve', { input: 'localhost:3000', projectRoot: '/repo', searchEngine: 'google' })
     await electronShell.openBrowserUrlInSystem('https://example.com/')
     expect(bridge.invoke).toHaveBeenLastCalledWith('browser_open_in_system', { url: 'https://example.com/' })
     await electronShell.openBrowserExternalProtocol('zoommtg://x')
     expect(bridge.invoke).toHaveBeenLastCalledWith('browser_open_protocol', { url: 'zoommtg://x' })
     await electronShell.clearBrowserData()
     expect(bridge.invoke).toHaveBeenLastCalledWith('browser_clear_data', undefined)
+  })
+
+  it('sends the browser control commands to the main process', async () => {
+    const { bridge } = installBridge(async () => undefined)
+    await electronShell.registerBrowserView({ sessionId: 's', tabId: 't', webContentsId: 7 })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_view_register', { sessionId: 's', tabId: 't', webContentsId: 7 })
+    await electronShell.updateBrowserView({ tabId: 't', shown: true, active: true, foreground: false })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_view_update', { tabId: 't', shown: true, active: true, foreground: false })
+    await electronShell.unregisterBrowserView({ tabId: 't' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_view_unregister', { tabId: 't' })
+    await electronShell.stopBrowserControl({ sessionId: 's' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_stop', { sessionId: 's' })
+    await electronShell.finishBrowserOpenTab({ requestId: 'r', tabId: 't' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_open_tab_done', { requestId: 'r', tabId: 't' })
+    await electronShell.finishBrowserActivate({ requestId: 'r', shown: false })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_activate_done', { requestId: 'r', shown: false })
+  })
+
+  it('sends pick mode and element marks to the main process', async () => {
+    const { bridge } = installBridge(async () => ['12'])
+    await electronShell.setBrowserPickMode({ tabId: 't', active: true })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_pick_set', { tabId: 't', active: true })
+    await expect(electronShell.syncBrowserMarks({ tabId: 't', refs: [{ ref: '12', generation: 2 }] })).resolves.toEqual(['12'])
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_marks_sync', { tabId: 't', refs: [{ ref: '12', generation: 2 }] })
+  })
+
+  it('treats pick mode as a no-op and every mark as alive without a shell bridge', async () => {
+    await expect(electronShell.setBrowserPickMode({ tabId: 't', active: true })).resolves.toBeUndefined()
+    await expect(
+      electronShell.syncBrowserMarks({ tabId: 't', refs: [{ ref: '1', generation: 0 }, { ref: '2', generation: 0 }] }),
+    ).resolves.toEqual(['1', '2'])
+    const unlisten = await electronShell.onBrowserPickState(vi.fn())
+    expect(() => unlisten()).not.toThrow()
+  })
+
+  it('delivers pick events from the main process', async () => {
+    const { listeners } = installBridge(async () => undefined)
+    const state = vi.fn()
+    const started = vi.fn()
+    const done = vi.fn()
+    await electronShell.onBrowserPickState(state)
+    await electronShell.onBrowserPickStarted(started)
+    await electronShell.onBrowserPickDone(done)
+
+    listeners.get('browser-pick-state')?.({ tabId: 't', active: true })
+    listeners.get('browser-pick-started')?.({ tabId: 't', sessionId: 's', pickId: 'p' })
+    listeners.get('browser-pick-done')?.({ tabId: 't', sessionId: 's', pickId: 'p', ok: false, cancelled: true })
+
+    expect(state).toHaveBeenCalledWith({ tabId: 't', active: true })
+    expect(started).toHaveBeenCalledWith({ tabId: 't', sessionId: 's', pickId: 'p' })
+    expect(done).toHaveBeenCalledWith({ tabId: 't', sessionId: 's', pickId: 'p', ok: false, cancelled: true })
+  })
+
+  it('sends browser grant replies and trusted-site changes to the main process', async () => {
+    const { bridge } = installBridge(async () => ['https://example.com'])
+    await electronShell.replyBrowserGrant({ requestId: 'g1', decision: 'session' })
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_grant_reply', { requestId: 'g1', decision: 'session' })
+    await expect(electronShell.listTrustedBrowserOrigins()).resolves.toEqual(['https://example.com'])
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_trust_list', undefined)
+    await expect(electronShell.trustBrowserOrigin('https://example.com')).resolves.toEqual(['https://example.com'])
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_trust_add', { origin: 'https://example.com' })
+    await electronShell.untrustBrowserOrigin('https://example.com')
+    expect(bridge.invoke).toHaveBeenLastCalledWith('browser_trust_remove', { origin: 'https://example.com' })
+  })
+
+  it('delivers browser control requests from the main process', async () => {
+    const { listeners } = installBridge(async () => undefined)
+    const openTab = vi.fn()
+    const activate = vi.fn()
+    await electronShell.onBrowserOpenTabRequest(openTab)
+    await electronShell.onBrowserActivateRequest(activate)
+
+    listeners.get('browser-open-tab-request')?.({ requestId: 'r1', sessionId: 's', url: null })
+    listeners.get('browser-activate-request')?.({ requestId: 'r2', tabId: 't' })
+
+    expect(openTab).toHaveBeenCalledWith({ requestId: 'r1', sessionId: 's', url: null })
+    expect(activate).toHaveBeenCalledWith({ requestId: 'r2', tabId: 't' })
+  })
+
+  it('treats the browser control commands and requests as no-ops without a shell bridge', async () => {
+    await expect(electronShell.registerBrowserView({ sessionId: 's', tabId: 't', webContentsId: 7 })).resolves.toBeUndefined()
+    await expect(electronShell.updateBrowserView({ tabId: 't', shown: true, active: true, foreground: true })).resolves.toBeUndefined()
+    await expect(electronShell.finishBrowserActivate({ requestId: 'r', shown: true })).resolves.toBeUndefined()
+    const unlisten = await electronShell.onBrowserOpenTabRequest(vi.fn())
+    expect(() => unlisten()).not.toThrow()
   })
 
   it('delivers browser events from the main process', async () => {

@@ -10,6 +10,7 @@ import { conversationService } from '../services/conversationService.js'
 import { sessionService } from '../services/sessionService.js'
 import { sessionStateStore } from '../session/state/store.js'
 import type { ClientKind } from '../ws/protocol.js'
+import { SessionBrowserGrants } from '../browserHost/grants.js'
 
 type FakeSocket = ServerWebSocket<WebSocketData> & { sent: string[] }
 
@@ -158,6 +159,61 @@ describe('WebSocket permission replies', () => {
     expect(received(phone)).toContainEqual(resolved)
     expect(received(desktop)).toContainEqual(expect.objectContaining({ type: 'error', code: 'PERMISSION_ALREADY_RESOLVED' }))
     expect(received(phone).some((msg) => msg.type === 'error')).toBe(false)
+  })
+
+  it('shows a pending browser grant to every client but does not let the open WebSocket answer it', async () => {
+    const sessionId = `browser-grant-${crypto.randomUUID()}`
+    fakeCli()
+    const respond = spyOn(conversationService, 'respondToPermission').mockReturnValue(true)
+    const desktop = makeClientSocket(sessionId)
+    const phone = makeClientSocket(sessionId, 'h5')
+    handleWebSocket.open(desktop)
+    handleWebSocket.open(phone)
+    const grants = new SessionBrowserGrants({ store: sessionStateStore, trust: { has: async () => false } })
+
+    const call = grants.ensureOperation({ sessionId, origin: 'https://example.com', action: 'Click element [1]' }, undefined).catch((error: unknown) => error)
+    await waitFor(() => (sessionStateStore.peek(sessionId)?.pendingBrowserGrants.length ?? 0) === 1)
+    const requestId = sessionStateStore.peek(sessionId)!.pendingBrowserGrants[0]!.requestId
+    for (const client of [desktop, phone]) {
+      expect(received(client)).toContainEqual(
+        expect.objectContaining({
+          type: 'session_patch',
+          changes: { pendingBrowserGrants: [expect.objectContaining({ requestId, origin: 'https://example.com', allowOnce: true, allowSession: true })] },
+        }),
+      )
+    }
+
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'permission_response', requestId, allowed: true }))
+    handleWebSocket.message(phone, JSON.stringify({ type: 'permission_response', requestId, allowed: true, rule: 'always' }))
+
+    expect(respond).not.toHaveBeenCalled()
+    expect(sessionStateStore.peek(sessionId)?.pendingBrowserGrants).toHaveLength(1)
+    expect(received(desktop)).toContainEqual(expect.objectContaining({ type: 'error', code: 'PERMISSION_REQUEST_EXPIRED' }))
+
+    grants.cancelSession(sessionId)
+    await call
+    for (const client of [desktop, phone]) {
+      expect(received(client)).toContainEqual(expect.objectContaining({ type: 'session_patch', changes: { pendingBrowserGrants: [] } }))
+    }
+  })
+
+  it('tells every client which tab the agent is operating and when it stops', () => {
+    const sessionId = `browser-activity-${crypto.randomUUID()}`
+    fakeCli()
+    const desktop = makeClientSocket(sessionId)
+    const phone = makeClientSocket(sessionId, 'h5')
+    handleWebSocket.open(desktop)
+    handleWebSocket.open(phone)
+
+    sessionStateStore.apply(sessionId, { type: 'browser_activity_changed', activity: { tabId: 't1' } })
+    sessionStateStore.apply(sessionId, { type: 'browser_activity_changed', activity: null })
+
+    for (const client of [desktop, phone]) {
+      const changes = received(client)
+        .filter((msg) => msg.type === 'session_patch' && 'browserActivity' in msg.changes)
+        .map((msg) => msg.changes.browserActivity)
+      expect(changes).toEqual([{ tabId: 't1' }, null])
+    }
   })
 
   it('tells every client when the CLI withdraws a permission request', () => {

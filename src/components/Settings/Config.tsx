@@ -871,25 +871,7 @@ export function Config({
         source: 'config_panel' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
     }
-  }] : []), {
-    id: 'claudeInChromeDefaultEnabled',
-    label: 'Claude in Chrome enabled by default',
-    value: globalConfig.claudeInChromeDefaultEnabled ?? true,
-    type: 'boolean' as const,
-    onChange(enabled_5: boolean) {
-      saveGlobalConfig(current_18 => ({
-        ...current_18,
-        claudeInChromeDefaultEnabled: enabled_5
-      }));
-      setGlobalConfig({
-        ...getGlobalConfig(),
-        claudeInChromeDefaultEnabled: enabled_5
-      });
-      logEvent('tengu_claude_in_chrome_setting_changed', {
-        enabled: enabled_5
-      });
-    }
-  },
+  }] : []),
   // Teammate mode (only shown when agent swarms are enabled)
   ...(isAgentSwarmsEnabled() ? (() => {
     const cliOverride = getCliTeammateModeOverride();

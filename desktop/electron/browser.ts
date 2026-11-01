@@ -2,11 +2,18 @@ import { randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  DEFAULT_BROWSER_SEARCH_ENGINE,
+  isBrowserSearchEngineId,
+  type BrowserSearchEngineId,
+} from '../../src/server/ws/protocol'
+import { normalizeBrowserSelection } from '../src/lib/browserReferences'
 import { BROWSER_PARTITION, type BrowserResolveResult } from '../src/lib/shell/electronBridge'
+import { SELECTION_PROBE_SOURCE } from './selectionProbe'
 
 export const PROJECT_SCHEME = 'dreamcoder-project'
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1'])
+export const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1'])
 const HTML_EXTENSIONS = new Set(['.html', '.htm', '.xhtml'])
 const EDITING_KEYS = new Set(['a', 'c', 'v', 'x', 'y', 'z'])
 const NEVER_EXTERNAL_PROTOCOLS = new Set([
@@ -35,6 +42,13 @@ const STRIPPED_PREFERENCE_KEYS = [
   'additionalArguments',
   'nodeIntegrationInWorker',
 ]
+
+const SEARCH_URL_TEMPLATES: Record<BrowserSearchEngineId, string> = {
+  bing: 'https://www.bing.com/search?q=%s',
+  google: 'https://www.google.com/search?q=%s',
+  duckduckgo: 'https://duckduckgo.com/?q=%s',
+  baidu: 'https://www.baidu.com/s?wd=%s',
+}
 
 type UrlVerdict = 'allow' | 'external' | 'refuse'
 type ProjectFileResult = { file: string } | { status: 403 | 404 }
@@ -115,6 +129,19 @@ function looksLikeHostAndPort(text: string) {
   return /^[^/\s:]+:\d+(?:[/?#]|$)/.test(text)
 }
 
+function looksLikeAddress(text: string) {
+  if (/\s/.test(text)) return false
+  const authority = text.split(/[/?#]/, 1)[0]
+  if (authority.startsWith('[')) return true
+  const hostname = authority.split(':', 1)[0].toLowerCase()
+  return hostname.includes('.') || hostname === 'localhost' || looksLikeHostAndPort(text)
+}
+
+export function searchUrl(query: string, engine: unknown) {
+  const id = isBrowserSearchEngineId(engine) ? engine : DEFAULT_BROWSER_SEARCH_ENGINE
+  return SEARCH_URL_TEMPLATES[id].replace('%s', encodeURIComponent(query))
+}
+
 function hasScheme(text: string) {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(text)
 }
@@ -147,10 +174,13 @@ function resolveWebAddress(raw: string, roots: ProjectRoots): BrowserResolveResu
   return verdict === 'allow' ? { ok: true, url: new URL(raw).toString() } : { ok: false, reason: 'scheme' }
 }
 
+export type BrowserSearchOption = { engine: unknown }
+
 export async function resolveBrowserInput(
   input: string,
   projectRoot: string | null,
   roots: ProjectRoots,
+  search?: BrowserSearchOption,
 ): Promise<BrowserResolveResult> {
   const text = input.trim()
   if (!text) return { ok: false, reason: 'scheme' }
@@ -170,6 +200,9 @@ export async function resolveBrowserInput(
     if ((await stat(candidate).catch(() => null))?.isFile()) {
       return resolveProjectFile(candidate, projectRoot, roots)
     }
+  }
+  if (!looksLikeAddress(text)) {
+    return search ? resolveWebAddress(searchUrl(text, search.engine), roots) : { ok: false, reason: 'scheme' }
   }
   const hostname = text.split(/[/:?#]/, 1)[0].toLowerCase()
   const scheme = LOOPBACK_HOSTS.has(hostname) ? 'http' : 'https'
@@ -225,7 +258,16 @@ export type GuestLike = {
   setWindowOpenHandler(handler: (details: { url: string }) => { action: 'deny' }): void
   on(event: string, listener: Listener): unknown
   loadURL(url: string): unknown
+  getURL(): string
+  getTitle(): string
+  copy(): void
+  executeJavaScriptInIsolatedWorld(worldId: number, scripts: { code: string }[]): Promise<unknown>
 }
+
+export type SelectionMenuItem = { label: string; click(): void }
+export type SelectionMenuLabels = { addToChat: string; copy: string }
+
+type ContextMenuParams = { selectionText: string; frame?: { parent: unknown } | null }
 
 type BrowserHostLike = {
   on(event: string, listener: Listener): unknown
@@ -247,6 +289,8 @@ type BrowserDeps = {
   roots: ProjectRoots
   readFile: (file: string) => Promise<Response>
   notify: (event: string, payload: unknown) => void
+  popupMenu: (items: SelectionMenuItem[]) => void
+  menuLabels: () => SelectionMenuLabels | null
 }
 
 type KeyInput = {
@@ -261,6 +305,32 @@ type KeyInput = {
 
 function isAppShortcut(input: KeyInput) {
   return input.type === 'keyDown' && (input.control || input.meta) && !EDITING_KEYS.has(input.key.toLowerCase())
+}
+
+const SELECTION_PROBE_WORLD = 4242
+
+async function touchesSensitiveField(guest: GuestLike) {
+  try {
+    return (await guest.executeJavaScriptInIsolatedWorld(SELECTION_PROBE_WORLD, [{ code: SELECTION_PROBE_SOURCE }])) !== false
+  } catch (error) {
+    console.warn('[browser] selection check failed', error)
+    return true
+  }
+}
+
+async function offerSelection(guest: GuestLike, params: ContextMenuParams, deps: BrowserDeps) {
+  const capture = normalizeBrowserSelection({ text: params.selectionText, title: guest.getTitle(), url: guest.getURL() })
+  if (!capture) return
+  const inMainFrame = !params.frame?.parent
+  const allowAdd = inMainFrame && !(await touchesSensitiveField(guest))
+  const labels = deps.menuLabels()
+  if (!labels) return
+  deps.popupMenu([
+    ...(allowAdd
+      ? [{ label: labels.addToChat, click: () => deps.notify('browser-selection', { guestId: guest.id, ...capture }) }]
+      : []),
+    { label: labels.copy, click: () => guest.copy() },
+  ])
 }
 
 function guardGuest(guest: GuestLike, deps: BrowserDeps) {
@@ -285,6 +355,9 @@ function guardGuest(guest: GuestLike, deps: BrowserDeps) {
   }) as Listener)
   guest.on('will-frame-navigate', ((details: PreventableEvent & { url: string; isMainFrame: boolean }) => {
     if (!details.isMainFrame && !allowSubframe(details.url)) details.preventDefault()
+  }) as Listener)
+  guest.on('context-menu', ((_event: unknown, params: ContextMenuParams) => {
+    void offerSelection(guest, params, deps)
   }) as Listener)
   guest.on('before-input-event', ((_event: PreventableEvent, input: KeyInput) => {
     if (!isAppShortcut(input)) return

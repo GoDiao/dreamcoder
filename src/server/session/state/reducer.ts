@@ -19,6 +19,8 @@ export function createSessionState(id: string): SessionState {
     process: { phase: 'stopped', generation: 0 },
     turn: { phase: 'idle' },
     pendingPermissions: [],
+    pendingBrowserGrants: [],
+    browserActivity: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
@@ -167,6 +169,20 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
       }
     }
 
+    case 'browser_grant_requested': {
+      const others = state.pendingBrowserGrants.filter((grant) => grant.requestId !== event.grant.requestId)
+      return { ...state, pendingBrowserGrants: [...others, event.grant] }
+    }
+
+    case 'browser_grant_closed': {
+      const pendingBrowserGrants = state.pendingBrowserGrants.filter((grant) => grant.requestId !== event.requestId)
+      if (pendingBrowserGrants.length === state.pendingBrowserGrants.length) return state
+      return { ...state, pendingBrowserGrants }
+    }
+
+    case 'browser_activity_changed':
+      return { ...state, browserActivity: event.activity }
+
     case 'slash_commands_reported':
       return { ...state, slashCommands: event.commands }
 
@@ -190,6 +206,8 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
         ...state,
         turn: { phase: 'idle' },
         pendingPermissions: [],
+        pendingBrowserGrants: [],
+        browserActivity: null,
         slashCommands: [],
         activeGoal: null,
         backgroundTasks: [],
@@ -226,6 +244,8 @@ function applyProcessPhase(
     runtime: { ...state.runtime, effective: null },
     turn: { phase: 'idle' },
     pendingPermissions: [],
+    pendingBrowserGrants: [],
+    browserActivity: null,
   }
 }
 

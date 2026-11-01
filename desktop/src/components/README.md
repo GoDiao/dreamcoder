@@ -63,7 +63,7 @@ that only renames props or passes them through does not belong here.
 | `ConfirmDialog` | Alert Dialog with application confirmation callbacks |
 | `MobileBottomSheet` | Drawer with localized title and close control |
 | `Tooltip` | The tooltip entry point: a Tooltip and content wrapper that keeps the trigger mounted when the content is empty; the single `TooltipProvider` (400 ms delay) is mounted in `App`. `ActivitySettings` and `TerminalSettings` use `ui/tooltip` directly because they need an instant delay, a controlled open state or custom content |
-| `ActionMenu` | Shared Dropdown Menu and Context Menu actions/focus handling |
+| `ActionMenu` | Shared Dropdown Menu and Context Menu actions/focus handling; the dropdown also takes single-choice submenus (`MenuChoiceGroup`) |
 | `ResponsivePopover` | Popover on desktop and bottom sheet on mobile |
 | `CopyButton` | Button, Tooltip and `useCopyAndNotify`, which wraps the clipboard helper with localized success and failure toasts |
 | `DirectoryPicker`, `RepositoryLaunchControls` | DreamCoder project/branch workflows using shared popovers, Command and controls |
