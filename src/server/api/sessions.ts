@@ -16,6 +16,8 @@ import { isPermissionMode } from '../services/permissionModes.js'
 import { normalizeRuntimeSelection } from '../services/runtimeSelection.js'
 import { listSkillSlashCommands, type SkillSlashCommand } from './skills.js'
 import { WorkspaceService } from '../services/workspaceService.js'
+import { artifactService } from '../services/artifactService.js'
+import { optionalString, readBody, requireString } from './requestBody.js'
 import {
   getRepositoryContext,
   type CreateSessionRepositoryOptions,
@@ -166,6 +168,9 @@ export async function handleSessionsApi(
     }
 
     if (subResource === 'workspace') {
+      if (req.method === 'POST' && segments[4] === 'artifacts' && segments[5] === 'systems') {
+        return await installSessionDesignSystem(req, sessionId)
+      }
       if (req.method !== 'GET') {
         return Response.json(
           { error: 'METHOD_NOT_ALLOWED', message: `Method ${req.method} not allowed` },
@@ -225,14 +230,27 @@ async function getSession(sessionId: string): Promise<Response> {
   return Response.json(detail)
 }
 
+async function installSessionDesignSystem(req: Request, sessionId: string): Promise<Response> {
+  const body = await readBody(req)
+  const workDir = await requireSessionWorkspace(sessionId)
+  const installed = await artifactService.installSystemInWorkDir(
+    workDir,
+    { systemId: requireString(body, 'systemId'), name: optionalString(body, 'name') },
+    sessionId,
+  )
+  return Response.json(installed)
+}
+
 async function handleSessionWorkspaceRoute(
   sessionId: string,
   url: URL,
   workspaceResource?: string,
 ): Promise<Response> {
-  await requireSessionWorkspace(sessionId)
+  const workDir = await requireSessionWorkspace(sessionId)
 
   switch (workspaceResource) {
+    case 'artifacts':
+      return Response.json(await artifactService.listForWorkDir(workDir))
     case 'status':
       return Response.json(await workspaceService.getStatus(sessionId))
     case 'tree':

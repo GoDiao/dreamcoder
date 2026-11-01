@@ -13,6 +13,9 @@ import {
 } from 'fs/promises'
 import ignore from 'ignore'
 import { basename, dirname, join } from 'path'
+import { moveArtifactsToGlobalStore } from './artifactTransfer.js'
+import { emitArtifactWrittenAt } from './artifactEvents.js'
+import { ARTIFACTS_DIRNAME } from './artifacts.js'
 import { saveCurrentProjectConfig } from './config.js'
 import { getCwd } from './cwd.js'
 import { logForDebugging } from './debug.js'
@@ -206,19 +209,13 @@ function worktreesDir(repoRoot: string): string {
   return join(repoRoot, '.claude', 'worktrees')
 }
 
-export async function ensureWorktreesDirExcluded(repoRoot: string): Promise<void> {
+async function ensureGitInfoExcluded(repoRoot: string, pattern: string, comment: string): Promise<void> {
   const gitDir = await resolveGitDir(repoRoot)
   const commonDir = gitDir ? ((await getCommonDir(gitDir)) ?? gitDir) : null
   if (!commonDir) return
 
   const excludePath = join(commonDir, 'info', 'exclude')
-  const pattern = '.claude/worktrees/'
-  let existing = ''
-  try {
-    existing = await readFile(excludePath, 'utf-8')
-  } catch {
-    // Missing exclude file is normal in freshly initialized repositories.
-  }
+  const existing = await readFile(excludePath, 'utf-8').catch(() => '')
 
   const alreadyExcluded = existing
     .split(/\r?\n/)
@@ -228,11 +225,41 @@ export async function ensureWorktreesDirExcluded(repoRoot: string): Promise<void
 
   await mkdir(dirname(excludePath), { recursive: true })
   const prefix = existing.length === 0 || existing.endsWith('\n') ? existing : `${existing}\n`
-  await writeFile(
-    excludePath,
-    `${prefix}# Claude worktree sessions\n${pattern}\n`,
-    'utf-8',
-  )
+  await writeFile(excludePath, `${prefix}# ${comment}\n${pattern}\n`, 'utf-8')
+}
+
+export async function ensureWorktreesDirExcluded(repoRoot: string): Promise<void> {
+  await ensureGitInfoExcluded(repoRoot, '.claude/worktrees/', 'Claude worktree sessions')
+}
+
+export async function ensureArtifactsDirExcluded(workDir: string): Promise<void> {
+  await ensureGitInfoExcluded(workDir, `${ARTIFACTS_DIRNAME}/`, 'DreamCoder artifacts')
+}
+
+export async function announceArtifactWrite(workRoot: string, file: string, toolName: string): Promise<void> {
+  await ensureArtifactsDirExcluded(workRoot)
+  emitArtifactWrittenAt(file, toolName)
+}
+
+export type MovedArtifact = { name: string; dir: string }
+
+export async function preserveWorktreeArtifacts(
+  worktreePath: string,
+  gitRoot?: string,
+  branch?: string,
+): Promise<MovedArtifact[]> {
+  const projectRoot = findCanonicalGitRoot(worktreePath) ?? gitRoot ?? null
+  const currentBranch =
+    branch ??
+    (
+      await execFileNoThrowWithCwd(gitExe(), ['branch', '--show-current'], {
+        cwd: worktreePath,
+      })
+    ).stdout.trim()
+  return moveArtifactsToGlobalStore(worktreePath, {
+    projectRoot,
+    branch: currentBranch || null,
+  })
 }
 
 // Flatten nested slugs (`user/feature` → `user+feature`) for both the branch
@@ -855,6 +882,8 @@ export async function cleanupWorktree(): Promise<void> {
     // Change back to original directory first
     process.chdir(originalCwd)
 
+    await preserveWorktreeArtifacts(worktreePath, originalCwd, worktreeBranch)
+
     if (hookBased) {
       // Hook-based worktree: delegate cleanup to WorktreeRemove hook
       const hookRan = await executeWorktreeRemoveHook(worktreePath)
@@ -996,7 +1025,19 @@ export async function removeAgentWorktree(
   worktreeBranch?: string,
   gitRoot?: string,
   hookBased?: boolean,
+  movedArtifacts?: MovedArtifact[],
 ): Promise<boolean> {
+  try {
+    const moved = await preserveWorktreeArtifacts(worktreePath, gitRoot, worktreeBranch)
+    movedArtifacts?.push(...moved)
+  } catch (error) {
+    logForDebugging(
+      `Keeping agent worktree ${worktreePath}: could not move its artifacts: ${errorMessage(error)}`,
+      { level: 'error' },
+    )
+    return false
+  }
+
   if (hookBased) {
     const hookRan = await executeWorktreeRemoveHook(worktreePath)
     if (hookRan) {

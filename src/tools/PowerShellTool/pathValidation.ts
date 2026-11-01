@@ -6,6 +6,7 @@
  * Follows the same patterns as BashTool/pathValidation.ts.
  */
 
+import { allowsOwnArtifactWrite, artifactDenialFor, isHardDenial, OWN_ARTIFACT_WRITE_REASON } from '../../utils/permissions/artifactLocation.js'
 import { homedir } from 'os'
 import { isAbsolute, resolve } from 'path'
 import type { ToolPermissionContext } from '../../Tool.js'
@@ -882,6 +883,14 @@ function isPathAllowed(
     }
   }
 
+  const artifactDenial = artifactDenialFor(precomputedPathsToCheck ?? [resolvedPath], operationType)
+  if (artifactDenial) {
+    return {
+      allowed: false,
+      decisionReason: artifactDenial,
+    }
+  }
+
   // 2. For write/create operations, check internal editable paths (plan files, scratchpad, agent memory, job dirs)
   // This MUST come before checkPathSafetyForAutoEdit since .claude is a dangerous directory
   // and internal editable paths live under ~/.claude/ — matching the ordering in
@@ -911,6 +920,13 @@ function isPathAllowed(
           classifierApprovable: safetyCheck.classifierApprovable,
         },
       }
+    }
+  }
+
+  if (allowsOwnArtifactWrite(precomputedPathsToCheck ?? [resolvedPath], operationType, context.mode)) {
+    return {
+      allowed: true,
+      decisionReason: OWN_ARTIFACT_WRITE_REASON,
     }
   }
 
@@ -1762,7 +1778,7 @@ function checkPathConstraintsForStatement(
             ? decisionReason.reason
             : `${canonical} targeting '${resolvedPath}' was blocked. For security, Claude Code may only access files in the allowed working directories for this session: ${dirListStr}.`
 
-        if (decisionReason?.type === 'rule') {
+        if (isHardDenial(decisionReason)) {
           return {
             behavior: 'deny',
             message,
@@ -1875,7 +1891,7 @@ function checkPathConstraintsForStatement(
               ? decisionReason.reason
               : `${canonical} targeting '${resolvedPath}' was blocked. For security, Claude Code may only access files in the allowed working directories for this session: ${dirListStr}.`
 
-          if (decisionReason?.type === 'rule') {
+          if (isHardDenial(decisionReason)) {
             return {
               behavior: 'deny',
               message,
@@ -1962,7 +1978,7 @@ function checkPathConstraintsForStatement(
                 ? decisionReason.reason
                 : `Output redirection to '${resolvedPath}' was blocked. For security, Claude Code may only write to files in the allowed working directories for this session: ${dirListStr}.`
 
-            if (decisionReason?.type === 'rule') {
+            if (isHardDenial(decisionReason)) {
               return {
                 behavior: 'deny',
                 message,
@@ -2015,7 +2031,7 @@ function checkPathConstraintsForStatement(
             ? decisionReason.reason
             : `Output redirection to '${resolvedPath}' was blocked. For security, Claude Code may only write to files in the allowed working directories for this session: ${dirListStr}.`
 
-        if (decisionReason?.type === 'rule') {
+        if (isHardDenial(decisionReason)) {
           return {
             behavior: 'deny',
             message,

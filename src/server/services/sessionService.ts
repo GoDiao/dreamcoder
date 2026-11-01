@@ -20,7 +20,7 @@ import {
 } from './repositoryLaunchService.js'
 import { registerFilesystemAccessRoot } from './filesystemAccessRoots.js'
 import { readJsonlFile } from './jsonlFile.js'
-import { normalizeDriveRootPathForPlatform } from './windowsDrivePath.js'
+import { normalizeDriveRootPathForPlatform } from '../../utils/windowsDrivePath.js'
 import { cleanSessionTitleSource } from '../../utils/sessionTitleText.js'
 import { extractTextBlocks, parseLocalCommand } from '../transcript/classify.js'
 import {
@@ -1126,6 +1126,33 @@ export class SessionService {
     const mem1 = process.memoryUsage()
     console.log(`[mem:sidecar] listSessions:done total=${total} returned=${items.length} rss=${(mem1.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem1.heapUsed/1024/1024).toFixed(1)}MB`)
     return { sessions: items, total }
+  }
+
+  async listKnownWorkDirs(): Promise<Array<{ workDir: string; projectRoot: string | null }>> {
+    const newestByProject = new Map<string, { filePath: string; projectDir: string; mtimeMs: number }>()
+    for (const file of await this.discoverSessionFiles()) {
+      let mtimeMs: number
+      try {
+        mtimeMs = (await fs.stat(file.filePath)).mtimeMs
+      } catch {
+        continue
+      }
+      const current = newestByProject.get(file.projectDir)
+      if (!current || mtimeMs > current.mtimeMs) {
+        newestByProject.set(file.projectDir, { filePath: file.filePath, projectDir: file.projectDir, mtimeMs })
+      }
+    }
+    const found = await Promise.all([...newestByProject.values()].map(async ({ filePath, projectDir }) => {
+      try {
+        const { entries } = await this.scanSessionFileHead(filePath, 100, 100)
+        const workDir = this.resolveWorkDirFromEntries(entries, projectDir)
+        if (!workDir || !(await this.pathExists(workDir))) return null
+        return { workDir, projectRoot: await this.resolveProjectRootFromEntries(entries, workDir, projectDir) }
+      } catch {
+        return null
+      }
+    }))
+    return found.filter((item): item is { workDir: string; projectRoot: string | null } => item !== null)
   }
 
   async getSession(sessionId: string): Promise<SessionDetail | null> {

@@ -54,7 +54,7 @@ function migrateTabs(storage: StorageLike, report: DesktopMigrationReport): void
       .map((tab) => ({
         sessionId: tab.sessionId as string,
         title: tab.title as string,
-        type: tab.type === 'scheduled' ? tab.type : 'session',
+        type: tab.type === 'scheduled' || tab.type === 'artifacts' ? tab.type : 'session',
       }))
     const activeTabId =
       isRecord(parsed) &&

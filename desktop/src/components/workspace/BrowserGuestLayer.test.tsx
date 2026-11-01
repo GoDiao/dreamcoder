@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   setBrowserMenuLabels: vi.fn(),
   handleOpenTabRequest: vi.fn(),
   handleActivateRequest: vi.fn(),
+  handleCloseTabRequest: vi.fn(),
   handleBrowserPickState: vi.fn(),
   handleBrowserPickStarted: vi.fn(),
   handleBrowserPickDone: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('../../lib/browserGuests', () => ({
 vi.mock('../../lib/browserControlRequests', () => ({
   handleOpenTabRequest: mocks.handleOpenTabRequest,
   handleActivateRequest: mocks.handleActivateRequest,
+  handleCloseTabRequest: mocks.handleCloseTabRequest,
 }))
 
 vi.mock('../../lib/browserPicks', () => ({
@@ -53,6 +55,7 @@ vi.mock('../../lib/shell', () => {
     onBrowserExternalRequest: subscribe('external'),
     onBrowserOpenTabRequest: subscribe('openTab'),
     onBrowserActivateRequest: subscribe('activate'),
+    onBrowserCloseTabRequest: subscribe('closeTab'),
     onBrowserSelection: subscribe('selection'),
     onBrowserPickState: subscribe('pickState'),
     onBrowserPickStarted: subscribe('pickStarted'),
@@ -88,7 +91,7 @@ describe('BrowserGuestLayer', () => {
 
   it('forwards main-process events and unsubscribes on unmount', async () => {
     const { unmount } = render(<BrowserGuestLayer />)
-    await waitFor(() => expect(Object.keys(mocks.handlers)).toHaveLength(9))
+    await waitFor(() => expect(Object.keys(mocks.handlers)).toHaveLength(10))
 
     mocks.handlers.blocked?.({ guestId: 1, url: 'http://x.test', reason: 'scheme' } as never)
     mocks.handlers.shortcut?.({ key: 'k' } as never)
@@ -97,8 +100,10 @@ describe('BrowserGuestLayer', () => {
 
     mocks.handlers.openTab?.({ requestId: 'r1', sessionId: 's', url: null } as never)
     mocks.handlers.activate?.({ requestId: 'r2', tabId: 't' } as never)
+    mocks.handlers.closeTab?.({ requestId: 'r3', tabId: 't' } as never)
     expect(mocks.handleOpenTabRequest).toHaveBeenCalledWith({ requestId: 'r1', sessionId: 's', url: null })
     expect(mocks.handleActivateRequest).toHaveBeenCalledWith({ requestId: 'r2', tabId: 't' })
+    expect(mocks.handleCloseTabRequest).toHaveBeenCalledWith({ requestId: 'r3', tabId: 't' })
 
     const selection = { guestId: 3, text: 'picked', truncated: false, title: 'T', url: 'https://example.com/' }
     mocks.handlers.selection?.(selection as never)
@@ -112,7 +117,7 @@ describe('BrowserGuestLayer', () => {
     expect(mocks.handleBrowserPickDone).toHaveBeenCalledWith({ tabId: 't', sessionId: 's', pickId: 'p', ok: false, cancelled: true })
 
     unmount()
-    await waitFor(() => expect(mocks.unlisten).toHaveBeenCalledTimes(9))
+    await waitFor(() => expect(mocks.unlisten).toHaveBeenCalledTimes(10))
   })
 
   it('keeps the marks of picked elements in sync with the message box while it is mounted', () => {

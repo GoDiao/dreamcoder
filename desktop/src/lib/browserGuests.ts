@@ -4,8 +4,14 @@ import { browserReferenceName, normalizeBrowserSelection, type BrowserReferenceD
 import { useSettingsStore } from '../stores/settingsStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { registerGuestView, reportViewState, unregisterGuestView } from './browserViewReporter'
+import { artifactsApi } from '../api/artifacts'
+import { designApi } from '../api/design'
+import { GLOBAL_ARTIFACTS_ROOT } from './artifactRoots'
 import { resolveBrowserInput, type BrowserBlockedEvent, type BrowserSelectionEvent, type BrowserShortcutEvent } from './shell'
 import { BROWSER_PARTITION } from './shell/electronBridge'
+import { CANVAS_REFRESH_CALL, canvasSchemeCall, parseCanvasMessage, type CanvasMessage } from './canvasBridge'
+import { useUIStore } from '../stores/uiStore'
+import { themeColorScheme } from '../theme/colorScheme'
 
 type WebviewElement = HTMLElement & {
   loadURL: (url: string) => Promise<void>
@@ -19,10 +25,11 @@ type WebviewElement = HTMLElement & {
   getTitle: () => string
   isLoading: () => boolean
   getWebContentsId: () => number
+  executeJavaScript: (code: string) => Promise<unknown>
 }
 
 type Guest = {
-  sessionId: string
+  sessionId: string | null
   tabId: string
   slot: HTMLDivElement
   webview: WebviewElement
@@ -36,16 +43,19 @@ type Placement = {
   observer: ResizeObserver | null
 }
 
+const PROJECT_URL_PREFIX = 'dreamcoder-project://'
 const ERROR_PAGE_PROTOCOL = 'chrome-error:'
 const ABORTED_LOAD = -3
 
 const guests = new Map<string, Guest>()
 const placements = new Map<string, Placement>()
+const canvasHandlers = new Map<string, (message: CanvasMessage) => void>()
 let layer: HTMLElement | null = null
 let layerObserver: ResizeObserver | null = null
 let gestureActive = false
 let dismissingHostPopups = false
 let gestureListenersInstalled = false
+let themeSyncInstalled = false
 
 export function setBrowserGuestLayer(element: HTMLElement | null) {
   if (element === layer) return
@@ -54,6 +64,7 @@ export function setBrowserGuestLayer(element: HTMLElement | null) {
   layer = element
   if (!element) return
   installGestureListeners()
+  installThemeSync()
   if (typeof ResizeObserver !== 'undefined') {
     layerObserver = new ResizeObserver(applyAllPlacements)
     layerObserver.observe(element)
@@ -70,7 +81,7 @@ function syncPage(guest: Guest) {
   const { webview } = guest
   const url = webview.getURL()
   if (!url.startsWith(ERROR_PAGE_PROTOCOL)) {
-    useWorkspacePanelStore.getState().patchTab(guest.sessionId, guest.tabId, { url, title: webview.getTitle() })
+    if (guest.sessionId) useWorkspacePanelStore.getState().patchTab(guest.sessionId, guest.tabId, { url, title: webview.getTitle() })
   }
   useBrowserStore.getState().patchPage(guest.tabId, {
     loading: webview.isLoading(),
@@ -88,7 +99,7 @@ function dismissHostPopups() {
   }
 }
 
-function createGuest(sessionId: string, tabId: string, url: string) {
+function createGuest(sessionId: string | null, tabId: string, url: string) {
   const slot = document.createElement('div')
   slot.dataset.browserSlot = tabId
   Object.assign(slot.style, {
@@ -111,11 +122,12 @@ function createGuest(sessionId: string, tabId: string, url: string) {
   const guest: Guest = { sessionId, tabId, slot, webview, ready: false, webContentsId: null }
   const store = useBrowserStore.getState()
   webview.addEventListener('dom-ready', () => {
+    applyCanvasScheme(guest)
     if (guest.ready) return
     guest.ready = true
     guest.webContentsId = webview.getWebContentsId()
     store.patchPage(tabId, { ready: true })
-    registerGuestView(sessionId, tabId, guest.webContentsId, () => isBrowserGuestShown(tabId))
+    if (sessionId) registerGuestView(sessionId, tabId, guest.webContentsId, () => isBrowserGuestShown(tabId))
     syncPage(guest)
   })
   webview.addEventListener('did-start-loading', () => store.patchPage(tabId, { loading: true }))
@@ -124,10 +136,10 @@ function createGuest(sessionId: string, tabId: string, url: string) {
   webview.addEventListener('did-navigate-in-page', () => syncPage(guest))
   webview.addEventListener('did-navigate', (event) => {
     const { url: navigatedUrl } = event as Event & { url: string }
-    useWorkspaceChatContextStore.getState().markBrowserElementsStale(sessionId, tabId)
+    if (sessionId) useWorkspaceChatContextStore.getState().markBrowserElementsStale(sessionId, tabId)
     if (navigatedUrl.startsWith(ERROR_PAGE_PROTOCOL)) return
     store.setNotice(tabId, null)
-    useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { url: navigatedUrl })
+    if (sessionId) useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { url: navigatedUrl })
     syncPage(guest)
   })
   webview.addEventListener('did-fail-load', (event) => {
@@ -136,9 +148,57 @@ function createGuest(sessionId: string, tabId: string, url: string) {
     store.setNotice(tabId, { kind: 'loadFailed', url: failure.validatedURL, description: failure.errorDescription })
     store.patchPage(tabId, { loading: false })
   })
+  webview.addEventListener('console-message', (event) => {
+    const { message, sourceId } = event as Event & { message: string; sourceId: string }
+    const handler = canvasHandlers.get(tabId)
+    const parsed = handler ? parseCanvasMessage(message, sourceId) : null
+    if (parsed) handler?.(parsed)
+  })
   webview.addEventListener('focus', dismissHostPopups)
   guests.set(tabId, guest)
   return guest
+}
+
+export async function canvasBoardLabel(tabId: string, documentUrl: string): Promise<string | null> {
+  const guest = readyGuest(tabId)
+  if (!guest || !canvasHandlers.has(tabId)) return null
+  const topUrl = guest.webview.getURL()
+  if (!isProjectPageUrl(topUrl)) return null
+  const artifact = decodeURIComponent(new URL(topUrl).pathname).split('/').filter(Boolean)[0]
+  if (!artifact) return null
+  try {
+    const board = await guest.webview.executeJavaScript(`window.__dreamcoderCanvas ? window.__dreamcoderCanvas.boardTitle(${JSON.stringify(documentUrl)}) : null`)
+    return typeof board === 'string' && board !== '' ? `${artifact} / ${board}` : null
+  } catch (error) {
+    console.warn('[browser] could not read the board of a selection', error)
+    return null
+  }
+}
+
+function applyCanvasScheme(guest: Guest) {
+  if (!canvasHandlers.has(guest.tabId)) return
+  const call = canvasSchemeCall(themeColorScheme(useUIStore.getState().theme))
+  guest.webview.executeJavaScript(call).catch((error: unknown) => console.warn('[browser] could not set the canvas color scheme', error))
+}
+
+function installThemeSync() {
+  if (themeSyncInstalled) return
+  themeSyncInstalled = true
+  useUIStore.subscribe((state, previous) => {
+    if (state.theme === previous.theme) return
+    for (const guest of guests.values()) if (guest.ready) applyCanvasScheme(guest)
+  })
+}
+
+export function setCanvasMessageHandler(tabId: string, handler: ((message: CanvasMessage) => void) | null) {
+  if (handler) canvasHandlers.set(tabId, handler)
+  else canvasHandlers.delete(tabId)
+}
+
+export async function refreshCanvas(tabId: string): Promise<boolean> {
+  const guest = readyGuest(tabId)
+  if (!guest) return false
+  return (await guest.webview.executeJavaScript(CANVAS_REFRESH_CALL)) !== false
 }
 
 export function hasBrowserGuest(tabId: string) {
@@ -149,7 +209,7 @@ export function isBrowserGuestShown(tabId: string) {
   return guests.get(tabId)?.slot.dataset.shown === 'true'
 }
 
-export function openBrowserUrl(sessionId: string, tabId: string, url: string) {
+export function openBrowserUrl(sessionId: string | null, tabId: string, url: string) {
   const existing = guests.get(tabId)
   if (existing?.slot.isConnected) {
     if (existing.ready) {
@@ -166,7 +226,7 @@ export function openBrowserUrl(sessionId: string, tabId: string, url: string) {
   applyPlacement(tabId)
 }
 
-export async function submitBrowserInput(sessionId: string, tabId: string, input: string, projectRoot: string | null) {
+export async function submitBrowserInput(sessionId: string | null, tabId: string, input: string, projectRoot: string | null) {
   const store = useBrowserStore.getState()
   const result = await resolveBrowserInput({ input, projectRoot, searchEngine: useSettingsStore.getState().browserSearchEngine })
   if (!result.ok) {
@@ -175,6 +235,47 @@ export async function submitBrowserInput(sessionId: string, tabId: string, input
   }
   store.setNotice(tabId, null)
   openBrowserUrl(sessionId, tabId, result.url)
+}
+
+export function getBrowserGuestContentsId(tabId: string) {
+  return guests.get(tabId)?.webContentsId ?? null
+}
+
+export function isProjectPageUrl(url: string) {
+  return url.startsWith(PROJECT_URL_PREFIX)
+}
+
+async function resolveUnderRoot(root: string, relative: string) {
+  return resolveBrowserInput({
+    input: `${root.replace(/[\\/]+$/, '')}/${relative}`,
+    projectRoot: root,
+    searchEngine: useSettingsStore.getState().browserSearchEngine,
+  })
+}
+
+export async function resolveStoredBrowserUrl(
+  tab: { url: string; root?: string; artifact?: { id: string }; template?: { id: string } },
+  projectRoot: string | null,
+): Promise<string> {
+  if (!isProjectPageUrl(tab.url)) return tab.url
+  const relative = decodeURIComponent(new URL(tab.url).pathname).replace(/^\/+/, '')
+  if (!relative) return tab.url
+  const root = tab.root === undefined ? projectRoot : tab.root === GLOBAL_ARTIFACTS_ROOT ? null : tab.root
+  if (root) {
+    const result = await resolveUnderRoot(root, relative)
+    if (result.ok) return result.url
+  }
+  if (tab.template) {
+    const located = await designApi.preview(tab.template.id)
+    const result = await resolveUnderRoot(located.rootDir, relative)
+    return result.ok ? result.url : tab.url
+  }
+  if (!tab.artifact) return tab.url
+  const located = await artifactsApi.openById(tab.artifact.id)
+  const folder = located.filePath.slice(located.rootDir.length).split(/[\\/]/).filter(Boolean)[0]
+  if (!folder) return tab.url
+  const result = await resolveUnderRoot(located.rootDir, [folder, ...relative.split('/').slice(1)].join('/'))
+  return result.ok ? result.url : tab.url
 }
 
 export function browserGoBack(tabId: string) {
@@ -217,7 +318,7 @@ export function placeBrowserGuest(tabId: string, stage: HTMLElement, visible: bo
 export function closeBrowser(tabId: string) {
   const guest = guests.get(tabId)
   if (guest) {
-    useWorkspaceChatContextStore.getState().markBrowserElementsStale(guest.sessionId, tabId)
+    if (guest.sessionId) useWorkspaceChatContextStore.getState().markBrowserElementsStale(guest.sessionId, tabId)
     disposeGuest(guest)
   }
   placements.get(tabId)?.observer?.disconnect()
@@ -294,10 +395,10 @@ export function replayBrowserShortcut(event: BrowserShortcutEvent) {
   document.body.dispatchEvent(new KeyboardEvent('keydown', { ...event, bubbles: true, cancelable: true }))
 }
 
-export function addBrowserSelectionToChat(event: BrowserSelectionEvent) {
+export async function addBrowserSelectionToChat(event: BrowserSelectionEvent) {
   const guest = [...guests.values()].find((candidate) => candidate.webContentsId === event.guestId)
   const capture = normalizeBrowserSelection(event)
-  if (!guest || !capture) return
+  if (!guest?.sessionId || !capture) return
   const browser: BrowserReferenceData = {
     url: capture.url,
     title: capture.title,
@@ -305,10 +406,11 @@ export function addBrowserSelectionToChat(event: BrowserSelectionEvent) {
     text: capture.text,
     truncated: capture.truncated,
   }
+  const board = await canvasBoardLabel(guest.tabId, capture.url)
   useWorkspaceChatContextStore.getState().addReference(guest.sessionId, {
     kind: 'browser',
     path: capture.url,
-    name: browserReferenceName(browser),
+    name: board ?? browserReferenceName(browser),
     browser,
   })
 }

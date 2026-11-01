@@ -1,0 +1,14 @@
+{
+  "sourceRepo": "https://github.com/nexu-io/open-design",
+  "bundledOrigin": "OpenDesign curated bundled fixture",
+  "excluded": {
+    "tom-modern": "The upstream (github.com/Tom-Opencart/tom-modern-html-style-rule) states no license, and its DESIGN.md loads Geist from a CDN."
+  },
+  "exceptions": {
+    "cloudflare-kumo": {
+      "licenseId": "MIT",
+      "licenseText": "licenses/cloudflare-kumo.txt",
+      "author": "Cloudflare, Inc."
+    }
+  }
+}

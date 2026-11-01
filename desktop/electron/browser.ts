@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { Readable } from 'node:stream'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { CANVAS_RESERVED_PREFIX, CANVAS_SHELL_FILES } from '../../src/utils/canvas'
 import {
   DEFAULT_BROWSER_SEARCH_ENGINE,
   isBrowserSearchEngineId,
@@ -209,13 +212,80 @@ export async function resolveBrowserInput(
   return resolveWebAddress(`${scheme}://${text}`, roots)
 }
 
+export type ProjectFile = {
+  size: number
+  contentType: string | null
+  slice: (start: number, end: number) => BodyInit
+}
+
+export type OpenProjectFile = (file: string) => Promise<ProjectFile>
+
+export type ProjectRequest = { url: string; headers: { get(name: string): string | null } }
+
+type ByteRange = { start: number; end: number }
+
+export function openProjectFile(fetchFile: (url: string) => Promise<Response>): OpenProjectFile {
+  return async (file) => {
+    const [info, probe] = await Promise.all([stat(file), fetchFile(pathToFileURL(file).toString())])
+    void probe.body?.cancel()
+    return {
+      size: info.size,
+      contentType: probe.headers.get('content-type'),
+      slice: (start, end) => (end < start ? '' : (Readable.toWeb(createReadStream(file, { start, end })) as ReadableStream)),
+    }
+  }
+}
+
+function parseByteRange(header: string | null, size: number): ByteRange | 'unsatisfiable' | null {
+  const match = header === null ? null : /^bytes=(\d*)-(\d*)$/.exec(header.trim())
+  if (!match || (match[1] === '' && match[2] === '')) return null
+  if (match[1] === '') {
+    const length = Number(match[2])
+    return length === 0 || size === 0 ? 'unsatisfiable' : { start: Math.max(0, size - length), end: size - 1 }
+  }
+  const start = Number(match[1])
+  if (match[2] !== '' && Number(match[2]) < start) return null
+  if (start >= size) return 'unsatisfiable'
+  return { start, end: match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1) }
+}
+
+async function respondWithFile(file: string, rangeHeader: string | null, openFile: OpenProjectFile): Promise<Response> {
+  const opened = await openFile(file)
+  const headers: Record<string, string> = { 'Accept-Ranges': 'bytes' }
+  if (opened.contentType) headers['Content-Type'] = opened.contentType
+  const range = parseByteRange(rangeHeader, opened.size)
+  if (range === 'unsatisfiable') {
+    return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${opened.size}` } })
+  }
+  if (!range) {
+    return new Response(opened.slice(0, opened.size - 1), { status: 200, headers: { ...headers, 'Content-Length': String(opened.size) } })
+  }
+  return new Response(opened.slice(range.start, range.end), {
+    status: 206,
+    headers: {
+      ...headers,
+      'Content-Range': `bytes ${range.start}-${range.end}/${opened.size}`,
+      'Content-Length': String(range.end - range.start + 1),
+    },
+  })
+}
+
 export async function serveProjectRequest(
-  requestUrl: string,
+  request: ProjectRequest,
   roots: ProjectRoots,
-  readFile: (file: string) => Promise<Response>,
+  openFile: OpenProjectFile,
+  canvasShellDir: string,
 ): Promise<Response> {
-  const result = await roots.fileFor(new URL(requestUrl))
-  if ('file' in result) return readFile(result.file)
+  const url = new URL(request.url)
+  const range = request.headers.get('range')
+  if (url.pathname.startsWith(CANVAS_RESERVED_PREFIX)) {
+    const name = url.pathname.slice(CANVAS_RESERVED_PREFIX.length)
+    if (!roots.has(url.hostname)) return new Response('Forbidden', { status: 403 })
+    if (!CANVAS_SHELL_FILES.includes(name)) return new Response('Not found', { status: 404 })
+    return respondWithFile(path.join(canvasShellDir, name), range, openFile)
+  }
+  const result = await roots.fileFor(url)
+  if ('file' in result) return respondWithFile(result.file, range, openFile)
   return new Response(result.status === 403 ? 'Forbidden' : 'Not found', { status: result.status })
 }
 
@@ -246,6 +316,7 @@ function applyAttachPolicy(webPreferences: WebPreferences, params: AttachParams,
     allowRunningInsecureContent: false,
     experimentalFeatures: false,
     webviewTag: false,
+    transparent: false,
     zoomFactor: 1,
   })
   return true
@@ -267,7 +338,9 @@ export type GuestLike = {
 export type SelectionMenuItem = { label: string; click(): void }
 export type SelectionMenuLabels = { addToChat: string; copy: string }
 
-type ContextMenuParams = { selectionText: string; frame?: { parent: unknown } | null }
+type FrameLike = { parent: unknown; url: string; executeJavaScript(code: string): Promise<unknown> }
+
+type ContextMenuParams = { selectionText: string; frame?: FrameLike | null }
 
 type BrowserHostLike = {
   on(event: string, listener: Listener): unknown
@@ -280,14 +353,15 @@ export type BrowserSessionLike = {
   setPermissionCheckHandler(handler: () => boolean): void
   setDevicePermissionHandler(handler: () => boolean): void
   setDisplayMediaRequestHandler(handler: (request: unknown, callback: (streams: Record<string, never>) => void) => void): void
-  protocol: { handle(scheme: string, handler: (request: { url: string }) => Promise<Response>): void }
+  protocol: { handle(scheme: string, handler: (request: ProjectRequest) => Promise<Response>): void }
 }
 
 type BrowserDeps = {
   host: BrowserHostLike
   session: BrowserSessionLike
   roots: ProjectRoots
-  readFile: (file: string) => Promise<Response>
+  openFile: OpenProjectFile
+  canvasShellDir: string
   notify: (event: string, payload: unknown) => void
   popupMenu: (items: SelectionMenuItem[]) => void
   menuLabels: () => SelectionMenuLabels | null
@@ -318,11 +392,36 @@ async function touchesSensitiveField(guest: GuestLike) {
   }
 }
 
+function isSameOriginFrame(frame: FrameLike, guest: GuestLike) {
+  try {
+    const frameUrl = new URL(frame.url)
+    const pageUrl = new URL(guest.getURL())
+    return frameUrl.protocol === pageUrl.protocol && frameUrl.host === pageUrl.host
+  } catch {
+    return false
+  }
+}
+
+async function frameTitle(frame: FrameLike) {
+  try {
+    const title = await frame.executeJavaScript('document.title')
+    return typeof title === 'string' ? title : ''
+  } catch (error) {
+    console.warn('[browser] reading the frame title failed', error)
+    return ''
+  }
+}
+
 async function offerSelection(guest: GuestLike, params: ContextMenuParams, deps: BrowserDeps) {
-  const capture = normalizeBrowserSelection({ text: params.selectionText, title: guest.getTitle(), url: guest.getURL() })
+  const frame = params.frame?.parent ? params.frame : null
+  const selectable = !frame || isSameOriginFrame(frame, guest)
+  const capture = normalizeBrowserSelection({
+    text: params.selectionText,
+    title: frame && selectable ? await frameTitle(frame) : guest.getTitle(),
+    url: frame && selectable ? frame.url : guest.getURL(),
+  })
   if (!capture) return
-  const inMainFrame = !params.frame?.parent
-  const allowAdd = inMainFrame && !(await touchesSensitiveField(guest))
+  const allowAdd = selectable && !(await touchesSensitiveField(guest))
   const labels = deps.menuLabels()
   if (!labels) return
   deps.popupMenu([
@@ -377,13 +476,13 @@ export function chromeUserAgent(userAgent: string) {
 }
 
 export function installBrowser(deps: BrowserDeps) {
-  const { host, session, roots, readFile } = deps
+  const { host, session, roots, openFile, canvasShellDir } = deps
   session.setUserAgent(chromeUserAgent(session.getUserAgent()))
   session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   session.setPermissionCheckHandler(() => false)
   session.setDevicePermissionHandler(() => false)
   session.setDisplayMediaRequestHandler((_request, callback) => callback({}))
-  session.protocol.handle(PROJECT_SCHEME, (request) => serveProjectRequest(request.url, roots, readFile))
+  session.protocol.handle(PROJECT_SCHEME, (request) => serveProjectRequest(request, roots, openFile, canvasShellDir))
   host.on('will-attach-webview', ((event: PreventableEvent, webPreferences: WebPreferences, params: AttachParams) => {
     if (!applyAttachPolicy(webPreferences, params, roots)) event.preventDefault()
   }) as Listener)

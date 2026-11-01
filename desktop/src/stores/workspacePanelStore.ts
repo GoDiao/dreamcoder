@@ -6,7 +6,10 @@ import {
   type WorkspaceStatusResult,
   type WorkspaceTreeResult,
 } from '../api/sessions'
+import { artifactsApi } from '../api/artifacts'
+import { designApi } from '../api/design'
 import { closeBrowser, submitBrowserInput } from '../lib/browserGuests'
+import type { ArtifactListItem } from '../types/artifact'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
@@ -37,21 +40,26 @@ export type WorkspacePreviewEntry = {
   size?: number
 }
 
+export type BrowserTabArtifact = { id: string; name: string; mtimeMs: number; canvas?: true; board?: string }
+
+export type BrowserTabTemplate = { id: string }
+
 export type WorkspaceTab =
   | { id: string; kind: 'launcher' }
   | { id: string; kind: 'changes' }
   | { id: string; kind: 'files' }
+  | { id: string; kind: 'artifacts' }
   | { id: string; kind: 'file'; path: string }
-  | { id: string; kind: 'browser'; url: string; title: string }
+  | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { id: string; kind: 'terminal'; index: number; shell?: string }
   | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
 
 export type WorkspaceTabKind = WorkspaceTab['kind']
 
 export type WorkspaceTabTarget =
-  | { kind: 'launcher' | 'changes' | 'files' | 'terminal' }
+  | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' | 'terminal' }
   | { kind: 'file'; path: string }
-  | { kind: 'browser'; url: string }
+  | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { kind: 'uiPage'; pageId: string; revision: number; title: string }
 
 export type WorkspacePanelSessionState = {
@@ -90,6 +98,8 @@ type WorkspacePanelStore = {
   getActiveTab: (sessionId: string) => WorkspaceTab | null
   openTab: (sessionId: string, target: WorkspaceTabTarget) => string
   openAddress: (sessionId: string, input: string, projectRoot: string | null) => Promise<void>
+  openArtifact: (sessionId: string, item: Pick<ArtifactListItem, 'name' | 'latestMtimeMs' | 'id'> & Partial<Pick<ArtifactListItem, 'manifest'>>, root: string) => Promise<void>
+  openTemplatePreview: (sessionId: string, templateId: string) => Promise<void>
   activateTab: (sessionId: string, tabId: string) => void
   closeTab: (sessionId: string, tabId: string) => void
   patchTab: (sessionId: string, tabId: string, patch: WorkspaceTabPatch) => void
@@ -109,7 +119,7 @@ type WorkspacePanelStore = {
   clearSession: (sessionId: string) => void
 }
 
-type WorkspaceTabPatch = { url?: string; title?: string; shell?: string }
+type WorkspaceTabPatch = { url?: string; title?: string; shell?: string; artifact?: BrowserTabArtifact }
 
 const PANEL_STORAGE_KEY = 'dreamcoder-workspace-panels'
 const MAX_RECENT_FILES = 8
@@ -215,11 +225,15 @@ function isSameTarget(tab: WorkspaceTab, target: WorkspaceTabTarget) {
   switch (target.kind) {
     case 'changes':
     case 'files':
+    case 'artifacts':
       return tab.kind === target.kind
     case 'file':
       return tab.kind === 'file' && tab.path === target.path
     case 'uiPage':
       return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision
+    case 'browser':
+      if (target.artifact !== undefined) return tab.kind === 'browser' && tab.artifact?.id === target.artifact.id && tab.artifact.board === target.artifact.board
+      return target.template !== undefined && tab.kind === 'browser' && tab.template?.id === target.template.id
     default:
       return false
   }
@@ -231,7 +245,15 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
     case 'file':
       return { id, kind: 'file', path: target.path }
     case 'browser':
-      return { id, kind: 'browser', url: target.url, title: '' }
+      return {
+        id,
+        kind: 'browser',
+        url: target.url,
+        title: '',
+        ...(target.root !== undefined && { root: target.root }),
+        ...(target.artifact !== undefined && { artifact: target.artifact }),
+        ...(target.template !== undefined && { template: target.template }),
+      }
     case 'uiPage':
       return { id, kind: 'uiPage', pageId: target.pageId, revision: target.revision, title: target.title }
     case 'terminal': {
@@ -261,6 +283,18 @@ export function getShellDisplayName(shell: string | undefined) {
 
 type StoredPanel = Pick<WorkspacePanelSessionState, 'isOpen' | 'tabs' | 'activeTabId' | 'recentFiles'>
 
+function isStoredBrowserTabArtifact(value: unknown): value is BrowserTabArtifact {
+  if (!value || typeof value !== 'object') return false
+  const artifact = value as Record<string, unknown>
+  return typeof artifact.id === 'string' && typeof artifact.name === 'string' && typeof artifact.mtimeMs === 'number'
+    && (artifact.board === undefined || typeof artifact.board === 'string')
+    && (artifact.canvas === undefined || artifact.canvas === true)
+}
+
+function isStoredBrowserTabTemplate(value: unknown): value is BrowserTabTemplate {
+  return !!value && typeof value === 'object' && typeof (value as Record<string, unknown>).id === 'string'
+}
+
 function isStoredTab(value: unknown): value is WorkspaceTab {
   if (!value || typeof value !== 'object') return false
   const tab = value as Record<string, unknown>
@@ -269,11 +303,15 @@ function isStoredTab(value: unknown): value is WorkspaceTab {
     case 'launcher':
     case 'changes':
     case 'files':
+    case 'artifacts':
       return true
     case 'file':
       return typeof tab.path === 'string'
     case 'browser':
       return typeof tab.url === 'string' && typeof tab.title === 'string'
+        && (tab.root === undefined || typeof tab.root === 'string')
+        && (tab.artifact === undefined || isStoredBrowserTabArtifact(tab.artifact))
+        && (tab.template === undefined || isStoredBrowserTabTemplate(tab.template))
     case 'uiPage':
       return typeof tab.pageId === 'string' && typeof tab.revision === 'number' && typeof tab.title === 'string'
     default:
@@ -383,6 +421,31 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     }
     const tabId = get().openTab(sessionId, { kind: 'browser', url: '' })
     await submitBrowserInput(sessionId, tabId, value, projectRoot)
+  },
+
+  openArtifact: async (sessionId, item, root) => {
+    if (!item.id) throw new Error('This artifact has no id')
+    const target: WorkspaceTabTarget = { kind: 'browser', url: '', root, artifact: { id: item.id, name: item.name, mtimeMs: item.latestMtimeMs, ...(item.manifest?.kind === 'canvas' && { canvas: true as const }) } }
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
+      get().openTab(sessionId, target)
+      return
+    }
+    const opened = await artifactsApi.open(root, item.name)
+    const tabId = get().openTab(sessionId, target)
+    await submitBrowserInput(sessionId, tabId, opened.filePath, opened.rootDir)
+  },
+
+  openTemplatePreview: async (sessionId, templateId) => {
+    const target: WorkspaceTabTarget = { kind: 'browser', url: '', template: { id: templateId } }
+    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
+      get().openTab(sessionId, target)
+      return
+    }
+    const opened = await designApi.preview(templateId)
+    const tabId = get().openTab(sessionId, { ...target, root: opened.rootDir })
+    await submitBrowserInput(sessionId, tabId, opened.filePath, opened.rootDir)
   },
 
   activateTab: (sessionId, tabId) =>

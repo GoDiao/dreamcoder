@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
-} from './windowsDrivePath.js'
+} from '../../utils/windowsDrivePath.js'
 
 const registeredRoots = new Set<string>()
 

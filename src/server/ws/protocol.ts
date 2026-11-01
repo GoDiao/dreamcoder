@@ -111,6 +111,7 @@ export type ServerMessage =
   | { type: 'team_created'; teamName: string }
   | { type: 'team_deleted'; teamName: string }
   | { type: 'task_update'; taskId: string; status: string; progress?: string }
+  | { type: 'artifact_written'; path: string; toolName: string; agentId?: string }
 
 export type TokenUsage = {
   input_tokens: number

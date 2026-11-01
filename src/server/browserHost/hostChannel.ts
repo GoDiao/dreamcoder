@@ -8,6 +8,7 @@ import {
   BROWSER_HOST_CLOSE_UNAUTHORIZED,
   BROWSER_HOST_HELLO_TIMEOUT_MS,
   BROWSER_HOST_PROTOCOL_VERSION,
+  type BackgroundBrowserCommand,
   type BrowserDialogRecord,
   type BrowserGrantDecision,
   type BrowserHostCommand,
@@ -68,6 +69,10 @@ type Pending = {
 type HostSocket = ServerWebSocket<BrowserHostSocketData>
 
 export type BrowserGrantReply = { requestId: string; decision: BrowserGrantDecision }
+
+export type BackgroundBrowserEvent =
+  | { kind: 'cdp'; session: string; target: string; method: string; params: unknown }
+  | { kind: 'closed'; session: string; target: string }
 
 export type BrowserTrustRequest = { op: BrowserTrustOp; origin?: string }
 
@@ -197,6 +202,17 @@ export function parseBrowserHostInbound(raw: string): BrowserHostInbound | null 
       expiresAt: value.expiresAt,
     }
   }
+  if (
+    value.type === 'background_event' &&
+    isBoundedString(value.session, MAX_ID_LENGTH) &&
+    isBoundedString(value.target, MAX_ID_LENGTH) &&
+    isBoundedString(value.method, MAX_ID_LENGTH)
+  ) {
+    return { type: 'background_event', session: value.session, target: value.target, method: value.method, params: value.params }
+  }
+  if (value.type === 'background_closed' && isBoundedString(value.session, MAX_ID_LENGTH) && isBoundedString(value.target, MAX_ID_LENGTH)) {
+    return { type: 'background_closed', session: value.session, target: value.target }
+  }
   if (value.type === 'result' && typeof value.id === 'string') {
     const dialogs = isDialogRecords(value.dialogs) ? value.dialogs : undefined
     if (value.ok === true) return { type: 'result', id: value.id, ok: true, value: value.value, dialogs }
@@ -238,6 +254,8 @@ export class BrowserHostChannel {
   private readonly viewListeners = new Set<() => void>()
   private readonly stopListeners = new Set<(sessionId: string) => void>()
   private readonly grantReplyListeners = new Set<(reply: BrowserGrantReply) => void>()
+  private readonly disconnectListeners = new Set<() => void>()
+  private readonly backgroundListeners = new Set<(event: BackgroundBrowserEvent) => void>()
   private trustHandler: BrowserTrustHandler | null = null
   private pickHandler: BrowserPickHandler | null = null
   private marksHandler: BrowserMarksHandler | null = null
@@ -276,6 +294,20 @@ export class BrowserHostChannel {
     this.grantReplyListeners.add(listener)
     return () => {
       this.grantReplyListeners.delete(listener)
+    }
+  }
+
+  onDisconnect(listener: () => void) {
+    this.disconnectListeners.add(listener)
+    return () => {
+      this.disconnectListeners.delete(listener)
+    }
+  }
+
+  onBackgroundEvent(listener: (event: BackgroundBrowserEvent) => void) {
+    this.backgroundListeners.add(listener)
+    return () => {
+      this.backgroundListeners.delete(listener)
     }
   }
 
@@ -322,6 +354,10 @@ export class BrowserHostChannel {
       void this.answerMarks(message)
     } else if (message.type === 'result') {
       this.settle(message)
+    } else if (message.type === 'background_event') {
+      this.backgroundListeners.forEach(listener => listener({ kind: 'cdp', session: message.session, target: message.target, method: message.method, params: message.params }))
+    } else if (message.type === 'background_closed') {
+      this.backgroundListeners.forEach(listener => listener({ kind: 'closed', session: message.session, target: message.target }))
     }
   }
 
@@ -334,19 +370,41 @@ export class BrowserHostChannel {
     const pending = Array.from(this.pending.values())
     this.pending.clear()
     for (const entry of pending) entry.reject(new BrowserHostError('disconnected', DISCONNECTED_MESSAGE))
+    this.disconnectListeners.forEach(listener => listener())
   }
 
   request<K extends BrowserHostCommand['kind']>(
     command: Extract<BrowserHostCommand, { kind: K }>,
     options: BrowserHostRequestOptions,
   ): Promise<BrowserHostResponse<K>> {
+    return this.dispatch<BrowserHostResponse<K>>(
+      id => ({
+        type: 'command',
+        id,
+        tabId: options.tabId,
+        ...(options.expectGeneration === undefined ? {} : { expectGeneration: options.expectGeneration }),
+        command,
+      }),
+      options,
+    )
+  }
+
+  async requestBackground(
+    command: BackgroundBrowserCommand,
+    options: Pick<BrowserHostRequestOptions, 'signal' | 'timeoutMs'> = {},
+  ): Promise<unknown> {
+    const response = await this.dispatch<{ value: unknown }>(id => ({ type: 'background', id, command }), { tabId: null, ...options })
+    return response.value
+  }
+
+  private dispatch<R>(build: (id: string) => BrowserHostMessage, options: Pick<BrowserHostRequestOptions, 'signal' | 'timeoutMs'>): Promise<R> {
     if (!this.isConnected()) return Promise.reject(new BrowserHostError('no_host', NO_HOST_MESSAGE))
     if (options.signal?.aborted) {
       return Promise.reject(new BrowserHostError('cancelled', '[browser.cancelled] The browser call was cancelled before it started.'))
     }
     const id = crypto.randomUUID()
     const timeoutMs = options.timeoutMs ?? BROWSER_COMMAND_TIMEOUT_MS
-    return new Promise<BrowserHostResponse<K>>((resolve, reject) => {
+    return new Promise<R>((resolve, reject) => {
       const finish = () => {
         clearTimeout(timer)
         options.signal?.removeEventListener('abort', onAbort)
@@ -378,20 +436,14 @@ export class BrowserHostChannel {
       this.pending.set(id, {
         resolve: (response) => {
           finish()
-          resolve(response as BrowserHostResponse<K>)
+          resolve(response as R)
         },
         reject: (error) => {
           finish()
           reject(error)
         },
       })
-      this.send({
-        type: 'command',
-        id,
-        tabId: options.tabId,
-        ...(options.expectGeneration === undefined ? {} : { expectGeneration: options.expectGeneration }),
-        command,
-      })
+      this.send(build(id))
     })
   }
 

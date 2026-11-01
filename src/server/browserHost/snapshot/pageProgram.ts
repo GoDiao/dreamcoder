@@ -1276,8 +1276,9 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     const tag = picked.localName
     const label = labelOf(picked)
     const selector = selectorOf(picked)
+    const ownerDocument = picked.ownerDocument
     if (containsSensitive(picked)) {
-      return { ref, url: location.href, title: document.title, tag, label, selector, sensitive: true, truncated: false }
+      return { ref, url: ownerDocument.location.href, title: ownerDocument.title, tag, label, selector, sensitive: true, truncated: false }
     }
     let truncated = false
     const cut = (value: string, max: number): string => {
@@ -1297,8 +1298,8 @@ export function pageProgram(op: PageProgramOp, args: PageProgramArgs, target?: E
     const href = picked.getAttribute('href') !== null ? (picked as HTMLAnchorElement).href : ''
     return {
       ref,
-      url: location.href,
-      title: document.title,
+      url: ownerDocument.location.href,
+      title: ownerDocument.title,
       tag,
       label,
       selector,

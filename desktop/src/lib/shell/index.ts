@@ -2,6 +2,9 @@ import type { BrowserGrantDecision, BrowserPickValue } from '../../../../src/ser
 import type { AppMode, AppModeConfig, BrowserSearchEngineId } from '../../types/settings'
 import {
   ELECTRON_BRIDGE_KEY,
+  type BrowserExportFormat,
+  type BrowserExportMessages,
+  type BrowserExportResult,
   type BrowserRefusal,
   type BrowserResolveResult,
   type ElectronDialogFilter,
@@ -153,6 +156,7 @@ export type BrowserViewRegistration = { sessionId: string; tabId: string; webCon
 export type BrowserViewState = { tabId: string; shown: boolean; active: boolean; foreground: boolean }
 export type BrowserOpenTabRequest = { requestId: string; sessionId: string; url: string | null }
 export type BrowserActivateRequest = { requestId: string; tabId: string }
+export type BrowserCloseTabRequest = { requestId: string; tabId: string }
 export type { BrowserGrantDecision }
 
 function hasBridge() {
@@ -203,6 +207,23 @@ export function finishBrowserActivate(input: { requestId: string; shown: boolean
   return invokeInDesktop('browser_activate_done', input)
 }
 
+export function finishBrowserCloseTab(input: { requestId: string; closed: boolean }) {
+  return invokeInDesktop('browser_close_tab_done', input)
+}
+
+export function captureBrowserThumbnail(input: { webContentsId: number }) {
+  return invoke<string>('browser_capture_thumbnail', input)
+}
+
+export function exportBrowserPage(input: {
+  webContentsId: number
+  format: BrowserExportFormat
+  suggestedName: string
+  messages: BrowserExportMessages
+}) {
+  return invoke<BrowserExportResult>('browser_export_page', input)
+}
+
 export function replyBrowserGrant(input: { requestId: string; decision: BrowserGrantDecision }) {
   return invoke<void>('browser_grant_reply', input)
 }
@@ -225,6 +246,10 @@ export function onBrowserOpenTabRequest(handler: (request: BrowserOpenTabRequest
 
 export function onBrowserActivateRequest(handler: (request: BrowserActivateRequest) => void) {
   return listenInDesktop<BrowserActivateRequest>('browser-activate-request', handler)
+}
+
+export function onBrowserCloseTabRequest(handler: (request: BrowserCloseTabRequest) => void) {
+  return listenInDesktop<BrowserCloseTabRequest>('browser-close-tab-request', handler)
 }
 
 export function onBrowserBlocked(handler: (event: BrowserBlockedEvent) => void): Promise<Unlisten> {

@@ -1,5 +1,14 @@
 import { randomBytes } from 'node:crypto'
 
+export function bearerToken(request: Request): string | null {
+  const [scheme, token] = (request.headers.get('authorization') ?? '').split(' ')
+  return scheme?.toLowerCase() === 'bearer' && token ? token : null
+}
+
+export function unauthorizedResponse(): Response {
+  return Response.json({ error: 'Unauthorized' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } })
+}
+
 export class BrowserSessionTokens {
   private readonly tokenBySession = new Map<string, string>()
   private readonly sessionByToken = new Map<string, string>()

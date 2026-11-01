@@ -1493,6 +1493,7 @@ describe('WorkspacePanel', () => {
     const launcher = within(view.getByTestId('workspace-launcher'))
     expect(launcher.getByRole('textbox', { name: 'Address' }).getAttribute('placeholder')).toBe('Enter a file path')
     expect(launcher.queryByRole('button', { name: 'Terminal' })).toBeNull()
+    expect(launcher.queryByRole('button', { name: 'Artifacts' })).toBeNull()
 
     await clickElement(launcher.getByRole('button', { name: /Plan/ }))
     expect(view.getByRole('tab', { name: 'Plan · rev 2' }).getAttribute('aria-selected')).toBe('true')
@@ -1513,6 +1514,7 @@ describe('WorkspacePanel', () => {
     const view = await renderPanel('session-desktop')
     const launcher = within(view.getByTestId('workspace-launcher'))
     expect(launcher.getByRole('textbox', { name: 'Address' }).getAttribute('placeholder')).toBe('Enter a URL or a file path')
+    expect(launcher.getByRole('button', { name: 'Artifacts' })).toBeTruthy()
     await clickElement(launcher.getByRole('button', { name: 'Terminal' }))
 
     expect(view.getByRole('tab', { name: 'Terminal 1' }).getAttribute('aria-selected')).toBe('true')

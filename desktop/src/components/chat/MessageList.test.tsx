@@ -277,6 +277,29 @@ describe('MessageList nested tool calls', () => {
     })
   })
 
+  it('treats an unresolved ChooseDesignTemplate card like an unresolved AskUserQuestion card', () => {
+    const input = { candidates: [{ id: 'saas', reason: 'a landing page' }, { id: 'app-a', reason: 'an app' }] }
+    const messages: UIMessage[] = [
+      { id: 'stale-pick', type: 'tool_use', toolName: 'ChooseDesignTemplate', toolUseId: 'stale-tool', input, timestamp: 1 },
+      { id: 'active-pick', type: 'tool_use', toolName: 'ChooseDesignTemplate', toolUseId: 'active-tool', input, timestamp: 2 },
+    ]
+
+    const { renderItems } = buildRenderModel(messages, 'active-tool')
+
+    expect(renderItems).toHaveLength(1)
+    expect(renderItems[0]).toMatchObject({ kind: 'message', message: { toolName: 'ChooseDesignTemplate', toolUseId: 'active-tool' } })
+  })
+
+  it('keeps the latest unresolved question card of either kind when no permission is active', () => {
+    const ask: UIMessage = { id: 'ask', type: 'tool_use', toolName: 'AskUserQuestion', toolUseId: 'ask-tool', input: { questions: [] }, timestamp: 1 }
+    const pick: UIMessage = { id: 'pick', type: 'tool_use', toolName: 'ChooseDesignTemplate', toolUseId: 'pick-tool', input: { candidates: [] }, timestamp: 2 }
+
+    const { renderItems } = buildRenderModel([ask, pick], null)
+
+    expect(renderItems).toHaveLength(1)
+    expect(renderItems[0]).toMatchObject({ message: { toolUseId: 'pick-tool' } })
+  })
+
   it('keeps resolved AskUserQuestion history visible when filtering active duplicates', () => {
     const messages: UIMessage[] = [
       {

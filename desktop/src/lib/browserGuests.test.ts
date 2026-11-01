@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BROWSER_PARTITION } from './shell/electronBridge'
 
+const artifactApiMocks = vi.hoisted(() => ({ open: vi.fn(), openById: vi.fn(), previewTemplate: vi.fn() }))
+
+vi.mock('../api/artifacts', () => ({ artifactsApi: { open: artifactApiMocks.open, openById: artifactApiMocks.openById } }))
+vi.mock('../api/design', () => ({ designApi: { preview: artifactApiMocks.previewTemplate } }))
+
 const shellMocks = vi.hoisted(() => ({
   resolveBrowserInput: vi.fn(),
   registerBrowserView: vi.fn(),
@@ -21,13 +26,18 @@ import {
   browserReload,
   closeBrowser,
   openBrowserUrl,
+  canvasBoardLabel,
   placeBrowserGuest,
+  refreshCanvas,
   replayBrowserShortcut,
+  resolveStoredBrowserUrl,
   setBrowserGuestLayer,
+  setCanvasMessageHandler,
   showBlockedNavigation,
   submitBrowserInput,
 } from './browserGuests'
 import { useBrowserStore } from '../stores/browserStore'
+import { useUIStore } from '../stores/uiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
@@ -71,7 +81,7 @@ function webviewOf(tabId: string) {
   return { slot, webview }
 }
 
-function makeReady(tabId: string, state: { url?: string; id?: number } = {}) {
+function makeReady(tabId: string, state: { url?: string; id?: number; execute?: (code: string) => Promise<unknown> } = {}) {
   const { webview } = webviewOf(tabId)
   Object.assign(webview, {
     loadURL: vi.fn(async () => {}),
@@ -83,6 +93,7 @@ function makeReady(tabId: string, state: { url?: string; id?: number } = {}) {
     canGoBack: vi.fn(() => true),
     canGoForward: vi.fn(() => false),
     getWebContentsId: vi.fn(() => state.id ?? 11),
+    executeJavaScript: state.execute ?? vi.fn(async () => undefined),
   })
   webview.dispatchEvent(new Event('dom-ready'))
   return webview
@@ -131,6 +142,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   useBrowserStore.setState(useBrowserStore.getInitialState(), true)
   useWorkspacePanelStore.setState({ panelBySession: {} })
+  useWorkspaceChatContextStore.setState(useWorkspaceChatContextStore.getInitialState(), true)
   useSettingsStore.setState(useSettingsStore.getInitialState(), true)
   localStorage.clear()
   vi.unstubAllGlobals()
@@ -281,15 +293,15 @@ describe('browser guests', () => {
     })
   })
 
-  it('adds a selection from the main process to the session that owns the guest', () => {
+  it('adds a selection from the main process to the session that owns the guest', async () => {
     openBrowserUrl('s', 'a', 'https://example.com/')
     openBrowserUrl('t', 'b', 'https://b.test/')
     makeReady('a', { id: 11 })
     makeReady('b', { id: 22 })
 
-    addBrowserSelectionToChat({ guestId: 22, text: ' picked  text ', truncated: false, title: 'B page', url: 'https://b.test/x' })
-    addBrowserSelectionToChat({ guestId: 99, text: 'nobody', truncated: false, title: '', url: '' })
-    addBrowserSelectionToChat({ guestId: 11, text: '   ', truncated: false, title: '', url: '' })
+    await addBrowserSelectionToChat({ guestId: 22, text: ' picked  text ', truncated: false, title: 'B page', url: 'https://b.test/x' })
+    await addBrowserSelectionToChat({ guestId: 99, text: 'nobody', truncated: false, title: '', url: '' })
+    await addBrowserSelectionToChat({ guestId: 11, text: '   ', truncated: false, title: '', url: '' })
 
     const references = useWorkspaceChatContextStore.getState().referencesBySession
     expect(references.s).toBeUndefined()
@@ -508,3 +520,277 @@ describe('app interaction while a page is shown', () => {
     document.removeEventListener('keydown', handler)
   })
 })
+
+describe('resolveStoredBrowserUrl', () => {
+  it('leaves web addresses alone', async () => {
+    expect(await resolveStoredBrowserUrl({ url: 'https://example.com/a' }, '/repo')).toBe('https://example.com/a')
+    expect(shellMocks.resolveBrowserInput).not.toHaveBeenCalled()
+  })
+
+  it('rebuilds a project page address from the stored root after a restart', async () => {
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://fresh/report/a%20b.html' })
+    const url = await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/report/a%20b.html', root: '/other/dc_artifacts' }, '/repo')
+
+    expect(url).toBe('dreamcoder-project://fresh/report/a%20b.html')
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith({
+      input: '/other/dc_artifacts/report/a b.html',
+      projectRoot: '/other/dc_artifacts',
+      searchEngine: 'bing',
+    })
+  })
+
+  it('uses the session folder for a project page that has no stored root', async () => {
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://fresh/docs/index.html' })
+    await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/docs/index.html' }, '/repo/')
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith(expect.objectContaining({ input: '/repo/docs/index.html', projectRoot: '/repo/' }))
+  })
+
+  it('finds an artifact by id when its stored root is gone, keeping the path inside the artifact', async () => {
+    artifactApiMocks.openById.mockResolvedValue({ rootDir: '/config/global/dc_artifacts', filePath: '/config/global/dc_artifacts/moved-2/index.html' })
+    shellMocks.resolveBrowserInput
+      .mockResolvedValueOnce({ ok: false, reason: 'notFound' })
+      .mockResolvedValueOnce({ ok: true, url: 'dreamcoder-project://fresh/moved-2/pages/b.html' })
+
+    const url = await resolveStoredBrowserUrl(
+      { url: 'dreamcoder-project://stale/moved/pages/b.html', root: '/gone/dc_artifacts', artifact: { id: 'stable-id' } },
+      '/repo',
+    )
+
+    expect(url).toBe('dreamcoder-project://fresh/moved-2/pages/b.html')
+    expect(artifactApiMocks.openById).toHaveBeenCalledWith('stable-id')
+    expect(shellMocks.resolveBrowserInput).toHaveBeenLastCalledWith(expect.objectContaining({
+      input: '/config/global/dc_artifacts/moved-2/pages/b.html',
+      projectRoot: '/config/global/dc_artifacts',
+    }))
+  })
+
+  it('finds a template preview by id when the app moved and its stored root is gone', async () => {
+    artifactApiMocks.previewTemplate.mockResolvedValue({ rootDir: '/new/design-templates/saas', filePath: '/new/design-templates/saas/index.html' })
+    shellMocks.resolveBrowserInput
+      .mockResolvedValueOnce({ ok: false, reason: 'notFound' })
+      .mockResolvedValueOnce({ ok: true, url: 'dreamcoder-project://fresh/index.html' })
+
+    const url = await resolveStoredBrowserUrl(
+      { url: 'dreamcoder-project://stale/index.html', root: '/old/design-templates/saas', template: { id: 'saas' } },
+      '/repo',
+    )
+
+    expect(url).toBe('dreamcoder-project://fresh/index.html')
+    expect(artifactApiMocks.previewTemplate).toHaveBeenCalledWith('saas')
+    expect(shellMocks.resolveBrowserInput).toHaveBeenLastCalledWith(expect.objectContaining({
+      input: '/new/design-templates/saas/index.html',
+      projectRoot: '/new/design-templates/saas',
+    }))
+  })
+
+  it('goes straight to the id for an artifact in the global store marker', async () => {
+    artifactApiMocks.openById.mockResolvedValue({ rootDir: '/config/global/dc_artifacts', filePath: '/config/global/dc_artifacts/moved/index.html' })
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://fresh/moved/index.html' })
+
+    await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/moved/index.html', root: 'global', artifact: { id: 'x' } }, '/repo')
+
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledTimes(1)
+    expect(artifactApiMocks.openById).toHaveBeenCalledWith('x')
+  })
+
+  it('keeps the stored address when there is no root to resolve against or the page is gone', async () => {
+    expect(await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/a.html' }, null)).toBe('dreamcoder-project://stale/a.html')
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: false, reason: 'notFound' })
+    expect(await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/a.html', root: '/r' }, null)).toBe('dreamcoder-project://stale/a.html')
+  })
+})
+
+describe('a page that belongs to no chat', () => {
+  it('is never registered with the browser host, so no chat or agent can reach it', async () => {
+    openBrowserUrl(null, 'viewer', 'https://example.com/')
+    makeReady('viewer', { id: 31 })
+    await Promise.resolve()
+
+    expect(shellMocks.registerBrowserView).not.toHaveBeenCalled()
+    expect(shellMocks.updateBrowserView).not.toHaveBeenCalled()
+  })
+
+  it('does not touch any panel tab or chat context when it navigates, is closed or has text selected', () => {
+    openBrowserUrl(null, 'viewer', 'https://example.com/')
+    const webview = makeReady('viewer', { id: 31 })
+    const panels = useWorkspacePanelStore.getState().panelBySession
+    const references = useWorkspaceChatContextStore.getState().referencesBySession
+
+    webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'https://example.com/next' }))
+    addBrowserSelectionToChat({ guestId: 31, text: 'picked', truncated: false, title: 'T', url: 'https://example.com/' })
+    closeBrowser('viewer')
+
+    expect(useWorkspacePanelStore.getState().panelBySession).toBe(panels)
+    expect(useWorkspaceChatContextStore.getState().referencesBySession).toBe(references)
+  })
+
+  it('opens an address like any other page', async () => {
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://id/a/index.html' })
+    await submitBrowserInput(null, 'viewer', '/repo/dc_artifacts/a/index.html', '/repo/dc_artifacts')
+    expect(webviewOf('viewer').webview.getAttribute('src')).toBe('dreamcoder-project://id/a/index.html')
+  })
+})
+
+describe('canvas pages', () => {
+  const SCRIPT = 'dreamcoder-project://abc/__dreamcoder__/canvas.js'
+  const log = (webview: HTMLElement, message: string, sourceId: string) => webview.dispatchEvent(Object.assign(new Event('console-message'), { message, sourceId }))
+
+  afterEach(() => {
+    setCanvasMessageHandler('a', null)
+  })
+
+  it('passes the messages the canvas script logs to the handler of the tab', () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    const handler = vi.fn()
+    setCanvasMessageHandler('a', handler)
+    log(webviewOf('a').webview, 'dreamcoder-canvas:{"type":"open","id":"home"}', SCRIPT)
+    expect(handler).toHaveBeenCalledWith({ type: 'open', id: 'home' })
+  })
+
+  it('ignores messages from other scripts, other logs, other tabs and a tab without a handler', () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    openBrowserUrl('s', 'b', 'dreamcoder-project://abc/flow/index.html')
+    const handler = vi.fn()
+    setCanvasMessageHandler('a', handler)
+    log(webviewOf('a').webview, 'dreamcoder-canvas:{"type":"open","id":"home"}', 'dreamcoder-project://abc/flow/home.html')
+    log(webviewOf('a').webview, 'just a log', SCRIPT)
+    log(webviewOf('b').webview, 'dreamcoder-canvas:{"type":"open","id":"home"}', SCRIPT)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('stops passing messages once the handler is removed', () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    const handler = vi.fn()
+    setCanvasMessageHandler('a', handler)
+    setCanvasMessageHandler('a', null)
+    log(webviewOf('a').webview, 'dreamcoder-canvas:{"type":"open","id":"home"}', SCRIPT)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  describe('the color scheme of the canvas', () => {
+    const attach = (tabId: string, url: string) => {
+      const execute = vi.fn(async (_code: string) => undefined)
+      const webview = makeReady(tabId, { url, execute })
+      return { webview, execute }
+    }
+    const schemes = (execute: { mock: { calls: unknown[][] } }) => execute.mock.calls.map((call) => String(call[0]))
+
+    afterEach(() => {
+      useUIStore.setState({ theme: 'light' })
+      setCanvasMessageHandler('b', null)
+    })
+
+    it('sets the scheme of the app theme when a canvas page is ready, and again for every later load', () => {
+      useUIStore.setState({ theme: 'midnight' })
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      setCanvasMessageHandler('a', () => undefined)
+      const { webview, execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
+      expect(schemes(execute)).toEqual([expect.stringContaining('setScheme("dark")')])
+      webview.dispatchEvent(new Event('dom-ready'))
+      expect(execute).toHaveBeenCalledTimes(2)
+    })
+
+    it('uses light for a light theme', () => {
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      setCanvasMessageHandler('a', () => undefined)
+      const { execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
+      expect(schemes(execute)).toEqual([expect.stringContaining('setScheme("light")')])
+    })
+
+    it('does not touch pages that are not canvases', () => {
+      useUIStore.setState({ theme: 'dark' })
+      openBrowserUrl('s', 'a', 'https://example.com/')
+      const { execute } = attach('a', 'https://example.com/')
+      expect(execute).not.toHaveBeenCalled()
+    })
+
+    it('updates every ready canvas tab when the theme changes and leaves other tabs alone', () => {
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      openBrowserUrl('s', 'b', 'https://example.com/')
+      setCanvasMessageHandler('a', () => undefined)
+      const canvas = attach('a', 'dreamcoder-project://abc/flow/index.html')
+      const other = attach('b', 'https://example.com/')
+      canvas.execute.mockClear()
+      useUIStore.getState().setTheme('aurora')
+      expect(schemes(canvas.execute)).toEqual([expect.stringContaining('setScheme("dark")')])
+      useUIStore.getState().setTheme('light')
+      expect(schemes(canvas.execute)).toHaveLength(2)
+      expect(schemes(canvas.execute)[1]).toContain('setScheme("light")')
+      expect(other.execute).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when something other than the theme changes', () => {
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      setCanvasMessageHandler('a', () => undefined)
+      const { execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
+      execute.mockClear()
+      useUIStore.setState({ sidebarOpen: false })
+      expect(execute).not.toHaveBeenCalled()
+    })
+  })
+
+  it('asks a ready page to refresh its canvas and reports when it cannot', async () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    expect(await refreshCanvas('a')).toBe(false)
+    const webview = makeReady('a')
+    const execute = vi.fn(async (_code: string) => undefined)
+    Object.assign(webview, { executeJavaScript: execute })
+    expect(await refreshCanvas('a')).toBe(true)
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining('__dreamcoderCanvas'))
+    expect(execute.mock.calls[0]![0]).toContain('refresh()')
+  })
+
+  it('reports false when the page has no canvas to refresh', async () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    const webview = makeReady('a')
+    Object.assign(webview, { executeJavaScript: vi.fn(async (_code: string) => false) })
+    expect(await refreshCanvas('a')).toBe(false)
+  })
+
+  describe('the board of a selection', () => {
+    function readyCanvas(boardTitle: string | null | Error) {
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      const webview = makeReady('a', { url: 'dreamcoder-project://abc/flow/index.html' })
+      const execute = vi.fn(async (_code: string) => {
+        if (boardTitle instanceof Error) throw boardTitle
+        return boardTitle
+      })
+      Object.assign(webview, { executeJavaScript: execute })
+      setCanvasMessageHandler('a', () => undefined)
+      return execute
+    }
+
+    it('names the artifact and the board a selection came from', async () => {
+      const execute = readyCanvas('Home')
+      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBe('flow / Home')
+      expect(execute.mock.calls[0]![0]).toContain('boardTitle("dreamcoder-project://abc/flow/home.html")')
+    })
+
+    it('gives a text selection in a board that name in the chat', async () => {
+      readyCanvas('Home')
+      await addBrowserSelectionToChat({ guestId: 11, text: 'hello', truncated: false, title: 'Home page', url: 'dreamcoder-project://abc/flow/home.html' })
+      expect(useWorkspaceChatContextStore.getState().referencesBySession.s?.at(-1)?.name).toBe('flow / Home')
+    })
+
+    it('says nothing when the page is not a canvas, the url is not a board or the page cannot answer', async () => {
+      openBrowserUrl('s', 'a', 'https://example.com/')
+      makeReady('a', { url: 'https://example.com/' })
+      expect(await canvasBoardLabel('a', 'https://example.com/x')).toBeNull()
+      closeBrowser('a')
+      readyCanvas(null)
+      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/other.html')).toBeNull()
+      closeBrowser('a')
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      readyCanvas(new Error('gone'))
+      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBeNull()
+      expect(warn).toHaveBeenCalled()
+    })
+
+    it('says nothing for a tab that has no canvas handler', async () => {
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      Object.assign(makeReady('a', { url: 'dreamcoder-project://abc/flow/index.html' }), { executeJavaScript: vi.fn(async () => 'Home') })
+      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBeNull()
+    })
+  })
+})
+

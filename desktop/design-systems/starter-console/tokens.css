@@ -1,0 +1,62 @@
+/* starter-console/tokens.css
+ * Design tokens for Console: Dark graphite surfaces, a teal signal color and monospaced details for developer tools, dashboards and technical docs.
+ */
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-warm: #1c232d;
+  --fg: #e6edf3;
+  --fg-2: #c0cad6;
+  --muted: #8b98a8;
+  --meta: #6b7787;
+  --border: #2b3440;
+  --border-soft: #202833;
+  --accent: #2dd4bf;
+  --accent-on: #04201c;
+  --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+  --accent-active: color-mix(in oklab, var(--accent), black 14%);
+  --success: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+  --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --text-3xl: 40px;
+  --text-4xl: 56px;
+  --leading-body: 1.5;
+  --leading-tight: 1.1;
+  --tracking-display: -0.02em;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 80px;
+  --section-y-tablet: 56px;
+  --section-y-phone: 40px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --focus-ring: 0 0 0 3px rgba(45, 212, 191, 0.35);
+  --motion-fast: 130ms;
+  --motion-base: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --container-max: 1180px;
+  --container-gutter-desktop: 32px;
+  --container-gutter-tablet: 24px;
+  --container-gutter-phone: 16px;
+}

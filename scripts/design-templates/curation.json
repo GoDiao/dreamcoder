@@ -1,0 +1,1437 @@
+{
+  "sourceRepo": "https://github.com/nexu-io/open-design",
+  "templates": {
+    "saas-landing": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "SaaS landing page",
+        "zh": "SaaS 落地页"
+      },
+      "descriptionZh": "带主视觉、功能、口碑、定价和行动号召的单页产品介绍。",
+      "tags": [
+        "landing",
+        "marketing",
+        "saas"
+      ],
+      "prompt": {
+        "en": "Keep the page structure, section order, layout grid, spacing scale and component styles of the example. Replace the product name, headlines, copy, numbers, links and image placeholders with the user's real content; the example uses a made-up product called Filebase, and no trace of it may remain. Before finishing, check that every section still reads well with the new copy, that nothing overflows at narrow widths, and that every button and link has a purpose.",
+        "zh": "保留示例的页面结构、版块顺序、栅格、间距和组件样式。把产品名、标题、文案、数字、链接和图片占位换成用户的真实内容；示例里的 Filebase 是虚构产品，不能留下任何痕迹。完成前检查：每个版块换上新文案后仍然通顺，窄屏下没有溢出，每个按钮和链接都有用途。"
+      },
+      "style": {
+        "en": "Clean light marketing page on warm off-white with a terracotta accent, sans-serif type, generous spacing and almost no motion.",
+        "zh": "暖白底、陶土色强调、无衬线字体的简洁营销页，留白充足，几乎没有动效。"
+      }
+    },
+    "pricing-page": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Pricing page",
+        "zh": "定价页"
+      },
+      "descriptionZh": "套餐卡片、功能对比表和常见问题组成的独立定价页。",
+      "tags": [
+        "pricing",
+        "sales",
+        "comparison"
+      ],
+      "prompt": {
+        "en": "Keep the page structure, tier order, layout grid, spacing scale and component styles of the example. Replace the product name, headlines, copy, numbers, links and image placeholders with the user's real content; the example uses a made-up product called Filebase, and no trace of it may remain. Before finishing, check that every section still reads well with the new copy, that nothing overflows at narrow widths, and that every button and link has a purpose.",
+        "zh": "保留示例的页面结构、版块顺序、栅格、间距和组件样式。把产品名、标题、文案、数字、链接和图片占位换成用户的真实内容；示例里的 Filebase 是虚构产品，不能留下任何痕迹。完成前检查：每个版块换上新文案后仍然通顺，窄屏下没有溢出，每个按钮和链接都有用途。"
+      },
+      "style": {
+        "en": "Orderly light pricing layout on warm off-white with a terracotta accent, equal-width tier cards and a plain comparison table; calm and low in motion.",
+        "zh": "暖白底、陶土色强调，套餐卡片等宽、对比表朴素，整体克制安静。"
+      }
+    },
+    "docs-page": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Documentation page",
+        "zh": "文档页"
+      },
+      "descriptionZh": "左侧导航、可滚动正文和右侧目录的文档页面。",
+      "tags": [
+        "docs",
+        "engineering",
+        "guide"
+      ],
+      "prompt": {
+        "en": "Keep the layout (navigation, article, table of contents), the typographic hierarchy and the code block styling of the example. Replace the product name, section titles, article text, code samples and navigation entries with the user's real documentation; the example uses a made-up product called Filebase. Before finishing, check that the table of contents matches the headings, that code samples are correct for the user's product, and that the navigation highlights the current page.",
+        "zh": "保留示例的布局（导航、正文、目录）、字体层级和代码块样式。把产品名、章节标题、正文、代码示例和导航项换成用户真实的文档；示例里的 Filebase 是虚构产品。完成前检查：目录和标题一一对应，代码示例适用于用户的产品，导航高亮当前页面。"
+      },
+      "style": {
+        "en": "Quiet three-column documentation layout on warm off-white with monospace code blocks, a terracotta accent and fairly dense text.",
+        "zh": "暖白底三栏文档版式，代码块用等宽字体，陶土色强调，信息密度中等偏高。"
+      }
+    },
+    "blog-post": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Blog post",
+        "zh": "博客文章页"
+      },
+      "descriptionZh": "题图、数字统计、引语、作者署名和结语组成的长文页面。",
+      "tags": [
+        "article",
+        "blog",
+        "editorial"
+      ],
+      "prompt": {
+        "en": "Keep the top bar, the hero figure, the reading column width, the stat blocks, the quote treatment, the byline and the endnote of the example. Replace the headline, article text, captions, numbers, author and endnote with the user's real content, and leave image placeholders clearly marked where no image is available. Before finishing, check the reading rhythm of the whole article, the line length, and that the example's made-up company Filebase is gone.",
+        "zh": "保留示例的顶栏、题图、阅读栏宽度、数字统计块、引语样式、作者署名和结语。把标题、正文、图注、数字、作者和结语换成用户的真实内容；没有图片的地方保留明确标出的占位。完成前检查：整篇文章的阅读节奏和行宽，示例里虚构的 Filebase 已清除。"
+      },
+      "style": {
+        "en": "Editorial long-form article on warm off-white with large type, pull quotes and a terracotta accent; reading first, almost no motion.",
+        "zh": "暖白底的长文版式，大字号、引语突出、陶土色强调，以阅读为先，几乎没有动效。"
+      }
+    },
+    "mobile-onboarding": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Mobile onboarding flow",
+        "zh": "手机引导流程"
+      },
+      "descriptionZh": "三个并排的手机画面：启动页、价值介绍、登录。",
+      "tags": [
+        "mobile",
+        "onboarding",
+        "flow"
+      ],
+      "prompt": {
+        "en": "Keep the three phone frames, the status bar, the pager dots and the primary button style of the example. Replace the app name, taglines, value propositions and sign-in options with the user's real ones; the example uses a made-up app called Lull. Before finishing, check that the three screens tell one story in order, that text fits inside each frame, and that the primary action is obvious on every screen.",
+        "zh": "保留示例的三个手机外框、状态栏、分页圆点和主按钮样式。把应用名、标语、价值点和登录方式换成用户的真实内容；示例里的 Lull 是虚构应用。完成前检查：三个画面按顺序讲同一个故事，文字都在外框内，每个画面的主操作都很明显。"
+      },
+      "style": {
+        "en": "Three phone screens side by side in warm earth tones with a display typeface and a copper accent; friendly, airy and low in density.",
+        "zh": "三个并排的手机画面，暖土色调、展示字体、铜色强调，亲切、疏朗、信息量少。"
+      }
+    },
+    "mobile-app": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Mobile app screen",
+        "zh": "手机应用界面"
+      },
+      "descriptionZh": "放在 iPhone 15 Pro 外框里的单个应用界面。",
+      "tags": [
+        "mobile",
+        "app",
+        "screen"
+      ],
+      "prompt": {
+        "en": "Keep the device frame, the status bar and the screen primitives (header, content blocks, tab bar, buttons) of the example. Replace the app name, the screen content, labels and icons with the user's own, and change the screen type only when the user asks for another one. Before finishing, check that the content fits the frame without clipping, that tap targets look tappable, and that the example's made-up app Tomato is gone.",
+        "zh": "保留示例的设备外框、状态栏和界面基本件（页头、内容块、标签栏、按钮）。把应用名、界面内容、标签和图标换成用户自己的；用户没有要求时不改界面类型。完成前检查：内容在外框内没有被裁切，可点击的元素看起来可以点，示例里虚构的 Tomato 已清除。"
+      },
+      "style": {
+        "en": "One app screen inside an iPhone frame on warm off-white with a terracotta accent and sans-serif type; clean and low in density.",
+        "zh": "iPhone 外框里的单个应用界面，暖白底、陶土色强调、无衬线字体，干净、信息量少。"
+      }
+    },
+    "dashboard": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Analytics dashboard",
+        "zh": "数据看板"
+      },
+      "descriptionZh": "左侧导航、顶栏、指标卡片和图表组成的管理看板。",
+      "tags": [
+        "dashboard",
+        "analytics",
+        "operations"
+      ],
+      "prompt": {
+        "en": "Keep the fixed sidebar, the top bar, the card grid and the chart styling of the example. Replace the product name, metric names, numbers, chart data and navigation entries with the user's real ones; the example uses a made-up product called Pulse. Before finishing, check that every number is plausible and consistent across cards and charts, and that charts have labels and units.",
+        "zh": "保留示例的固定侧栏、顶栏、卡片栅格和图表样式。把产品名、指标名、数字、图表数据和导航项换成用户真实的内容；示例里的 Pulse 是虚构产品。完成前检查：每个数字合理，卡片和图表之间一致，图表有标签和单位。"
+      },
+      "style": {
+        "en": "Light admin dashboard on warm off-white with a left sidebar, metric cards and charts, a terracotta accent and medium information density.",
+        "zh": "暖白底的管理看板，左侧导航、指标卡片和图表，陶土色强调，信息密度中等。"
+      }
+    },
+    "kanban-board": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Kanban board",
+        "zh": "看板"
+      },
+      "descriptionZh": "带列、任务卡片、成员头像和筛选栏的任务看板。",
+      "tags": [
+        "kanban",
+        "tasks",
+        "operations"
+      ],
+      "prompt": {
+        "en": "Keep the column layout, the card anatomy (title, tag, points, assignee avatars), the filter chips and the top bar of the example. Replace the team name, columns, cards, people and numbers with the user's real work. Before finishing, check that card counts per column look believable, that long titles wrap cleanly, and that the example's made-up team Growth Squad is gone.",
+        "zh": "保留示例的列布局、卡片结构（标题、标签、点数、成员头像）、筛选标签和顶栏。把团队名、列、卡片、成员和数字换成用户真实的工作。完成前检查：每列的卡片数量可信，长标题能正常换行，示例里虚构的 Growth Squad 已清除。"
+      },
+      "style": {
+        "en": "Light task board in cool grey-white with an indigo accent, pink highlights and monospace labels; compact cards and high information density.",
+        "zh": "冷灰白底的任务看板，靛蓝强调、粉色点缀、等宽标签，卡片紧凑，信息密度高。"
+      }
+    },
+    "aster-atelier": {
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Creative studio website",
+        "zh": "创意工作室网站"
+      },
+      "descriptionZh": "钴蓝电影感的创意工作室单页网站，包含天文台主视觉、点云仪器、服务折叠项、常见问题和联系表单。",
+      "tags": [
+        "creative-studio",
+        "portfolio",
+        "editorial",
+        "cinematic",
+        "art"
+      ],
+      "prompt": {
+        "en": "Keep the five-chapter structure and order (astronomer hero, sticky point-cloud approach, observatory artwork with services, questions/contact, oversized wordmark footer), the fixed chapter guide, the large serif headings with tiny monospace coordinates, the native navigation and contact dialogs, and the details/summary services and FAQ. Replace the Aster Atelier name, headlines, copy, coordinates, service and FAQ text, form labels and placeholders, links and footer with the user's real studio content; no trace of the made-up Aster Atelier brand may remain. Keep the two embedded illustrations and the procedural armillary canvas, or swap in the user's own images at the same aspect and focus. Before finishing, check that all chapter anchors scroll correctly, both dialogs close with Escape and return focus, the form validates and saves locally without pretending to submit, the canvas pauses offscreen and under reduced motion, and the layout has no horizontal overflow at 390px.",
+        "zh": "保留五章结构与顺序（天文学家主视觉、粘性点云方法段、天文台插画与服务、问题与联系、超大字号页脚）、固定章节指引、大号衬线标题配等宽小字坐标、原生导航与联系对话框，以及服务与常见问题的 details/summary。把 Aster Atelier 名称、标题、文案、坐标、服务与常见问题文字、表单标签和占位、链接及页脚换成用户真实的工作室内容；虚构的 Aster Atelier 不能留下任何痕迹。保留两张内嵌插画和程序化浑天仪画布，或按相同比例和焦点换成用户自己的图片。完成前检查：所有章节锚点滚动正确，两个对话框都能用 Escape 关闭并归还焦点，表单能校验并在本地保存且不假装提交，画布在离屏和减少动态时暂停，390px 宽度下没有横向溢出。"
+      },
+      "style": {
+        "en": "Cinematic cobalt-blue studio site with classical observatory artwork, large serif headings, tiny mono coordinates, a fixed chapter guide and a slowly rotating point-cloud instrument.",
+        "zh": "钴蓝电影感工作室网站，古典天文台插画、大号衬线标题、等宽小字坐标、固定章节指引和缓慢旋转的点云仪器。"
+      }
+    },
+    "clinical-case-report": {
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Clinical case report",
+        "zh": "临床病例报告"
+      },
+      "descriptionZh": "一份结构化的病例报告文档，包含患者信息栏、主诉、现病史、体格检查、生命体征与化验表格、鉴别诊断和分问题管理计划。",
+      "tags": [
+        "medical",
+        "case-report",
+        "clinical",
+        "document",
+        "healthcare"
+      ],
+      "prompt": {
+        "en": "Keep the single-column document layout: the ruled document header with its four-item meta grid, the uppercase section headings with hairline rules, the red critical alert boxes, the vitals and laboratory tables with reference-range and status columns, the risk-score chip, the differential items with likelihood badges, the numbered plan blocks (including the medication-safety block) and the footer, plus the print stylesheet. Replace the patient age and sex, setting, specialty, chief complaint, HPI narrative, past history, medications, examination findings, every vital sign and lab value with its reference range and flag, the ECG and imaging findings, the primary diagnosis, differentials and plan items with the user's real case; the example's 58-year-old male with inferior STEMI must leave no trace. Before finishing, check that every value sits inside its stated reference range or is flagged, that flags and colours agree with the values, that tables do not overflow at narrow widths, and that the educational disclaimer in the footer stays.",
+        "zh": "保留单栏文档版式：带上下横线的文档页头及其四项信息栅格、带细线的全大写章节标题、红色危急提示框、含参考范围和状态列的生命体征与化验表格、风险评分标签、带可能性徽标的鉴别诊断条目、编号管理计划块（含用药安全块）和页脚，以及打印样式。把患者年龄性别、就诊场景、专科、主诉、现病史叙述、既往史、用药、查体所见、每项生命体征和化验值及其参考范围与标记、心电图与影像所见、主要诊断、鉴别诊断和计划条目换成用户的真实病例；示例里 58 岁男性下壁心梗的病例不能留下任何痕迹。完成前检查：每个数值都在其标注的参考范围内或被标记，标记和颜色与数值一致，窄屏下表格不溢出，页脚的教育用途声明保留。"
+      },
+      "style": {
+        "en": "Print-style serif medical document on plain white with black rules, red critical flags, green normal values, dense tables and no motion.",
+        "zh": "纯白底的印刷风格衬线字体病历，黑色分隔线、红色危急标记、绿色正常值，表格密集，无动效。"
+      }
+    },
+    "contact-widget": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Floating chat widget",
+        "zh": "浮动聊天组件"
+      },
+      "descriptionZh": "右下角浮动聊天按钮展开的客服面板，含欢迎语、社交链接、预约按钮和消息输入框。",
+      "tags": [
+        "chat-widget",
+        "contact",
+        "support",
+        "floating"
+      ],
+      "prompt": {
+        "en": "Keep the fixed bottom-right chat bubble, the expandable panel, the header with avatar, close button, greeting and online status, the row of circular social buttons, the meeting card, the message input with emoji and send buttons, and the offline form fallback of the example. Replace the agent name, greeting, primary color, social links, meeting URL, offline message and the demo page copy with the user's real content; the example's Alex, demo links and portfolio text must leave no trace. Before finishing, check that the panel opens and closes, that only the provided social links appear, that the offline state shows the form, and that nothing overflows at narrow widths.",
+        "zh": "保留示例中固定在右下角的聊天按钮、可展开面板、含头像/关闭按钮/欢迎语/在线状态的头部、圆形社交按钮行、预约卡片、带表情和发送按钮的消息输入框，以及离线表单回退。把客服名、欢迎语、主色、社交链接、预约链接、离线提示和演示页文案换成用户的真实内容；示例里的 Alex、演示链接和作品集文案不能留下痕迹。完成前检查：面板能打开和关闭，只显示用户提供的社交链接，离线状态显示表单，窄屏下没有溢出。"
+      },
+      "style": {
+        "en": "Clean minimal floating chat widget with a blue primary accent, white rounded panel, soft shadows and subtle hover motion.",
+        "zh": "简洁的浮动聊天组件，蓝色主色、白色圆角面板、柔和阴影，悬停有轻微动效。"
+      }
+    },
+    "critique": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Design critique report",
+        "zh": "设计评审报告"
+      },
+      "descriptionZh": "一页设计评审报告：五边形雷达图、五维评分条、逐维度证据卡片和 Keep / Fix / Quick-wins 行动清单。",
+      "tags": [
+        "design-review",
+        "critique",
+        "report",
+        "radar-chart"
+      ],
+      "prompt": {
+        "en": "Keep the report structure of the example: the header with mono meta line, large serif title and right-aligned italic verdict; the top row pairing the pentagon radar card with the five-row score table (name, bar, number, band); the two-column grid of five dimension cards, each with score, evidence paragraph and Keep/Fix tag rows; the three action-list cards (Keep, Fix, Quick wins) and the footer. Replace the reviewed artifact name, date, reviewer, verdict, all five scores, evidence text, code references and action items with the user's real review; the example reviews a made-up \"magazine-web-ppt example deck\", and no trace of it may remain. Before finishing, check that the radar polygon points and the bar widths match the stated scores, that each band label matches its score range, that long evidence paragraphs wrap inside the cards, and that both grids collapse to one column at narrow widths.",
+        "zh": "保留示例的报告结构：带等宽元信息行、大号衬线标题和右对齐斜体结论的页头；雷达图卡片与五行评分表（名称、进度条、分数、档位）并排的顶部区域；五张维度卡片组成的双列栅格，每张含分数、证据段落和 Keep/Fix 标签行；三张行动清单卡片（Keep、Fix、Quick wins）和页脚。把被评审的作品名、日期、评审人、结论、五个分数、证据文字、代码引用和行动项换成用户真实的评审内容；示例评审的是虚构的“magazine-web-ppt example deck”，不能留下任何痕迹。完成前检查：雷达图多边形顶点和进度条宽度与所标分数一致，每个档位标签与分数区间对应，长证据段落在卡片内正常换行，窄屏下两个栅格都收成一列。"
+      },
+      "style": {
+        "en": "Editorial review report on warm off-white with serif headings, mono labels, a terracotta accent and a pentagon radar; calm, dense and static.",
+        "zh": "暖白底的编辑式评审报告，衬线标题、等宽标签、陶土色强调和五边形雷达图，安静、信息密集、无动效。"
+      }
+    },
+    "dating-web": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Dating stats dashboard",
+        "zh": "约会数据看板"
+      },
+      "descriptionZh": "顶部滚动条、左侧分组导航、九宫格指标、30 天互关柱状图和匹配率趋势组成的约会数据看板。",
+      "tags": [
+        "dating",
+        "dashboard",
+        "community",
+        "stats",
+        "editorial"
+      ],
+      "prompt": {
+        "en": "Keep the structure of the example: the single-row mono ticker across the top with a tagline on the left and a tier counter on the right, the 232px left rail with a serif italic wordmark, the avatar/handle/ratio user card, the three nav groups (TODAY, YOU, ARCHIVE) with an accent-dotted active item and pill badges, the 3×3 KPI grid of mono caps labels over oversized serif numerals with italic one-line footnotes, the 30-bar SVG chart panel with the last two bars in the accent color and a mono caption plus date axis, and the closing trend panel with its italic lede. Replace the brand name, handle, tier and ratio, every KPI label, number and footnote, the nav entries and badge counts, the chart bar heights and axis dates, and all panel copy with the user's real content; the example's made-up brand 'mutuals' and handle '@signals' must leave no trace. Before finishing, check that the numerals fit their cells at 56px, that the bar count matches the axis labels, that the accent appears in only three or four places, that the layout collapses cleanly below 1100px, and that no swipe deck, hearts or emoji crept in.",
+        "zh": "保留示例的结构：顶部单行等宽滚动条（左侧标语、右侧等级计数）、232px 左侧栏（衬线斜体字标、头像/账号/比率用户卡、TODAY、YOU、ARCHIVE 三组导航，当前项带强调色圆点和胶囊徽标）、3×3 指标栅格（等宽大写标签 + 超大衬线数字 + 斜体单行脚注）、30 根柱子的 SVG 图表面板（最后两根用强调色，配等宽说明和日期轴），以及带斜体导语的趋势面板。把品牌名、账号、等级和比率、每个指标名、数字和脚注、导航项和徽标数字、柱子高度和轴日期、所有面板文案换成用户的真实内容；示例里虚构的 mutuals 和 @signals 不能留下任何痕迹。完成前检查：56px 的数字在格子里放得下，柱子数量与轴标签对应，强调色只出现三四次，1100px 以下布局正常折叠，没有混入滑动卡片、爱心或表情符号。"
+      },
+      "style": {
+        "en": "Cream-paper editorial dashboard with serif display numerals, mono caps labels, hairline rules, one terracotta accent and a tall 30-bar chart; calm, dense, almost no motion.",
+        "zh": "奶油纸色编辑风看板，衬线大数字、等宽大写标签、细线分隔、单一陶土色强调和 30 根细柱图表，安静、信息密集、几乎无动效。"
+      }
+    },
+    "digital-eguide": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Digital e-guide preview",
+        "zh": "电子指南预览页"
+      },
+      "descriptionZh": "并排两页的电子指南预览：封面页含大标题、作者、数据统计和目录，内页含双栏正文、步骤清单、引语和练习框。",
+      "tags": [
+        "e-guide",
+        "lead-magnet",
+        "editorial",
+        "lookbook",
+        "pdf"
+      ],
+      "prompt": {
+        "en": "Keep the two paper cards side by side on the tinted backdrop with their opposing slight rotation, and keep both page anatomies: the cover (eyebrow with dot and edition, mixed-weight display title with one italic accent word, mono author byline, three-cell stat row between rules, 'What's inside' heading, two-column table of contents with leader dots and mono page numbers, corner sticker, footer with page number) and the spread (chapter eyebrow, display sub-title with an accent line, italic deck, two-column body with drop cap, numbered four-step list with dashed rules, rotated pull-quote pinned to the inline-end with attribution, bordered exercise callout, footer). Replace the title, author, stats, chapter names, TOC entries, body copy, steps, quote, exercise text and page numbers with the user's real guide; the example's made-up guide 'The Creator's Style & Format Guide' by Auny must leave no trace. Before finishing, check that the cover title still fits without overflowing, that TOC leader dots line up with the page numbers, that the pull-quote does not cover body text at narrow widths, that the italic accent appears once per page, and that mono is used only for labels, stats and page numbers.",
+        "zh": "保留暖色背景上并排的两张纸感页面及其相反的轻微旋转，并保留两页的结构：封面（带圆点和版次的眉标、混合字重且含一个斜体强调词的大标题、等宽字体的作者署名、上下有分隔线的三格数据、\"What's inside\" 标题、带引导点和等宽页码的双栏目录、角落贴纸、带页码的页脚）与内页（章节眉标、带强调行的展示副标题、斜体导语、带首字下沉的双栏正文、带虚线分隔的编号四步清单、固定在内侧并带署名的旋转引语、带边框的练习框、页脚）。把标题、作者、数据、章节名、目录项、正文、步骤、引语、练习文案和页码换成用户真实的指南内容；示例里虚构的 Auny 所著《The Creator's Style & Format Guide》不能留下任何痕迹。完成前检查：封面标题不溢出，目录引导点与页码对齐，窄屏下引语不遮挡正文，每页只出现一次斜体强调，等宽字体只用于标签、数据和页码。"
+      },
+      "style": {
+        "en": "Two paper-tone pages side by side on a warm gradient backdrop, serif display with italic accents, mono labels and slight rotation; editorial and airy.",
+        "zh": "暖色渐变背景上并排两张纸感页面，衬线大标题配斜体点缀、等宽标签，轻微旋转，编辑感强、留白多。"
+      }
+    },
+    "email-marketing": {
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Product launch email",
+        "zh": "产品发布邮件"
+      },
+      "descriptionZh": "居中单栏的产品发布邮件，含报头、产品主视觉、大标题、正文、行动按钮和规格网格。",
+      "tags": [
+        "email",
+        "newsletter",
+        "product-launch",
+        "marketing"
+      ],
+      "prompt": {
+        "en": "Keep the email-on-page structure: a 680px centered column on a tinted page background, the masthead with skewed wordmark mark, EST badge and three nav links over a thin rule, the 4:3 hero block with corner stamps and a centered inline SVG product silhouette, the accent eyebrow with its short bar, the all-caps condensed headline lockup with one skewed accent word, the left-aligned body paragraph, the single dark CTA with arrow, the 2×2 specs grid of big number plus superscript unit plus monospace label, and the footer with address, unsubscribe and view-in-browser links. Replace the brand name SPORT TEST, the product name Axis Pro, the colorway Ember Flare, the drop date, all copy, numbers, units and links with the user's real content; no trace of the example may remain. Before finishing, check that there is exactly one CTA, that the accent appears at most twice, that the email reads top to bottom in under ten seconds, and that at 480px the nav hides, the headline drops a step and the specs grid still holds two columns without clipping.",
+        "zh": "保留“页面中的邮件”结构：暖色页面底上 680px 居中单栏、带斜切标志与 EST 徽标及三个导航链接的报头（下方细线）、带四角小标注和居中内联 SVG 产品剪影的 4:3 主视觉、带短横线的强调眉标、全大写窄体大标题（其中一个强调词斜切）、左对齐正文、唯一的深色带箭头行动按钮、由大数字加单位上标加等宽标签组成的 2×2 规格网格，以及含地址、退订和在浏览器中查看链接的页脚。把品牌名 SPORT TEST、产品名 Axis Pro、配色名 Ember Flare、发售日期、所有文案、数字、单位和链接换成用户的真实内容，示例不能留下任何痕迹。完成前检查：只有一个行动按钮，强调色最多出现两次，整封邮件十秒内能读完，480px 下导航隐藏、标题降一档、规格网格仍为两列且不被裁切。"
+      },
+      "style": {
+        "en": "Centered 680px email on a warm grey page: cream paper, near-black ink, ember-red accent, condensed all-caps headline with a skewed accent word, monospace labels and a dense spec grid.",
+        "zh": "暖灰页面上的居中邮件：米色纸面、近黑文字、砖红强调，窄体全大写标题带斜切强调词，等宽标签与紧凑规格网格。"
+      }
+    },
+    "eng-runbook": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Engineering runbook",
+        "zh": "工程运维手册"
+      },
+      "descriptionZh": "包含服务概览、依赖状态、告警表、常用操作命令、值班轮换和事故响应清单的运维手册页面。",
+      "tags": [
+        "runbook",
+        "engineering",
+        "ops",
+        "on-call",
+        "documentation"
+      ],
+      "prompt": {
+        "en": "Keep the page structure and section order of the example: header with service name, owner, tier pill and version; service summary panel beside a dependency status list; alerts table with severity badges; stacked procedure cards with monospace code blocks; on-call rotation table; two-column numbered incident-response checklist; and the footer. Replace the service name, team, version, dates, copy, alert names, commands, people and links with the user's real content; the example uses a made-up Northwind auth-service, and no trace of it may remain. Before finishing, check that long commands scroll inside their code blocks, tables stay readable at narrow widths, severity badges match the alert text, dependency statuses are consistent, and every checklist step is numbered and actionable.",
+        "zh": "保留示例的页面结构和版块顺序：带服务名、负责团队、等级标签和版本的页头；服务概览面板与依赖状态列表并排；带严重级别标签的告警表；堆叠的操作卡片和等宽代码块；值班轮换表；两栏编号的事故响应清单；以及页脚。把服务名、团队、版本、日期、文案、告警名、命令、人员和链接换成用户的真实内容；示例里的 Northwind auth-service 是虚构的，不能留下任何痕迹。完成前检查：长命令在代码块内可横向滚动，窄屏下表格仍然可读，严重级别标签与告警内容一致，依赖状态前后一致，清单每一步都有编号且可执行。"
+      },
+      "style": {
+        "en": "Dark ops-console page on near-black with a mint accent, amber and red severity badges, monospace labels, dense tables and code blocks, almost no motion.",
+        "zh": "近黑底的深色运维控制台页面，薄荷绿强调，琥珀与红色告警标签，等宽字体，表格和代码块密集，几乎没有动效。"
+      }
+    },
+    "finance-report": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Financial report",
+        "zh": "财务报告"
+      },
+      "descriptionZh": "包含 KPI 指标条、营收与成本图表、损益表、重点客户表和展望段落的季度财务报告。",
+      "tags": [
+        "finance",
+        "report",
+        "quarterly",
+        "kpi",
+        "tables"
+      ],
+      "prompt": {
+        "en": "Keep the single-page report structure and order: masthead with company, period and Confidential badge; four-card KPI strip; revenue trend line-and-area chart with dashed plan line; operating-cost bar breakdown; P&L summary table with current quarter, prior quarter and YoY deltas; top-accounts table with logo placeholders, plan, region, ARR and status badges; outlook quote with CFO signoff; footer. Replace the company name Northwind Trading, the period, all figures, customer names, quote and signoff with the user's real content; no trace of the example may remain. Before finishing, check that every number ties to a labelled chart or table, deltas show direction and percentage, the accent is used sparingly, long customer names wrap, and the KPI grid and chart row stack cleanly at narrow widths.",
+        "zh": "保留单页报告的结构和顺序：含公司、期间和机密标签的报头；四张 KPI 卡片；带虚线计划线的营收折线与面积图；运营成本条形分解；含本季、上季和同比变化的损益汇总表；含 logo 占位、套餐、地区、ARR 和状态标签的重点客户表；带 CFO 署名的展望引语；页脚。把公司名 Northwind Trading、期间、所有数字、客户名、引语和署名换成用户的真实内容，不能留下示例痕迹。完成前检查：每个数字都能对应到有标签的图表或表格，变化量标明方向和百分比，强调色克制使用，长客户名能换行，窄屏下 KPI 栅格和图表行正常堆叠。"
+      },
+      "style": {
+        "en": "Print-like quarterly report on warm off-white paper with serif display headings, monospace labels, a teal accent and dense tables; almost no motion.",
+        "zh": "暖白纸感底、衬线标题、等宽标签、青色强调的季度报表版式，表格密集，几乎没有动效。"
+      }
+    },
+    "gamified-app": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Gamified habit app screens",
+        "zh": "游戏化习惯应用界面"
+      },
+      "descriptionZh": "深色展示台上并排的三个手机画面：封面海报、带等级条和 XP 的每日任务面板、任务详情。",
+      "tags": [
+        "gamified",
+        "habit-tracker",
+        "mobile",
+        "quests",
+        "xp"
+      ],
+      "prompt": {
+        "en": "Keep the dark showcase stage with its mono caption bar, the three 360×780 phone frames with bezel, notch, status bar and five-item tab bar, and the three-screen sequence: cover poster, today's quests dashboard, quest detail. Preserve the level ribbon with XP progress, the 3×2 pastel quest tile grid with glyph chips and XP pills, the detail hero with reward stamp, the micro-task checklist and the Start quest pill. Replace the brand name Level, the greeting Sam, quest names, copy, XP and level numbers, dates and links with the user's real content; no trace of the example may remain. Before finishing, check that the three frames have distinct purposes, that long quest titles and micro-task labels fit inside the frames, that XP totals are consistent across ribbon, tiles and detail, and that the phones stack cleanly at narrow widths.",
+        "zh": "保留深色展示台及其等宽字说明栏、三个 360×780 手机外框（含边框、刘海、状态栏和五项标签栏），以及三个画面的顺序：封面海报、今日任务面板、任务详情。保留带 XP 进度的等级条、3×2 柔和彩色任务卡栅格（含图标块和 XP 胶囊）、带奖励印章的详情主视觉、微任务清单和“Start quest”胶囊按钮。把品牌名 Level、问候语 Sam、任务名、文案、XP 和等级数字、日期和链接换成用户的真实内容；示例不能留下任何痕迹。完成前检查：三个画面各有明确用途，长任务标题和微任务标签能放进外框，等级条、任务卡和详情里的 XP 总数一致，窄屏下手机画面能整齐堆叠。"
+      },
+      "style": {
+        "en": "Dark near-black showcase stage with a warm spotlight, three phone frames, pastel quest tiles, an orange accent, serif display type and mono labels; vivid, compact and almost static.",
+        "zh": "近黑展示台配暖色聚光，三个手机画面、柔和彩色任务卡、橙色强调，衬线大标题与等宽标签，鲜明紧凑，几乎无动效。"
+      }
+    },
+    "github-dashboard": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "GitHub repository dashboard",
+        "zh": "GitHub 仓库分析看板"
+      },
+      "descriptionZh": "包含仓库概览、五个指标卡、星标增长图、贡献者列表、近期活动表格和仓库统计的 GitHub 仓库分析看板。",
+      "tags": [
+        "github",
+        "dashboard",
+        "analytics",
+        "open-source",
+        "repository"
+      ],
+      "prompt": {
+        "en": "Keep the fixed left sidebar with its Repository, Metrics and Quick Links groups, the top bar with date and refresh controls, the repository header, the tab strip, the five KPI cards, the two-column star-growth and top-contributors row, the full-width recent activity table, the fork-trend chart and repository-stats table, and the provenance footer. Replace the repository owner/name, description, KPI numbers and trends, chart values, contributor names and avatars, activity rows, repository stats, dates and links with the user's real GitHub data; the example's nexu-io/open-design content must leave no trace. Before finishing, check that KPI totals agree with the charts and tables, that sidebar and tab anchors point to the right sections, that long issue titles and contributor names wrap or truncate cleanly, that the activity table scrolls at narrow widths, and that empty states are shown when there is no activity or contributor data.",
+        "zh": "保留示例的固定左侧栏（Repository、Metrics、Quick Links 分组）、带日期和刷新按钮的顶栏、仓库标题区、标签栏、五个指标卡、星标增长图与贡献者列表的两栏布局、整行近期活动表格、Fork 趋势图和仓库统计表，以及底部的数据来源说明。把仓库所有者/名称、描述、指标数字和趋势、图表数值、贡献者姓名和头像、活动行、仓库统计、日期和链接换成用户真实的 GitHub 数据；示例里的 nexu-io/open-design 内容不能留下任何痕迹。完成前检查：指标总数与图表和表格一致，侧栏和标签锚点指向正确版块，长 issue 标题和贡献者姓名能正常换行或截断，窄屏下活动表格可以横向滚动，没有活动或贡献者数据时显示空状态。"
+      },
+      "style": {
+        "en": "Warm off-white GitHub analytics dashboard with a fixed sidebar, white rounded panels, five KPI tiles, pastel status pills and dense tables; calm, low motion.",
+        "zh": "暖白底的 GitHub 分析看板，固定侧栏、白色圆角面板、五个指标卡、柔和状态标签和密集表格，安静少动效。"
+      }
+    },
+    "hr-onboarding": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Onboarding plan page",
+        "zh": "入职计划页"
+      },
+      "descriptionZh": "由封面横幅、第一天日程、首周时间线、30/60/90 天里程碑和资源清单组成的新员工入职计划页。",
+      "tags": [
+        "onboarding",
+        "hr",
+        "new-hire",
+        "schedule",
+        "checklist"
+      ],
+      "prompt": {
+        "en": "Keep the single-page structure and section order of the example: the dark cover banner with eyebrow, headline, four-item meta row (role, start date, manager, buddy) and circular monogram; the Day 1 panel with its two-column time/item schedule rows; the five-column Monday–Friday timeline with dot-marked activities and small captions; the three 30/60/90 milestone cards with pill badges and bulleted outcomes; the two-panel grid holding the resource list (icon, name, mono source label) and the 'You're set when…' checklist with done and undone boxes; and the footer. Replace the company name, hire name, role, dates, manager and buddy, every schedule row, activity, milestone outcome, resource and checklist item with the user's real content; the example's Northwind, Maya, Alvaro and Sasha must leave no trace. Before finishing, check that weekday labels match the dates, that the five day cards stay visually even, that long names and resource labels do not overflow the cover meta or resource rows, and that checked and unchecked boxes reflect the real state.",
+        "zh": "保留示例的单页结构和版块顺序：深色封面横幅（小标签、标题、角色/入职日期/主管/伙伴四项信息、圆形字母徽标）；第一天面板的两列时间/事项日程行；周一到周五五列时间线（圆点活动加小字说明）；三张 30/60/90 天里程碑卡片（胶囊徽章加要点列表）；资源列表（图标、名称、等宽来源标签）与“你已就绪当……”勾选清单组成的双栏面板；以及页脚。把公司名、新员工姓名、角色、日期、主管和伙伴、每一条日程、活动、里程碑要点、资源和清单项换成用户的真实内容；示例里的 Northwind、Maya、Alvaro 和 Sasha 不能留下任何痕迹。完成前检查：星期标签与日期对应，五张日卡片高度看起来齐平，长姓名和资源标签不会撑破封面信息区或资源行，勾选与未勾选框反映真实状态。"
+      },
+      "style": {
+        "en": "Warm off-white document with a dark cover banner, serif display headings, monospace labels, a terracotta accent and card-based sections; calm, dense and static.",
+        "zh": "暖白纸感页面，深色封面横幅、衬线标题、等宽标签和陶土色强调，卡片分区，安静、信息密集、无动效。"
+      }
+    },
+    "invoice": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Invoice",
+        "zh": "发票"
+      },
+      "descriptionZh": "包含开票方与收票方信息、明细表格、税费与总额、付款说明和签名的可打印发票页。",
+      "tags": [
+        "invoice",
+        "billing",
+        "finance",
+        "printable",
+        "document"
+      ],
+      "prompt": {
+        "en": "Keep the centered paper sheet, the top brand bar with invoice number and dates, the two-column From / Bill to block, the three-cell project / PO / terms strip, the line-items table with description, qty, rate and amount, the right-aligned totals block with retainer and tax rows, the two-column payment instructions panel, the thank-you and signature footer, and the print stylesheet. Replace the studio and client names, invoice number, dates, addresses, tax IDs, project and PO references, line item descriptions and amounts, payment terms, bank details, links and signature with the user's real content; the example's Sable Studio and Northwind Trading Co. must leave no trace. Before finishing, check that subtotal, retainer, tax and total due add up correctly, that long descriptions wrap without breaking the table, that the layout stacks cleanly under 720px, and that print preview has no clipped content or unwanted backgrounds.",
+        "zh": "保留居中的纸张版式、带发票编号和日期的顶部品牌栏、两栏的开票方/收票方信息、三格的项目/采购单/条款条、含描述/数量/单价/金额的明细表、右对齐且包含预付款和税费行的总额块、两栏付款说明面板、致谢与签名页脚，以及打印样式表。把工作室名和客户名、发票编号、日期、地址、税号、项目与采购单编号、明细描述和金额、付款条款、银行信息、链接和签名换成用户的真实内容；示例里的 Sable Studio 和 Northwind Trading Co. 不能留下任何痕迹。完成前检查：小计、预付款、税费和应付总额计算正确，长描述能正常换行且不破坏表格，720px 以下布局能整齐堆叠，打印预览没有内容被裁切或多余背景。"
+      },
+      "style": {
+        "en": "Printable invoice sheet on warm off-white paper with serif headings, monospace figures, a deep green accent and dense financial detail.",
+        "zh": "暖白纸张上的可打印发票，衬线标题、等宽数字、深绿强调，财务信息密集。"
+      }
+    },
+    "kami-landing": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Editorial white paper one-pager",
+        "zh": "纸感白皮书单页"
+      },
+      "descriptionZh": "暖纸底色、墨蓝强调的印刷风单页文档，含眉栏、大标题主视觉、宣言、指标行、编号章节和页脚索引。",
+      "tags": [
+        "white-paper",
+        "editorial",
+        "one-pager",
+        "manifesto",
+        "print"
+      ],
+      "prompt": {
+        "en": "Keep the kami document structure and order: the eyebrow row with locale switcher on the left and edition/version/license/year meta on the right, the two-column hero (1.45fr copy with an oversized serif headline whose last word is ink-blue, plus a right-aligned stack of three paper-tinted hero-token chips), the bordered manifesto band with a small label column, an ink-blue left rule on the pull paragraph and a signature line, the full-width metrics row of 3–6 cells divided by hairlines with tabular-nums values, the numbered chapters (01, 02, …) laid out as a narrow head column beside a wide body column with dash lists, inline code and an optional ivory aside card, and the footer with a mega serif kicker, colophon and three-column site index above a legal line. Replace the brand name OpenDesign, the headline, tagline, manifesto text, signature, all metric values and labels, chapter titles, ledes, body copy, code samples, links and footer index entries with the user's real content; no trace of the example's made-up studio may remain. Before finishing, check that the headline stays within about six words at display size, that the metric row still divides evenly when there are 3, 5 or 6 cells, that chapter numbers run in order, that long body text keeps its 62ch measure, and that nothing overflows at 1280, 980, 768 and 560px.",
+        "zh": "保留 kami 文档的结构与顺序：眉栏左侧语言切换、右侧版本/期号/许可/年份元信息；双栏主视觉（1.45fr 文案栏，超大衬线标题的最后一个词用墨蓝，右侧对齐三个纸色信息胶囊）；带上下细线的宣言带，左侧小标签栏、引文段带墨蓝左边线和署名行；整宽的指标行，3–6 个单元格用细线分隔，数值用等宽数字；编号章节（01、02……）为窄标题栏配宽正文栏，含破折号列表、行内代码和可选的象牙色旁注卡片；页脚含超大衬线字标、版权说明、三栏站点索引和底部法务行。把品牌名 OpenDesign、标题、标语、宣言正文、署名、所有指标数值与标签、章节标题、导语、正文、代码示例、链接和页脚索引项换成用户的真实内容；示例里虚构的工作室不能留下任何痕迹。完成前检查：标题在展示字号下不超过约六个词，指标行在 3、5、6 个单元格时仍均分，章节编号连续，长正文保持 62ch 行宽，1280、980、768 和 560px 下都没有溢出。"
+      },
+      "style": {
+        "en": "Warm parchment page with ink-blue accent, one-weight serif hierarchy, hairline rules and tabular numerals; print-like, dense and almost motionless.",
+        "zh": "暖纸底色配墨蓝强调，单一字重的衬线层级、细线与等宽数字，印刷感强、信息密度偏高、几乎无动效。"
+      }
+    },
+    "live-dashboard": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Team dashboard",
+        "zh": "团队仪表盘"
+      },
+      "descriptionZh": "左侧工作区导航、实时状态顶栏、KPI 指标格、7 天迷你折线图、活动流和任务数据库表格组成的团队仪表盘。",
+      "tags": [
+        "dashboard",
+        "team",
+        "kpi",
+        "activity-feed",
+        "tasks"
+      ],
+      "prompt": {
+        "en": "Keep the app shell (240px workspace sidebar with switcher, search rows and Workspace/Private/Connections nav groups), the topbar breadcrumb plus live-status pill, the page header with emoji, 40px title and meta row carrying the auto-refresh toggle and primary Refresh button, the one-line callout, the hairline 1px KPI grid with tabular numbers and delta lines, the two-column sparkline card and activity feed card, the linked-database table with uppercase head, status pills and initials avatars, and the source-attribution footer. Replace the workspace name Acme Studio, page title, KPI labels, numbers and deltas, the 7-day series and its labels, activity entries, task rows, assignees, dates, priorities and connector slug with the user's real content; no trace of the example's made-up workspace may remain. Before finishing, check that the KPI count matches the grid columns, that the sparkline has seven points with matching axis labels, that status pills use one consistent set, that long task names and assignee names wrap without breaking rows, that the feed and table have sensible empty states, and that the live pill honestly says sample data when no source is bound.",
+        "zh": "保留应用外壳（240px 工作区侧栏，含切换器、搜索行和 Workspace/Private/Connections 导航分组）、顶栏面包屑与实时状态胶囊、带 emoji 的页头（40px 标题和含自动刷新开关与主刷新按钮的元信息行）、单行说明条、1px 细线 KPI 格（等宽数字与增减行）、两栏的迷你折线图卡片与活动流卡片、带大写表头、状态胶囊和首字母头像的关联数据库表格，以及标注数据来源的页脚。把工作区名 Acme Studio、页面标题、KPI 标签、数字与增减、7 天数据序列及其标签、活动条目、任务行、负责人、日期、优先级和连接器标识换成用户的真实内容；示例里虚构的工作区不能留下任何痕迹。完成前检查：KPI 数量与栅格列数一致，折线图有七个点且坐标标签对应，状态胶囊使用同一套配色，长任务名和负责人名换行时不撑破行，活动流和表格有空状态，未接入数据源时实时胶囊如实显示为示例数据。"
+      },
+      "style": {
+        "en": "Notion-like light dashboard: white canvas, warm grey sidebar, hairline borders, blue accent, 14px sans-serif, tabular numbers, dense tables and a softly pulsing live dot.",
+        "zh": "Notion 风格浅色仪表盘：白底、暖灰侧栏、细线分隔、蓝色强调、14px 无衬线字体，表格紧凑，实时圆点轻微脉动。"
+      }
+    },
+    "magazine-poster": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Editorial magazine poster",
+        "zh": "编辑式杂志海报"
+      },
+      "descriptionZh": "报纸质感的编辑式海报，包含日期栏、超大衬线标题、双栏正文和六个带引语注释的编号段落。",
+      "tags": [
+        "editorial",
+        "poster",
+        "magazine",
+        "newsprint",
+        "manifesto"
+      ],
+      "prompt": {
+        "en": "Keep the single-page poster structure and order: top hairline rule with dateline, mono eyebrow, oversized serif headline with exactly one struck-through word and one italic accent word, italic deck with an accent callout, short accent rule, a two-column grid of six numbered cells (mono eyebrow, bold serif sub-headline, 2–3 sentence body, tinted mono quote callout), and the footer band with the PRO TIP plate and three-cell meta line. Replace the publication name, date, headline, deck, all six section titles, body copy, quote prompts and footer text with the user's real topic; the example's made-up publication AI Enthusiast and its copy must leave no trace. Before finishing, check that the headline dominates the hierarchy, the strikethrough and italic accent each appear exactly once, the six cells read as real opinion rather than filler, the layout holds at 1280–1440px and stacks cleanly to one column at narrow widths, and long headlines and quote blocks do not overflow.",
+        "zh": "保留单页海报的结构和顺序：顶部细线日期栏、等宽小标题、超大衬线主标题（恰好一个词带删除线、一个词为斜体强调）、带强调标注的斜体导语、短强调线、六格双栏编号网格（等宽眉题、粗体衬线小标题、2–3 句正文、浅色底等宽引语块），以及带 PRO TIP 标牌和三格信息的页脚。把刊物名、日期、主标题、导语、六个段落的标题、正文、引语提示和页脚文字换成用户真实主题；示例里虚构的刊物 AI Enthusiast 及其文案不能留下任何痕迹。完成前检查：主标题在层级上占主导，删除线和斜体强调各只出现一次，六个段落读起来像真实观点而不是填充文字，1280–1440px 下版式成立，窄屏能干净地收成单栏，长标题和引语块不溢出。"
+      },
+      "style": {
+        "en": "Newsprint-toned editorial poster with oversized serif headline, two-column numbered essay grid, mono annotations and a rust accent; static and type-driven.",
+        "zh": "报纸质感的编辑式海报，超大衬线标题、双栏编号文章网格、等宽注释和铁锈色强调，静态且以字体为主。"
+      }
+    },
+    "meeting-notes": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Meeting notes page",
+        "zh": "会议纪要页"
+      },
+      "descriptionZh": "包含会议标题与参会人、议程清单、决议面板、行动项表格和下次会议信息的单页会议纪要。",
+      "tags": [
+        "meeting-notes",
+        "minutes",
+        "operations",
+        "agenda",
+        "action-items"
+      ],
+      "prompt": {
+        "en": "Keep the paper-card page, the header (breadcrumb, serif title, meta row of date/time/where/notes-by, attendee avatar row with an apologies line), the agenda checklist with time column and done state, the accent-bordered decisions panel, the action items table with owner avatars and status pills, the two-column open questions / next meeting grid and the monospace footer. Replace the company, team, people, dates, agenda items, decisions, action rows, statuses and links with the user's real meeting; the example's Northwind and Growth squad must leave no trace. Before finishing, check that avatar initials match the names used everywhere, that due dates and the next-meeting date agree, that status pills fit their labels, and that the table and the two-column grid collapse cleanly at narrow widths.",
+        "zh": "保留纸张卡片式页面、页头（面包屑、衬线标题、日期/时间/地点/记录人的元信息行、参会人头像行和请假说明）、带时间列和完成状态的议程清单、带强调色左边框的决议面板、含负责人头像和状态胶囊的行动项表格、双栏的待解决问题/下次会议区以及等宽字体页脚。把公司、团队、人名、日期、议程、决议、行动项、状态和链接换成用户真实的会议内容；示例里的 Northwind 和 Growth squad 不能留下任何痕迹。完成前检查：头像缩写与各处姓名一致，截止日期和下次会议日期相互吻合，状态胶囊能容纳标签文字，表格和双栏区在窄屏下正常折叠。"
+      },
+      "style": {
+        "en": "White paper card on off-white with serif headings, monospace labels, a blue accent and status pills; compact, document-like and almost no motion.",
+        "zh": "暖白底上的白色纸张卡片，衬线标题配等宽小标签，蓝色强调与状态胶囊，紧凑的文档感，几乎没有动效。"
+      }
+    },
+    "orbit-general": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Daily briefing dashboard",
+        "zh": "每日简报看板"
+      },
+      "descriptionZh": "由问候语、五项指标、今日三件优先事项和多个连接器卡片组成的跨工具每日简报看板。",
+      "tags": [
+        "dashboard",
+        "daily-briefing",
+        "bento",
+        "connectors",
+        "productivity"
+      ],
+      "prompt": {
+        "en": "Keep the Open Orbit briefing frame: the centered hero with sun mark and date, the five-card KPI strip, the three numbered Top 3 priority cards, the bento grid with the same connector modules in the same order (GitHub, Sentry, Vercel, Linear, Slack, Gmail, Notion, Jira, Trello, Drive, 飞书 IM, GitLab, 飞书文档), each module's own data shape (PR list, error count and heatmap, deploy status, sprint ring and task list, message list, mail list, doc excerpts, progress bar and tickets, board columns, file list, pipeline stages), and the footer mark. Replace the greeting, date, KPI labels and numbers, Top 3 entries, connector data, people names, messages, tasks, files, times and footer timestamp with the user's real connector activity; the example's mock people and project names must leave no trace. Before finishing, check that the KPI cards and Top 3 priorities agree with the connector modules, that every module fits its card without overflow, that long titles and messages wrap cleanly, and that no connector or module has been added or dropped.",
+        "zh": "保留 Open Orbit 简报框架：居中的问候区（太阳图标和日期）、五张指标卡、三张带编号的今日优先事项卡、按相同顺序排列相同连接器模块的便当栅格（GitHub、Sentry、Vercel、Linear、Slack、Gmail、Notion、Jira、Trello、Drive、飞书 IM、GitLab、飞书文档），以及每个模块自己的数据形态（PR 列表、错误数和热力图、部署状态、迭代圆环和任务列表、消息列表、邮件列表、文档摘要、进度条和工单、看板列、文件列表、流水线阶段）和页脚标识。把问候语、日期、指标标签和数字、今日优先事项、连接器数据、人名、消息、任务、文件、时间和页脚时间戳换成用户真实的连接器动态；示例里的虚构人名和项目名不能留下任何痕迹。完成前检查：指标卡和今日优先事项与连接器模块一致，每个模块都在卡片内没有溢出，长标题和消息能正常换行，没有增加或删除连接器和模块。"
+      },
+      "style": {
+        "en": "Editorial bento dashboard on warm off-white with serif numerals, hairline cards, an orange accent and compact connector modules; dense, calm and almost motionless.",
+        "zh": "暖白底编辑式便当看板，衬线数字、细线卡片、橙色强调，连接器模块紧凑，信息密度高且安静。"
+      }
+    },
+    "orbit-github": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "GitHub activity briefing",
+        "zh": "GitHub 活动简报"
+      },
+      "descriptionZh": "仿 GitHub 通知页的每日代码活动简报，含左侧筛选、待审 PR、CI 失败、指派议题和合并动态。",
+      "tags": [
+        "github",
+        "digest",
+        "pull-requests",
+        "notifications",
+        "developer"
+      ],
+      "prompt": {
+        "en": "Keep the GitHub-style chrome and structure of the example: the dark top bar with octocat logo, search field and avatar, the 256px left rail of filters (All, Participating, Mentions, Review requests) with counts, and the main column of event groups in this order — review requests with a yellow warning header, CI/Checks with a red failure header, issues assigned to you, and activity. Keep the event row anatomy (repo · PR number · status pill · linked title · timestamp, the meta line with stacked reviewer avatars and approval dots, the monospace diff preview with add/remove lines, and the inline code commit chip). Replace repo names, PR and issue numbers, titles, handles, timestamps, commit messages, labels and counts with the user's real data; the example's open-design/web repo and its people are mock and must leave no trace. Before finishing, check that every group count and sidebar count matches its rows, that long PR titles wrap without pushing the timestamp out, that the diff preview stays readable at narrow widths, and that no extra rail entries, badges or event types were added.",
+        "zh": "保留示例的 GitHub 风格外壳和结构：深色顶栏（octocat 标志、搜索框、头像）、256px 左侧筛选栏（All、Participating、Mentions、Review requests，带计数），以及主栏按此顺序排列的事件分组——黄色警示头的待审请求、红色失败头的 CI/Checks、指派给你的议题、活动动态。保留事件行的结构（仓库 · PR 编号 · 状态胶囊 · 链接标题 · 时间戳，含评审人头像堆叠和通过圆点的元信息行，等宽字体的增删 diff 预览，以及行内代码提交标签）。把仓库名、PR 与议题编号、标题、用户名、时间戳、提交信息、标签和计数换成用户的真实数据；示例里的 open-design/web 仓库和相关人物都是虚构的，不能留下任何痕迹。完成前检查：每个分组计数和侧栏计数与行数一致，长 PR 标题换行时不会把时间戳挤出去，diff 预览在窄屏下仍然可读，没有新增侧栏项、徽章或事件类型。"
+      },
+      "style": {
+        "en": "GitHub-native light briefing: dark header bar, grey-white canvas, white bordered event groups, green/purple/red state pills and monospace diff blocks; dense and static.",
+        "zh": "GitHub 原生浅色简报页：深色顶栏、灰白画布、白色描边分组，绿紫红状态胶囊与等宽 diff 块，信息密集。"
+      }
+    },
+    "orbit-gmail": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Gmail digest reading view",
+        "zh": "Gmail 简报阅读界面"
+      },
+      "descriptionZh": "Gmail 顶栏下打开的每日简报邮件，包含摘要条、三级优先分组、折叠通知和底部回复栏。",
+      "tags": [
+        "email",
+        "digest",
+        "briefing",
+        "gmail",
+        "reading-view"
+      ],
+      "prompt": {
+        "en": "Keep the Gmail top bar (hamburger, wordmark, search, help, settings, app launcher, avatar), the single opened-email chrome (toolbar, subject with tag, sender row, digest body, reply bar) and the digest order: greeting, summary strip, 需要处理, 值得关注, 仅供知悉, footer. Keep the card anatomy (avatar, sender, role, subject, summary, primary/ghost action), the collapsed notification row and the priority-colored section rules. Replace the sender names, roles, subjects, summaries, counts, times, avatar initials and links with the user's real Gmail briefing; the example's Open Orbit, Allen Liu, Nina Park, Marie and Sarah Chen are mock and must leave no trace. Do not add a left rail, inbox list, category tabs or extra sections. Before finishing, check that summary counts match the cards, long subjects and summaries wrap without overflow at narrow widths, the current user is referred to neutrally, and every action button and reply control has a purpose.",
+        "zh": "保留 Gmail 顶栏（汉堡菜单、字标、搜索、帮助、设置、应用启动器、头像）、单个已打开邮件的框架（工具栏、带标签的标题、发件人行、简报正文、回复栏）以及简报顺序：问候、摘要条、需要处理、值得关注、仅供知悉、页脚。保留卡片结构（头像、发件人、角色、主题、摘要、主按钮/幽灵按钮）、折叠通知行和按优先级着色的分节线。把发件人姓名、角色、主题、摘要、数量、时间、头像缩写和链接换成用户真实的 Gmail 简报；示例中的 Open Orbit、Allen Liu、Nina Park、Marie 和 Sarah Chen 是虚构内容，不能留下任何痕迹。不要添加左侧栏、收件箱列表、分类标签或额外版块。完成前检查：摘要数量与卡片一致，长主题和摘要在窄屏下换行不溢出，当前用户用中性称呼，每个操作按钮和回复控件都有用途。"
+      },
+      "style": {
+        "en": "Gmail-style white reading view on pale blue-grey, Google Sans type, blue accents, red and yellow priority markers, compact cards and almost no motion.",
+        "zh": "浅蓝灰底的 Gmail 风格阅读界面，Google Sans 字体，蓝色强调，红黄优先级标记，卡片紧凑，几乎没有动效。"
+      }
+    },
+    "orbit-linear": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Linear issue digest",
+        "zh": "Linear 问题简报"
+      },
+      "descriptionZh": "单栏每日简报页，含问候语、周期进度条、按优先级分组的 issue 列表和可展开的详情与活动记录。",
+      "tags": [
+        "digest",
+        "issues",
+        "linear",
+        "daily-briefing",
+        "productivity"
+      ],
+      "prompt": {
+        "en": "Keep the narrow centered column, the top brand breadcrumb with theme toggle, the greeting block, the cycle-progress card with its track and fill, the two issue groups in order (\"Needs your attention\" then \"Updated yesterday\") with their dot-and-count section headers, and the issue row anatomy: status ring, monospace issue ID, truncated title, sub line, label pills, priority bars and relative time. Keep the expanded detail pane (description, property grid, activity feed), the footer and the keyboard hint bar, and the toggle / theme / keyboard script. Replace the issue identifiers, titles, descriptions, labels, assignees, dates, cycle number and progress with the user's real data, use neutral wording like \"you\" for the current user, and leave no trace of the example's mock people or IDs. Before finishing, check that rows expand and collapse, that long titles ellipsize instead of wrapping, that group counts match the rows, that dates and relative times agree, and that both light and dark themes stay readable.",
+        "zh": "保留居中的窄栏、带主题切换的顶部品牌面包屑、问候语、含轨道与填充的周期进度卡、按顺序排列的两个 issue 分组（先“Needs your attention”后“Updated yesterday”）及其圆点加计数的分组标题，以及 issue 行结构：状态圆环、等宽编号、截断标题、副行、标签胶囊、优先级条和相对时间。保留展开详情区（描述、属性表、活动记录）、页脚和键盘提示条，以及展开/主题/键盘脚本。把 issue 编号、标题、描述、标签、负责人、日期、周期编号和进度换成用户的真实数据，当前用户用“你”这类中性说法，示例里的虚构人名和编号不能留下痕迹。完成前检查：行能展开收起，长标题省略而不换行，分组计数与行数一致，日期与相对时间相符，明暗两种主题都清晰可读。"
+      },
+      "style": {
+        "en": "Compact single-column Linear-style digest on cool grey-white with an indigo accent, monospace issue IDs, status dots and priority bars; dense and nearly motionless.",
+        "zh": "冷灰白底的单栏 Linear 风格简报，靛蓝强调、等宽 issue 编号、状态圆点和优先级条，紧凑高密度，几乎没有动效。"
+      }
+    },
+    "orbit-notion": {
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Notion-style daily briefing",
+        "zh": "Notion 风格每日简报"
+      },
+      "descriptionZh": "仿 Notion 页面外观的每日简报，包含封面、面包屑、提示块、文档变更、评论提及和数据库表格。",
+      "tags": [
+        "briefing",
+        "digest",
+        "notion-style",
+        "daily",
+        "document"
+      ],
+      "prompt": {
+        "en": "Keep the Notion page chrome: the thin sidebar hint, sticky breadcrumb, warm dark gradient cover, 900px reading column, page title and subtitle, divider rules, callout, the three H2 sections in order (文档变更, 评论 / @ 提及, 数据库变更), the bullet rows with page links, people and timestamps, the database table with its 名称/状态/更新人/时间 columns and colored status tags, and the collapsible 原始变更记录 toggle. Replace the briefing date, headline, callout copy, document titles, people, comments, timestamps, table rows, statuses and links with the user's real digest; the example's names Marie, Bob and Lily and its made-up pages must leave no trace, and use neutral wording for the current user. Before finishing, check that the three sections stay in order, no extra sections, callouts or table columns are added, long document titles wrap cleanly, timestamps are plausible, and the toggle opens.",
+        "zh": "保留 Notion 页面外观：细侧栏提示、吸顶面包屑、暖深色渐变封面、900px 阅读栏、页面标题与副标题、分隔线、提示块、按顺序排列的三个 H2 版块（文档变更、评论 / @ 提及、数据库变更）、带页面链接/人物/时间的项目符号行、含名称/状态/更新人/时间列和彩色状态标签的数据库表格，以及可折叠的原始变更记录。把简报日期、标题、提示块文案、文档标题、人物、评论、时间、表格行、状态和链接换成用户真实的简报内容；示例里的 Marie、Bob、Lily 和虚构页面不能留下痕迹，当前用户用中性称呼。完成前检查：三个版块顺序不变，没有多加版块、提示块或表格列，长文档标题能正常换行，时间合理，折叠块可以展开。"
+      },
+      "style": {
+        "en": "Notion-like document page with a breadcrumb, warm dark gradient cover, white body, grey callout and compact database table; calm, text-first and nearly motionless.",
+        "zh": "仿 Notion 的文档页，面包屑、暖深色渐变封面、白底正文、灰色提示块和紧凑数据库表格，安静、以文字为主、几乎无动效。"
+      }
+    },
+    "pm-spec": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Product spec page",
+        "zh": "产品需求文档页"
+      },
+      "descriptionZh": "包含问题、目标与非目标、成功指标、用户故事、四阶段里程碑和待决问题的单页产品需求文档。",
+      "tags": [
+        "prd",
+        "product-spec",
+        "document",
+        "planning",
+        "roadmap"
+      ],
+      "prompt": {
+        "en": "Keep the page structure and order: the top strip with breadcrumb, status pill and owner/date/reviewer chips; the large serif title and three-line summary; the meta row; the Problem section with paragraph panel and customer quote; the two-column Goals and Non-goals block; the success metrics table with baseline, target and measurement columns; the numbered user stories; the four-phase milestone tracker; the open questions with assignee avatars; and the footer. Replace the product name Northwind, the two-factor authentication feature, all headlines, copy, names, numbers, dates, metrics, milestones and links with the user's real spec; the example's made-up product and feature must leave no trace. Before finishing, check that the summary states what, who and why now, that metrics and milestones agree with each other, that long table cells and question text wrap at narrow widths, and that the 880px single-column fallback still reads in order.",
+        "zh": "保留页面结构和顺序：带面包屑、状态标签和负责人/日期/评审人标签的顶栏；大号衬线标题和三行摘要；元信息行；由段落面板和客户引语组成的问题版块；目标与非目标双栏块；含基线、目标和衡量方式列的成功指标表；编号用户故事；四阶段里程碑；带负责人头像的待决问题；以及页脚。把产品名 Northwind、双因素认证功能、所有标题、文案、人名、数字、日期、指标、里程碑和链接换成用户真实的需求文档内容；示例里虚构的产品和功能不能留下任何痕迹。完成前检查：摘要说清做什么、给谁、为什么现在做，指标和里程碑彼此一致，长表格单元格和问题文字在窄屏下正常换行，880px 单栏回退后仍按顺序可读。"
+      },
+      "style": {
+        "en": "Light spec document on cool grey-white with a serif display face, indigo accent, mono labels, card panels and a four-column timeline; dense and calm.",
+        "zh": "冷灰白底的产品规格文档，衬线标题、靛蓝强调、等宽标签，卡片面板与四列里程碑，信息密度高而安静。"
+      }
+    },
+    "social-carousel": {
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Three-card social carousel",
+        "zh": "三联社交轮播图"
+      },
+      "descriptionZh": "深色舞台上并排三张 1080×1080 方形卡片，每张带品牌标记、编号、大号衬线标题、说明文字和循环角标。",
+      "tags": [
+        "carousel",
+        "social-media",
+        "marketing",
+        "instagram",
+        "series"
+      ],
+      "prompt": {
+        "en": "Keep the dark full-bleed stage, the header strip (serif italic title, one-line mono lede, 'SERIES · 01 → 03' badge), and the centered row of three 1:1 cards with rounded corners, soft shadow and layered gradient backgrounds; keep each card's anatomy — brand chip and mono index at the top, serif display headline lockup at the bottom left, caption plus '1× LOOP' stamp in the bottom strip — and the wrap to a stacked column below 1180px. Replace the brand name Jerrod Lew, the three headlines, index labels, captions, lede and badge with the user's content, and make the three headlines read as one sentence across the series; no trace of the example may remain. Before finishing, check that each panel keeps a distinct dominant hue, that headlines fit inside the square at narrow widths, and that mono is used only for the index, loop stamp and captions.",
+        "zh": "保留深色满屏舞台、顶部标题条（衬线斜体标题、一行等宽说明、'SERIES · 01 → 03' 角标），以及居中的三张 1:1 卡片：圆角、柔和投影、多层渐变背景；保留每张卡片的结构——顶部品牌胶囊和等宽编号、左下角衬线大标题、底部说明文字和 '1× LOOP' 角标，并保留 1180px 以下折成竖排的行为。把品牌名 Jerrod Lew、三条标题、编号、说明文字、导语和角标换成用户的内容，三条标题连起来要读成一句话；示例的痕迹不能留下。完成前检查：每张卡片的主色调仍然不同，窄屏下标题仍在方形内，等宽字体只用于编号、循环角标和说明文字。"
+      },
+      "style": {
+        "en": "Dark cinematic stage with three square gradient panels, large serif display headlines, mono stamps and captions; high contrast, no motion, low density.",
+        "zh": "深色舞台上并排三张方形渐变卡片，大号衬线标题配等宽字标签，对比强烈、无动效、信息量少。"
+      }
+    },
+    "social-media-dashboard": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Social media analytics dashboard",
+        "zh": "社媒数据看板"
+      },
+      "descriptionZh": "深色玻璃质感的创作者社媒看板，含平台切换、指标卡、粉丝增长图、受众地域、热门帖子和趋势与评论侧栏。",
+      "tags": [
+        "dashboard",
+        "social-media",
+        "analytics",
+        "creator",
+        "dark"
+      ],
+      "prompt": {
+        "en": "Keep the sticky header (brand mark, ANALYTICS label, platform pills, 7D/30D/90D/YTD tabs, creator avatar block), the sticky hero strip with its display headline, metadata line and Export report / New post buttons, the single-line ask bar, the platform card row, the four KPI cards with label, big value, delta and footnote, the three-column main grid (follower-growth area chart with annotation dots, audience geography map with cluster dots and percentage stats, top post card with handle, body, media block and engagement row) and the lower grid of trending rows with sparklines plus top comment cards. Replace the creator name, handles, platform names, every number, the post and comment copy and the trending topics with the user's real content; the example's OpenDesign / @opendesignhq persona must leave no trace. Before finishing, check that follower counts and deltas agree across the platform cards, KPI row and hero line, that chart annotations sit on the curve, that long handles and comments truncate cleanly, and that the grids hold at narrow desktop widths.",
+        "zh": "保留示例的吸顶页头（品牌标记、ANALYTICS 标签、平台胶囊、7D/30D/90D/YTD 时间标签、创作者头像块）、吸顶主视觉条（大标题、元信息行、Export report 与 New post 按钮）、单行提问输入框、平台卡片行、四张指标卡（标签、大数值、变化量、脚注）、三栏主栅格（带标注点的粉丝增长面积图、带聚类圆点和百分比统计的受众地域图、含账号、正文、媒体块和互动行的热门帖子卡），以及下方由带迷你折线的趋势行和热门评论卡组成的双栏区。把创作者名、账号、平台名、所有数字、帖子和评论文案、趋势话题换成用户的真实内容；示例里 OpenDesign / @opendesignhq 的虚构身份不能留下任何痕迹。完成前检查：平台卡片、指标卡和主视觉行的粉丝数与变化量彼此一致，图表标注点落在曲线上，长账号名和长评论能正常截断，窄桌面宽度下各栅格不塌陷。"
+      },
+      "style": {
+        "en": "Dark glassmorphic analytics dashboard with gold and cyan neon accents, Space Grotesk display type, glowing cards and dense metric layout.",
+        "zh": "深色玻璃拟态看板，金色与青色霓虹点缀，Space Grotesk 标题字体，卡片发光，信息密度高。"
+      }
+    },
+    "social-media-matrix-tracker-template": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Social media matrix tracker dashboard",
+        "zh": "社媒矩阵数据看板"
+      },
+      "descriptionZh": "深色电影感玻璃拟态风格的社媒矩阵数据看板，含平台矩阵、KPI、互动图表、竞品对比和趋势雷达。",
+      "tags": [
+        "social-media",
+        "analytics",
+        "dashboard",
+        "creator",
+        "dark-mode"
+      ],
+      "prompt": {
+        "en": "Keep the desktop dashboard structure and order: top bar with theme switch, date-range chips and avatar; gradient hero headline with action buttons; search bar; four-cell insights panel (Insight Focus, Pinned Point, Range Compare, A/B Compare); platform matrix; KPI strip; follower-growth line chart with legend; top-post card; drafts list; competitor benchmark table; engagement-rate breakdown; then the deep chart sections (engagement by hour, audience heatmap, sentiment donut, content-mix stacked bars, trend radar, conversion funnel, response SLA, revenue vs cost, cohort retention, geo share) and footer note. Keep the glass card styling, chart canvases and interactions: dark/light toggle, hover tooltips, click-to-pin, drag interval, Shift+drag multi-range compare and keyboard arrows. Replace the creator name Jerrod Lew, post copy, competitor names, platform names, headlines, numbers, labels and all chart data with the user's real content; no trace of the example's made-up creator or sample posts may remain. Before finishing, check that KPI cards and charts agree, line series share the same length, stacked bars keep three segments, sentiment shares sum to 100, long labels wrap, and both themes stay legible.",
+        "zh": "保留桌面看板的结构和顺序：带主题切换、时间范围标签和头像的顶栏；渐变主标题和操作按钮；搜索栏；四格洞察面板（Insight Focus、Pinned Point、Range Compare、A/B Compare）；平台矩阵；KPI 条；带图例的粉丝增长折线图；热门帖子卡片；草稿列表；竞品对比表；互动率拆分；以及后续深度图表区（分时互动、受众热力图、情绪环图、内容组合堆叠柱、趋势雷达、转化漏斗、响应 SLA、收入与内容成本、受众留存、地区占比）和页脚说明。保留玻璃卡片样式、图表画布和交互：明暗主题切换、悬停提示、点击固定数据点、拖拽区间、Shift+拖拽多区间对比和键盘方向键。把创作者名 Jerrod Lew、帖子文案、竞品名、平台名、标题、数字、标签和所有图表数据换成用户的真实内容；示例里虚构的创作者和示例帖子不能留下任何痕迹。完成前检查：KPI 卡片和图表数据一致，折线序列长度相同，堆叠柱保持三段，情绪占比合计为 100，长标签能正常换行，明暗两套主题都清晰可读。"
+      },
+      "style": {
+        "en": "Cinematic dark glassmorphism dashboard with neon gradients, serif display numerals, dense multi-chart analytics and subtle ambient motion.",
+        "zh": "深色电影感玻璃拟态看板，霓虹渐变、衬线大数字、密集多图表分析，带轻微环境动效。"
+      }
+    },
+    "team-okrs": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "OKR tracker",
+        "zh": "OKR 目标追踪页"
+      },
+      "descriptionZh": "季度横幅、三个目标卡片（含关键结果进度条、负责人头像和状态标签）以及右侧概览栏组成的 OKR 追踪页。",
+      "tags": [
+        "okr",
+        "goals",
+        "tracker",
+        "progress",
+        "team"
+      ],
+      "prompt": {
+        "en": "Keep the two-column app grid (main column plus 320px sidebar), the dark quarter banner with its large overall-progress figure, the objective card anatomy (objective number, title, owner avatar, status pill), the key-result row grid of name with sub-note, progress bar and value, the sidebar blocks (at-a-glance stats, top movers, blockers callout) and the single-column collapse below 1080px. Replace the company name Northwind, the quarter and dates, owner names and initials, objective titles, key results, sub-notes, numbers, statuses and blocker text with the user's real content; no trace of Northwind, Mira Reddy, Devon Park or Priya Banerjee may remain. Before finishing, check that each progress bar width matches its stated percentage, that status pills agree with the numbers, that long objective titles wrap inside the 60ch limit, and that the layout stacks cleanly at narrow widths.",
+        "zh": "保留示例的双栏应用栅格（主栏加 320px 侧栏）、带大号整体进度数字的深色季度横幅、目标卡片结构（目标编号、标题、负责人头像、状态标签）、关键结果行栅格（名称加副注、进度条、数值）、侧栏各块（概览统计、本周变化、阻碍提示）以及 1080px 以下收成单栏的行为。把公司名 Northwind、季度和日期、负责人姓名与缩写、目标标题、关键结果、副注、数字、状态和阻碍文案换成用户的真实内容；不能留下 Northwind、Mira Reddy、Devon Park、Priya Banerjee 的任何痕迹。完成前检查：每条进度条宽度与标注百分比一致，状态标签与数字相符，长目标标题在 60ch 内正常换行，窄屏下布局干净地堆叠。"
+      },
+      "style": {
+        "en": "Calm light OKR tracker on cool grey-white with a dark gradient quarter banner, indigo accent, monospace labels and thin progress bars; medium density.",
+        "zh": "冷灰白底的克制 OKR 追踪页，深色渐变季度横幅、靛蓝强调、等宽标签和细进度条，信息密度中等。"
+      }
+    },
+    "tweaks": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Live tweak panel",
+        "zh": "实时调参面板"
+      },
+      "descriptionZh": "带导航、主视觉、数据条、功能卡片和行动号召的落地页，右侧固定一个实时调参面板。",
+      "tags": [
+        "tweaks",
+        "controls",
+        "theming",
+        "landing",
+        "design-system"
+      ],
+      "prompt": {
+        "en": "Keep the stage layout (top nav with brand mark and links, two-column hero with a monospace sync-log card, four-column stats strip, three feature cards, CTA banner, footer) and the fixed right tweak panel with its accent swatches, Light/Dark, Compact/Normal/Generous, Tight/Normal/Roomy and Off/Subtle/Lively segmented controls, the T/R shortcuts and the Reset button. Keep the CSS custom properties (--accent, --scale, --density, --motion-mult, data-mode) and the localStorage persistence. Replace the Filebase brand, nav links, headlines, lede, stat numbers and labels, feature copy, code sample, banner text and footer with the user's real content; no trace of Filebase may remain. Before finishing, check that the panel never covers the stage at narrow widths, that every control updates the stage instantly and survives a refresh, that Reset restores the defaults, and that long copy still fits at Generous scale and Roomy density.",
+        "zh": "保留示例的舞台布局（带品牌标记和链接的顶栏、含等宽同步日志卡的两栏主视觉、四列数据条、三张功能卡片、行动号召横幅、页脚），以及右侧固定的调参面板：强调色色板、Light/Dark、Compact/Normal/Generous、Tight/Normal/Roomy、Off/Subtle/Lively 分段控件、T/R 快捷键和 Reset 按钮。保留 CSS 自定义属性（--accent、--scale、--density、--motion-mult、data-mode）和 localStorage 持久化。把 Filebase 品牌、导航项、标题、导语、数据数字和说明、功能文案、代码示例、横幅文字和页脚换成用户的真实内容；不能留下任何 Filebase 的痕迹。完成前检查：窄屏下面板不遮挡舞台，每个控件都能即时更新舞台并在刷新后保留，Reset 能恢复默认值，长文案在 Generous 字号和 Roomy 密度下仍然放得下。"
+      },
+      "style": {
+        "en": "Warm off-white editorial landing page with serif headlines, mono labels and a rust accent, plus a fixed control sidebar; restrained motion, medium density.",
+        "zh": "暖白底编辑风落地页，衬线标题、等宽标签、铁锈色强调，右侧固定参数面板，动效克制，密度中等。"
+      }
+    },
+    "waitlist-page": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Waitlist page",
+        "zh": "等候名单页"
+      },
+      "descriptionZh": "极简的发布前落地页：品牌标志、超大标题、姓名与邮箱收集表单，底部是装饰网格和滚动字幕。",
+      "tags": [
+        "waitlist",
+        "launch",
+        "email-capture",
+        "coming-soon",
+        "marketing"
+      ],
+      "prompt": {
+        "en": "Keep the structure of the example: the logo lockup fixed at the top left, the centered hero with an oversized display headline, short subtext and inline first-name/email form with its success message, and the lower decorative band made of the coil SVG row, the accent stripe, the perspective grid floor and the scrolling COMING SOON ticker. Replace the product name Meridian, the headline, subtext, field placeholders, button label, ticker text and logo initials with the user's real content, and take colors and fonts from the user's design system; no trace of Meridian may remain. Before finishing, check that the form stacks cleanly at narrow widths, that a long headline and tagline wrap without overflow, that the success message appears in place, that text and button contrast pass, and that the ticker stops under reduced motion.",
+        "zh": "保留示例的结构：固定在左上角的品牌标志、居中的主视觉（超大展示标题、简短副文案、姓名与邮箱行内表单及成功提示），以及下方由线圈 SVG、强调条纹、透视网格地面和滚动 COMING SOON 字幕组成的装饰带。把产品名 Meridian、标题、副文案、输入框占位、按钮文字、字幕文字和标志缩写换成用户的真实内容，颜色和字体取自用户的设计系统；不能留下 Meridian 的痕迹。完成前检查：窄屏下表单正常堆叠，长标题和标语换行不溢出，成功提示在原位出现，文字与按钮对比度达标，减少动效时字幕停止滚动。"
+      },
+      "style": {
+        "en": "Bold pre-launch page on peach with an oversized display headline, orange stripe, perspective grid and scrolling ticker; minimal and mostly static.",
+        "zh": "蜜桃色底的发布前页面，超大展示标题、橙色条纹、透视网格和滚动字幕，简洁克制，动效很少。"
+      }
+    },
+    "web-prototype": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Product landing page (centered hero)",
+        "zh": "产品落地页（居中主视觉）"
+      },
+      "descriptionZh": "带顶栏、居中主视觉、三张功能卡片和结尾行动号召的产品落地页。",
+      "tags": [
+        "landing",
+        "marketing",
+        "product",
+        "features",
+        "cta"
+      ],
+      "prompt": {
+        "en": "Keep the top navigation with logo and three links, the centered hero with oversized headline, supporting paragraph and two-button CTA, the three equal feature cards with icon placeholders, the closing CTA band and the centered footer. Replace the product name Tomato, the emoji logo, headlines, copy, pricing numbers, links and icon placeholders with the user's real content; no trace of Tomato may remain. Before finishing, check that the feature cards stack cleanly at narrow widths, that long headlines and copy wrap without overflow, that both hero buttons and the closing button have a clear purpose, and that navigation anchors match the sections.",
+        "zh": "保留顶栏（标志和三个链接）、居中主视觉（超大标题、说明段落和双按钮行动号召）、三张等宽功能卡片及图标占位、结尾行动号召区和居中页脚。把产品名 Tomato、表情标志、标题、文案、价格数字、链接和图标占位换成用户的真实内容；不能留下任何 Tomato 的痕迹。完成前检查：窄屏下功能卡片正常堆叠，长标题和文案换行不溢出，主视觉两个按钮和结尾按钮都有明确用途，导航锚点与版块对应。"
+      },
+      "style": {
+        "en": "Warm off-white landing page with a centered oversized hero, terracotta accent, three equal feature cards and a closing CTA; sans-serif, airy and almost no motion.",
+        "zh": "暖白底、居中大标题主视觉、陶土色强调、三张等宽功能卡片和结尾行动号召，无衬线字体，疏朗安静，几乎没有动效。"
+      }
+    },
+    "webgl-experience": {
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "WebGL hero experience",
+        "zh": "WebGL 主视觉体验"
+      },
+      "descriptionZh": "全屏 WebGL 着色器动画上叠加引导语、大标题和 FPS 徽标的实时视觉页面。",
+      "tags": [
+        "webgl",
+        "shader",
+        "hero",
+        "animation",
+        "generative"
+      ],
+      "prompt": {
+        "en": "Keep the full-viewport canvas, the fragment-shader draw loop, the DPR-aware resize, the bottom-left overlay stack (kicker, headline, supporting line), the top-right FPS badge and the dark palette with a single vivid accent. Replace the kicker, headline, supporting line, badge label and accent color with the user's content; the example's headline 'Motion that runs on the GPU.' and its lime accent must leave no trace. Before finishing, check that the overlay stays readable over the brightest frame, that the canvas resizes without blur or stretching, that the animation holds roughly 60fps, and that a graceful message appears instead of a blank page when WebGL2 is unavailable.",
+        "zh": "保留示例的全屏画布、片元着色器绘制循环、按 DPR 缩放的 resize、左下角叠加层（引导语、大标题、说明句）、右上角 FPS 徽标，以及深色底加单一亮色的配色。把引导语、大标题、说明句、徽标文字和强调色换成用户的内容；示例里的标题“Motion that runs on the GPU.”和荧光绿强调不能留下任何痕迹。完成前检查：叠加文字在最亮的画面上仍然可读，画布缩放时没有模糊或拉伸，动画大致保持 60fps，WebGL2 不可用时显示友好提示而不是空白页。"
+      },
+      "style": {
+        "en": "Full-bleed dark WebGL aurora field with a lime accent, an oversized tight headline bottom-left and a small FPS badge; continuous motion, minimal text.",
+        "zh": "全屏深色 WebGL 极光场，荧光绿强调，左下超大紧凑标题与右上 FPS 徽标，持续动效，文字极少。"
+      }
+    },
+    "wireframe-annotated": {
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Annotated wireframe",
+        "zh": "标注线框图"
+      },
+      "descriptionZh": "浏览器外框内的低保真落地页灰块线框，五个编号标注对应右侧规格面板。",
+      "tags": [
+        "wireframe",
+        "redline",
+        "annotation",
+        "low-fidelity",
+        "design-spec"
+      ],
+      "prompt": {
+        "en": "Keep the two-column shell: a browser-chrome framed greybox canvas on the left and a sticky ANNOTATIONS / SPEC panel on the right. Preserve the five stacked canvas blocks in order (nav, hero with image placeholder, five-logo strip, three-up feature grid, four-column footer), the numbered pins ①–⑤, the one-to-one spec rows, the greyscale greybox primitives and the single accent used only for pins and spec numbers. Replace the project name, page title, browser URL, pin notes, dimensions and any labels with the user's real content; the example's Acme name must leave no trace. Before finishing, check that every pin has exactly one matching spec row, the accent appears nowhere else, the canvas still reads at thumbnail size, and the layout collapses cleanly below 1000px.",
+        "zh": "保留两栏结构：左侧是带浏览器外框的灰块画布，右侧是吸顶的“标注 / 规格”面板。保留画布上按顺序排列的五个区块（导航、带图片占位的首屏、五个合作方标志条、三列功能网格、四列页脚）、编号圆点①–⑤、一一对应的规格行、灰阶灰块基本件，以及只用于圆点和规格编号的单一强调色。把项目名、页面标题、浏览器地址、标注说明、尺寸和所有标签换成用户的真实内容；示例里的 Acme 不能留下任何痕迹。完成前检查：每个圆点恰好对应一条规格行，强调色不出现在别处，画布在缩略图尺寸下仍然清楚，1000px 以下布局能正常折叠。"
+      },
+      "style": {
+        "en": "Flat greyscale lo-fi landing wireframe inside a browser frame, with coral numbered pins and a mono spec panel; crisp, structural and low in density.",
+        "zh": "扁平灰阶低保真落地页线框，浏览器外框、珊瑚色编号圆点与等宽规格面板，结构清晰、密度低。"
+      }
+    },
+    "wireframe-greybox": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Greybox dashboard wireframe",
+        "zh": "灰盒仪表盘线框图"
+      },
+      "descriptionZh": "由顶栏、侧栏、四个指标块、示意图表和带图片占位的列表组成的低保真灰盒仪表盘线框图。",
+      "tags": [
+        "wireframe",
+        "dashboard",
+        "low-fidelity",
+        "blueprint",
+        "greybox"
+      ],
+      "prompt": {
+        "en": "Keep the greybox structure and order: top app bar with logo block, nav lorem-bars and avatar; left sidebar with icon squares and one inverted active item; four-up KPI row; chart panel with axes, alternating solid and hatched bars plus a dashed trend line; table panel with X-crossed thumbnail placeholders, lorem-bar columns and pill statuses; and the monospace redline annotations (floating max-width note and footer grid notes). Replace the example's made-up product name Acme Analytics and its implied section labels with the user's product name and navigation structure, and keep text as lorem bars and images as X-crossed placeholders unless the user asks for real content. Before finishing, check that the page still reads as a greybox at thumbnail size, that only the single redline accent carries color, that the sidebar, KPI row and table collapse cleanly under 1000px, and that the annotations match the actual grid and gutter values.",
+        "zh": "保留灰盒结构和顺序：顶部应用栏（logo 块、导航文本条、头像）、左侧栏（图标方块和一个反色选中项）、四列指标行、带坐标轴和实心/斜线柱及虚线趋势线的图表面板、带打叉缩略图占位和文本条列及胶囊状态的表格面板，以及等宽红线标注（浮动的 max-width 注记和底部栅格注记）。把示例中虚构的产品名 Acme Analytics 及其隐含的栏目名换成用户的产品名和导航结构；除非用户要求真实内容，文字保持文本条、图片保持打叉占位。完成前检查：缩略图尺寸下仍像灰盒线框图，只有单一红线强调色带颜色，侧栏、指标行和表格在 1000px 以下正常折叠，标注与实际栅格和间距数值一致。"
+      },
+      "style": {
+        "en": "Neutral grey lo-fi dashboard wireframe with crisp 1.5px borders, lorem bars, X-crossed image boxes, a hatched schematic chart and one blue monospace redline accent.",
+        "zh": "中性灰的低保真仪表盘线框图，1.5px 硬边框、文本条、打叉图片占位、斜线示意图表，仅用蓝色等宽标注作强调。"
+      }
+    },
+    "wireframe-mobile-flow": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Mobile flow wireframe",
+        "zh": "移动端流程线框图"
+      },
+      "descriptionZh": "白板上的四个手机线框画面，用虚线箭头和编号标注串起从引导到下单确认的流程。",
+      "tags": [
+        "wireframe",
+        "mobile",
+        "user-flow",
+        "low-fidelity",
+        "prototype"
+      ],
+      "prompt": {
+        "en": "Keep the board header with its pinned WIREFRAME tag and mono dateline, the horizontal row of 3–4 rounded phone frames with notch and status bar, the greybox screen primitives (image placeholder with X, title and text bars, list cards, category chips, tab bar, sticky CTA, confirm checkmark), the dashed connector arrows with numbered verb-first step labels, the 1–2 sticky annotation callouts and the legend. Replace the app name, flow steps, screen content, step labels, dates, device details and annotations with the user's real flow; the example's made-up Marketplace App and its buy flow must leave no trace. Before finishing, check that the flow reads left-to-right, that three main phones are visible at about 1280px, that every screen has visible grey fills or borders and does not render blank, and that labels and annotations fit without overlapping.",
+        "zh": "保留示例的看板页头（带倾斜的 WIREFRAME 标签和等宽日期行）、横向排列的 3–4 个圆角手机外框（含刘海和状态栏）、灰盒界面基本件（带 X 的图片占位、标题和文字条、列表卡片、分类标签、标签栏、底部固定 CTA、确认勾选）、带编号动词步骤标签的虚线连接箭头、1–2 个便利贴批注和图例。把应用名、流程步骤、界面内容、步骤标签、日期、设备信息和批注换成用户真实的流程；示例里虚构的 Marketplace App 及其购买流程不能留下任何痕迹。完成前检查：流程从左到右阅读顺畅，约 1280px 宽度下能看到三个主要手机画面，每个界面都有可见的灰色填充或边框、不会显示为空白，标签和批注不重叠且放得下。"
+      },
+      "style": {
+        "en": "Lo-fi whiteboard wireframe on gridded off-white, four greybox phone frames linked by dashed orange arrows, mono labels and sticky notes; flat and static.",
+        "zh": "网格白板上的低保真线框图，四个灰盒手机画面由橙色虚线箭头连接，配等宽标签和便利贴，扁平静止。"
+      }
+    },
+    "wireframe-sketch": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Hand-drawn wireframe",
+        "zh": "手绘线框图"
+      },
+      "descriptionZh": "方格纸背景上的手绘仪表盘线框，含标签页、侧栏、KPI 卡片、手绘图表和便利贴批注。",
+      "tags": [
+        "wireframe",
+        "sketch",
+        "low-fidelity",
+        "whiteboard",
+        "dashboard"
+      ],
+      "prompt": {
+        "en": "Keep the page header with the rotated WIREFRAME v0.1 pin, the tab strip with one highlighter-swipe active tab, the graph-paper canvas, the browser chrome row, the checkbox sidebar, the four tilted KPI tiles, the scribbled line chart and hatched bar chart, the dashed events block, the next-step list and the taped sticky notes. Replace the product name, Japanese labels, headlines, numbers, URL, user name, navigation items and sticky-note text with the user's real content; the example's made-up Zentou AI portal must leave no trace. Before finishing, check that only one tab is active, that sticky notes do not cover key content, that long labels wrap inside the sidebar and KPI tiles, and that the page still reads as a loose sketch rather than finished UI.",
+        "zh": "保留示例的页头（含旋转的 WIREFRAME v0.1 标签）、只有一个高亮活动标签的标签栏、方格纸画布、浏览器外框行、带复选框的侧栏、四个轻微倾斜的 KPI 卡片、手绘折线图和斜线填充柱状图、虚线公告块、下一步列表和胶带便利贴。把产品名、日文标签、标题、数字、网址、用户名、导航项和便利贴文字换成用户的真实内容；示例里虚构的 Zentou AI 门户不能留下任何痕迹。完成前检查：只有一个标签处于活动状态，便利贴没有遮住关键内容，长标签在侧栏和 KPI 卡片内正常换行，页面仍然像草稿而不是完成品。"
+      },
+      "style": {
+        "en": "Hand-drawn low-fidelity dashboard wireframe on cream graph paper with marker and serif type, hatched charts, sticky notes and slight rotations; loose and informal.",
+        "zh": "米色方格纸上的手绘低保真仪表盘线框，马克笔与衬线字体、斜线填充图表、便利贴和轻微倾斜，松散随意。"
+      }
+    },
+    "worker-visualizer": {
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Web Worker particle visualizer",
+        "zh": "Web Worker 粒子可视化"
+      },
+      "descriptionZh": "全屏画布上的实时粒子模拟，计算放在 Web Worker 中，左上标题和底部统计块显示运行状态。",
+      "tags": [
+        "visualizer",
+        "web-worker",
+        "particles",
+        "simulation",
+        "canvas"
+      ],
+      "prompt": {
+        "en": "Keep the full-bleed canvas, the top-left HUD (kicker, oversized headline), the bottom-left row of three live stat tiles (Particles, Transport, Render fps), the worker/main-thread split and the single-file, zero-external-request build of the example. Replace the kicker, headline, stat labels, particle count and any copy with the user's real visualization brief; the example's placeholder title 'Compute off the main thread.' must not remain. Keep the SharedArrayBuffer fast path with a postMessage transferable fallback and feature detection. Before finishing, check that the worker constructs without a SecurityError, both transport branches run and the Transport tile reports the live path truthfully, the HUD and stats stay readable at narrow widths and with long titles, the canvas resizes without clipping, and the simulation stays stable over minutes.",
+        "zh": "保留示例的全屏画布、左上角 HUD（小标题、超大标题）、左下角三个实时统计块（粒子数、传输方式、渲染帧率）、Worker 计算与主线程只读取并绘制的分工，以及单文件、无外部请求的构建方式。把标题、统计标签、粒子数量和文案换成用户真实的可视化主题；示例里的占位标题“Compute off the main thread.”不能留下。保留 SharedArrayBuffer 快路径、postMessage 可转移缓冲区回退和特性检测。完成前检查：Worker 能正常创建且没有 SecurityError，两条传输路径都能运行且“传输方式”如实显示当前路径，窄屏和长标题下 HUD 与统计仍然可读，画布缩放不裁切，模拟运行数分钟仍然稳定。"
+      },
+      "style": {
+        "en": "Full-bleed dark canvas with a neon green accent, oversized bold headline, tabular stat readouts and continuous particle motion; minimal HUD and high visual energy.",
+        "zh": "全屏深色画布配荧光绿强调，超大粗体标题，等宽数字统计，持续粒子动效，HUD 极简且视觉能量强。"
+      }
+    },
+    "article-magazine": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Magazine article",
+        "zh": "杂志文章"
+      },
+      "descriptionZh": "带来源横幅、衬线大标题、作者信息、引语、装饰分隔线和文末卡片的单栏长文页面。",
+      "tags": [
+        "article",
+        "essay",
+        "editorial",
+        "longform",
+        "newsletter"
+      ],
+      "prompt": {
+        "en": "Keep the single centered reading column (about 720px), the source banner at the top, the small uppercase kicker, the large serif headline with an inline accent link, the light subtitle, the byline row with avatar, date and reading time, the serif H2s, the drop-cap first letter, the left-border italic blockquote, the inline code chips, the centered ornament divider and the closing card. Replace the source attribution and its URL, the headline, subtitle, all body copy, the author name, date, reading time and every link with the user's real content; the example's @trq212 tweet, Tom Pan and HTML Anything must leave no trace. Before finishing, check that the headline wraps cleanly at narrow widths, that the drop cap aligns with the first line, that the ornament divider sits evenly between sections, and that the reading measure stays comfortable.",
+        "zh": "保留居中的单栏阅读宽度（约 720px）、顶部来源横幅、小号大写眉标、带内联强调链接的衬线大标题、浅色副标题、含头像/日期/阅读时长的作者行、衬线 H2、首字下沉、左侧边线斜体引语、行内代码块、居中装饰分隔线和文末卡片。把来源说明及其链接、标题、副标题、全部正文、作者名、日期、阅读时长和所有链接换成用户的真实内容；示例里的 @trq212 推文、Tom Pan 和 HTML Anything 不能留下任何痕迹。完成前检查：窄屏下大标题换行自然，首字下沉与首行对齐，装饰分隔线在章节之间居中均匀，阅读行宽保持舒适。"
+      },
+      "style": {
+        "en": "Warm off-white paper with serif display headings, a rust accent, drop caps and a centered ornament divider; quiet single-column long read.",
+        "zh": "暖白纸感底、衬线大标题、锈红强调，首字下沉与居中装饰分隔线，单栏长文，安静克制。"
+      }
+    },
+    "card-xiaohongshu": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Xiaohongshu card carousel",
+        "zh": "小红书图文卡片"
+      },
+      "descriptionZh": "七张 3:4 竖版卡片纵向排列，由封面、五个编号要点和总结行动号召组成的图文合集。",
+      "tags": [
+        "xiaohongshu",
+        "carousel",
+        "social-media",
+        "knowledge-cards"
+      ],
+      "prompt": {
+        "en": "Keep the vertical stack of 1080×1440 3:4 rounded cards, the cover card (pill badge, oversized headline with one highlighted phrase, subtitle, swipe hint), the numbered content cards (large italic serif numeral, big heading, short body with bolded phrases), the dark closing card with pill action buttons, and the page counter and watermark on every card. Replace the topic, cover headline, the five points, examples, author handle, date, page counts and button labels with the user's real content, and set the number of cards from the amount of content (3–6 for short, up to 18); the example's AI-editing-habits text and the @HTMLAnything handle must leave no trace. Before finishing, check that each card carries one idea, that headings and body still fit inside the 3:4 frame at these large type sizes, that page numbers run in sequence, and that the watermark is consistent across cards.",
+        "zh": "保留 1080×1440、3:4 圆角卡片的纵向排列，封面卡（胶囊标签、超大标题并高亮一个词、副标题、滑动提示）、编号正文卡（大号斜体衬线序号、大标题、带加粗短语的短正文）、深色结尾卡与胶囊行动按钮，以及每张卡上的页码和水印。把主题、封面标题、五个要点、例子、作者名、日期、页码和按钮文字换成用户的真实内容，卡片数量按信息量决定（短内容 3–6 张，最多 18 张）；示例里的 AI 编辑习惯文案和 @HTMLAnything 署名不能留下任何痕迹。完成前检查：每张卡只讲一个观点，大字号下标题和正文仍能放进 3:4 画幅，页码连续，各卡水印一致。"
+      },
+      "style": {
+        "en": "Seven stacked 3:4 cards with soft Morandi gradients, oversized bold headings, italic serif numerals and rounded corners; poster-like, low density, no motion.",
+        "zh": "七张 3:4 竖版卡片纵向排列，柔和莫兰迪渐变、超大粗标题、斜体衬线序号、圆角，海报感强，信息量少，无动效。"
+      }
+    },
+    "data-report": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Data visualization report",
+        "zh": "数据可视化报告页"
+      },
+      "descriptionZh": "由报告头部、KPI 卡片、Chart.js 图表、明细表格和洞察块组成的单页数据报告。",
+      "tags": [
+        "report",
+        "data",
+        "charts",
+        "kpi",
+        "analytics"
+      ],
+      "prompt": {
+        "en": "Keep the report structure and order: header with title, time range and data source, the 4-card KPI grid with value, delta and 40px sparkline, the two-chart trend row (wide line chart plus narrow churn chart), the zebra-striped table with sticky header, the emoji insight cards and the collapsible methodology block. Replace the report title, date range, source, KPI names, numbers, deltas, chart series, table rows and insight text with the user's real data parsed from their CSV/Excel/JSON; the example's weekly-report content and made-up figures must leave no trace. Before finishing, check that every chart canvas sits in a container with an explicit pixel height (40px for sparklines, 240–280px for main charts) so Chart.js does not grow endlessly, that KPI values, deltas and table rows agree with each other and with the charts, that up/down colors match the direction of change, and that the table scrolls instead of overflowing at narrow widths.",
+        "zh": "保留报告的结构和顺序：带标题、时间区间和数据来源的头部，4 张 KPI 卡片（数值、同比变化、40px 迷你趋势线），双图趋势行（宽折线图加窄流失率图），带吸顶表头的斑马纹表格，emoji 洞察卡片，以及可折叠的方法论区。把报告标题、时间区间、来源、指标名、数字、变化值、图表序列、表格行和洞察文案换成从用户 CSV/Excel/JSON 解析出的真实数据；示例里的周报内容和虚构数字不能留下任何痕迹。完成前检查：每个图表 canvas 外层容器都有明确的像素高度（迷你图 40px，主图 240–280px），避免 Chart.js 无限增高；KPI 数值、变化值和表格行彼此一致并与图表一致；涨跌颜色与变化方向相符；窄屏下表格可滚动而不溢出。"
+      },
+      "style": {
+        "en": "Restrained warm off-white report with a terracotta accent, tabular numerals, KPI cards with sparklines, two charts and a zebra table; dense and calm.",
+        "zh": "暖白底、陶土色强调的数据报告，等宽数字、KPI 卡片带迷你趋势线，双图表加斑马纹表格，信息密度高而克制。"
+      }
+    },
+    "doc-kami-parchment": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Editorial one-pager document",
+        "zh": "编辑级单页文档"
+      },
+      "descriptionZh": "暖羊皮纸底、墨蓝单色强调的编辑级单页文档，含页眉刊头、大标题、导语、三栏要点、引语和版权脚注。",
+      "tags": [
+        "editorial",
+        "one-pager",
+        "document",
+        "serif",
+        "report"
+      ],
+      "prompt": {
+        "en": "Keep the 920px single reading column, the three-part folio header with hairline bottom rule, the kicker row (uppercase tag chip plus mono location meta), the oversized display headline with one italic ink-blue word, the lede paragraph, the three-column pillar grid with numbered mono kickers and top rule, the left-ruled pull quote with mono attribution, and the three-part colophon footer. Replace the studio name, issue and volume numbers, license, city and coordinates, headline, lede, pillar titles and body, quote and attribution, and footer links with the user's real content; the example's KAMI · OpenDesign Studio and Issue №26 must leave no trace. Keep only the parchment, ink and ink-blue hex values, one serif family plus mono for meta labels, and no shadows, gradients or rounded corners. Before finishing, check that the headline still breaks into two lines without overflow, that the three pillars stack cleanly at narrow widths, that long pillar text does not unbalance the row, and that any image the user supplies is a paper-tint block with a 1px ink outline.",
+        "zh": "保留示例的 920px 单一阅读栏、带细线底边的三段式刊头、眉标行（大写标签块 + 等宽地点信息）、含一个墨蓝斜体词的大号展示标题、导语段、带编号等宽眉标和顶线的三栏要点、左侧墨蓝竖线的引语及等宽署名、以及三段式版权脚注。把工作室名、期号卷号、许可证、城市与坐标、标题、导语、三栏标题与正文、引语与署名、脚注链接都换成用户的真实内容；示例里的 KAMI · OpenDesign Studio 和 Issue №26 不能留下任何痕迹。只保留羊皮纸、墨色和墨蓝三个色值，一种衬线字体加等宽字体做小标签，不要阴影、渐变和圆角。完成前检查：标题仍能自然断成两行且不溢出，三栏在窄屏下整齐堆叠，较长的要点文字不会撑歪整行，用户提供的图片用纸色块加 1px 墨色描边表示。"
+      },
+      "style": {
+        "en": "Warm parchment one-pager with a single ink-blue accent, one serif family, mono meta labels and hairline rules; print-like, calm and motionless.",
+        "zh": "暖羊皮纸底的单页文档，墨蓝单色强调，单一衬线字体配等宽小标签，细线分隔，像印刷品，安静无动效。"
+      }
+    },
+    "faq-page": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "FAQ page",
+        "zh": "常见问题页"
+      },
+      "descriptionZh": "带搜索、分类筛选、可折叠问答列表和联系支持入口的帮助中心页面。",
+      "tags": [
+        "faq",
+        "help-center",
+        "support",
+        "accordion",
+        "search"
+      ],
+      "prompt": {
+        "en": "Keep the centered 800px column, the header, the full-width search field with icon, the row of category pills with 'All' active, the stacked accordion cards with rotating chevrons and animated expansion, the no-results message and the footer CTA card. Populate the accordion with the user's real questions across 3–4 categories. Replace the page title, subtitle, category labels, every question and answer, and the support email/link with the user's real content; the example's generic placeholder questions and support@example.com must leave no trace. Before finishing, check that search and category filters work together and are case-insensitive, that keyboard focus and aria-expanded states are correct, that long answers are not clipped by the expansion height, and that the layout holds at narrow widths and in the empty state.",
+        "zh": "保留居中的 800px 单栏、页头、带图标的整宽搜索框、含默认选中“全部”的分类胶囊行、带旋转箭头和展开动画的堆叠手风琴卡片、无结果提示和底部联系卡片。用用户真实的 3–4 个分类问题填充手风琴。把页面标题、副标题、分类名称、所有问题和答案、支持邮箱/链接换成用户的真实内容；示例里的通用占位问题和 support@example.com 不能留下任何痕迹。完成前检查：搜索和分类筛选能同时生效且不区分大小写，键盘焦点和 aria-expanded 状态正确，长答案不会被展开高度裁切，窄屏和空状态下布局正常。"
+      },
+      "style": {
+        "en": "Centered single-column FAQ on near-white with white accordion cards, a bright blue accent, rounded category pills and soft shadows; calm and low in motion.",
+        "zh": "居中的单栏常见问题页，近白底、白色手风琴卡片、亮蓝强调、圆角分类胶囊和柔和阴影，安静少动效。"
+      }
+    },
+    "field-notes-editorial-template": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Editorial report",
+        "zh": "编辑风报告"
+      },
+      "descriptionZh": "奶油纸底、粉彩卡片、衬线大标题和留存折线图组成的三视图编辑风报告页。",
+      "tags": [
+        "report",
+        "editorial",
+        "data-storytelling",
+        "insights",
+        "chart"
+      ],
+      "prompt": {
+        "en": "Keep the paper-toned deck frame, the top line with section mark, the three switchable panels (metrics grid with a large lime hero and pink/peach stat cards, three pastel insight cards, and the retention split with legend and line chart), the bottom date/volume/pager bar, and the count-up and chart-reveal motion. Replace the Field Notes name, headlines, insight copy, metric labels and numbers, chart series and legend labels, dates, volume and page numbers with the user's real report content; no trace of the example's Field Notes branding may remain. Before finishing, check that the pager switches all three panels, that metrics and chart values agree, that the chart has axis labels and units, that long insight text fits its card, and that the grids stack cleanly at narrow widths.",
+        "zh": "保留纸感报告外框、带章节标记的顶行、三个可切换面板（含大号青柠主卡和粉/桃色数据卡片的指标栅格、三张粉彩洞察卡片、带图例和折线图的留存分栏）、底部日期/卷号/翻页条，以及数字递增和折线显现动效。把 Field Notes 名称、标题、洞察文案、指标标签和数字、图表系列和图例、日期、卷号和页码换成用户真实的报告内容；示例里的 Field Notes 品牌不能留下任何痕迹。完成前检查：翻页能切换三个面板，指标和图表数值一致，图表有坐标标签和单位，长洞察文案能放进卡片，窄屏下栅格正常堆叠。"
+      },
+      "style": {
+        "en": "Warm paper background with lime, pink and peach pastel cards, serif display headlines, sans-serif body, a clean retention chart and restrained motion; medium density.",
+        "zh": "暖纸色背景，青柠、粉、桃色粉彩卡片，衬线大标题配无衬线正文，留存折线图干净，动效克制，信息密度中等。"
+      }
+    },
+    "login-flow": {
+      "sourceDir": "skills",
+      "category": "prototype",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Mobile login screen",
+        "zh": "手机登录界面"
+      },
+      "descriptionZh": "手机外框内的登录界面，含手机号与密码输入、显示密码切换、社交登录和注册链接。",
+      "tags": [
+        "login",
+        "mobile",
+        "auth",
+        "form"
+      ],
+      "prompt": {
+        "en": "Keep the phone frame, the status bar, the centered logo block, the welcome header, the labeled form fields (country-code selector plus phone input, password field with show/hide toggle), the right-aligned forgot-password link, the full-width primary button with its loading spinner, the 'or continue with' divider, the two social SSO buttons and the sign-up footer of the example. Replace the app name Nova, the logo mark, the headline, the supporting copy, the placeholders, the country code and the social providers with the user's real content; no trace of Nova may remain. Before finishing, check that everything fits 375px without horizontal scroll, that labels sit above inputs rather than only in placeholders, that touch targets are at least 44px, and that the error and loading states still display correctly.",
+        "zh": "保留示例的手机外框、状态栏、居中的标志区、欢迎标题、带标签的表单字段（区号选择加手机号输入、带显示/隐藏切换的密码框）、右对齐的忘记密码链接、带加载转圈的整宽主按钮、“or continue with”分隔线、两个社交登录按钮和底部注册链接。把应用名 Nova、标志图形、标题、说明文案、占位文字、区号和社交平台换成用户的真实内容；不能留下任何 Nova 的痕迹。完成前检查：内容在 375px 宽度内不出现横向滚动，标签在输入框上方而不只靠占位文字，可点击区域不小于 44px，错误态和加载态仍然正常显示。"
+      },
+      "style": {
+        "en": "One rounded phone frame on cool grey-white with an indigo accent, 12px rounded inputs, centered stack and only a spinner for motion.",
+        "zh": "冷灰白底上的单个圆角手机外框，靛蓝强调色，12px 圆角输入框，居中纵向排布，仅有加载转圈动效。"
+      }
+    },
+    "mockup-device-3d": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Device 3D showcase",
+        "zh": "设备 3D 展架"
+      },
+      "descriptionZh": "深色舞台上倾斜摆放 iPhone 与 MacBook 立体模型，屏幕内嵌真实界面内容的 16:9 展示图。",
+      "tags": [
+        "mockup",
+        "device",
+        "showcase",
+        "product-launch",
+        "3d"
+      ],
+      "prompt": {
+        "en": "Keep the 1920×1080 dark stage, the top caption row, the tilted iPhone with notch, status bar, header, template tile, input block, CTA and tab bar, the MacBook with window chrome and its three-pane sidebar / editor / preview layout, the glass lens flares, the mirrored ground and the bottom slug footer. Replace the codename, caption text, screen content, task names, metrics, preview slide copy and footer slug with the user's real product content; the example's made-up product Atlas and its numbers must leave no trace. Before finishing, check that each screen's content fits inside its frame without clipping, that in-screen type stays at realistic mobile and desktop sizes, that no external mockup images are used, and that the composition still reads when scaled down.",
+        "zh": "保留 1920×1080 的深色舞台、顶部说明行、带刘海/状态栏/标题/模板卡/输入框/主按钮/标签栏的倾斜 iPhone、带窗口栏和三栏（侧栏/编辑器/预览）布局的 MacBook、玻璃光斑、镜面地面和底部角标。把代号、说明文字、屏幕内容、任务名、指标、预览页文案和底部角标换成用户真实的产品内容；示例里虚构的 Atlas 及其数字不能留下任何痕迹。完成前检查：每个屏幕的内容都在外框内没有被裁切，屏内字号保持真实的手机和桌面尺寸，没有使用外部样机图片，整体缩小后仍然可读。"
+      },
+      "style": {
+        "en": "Dark charcoal 16:9 stage with a tilted iPhone and MacBook, metallic gradients, glass lens flares and a mirrored floor; cinematic and low in motion.",
+        "zh": "深色 16:9 舞台上倾斜摆放 iPhone 与 MacBook，金属渐变、玻璃光斑与镜面地面，电影感强，动效极少。"
+      }
+    },
+    "poster-hero": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Marketing poster",
+        "zh": "营销海报"
+      },
+      "descriptionZh": "竖版 9:16 营销海报，含渐变背景、噪点纹理、超大标题、要点列表和二维码占位。",
+      "tags": [
+        "poster",
+        "marketing",
+        "social-share",
+        "launch",
+        "vertical"
+      ],
+      "prompt": {
+        "en": "Keep the 1080×1920 9:16 poster container, the top label and glyph row, the centered oversized headline with its italic serif accent word, the one-line subtitle, the 3–5 item feature list with icon/title/description, and the bottom QR block with command line. Replace the product name, release label, headline, subtitle, feature copy, numbers, links, emoji/glyph and QR placeholder with the user's real campaign content; the example's made-up product HTML Anything and its v0.1 release must leave no trace. Before finishing, check that the headline and subtitle fit the poster without clipping, that the feature list stays between 3 and 5 items, that the QR area is clearly a placeholder or a real code, and that white text keeps contrast over the gradient at narrow widths.",
+        "zh": "保留 1080×1920 的 9:16 海报容器、顶部标签与图形行、居中的超大标题及斜体衬线强调词、一句话副标题、3–5 条图标加标题加描述的要点列表，以及底部二维码和命令行区块。把产品名、发布标签、标题、副标题、要点文案、数字、链接、emoji/图形和二维码占位换成用户真实的营销内容；示例里虚构的 HTML Anything 及其 v0.1 发布信息不能留下任何痕迹。完成前检查：标题和副标题在海报内不被裁切，要点列表保持 3–5 条，二维码区域明确是占位或真实二维码，窄屏下白色文字在渐变上仍有足够对比。"
+      },
+      "style": {
+        "en": "Bold vertical 9:16 poster with a terracotta-to-indigo gradient mesh, gold serif accent, huge black-weight headline, grain texture and high contrast; static.",
+        "zh": "大胆的 9:16 竖版海报，陶土色到靛蓝的渐变网格、金色衬线强调、超大黑体标题和噪点纹理，高对比、静态。"
+      }
+    },
+    "release-notes-one-pager": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Release notes page",
+        "zh": "发布说明页"
+      },
+      "descriptionZh": "包含版本摘要、新增、修复、破坏性变更、已知问题和升级说明的单页发布说明。",
+      "tags": [
+        "release-notes",
+        "changelog",
+        "engineering",
+        "documentation"
+      ],
+      "prompt": {
+        "en": "Keep the sticky top navigation with its anchor links, the centered hero with version, date and one-sentence summary, the section order (Added, Fixed, Breaking changes, Known issues, Upgrade note), the three-column log-row grid, the thin section dividers and the footer of the example. Replace the version number, date, summary, every log entry, section metadata and navigation labels with the user's real release details; the example's v2.3.1 and placeholder dashes must not remain. When details are missing, write the explicit 'None' or 'No ... provided' statements instead of inventing them. Before finishing, check that every topnav anchor has a matching section id, that long entry titles wrap cleanly in the log rows, that the layout collapses correctly at narrow widths, and that no placeholder links remain.",
+        "zh": "保留示例的吸顶导航及其锚点链接、居中的版本/日期/一句话摘要主视觉、版块顺序（新增、修复、破坏性变更、已知问题、升级说明）、三栏日志行栅格、细分隔线和页脚。把版本号、日期、摘要、每条日志、版块元信息和导航标签换成用户真实的发布内容；示例里的 v2.3.1 和占位破折号不能留下。缺少细节时写明“None”或“No ... provided”式的明确说明，不要编造。完成前检查：每个导航锚点都有对应的版块 id，长条目标题在日志行中正常换行，窄屏下布局正确折叠，没有残留占位链接。"
+      },
+      "style": {
+        "en": "Warm off-white release notes page with serif display headings, monospace meta labels, a terracotta accent, thin rules and calm spacing.",
+        "zh": "暖白底发布说明页，衬线大标题、等宽小标签、陶土色强调，细分隔线，排版安静克制。"
+      }
+    },
+    "research-decision-room": {
+      "sourceDir": "skills",
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Research decision room",
+        "zh": "研究决策室"
+      },
+      "descriptionZh": "把访谈、工单和指标整理成证据台账、主题地图、机会矩阵、决策备忘和实验队列的研究决策页。",
+      "tags": [
+        "research",
+        "synthesis",
+        "decision",
+        "evidence",
+        "dashboard"
+      ],
+      "prompt": {
+        "en": "Keep the top metadata bar, the two-column hero (decision question, confidence and segment pills, three-stat readout, dark recommendation panel with risk list), the filterable four-column evidence ledger, the three-card theme map with evidence-id chips, the opportunity matrix table, the two-column decision memo and contradictions block, the numbered experiment queue with definition lists, and the assumptions and limitations section. Replace the decision question, research material, quotes, metrics, evidence IDs, theme names, scores, memo points, experiment owners and thresholds with the user's real research; the example's onboarding-checklist decision and all its numbers must leave no trace. Before finishing, check that every evidence ID cited in themes and the memo exists in the ledger, that source filters show the right cards and All restores them, that long quotes and table rows do not break the layout at narrow widths, and that no quote, sample size or metric is invented.",
+        "zh": "保留顶部元信息栏、双栏主视觉（决策问题、置信度与人群标签、三项统计、深色建议面板与风险列表）、可筛选的四列证据台账、带证据编号标签的三卡片主题地图、机会矩阵表格、双栏决策备忘与矛盾说明、带编号和定义列表的实验队列，以及假设与局限版块。把决策问题、研究材料、引语、指标、证据编号、主题名、评分、备忘要点、实验负责人和阈值换成用户真实的研究内容；示例里的新手引导清单决策及其所有数字不能留下痕迹。完成前检查：主题和备忘中引用的每个证据编号都存在于台账中，来源筛选显示正确的卡片且“全部”能恢复，长引语和表格行在窄屏下不破坏布局，没有编造引语、样本量或指标。"
+      },
+      "style": {
+        "en": "Warm paper-toned research dashboard with serif display type, grid-paper background, deep green and rust accents, dense evidence cards and tables.",
+        "zh": "暖纸质研究看板，衬线大标题、网格纸背景、深绿与铁锈色强调，证据卡片和表格信息密集。"
+      }
+    },
+    "resume-modern": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": true,
+      "title": {
+        "en": "Minimal A4 resume",
+        "zh": "极简简历"
+      },
+      "descriptionZh": "A4 单页两栏简历，含大号姓名抬头、联系方式、个人简介、工作经历、公开项目、教育、技能标签、语言和兴趣。",
+      "tags": [
+        "resume",
+        "cv",
+        "print",
+        "personal"
+      ],
+      "prompt": {
+        "en": "Keep the A4 page container (210mm wide, min 297mm tall, 16–18mm padding, soft shadow on a warm grey backdrop), the oversized name header with the role line and the pipe-separated contact row, the 8/4 two-column grid, the section headings with a short accent bar and uppercase letter-spaced labels, the role rows with right-aligned date ranges, the square-marker bullet lists, the skill chips, and the @media print rules. Replace the name, role, contact details, summary, companies, job titles, dates, achievement bullets and numbers, project names and star counts, school, GPA, skills, languages and interests with the user's real content; the example's made-up person 林清禾 and company Acme AI must leave no trace. Before finishing, check that everything still fits on one A4 page without spilling over, that long bullets wrap cleanly and dates stay right-aligned, and that printing hides the page shadow and background while keeping the accent color.",
+        "zh": "保留 A4 页面容器（宽 210mm、高至少 297mm、内边距 16–18mm、暖灰背景上的柔和投影）、超大姓名抬头与职位行、竖线分隔的联系方式行、8/4 两栏栅格、带短强调线和大写字距的章节标题、右对齐时间区间的职位行、方形标记的项目符号列表、技能标签以及 @media print 规则。把姓名、职位、联系方式、简介、公司、职位名、时间、成就条目和数字、项目名和星数、学校、GPA、技能、语言和兴趣换成用户的真实内容；示例里虚构的林清禾和 Acme AI 不能留下任何痕迹。完成前检查：所有内容仍能装进一页 A4 不溢出，长条目能正常换行且时间保持右对齐，打印时隐藏页面投影和背景但保留强调色。"
+      },
+      "style": {
+        "en": "Single A4 page in black, grey and white with a deep-blue accent, thin rules, a compact 8/4 two-column grid and print-ready styling; almost no motion.",
+        "zh": "A4 单页黑白灰简历，深蓝强调色、细线分隔、8/4 两栏紧凑排版，适合打印，几乎无动效。"
+      }
+    },
+    "social-reddit-card": {
+      "sourceDir": "skills",
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Reddit post card",
+        "zh": "Reddit 帖子卡"
+      },
+      "descriptionZh": "深色模式下的拟真 Reddit 帖子卡，含左侧投票栏、子版块信息、标题正文和评论操作行。",
+      "tags": [
+        "reddit",
+        "social-card",
+        "overlay",
+        "story"
+      ],
+      "prompt": {
+        "en": "Keep the single dark card centered on its near-black radial-gradient backdrop, the fixed 720px card width, the left vote rail (up arrow, vote count, down arrow), the meta row (round subreddit badge, r/name, posted-by and time, flair chip on the right), the title, the body paragraphs and the bottom action row with comments, awards, share and the more icon. Replace the subreddit, username, timestamp, flair, title, body text, vote count, comment count and award count with the user's real content; the example's r/programming post and its author must leave no trace. If the user supplies an image, use a CSS gradient placeholder with a description instead of an external link. Before finishing, check that the vote count uses the 12.3k abbreviation style, that a long title wraps without pushing the action row out of the card, and that the body stays short enough to read as one card.",
+        "zh": "保留示例中居中于近黑径向渐变背景上的单张深色卡片、720px 固定卡宽、左侧投票栏（上箭头、票数、下箭头）、信息行（圆形子版块徽标、r/名称、作者与时间、右侧标签）、标题、正文段落，以及底部含评论、奖项、分享和更多图标的操作行。把子版块、用户名、时间、标签、标题、正文、票数、评论数和奖项数换成用户的真实内容；示例里 r/programming 的帖子和作者不能留下任何痕迹。用户提供图片时，用带描述的 CSS 渐变占位代替外链图片。完成前检查：票数使用 12.3k 这类缩写格式，长标题换行后不会把操作行挤出卡片，正文长度仍能作为一张卡片读完。"
+      },
+      "style": {
+        "en": "Dark Reddit card on a near-black radial gradient: orange vote rail, IBM Plex Sans, compact spacing and almost no motion.",
+        "zh": "近黑径向渐变背景上的深色 Reddit 卡片，橙色投票栏、IBM Plex Sans 字体，间距紧凑，几乎无动效。"
+      }
+    },
+    "social-spotify-card": {
+      "sourceDir": "skills",
+      "category": "prototype",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Spotify now-playing card",
+        "zh": "Spotify 正在播放卡"
+      },
+      "descriptionZh": "深色渐变卡片，左侧是 CSS 渐变专辑封面，右侧是 NOW PLAYING 标签、歌名、艺人、进度条和播放控制行。",
+      "tags": [
+        "music",
+        "now-playing",
+        "card",
+        "overlay",
+        "dark"
+      ],
+      "prompt": {
+        "en": "Keep the single rounded card, its two-column split (square album cover on the left, text and controls on the right), the NOW PLAYING eyebrow with the green accent and animated wave bars, the title/artist stack, the thin progress bar with a knob and two timestamps, and the control row with shuffle, previous, white circular play button, next and repeat. Replace the album name, cover monogram text, track title, artist names, timestamps and progress percentage with the user's real content; the example's Chillhop / Lo-Fi Essentials / Sunday Afternoon / j'san content must leave no trace. Keep the cover as a CSS gradient with text, never an external image. Before finishing, check that the progress fill width matches the shown timestamps, that long titles and artist names truncate or wrap without pushing the controls out of the card, and that the wave animation stops under prefers-reduced-motion.",
+        "zh": "保留单张圆角卡片、左右两栏结构（左侧方形专辑封面，右侧文字与控制）、带绿色强调和音波动效的 NOW PLAYING 小标、歌名与艺人层级、带圆点和两端时间戳的细进度条，以及包含随机、上一首、白色圆形播放按钮、下一首和循环的控制行。把专辑名、封面文字、歌名、艺人名、时间戳和进度百分比换成用户的真实内容；示例里的 Chillhop / Lo-Fi Essentials / Sunday Afternoon / j'san 不能留下任何痕迹。封面始终用 CSS 渐变加文字，不使用外链图片。完成前检查：进度条填充宽度与显示的时间戳一致，长歌名和艺人名截断或换行后不会把控制行挤出卡片，音波动效在 prefers-reduced-motion 下停止。"
+      },
+      "style": {
+        "en": "Dark Spotify-style card with a deep blue gradient, green accent, gradient album art, white type and a small looping wave animation.",
+        "zh": "深蓝渐变的 Spotify 风格暗色卡片，绿色强调、渐变专辑封面、白色字体，带轻微循环音波动效。"
+      }
+    },
+    "social-x-post-card": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "X post card",
+        "zh": "X 帖子卡"
+      },
+      "descriptionZh": "一条带蓝勾、互动数据和浏览量的拟真 X 帖子卡片，适合视频叠加或分享图卡。",
+      "tags": [
+        "social",
+        "x-post",
+        "card",
+        "overlay",
+        "marketing"
+      ],
+      "prompt": {
+        "en": "Keep the single centered card on the dark radial background, the rounded black card with a 1px border, the header row (avatar, display name, verified badge, @handle, timestamp, overflow menu), the post body with X-blue links, the optional quote card and 16:9 image placeholder, and the engagement row with reply, repost, like and view icons plus K/M-formatted numbers. Replace the display name, handle, avatar gradient, post text, timestamp, metrics and any quoted or image content with the user's real content; the example's AlchainHust identity and its Markdown/HTML post must leave no trace. Before finishing, check that the post reads as one coherent statement within 280 characters, that numbers are formatted as 1.2K/4.5M, that the card fits a 1280×720 or 1080×1080 canvas without clipping, and that no external image URLs are used.",
+        "zh": "保留深色径向背景上居中的单张卡片、带 1px 边框的黑色圆角卡片、顶部信息行（头像、显示名、蓝勾、@handle、时间、更多菜单）、带 X 蓝链接的正文、可选的引用卡和 16:9 图片占位，以及包含回复、转推、点赞和浏览量图标的互动行与 K/M 格式数字。把显示名、handle、头像渐变、正文、时间、互动数据和引用/图片内容换成用户的真实内容；示例里的 AlchainHust 身份和 Markdown/HTML 推文不能留下任何痕迹。完成前检查：推文是一句连贯表达且不超过 280 字符，数字按 1.2K/4.5M 格式，卡片在 1280×720 或 1080×1080 画布内不被裁切，且没有使用外部图片链接。"
+      },
+      "style": {
+        "en": "Dark X-style post card centered on a near-black radial background, with a black rounded card, grey secondary text, X-blue links and compact engagement icons.",
+        "zh": "深色 X 风格帖子卡，近黑径向背景、黑色圆角卡片、灰色次要文字、X 蓝链接和紧凑互动图标。"
+      }
+    },
+    "swiss-creative-mode-template": {
+      "sourceDir": "skills",
+      "category": "web",
+      "acceptsDesignSystem": false,
+      "title": {
+        "en": "Swiss editorial landing page",
+        "zh": "瑞士风编辑式落地页"
+      },
+      "descriptionZh": "粗黑边框和硬阴影的瑞士风单页，包含超大标题、四步流程卡片和层叠结构图。",
+      "tags": [
+        "swiss",
+        "editorial",
+        "brutalist",
+        "landing",
+        "process"
+      ],
+      "prompt": {
+        "en": "Keep the bordered outer frame with its hard offset shadow, the small uppercase kicker line, the oversized uppercase hero title with one accent-colored word, the 2×2 four-step process card grid (big number, uppercase title, short paragraph, each card a different flat color with black border and offset shadow), the stacked layer diagram of progressively wider offset bars, and the footer with the counter. Replace the kicker, title, step names, step descriptions, layer labels and counter with the user's real content; the example's 'Creative Mode' wording and its Discover/Define/Develop/Deliver steps must leave no trace. Before finishing, check that the card grid collapses to one column below 860px, that long step titles and paragraphs still fit inside the fixed-height cards, and that the offset layer bars still read as a stack at narrow widths.",
+        "zh": "保留示例的外层粗边框和硬阴影、小号大写引导行、带一个强调色单词的超大号大写标题、2×2 四步流程卡片栅格（大号数字、大写标题、短段落，每张卡片一种纯色配黑边和硬阴影）、逐级加宽错位的层叠结构图，以及带计数器的页脚。把引导行、标题、步骤名、步骤说明、层级标签和计数器换成用户的真实内容；示例里的“Creative Mode”字样和 Discover/Define/Develop/Deliver 四个步骤不能留下任何痕迹。完成前检查：卡片栅格在 860px 以下收成单列，较长的步骤标题和段落仍能放进固定高度的卡片，错位层级条在窄屏下仍然读得出层叠关系。"
+      },
+      "style": {
+        "en": "Brutalist Swiss editorial page on warm paper with black 3px borders, hard offset shadows, oversized uppercase type and flat pink, yellow, orange and green blocks; static.",
+        "zh": "暖纸色底、黑色粗边框与硬阴影的瑞士粗野风页面，超大号大写标题，粉黄橙绿四色卡片，静态无动效。"
+      }
+    }
+  }
+}

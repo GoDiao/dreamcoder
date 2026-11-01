@@ -10,6 +10,7 @@ import { execFileNoThrowWithCwd } from '../execFileNoThrow.js'
 import { gitExe } from '../git.js'
 import { lazySchema } from '../lazySchema.js'
 import * as lockfile from '../lockfile.js'
+import { preserveWorktreeArtifacts } from '../worktree.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { jsonParse, jsonStringify } from '../slowOperations.js'
 import { getTasksDir, notifyTasksUpdated } from '../tasks.js'
@@ -547,6 +548,15 @@ async function destroyWorktree(worktreePath: string): Promise<void> {
     }
   } catch {
     // Ignore errors reading .git file (path doesn't exist, not a file, etc.)
+  }
+
+  try {
+    await preserveWorktreeArtifacts(worktreePath, mainRepoPath ?? undefined)
+  } catch (error) {
+    logForDebugging(
+      `[TeammateTool] Keeping worktree ${worktreePath}: could not move its artifacts: ${errorMessage(error)}`,
+    )
+    return
   }
 
   // Try to remove using git worktree remove command

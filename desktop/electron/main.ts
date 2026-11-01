@@ -17,10 +17,22 @@ import {
   type OpenDialogOptions,
 } from 'electron'
 import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { CANVAS_SHELL_DIRNAME } from '../../src/utils/canvas'
 import { BROWSER_GRANT_DECISIONS, BROWSER_HOST_PATH, type BrowserGrantDecision } from '../../src/server/browserHost/protocol'
-import { BROWSER_PARTITION, type ElectronDialogFilter, type ElectronOpenDialogInput } from '../src/lib/shell/electronBridge'
+import { BackgroundBrowserHost } from './backgroundBrowser'
+import { captureThumbnail, findGuest } from './browserCapture'
+import { exportPage } from './pageExport'
+import {
+  BROWSER_EXPORT_FORMATS,
+  BROWSER_PARTITION,
+  type BrowserExportFormat,
+  type BrowserExportMessages,
+  type ElectronDialogFilter,
+  type ElectronOpenDialogInput,
+} from '../src/lib/shell/electronBridge'
 import {
   appModeLocations,
   clearPortableEnvForRestart,
@@ -32,8 +44,10 @@ import {
   setAppMode,
 } from './appMode'
 import {
+  chromeUserAgent,
   classifyUrl,
   installBrowser,
+  openProjectFile,
   PROJECT_SCHEME,
   ProjectRoots,
   resolveBrowserInput,
@@ -93,6 +107,8 @@ let tray: Tray | null = null
 let sidecar: SidecarRuntime | null = null
 let sidecarError: string | null = null
 let browserHost: BrowserHostHandle | null = null
+let backgroundBrowser: BackgroundBrowserHost | null = null
+let canvasShellDir = ''
 let quitting = false
 const activeNotifications = new Set<Notification>()
 let saveTimer: NodeJS.Timeout | null = null
@@ -106,7 +122,7 @@ function hostTriple() {
   throw new Error(`unsupported platform: ${process.platform}-${process.arch}`)
 }
 
-type AppPaths = SidecarPaths & { webDist: string; trayIcon: string }
+type AppPaths = SidecarPaths & { webDist: string; canvasShellDir: string; trayIcon: string }
 
 function resolvePaths(): AppPaths {
   const exe = IS_WINDOWS ? '.exe' : ''
@@ -118,6 +134,7 @@ function resolvePaths(): AppPaths {
       appRoot: binDir,
       h5DistDir: dist,
       webDist: dist,
+      canvasShellDir: path.join(dist, CANVAS_SHELL_DIRNAME),
       trayIcon: path.join(process.resourcesPath, 'icons', 'tray.png'),
     }
   }
@@ -127,6 +144,7 @@ function resolvePaths(): AppPaths {
     ...devSidecarPaths(desktopRoot, hostTriple(), exe),
     h5DistDir: dist,
     webDist: dist,
+    canvasShellDir: path.join(desktopRoot, 'public', CANVAS_SHELL_DIRNAME),
     trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', 'tray.png'),
   }
 }
@@ -239,11 +257,33 @@ function showNotification(input: { title: string; body?: string; clickPayload?: 
   return true
 }
 
+function createBackgroundBrowser() {
+  return new BackgroundBrowserHost({
+    createWindow: (partition) => {
+      session.fromPartition(partition).setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+      session.fromPartition(partition).setPermissionCheckHandler(() => false)
+      return new BrowserWindow({
+        show: false,
+        width: 1280,
+        height: 800,
+        webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false, webviewTag: false },
+      })
+    },
+    clearPartition: async (partition) => {
+      const target = session.fromPartition(partition)
+      await target.clearStorageData()
+      await target.clearCache()
+    },
+    classify: (url) => classifyUrl(url, projectRoots),
+    userAgent: chromeUserAgent,
+  })
+}
+
 function startBrowserHost(runtime: SidecarRuntime) {
+  backgroundBrowser = createBackgroundBrowser()
   const host = createBrowserHost({
-    getMainWebContents: () => mainWindow?.webContents ?? null,
-    fromId: (id) => webContents.fromId(id),
-    browserSession: session.fromPartition(BROWSER_PARTITION),
+    background: backgroundBrowser,
+    ...guestLookup(),
     emitToRenderer: emit,
     resolveInput: (input, projectRoot) => resolveBrowserInput(input, projectRoot, projectRoots),
     classify: (url) => classifyUrl(url, projectRoots),
@@ -261,6 +301,50 @@ function stringArg(args: Record<string, unknown>, key: string) {
   const value = args[key]
   if (typeof value !== 'string' || !value) throw new Error(`${key} must be a non-empty string`)
   return value
+}
+
+function guestLookup() {
+  return {
+    fromId: (id: number) => webContents.fromId(id),
+    getMainWebContents: () => mainWindow?.webContents ?? null,
+    browserSession: session.fromPartition(BROWSER_PARTITION),
+  }
+}
+
+function browserGuest(webContentsId: number) {
+  return findGuest(guestLookup(), webContentsId)
+}
+
+function exportFormatArg(args: Record<string, unknown>): BrowserExportFormat {
+  const value = BROWSER_EXPORT_FORMATS.find((format) => format === args.format)
+  if (!value) throw new Error('format must be pdf, png or html')
+  return value
+}
+
+function exportMessagesArg(args: Record<string, unknown>): BrowserExportMessages {
+  const messages = args.messages as Record<string, unknown> | undefined
+  if (!messages) throw new Error('messages are required')
+  return {
+    externalLinks: stringArg(messages, 'externalLinks'),
+    proceed: stringArg(messages, 'proceed'),
+    cancel: stringArg(messages, 'cancel'),
+  }
+}
+
+function exportBrowserPage(args: Record<string, unknown>) {
+  return exportPage(
+    browserGuest(integerArg(args, 'webContentsId')),
+    { format: exportFormatArg(args), suggestedName: String(args.suggestedName ?? ''), messages: exportMessagesArg(args) },
+    {
+      chooseFile: async (options) => {
+        const result = await dialog.showSaveDialog(window(), options)
+        return result.canceled || !result.filePath ? null : result.filePath
+      },
+      confirm: async ({ message, proceed, cancel }) =>
+        (await dialog.showMessageBox(window(), { type: 'warning', message, buttons: [proceed, cancel], defaultId: 0, cancelId: 1 })).response === 0,
+      writeFile: (file, data) => writeFile(file, data),
+    },
+  )
 }
 
 function booleanArg(args: Record<string, unknown>, key: string) {
@@ -369,6 +453,8 @@ const handlers: Record<string, Handler> = {
     await browserSession.clearCache()
     await browserSession.clearAuthCache()
   },
+  browser_export_page: (args) => exportBrowserPage(args),
+  browser_capture_thumbnail: (args) => captureThumbnail(browserGuest(integerArg(args, 'webContentsId'))),
   browser_set_menu_labels: (args) => {
     browserMenuLabels = { addToChat: stringArg(args, 'addToChat'), copy: stringArg(args, 'copy') }
   },
@@ -389,6 +475,7 @@ const handlers: Record<string, Handler> = {
   browser_stop: (args) => runningBrowserHost().stopSession(stringArg(args, 'sessionId')),
   browser_open_tab_done: (args) => runningBrowserHost().resolveOpenTab(stringArg(args, 'requestId'), stringArg(args, 'tabId')),
   browser_activate_done: (args) => runningBrowserHost().resolveActivate(stringArg(args, 'requestId'), booleanArg(args, 'shown')),
+  browser_close_tab_done: (args) => runningBrowserHost().resolveCloseTab(stringArg(args, 'requestId'), booleanArg(args, 'closed')),
   browser_grant_reply: (args) => runningBrowserHost().replyGrant(stringArg(args, 'requestId'), grantDecisionArg(args)),
   browser_trust_list: () => runningBrowserHost().trust('list'),
   browser_trust_add: (args) => runningBrowserHost().trust('add', stringArg(args, 'origin')),
@@ -487,7 +574,8 @@ function createWindow(startUrl: string) {
     host: win.webContents,
     session: session.fromPartition(BROWSER_PARTITION),
     roots: projectRoots,
-    readFile: (file) => net.fetch(pathToFileURL(file).toString()),
+    openFile: openProjectFile((url) => net.fetch(url)),
+    canvasShellDir,
     notify: emit,
     popupMenu: (items) => Menu.buildFromTemplate(items).popup({ window: win }),
     menuLabels: () => browserMenuLabels,
@@ -544,6 +632,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     const paths = resolvePaths()
+    canvasShellDir = paths.canvasShellDir
     if (!DEV_URL) serveDist(paths.webDist)
     installApplicationMenu()
     installTray(paths.trayIcon)
@@ -562,6 +651,9 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true
     saveWindowState()
   })
-  app.on('will-quit', stopSidecar)
+  app.on('will-quit', () => {
+    void backgroundBrowser?.destroyAll()
+    stopSidecar()
+  })
   process.on('exit', stopSidecar)
 }

@@ -21,6 +21,7 @@ import { ToolResultBlock } from './ToolResultBlock'
 import { PermissionDialog } from './PermissionDialog'
 import { BrowserGrantRequests } from './BrowserGrantRequests'
 import { AskUserQuestion } from './AskUserQuestion'
+import { DesignTemplateChoice } from './DesignTemplateChoice'
 import { ShowUIBlock, uiPageOfCall } from './ShowUIBlock'
 import { StreamingIndicator } from './StreamingIndicator'
 import { InlineTaskSummary } from './InlineTaskSummary'
@@ -28,6 +29,7 @@ import { CurrentTurnChangeCard } from './CurrentTurnChangeCard'
 import type { AgentTaskNotification, UIMessage } from '../../types/chat'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { getSelectionAnchor, useQuoteSelection } from '../../lib/selectionPopover'
+import { ASK_USER_QUESTION_TOOL, CHOOSE_DESIGN_TEMPLATE_TOOL, isInlineQuestionTool } from '../../lib/inlineQuestionTools'
 import { SelectionPopover } from '../shared/SelectionPopover'
 import {
   getHeightsForSession,
@@ -293,7 +295,7 @@ function BackgroundTaskEventCard({ message }: { message: BackgroundTaskEvent }) 
       >
         <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
           {isRunning ? (
-            <LoaderCircle size={15} strokeWidth={2.25} className="animate-spin text-[var(--color-accent)]" aria-hidden="true" />
+            <LoaderCircle size={15} strokeWidth={2.25} className="animate-spin text-[var(--color-brand)]" aria-hidden="true" />
           ) : isFailed ? (
             <XCircle size={15} strokeWidth={2.25} className="text-[var(--color-error)]" aria-hidden="true" />
           ) : isStopped ? (
@@ -472,7 +474,7 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
   messages.forEach((msg, index) => {
     if (
       msg.type === 'tool_use' &&
-      msg.toolName === 'AskUserQuestion' &&
+      isInlineQuestionTool(msg.toolName) &&
       !toolResultMap.has(msg.toolUseId)
     ) {
       lastUnresolvedAskUserQuestionIndexByToolUseId.set(msg.toolUseId, index)
@@ -501,7 +503,7 @@ export function buildRenderModel(messages: UIMessage[], activeAskUserQuestionToo
         appendChildToolCall(childToolCallsByParent, msg.parentToolUseId, msg)
         continue
       }
-      if (msg.toolName === 'AskUserQuestion') {
+      if (isInlineQuestionTool(msg.toolName)) {
         const isResolved = toolResultMap.has(msg.toolUseId)
         const lastUnresolvedIndex = lastUnresolvedAskUserQuestionIndexByToolUseId.get(msg.toolUseId)
         if (!isResolved && lastUnresolvedIndex !== undefined && messages[lastUnresolvedIndex] !== msg) {
@@ -1285,7 +1287,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   const agentTaskNotifications = useSessionField(resolvedSessionId, 'agentTaskNotifications') ?? EMPTY_AGENT_TASK_NOTIFICATIONS
   const activeAskUserQuestionToolUseId = useChatStore((s) => {
     const pending = resolvedSessionId ? s.sessions[resolvedSessionId]?.pendingPermission : undefined
-    return pending?.toolName === 'AskUserQuestion' ? pending.toolUseId : null
+    return isInlineQuestionTool(pending?.toolName) ? pending?.toolUseId ?? null : null
   })
   const hasActiveTool = useChatStore((s) => {
     const sessionState = resolvedSessionId ? s.sessions[resolvedSessionId] : undefined
@@ -2075,7 +2077,17 @@ export const MessageBlock = memo(function MessageBlock({
     case 'thinking':
       return <ThinkingBlock content={message.content} isActive={message.id === activeThinkingId} />
     case 'tool_use':
-      if (message.toolName === 'AskUserQuestion' && !message.isPending) {
+      if (message.toolName === CHOOSE_DESIGN_TEMPLATE_TOOL && sessionId && !message.isPending) {
+        return (
+          <DesignTemplateChoice
+            sessionId={sessionId}
+            toolUseId={message.toolUseId}
+            input={message.input}
+            result={toolResult?.content}
+          />
+        )
+      }
+      if (message.toolName === ASK_USER_QUESTION_TOOL && !message.isPending) {
         return (
           <AskUserQuestion
             sessionId={sessionId}

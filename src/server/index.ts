@@ -13,12 +13,14 @@ import { diagnosticsService } from './services/diagnosticsService.js'
 import { ensurePersistentStorageUpgraded } from './services/persistentStorageMigrations.js'
 import { handleStaticH5Request } from './staticH5.js'
 import { handleUiPageRequest, isUiPageRequest } from './uiPageHost.js'
-import { classifyH5Request, isDesktopOnlyPath, isLoopbackHost, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
+import { classifyH5Request, isDesktopOnlyPath, isLocalNonBrowserRequest, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
 import { browserHostChannel, createBrowserHostSocketData } from './browserHost/hostChannel.js'
 import { BROWSER_HOST_PATH } from './browserHost/protocol.js'
 import { BROWSER_MCP_PATH } from './browserHost/names.js'
 import { handleBrowserMcpRequest } from './browserHost/mcpEndpoint.js'
 import { getBrowserRuntime } from './browserHost/runtime.js'
+import { handleWebCloneRoute } from './browserHost/webClone.js'
+import { WEB_CLONE_BROWSER_PATH } from './browserHost/names.js'
 import { startBrowserHostTokenReader } from './browserHost/stdinToken.js'
 import { H5AccessService } from './services/h5AccessService.js'
 
@@ -192,7 +194,7 @@ export function startServer(port = PORT, host = HOST) {
         }
 
         if (url.pathname === BROWSER_HOST_PATH) {
-          if (!clientAddress || !isLoopbackHost(clientAddress) || origin) {
+          if (!isLocalNonBrowserRequest(clientAddress, origin)) {
             return new Response('Forbidden', { status: 403 })
           }
           getBrowserRuntime()
@@ -201,11 +203,16 @@ export function startServer(port = PORT, host = HOST) {
         }
 
         if (url.pathname === BROWSER_MCP_PATH) {
-          if (!clientAddress || !isLoopbackHost(clientAddress) || origin) {
+          if (!isLocalNonBrowserRequest(clientAddress, origin)) {
             return new Response('Forbidden', { status: 403 })
           }
           const { service, tokens } = getBrowserRuntime()
           return handleBrowserMcpRequest(req, { service, tokens, version: process.env.APP_VERSION ?? '0.0.0' })
+        }
+
+        if (url.pathname === WEB_CLONE_BROWSER_PATH || url.pathname.startsWith(`${WEB_CLONE_BROWSER_PATH}/`)) {
+          const { webClone } = getBrowserRuntime()
+          return handleWebCloneRoute(req, url, { clientAddress, origin }, { browsers: webClone, upgrade: (data) => server.upgrade(req, { data }) })
         }
 
         if (req.method === 'OPTIONS') {

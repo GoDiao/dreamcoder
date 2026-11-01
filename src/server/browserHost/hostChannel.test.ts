@@ -407,3 +407,83 @@ describe('parseBrowserHostInbound', () => {
     expect(parseBrowserHostInbound(JSON.stringify({ type: 'result', id: 'a' }))).toBeNull()
   })
 })
+
+describe('background browser commands', () => {
+  test('sends the command with an id and resolves with the value of the matching result', async () => {
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    const pending = channel.requestBackground({ kind: 'createTarget', session: 'a', target: 'b' })
+    const sent = socket.sent.at(-1)!
+    expect(sent).toMatchObject({ type: 'background', command: { kind: 'createTarget', session: 'a', target: 'b' } })
+    channel.message(socket, JSON.stringify({ type: 'result', id: sent.id, ok: true, value: { shown: 1 } }))
+    expect(await pending).toEqual({ shown: 1 })
+  })
+
+  test('rejects with the code and message of a failed result', async () => {
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    const pending = channel.requestBackground({ kind: 'destroySession', session: 'a' })
+    channel.message(socket, JSON.stringify({ type: 'result', id: socket.sent.at(-1)!.id, ok: false, error: { code: 'internal', message: 'no window' } }))
+    await expect(pending).rejects.toMatchObject({ code: 'internal', message: 'no window' })
+  })
+
+  test('fails at once without a desktop and when the connection closes while waiting', async () => {
+    const lonely = new BrowserHostChannel()
+    await expect(lonely.requestBackground({ kind: 'destroySession', session: 'a' })).rejects.toMatchObject({ code: 'no_host' })
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    const pending = channel.requestBackground({ kind: 'destroySession', session: 'a' })
+    channel.close(socket)
+    await expect(pending).rejects.toMatchObject({ code: 'disconnected' })
+  })
+
+  test('sends a cancel for a command that was aborted', async () => {
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    const controller = new AbortController()
+    const pending = channel.requestBackground({ kind: 'cdp', session: 'a', target: 'b', method: 'Page.enable' }, { signal: controller.signal })
+    const id = socket.sent.at(-1)!.id
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ code: 'cancelled' })
+    expect(socket.sent.at(-1)).toEqual({ type: 'cancel', id })
+  })
+
+  test('hands events and closings of background pages to the listeners', () => {
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    const events: unknown[] = []
+    channel.onBackgroundEvent(event => events.push(event))
+    channel.message(socket, JSON.stringify({ type: 'background_event', session: 'a', target: 'b', method: 'Network.loadingFinished', params: { requestId: '1' } }))
+    channel.message(socket, JSON.stringify({ type: 'background_closed', session: 'a', target: 'b' }))
+    expect(events).toEqual([
+      { kind: 'cdp', session: 'a', target: 'b', method: 'Network.loadingFinished', params: { requestId: '1' } },
+      { kind: 'closed', session: 'a', target: 'b' },
+    ])
+  })
+
+  test('ignores background events before the hello and malformed ones', () => {
+    const channel = new BrowserHostChannel()
+    channel.setToken('secret')
+    const socket = fakeSocket()
+    sockets.push(socket)
+    channel.open(socket)
+    const events: unknown[] = []
+    channel.onBackgroundEvent(event => events.push(event))
+    channel.message(socket, JSON.stringify({ type: 'background_event', session: 'a', target: 'b', method: 'X.y', params: {} }))
+    expect(events).toEqual([])
+    expect(socket.closed[0]?.code).toBe(BROWSER_HOST_CLOSE_UNAUTHORIZED)
+    expect(parseBrowserHostInbound(JSON.stringify({ type: 'background_event', session: '', target: 'b', method: 'X.y' }))).toBeNull()
+    expect(parseBrowserHostInbound(JSON.stringify({ type: 'background_closed', session: 'a' }))).toBeNull()
+  })
+
+  test('tells the listeners when the desktop connection closes, and only that connection', () => {
+    const { channel, socket } = connected()
+    sockets.push(socket)
+    let count = 0
+    channel.onDisconnect(() => count++)
+    channel.close(fakeSocket())
+    expect(count).toBe(0)
+    channel.close(socket)
+    expect(count).toBe(1)
+  })
+})
