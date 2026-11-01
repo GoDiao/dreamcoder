@@ -27,6 +27,7 @@ All notable changes to DreamCoder will be documented in this file.
 - Dev mode (`bun run electron:dev`) finds the bundled ripgrep, so Glob and Grep work without a system `rg` on `PATH`. `bun run build:sidecars` now writes `desktop/binaries/<target>/dreamcoder-sidecar` and `rg`, the same names as the packaged app; run it once more in an existing checkout and delete the old suffixed files in `desktop/binaries/` (#195). Thanks @pcbeingused333.
 - A forced tool (`tool_choice` of type `tool`) from an Anthropic client is now sent to OpenAI Responses providers in the Responses shape (`{ type: 'function', name }`), so the request no longer fails with a 400 (#212). Thanks @pcbeingused333.
 - Stopping or restarting a lead session no longer deletes its team and task list (#199). Teams are removed only by `TeamDelete`, not when the CLI process exits (Stop, `/clear`, restart, app quit). Thanks @pcbeingused333.
+- On Windows, sending a message no longer flashes console windows. The background `git`, `where`, `reg` and `cmd` commands that DreamCoder runs were each opening a console window and taking focus from the app, which made the input method bar flicker while typing. They now run hidden.
 
 ## [0.8.0-beta.2] — 2026-10-29
 

@@ -143,6 +143,7 @@ async function runGit(
 ): Promise<GitResult> {
   try {
     const { stdout, stderr } = await execFile('git', args, {
+      windowsHide: true,
       cwd,
       timeout,
       maxBuffer: MAX_GIT_BUFFER_BYTES,

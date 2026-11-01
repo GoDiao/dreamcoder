@@ -634,6 +634,7 @@ async function getGitInfo(sessionId: string): Promise<Response> {
 
   try {
     const branchProc = Bun.spawn(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
+      windowsHide: true,
       cwd: workDir,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -653,6 +654,7 @@ async function getGitInfo(sessionId: string): Promise<Response> {
     let repoName = ''
     try {
       const remoteProc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
+        windowsHide: true,
         cwd: workDir,
         stdout: 'pipe',
         stderr: 'pipe',
@@ -667,6 +669,7 @@ async function getGitInfo(sessionId: string): Promise<Response> {
     }
 
     const statusProc = Bun.spawn(['git', 'status', '--porcelain'], {
+      windowsHide: true,
       cwd: workDir,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -887,6 +890,7 @@ async function getRecentProjects(url: URL): Promise<Response> {
       let branch: string | null = null
       try {
         const proc = Bun.spawn(['git', 'rev-parse', '--is-inside-work-tree'], {
+          windowsHide: true,
           cwd: realPath, stdout: 'pipe', stderr: 'pipe',
         })
         const out = await new Response(proc.stdout).text()
@@ -896,6 +900,7 @@ async function getRecentProjects(url: URL): Promise<Response> {
           const [branchResult, remoteResult] = await Promise.all([
             (async () => {
               const branchProc = Bun.spawn(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
+                windowsHide: true,
                 cwd: realPath, stdout: 'pipe', stderr: 'pipe',
               })
               return (await new Response(branchProc.stdout).text()).trim() || null
@@ -903,6 +908,7 @@ async function getRecentProjects(url: URL): Promise<Response> {
             (async () => {
               try {
                 const remoteProc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
+                  windowsHide: true,
                   cwd: realPath, stdout: 'pipe', stderr: 'pipe',
                 })
                 const remote = (await new Response(remoteProc.stdout).text()).trim()

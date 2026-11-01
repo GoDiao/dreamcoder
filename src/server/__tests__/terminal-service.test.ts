@@ -56,13 +56,13 @@ describe('shell detection', () => {
   })
 
   test('searches Homebrew first on macOS and only absolute PATH entries', () => {
-    const pathValue = ['/bin', '/usr/bin', '/custom/bin', 'relative'].join(path.delimiter)
+    const pathValue = ['/bin', '/usr/bin', '/custom/bin', 'relative'].join(path.posix.delimiter)
     const macDirs = shellSearchDirs(true, pathValue)
     const linuxDirs = shellSearchDirs(false, pathValue)
     const installed = (p: string) => ['/bin/bash', '/opt/homebrew/bin/bash'].includes(p)
     expect(resolvePosixOverride('bash', undefined, macDirs, installed)).toBe('/opt/homebrew/bin/bash')
     expect(resolvePosixOverride('bash', undefined, linuxDirs, installed)).toBe('/bin/bash')
-    expect(macDirs.every((dir) => path.isAbsolute(dir))).toBe(true)
+    expect(macDirs.every((dir) => path.posix.isAbsolute(dir))).toBe(true)
   })
 })
 

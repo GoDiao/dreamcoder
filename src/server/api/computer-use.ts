@@ -71,7 +71,7 @@ const defaultDeps: Deps = {
         : process.platform === 'win32'
           ? ['cmd', '/c', 'start', '', url]
           : ['xdg-open', url]
-    await Bun.spawn(command, { stdout: 'ignore', stderr: 'ignore' }).exited
+    await Bun.spawn(command, { stdout: 'ignore', stderr: 'ignore', windowsHide: true }).exited
   },
 }
 
