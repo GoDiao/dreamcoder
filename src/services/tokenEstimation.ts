@@ -388,7 +388,7 @@ function roughTokenCountEstimationForContent(
   return totalTokens
 }
 
-function roughTokenCountEstimationForBlock(
+export function roughTokenCountEstimationForBlock(
   block: string | Anthropic.ContentBlock | Anthropic.ContentBlockParam,
 ): number {
   if (typeof block === 'string') {

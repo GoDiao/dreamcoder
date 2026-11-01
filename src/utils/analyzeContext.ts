@@ -18,6 +18,8 @@ import {
   countMessagesTokensWithAPI,
   countTokensViaHaikuFallback,
   roughTokenCountEstimation,
+  roughTokenCountEstimationForBlock,
+  roughTokenCountEstimationForMessages,
 } from '../services/tokenEstimation.js'
 import { estimateSkillFrontmatterTokens } from '../skills/loadSkillsDir.js'
 import {
@@ -76,13 +78,29 @@ const MANUAL_COMPACT_BUFFER_NAME = 'Compact buffer'
  */
 export const TOOL_TOKEN_COUNT_OVERHEAD = 500
 
+export function estimateTokensForContextMessages(
+  messages: Anthropic.Beta.Messages.BetaMessageParam[],
+  tools: Anthropic.Beta.Messages.BetaToolUnion[],
+): number {
+  const messageTokens = roughTokenCountEstimationForMessages(
+    messages.map(message => ({
+      type: message.role === 'assistant' ? 'assistant' : 'user',
+      message: { content: message.content },
+    })),
+  )
+  if (tools.length === 0) {
+    return messageTokens
+  }
+  return messageTokens + roughTokenCountEstimation(jsonStringify(tools))
+}
+
 async function countTokensWithFallback(
   messages: Anthropic.Beta.Messages.BetaMessageParam[],
   tools: Anthropic.Beta.Messages.BetaToolUnion[],
   estimateOnly = false,
 ): Promise<number | null> {
   if (estimateOnly) {
-    return roughTokenCountEstimation(jsonStringify({ messages, tools }))
+    return estimateTokensForContextMessages(messages, tools)
   }
 
   try {
@@ -809,8 +827,7 @@ function processAssistantMessage(
 ): void {
   // Process each content block individually
   for (const block of msg.message.content) {
-    const blockStr = jsonStringify(block)
-    const blockTokens = roughTokenCountEstimation(blockStr)
+    const blockTokens = roughTokenCountEstimationForBlock(block)
 
     if ('type' in block && block.type === 'tool_use') {
       breakdown.toolCallTokens += blockTokens
@@ -841,8 +858,7 @@ function processUserMessage(
 
   // Process each content block individually
   for (const block of msg.message.content) {
-    const blockStr = jsonStringify(block)
-    const blockTokens = roughTokenCountEstimation(blockStr)
+    const blockTokens = roughTokenCountEstimationForBlock(block)
 
     if ('type' in block && block.type === 'tool_result') {
       breakdown.toolResultTokens += blockTokens
