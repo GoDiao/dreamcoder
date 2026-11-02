@@ -20,9 +20,9 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLa
   return (
     <AlertDialog open={open} onOpenChange={(next) => { if (!next && !loading) onClose() }}>
       <AlertDialogContent {...focus} onEscapeKeyDown={(event) => { if (loading) event.preventDefault() }}>
-        <AlertDialogHeader>
+        <AlertDialogHeader className="min-w-0">
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription asChild><div>{body}</div></AlertDialogDescription>
+          <AlertDialogDescription className="min-w-0 w-full" asChild><div>{body}</div></AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>

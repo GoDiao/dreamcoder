@@ -6,6 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.
 - Images attached from uploads, paste or the built-in browser are kept unchanged within the client limits and resized or compressed when they exceed 2000×2000 pixels or 3.75 MB. Sent images now use compact thumbnails that still open in the gallery (#218).
 
 ## [0.8.0] — 2026-11-01
