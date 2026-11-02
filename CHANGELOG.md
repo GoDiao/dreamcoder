@@ -7,6 +7,8 @@ All notable changes to DreamCoder will be documented in this file.
 ### Fixed
 
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.
+- Reading environment files, credential files, and SSH private keys now requires explicit approval through both the Read tool and read-only Bash commands.
+- The exact shell no-op `:` is recognized as read-only and no longer requires approval.
 
 ## [0.8.0] — 2026-11-01
 

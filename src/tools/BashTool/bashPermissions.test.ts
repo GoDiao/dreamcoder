@@ -1,4 +1,7 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { join } from 'node:path'
+import { getOriginalCwd, setOriginalCwd } from '../../bootstrap/state'
+import { getEmptyToolPermissionContext } from '../../Tool'
 import {
   BINARY_HIJACK_VARS,
   getFirstWordPrefix,
@@ -8,6 +11,11 @@ import {
   stripSafeWrappers,
   stripWrappersFromArgv,
 } from './bashPermissions'
+import { checkPathConstraints } from './pathValidation'
+import { checkReadOnlyConstraints } from './readOnlyValidation'
+
+const originalCwd = getOriginalCwd()
+const project = join(originalCwd, 'issue-145-bash-permissions')
 
 describe('bash permission command normalization', () => {
   test('extracts stable prefixes only through safe env vars', () => {
@@ -43,5 +51,74 @@ describe('bash permission command normalization', () => {
   test('matches wildcard permission patterns consistently', () => {
     expect(matchWildcardPattern('git *', 'git status --short')).toBe(true)
     expect(matchWildcardPattern('git commit', 'git status')).toBe(false)
+  })
+})
+
+describe('bash sensitive read permissions', () => {
+  beforeEach(() => {
+    setOriginalCwd(project)
+  })
+
+  afterEach(() => {
+    setOriginalCwd(originalCwd)
+  })
+
+  const check = (command: string) =>
+    checkPathConstraints(
+      { command },
+      project,
+      getEmptyToolPermissionContext(),
+    )
+
+  test('asks before reading environment and credential files', () => {
+    for (const command of [
+      'cat .env',
+      'cat .env.local',
+      'cat .env*',
+      'head -n 5 credentials',
+      'grep token secrets.yaml',
+      'cat .netrc',
+      'cat .npmrc',
+      'cat .pgpass',
+      'cat token',
+      'cat .aws/credentials',
+    ]) {
+      const result = check(command)
+      expect(result.behavior).toBe('ask')
+      expect(result.decisionReason?.type).toBe('safetyCheck')
+    }
+  })
+
+  test('asks before reading SSH private keys', () => {
+    for (const command of [
+      'cat .ssh/id_rsa',
+      'head -n 1 .ssh/id_ed25519',
+      'cat .ssh/id_*',
+    ]) {
+      expect(check(command).behavior).toBe('ask')
+    }
+  })
+
+  test('keeps safe SSH files and ordinary reads on the read-only path', () => {
+    for (const command of [
+      'cat README.md',
+      'cat .ssh/id_rsa.pub',
+      'cat .ssh/known_hosts',
+      'cat .ssh/config',
+      'cat .bashrc',
+    ]) {
+      expect(check(command).behavior).toBe('passthrough')
+    }
+  })
+})
+
+describe('bash data-backed read-only permissions', () => {
+  test('allows only the exact shell no-op shape', () => {
+    expect(checkReadOnlyConstraints({ command: ':' }, false).behavior).toBe(
+      'allow',
+    )
+    expect(
+      checkReadOnlyConstraints({ command: ': $(whoami)' }, false).behavior,
+    ).toBe('passthrough')
   })
 })

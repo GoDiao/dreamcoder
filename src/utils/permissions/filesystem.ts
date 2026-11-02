@@ -68,6 +68,15 @@ export const DANGEROUS_FILES = [
   '.claude.json',
 ] as const
 
+export const SENSITIVE_READ_FILES = [
+  'credentials',
+  'secrets.yaml',
+  '.netrc',
+  '.npmrc',
+  '.pgpass',
+  'token',
+] as const
+
 /**
  * Dangerous directories that should be protected from auto-editing.
  * These directories contain sensitive configuration or executable files.
@@ -91,6 +100,42 @@ export const DANGEROUS_DIRECTORIES = [
  */
 export function normalizeCaseForComparison(path: string): string {
   return path.toLowerCase()
+}
+
+export function isSensitiveReadPath(path: string): boolean {
+  const parts = normalizeCaseForComparison(path)
+    .replace(/[\\]+/g, '/')
+    .split('/')
+    .filter(Boolean)
+  const fileName = parts.at(-1)
+  if (!fileName) return false
+  if (fileName.startsWith('.env')) return true
+  if (SENSITIVE_READ_FILES.some(name => name === fileName)) return true
+  return (
+    parts.at(-2) === '.ssh' &&
+    fileName.startsWith('id_') &&
+    !fileName.endsWith('.pub')
+  )
+}
+
+export function checkSensitiveReadPermission(
+  path: string,
+  precomputedPathsToCheck?: readonly string[],
+): PermissionDecision | null {
+  const pathsToCheck =
+    precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
+  const sensitivePath = pathsToCheck.find(isSensitiveReadPath)
+  if (!sensitivePath) return null
+  const reason = `Reading ${sensitivePath} may expose secrets and requires explicit approval`
+  return {
+    behavior: 'ask',
+    message: `Claude requested permission to read ${path}, which may contain secrets.`,
+    decisionReason: {
+      type: 'safetyCheck',
+      reason,
+      classifierApprovable: false,
+    },
+  }
 }
 
 /**
@@ -1159,6 +1204,11 @@ export function checkReadPermissionForTool(
         },
       }
     }
+  }
+
+  const sensitiveReadResult = checkSensitiveReadPermission(path, pathsToCheck)
+  if (sensitiveReadResult) {
+    return sensitiveReadResult
   }
 
   // 5. Edit access implies read access (but only if no read-specific deny/ask rules exist)

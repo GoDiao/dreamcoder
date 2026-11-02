@@ -16,6 +16,7 @@ import {
   checkEditableInternalPath,
   checkPathSafetyForAutoEdit,
   checkReadableInternalPath,
+  checkSensitiveReadPermission,
   matchingRuleForInput,
   pathInAllowedWorkingPath,
   pathInWorkingPath,
@@ -145,6 +146,10 @@ export function isPathAllowed(
   operationType: FileOperationType,
   precomputedPathsToCheck?: readonly string[],
 ): PathCheckResult {
+  const pathsToCheck =
+    operationType === 'read'
+      ? (precomputedPathsToCheck ?? getPathsForPermissionCheck(resolvedPath))
+      : precomputedPathsToCheck
   // Determine which permission type to check based on operation
   const permissionType = operationType === 'read' ? 'read' : 'edit'
 
@@ -162,11 +167,27 @@ export function isPathAllowed(
     }
   }
 
-  const artifactDenial = artifactDenialFor(precomputedPathsToCheck ?? [resolvedPath], operationType)
+  const artifactDenial = artifactDenialFor(
+    pathsToCheck ?? [resolvedPath],
+    operationType,
+  )
   if (artifactDenial) {
     return {
       allowed: false,
       decisionReason: artifactDenial,
+    }
+  }
+
+  if (operationType === 'read') {
+    const sensitiveReadResult = checkSensitiveReadPermission(
+      resolvedPath,
+      pathsToCheck,
+    )
+    if (sensitiveReadResult) {
+      return {
+        allowed: false,
+        decisionReason: sensitiveReadResult.decisionReason,
+      }
     }
   }
 
@@ -217,7 +238,7 @@ export function isPathAllowed(
   const isInWorkingDir = pathInAllowedWorkingPath(
     resolvedPath,
     context,
-    precomputedPathsToCheck,
+    pathsToCheck,
   )
   if (isInWorkingDir) {
     if (operationType === 'read' || context.mode === 'acceptEdits') {
@@ -469,13 +490,25 @@ export function validatePath(
       }
     }
 
-    // For read operations, validate the base directory where the glob would expand
-    return validateGlobPattern(
+    const result = validateGlobPattern(
       cleanPath,
       cwd,
       toolPermissionContext,
       operationType,
     )
+    if (!result.allowed) return result
+    const absolutePath = isAbsolute(cleanPath)
+      ? cleanPath
+      : resolve(cwd, cleanPath)
+    const sensitiveReadResult = checkSensitiveReadPermission(absolutePath, [
+      absolutePath,
+    ])
+    if (!sensitiveReadResult) return result
+    return {
+      allowed: false,
+      resolvedPath: absolutePath,
+      decisionReason: sensitiveReadResult.decisionReason,
+    }
   }
 
   // Resolve path
