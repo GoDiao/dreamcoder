@@ -3,7 +3,7 @@ import { usePanelWidthPersistence } from '../hooks/usePanelWidthPersistence'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/shared/ui/resizable'
 import { Button } from '../components/shared/ui/button'
 import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
-import { lazy, Suspense, useEffect, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import {
   SCHEDULED_TAB_ID,
   useTabStore,
@@ -13,7 +13,6 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useChatStore, useSessionField } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
-import { useUIStore } from '../stores/uiStore'
 import {
   WORKSPACE_PANEL_MAX_WIDTH,
   WORKSPACE_PANEL_MIN_CHAT_WIDTH,
@@ -30,8 +29,8 @@ import { TeamStatusBar } from '../components/teams/TeamStatusBar'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
 import { useMobileViewport, useViewportQuery } from '../hooks/useMobileViewport'
+import { useTitleRow } from '../hooks/useTitleRow'
 import { Spinner } from '../components/shared/ui/spinner'
-import { isMacOverlayTitlebar } from '../lib/windowChrome'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 
 const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
@@ -155,17 +154,7 @@ export function ActiveSession() {
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
   const activeTeam = useTeamStore((s) => s.activeTeam)
   const isMemberSession = !!memberInfo
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen)
-  // On macOS the header is the window's title row. With the sidebar hidden it
-  // starts at the window's edge, under the traffic lights and the sidebar toggle.
-  const macTitlebar = isMacOverlayTitlebar()
-  const titleRowStyle = (atWindowEdge: boolean): CSSProperties | undefined => macTitlebar
-    ? {
-        height: 'var(--titlebar-height)',
-        ...(atWindowEdge && !sidebarOpen ? { paddingLeft: 'calc(var(--traffic-lights-end) + 1.75rem + 12px)' } : {}),
-      }
-    : undefined
-  const titleRowClass = macTitlebar ? '' : 'h-11'
+  const { style: titleRowStyle, className: titleRowClass } = useTitleRow()
   const canUsePanel = Boolean(activeTabId) &&
     isSessionTabState(activeTabId, activeTabType) &&
     !isMemberSession &&

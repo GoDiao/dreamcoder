@@ -62,6 +62,41 @@ describe('selection probe', () => {
     expect(probe()).toBe(true)
   })
 
+  it('looks inside same-origin iframes for a focused password field', () => {
+    document.body.innerHTML = '<iframe id="frame"></iframe>'
+    const inner = (document.getElementById('frame') as HTMLIFrameElement).contentDocument as Document
+    inner.body.innerHTML = '<input id="f" type="password">'
+    ;(inner.getElementById('f') as HTMLElement).focus()
+
+    expect(probe()).toBe(true)
+  })
+
+  it('looks inside same-origin iframes for a selection spanning a sensitive field', () => {
+    document.body.innerHTML = '<iframe id="frame"></iframe>'
+    const frame = document.getElementById('frame') as HTMLIFrameElement
+    const inner = frame.contentDocument as Document
+    inner.body.innerHTML = '<div id="box">a <input type="password" value="x"> b</div>'
+    const range = inner.createRange()
+    range.selectNodeContents(inner.getElementById('box') as HTMLElement)
+    const selection = frame.contentWindow?.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    expect(probe()).toBe(true)
+  })
+
+  it('passes a plain selection inside an iframe', () => {
+    document.body.innerHTML = '<iframe id="frame"></iframe>'
+    const frame = document.getElementById('frame') as HTMLIFrameElement
+    const inner = frame.contentDocument as Document
+    inner.body.innerHTML = '<p id="p">plain</p><input type="text">'
+    const range = inner.createRange()
+    range.selectNodeContents(inner.getElementById('p') as HTMLElement)
+    frame.contentWindow?.getSelection()?.addRange(range)
+
+    expect(probe()).toBe(false)
+  })
+
   it('does not depend on anything outside its own source', () => {
     expect(SELECTION_PROBE_SOURCE).not.toContain('import')
     expect(() => new Function(`return ${SELECTION_PROBE_SOURCE}`)).not.toThrow()

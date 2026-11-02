@@ -69,10 +69,10 @@ export function AppShell() {
   const effectiveSidebarVisible = isMobileShell ? mobileSidebarVisible : sidebarOpen
   const activeTab = tabs.find((tab) => tab.sessionId === activeTabId)
   const isActiveChatTab = isChatTab(activeTab)
-  // Mirrors ContentRouter and ActiveSession: every tab but scheduled tasks is a
-  // session page, and a teammate's session has no header.
+  // Every tab but scheduled tasks brings its own title row: a session's header,
+  // or the header of an Artifacts page. A teammate's session has none.
   const isTeammateSession = useTeamStore((s) => activeTabId ? !!s.getMemberBySessionId(activeTabId) : false)
-  const pageHasSessionHeader = !!activeTab && activeTab.type !== 'scheduled' && !isTeammateSession
+  const pageHasTitleRow = !!activeTab && activeTab.type !== 'scheduled' && !isTeammateSession
   const mobileSessionTitle = activeSession?.title || activeTab?.title || t('session.untitled')
   const mobileSessionUpdated = (() => {
     if (!activeSession?.modifiedAt) return ''
@@ -295,14 +295,14 @@ export function AppShell() {
       >
         {/* Kept outside the inert area and above the settings overlay so the
             window can still be moved, minimised or closed while settings is open.
-            On macOS a session's header is the title row itself, so the strip is
+            On macOS a page's own header is the title row itself, so the strip is
             only needed there while settings covers that header; it then floats
             over the header instead of pushing the page down. */}
-        {titlebarToggle && (!(macTitlebar && pageHasSessionHeader) || settingsOpen) ? (
+        {titlebarToggle && (!(macTitlebar && pageHasTitleRow) || settingsOpen) ? (
           <WindowDragStrip
-            tall={!pageHasSessionHeader}
+            tall={!pageHasTitleRow}
             mac={macTitlebar}
-            floating={macTitlebar && pageHasSessionHeader}
+            floating={macTitlebar && pageHasTitleRow}
           />
         ) : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" {...behindSettingsProps}>

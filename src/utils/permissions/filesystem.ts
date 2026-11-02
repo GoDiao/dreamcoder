@@ -1,4 +1,6 @@
 import { feature } from 'bun:bundle'
+import { hasArtifactsSegment } from '../artifacts.js'
+import { artifactDenialReason, artifactLocationDenial, isOwnArtifactWrite, OWN_ARTIFACT_WRITE_REASON } from './artifactLocation.js'
 import { randomBytes } from 'crypto'
 import ignore from 'ignore'
 import memoize from 'lodash-es/memoize.js'
@@ -1276,6 +1278,15 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     }
   }
 
+  const artifactDenial = artifactLocationDenial(pathsToCheck)
+  if (artifactDenial) {
+    return {
+      behavior: 'deny',
+      message: artifactDenial,
+      decisionReason: artifactDenialReason(artifactDenial),
+    }
+  }
+
   // 1.5. Allow writes to internal editable paths (plan files, scratchpad)
   // This MUST come before isDangerousFilePathToAutoEdit check since .claude is a dangerous directory
   const absolutePathForEdit = expandPath(path)
@@ -1391,6 +1402,14 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
           rule: askRule,
         },
       }
+    }
+  }
+
+  if (toolPermissionContext.mode !== 'plan' && isOwnArtifactWrite(pathsToCheck)) {
+    return {
+      behavior: 'allow',
+      updatedInput: input,
+      decisionReason: OWN_ARTIFACT_WRITE_REASON,
     }
   }
 
@@ -1652,6 +1671,17 @@ export function checkReadableInternalPath(
   // SECURITY: Normalize path to prevent traversal bypasses via .. segments
   // This is defense-in-depth; individual helper functions also normalize
   const normalizedPath = normalize(absolutePath)
+
+  if (hasArtifactsSegment(normalizedPath) && getPathsForPermissionCheck(absolutePath).every(hasArtifactsSegment)) {
+    return {
+      behavior: 'allow',
+      updatedInput: input,
+      decisionReason: {
+        type: 'other',
+        reason: 'Artifact files are allowed for reading',
+      },
+    }
+  }
 
   // Session memory directory
   if (isSessionMemoryPath(normalizedPath)) {

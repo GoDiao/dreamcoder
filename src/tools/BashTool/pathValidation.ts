@@ -1,4 +1,5 @@
 import { homedir } from 'os'
+import { isHardDenial } from '../../utils/permissions/artifactLocation.js'
 import { isAbsolute, resolve } from 'path'
 import type { z } from 'zod/v4'
 import type { ToolPermissionContext } from '../../Tool.js'
@@ -676,7 +677,7 @@ function validateCommandPaths(
           ? decisionReason.reason
           : `${command} in '${resolvedPath}' was blocked. For security, Claude Code may only ${ACTION_VERBS[command]} the allowed working directories for this session: ${dirListStr}.`
 
-      if (decisionReason?.type === 'rule') {
+      if (isHardDenial(decisionReason)) {
         return {
           behavior: 'deny',
           message,
@@ -972,7 +973,7 @@ function validateOutputRedirections(
             : `Output redirection to '${resolvedPath}' was blocked. For security, Claude Code may only write to files in the allowed working directories for this session: ${dirListStr}.`
 
       // If denied by a deny rule, return 'deny' behavior
-      if (decisionReason?.type === 'rule') {
+      if (isHardDenial(decisionReason)) {
         return {
           behavior: 'deny',
           message,

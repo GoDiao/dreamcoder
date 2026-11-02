@@ -1,3 +1,6 @@
+import { handleArtifactsApi } from './api/artifacts.js'
+import { handleDesignApi } from './api/design.js'
+import { handleBrowserApi } from './api/browser.js'
 import { handleSessionsApi } from './api/sessions.js'
 import { handleSettingsApi } from './api/settings.js'
 import { handleModelsApi } from './api/models.js'
@@ -108,6 +111,15 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
 
     case 'desktop-ui':
       return handleDesktopUiApi(req, url, segments)
+
+    case 'artifacts':
+      return handleArtifactsApi(req, url, segments)
+
+    case 'design':
+      return handleDesignApi(req, url, segments)
+
+    case 'browser':
+      return handleBrowserApi(req, url, segments)
 
     case 'filesystem':
       return handleFilesystemRoute(url.pathname, url)

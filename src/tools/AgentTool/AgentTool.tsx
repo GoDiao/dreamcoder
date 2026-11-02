@@ -39,7 +39,8 @@ import { isInProcessTeammate } from '../../utils/teammateContext.js';
 import { teleportToRemote } from '../../utils/teleport.js';
 import { getAssistantMessageContentLength } from '../../utils/tokens.js';
 import { createAgentId } from '../../utils/uuid.js';
-import { createAgentWorktree, hasWorktreeChanges, removeAgentWorktree } from '../../utils/worktree.js';
+import { createAgentWorktree, hasWorktreeChanges, removeAgentWorktree, type MovedArtifact } from '../../utils/worktree.js';
+import { ARTIFACT_COPY_TOOL_NAME } from '../ArtifactCopyTool/constants.js';
 import { BASH_TOOL_NAME } from '../BashTool/toolName.js';
 import { BackgroundHint } from '../BashTool/UI.js';
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js';
@@ -644,6 +645,7 @@ export const AgentTool = buildTool({
     const cleanupWorktreeIfNeeded = async (): Promise<{
       worktreePath?: string;
       worktreeBranch?: string;
+      movedArtifacts?: MovedArtifact[];
     }> => {
       if (!worktreeInfo) return {};
       const {
@@ -666,7 +668,14 @@ export const AgentTool = buildTool({
       if (headCommit) {
         const changed = await hasWorktreeChanges(worktreePath, headCommit);
         if (!changed) {
-          await removeAgentWorktree(worktreePath, worktreeBranch, gitRoot);
+          const movedArtifacts: MovedArtifact[] = [];
+          const removed = await removeAgentWorktree(worktreePath, worktreeBranch, gitRoot, undefined, movedArtifacts);
+          if (!removed) {
+            return {
+              worktreePath,
+              worktreeBranch
+            };
+          }
           // Clear worktreePath from metadata so resume doesn't try to use
           // a deleted directory. Fire-and-forget to match runAgent's
           // writeAgentMetadata handling.
@@ -674,7 +683,9 @@ export const AgentTool = buildTool({
             agentType: selectedAgent.agentType,
             description
           }).catch(_err => logForDebugging(`Failed to clear worktree metadata: ${_err}`));
-          return {};
+          return movedArtifacts.length > 0 ? {
+            movedArtifacts
+          } : {};
         }
       }
       logForDebugging(`Agent worktree has changes, keeping: ${worktreePath}`);
@@ -863,6 +874,7 @@ export const AgentTool = buildTool({
         let worktreeResult: {
           worktreePath?: string;
           worktreeBranch?: string;
+          movedArtifacts?: MovedArtifact[];
         } = {};
         try {
           while (true) {
@@ -1336,7 +1348,9 @@ The agent is now running and will receive instructions via mailbox.`
     }
     if (data.status === 'completed') {
       const worktreeData = data as Record<string, unknown>;
-      const worktreeInfoText = worktreeData.worktreePath ? `\nworktreePath: ${worktreeData.worktreePath}\nworktreeBranch: ${worktreeData.worktreeBranch}` : '';
+      const movedArtifacts = worktreeData.movedArtifacts as MovedArtifact[] | undefined;
+      const movedArtifactsText = movedArtifacts?.length ? `\nartifacts moved to the global store (read-only; use ${ARTIFACT_COPY_TOOL_NAME} to copy one back into this project): ${movedArtifacts.map(artifact => `${artifact.name} at ${artifact.dir}`).join(', ')}` : '';
+      const worktreeInfoText = (worktreeData.worktreePath ? `\nworktreePath: ${worktreeData.worktreePath}\nworktreeBranch: ${worktreeData.worktreeBranch}` : '') + movedArtifactsText;
       // If the subagent completes with no content, the tool_result is just the
       // agentId/usage trailer below — a metadata-only block at the prompt tail.
       // Some models read that as "nothing to act on" and end their turn

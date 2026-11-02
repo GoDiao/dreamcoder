@@ -300,6 +300,11 @@ describe('AppShell boot flow', () => {
     mocks.tabState.activeTabId = 'scheduled'
     rerender(<AppShell />)
     expect(screen.getByTestId('window-drag-strip')).toHaveClass('h-11')
+
+    mocks.tabState.tabs = [{ sessionId: '__artifacts__', title: 'Artifacts', type: 'artifacts', status: 'idle' }]
+    mocks.tabState.activeTabId = '__artifacts__'
+    rerender(<AppShell />)
+    expect(screen.getByTestId('window-drag-strip')).not.toHaveClass('h-11')
   })
 
   it('hides the whole sidebar from one titlebar toggle in the desktop app', async () => {
@@ -337,6 +342,17 @@ describe('AppShell boot flow', () => {
     expect(toggle).toHaveClass('window-no-drag')
     const panels = document.querySelector('[data-slot="resizable-panel-group"]')!
     expect(panels.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
+  })
+
+  it('drops the strip on the Artifacts page on macOS because its headers are the title row', async () => {
+    mocks.isDesktopRuntime = true
+    mocks.isMacTitlebar = true
+    mocks.tabState.tabs = [{ sessionId: '__artifacts__', title: 'Artifacts', type: 'artifacts', status: 'idle' }]
+    mocks.tabState.activeTabId = '__artifacts__'
+
+    render(<AppShell />)
+    expect(await screen.findByTestId('titlebar-sidebar-toggle')).toBeInTheDocument()
     expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()
   })
 

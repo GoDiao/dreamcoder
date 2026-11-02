@@ -3,6 +3,7 @@ import { useTabStore } from '../../stores/tabStore'
 import { EmptySession } from '../../pages/EmptySession'
 import { ActiveSession } from '../../pages/ActiveSession'
 import { ScheduledTasks } from '../../pages/ScheduledTasks'
+import { ArtifactsPage } from '../../pages/ArtifactsPage'
 
 export function ContentRouter() {
   const activeTabId = useTabStore((s) => s.activeTabId)
@@ -20,6 +21,8 @@ export function ContentRouter() {
     page = <EmptySession />
   } else if (activeTabType === 'scheduled') {
     page = <ScheduledTasks />
+  } else if (activeTabType === 'artifacts') {
+    page = <ArtifactsPage />
   } else {
     page = <ActiveSession />
   }

@@ -7,6 +7,9 @@ import { getCwd } from '../../utils/cwd.js'
 import { clearInstalledPluginsCache } from '../../utils/plugins/installedPluginsManager.js'
 import { clearPluginCache, loadAllPlugins, loadAllPluginsCacheOnly } from '../../utils/plugins/pluginLoader.js'
 import { getSkillDirCommands } from '../../skills/loadSkillsDir.js'
+import { getBundledSkills } from '../../skills/bundledSkills.js'
+import { initBundledSkills } from '../../skills/bundled/index.js'
+import { isCommandEnabled } from '../../types/command.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import type { LoadedPlugin } from '../../types/plugin.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
@@ -401,6 +404,17 @@ async function collectAllSkills(cwd?: string): Promise<SkillMeta[]> {
   return skills
 }
 
+function listBundledSlashCommands(): SkillSlashCommand[] {
+  if (getBundledSkills().length === 0) initBundledSkills()
+  return getBundledSkills()
+    .filter(command => isCommandEnabled(command) && command.userInvocable !== false && !command.isHidden)
+    .map(command => ({
+      name: command.name,
+      description: command.description || '',
+      ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
+    }))
+}
+
 export async function listSkillSlashCommands(cwd?: string): Promise<SkillSlashCommand[]> {
   const requestedCwd = cwd || getCwd()
   const [skills, legacyCommands] = await Promise.all([
@@ -410,8 +424,12 @@ export async function listSkillSlashCommands(cwd?: string): Promise<SkillSlashCo
 
   const byName = new Map<string, SkillSlashCommand>()
 
+  for (const command of listBundledSlashCommands()) {
+    byName.set(command.name, command)
+  }
+
   for (const skill of skills) {
-    if (!skill.userInvocable) continue
+    if (!skill.userInvocable || byName.has(skill.name)) continue
     byName.set(skill.name, {
       name: skill.name,
       description: skill.description || '',

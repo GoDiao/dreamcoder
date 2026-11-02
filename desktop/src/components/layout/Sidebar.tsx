@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, FolderPlus, GitBranch, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
+import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, Layers, FolderPlus, GitBranch, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { Button } from '../shared/ui/button'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
@@ -12,7 +12,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SessionListItem } from '../../types/session'
-import { useTabStore, SCHEDULED_TAB_ID } from '../../stores/tabStore'
+import { useTabStore, ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
@@ -646,6 +646,21 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             icon={<ClockIcon />}
           >
             {t('sidebar.scheduled')}
+          </NavItem>
+        )}
+        {!isMobile && isDesktop && (
+          <NavItem
+            active={activeTabId === ARTIFACTS_TAB_ID}
+            collapsed={!expanded}
+            label={t('sidebar.artifacts')}
+            touchFriendly={isMobile}
+            onClick={() => {
+              useTabStore.getState().openTab(ARTIFACTS_TAB_ID, t('sidebar.artifacts'), 'artifacts')
+              closeMobileDrawer()
+            }}
+            icon={<Layers className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />}
+          >
+            {t('sidebar.artifacts')}
           </NavItem>
         )}
       </div>

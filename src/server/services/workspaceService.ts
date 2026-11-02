@@ -9,7 +9,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
-} from './windowsDrivePath.js'
+} from '../../utils/windowsDrivePath.js'
 
 const MAX_PREVIEW_BYTES = 1024 * 1024
 const MAX_UNTRACKED_STAT_BYTES = 256 * 1024
@@ -1552,6 +1552,7 @@ export class WorkspaceService {
   ): Promise<GitCommandResult> {
     try {
       const result = await execFile('git', args, {
+        windowsHide: true,
         cwd: workDir,
         timeout: GIT_TIMEOUT_MS,
         maxBuffer: MAX_GIT_BUFFER_BYTES,

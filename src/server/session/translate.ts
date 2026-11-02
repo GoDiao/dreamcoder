@@ -12,6 +12,7 @@ import {
   readCompactMetadata,
   type BackgroundTaskMessageSubtype,
 } from '../transcript/classify.js'
+import { structuredToolResultContent } from '../transcript/history.js'
 import type { LiveTranscriptItem, ServerMessage } from '../ws/protocol.js'
 import type { PendingPermission, SessionSlashCommand, SessionStateEvent } from './state/types.js'
 
@@ -150,21 +151,6 @@ function extractAssistantText(cliMsg: any): string {
   return textBlock?.text || ''
 }
 
-function readObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function normalizeAskUserQuestionToolResult(content: unknown, toolUseResult: unknown): unknown {
-  const result = readObject(toolUseResult)
-  const answers = readObject(result?.answers)
-  if (!result || !answers || !Array.isArray(result.questions)) return content
-  return {
-    questions: result.questions,
-    answers,
-  }
-}
-
 function isDuplicateOfLastApiError(
   lastApiError: SessionStreamState['lastApiError'],
   resultMessage: string,
@@ -289,7 +275,7 @@ function translateMessages(
             messages.push({
               type: 'tool_result',
               toolUseId: block.tool_use_id,
-              content: normalizeAskUserQuestionToolResult(block.content, cliMsg.toolUseResult),
+              content: structuredToolResultContent(block.content, cliMsg.tool_use_result),
               isError: !!block.is_error,
               parentToolUseId,
             })
@@ -550,6 +536,16 @@ function translateMessages(
       if (subtype === 'task_progress') {
         events.push({ type: 'turn_activity_reported', activity: 'tool' })
         return backgroundTaskMessages(cliMsg, subtype, events, now)
+      }
+      if (subtype === 'artifact_written') {
+        return typeof cliMsg.path === 'string' && cliMsg.path !== ''
+          ? [{
+              type: 'artifact_written',
+              path: cliMsg.path,
+              toolName: String(cliMsg.tool_name ?? ''),
+              ...(typeof cliMsg.agent_id === 'string' && { agentId: cliMsg.agent_id }),
+            }]
+          : []
       }
       if (subtype === 'session_state_changed') {
         if (cliMsg.state === 'running' || cliMsg.state === 'requires_action' || cliMsg.state === 'idle') {

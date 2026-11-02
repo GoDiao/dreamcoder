@@ -14,6 +14,10 @@ vi.mock('../../pages/ScheduledTasks', () => ({
   ScheduledTasks: () => <div data-testid="scheduled-tasks" />,
 }))
 
+vi.mock('../../pages/ArtifactsPage', () => ({
+  ArtifactsPage: () => <div data-testid="artifacts-page" />,
+}))
+
 import { ContentRouter } from './ContentRouter'
 import { useTabStore } from '../../stores/tabStore'
 
@@ -38,6 +42,17 @@ describe('ContentRouter', () => {
     render(<ContentRouter />)
 
     expect(screen.getByTestId('active-session')).toBeInTheDocument()
+  })
+
+  it('routes the artifacts tab to the artifacts page', () => {
+    useTabStore.setState({
+      tabs: [{ sessionId: '__artifacts__', title: 'Artifacts', type: 'artifacts', status: 'idle' }],
+      activeTabId: '__artifacts__',
+    })
+
+    render(<ContentRouter />)
+
+    expect(screen.getByTestId('artifacts-page')).toBeInTheDocument()
   })
 
   it('routes the scheduled tab to scheduled tasks', () => {

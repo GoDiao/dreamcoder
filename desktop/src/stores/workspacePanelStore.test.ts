@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceTreeMock: vi.fn(),
   getWorkspaceFileMock: vi.fn(),
   getWorkspaceDiffMock: vi.fn(),
+  openArtifactMock: vi.fn(),
+  previewTemplateMock: vi.fn(),
 }))
 
 vi.mock('../api/sessions', () => ({
@@ -25,6 +27,14 @@ vi.mock('../api/sessions', () => ({
     getWorkspaceFile: mocks.getWorkspaceFileMock,
     getWorkspaceDiff: mocks.getWorkspaceDiffMock,
   },
+}))
+
+vi.mock('../api/artifacts', () => ({
+  artifactsApi: { open: mocks.openArtifactMock },
+}))
+
+vi.mock('../api/design', () => ({
+  designApi: { preview: mocks.previewTemplateMock },
 }))
 
 vi.mock('../lib/browserGuests', () => ({
@@ -634,5 +644,181 @@ describe('workspacePanelStore', () => {
     expect(useWorkspacePanelStore.getState().panelBySession.s).toBeUndefined()
     expect(JSON.parse(localStorage.getItem('dreamcoder-workspace-panels') ?? '{}')).not.toHaveProperty('s')
     expect(kinds('other')).toEqual(['changes'])
+  })
+})
+
+describe('artifact tabs', () => {
+  const initialState = useWorkspacePanelStore.getInitialState()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useWorkspacePanelStore.setState(initialState, true)
+  })
+
+  afterEach(() => {
+    useWorkspacePanelStore.setState(initialState, true)
+    localStorage.clear()
+  })
+
+  const item = { name: 'report', latestMtimeMs: 42, id: 'id-report' }
+  const root = '/repo/dc_artifacts'
+
+  it('opens an artifact with its protocol root and remembers where it came from', async () => {
+    mocks.openArtifactMock.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/report/index.html' })
+
+    await useWorkspacePanelStore.getState().openArtifact('s1', item, root)
+
+    const tab = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]!
+    expect(tab).toMatchObject({ kind: 'browser', root: '/repo/dc_artifacts', artifact: { id: 'id-report', name: 'report', mtimeMs: 42 } })
+    expect(mocks.openArtifactMock).toHaveBeenCalledWith('/repo/dc_artifacts', 'report')
+    expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s1', tab.id, '/repo/dc_artifacts/report/index.html', '/repo/dc_artifacts')
+  })
+
+  it('records the fixed marker for an artifact in the global store', async () => {
+    mocks.openArtifactMock.mockResolvedValue({ rootDir: '/config/global', filePath: '/config/global/a/index.html' })
+
+    await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'a', id: 'id-a' }, 'global')
+
+    expect(useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]).toMatchObject({ root: 'global' })
+    expect(mocks.openArtifactMock).toHaveBeenCalledWith('global', 'a')
+  })
+
+  it('activates the tab of an artifact that is already open instead of opening another', async () => {
+    mocks.openArtifactMock.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/report/index.html' })
+    await useWorkspacePanelStore.getState().openArtifact('s1', item, root)
+    useWorkspacePanelStore.getState().openTab('s1', { kind: 'files' })
+    mocks.openArtifactMock.mockClear()
+    mocks.submitBrowserInput.mockClear()
+
+    await useWorkspacePanelStore.getState().openArtifact('s1', item, root)
+
+    const panel = useWorkspacePanelStore.getState().panelBySession['s1']!
+    expect(panel.tabs.map((tab) => tab.kind)).toEqual(['browser', 'files'])
+    expect(panel.activeTabId).toBe(panel.tabs[0]!.id)
+    expect(mocks.openArtifactMock).not.toHaveBeenCalled()
+    expect(mocks.submitBrowserInput).not.toHaveBeenCalled()
+  })
+
+  it('opens a template preview in its own root and remembers the template id', async () => {
+    mocks.previewTemplateMock.mockResolvedValue({ rootDir: '/app/design-templates/saas', filePath: '/app/design-templates/saas/index.html' })
+
+    await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
+
+    const tab = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]!
+    expect(tab).toMatchObject({ kind: 'browser', root: '/app/design-templates/saas', template: { id: 'saas' } })
+    expect(mocks.previewTemplateMock).toHaveBeenCalledWith('saas')
+    expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s1', tab.id, '/app/design-templates/saas/index.html', '/app/design-templates/saas')
+  })
+
+  it('activates the preview tab of a template that is already open', async () => {
+    mocks.previewTemplateMock.mockResolvedValue({ rootDir: '/app/design-templates/saas', filePath: '/app/design-templates/saas/index.html' })
+    await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
+    useWorkspacePanelStore.getState().openTab('s1', { kind: 'files' })
+    mocks.previewTemplateMock.mockClear()
+    mocks.submitBrowserInput.mockClear()
+
+    await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
+
+    const panel = useWorkspacePanelStore.getState().panelBySession['s1']!
+    expect(panel.tabs.map((tab) => tab.kind)).toEqual(['browser', 'files'])
+    expect(panel.activeTabId).toBe(panel.tabs[0]!.id)
+    expect(mocks.previewTemplateMock).not.toHaveBeenCalled()
+    expect(mocks.submitBrowserInput).not.toHaveBeenCalled()
+  })
+
+  it('opens no tab when the template folder cannot be found', async () => {
+    mocks.previewTemplateMock.mockRejectedValue(new Error('Template not found: nope'))
+
+    await expect(useWorkspacePanelStore.getState().openTemplatePreview('s1', 'nope')).rejects.toThrow('not found')
+    expect(useWorkspacePanelStore.getState().panelBySession['s1']).toBeUndefined()
+  })
+
+  it('restores a template preview tab after a restart and drops one with a malformed template', async () => {
+    mocks.previewTemplateMock.mockResolvedValue({ rootDir: '/app/design-templates/saas', filePath: '/app/design-templates/saas/index.html' })
+    await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
+    const saved = JSON.parse(localStorage.getItem('dreamcoder-workspace-panels')!)
+    saved.s2 = { isOpen: true, tabs: [{ id: 'bad', kind: 'browser', url: '', title: '', template: 7 }], activeTabId: 'bad' }
+    localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify(saved))
+
+    vi.resetModules()
+    const restarted = await import('./workspacePanelStore')
+    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+
+    expect(restored.s1?.tabs[0]).toMatchObject({ kind: 'browser', template: { id: 'saas' } })
+    expect(restored.s2?.tabs).toEqual([])
+  })
+
+  it('marks the tab of a canvas artifact and not the tab of a page', async () => {
+    mocks.openArtifactMock.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/flow/index.html' })
+
+    await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'flow', id: 'id-flow', manifest: { version: 1, id: 'id-flow', kind: 'canvas', title: 'Flow', entry: 'index.html' } }, root)
+    await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'report', id: 'id-report', manifest: { version: 1, id: 'id-report', kind: 'page', title: 'Report', entry: 'index.html' } }, root)
+
+    const tabs = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs
+    expect(tabs[0]).toMatchObject({ artifact: { id: 'id-flow', canvas: true } })
+    expect(tabs[1] && 'artifact' in tabs[1] ? tabs[1].artifact : null).not.toHaveProperty('canvas')
+  })
+
+  it('keeps the tab of a board apart from the tab of its canvas and from the tab of another board', () => {
+    const store = useWorkspacePanelStore.getState()
+    const artifact = { id: 'id-flow', name: 'flow', mtimeMs: 1 }
+    const canvas = store.openTab('s1', { kind: 'browser', url: '', artifact: { ...artifact, canvas: true } })
+    const home = store.openTab('s1', { kind: 'browser', url: '', artifact: { ...artifact, board: 'home' } })
+    const detail = store.openTab('s1', { kind: 'browser', url: '', artifact: { ...artifact, board: 'detail' } })
+    const homeAgain = store.openTab('s1', { kind: 'browser', url: '', artifact: { ...artifact, board: 'home' } })
+    expect(new Set([canvas, home, detail]).size).toBe(3)
+    expect(homeAgain).toBe(home)
+  })
+
+  it('restores the board and canvas marks after a restart and drops a tab with a malformed mark', async () => {
+    const store = useWorkspacePanelStore.getState()
+    store.openTab('s1', { kind: 'browser', url: 'dreamcoder-project://id/flow/index.html', root: '/repo/dc_artifacts', artifact: { id: 'id-flow', name: 'flow', mtimeMs: 1, canvas: true } })
+    store.openTab('s1', { kind: 'browser', url: 'dreamcoder-project://id/flow/home.html', root: '/repo/dc_artifacts', artifact: { id: 'id-flow', name: 'flow', mtimeMs: 1, board: 'home' } })
+    const saved = JSON.parse(localStorage.getItem('dreamcoder-workspace-panels')!)
+    saved.s2 = { isOpen: true, tabs: [{ id: 'bad', kind: 'browser', url: '', title: '', artifact: { id: 'x', name: 'x', mtimeMs: 1, board: 7 } }], activeTabId: 'bad' }
+    localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify(saved))
+
+    vi.resetModules()
+    const restarted = await import('./workspacePanelStore')
+    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+
+    expect(restored.s1?.tabs.map((tab) => ('artifact' in tab ? tab.artifact : null))).toEqual([
+      { id: 'id-flow', name: 'flow', mtimeMs: 1, canvas: true },
+      { id: 'id-flow', name: 'flow', mtimeMs: 1, board: 'home' },
+    ])
+    expect(restored.s2?.tabs).toEqual([])
+  })
+
+  it('refuses to open an artifact that has no id', async () => {
+    await expect(useWorkspacePanelStore.getState().openArtifact('s1', { ...item, id: null }, root)).rejects.toThrow('no id')
+  })
+
+  it('opens the artifacts list as a single tab', () => {
+    const store = useWorkspacePanelStore.getState()
+    const first = store.openTab('s1', { kind: 'artifacts' })
+    const second = store.openTab('s1', { kind: 'artifacts' })
+    expect(second).toBe(first)
+  })
+
+  it('keeps the root and artifact fields across a restart and drops malformed ones', () => {
+    localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify({
+      s1: {
+        isOpen: true,
+        activeTabId: 'a',
+        recentFiles: [],
+        tabs: [
+          { id: 'a', kind: 'browser', url: 'dreamcoder-project://x/a/index.html', title: '', root: '/repo/dc_artifacts', artifact: { id: 'id-a', name: 'a', mtimeMs: 1 } },
+          { id: 'b', kind: 'browser', url: 'u', title: '', root: 5 },
+          { id: 'c', kind: 'browser', url: 'u', title: '', artifact: { id: 'id-c', name: 'c' } },
+          { id: 'd', kind: 'artifacts' },
+        ],
+      },
+    }))
+    vi.resetModules()
+    return import('./workspacePanelStore').then(({ useWorkspacePanelStore: restored }) => {
+      const tabs = restored.getState().panelBySession['s1']!.tabs
+      expect(tabs.map((tab) => tab.id)).toEqual(['a', 'd'])
+      expect(tabs[0]).toMatchObject({ root: '/repo/dc_artifacts', artifact: { id: 'id-a', name: 'a', mtimeMs: 1 } })
+    })
   })
 })

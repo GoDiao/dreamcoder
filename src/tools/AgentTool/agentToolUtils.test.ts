@@ -15,6 +15,8 @@ import {
   createTeammateContext,
   runWithTeammateContext,
 } from '../../utils/teammateContext.js'
+import { ARTIFACT_CHECK_TOOL_NAME } from '../ArtifactCheckTool/constants.js'
+import { ARTIFACT_COPY_TOOL_NAME } from '../ArtifactCopyTool/constants.js'
 import { ENTER_WORKTREE_TOOL_NAME } from '../EnterWorktreeTool/constants.js'
 import { EXIT_WORKTREE_TOOL_NAME } from '../ExitWorktreeTool/constants.js'
 import { filterToolsForAgent, runAsyncAgentLifecycle } from './agentToolUtils.js'
@@ -135,5 +137,19 @@ describe('filterToolsForAgent worktree tools', () => {
       ENTER_WORKTREE_TOOL_NAME,
       EXIT_WORKTREE_TOOL_NAME,
     ])
+  })
+})
+
+describe('filterToolsForAgent artifact tools', () => {
+  test('async agents can check an artifact and cannot copy one', () => {
+    const tools = [
+      { name: 'Read' },
+      { name: ARTIFACT_CHECK_TOOL_NAME },
+      { name: ARTIFACT_COPY_TOOL_NAME },
+    ] as unknown as Tools
+
+    const names = filterToolsForAgent({ tools, isBuiltIn: true, isAsync: true }).map(tool => tool.name)
+
+    expect(names).toEqual(['Read', ARTIFACT_CHECK_TOOL_NAME])
   })
 })

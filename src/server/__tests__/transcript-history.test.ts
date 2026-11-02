@@ -72,6 +72,26 @@ describe('interpretTranscript', () => {
     })
   })
 
+  it('uses the structured choice of a ChooseDesignTemplate result from toolUseResult', () => {
+    const items = interpretTranscript([
+      {
+        id: 'assistant-pick',
+        type: 'assistant',
+        timestamp: '2026-04-06T00:00:00.000Z',
+        content: [{ type: 'tool_use', name: 'ChooseDesignTemplate', id: 'pick-1', input: { candidates: [] } }],
+      },
+      {
+        id: 'user-pick',
+        type: 'tool_result',
+        timestamp: '2026-04-06T00:00:01.000Z',
+        content: [{ type: 'tool_result', tool_use_id: 'pick-1', content: 'The user chose the template "saas".' }],
+        toolUseResult: { choice: 'saas', name: 'saas', path: '/p/dc_artifacts/saas', guidance: 'adapt it' },
+      },
+    ])
+
+    expect(items[1]).toMatchObject({ type: 'tool_result', toolUseId: 'pick-1', content: { choice: 'saas' } })
+  })
+
   it('collapses a compact boundary and its summary into one card after the earlier messages', () => {
     const items = interpretTranscript([
       { id: 'old-user', type: 'user', content: 'Build the billing import flow', timestamp: '2026-05-19T09:59:58.000Z' },

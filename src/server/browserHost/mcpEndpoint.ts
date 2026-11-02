@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { BrowserService } from './service.js'
-import type { BrowserSessionTokens } from './sessionTokens.js'
+import { bearerToken, unauthorizedResponse, type BrowserSessionTokens } from './sessionTokens.js'
 import { BROWSER_MCP_SERVER_NAME } from './names.js'
 import { BROWSER_TOOLS } from './tools.js'
 
@@ -9,13 +9,6 @@ export type BrowserMcpDeps = {
   service: BrowserService
   tokens: BrowserSessionTokens
   version: string
-}
-
-function bearerToken(request: Request): string | null {
-  const header = request.headers.get('authorization')
-  if (!header) return null
-  const [scheme, token] = header.split(' ')
-  return scheme?.toLowerCase() === 'bearer' && token ? token : null
 }
 
 function createServer(deps: BrowserMcpDeps, sessionId: string) {
@@ -40,9 +33,7 @@ function createServer(deps: BrowserMcpDeps, sessionId: string) {
 export async function handleBrowserMcpRequest(request: Request, deps: BrowserMcpDeps): Promise<Response> {
   const token = bearerToken(request)
   const sessionId = token ? deps.tokens.resolve(token) : null
-  if (!sessionId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } })
-  }
+  if (!sessionId) return unauthorizedResponse()
   const server = createServer(deps, sessionId)
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

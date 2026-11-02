@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
+Object.assign(globalThis, { MACRO: (globalThis as { MACRO?: unknown }).MACRO ?? { VERSION: 'test' } })
+
 // DreamCoder inherits customizations from Claude Code's directory. Tests must not
 // read the developer's real one, and os.homedir() ignores a HOME set mid-test, so
 // point it at a missing directory unless the run sets it.

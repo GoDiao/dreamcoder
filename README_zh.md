@@ -43,6 +43,7 @@ DreamCoder 在本机运行桌面应用与会话服务，把模型配置、编程
 *   **选择模型服务**：配置 Anthropic 或 OpenAI 兼容接口；提供 DeepSeek、通义千问、Kimi、智谱 GLM、LM Studio、Ollama 等预设，也支持自定义端点。具体模型能否使用取决于服务商与配置。
 *   **看清编程过程**：在桌面查看会话、文件变更、终端和工具调用。
 *   **不只是文字**：AI 可以直接在对话里给出可交互的页面，如图表、示意图、分步演示；内置浏览器能在对话旁边打开你的开发服务器。
+*   **设计与复刻**：用 `/design` 从 60+ 个模板和 156+ 套设计系统出发，Agent 先访谈再动手，做出网页或应用原型；也能复刻网站。成果保存在项目的 `dc_artifacts/` 里，可导出、可继续改、可在画布上并排比较。
 *   **从手机接续**：启用 H5 接入后，可在同一局域网内通过手机浏览器访问桌面会话；跨网络访问需要自行配置反向代理。
 *   **读懂编程智能体**：附带七篇源码导读，沿一次代码修改讲解执行循环、工具、权限、会话与桌面集成，见[《编程智能体实现指南》](docs/tutorial/README.md)。
 
@@ -87,7 +88,40 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
   <img src="./assets/browser.png" alt="侧栏标签页中的内置浏览器">
 </picture>
 
-### 3. 多模型配置
+### 3. 产物与设计模式
+*   **产物**：Agent 做的页面、原型和画布保存成项目里的文件夹，不再埋在对话里。侧栏的 Artifacts 页跨项目列出所有产物，带缩略图、搜索和项目筛选；可以全屏打开、在新对话里接着改，也能导出 PDF、PNG 或独立 HTML。删除 worktree 时，其中的产物会连同用到的设计系统一起移到全局文件夹，不会丢。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/artifacts.png">
+  <img src="./assets/artifacts.png" alt="Artifacts 页：带缩略图的产物列表和 Design 入口">
+</picture>
+
+*   **设计模式**：点 Artifacts 页的 Design 入口，或输入 `/design`。Agent 先问清需求，由你选模板，再生成网页或应用原型，最后在内置浏览器里自查。内置 60+ 个页面和原型模板（可按标题、描述、标签搜索）和 156+ 套设计系统（颜色、字体、间距），既能套用到模板，也能用于从零开始的页面。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/design.png">
+  <img src="./assets/design.png" alt="Design 页：模板网格，以及从零开始和复刻网站的入口" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/template-choice.png">
+  <img src="./assets/template-choice.png" alt="聊天里的模板选择卡片：Agent 推荐几个模板，由你挑选" width="49%">
+</picture>
+
+*   **画布**：多个页面作为画板铺在同一个平面上，可缩放、平移、拖动和调整大小，位置会保存。鼠标放在画板上也能平移和缩放，点画板上的「Interact」才进入画板内操作。
+*   **复刻网站**：给一个网址，Agent 在后台浏览器里读取页面的结构和样式，在项目里重建成页面，视频也能播放和拖动。访问外部网站前需要你先授权。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/canvas.png">
+  <img src="./assets/canvas.png" alt="画布：三块并排的移动端画板" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/clone.png">
+  <img src="./assets/clone.png" alt="复刻出的网站页面" width="49%">
+</picture>
+
+模板和大部分设计系统转换自 [Open Design](https://github.com/nexu-io/open-design)（Apache-2.0），详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### 4. 多模型配置
 *   **Provider 预设与自定义端点**：按所选服务商配置 API Key、地址与模型映射。
 *   **连接检查**：在设置界面测试已配置端点的可用性与延迟。
 
@@ -96,7 +130,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
   <img src="./assets/setting_provider.png" alt="从预设添加 Provider">
 </picture>
 
-### 4. Claude Code 工作流
+### 5. Claude Code 工作流
 *   **Computer Use**：在后台按界面元素操作桌面应用和浏览器，由 [cua-driver](https://github.com/trycua/cua)（MIT）驱动。开启时 DreamCoder 自动下载，不需要 Python。macOS 已验证；Windows 有待社区实测，Linux 为预览。
 *   **工具调用全程可见**：AI 读写文件、执行终端命令的过程透明呈现，便于理解与审查。
 *   **MCP 扩展能力**：通过 Model Context Protocol 持续扩展 AI 的上下文与工具能力。
@@ -106,13 +140,13 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
   <img src="./assets/setting_computeruse.png" alt="Computer Use 设置">
 </picture>
 
-### 5. 局域网内手机接续
+### 6. 局域网内手机接续
 *   **H5 接入**：在设置中开启访问、管理 Token，并使用二维码从同一局域网内的手机连接。
 *   **访问范围**：桌面端需保持运行；跨网络访问需要自行配置反向代理，相关部署指南仍在编写。
 
 ---
 
-### 6. MCP 扩展
+### 7. MCP 扩展
 *   **支持 MCP**：通过 Model Context Protocol 接入外部工具。
 *   **配置过程图形化**：不再手写 JSON，通过界面管理 MCP 服务器。
 

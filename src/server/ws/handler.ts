@@ -39,6 +39,7 @@ import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
+import { artifactService } from '../services/artifactService.js'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
@@ -268,9 +269,15 @@ function handleProcessEvent(event: ProcessLifecycleEvent): void {
   }
 }
 
-function handleRawCliMessage(sessionId: string, cliMsg: any): void {
+export function handleRawCliMessage(sessionId: string, cliMsg: any): void {
   if (cliMsg.type === 'system' && cliMsg.subtype === 'init') {
     recordInitMetadata(sessionId, cliMsg)
+    return
+  }
+  if (cliMsg.type === 'system' && cliMsg.subtype === 'artifact_written' && typeof cliMsg.path === 'string') {
+    artifactService.registerWrittenPath(cliMsg.path, sessionId).catch((error: unknown) => {
+      console.warn('[artifacts] Failed to register written artifact path', cliMsg.path, error)
+    })
     return
   }
   if (cliMsg.type !== 'control_response') return
@@ -317,10 +324,23 @@ function relayStateChange({ sessionId, event, patch, previous, state }: SessionS
 
   broadcastToSession(sessionId, { type: 'session_patch', version: state.version, changes: patch })
 
+  if (patch.turn && previous.turn.phase === 'idle' && state.turn.phase !== 'idle') {
+    trackArtifactTurn(sessionId, 'beginTurn')
+  }
+
   if (patch.turn && previous.turn.phase !== 'idle' && state.turn.phase === 'idle') {
+    trackArtifactTurn(sessionId, 'endTurn')
     peekSessionRuntime(sessionId)?.answeredPermissions.clear()
     runQueuedRestart(sessionId)
   }
+}
+
+function trackArtifactTurn(sessionId: string, phase: 'beginTurn' | 'endTurn'): void {
+  const workDir = conversationService.getSessionWorkDir(sessionId)
+  if (!workDir) return
+  artifactService[phase](sessionId, workDir).catch((error: unknown) => {
+    console.warn(`[artifacts] Failed to ${phase} for session ${sessionId}`, error)
+  })
 }
 
 async function handleUserMessage(

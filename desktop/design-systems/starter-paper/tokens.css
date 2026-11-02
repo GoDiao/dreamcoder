@@ -1,0 +1,62 @@
+/* starter-paper/tokens.css
+ * Design tokens for Paper: Warm off-white pages, serif headlines and a single terracotta accent for reading-first articles, portfolios and newsletters.
+ */
+
+:root {
+  --bg: #faf6ee;
+  --surface: #fffdf8;
+  --surface-warm: #f1eadb;
+  --fg: #1f1b16;
+  --fg-2: #4a4339;
+  --muted: #7b7266;
+  --meta: #9a8f80;
+  --border: #dcd3c2;
+  --border-soft: #ebe4d5;
+  --accent: #b4492c;
+  --accent-on: #fffdf8;
+  --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+  --accent-active: color-mix(in oklab, var(--accent), black 14%);
+  --success: #3f7d4e;
+  --warn: #b7791f;
+  --danger: #b3261e;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: Charter, "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 17px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 36px;
+  --text-3xl: 52px;
+  --text-4xl: 72px;
+  --leading-body: 1.65;
+  --leading-tight: 1.12;
+  --tracking-display: -0.015em;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 88px;
+  --section-y-tablet: 64px;
+  --section-y-phone: 44px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 12px 32px rgba(60, 40, 20, 0.10);
+  --focus-ring: 0 0 0 3px rgba(180, 73, 44, 0.28);
+  --motion-fast: 130ms;
+  --motion-base: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --container-max: 720px;
+  --container-gutter-desktop: 32px;
+  --container-gutter-tablet: 24px;
+  --container-gutter-phone: 16px;
+}

@@ -439,7 +439,7 @@ describe('default command runner', () => {
     },
   )
 
-  it('collects output and exit code', async () => {
+  it.skipIf(process.platform === 'win32')('collects output and exit code', async () => {
     const lines: string[] = []
     const result = await defaultDeps().run('sh', ['-c', 'echo one; echo two 1>&2; exit 3'], {
       onOutput: line => lines.push(line),

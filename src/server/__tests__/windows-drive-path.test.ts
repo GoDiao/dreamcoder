@@ -5,7 +5,7 @@ import * as path from 'node:path'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
-} from '../services/windowsDrivePath.js'
+} from '../../utils/windowsDrivePath.js'
 import { getRepositoryContext } from '../services/repositoryLaunchService.js'
 import { SessionService } from '../services/sessionService.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'

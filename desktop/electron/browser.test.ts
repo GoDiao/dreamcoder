@@ -7,6 +7,7 @@ import {
   classifyUrl,
   chromeUserAgent,
   installBrowser,
+  openProjectFile,
   PROJECT_SCHEME,
   ProjectRoots,
   resolveBrowserInput,
@@ -22,6 +23,8 @@ let project = ''
 let outside = ''
 let roots: ProjectRoots
 
+const escapeLink = process.platform === 'win32' ? 'link/secret.html' : 'link.html'
+
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'electron-browser-'))
   project = path.join(dir, 'project')
@@ -32,7 +35,8 @@ beforeEach(() => {
   writeFileSync(path.join(project, 'docs', 'my page.html'), '<h1>docs</h1>')
   writeFileSync(path.join(project, 'notes.txt'), 'notes')
   writeFileSync(path.join(outside, 'secret.html'), 'secret')
-  symlinkSync(path.join(outside, 'secret.html'), path.join(project, 'link.html'))
+  if (process.platform === 'win32') symlinkSync(outside, path.join(project, 'link'), 'junction')
+  else symlinkSync(path.join(outside, 'secret.html'), path.join(project, 'link.html'))
   roots = new ProjectRoots()
 })
 
@@ -112,7 +116,7 @@ describe('resolveBrowserInput', () => {
     await expect(resolveBrowserInput(secret, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('../outside/secret.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('../outside/missing.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
-    await expect(resolveBrowserInput('./link.html', project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
+    await expect(resolveBrowserInput(`./${escapeLink}`, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput(`file://${secret}`, project, roots)).resolves.toEqual({ ok: false, reason: 'outsideProject' })
     await expect(resolveBrowserInput('./missing.html', project, roots)).resolves.toEqual({ ok: false, reason: 'notFound' })
     await expect(resolveBrowserInput('./docs', project, roots)).resolves.toEqual({ ok: false, reason: 'notFound' })
@@ -189,27 +193,176 @@ describe('searching from the address bar', () => {
   })
 })
 
+const SHELL_DIR = '/app/dist/canvas-shell'
+
+const req = (url: string, range?: string) => ({ url, headers: { get: (name: string) => (name.toLowerCase() === 'range' ? (range ?? null) : null) } })
+
 describe('project files', () => {
-  const read = async (file: string) => new Response(`read:${path.basename(file)}`)
+  const read = async (file: string) => ({
+    size: 100,
+    contentType: 'text/plain',
+    slice: (start: number, end: number) => `${path.basename(file)}:${start}-${end}`,
+  })
 
   it('serves files below the root, including subresources', async () => {
     const notes = `${await projectBase()}/notes.txt`
-    const response = await serveProjectRequest(notes, roots, read)
+    const response = await serveProjectRequest(req(notes), roots, read, SHELL_DIR)
     expect(response.status).toBe(200)
-    await expect(response.text()).resolves.toBe('read:notes.txt')
+    await expect(response.text()).resolves.toBe('notes.txt:0-99')
+    expect(response.headers.get('accept-ranges')).toBe('bytes')
+    expect(response.headers.get('content-length')).toBe('100')
+    expect(response.headers.get('content-type')).toBe('text/plain')
+  })
+
+  describe('byte ranges', () => {
+    const serve = async (range?: string, file = 'notes.txt') => serveProjectRequest(req(`${await projectBase()}/${file}`, range), roots, read, SHELL_DIR)
+
+    it('answers an open range with 206 and the matching Content-Range', async () => {
+      const response = await serve('bytes=0-')
+      expect(response.status).toBe(206)
+      expect(response.headers.get('content-range')).toBe('bytes 0-99/100')
+      expect(response.headers.get('content-length')).toBe('100')
+      expect(response.headers.get('accept-ranges')).toBe('bytes')
+      await expect(response.text()).resolves.toBe('notes.txt:0-99')
+    })
+
+    it('answers a closed range and clamps its end to the file', async () => {
+      const closed = await serve('bytes=10-19')
+      expect(closed.status).toBe(206)
+      expect(closed.headers.get('content-range')).toBe('bytes 10-19/100')
+      expect(closed.headers.get('content-length')).toBe('10')
+      await expect(closed.text()).resolves.toBe('notes.txt:10-19')
+      const clamped = await serve('bytes=90-500')
+      expect(clamped.headers.get('content-range')).toBe('bytes 90-99/100')
+      await expect(clamped.text()).resolves.toBe('notes.txt:90-99')
+    })
+
+    it('answers a suffix range with the last bytes', async () => {
+      const response = await serve('bytes=-30')
+      expect(response.status).toBe(206)
+      expect(response.headers.get('content-range')).toBe('bytes 70-99/100')
+      await expect(response.text()).resolves.toBe('notes.txt:70-99')
+      expect((await serve('bytes=-500')).headers.get('content-range')).toBe('bytes 0-99/100')
+    })
+
+    it('answers 416 with the size when the start is past the end of the file', async () => {
+      for (const range of ['bytes=100-', 'bytes=500-600']) {
+        const response = await serve(range)
+        expect(response.status).toBe(416)
+        expect(response.headers.get('content-range')).toBe('bytes */100')
+      }
+    })
+
+    it('treats anything it does not support as a request without a range', async () => {
+      for (const range of ['bytes=0-1,5-9', 'bytes=abc', 'items=0-1', 'bytes=5-2', 'bytes=-', '0-5']) {
+        const response = await serve(range)
+        expect(response.status).toBe(200)
+        await expect(response.text()).resolves.toBe('notes.txt:0-99')
+      }
+    })
+
+    it('keeps the same Content-Type for 200, 206 and 416', async () => {
+      const types = await Promise.all([serve(), serve('bytes=0-9'), serve('bytes=500-')].map(async (pending) => (await pending).headers.get('content-type')))
+      expect(types).toEqual(['text/plain', 'text/plain', 'text/plain'])
+    })
+
+    it('leaves out Content-Type when the file source gives none', async () => {
+      const response = await serveProjectRequest(req(`${await projectBase()}/notes.txt`), roots, async () => ({ size: 1, contentType: null, slice: () => new Uint8Array(1) }), SHELL_DIR)
+      expect(response.headers.get('content-type')).toBeNull()
+    })
+
+    it('supports ranges on the canvas script too', async () => {
+      const origin = await projectBase()
+      const response = await serveProjectRequest(req(`${origin}/__dreamcoder__/canvas.js`, 'bytes=5-9'), roots, read, SHELL_DIR)
+      expect(response.status).toBe(206)
+      expect(response.headers.get('content-range')).toBe('bytes 5-9/100')
+      await expect(response.text()).resolves.toBe('canvas.js:5-9')
+    })
+
+    it('does not look at the range for a path that is refused', async () => {
+      const origin = await projectBase()
+      expect((await serveProjectRequest(req(`${origin}/..%2foutside%2fsecret.html`, 'bytes=0-'), roots, read, SHELL_DIR)).status).toBe(403)
+      expect((await serveProjectRequest(req(`${origin}/nope.html`, 'bytes=0-'), roots, read, SHELL_DIR)).status).toBe(404)
+    })
+  })
+
+  describe('opening a real file', () => {
+    const bytes = Buffer.from('0123456789abcdefghij')
+    const fetched: string[] = []
+    let cancelled = 0
+
+    const fetchFile = async (url: string) => {
+      fetched.push(url)
+      const body = new ReadableStream({ cancel: () => { cancelled += 1 } })
+      return new Response(body, { headers: { 'content-type': 'video/webm' } })
+    }
+
+    beforeEach(() => {
+      fetched.length = 0
+      cancelled = 0
+      writeFileSync(path.join(project, 'clip.webm'), bytes)
+      writeFileSync(path.join(project, 'empty.txt'), '')
+    })
+
+    it('reads only the requested slice from disk and takes the type from the file loader', async () => {
+      const base = await projectBase()
+      const open = openProjectFile(fetchFile)
+      const slice = await serveProjectRequest(req(`${base}/clip.webm`, 'bytes=5-9'), roots, open, SHELL_DIR)
+      expect(slice.status).toBe(206)
+      expect(slice.headers.get('content-type')).toBe('video/webm')
+      expect(slice.headers.get('content-range')).toBe('bytes 5-9/20')
+      expect(await slice.text()).toBe('56789')
+      const tail = await serveProjectRequest(req(`${base}/clip.webm`, 'bytes=-4'), roots, open, SHELL_DIR)
+      expect(await tail.text()).toBe('ghij')
+      const whole = await serveProjectRequest(req(`${base}/clip.webm`), roots, open, SHELL_DIR)
+      expect(whole.status).toBe(200)
+      expect(await whole.text()).toBe(bytes.toString())
+      expect(fetched.every((url) => url.startsWith('file://') && url.endsWith('/clip.webm'))).toBe(true)
+      expect(cancelled).toBe(3)
+    })
+
+    it('serves an empty file without a stream and refuses any range on it', async () => {
+      const base = await projectBase()
+      const open = openProjectFile(fetchFile)
+      const whole = await serveProjectRequest(req(`${base}/empty.txt`), roots, open, SHELL_DIR)
+      expect(whole.status).toBe(200)
+      expect(await whole.text()).toBe('')
+      expect((await serveProjectRequest(req(`${base}/empty.txt`, 'bytes=0-'), roots, open, SHELL_DIR)).status).toBe(416)
+    })
   })
 
   it('refuses traversal, symlinks out of the root and unknown roots', async () => {
     const origin = await projectBase()
     const reader = vi.fn(read)
-    expect((await serveProjectRequest(`${origin}/%2e%2e%2foutside%2fsecret.html`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${origin}/..%2foutside%2fsecret.html`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${origin}/link.html`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${PROJECT_SCHEME}://unknown/index.html`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${origin}/%00`, roots, reader)).status).toBe(403)
-    expect((await serveProjectRequest(`${origin}/nope.html`, roots, reader)).status).toBe(404)
-    expect((await serveProjectRequest(`${origin}/docs`, roots, reader)).status).toBe(404)
+    expect((await serveProjectRequest(req(`${origin}/%2e%2e%2foutside%2fsecret.html`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect((await serveProjectRequest(req(`${origin}/..%2foutside%2fsecret.html`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect((await serveProjectRequest(req(`${origin}/${escapeLink}`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect((await serveProjectRequest(req(`${PROJECT_SCHEME}://unknown/index.html`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect((await serveProjectRequest(req(`${origin}/%00`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect((await serveProjectRequest(req(`${origin}/nope.html`), roots, reader, SHELL_DIR)).status).toBe(404)
+    expect((await serveProjectRequest(req(`${origin}/docs`), roots, reader, SHELL_DIR)).status).toBe(404)
     expect(reader).not.toHaveBeenCalled()
+  })
+
+  it('serves the canvas script from the shell folder and nothing else below the reserved path', async () => {
+    const origin = await projectBase()
+    const reader = vi.fn(read)
+    const script = await serveProjectRequest(req(`${origin}/__dreamcoder__/canvas.js`), roots, reader, SHELL_DIR)
+    expect(script.status).toBe(200)
+    expect(reader).toHaveBeenCalledWith(path.join(SHELL_DIR, 'canvas.js'))
+    reader.mockClear()
+    for (const name of ['other.js', '..%2fsecret.txt', '..%2f..%2fetc%2fpasswd', 'canvas.js%2f..%2f..%2fx', 'sub%2fcanvas.js', '']) {
+      expect((await serveProjectRequest(req(`${origin}/__dreamcoder__/${name}`), roots, reader, SHELL_DIR)).status).toBe(404)
+    }
+    expect(reader).not.toHaveBeenCalled()
+  })
+
+  it('serves the reserved path before project files, only to a known project root', async () => {
+    const origin = await projectBase()
+    const reader = vi.fn(read)
+    expect((await serveProjectRequest(req(`${PROJECT_SCHEME}://unknown/__dreamcoder__/canvas.js`), roots, reader, SHELL_DIR)).status).toBe(403)
+    expect(reader).not.toHaveBeenCalled()
+    expect((await serveProjectRequest(req(`${origin}/__dreamcoder__x/canvas.js`), roots, reader, SHELL_DIR)).status).toBe(404)
   })
 
   it('names the file or url the system should open', async () => {
@@ -265,7 +418,8 @@ function install(options: { labels?: typeof MENU_LABELS | null } = {}) {
     host,
     session,
     roots,
-    readFile: async () => new Response('file'),
+    openFile: async () => ({ size: 4, contentType: 'text/html', slice: () => 'file' }),
+    canvasShellDir: SHELL_DIR,
     notify,
     popupMenu,
     menuLabels: () => labels,
@@ -286,6 +440,7 @@ describe('will-attach-webview', () => {
       sandbox: false,
       webSecurity: false,
       webviewTag: true,
+      transparent: true,
       enableBlinkFeatures: 'Anything',
       additionalArguments: ['--x'],
     }
@@ -299,6 +454,7 @@ describe('will-attach-webview', () => {
       sandbox: true,
       webSecurity: true,
       webviewTag: false,
+      transparent: false,
     })
     for (const key of ['preload', 'preloadURL', 'enableBlinkFeatures', 'additionalArguments']) {
       expect(webPreferences).not.toHaveProperty(key)
@@ -341,9 +497,12 @@ describe('browser session', () => {
   it('serves project files on this session only', async () => {
     const { handlers } = install()
     const origin = await projectBase()
-    const handle = handlers[`protocol:${PROJECT_SCHEME}`] as (request: { url: string }) => Promise<Response>
-    expect((await handle({ url: `${origin}/index.html` })).status).toBe(200)
-    expect((await handle({ url: `${origin}/..%2foutside%2fsecret.html` })).status).toBe(403)
+    const handle = handlers[`protocol:${PROJECT_SCHEME}`] as (request: ReturnType<typeof req>) => Promise<Response>
+    expect((await handle(req(`${origin}/index.html`))).status).toBe(200)
+    expect((await handle(req(`${origin}/..%2foutside%2fsecret.html`))).status).toBe(403)
+    const ranged = await handle(req(`${origin}/index.html`, 'bytes=1-2'))
+    expect(ranged.status).toBe(206)
+    expect(ranged.headers.get('content-range')).toBe('bytes 1-2/4')
   })
 })
 
@@ -524,16 +683,72 @@ describe('guest selection menu', () => {
     warn.mockRestore()
   })
 
-  it('does not offer a selection made inside a subframe', async () => {
+  it('offers a selection made inside a same-origin subframe with the address and title of that frame', async () => {
+    const { host, notify, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+    guest.getURL = () => 'dreamcoder-project://abc/board/page.html'
+    const frame = {
+      parent: {},
+      url: 'dreamcoder-project://abc/board/two.html',
+      executeJavaScript: vi.fn(async () => 'Board two'),
+    }
+
+    call('context-menu', {}, { selectionText: 'inside', frame })
+    await flush()
+
+    const items = popupMenu.mock.calls[0]?.[0] as { label: string; click(): void }[]
+    expect(items.map((item) => item.label)).toEqual(['Add to chat', 'Copy'])
+    items[0]?.click()
+    expect(notify).toHaveBeenCalledWith('browser-selection', {
+      guestId: 7,
+      text: 'inside',
+      truncated: false,
+      title: 'Board two',
+      url: 'dreamcoder-project://abc/board/two.html',
+    })
+    expect(guest.executeJavaScriptInIsolatedWorld).toHaveBeenCalledOnce()
+  })
+
+  it('still checks for a sensitive field when the selection is inside a same-origin subframe', async () => {
     const { host, popupMenu } = install()
     const { guest, call } = attachGuest(host)
+    guest.getURL = () => 'dreamcoder-project://abc/board/page.html'
+    vi.mocked(guest.executeJavaScriptInIsolatedWorld).mockResolvedValue(true)
 
-    call('context-menu', {}, { selectionText: 'text', frame: { parent: {} } })
+    call('context-menu', {}, { selectionText: 'secret', frame: { parent: {}, url: 'dreamcoder-project://abc/b.html', executeJavaScript: vi.fn(async () => 'T') } })
+    await flush()
+
+    expect((popupMenu.mock.calls[0]?.[0] as { label: string }[]).map((item) => item.label)).toEqual(['Copy'])
+  })
+
+  it('falls back to an empty title when the subframe title cannot be read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { host, notify, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+    guest.getURL = () => 'dreamcoder-project://abc/board/page.html'
+
+    call('context-menu', {}, { selectionText: 'inside', frame: { parent: {}, url: 'dreamcoder-project://abc/b.html', executeJavaScript: vi.fn(async () => { throw new Error('gone') }) } })
+    await flush()
+
+    ;(popupMenu.mock.calls[0]?.[0] as { click(): void }[])[0]?.click()
+    expect(notify).toHaveBeenCalledWith('browser-selection', expect.objectContaining({ title: '', url: 'dreamcoder-project://abc/b.html' }))
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+
+  it('does not offer a selection made inside a subframe of another origin', async () => {
+    const { host, popupMenu } = install()
+    const { guest, call } = attachGuest(host)
+    guest.getURL = () => 'dreamcoder-project://abc/board/page.html'
+    const executeJavaScript = vi.fn(async () => 'T')
+
+    call('context-menu', {}, { selectionText: 'text', frame: { parent: {}, url: 'https://ads.example.com/x', executeJavaScript } })
     await flush()
 
     const items = popupMenu.mock.calls[0]?.[0] as { label: string }[]
     expect(items.map((item) => item.label)).toEqual(['Copy'])
     expect(guest.executeJavaScriptInIsolatedWorld).not.toHaveBeenCalled()
+    expect(executeJavaScript).not.toHaveBeenCalled()
   })
 
   it('shows no menu without a selection or before the labels are known', async () => {

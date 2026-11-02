@@ -66,7 +66,16 @@ type SessionStateChangedEvent = {
   state: 'idle' | 'running' | 'requires_action'
 }
 
+type ArtifactWrittenEvent = {
+  type: 'system'
+  subtype: 'artifact_written'
+  path: string
+  tool_name: string
+  agent_id?: string
+}
+
 export type SdkEvent =
+  | ArtifactWrittenEvent
   | TaskStartedEvent
   | TaskProgressEvent
   | TaskNotificationSdkEvent

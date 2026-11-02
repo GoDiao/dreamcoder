@@ -43,6 +43,7 @@ DreamCoder runs its desktop app and session service locally, bringing model conf
 *   **Choose a model provider**: Configure Anthropic or OpenAI-compatible endpoints. Presets include DeepSeek, Qwen, Kimi, Zhipu GLM, LM Studio, and Ollama; custom endpoints are also supported. Model availability depends on your provider and configuration.
 *   **Follow the work**: Review sessions, file changes, terminal activity, and tool calls on your desktop.
 *   **See it, not just read it**: The agent can answer with interactive pages (charts, diagrams, step-by-step walkthroughs) shown right in the conversation, and a built-in browser shows your dev server next to the chat.
+*   **Design and clone**: Start from 60+ templates and 156+ design systems with `/design`: the agent interviews you first, then builds a web page or app prototype. It can also clone a website. Results are kept in your project's `dc_artifacts/`, ready to export, keep editing, or compare side by side on a canvas.
 *   **Continue on your phone**: Enable H5 Access to reach desktop sessions from a phone browser on the same LAN. Access across networks requires a reverse proxy you configure yourself.
 *   **Learn how a coding agent works**: A seven-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
 
@@ -87,7 +88,40 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/browser.png" alt="The built-in browser in a side panel tab">
 </picture>
 
-### 3. Multi-Provider Configuration
+### 3. Artifacts and Design Mode
+*   **Artifacts**: Pages, prototypes and canvases the agent makes are kept as folders in your project instead of getting lost in the conversation. The Artifacts page in the sidebar lists them across projects with thumbnails, search and a project filter; open one full screen, continue it in a new chat, or export it as PDF, PNG or a standalone HTML file. When a worktree is deleted, its artifacts move to a global folder together with the design systems they use.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/artifacts.png">
+  <img src="./assets/artifacts.png" alt="The Artifacts page: artifact cards with thumbnails and the Design entry">
+</picture>
+
+*   **Design mode**: Click Design on the Artifacts page, or type `/design`. The agent asks what you need, you pick a template, and it builds a web page or app prototype, then checks the result in the built-in browser. The library has 60+ page and prototype templates (searchable by title, description and tags) and 156+ design systems (colors, fonts, spacing) that apply to a template or to a page made from scratch.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/design.png">
+  <img src="./assets/design.png" alt="The Design page: the template grid with entries to start from scratch or clone a website" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/template-choice.png">
+  <img src="./assets/template-choice.png" alt="The template choice card in the conversation: the agent suggests a few templates and you pick one" width="49%">
+</picture>
+
+*   **Canvas**: Lay several pages out as boards on one surface; zoom, pan, drag and resize them, and their positions are saved. Panning and zooming work with the mouse over a board; click a board's "Interact" button to work inside it.
+*   **Clone a website**: Give the agent a URL and it opens the site in a hidden browser, reads its structure and styles, and rebuilds it as a page in your project, with videos that play and seek. You grant access to the site first.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/canvas.png">
+  <img src="./assets/canvas.png" alt="A canvas with three mobile boards side by side" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/clone.png">
+  <img src="./assets/clone.png" alt="A cloned website page" width="49%">
+</picture>
+
+The templates and most of the design systems are converted from [Open Design](https://github.com/nexu-io/open-design) (Apache-2.0); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### 4. Multi-Provider Configuration
 *   **Presets and custom endpoints**: Set the API key, endpoint, and model mapping for your chosen provider.
 *   **Connection check**: Test the availability and latency of configured endpoints in Settings.
 
@@ -96,7 +130,7 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/setting_provider.png" alt="Adding a provider from a preset">
 </picture>
 
-### 4. Claude Code Workflows
+### 5. Claude Code Workflows
 *   **Computer Use**: operates desktop apps and browsers in the background through UI elements, powered by [cua-driver](https://github.com/trycua/cua) (MIT). DreamCoder downloads it when you turn Computer Use on; no Python needed. Verified on macOS; Windows needs community testing, Linux is a preview.
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
@@ -106,11 +140,11 @@ Provider settings and API keys are stored in local files. When you use a cloud m
   <img src="./assets/setting_computeruse.png" alt="Computer Use settings">
 </picture>
 
-### 5. Continue on Your Phone over LAN
+### 6. Continue on Your Phone over LAN
 *   **H5 Access**: Enable access in Settings, manage the token, and use the QR code to connect a phone on the same LAN.
 *   **Access scope**: Keep the desktop app running. Cross-network access requires your own reverse proxy; the deployment guide is still in progress.
 
-### 6. MCP Extensions
+### 7. MCP Extensions
 *   **Visual configuration**: Manage MCP servers in the UI instead of editing JSON by hand.
 
 <picture>

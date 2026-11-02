@@ -1,3 +1,4 @@
+import { resolveArtifactOpenInput } from '../../utils/artifacts.js'
 import { evaluateInPage } from './evaluate.js'
 import { BrowserHostError, NO_HOST_MESSAGE, type BrowserHostChannel, type BrowserHostResponse } from './hostChannel.js'
 import { KeyedQueue } from './keyedQueue.js'
@@ -69,6 +70,7 @@ type TabState = {
   cdp: CdpSend
   dialogs: BrowserDialogRecord[]
   emulation: EmulationState | null
+  emulationSuspended: boolean
 }
 
 type ColorScheme = 'light' | 'dark'
@@ -259,6 +261,14 @@ async function clearEmulation(cdp: CdpSend) {
   await cdp('Emulation.setEmulatedMedia', emulatedMediaParams({ colorScheme: null, reducedMotion: null }))
 }
 
+async function applyEmulation(cdp: CdpSend, state: EmulationState) {
+  if (state.viewport) {
+    const { width, height, mobile, deviceScaleFactor } = state.viewport
+    await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile })
+  }
+  await cdp('Emulation.setEmulatedMedia', emulatedMediaParams(state))
+}
+
 function emulationOrNull(state: EmulationState): EmulationState | null {
   return state.viewport || state.colorScheme || state.reducedMotion ? state : null
 }
@@ -283,6 +293,7 @@ export class BrowserService {
   private readonly settleMs: number
   private readonly pollMs: number
   private readonly tabs = new Map<string, TabState>()
+  private readonly agentTabs = new Set<string>()
   private readonly stopped = new Set<string>()
   private readonly sessionControllers = new Map<string, AbortController>()
   private readonly activeCalls = new Map<string, number>()
@@ -336,6 +347,39 @@ export class BrowserService {
     }
   }
 
+  private emulationCdp(tabId: string): CdpSend {
+    return async (method, params) => {
+      const response = await this.channel.request(
+        { kind: 'cdp', method, ...(params ? { params } : {}) },
+        { tabId, timeoutMs: EMULATION_RESET_TIMEOUT_MS },
+      )
+      return response.value.result
+    }
+  }
+
+  async suspendEmulation(sessionId: string, tabId: string): Promise<boolean> {
+    if (!this.channel.listViews(sessionId).some((view) => view.tabId === tabId)) return false
+    return this.queue.run(tabId, async () => {
+      const state = this.tabs.get(tabId)
+      if (!state?.emulation || state.emulationSuspended) return false
+      await clearEmulation(this.emulationCdp(tabId))
+      state.emulationSuspended = true
+      return true
+    })
+  }
+
+  async resumeEmulation(sessionId: string, tabId: string): Promise<boolean> {
+    if (!this.channel.listViews(sessionId).some((view) => view.tabId === tabId)) return false
+    return this.queue.run(tabId, async () => {
+      const state = this.tabs.get(tabId)
+      if (!state?.emulationSuspended) return false
+      state.emulationSuspended = false
+      if (!state.emulation) return false
+      await applyEmulation(this.emulationCdp(tabId), state.emulation)
+      return true
+    })
+  }
+
   async resetEmulation(sessionId: string) {
     for (const view of this.channel.listViews(sessionId)) {
       if (!this.tabs.get(view.tabId)?.emulation) continue
@@ -343,14 +387,9 @@ export class BrowserService {
         await this.queue.run(view.tabId, async () => {
           const state = this.tabs.get(view.tabId)
           if (!state?.emulation) return
-          await clearEmulation(async (method, params) => {
-            const response = await this.channel.request(
-              { kind: 'cdp', method, ...(params ? { params } : {}) },
-              { tabId: view.tabId, timeoutMs: EMULATION_RESET_TIMEOUT_MS },
-            )
-            return response.value.result
-          })
+          await clearEmulation(this.emulationCdp(view.tabId))
           state.emulation = null
+          state.emulationSuspended = false
         })
       } catch (error) {
         console.warn(`[browser] could not clear the emulation of tab ${view.tabId}: ${error instanceof Error ? error.message : String(error)}`)
@@ -365,13 +404,15 @@ export class BrowserService {
     }
   }
 
-  async navigate(sessionId: string, args: { url: string; tabId?: string }, signal?: AbortSignal): Promise<ToolResult> {
+  async navigate(sessionId: string, args: { url: string; tabId?: string; newTab?: boolean }, signal?: AbortSignal): Promise<ToolResult> {
     return this.guard(async () => {
       this.assertNotStopped(sessionId)
       this.assertHost()
+      const sessionRoot = this.getProjectRoot(sessionId)
+      const artifact = await resolveArtifactOpenInput(args.url, sessionRoot)
       const resolved = (
         await this.channel.request(
-          { kind: 'resolve', input: args.url, projectRoot: this.getProjectRoot(sessionId) },
+          { kind: 'resolve', input: artifact?.filePath ?? args.url, projectRoot: artifact?.rootDir ?? sessionRoot },
           { tabId: null, signal },
         )
       ).value
@@ -383,7 +424,7 @@ export class BrowserService {
       }
       if (!args.tabId) {
         const opened = await this.queue.run(`open:${sessionId}`, async () => {
-          if (this.channel.listViews(sessionId).length > 0) return null
+          if (!args.newTab && this.channel.listViews(sessionId).length > 0) return null
           await this.ensureDestinationGrant(sessionId, resolved, `Open ${resolved.url}`, signal)
           const response = await this.channel.request(
             { kind: 'openTab', sessionId, url: resolved.url },
@@ -393,8 +434,9 @@ export class BrowserService {
           return response
         })
         if (opened) {
+          this.agentTabs.add(opened.value.tabId)
           return text(
-            `Opened a browser tab at ${clip(resolved.url, URL_LIMIT)}. Take a snapshot to see the page.${describeDialogs(opened.dialogs)}`,
+            `Opened a browser tab (id ${opened.value.tabId}) at ${clip(resolved.url, URL_LIMIT)}. Take a snapshot to see the page.${describeDialogs(opened.dialogs)}`,
           )
         }
       }
@@ -405,6 +447,23 @@ export class BrowserService {
           `Navigated to the address below. The page is ${moved.value.loading ? 'still loading' : 'loaded'}. Take a snapshot to see it.${describeAddress(moved.value.url)}`,
         )
       })
+    })
+  }
+
+  async closeTab(sessionId: string, args: { tabId: string }, signal?: AbortSignal): Promise<ToolResult> {
+    return this.guard(async () => {
+      this.assertNotStopped(sessionId)
+      const view = await this.pickView(sessionId, args.tabId)
+      if (!this.agentTabs.has(view.tabId)) {
+        throw new BrowserToolError(
+          'not_agent_tab',
+          `[browser.not_agent_tab] Tab ${view.tabId} was opened by the user, so only the user can close it. You can close tabs you opened with navigate.`,
+        )
+      }
+      await this.channel.request({ kind: 'closeTab' }, { tabId: view.tabId, signal })
+      this.agentTabs.delete(view.tabId)
+      this.tabs.delete(view.tabId)
+      return text(`Closed tab ${view.tabId}.`)
     })
   }
 
@@ -921,6 +980,7 @@ export class BrowserService {
         cdp: () => Promise.reject(new Error('browser operation is not running')),
         dialogs: [],
         emulation: null,
+        emulationSuspended: false,
       }
       this.tabs.set(tabId, state)
     }

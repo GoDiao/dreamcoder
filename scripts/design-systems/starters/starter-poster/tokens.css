@@ -1,0 +1,62 @@
+/* starter-poster/tokens.css
+ * Design tokens for Poster: Cream paper, heavy black outlines, hard offset shadows and a loud orange accent for campaigns, events and bold portfolios.
+ */
+
+:root {
+  --bg: #fff8e1;
+  --surface: #ffffff;
+  --surface-warm: #ffe9a8;
+  --fg: #111111;
+  --fg-2: #2b2b2b;
+  --muted: #5c5c5c;
+  --meta: #7a7a7a;
+  --border: #111111;
+  --border-soft: #d8cfa9;
+  --accent: #ff4d00;
+  --accent-on: #111111;
+  --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+  --accent-active: color-mix(in oklab, var(--accent), black 14%);
+  --success: #00a86b;
+  --warn: #ffb000;
+  --danger: #e00000;
+  --font-display: "Arial Black", "Helvetica Neue", Impact, sans-serif;
+  --font-body: "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 17px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 44px;
+  --text-3xl: 72px;
+  --text-4xl: 112px;
+  --leading-body: 1.5;
+  --leading-tight: 0.98;
+  --tracking-display: -0.03em;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 96px;
+  --section-y-tablet: 64px;
+  --section-y-phone: 44px;
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 6px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 6px 6px 0 #111111;
+  --focus-ring: 0 0 0 3px #111111;
+  --motion-fast: 130ms;
+  --motion-base: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --container-max: 1240px;
+  --container-gutter-desktop: 40px;
+  --container-gutter-tablet: 28px;
+  --container-gutter-phone: 16px;
+}

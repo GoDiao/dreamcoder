@@ -9,10 +9,15 @@ const mocks = vi.hoisted(() => ({
   browserReload: vi.fn(),
   browserStop: vi.fn(),
   hasBrowserGuest: vi.fn(),
+  setCanvasMessageHandler: vi.fn(),
   openBrowserUrl: vi.fn(),
   placeBrowserGuest: vi.fn(),
   release: vi.fn(),
   reloadAllBrowsers: vi.fn(),
+  isProjectPageUrl: vi.fn((url: string) => url.startsWith('dreamcoder-project://')),
+  getBrowserGuestContentsId: vi.fn(() => null),
+  exportArtifactPage: vi.fn(),
+  resolveStoredBrowserUrl: vi.fn(),
   clearBrowserData: vi.fn(),
   openBrowserUrlInSystem: vi.fn(),
   stopBrowserControl: vi.fn(),
@@ -28,9 +33,18 @@ vi.mock('../../lib/browserGuests', () => ({
   browserReload: mocks.browserReload,
   browserStop: mocks.browserStop,
   hasBrowserGuest: mocks.hasBrowserGuest,
+  setCanvasMessageHandler: mocks.setCanvasMessageHandler,
   openBrowserUrl: mocks.openBrowserUrl,
   placeBrowserGuest: mocks.placeBrowserGuest,
   reloadAllBrowsers: mocks.reloadAllBrowsers,
+  isProjectPageUrl: mocks.isProjectPageUrl,
+  resolveStoredBrowserUrl: mocks.resolveStoredBrowserUrl,
+  getBrowserGuestContentsId: mocks.getBrowserGuestContentsId,
+}))
+
+vi.mock('../../lib/artifactExport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/artifactExport')>()),
+  exportArtifactPage: mocks.exportArtifactPage,
 }))
 
 vi.mock('../../lib/browserPicks', () => ({
@@ -113,6 +127,27 @@ describe('BrowserView', () => {
     mocks.openBrowserUrl.mockClear()
     rerender(<BrowserView sessionId="s1" tab={tab('t2')} projectRoot="/repo" />)
     expect(mocks.openBrowserUrl).not.toHaveBeenCalled()
+  })
+
+  it('re-resolves the saved address of a restored project page with the tab root before opening it', async () => {
+    mocks.hasBrowserGuest.mockReturnValue(false)
+    mocks.resolveStoredBrowserUrl.mockResolvedValue('dreamcoder-project://fresh/report/index.html')
+    const restored = { ...tab('t1', 'dreamcoder-project://stale/report/index.html'), root: '/repo/dc_artifacts' }
+    render(<BrowserView sessionId="s1" tab={restored} projectRoot="/repo" />)
+
+    await waitFor(() => expect(mocks.openBrowserUrl).toHaveBeenCalledWith('s1', 't1', 'dreamcoder-project://fresh/report/index.html'))
+    expect(mocks.resolveStoredBrowserUrl).toHaveBeenCalledWith(restored, '/repo')
+  })
+
+  it('tells the user when a restored project page can no longer be found', async () => {
+    mocks.hasBrowserGuest.mockReturnValue(false)
+    mocks.resolveStoredBrowserUrl.mockRejectedValue(new Error('gone'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    render(<BrowserView sessionId="s1" tab={tab('t1', 'dreamcoder-project://stale/a.html')} projectRoot="/repo" />)
+
+    await waitFor(() => expect(useBrowserStore.getState().noticeByTab.t1).toEqual({ kind: 'refused', reason: 'notFound', url: 'dreamcoder-project://stale/a.html' }))
+    expect(mocks.openBrowserUrl).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('mirrors the page into the address bar and enables navigation', () => {
@@ -263,6 +298,121 @@ describe('BrowserView', () => {
     expect(mocks.openBrowserUrlInSystem).toHaveBeenCalledWith('https://example.com/')
   })
 
+  describe('canvas messages', () => {
+    const artifactTab = { ...tab('t1', 'dreamcoder-project://id/flow/index.html'), root: '/repo/dc_artifacts', artifact: { id: 'id-1', name: 'flow', mtimeMs: 1, canvas: true as const } }
+
+    async function openMenuOf() {
+      const trigger = screen.getByRole('button', { name: 'Browser actions' })
+      act(() => trigger.focus())
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+      await screen.findAllByRole('menuitem')
+    }
+
+    it('offers no export on the canvas page itself, only on a board opened from it', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      const view = render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+      await openMenuOf()
+      expect(screen.queryByRole('menuitem', { name: 'Export as PDF' })).not.toBeInTheDocument()
+      expect(screen.getByRole('menu').firstElementChild).not.toHaveAttribute('data-slot', 'dropdown-menu-separator')
+      view.unmount()
+      cleanup()
+
+      const boardTab = { ...tab('t3', 'dreamcoder-project://id/flow/home.html'), root: '/repo/dc_artifacts', artifact: { id: 'id-1', name: 'flow', mtimeMs: 1, board: 'home' } }
+      useBrowserStore.getState().patchPage('t3', { ready: true })
+      render(<BrowserView sessionId="s1" tab={boardTab} projectRoot="/repo" />)
+      await openMenuOf()
+      expect(screen.getByRole('menuitem', { name: 'Export as PDF' })).not.toHaveAttribute('data-disabled')
+    })
+
+    it('does not listen for canvas messages on a board tab or on a page artifact', () => {
+      render(<BrowserView sessionId="s1" tab={{ ...artifactTab, artifact: { id: 'id-1', name: 'flow', mtimeMs: 1, board: 'home' } }} projectRoot="/repo" />)
+      cleanup()
+      render(<BrowserView sessionId="s1" tab={{ ...artifactTab, artifact: { id: 'id-1', name: 'report', mtimeMs: 1 } }} projectRoot="/repo" />)
+      expect(mocks.setCanvasMessageHandler).not.toHaveBeenCalled()
+    })
+
+    it('listens for the canvas messages of an artifact tab and stops when the tab goes away', () => {
+      const view = render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+      expect(mocks.setCanvasMessageHandler).toHaveBeenCalledWith('t1', expect.any(Function))
+      view.unmount()
+      expect(mocks.setCanvasMessageHandler).toHaveBeenLastCalledWith('t1', null)
+    })
+
+    it('does not listen on an ordinary page', () => {
+      render(<BrowserView sessionId="s1" tab={tab('t2', 'https://example.com/')} projectRoot="/repo" />)
+      expect(mocks.setCanvasMessageHandler).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('export', () => {
+    const artifactTab = { ...tab('t1', 'dreamcoder-project://id/report/index.html'), title: 'Quarterly report', root: '/repo/dc_artifacts', artifact: { id: 'id-1', name: 'report', mtimeMs: 1 } }
+
+    async function openMenu() {
+      const trigger = screen.getByRole('button', { name: 'Browser actions' })
+      act(() => trigger.focus())
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+      await screen.findAllByRole('menuitem')
+    }
+
+    it('offers the three formats on an artifact tab once its page is ready', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+
+      await openMenu()
+
+      for (const name of ['Export as PDF', 'Export as PNG image', 'Export as standalone HTML']) {
+        expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('data-disabled')
+      }
+    })
+
+    it('disables them while the page is not ready and offers none on an ordinary page', async () => {
+      const { unmount } = render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+      await openMenu()
+      expect(screen.getByRole('menuitem', { name: 'Export as PDF' })).toHaveAttribute('data-disabled')
+      unmount()
+      cleanup()
+
+      render(<BrowserView sessionId="s1" tab={tab('t2', 'https://example.com/')} projectRoot="/repo" />)
+      await openMenu()
+      expect(screen.queryByRole('menuitem', { name: 'Export as PDF' })).not.toBeInTheDocument()
+    })
+
+    it('exports the tab page for this chat under the artifact title and reports where it was saved', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      mocks.exportArtifactPage.mockResolvedValue({ status: 'saved', path: '/Users/me/Report.pdf' })
+      const success = vi.mocked(toast.success)
+      success.mockClear()
+      render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+
+      await openMenu()
+      fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Export as PDF' }), { key: 'Enter' })
+
+      await waitFor(() => expect(success).toHaveBeenCalledWith('Saved to /Users/me/Report.pdf'))
+      expect(mocks.exportArtifactPage).toHaveBeenCalledWith(expect.objectContaining({ tabId: 't1', sessionId: 's1', format: 'pdf', title: 'Quarterly report' }))
+    })
+
+    it('shows why an export failed and stays quiet after a cancel', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      const error = vi.mocked(toast.error)
+      const success = vi.mocked(toast.success)
+      error.mockClear()
+      success.mockClear()
+      render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+
+      mocks.exportArtifactPage.mockResolvedValueOnce({ status: 'cancelled' })
+      await openMenu()
+      fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Export as PNG image' }), { key: 'Enter' })
+      await waitFor(() => expect(mocks.exportArtifactPage).toHaveBeenCalledTimes(1))
+      expect(error).not.toHaveBeenCalled()
+      expect(success).not.toHaveBeenCalled()
+
+      mocks.exportArtifactPage.mockRejectedValueOnce(new Error('disk full'))
+      await openMenu()
+      fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Export as standalone HTML' }), { key: 'Enter' })
+      await waitFor(() => expect(error).toHaveBeenCalledWith('Export failed: disk full'))
+    })
+  })
+
   it('clears browsing data only after confirmation and reloads the pages', async () => {
     render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
 
@@ -370,5 +520,50 @@ describe('BrowserView', () => {
 
     rerender(<BrowserView sessionId="s1" tab={tab('t2')} projectRoot="/repo" />)
     expect(screen.queryByTestId('browser-activity')).not.toBeInTheDocument()
+  })
+
+  describe('template preview tab', () => {
+    const pendingChoice = (candidates: string[]) => {
+      useChatStore.setState({
+        sessions: {
+          s1: {
+            ...useChatStore.getState().getSession('s1'),
+            pendingPermission: {
+              requestId: 'perm-1',
+              toolName: 'ChooseDesignTemplate',
+              toolUseId: 'tool-1',
+              input: { candidates: candidates.map((id) => ({ id, reason: 'fits' })), title: 'Landing' },
+            },
+          },
+        },
+      })
+    }
+    const previewTab = (templateId: string) => ({ ...tab('t1', 'dreamcoder-project://x/index.html'), template: { id: templateId } })
+
+    it('offers to use the template when the agent is waiting for a choice that includes it, and answers with it', () => {
+      const send = vi.spyOn(useChatStore.getState(), 'respondToPermission').mockImplementation(() => {})
+      pendingChoice(['saas', 'app-a'])
+      render(<BrowserView sessionId="s1" tab={previewTab('saas')} projectRoot="/repo" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Use this template' }))
+
+      expect(send).toHaveBeenCalledWith('s1', 'perm-1', true, {
+        updatedInput: { candidates: [{ id: 'saas', reason: 'fits' }, { id: 'app-a', reason: 'fits' }], title: 'Landing', choice: 'saas' },
+      })
+    })
+
+    it('offers nothing when the template was not among the candidates, nothing is pending, or the tab is not a preview', () => {
+      pendingChoice(['app-a', 'app'])
+      const { rerender } = render(<BrowserView sessionId="s1" tab={previewTab('saas')} projectRoot="/repo" />)
+      expect(screen.queryByRole('button', { name: 'Use this template' })).not.toBeInTheDocument()
+
+      act(() => useChatStore.setState(useChatStore.getInitialState(), true))
+      rerender(<BrowserView sessionId="s1" tab={previewTab('saas')} projectRoot="/repo" />)
+      expect(screen.queryByRole('button', { name: 'Use this template' })).not.toBeInTheDocument()
+
+      act(() => pendingChoice(['saas', 'app-a']))
+      rerender(<BrowserView sessionId="s1" tab={tab('t1', 'dreamcoder-project://x/index.html')} projectRoot="/repo" />)
+      expect(screen.queryByRole('button', { name: 'Use this template' })).not.toBeInTheDocument()
+    })
   })
 })

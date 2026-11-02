@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from '../../i18n'
-import { handleActivateRequest, handleOpenTabRequest } from '../../lib/browserControlRequests'
+import { handleActivateRequest, handleCloseTabRequest, handleOpenTabRequest } from '../../lib/browserControlRequests'
 import { startBrowserMarkSync } from '../../lib/browserMarks'
 import { handleBrowserPickDone, handleBrowserPickStarted, handleBrowserPickState } from '../../lib/browserPicks'
 import {
@@ -14,6 +14,7 @@ import {
   onBrowserActivateRequest,
   onBrowserBlocked,
   onBrowserExternalRequest,
+  onBrowserCloseTabRequest,
   onBrowserOpenTabRequest,
   onBrowserPickDone,
   onBrowserPickStarted,
@@ -56,6 +57,7 @@ export function BrowserGuestLayer() {
     onBrowserShortcut(replayBrowserShortcut),
     onBrowserOpenTabRequest(handleOpenTabRequest),
     onBrowserActivateRequest(handleActivateRequest),
+    onBrowserCloseTabRequest(handleCloseTabRequest),
     onBrowserExternalRequest(({ url }) => {
       if (!useBrowserStore.getState().externalRequestUrl) setExternalRequestUrl(url)
     }),

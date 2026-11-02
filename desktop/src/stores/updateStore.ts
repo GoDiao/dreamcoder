@@ -6,6 +6,7 @@ import {
   type ShellUpdate,
   checkForAppUpdate,
 } from '../lib/shell'
+import { errorMessage } from '../lib/errorMessage'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 import type { UpdateProxySettings } from '../types/settings'
 import { useSettingsStore } from './settingsStore'
@@ -97,10 +98,6 @@ async function setPendingUpdate(next: ShellUpdate | null, proxyKey: string | nul
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
-}
-
 export const useUpdateStore = create<UpdateStore>((set, get) => ({
   status: 'idle',
   availableVersion: null,
@@ -180,7 +177,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
         set((state) => ({
           ...state,
           status: 'error',
-          error: getErrorMessage(error),
+          error: errorMessage(error),
           checkedAt: Date.now(),
         }))
       } else {
@@ -275,7 +272,7 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
       set((state) => ({
         ...state,
         status: 'available',
-        error: getErrorMessage(error),
+        error: errorMessage(error),
         shouldPrompt: true,
       }))
     }

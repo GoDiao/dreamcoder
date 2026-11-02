@@ -1,4 +1,5 @@
 import memoize from 'lodash-es/memoize.js'
+import { allowsOwnArtifactWrite, artifactDenialFor, OWN_ARTIFACT_WRITE_REASON } from './artifactLocation.js'
 import { homedir } from 'os'
 import { dirname, isAbsolute, resolve } from 'path'
 import type { ToolPermissionContext } from '../../Tool.js'
@@ -161,6 +162,14 @@ export function isPathAllowed(
     }
   }
 
+  const artifactDenial = artifactDenialFor(precomputedPathsToCheck ?? [resolvedPath], operationType)
+  if (artifactDenial) {
+    return {
+      allowed: false,
+      decisionReason: artifactDenial,
+    }
+  }
+
   // 2. For write/create operations, check internal editable paths (plan files, scratchpad, agent memory, job dirs)
   // This MUST come before checkPathSafetyForAutoEdit since .claude is a dangerous directory
   // and internal editable paths live under ~/.claude/ — matching the ordering in
@@ -192,6 +201,13 @@ export function isPathAllowed(
           classifierApprovable: safetyCheck.classifierApprovable,
         },
       }
+    }
+  }
+
+  if (allowsOwnArtifactWrite(precomputedPathsToCheck ?? [resolvedPath], operationType, context.mode)) {
+    return {
+      allowed: true,
+      decisionReason: OWN_ARTIFACT_WRITE_REASON,
     }
   }
 

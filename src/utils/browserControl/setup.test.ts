@@ -24,18 +24,19 @@ describe('setupBrowserControlMCP', () => {
     })
   })
 
-  it('allows exactly the fourteen browser tools without a CLI prompt', () => {
+  it('allows exactly the fifteen browser tools without a CLI prompt', () => {
     const setup = setupBrowserControlMCP({
       [BROWSER_MCP_URL_ENV]: 'http://127.0.0.1:1/browser-mcp',
       [BROWSER_MCP_TOKEN_ENV]: 'tok',
     })
     expect(setup?.allowedTools).toEqual(BROWSER_TOOL_NAMES.map(tool => `mcp__dreamcoder-browser__${tool}`))
-    expect(setup?.allowedTools).toHaveLength(14)
+    expect(setup?.allowedTools).toHaveLength(15)
     expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__scroll')
     expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__wait_for')
     expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__styles')
     expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__evaluate')
     expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__emulate')
+    expect(setup?.allowedTools).toContain('mcp__dreamcoder-browser__close_tab')
   })
 
   it('does nothing without both variables', () => {

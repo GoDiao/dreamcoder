@@ -9,6 +9,7 @@ When to use it:
 - The user asks to chart, plot, graph, draw or visualize data, or to turn a table into a chart: use this tool. "Show it on the page" or "draw it in the page" also means this tool.
 - A chart, a table or something the user can adjust answers better than plain text.
 - Pick a fitting chart and show it; do not first ask which tool or output format to use. The user can ask for changes afterwards.
+- When the user asks to keep the content as an artifact, use the artifacts skill instead of this tool.
 - Do not write plotting scripts (matplotlib and the like), generate image or HTML files, or change the project's code to show a chart, unless the user explicitly asks for a file or a code change.
 
 A page is a list of blocks. Each block is { kind, data }: you supply data in the component's format and the app renders it. When no component can show what you need, an html block holds a self-contained HTML document you write.

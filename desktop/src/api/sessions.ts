@@ -2,6 +2,7 @@ import { api } from './client'
 import type { SessionListItem, SessionTranscript } from '../types/session'
 import type { PermissionMode } from '../types/settings'
 import type { RuntimeSelection } from '../types/runtime'
+import type { WorkspaceArtifactsResult } from '../types/artifact'
 
 type SessionsResponse = { sessions: SessionListItem[]; total: number }
 type CreateSessionResponse = { sessionId: string; workDir?: string }
@@ -291,7 +292,7 @@ export type TurnCheckpointDiffResult = WorkspaceDiffResult & {
 
 function buildWorkspacePath(
   sessionId: string,
-  resource: 'status' | 'tree' | 'file' | 'diff',
+  resource: 'status' | 'tree' | 'file' | 'diff' | 'artifacts',
   workspacePath?: string,
 ) {
   const query = new URLSearchParams()
@@ -401,6 +402,10 @@ export const sessionsApi = {
 
   getWorkspaceFile(sessionId: string, workspacePath: string) {
     return api.get<WorkspaceReadFileResult>(buildWorkspacePath(sessionId, 'file', workspacePath))
+  },
+
+  getWorkspaceArtifacts(sessionId: string) {
+    return api.get<WorkspaceArtifactsResult>(buildWorkspacePath(sessionId, 'artifacts'))
   },
 
   getWorkspaceDiff(sessionId: string, workspacePath: string) {

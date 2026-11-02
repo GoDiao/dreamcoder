@@ -9,6 +9,7 @@ import {
   BROWSER_TRUST_TIMEOUT_MS,
   CDP_INPUT_METHODS,
   CDP_METHOD_ALLOWLIST,
+  type BackgroundBrowserCommand,
   type BrowserConsoleEntry,
   type BrowserDialogRecord,
   type BrowserGrantDecision,
@@ -28,7 +29,9 @@ import {
   type BrowserViewInfo,
 } from '../../src/server/browserHost/protocol'
 import type { BrowserResolveResult } from '../src/lib/shell/electronBridge'
+import { BackgroundBrowserError, type BackgroundBrowserHost } from './backgroundBrowser'
 import { LOOPBACK_HOSTS, PROJECT_SCHEME } from './browser'
+import { findGuest } from './browserCapture'
 
 const MAX_BUFFER_ENTRIES = 500
 const MAX_BUFFER_BYTES = 1_000_000
@@ -102,6 +105,7 @@ export type BrowserHostDeps = {
   resolveInput(input: string, projectRoot: string | null): Promise<BrowserResolveResult>
   classify(url: string): 'allow' | 'external' | 'refuse'
   createSocket?(url: string, listener: SocketListener): SocketHandle
+  background?: BackgroundBrowserHost
 }
 
 export type MarkRequest = { ref: string; generation: number }
@@ -345,11 +349,32 @@ function parseFailure(parsed: Record<string, unknown>): { code: string; message:
   return typeof code === 'string' && typeof message === 'string' ? { code, message } : null
 }
 
+function parseBackgroundCommand(value: unknown): BackgroundBrowserCommand | null {
+  if (!isRecord(value) || typeof value.session !== 'string') return null
+  if (value.kind === 'destroySession') return { kind: 'destroySession', session: value.session }
+  if (typeof value.target !== 'string') return null
+  if (value.kind === 'createTarget' || value.kind === 'closeTarget') return { kind: value.kind, session: value.session, target: value.target }
+  if (value.kind === 'cdp' && typeof value.method === 'string') {
+    return {
+      kind: 'cdp',
+      session: value.session,
+      target: value.target,
+      method: value.method,
+      ...(isRecord(value.params) ? { params: value.params } : {}),
+    }
+  }
+  return null
+}
+
 function parseMessage(data: string): BrowserHostMessage | null {
   const parsed: unknown = JSON.parse(data)
   if (!isRecord(parsed)) return null
   if (parsed.type === 'ready') return { type: 'ready' }
   if (parsed.type === 'cancel' && typeof parsed.id === 'string') return { type: 'cancel', id: parsed.id }
+  if (parsed.type === 'background' && typeof parsed.id === 'string') {
+    const command = parseBackgroundCommand(parsed.command)
+    if (command) return { type: 'background', id: parsed.id, command }
+  }
   if (parsed.type === 'trust_result' && typeof parsed.id === 'string') {
     if (parsed.ok === true && Array.isArray(parsed.origins) && parsed.origins.every((origin) => typeof origin === 'string')) {
       return { type: 'trust_result', id: parsed.id, ok: true, origins: parsed.origins as string[] }
@@ -487,6 +512,13 @@ class BrowserHost {
 
   constructor(private readonly deps: BrowserHostDeps) {
     this.createSocket = deps.createSocket ?? createWebSocket
+    deps.background?.onEvent((event) =>
+      this.send(
+        event.kind === 'cdp'
+          ? { type: 'background_event', session: event.session, target: event.target, method: event.method, params: event.params }
+          : { type: 'background_closed', session: event.session, target: event.target },
+      ),
+    )
   }
 
   connect(config: { url: string; token: string }) {
@@ -504,15 +536,7 @@ class BrowserHost {
   registerView(input: ViewRegistration) {
     const existing = this.views.get(input.tabId)
     if (existing && existing.webContentsId === input.webContentsId && existing.sessionId === input.sessionId) return
-    const contents = this.deps.fromId(input.webContentsId)
-    if (!contents || contents.isDestroyed()) throw new Error(`web contents ${input.webContentsId} does not exist`)
-    const main = this.deps.getMainWebContents()
-    if (!main || contents.hostWebContents !== main) {
-      throw new Error(`web contents ${input.webContentsId} is not a guest of the main window`)
-    }
-    if (contents.session !== this.deps.browserSession) {
-      throw new Error(`web contents ${input.webContentsId} does not use the browser partition`)
-    }
+    const contents = findGuest(this.deps, input.webContentsId)
     for (const other of this.views.values()) {
       if (other.webContentsId === input.webContentsId && other.tabId !== input.tabId) {
         throw new Error(`web contents ${input.webContentsId} is already registered for tab ${other.tabId}`)
@@ -589,6 +613,10 @@ class BrowserHost {
 
   resolveActivate(requestId: string, shown: boolean) {
     return this.settlePending(requestId, shown)
+  }
+
+  resolveCloseTab(requestId: string, closed: boolean) {
+    return this.settlePending(requestId, closed)
   }
 
   stopSession(sessionId: string) {
@@ -729,6 +757,11 @@ class BrowserHost {
       this.inflight.get(message.id)?.controller.abort(new HostError('cancelled', 'command cancelled by the sidecar'))
       return
     }
+    if (message.type === 'background') {
+      void this.runBackground(id, message.id, message.command)
+      return
+    }
+    if (message.type !== 'command') return
     void this.runCommand(id, message)
   }
 
@@ -766,6 +799,7 @@ class BrowserHost {
     this.ready = false
     this.abortAll(new HostError('cancelled', 'the connection to the sidecar closed'))
     this.failSidecar(new Error('the connection to the sidecar closed'))
+    void this.deps.background?.destroyAll()
     if (!socket) return
     try {
       socket.close()
@@ -1234,6 +1268,20 @@ class BrowserHost {
     this.reply(connection, result)
   }
 
+  private async runBackground(connection: number, id: string, command: BackgroundBrowserCommand) {
+    const background = this.deps.background
+    if (!background) {
+      this.reply(connection, { type: 'result', id, ok: false, error: { code: 'internal', message: 'background browsers are not available' } })
+      return
+    }
+    try {
+      this.reply(connection, { type: 'result', id, ok: true, value: await background.run(command) })
+    } catch (error) {
+      const code = error instanceof BackgroundBrowserError ? error.code : 'internal'
+      this.reply(connection, { type: 'result', id, ok: false, error: { code, message: errorMessage(error) } })
+    }
+  }
+
   private reply(connection: number, result: BrowserHostResult) {
     if (connection !== this.connectionId) return
     this.send(result)
@@ -1263,6 +1311,8 @@ class BrowserHost {
         return this.inspect(view)
       case 'activate':
         return this.activate(view, signal)
+      case 'closeTab':
+        return this.closeTab(view, signal)
       case 'navigate':
         return this.navigate(view, command.url, signal)
       case 'history':
@@ -1339,6 +1389,12 @@ class BrowserHost {
     const reply = await this.requestRenderer('browser-activate-request', { tabId: view.tabId }, ACTIVATE_TIMEOUT_MS, signal)
     if (typeof reply !== 'boolean') throw new HostError('timeout', 'the browser tab was not activated in time')
     return { shown: reply }
+  }
+
+  private async closeTab(view: View, signal: AbortSignal) {
+    const reply = await this.requestRenderer('browser-close-tab-request', { tabId: view.tabId }, ACTIVATE_TIMEOUT_MS, signal)
+    if (typeof reply !== 'boolean') throw new HostError('timeout', 'the browser tab was not closed in time')
+    return { closed: reply }
   }
 
   private requestRenderer(event: string, payload: Record<string, unknown>, timeoutMs: number, signal: AbortSignal): Promise<unknown> {

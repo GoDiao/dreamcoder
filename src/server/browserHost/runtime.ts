@@ -6,6 +6,7 @@ import { BrowserService } from './service.js'
 import { createSnapshotter } from './snapshot/index.js'
 import { browserSessionTokens } from './sessionTokens.js'
 import { BrowserTrustStore } from './trustStore.js'
+import { WebCloneBrowsers } from './webClone.js'
 
 export function bindPickChannel(channel: BrowserHostChannel, service: BrowserService) {
   channel.setPickHandler(({ tabId, generation, backendNodeId, expiresAt }) => service.pick(tabId, generation, backendNodeId, expiresAt))
@@ -30,7 +31,7 @@ export function bindEmulationReset(service: BrowserService, store: Pick<SessionS
   })
 }
 
-let shared: { service: BrowserService; channel: BrowserHostChannel; tokens: typeof browserSessionTokens } | null = null
+let shared: { service: BrowserService; channel: BrowserHostChannel; tokens: typeof browserSessionTokens; webClone: WebCloneBrowsers } | null = null
 
 export function getBrowserRuntime() {
   if (shared) return shared
@@ -42,7 +43,9 @@ export function getBrowserRuntime() {
     getProjectRoot: (sessionId) => conversationService.getSessionWorkDir(sessionId) || null,
     createSnapshotter,
   })
-  const runtime = { service, channel: browserHostChannel, tokens: browserSessionTokens }
+  const webClone = new WebCloneBrowsers({ channel: browserHostChannel, grants })
+  const runtime = { service, channel: browserHostChannel, tokens: browserSessionTokens, webClone }
+  browserHostChannel.onStop(sessionId => void webClone.destroyForOwner(sessionId))
   bindGrantChannel(runtime.channel, grants, trust)
   bindPickChannel(runtime.channel, runtime.service)
   bindBrowserActivity(runtime.service, sessionStateStore)
@@ -50,6 +53,8 @@ export function getBrowserRuntime() {
   conversationService.onProcessEvent((event) => {
     if (event.phase !== 'stopped' && event.phase !== 'failed') return
     runtime.tokens.revoke(event.sessionId)
+    webClone.tokens.revoke(event.sessionId)
+    void webClone.destroyForOwner(event.sessionId)
     void runtime.service.releaseSession(event.sessionId)
   })
   shared = runtime

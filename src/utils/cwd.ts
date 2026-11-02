@@ -13,6 +13,10 @@ export function runWithCwdOverride<T>(cwd: string, fn: () => T): T {
   return cwdOverrideStorage.run(cwd, fn)
 }
 
+export function getArtifactWorkRoot(): string {
+  return cwdOverrideStorage.getStore() ?? getOriginalCwd()
+}
+
 /**
  * Get the current working directory
  */
