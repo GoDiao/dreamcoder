@@ -70,6 +70,7 @@ export async function handleBrowserPickDone(event: BrowserPickDone) {
     } catch (error) {
       browser.element!.screenshot = undefined
       console.warn('[browser] could not prepare the picked element screenshot', error)
+      toast.error(t('browser.pickScreenshotFailed'))
     }
   }
   const board = await canvasBoardLabel(event.tabId, browser.url)

@@ -54,11 +54,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                 <button
                   type="button"
                   onClick={() => setActiveImageIndex(images.findIndex((image) => image.src === src))}
-                  className={
-                    isComposer
-                      ? 'overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
-                      : 'overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
-                  }
+                  className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]"
                 >
                   <img
                     src={src}

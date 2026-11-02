@@ -1,3 +1,5 @@
+import { t } from '../i18n'
+import { useUIStore } from '../stores/uiStore'
 import { isDesktopRuntime } from './desktopRuntime'
 import { getFilePath, pickFiles } from './shell'
 
@@ -6,6 +8,7 @@ const IMAGE_MAX_HEIGHT = 2000
 const IMAGE_TARGET_RAW_SIZE = 3.75 * 1024 * 1024
 const IMAGE_QUALITY = 0.86
 const IMAGE_MIN_QUALITY = 0.5
+const IMAGE_ENCODE_ATTEMPTS = 12
 
 export type ComposerAttachment = {
   id: string
@@ -73,8 +76,26 @@ export async function selectNativeFileAttachments(): Promise<ComposerAttachment[
 
 export async function filesToComposerAttachments(files: FileList | File[]): Promise<ComposerAttachment[]> {
   const entries = Array.from(files)
-  const attachments = await Promise.all(entries.map(fileToComposerAttachment))
-  return attachments.filter((attachment): attachment is ComposerAttachment => !!attachment)
+  const results = await Promise.allSettled(entries.map(fileToComposerAttachment))
+  const attachments: ComposerAttachment[] = []
+  const failures: { file: File; reason: unknown }[] = []
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') failures.push({ file: entries[index]!, reason: result.reason })
+    else if (result.value) attachments.push(result.value)
+  })
+  reportAttachmentFailures(failures)
+  return attachments
+}
+
+function reportAttachmentFailures(failures: { file: File; reason: unknown }[]) {
+  if (failures.length === 0) return
+  for (const { file, reason } of failures) {
+    console.warn('[attachments] Could not attach a file', file.name, reason)
+  }
+  useUIStore.getState().addToast({
+    type: 'error',
+    message: t('chat.attachmentFailed', { name: failures.map(({ file }) => file.name).join(', ') }),
+  })
 }
 
 export function clipboardImageFiles(items: DataTransferItemList): File[] {
@@ -85,8 +106,7 @@ export function clipboardImageFiles(items: DataTransferItemList): File[] {
     if (!item?.type.startsWith('image/')) continue
     const file = item.getAsFile()
     if (!file) continue
-    const subtype = file.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
-    files.push(new File([file], `pasted-image-${timestamp}-${files.length + 1}.${subtype}`, {
+    files.push(new File([file], `pasted-image-${timestamp}-${files.length + 1}.${imageExtension(file.type)}`, {
       type: file.type,
       lastModified: file.lastModified,
     }))
@@ -118,7 +138,7 @@ async function fileToComposerAttachment(file: File): Promise<ComposerAttachment 
     : null
   return {
     id: nextAttachmentId(),
-    name: file.name,
+    name: prepared && prepared.data !== data ? nameWithImageExtension(file.name, prepared.mimeType) : file.name,
     type: isImage ? 'image' : 'file',
     mimeType: prepared?.mimeType || file.type || undefined,
     previewUrl: prepared?.data,
@@ -127,7 +147,13 @@ async function fileToComposerAttachment(file: File): Promise<ComposerAttachment 
 }
 
 async function prepareImageSource(source: Blob, originalData: string, mimeType: string) {
-  const image = await createImageBitmap(source)
+  let image: ImageBitmap
+  try {
+    image = await createImageBitmap(source)
+  } catch (error) {
+    if (source.size <= IMAGE_TARGET_RAW_SIZE) return { data: originalData, mimeType }
+    throw error
+  }
   try {
     if (
       source.size <= IMAGE_TARGET_RAW_SIZE &&
@@ -137,13 +163,11 @@ async function prepareImageSource(source: Blob, originalData: string, mimeType: 
       return { data: originalData, mimeType }
     }
 
-    const scale = Math.min(1, IMAGE_MAX_WIDTH / image.width, IMAGE_MAX_HEIGHT / image.height)
-    let width = Math.max(1, Math.floor(image.width * scale))
-    let height = Math.max(1, Math.floor(image.height * scale))
+    let { width, height } = fitWithinImageLimits(image.width, image.height)
     let outputType = encoderMimeType(mimeType)
     let quality = IMAGE_QUALITY
 
-    for (let attempt = 0; attempt < 12; attempt += 1) {
+    for (let attempt = 0; attempt < IMAGE_ENCODE_ATTEMPTS; attempt += 1) {
       const blob = await renderImageBlob(image, width, height, outputType, quality)
       if (blob.size <= IMAGE_TARGET_RAW_SIZE) {
         return {
@@ -175,6 +199,24 @@ async function prepareImageSource(source: Blob, originalData: string, mimeType: 
   } finally {
     image.close()
   }
+}
+
+function fitWithinImageLimits(width: number, height: number) {
+  if (width <= IMAGE_MAX_WIDTH && height <= IMAGE_MAX_HEIGHT) return { width, height }
+  if (width * IMAGE_MAX_HEIGHT >= height * IMAGE_MAX_WIDTH) {
+    return { width: IMAGE_MAX_WIDTH, height: Math.max(1, Math.floor((height * IMAGE_MAX_WIDTH) / width)) }
+  }
+  return { width: Math.max(1, Math.floor((width * IMAGE_MAX_HEIGHT) / height)), height: IMAGE_MAX_HEIGHT }
+}
+
+function imageExtension(mimeType: string) {
+  const subtype = mimeType.split('/')[1]?.split('+')[0]
+  return subtype === 'jpeg' ? 'jpg' : subtype || 'png'
+}
+
+function nameWithImageExtension(name: string, mimeType: string) {
+  const dot = name.lastIndexOf('.')
+  return `${dot > 0 ? name.slice(0, dot) : name}.${imageExtension(mimeType)}`
 }
 
 function encoderMimeType(mimeType: string) {
