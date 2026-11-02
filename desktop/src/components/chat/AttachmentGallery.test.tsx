@@ -64,4 +64,29 @@ describe('AttachmentGallery', () => {
 
     expect(onRemove).toHaveBeenCalledWith('selection-1')
   })
+
+  it('renders a sent image as a fixed thumbnail and opens its processed data in the gallery', () => {
+    const data = 'data:image/webp;base64,cHJvY2Vzc2Vk'
+    const view = render(
+      <AttachmentGallery
+        variant="message"
+        attachments={[{
+          id: 'image-1',
+          type: 'image',
+          name: 'processed.webp',
+          data,
+        }]}
+      />,
+    )
+
+    const thumbnail = view.getByRole('img', { name: 'processed.webp' })
+    expect(thumbnail.className.split(' ')).toEqual(expect.arrayContaining(['h-16', 'w-16', 'object-cover']))
+    expect(thumbnail.getAttribute('src')).toBe(data)
+
+    fireEvent.click(thumbnail)
+
+    const modalImage = view.getByRole('dialog').querySelector('img')
+    expect(modalImage?.className.split(' ')).toContain('object-contain')
+    expect(modalImage?.getAttribute('src')).toBe(data)
+  })
 })

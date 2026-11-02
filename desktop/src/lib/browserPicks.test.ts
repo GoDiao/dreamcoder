@@ -5,7 +5,13 @@ const shellMocks = vi.hoisted(() => ({
   canvasBoardLabel: vi.fn(async (): Promise<string | null> => null),
 }))
 
+const imageMocks = vi.hoisted(() => ({
+  prepareImageDataUrl: vi.fn(async (data: string, mimeType: string) => ({ data, mimeType })),
+}))
+
 vi.mock('./browserGuests', () => ({ canvasBoardLabel: shellMocks.canvasBoardLabel }))
+
+vi.mock('./composerAttachments', () => ({ prepareImageDataUrl: imageMocks.prepareImageDataUrl }))
 
 vi.mock('./shell', () => ({
   setBrowserPickMode: shellMocks.setBrowserPickMode,
@@ -124,6 +130,43 @@ describe('browser picks', () => {
       })
       expect(first?.browser?.pendingPickId).toBeUndefined()
       expect(references()[1]?.browser?.pendingPickId).toBe('p2')
+    })
+
+    it('processes an element screenshot before storing the browser reference', async () => {
+      imageMocks.prepareImageDataUrl.mockResolvedValueOnce({
+        data: 'data:image/webp;base64,U01BTEw=',
+        mimeType: 'image/webp',
+      })
+      handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
+
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+
+      expect(imageMocks.prepareImageDataUrl).toHaveBeenCalledWith('data:image/webp;base64,QUJD', 'image/webp')
+      expect(references()[0]?.browser?.element?.screenshot).toEqual({
+        data: 'data:image/webp;base64,U01BTEw=',
+        mimeType: 'image/webp',
+      })
+    })
+
+    it('keeps the element reference without its screenshot, logs and tells the user when the screenshot cannot be prepared', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      imageMocks.prepareImageDataUrl.mockRejectedValueOnce(new Error('Image could not be compressed below the attachment size limit'))
+      handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
+
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+
+      expect(references()).toHaveLength(1)
+      const [reference] = references()
+      expect(reference).toMatchObject({
+        kind: 'browser',
+        path: 'https://example.com/a',
+        name: 'button.buy',
+        browser: { tabId: 't', text: 'Buy now', element: { ref: '12', generation: 3, label: 'button.buy', stale: false } },
+      })
+      expect(reference?.browser?.pendingPickId).toBeUndefined()
+      expect(reference?.browser?.element?.screenshot).toBeUndefined()
+      expect(toast.error).toHaveBeenCalledWith('The element was added without its screenshot.')
+      expect(warn).toHaveBeenCalled()
     })
 
     it('names the artifact and board in front of the element when the pick is inside a canvas board', async () => {

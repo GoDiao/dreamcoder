@@ -54,20 +54,12 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                 <button
                   type="button"
                   onClick={() => setActiveImageIndex(images.findIndex((image) => image.src === src))}
-                  className={
-                    isComposer
-                      ? 'overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
-                      : 'overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] text-left shadow-sm transition-transform hover:scale-[1.01]'
-                  }
+                  className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]"
                 >
                   <img
                     src={src}
                     alt={attachment.name}
-                    className={
-                      isComposer
-                        ? 'h-16 w-16 object-cover'
-                        : 'max-h-[340px] w-full max-w-[360px] object-cover'
-                    }
+                    className="h-16 w-16 object-cover"
                   />
                 </button>
                 {onRemove && attachment.id && (
