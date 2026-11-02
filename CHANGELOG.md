@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.
+
 ## [0.8.0] — 2026-11-01
 
 The first stable release of the Electron desktop app. These notes cover everything since 0.7.0, including 0.8.0-beta.1 and 0.8.0-beta.2.
