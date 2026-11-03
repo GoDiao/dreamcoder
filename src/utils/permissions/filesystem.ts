@@ -45,6 +45,7 @@ import type {
   PermissionResult,
 } from './PermissionResult.js'
 import type { PermissionRule, PermissionRuleSource } from './PermissionRule.js'
+import { isBypassPermissionsActive } from './PermissionMode.js'
 import { createReadRuleSuggestion } from './PermissionUpdate.js'
 import type { PermissionUpdate } from './PermissionUpdateSchema.js'
 import { getRuleByContentsForToolName } from './permissions.js'
@@ -76,6 +77,13 @@ export const SENSITIVE_READ_FILES = [
   '.pgpass',
   'token',
 ] as const
+
+const SAFE_ENV_FILE_SUFFIXES = new Set([
+  'example',
+  'sample',
+  'template',
+  'dist',
+])
 
 /**
  * Dangerous directories that should be protected from auto-editing.
@@ -109,7 +117,13 @@ export function isSensitiveReadPath(path: string): boolean {
     .filter(Boolean)
   const fileName = parts.at(-1)
   if (!fileName) return false
-  if (fileName.startsWith('.env')) return true
+  if (fileName === '.env') return true
+  if (
+    fileName.startsWith('.env.') &&
+    !SAFE_ENV_FILE_SUFFIXES.has(fileName.slice('.env.'.length))
+  ) {
+    return true
+  }
   if (SENSITIVE_READ_FILES.some(name => name === fileName)) return true
   return (
     parts.at(-2) === '.ssh' &&
@@ -118,14 +132,12 @@ export function isSensitiveReadPath(path: string): boolean {
   )
 }
 
-export function checkSensitiveReadPermission(
+export function getSensitiveReadPermission(
   path: string,
-  precomputedPathsToCheck?: readonly string[],
+  sensitivePath: string,
+  toolPermissionContext: ToolPermissionContext,
 ): PermissionDecision | null {
-  const pathsToCheck =
-    precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
-  const sensitivePath = pathsToCheck.find(isSensitiveReadPath)
-  if (!sensitivePath) return null
+  if (isBypassPermissionsActive(toolPermissionContext)) return null
   const reason = `Reading ${sensitivePath} may expose secrets and requires explicit approval`
   return {
     behavior: 'ask',
@@ -136,6 +148,23 @@ export function checkSensitiveReadPermission(
       classifierApprovable: false,
     },
   }
+}
+
+export function checkSensitiveReadPermission(
+  path: string,
+  toolPermissionContext: ToolPermissionContext,
+  precomputedPathsToCheck?: readonly string[],
+): PermissionDecision | null {
+  if (isBypassPermissionsActive(toolPermissionContext)) return null
+  const pathsToCheck =
+    precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
+  const sensitivePath = pathsToCheck.find(isSensitiveReadPath)
+  if (!sensitivePath) return null
+  return getSensitiveReadPermission(
+    path,
+    sensitivePath,
+    toolPermissionContext,
+  )
 }
 
 /**
@@ -1206,7 +1235,11 @@ export function checkReadPermissionForTool(
     }
   }
 
-  const sensitiveReadResult = checkSensitiveReadPermission(path, pathsToCheck)
+  const sensitiveReadResult = checkSensitiveReadPermission(
+    path,
+    toolPermissionContext,
+    pathsToCheck,
+  )
   if (sensitiveReadResult) {
     return sensitiveReadResult
   }
