@@ -43,6 +43,12 @@ import { AboutSettings } from '../components/settings/AboutSettings'
 import { Button } from '../components/shared/ui/button'
 import { SearchField } from '../components/shared/SearchField'
 import { moveRovingFocus } from '../lib/rovingFocus'
+import { useDecisionProviderStore } from '../stores/decisionProviderStore'
+import type { PermissionGuardrailSettings as PermissionGuardrailSettingsValue } from '../types/settings'
+import { FormSelect } from '../components/shared/FormSelect'
+import { LabeledInput } from '../components/shared/LabeledInput'
+import { Switch } from '../components/shared/ui/switch'
+import { Checkbox } from '../components/shared/ui/checkbox'
 
 type SettingsNavGroup = {
   titleKey: TranslationKey | null
@@ -259,8 +265,179 @@ function PermissionSettings() {
         })}
       </div>
 
+      <section className="mt-8 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-secondary)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.permissions.rulesTitle')}</h3>
+        <p className="mt-1 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesDescription')}
+        </p>
+        <div className="mt-3 text-xs text-[var(--color-text-secondary)]">
+          <span className="font-medium text-[var(--color-text-primary)]">{t('settings.permissions.rulesFile')}</span>
+          <code className="ml-2 rounded bg-[var(--color-surface-primary)] px-1.5 py-0.5 text-[var(--color-text-primary)]">
+            .claude/settings.local.json
+          </code>
+        </div>
+        <p className="mt-3 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesShellNames')}
+        </p>
+        <p className="mt-1 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesReload')}
+        </p>
+      </section>
+
+      <PermissionGuardrailSettings />
+
       {isDesktopRuntime() ? <BrowserTrustSettings /> : null}
     </div>
+  )
+}
+
+function PermissionGuardrailSettings() {
+  const t = useTranslation()
+  const saved = useSettingsStore((state) => state.permissionGuardrail)
+  const save = useSettingsStore((state) => state.setPermissionGuardrail)
+  const providers = useDecisionProviderStore((state) => state.providers)
+  const fetchProviders = useDecisionProviderStore((state) => state.fetchProviders)
+  const [draft, setDraft] = useState<PermissionGuardrailSettingsValue>(saved)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetchProviders()
+  }, [fetchProviders])
+
+  useEffect(() => {
+    setDraft(saved)
+  }, [saved])
+
+  const provider = providers.find((entry) => entry.id === draft.providerId) ?? null
+  const privacyAccepted = draft.privacyNoticeVersion >= 1
+  const saveDisabled = saving || (
+    draft.enabled && (
+      !provider ||
+      !draft.modelId ||
+      (provider.deployment === 'hosted' && !privacyAccepted)
+    )
+  )
+
+  const update = <K extends keyof PermissionGuardrailSettingsValue>(
+    key: K,
+    value: PermissionGuardrailSettingsValue[K],
+  ) => setDraft((current) => ({ ...current, [key]: value }))
+
+  return (
+    <section className="mt-10 border-t border-[var(--color-border-separator)] pt-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.title')}</h3>
+          <p className="mt-1 max-w-[70ch] text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+            {t('settings.permissionGuardrail.description')}
+          </p>
+        </div>
+        <Switch
+          checked={draft.enabled}
+          onCheckedChange={(checked) => update('enabled', checked)}
+          aria-label={t('settings.permissionGuardrail.enabled')}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.provider')}</label>
+          <FormSelect
+            value={draft.providerId ?? ''}
+            onChange={(providerId) => {
+              const next = providers.find((entry) => entry.id === providerId)
+              setDraft((current) => ({
+                ...current,
+                providerId: providerId || null,
+                modelId: next?.models[0]?.id ?? '',
+                privacyNoticeVersion: next?.deployment === 'local' ? 1 : 0,
+              }))
+            }}
+            label={t('settings.permissionGuardrail.provider')}
+            options={[
+              { value: '', label: t('settings.permissionGuardrail.selectProvider') },
+              ...providers.map((entry) => ({ value: entry.id, label: entry.name })),
+            ]}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.model')}</label>
+          <FormSelect
+            value={draft.modelId}
+            onChange={(modelId) => update('modelId', modelId)}
+            label={t('settings.permissionGuardrail.model')}
+            options={[
+              { value: '', label: t('settings.permissionGuardrail.selectModel') },
+              ...(provider?.models ?? []).map((model) => ({ value: model.id, label: model.name ?? model.id })),
+            ]}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.preset')}</label>
+          <FormSelect
+            value={draft.preset}
+            onChange={(preset) => update('preset', preset)}
+            label={t('settings.permissionGuardrail.preset')}
+            options={[
+              { value: 'safetyNet', label: t('settings.permissionGuardrail.safetyNet') },
+              { value: 'fewerPrompts', label: t('settings.permissionGuardrail.fewerPrompts') },
+            ]}
+          />
+        </div>
+        <LabeledInput
+          label={t('settings.permissionGuardrail.threshold')}
+          type="number"
+          min="0"
+          max="1"
+          step="0.01"
+          value={draft.threshold}
+          onChange={(event) => update('threshold', Math.min(1, Math.max(0, Number(event.target.value))))}
+        />
+      </div>
+
+      {draft.preset === 'fewerPrompts' && (
+        <p role="note" className="mt-3 rounded-[8px] border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+          {t('settings.permissionGuardrail.calibrationRequired')}
+        </p>
+      )}
+
+      <p className="mt-3 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+        {t('settings.permissionGuardrail.experimentNote')}
+      </p>
+
+      {provider?.deployment === 'hosted' && (
+        <label className="mt-4 flex items-start gap-2 text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+          <Checkbox
+            checked={privacyAccepted}
+            onCheckedChange={(checked) => update('privacyNoticeVersion', checked === true ? 1 : 0)}
+          />
+          <span>{t('settings.permissionGuardrail.privacyNotice')}</span>
+        </label>
+      )}
+
+      <div className="mt-5 flex items-center gap-3">
+        <Button
+          size="xs"
+          disabled={saveDisabled}
+          loading={saving}
+          onClick={async () => {
+            setSaving(true)
+            setError(null)
+            try {
+              await save(draft)
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : String(reason))
+            } finally {
+              setSaving(false)
+            }
+          }}
+        >
+          {t('common.save')}
+        </Button>
+        {error && <span role="alert" className="text-xs text-[var(--color-error)]">{error}</span>}
+      </div>
+    </section>
   )
 }
 

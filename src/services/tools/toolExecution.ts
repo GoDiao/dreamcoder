@@ -236,6 +236,7 @@ function decisionReasonToOTelSource(
       return 'hook'
     case 'mode':
     case 'classifier':
+    case 'permissionGuardrail':
     case 'subcommandResults':
     case 'asyncAgent':
     case 'sandboxOverride':
@@ -989,6 +990,23 @@ async function checkPermissionsAndCallTool(
         decision: permissionDecision.behavior,
         toolUseID,
         hookEvent: 'PermissionRequest',
+      }),
+    })
+  }
+
+  if (
+    permissionDecision.behavior === 'allow' &&
+    permissionDecision.decisionReason?.type === 'permissionGuardrail'
+  ) {
+    resultingMessages.push({
+      message: createAttachmentMessage({
+        type: 'permission_guardrail_decision',
+        decision: permissionDecision.decisionReason.decision,
+        toolUseID,
+        providerId: permissionDecision.decisionReason.providerId,
+        modelId: permissionDecision.decisionReason.modelId,
+        preset: permissionDecision.decisionReason.preset,
+        score: permissionDecision.decisionReason.score,
       }),
     })
   }

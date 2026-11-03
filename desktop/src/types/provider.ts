@@ -14,6 +14,52 @@ export type ProviderModel = {
   name?: string
 }
 
+export type DecisionProviderFormat =
+  | 'openai_decisions'
+  | 'openrouter_decisions'
+  | 'openai_chat'
+  | 'ollama_chat'
+
+export type DecisionProviderPresetId = 'openai' | 'openrouter' | 'ollama' | 'custom'
+
+export type SavedDecisionProvider = {
+  id: string
+  presetId: DecisionProviderPresetId
+  name: string
+  deployment: 'hosted' | 'local'
+  apiFormat: DecisionProviderFormat
+  baseUrl: string
+  apiKey: string
+  models: ProviderModel[]
+}
+
+export type DecisionProviderPreset = {
+  id: DecisionProviderPresetId
+  name: string
+  baseUrl: string
+  apiFormat: DecisionProviderFormat
+  models: ProviderModel[]
+}
+
+export type CreateDecisionProviderInput = Omit<
+  SavedDecisionProvider,
+  'id' | 'deployment'
+>
+
+export type UpdateDecisionProviderInput = Partial<CreateDecisionProviderInput>
+
+export type TestDecisionProviderInput = {
+  baseUrl: string
+  apiKey: string
+  modelId: string
+  apiFormat: DecisionProviderFormat
+}
+
+export type DiscoverDecisionProviderModelsInput = Omit<
+  CreateDecisionProviderInput,
+  'name' | 'models'
+>
+
 export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
 
 export type ModelContextWindows = Record<string, number>

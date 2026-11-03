@@ -2,12 +2,14 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
+import { DECISION_PROVIDER_PRESETS } from '../config/decisionProviderPresets.js'
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
 import type {
   ApiFormat,
   ProviderModel,
   ProviderAuthStrategy,
   ProvidersIndex,
+  SavedDecisionProvider,
   SavedProvider,
 } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl } from '../upstream/baseUrl.js'
@@ -64,6 +66,28 @@ function isSavedProvider(value: unknown): value is SavedProvider {
   )
 }
 
+export function isLoopbackDecisionProviderUrl(baseUrl: string): boolean {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase()
+    return hostname === '127.0.0.1' || hostname === '[::1]'
+  } catch {
+    return false
+  }
+}
+
+function isSavedDecisionProvider(value: unknown): value is SavedDecisionProvider {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    ['openai', 'openrouter', 'ollama', 'custom'].includes(String(value.presetId)) &&
+    typeof value.name === 'string' &&
+    ['openai_decisions', 'openrouter_decisions', 'openai_chat', 'ollama_chat'].includes(String(value.apiFormat)) &&
+    typeof value.baseUrl === 'string' &&
+    typeof value.apiKey === 'string' &&
+    isProviderModels(value.models)
+  )
+}
+
 export function stripContextSuffix(model: string): string {
   return model.replace(/\[(1|2)m\]/gi, '')
 }
@@ -113,6 +137,24 @@ export function normalizeSavedProvider(provider: SavedProvider): SavedProvider {
   }
 }
 
+export function normalizeSavedDecisionProvider(
+  provider: SavedDecisionProvider,
+): SavedDecisionProvider {
+  const normalizedModels = normalizeProviderModels(provider.models)
+  const preset = DECISION_PROVIDER_PRESETS.find((entry) => (
+    entry.id === provider.presetId && entry.apiFormat === provider.apiFormat && entry.models.length > 0
+  ))
+  const supportedIds = new Set(preset?.models.map((model) => model.id) ?? [])
+  const supportedModels = normalizedModels.filter((model) => supportedIds.has(model.id))
+  return {
+    ...provider,
+    deployment: isLoopbackDecisionProviderUrl(provider.baseUrl) ? 'local' : 'hosted',
+    models: preset
+      ? supportedModels.length > 0 ? supportedModels : preset.models
+      : normalizedModels,
+  }
+}
+
 export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
   if (!isRecord(value) || !Array.isArray(value.providers)) {
     return null
@@ -131,12 +173,24 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
   const activeId = rawActiveId && providers.some((provider) => provider.id === rawActiveId)
     ? rawActiveId
     : null
+  const decisionProviders = Array.isArray(value.decisionProviders)
+    ? value.decisionProviders
+        .filter(isSavedDecisionProvider)
+        .map((provider) => normalizeSavedDecisionProvider(provider))
+    : []
+  const activeDecisionProviderId =
+    typeof value.activeDecisionProviderId === 'string' &&
+    decisionProviders.some((provider) => provider.id === value.activeDecisionProviderId)
+      ? value.activeDecisionProviderId
+      : null
 
   return {
     ...rest,
     schemaVersion: typeof value.schemaVersion === 'number' ? value.schemaVersion : 1,
     activeId,
     providers,
+    activeDecisionProviderId,
+    decisionProviders,
   }
 }
 

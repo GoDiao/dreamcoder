@@ -4347,6 +4347,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
     case 'hook_system_message':
     case 'structured_output':
     case 'hook_permission_decision':
+    case 'permission_guardrail_decision':
       return []
   }
 

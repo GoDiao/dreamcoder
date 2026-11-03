@@ -30,6 +30,14 @@ export type SessionRepository = {
   worktreeSlug?: string
 }
 
+export type PermissionGuardrailDetails = {
+  providerId: string
+  modelId: string
+  preset: 'fewerPrompts' | 'safetyNet'
+  decision: 'allow' | 'ask'
+  score: number | null
+}
+
 export type PendingPermission = {
   requestId: string
   toolName: string
@@ -37,6 +45,7 @@ export type PendingPermission = {
   input: unknown
   description?: string
   suggestions?: unknown[]
+  guardrail?: PermissionGuardrailDetails
 }
 
 export type PendingBrowserGrant = {

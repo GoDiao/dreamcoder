@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SavedProvider } from '../../types/provider'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { ProviderSettings } from './ProviderSettings'
+import { useDecisionProviderStore } from '../../stores/decisionProviderStore'
 
 const models = [{ id: 'model-main' }]
 const providers: SavedProvider[] = [
@@ -41,6 +42,25 @@ describe('ProviderSettings provider icons', () => {
       fetchProviders: vi.fn(async () => {}),
       fetchPresets: vi.fn(async () => {}),
     })
+    useDecisionProviderStore.setState({
+      providers: [
+        {
+          id: 'guardrail-1',
+          presetId: 'openai',
+          name: 'OpenAI Decisions',
+          deployment: 'hosted',
+          apiFormat: 'openai_decisions',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: '',
+          models: [{ id: 'gpt-6-luna' }],
+        },
+      ],
+      activeId: 'guardrail-1',
+      presets: [],
+      isLoading: false,
+      fetchProviders: vi.fn(async () => {}),
+      fetchPresets: vi.fn(async () => {}),
+    })
   })
 
   it('uses the saved preset ID for the logo and falls back for custom providers', () => {
@@ -48,5 +68,14 @@ describe('ProviderSettings provider icons', () => {
 
     expect(screen.getByText('DeepSeek').parentElement?.querySelector('[data-testid="provider-icon-deepseek"]')).toBeInTheDocument()
     expect(screen.getByText('My Custom Provider').parentElement?.querySelector('[data-testid="provider-icon-fallback"]')).toBeInTheDocument()
+    expect(screen.getByText('Permission guardrail providers')).toBeInTheDocument()
+    expect(screen.getByText('OpenAI Decisions')).toBeInTheDocument()
+  })
+
+  afterEach(() => {
+    cleanup()
+    useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+    useProviderStore.setState(useProviderStore.getInitialState(), true)
+    useDecisionProviderStore.setState(useDecisionProviderStore.getInitialState(), true)
   })
 })

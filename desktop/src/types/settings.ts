@@ -91,6 +91,7 @@ export type UserSettings = {
   alwaysThinkingEnabled?: boolean
   autoCompactPercent?: number
   permissionMode?: PermissionMode
+  permissionGuardrail?: PermissionGuardrailSettings
   theme?: ThemeMode
   skipWebFetchPreflight?: boolean
   desktopNotificationsEnabled?: boolean
@@ -106,6 +107,15 @@ export type UserSettings = {
   language?: string
   desktopTerminal?: Partial<DesktopTerminalSettings>
   [key: string]: unknown
+}
+
+export type PermissionGuardrailSettings = {
+  enabled: boolean
+  providerId: string | null
+  modelId: string
+  preset: 'fewerPrompts' | 'safetyNet'
+  threshold: number
+  privacyNoticeVersion: number
 }
 
 export type AppMode = 'default' | 'portable'

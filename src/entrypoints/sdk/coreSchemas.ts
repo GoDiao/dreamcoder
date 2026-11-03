@@ -1541,6 +1541,21 @@ export const SDKStatusMessageSchema = lazySchema(() =>
   }),
 )
 
+export const SDKPermissionGuardrailDecisionMessageSchema = lazySchema(() =>
+  z.object({
+    type: z.literal('system'),
+    subtype: z.literal('permission_guardrail_decision'),
+    decision: z.enum(['allow', 'ask']),
+    tool_use_id: z.string(),
+    provider_id: z.string(),
+    model_id: z.string(),
+    preset: z.enum(['fewerPrompts', 'safetyNet']),
+    score: z.number().min(0).max(1).nullable(),
+    uuid: UUIDPlaceholder(),
+    session_id: z.string(),
+  }),
+)
+
 export const SDKPostTurnSummaryMessageSchema = lazySchema(() =>
   z
     .object({
@@ -1862,6 +1877,7 @@ export const SDKMessageSchema = lazySchema(() =>
     SDKPartialAssistantMessageSchema(),
     SDKCompactBoundaryMessageSchema(),
     SDKStatusMessageSchema(),
+    SDKPermissionGuardrailDecisionMessageSchema(),
     SDKAPIRetryMessageSchema(),
     SDKLocalCommandOutputMessageSchema(),
     SDKHookStartedMessageSchema(),

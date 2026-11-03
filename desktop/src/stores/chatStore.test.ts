@@ -2879,6 +2879,13 @@ describe('chatStore permission requests shared across clients', () => {
     toolName: 'Bash',
     toolUseId: 'tool-shared-1',
     input: { command: 'ls' },
+    guardrail: {
+      providerId: 'provider-1',
+      modelId: 'gpt-6-luna',
+      preset: 'safetyNet' as const,
+      decision: 'ask' as const,
+      score: 0.812,
+    },
   }
 
   beforeEach(() => {
@@ -2903,6 +2910,10 @@ describe('chatStore permission requests shared across clients', () => {
     expect(session().messages.filter((message) => message.type === 'permission_request')).toHaveLength(1)
     expect(notifyDesktopMock).toHaveBeenCalledTimes(1)
     expect(session().pendingPermission?.requestId).toBe('perm-shared-1')
+    expect(session().pendingPermission?.guardrail).toEqual(request.guardrail)
+    expect(session().messages.find((message) => message.type === 'permission_request')).toMatchObject({
+      guardrail: request.guardrail,
+    })
     expect(session().chatState).toBe('permission_pending')
   })
 

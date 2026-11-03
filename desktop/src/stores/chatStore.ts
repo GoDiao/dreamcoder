@@ -27,6 +27,7 @@ import type {
   UIAttachment,
   UIMessage,
   PermissionResolution,
+  PermissionGuardrailDetails,
   ServerMessage,
   SessionState,
   TokenUsage,
@@ -68,6 +69,7 @@ export type PerSessionState = {
     toolUseId?: string
     input: unknown
     description?: string
+    guardrail?: PermissionGuardrailDetails
   } | null
   tokenUsage: TokenUsage
   statusVerb: string
@@ -1744,6 +1746,7 @@ function pendingPermissionFromMirror(state: SessionState): PerSessionState['pend
     toolUseId: request.toolUseId,
     input: request.input,
     description: request.description,
+    guardrail: request.guardrail,
   }
 }
 
@@ -1775,6 +1778,7 @@ function applyMirror(sessionId: string, next: SessionState): void {
         toolUseId: request.toolUseId,
         input: request.input,
         description: request.description,
+        guardrail: request.guardrail,
         timestamp: now,
       })
     }

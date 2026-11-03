@@ -78,6 +78,17 @@ export type TranscriptItem =
       teamCount?: number
       timestamp: number
     }
+  | {
+      id: string
+      type: 'permission_guardrail_decision'
+      decision: 'allow' | 'ask'
+      toolUseId: string
+      providerId: string
+      modelId: string
+      preset: 'fewerPrompts' | 'safetyNet'
+      score: number | null
+      timestamp: number
+    }
 
 export type TodoItem = { content: string; status: string; activeForm?: string }
 

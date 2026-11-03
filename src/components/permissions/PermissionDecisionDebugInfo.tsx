@@ -25,6 +25,8 @@ function decisionReasonDisplayString(decisionReason: PermissionDecisionReason & 
     return `${chalk.bold(decisionReason.classifier)} classifier: ${decisionReason.reason}`;
   }
   switch (decisionReason.type) {
+    case 'permissionGuardrail':
+      return `${chalk.bold(decisionReason.modelId)} permission guardrail: ${decisionReason.decision} (${decisionReason.score ?? 'unavailable'})`;
     case 'rule':
       return `${chalk.bold(permissionRuleValueToString(decisionReason.rule.ruleValue))} rule from ${getSettingSourceDisplayNameLowercase(decisionReason.rule.source)}`;
     case 'mode':

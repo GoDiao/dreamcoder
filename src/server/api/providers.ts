@@ -1,11 +1,16 @@
 import { z } from 'zod'
 import { ProviderService } from '../services/providerService.js'
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
+import { DECISION_PROVIDER_PRESETS } from '../config/decisionProviderPresets.js'
 import {
   CreateProviderSchema,
   UpdateProviderSchema,
   TestProviderSchema,
   DiscoverProviderModelsSchema,
+  CreateDecisionProviderSchema,
+  UpdateDecisionProviderSchema,
+  TestDecisionProviderSchema,
+  DiscoverDecisionProviderModelsSchema,
 } from '../types/provider.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { diagnosticsService } from '../services/diagnosticsService.js'
@@ -20,6 +25,10 @@ export async function handleProvidersApi(
   try {
     const id = segments[2]
     const action = segments[3]
+
+    if (id === 'decisions') {
+      return await handleDecisionProviders(req, segments)
+    }
 
     if (id === 'test' && req.method === 'POST') {
       return await handleTestUnsaved(req)
@@ -113,8 +122,66 @@ export async function handleProvidersApi(
 
     throw methodNotAllowed(req.method)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return errorResponse(ApiError.badRequest(error.issues.map((issue) => issue.message).join('; ')))
+    }
     return errorResponse(error)
   }
+}
+
+async function handleDecisionProviders(
+  req: Request,
+  segments: string[],
+): Promise<Response> {
+  const id = segments[3]
+  const action = segments[4]
+
+  if (id === 'presets' && req.method === 'GET') {
+    return Response.json({ presets: DECISION_PROVIDER_PRESETS })
+  }
+  if (id === 'models' && req.method === 'POST') {
+    const input = DiscoverDecisionProviderModelsSchema.parse(await parseJsonBody(req))
+    return Response.json({ models: await providerService.discoverDecisionModels(input) })
+  }
+  if (id === 'test' && req.method === 'POST') {
+    const input = TestDecisionProviderSchema.parse(await parseJsonBody(req))
+    return Response.json({ result: await providerService.testDecisionProviderConfig(input) })
+  }
+  if (!id) {
+    if (req.method === 'GET') {
+      const { providers, activeId } = await providerService.listDecisionProviders()
+      return Response.json({ providers, activeId })
+    }
+    if (req.method === 'POST') {
+      const input = CreateDecisionProviderSchema.parse(await parseJsonBody(req))
+      const provider = await providerService.addDecisionProvider(input)
+      return Response.json({ provider }, { status: 201 })
+    }
+    throw methodNotAllowed(req.method)
+  }
+  if (action === 'activate') {
+    if (req.method !== 'POST') throw methodNotAllowed(req.method)
+    await providerService.activateDecisionProvider(id)
+    return Response.json({ ok: true })
+  }
+  if (action === 'test') {
+    if (req.method !== 'POST') throw methodNotAllowed(req.method)
+    const body = await parseJsonBody(req).catch(() => ({}))
+    const modelId = typeof body.modelId === 'string' ? body.modelId : undefined
+    return Response.json({ result: await providerService.testDecisionProvider(id, modelId) })
+  }
+  if (req.method === 'GET') {
+    return Response.json({ provider: await providerService.getDecisionProvider(id) })
+  }
+  if (req.method === 'PUT') {
+    const input = UpdateDecisionProviderSchema.parse(await parseJsonBody(req))
+    return Response.json({ provider: await providerService.updateDecisionProvider(id, input) })
+  }
+  if (req.method === 'DELETE') {
+    await providerService.deleteDecisionProvider(id)
+    return Response.json({ ok: true })
+  }
+  throw methodNotAllowed(req.method)
 }
 
 async function handleCreate(req: Request): Promise<Response> {

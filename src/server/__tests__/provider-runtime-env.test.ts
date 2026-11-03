@@ -7,6 +7,7 @@ import {
   mergeActiveProviderManagedEnv,
   readActiveProviderManagedEnv,
   resolveProviderDefaultModel,
+  normalizeProvidersIndex,
 } from '../services/providerRuntimeEnv.js'
 import type { SavedProvider } from '../types/provider.js'
 
@@ -136,5 +137,69 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gpt-5.5',
       DISABLE_AUTOUPDATER: '1',
     })
+  })
+
+  test('normalizes decision providers without widening model providers', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      activeDecisionProviderId: 'local',
+      decisionProviders: [
+        {
+          id: 'local',
+          presetId: 'custom',
+          name: 'Loopback',
+          deployment: 'hosted',
+          apiFormat: 'openai_chat',
+          baseUrl: 'http://127.0.0.1:9000/v1',
+          apiKey: '',
+          models: [{ id: 'guard' }],
+        },
+        {
+          id: 'remote',
+          presetId: 'custom',
+          name: 'LAN',
+          deployment: 'local',
+          apiFormat: 'openai_chat',
+          baseUrl: 'http://192.168.1.10:9000/v1',
+          apiKey: 'secret',
+          models: [{ id: 'guard' }],
+        },
+      ],
+    })
+
+    expect(index?.activeDecisionProviderId).toBe('local')
+    expect(index?.decisionProviders.map((provider) => provider.deployment)).toEqual([
+      'local',
+      'hosted',
+    ])
+    expect(index?.providers).toEqual([])
+  })
+
+  test('repairs invalid models saved for a curated decision provider preset', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      activeDecisionProviderId: 'openai',
+      decisionProviders: [{
+        id: 'openai',
+        presetId: 'openai',
+        name: 'OpenAI Decisions',
+        deployment: 'hosted',
+        apiFormat: 'openai_decisions',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'secret',
+        models: [{ id: 'gpt-3.5-turbogpt-5.6-lunagpt-6-luna' }],
+      }],
+    })
+
+    expect(index?.decisionProviders[0]?.models).toEqual([{ id: 'gpt-6-luna', name: 'GPT-6 Luna' }])
+  })
+
+  test('defaults missing decision provider fields for legacy indexes', () => {
+    const index = normalizeProvidersIndex({ activeId: null, providers: [] })
+
+    expect(index?.activeDecisionProviderId).toBeNull()
+    expect(index?.decisionProviders).toEqual([])
   })
 })

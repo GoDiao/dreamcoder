@@ -16,6 +16,7 @@ export type {
   BrowserActivity,
   PendingBrowserGrant,
   PendingPermission,
+  PermissionGuardrailDetails,
   ProcessDetail,
   ProcessPhase,
   RuntimeSelection,
@@ -78,7 +79,7 @@ export type AttachmentRef = {
 }
 
 /** Transcript items the server recognizes in a live conversation and sends as they are. */
-export type LiveTranscriptItem = Extract<TranscriptItem, { type: 'goal_event' | 'compact_summary' | 'memory_event' }>
+export type LiveTranscriptItem = Extract<TranscriptItem, { type: 'goal_event' | 'compact_summary' | 'memory_event' | 'permission_guardrail_decision' }>
 
 export type ServerMessage =
   | { type: 'connected'; sessionId: string }

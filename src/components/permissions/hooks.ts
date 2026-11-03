@@ -75,6 +75,8 @@ function decisionReasonToString(
       return `Rule: ${permissionRuleValueToString(decisionReason.rule.ruleValue)}`
     case 'mode':
       return `Mode: ${decisionReason.mode}`
+    case 'permissionGuardrail':
+      return `Permission guardrail: ${decisionReason.modelId}, Decision: ${decisionReason.decision}, Score: ${decisionReason.score ?? 'unavailable'}`
     case 'subcommandResults':
       return `Subcommand Results: ${Array.from(decisionReason.reasons.entries())
         .map(([key, value]) => `${key}: ${permissionResultToLog(value)}`)
