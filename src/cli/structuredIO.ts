@@ -79,6 +79,7 @@ function serializeDecisionReason(
     case 'mode':
     case 'subcommandResults':
     case 'permissionPromptTool':
+    case 'permissionGuardrail':
       return undefined
     case 'hook':
     case 'asyncAgent':
@@ -87,6 +88,28 @@ function serializeDecisionReason(
     case 'safetyCheck':
     case 'other':
       return reason.reason
+  }
+}
+
+export function preservePermissionGuardrailReason(
+  source: PermissionDecision,
+  response: PermissionDecision,
+): PermissionDecision {
+  return source.decisionReason?.type === 'permissionGuardrail'
+    ? { ...response, decisionReason: source.decisionReason }
+    : response
+}
+
+export function serializePermissionGuardrail(
+  reason: PermissionDecisionReason | undefined,
+) {
+  if (reason?.type !== 'permissionGuardrail') return undefined
+  return {
+    provider_id: reason.providerId,
+    model_id: reason.modelId,
+    preset: reason.preset,
+    decision: reason.decision,
+    score: reason.score,
   }
 }
 
@@ -558,6 +581,16 @@ export class StructuredIO {
         return mainPermissionResult
       }
 
+      const normalizePermissionResponse = (result: PermissionToolOutput) => {
+        const decision = permissionPromptToolResultToPermissionDecision(
+          result,
+          tool,
+          input,
+          toolUseContext,
+        )
+        return preservePermissionGuardrailReason(mainPermissionResult, decision)
+      }
+
       // Run PermissionRequest hooks in parallel with the SDK permission
       // prompt.  In the terminal CLI, hooks race against the interactive
       // prompt so that e.g. a hook with --delay 20 doesn't block the UI.
@@ -597,6 +630,9 @@ export class StructuredIO {
             decision_reason: serializeDecisionReason(
               mainPermissionResult.decisionReason,
             ),
+            permission_guardrail: serializePermissionGuardrail(
+              mainPermissionResult.decisionReason,
+            ),
             tool_use_id: toolUseID,
             agent_id: toolUseContext.agentId,
           },
@@ -620,33 +656,18 @@ export class StructuredIO {
           }
           // Hook passed through (no decision) — wait for the SDK prompt
           const sdkResult = await sdkPromise
-          return permissionPromptToolResultToPermissionDecision(
-            sdkResult.result,
-            tool,
-            input,
-            toolUseContext,
-          )
+          return normalizePermissionResponse(sdkResult.result)
         }
 
         // SDK prompt responded first — use its result (hook still running
         // in background but its result will be ignored)
-        return permissionPromptToolResultToPermissionDecision(
-          winner.result,
-          tool,
-          input,
-          toolUseContext,
-        )
+        return normalizePermissionResponse(winner.result)
       } catch (error) {
-        return permissionPromptToolResultToPermissionDecision(
-          {
-            behavior: 'deny',
-            message: `Tool permission request failed: ${error}`,
-            toolUseID,
-          },
-          tool,
-          input,
-          toolUseContext,
-        )
+        return normalizePermissionResponse({
+          behavior: 'deny',
+          message: `Tool permission request failed: ${error}`,
+          toolUseID,
+        })
       } finally {
         // Only transition back to 'running' if no other permission prompts
         // are pending (concurrent tool execution can have multiple in-flight).

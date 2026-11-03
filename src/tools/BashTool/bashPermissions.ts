@@ -1381,14 +1381,7 @@ function filterCdCwdSubcommands(
   return { subcommands, astCommandsByIdx }
 }
 
-/**
- * Early-exit deny enforcement for the AST too-complex and checkSemantics
- * paths. Returns the exact-match result if non-passthrough (deny/ask/allow),
- * then checks prefix/wildcard deny rules. Returns null if neither matched,
- * meaning the caller should fall through to ask. Extracted to keep
- * bashToolHasPermission under Bun's feature() DCE complexity threshold.
- */
-function checkEarlyExitDeny(
+function checkExplicitDeny(
   input: z.infer<typeof BashTool.inputSchema>,
   toolPermissionContext: ToolPermissionContext,
 ): PermissionResult | null {
@@ -1396,7 +1389,7 @@ function checkEarlyExitDeny(
     input,
     toolPermissionContext,
   )
-  if (exactMatchResult.behavior !== 'passthrough') {
+  if (exactMatchResult.behavior === 'deny') {
     return exactMatchResult
   }
   const denyMatch = matchingRulesForInput(
@@ -1404,12 +1397,26 @@ function checkEarlyExitDeny(
     toolPermissionContext,
     'prefix',
   ).matchingDenyRules[0]
-  if (denyMatch !== undefined) {
-    return {
-      behavior: 'deny',
-      message: `Permission to use ${BashTool.name} with command ${input.command} has been denied.`,
-      decisionReason: { type: 'rule', rule: denyMatch },
-    }
+  if (denyMatch === undefined) return null
+  return {
+    behavior: 'deny',
+    message: `Permission to use ${BashTool.name} with command ${input.command} has been denied.`,
+    decisionReason: { type: 'rule', rule: denyMatch },
+  }
+}
+
+function checkEarlyExitDeny(
+  input: z.infer<typeof BashTool.inputSchema>,
+  toolPermissionContext: ToolPermissionContext,
+): PermissionResult | null {
+  const explicitDeny = checkExplicitDeny(input, toolPermissionContext)
+  if (explicitDeny !== null) return explicitDeny
+  const exactMatchResult = bashToolCheckExactMatchPermission(
+    input,
+    toolPermissionContext,
+  )
+  if (exactMatchResult.behavior !== 'passthrough') {
+    return exactMatchResult
   }
   return null
 }
@@ -1664,6 +1671,23 @@ export async function bashToolHasPermission(
   input: z.infer<typeof BashTool.inputSchema>,
   context: ToolUseContext,
   getCommandSubcommandPrefixFn = getCommandSubcommandPrefix,
+): Promise<PermissionResult> {
+  const explicitDeny = checkExplicitDeny(
+    input,
+    context.getAppState().toolPermissionContext,
+  )
+  if (explicitDeny !== null) return explicitDeny
+  return bashToolHasPermissionAfterExplicitDeny(
+    input,
+    context,
+    getCommandSubcommandPrefixFn,
+  )
+}
+
+async function bashToolHasPermissionAfterExplicitDeny(
+  input: z.infer<typeof BashTool.inputSchema>,
+  context: ToolUseContext,
+  getCommandSubcommandPrefixFn: typeof getCommandSubcommandPrefix,
 ): Promise<PermissionResult> {
   let appState = context.getAppState()
 

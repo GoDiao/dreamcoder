@@ -7,6 +7,12 @@ import type {
   ProviderTestResult,
   DiscoveredProviderModel,
   DiscoverProviderModelsInput,
+  SavedDecisionProvider,
+  DecisionProviderPreset,
+  CreateDecisionProviderInput,
+  UpdateDecisionProviderInput,
+  TestDecisionProviderInput,
+  DiscoverDecisionProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
 
@@ -20,6 +26,9 @@ type AuthStatusResponse = {
   source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'
   activeProvider?: string
 }
+type DecisionProvidersResponse = { providers: SavedDecisionProvider[]; activeId: string | null }
+type DecisionProviderResponse = { provider: SavedDecisionProvider }
+type DecisionPresetsResponse = { presets: DecisionProviderPreset[] }
 
 export const providersApi = {
   list() {
@@ -68,5 +77,41 @@ export const providersApi = {
 
   discoverModels(input: DiscoverProviderModelsInput) {
     return api.post<ModelsResponse>('/api/providers/models', input)
+  },
+
+  listDecisions() {
+    return api.get<DecisionProvidersResponse>('/api/providers/decisions')
+  },
+
+  decisionPresets() {
+    return api.get<DecisionPresetsResponse>('/api/providers/decisions/presets')
+  },
+
+  createDecision(input: CreateDecisionProviderInput) {
+    return api.post<DecisionProviderResponse>('/api/providers/decisions', input)
+  },
+
+  updateDecision(id: string, input: UpdateDecisionProviderInput) {
+    return api.put<DecisionProviderResponse>(`/api/providers/decisions/${id}`, input)
+  },
+
+  deleteDecision(id: string) {
+    return api.delete<{ ok: true }>(`/api/providers/decisions/${id}`)
+  },
+
+  activateDecision(id: string) {
+    return api.post<{ ok: true }>(`/api/providers/decisions/${id}/activate`)
+  },
+
+  testDecision(id: string, modelId?: string) {
+    return api.post<TestResultResponse>(`/api/providers/decisions/${id}/test`, { modelId })
+  },
+
+  testDecisionConfig(input: TestDecisionProviderInput) {
+    return api.post<TestResultResponse>('/api/providers/decisions/test', input)
+  },
+
+  discoverDecisionModels(input: DiscoverDecisionProviderModelsInput) {
+    return api.post<ModelsResponse>('/api/providers/decisions/models', input)
   },
 }

@@ -306,6 +306,14 @@ export type PermissionDecisionReason =
       reason: string
     }
   | {
+      type: 'permissionGuardrail'
+      providerId: string
+      modelId: string
+      preset: 'fewerPrompts' | 'safetyNet'
+      decision: 'allow' | 'ask'
+      score: number | null
+    }
+  | {
       type: 'workingDir'
       reason: string
     }

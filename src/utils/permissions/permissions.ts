@@ -103,6 +103,7 @@ import {
   classifyYoloAction,
   formatActionForClassifier,
 } from './yoloClassifier.js'
+import { evaluatePermissionGuardrail } from './permissionGuardrail.js'
 
 const CLASSIFIER_FAIL_CLOSED_REFRESH_MS = 30 * 60 * 1000 // 30 minutes
 
@@ -479,12 +480,43 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
 ): Promise<PermissionDecision> => {
   const result = await hasPermissionsToUseToolInner(tool, input, context)
 
+  const appState = context.getAppState()
+
+  if (
+    result.behavior === 'allow' &&
+    appState.toolPermissionContext.mode === 'bypassPermissions' &&
+    result.decisionReason?.type === 'mode' &&
+    result.decisionReason.mode === 'bypassPermissions'
+  ) {
+    const evaluation = await evaluatePermissionGuardrail('safetyNet', {
+      toolName: tool.name,
+      input,
+      messages: context.messages,
+    })
+    if (evaluation) {
+      const decisionReason = {
+        type: 'permissionGuardrail' as const,
+        providerId: evaluation.providerId,
+        modelId: evaluation.modelId,
+        preset: evaluation.preset,
+        decision: evaluation.behavior,
+        score: evaluation.score,
+      }
+      if (evaluation.behavior === 'allow') {
+        return { ...result, decisionReason }
+      }
+      return {
+        behavior: 'ask',
+        message: 'Permission guardrail requires confirmation',
+        decisionReason,
+      }
+    }
+  }
 
   // Reset consecutive denials on any allowed tool use in auto mode.
   // This ensures that a successful tool use (even one auto-allowed by rules)
   // breaks the consecutive denial streak.
   if (result.behavior === 'allow') {
-    const appState = context.getAppState()
     if (feature('TRANSCRIPT_CLASSIFIER')) {
       const currentDenialState =
         context.localDenialTracking ?? appState.denialTracking
@@ -503,8 +535,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
   // Apply dontAsk mode transformation: convert 'ask' to 'deny'
   // This is done at the end so it can't be bypassed by early returns
   if (result.behavior === 'ask') {
-    const appState = context.getAppState()
-
     if (appState.toolPermissionContext.mode === 'dontAsk') {
       return {
         behavior: 'deny',
@@ -513,6 +543,36 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
           mode: 'dontAsk',
         },
         message: DONT_ASK_REJECT_MESSAGE(tool.name),
+      }
+    }
+    if (
+      (appState.toolPermissionContext.mode === 'default' ||
+        appState.toolPermissionContext.mode === 'acceptEdits') &&
+      result.decisionReason?.type !== 'safetyCheck' &&
+      !tool.requiresUserInteraction?.()
+    ) {
+      const evaluation = await evaluatePermissionGuardrail('fewerPrompts', {
+        toolName: tool.name,
+        input,
+        messages: context.messages,
+      })
+      if (evaluation) {
+        const decisionReason = {
+          type: 'permissionGuardrail' as const,
+          providerId: evaluation.providerId,
+          modelId: evaluation.modelId,
+          preset: evaluation.preset,
+          decision: evaluation.behavior,
+          score: evaluation.score,
+        }
+        if (evaluation.behavior === 'allow') {
+          return {
+            behavior: 'allow',
+            updatedInput: input,
+            decisionReason,
+          }
+        }
+        return { ...result, decisionReason }
       }
     }
     // Apply auto mode: use AI classifier instead of prompting user

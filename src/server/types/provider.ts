@@ -38,6 +38,36 @@ export const ProviderModelsSchema = z.array(ProviderModelSchema).superRefine((mo
   })
 })
 
+export const DecisionProviderFormatSchema = z.enum([
+  'openai_decisions',
+  'openrouter_decisions',
+  'openai_chat',
+  'ollama_chat',
+])
+export type DecisionProviderFormat = z.infer<typeof DecisionProviderFormatSchema>
+
+export const DecisionProviderPresetIdSchema = z.enum([
+  'openai',
+  'openrouter',
+  'ollama',
+  'custom',
+])
+export type DecisionProviderPresetId = z.infer<typeof DecisionProviderPresetIdSchema>
+
+export const DecisionProviderDeploymentSchema = z.enum(['hosted', 'local'])
+export type DecisionProviderDeployment = z.infer<typeof DecisionProviderDeploymentSchema>
+
+export const SavedDecisionProviderSchema = z.object({
+  id: z.string(),
+  presetId: DecisionProviderPresetIdSchema,
+  name: z.string().trim().min(1),
+  deployment: DecisionProviderDeploymentSchema,
+  apiFormat: DecisionProviderFormatSchema,
+  baseUrl: z.string().url(),
+  apiKey: z.string(),
+  models: ProviderModelsSchema.min(1),
+})
+
 export const ModelContextWindowSchema = z.number().int().min(16000).max(10000000)
 export const ModelContextWindowsSchema = z.record(
   z.string().min(1),
@@ -63,6 +93,34 @@ export const ProvidersIndexSchema = z.object({
   schemaVersion: z.number().int().positive().optional(),
   activeId: z.string().nullable(),
   providers: z.array(SavedProviderSchema),
+  activeDecisionProviderId: z.string().nullable().default(null),
+  decisionProviders: z.array(SavedDecisionProviderSchema).default([]),
+})
+
+export const CreateDecisionProviderSchema = z.object({
+  presetId: DecisionProviderPresetIdSchema,
+  name: z.string().trim().min(1),
+  apiFormat: DecisionProviderFormatSchema,
+  baseUrl: z.string().url(),
+  apiKey: z.string(),
+  models: ProviderModelsSchema.min(1),
+})
+
+export const UpdateDecisionProviderSchema = CreateDecisionProviderSchema.partial()
+
+export const TestDecisionProviderSchema = CreateDecisionProviderSchema.pick({
+  apiFormat: true,
+  baseUrl: true,
+  apiKey: true,
+}).extend({
+  modelId: z.string().trim().min(1),
+})
+
+export const DiscoverDecisionProviderModelsSchema = CreateDecisionProviderSchema.pick({
+  presetId: true,
+  apiFormat: true,
+  baseUrl: true,
+  apiKey: true,
 })
 
 export const CreateProviderSchema = z.object({
@@ -111,11 +169,16 @@ export const DiscoverProviderModelsSchema = z.object({
 export type ProviderModel = z.infer<typeof ProviderModelSchema>
 export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
+export type SavedDecisionProvider = z.infer<typeof SavedDecisionProviderSchema>
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
 export type CreateProviderInput = z.infer<typeof CreateProviderSchema>
 export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>
 export type TestProviderInput = z.infer<typeof TestProviderSchema>
 export type DiscoverProviderModelsInput = z.infer<typeof DiscoverProviderModelsSchema>
+export type CreateDecisionProviderInput = z.infer<typeof CreateDecisionProviderSchema>
+export type UpdateDecisionProviderInput = z.infer<typeof UpdateDecisionProviderSchema>
+export type TestDecisionProviderInput = z.infer<typeof TestDecisionProviderSchema>
+export type DiscoverDecisionProviderModelsInput = z.infer<typeof DiscoverDecisionProviderModelsSchema>
 
 export interface ProviderTestStepResult {
   success: boolean

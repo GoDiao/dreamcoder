@@ -34,6 +34,7 @@ type UserBlock = {
 }
 type CompactSummaryItem = Extract<TranscriptItem, { type: 'compact_summary' }>
 type AssistantTextItem = Extract<TranscriptItem, { type: 'assistant_text' }>
+type PermissionGuardrailDecisionItem = Extract<TranscriptItem, { type: 'permission_guardrail_decision' }>
 
 export type InterpretOptions = {
   /** Team member transcripts show prompts sent by teammates; the lead's own session hides them. */
@@ -160,6 +161,17 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
 
   for (const msg of messages) {
     const timestamp = new Date(msg.timestamp).getTime()
+
+    if (msg.type === 'permission_guardrail_decision') {
+      const marker = msg.content as Omit<PermissionGuardrailDecisionItem, 'id' | 'type' | 'timestamp'>
+      items.push({
+        id: allocateId(msg.id),
+        type: 'permission_guardrail_decision',
+        ...marker,
+        timestamp,
+      })
+      continue
+    }
 
     if (msg.type === 'system' && typeof msg.content === 'string') {
       const text = msg.content.trim()

@@ -4,6 +4,10 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- An opt-in permission guardrail can use separately configured OpenAI, OpenRouter, Ollama, or custom decision providers after deterministic permission rules. It defaults off, fails back to asking, preserves deny and bypass-immune checks, and records model-assisted permission decisions in the transcript. The desktop `/permissions` command opens permission settings, which document the project rule file and cross-platform shell rule names (#146).
+
 ### Fixed
 
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.

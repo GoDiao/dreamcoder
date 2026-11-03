@@ -382,6 +382,16 @@ export type HookPermissionDecisionAttachment = {
   hookEvent: HookEvent
 }
 
+export type PermissionGuardrailDecisionAttachment = {
+  type: 'permission_guardrail_decision'
+  decision: 'allow' | 'ask'
+  toolUseID: string
+  providerId: string
+  modelId: string
+  preset: 'fewerPrompts' | 'safetyNet'
+  score: number | null
+}
+
 export type HookSystemMessageAttachment = {
   type: 'hook_system_message'
   content: string
@@ -639,6 +649,7 @@ export type Attachment =
   | TeammateMailboxAttachment
   | TeamContextAttachment
   | HookAttachment
+  | PermissionGuardrailDecisionAttachment
   | {
       type: 'invoked_skills'
       skills: Array<{

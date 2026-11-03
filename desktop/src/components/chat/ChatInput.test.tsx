@@ -1265,4 +1265,17 @@ describe('ChatInput file mentions', () => {
       expect(commandButtons[0]).toHaveTextContent('/superpowers:brainstorming')
     })
   })
+
+  it('opens permission settings instead of sending /permissions to the sidecar', () => {
+    render(<ChatInput />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '/permissions', selectionStart: 12 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    expect(useUIStore.getState().settingsOpen).toBe(true)
+    expect(useUIStore.getState().settingsTab).toBe('permissions')
+    expect(screen.getByRole('textbox')).toHaveValue('')
+  })
 })

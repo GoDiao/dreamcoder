@@ -32,7 +32,7 @@ export type TranscriptEntry = {
 /** A visible conversation message, before it is split into display items. */
 export type MessageEntry = {
   id: string
-  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result'
+  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'permission_guardrail_decision'
   content: unknown
   toolUseResult?: unknown
   timestamp: string
@@ -112,6 +112,39 @@ function isToolResultContent(content: unknown): boolean {
       (block as ContentBlock).type === 'tool_result'
     )
   )
+}
+
+function permissionGuardrailEntryToMessage(entry: TranscriptEntry): MessageEntry | null {
+  if (entry.type !== 'attachment' || !entry.attachment || typeof entry.attachment !== 'object') return null
+  const marker = entry.attachment as Record<string, unknown>
+  const decision = marker.decision
+  const preset = marker.preset
+  const score = marker.score
+  if (
+    marker.type !== 'permission_guardrail_decision' ||
+    (decision !== 'allow' && decision !== 'ask') ||
+    (preset !== 'fewerPrompts' && preset !== 'safetyNet') ||
+    typeof marker.toolUseID !== 'string' ||
+    typeof marker.providerId !== 'string' ||
+    typeof marker.modelId !== 'string' ||
+    (score !== null && (typeof score !== 'number' || score < 0 || score > 1))
+  ) {
+    return null
+  }
+  return {
+    id: entry.uuid || crypto.randomUUID(),
+    type: 'permission_guardrail_decision',
+    content: {
+      decision,
+      toolUseId: marker.toolUseID,
+      providerId: marker.providerId,
+      modelId: marker.modelId,
+      preset,
+      score,
+    },
+    timestamp: entry.timestamp || new Date().toISOString(),
+    isSidechain: entry.isSidechain,
+  }
 }
 
 /** CLI bookkeeping that is written as a user or assistant message but is not conversation. */
@@ -243,6 +276,12 @@ export function entriesToMessages(entries: TranscriptEntry[]): MessageEntry[] {
   }
 
   for (const entry of entries) {
+    const guardrailMessage = permissionGuardrailEntryToMessage(entry)
+    if (guardrailMessage) {
+      messages.push(guardrailMessage)
+      continue
+    }
+
     const goalMessage = goalLocalCommandEntryToMessage(entry)
     if (goalMessage) {
       messages.push(goalMessage)

@@ -17,7 +17,7 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { loadRecords, parseFlags, type Split, type ToolCallRecord } from '../dataset/lib'
-import { dataDir, evalRecords, type Prediction, readPredictions, readRunMeta, runDir, type Source } from './lib'
+import { dataDir, evalRecords, type EvalCohort, type Prediction, readPredictions, readRunMeta, runDir, type Source } from './lib'
 
 const flags = parseFlags(process.argv.slice(2))
 
@@ -31,7 +31,8 @@ function join_(name: string): Row[] {
   // otherwise one failure would invent a decision point for a probability-only model.
   const givesDecisions = all.some(p => p.decision !== null)
   const exactOnly = flags.has('exact-only')
-  return evalRecords(meta.source, meta.split, { withContext: false }).flatMap(record => {
+  const cohort = typeof meta.cohort === 'string' ? meta.cohort as EvalCohort : 'ask'
+  return evalRecords(meta.source, meta.split, { withContext: false, cohort }).flatMap(record => {
     if (exactOnly && record.label === 'ask' && record.meta.judge_match !== 'exact') return []
     const p = predictions.get(record.id)
     if (!p) return []

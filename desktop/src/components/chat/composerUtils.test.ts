@@ -117,8 +117,12 @@ describe('composerUtils', () => {
     expect(resolveSlashUiAction('plugins')).toEqual({ type: 'settings', tab: 'plugins' })
     expect(resolveSlashUiAction('memory')).toEqual({ type: 'settings', tab: 'memory' })
     expect(resolveSlashUiAction('doctor')).toEqual({ type: 'settings', tab: 'diagnostics' })
+    expect(resolveSlashUiAction('permissions')).toEqual({ type: 'settings', tab: 'permissions' })
     expect(mergeSlashCommands([]).map((command) => command.name)).toContain('plugin')
     expect(mergeSlashCommands([]).map((command) => command.name)).toContain('memory')
+    expect(mergeSlashCommands([]).filter((command) => command.name === 'permissions')).toEqual([
+      { name: 'permissions', description: 'View or manage tool permissions' },
+    ])
     expect(mergeSlashCommands([]).map((command) => command.name)).not.toContain('plugins')
   })
 

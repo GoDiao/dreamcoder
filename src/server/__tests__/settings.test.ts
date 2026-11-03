@@ -201,6 +201,25 @@ describe('SettingsService', () => {
     expect(settings.model).toBe('claude-opus-4-7')
   })
 
+  it('validates permission guardrail settings before saving', async () => {
+    const svc = new SettingsService()
+    const permissionGuardrail = {
+      enabled: false,
+      providerId: null,
+      modelId: '',
+      preset: 'safetyNet',
+      threshold: 0.95,
+      privacyNoticeVersion: 0,
+    }
+
+    await svc.updateUserSettings({ permissionGuardrail })
+
+    expect((await svc.getUserSettings()).permissionGuardrail).toEqual(permissionGuardrail)
+    await expect(svc.updateUserSettings({
+      permissionGuardrail: { ...permissionGuardrail, threshold: 2 },
+    })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
   it('should write and read the pure white theme setting', async () => {
     const svc = new SettingsService()
     await svc.updateUserSettings({ theme: 'white' })

@@ -13,8 +13,28 @@ import type { ProviderPreset } from '../types/providerPreset'
 import type { AppMode, ThemeMode, UpdateProxySettings } from '../types/settings'
 
 const MOCK_DELETE_PROVIDER = vi.fn()
-const MOCK_GET_SETTINGS = vi.fn()
-const MOCK_UPDATE_SETTINGS = vi.fn()
+const providerSettingsApiMock = vi.hoisted(() => ({
+  getSettings: vi.fn(),
+  updateSettings: vi.fn(),
+}))
+const decisionProviderStoreState = vi.hoisted(() => ({
+  providers: [],
+  activeId: null,
+  presets: [],
+  isLoading: false,
+  error: null,
+  fetchProviders: vi.fn(async () => {}),
+  fetchPresets: vi.fn(async () => {}),
+  createProvider: vi.fn(),
+  updateProvider: vi.fn(),
+  deleteProvider: vi.fn(),
+  activateProvider: vi.fn(),
+  testProvider: vi.fn(),
+  testConfig: vi.fn(),
+  discoverModels: vi.fn(),
+}))
+const MOCK_GET_SETTINGS = providerSettingsApiMock.getSettings
+const MOCK_UPDATE_SETTINGS = providerSettingsApiMock.updateSettings
 const desktopNotificationsMock = vi.hoisted(() => ({
   getDesktopNotificationPermission: vi.fn(),
   notifyDesktop: vi.fn(),
@@ -63,10 +83,14 @@ vi.mock('../stores/providerStore', () => ({
   useProviderStore: <T,>(selector?: (state: typeof providerStoreState) => T) => selector ? selector(providerStoreState) : providerStoreState,
 }))
 
+vi.mock('../stores/decisionProviderStore', () => ({
+  useDecisionProviderStore: <T,>(selector?: (state: typeof decisionProviderStoreState) => T) => selector ? selector(decisionProviderStoreState) : decisionProviderStoreState,
+}))
+
 vi.mock('../api/providers', () => ({
   providersApi: {
-    getSettings: MOCK_GET_SETTINGS,
-    updateSettings: MOCK_UPDATE_SETTINGS,
+    getSettings: providerSettingsApiMock.getSettings,
+    updateSettings: providerSettingsApiMock.updateSettings,
   },
 }))
 
@@ -1269,6 +1293,7 @@ describe('Settings > Providers tab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Add Provider|添加服务商/i }))
     const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByRole('textbox', { name: 'Settings JSON' })).toBeEnabled())
     fireEvent.change(within(dialog).getByPlaceholderText('sk-...'), { target: { value: 'sk-test' } })
     fireEvent.change(within(dialog).getByLabelText(/Model ID|模型 ID/i), { target: { value: 'gpt-5.5' } })
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Add|添加/i })[0]!)

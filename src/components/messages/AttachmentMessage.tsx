@@ -331,6 +331,10 @@ export function AttachmentMessage({
           {action} by <Text bold>{attachment.hookEvent}</Text> hook
         </Line>;
       }
+    case 'permission_guardrail_decision':
+      return <Line>
+        {attachment.decision === 'allow' ? 'Allowed' : 'Confirmation requested'} by permission guardrail <Text bold>{attachment.modelId}</Text>{attachment.score === null ? ' (unavailable)' : ` (${Math.round(attachment.score * 100)}%)`}
+      </Line>;
     case 'task_status':
       return <TaskStatusMessage attachment={attachment} />;
     case 'teammate_shutdown_batch':

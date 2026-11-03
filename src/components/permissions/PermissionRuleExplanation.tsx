@@ -36,6 +36,11 @@ function stringsForDecisionReason(reason: PermissionDecisionReason | undefined, 
     };
   }
   switch (reason.type) {
+    case 'permissionGuardrail':
+      return {
+        reasonString: `Permission guardrail ${chalk.bold(reason.modelId)} requires confirmation for this ${toolType}.`,
+        configString: undefined
+      };
     case 'rule':
       return {
         reasonString: `Permission rule ${chalk.bold(permissionRuleValueToString(reason.rule.ruleValue))} requires confirmation for this ${toolType}.`,
