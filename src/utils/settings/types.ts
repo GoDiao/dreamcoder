@@ -655,10 +655,10 @@ export const SettingsSchema = lazySchema(() =>
       webSearch: z
         .object({
           mode: z
-            .enum(['auto', 'anthropic', 'tavily', 'brave', 'disabled'])
+            .enum(['auto', 'anthropic', 'tavily', 'brave', 'keenable', 'disabled'])
             .optional()
             .describe(
-              'WebSearch backend selection. auto uses native Claude web search for Claude model names, then Tavily, then Brave.',
+              'WebSearch backend selection. auto uses native Claude web search for Claude model names, then Tavily, then Brave, then Keenable.',
             ),
           tavilyApiKey: z
             .string()
@@ -668,6 +668,10 @@ export const SettingsSchema = lazySchema(() =>
             .string()
             .optional()
             .describe('Brave Search API key for WebSearch fallback'),
+          keenableApiKey: z
+            .string()
+            .optional()
+            .describe('Keenable API key for WebSearch fallback'),
         })
         .optional()
         .describe('Configures native and external WebSearch backends'),
