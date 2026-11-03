@@ -10,10 +10,20 @@ import {
   listTasks,
   type Task,
 } from '../tasks.js'
-import { restoreLeaderTeamName } from './reconnection.js'
+import {
+  restoreLeaderTeamName,
+  restoreLeaderTeamNameOnResume,
+} from './reconnection.js'
 
 const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
+const userTypeAtLoad = process.env.USER_TYPE
+const agentTeamsAtLoad = process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
 let tmpDir: string
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}
 
 const pendingTask = (subject: string): Omit<Task, 'id'> => ({
   subject,
@@ -85,6 +95,45 @@ describe('restoreLeaderTeamName', () => {
 
   it('does nothing when no team has been created', () => {
     restoreLeaderTeamName()
+
+    expect(getTaskListId()).toBe(getSessionId())
+  })
+})
+
+describe('restoreLeaderTeamNameOnResume', () => {
+  beforeEach(() => {
+    delete process.env.USER_TYPE
+    delete process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+  })
+
+  afterEach(() => {
+    restoreEnv('USER_TYPE', userTypeAtLoad)
+    restoreEnv('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS', agentTeamsAtLoad)
+  })
+
+  it('restores the team name when agent teams are enabled', async () => {
+    process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1'
+    await writeTeam('keep-test', getSessionId())
+
+    restoreLeaderTeamNameOnResume()
+
+    expect(getTaskListId()).toBe('keep-test')
+  })
+
+  it('restores nothing when agent teams are disabled', async () => {
+    await writeTeam('keep-test', getSessionId())
+
+    restoreLeaderTeamNameOnResume()
+
+    expect(getTaskListId()).toBe(getSessionId())
+  })
+
+  it('does not take over the team of the session it was forked from', async () => {
+    process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1'
+    await writeTeam('original-team', 'original-session')
+    expect(getSessionId()).not.toBe('original-session')
+
+    restoreLeaderTeamNameOnResume()
 
     expect(getTaskListId()).toBe(getSessionId())
   })

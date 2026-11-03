@@ -344,8 +344,7 @@ import {
   markMessagesAsRead,
   isShutdownApproved,
 } from '../utils/teammateMailbox.js'
-import { isAgentSwarmsEnabled } from '../utils/agentSwarmsEnabled.js'
-import { restoreLeaderTeamName } from '../utils/swarm/reconnection.js'
+import { restoreLeaderTeamNameOnResume } from '../utils/swarm/reconnection.js'
 import { removeTeammateFromTeamFile } from '../utils/swarm/teamHelpers.js'
 import { unassignTeammateTasks } from '../utils/tasks.js'
 import { getRunningTasks } from '../utils/task/framework.js'
@@ -737,8 +736,8 @@ export async function runHeadless(
     return
   }
 
-  if ((options.continue || options.resume) && isAgentSwarmsEnabled()) {
-    restoreLeaderTeamName()
+  if (options.continue || options.resume) {
+    restoreLeaderTeamNameOnResume()
   }
 
   // Handle --rewind-files: restore filesystem and exit immediately

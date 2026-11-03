@@ -9,6 +9,7 @@
 import { readdirSync } from 'fs'
 import { getSessionId } from '../../bootstrap/state.js'
 import type { AppState } from '../../state/AppState.js'
+import { isAgentSwarmsEnabled } from '../agentSwarmsEnabled.js'
 import { logForDebugging } from '../debug.js'
 import { getTeamsDir } from '../envUtils.js'
 import { errorMessage, getErrnoCode } from '../errors.js'
@@ -94,6 +95,11 @@ export function restoreLeaderTeamName(): void {
   if (newest) {
     setLeaderTeamName(newest.name)
   }
+}
+
+export function restoreLeaderTeamNameOnResume(): void {
+  if (!isAgentSwarmsEnabled()) return
+  restoreLeaderTeamName()
 }
 
 /**
