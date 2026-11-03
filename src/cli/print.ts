@@ -344,6 +344,7 @@ import {
   markMessagesAsRead,
   isShutdownApproved,
 } from '../utils/teammateMailbox.js'
+import { restoreLeaderTeamNameOnResume } from '../utils/swarm/reconnection.js'
 import { removeTeammateFromTeamFile } from '../utils/swarm/teamHelpers.js'
 import { unassignTeammateTasks } from '../utils/tasks.js'
 import { getRunningTasks } from '../utils/task/framework.js'
@@ -733,6 +734,10 @@ export async function runHeadless(
   // unnecessary work while the process winds down.
   if (initialMessages.length === 0 && process.exitCode !== undefined) {
     return
+  }
+
+  if (options.continue || options.resume) {
+    restoreLeaderTeamNameOnResume()
   }
 
   // Handle --rewind-files: restore filesystem and exit immediately

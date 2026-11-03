@@ -6,9 +6,15 @@
  * - Resumed sessions: Initialize from teamName/agentName stored in the transcript
  */
 
+import { readdirSync } from 'fs'
+import { getSessionId } from '../../bootstrap/state.js'
 import type { AppState } from '../../state/AppState.js'
+import { isAgentSwarmsEnabled } from '../agentSwarmsEnabled.js'
 import { logForDebugging } from '../debug.js'
+import { getTeamsDir } from '../envUtils.js'
+import { errorMessage, getErrnoCode } from '../errors.js'
 import { logError } from '../log.js'
+import { setLeaderTeamName } from '../tasks.js'
 import { getDynamicTeamContext } from '../teammate.js'
 import { getTeamFilePath, readTeamFile } from './teamHelpers.js'
 
@@ -63,6 +69,37 @@ export function computeInitialTeamContext():
     isLeader,
     teammates: {},
   }
+}
+
+export function restoreLeaderTeamName(): void {
+  let teamNames: string[]
+  try {
+    teamNames = readdirSync(getTeamsDir())
+  } catch (e) {
+    if (getErrnoCode(e) !== 'ENOENT') {
+      logForDebugging(`[Reconnection] Failed to list teams: ${errorMessage(e)}`)
+    }
+    return
+  }
+
+  const sessionId = getSessionId()
+  let newest: { name: string; createdAt: number } | undefined
+  for (const name of teamNames) {
+    const teamFile = readTeamFile(name)
+    if (teamFile?.leadSessionId !== sessionId) continue
+    if (!newest || teamFile.createdAt > newest.createdAt) {
+      newest = { name, createdAt: teamFile.createdAt }
+    }
+  }
+
+  if (newest) {
+    setLeaderTeamName(newest.name)
+  }
+}
+
+export function restoreLeaderTeamNameOnResume(): void {
+  if (!isAgentSwarmsEnabled()) return
+  restoreLeaderTeamName()
 }
 
 /**
