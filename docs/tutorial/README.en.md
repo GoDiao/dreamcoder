@@ -25,7 +25,7 @@ You need basic TypeScript and `async/await`, and you should know what HTTP and W
 ## Two ways to read
 
 - **Read the source only.** Read the chapters in the order listed. Source links in the text point to a pinned version; open them to compare.
-- **Run the project alongside.** Follow [Getting Started](../../README_en.md#-getting-started) in the root README to run DreamCoder from source, have it change a small file in the desktop app, then compare what you see with the section "What the desktop UI shows" in the [overview](./00-overview.en.md). The code you run may be newer than the version cited in the text.
+- **Run the project alongside.** Follow [Getting Started](../../README.md#-getting-started) in the root README to run DreamCoder from source, have it change a small file in the desktop app, then compare what you see with the section "What the desktop UI shows" in the [overview](./00-overview.en.md). The code you run may be newer than the version cited in the text.
 
 ## Table of contents
 
@@ -49,4 +49,4 @@ You need basic TypeScript and `async/await`, and you should know what HTTP and W
 ## Participation and feedback
 
 - If a description does not match the code, or a part is not explained clearly, please open an [issue](https://github.com/GoDiao/dreamcoder/issues).
-- If you want to improve DreamCoder, read the [contributing guide](../CONTRIBUTING_en.md) first, then start with a [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+- If you want to improve DreamCoder, read the [contributing guide](../general/CONTRIBUTING_en.md) first, then start with a [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).

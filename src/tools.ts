@@ -13,9 +13,12 @@ import { TaskStopTool } from './tools/TaskStopTool/TaskStopTool.js'
 import { BriefTool } from './tools/BriefTool/BriefTool.js'
 import { ArtifactCheckTool } from './tools/ArtifactCheckTool/ArtifactCheckTool.js'
 import { ArtifactCopyTool } from './tools/ArtifactCopyTool/ArtifactCopyTool.js'
+import { ListSessionsTool } from './tools/ListSessionsTool/ListSessionsTool.js'
+import { RenameSessionTool } from './tools/RenameSessionTool/RenameSessionTool.js'
 import { ChooseDesignTemplateTool } from './tools/ChooseDesignTemplateTool/ChooseDesignTemplateTool.js'
 import { UseDesignSystemTool } from './tools/UseDesignSystemTool/UseDesignSystemTool.js'
 import { ShowUITool } from './tools/ShowUITool/ShowUITool.js'
+import { StartSessionTool } from './tools/StartSessionTool/StartSessionTool.js'
 // Dead code elimination: conditional import for ant-only tools
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 const REPLTool =
@@ -129,9 +132,6 @@ const coordinatorModeModule = feature('COORDINATOR_MODE')
 const SnipTool = feature('HISTORY_SNIP')
   ? require('./tools/SnipTool/SnipTool.js').SnipTool
   : null
-const ListPeersTool = feature('UDS_INBOX')
-  ? require('./tools/ListPeersTool/ListPeersTool.js').ListPeersTool
-  : null
 const WorkflowTool = feature('WORKFLOW_SCRIPTS')
   ? (() => {
       require('./tools/WorkflowTool/bundled/index.js').initBundledWorkflows()
@@ -230,7 +230,6 @@ export function getAllBaseTools(): Tools {
     ...(isEnvTruthy(process.env.ENABLE_LSP_TOOL) ? [LSPTool] : []),
     ...(isWorktreeModeEnabled() ? [EnterWorktreeTool, ExitWorktreeTool] : []),
     getSendMessageTool(),
-    ...(ListPeersTool ? [ListPeersTool] : []),
     ...(isAgentSwarmsEnabled()
       ? [getTeamCreateTool(), getTeamDeleteTool()]
       : []),
@@ -243,6 +242,9 @@ export function getAllBaseTools(): Tools {
     ...(MonitorTool ? [MonitorTool] : []),
     BriefTool,
     ShowUITool,
+    StartSessionTool,
+    ListSessionsTool,
+    RenameSessionTool,
     ArtifactCheckTool,
     ArtifactCopyTool,
     ChooseDesignTemplateTool,

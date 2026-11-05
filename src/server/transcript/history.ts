@@ -1,3 +1,4 @@
+import { unwrapCrossSessionBody } from '../../utils/crossSessionEnvelope.js'
 import type { MessageEntry } from './entries.js'
 import {
   extractCompactSummary,
@@ -145,12 +146,13 @@ export function interpretTranscript(messages: MessageEntry[], options?: Interpre
   }
 
   const pushUserText = (msg: MessageEntry, text: string, timestamp: number, extra: TranscriptAttachment[] = []) => {
-    const parsed = extractLeadingFileReferences(text)
+    const parsed = extractLeadingFileReferences(msg.origin ? unwrapCrossSessionBody(text, msg.origin) : text)
     const attachments: TranscriptAttachment[] = [...(parsed.attachments ?? []), ...extra]
     items.push({
       id: allocateId(msg.id),
       type: 'user_text',
       content: parsed.content,
+      ...(msg.origin ? { origin: msg.origin } : {}),
       ...(msg.id ? { transcriptMessageId: msg.id } : {}),
       ...(parsed.modelContent ? { modelContent: parsed.modelContent } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),

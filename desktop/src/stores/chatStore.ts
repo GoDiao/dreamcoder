@@ -137,6 +137,8 @@ type ChatStore = {
   setSessionRuntime: (sessionId: string, selection: RuntimeSelection) => void
   setSessionPermissionMode: (sessionId: string, mode: PermissionMode) => void
   stopGeneration: (sessionId: string) => void
+  cancelQueuedMessage: (sessionId: string, id: string) => void
+  sendQueuedNow: (sessionId: string) => void
   loadHistory: (sessionId: string) => Promise<void>
   reloadHistory: (sessionId: string) => Promise<void>
   queueComposerPrefill: (
@@ -154,6 +156,7 @@ type ChatStore = {
   handleServerMessage: (sessionId: string, msg: ServerMessage) => void
 }
 
+const START_SESSION_TOOL = 'StartSession'
 const TASK_TOOL_NAMES = new Set(['TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TodoWrite'])
 const TASK_STOP_TOOL_NAMES = new Set(['TaskStop', 'KillShell'])
 const MAX_MESSAGES = 5000
@@ -167,6 +170,12 @@ function trimMessages(messages: UIMessage[], max: number = MAX_MESSAGES): UIMess
 
 function appendMessage(messages: UIMessage[], msg: UIMessage): UIMessage[] {
   return trimMessages([...messages, msg])
+}
+
+function insertBeforePendingPrompt(messages: UIMessage[], msg: UIMessage): UIMessage[] {
+  const last = messages[messages.length - 1]
+  if (last?.type !== 'user_text' || last.origin) return appendMessage(messages, msg)
+  return trimMessages([...messages.slice(0, -1), msg, last])
 }
 const pendingTaskToolUseIdsBySession = new Map<string, Set<string>>()
 
@@ -183,6 +192,8 @@ function consumePendingTaskToolUseId(sessionId: string, toolUseId: string): bool
   if (ids.size === 0) pendingTaskToolUseIdsBySession.delete(sessionId)
   return true
 }
+
+const pendingStartSessionToolUseIds = new Set<string>()
 
 function clearPendingTaskToolUseIds(sessionId: string): void {
   pendingTaskToolUseIdsBySession.delete(sessionId)
@@ -828,6 +839,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     const messageId = isMemberSession ? undefined : randomUUID()
 
+    const existingSession = get().sessions[sessionId]
+    if (!isMemberSession && existingSession && isTurnRunning(existingSession) && !userFacingContent.startsWith('/')) {
+      wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId })
+      return
+    }
+
     set((s) => {
       const session = s.sessions[sessionId] ?? createDefaultSessionState()
       const bufferedDelta = consumePendingDelta(sessionId)
@@ -894,6 +911,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId })
+  },
+
+  cancelQueuedMessage: (sessionId, id) => {
+    wsManager.send(sessionId, { type: 'cancel_queued_message', id })
+  },
+
+  sendQueuedNow: (sessionId) => {
+    wsManager.send(sessionId, { type: 'send_queued_now' })
   },
 
   respondToPermission: (sessionId, requestId, allowed, options) => {
@@ -1156,15 +1181,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         update((s) => {
           const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
           const base = pendingText.trim() ? appendAssistantTextMessage(s.messages, pendingText, Date.now()) : s.messages
+          const incoming: UIMessage = {
+            id: nextId(),
+            type: 'user_text',
+            content: msg.content,
+            transcriptMessageId: msg.id,
+            ...(msg.origin ? { origin: msg.origin } : {}),
+            timestamp: Date.now(),
+          }
           return {
             streamingText: '',
-            messages: appendMessage(base, {
-              id: nextId(),
-              type: 'user_text',
-              content: msg.content,
-              transcriptMessageId: msg.id,
-              timestamp: Date.now(),
-            }),
+            messages: msg.origin?.kind === 'session' && msg.origin.purpose === 'report'
+              ? insertBeforePendingPrompt(base, incoming)
+              : appendMessage(base, incoming),
           }
         })
         break
@@ -1353,6 +1382,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         } else if (TASK_TOOL_NAMES.has(toolName)) {
           const useId = msg.toolUseId || session?.activeToolUseId
           if (useId) addPendingTaskToolUseId(sessionId, useId)
+        } else if (toolName === START_SESSION_TOOL && toolUseId) {
+          pendingStartSessionToolUseIds.add(toolUseId)
         }
         break
       }
@@ -1384,6 +1415,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         })
         if (consumePendingTaskToolUseId(sessionId, msg.toolUseId)) {
           useCLITaskStore.getState().refreshTasks(sessionId)
+        }
+        if (pendingStartSessionToolUseIds.delete(msg.toolUseId) && !msg.isError) {
+          void useSessionStore.getState().fetchSessions()
         }
         break
       }
@@ -1747,6 +1781,17 @@ function pendingPermissionFromMirror(state: SessionState): PerSessionState['pend
   }
 }
 
+function isTurnRunning(session: PerSessionState): boolean {
+  return session.mirror ? session.mirror.turn.phase !== 'idle' : session.chatState !== 'idle'
+}
+
+function dropQueuedBubbles(messages: UIMessage[], queued: SessionState['queuedMessages']): UIMessage[] {
+  if (!queued.length) return messages
+  const ids = new Set(queued.map((entry) => entry.id))
+  const kept = messages.filter((message) => !(message.type === 'user_text' && message.transcriptMessageId && ids.has(message.transcriptMessageId)))
+  return kept.length === messages.length ? messages : kept
+}
+
 function applyMirror(sessionId: string, next: SessionState): void {
   const session = useChatStore.getState().sessions[sessionId]
   if (!session) return
@@ -1762,7 +1807,7 @@ function applyMirror(sessionId: string, next: SessionState): void {
   useChatStore.setState((store) => {
     const current = store.sessions[sessionId]
     if (!current) return store
-    let messages = current.messages
+    let messages = dropQueuedBubbles(current.messages, next.queuedMessages ?? [])
     let streamingText = current.streamingText
 
     for (const request of openedRequests) {

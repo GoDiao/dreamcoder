@@ -4,12 +4,12 @@
  * that needs Node or the SDK.
  */
 import type { BackgroundTaskEvent, TaskNotification, TaskUsage } from '../transcript/classify.js'
-import type { TranscriptItem } from '../transcript/items.js'
+import type { SessionOrigin, TranscriptItem } from '../transcript/items.js'
 import type { SessionState, SessionStatePatch } from '../session/state/types.js'
 
 export type { BackgroundTaskEvent, TaskNotification, TaskUsage }
 export type { GoalEventAction } from '../transcript/classify.js'
-export type { MemoryEventFile, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
+export type { MemoryEventFile, SessionOrigin, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
 export type {
   ActiveGoal,
   BackgroundTaskSummary,
@@ -18,6 +18,7 @@ export type {
   PendingPermission,
   ProcessDetail,
   ProcessPhase,
+  QueuedMessage,
   RuntimeSelection,
   SessionState,
   SessionStateKey,
@@ -62,6 +63,8 @@ export type ClientMessage =
   | { type: 'set_permission_mode'; mode: PermissionMode }
   | { type: 'set_runtime_config'; providerId: string | null; modelId: string; effort?: string }
   | { type: 'stop_generation' }
+  | { type: 'cancel_queued_message'; id: string }
+  | { type: 'send_queued_now' }
   | { type: 'ping' }
 
 export type AttachmentRef = {
@@ -84,7 +87,7 @@ export type ServerMessage =
   | { type: 'connected'; sessionId: string }
   | { type: 'session_snapshot'; state: SessionState }
   | { type: 'session_patch'; version: number; changes: SessionStatePatch }
-  | { type: 'user_message'; id: string; content: string }
+  | { type: 'user_message'; id: string; content: string; origin?: SessionOrigin }
   | { type: 'message_id'; id: string }
   | { type: 'content_start'; blockType: 'text' | 'tool_use'; toolName?: string; toolUseId?: string; parentToolUseId?: string }
   | { type: 'content_delta'; text?: string; toolInput?: string }

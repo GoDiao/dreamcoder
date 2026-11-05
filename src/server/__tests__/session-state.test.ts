@@ -193,6 +193,109 @@ describe('session state reducer', () => {
     expect(state.turn).toEqual({ phase: 'idle' })
   })
 
+  it('queues reports oldest first and ignores a report queued twice', () => {
+    const first = { id: 'r1', from: { sessionId: 'c1', name: 'worker' }, summary: 'one', createdAt: 1 }
+    const second = { id: 'r2', from: { sessionId: 'c1' }, summary: 'two', createdAt: 2 }
+
+    const state = reduce(
+      createSessionState('s1'),
+      { type: 'report_queued', report: first },
+      { type: 'report_queued', report: second },
+      { type: 'report_queued', report: first },
+    )
+
+    expect(state.pendingReports).toEqual([first, second])
+  })
+
+  it('drops delivered reports and keeps the others', () => {
+    const report = (id: string) => ({ id, from: { sessionId: 'c1' }, summary: id, createdAt: 1 })
+    const queued = reduce(
+      createSessionState('s1'),
+      { type: 'report_queued', report: report('a') },
+      { type: 'report_queued', report: report('b') },
+    )
+
+    const result = reduceSessionState(queued, { type: 'reports_delivered', ids: ['a', 'unknown'] })
+
+    expect(result.state.pendingReports.map((entry) => entry.id)).toEqual(['b'])
+    expect(result.patch).toEqual({ pendingReports: result.state.pendingReports })
+    expect(reduceSessionState(result.state, { type: 'reports_delivered', ids: ['a'] }).patch).toEqual({})
+  })
+
+  it('keeps pending reports when the process ends and drops them when the conversation is cleared', () => {
+    const report = { id: 'a', from: { sessionId: 'c1' }, summary: 'a', createdAt: 1 }
+    const queued = reduce(createSessionState('s1'), { type: 'report_queued', report })
+
+    const stopped = reduce(queued, { type: 'process_phase_changed', phase: 'stopped', generation: 0 })
+    const cleared = reduce(queued, { type: 'conversation_cleared' })
+
+    expect(stopped.pendingReports).toEqual([report])
+    expect(cleared.pendingReports).toEqual([])
+  })
+
+  it('queues messages oldest first and ignores one queued twice', () => {
+    const first = { id: 'q1', content: 'one', attachmentCount: 0, createdAt: 1 }
+    const second = { id: 'q2', content: 'two', attachmentCount: 1, createdAt: 2 }
+
+    const state = reduce(
+      createSessionState('s1'),
+      { type: 'message_queued', message: first },
+      { type: 'message_queued', message: second },
+      { type: 'message_queued', message: first },
+    )
+
+    expect(state.queuedMessages).toEqual([first, second])
+  })
+
+  it('starts a turn when a queued message starts on an idle session and only removes it on a running one', () => {
+    const message = { id: 'q1', content: 'one', attachmentCount: 0, createdAt: 1 }
+    const queued = reduce(createSessionState('s1'), { type: 'message_queued', message })
+
+    const idle = reduce(queued, { type: 'queued_message_started', id: 'q1', at: 9 })
+    const running = reduce(
+      reduce(queued, { type: 'turn_started', at: 5 }),
+      { type: 'queued_message_started', id: 'q1', at: 9 },
+    )
+
+    expect(idle.queuedMessages).toEqual([])
+    expect(idle.turn).toEqual({ phase: 'running', startedAt: 9, activity: 'thinking' })
+    expect(running.queuedMessages).toEqual([])
+    expect(running.turn.startedAt).toBe(5)
+    expect(reduceSessionState(idle, { type: 'queued_message_started', id: 'q1', at: 10 }).patch).toEqual({})
+  })
+
+  it('drops a cancelled queued message and clears the queue with the process and the conversation', () => {
+    const message = (id: string) => ({ id, content: id, attachmentCount: 0, createdAt: 1 })
+    const queued = reduce(
+      createSessionState('s1'),
+      { type: 'message_queued', message: message('a') },
+      { type: 'message_queued', message: message('b') },
+    )
+
+    expect(reduce(queued, { type: 'queued_message_cancelled', id: 'a' }).queuedMessages.map((entry) => entry.id)).toEqual(['b'])
+    expect(reduceSessionState(queued, { type: 'queued_message_cancelled', id: 'zzz' }).patch).toEqual({})
+    expect(reduce(queued, { type: 'process_phase_changed', phase: 'stopped', generation: 0 }).queuedMessages).toEqual([])
+    expect(reduce(queued, { type: 'process_phase_changed', phase: 'starting', generation: 0 }).queuedMessages).toEqual([])
+    expect(reduce(queued, { type: 'conversation_cleared' }).queuedMessages).toEqual([])
+  })
+
+  it('restores pending reports from the persisted fields', () => {
+    const report = { id: 'a', from: { sessionId: 'c1' }, summary: 'a', createdAt: 1 }
+    const state = reduce(createSessionState('s1'), {
+      type: 'restored',
+      fields: {
+        permissionMode: 'default',
+        runtime: null,
+        title: { text: null, source: null },
+        workspace: { workDir: '/repo', projectRoot: null, workDirExists: true },
+        uiPages: [],
+        pendingReports: [report],
+      },
+    })
+
+    expect(state.pendingReports).toEqual([report])
+  })
+
   it('tracks the active goal from goal events', () => {
     const state = reduce(
       createSessionState('s1'),
@@ -239,6 +342,7 @@ describe('session state store', () => {
     title: { text: 'Saved', source: 'custom' as const },
     workspace: { workDir: '/repo', projectRoot: '/repo', workDirExists: true },
     uiPages: [],
+    pendingReports: [],
   }
 
   it('restores persisted fields once and tells subscribers', async () => {

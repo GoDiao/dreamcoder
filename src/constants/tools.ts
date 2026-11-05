@@ -6,6 +6,8 @@ import { ENTER_PLAN_MODE_TOOL_NAME } from '../tools/EnterPlanModeTool/constants.
 import { AGENT_TOOL_NAME } from '../tools/AgentTool/constants.js'
 import { ASK_USER_QUESTION_TOOL_NAME } from '../tools/AskUserQuestionTool/prompt.js'
 import { CHOOSE_DESIGN_TEMPLATE_TOOL_NAME } from '../tools/ChooseDesignTemplateTool/constants.js'
+import { RENAME_SESSION_TOOL_NAME } from '../tools/RenameSessionTool/constants.js'
+import { START_SESSION_TOOL_NAME } from '../tools/StartSessionTool/constants.js'
 import { ARTIFACT_CHECK_TOOL_NAME } from '../tools/ArtifactCheckTool/constants.js'
 import { USE_DESIGN_SYSTEM_TOOL_NAME } from '../tools/UseDesignSystemTool/constants.js'
 import { TASK_STOP_TOOL_NAME } from '../tools/TaskStopTool/prompt.js'
@@ -45,6 +47,8 @@ export const ALL_AGENT_DISALLOWED_TOOLS = new Set([
   ASK_USER_QUESTION_TOOL_NAME,
   CHOOSE_DESIGN_TEMPLATE_TOOL_NAME,
   USE_DESIGN_SYSTEM_TOOL_NAME,
+  START_SESSION_TOOL_NAME,
+  RENAME_SESSION_TOOL_NAME,
   TASK_STOP_TOOL_NAME,
   // Prevent recursive workflow execution inside subagents.
   ...(feature('WORKFLOW_SCRIPTS') ? [WORKFLOW_TOOL_NAME] : []),

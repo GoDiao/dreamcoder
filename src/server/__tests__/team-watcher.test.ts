@@ -333,8 +333,6 @@ describe('TeamWatcher delivery', () => {
         channel: 'client',
         clientKind: 'desktop',
         sdkToken: null,
-        serverPort: 0,
-        serverHost: '127.0.0.1',
       },
       send: (payload: string) => {
         sent.push(JSON.parse(payload))

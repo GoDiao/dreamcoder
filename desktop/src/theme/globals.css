@@ -1600,7 +1600,7 @@ html, body, #root {
 .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; }
 .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
-/* UI refresh (docs/ui/design-log.zh.md): warm grey palette for the light and
+/* UI refresh (docs/features/ui-refresh/design-log.zh.md): warm grey palette for the light and
    dark themes, plus a font-size scale. Later blocks win over the theme blocks
    above because they share the same selectors. */
 @theme {

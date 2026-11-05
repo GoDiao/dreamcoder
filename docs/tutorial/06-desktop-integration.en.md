@@ -249,4 +249,4 @@ The current [README](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c3
 - Clients connect to the Sidecar over `/ws/:sessionId` and the CLI over `/sdk/:sessionId`; before the CLI connects back, input is held in `pendingOutbound`, and after it connects back and the token is verified, the input is sent in order.
 - Further reading: OpenAI-format providers go through the Sidecar's `/proxy/` for protocol conversion, and call IDs stay unchanged; H5 on a phone accesses the same desktop service and session, so the desktop must stay running.
 
-This is the end of the series. To modify or extend DreamCoder, start with the [contribution guide](https://github.com/GoDiao/dreamcoder/blob/main/docs/CONTRIBUTING_en.md); to report a problem or make a suggestion, submit it to [issues](https://github.com/GoDiao/dreamcoder/issues).
+This is the end of the series. To modify or extend DreamCoder, start with the [contribution guide](https://github.com/GoDiao/dreamcoder/blob/main/docs/general/CONTRIBUTING_en.md); to report a problem or make a suggestion, submit it to [issues](https://github.com/GoDiao/dreamcoder/issues).

@@ -9,8 +9,15 @@ import type {
 } from '../types/logs.js'
 import type { ContentReplacementRecord } from './toolResultStorage.js'
 import { parseJSONL } from './json.js'
+import { queuedCommandSourceUuid } from './queuedCommandEntry.js'
+import {
+  createAssistantMessage,
+  createUserMessage,
+  NO_RESPONSE_REQUESTED,
+} from './messages.js'
 import { buildConversationChain, loadTranscriptFile } from './sessionStorage.js'
 import { jsonStringify } from './slowOperations.js'
+import { sanitizePath } from './sessionStoragePortable.js'
 import { escapeRegExp } from './stringUtils.js'
 
 type SessionMetaEntry = {
@@ -98,6 +105,10 @@ export type CreateSessionBranchOptions = {
   sourceWorkDir?: string | null
   sourceRepository?: unknown
   sourceWorktreeSession?: PersistedWorktreeSession | null
+  parentKind?: 'forked' | 'spawned'
+  sessionId?: UUID
+  workspace?: { workDir: string; repository: unknown }
+  openToolUseResult?: string
 }
 
 export class SessionBranchingError extends Error {
@@ -196,6 +207,32 @@ function extractToolResultIds(message: TranscriptMessage): string[] {
   ))
 }
 
+function findOpenToolUseIds(messages: TranscriptMessage[]): string[] {
+  const resolved = new Set(messages.flatMap(extractToolResultIds))
+  return messages.flatMap((message) => (
+    message.type === 'assistant' && Array.isArray(message.message.content)
+      ? message.message.content.flatMap((block) => (
+        block.type === 'tool_use' && !resolved.has(block.id) ? [block.id] : []
+      ))
+      : []
+  ))
+}
+
+function closeOpenToolUses(messages: TranscriptMessage[], result: string) {
+  const openToolUseIds = findOpenToolUseIds(messages)
+  if (openToolUseIds.length === 0) return []
+  return [
+    createUserMessage({
+      content: openToolUseIds.map((id) => ({
+        type: 'tool_result' as const,
+        tool_use_id: id,
+        content: result,
+      })),
+    }),
+    createAssistantMessage({ content: NO_RESPONSE_REQUESTED }),
+  ]
+}
+
 async function readRawEntries(filePath: string): Promise<RawEntry[]> {
   const content = await readFile(filePath)
   return parseJSONL<RawEntry>(content)
@@ -287,10 +324,17 @@ function buildPreservedMetadataEntries(
   sourceEntries: RawEntry[],
   copiedMessageIds: Set<string>,
   forkSessionId: UUID,
+  ownWorkspace: boolean,
 ): RawEntry[] {
   return sourceEntries.flatMap((entry) => {
     if (isSessionMetaEntry(entry)) {
-      return [entry]
+      const inherited: SessionMetaEntry = { ...entry }
+      delete inherited.parent
+      return [inherited]
+    }
+
+    if (isWorktreeStateEntry(entry) && ownWorkspace) {
+      return []
     }
 
     if (isWorktreeStateEntry(entry) && entry.worktreeSession) {
@@ -345,6 +389,24 @@ function ensureSyntheticSessionMeta(
   }, ...preservedMetadataEntries]
 }
 
+function withForkRelation(
+  metadataEntries: RawEntry[],
+  relation: Record<string, unknown>,
+): RawEntry[] {
+  const metaIndex = metadataEntries.findLastIndex(isSessionMetaEntry)
+  if (metaIndex < 0) {
+    return [{
+      type: 'session-meta',
+      isMeta: true,
+      ...relation,
+      timestamp: new Date().toISOString(),
+    }, ...metadataEntries]
+  }
+  return metadataEntries.map((entry, index) =>
+    index === metaIndex ? { ...entry, ...relation } : entry,
+  )
+}
+
 function ensureSyntheticWorktreeState(
   preservedMetadataEntries: RawEntry[],
   forkSessionId: UUID,
@@ -376,9 +438,15 @@ export async function createSessionBranch(
     sourceWorkDir,
     sourceRepository,
     sourceWorktreeSession,
+    parentKind = 'forked',
+    workspace,
+    openToolUseResult,
   } = options
 
-  const projectDirPath = path.dirname(sourceTranscriptPath)
+  const sourceProjectDirPath = path.dirname(sourceTranscriptPath)
+  const projectDirPath = workspace
+    ? path.join(path.dirname(sourceProjectDirPath), sanitizePath(workspace.workDir))
+    : sourceProjectDirPath
   const sourceEntries = await readRawEntries(sourceTranscriptPath).catch((error) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new SessionBranchingError(
@@ -411,7 +479,9 @@ export async function createSessionBranch(
   }
 
   const targetIndex = targetMessageId
-    ? activeChain.findIndex((message) => message.uuid === targetMessageId)
+    ? activeChain.findIndex((message) => (
+      message.uuid === targetMessageId || queuedCommandSourceUuid(message) === targetMessageId
+    ))
     : activeChain.length - 1
 
   if (targetIndex < 0) {
@@ -459,7 +529,7 @@ export async function createSessionBranch(
     transcript.contentReplacements.get(sourceSessionId as UUID) ?? []
   ).filter((record) => copiedToolResultIds.has(record.toolUseId))
 
-  const forkSessionId = randomUUID() as UUID
+  const forkSessionId = options.sessionId ?? (randomUUID() as UUID)
   const forkPath = path.join(projectDirPath, `${forkSessionId}.jsonl`)
   await mkdir(projectDirPath, { recursive: true, mode: 0o700 })
 
@@ -473,6 +543,7 @@ export async function createSessionBranch(
       sessionId: forkSessionId,
       parentUuid,
       isSidechain: false,
+      ...(workspace && typeof entry.cwd === 'string' ? { cwd: workspace.workDir } : {}),
       forkedFrom: {
         sessionId: sourceSessionId,
         messageUuid: entry.uuid,
@@ -487,6 +558,24 @@ export async function createSessionBranch(
     parentUuid = entry.uuid
   }
 
+  const lastEntry = branchMessageEntries[branchMessageEntries.length - 1]!
+  const closingMessages = openToolUseResult
+    ? closeOpenToolUses(branchMessageEntries, openToolUseResult)
+    : []
+  for (const message of closingMessages) {
+    const closingMessage: SerializedMessage = {
+      ...message,
+      sessionId: forkSessionId,
+      cwd: workspace?.workDir ?? lastEntry.cwd,
+      userType: lastEntry.userType,
+      version: lastEntry.version,
+      gitBranch: lastEntry.gitBranch,
+    }
+    serializedMessages.push(closingMessage)
+    messageLines.push(jsonStringify({ ...closingMessage, parentUuid, isSidechain: false }))
+    parentUuid = closingMessage.uuid
+  }
+
   const firstPrompt = deriveFirstPrompt(
     serializedMessages.find(
       (message): message is Extract<SerializedMessage, { type: 'user' }> =>
@@ -499,17 +588,24 @@ export async function createSessionBranch(
     sourceEntries,
     copiedMessageIds,
     forkSessionId,
+    !!workspace,
   )
   metadataEntries = ensureSyntheticSessionMeta(
     metadataEntries,
     sourceWorkDir ?? null,
     sourceRepository,
   )
-  metadataEntries = ensureSyntheticWorktreeState(
-    metadataEntries,
-    forkSessionId,
-    sourceWorktreeSession,
-  )
+  if (!workspace) {
+    metadataEntries = ensureSyntheticWorktreeState(
+      metadataEntries,
+      forkSessionId,
+      sourceWorktreeSession,
+    )
+  }
+  metadataEntries = withForkRelation(metadataEntries, {
+    parent: { sessionId: sourceSessionId, kind: parentKind },
+    ...(workspace ? { workDir: workspace.workDir, repository: workspace.repository } : {}),
+  })
 
   const lines = [
     ...metadataEntries.map((entry) => jsonStringify(entry)),

@@ -24,6 +24,7 @@ export async function restoreSessionFields(sessionId: string): Promise<RestoredS
       workDirExists: info?.workDirExists ?? false,
     },
     uiPages,
+    pendingReports: info?.pendingReports ?? [],
   }
 }
 

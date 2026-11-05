@@ -24,6 +24,8 @@ function mirror(turn: SessionState['turn']): SessionState {
     activeGoal: null,
     backgroundTasks: [],
     uiPages: [],
+    pendingReports: [],
+    queuedMessages: [],
     team: null,
     clientCount: 1,
   }

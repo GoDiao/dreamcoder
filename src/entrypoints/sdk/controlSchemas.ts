@@ -587,6 +587,121 @@ export const SDKControlElicitationResponseSchema = lazySchema(() =>
     .describe('Response from the SDK consumer for an elicitation request.'),
 )
 
+export const SDKControlSessionStartRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('session_start'),
+      prompt: z.string(),
+      title: z.string(),
+      context: z.enum(['fresh', 'fork']),
+      worktree: z.boolean(),
+    })
+    .describe('Asks the host to start a new session that begins with the given prompt.'),
+)
+
+export const SDKControlSessionStartResponseSchema = lazySchema(() =>
+  z
+    .object({
+      sessionId: z.string(),
+      title: z.string(),
+    })
+    .describe('Response from the host for a session_start request.'),
+)
+
+export const SDKControlSessionSendRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('session_send'),
+      to: z.string(),
+      message: z.string(),
+      summary: z.string(),
+      mode: z.enum(['message', 'report']).optional(),
+    })
+    .describe('Asks the host to deliver a message to another session by session id.'),
+)
+
+export const SDKControlSessionSendResponseSchema = lazySchema(() =>
+  z
+    .object({
+      delivered: z.boolean(),
+      error: z.string().optional(),
+    })
+    .describe('Response from the host for a session_send request.'),
+)
+
+export const SDKControlSessionListRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('session_list'),
+      project: z.string().optional(),
+    })
+    .describe('Asks the host for the sessions this session can message.'),
+)
+
+export const SDKControlSessionRenameRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('session_rename'),
+      title: z.string(),
+    })
+    .describe('Asks the host to change the title of the calling session.'),
+)
+
+export const SDKControlSessionRenameResponseSchema = lazySchema(() =>
+  z
+    .object({
+      title: z.string(),
+    })
+    .describe('Response from the host for a session_rename request.'),
+)
+
+export const SDKSessionListEntrySchema = lazySchema(() =>
+  z.object({
+    sessionId: z.string(),
+    title: z.string(),
+    project: z.string(),
+    parentSessionId: z.string().optional(),
+    relation: z.enum(['parent', 'child', 'self', 'none']),
+    running: z.boolean(),
+  }),
+)
+
+export const SDKControlSessionListResponseSchema = lazySchema(() =>
+  z
+    .object({
+      sessions: z.array(SDKSessionListEntrySchema()),
+    })
+    .describe('Response from the host for a session_list request.'),
+)
+
+export type SDKControlSessionStartRequest = z.infer<
+  ReturnType<typeof SDKControlSessionStartRequestSchema>
+>
+export type SDKControlSessionStartResponse = z.infer<
+  ReturnType<typeof SDKControlSessionStartResponseSchema>
+>
+export type SDKControlSessionSendRequest = z.infer<
+  ReturnType<typeof SDKControlSessionSendRequestSchema>
+>
+export type SDKControlSessionSendResponse = z.infer<
+  ReturnType<typeof SDKControlSessionSendResponseSchema>
+>
+export type SDKControlSessionRenameRequest = z.infer<
+  ReturnType<typeof SDKControlSessionRenameRequestSchema>
+>
+export type SDKControlSessionRenameResponse = z.infer<
+  ReturnType<typeof SDKControlSessionRenameResponseSchema>
+>
+export type SDKControlSessionListRequest = z.infer<
+  ReturnType<typeof SDKControlSessionListRequestSchema>
+>
+export type SDKControlSessionListResponse = z.infer<
+  ReturnType<typeof SDKControlSessionListResponseSchema>
+>
+export type SDKSessionListEntry = z.infer<
+  ReturnType<typeof SDKSessionListEntrySchema>
+>
+
 
 // ============================================================================
 // Control Request/Response Wrappers
@@ -616,6 +731,10 @@ export const SDKControlRequestInnerSchema = lazySchema(() =>
     SDKControlApplyFlagSettingsRequestSchema(),
     SDKControlGetSettingsRequestSchema(),
     SDKControlElicitationRequestSchema(),
+    SDKControlSessionStartRequestSchema(),
+    SDKControlSessionSendRequestSchema(),
+    SDKControlSessionListRequestSchema(),
+    SDKControlSessionRenameRequestSchema(),
   ]),
 )
 

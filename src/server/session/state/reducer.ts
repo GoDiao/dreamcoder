@@ -25,6 +25,8 @@ export function createSessionState(id: string): SessionState {
     activeGoal: null,
     backgroundTasks: [],
     uiPages: [],
+    pendingReports: [],
+    queuedMessages: [],
     team: null,
     clientCount: 0,
   }
@@ -58,6 +60,7 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
         title: event.fields.title,
         workspace: event.fields.workspace,
         uiPages: event.fields.uiPages.reduce(upsertUiPage, state.uiPages),
+        pendingReports: event.fields.pendingReports,
       }
 
     case 'permission_desired_changed': {
@@ -195,6 +198,39 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
     case 'ui_page_reported':
       return { ...state, uiPages: upsertUiPage(state.uiPages, event.page) }
 
+    case 'report_queued':
+      if (state.pendingReports.some((report) => report.id === event.report.id)) return state
+      return { ...state, pendingReports: [...state.pendingReports, event.report] }
+
+    case 'reports_delivered': {
+      const ids = new Set(event.ids)
+      const pendingReports = state.pendingReports.filter((report) => !ids.has(report.id))
+      if (pendingReports.length === state.pendingReports.length) return state
+      return { ...state, pendingReports }
+    }
+
+    case 'message_queued':
+      if (state.queuedMessages.some((message) => message.id === event.message.id)) return state
+      return { ...state, queuedMessages: [...state.queuedMessages, event.message] }
+
+    case 'queued_message_started': {
+      const queuedMessages = state.queuedMessages.filter((message) => message.id !== event.id)
+      if (queuedMessages.length === state.queuedMessages.length) return state
+      return {
+        ...state,
+        queuedMessages,
+        turn: state.turn.phase === 'idle'
+          ? { phase: 'running', startedAt: event.at, activity: 'thinking' }
+          : state.turn,
+      }
+    }
+
+    case 'queued_message_cancelled': {
+      const queuedMessages = state.queuedMessages.filter((message) => message.id !== event.id)
+      if (queuedMessages.length === state.queuedMessages.length) return state
+      return { ...state, queuedMessages }
+    }
+
     case 'team_changed':
       return { ...state, team: event.team }
 
@@ -211,6 +247,8 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
         slashCommands: [],
         activeGoal: null,
         backgroundTasks: [],
+        pendingReports: [],
+        queuedMessages: [],
       }
   }
 }
@@ -246,6 +284,7 @@ function applyProcessPhase(
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    queuedMessages: [],
   }
 }
 

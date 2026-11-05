@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for coding agents (and humans) working on DreamCoder. Setup, build order and the contribution flow are in [docs/CONTRIBUTING_en.md](docs/CONTRIBUTING_en.md); this file covers what is easy to get wrong.
+Guidance for coding agents (and humans) working on DreamCoder. Setup, build order and the contribution flow are in [docs/general/CONTRIBUTING_en.md](docs/general/CONTRIBUTING_en.md); this file covers what is easy to get wrong.
 
 ## Project layout
 
@@ -8,7 +8,8 @@ Guidance for coding agents (and humans) working on DreamCoder. Setup, build orde
 - `desktop/electron`: the Electron main process and preload. The page reaches it only through `desktop/src/lib/shell`.
 - `src/server`: the Bun server that runs as the app's sidecar. It starts one CLI process per session.
 - `src`: the CLI, derived from Claude Code. The app drives it in `--print` stream-json mode.
-- Session state lives on the server. The desktop app and the H5 page mirror it. New session state belongs in the server state store, not only in a client store. See [docs/session-state-tech-design.md](docs/session-state-tech-design.md).
+- `docs`: project-wide documents in `docs/general`, and one folder per feature in `docs/features/<feature>` for its technical design and related documents. A new feature's design goes in its own folder there. See [docs/README.md](docs/README.md).
+- Session state lives on the server. The desktop app and the H5 page mirror it. New session state belongs in the server state store, not only in a client store. See [docs/features/session-state/tech-design.md](docs/features/session-state/tech-design.md).
 
 ## Checks
 

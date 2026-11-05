@@ -1,5 +1,5 @@
-import { useChatStore } from '../stores/chatStore'
 import { useSessionStore } from '../stores/sessionStore'
+import { openSessionTab } from './sessionNavigation'
 import { SCHEDULED_TAB_ID, useTabStore } from '../stores/tabStore'
 import {
   installDesktopNotificationClickListener,
@@ -19,8 +19,7 @@ export function openDesktopNotificationTarget(target: DesktopNotificationTarget)
     .sessions
     .find((session) => session.id === target.sessionId)
     ?.title
-  useTabStore.getState().openTab(target.sessionId, target.title || knownTitle || 'Session', 'session')
-  useChatStore.getState().connectToSession(target.sessionId)
+  openSessionTab(target.sessionId, target.title || knownTitle || 'Session')
 }
 
 export function installDesktopNotificationNavigation(): Promise<() => void> {

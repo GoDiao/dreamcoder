@@ -1,5 +1,6 @@
 import { MenuIcon, XIcon } from 'lucide-react'
 import { usePanelWidthPersistence } from '../../hooks/usePanelWidthPersistence'
+import { relativeTimeLabel } from '../../lib/relativeTime'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../shared/ui/resizable'
 import { useEffect, useRef, useState, type HTMLAttributes } from 'react'
 import { onMenuNavigate } from '../../lib/shell'
@@ -77,10 +78,7 @@ export function AppShell() {
   const mobileSessionUpdated = (() => {
     if (!activeSession?.modifiedAt) return ''
     const diff = Date.now() - new Date(activeSession.modifiedAt).getTime()
-    if (diff < 60000) return t('session.timeJustNow')
-    if (diff < 3600000) return t('session.timeMinutes', { n: Math.floor(diff / 60000) })
-    if (diff < 86400000) return t('session.timeHours', { n: Math.floor(diff / 3600000) })
-    return t('session.timeDays', { n: Math.floor(diff / 86400000) })
+    return relativeTimeLabel(t, diff)
   })()
   const settingsOpen = useUIStore((s) => s.settingsOpen)
   const { panelRef: sidebarPanelRef, onLayoutChanged } = usePanelWidthPersistence(setSidebarWidth, effectiveSidebarOpen && !isMobileShell && !settingsOpen)

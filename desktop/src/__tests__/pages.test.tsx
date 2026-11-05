@@ -117,6 +117,8 @@ function runtimeMirror(selection: RuntimeSelection): SessionState {
     activeGoal: null,
     backgroundTasks: [],
     uiPages: [],
+    pendingReports: [],
+    queuedMessages: [],
     team: null,
     clientCount: 1,
   } satisfies SessionState

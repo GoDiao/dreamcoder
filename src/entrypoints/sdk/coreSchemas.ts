@@ -1269,6 +1269,30 @@ export const SDKStatusSchema = lazySchema(() =>
   z.union([z.literal('compacting'), z.null()]),
 )
 
+export const SDKSessionOriginSchema = lazySchema(() =>
+  z.object({
+    kind: z.literal('session'),
+    sessionId: z.string(),
+    name: z.string().optional(),
+    purpose: z.enum(['message', 'brief', 'report']),
+    summary: z.string().optional(),
+  }),
+)
+
+export const SDKSessionReportSchema = lazySchema(() =>
+  z.object({
+    id: z.string(),
+    message: z.string(),
+    origin: SDKSessionOriginSchema(),
+  }),
+)
+
+export type SessionReport = z.infer<ReturnType<typeof SDKSessionReportSchema>>
+
+export type SessionOrigin = z.infer<
+  ReturnType<typeof SDKSessionOriginSchema>
+>
+
 // SDKUserMessage content without uuid/session_id
 const SDKUserMessageContentSchema = lazySchema(() =>
   z.object({
@@ -1278,6 +1302,8 @@ const SDKUserMessageContentSchema = lazySchema(() =>
     isSynthetic: z.boolean().optional(),
     tool_use_result: z.unknown().optional(),
     priority: z.enum(['now', 'next', 'later']).optional(),
+    origin: SDKSessionOriginSchema().optional(),
+    reports: z.array(SDKSessionReportSchema()).optional(),
     timestamp: z
       .string()
       .optional()
