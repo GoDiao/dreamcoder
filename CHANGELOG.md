@@ -4,10 +4,20 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions can start other sessions and message each other.** The agent can start a new session with `StartSession`, either fresh with a brief or as a fork of its own conversation, optionally in a new git worktree; you approve every new session, whatever the permission mode. Any session can message any other with `SendMessage`, across projects: a message wakes the receiver, and a progress report from a child to its parent waits for the parent's next turn instead of interrupting it (a parent that is already working sees it right away). Reports waiting for the parent are listed above its message box. The server stamps who sent each message, so a session cannot pass itself off as you or as another session. `ListSessions` lists sessions, and `RenameSession` lets the agent rename its own session (#239).
+- **Sessions are nested in the sidebar.** Sessions the agent started, and conversations you forked, appear under the session they came from, with an icon for each kind and a count that collapses or expands them. Messages from another session appear in the conversation as a one-line row with the sender, which expands to the full text (#239).
+
+### Changed
+
+- **A message you send while the agent is working waits for the next turn.** It used to be slipped into the running turn. Queued messages are listed above the message box, where you can withdraw one or send the queue now, which stops the current turn and starts the next one; Stop does the same while messages are queued. Queued messages survive a model or permission change that restarts the agent at the end of the turn (#239).
+
 ### Fixed
 
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.
 - Images attached from uploads, paste or the built-in browser are kept unchanged within the client limits and resized or compressed when they exceed 2000×2000 pixels or 3.75 MB; a re-encoded image is named after its new type. An image the app cannot decode is attached as it is when it is within 3.75 MB. A file that cannot be attached is named in a message, and the other files picked or dropped with it are still attached. Sent images now use compact thumbnails that still open in the gallery (#218). Thanks @henricop.
+- Messages that reach a session in the middle of a turn are saved with the conversation. They used to disappear when the history was reloaded, and the agent forgot them when the session was resumed (#239).
 - A lead session that is resumed after a restart keeps using its team's task list (#216). The lead looked for tasks in a list named after its session, so `TaskList` returned nothing and new tasks went to a different list than the one the teammates read. The lead now goes back to the team it created when the session is resumed. Thanks @WhitePepperLambSoup.
 
 ## [0.8.0] — 2026-11-01

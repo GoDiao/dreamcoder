@@ -2,6 +2,7 @@ import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs
 import type { UUID } from 'crypto'
 import type React from 'react'
 import type { PermissionResult } from '../entrypoints/agentSdkTypes.js'
+import type { SessionReport } from '../entrypoints/sdk/coreSchemas.js'
 import type { Key } from '../ink.js'
 import type { PastedContent } from '../utils/config.js'
 import type { ImageDimensions } from '../utils/imageResizer.js'
@@ -339,6 +340,7 @@ export type QueuedCommand = {
    * undefined = human (keyboard).
    */
   origin?: MessageOrigin
+  reports?: SessionReport[]
   /**
    * Workload tag threaded through to cc_workload= in the billing-header
    * attribution block. The queue is the async boundary between the cron

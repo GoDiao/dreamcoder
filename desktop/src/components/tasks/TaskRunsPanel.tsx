@@ -2,8 +2,7 @@ import { CircleAlertIcon, CircleCheckIcon, ExternalLinkIcon, RefreshCwIcon, Time
 import { LoadingBlock } from '../shared/LoadingBlock'
 import { useEffect, useState } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
-import { useChatStore } from '../../stores/chatStore'
-import { useTabStore } from '../../stores/tabStore'
+import { openSessionTab } from '../../lib/sessionNavigation'
 import { useTranslation } from '../../i18n'
 import { parseRunOutput } from '../../lib/parseRunOutput'
 import type { TaskRun } from '../../types/task'
@@ -57,16 +56,9 @@ const STATUS_CONFIG: Record<string, { icon: LucideIcon; color: string }> = {
 export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
   const t = useTranslation()
   const { fetchTaskRuns } = useTaskStore()
-  const connectToSession = useChatStore((s) => s.connectToSession)
-  const openTab = useTabStore((s) => s.openTab)
   const [runs, setRuns] = useState<TaskRun[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  const openSession = (sessionId: string, taskName?: string) => {
-    openTab(sessionId, taskName || 'Task Run')
-    connectToSession(sessionId)
-  }
 
   const refresh = () => {
     fetchTaskRuns(taskId).then((r) => {
@@ -147,7 +139,7 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                     <div className="ml-auto flex items-center gap-2">
                       {run.sessionId && run.status !== 'running' && (
                         <button
-                          onClick={() => openSession(run.sessionId!, run.taskName)}
+                          onClick={() => openSessionTab(run.sessionId!, run.taskName || 'Task Run')}
                           className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[var(--color-brand)] bg-[var(--color-brand)]/8 hover:bg-[var(--color-brand)]/15 rounded-sm transition-colors"
                         >
                           <ExternalLinkIcon aria-hidden="true" size={14} />

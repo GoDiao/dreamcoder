@@ -22,6 +22,7 @@ const {
   updateTabTitleMock,
   updateTabStatusMock,
   updateSessionTitleMock,
+  fetchSessionsMock,
   sessionStoreSnapshot,
   cliTaskStoreSnapshot,
 } = vi.hoisted(() => ({
@@ -42,6 +43,7 @@ const {
   updateTabTitleMock: vi.fn(),
   updateTabStatusMock: vi.fn(),
   updateSessionTitleMock: vi.fn(),
+  fetchSessionsMock: vi.fn(async () => {}),
   sessionStoreSnapshot: {
     sessions: [] as Array<{
       id: string
@@ -116,6 +118,7 @@ vi.mock('./sessionStore', () => ({
     getState: () => ({
       sessions: sessionStoreSnapshot.sessions,
       updateSessionTitle: updateSessionTitleMock,
+      fetchSessions: fetchSessionsMock,
     }),
   },
 }))
@@ -187,6 +190,8 @@ function mirrorState(overrides: Partial<SessionState> = {}): SessionState {
     activeGoal: null,
     backgroundTasks: [],
     uiPages: [],
+    pendingReports: [],
+    queuedMessages: [],
     team: null,
     clientCount: 1,
     ...overrides,
@@ -567,6 +572,114 @@ describe('chatStore history mapping', () => {
       { content: 'from desktop', transcriptMessageId: ownId },
       { content: 'from phone', transcriptMessageId: 'phone-1' },
     ])
+  })
+
+  it('sends a message into a running turn without touching it and keeps no bubble', () => {
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: makeSession({
+          chatState: 'streaming',
+          streamingText: 'partial reply',
+          messages: [{ id: 'm1', type: 'user_text', content: 'first', timestamp: 1 }],
+        }),
+      },
+    })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'second')
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]!
+    expect(session.chatState).toBe('streaming')
+    expect(session.streamingText).toBe('partial reply')
+    expect(session.messages).toHaveLength(1)
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, expect.objectContaining({
+      type: 'user_message',
+      content: 'second',
+      id: expect.any(String),
+    }))
+  })
+
+  it('leaves the title and the finished task list alone when a message waits for the running turn', () => {
+    sessionStoreSnapshot.sessions = [{
+      id: TEST_SESSION_ID,
+      title: 'New Session',
+      createdAt: '2026-11-06T00:00:00Z',
+      modifiedAt: '2026-11-06T00:00:00Z',
+      messageCount: 0,
+      projectPath: '/repo',
+      workDir: '/repo',
+      workDirExists: true,
+    }]
+    cliTaskStoreSnapshot.sessionId = TEST_SESSION_ID
+    cliTaskStoreSnapshot.tasks = [{ id: '1', subject: 'Done', status: 'completed' }]
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'Rename the module next')
+
+    expect(updateSessionTitleMock).not.toHaveBeenCalled()
+    expect(updateTabTitleMock).not.toHaveBeenCalled()
+    expect(resetCompletedTasksMock).not.toHaveBeenCalled()
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toHaveLength(0)
+  })
+
+  it('shows a slash command sent during a running turn right away', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, '/compact')
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: '/compact' },
+    ])
+  })
+
+  it('sends to a team member during its running turn instead of queueing', () => {
+    getMemberBySessionIdMock.mockReturnValue({ agentId: 'reviewer@team', role: 'reviewer', status: 'running' })
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'also check the tests')
+
+    expect(sendMessageToMemberMock).toHaveBeenCalledWith(TEST_SESSION_ID, 'also check the tests')
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: 'also check the tests', pending: true },
+    ])
+  })
+
+  it('treats the session as idle when the server says so, even if the local state still streams', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
+    sendSnapshot(mirrorState({ turn: { phase: 'idle' } }))
+    useChatStore.setState((state) => ({
+      sessions: { ...state.sessions, [TEST_SESSION_ID]: { ...state.sessions[TEST_SESSION_ID]!, chatState: 'streaming' } },
+    }))
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'next step')
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]!
+    expect(session.messages).toMatchObject([{ type: 'user_text', content: 'next step' }])
+    expect(session.chatState).toBe('thinking')
+  })
+
+  it('removes the optimistic bubble of a message the server queued, and appends it when the turn starts it', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
+    sendSnapshot(mirrorState({ version: 1 }))
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'later')
+    const bubble = useChatStore.getState().sessions[TEST_SESSION_ID]!.messages[0] as Extract<UIMessage, { type: 'user_text' }>
+    const id = bubble.transcriptMessageId!
+
+    sendPatch(2, { queuedMessages: [{ id, content: 'later', attachmentCount: 0, createdAt: 1 }] })
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toHaveLength(0)
+
+    sendPatch(3, { queuedMessages: [] })
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id, content: 'later' })
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: 'later', transcriptMessageId: id },
+    ])
+  })
+
+  it('sends withdraw and send-now requests for the session', () => {
+    useChatStore.getState().cancelQueuedMessage(TEST_SESSION_ID, 'q1')
+    useChatStore.getState().sendQueuedNow(TEST_SESSION_ID)
+
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, { type: 'cancel_queued_message', id: 'q1' })
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, { type: 'send_queued_now' })
   })
 
   it('does not duplicate a hydrated assistant reply when live output replays after reconnect', () => {
@@ -2119,7 +2232,7 @@ describe('chatStore history mapping', () => {
       sessions: {
         [TEST_SESSION_ID]: {
           messages: [],
-          chatState: 'streaming',
+          chatState: 'idle',
           connectionState: 'connected',
           streamingText: '上一次分析结果 **还在流式区域**',
           streamingToolInput: '',
@@ -2998,5 +3111,77 @@ describe('chatStore artifact activity', () => {
     })
 
     expect(noteArtifactActivityMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('chatStore messages from other sessions', () => {
+  const origin = { kind: 'session', sessionId: 'child-1', name: 'docs-reorg', purpose: 'report' } as const
+
+  beforeEach(() => {
+    fetchSessionsMock.mockClear()
+    useChatStore.setState({ ...initialState, sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
+  })
+
+  it('keeps the origin of a live user message and leaves a human message without one', () => {
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'm-1', content: 'done', origin })
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'm-2', content: 'hello' })
+
+    const [fromSession, fromHuman] = useChatStore.getState().sessions[TEST_SESSION_ID]!.messages as Array<Extract<UIMessage, { type: 'user_text' }>>
+    expect(fromSession).toMatchObject({ content: 'done', origin })
+    expect(fromHuman?.content).toBe('hello')
+    expect('origin' in fromHuman!).toBe(false)
+  })
+
+  it('places reports delivered for a turn the user just started before the pending prompt', () => {
+    const store = useChatStore.getState()
+    store.sendMessage(TEST_SESSION_ID, 'next step')
+    const prompt = store.getSession(TEST_SESSION_ID).messages.at(-1) as Extract<UIMessage, { type: 'user_text' }>
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'r-1', content: 'first report', origin })
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'r-2', content: 'second report', origin })
+
+    const contents = (useChatStore.getState().sessions[TEST_SESSION_ID]!.messages as Array<Extract<UIMessage, { type: 'user_text' }>>).map((message) => message.content)
+    expect(contents).toEqual(['first report', 'second report', prompt.content])
+  })
+
+  it('appends a report in order when the last message is not a pending prompt', () => {
+    useChatStore.setState({
+      sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle', messages: [{ id: 'a-1', type: 'assistant_text', content: 'earlier reply', timestamp: 1 }] }) },
+    })
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'r-1', content: 'a report', origin })
+
+    const messages = useChatStore.getState().sessions[TEST_SESSION_ID]!.messages
+    expect(messages.map((message) => message.id === 'a-1' ? 'assistant' : (message as Extract<UIMessage, { type: 'user_text' }>).content)).toEqual(['assistant', 'a report'])
+  })
+
+  it('keeps the origin of a user message loaded from the transcript', async () => {
+    vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(
+      transcriptOf([
+        { id: 'u-1', type: 'user_text', content: 'brief text', origin: { ...origin, purpose: 'brief' }, timestamp: 1 },
+        { id: 'u-2', type: 'user_text', content: 'human text', timestamp: 2 },
+      ]),
+    )
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ messages: [] }) } })
+
+    await useChatStore.getState().loadHistory(TEST_SESSION_ID)
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
+      { id: 'u-1', origin: { kind: 'session', purpose: 'brief' } },
+      { id: 'u-2' },
+    ])
+  })
+
+  it('refreshes the session list when StartSession returns, and not for other tools or failures', () => {
+    const store = useChatStore.getState()
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'StartSession', toolUseId: 'start-1', input: {} })
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'Read', toolUseId: 'read-1', input: {} })
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'StartSession', toolUseId: 'start-2', input: {} })
+    expect(fetchSessionsMock).not.toHaveBeenCalled()
+
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_result', toolUseId: 'read-1', content: 'ok', isError: false })
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_result', toolUseId: 'start-2', content: 'denied', isError: true })
+    expect(fetchSessionsMock).not.toHaveBeenCalled()
+
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_result', toolUseId: 'start-1', content: 'started', isError: false })
+    expect(fetchSessionsMock).toHaveBeenCalledTimes(1)
   })
 })

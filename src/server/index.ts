@@ -13,6 +13,7 @@ import { diagnosticsService } from './services/diagnosticsService.js'
 import { ensurePersistentStorageUpgraded } from './services/persistentStorageMigrations.js'
 import { handleStaticH5Request } from './staticH5.js'
 import { handleUiPageRequest, isUiPageRequest } from './uiPageHost.js'
+import { SESSION_ID_PATTERN } from './sessionId.js'
 import { classifyH5Request, isDesktopOnlyPath, isLocalNonBrowserRequest, shouldBlockDisabledH5Access, shouldRequireH5Token } from './h5AccessPolicy.js'
 import { browserHostChannel, createBrowserHostSocketData } from './browserHost/hostChannel.js'
 import { BROWSER_HOST_PATH } from './browserHost/protocol.js'
@@ -23,6 +24,7 @@ import { handleWebCloneRoute } from './browserHost/webClone.js'
 import { WEB_CLONE_BROWSER_PATH } from './browserHost/names.js'
 import { startBrowserHostTokenReader } from './browserHost/stdinToken.js'
 import { H5AccessService } from './services/h5AccessService.js'
+import { setServerEndpoint } from './ws/sessionRuntime.js'
 
 function readArgValue(flag: string): string | undefined {
   const args = process.argv.slice(2)
@@ -256,7 +258,7 @@ export function startServer(port = PORT, host = HOST) {
           }
 
           const sessionId = url.pathname.split('/').pop() || ''
-          if (!sessionId || !/^[0-9a-zA-Z_-]{1,64}$/.test(sessionId)) {
+          if (!sessionId || !SESSION_ID_PATTERN.test(sessionId)) {
             return new Response('Invalid session ID', { status: 400 })
           }
           const upgraded = server.upgrade(req, {
@@ -266,8 +268,6 @@ export function startServer(port = PORT, host = HOST) {
               channel: 'client',
               clientKind: url.searchParams.get('client') === 'h5' ? 'h5' : 'desktop',
               sdkToken: null,
-              serverPort: port,
-              serverHost: localConnectHost,
             },
           })
           if (upgraded) return undefined
@@ -291,7 +291,7 @@ export function startServer(port = PORT, host = HOST) {
           }
 
           const sessionId = url.pathname.split('/').pop() || ''
-          if (!sessionId || !/^[0-9a-zA-Z_-]{1,64}$/.test(sessionId)) {
+          if (!sessionId || !SESSION_ID_PATTERN.test(sessionId)) {
             return new Response('Invalid session ID', { status: 400 })
           }
           const upgraded = server.upgrade(req, {
@@ -301,8 +301,6 @@ export function startServer(port = PORT, host = HOST) {
               channel: 'sdk',
               clientKind: 'desktop',
               sdkToken: url.searchParams.get('token'),
-              serverPort: port,
-              serverHost: localConnectHost,
             },
           })
           if (upgraded) return undefined
@@ -409,6 +407,8 @@ export function startServer(port = PORT, host = HOST) {
       : `Failed to start server. Is port ${port} in use?`
     throw new Error(message, { cause: error })
   }
+
+  setServerEndpoint({ serverHost: localConnectHost, serverPort: server.port ?? port })
 
   teamWatcher.start()
 

@@ -32,7 +32,7 @@ Also hosted on AtomGit: [atomgit.com/GoDiao/DreamCoder](https://atomgit.com/GoDi
 
 > 🎉 **500 stars!** Thank you to everyone who starred, tried, reported issues, and contributed. DreamCoder is only five months old, and it has grown step by step because of you. Next, we'll keep pace with the best practices of frontier coding agents and try everything that can make the experience better, along with brand-new features. Our goal will always be to **reach for the stars**.
 
-> 🌱 **Contributions welcome!** Browse [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) and [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22), and read the [contributing guide](docs/CONTRIBUTING_en.md) before starting.
+> 🌱 **Contributions welcome!** Browse [good first issues](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) and [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22), and read the [contributing guide](docs/general/CONTRIBUTING_en.md) before starting.
 
 ---
 
@@ -185,7 +185,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 > The maintainer now develops primarily on **macOS (Apple Silicon)**, running from source (`bun run electron:dev`); it ships as a `.dmg` from v0.5.0.
 > **Windows x64** was the main platform before and has been tested extensively, but the maintainer no longer develops on it day to day, so feedback on how new changes behave on Windows is especially welcome.
 > **Linux** is not built or packaged; running the desktop app from source may work but is not part of the maintainer's day-to-day workflow, so Linux support is still best-effort.
-> For the validated Ubuntu browser workflow, exFAT installation workaround, and local Ollama results, see the [Linux validation report](docs/LINUX_BROWSER_VALIDATION.md). For startup, shutdown, and termination by PID, see the [browser usage guide](docs/WEB_USAGE.md).
+> For the validated Ubuntu browser workflow, exFAT installation workaround, and local Ollama results, see the [Linux validation report](docs/general/LINUX_BROWSER_VALIDATION.md). For startup, shutdown, and termination by PID, see the [browser usage guide](docs/general/WEB_USAGE.md).
 > If you're running DreamCoder on Windows or Linux, issues and PRs are especially valuable;
 > for the current Linux memory investigation, see [#25](https://github.com/GoDiao/dreamcoder/issues/25).
 > Check [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) for the actual assets available with each release.
@@ -201,7 +201,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 - [ ] **Phase 4**: Release Automation + Auto-update
 - [ ] **Phase 5**: Remote Agent Backend (run the agent on a remote host over SSH / WebSocket)
 
-See [ROADMAP](docs/ROADMAP_en.md)
+See [ROADMAP](docs/general/ROADMAP_en.md)
 
 ---
 
@@ -255,11 +255,11 @@ On first launch, DreamCoder detects your system locale: Chinese systems (`zh-*`)
 
 ## 💝 Sponsorship
 
-DreamCoder is maintained by one person in their spare time. Companies and individuals are welcome to sponsor its development. See the [sponsorship policy](docs/SPONSORS_en.md) for tiers and rules, and email diaoshengjia@gmail.com to get in touch.
+DreamCoder is maintained by one person in their spare time. Companies and individuals are welcome to sponsor its development. See the [sponsorship policy](docs/general/SPONSORS_en.md) for tiers and rules, and email diaoshengjia@gmail.com to get in touch.
 
 ## 🤝 Contributing
 
-Issues and pull requests are welcome. If you'd like to improve DreamCoder, start with the [Contributing Guide](docs/CONTRIBUTING_en.md) to get familiar with the workflow and collaboration style.
+Issues and pull requests are welcome. If you'd like to improve DreamCoder, start with the [Contributing Guide](docs/general/CONTRIBUTING_en.md) to get familiar with the workflow and collaboration style.
 
 ## 📝 Changelog
 

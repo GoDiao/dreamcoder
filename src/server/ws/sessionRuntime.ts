@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import type { WebSocketData } from './handler.js'
-import type { PermissionMode } from './protocol.js'
+import type { AttachmentRef, PermissionMode } from './protocol.js'
 import type { OutputPipeline } from '../session/outputPipeline.js'
 import type { RuntimeSelection } from '../session/state/types.js'
 
@@ -21,6 +21,17 @@ export type SessionEndpoint = {
   serverPort: number
 }
 
+let serverEndpoint: SessionEndpoint | null = null
+
+export function setServerEndpoint(endpoint: SessionEndpoint | null): void {
+  serverEndpoint = endpoint
+}
+
+export function getServerEndpoint(): SessionEndpoint {
+  if (!serverEndpoint) throw new Error('The server has not published its listen address yet')
+  return serverEndpoint
+}
+
 /**
  * Everything the WebSocket layer remembers about one desktop session.
  *
@@ -31,13 +42,13 @@ export type SessionEndpoint = {
 export type SessionRuntime = {
   clients: Set<ServerWebSocket<WebSocketData>>
   pipeline?: OutputPipeline
-  endpoint?: SessionEndpoint
   pendingModeRequests: Map<string, PermissionMode>
   answeredPermissions: Set<string>
   disconnectCleanupTimer?: Timer
   title?: SessionTitleState
   runtimeTransition?: Promise<void>
   queuedFromRuntime?: { selection: RuntimeSelection | null }
+  queuedPayloads: Map<string, { content: string; attachments?: AttachmentRef[] }>
   startup?: Promise<void>
   prewarm: {
     pending: boolean
@@ -56,6 +67,7 @@ export function getSessionRuntime(sessionId: string): SessionRuntime {
       clients: new Set(),
       pendingModeRequests: new Map(),
       answeredPermissions: new Set(),
+      queuedPayloads: new Map(),
       prewarm: { pending: false, done: false },
     }
     sessionRuntimes.set(sessionId, runtime)

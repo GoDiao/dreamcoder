@@ -1,4 +1,3 @@
-import { feature } from 'bun:bundle'
 import { randomUUID } from 'crypto'
 import { getSdkBetas, getSessionId } from 'src/bootstrap/state.js'
 import { DEFAULT_OUTPUT_STYLE_NAME } from 'src/constants/outputStyles.js'
@@ -83,13 +82,6 @@ export function buildSystemInitMessage(inputs: SystemInitInputs): SDKMessage {
       source: plugin.source,
     })),
     uuid: randomUUID(),
-  }
-  // Hidden from public SDK types — ant-only UDS messaging socket path
-  if (feature('UDS_INBOX')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    ;(initMessage as Record<string, unknown>).messaging_socket_path =
-      require('../udsMessaging.js').getUdsMessagingSocketPath()
-    /* eslint-enable @typescript-eslint/no-require-imports */
   }
   initMessage.fast_mode_state = getFastModeState(inputs.model, inputs.fastMode)
   return initMessage

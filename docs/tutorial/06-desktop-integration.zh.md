@@ -249,4 +249,4 @@ const baseUrl = needsProxy
 - 客户端经 `/ws/:sessionId`、CLI 经 `/sdk/:sessionId` 连到 Sidecar；CLI 回连之前，输入暂存在 `pendingOutbound`，回连并核对 token 后按顺序发出。
 - 扩展部分：OpenAI 格式的服务商经 Sidecar 的 `/proxy/` 转换协议，调用 ID 保持不变；手机 H5 访问的是同一个桌面服务和会话，桌面必须保持运行。
 
-系列到这里结束。想修改或补充 DreamCoder，可以先读[贡献指南](https://github.com/GoDiao/dreamcoder/blob/main/docs/CONTRIBUTING_zh.md)；发现问题或有建议，可以提交到 [issues](https://github.com/GoDiao/dreamcoder/issues)。
+系列到这里结束。想修改或补充 DreamCoder，可以先读[贡献指南](https://github.com/GoDiao/dreamcoder/blob/main/docs/general/CONTRIBUTING_zh.md)；发现问题或有建议，可以提交到 [issues](https://github.com/GoDiao/dreamcoder/issues)。

@@ -9,6 +9,7 @@ import {
   getActiveSessionIds,
   getSessionState,
   getSlashCommands,
+  handleRawCliMessage,
   handleWebSocket,
   resolveSessionPermissionMode,
   translateCliMessage,
@@ -19,7 +20,7 @@ import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { conversationService } from '../services/conversationService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
-import { getSessionRuntime } from '../ws/sessionRuntime.js'
+import { getSessionRuntime, setServerEndpoint } from '../ws/sessionRuntime.js'
 import { sessionStateStore } from '../session/state/store.js'
 
 function makeClientSocket(sessionId: string) {
@@ -31,8 +32,6 @@ function makeClientSocket(sessionId: string) {
       channel: 'client',
       clientKind: 'desktop',
       sdkToken: null,
-      serverPort: 0,
-      serverHost: '127.0.0.1',
     },
     send: mock((payload: string) => {
       sent.push(payload)
@@ -62,6 +61,30 @@ describe('WebSocket handler session isolation', () => {
 
     expect(getActiveSessionIds()).toContain(sessionId)
     expect(clearCallbacks).not.toHaveBeenCalled()
+  })
+
+  it('applies a title the session sets on itself as a custom title in the session state', async () => {
+    const sessionId = `self-rename-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    handleWebSocket.open(ws)
+    sessionStateStore.apply(sessionId, { type: 'title_changed', text: 'Old', source: 'ai' })
+    const rename = spyOn(sessionService, 'renameSession').mockResolvedValue(undefined)
+    const replies: unknown[] = []
+    spyOn(conversationService, 'respondToHostRequest').mockImplementation((_id, _requestId, result) => {
+      replies.push(result)
+      return true
+    })
+
+    handleRawCliMessage(sessionId, {
+      type: 'control_request',
+      request_id: 'rename-1',
+      request: { subtype: 'session_rename', title: 'Project manager' },
+    })
+    await waitFor(() => replies.length > 0)
+
+    expect(rename).toHaveBeenCalledWith(sessionId, 'Project manager')
+    expect(replies[0]).toEqual({ response: { title: 'Project manager' } })
+    expect(getSessionState(sessionId)?.title).toEqual({ text: 'Project manager', source: 'custom' })
   })
 
   it('closes and removes an active client socket when a session is deleted', () => {
@@ -153,9 +176,11 @@ describe('WebSocket handler session runtime lifetime', () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-session-runtime-'))
     originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
     process.env.DREAMCODER_CONFIG_DIR = tmpDir
+    setServerEndpoint({ serverHost: '127.0.0.1', serverPort: 3456 })
   })
 
   afterEach(async () => {
+    setServerEndpoint(null)
     __resetWebSocketHandlerStateForTests()
     mock.restore()
     if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
@@ -302,7 +327,12 @@ async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<voi
 }
 
 describe('WebSocket permission mode updates', () => {
+  beforeEach(() => {
+    setServerEndpoint({ serverHost: '127.0.0.1', serverPort: 3456 })
+  })
+
   afterEach(() => {
+    setServerEndpoint(null)
     __resetWebSocketHandlerStateForTests()
     mock.restore()
   })

@@ -145,6 +145,7 @@ export class SessionStateStore {
         ? { ...fields.workspace, workDir: current.workspace.workDir, workDirExists: current.workspace.workDirExists }
         : fields.workspace,
       uiPages: fields.uiPages,
+      pendingReports: fields.pendingReports,
     }
   }
 }

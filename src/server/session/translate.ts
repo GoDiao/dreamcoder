@@ -233,6 +233,9 @@ function translateMessages(
 
     case 'user': {
       const messages: ServerMessage[] = []
+      if (cliMsg.isReplay && typeof cliMsg.uuid === 'string') {
+        events.push({ type: 'queued_message_started', id: cliMsg.uuid, at: now })
+      }
       const echo = replayedUserMessage(cliMsg)
       if (echo) return [echo]
 

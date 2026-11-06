@@ -32,7 +32,7 @@
 
 > 🎉 **500 Star 了！** 感谢每一位点 Star、试用、提 issue 和贡献代码的朋友。DreamCoder 才五个月大，是你们让它一点点长起来的。我们接下来会更进一步跟进前沿 coding agent 的最佳实践，完成一切可以提升用户体验的尝试和崭新的功能，我们的目标一直会是**星辰大海**。
 
-> 🌱 **欢迎贡献！** 可以从 [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 和 [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22) 开始；动手前请阅读 [贡献指南](docs/CONTRIBUTING_zh.md)。
+> 🌱 **欢迎贡献！** 可以从 [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 和 [help wanted](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22) 开始；动手前请阅读 [贡献指南](docs/general/CONTRIBUTING_zh.md)。
 
 ---
 
@@ -188,7 +188,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 > 维护者目前主要在 **macOS（Apple Silicon）** 上开发，从源码运行（`bun run electron:dev`），自 v0.5.0 起提供 `.dmg` 安装包。
 > **Windows x64** 是此前的主力平台，经过长期实测；维护者现在不在 Windows 上日常开发，新改动在 Windows 上的表现尤其欢迎反馈。
 > **Linux** 暂不构建安装包；从源码运行桌面端或许可行，但维护者并不日常使用，仍属于尽力支持的状态。
-> Ubuntu 浏览器版的验证范围、exFAT 依赖安装问题及本地 Ollama 调用结果见[Linux 验证报告](docs/LINUX_BROWSER_VALIDATION_zh.md)；启动、关闭和按 PID 终止进程的方法见[浏览器版使用指南](docs/WEB_USAGE_zh.md)。
+> Ubuntu 浏览器版的验证范围、exFAT 依赖安装问题及本地 Ollama 调用结果见[Linux 验证报告](docs/general/LINUX_BROWSER_VALIDATION_zh.md)；启动、关闭和按 PID 终止进程的方法见[浏览器版使用指南](docs/general/WEB_USAGE_zh.md)。
 > 如果你正在使用 Windows 或 Linux，欢迎通过 issue 或 PR 一起把这部分体验补完整；
 > Linux 内存问题可关注 [#25](https://github.com/GoDiao/dreamcoder/issues/25)。
 > 安装包供应情况以 [GitHub Releases](https://github.com/GoDiao/dreamcoder/releases) 页面中的实际附件为准。
@@ -204,7 +204,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 - [ ] **Phase 4**: Release 自动化 + 自动更新
 - [ ] **Phase 5**: 远程 Agent 后端 (通过 SSH / WebSocket 在远程主机运行 Agent)
 
-详见 [ROADMAP](docs/ROADMAP_zh.md)
+详见 [ROADMAP](docs/general/ROADMAP_zh.md)
 
 ---
 
@@ -258,11 +258,11 @@ bun run electron:dev
 
 ## 💝 赞助与合作
 
-DreamCoder 由个人利用业余时间维护。欢迎企业和个人赞助，支持项目持续开发。档位和规则见 [赞助政策](docs/SPONSORS_zh.md)，合作请发邮件到 diaoshengjia@gmail.com。
+DreamCoder 由个人利用业余时间维护。欢迎企业和个人赞助，支持项目持续开发。档位和规则见 [赞助政策](docs/general/SPONSORS_zh.md)，合作请发邮件到 diaoshengjia@gmail.com。
 
 ## 🤝 贡献指南
 
-欢迎提交 Issue 和 PR。若你准备参与改进 DreamCoder，建议先阅读 [贡献指南](docs/CONTRIBUTING_zh.md)，可以更快熟悉开发流程与协作方式。
+欢迎提交 Issue 和 PR。若你准备参与改进 DreamCoder，建议先阅读 [贡献指南](docs/general/CONTRIBUTING_zh.md)，可以更快熟悉开发流程与协作方式。
 
 ## 📝 更新日志
 

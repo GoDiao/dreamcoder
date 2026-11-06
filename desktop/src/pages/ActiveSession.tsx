@@ -23,6 +23,8 @@ import { useTranslation } from '../i18n'
 import { MessageList } from '../components/chat/MessageList'
 import { ChatInput } from '../components/chat/ChatInput'
 import { SessionTaskBar } from '../components/chat/SessionTaskBar'
+import { PendingReportsBar } from '../components/chat/PendingReportsBar'
+import { QueuedMessagesBar } from '../components/chat/QueuedMessagesBar'
 import { OpenProjectMenu } from '../components/layout/OpenProjectMenu'
 import { SessionHeaderMenu } from '../components/layout/SessionHeaderMenu'
 import { TeamStatusBar } from '../components/teams/TeamStatusBar'
@@ -358,6 +360,10 @@ export function ActiveSession() {
           )}
 
           {!isMemberSession && <SessionTaskBar />}
+
+          {!isMemberSession && <PendingReportsBar sessionId={activeTabId} />}
+
+          {!isMemberSession && <QueuedMessagesBar sessionId={activeTabId} />}
 
           <TeamStatusBar />
 

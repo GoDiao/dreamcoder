@@ -106,7 +106,12 @@ import {
   isShuttingDown,
 } from 'src/utils/gracefulShutdown.js'
 import { registerCleanup } from 'src/utils/cleanupRegistry.js'
+import { setHostRequester } from 'src/utils/hostRequests.js'
 import { createIdleTimeoutManager } from 'src/utils/idleTimeout.js'
+import {
+  SDKSessionOriginSchema,
+  SDKSessionReportSchema,
+} from 'src/entrypoints/sdk/coreSchemas.js'
 import type {
   SDKStatus,
   ModelInfo,
@@ -436,6 +441,19 @@ export function joinPromptValues(values: PromptValue[]): PromptValue {
   return values.flatMap(toBlocks)
 }
 
+function sameOrigin(
+  a: QueuedCommand['origin'],
+  b: QueuedCommand['origin'],
+): boolean {
+  if (a === undefined || b === undefined) return a === b
+  return (
+    a.kind === b.kind &&
+    a.sessionId === b.sessionId &&
+    a.purpose === b.purpose &&
+    a.summary === b.summary
+  )
+}
+
 /**
  * Whether `next` can be batched into the same ask() call as `head`. Only
  * prompt-mode commands batch, and only when the workload tag matches (so the
@@ -451,8 +469,19 @@ export function canBatchWith(
     next !== undefined &&
     next.mode === 'prompt' &&
     next.workload === head.workload &&
-    next.isMeta === head.isMeta
+    next.isMeta === head.isMeta &&
+    sameOrigin(head.origin, next.origin)
   )
+}
+
+export function mergeBatchedCommands(batch: QueuedCommand[]): QueuedCommand {
+  const head = batch[0]!
+  return {
+    ...head,
+    value: joinPromptValues(batch.map(c => c.value)),
+    uuid: batch.findLast(c => c.uuid)?.uuid ?? head.uuid,
+    reports: batch.flatMap(c => c.reports ?? []),
+  }
 }
 
 export async function runHeadless(
@@ -588,6 +617,9 @@ export async function runHeadless(
   }
 
   const structuredIO = getStructuredIO(inputPrompt, options)
+  setHostRequester((request, schema, signal) =>
+    structuredIO.requestHost(request, schema, signal),
+  )
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
   // prints, dependency console.log, library banners) breaks the client's
@@ -1959,13 +1991,7 @@ function runHeadlessStreaming(
             while (canBatchWith(command, peek(isMainThread))) {
               batch.push(dequeue(isMainThread)!)
             }
-            if (batch.length > 1) {
-              command = {
-                ...command,
-                value: joinPromptValues(batch.map(c => c.value)),
-                uuid: batch.findLast(c => c.uuid)?.uuid ?? command.uuid,
-              }
-            }
+            if (batch.length > 1) command = mergeBatchedCommands(batch)
           }
           const batchUuids = batch.map(c => c.uuid).filter(u => u !== undefined)
 
@@ -2164,6 +2190,8 @@ function runHeadlessStreaming(
               prompt: input,
               promptUuid: cmd.uuid,
               isMeta: cmd.isMeta,
+              origin: cmd.origin?.kind === 'session' ? cmd.origin : undefined,
+              reports: cmd.reports,
               cwd: cwd(),
               tools: allTools,
               verbose: options.verbose,
@@ -2690,19 +2718,6 @@ function runHeadlessStreaming(
         output.done()
       }
     }
-  }
-
-  // Set up UDS inbox callback so the query loop is kicked off
-  // when a message arrives via the UDS socket in headless mode.
-  if (feature('UDS_INBOX')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { setOnEnqueue } = require('../utils/udsMessaging.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    setOnEnqueue(() => {
-      if (!inputClosed) {
-        void run()
-      }
-    })
   }
 
   // Cron scheduler: runs scheduled_tasks.json tasks in SDK/-p mode.
@@ -4121,6 +4136,9 @@ function runHeadlessStreaming(
         value: await resolveAndPrepend(message, message.message.content),
         uuid: message.uuid,
         priority: message.priority,
+        origin: SDKSessionOriginSchema().safeParse(message.origin).data,
+        reports: SDKSessionReportSchema().array().safeParse(message.reports)
+          .data,
       })
       // Increment prompt count for attribution tracking and save snapshot
       // The snapshot persists promptCount so it survives compaction

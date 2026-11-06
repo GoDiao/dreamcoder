@@ -51,6 +51,8 @@ function sessionWithTurn(sessionId: string, turn: SessionState['turn']): PerSess
       activeGoal: null,
       backgroundTasks: [],
       uiPages: [],
+      pendingReports: [],
+      queuedMessages: [],
       team: null,
       clientCount: 1,
     },

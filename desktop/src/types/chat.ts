@@ -1,4 +1,4 @@
-import type { TaskNotification, TaskUsage, TranscriptItem } from '@protocol'
+import type { SessionOrigin, TaskNotification, TaskUsage, TranscriptItem } from '@protocol'
 
 export type {
   AttachmentRef,
@@ -10,6 +10,7 @@ export type {
   PendingBrowserGrant,
   PendingPermission,
   ServerMessage,
+  SessionOrigin,
   SessionState,
   SessionStatePatch,
   TeamMemberStatus,
@@ -87,7 +88,7 @@ export type TaskSummaryItem = {
 type SharedItem<T extends TranscriptItem['type']> = Extract<TranscriptItem, { type: T }>
 
 export type UIMessage =
-  | { id: string; type: 'user_text'; content: string; modelContent?: string; transcriptMessageId?: string; timestamp: number; attachments?: UIAttachment[]; pending?: boolean }
+  | { id: string; type: 'user_text'; content: string; modelContent?: string; transcriptMessageId?: string; origin?: SessionOrigin; timestamp: number; attachments?: UIAttachment[]; pending?: boolean }
   | SharedItem<'assistant_text'>
   | SharedItem<'thinking'>
   | {
