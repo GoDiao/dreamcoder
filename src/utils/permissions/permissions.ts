@@ -22,7 +22,10 @@ import {
   SETTING_SOURCES,
 } from '../settings/constants.js'
 import { plural } from '../stringUtils.js'
-import { permissionModeTitle } from './PermissionMode.js'
+import {
+  isBypassPermissionsActive,
+  permissionModeTitle,
+} from './PermissionMode.js'
 import type {
   PermissionAskDecision,
   PermissionDecision,
@@ -1265,10 +1268,9 @@ async function hasPermissionsToUseToolInner(
   // Check if permissions should be bypassed:
   // - Direct bypassPermissions mode
   // - Plan mode when the user originally started with bypass mode (isBypassPermissionsModeAvailable)
-  const shouldBypassPermissions =
-    appState.toolPermissionContext.mode === 'bypassPermissions' ||
-    (appState.toolPermissionContext.mode === 'plan' &&
-      appState.toolPermissionContext.isBypassPermissionsModeAvailable)
+  const shouldBypassPermissions = isBypassPermissionsActive(
+    appState.toolPermissionContext,
+  )
   if (shouldBypassPermissions) {
     return {
       behavior: 'allow',
