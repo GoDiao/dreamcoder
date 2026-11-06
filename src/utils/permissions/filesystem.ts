@@ -4,6 +4,7 @@ import { artifactDenialReason, artifactLocationDenial, isOwnArtifactWrite, OWN_A
 import { randomBytes } from 'crypto'
 import ignore from 'ignore'
 import memoize from 'lodash-es/memoize.js'
+import picomatch from 'picomatch'
 import { homedir, tmpdir } from 'os'
 import { join, normalize, posix, sep } from 'path'
 import { hasAutoMemPathOverride, isAutoMemPath } from 'src/memdir/paths.js'
@@ -85,6 +86,14 @@ const SAFE_ENV_FILE_SUFFIXES = new Set([
   'dist',
 ])
 
+const SENSITIVE_READ_GLOB_CANDIDATES = [
+  ...SENSITIVE_READ_FILES,
+  '.env',
+  '.env.local',
+  'id_rsa',
+  'id_ed25519',
+]
+
 /**
  * Dangerous directories that should be protected from auto-editing.
  * These directories contain sensitive configuration or executable files.
@@ -132,6 +141,18 @@ export function isSensitiveReadPath(path: string): boolean {
   )
 }
 
+export function isSensitiveReadFilePattern(pattern: string): boolean {
+  if (
+    isSensitiveReadPath(pattern) ||
+    isSensitiveReadPath(join('.ssh', pattern))
+  ) {
+    return true
+  }
+  return SENSITIVE_READ_GLOB_CANDIDATES.some(candidate =>
+    picomatch.isMatch(candidate, pattern, { nocase: true }),
+  )
+}
+
 export function getSensitiveReadPermission(
   path: string,
   sensitivePath: string,
@@ -158,7 +179,14 @@ export function checkSensitiveReadPermission(
   if (isBypassPermissionsActive(toolPermissionContext)) return null
   const pathsToCheck =
     precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
-  const sensitivePath = pathsToCheck.find(isSensitiveReadPath)
+  const sensitivePath = pathsToCheck.find(candidate => {
+    if (!isSensitiveReadPath(candidate)) return false
+    try {
+      return !getFsImplementation().lstatSync(candidate).isDirectory()
+    } catch {
+      return true
+    }
+  })
   if (!sensitivePath) return null
   return getSensitiveReadPermission(
     path,

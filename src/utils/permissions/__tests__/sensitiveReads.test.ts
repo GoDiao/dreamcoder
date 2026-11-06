@@ -90,6 +90,14 @@ describe('sensitive Read tool permissions', () => {
     }
   })
 
+  test('allows existing directories with sensitive names', async () => {
+    await mkdir(join(project, 'token'))
+    await mkdir(join(project, 'credentials'))
+
+    expect(read('token').behavior).toBe('allow')
+    expect(read('credentials').behavior).toBe('allow')
+  })
+
   test('matches case variants and Windows path separators', () => {
     expect(read('.ENV').behavior).toBe('ask')
     expect(isSensitiveReadPath('C:\\project\\.ssh\\ID_RSA')).toBe(true)

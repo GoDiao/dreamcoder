@@ -21,6 +21,7 @@ import {
   checkReadableInternalPath,
   checkSensitiveReadPermission,
   getSensitiveReadPermission,
+  isSensitiveReadFilePattern,
   matchingRuleForInput,
   pathInAllowedWorkingPath,
   pathInWorkingPath,
@@ -105,6 +106,8 @@ function checkSensitiveGlobReadPermission(
   const absolutePattern = isAbsolute(path) ? path : resolve(cwd, path)
   const directory = dirname(absolutePattern)
   if (GLOB_PATTERN_REGEX.test(directory)) {
+    const filePattern = basename(absolutePattern)
+    if (!isSensitiveReadFilePattern(filePattern)) return null
     return getSensitiveReadPermission(
       absolutePattern,
       absolutePattern,

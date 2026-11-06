@@ -163,8 +163,25 @@ describe('bash sensitive read permissions', () => {
     }
   })
 
-  test('asks for glob patterns in directory segments', () => {
-    expect(check('cat .s*/id_rsa').behavior).toBe('ask')
+  test('asks for directory globs only when the file pattern is sensitive', () => {
+    for (const command of ['cat .s*/id_rsa', 'cat */.env']) {
+      expect(check(command).behavior).toBe('ask')
+    }
+    for (const command of [
+      'cat packages/*/package.json',
+      'cat src/**/*.ts',
+      'cat app/[id]/page.tsx',
+    ]) {
+      expect(check(command).behavior).toBe('passthrough')
+    }
+  })
+
+  test('allows reads of existing directories with sensitive names', async () => {
+    await mkdir(join(project, 'src', 'token'), { recursive: true })
+    await mkdir(join(project, 'credentials'))
+
+    expect(check('ls src/token').behavior).toBe('passthrough')
+    expect(check('ls credentials').behavior).toBe('passthrough')
   })
 
   test('checks the original name of a file symlink', async () => {
