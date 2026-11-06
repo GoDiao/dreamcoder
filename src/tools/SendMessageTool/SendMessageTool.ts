@@ -49,6 +49,10 @@ function isSessionAddress(to: string): boolean {
   return isSessionLinksEnabled() && to.startsWith(SESSION_ADDRESS_PREFIX)
 }
 
+function sessionTargetId(to: string): string {
+  return to.slice(SESSION_ADDRESS_PREFIX.length).trim()
+}
+
 function describeRecipient(): string {
   const sessionAddress = `"${SESSION_ADDRESS_PREFIX}<id>" for another session (use ListSessions to discover)`
   if (!isAgentSwarmsEnabled()) return `Recipient: ${sessionAddress}`
@@ -161,7 +165,7 @@ async function handleSessionMessage(
   summary: string,
   mode: 'message' | 'report' | undefined,
 ): Promise<{ data: MessageOutput }> {
-  const targetId = to.slice(SESSION_ADDRESS_PREFIX.length).trim()
+  const targetId = sessionTargetId(to)
   const result = await requestHost(
     {
       subtype: 'session_send',
@@ -672,7 +676,7 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
         }
       }
       if (isSessionAddress(input.to)) {
-        const targetId = input.to.slice(SESSION_ADDRESS_PREFIX.length).trim()
+        const targetId = sessionTargetId(input.to)
         if (targetId.length === 0) {
           return {
             result: false,

@@ -1,8 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import type { AttachmentRef, ClientKind, ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
-import type { SessionOrigin, SessionReport } from '../../entrypoints/sdk/coreSchemas.js'
-import { buildSessionOrigin } from '../../utils/crossSessionEnvelope.js'
-import type { SessionReportEntry } from '../transcript/entries.js'
+import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
@@ -44,6 +42,7 @@ import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
 import { artifactService } from '../services/artifactService.js'
 import { createSessionLinks } from '../services/sessionLinksService.js'
+import { createTurnQueue } from '../services/turnQueueService.js'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
@@ -56,10 +55,16 @@ const PENDING_PERMISSION_DISCONNECT_CLEANUP_MS = 30 * 60_000
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 5 * 60_000
 const MESSAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const sessionLinks = createSessionLinks(
-  (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
-  (sessionId, title) => noteSessionRenamed(sessionId, title),
+const turnQueue = createTurnQueue(
+  (sessionId, message) => broadcastToSession(sessionId, message),
+  (sessionId, content, options) => deliverUserTurn(sessionId, content, options),
 )
+
+const sessionLinks = createSessionLinks({
+  deliver: (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
+  queueReport: turnQueue.queueReport,
+  onRenamed: (sessionId, title) => noteSessionRenamed(sessionId, title),
+})
 
 installSessionPersistence(store)
 store.subscribe(relayStateChange)
@@ -185,11 +190,11 @@ export const handleWebSocket = {
           break
 
         case 'cancel_queued_message':
-          void handleCancelQueuedMessage(ws, message)
+          void turnQueue.cancelMessage(ws.data.sessionId, message.id)
           break
 
         case 'send_queued_now':
-          handleSendQueuedNow(ws)
+          turnQueue.interrupt(ws.data.sessionId)
           break
 
         case 'ping':
@@ -451,12 +456,14 @@ export async function deliverUserTurn(
     return { ok: false, code: 'CLI_RESTART_FAILED', message: startupRuntimeTransition.message ?? '' }
   }
 
-  if (shouldQueueBehindTurn(sessionId, content, origin)) {
-    return queueUserMessage(sessionId, content, options)
+  const requestedId = messageIdFrom(options.id)
+  if (turnQueue.shouldQueue(sessionId, content, origin)) {
+    ensurePipelineAttached(sessionId)
+    const queued = turnQueue.queueMessage(sessionId, requestedId ?? crypto.randomUUID(), content, options.attachments)
+    return queued ? { ok: true } : reportCliNotRunning(sessionId)
   }
 
-  const storedReports = await readStoredReports(sessionId)
-  const reports = claimQueuedReports(sessionId, storedReports)
+  const reports = await turnQueue.claimReports(sessionId)
 
   const shouldForwardCurrentTurnLocalCommand =
     createCurrentTurnLocalCommandForwarder(desktopSlashCommand)
@@ -466,12 +473,7 @@ export async function deliverUserTurn(
   pipeline.gate = (cliMsg) =>
     (cliMsg.type === 'result' && cliMsg.is_error) || shouldForwardCurrentTurnLocalCommand(cliMsg)
 
-  const messageId =
-    typeof options.id === 'string' && MESSAGE_ID_PATTERN.test(options.id)
-      ? options.id
-      : origin
-        ? crypto.randomUUID()
-        : undefined
+  const messageId = requestedId ?? (origin ? crypto.randomUUID() : undefined)
   const sent = conversationService.sendMessage(
     sessionId,
     content,
@@ -480,14 +482,10 @@ export async function deliverUserTurn(
     origin,
     reports,
   )
-  if (!sent) {
-    const message = 'CLI process is not running. The session may have ended or the process crashed.'
-    broadcastToSession(sessionId, { type: 'error', message, code: 'CLI_NOT_RUNNING' })
-    return { ok: false, code: 'CLI_NOT_RUNNING', message }
-  }
+  if (!sent) return reportCliNotRunning(sessionId)
 
   pipeline.gate = undefined
-  await markReportsDelivered(sessionId, reports)
+  await turnQueue.markReportsDelivered(sessionId, reports)
   if (origin && messageId) {
     broadcastToSession(sessionId, { type: 'user_message', id: messageId, content, origin })
   }
@@ -495,129 +493,14 @@ export async function deliverUserTurn(
   return { ok: true }
 }
 
-function shouldQueueBehindTurn(sessionId: string, content: string, origin: SessionOrigin | undefined): boolean {
-  const state = store.peek(sessionId)
-  return !origin &&
-    !content.trimStart().startsWith('/') &&
-    (state?.turn.phase !== 'idle' || (state?.queuedMessages.length ?? 0) > 0)
+function messageIdFrom(id: unknown): string | undefined {
+  return typeof id === 'string' && MESSAGE_ID_PATTERN.test(id) ? id : undefined
 }
 
-function queueUserMessage(
-  sessionId: string,
-  content: string,
-  options: DeliverUserTurnOptions,
-): DeliverUserTurnResult {
-  ensurePipelineAttached(sessionId)
-  const id =
-    typeof options.id === 'string' && MESSAGE_ID_PATTERN.test(options.id)
-      ? options.id
-      : crypto.randomUUID()
-  rememberQueuedPayload(sessionId, id, content, options.attachments)
-  const held = !!store.peek(sessionId)?.process.pendingRestart
-  const sent = held || conversationService.sendMessage(
-    sessionId,
-    content,
-    options.attachments,
-    id,
-    undefined,
-    undefined,
-    'later',
-  )
-  if (!sent) {
-    const message = 'CLI process is not running. The session may have ended or the process crashed.'
-    broadcastToSession(sessionId, { type: 'error', message, code: 'CLI_NOT_RUNNING' })
-    return { ok: false, code: 'CLI_NOT_RUNNING', message }
-  }
-  store.apply(sessionId, {
-    type: 'message_queued',
-    message: { id, content, attachmentCount: options.attachments?.length ?? 0, createdAt: Date.now() },
-  })
-  return { ok: true }
-}
-
-function rememberQueuedPayload(sessionId: string, id: string, content: string, attachments?: AttachmentRef[]): void {
-  const payloads = getSessionRuntime(sessionId).queuedPayloads
-  const queued = new Set(store.peek(sessionId)?.queuedMessages.map((message) => message.id))
-  for (const key of payloads.keys()) {
-    if (!queued.has(key)) payloads.delete(key)
-  }
-  payloads.set(id, { content, attachments })
-}
-
-async function withdrawQueueFromCli(sessionId: string): Promise<void> {
-  for (const queued of store.peek(sessionId)?.queuedMessages ?? []) {
-    await conversationService.cancelQueuedMessage(sessionId, queued.id).catch((error: unknown) => {
-      console.warn(`[WS] Could not hold queued message ${queued.id} of ${sessionId} for a restart:`, error)
-    })
-  }
-}
-
-async function redeliverQueuedMessages(sessionId: string, ids: string[]): Promise<void> {
-  const payloads = peekSessionRuntime(sessionId)?.queuedPayloads
-  for (const id of ids) {
-    store.apply(sessionId, { type: 'queued_message_cancelled', id })
-  }
-  for (const id of ids) {
-    const payload = payloads?.get(id)
-    payloads?.delete(id)
-    if (payload) await deliverUserTurn(sessionId, payload.content, { attachments: payload.attachments, id })
-  }
-}
-
-async function handleCancelQueuedMessage(
-  ws: ServerWebSocket<WebSocketData>,
-  message: Extract<ClientMessage, { type: 'cancel_queued_message' }>,
-): Promise<void> {
-  const { sessionId } = ws.data
-  if (!store.peek(sessionId)?.queuedMessages.some((queued) => queued.id === message.id)) return
-  try {
-    if (await conversationService.cancelQueuedMessage(sessionId, message.id)) {
-      store.apply(sessionId, { type: 'queued_message_cancelled', id: message.id })
-    }
-  } catch (err) {
-    console.warn(`[WS] Could not cancel queued message ${message.id} of ${sessionId}:`, err)
-  }
-}
-
-function handleSendQueuedNow(ws: ServerWebSocket<WebSocketData>): void {
-  interruptForQueue(ws.data.sessionId)
-}
-
-function interruptForQueue(sessionId: string): boolean {
-  const state = store.peek(sessionId)
-  if (!state?.queuedMessages.length) return false
-  if (state.turn.phase !== 'idle') getPipeline(sessionId).stream.stopRequested = true
-  conversationService.sendInterrupt(sessionId)
-  return true
-}
-
-async function readStoredReports(sessionId: string): Promise<SessionReportEntry[]> {
-  const state = await store.ensure(sessionId)
-  if (state.pendingReports.length === 0) return []
-  return sessionService.getPendingReports(sessionId)
-}
-
-function claimQueuedReports(sessionId: string, stored: SessionReportEntry[]): SessionReport[] {
-  const queued = new Set(store.peek(sessionId)?.pendingReports.map((report) => report.id))
-  return stored
-    .filter((entry) => queued.has(entry.id))
-    .map((entry) => ({
-      id: entry.id,
-      message: entry.message,
-      origin: buildSessionOrigin(entry.from.sessionId, entry.from.name, 'report', entry.summary),
-    }))
-}
-
-async function markReportsDelivered(sessionId: string, reports: SessionReport[]): Promise<void> {
-  if (reports.length === 0) return
-  const ids = reports.map((report) => report.id)
-  store.apply(sessionId, { type: 'reports_delivered', ids })
-  for (const report of reports) {
-    broadcastToSession(sessionId, { type: 'user_message', id: report.id, content: report.message, origin: report.origin })
-  }
-  await sessionService.appendSessionReportsDelivered(sessionId, ids).catch((error: unknown) => {
-    console.warn(`[SessionLinks] Could not record the delivered reports of ${sessionId}:`, error)
-  })
+function reportCliNotRunning(sessionId: string): DeliverUserTurnResult {
+  const message = 'CLI process is not running. The session may have ended or the process crashed.'
+  broadcastToSession(sessionId, { type: 'error', message, code: 'CLI_NOT_RUNNING' })
+  return { ok: false, code: 'CLI_NOT_RUNNING', message }
 }
 
 async function handleDesktopClearCommand(sessionId: string) {
@@ -786,14 +669,14 @@ function deferRestartUntilTurnEnds(sessionId: string, reason: RestartReason): bo
   if (store.get(sessionId).turn.phase === 'idle' || !conversationService.hasSession(sessionId)) return false
   store.apply(sessionId, { type: 'restart_queued', reason })
   console.log(`[WS] Deferring CLI restart for ${sessionId} until the current turn ends`)
-  void withdrawQueueFromCli(sessionId)
+  void turnQueue.withdrawFromCli(sessionId)
   return true
 }
 
 function runQueuedRestart(sessionId: string): void {
   const reason = store.peek(sessionId)?.process.pendingRestart
   if (!reason) return
-  const heldIds = store.peek(sessionId)?.queuedMessages.map((message) => message.id) ?? []
+  const heldIds = turnQueue.heldMessageIds(sessionId)
   void enqueueRuntimeTransition(sessionId, async () => {
     if (!store.peek(sessionId)?.process.pendingRestart) return
     const runtime = peekSessionRuntime(sessionId)
@@ -805,7 +688,7 @@ function runQueuedRestart(sessionId: string): void {
     }
     await restartSession(sessionId, reason)
   })
-    .then(() => redeliverQueuedMessages(sessionId, heldIds))
+    .then(() => turnQueue.redeliver(sessionId, heldIds))
     .catch((error: unknown) => {
       console.warn(`[WS] Could not resend the queued messages of ${sessionId} after a restart:`, error)
     })
@@ -946,7 +829,7 @@ function buildSdkUrl(sessionId: string): string {
 function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
   console.log(`[WS] Stop generation requested for session: ${sessionId}`)
-  if (interruptForQueue(sessionId)) return
+  if (turnQueue.interrupt(sessionId)) return
   getBrowserRuntime().service.stop(sessionId)
 
   getPipeline(sessionId).stream.stopRequested = true

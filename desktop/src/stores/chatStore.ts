@@ -822,6 +822,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }))
         : undefined
 
+    const existingSession = get().sessions[sessionId]
+    if (!isMemberSession && existingSession && isTurnRunning(existingSession) && !userFacingContent.startsWith('/')) {
+      wsManager.send(sessionId, { type: 'user_message', content, attachments, id: randomUUID() })
+      return
+    }
+
     const taskStore = useCLITaskStore.getState()
     const sessionTasks = taskStore.sessionId === sessionId ? taskStore.tasks : []
     const allTasksDone = sessionTasks.length > 0 && sessionTasks.every((t) => t.status === 'completed')
@@ -838,12 +844,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     const messageId = isMemberSession ? undefined : randomUUID()
-
-    const existingSession = get().sessions[sessionId]
-    if (!isMemberSession && existingSession && isTurnRunning(existingSession) && !userFacingContent.startsWith('/')) {
-      wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId })
-      return
-    }
 
     set((s) => {
       const session = s.sessions[sessionId] ?? createDefaultSessionState()

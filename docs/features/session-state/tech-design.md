@@ -231,6 +231,8 @@ type SessionState = {
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
+  pendingReports: PendingReport[]
+  queuedMessages: QueuedMessage[]
   team: { name: string; role: 'lead' | 'member' } | null
   clientCount: number
 }
@@ -258,6 +260,8 @@ type RuntimeSelection = { providerId: string | null; modelId: string; effort?: s
 | `slashCommands` | OutputPipeline（`init`）、插件重载 | 否 | — |
 | `activeGoal` | OutputPipeline | 由 transcript 推导（现状） | 本地命令输出条目 |
 | `backgroundTasks` | OutputPipeline | 由 transcript 推导（现状） | — |
+| `pendingReports` | session 之间的汇报（排队、随下一轮送达） | 是 | `session-report`、`session-report-delivered` |
+| `queuedMessages` | 一轮进行中用户发的消息（排队、开始处理、撤回） | 否，CLI 退出即清空 | — |
 | `team` | team 服务 | 在 team 文件里（现状） | — |
 | `clientCount` | SessionHub | 否 | — |
 
@@ -298,7 +302,10 @@ CLI 源码注释提到，末尾的 `idle` 事件曾让一些客户端卡在「�
 - 新增 `{ type: 'request_snapshot' }`。
 - `set_runtime_config`：语义改为「用户主动修改」，连接时不再发送。
 - `permission_response`：增加「已被处理」的错误码，用于其他端已经回复的情况。
+- `cancel_queued_message`（撤回一条排队的消息）和 `send_queued_now`（打断当前这一轮，接着处理排队的消息）。
 - 其余请求不变。
+
+`pendingReports`、`queuedMessages` 两个字段和上面两条消息的行为，见 [session-links 的技术设计](../session-links/tech-design.md)的“一轮进行中用户发的消息”和“汇报”。
 
 ### 被取代的消息
 

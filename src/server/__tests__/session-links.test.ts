@@ -9,6 +9,7 @@ import {
   type UserTurnDelivery,
 } from '../services/sessionLinksService.js'
 import { sessionService } from '../services/sessionService.js'
+import { createTurnQueue } from '../services/turnQueueService.js'
 import { sessionStateStore } from '../session/state/store.js'
 import { pendingReportsFromEntries } from '../transcript/entries.js'
 import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
@@ -468,10 +469,11 @@ describe('session links service', () => {
       deliveries.push({ sessionId, content, origin })
       return { ok: true }
     }
-    links = createSessionLinks(
-      (sessionId, content, origin) => deliver(sessionId, content, origin),
-      (sessionId, title) => renamed.push({ sessionId, title }),
-    )
+    links = createSessionLinks({
+      deliver: (sessionId, content, origin) => deliver(sessionId, content, origin),
+      queueReport: createTurnQueue(() => {}, async () => {}).queueReport,
+      onRenamed: (sessionId, title) => renamed.push({ sessionId, title }),
+    })
     spyOn(console, 'log').mockImplementation(() => {})
     spyOn(console, 'warn').mockImplementation(() => {})
     spyOn(conversationService, 'respondToHostRequest').mockImplementation((_sessionId, requestId, result) => {
@@ -486,9 +488,10 @@ describe('session links service', () => {
   })
 
   describe('session_start', () => {
-    it('creates a spawned child in the caller folder with its title and mode, and delivers the brief', async () => {
+    it('creates a spawned child in the caller folder with its title, mode and model, and delivers the brief', async () => {
       await writeConversation(callerId, {}, 'Lead session')
       sessionStateStore.apply(callerId, { type: 'permission_desired_changed', mode: 'acceptEdits' })
+      sessionStateStore.apply(callerId, { type: 'runtime_desired_changed', selection: { providerId: 'p1', modelId: 'm1', effort: 'high' } })
 
       const reply = await request({
         subtype: 'session_start',
@@ -506,6 +509,7 @@ describe('session links service', () => {
       expect('name' in info!).toBe(false)
       expect(await sessionService.getSessionWorkDir(sessionId)).toBe(workDir)
       expect(await sessionService.getSessionPermissionMode(sessionId)).toBe('acceptEdits')
+      expect((await sessionService.getSessionRestoreInfo(sessionId))?.runtime).toEqual({ providerId: 'p1', modelId: 'm1', effort: 'high' })
       expect(deliveries).toEqual([
         {
           sessionId,
@@ -548,8 +552,10 @@ describe('session links service', () => {
       expect((meta?.repository as { worktree: boolean }).worktree).toBe(true)
     })
 
-    it('forks the caller conversation as a spawned child', async () => {
+    it('forks the caller conversation as a spawned child with the caller mode and model', async () => {
       await writeConversation(callerId, {}, 'Lead session')
+      sessionStateStore.apply(callerId, { type: 'permission_desired_changed', mode: 'acceptEdits' })
+      sessionStateStore.apply(callerId, { type: 'runtime_desired_changed', selection: { providerId: 'p1', modelId: 'm1' } })
 
       const reply = await request({
         subtype: 'session_start',
@@ -564,6 +570,8 @@ describe('session links service', () => {
       expect(info).toMatchObject({ title: 'Forked helper', parent: { sessionId: callerId, kind: 'spawned' } })
       const messages = await sessionService.getSessionMessages(childId)
       expect(messages.map((message) => message.type)).toEqual(['user', 'assistant'])
+      expect(await sessionService.getSessionPermissionMode(childId)).toBe('acceptEdits')
+      expect((await sessionService.getSessionRestoreInfo(childId))?.runtime).toEqual({ providerId: 'p1', modelId: 'm1' })
       expect(deliveries[0]).toMatchObject({ sessionId: childId, content: 'continue from here', origin: { purpose: 'brief', sessionId: callerId } })
     })
 
@@ -730,6 +738,19 @@ describe('session links service', () => {
 
       expect(reply.error).toBe('boom')
       expect((await sessionService.listSessions()).sessions.map((session) => session.id)).toEqual([callerId])
+    })
+
+    it('still reports the start error when the new session cannot be removed', async () => {
+      await writeConversation(callerId)
+      deliver = async () => ({ ok: false, message: 'CLI failed to start' })
+      spyOn(sessionService, 'deleteSession').mockRejectedValue(new Error('locked'))
+      const unmark = spyOn(conversationService, 'unmarkSessionDeleted')
+
+      const reply = await request({ subtype: 'session_start', prompt: 'go', title: 'Stuck', context: 'fresh', worktree: false })
+
+      expect(reply.error).toBe('CLI failed to start')
+      expect(unmark).toHaveBeenCalledTimes(1)
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('locked'))
     })
 
     it('rejects a malformed request', async () => {
@@ -963,6 +984,16 @@ describe('session links service', () => {
         },
       ])
       expect((await readEntries(parentId)).some((entry) => entry.type === 'session-report')).toBe(false)
+      expect(sessionStateStore.peek(parentId)?.pendingReports).toEqual([])
+    })
+
+    it('answers with the error and queues nothing when the report cannot be stored', async () => {
+      await writeFamily()
+      spyOn(sessionService, 'appendSessionReport').mockRejectedValue(new Error('disk full'))
+
+      const reply = await sendReport(parentId)
+
+      expect(reply.error).toBe('disk full')
       expect(sessionStateStore.peek(parentId)?.pendingReports).toEqual([])
     })
 

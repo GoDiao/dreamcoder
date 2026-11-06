@@ -12,13 +12,15 @@ import {
 } from '../../entrypoints/sdk/controlSchemas.js'
 import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { buildSessionOrigin, sanitizeDisplayName } from '../../utils/crossSessionEnvelope.js'
+import { errorMessage } from '../../utils/errors.js'
 import { createSessionBranch, SessionBranchingError } from '../../utils/sessionBranching.js'
 import { SESSION_ID_PATTERN } from '../sessionId.js'
 import { sessionStateStore } from '../session/state/store.js'
 import { conversationService } from './conversationService.js'
 import { removeAgentWorktree } from '../../utils/worktree.js'
 import { prepareSessionWorkspace } from './repositoryLaunchService.js'
-import { sessionService, type SessionRelation } from './sessionService.js'
+import { sessionService } from './sessionService.js'
+import type { QueuedReport } from './turnQueueService.js'
 
 const MAX_LISTED_SESSIONS = 500
 const FORKED_SESSION_NOTE =
@@ -39,25 +41,14 @@ type CliControlRequest = {
 
 const SESSION_REQUEST_SUBTYPES = new Set(['session_start', 'session_send', 'session_list', 'session_rename'])
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+export type SessionLinksDeps = {
+  deliver: UserTurnDelivery
+  queueReport: (to: string, report: QueuedReport) => Promise<void>
+  onRenamed: SessionRenamed
 }
 
-export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: SessionRenamed) {
+export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionLinksDeps) {
   const store = sessionStateStore
-
-  async function describe(sessionId: string): Promise<(SessionRelation & { title: string }) | null> {
-    return sessionService.getSessionLinkInfo(sessionId)
-  }
-
-  function originFor(
-    sessionId: string,
-    info: SessionRelation & { title: string },
-    purpose: SessionOrigin['purpose'],
-    summary?: string,
-  ): SessionOrigin {
-    return buildSessionOrigin(sessionId, info.title, purpose, summary)
-  }
 
   async function removeWorktree(
     repository: { repoRoot?: string; worktreePath?: string; worktreeBranch?: string } | undefined,
@@ -134,7 +125,7 @@ export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: Session
   }
 
   async function startSession(callerId: string, request: SDKControlSessionStartRequest): Promise<SDKControlSessionStartResponse> {
-    const callerInfo = await describe(callerId)
+    const callerInfo = await sessionService.getSessionLinkInfo(callerId)
     if (!callerInfo) throw new Error(`Session not found: ${callerId}`)
     const title = request.title.trim()
     if (!title) throw new Error('A session needs a title')
@@ -142,31 +133,13 @@ export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: Session
     const childId = await createChild(callerId, request, title)
     try {
       await sessionService.renameSession(childId, title)
-      const delivery = await deliver(childId, request.prompt, originFor(callerId, callerInfo, 'brief', title))
+      const delivery = await deliver(childId, request.prompt, buildSessionOrigin(callerId, callerInfo.title, 'brief', title))
       if (!delivery.ok) throw new Error(delivery.message ?? 'The session could not be started')
     } catch (error) {
       await discard(childId)
       throw error
     }
     return { sessionId: childId, title }
-  }
-
-  async function queueReport(
-    callerId: string,
-    callerInfo: SessionRelation & { title: string },
-    to: string,
-    message: string,
-    summary: string,
-  ): Promise<void> {
-    const report = {
-      id: crypto.randomUUID(),
-      from: { sessionId: callerId, name: callerInfo.title },
-      summary,
-      createdAt: Date.now(),
-    }
-    await store.ensure(to)
-    await sessionService.appendSessionReport(to, { ...report, message })
-    store.apply(to, { type: 'report_queued', report })
   }
 
   async function sendToSession(
@@ -178,9 +151,9 @@ export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: Session
   ): Promise<SDKControlSessionSendResponse> {
     if (!SESSION_ID_PATTERN.test(to)) return { delivered: false, error: `Not a session id: ${to}` }
     if (to === callerId) return { delivered: false, error: 'A session cannot message itself.' }
-    const target = await describe(to)
+    const target = await sessionService.getSessionLinkInfo(to)
     if (!target) return { delivered: false, error: `Session not found: ${to}` }
-    const callerInfo = await describe(callerId)
+    const callerInfo = await sessionService.getSessionLinkInfo(callerId)
     if (!callerInfo) return { delivered: false, error: `Session not found: ${callerId}` }
 
     if (mode === 'report') {
@@ -189,12 +162,12 @@ export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: Session
       }
       const parentTurnRunning = (store.peek(to)?.turn.phase ?? 'idle') !== 'idle'
       if (!parentTurnRunning) {
-        await queueReport(callerId, callerInfo, to, message, summary)
+        await queueReport(to, { from: { sessionId: callerId, name: callerInfo.title }, message, summary })
         return { delivered: true }
       }
     }
 
-    const delivery = await deliver(to, message, originFor(callerId, callerInfo, mode, summary)).catch(
+    const delivery = await deliver(to, message, buildSessionOrigin(callerId, callerInfo.title, mode, summary)).catch(
       (error: unknown) => ({ ok: false, message: errorMessage(error) }),
     )
     return delivery.ok ? { delivered: true } : { delivered: false, error: delivery.message ?? 'The message could not be delivered' }
@@ -203,7 +176,7 @@ export function createSessionLinks(deliver: UserTurnDelivery, onRenamed: Session
   async function listSessions(callerId: string, project?: string): Promise<SDKControlSessionListResponse> {
     const [{ sessions }, callerInfo] = await Promise.all([
       sessionService.listSessions({ project, limit: MAX_LISTED_SESSIONS }),
-      describe(callerId),
+      sessionService.getSessionLinkInfo(callerId),
     ])
     return {
       sessions: sessions.map((session) => {

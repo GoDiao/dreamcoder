@@ -42,11 +42,7 @@ import { permissionModeFromTranscriptEntries } from './permissionModes.js'
 import { runtimeSelectionFromTranscriptEntries } from './runtimeSelection.js'
 import type { RuntimeSelection } from '../session/state/types.js'
 import { queuedCommandSourceUuid } from '../../utils/queuedCommandEntry.js'
-
-export type SessionParent = {
-  sessionId: string
-  kind: 'spawned' | 'forked'
-}
+import type { SessionParent } from '../../utils/sessionBranching.js'
 
 export type SessionRelation = {
   parent?: SessionParent

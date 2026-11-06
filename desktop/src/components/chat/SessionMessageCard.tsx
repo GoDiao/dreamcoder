@@ -13,13 +13,6 @@ const PURPOSE_LABEL_KEYS: Record<SessionOrigin['purpose'], TranslationKey> = {
   report: 'chat.sessionMessage.purpose.report',
 }
 
-const PREVIEW_MAX_LENGTH = 80
-
-function previewOf(summary: string | undefined, content: string): string {
-  const text = summary?.trim() || content.match(/\S[^\r\n]*/)?.[0]?.replace(/\s+/g, ' ').trim() || ''
-  return text.length > PREVIEW_MAX_LENGTH ? `${text.slice(0, PREVIEW_MAX_LENGTH)}…` : text
-}
-
 type Props = {
   content: string
   origin: SessionOrigin
@@ -29,7 +22,7 @@ type Props = {
 export const SessionMessageCard = memo(function SessionMessageCard({ content, origin, timestamp }: Props) {
   const t = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const preview = previewOf(origin.summary, content)
+  const preview = origin.summary
 
   return (
     <div data-message-shell="session" className="group mb-1 flex w-full min-w-0 flex-col">

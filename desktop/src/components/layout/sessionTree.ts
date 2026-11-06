@@ -6,11 +6,6 @@ export type SessionTreeRow = {
   childCount: number
 }
 
-function modifiedAtOf(session: SessionListItem): number {
-  const timestamp = new Date(session.modifiedAt).getTime()
-  return Number.isFinite(timestamp) ? timestamp : 0
-}
-
 export function buildSessionTreeRows(sessions: SessionListItem[]): SessionTreeRow[] {
   const ids = new Set(sessions.map((session) => session.id))
   const childrenByParent = new Map<string, SessionListItem[]>()
@@ -24,9 +19,6 @@ export function buildSessionTreeRows(sessions: SessionListItem[]): SessionTreeRo
     } else {
       roots.push(session)
     }
-  }
-  for (const siblings of childrenByParent.values()) {
-    siblings.sort((a, b) => modifiedAtOf(b) - modifiedAtOf(a))
   }
 
   const rows: SessionTreeRow[] = []

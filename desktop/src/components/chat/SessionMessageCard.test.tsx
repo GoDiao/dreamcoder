@@ -32,13 +32,6 @@ describe('SessionMessageCard', () => {
     expect(screen.queryByRole('button', { name: 'Copy prompt' })).not.toBeInTheDocument()
   })
 
-  it('previews the first line of the body when there is no summary', () => {
-    render(<SessionMessageCard content={'First line\nSecond line'} origin={origin} />)
-
-    expect(screen.getByText('First line')).toBeInTheDocument()
-    expect(screen.queryByText(/Second line/)).not.toBeInTheDocument()
-  })
-
   it('expands to the body as markdown, with the copy action', () => {
     render(<SessionMessageCard content={'Result: **all green**'} origin={origin} />)
 

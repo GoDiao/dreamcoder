@@ -1,6 +1,6 @@
 # Session 之间的关系、消息与创建：技术设计
 
-状态：草案，维护者已同意方向（2026-11-03），边写边实现，分支 `feat/session-links`。基线：`main` 的 `15d77052`。文中的代码位置以这个提交为准。
+状态：已实现，随 [#239](https://github.com/GoDiao/dreamcoder/pull/239) 合并。基线：`main` 的 `15d77052`。“现状”一节和其他地方引用的行号都以这个提交为准，之后代码变了，行号可能对不上。
 
 ## 背景
 
@@ -69,7 +69,7 @@ CLI 已经有 `origin`（`MessageOrigin`）这个概念，用来区分用户输�
 
 ### 继承来的 UDS inbox 是空壳
 
-`feature('UDS_INBOX')` 在开发模式和打包后都是关的（`build-sidecars.ts` 的 `Bun.build` 没有打开任何 feature，实测打包产物里它被替换成常量）。即使打开，真正干活的模块也都是空壳：[udsMessaging.ts](../../../src/utils/udsMessaging.ts)、[udsClient.ts](../../../src/utils/udsClient.ts)、[ListPeersTool.ts](../../../src/tools/ListPeersTool/ListPeersTool.ts)、[peerSessions.ts](../../../src/bridge/peerSessions.ts) 的第一行都是 `// @generated stub from scan-missing-imports`。调用点散落在：
+`feature('UDS_INBOX')` 在开发模式和打包后都是关的（`build-sidecars.ts` 的 `Bun.build` 没有打开任何 feature，实测打包产物里它被替换成常量）。即使打开，真正干活的模块也都是空壳：`src/utils/udsMessaging.ts`、`src/utils/udsClient.ts`、`src/tools/ListPeersTool/ListPeersTool.ts`、`src/bridge/peerSessions.ts`（都已随本设计删除）的第一行都是 `// @generated stub from scan-missing-imports`。调用点散落在：
 
 - `SendMessage` 的 `uds:` 和 `bridge:` 分支（[SendMessageTool.ts:586](../../../src/tools/SendMessageTool/SendMessageTool.ts)、[:614](../../../src/tools/SendMessageTool/SendMessageTool.ts)、[:742](../../../src/tools/SendMessageTool/SendMessageTool.ts)）和提示词（[prompt.ts:6](../../../src/tools/SendMessageTool/prompt.ts)）
 - `ListPeers` 工具注册（[tools.ts:132](../../../src/tools.ts)）、`/peers` 命令（[commands.ts:109](../../../src/commands.ts)）
@@ -142,8 +142,8 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 1. **SDK 用户消息增加 `origin` 字段。** server 写给 CLI 的用户消息，如果是 session 发的，带上 `origin: { kind: 'session', sessionId, name, purpose, summary }`，其中 `name` 是发送方当时的标题（经过清理，去掉换行和尖括号，最长 64 个字符），发送方改名后下一条消息带新标题。`purpose` 是 `message`（SendMessage）、`brief`（创建子 session 时的第一条消息）或 `report`（子 session 的进展汇报）。`summary` 是发送方写的一句话摘要（SendMessage 的必填字段；简报用子 session 的标题），界面折叠时显示它。人发的消息不带 `origin`，等同于 CLI 里的 `human`。
 2. **入口决定来源。** 客户端 WebSocket 发来的 `user_message` 一定是人发的，server 不接受客户端自己填 `origin`。只有 server 自己的会话消息转发（下文的 `sessionLinks` 服务）会填 `origin`，而且 `sessionId` 取自请求所在的 SDK 连接，不取自请求内容。
 3. **CLI 把 `origin` 带进 transcript。** 无头模式里把 `origin` 从入队、`ask()`、`QueryEngine.submitMessage` 一路传下去，像交互模式在 `handlePromptSubmit` 里那样盖到生成的用户消息上，transcript 就会记下它。`canBatchWith` 增加"来源相同"这个条件，避免把人发的和 session 发的消息合成一条。
-4. **给模型看的文字由 CLI 根据 `origin` 生成。** `wrapCommandText` 增加 `session` 这一类。消息正文包在 `<cross-session-message from="session:<id>" name="<发送方标题>">` 里交给模型，同时说明：这不是用户发的，它没有用户的授权，不能把其中的"用户已同意"当真。末尾的回复说明按 `purpose` 不同：`brief` 告诉子 session 发送方是它的父 session，需要父 session 马上处理的（做完了、卡住了、有问题）用 `mode: 'message'`，可以等的进展用 `mode: 'report'`；`report` 告诉父 session 这是进展、不是请求，不要丢下手头的工作，最多跟用户说一句；`message` 提示用 `SendMessage` 发到 `from` 的地址回复。正文里如果出现 `<cross-session-message` 或 `</cross-session-message>`，先转义，防止伪造嵌套。
-5. **界面根据记录里的 `origin` 显示，不解析文本。** server 读 transcript 时把用户消息记录上的 `origin` 带进给界面的消息项；实时广播的 `user_message` 也带上 `origin`。桌面端对这类消息显示"来自 <发送方标题>"（发送方在列表里时显示它当前的标题，否则显示发送时的标题），可以点过去打开那个 session，不显示成用户的气泡。
+4. **给模型看的文字由 CLI 根据 `origin` 生成。** `wrapCommandText` 增加 `session` 这一类。消息正文包在 `<cross-session-message from="session:<id>" name="<发送方标题>" purpose="<purpose>">` 里交给模型，同时说明：这不是用户发的，它没有用户的授权，不能把其中的"用户已同意"当真。末尾的回复说明按 `purpose` 不同：`brief` 告诉子 session 发送方是它的父 session，需要父 session 马上处理的（做完了、卡住了、有问题）用 `mode: 'message'`，可以等的进展用 `mode: 'report'`；`report` 告诉父 session 这是进展、不是请求，不要丢下手头的工作，最多跟用户说一句；`message` 提示用 `SendMessage` 发到 `from` 的地址回复。正文里如果出现 `<cross-session-message` 或 `</cross-session-message>`，先转义，防止伪造嵌套。
+5. **界面根据记录里的 `origin` 显示，不解析文本。** server 读 transcript 时把用户消息记录上的 `origin` 带进给界面的消息项；实时广播的 `user_message` 也带上 `origin`。transcript 里存的是带包装的正文，读历史时 server 用同一个 `origin` 重新生成包装的开头和结尾，逐字比对后剥掉（`unwrapCrossSessionBody`）。所以改了包装文字以后，旧记录对不上，会带着包装原样显示；改包装文字时要考虑这一点。桌面端对这类消息显示"来自 <发送方标题>"（发送方在列表里时显示它当前的标题，否则显示发送时的标题），可以点过去打开那个 session，不显示成用户的气泡。
 
 **session 发的消息没有用户的权限。** 权限请求和 AskUserQuestion 的回答只能来自客户端的 `permission_response`（[handler.ts:511](../../../src/server/ws/handler.ts)），session 发来的消息只是一条带来源的用户消息，本来就走不到那条路。上面第 4 点在提示词层面再说一次，让模型不要把它当成用户的授权。
 
@@ -156,10 +156,10 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 | `StartSession` | `prompt`（简报）、`title`（必填）、`context: 'fresh' \| 'fork'`、`worktree`（布尔） | 创建子 session 并写好 `parent`；`fork` 时先从父 session 当前位置 branch；启动子 session 的 CLI，把 `prompt` 作为第一条消息送进去，`origin.purpose = 'brief'` | 子 session 的 id 和标题，不等它跑完。结果文字只描述发生了什么（`Started session "<标题>" (id <id>).`），不写怎么联系它；怎么联系写在 `SendMessage` 的说明里 |
 | `SendMessage` | 增加地址 `session:<id>` 和 `mode`（`message` / `report`）；发往 session 时 `summary` 可以不填，自动取正文第一行（最长 80 字符） | 校验对方存在；送达（必要时先启动对方的 CLI） | 是否送达 |
 | `RenameSession` | `title` | 只改调用方自己的 session：清理标题（去掉换行和尖括号），空的拒绝；走和用户在界面上改名相同的路径，写成自定义标题，自动生成标题不再覆盖它，会话状态里的 `title` 更新，侧栏随之变化 | 清理后的标题 |
-| `ListSessions` | 可选的项目过滤 | 列出所有 session，按最近活动排序 | 每个 session 的 id、标题、项目、父 session、和调用方的关系（父、子、无）、运行状态 |
+| `ListSessions` | 可选的项目过滤 | 列出所有 session，按最近活动排序 | 每个 session 的 id、标题、项目、父 session、和调用方的关系（自己、父、子、无）、运行状态 |
 
-- **子 session 继承父 session 的工作目录、权限模式和模型设置。** `worktree: true` 时，在父 session 的仓库里新建一个 worktree，用的是 `createSession` 现有的 `repository` 参数。
-- **`StartSession` 每次都要用户确认，不受权限模式影响。** `bypassPermissions` 和自动模式也跳不过：它返回 `safetyCheck` 类型的 ask，并设 `classifierApprovable: false`，和原来 `bridge:` 发送的做法一样（[SendMessageTool.ts:586](../../../src/tools/SendMessageTool/SendMessageTool.ts)）。`SendMessage` 发往 session 不需要确认。更细的权限规则留给 agent teams（#162）去定。
+- **子 session 继承父 session 的工作目录、权限模式和模型设置。** `worktree: true` 时，在父 session 的仓库里新建一个 worktree：fresh 用的是 `createSession` 现有的 `repository` 参数；fork 先用 `prepareSessionWorkspace` 建好 worktree，再把它作为 `workspace` 传给 `createSessionBranch`。
+- **`StartSession` 每次都要用户确认，不受权限模式影响。** `bypassPermissions` 和自动模式也跳不过：它返回 `safetyCheck` 类型的 ask，并设 `classifierApprovable: false`，和原来 `bridge:` 发送的做法一样（[SendMessageTool.ts:586](../../../src/tools/SendMessageTool/SendMessageTool.ts)）。`SendMessage` 发往 session 不需要确认。更细的权限规则留给 agent teams（#162）去定。`StartSession` 和 `RenameSession` 一样在 `ALL_AGENT_DISALLOWED_TOOLS` 里，子 agent 不能用。
 - **`SendMessage` 现有的队员和子 agent 路由不变。** 只是把 `uds:` / `bridge:` 换成 `session:`。结构化消息（`shutdown_request` 等）不能发往 session。原来这个工具只在 agent teams 打开时启用；现在 session-links 打开时也启用。只开 session-links 时，工具说明里只有 `session:<id>`，发往其他地址会被拒绝。
 - **发出消息或创建 session 后结束这一轮，不编造对方的回复。** 实测中父 session 发完消息后写"等待回复…"，然后照着前几轮的样子自己续写了一段 `<cross-session-message>`。`SendMessage` 和 `StartSession` 的说明里写明：简短告诉用户做了什么就结束这一轮；回复之后作为新消息送来，永远不是自己写的；不要以任何形式编造或预测对方的回复；用户追问时只说还没回复。写法照 Claude Code 后台 agent 和协调者模式的提示（[AgentTool/prompt.ts:93](../../../src/tools/AgentTool/prompt.ts)、[coordinatorMode.ts:140](../../../src/coordinator/coordinatorMode.ts)）。
 - **fork 出来的子 session 知道父 session 那一轮不归它。** agent 调 `StartSession` 时，父 session 正在一轮当中，复制过去的对话结尾是父 session 这一轮的指令和还没有结果的 `StartSession` 调用。CLI 恢复时会丢掉没有结果的调用（[conversationRecovery.ts:187](../../../src/utils/conversationRecovery.ts)），父 session 的指令就像一条没做完的任务，子 session 会接着去做。所以 fork 时 server 给每个没有结果的调用补一条结果，说明"这次调用创建了你所在的 session，上面这一轮由父 session 继续，你只做下一条消息"，再补一条合成的 assistant 回复，让这一轮完整结束，之后再送简报。Claude Code 的 fork 子 agent 用的是同一个做法（[forkSubagent.ts:107](../../../src/tools/AgentTool/forkSubagent.ts)）。用户在界面上 fork 不走这一步。
@@ -177,7 +177,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 
 ### 一轮进行中用户发的消息
 
-session 发来的消息照上面的规则插进当前这一轮；**用户自己发的消息默认排到下一轮**，不再插话。CLI 的消息队列本来就有三档优先级（[textInputTypes.ts:278](../../../src/types/textInputTypes.ts)）：`later` 等这一轮结束再作为新的一轮处理，`next` 在下一次工具调用后插进当前这一轮，`now` 立即中断当前这一轮。排队就放在 CLI 的队列里，server 只同步一份状态给界面。
+session 发来的消息照上面的规则插进当前这一轮；**用户自己发的消息默认排到下一轮**，不再插话。CLI 的消息队列本来就有三档优先级（[textInputTypes.ts:278](../../../src/types/textInputTypes.ts)）：`later` 等这一轮结束再作为新的一轮处理，`next` 在下一次工具调用后插进当前这一轮，`now` 立即中断当前这一轮。排队就放在 CLI 的队列里，server 只同步一份状态给界面。排队的判断、撤回、重启前后的暂存与重发，以及下面“汇报”的排队、认领和标记送达，都在 server 的 `turnQueueService` 里；`deliverUserTurn` 和 ws handler 只调用它。
 
 - **发送：** 一轮进行中（或者队列里还有没处理的消息），用户发的非斜杠命令消息带 `priority: 'later'` 交给 CLI，记进会话状态的 `queuedMessages`（id、正文、附件数、时间），不广播、不标记新一轮开始。
 - **开始处理：** CLI 处理每条消息时用同一个 uuid 回放（`--replay-user-messages`）。server 收到排队消息的回放，就把它移出 `queuedMessages`、广播这条 `user_message`、标记新一轮开始；界面这时才把它显示在对话里。
@@ -204,13 +204,14 @@ session 发来的消息照上面的规则插进当前这一轮；**用户自己�
 
 - **侧栏嵌套。** 在项目分组内，子 session 显示在父 session 下面，缩进并带一条连线；父 session 行上有展开/收起的按钮，收起状态按 session 记在客户端。子 session 和父 session 不在同一个项目分组时（例如子 session 换了工作目录），子 session 留在自己的分组里平铺显示。fork 和 spawn 用不同的小图标区分。
 - **消息来源。** `origin.kind === 'session'` 的用户消息显示成和思维链、工具调用一样的单行折叠条：图标、"来自 <发送方标题>"、`brief` / `message` / `report` 的标签和摘要，点开看正文。点击来源可以打开那个 session。
+- **排队的消息。** 会话状态的 `queuedMessages` 不为空时，输入框上方显示排队条：每条的正文和附件数，各带一个“撤回”；条上有“立即发送”。这些消息开始处理之前不显示成对话里的气泡，开始处理时才出现。队列里有消息时，输入框的“停止”按钮等同于“立即发送”。
 - **待送达的汇报。** 父 session 的 `pendingReports` 不为空时，输入框附近显示"N 条进展待送达"，展开是每条的发送方、摘要和时间，并说明它们会随下一条消息送达。实时界面里，随某条消息送达的汇报排在这条消息前面，和刷新后的历史一致。
 - **H5** 用的是同一套前端，侧栏和消息卡片自然覆盖。
 - 所有文字走 i18n，中英文都要加，两种主题都要检查。
 
 ### 删掉的东西
 
-`UDS_INBOX` 相关的调用点全部删掉，包括 `SendMessage` 里的 `uds:` / `bridge:` 分支和提示词、`ListPeers` 工具、`/peers` 命令、启动时绑定 socket 和 `--messaging-socket-path` 参数、pid 文件里的 socket 字段、init 消息里的 socket 字段、无头模式的收件唤醒、终端界面里 `<cross-session-message>` 的渲染分支，以及 [udsMessaging.ts](../../../src/utils/udsMessaging.ts)、[udsClient.ts](../../../src/utils/udsClient.ts)、[ListPeersTool](../../../src/tools/ListPeersTool)、[peerSessions.ts](../../../src/bridge/peerSessions.ts) 这些空壳。`CROSS_SESSION_MESSAGE_TAG`（[xml.ts:59](../../../src/constants/xml.ts)）保留，新的包装用它。
+`UDS_INBOX` 相关的调用点全部删掉，包括 `SendMessage` 里的 `uds:` / `bridge:` 分支和提示词、`ListPeers` 工具、`/peers` 命令、启动时绑定 socket 和 `--messaging-socket-path` 参数、pid 文件里的 socket 字段、init 消息里的 socket 字段、无头模式的收件唤醒、终端界面里 `<cross-session-message>` 的渲染分支，以及 `src/utils/udsMessaging.ts`、`src/utils/udsClient.ts`、`src/tools/ListPeersTool`、`src/bridge/peerSessions.ts` 这些空壳。pid 文件里给 peer 去重用的 `bridgeSessionId` 字段没有人再读，写它的 `updateSessionBridgeId` 和 `getSelfBridgeCompatId` 也一起删掉。`CROSS_SESSION_MESSAGE_TAG`（[xml.ts:59](../../../src/constants/xml.ts)）保留，新的包装用它。
 
 ## 主要流程
 
@@ -258,7 +259,7 @@ B -> B : 包装成 <cross-session-message from="session:A">\n闲着则开一轮
 
 - **目标不存在：** `SendMessage` 返回失败和原因，不送达。
 - **目标 CLI 启动失败：** 返回失败，带上启动错误，和用户发消息时看到的错误一致。
-- **子 session 创建失败**（例如 worktree 建不出来）：`StartSession` 返回失败，已经写下的 transcript 文件删掉。
+- **子 session 创建失败**（例如 worktree 建不出来、CLI 启动失败、简报送不进去）：`StartSession` 返回失败，已经写下的 transcript 文件删掉，为它新建的 worktree 和分支也删掉。删除本身失败时只记日志，返回的仍是原来的错误。
 - **汇报发给不是自己父 session 的 session：** 返回失败。
 - **父 session 已被删除：** 汇报和消息都返回目标不存在。
 - **父 session 的一轮在 server 判断"在跑"之后、汇报送到之前结束：** 这条汇报会让 CLI 开新的一轮。不加额外处理。

@@ -248,6 +248,19 @@ describe('a user message sent during a turn', () => {
   })
 })
 
+describe('a user message sent during a turn when the CLI is gone', () => {
+  it('reports that the CLI is not running and queues nothing', async () => {
+    startTurn()
+    cli.sendMessage.mockReturnValue(false)
+
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'user_message', content: 'lost', id: crypto.randomUUID() }))
+    await waitFor(() => received(desktop).some((msg) => msg.type === 'error'))
+
+    expect(received(desktop).find((msg) => msg.type === 'error')).toMatchObject({ code: 'CLI_NOT_RUNNING' })
+    expect(queuedIds(sessionId)).toEqual([])
+  })
+})
+
 describe('a message from another session during a turn', () => {
   it('is injected as before and not queued', async () => {
     startTurn()
@@ -397,6 +410,19 @@ describe('sending the queue now', () => {
     expect(queuedIds(sessionId)).toHaveLength(1)
   })
 
+  it('nudges the CLI between two turns while something is still queued', async () => {
+    startTurn()
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'user_message', content: 'urgent', id: crypto.randomUUID() }))
+    await waitFor(() => queuedIds(sessionId).length === 1)
+    sessionStateStore.apply(sessionId, { type: 'turn_ended' })
+
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'send_queued_now' }))
+
+    expect(cli.sendInterrupt).toHaveBeenCalledTimes(1)
+    expect(sessionStateStore.peek(sessionId)?.turn.phase).toBe('idle')
+    expect(queuedIds(sessionId)).toHaveLength(1)
+  })
+
   it('does nothing when nothing is queued', async () => {
     startTurn()
 
@@ -487,5 +513,26 @@ describe('queued messages and a restart at the end of the turn', () => {
     const resent = cli.sendMessage.mock.calls.slice(1).map((call) => [call[1], call[3], call[6]])
     expect(resent).toEqual([['one', first, undefined], ['two', second, 'later']])
     expect(queuedIds(sessionId)).toEqual([second])
+  })
+
+  it('tells the clients when a held message cannot be sent again', async () => {
+    const { sessionService } = await import('../services/sessionService.js')
+    spyOn(sessionService, 'appendSessionRuntimeConfig').mockResolvedValue()
+    sessionStateStore.apply(sessionId, { type: 'runtime_desired_changed', selection: { providerId: null, modelId: 'model-a' } })
+    startTurn()
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'user_message', content: 'one', id: crypto.randomUUID() }))
+    await waitFor(() => queuedIds(sessionId).length === 1)
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'set_runtime_config', providerId: null, modelId: 'model-b' }))
+    await waitFor(() => cli.cancelQueuedMessage.mock.calls.length === 1)
+    handleWebSocket.message(desktop, JSON.stringify({ type: 'set_runtime_config', providerId: null, modelId: 'model-a' }))
+    await waitFor(() => sessionStateStore.peek(sessionId)?.runtime.desired?.modelId === 'model-a')
+    cli.sendMessage.mockReturnValue(false)
+    desktop.sent.length = 0
+
+    cli.emit({ type: 'result', usage: { input_tokens: 0, output_tokens: 0 } })
+    await waitFor(() => received(desktop).some((msg) => msg.type === 'error'))
+
+    expect(received(desktop).find((msg) => msg.type === 'error')).toMatchObject({ code: 'CLI_NOT_RUNNING' })
+    expect(queuedIds(sessionId)).toEqual([])
   })
 })

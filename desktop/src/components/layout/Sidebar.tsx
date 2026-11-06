@@ -11,7 +11,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import type { SessionListItem } from '../../types/session'
+import type { SessionListItem, SessionParent } from '../../types/session'
 import { useTabStore, ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
@@ -97,10 +97,10 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [lastSelectedSessionId, setLastSelectedSessionId] = useState<string | null>(null)
   const [expandedProjectKeys, setExpandedProjectKeys] = useState<Set<string>>(new Set())
   const [collapsedProjectKeys, setCollapsedProjectKeys] = useState<Set<string>>(new Set())
-  const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(() => readStoredCollapsedSessions())
-  const [projectOrder, setProjectOrder] = useState<string[]>(() => readStoredProjectOrder())
-  const [pinnedProjectKeys, setPinnedProjectKeys] = useState<Set<string>>(() => readStoredProjectPins())
-  const [hiddenProjectKeys, setHiddenProjectKeys] = useState<Set<string>>(() => readStoredProjectHidden())
+  const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(() => new Set(readStoredStrings(SESSION_COLLAPSED_STORAGE_KEY)))
+  const [projectOrder, setProjectOrder] = useState<string[]>(() => readStoredStrings(PROJECT_ORDER_STORAGE_KEY))
+  const [pinnedProjectKeys, setPinnedProjectKeys] = useState<Set<string>>(() => new Set(readStoredStrings(PROJECT_PINNED_STORAGE_KEY)))
+  const [hiddenProjectKeys, setHiddenProjectKeys] = useState<Set<string>>(() => new Set(readStoredStrings(PROJECT_HIDDEN_STORAGE_KEY)))
   const [projectOrganization, setProjectOrganizationState] = useState<SidebarProjectOrganization>(() => readStoredProjectOrganization())
   const [projectSortBy, setProjectSortByState] = useState<SidebarProjectSortBy>(() => readStoredProjectSortBy())
   const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null)
@@ -510,7 +510,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       } else {
         next.add(sessionId)
       }
-      writeStoredCollapsedSessions(next)
+      writeStoredStrings(SESSION_COLLAPSED_STORAGE_KEY, next)
       return next
     })
   }, [])
@@ -1272,77 +1272,23 @@ function getProjectDropPosition(event: React.DragEvent<HTMLElement>): 'before' |
 
 const EMPTY_ID_SET: ReadonlySet<string> = new Set()
 
-function readStoredCollapsedSessions(): Set<string> {
-  if (typeof localStorage === 'undefined') return new Set()
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SESSION_COLLAPSED_STORAGE_KEY) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
-  } catch (error) {
-    console.warn('Could not read the collapsed sessions from storage', error)
-    return new Set()
-  }
-}
-
-function writeStoredCollapsedSessions(sessionIds: Set<string>): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(SESSION_COLLAPSED_STORAGE_KEY, JSON.stringify([...sessionIds]))
-  } catch (error) {
-    console.warn('Could not save the collapsed sessions to storage', error)
-  }
-}
-
-function readStoredProjectOrder(): string[] {
+function readStoredStrings(key: string): string[] {
   if (typeof localStorage === 'undefined') return []
   try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_ORDER_STORAGE_KEY) ?? '[]')
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '[]')
     return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
-  } catch {
+  } catch (error) {
+    console.warn(`Could not read ${key} from storage`, error)
     return []
   }
 }
 
-function writeStoredProjectOrder(projectOrder: string[]): void {
+function writeStoredStrings(key: string, values: Iterable<string>): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(PROJECT_ORDER_STORAGE_KEY, JSON.stringify(projectOrder))
-  } catch {
-  }
-}
-
-function readStoredProjectPins(): Set<string> {
-  if (typeof localStorage === 'undefined') return new Set()
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_PINNED_STORAGE_KEY) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function writeStoredProjectPins(projectKeys: Set<string>): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(PROJECT_PINNED_STORAGE_KEY, JSON.stringify([...projectKeys]))
-  } catch {
-  }
-}
-
-function readStoredProjectHidden(): Set<string> {
-  if (typeof localStorage === 'undefined') return new Set()
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function writeStoredProjectHidden(projectKeys: Set<string>): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(PROJECT_HIDDEN_STORAGE_KEY, JSON.stringify([...projectKeys]))
-  } catch {
+    localStorage.setItem(key, JSON.stringify([...values]))
+  } catch (error) {
+    console.warn(`Could not save ${key} to storage`, error)
   }
 }
 
@@ -1390,9 +1336,9 @@ function buildSidebarProjectPreferences(
 
 function readCachedSidebarProjectPreferences(): SidebarProjectPreferences {
   return {
-    projectOrder: readStoredProjectOrder(),
-    pinnedProjects: [...readStoredProjectPins()],
-    hiddenProjects: [...readStoredProjectHidden()],
+    projectOrder: readStoredStrings(PROJECT_ORDER_STORAGE_KEY),
+    pinnedProjects: readStoredStrings(PROJECT_PINNED_STORAGE_KEY),
+    hiddenProjects: readStoredStrings(PROJECT_HIDDEN_STORAGE_KEY),
     projectOrganization: readStoredProjectOrganization(),
     projectSortBy: readStoredProjectSortBy(),
   }
@@ -1400,9 +1346,9 @@ function readCachedSidebarProjectPreferences(): SidebarProjectPreferences {
 
 function writeCachedSidebarProjectPreferences(preferences: SidebarProjectPreferences): void {
   const normalized = normalizeSidebarProjectPreferences(preferences)
-  writeStoredProjectOrder(normalized.projectOrder)
-  writeStoredProjectPins(new Set(normalized.pinnedProjects))
-  writeStoredProjectHidden(new Set(normalized.hiddenProjects))
+  writeStoredStrings(PROJECT_ORDER_STORAGE_KEY, normalized.projectOrder)
+  writeStoredStrings(PROJECT_PINNED_STORAGE_KEY, normalized.pinnedProjects)
+  writeStoredStrings(PROJECT_HIDDEN_STORAGE_KEY, normalized.hiddenProjects)
   writeStoredProjectOrganization(normalized.projectOrganization)
   writeStoredProjectSortBy(normalized.projectSortBy)
 }
@@ -1547,7 +1493,7 @@ function SessionRowMeta({
 }: {
   isRunning: boolean
   isWorktree: boolean
-  relation: 'spawned' | 'forked' | undefined
+  relation: SessionParent['kind'] | undefined
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
   return (

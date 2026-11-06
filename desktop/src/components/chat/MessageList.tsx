@@ -7,6 +7,7 @@ import { useChatStore, useSessionField } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useTabStore } from '../../stores/tabStore'
+import { openSessionTab } from '../../lib/sessionNavigation'
 import { useTeamStore } from '../../stores/teamStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
@@ -1834,8 +1835,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     try {
       const result = await branchSession(resolvedSessionId, target.transcriptMessageId)
       const title = result.title.trim() || t('sidebar.newSession')
-      useTabStore.getState().openTab(result.sessionId, title)
-      useChatStore.getState().connectToSession(result.sessionId)
+      openSessionTab(result.sessionId, title)
       addToast({
         type: 'success',
         message: t('chat.branchSuccess', { title }),

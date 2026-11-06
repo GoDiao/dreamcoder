@@ -598,6 +598,65 @@ describe('chatStore history mapping', () => {
     }))
   })
 
+  it('leaves the title and the finished task list alone when a message waits for the running turn', () => {
+    sessionStoreSnapshot.sessions = [{
+      id: TEST_SESSION_ID,
+      title: 'New Session',
+      createdAt: '2026-11-06T00:00:00Z',
+      modifiedAt: '2026-11-06T00:00:00Z',
+      messageCount: 0,
+      projectPath: '/repo',
+      workDir: '/repo',
+      workDirExists: true,
+    }]
+    cliTaskStoreSnapshot.sessionId = TEST_SESSION_ID
+    cliTaskStoreSnapshot.tasks = [{ id: '1', subject: 'Done', status: 'completed' }]
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'Rename the module next')
+
+    expect(updateSessionTitleMock).not.toHaveBeenCalled()
+    expect(updateTabTitleMock).not.toHaveBeenCalled()
+    expect(resetCompletedTasksMock).not.toHaveBeenCalled()
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toHaveLength(0)
+  })
+
+  it('shows a slash command sent during a running turn right away', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, '/compact')
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: '/compact' },
+    ])
+  })
+
+  it('sends to a team member during its running turn instead of queueing', () => {
+    getMemberBySessionIdMock.mockReturnValue({ agentId: 'reviewer@team', role: 'reviewer', status: 'running' })
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'also check the tests')
+
+    expect(sendMessageToMemberMock).toHaveBeenCalledWith(TEST_SESSION_ID, 'also check the tests')
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: 'also check the tests', pending: true },
+    ])
+  })
+
+  it('treats the session as idle when the server says so, even if the local state still streams', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
+    sendSnapshot(mirrorState({ turn: { phase: 'idle' } }))
+    useChatStore.setState((state) => ({
+      sessions: { ...state.sessions, [TEST_SESSION_ID]: { ...state.sessions[TEST_SESSION_ID]!, chatState: 'streaming' } },
+    }))
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, 'next step')
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]!
+    expect(session.messages).toMatchObject([{ type: 'user_text', content: 'next step' }])
+    expect(session.chatState).toBe('thinking')
+  })
+
   it('removes the optimistic bubble of a message the server queued, and appends it when the turn starts it', () => {
     useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
     sendSnapshot(mirrorState({ version: 1 }))

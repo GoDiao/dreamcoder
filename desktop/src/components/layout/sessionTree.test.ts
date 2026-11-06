@@ -17,7 +17,7 @@ function session(id: string, modifiedAt: string, parentId?: string): SessionList
 }
 
 describe('buildSessionTreeRows', () => {
-  it('keeps roots in the given order and sorts siblings by most recent activity', () => {
+  it('keeps roots and siblings in the given order, whatever their activity times', () => {
     const rows = buildSessionTreeRows([
       session('a', '2026-11-04T10:00:00Z'),
       session('b', '2026-11-04T09:00:00Z'),
@@ -26,8 +26,8 @@ describe('buildSessionTreeRows', () => {
     ])
     expect(rows.map((r) => [r.session.id, r.depth, r.childCount])).toEqual([
       ['a', 0, 2],
-      ['a2', 1, 0],
       ['a1', 1, 0],
+      ['a2', 1, 0],
       ['b', 0, 0],
     ])
   })

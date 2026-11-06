@@ -474,6 +474,16 @@ export function canBatchWith(
   )
 }
 
+export function mergeBatchedCommands(batch: QueuedCommand[]): QueuedCommand {
+  const head = batch[0]!
+  return {
+    ...head,
+    value: joinPromptValues(batch.map(c => c.value)),
+    uuid: batch.findLast(c => c.uuid)?.uuid ?? head.uuid,
+    reports: batch.flatMap(c => c.reports ?? []),
+  }
+}
+
 export async function runHeadless(
   inputPrompt: string | AsyncIterable<string>,
   getAppState: () => AppState,
@@ -1981,14 +1991,7 @@ function runHeadlessStreaming(
             while (canBatchWith(command, peek(isMainThread))) {
               batch.push(dequeue(isMainThread)!)
             }
-            if (batch.length > 1) {
-              command = {
-                ...command,
-                value: joinPromptValues(batch.map(c => c.value)),
-                uuid: batch.findLast(c => c.uuid)?.uuid ?? command.uuid,
-                reports: batch.flatMap(c => c.reports ?? []),
-              }
-            }
+            if (batch.length > 1) command = mergeBatchedCommands(batch)
           }
           const batchUuids = batch.map(c => c.uuid).filter(u => u !== undefined)
 

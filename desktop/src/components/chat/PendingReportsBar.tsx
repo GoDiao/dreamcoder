@@ -4,7 +4,8 @@ import { relativeTimeLabel } from '../../lib/relativeTime'
 import { useChatStore } from '../../stores/chatStore'
 import { SessionLink } from './SessionLink'
 import type { SessionState } from '../../types/chat'
-import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '../shared/ui/trace'
+import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '../shared/ui/trace'
+import { ChatTraceBar } from './ChatTraceBar'
 
 function PendingReportRow({ report }: { report: SessionState['pendingReports'][number] }) {
   const t = useTranslation()
@@ -27,23 +28,21 @@ export function PendingReportsBar({ sessionId }: { sessionId: string | null | un
     : t('chat.pendingReports.other', { count: reports.length })
 
   return (
-    <div className="shrink-0 px-8">
-      <Trace className="mx-auto mb-2 max-w-[860px] rounded-lg border border-ui-border p-3">
-        <TraceCollapsible>
-          <TraceCollapsibleTrigger aria-label={title}>
-            <TraceLine>
-              <TraceIcon><Inbox /></TraceIcon>
-              <TraceTitle>{title}</TraceTitle>
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="max-h-[240px] overflow-y-auto">
-            <p className="mb-2 text-ui-aux">{t('chat.pendingReports.hint')}</p>
-            <ul className="flex flex-col gap-1.5">
-              {reports.map((report) => <PendingReportRow key={report.id} report={report} />)}
-            </ul>
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      </Trace>
-    </div>
+    <ChatTraceBar>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger aria-label={title}>
+          <TraceLine>
+            <TraceIcon><Inbox /></TraceIcon>
+            <TraceTitle>{title}</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent className="max-h-[240px] overflow-y-auto">
+          <p className="mb-2 text-ui-aux">{t('chat.pendingReports.hint')}</p>
+          <ul className="flex flex-col gap-1.5">
+            {reports.map((report) => <PendingReportRow key={report.id} report={report} />)}
+          </ul>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </ChatTraceBar>
   )
 }

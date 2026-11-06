@@ -1,5 +1,6 @@
 import { useTranslation } from '../../i18n'
 import { useSessionLink } from '../../lib/sessionNavigation'
+import { Button } from '../shared/ui/button'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -12,16 +13,14 @@ export function SessionLink({ sessionId, sentTitle, className }: Props) {
   const t = useTranslation()
   const link = useSessionLink({ sessionId, sentTitle })
   return (
-    <button
+    <Button
       type="button"
+      variant="link"
       onClick={link.open}
       aria-label={t('chat.sessionMessage.open', { name: link.title })}
-      className={cn(
-        'truncate rounded bg-transparent font-medium text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]',
-        className,
-      )}
+      className={cn('h-auto min-w-0 justify-start px-0 text-[length:inherit]', className)}
     >
-      {link.title}
-    </button>
+      <span className="truncate">{link.title}</span>
+    </Button>
   )
 }

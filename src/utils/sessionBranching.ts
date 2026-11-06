@@ -97,6 +97,11 @@ export type SessionBranchResult = {
   contentReplacementRecords: ContentReplacementRecord[]
 }
 
+export type SessionParent = {
+  sessionId: string
+  kind: 'spawned' | 'forked'
+}
+
 export type CreateSessionBranchOptions = {
   sourceSessionId: string
   sourceTranscriptPath: string
@@ -105,7 +110,7 @@ export type CreateSessionBranchOptions = {
   sourceWorkDir?: string | null
   sourceRepository?: unknown
   sourceWorktreeSession?: PersistedWorktreeSession | null
-  parentKind?: 'forked' | 'spawned'
+  parentKind?: SessionParent['kind']
   sessionId?: UUID
   workspace?: { workDir: string; repository: unknown }
   openToolUseResult?: string
