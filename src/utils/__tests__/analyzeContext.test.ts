@@ -1,9 +1,18 @@
 import { describe, expect, test } from 'bun:test'
+import type {
+  AssistantMessage,
+  AttachmentMessage,
+  UserMessage,
+} from '../../types/message.js'
+import { roughTokenCountEstimation } from '../../services/tokenEstimation.js'
+import { jsonStringify } from '../slowOperations.js'
 import {
-  roughTokenCountEstimation,
-  roughTokenCountEstimationForBlock,
-} from '../../services/tokenEstimation.js'
-import { estimateTokensForContextMessages } from '../analyzeContext.js'
+  estimateTokensForContextMessages,
+  processAssistantMessage,
+  processAttachment,
+  processUserMessage,
+  type MessageBreakdown,
+} from '../analyzeContext.js'
 
 const LARGE_BASE64 = 'A'.repeat(800_000)
 
@@ -35,15 +44,43 @@ function largeImageUserMessage() {
   }
 }
 
+function emptyMessageBreakdown(): MessageBreakdown {
+  return {
+    totalTokens: 0,
+    toolCallTokens: 0,
+    toolResultTokens: 0,
+    attachmentTokens: 0,
+    assistantMessageTokens: 0,
+    userMessageTokens: 0,
+    toolCallsByType: new Map(),
+    toolResultsByType: new Map(),
+    attachmentsByType: new Map(),
+  }
+}
+
+function largeImageFileAttachment() {
+  return {
+    type: 'file' as const,
+    filename: '/tmp/screenshot.png',
+    displayPath: 'screenshot.png',
+    content: {
+      type: 'image' as const,
+      file: {
+        base64: LARGE_BASE64,
+        type: 'image/png' as const,
+        originalSize: 600_000,
+      },
+    },
+  }
+}
+
 describe('estimateTokensForContextMessages', () => {
-  test('counts a large base64 image near 2000 tokens instead of hundreds of thousands', () => {
+  test('counts a large base64 image as 2000 tokens instead of hundreds of thousands', () => {
     const tokens = estimateTokensForContextMessages([largeImageUserMessage()], [])
-    expect(tokens).toBeGreaterThanOrEqual(1_500)
-    expect(tokens).toBeLessThanOrEqual(2_500)
-    expect(tokens).toBeLessThan(100_000)
+    expect(tokens).toBe(2000)
   })
 
-  test('counts a tool_result that holds a large base64 image near 2000 tokens', () => {
+  test('counts a tool_result that holds a large base64 image as 2000 tokens', () => {
     const tokens = estimateTokensForContextMessages(
       [
         {
@@ -64,9 +101,7 @@ describe('estimateTokensForContextMessages', () => {
       ],
       [],
     )
-    expect(tokens).toBeGreaterThanOrEqual(1_500)
-    expect(tokens).toBeLessThanOrEqual(2_500)
-    expect(tokens).toBeLessThan(100_000)
+    expect(tokens).toBe(2000)
   })
 
   test('counts a large base64 document as 2000 tokens', () => {
@@ -106,41 +141,107 @@ describe('estimateTokensForContextMessages', () => {
     )
     const textTokens = roughTokenCountEstimation(text)
     expect(tokens).toBe(textTokens + 2000)
-    expect(tokens).toBeLessThan(100_000)
   })
 })
 
-describe('roughTokenCountEstimationForBlock', () => {
-  test('scores an image block as 2000 tokens', () => {
-    expect(
-      roughTokenCountEstimationForBlock({
-        type: 'image',
-        source: largeImageSource(),
-      }),
-    ).toBe(2000)
-  })
+describe('processUserMessage', () => {
+  test('scores a tool_result image as 2000 tokens in the tool result breakdown', () => {
+    const breakdown = emptyMessageBreakdown()
+    const message = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_screenshot',
+            content: [
+              {
+                type: 'image',
+                source: largeImageSource(),
+              },
+            ],
+          },
+        ],
+      },
+    } as UserMessage
 
-  test('scores a document block as 2000 tokens', () => {
-    expect(
-      roughTokenCountEstimationForBlock({
-        type: 'document',
-        source: largeDocumentSource(),
-      }),
-    ).toBe(2000)
-  })
+    processUserMessage(
+      message,
+      breakdown,
+      new Map([['toolu_screenshot', 'screenshot']]),
+    )
 
-  test('scores a tool_result that holds a large image as 2000 tokens', () => {
-    expect(
-      roughTokenCountEstimationForBlock({
-        type: 'tool_result',
-        tool_use_id: 'toolu_screenshot',
+    expect(breakdown.toolResultTokens).toBe(2000)
+    expect(breakdown.toolResultsByType.get('screenshot')).toBe(2000)
+    expect(breakdown.userMessageTokens).toBe(0)
+  })
+})
+
+describe('processAssistantMessage', () => {
+  test('scores an image block as 2000 tokens instead of the base64 length', () => {
+    const breakdown = emptyMessageBreakdown()
+    const message = {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
         content: [
           {
             type: 'image',
             source: largeImageSource(),
           },
         ],
-      }),
-    ).toBe(2000)
+      },
+    } as AssistantMessage
+
+    processAssistantMessage(message, breakdown)
+
+    expect(breakdown.assistantMessageTokens).toBe(2000)
+    expect(breakdown.toolCallTokens).toBe(0)
+  })
+
+  test('scores a tool call with the per-block estimator', () => {
+    const breakdown = emptyMessageBreakdown()
+    const block = {
+      type: 'tool_use' as const,
+      id: 'toolu_screenshot',
+      name: 'screenshot',
+      input: { url: 'https://example.com' },
+    }
+    const message = {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [block],
+      },
+    } as AssistantMessage
+
+    processAssistantMessage(message, breakdown)
+
+    const perBlock = roughTokenCountEstimation(
+      block.name + jsonStringify(block.input),
+    )
+    expect(breakdown.toolCallTokens).toBe(perBlock)
+    expect(breakdown.toolCallsByType.get('screenshot')).toBe(perBlock)
+    expect(perBlock).not.toBe(roughTokenCountEstimation(jsonStringify(block)))
+  })
+})
+
+describe('processAttachment', () => {
+  test('scores a file attachment image as 2000 tokens plus the Read wrapper', () => {
+    const attachment = largeImageFileAttachment()
+    const breakdown = emptyMessageBreakdown()
+    const message = {
+      type: 'attachment',
+      attachment,
+    } as AttachmentMessage
+
+    processAttachment(message, breakdown)
+
+    expect(breakdown.attachmentTokens).toBe(2030)
+    expect(breakdown.attachmentsByType.get('file')).toBe(2030)
+    expect(roughTokenCountEstimation(jsonStringify(attachment))).toBeGreaterThan(
+      100_000,
+    )
   })
 })

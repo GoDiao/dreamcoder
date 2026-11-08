@@ -19,6 +19,7 @@ import {
   countTokensViaHaikuFallback,
   roughTokenCountEstimation,
   roughTokenCountEstimationForBlock,
+  roughTokenCountEstimationForMessage,
   roughTokenCountEstimationForMessages,
 } from '../services/tokenEstimation.js'
 import { estimateSkillFrontmatterTokens } from '../skills/loadSkillsDir.js'
@@ -809,7 +810,7 @@ async function countCustomAgentTokens(
   return { agentTokens, agentDetails }
 }
 
-type MessageBreakdown = {
+export type MessageBreakdown = {
   totalTokens: number
   toolCallTokens: number
   toolResultTokens: number
@@ -821,7 +822,7 @@ type MessageBreakdown = {
   attachmentsByType: Map<string, number>
 }
 
-function processAssistantMessage(
+export function processAssistantMessage(
   msg: AssistantMessage | NormalizedAssistantMessage,
   breakdown: MessageBreakdown,
 ): void {
@@ -843,7 +844,7 @@ function processAssistantMessage(
   }
 }
 
-function processUserMessage(
+export function processUserMessage(
   msg: UserMessage | NormalizedUserMessage,
   breakdown: MessageBreakdown,
   toolUseIdToName: Map<string, string>,
@@ -876,12 +877,14 @@ function processUserMessage(
   }
 }
 
-function processAttachment(
+export function processAttachment(
   msg: AttachmentMessage,
   breakdown: MessageBreakdown,
 ): void {
-  const contentStr = jsonStringify(msg.attachment)
-  const tokens = roughTokenCountEstimation(contentStr)
+  const tokens = roughTokenCountEstimationForMessage({
+    type: 'attachment',
+    attachment: msg.attachment,
+  })
   breakdown.attachmentTokens += tokens
   const attachType = msg.attachment.type || 'unknown'
   breakdown.attachmentsByType.set(

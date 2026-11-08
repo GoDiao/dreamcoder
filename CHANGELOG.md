@@ -6,7 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
-- **Context usage no longer treats screenshot base64 as text** (#230). The estimate-only path and the Messages breakdown now use the same per-block estimator that already scores images and documents as 2000 tokens, so a session with many browser screenshots no longer shows a nearly full context bar when the provider still reports a modest input size.
+- **Context usage no longer treats screenshot base64 as text** (#230). The estimate-only path and the Messages breakdown score images and documents as 2000 tokens instead of counting their base64 as text, so a session with many browser screenshots no longer shows a nearly full context bar when the provider still reports a modest input size. An @-mentioned image or PDF is estimated from the message the API receives, so that payload is no longer counted as text and the attachment line in `/context` stays in line with the total.
 
 ## [0.8.0] — 2026-11-01
 
