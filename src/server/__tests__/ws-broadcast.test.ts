@@ -11,6 +11,7 @@ import { sessionService } from '../services/sessionService.js'
 import { sessionStateStore } from '../session/state/store.js'
 import type { ClientKind } from '../ws/protocol.js'
 import { SessionBrowserGrants } from '../browserHost/grants.js'
+import { setServerEndpoint } from '../ws/sessionRuntime.js'
 
 type FakeSocket = ServerWebSocket<WebSocketData> & { sent: string[] }
 
@@ -23,8 +24,6 @@ function makeClientSocket(sessionId: string, clientKind: ClientKind = 'desktop')
       channel: 'client',
       clientKind,
       sdkToken: null,
-      serverPort: 0,
-      serverHost: '127.0.0.1',
     },
     send: mock((payload: string) => {
       sent.push(payload)
@@ -239,9 +238,11 @@ describe('WebSocket permission replies', () => {
 describe('WebSocket restarts wait for the turn to end', () => {
   beforeEach(() => {
     spyOn(console, 'log').mockImplementation(() => {})
+    setServerEndpoint({ serverHost: '127.0.0.1', serverPort: 3456 })
   })
 
   afterEach(() => {
+    setServerEndpoint(null)
     __resetWebSocketHandlerStateForTests()
     mock.restore()
   })

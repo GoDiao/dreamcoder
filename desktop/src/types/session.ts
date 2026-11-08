@@ -1,5 +1,10 @@
 import type { AgentTaskNotification, UIMessage } from './chat'
 
+export type SessionParent = {
+  sessionId: string
+  kind: 'spawned' | 'forked'
+}
+
 export type SessionListItem = {
   id: string
   title: string
@@ -13,6 +18,7 @@ export type SessionListItem = {
   workDir: string | null
   workDirExists: boolean
   lastAssistantMessage?: string
+  parent?: SessionParent
 }
 
 export type MessageEntry = {

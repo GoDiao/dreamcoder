@@ -7,11 +7,13 @@ import { useChatStore, useSessionField } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useTabStore } from '../../stores/tabStore'
+import { openSessionTab } from '../../lib/sessionNavigation'
 import { useTeamStore } from '../../stores/teamStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n/locales/en'
 import { UserMessage } from './UserMessage'
+import { SessionMessageCard } from './SessionMessageCard'
 import { AssistantMessage } from './AssistantMessage'
 import { StreamingReply } from './StreamingReply'
 import { ThinkingBlock } from './ThinkingBlock'
@@ -1833,8 +1835,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     try {
       const result = await branchSession(resolvedSessionId, target.transcriptMessageId)
       const title = result.title.trim() || t('sidebar.newSession')
-      useTabStore.getState().openTab(result.sessionId, title)
-      useChatStore.getState().connectToSession(result.sessionId)
+      openSessionTab(result.sessionId, title)
       addToast({
         type: 'success',
         message: t('chat.branchSuccess', { title }),
@@ -2044,6 +2045,9 @@ export const MessageBlock = memo(function MessageBlock({
 
   switch (message.type) {
     case 'user_text':
+      if (message.origin?.kind === 'session') {
+        return <SessionMessageCard content={message.content} origin={message.origin} timestamp={message.timestamp} />
+      }
       return (
         <SelectableChatMessage
           sessionId={sessionId}

@@ -83,9 +83,6 @@ export async function registerSession(): Promise<boolean> {
         startedAt: Date.now(),
         kind,
         entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT,
-        ...(feature('UDS_INBOX')
-          ? { messagingSocketPath: process.env.CLAUDE_CODE_MESSAGING_SOCKET }
-          : {}),
         ...(feature('BG_SESSIONS')
           ? {
               name: process.env.CLAUDE_CODE_SESSION_NAME,
@@ -109,9 +106,9 @@ export async function registerSession(): Promise<boolean> {
 }
 
 /**
- * Update this session's name in its PID registry file so ListPeers
- * can surface it. Best-effort: silently no-op if name is falsy, the
- * file doesn't exist (session not registered), or read/write fails.
+ * Merge a patch into this session's PID registry file. Best-effort:
+ * silently no-op if the file doesn't exist (session not registered) or
+ * read/write fails.
  */
 async function updatePidFile(patch: Record<string, unknown>): Promise<void> {
   const pidFile = join(getSessionsDir(), `${process.pid}.json`)
@@ -133,18 +130,6 @@ export async function updateSessionName(
 ): Promise<void> {
   if (!name) return
   await updatePidFile({ name })
-}
-
-/**
- * Record this session's Remote Control session ID so peer enumeration can
- * dedup: a session reachable over both UDS and bridge should only appear
- * once (local wins). Cleared on bridge teardown so stale IDs don't
- * suppress a legitimately-remote session after reconnect.
- */
-export async function updateSessionBridgeId(
-  bridgeSessionId: string | null,
-): Promise<void> {
-  await updatePidFile({ bridgeSessionId })
 }
 
 /**

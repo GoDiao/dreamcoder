@@ -43,6 +43,8 @@ function mirrorRuntime(sessionId: string, selection: RuntimeSelection) {
           activeGoal: null,
           backgroundTasks: [],
           uiPages: [],
+          pendingReports: [],
+          queuedMessages: [],
           team: null,
           clientCount: 1,
         },

@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, Layers, FolderPlus, GitBranch, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
+import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, Layers, FolderPlus, Bot, GitBranch, GitFork, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { Button } from '../shared/ui/button'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
@@ -11,7 +11,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
-import type { SessionListItem } from '../../types/session'
+import type { SessionListItem, SessionParent } from '../../types/session'
 import { useTabStore, ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
@@ -22,6 +22,8 @@ import { ProjectManagementDialog, type SidebarProjectOrganization, type SidebarP
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
+import { openSessionTab } from '../../lib/sessionNavigation'
+import { buildSessionTreeRows, unfoldSessionTreeRows, type SessionTreeRow } from './sessionTree'
 
 const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
@@ -32,6 +34,9 @@ const PROJECT_PINNED_STORAGE_KEY = 'dreamcoder-sidebar-pinned-projects'
 const PROJECT_HIDDEN_STORAGE_KEY = 'dreamcoder-sidebar-hidden-projects'
 const PROJECT_ORGANIZATION_STORAGE_KEY = 'dreamcoder-sidebar-project-organization'
 const PROJECT_SORT_STORAGE_KEY = 'dreamcoder-sidebar-project-sort'
+const SESSION_COLLAPSED_STORAGE_KEY = 'dreamcoder-sidebar-collapsed-sessions'
+const SESSION_INDENT_PX = 14
+const SESSION_MAX_INDENT_DEPTH = 4
 const PROJECT_GROUP_VISIBLE_COUNT = 6
 const PROJECT_GROUP_SCROLL_COUNT = 12
 
@@ -42,6 +47,7 @@ type ProjectGroup = {
   subtitle: string | null
   workDir: string | undefined
   sessions: SessionListItem[]
+  rows: SessionTreeRow[]
 }
 
 type SidebarProps = {
@@ -91,9 +97,10 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [lastSelectedSessionId, setLastSelectedSessionId] = useState<string | null>(null)
   const [expandedProjectKeys, setExpandedProjectKeys] = useState<Set<string>>(new Set())
   const [collapsedProjectKeys, setCollapsedProjectKeys] = useState<Set<string>>(new Set())
-  const [projectOrder, setProjectOrder] = useState<string[]>(() => readStoredProjectOrder())
-  const [pinnedProjectKeys, setPinnedProjectKeys] = useState<Set<string>>(() => readStoredProjectPins())
-  const [hiddenProjectKeys, setHiddenProjectKeys] = useState<Set<string>>(() => readStoredProjectHidden())
+  const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(() => new Set(readStoredStrings(SESSION_COLLAPSED_STORAGE_KEY)))
+  const [projectOrder, setProjectOrder] = useState<string[]>(() => readStoredStrings(PROJECT_ORDER_STORAGE_KEY))
+  const [pinnedProjectKeys, setPinnedProjectKeys] = useState<Set<string>>(() => new Set(readStoredStrings(PROJECT_PINNED_STORAGE_KEY)))
+  const [hiddenProjectKeys, setHiddenProjectKeys] = useState<Set<string>>(() => new Set(readStoredStrings(PROJECT_HIDDEN_STORAGE_KEY)))
   const [projectOrganization, setProjectOrganizationState] = useState<SidebarProjectOrganization>(() => readStoredProjectOrganization())
   const [projectSortBy, setProjectSortByState] = useState<SidebarProjectSortBy>(() => readStoredProjectSortBy())
   const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null)
@@ -495,6 +502,19 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     }
   }, [deselectSessions, selectSessions, selectedSessionIds])
 
+  const toggleSessionCollapsed = useCallback((sessionId: string) => {
+    setCollapsedSessionIds((current) => {
+      const next = new Set(current)
+      if (next.has(sessionId)) {
+        next.delete(sessionId)
+      } else {
+        next.add(sessionId)
+      }
+      writeStoredStrings(SESSION_COLLAPSED_STORAGE_KEY, next)
+      return next
+    })
+  }, [])
+
   const toggleProjectCollapsed = useCallback((projectKey: string) => {
     if (suppressProjectClickRef.current === projectKey) {
       suppressProjectClickRef.current = null
@@ -762,11 +782,12 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               {visibleProjectGroups.map((project) => {
                 const projectCollapsed = collapsedProjectKeys.has(project.key)
                 const sessionsExpanded = expandedProjectKeys.has(project.key)
-                const visibleItems = projectCollapsed ? [] : getVisibleProjectSessions(project.sessions, sessionsExpanded, activeTabId)
-                const hiddenCount = project.sessions.length - visibleItems.length
+                const unfoldedRows = unfoldSessionTreeRows(project.rows, searchQuery ? EMPTY_ID_SET : collapsedSessionIds)
+                const visibleItems = projectCollapsed ? [] : getVisibleProjectRows(unfoldedRows, sessionsExpanded, activeTabId)
+                const hiddenCount = unfoldedRows.length - visibleItems.length
                 const groupIds = project.sessions.map((session) => session.id)
                 const groupSelectedCount = groupIds.filter((id) => selectedSessionIds.has(id)).length
-                const hasInternalScroll = sessionsExpanded && project.sessions.length > PROJECT_GROUP_SCROLL_COUNT
+                const hasInternalScroll = sessionsExpanded && unfoldedRows.length > PROJECT_GROUP_SCROLL_COUNT
                 const isProjectDragging = draggingProjectKey === project.key
                 const isProjectPinned = pinnedProjectKeys.has(project.key)
                 const dropBefore = projectDropTarget?.key === project.key && projectDropTarget.position === 'before'
@@ -857,7 +878,8 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                           className={hasInternalScroll ? 'max-h-[420px] overflow-y-auto pr-1' : undefined}
                           data-testid={`sidebar-project-session-list-${domSafeProjectKey(project.key)}`}
                         >
-                          {visibleItems.map((session) => {
+                          {visibleItems.map(({ session, depth, childCount }) => {
+                            const rowCollapsed = !searchQuery && collapsedSessionIds.has(session.id)
                             const isSelected = selectedSessionIds.has(session.id)
                             const isCurrent = session.id === activeTabId
                             const title = session.title || t('session.untitled')
@@ -868,7 +890,19 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                               { id: 'delete', label: t('common.delete'), icon: <Trash2 size={15} />, danger: true, separatorBefore: true, afterClose: true, onSelect: () => handleDelete(session.id) },
                             ]}>
                               {(menuTrigger, menuOpen) => (
-                            <div className="relative mb-0.5 last:mb-0">
+                            <div
+                              className="relative mb-0.5 last:mb-0"
+                              style={depth > 0 ? { paddingLeft: Math.min(depth, SESSION_MAX_INDENT_DEPTH) * SESSION_INDENT_PX } : undefined}
+                            >
+                              {depth > 0 && Array.from({ length: Math.min(depth, SESSION_MAX_INDENT_DEPTH) }, (_, level) => (
+                                <span
+                                  key={level}
+                                  aria-hidden="true"
+                                  data-testid="sidebar-session-connector"
+                                  className="pointer-events-none absolute -bottom-0.5 top-0 w-px bg-[var(--color-border)]"
+                                  style={{ left: (level + 1) * SESSION_INDENT_PX - 7 }}
+                                />
+                              ))}
                               {renamingId === session.id ? (
                                 <input
                                   autoFocus
@@ -905,12 +939,11 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                         handleBatchSessionClick(event, session.id)
                                         return
                                       }
-                                      useTabStore.getState().openTab(session.id, session.title)
-                                      useChatStore.getState().connectToSession(session.id)
+                                      openSessionTab(session.id, session.title)
                                       closeMobileDrawer()
                                     }}
                                     aria-label={title}
-                                    className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+                                    className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent pr-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none pl-2.5 ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                                     aria-pressed={isBatchMode ? isSelected : undefined}
                                   >
                                     {isBatchMode ? (
@@ -938,9 +971,25 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                     <SessionRowMeta
                                       isRunning={runningSessionIds.has(session.id)}
                                       isWorktree={isWorktreeSession(session)}
+                                      relation={session.parent?.kind}
                                       t={t}
                                     />
                                   </button></HintTooltip>
+                                  {childCount > 0 && !isBatchMode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSessionCollapsed(session.id)}
+                                      aria-expanded={!rowCollapsed}
+                                      aria-label={t(rowCollapsed ? 'sidebar.expandChildren' : 'sidebar.collapseChildren', { title })}
+                                      data-testid="sidebar-session-children-toggle"
+                                      className={`mr-0.5 flex flex-shrink-0 items-center gap-0.5 rounded bg-transparent px-1 text-[11px] tabular-nums text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] ${isMobile ? 'min-h-[44px] min-w-[44px] justify-center' : 'h-5'}`}
+                                    >
+                                      <span>{childCount}</span>
+                                      {rowCollapsed
+                                        ? <ChevronRight className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+                                        : <ChevronDown className="h-3 w-3" strokeWidth={2} aria-hidden="true" />}
+                                    </button>
+                                  )}
                                   {menuTrigger}
                                 </div>
                               )}
@@ -1170,6 +1219,7 @@ function groupByProject(sessions: SessionListItem[], sortBy: SidebarProjectSortB
       subtitle: projectSubtitle(projectRoot, key),
       workDir: projectRoot || newest?.workDir || undefined,
       sessions: sortedSessions,
+      rows: buildSessionTreeRows(sortedSessions),
     }
   })
 
@@ -1220,57 +1270,25 @@ function getProjectDropPosition(event: React.DragEvent<HTMLElement>): 'before' |
   return event.clientY <= rect.top + rect.height / 2 ? 'before' : 'after'
 }
 
-function readStoredProjectOrder(): string[] {
+const EMPTY_ID_SET: ReadonlySet<string> = new Set()
+
+function readStoredStrings(key: string): string[] {
   if (typeof localStorage === 'undefined') return []
   try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_ORDER_STORAGE_KEY) ?? '[]')
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '[]')
     return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
-  } catch {
+  } catch (error) {
+    console.warn(`Could not read ${key} from storage`, error)
     return []
   }
 }
 
-function writeStoredProjectOrder(projectOrder: string[]): void {
+function writeStoredStrings(key: string, values: Iterable<string>): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(PROJECT_ORDER_STORAGE_KEY, JSON.stringify(projectOrder))
-  } catch {
-  }
-}
-
-function readStoredProjectPins(): Set<string> {
-  if (typeof localStorage === 'undefined') return new Set()
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_PINNED_STORAGE_KEY) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function writeStoredProjectPins(projectKeys: Set<string>): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(PROJECT_PINNED_STORAGE_KEY, JSON.stringify([...projectKeys]))
-  } catch {
-  }
-}
-
-function readStoredProjectHidden(): Set<string> {
-  if (typeof localStorage === 'undefined') return new Set()
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PROJECT_HIDDEN_STORAGE_KEY) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function writeStoredProjectHidden(projectKeys: Set<string>): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(PROJECT_HIDDEN_STORAGE_KEY, JSON.stringify([...projectKeys]))
-  } catch {
+    localStorage.setItem(key, JSON.stringify([...values]))
+  } catch (error) {
+    console.warn(`Could not save ${key} to storage`, error)
   }
 }
 
@@ -1318,9 +1336,9 @@ function buildSidebarProjectPreferences(
 
 function readCachedSidebarProjectPreferences(): SidebarProjectPreferences {
   return {
-    projectOrder: readStoredProjectOrder(),
-    pinnedProjects: [...readStoredProjectPins()],
-    hiddenProjects: [...readStoredProjectHidden()],
+    projectOrder: readStoredStrings(PROJECT_ORDER_STORAGE_KEY),
+    pinnedProjects: readStoredStrings(PROJECT_PINNED_STORAGE_KEY),
+    hiddenProjects: readStoredStrings(PROJECT_HIDDEN_STORAGE_KEY),
     projectOrganization: readStoredProjectOrganization(),
     projectSortBy: readStoredProjectSortBy(),
   }
@@ -1328,9 +1346,9 @@ function readCachedSidebarProjectPreferences(): SidebarProjectPreferences {
 
 function writeCachedSidebarProjectPreferences(preferences: SidebarProjectPreferences): void {
   const normalized = normalizeSidebarProjectPreferences(preferences)
-  writeStoredProjectOrder(normalized.projectOrder)
-  writeStoredProjectPins(new Set(normalized.pinnedProjects))
-  writeStoredProjectHidden(new Set(normalized.hiddenProjects))
+  writeStoredStrings(PROJECT_ORDER_STORAGE_KEY, normalized.projectOrder)
+  writeStoredStrings(PROJECT_PINNED_STORAGE_KEY, normalized.pinnedProjects)
+  writeStoredStrings(PROJECT_HIDDEN_STORAGE_KEY, normalized.hiddenProjects)
   writeStoredProjectOrganization(normalized.projectOrganization)
   writeStoredProjectSortBy(normalized.projectSortBy)
 }
@@ -1393,18 +1411,18 @@ function normalizeProjectSortBy(value: unknown): SidebarProjectSortBy {
   return value === 'createdAt' || value === 'updatedAt' ? value : 'updatedAt'
 }
 
-function getVisibleProjectSessions(
-  sessions: SessionListItem[],
+function getVisibleProjectRows(
+  rows: SessionTreeRow[],
   expanded: boolean,
   activeSessionId: string | null,
-): SessionListItem[] {
-  if (expanded || sessions.length <= PROJECT_GROUP_VISIBLE_COUNT) return sessions
+): SessionTreeRow[] {
+  if (expanded || rows.length <= PROJECT_GROUP_VISIBLE_COUNT) return rows
 
-  const visible = sessions.slice(0, PROJECT_GROUP_VISIBLE_COUNT)
-  if (!activeSessionId || visible.some((session) => session.id === activeSessionId)) return visible
+  const visible = rows.slice(0, PROJECT_GROUP_VISIBLE_COUNT)
+  if (!activeSessionId || visible.some((row) => row.session.id === activeSessionId)) return visible
 
-  const activeSession = sessions.find((session) => session.id === activeSessionId)
-  return activeSession ? [...visible, activeSession] : visible
+  const activeRow = rows.find((row) => row.session.id === activeSessionId)
+  return activeRow ? [...visible, activeRow] : visible
 }
 
 function getSessionProjectKey(session: SessionListItem): string {
@@ -1470,19 +1488,29 @@ function domSafeProjectKey(projectKey: string): string {
 function SessionRowMeta({
   isRunning,
   isWorktree,
+  relation,
   t,
 }: {
   isRunning: boolean
   isWorktree: boolean
+  relation: SessionParent['kind'] | undefined
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
   return (
-    <span hidden={!isRunning && !isWorktree} className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
+    <span hidden={!isRunning && !isWorktree && !relation} className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
         <HintTooltip content={t('sidebar.sessionRunning')}><span hidden={!isRunning}
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-success)]"
           aria-label={isRunning ? t('sidebar.sessionRunning') : undefined}
         >
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2.2} aria-hidden="true" />
+        </span></HintTooltip>
+        <HintTooltip content={relation === 'forked' ? t('sidebar.sessionForked') : t('sidebar.sessionSpawned')}><span hidden={!relation}
+          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
+        >
+          {relation === 'forked'
+            ? <GitFork className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+            : <Bot className="h-3 w-3" strokeWidth={2} aria-hidden="true" />}
+          {relation && <span className="sr-only">{relation === 'forked' ? t('sidebar.sessionForked') : t('sidebar.sessionSpawned')}</span>}
         </span></HintTooltip>
         <HintTooltip content={t('sidebar.worktree')}><span hidden={!isWorktree}
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"

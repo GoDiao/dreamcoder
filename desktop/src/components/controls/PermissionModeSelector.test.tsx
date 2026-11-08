@@ -214,6 +214,24 @@ describe('PermissionModeSelector', () => {
     expect(setDefault).not.toHaveBeenCalled()
   })
 
+  it.each([false, true])('constrains long workspace paths inside the confirmation on mobile=%s', async (mobile) => {
+    viewportMocks.isMobile = mobile
+    const workDir = `/private/tmp/${'long-directory/'.repeat(30)}`
+    const { onChange } = renderSelector({ workDir })
+    const trigger = screen.getByRole('button', { name: 'Manual' })
+    if (mobile) fireEvent.click(trigger)
+    else fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole(mobile ? 'radio' : 'menuitemradio', { name: /Bypass permissions/ }))
+
+    const path = await screen.findByText(workDir)
+    expect(path).toHaveClass('truncate')
+    expect(path.closest('[data-slot="alert-dialog-description"]')).toHaveClass('min-w-0', 'w-full')
+    expect(path.closest('[data-slot="alert-dialog-header"]')).toHaveClass('min-w-0')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onChange).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+  })
+
   it('asks before switching to Bypass', async () => {
     const { onChange } = renderSelector()
     fireEvent.keyDown(screen.getByRole('button', { name: 'Manual' }), { key: 'ArrowDown' })

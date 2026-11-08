@@ -509,6 +509,8 @@ describe('BrowserView', () => {
             activeGoal: null,
             backgroundTasks: [],
             uiPages: [],
+            pendingReports: [],
+            queuedMessages: [],
             team: null,
             clientCount: 1,
           },

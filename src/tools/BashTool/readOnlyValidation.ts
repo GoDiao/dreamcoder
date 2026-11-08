@@ -1538,6 +1538,7 @@ const READONLY_COMMAND_REGEXES = new Set([
   /^node --version$/,
   /^python --version$/,
   /^python3 --version$/,
+  /^:$/,
 
   // Misc. safe commands
   // tree command moved to COMMAND_ALLOWLIST for proper flag validation (blocks -o/--output)

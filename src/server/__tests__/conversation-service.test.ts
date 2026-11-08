@@ -260,6 +260,54 @@ describe('ConversationService', () => {
     }
   })
 
+  test('buildChildEnv enables session links and flushes the transcript before results', async () => {
+    const service = new ConversationService() as any
+    const env = (await service.buildChildEnv(tmpDir)) as Record<string, string>
+    expect(env.DREAMCODER_SESSION_LINKS).toBe('1')
+    expect(env.CLAUDE_CODE_EAGER_FLUSH).toBe('1')
+  })
+
+  test('sendMessage writes an origin to the SDK message only when given one', () => {
+    const service = new ConversationService() as any
+    const sent: any[] = []
+    service.sessions.set('s1', { sdkSocket: { send: (line: string) => sent.push(JSON.parse(line)) }, pendingOutbound: [] })
+    const origin = { kind: 'session', sessionId: 'a', name: 'lead', purpose: 'message' }
+
+    service.sendMessage('s1', 'from a person')
+    service.sendMessage('s1', 'from a session', undefined, 'uuid-1', origin)
+
+    expect('origin' in sent[0]).toBe(false)
+    expect(sent[1].origin).toEqual(origin)
+    expect(sent[1].uuid).toBe('uuid-1')
+  })
+
+  test('sendMessage carries reports only when there are some', () => {
+    const service = new ConversationService() as any
+    const sent: any[] = []
+    service.sessions.set('s1', { sdkSocket: { send: (line: string) => sent.push(JSON.parse(line)) }, pendingOutbound: [] })
+    const origin = { kind: 'session', sessionId: 'c', name: 'worker', purpose: 'report', summary: 'half way' }
+
+    service.sendMessage('s1', 'next', undefined, undefined, undefined, [])
+    service.sendMessage('s1', 'next', undefined, undefined, undefined, [{ message: 'progress', origin }])
+
+    expect('reports' in sent[0]).toBe(false)
+    expect(sent[1].reports).toEqual([{ message: 'progress', origin }])
+  })
+
+  test('respondToHostRequest answers with a success or an error control response', () => {
+    const service = new ConversationService() as any
+    const sent: any[] = []
+    service.sessions.set('s1', { sdkSocket: { send: (line: string) => sent.push(JSON.parse(line)) }, pendingOutbound: [] })
+
+    service.respondToHostRequest('s1', 'r1', { response: { delivered: true } })
+    service.respondToHostRequest('s1', 'r2', { error: 'nope' })
+
+    expect(sent).toEqual([
+      { type: 'control_response', response: { subtype: 'success', request_id: 'r1', response: { delivered: true } } },
+      { type: 'control_response', response: { subtype: 'error', request_id: 'r2', error: 'nope' } },
+    ])
+  })
+
   test('buildChildEnv gives no browser endpoint when no desktop browser is connected', async () => {
     const service = new ConversationService() as any
     const env = (await service.buildChildEnv(tmpDir, 'ws://127.0.0.1:4000/sdk/session-a?token=x', undefined, 'session-a')) as Record<string, string>

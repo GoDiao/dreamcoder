@@ -29,7 +29,6 @@ import {
   sameSessionId,
 } from './workSecret.js'
 import { toCompatSessionId, toInfraSessionId } from './sessionIdCompat.js'
-import { updateSessionBridgeId } from '../utils/concurrentSessions.js'
 import { getTrustedDeviceToken } from './trustedDevice.js'
 import { HybridTransport } from '../cli/transports/HybridTransport.js'
 import {
@@ -786,9 +785,6 @@ export async function initBridgeCore(
     }
 
     currentSessionId = newSessionId
-    // Re-publish to the PID file so peer dedup (peerRegistry.ts) picks up the
-    // new ID — setReplBridgeHandle only fires at init/teardown, not reconnect.
-    void updateSessionBridgeId(toCompatSessionId(newSessionId)).catch(() => {})
     // Reset per-session transport state IMMEDIATELY after the session swap,
     // before any await. If this runs after `await writeBridgePointer` below,
     // there's a window where handle.bridgeSessionId already returns session B

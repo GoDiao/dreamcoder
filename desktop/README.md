@@ -52,7 +52,7 @@ bun run electron:pack
 
 ## 许可证
 
-[MIT License](LICENSE)
+[MIT License](../LICENSE)
 
 ## 致谢
 

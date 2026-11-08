@@ -4,6 +4,7 @@ import { artifactDenialReason, artifactLocationDenial, isOwnArtifactWrite, OWN_A
 import { randomBytes } from 'crypto'
 import ignore from 'ignore'
 import memoize from 'lodash-es/memoize.js'
+import picomatch from 'picomatch'
 import { homedir, tmpdir } from 'os'
 import { join, normalize, posix, sep } from 'path'
 import { hasAutoMemPathOverride, isAutoMemPath } from 'src/memdir/paths.js'
@@ -45,6 +46,7 @@ import type {
   PermissionResult,
 } from './PermissionResult.js'
 import type { PermissionRule, PermissionRuleSource } from './PermissionRule.js'
+import { isBypassPermissionsActive } from './PermissionMode.js'
 import { createReadRuleSuggestion } from './PermissionUpdate.js'
 import type { PermissionUpdate } from './PermissionUpdateSchema.js'
 import { getRuleByContentsForToolName } from './permissions.js'
@@ -67,6 +69,30 @@ export const DANGEROUS_FILES = [
   '.mcp.json',
   '.claude.json',
 ] as const
+
+export const SENSITIVE_READ_FILES = [
+  'credentials',
+  'secrets.yaml',
+  '.netrc',
+  '.npmrc',
+  '.pgpass',
+  'token',
+] as const
+
+const SAFE_ENV_FILE_SUFFIXES = new Set([
+  'example',
+  'sample',
+  'template',
+  'dist',
+])
+
+const SENSITIVE_READ_GLOB_CANDIDATES = [
+  ...SENSITIVE_READ_FILES,
+  '.env',
+  '.env.local',
+  'id_rsa',
+  'id_ed25519',
+]
 
 /**
  * Dangerous directories that should be protected from auto-editing.
@@ -91,6 +117,82 @@ export const DANGEROUS_DIRECTORIES = [
  */
 export function normalizeCaseForComparison(path: string): string {
   return path.toLowerCase()
+}
+
+export function isSensitiveReadPath(path: string): boolean {
+  const parts = normalizeCaseForComparison(path)
+    .replace(/[\\]+/g, '/')
+    .split('/')
+    .filter(Boolean)
+  const fileName = parts.at(-1)
+  if (!fileName) return false
+  if (fileName === '.env') return true
+  if (
+    fileName.startsWith('.env.') &&
+    !SAFE_ENV_FILE_SUFFIXES.has(fileName.slice('.env.'.length))
+  ) {
+    return true
+  }
+  if (SENSITIVE_READ_FILES.some(name => name === fileName)) return true
+  return (
+    parts.at(-2) === '.ssh' &&
+    fileName.startsWith('id_') &&
+    !fileName.endsWith('.pub')
+  )
+}
+
+export function isSensitiveReadFilePattern(pattern: string): boolean {
+  if (
+    isSensitiveReadPath(pattern) ||
+    isSensitiveReadPath(join('.ssh', pattern))
+  ) {
+    return true
+  }
+  return SENSITIVE_READ_GLOB_CANDIDATES.some(candidate =>
+    picomatch.isMatch(candidate, pattern, { nocase: true }),
+  )
+}
+
+export function getSensitiveReadPermission(
+  path: string,
+  sensitivePath: string,
+  toolPermissionContext: ToolPermissionContext,
+): PermissionDecision | null {
+  if (isBypassPermissionsActive(toolPermissionContext)) return null
+  const reason = `Reading ${sensitivePath} may expose secrets and requires explicit approval`
+  return {
+    behavior: 'ask',
+    message: `Claude requested permission to read ${path}, which may contain secrets.`,
+    decisionReason: {
+      type: 'safetyCheck',
+      reason,
+      classifierApprovable: false,
+    },
+  }
+}
+
+export function checkSensitiveReadPermission(
+  path: string,
+  toolPermissionContext: ToolPermissionContext,
+  precomputedPathsToCheck?: readonly string[],
+): PermissionDecision | null {
+  if (isBypassPermissionsActive(toolPermissionContext)) return null
+  const pathsToCheck =
+    precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
+  const sensitivePath = pathsToCheck.find(candidate => {
+    if (!isSensitiveReadPath(candidate)) return false
+    try {
+      return !getFsImplementation().lstatSync(candidate).isDirectory()
+    } catch {
+      return true
+    }
+  })
+  if (!sensitivePath) return null
+  return getSensitiveReadPermission(
+    path,
+    sensitivePath,
+    toolPermissionContext,
+  )
 }
 
 /**
@@ -1159,6 +1261,15 @@ export function checkReadPermissionForTool(
         },
       }
     }
+  }
+
+  const sensitiveReadResult = checkSensitiveReadPermission(
+    path,
+    toolPermissionContext,
+    pathsToCheck,
+  )
+  if (sensitiveReadResult) {
+    return sensitiveReadResult
   }
 
   // 5. Edit access implies read access (but only if no read-specific deny/ask rules exist)

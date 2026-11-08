@@ -149,7 +149,7 @@ Generate through the CLI, then review imports, icons, dependencies, tokens and
 accessibility against the local adaptations above. Do not overwrite local
 behavior with unreviewed registry output.
 
-See [CONTRIBUTING](../../../docs/CONTRIBUTING_en.md#development-environment) for
+See [CONTRIBUTING](../../../docs/general/CONTRIBUTING_en.md#development-environment) for
 setup. Run `bun run lint` and `bun run test -- --run`
 from `desktop/`, plus `bun test` from the repository root before a PR. Automated
 checks do not replace seven-theme/bilingual desktop and H5 visual acceptance,
