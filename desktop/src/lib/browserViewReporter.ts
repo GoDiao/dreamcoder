@@ -18,7 +18,7 @@ function isForeground(sessionId: string) {
 }
 
 function currentState(tabId: string, entry: ViewEntry): BrowserViewState {
-  const panel = useWorkspacePanelStore.getState().panelBySession[entry.sessionId]
+  const panel = useWorkspacePanelStore.getState().panelByTab[entry.sessionId]
   return {
     tabId,
     shown: entry.readShown(),
@@ -50,7 +50,7 @@ function startWatching() {
   if (unsubscribers.length > 0) return
   unsubscribers = [
     useWorkspacePanelStore.subscribe((state, previous) => {
-      if (state.panelBySession !== previous.panelBySession) reportAll()
+      if (state.panelByTab !== previous.panelByTab) reportAll()
     }),
     useTabStore.subscribe((state, previous) => {
       if (state.activeTabId !== previous.activeTabId || state.tabs !== previous.tabs) reportAll()

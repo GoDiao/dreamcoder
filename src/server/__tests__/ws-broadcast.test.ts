@@ -215,6 +215,24 @@ describe('WebSocket permission replies', () => {
     }
   })
 
+  it('marks a permission request the CLI asks for every time, so clients do not offer to remember it', () => {
+    const sessionId = `permission-always-${crypto.randomUUID()}`
+    const cli = fakeCli()
+    const desktop = makeClientSocket(sessionId)
+    handleWebSocket.open(desktop)
+
+    cli.emit({ type: 'control_request', request_id: 'req-board', request: { subtype: 'can_use_tool', tool_name: 'StartSession', input: {}, always_asks: true } })
+    cli.emit({ type: 'control_request', request_id: 'req-bash', request: { subtype: 'can_use_tool', tool_name: 'Bash', input: {} } })
+
+    const latest = received(desktop)
+      .filter((msg) => msg.type === 'session_patch' && msg.changes.pendingPermissions)
+      .at(-1)!.changes.pendingPermissions
+    expect(latest).toEqual([
+      expect.objectContaining({ requestId: 'req-board', alwaysAsks: true }),
+      expect.not.objectContaining({ alwaysAsks: true }),
+    ])
+  })
+
   it('tells every client when the CLI withdraws a permission request', () => {
     const sessionId = `permission-cancel-${crypto.randomUUID()}`
     const cli = fakeCli()

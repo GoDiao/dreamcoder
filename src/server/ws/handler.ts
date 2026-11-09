@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import type { AttachmentRef, ClientKind, ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
-import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
@@ -41,7 +41,9 @@ import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
 import { artifactService } from '../services/artifactService.js'
-import { createSessionLinks } from '../services/sessionLinksService.js'
+import { createLinkedSession, createSessionLinks, discardSession, isSessionRunning } from '../services/sessionLinksService.js'
+import { createKanban } from '../services/kanbanService.js'
+import { createKanbanControl } from '../services/kanbanControl.js'
 import { createTurnQueue } from '../services/turnQueueService.js'
 
 const settingsService = new SettingsService()
@@ -60,10 +62,26 @@ const turnQueue = createTurnQueue(
   (sessionId, content, options) => deliverUserTurn(sessionId, content, options),
 )
 
+export const kanban = createKanban({
+  sessionInfo: async (sessionId) => {
+    const info = await sessionService.getSessionLinkInfo(sessionId)
+    return info
+      ? { title: info.title, exists: true, running: isSessionRunning(sessionId) }
+      : { title: '', exists: false, running: false }
+  },
+  sessionWorkspace: async (sessionId) => (await store.read(sessionId)).workspace,
+  deliver: (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
+  createLinkedSession,
+  discardSession,
+})
+
+const kanbanControl = createKanbanControl(kanban)
+
 const sessionLinks = createSessionLinks({
   deliver: (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
   queueReport: turnQueue.queueReport,
   onRenamed: (sessionId, title) => noteSessionRenamed(sessionId, title),
+  startCardAssignee: kanbanControl.startAssignee,
 })
 
 installSessionPersistence(store)
@@ -287,7 +305,12 @@ export function handleRawCliMessage(sessionId: string, cliMsg: any): void {
     })
     return
   }
-  if (cliMsg.type === 'control_request' && sessionLinks.handleControlRequest(sessionId, cliMsg)) return
+  if (
+    cliMsg.type === 'control_request' &&
+    (sessionLinks.handleControlRequest(sessionId, cliMsg) || kanbanControl.handleControlRequest(sessionId, cliMsg))
+  ) {
+    return
+  }
   if (cliMsg.type !== 'control_response') return
   const requestId = cliMsg.response?.request_id
   const runtime = peekSessionRuntime(sessionId)
@@ -373,7 +396,7 @@ async function handleUserMessage(
 export type DeliverUserTurnOptions = {
   attachments?: AttachmentRef[]
   id?: unknown
-  origin?: SessionOrigin
+  origin?: UserMessageOrigin
 }
 
 export type DeliverUserTurnResult = { ok: boolean; code?: string; message?: string }
@@ -1390,4 +1413,5 @@ export function getActiveSessionIds(): string[] {
 export function __resetWebSocketHandlerStateForTests(): void {
   disposeAllSessionRuntimes()
   store.clear()
+  kanban.clear()
 }

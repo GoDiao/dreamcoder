@@ -10,6 +10,8 @@ The new session starts immediately with the prompt you give it, as if the user h
 - title: a short title shown in the session list.
 - context: "fresh" starts with an empty conversation. "fork" starts with a copy of this conversation so far.
 - worktree: true runs the new session in a new git worktree of this session's repository, so its file changes do not collide with yours. Defaults to false.
+- card: a card on the project board that you own or created. The new session takes a role on it before it starts, and its first message is the card's goal and acceptance criteria with your prompt. Whoever held that role before is replaced.
+- role: with card, "owner" (the default) to do the card, or "reviewer" to check the result and accept it. Only the card's creator starts a reviewer. For a reviewer, write the prompt as its review instructions: what to check and by which standard, for example reviewing the code or helping the user try the result.
 
 The user must approve every session you start, whatever the permission mode. Ask only when the work is worth a session of its own.
 

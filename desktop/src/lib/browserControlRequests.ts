@@ -20,7 +20,7 @@ function isKnownSession(sessionId: string) {
 }
 
 function findTabOwner(tabId: string) {
-  const entries = Object.entries(useWorkspacePanelStore.getState().panelBySession)
+  const entries = Object.entries(useWorkspacePanelStore.getState().panelByTab)
   return entries.find(([, panel]) => panel?.tabs.some((tab) => tab.id === tabId))?.[0] ?? null
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 const desktopUiPreferencesApiMock = vi.hoisted(() => ({
@@ -11,6 +11,10 @@ vi.mock('../../api/desktopUiPreferences', () => ({
   desktopUiPreferencesApi: desktopUiPreferencesApiMock,
 }))
 
+const kanbanApiMock = vi.hoisted(() => ({ listBoards: vi.fn(), view: vi.fn() }))
+
+vi.mock('../../api/kanban', () => ({ kanbanApi: kanbanApiMock }))
+
 vi.mock('../../i18n', () => ({
   useTranslation: () => (key: string, params?: Record<string, string | number>) =>
     params ? `${key} ${Object.values(params).join(' ')}` : key,
@@ -21,6 +25,8 @@ import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useKanbanStore } from '../../stores/kanbanStore'
+import { fixtureCard, fixtureView } from '../kanban/kanbanFixture'
 import type { SessionListItem } from '../../types/session'
 
 const COLLAPSED_KEY = 'dreamcoder-sidebar-collapsed-sessions'
@@ -87,6 +93,8 @@ describe('Sidebar session tree', () => {
     })
     useChatStore.setState({ sessions: {}, connectToSession } as Partial<ReturnType<typeof useChatStore.getState>>)
     useUIStore.setState({ sidebarOpen: true } as Partial<ReturnType<typeof useUIStore.getState>>)
+    useKanbanStore.setState({ boards: null, views: {}, snoozed: {} })
+    kanbanApiMock.listBoards.mockResolvedValue({ boards: [] })
   })
 
   afterEach(() => {
@@ -99,10 +107,10 @@ describe('Sidebar session tree', () => {
     render(<Sidebar />)
 
     expect(rowIds()).toEqual(['p', 'c2', 'c1', 'g', 'o'])
-    expect(within(row('p').parentElement!).queryAllByTestId('sidebar-session-connector')).toHaveLength(0)
-    expect(within(row('c1').parentElement!).getAllByTestId('sidebar-session-connector')).toHaveLength(1)
-    expect(within(row('g').parentElement!).getAllByTestId('sidebar-session-connector')).toHaveLength(2)
-    expect(within(row('o').parentElement!).queryAllByTestId('sidebar-session-connector')).toHaveLength(0)
+    expect(within(row('p').parentElement!).queryAllByTestId('tree-connector-elbow')).toHaveLength(0)
+    expect(within(row('c1').parentElement!).getAllByTestId('tree-connector-elbow')).toHaveLength(1)
+    expect(within(row('g').parentElement!).getAllByTestId('tree-connector-elbow')).toHaveLength(1)
+    expect(within(row('o').parentElement!).queryAllByTestId('tree-connector-elbow')).toHaveLength(0)
     expect(row('p').parentElement!.style.paddingLeft).toBe('')
     expect(row('c1').parentElement!.style.paddingLeft).toBe('14px')
     expect(row('g').parentElement!.style.paddingLeft).toBe('28px')
@@ -117,7 +125,7 @@ describe('Sidebar session tree', () => {
 
     const betaGroup = screen.getByTestId('sidebar-project-group-work-beta')
     expect(within(betaGroup).getByTestId('sidebar-session-row-x')).toBeInTheDocument()
-    expect(within(row('x').parentElement!).queryAllByTestId('sidebar-session-connector')).toHaveLength(0)
+    expect(within(row('x').parentElement!).queryAllByTestId('tree-connector-elbow')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /sidebar\.(collapse|expand)Children/ })).not.toBeInTheDocument()
   })
 
@@ -129,6 +137,19 @@ describe('Sidebar session tree', () => {
     expect(within(row('c2')).getByText('sidebar.sessionForked')).toBeInTheDocument()
     expect(within(row('p')).queryByText('sidebar.sessionSpawned')).not.toBeInTheDocument()
     expect(within(row('p')).queryByText('sidebar.sessionForked')).not.toBeInTheDocument()
+  })
+
+  it('nests a session assigned from the project board under the session that proposed it', () => {
+    setSessions([
+      makeSession('p', 'Parent', '2026-11-04T10:00:00Z'),
+      makeSession('a', 'Assigned', '2026-11-04T09:00:00Z', { parent: { sessionId: 'p', kind: 'assigned' } }),
+    ])
+    render(<Sidebar />)
+
+    expect(rowIds()).toEqual(['p', 'a'])
+    expect(within(row('a').parentElement!).getAllByTestId('tree-connector-elbow')).toHaveLength(1)
+    expect(within(row('a')).getByText('sidebar.sessionAssigned')).toBeInTheDocument()
+    expect(within(row('a')).queryByText('sidebar.sessionSpawned')).not.toBeInTheDocument()
   })
 
   it('puts the child toggle after the session title with the child count', () => {
@@ -187,8 +208,8 @@ describe('Sidebar session tree', () => {
 
     fireEvent.change(screen.getByPlaceholderText('sidebar.searchPlaceholder'), { target: { value: 'child' } })
     expect(rowIds()).toEqual(['c2', 'c1', 'g'])
-    expect(within(row('c2').parentElement!).queryAllByTestId('sidebar-session-connector')).toHaveLength(0)
-    expect(within(row('g').parentElement!).getAllByTestId('sidebar-session-connector')).toHaveLength(1)
+    expect(within(row('c2').parentElement!).queryAllByTestId('tree-connector-elbow')).toHaveLength(0)
+    expect(within(row('g').parentElement!).getAllByTestId('tree-connector-elbow')).toHaveLength(1)
 
     fireEvent.change(screen.getByPlaceholderText('sidebar.searchPlaceholder'), { target: { value: 'parent' } })
     expect(rowIds()).toEqual(['p'])
@@ -214,5 +235,33 @@ describe('Sidebar session tree', () => {
     fireEvent.click(within(row('g')).getByRole('button', { name: 'Grandchild' }))
     expect(useTabStore.getState().activeTabId).toBe('g')
     expect(connectToSession).toHaveBeenCalledWith('g')
+  })
+
+  it('puts the project board first under a project that has one, with what needs you, and opens it', async () => {
+    kanbanApiMock.listBoards.mockResolvedValue({ boards: [{ key: 'work-alpha', project: '/work/alpha' }] })
+    kanbanApiMock.view.mockResolvedValue({
+      changed: true,
+      view: fixtureView([fixtureCard(1, { status: 'review' }), fixtureCard(2, { status: 'review' })], { key: 'work-alpha', inbox: [{ kind: 'review', card: 1 }, { kind: 'review', card: 2 }] }),
+    })
+    setSessions(alphaSessions())
+    render(<Sidebar />)
+
+    const board = await screen.findByTestId('sidebar-project-board')
+    await waitFor(() => expect(within(board).getByLabelText('kanban.inbox.count 2')).toHaveTextContent('2'))
+    const list = screen.getByTestId('sidebar-project-session-list-work-alpha')
+    expect(list.firstElementChild).toBe(board)
+
+    fireEvent.click(within(board).getByRole('button'))
+
+    expect(useTabStore.getState().tabs).toContainEqual({ sessionId: '__kanban__:/work/alpha', title: 'kanban.title', type: 'kanban', status: 'idle' })
+    expect(useTabStore.getState().activeTabId).toBe('__kanban__:/work/alpha')
+  })
+
+  it('shows no board row for a project without a board', async () => {
+    setSessions(alphaSessions())
+    render(<Sidebar />)
+
+    await waitFor(() => expect(kanbanApiMock.listBoards).toHaveBeenCalled())
+    expect(screen.queryByTestId('sidebar-project-board')).not.toBeInTheDocument()
   })
 })

@@ -38,6 +38,7 @@ export type PendingPermission = {
   input: unknown
   description?: string
   suggestions?: unknown[]
+  alwaysAsks?: true
 }
 
 export type PendingBrowserGrant = {

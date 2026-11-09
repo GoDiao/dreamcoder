@@ -14,6 +14,12 @@ const session = (
 
 const human: QueuedCommand = { mode: 'prompt', value: 'x' }
 
+const kanban = (card: number, purpose = 'comment', project = '/repo'): QueuedCommand => ({
+  mode: 'prompt',
+  value: 'x',
+  origin: { kind: 'kanban', project, card: { id: card, title: `Card ${card}` }, purpose },
+})
+
 describe('canBatchWith origin', () => {
   test('merges messages with the same origin', () => {
     expect(canBatchWith(session('a'), session('a'))).toBe(true)
@@ -23,6 +29,15 @@ describe('canBatchWith origin', () => {
   test('does not merge a human prompt with a session message', () => {
     expect(canBatchWith(human, session('a'))).toBe(false)
     expect(canBatchWith(session('a'), human)).toBe(false)
+  })
+
+  test('merges board notifications only for the same card and purpose', () => {
+    expect(canBatchWith(kanban(1), kanban(1))).toBe(true)
+    expect(canBatchWith(kanban(1), kanban(2))).toBe(false)
+    expect(canBatchWith(kanban(1, 'comment'), kanban(1, 'review'))).toBe(false)
+    expect(canBatchWith(kanban(1, 'comment', '/a'), kanban(1, 'comment', '/b'))).toBe(false)
+    expect(canBatchWith(kanban(1), session('a'))).toBe(false)
+    expect(canBatchWith(human, kanban(1))).toBe(false)
   })
 
   test('does not merge messages from different sessions', () => {

@@ -421,7 +421,7 @@ describe('anthropicToOpenaiResponses', () => {
     expect(result.input).toEqual([{ type: 'message', role: 'user', content: 'Hello' }])
   })
 
-  test('tools conversion uses top-level name', () => {
+  test('tools conversion uses top-level name and turns strict mode off, so optional parameters stay optional', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4o',
       max_tokens: 100,
@@ -439,6 +439,7 @@ describe('anthropicToOpenaiResponses', () => {
       name: 'get_weather',
       description: 'Get weather',
       parameters: { type: 'object', properties: { city: { type: 'string' } } },
+      strict: false,
     })
   })
 

@@ -106,11 +106,12 @@ import {
   isShuttingDown,
 } from 'src/utils/gracefulShutdown.js'
 import { registerCleanup } from 'src/utils/cleanupRegistry.js'
+import { isUserMessageOrigin } from 'src/utils/crossSessionEnvelope.js'
 import { setHostRequester } from 'src/utils/hostRequests.js'
 import { createIdleTimeoutManager } from 'src/utils/idleTimeout.js'
 import {
-  SDKSessionOriginSchema,
   SDKSessionReportSchema,
+  SDKUserMessageOriginSchema,
 } from 'src/entrypoints/sdk/coreSchemas.js'
 import type {
   SDKStatus,
@@ -446,6 +447,14 @@ function sameOrigin(
   b: QueuedCommand['origin'],
 ): boolean {
   if (a === undefined || b === undefined) return a === b
+  if (a.kind === 'kanban' || b.kind === 'kanban') {
+    return (
+      a.kind === b.kind &&
+      a.project === b.project &&
+      a.card?.id === b.card?.id &&
+      a.purpose === b.purpose
+    )
+  }
   return (
     a.kind === b.kind &&
     a.sessionId === b.sessionId &&
@@ -2190,7 +2199,7 @@ function runHeadlessStreaming(
               prompt: input,
               promptUuid: cmd.uuid,
               isMeta: cmd.isMeta,
-              origin: cmd.origin?.kind === 'session' ? cmd.origin : undefined,
+              origin: isUserMessageOrigin(cmd.origin) ? cmd.origin : undefined,
               reports: cmd.reports,
               cwd: cwd(),
               tools: allTools,
@@ -4136,7 +4145,7 @@ function runHeadlessStreaming(
         value: await resolveAndPrepend(message, message.message.content),
         uuid: message.uuid,
         priority: message.priority,
-        origin: SDKSessionOriginSchema().safeParse(message.origin).data,
+        origin: SDKUserMessageOriginSchema().safeParse(message.origin).data,
         reports: SDKSessionReportSchema().array().safeParse(message.reports)
           .data,
       })

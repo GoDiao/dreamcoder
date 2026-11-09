@@ -1,5 +1,6 @@
 import { z } from 'zod/v4'
 import {
+  KANBAN_ROLES,
   SDKControlSessionStartResponseSchema,
   type SDKControlSessionStartResponse,
 } from '../../entrypoints/sdk/controlSchemas.js'
@@ -27,6 +28,16 @@ const inputSchema = lazySchema(() =>
     worktree: semanticBoolean(z.boolean().default(false)).describe(
       "Run the new session in a new git worktree of this session's repository.",
     ),
+    card: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('A project board card you own or created. The new session takes a role on it.'),
+    role: z
+      .enum(KANBAN_ROLES)
+      .optional()
+      .describe('With card: "owner" (the default) does the card, "reviewer" checks and accepts it; only the creator of the card starts a reviewer. The prompt is its instructions.'),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -66,10 +77,16 @@ export const StartSessionTool = buildTool({
   toAutoClassifierInput(input) {
     return `${input.title}: ${input.prompt}`
   },
+  async validateInput(input) {
+    if (input.role !== undefined && input.card === undefined) {
+      return { result: false, message: 'role takes effect only together with card. Pass the card the new session takes this role on.', errorCode: 1 }
+    }
+    return { result: true }
+  },
   async checkPermissions(input) {
     return {
       behavior: 'ask',
-      message: `Start a new session "${input.title}"?`,
+      message: input.card === undefined ? `Start a new session "${input.title}"?` : `Start a new session "${input.title}" as the ${input.role ?? 'owner'} of card #${input.card}?`,
       updatedInput: input,
       decisionReason: {
         type: 'safetyCheck',
@@ -89,6 +106,7 @@ export const StartSessionTool = buildTool({
         title: input.title,
         context: input.context,
         worktree: input.worktree,
+        ...(input.card === undefined ? {} : { card: input.card, role: input.role ?? 'owner' }),
       },
       SDKControlSessionStartResponseSchema(),
     )

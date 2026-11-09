@@ -1,9 +1,7 @@
 import { ArrowLeftIcon, BotIcon, CircleCheckIcon, PanelRight, Target } from 'lucide-react'
-import { usePanelWidthPersistence } from '../hooks/usePanelWidthPersistence'
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/shared/ui/resizable'
 import { Button } from '../components/shared/ui/button'
 import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
-import { lazy, Suspense, useEffect } from 'react'
+import { useEffect } from 'react'
 import {
   SCHEDULED_TAB_ID,
   useTabStore,
@@ -13,12 +11,7 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useChatStore, useSessionField } from '../stores/chatStore'
 import { useCLITaskStore } from '../stores/cliTaskStore'
 import { useTeamStore } from '../stores/teamStore'
-import {
-  WORKSPACE_PANEL_MAX_WIDTH,
-  WORKSPACE_PANEL_MIN_CHAT_WIDTH,
-  WORKSPACE_PANEL_MIN_WIDTH,
-  useWorkspacePanelStore,
-} from '../stores/workspacePanelStore'
+import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { useTranslation } from '../i18n'
 import { MessageList } from '../components/chat/MessageList'
 import { ChatInput } from '../components/chat/ChatInput'
@@ -30,19 +23,12 @@ import { SessionHeaderMenu } from '../components/layout/SessionHeaderMenu'
 import { TeamStatusBar } from '../components/teams/TeamStatusBar'
 import type { SessionListItem } from '../types/session'
 import type { ActiveGoalState } from '../types/chat'
-import { useMobileViewport, useViewportQuery } from '../hooks/useMobileViewport'
+import { useMobileViewport } from '../hooks/useMobileViewport'
 import { useTitleRow } from '../hooks/useTitleRow'
-import { Spinner } from '../components/shared/ui/spinner'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
-
-const WorkspacePanel = lazy(() => import('../components/workspace/WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
+import { WorkspaceSplit, useWorkspaceSplitState } from '../components/workspace/WorkspaceSplit'
 
 const TASK_POLL_INTERVAL_MS = 1000
-const SIDE_PANEL_CLASS = [
-  'relative flex border-l border-[var(--color-border)] bg-[var(--color-surface)]',
-  'max-[850px]:absolute max-[850px]:inset-y-0 max-[850px]:right-0 max-[850px]:z-20',
-  'max-[850px]:w-[min(380px,100%)]! max-[850px]:max-w-full max-[850px]:shadow-[var(--shadow-dropdown)]',
-].join(' ')
 
 function isSessionTabState(activeTabId: string | null, activeTabType: TabType | null | undefined) {
   if (!activeTabId) return false
@@ -127,8 +113,6 @@ function getSessionProjectName(session: SessionListItem | undefined, repoName: s
 }
 
 export function ActiveSession() {
-  const useOverlayPanel = useViewportQuery('(width < 850px)')
-  const setPanelWidth = useWorkspacePanelStore((state) => state.setWidth)
   const isMobileLayout = useMobileViewport() && !isDesktopRuntime()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const activeTabType = useTabStore((s) => s.tabs.find((tab) => tab.sessionId === s.activeTabId)?.type ?? null)
@@ -161,14 +145,7 @@ export function ActiveSession() {
     isSessionTabState(activeTabId, activeTabType) &&
     !isMemberSession &&
     !isMobileLayout
-  const showPanel = useWorkspacePanelStore((state) =>
-    canUsePanel && activeTabId ? state.isPanelOpen(activeTabId) : false,
-  )
-  const panelExpanded = useWorkspacePanelStore((state) =>
-    showPanel && activeTabId ? state.isPanelExpanded(activeTabId) : false,
-  )
-  const panelWidth = useWorkspacePanelStore((state) => state.width)
-  const { panelRef: workspacePanelRef, onLayoutChanged } = usePanelWidthPersistence(setPanelWidth, showPanel && !panelExpanded && !useOverlayPanel)
+  const { showPanel, panelExpanded } = useWorkspaceSplitState(activeTabId, canUsePanel)
   const workspaceStatus = useWorkspacePanelStore((state) => activeTabId ? state.statusBySession[activeTabId] : undefined)
   const workspaceStatusLoading = useWorkspacePanelStore((state) =>
     activeTabId ? state.loading.statusBySession[activeTabId] ?? false : false,
@@ -231,8 +208,18 @@ export function ActiveSession() {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
-      <ResizablePanelGroup orientation="horizontal" data-testid="active-session-content-row" className="relative min-h-0 min-w-0 flex-1" onLayoutChanged={onLayoutChanged}>
-        <ResizablePanel id="conversation-panel" minSize={panelExpanded || useOverlayPanel ? 0 : showPanel ? WORKSPACE_PANEL_MIN_CHAT_WIDTH : 0} maxSize={panelExpanded ? 0 : undefined} className="flex min-h-0">
+      <WorkspaceSplit
+        showPanel={showPanel}
+        panelExpanded={panelExpanded}
+        testId="active-session-content-row"
+        panel={{
+          panelId: activeTabId,
+          sessionTitle: session?.title || t('session.untitled'),
+          terminalCwd: getSessionTerminalCwd(session),
+          contextLabel,
+          projectRoot: openProjectPath,
+        }}
+      >
         <div
           data-testid="active-session-chat-column"
           hidden={panelExpanded}
@@ -373,40 +360,7 @@ export function ActiveSession() {
           />
         </div>
 
-        </ResizablePanel>
-        {showPanel && !panelExpanded && !useOverlayPanel ? <ResizableHandle aria-label={t('workspace.resizePanel')} data-testid="workspace-resize-handle" className="w-1.5" /> : null}
-        {showPanel ? (
-          <ResizablePanel id="workspace-panel" panelRef={workspacePanelRef} groupResizeBehavior="preserve-pixel-size"
-            defaultSize={panelExpanded ? '100%' : useOverlayPanel ? 0 : panelWidth}
-            minSize={panelExpanded || useOverlayPanel ? 0 : WORKSPACE_PANEL_MIN_WIDTH}
-            maxSize={panelExpanded ? '100%' : useOverlayPanel ? 0 : WORKSPACE_PANEL_MAX_WIDTH}
-            data-testid="session-side-panel"
-            className={panelExpanded ? 'flex min-w-0' : SIDE_PANEL_CLASS}
-          >
-            <Suspense
-              fallback={
-                <div
-                  role="status"
-                  aria-label={t('common.loading')}
-                  className="flex h-full min-h-0 w-full min-w-0 items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-tertiary)]"
-                >
-                  <Spinner aria-hidden="true" />
-                </div>
-              }
-            >
-              <WorkspacePanel
-                sessionId={activeTabId}
-                sessionTitle={session?.title || t('session.untitled')}
-                titleRowStyle={titleRowStyle(panelExpanded)}
-                titleRowClass={titleRowClass}
-                terminalCwd={getSessionTerminalCwd(session)}
-                contextLabel={contextLabel}
-                projectRoot={openProjectPath}
-              />
-            </Suspense>
-          </ResizablePanel>
-        ) : null}
-      </ResizablePanelGroup>
+      </WorkspaceSplit>
     </div>
   )
 }

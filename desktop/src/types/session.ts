@@ -2,7 +2,7 @@ import type { AgentTaskNotification, UIMessage } from './chat'
 
 export type SessionParent = {
   sessionId: string
-  kind: 'spawned' | 'forked'
+  kind: 'spawned' | 'forked' | 'assigned'
 }
 
 export type SessionListItem = {

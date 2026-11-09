@@ -1,4 +1,4 @@
-import type { SessionOrigin, SessionReport } from '../../entrypoints/sdk/coreSchemas.js'
+import type { SessionReport, UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { buildSessionOrigin } from '../../utils/crossSessionEnvelope.js'
 import { errorMessage } from '../../utils/errors.js'
 import { sessionStateStore } from '../session/state/store.js'
@@ -24,7 +24,7 @@ export type QueuedReport = {
 export function createTurnQueue(broadcast: SessionBroadcast, deliver: QueuedTurnDelivery) {
   const store = sessionStateStore
 
-  function shouldQueue(sessionId: string, content: string, origin: SessionOrigin | undefined): boolean {
+  function shouldQueue(sessionId: string, content: string, origin: UserMessageOrigin | undefined): boolean {
     const state = store.peek(sessionId)
     return !origin &&
       !content.trimStart().startsWith('/') &&

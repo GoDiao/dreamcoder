@@ -283,9 +283,9 @@ describe('sessionStore', () => {
     else await useSessionStore.getState().deleteSessions([doomed.id])
 
     expect(Object.keys(useBrowserStore.getState().pageByTab)).toEqual([otherTab])
-    expect(useWorkspacePanelStore.getState().panelBySession[doomed.id]).toBeUndefined()
+    expect(useWorkspacePanelStore.getState().panelByTab[doomed.id]).toBeUndefined()
     useBrowserStore.setState(useBrowserStore.getInitialState(), true)
-    useWorkspacePanelStore.setState({ panelBySession: {} })
+    useWorkspacePanelStore.setState({ panelByTab: {} })
     localStorage.clear()
   })
 

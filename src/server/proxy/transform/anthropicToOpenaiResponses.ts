@@ -40,6 +40,7 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
         name: t.name,
         description: t.description,
         parameters: t.input_schema,
+        strict: false,
       }))
   }
 

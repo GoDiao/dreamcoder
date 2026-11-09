@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { LITE_READ_BUF_SIZE, sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
-import { findCanonicalGitRoot } from '../../utils/git.js'
+import { resolveProjectRoot } from '../../utils/projectRoot.js'
 import { calculateUSDCost, MODEL_COSTS } from '../../utils/modelCost.js'
 import {
   calculateCurrentContextTokenTotal,
@@ -42,7 +42,7 @@ import { permissionModeFromTranscriptEntries } from './permissionModes.js'
 import { runtimeSelectionFromTranscriptEntries } from './runtimeSelection.js'
 import type { RuntimeSelection } from '../session/state/types.js'
 import { queuedCommandSourceUuid } from '../../utils/queuedCommandEntry.js'
-import type { SessionParent } from '../../utils/sessionBranching.js'
+import { isSessionParentKind, type SessionParent } from '../../utils/sessionBranching.js'
 
 export type SessionRelation = {
   parent?: SessionParent
@@ -186,7 +186,7 @@ function sessionRelationFromEntries(entries: RawEntry[]): SessionRelation {
     if (
       parent &&
       typeof parent.sessionId === 'string' &&
-      (parent.kind === 'spawned' || parent.kind === 'forked')
+      isSessionParentKind(parent.kind)
     ) {
       relation.parent = { sessionId: parent.sessionId, kind: parent.kind }
     }
@@ -544,27 +544,7 @@ export class SessionService {
       workDir ||
       (fallbackProjectDir ? this.desanitizePath(fallbackProjectDir) : null)
 
-    if (!candidate) return null
-
-    const canonicalCandidate = await this.canonicalizeProjectPath(candidate)
-    const gitRoot = findCanonicalGitRoot(canonicalCandidate)
-    if (gitRoot) return gitRoot
-
-    if (workDir) {
-      const marker = `${path.sep}.claude${path.sep}worktrees${path.sep}`
-      const markerIndex = canonicalCandidate.indexOf(marker)
-      if (markerIndex > 0) return canonicalCandidate.slice(0, markerIndex)
-    }
-
-    return canonicalCandidate
-  }
-
-  private async canonicalizeProjectPath(projectPath: string): Promise<string> {
-    try {
-      return normalizeDriveRootPathForPlatform(await fs.realpath(projectPath)).normalize('NFC')
-    } catch {
-      return projectPath.normalize('NFC')
-    }
+    return candidate ? resolveProjectRoot(candidate) : null
   }
 
   private countTranscriptMessages(entries: RawEntry[]): number {

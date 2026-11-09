@@ -5,14 +5,16 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { conversationService } from '../services/conversationService.js'
 import {
+  createLinkedSession,
   createSessionLinks,
+  type CardAssigneeLaunch,
   type UserTurnDelivery,
 } from '../services/sessionLinksService.js'
 import { sessionService } from '../services/sessionService.js'
 import { createTurnQueue } from '../services/turnQueueService.js'
 import { sessionStateStore } from '../session/state/store.js'
 import { pendingReportsFromEntries } from '../transcript/entries.js'
-import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import type { KanbanOrigin, SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { wrapCrossSessionBody } from '../../utils/crossSessionEnvelope.js'
 import { createSessionBranch } from '../../utils/sessionBranching.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'
@@ -130,7 +132,8 @@ beforeEach(async () => {
 afterEach(async () => {
   mock.restore()
   sessionStateStore.clear()
-  process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
+  if (configDirAtLoad === undefined) delete process.env.DREAMCODER_CONFIG_DIR
+  else process.env.DREAMCODER_CONFIG_DIR = configDirAtLoad
   await fs.rm(configDir, { recursive: true, force: true })
   await fs.rm(workDir, { recursive: true, force: true })
 })
@@ -179,6 +182,38 @@ describe('session relations in session-meta', () => {
     const info = await sessionService.getSessionLinkInfo(created.sessionId)
     expect(info?.parent).toEqual({ sessionId: 'parent-1', kind: 'spawned' })
     expect('name' in info!).toBe(false)
+  })
+
+  it('lists a session assigned from the project board under the session that proposed it', async () => {
+    const created = await sessionService.createSession(workDir, undefined, undefined, undefined, {
+      parent: { sessionId: 'proposer-1', kind: 'assigned' },
+    })
+
+    const { sessions } = await sessionService.listSessions()
+    expect(sessions.find((session) => session.id === created.sessionId)?.parent).toEqual({
+      sessionId: 'proposer-1',
+      kind: 'assigned',
+    })
+  })
+
+  it('creates a linked session with its title and the parent mode and model', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Lead session')
+    sessionStateStore.apply(parentId, { type: 'permission_desired_changed', mode: 'acceptEdits' })
+    sessionStateStore.apply(parentId, { type: 'runtime_desired_changed', selection: { providerId: 'p1', modelId: 'm1' } })
+
+    const sessionId = await createLinkedSession({
+      workDir,
+      parent: { sessionId: parentId, kind: 'assigned' },
+      title: '#12 OAuth module',
+    })
+
+    expect(await sessionService.getSessionLinkInfo(sessionId)).toMatchObject({
+      title: '#12 OAuth module',
+      parent: { sessionId: parentId, kind: 'assigned' },
+    })
+    expect(await sessionService.getSessionPermissionMode(sessionId)).toBe('acceptEdits')
+    expect((await sessionService.getSessionRestoreInfo(sessionId))?.runtime).toEqual({ providerId: 'p1', modelId: 'm1' })
   })
 
   it('records the source as the parent of a fork and drops the source relation', async () => {
@@ -303,6 +338,17 @@ describe('transcript items from session messages', () => {
     expect(first).toMatchObject({ type: 'user_text', content: 'Please audit the docs folder.', origin })
   })
 
+  it('carries a project board origin and shows the notification without the wrapper', async () => {
+    const sessionId = crypto.randomUUID()
+    const origin: KanbanOrigin = { kind: 'kanban', project: workDir, card: { id: 12, title: 'OAuth module' }, purpose: 'assignment' }
+    const user = userEntry(sessionId, wrapCrossSessionBody('Card #12 is yours.', origin), { origin })
+    await writeTranscript(sessionId, [metaEntry(), user, assistantEntry(sessionId, 'On it.', user.uuid)])
+
+    const { items } = await sessionService.getSessionTranscript(sessionId)
+
+    expect(items[0]).toMatchObject({ type: 'user_text', content: 'Card #12 is yours.', origin })
+  })
+
   it('unwraps a message that also carries an image', async () => {
     const sessionId = crypto.randomUUID()
     const origin: SessionOrigin = { kind: 'session', sessionId: 'parent-1', purpose: 'message' }
@@ -404,6 +450,18 @@ describe('transcript items from session messages', () => {
       expect(items[1]).toMatchObject({ type: 'user_text', content: 'progress body', transcriptMessageId: 'report-1', origin })
     })
 
+    it('shows a project board notification queued mid-turn with its origin', async () => {
+      const sessionId = crypto.randomUUID()
+      const origin: KanbanOrigin = { kind: 'kanban', project: workDir, card: { id: 3, title: 'Docs' }, purpose: 'review' }
+      const user = userEntry(sessionId, 'start')
+      const queued = queuedEntry(sessionId, { prompt: 'Card #3 was submitted', source_uuid: 'board-1', origin }, '2026-01-01T00:01:30.000Z')
+      await writeTranscript(sessionId, [metaEntry(), user, queued, assistantEntry(sessionId, 'ok', user.uuid)])
+
+      const { items } = await sessionService.getSessionTranscript(sessionId)
+
+      expect(items[1]).toMatchObject({ type: 'user_text', content: 'Card #3 was submitted', transcriptMessageId: 'board-1', origin })
+    })
+
     it('keeps leaving out task notifications and other queued commands', async () => {
       const sessionId = crypto.randomUUID()
       const user = userEntry(sessionId, 'start')
@@ -448,6 +506,7 @@ describe('session links service', () => {
   let replies: Array<{ requestId: string; result: Record<string, any> }>
   let renamed: Array<{ sessionId: string; title: string }>
   let links: ReturnType<typeof createSessionLinks>
+  let startCardAssignee: CardAssigneeLaunch
 
   async function request(request: Record<string, unknown>, from = callerId): Promise<Record<string, any>> {
     const before = replies.length
@@ -466,13 +525,18 @@ describe('session links service', () => {
     renamed = []
     replies = []
     deliver = async (sessionId, content, origin) => {
+      if (origin.kind !== 'session') throw new Error(`Unexpected origin ${origin.kind}`)
       deliveries.push({ sessionId, content, origin })
       return { ok: true }
+    }
+    startCardAssignee = async () => {
+      throw new Error('Not on a board')
     }
     links = createSessionLinks({
       deliver: (sessionId, content, origin) => deliver(sessionId, content, origin),
       queueReport: createTurnQueue(() => {}, async () => {}).queueReport,
       onRenamed: (sessionId, title) => renamed.push({ sessionId, title }),
+      startCardAssignee: (caller, start, launch) => startCardAssignee(caller, start, launch),
     })
     spyOn(console, 'log').mockImplementation(() => {})
     spyOn(console, 'warn').mockImplementation(() => {})
@@ -517,6 +581,55 @@ describe('session links service', () => {
           origin: { kind: 'session', sessionId: callerId, name: 'Lead session', purpose: 'brief', summary: 'Docs audit' },
         },
       ])
+    })
+
+    it('starts the child in its role on a card, with the brief as its instructions, and sends it the card message', async () => {
+      await writeConversation(callerId, {}, 'Lead session')
+      const starts: Array<{ caller: string; start: unknown; child: string }> = []
+      startCardAssignee = async (caller, start, launch) => {
+        const child = await launch()
+        starts.push({ caller, start, child })
+        return { sessionId: child, message: 'Card #3: Tokens\nYou are assigned as its reviewer.', abandon: async () => {} }
+      }
+
+      const reply = await request({ subtype: 'session_start', prompt: 'Review the tokens', title: 'Tokens', context: 'fresh', worktree: false, card: 3, role: 'reviewer' })
+      await request({ subtype: 'session_start', prompt: 'Do the tokens', title: 'Owner', context: 'fresh', worktree: false, card: 4 })
+
+      const { sessionId } = reply.response
+      expect(starts.map(({ caller, start }) => ({ caller, start }))).toEqual([
+        { caller: callerId, start: { card: 3, role: 'reviewer', instructions: 'Review the tokens' } },
+        { caller: callerId, start: { card: 4, role: 'owner', instructions: 'Do the tokens' } },
+      ])
+      expect(starts[0]!.child).toBe(sessionId)
+      expect(await sessionService.getSessionLinkInfo(sessionId)).toMatchObject({ title: 'Tokens', parent: { sessionId: callerId, kind: 'spawned' } })
+      expect(deliveries[0]).toMatchObject({ sessionId, content: 'Card #3: Tokens\nYou are assigned as its reviewer.' })
+    })
+
+    it('hands the card back when the brief of a session started on it cannot be delivered', async () => {
+      await writeConversation(callerId, {}, 'Lead session')
+      const abandoned: string[] = []
+      startCardAssignee = async (_caller, _start, launch) => {
+        const child = await launch()
+        return { sessionId: child, message: 'Card #3: Tokens', abandon: async (reason) => { abandoned.push(`${child}: ${reason}`) } }
+      }
+      deliver = async () => ({ ok: false, message: 'CLI did not start' })
+
+      const reply = await request({ subtype: 'session_start', prompt: 'go', title: 'Tokens', context: 'fresh', worktree: false, card: 3 })
+
+      expect(reply.error).toContain('CLI did not start')
+      expect(abandoned).toEqual([expect.stringMatching(/: CLI did not start$/)])
+    })
+
+    it('delivers nothing when the board refuses the card', async () => {
+      await writeConversation(callerId)
+      startCardAssignee = async () => {
+        throw new Error('Only its owner, the session that created it or a person can assign another session to it: card #3.')
+      }
+
+      const reply = await request({ subtype: 'session_start', prompt: 'go', title: 'Tokens', context: 'fresh', worktree: false, card: 3 })
+
+      expect(reply.error).toContain('can assign another session to it')
+      expect(deliveries).toEqual([])
     })
 
     it('sends the caller title to the child without line breaks or tags', async () => {

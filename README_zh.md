@@ -44,6 +44,7 @@ DreamCoder 在本机运行桌面应用与会话服务，把模型配置、编程
 *   **看清编程过程**：在桌面查看会话、文件变更、终端和工具调用。
 *   **不只是文字**：AI 可以直接在对话里给出可交互的页面，如图表、示意图、分步演示；内置浏览器能在对话旁边打开你的开发服务器。
 *   **设计与复刻**：用 `/design` 从 60+ 个模板和 156+ 套设计系统出发，Agent 先访谈再动手，做出网页或应用原型；也能复刻网站。成果保存在项目的 `dc_artifacts/` 里，可导出、可继续改、可在画布上并排比较。
+*   **在看板上安排工作**：项目看板为你和会话记录任务、负责人、审核人和进展，跨会话、跨 worktree 保留。
 *   **从手机接续**：启用 H5 接入后，可在同一局域网内通过手机浏览器访问桌面会话；跨网络访问需要自行配置反向代理。
 *   **读懂编程智能体**：附带七篇源码导读，沿一次代码修改讲解执行循环、工具、权限、会话与桌面集成，见[《编程智能体实现指南》](docs/tutorial/README.md)。
 
@@ -121,7 +122,30 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
 
 模板和大部分设计系统转换自 [Open Design](https://github.com/nexu-io/open-design)（Apache-2.0），详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-### 4. 多模型配置
+### 4. 项目看板
+*   **你和会话共用一块看板**：每个项目一块持久的看板，记录任务和子任务。你在看板上建任务、分配给会话；会话读看板，把工作拆成子任务，记录进展，做完提交交付报告。会话结束了看板还在，同一项目的各个 worktree 共用同一块看板。
+*   **负责人、审核人和创建者**：每个任务记着谁来做、谁来审、谁建的。审核人对照验收要点检查交付，接受或退回；没有审核人时由你验收。层级视图展示整棵任务树，"待我处理" 汇总等你处理的事：带着会话提问的阻塞任务，和等你验收的交付。
+*   **由你把关**：验收要点由任务的创建者定。其他会话要改时每次都要你确认，确认卡片列出新增和删除的要点。会话建看板、开新会话做任务、取消任务、把自己设为审核人之前，也都会先问你。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban.png">
+  <img src="./assets/kanban.png" alt="打开任务详情的项目看板：状态、负责人、带审核说明的审核人和交付报告" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-approval.png">
+  <img src="./assets/kanban-approval.png" alt="会话请求修改任务的验收要点，确认卡片列出新增和删除的要点" width="49%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-tree.png">
+  <img src="./assets/kanban-tree.png" alt="层级视图：任务和子任务，带状态、负责人和依赖" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-inbox.png">
+  <img src="./assets/kanban-inbox.png" alt="待我处理：一条带会话提问的阻塞任务，一条等待验收的交付" width="49%">
+</picture>
+
+### 5. 多模型配置
 *   **Provider 预设与自定义端点**：按所选服务商配置 API Key、地址与模型映射。
 *   **连接检查**：在设置界面测试已配置端点的可用性与延迟。
 
@@ -130,7 +154,7 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
   <img src="./assets/setting_provider.png" alt="从预设添加 Provider">
 </picture>
 
-### 5. Claude Code 工作流
+### 6. Claude Code 工作流
 *   **Computer Use**：在后台按界面元素操作桌面应用和浏览器，由 [cua-driver](https://github.com/trycua/cua)（MIT）驱动。开启时 DreamCoder 自动下载，不需要 Python。macOS 已验证；Windows 有待社区实测，Linux 为预览。
 *   **工具调用全程可见**：AI 读写文件、执行终端命令的过程透明呈现，便于理解与审查。
 *   **MCP 扩展能力**：通过 Model Context Protocol 持续扩展 AI 的上下文与工具能力。
@@ -140,13 +164,13 @@ Provider 配置和 API Key 保存在本机文件中。使用云端模型时，�
   <img src="./assets/setting_computeruse.png" alt="Computer Use 设置">
 </picture>
 
-### 6. 局域网内手机接续
+### 7. 局域网内手机接续
 *   **H5 接入**：在设置中开启访问、管理 Token，并使用二维码从同一局域网内的手机连接。
 *   **访问范围**：桌面端需保持运行；跨网络访问需要自行配置反向代理，相关部署指南仍在编写。
 
 ---
 
-### 7. MCP 扩展
+### 8. MCP 扩展
 *   **支持 MCP**：通过 Model Context Protocol 接入外部工具。
 *   **配置过程图形化**：不再手写 JSON，通过界面管理 MCP 服务器。
 

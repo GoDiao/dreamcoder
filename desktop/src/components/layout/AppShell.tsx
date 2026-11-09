@@ -40,6 +40,10 @@ function isChatTab(tab: Tab | undefined) {
   return tab?.type === 'session'
 }
 
+function opensOnMobile(tab: Tab | undefined) {
+  return isChatTab(tab) || tab?.type === 'kanban'
+}
+
 export function AppShell() {
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
@@ -183,7 +187,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (!ready || !isMobileShell) return
-    if (isChatTab(activeTab) || (!activeTab && !activeTabId)) return
+    if (opensOnMobile(activeTab) || (!activeTab && !activeTabId)) return
     const nextChatTab = tabs.find(isChatTab)
     if (nextChatTab) {
       setActiveTab(nextChatTab.sessionId)

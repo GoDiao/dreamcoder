@@ -4,21 +4,22 @@ import {
   SDKControlSessionRenameRequestSchema,
   SDKControlSessionSendRequestSchema,
   SDKControlSessionStartRequestSchema,
+  type KANBAN_ROLES,
   type SDKControlSessionListResponse,
   type SDKControlSessionRenameResponse,
   type SDKControlSessionSendResponse,
   type SDKControlSessionStartRequest,
   type SDKControlSessionStartResponse,
 } from '../../entrypoints/sdk/controlSchemas.js'
-import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { buildSessionOrigin, sanitizeDisplayName } from '../../utils/crossSessionEnvelope.js'
 import { errorMessage } from '../../utils/errors.js'
-import { createSessionBranch, SessionBranchingError } from '../../utils/sessionBranching.js'
+import { createSessionBranch, SessionBranchingError, type SessionParent } from '../../utils/sessionBranching.js'
 import { SESSION_ID_PATTERN } from '../sessionId.js'
 import { sessionStateStore } from '../session/state/store.js'
-import { conversationService } from './conversationService.js'
+import { conversationService, type HostRequest } from './conversationService.js'
 import { removeAgentWorktree } from '../../utils/worktree.js'
-import { prepareSessionWorkspace } from './repositoryLaunchService.js'
+import { prepareSessionWorkspace, type CreateSessionRepositoryOptions } from './repositoryLaunchService.js'
 import { sessionService } from './sessionService.js'
 import type { QueuedReport } from './turnQueueService.js'
 
@@ -31,48 +32,84 @@ export type SessionRenamed = (sessionId: string, title: string) => void
 export type UserTurnDelivery = (
   sessionId: string,
   content: string,
-  origin: SessionOrigin,
+  origin: UserMessageOrigin,
 ) => Promise<{ ok: boolean; message?: string }>
 
-type CliControlRequest = {
-  request_id?: unknown
-  request?: { subtype?: unknown }
-}
-
 const SESSION_REQUEST_SUBTYPES = new Set(['session_start', 'session_send', 'session_list', 'session_rename'])
+
+export type CardAssigneeStart = { card: number; role: (typeof KANBAN_ROLES)[number]; instructions: string }
+
+export type StartedSession = { sessionId: string; message: string; abandon: (reason: string) => Promise<void> }
+
+export type CardAssigneeLaunch = (
+  callerId: string,
+  start: CardAssigneeStart,
+  launch: () => Promise<string>,
+) => Promise<StartedSession>
 
 export type SessionLinksDeps = {
   deliver: UserTurnDelivery
   queueReport: (to: string, report: QueuedReport) => Promise<void>
   onRenamed: SessionRenamed
+  startCardAssignee: CardAssigneeLaunch
 }
 
-export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionLinksDeps) {
+async function removeWorktree(
+  repository: { repoRoot?: string; worktreePath?: string; worktreeBranch?: string } | undefined,
+): Promise<void> {
+  if (!repository?.worktreePath || !repository.repoRoot) return
+  if (!(await fs.stat(repository.worktreePath).then(() => true, () => false))) return
+  const removed = await removeAgentWorktree(repository.worktreePath, repository.worktreeBranch, repository.repoRoot).catch(
+    () => false,
+  )
+  if (!removed) console.warn(`[SessionLinks] Could not remove the worktree ${repository.worktreePath} of a failed start`)
+}
+
+export async function discardSession(sessionId: string): Promise<void> {
+  const repository = (await sessionService.getSessionLaunchInfo(sessionId))?.repository
+  conversationService.markSessionDeleted(sessionId)
+  try {
+    await sessionService.deleteSession(sessionId)
+  } catch (error) {
+    conversationService.unmarkSessionDeleted(sessionId)
+    console.warn(`[SessionLinks] Could not remove session ${sessionId} after a failed start: ${errorMessage(error)}`)
+    return
+  }
+  if (repository?.worktree) await removeWorktree(repository)
+}
+
+export type LinkedSessionOptions = {
+  workDir: string
+  repository?: CreateSessionRepositoryOptions
+  parent?: SessionParent
+  title: string
+}
+
+export async function createLinkedSession({ workDir, repository, parent, title }: LinkedSessionOptions): Promise<string> {
+  const parentState = parent ? await sessionStateStore.read(parent.sessionId) : undefined
+  const { sessionId } = await sessionService.createSession(
+    workDir,
+    repository,
+    parentState?.permission.desired,
+    parentState?.runtime.desired ?? undefined,
+    parent ? { parent } : undefined,
+  )
+  try {
+    await sessionService.renameSession(sessionId, title)
+  } catch (error) {
+    await discardSession(sessionId)
+    throw error
+  }
+  return sessionId
+}
+
+export function isSessionRunning(sessionId: string): boolean {
+  const phase = sessionStateStore.peek(sessionId)?.turn.phase
+  return conversationService.hasSession(sessionId) && phase !== undefined && phase !== 'idle'
+}
+
+export function createSessionLinks({ deliver, queueReport, onRenamed, startCardAssignee }: SessionLinksDeps) {
   const store = sessionStateStore
-
-  async function removeWorktree(
-    repository: { repoRoot?: string; worktreePath?: string; worktreeBranch?: string } | undefined,
-  ): Promise<void> {
-    if (!repository?.worktreePath || !repository.repoRoot) return
-    if (!(await fs.stat(repository.worktreePath).then(() => true, () => false))) return
-    const removed = await removeAgentWorktree(repository.worktreePath, repository.worktreeBranch, repository.repoRoot).catch(
-      () => false,
-    )
-    if (!removed) console.warn(`[SessionLinks] Could not remove the worktree ${repository.worktreePath} of a failed start`)
-  }
-
-  async function discard(sessionId: string): Promise<void> {
-    const repository = (await sessionService.getSessionLaunchInfo(sessionId))?.repository
-    conversationService.markSessionDeleted(sessionId)
-    try {
-      await sessionService.deleteSession(sessionId)
-    } catch (error) {
-      conversationService.unmarkSessionDeleted(sessionId)
-      console.warn(`[SessionLinks] Could not remove session ${sessionId} after a failed start: ${errorMessage(error)}`)
-      return
-    }
-    if (repository?.worktree) await removeWorktree(repository)
-  }
 
   async function createChild(
     callerId: string,
@@ -81,47 +118,51 @@ export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionL
   ): Promise<string> {
     const launch = await sessionService.getSessionLaunchInfo(callerId)
     if (!launch) throw new Error(`Session not found: ${callerId}`)
-    const caller = await store.read(callerId)
-    const parent = { sessionId: callerId, kind: 'spawned' as const }
-
     const workDir = conversationService.getSessionWorkDir(callerId) || launch.workDir
 
-    if (request.context === 'fork') {
-      const sessionId = crypto.randomUUID()
-      const workspace = request.worktree
-        ? await prepareSessionWorkspace(workDir, { worktree: true }, sessionId)
-        : undefined
-      try {
-        const branch = await createSessionBranch({
-          sessionId,
-          sourceSessionId: callerId,
-          sourceTranscriptPath: launch.filePath,
-          title,
-          sourceWorkDir: launch.workDir,
-          sourceRepository: launch.repository,
-          sourceWorktreeSession: launch.worktreeSession,
-          parentKind: parent.kind,
-          openToolUseResult: FORKED_SESSION_NOTE,
-          ...(workspace ? { workspace: { workDir: workspace.workDir, repository: workspace.repository } } : {}),
-        })
-        await sessionService.appendSessionPermissionMode(branch.sessionId, caller.permission.desired)
-        if (caller.runtime.desired) await sessionService.appendSessionRuntimeConfig(branch.sessionId, caller.runtime.desired)
-        return branch.sessionId
-      } catch (error) {
-        await removeWorktree(workspace?.repository)
-        if (error instanceof SessionBranchingError) throw new Error(error.message)
-        throw error
-      }
+    if (request.context !== 'fork') {
+      return createLinkedSession({
+        workDir,
+        repository: request.worktree ? { worktree: true } : undefined,
+        parent: { sessionId: callerId, kind: 'spawned' },
+        title,
+      })
     }
 
-    const created = await sessionService.createSession(
-      workDir,
-      request.worktree ? { worktree: true } : undefined,
-      caller.permission.desired,
-      caller.runtime.desired ?? undefined,
-      { parent },
-    )
-    return created.sessionId
+    const caller = await store.read(callerId)
+    const sessionId = crypto.randomUUID()
+    const workspace = request.worktree
+      ? await prepareSessionWorkspace(workDir, { worktree: true }, sessionId)
+      : undefined
+    let branchId: string
+    try {
+      const branch = await createSessionBranch({
+        sessionId,
+        sourceSessionId: callerId,
+        sourceTranscriptPath: launch.filePath,
+        title,
+        sourceWorkDir: launch.workDir,
+        sourceRepository: launch.repository,
+        sourceWorktreeSession: launch.worktreeSession,
+        parentKind: 'spawned',
+        openToolUseResult: FORKED_SESSION_NOTE,
+        ...(workspace ? { workspace: { workDir: workspace.workDir, repository: workspace.repository } } : {}),
+      })
+      branchId = branch.sessionId
+    } catch (error) {
+      await removeWorktree(workspace?.repository)
+      if (error instanceof SessionBranchingError) throw new Error(error.message)
+      throw error
+    }
+    try {
+      await sessionService.appendSessionPermissionMode(branchId, caller.permission.desired)
+      if (caller.runtime.desired) await sessionService.appendSessionRuntimeConfig(branchId, caller.runtime.desired)
+      await sessionService.renameSession(branchId, title)
+    } catch (error) {
+      await discardSession(branchId)
+      throw error
+    }
+    return branchId
   }
 
   async function startSession(callerId: string, request: SDKControlSessionStartRequest): Promise<SDKControlSessionStartResponse> {
@@ -130,16 +171,19 @@ export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionL
     const title = request.title.trim()
     if (!title) throw new Error('A session needs a title')
 
-    const childId = await createChild(callerId, request, title)
+    const launch = () => createChild(callerId, request, title)
+    const started: StartedSession =
+      request.card === undefined
+        ? await launch().then((sessionId) => ({ sessionId, message: request.prompt, abandon: () => discardSession(sessionId) }))
+        : await startCardAssignee(callerId, { card: request.card, role: request.role ?? 'owner', instructions: request.prompt }, launch)
     try {
-      await sessionService.renameSession(childId, title)
-      const delivery = await deliver(childId, request.prompt, buildSessionOrigin(callerId, callerInfo.title, 'brief', title))
+      const delivery = await deliver(started.sessionId, started.message, buildSessionOrigin(callerId, callerInfo.title, 'brief', title))
       if (!delivery.ok) throw new Error(delivery.message ?? 'The session could not be started')
     } catch (error) {
-      await discard(childId)
+      await started.abandon(errorMessage(error))
       throw error
     }
-    return { sessionId: childId, title }
+    return { sessionId: started.sessionId, title }
   }
 
   async function sendToSession(
@@ -188,14 +232,13 @@ export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionL
               : callerInfo?.parent?.sessionId === session.id
                 ? 'parent'
                 : 'none'
-        const turnPhase = store.peek(session.id)?.turn.phase
         return {
           sessionId: session.id,
           title: session.title,
           project: session.workDir ?? session.projectPath,
           ...(session.parent ? { parentSessionId: session.parent.sessionId } : {}),
           relation,
-          running: conversationService.hasSession(session.id) && turnPhase !== undefined && turnPhase !== 'idle',
+          running: isSessionRunning(session.id),
         } as const
       }),
     }
@@ -209,24 +252,9 @@ export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionL
     return { title }
   }
 
-  async function answer(callerId: string, requestId: string, work: () => Promise<Record<string, unknown>>): Promise<void> {
-    let reply: { response: Record<string, unknown> } | { error: string }
-    try {
-      reply = { response: await work() }
-    } catch (error) {
-      reply = { error: errorMessage(error) }
-    }
-    conversationService.respondToHostRequest(callerId, requestId, reply)
-  }
-
   return {
-    handleControlRequest(callerId: string, cliMsg: CliControlRequest): boolean {
-      const subtype = cliMsg.request?.subtype
-      if (typeof subtype !== 'string' || !SESSION_REQUEST_SUBTYPES.has(subtype)) return false
-      const requestId = cliMsg.request_id
-      if (typeof requestId !== 'string') return true
-
-      void answer(callerId, requestId, async () => {
+    handleControlRequest(callerId: string, cliMsg: HostRequest): boolean {
+      return conversationService.answerHostRequest(callerId, cliMsg, SESSION_REQUEST_SUBTYPES, async (subtype) => {
         if (subtype === 'session_start') {
           const parsed = SDKControlSessionStartRequestSchema().safeParse(cliMsg.request)
           if (!parsed.success) throw new Error('Invalid session_start request')
@@ -246,7 +274,6 @@ export function createSessionLinks({ deliver, queueReport, onRenamed }: SessionL
         if (!parsed.success) throw new Error('Invalid session_list request')
         return listSessions(callerId, parsed.data.project)
       })
-      return true
     },
   }
 }

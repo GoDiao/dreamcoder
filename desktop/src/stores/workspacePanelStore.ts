@@ -49,18 +49,22 @@ export type WorkspaceTab =
   | { id: string; kind: 'changes' }
   | { id: string; kind: 'files' }
   | { id: string; kind: 'artifacts' }
-  | { id: string; kind: 'file'; path: string }
+  | { id: string; kind: 'file'; path: string; sessionId?: string }
   | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { id: string; kind: 'terminal'; index: number; shell?: string }
   | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
+  | { id: string; kind: 'task'; board: string; card: number }
+  | { id: string; kind: 'inbox'; board: string }
 
 export type WorkspaceTabKind = WorkspaceTab['kind']
 
 export type WorkspaceTabTarget =
   | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' | 'terminal' }
-  | { kind: 'file'; path: string }
+  | { kind: 'file'; path: string; sessionId?: string }
   | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { kind: 'uiPage'; pageId: string; revision: number; title: string }
+  | { kind: 'task'; board: string; card: number }
+  | { kind: 'inbox'; board: string }
 
 export type WorkspacePanelSessionState = {
   isOpen: boolean
@@ -83,7 +87,7 @@ type WorkspacePanelErrorState = {
 }
 
 type WorkspacePanelStore = {
-  panelBySession: Record<string, WorkspacePanelSessionState | undefined>
+  panelByTab: Record<string, WorkspacePanelSessionState | undefined>
   width: number
   statusBySession: Record<string, WorkspaceStatusResult | undefined>
   expandedPathsBySession: Record<string, string[] | undefined>
@@ -98,6 +102,7 @@ type WorkspacePanelStore = {
   getActiveTab: (sessionId: string) => WorkspaceTab | null
   openTab: (sessionId: string, target: WorkspaceTabTarget) => string
   openAddress: (sessionId: string, input: string, projectRoot: string | null) => Promise<void>
+  openUrl: (sessionId: string, url: string, projectRoot: string | null) => Promise<void>
   openArtifact: (sessionId: string, item: Pick<ArtifactListItem, 'name' | 'latestMtimeMs' | 'id'> & Partial<Pick<ArtifactListItem, 'manifest'>>, root: string) => Promise<void>
   openTemplatePreview: (sessionId: string, templateId: string) => Promise<void>
   activateTab: (sessionId: string, tabId: string) => void
@@ -157,10 +162,10 @@ export function clampWorkspacePanelWidth(width: number) {
 }
 
 function getSessionPanelState(
-  panelBySession: Record<string, WorkspacePanelSessionState | undefined>,
+  panelByTab: Record<string, WorkspacePanelSessionState | undefined>,
   sessionId: string,
 ) {
-  return panelBySession[sessionId] ?? DEFAULT_PANEL_STATE
+  return panelByTab[sessionId] ?? DEFAULT_PANEL_STATE
 }
 
 function makeTreeKey(sessionId: string, path: string) {
@@ -204,14 +209,14 @@ function invalidateSessionScopedRequests(store: Map<string, number>, sessionId: 
 }
 
 function patchSessionPanel(
-  panelBySession: Record<string, WorkspacePanelSessionState | undefined>,
+  panelByTab: Record<string, WorkspacePanelSessionState | undefined>,
   sessionId: string,
   patch: Partial<WorkspacePanelSessionState>,
 ) {
   return {
-    ...panelBySession,
+    ...panelByTab,
     [sessionId]: {
-      ...getSessionPanelState(panelBySession, sessionId),
+      ...getSessionPanelState(panelByTab, sessionId),
       ...patch,
     },
   }
@@ -228,9 +233,13 @@ function isSameTarget(tab: WorkspaceTab, target: WorkspaceTabTarget) {
     case 'artifacts':
       return tab.kind === target.kind
     case 'file':
-      return tab.kind === 'file' && tab.path === target.path
+      return tab.kind === 'file' && tab.path === target.path && tab.sessionId === target.sessionId
     case 'uiPage':
       return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision
+    case 'task':
+      return tab.kind === 'task' && tab.board === target.board && tab.card === target.card
+    case 'inbox':
+      return tab.kind === 'inbox' && tab.board === target.board
     case 'browser':
       if (target.artifact !== undefined) return tab.kind === 'browser' && tab.artifact?.id === target.artifact.id && tab.artifact.board === target.artifact.board
       return target.template !== undefined && tab.kind === 'browser' && tab.template?.id === target.template.id
@@ -243,7 +252,7 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
   const id = newTabId()
   switch (target.kind) {
     case 'file':
-      return { id, kind: 'file', path: target.path }
+      return { id, kind: 'file', path: target.path, ...(target.sessionId ? { sessionId: target.sessionId } : {}) }
     case 'browser':
       return {
         id,
@@ -256,6 +265,10 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
       }
     case 'uiPage':
       return { id, kind: 'uiPage', pageId: target.pageId, revision: target.revision, title: target.title }
+    case 'task':
+      return { id, kind: 'task', board: target.board, card: target.card }
+    case 'inbox':
+      return { id, kind: 'inbox', board: target.board }
     case 'terminal': {
       const index = Math.max(0, ...tabs.map((tab) => tab.kind === 'terminal' ? tab.index : 0)) + 1
       return { id, kind: 'terminal', index }
@@ -306,7 +319,7 @@ function isStoredTab(value: unknown): value is WorkspaceTab {
     case 'artifacts':
       return true
     case 'file':
-      return typeof tab.path === 'string'
+      return typeof tab.path === 'string' && (tab.sessionId === undefined || typeof tab.sessionId === 'string')
     case 'browser':
       return typeof tab.url === 'string' && typeof tab.title === 'string'
         && (tab.root === undefined || typeof tab.root === 'string')
@@ -314,6 +327,10 @@ function isStoredTab(value: unknown): value is WorkspaceTab {
         && (tab.template === undefined || isStoredBrowserTabTemplate(tab.template))
     case 'uiPage':
       return typeof tab.pageId === 'string' && typeof tab.revision === 'number' && typeof tab.title === 'string'
+    case 'task':
+      return typeof tab.board === 'string' && typeof tab.card === 'number'
+    case 'inbox':
+      return typeof tab.board === 'string'
     default:
       return false
   }
@@ -346,9 +363,9 @@ function readStoredPanels(): Record<string, WorkspacePanelSessionState | undefin
   }
 }
 
-function writeStoredPanels(panelBySession: Record<string, WorkspacePanelSessionState | undefined>) {
+function writeStoredPanels(panelByTab: Record<string, WorkspacePanelSessionState | undefined>) {
   const stored = Object.fromEntries(
-    Object.entries(panelBySession).flatMap(([sessionId, panel]) => {
+    Object.entries(panelByTab).flatMap(([sessionId, panel]) => {
       if (!panel) return []
       const tabs = panel.tabs.filter((tab) => tab.kind !== 'terminal')
       if (tabs.length === 0 && panel.recentFiles.length === 0) return []
@@ -364,7 +381,7 @@ function writeStoredPanels(panelBySession: Record<string, WorkspacePanelSessionS
 }
 
 export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => ({
-  panelBySession: readStoredPanels(),
+  panelByTab: readStoredPanels(),
   width: WORKSPACE_PANEL_DEFAULT_WIDTH,
   statusBySession: {},
   expandedPathsBySession: {},
@@ -382,18 +399,18 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     previewById: {},
   },
 
-  isPanelOpen: (sessionId) => getSessionPanelState(get().panelBySession, sessionId).isOpen,
+  isPanelOpen: (sessionId) => getSessionPanelState(get().panelByTab, sessionId).isOpen,
   isPanelExpanded: (sessionId) => {
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     return panel.isOpen && panel.expanded
   },
   getActiveTab: (sessionId) => {
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     return panel.tabs.find((tab) => tab.id === panel.activeTabId) ?? null
   },
 
   openTab: (sessionId, target) => {
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     const existing = panel.tabs.find((tab) => isSameTarget(tab, target))
     const active = panel.tabs.find((tab) => tab.id === panel.activeTabId)
     const replaced = active?.kind === 'launcher' && target.kind !== 'launcher' ? active : null
@@ -407,7 +424,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       ? [target.path, ...panel.recentFiles.filter((path) => path !== target.path)].slice(0, MAX_RECENT_FILES)
       : panel.recentFiles
     set((state) => ({
-      panelBySession: patchSessionPanel(state.panelBySession, sessionId, { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
     }))
     return tab.id
   },
@@ -419,14 +436,18 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       get().openTab(sessionId, { kind: 'file', path: value })
       return
     }
+    await get().openUrl(sessionId, value, projectRoot)
+  },
+
+  openUrl: async (sessionId, url, projectRoot) => {
     const tabId = get().openTab(sessionId, { kind: 'browser', url: '' })
-    await submitBrowserInput(sessionId, tabId, value, projectRoot)
+    await submitBrowserInput(sessionId, tabId, url, projectRoot)
   },
 
   openArtifact: async (sessionId, item, root) => {
     if (!item.id) throw new Error('This artifact has no id')
     const target: WorkspaceTabTarget = { kind: 'browser', url: '', root, artifact: { id: item.id, name: item.name, mtimeMs: item.latestMtimeMs, ...(item.manifest?.kind === 'canvas' && { canvas: true as const }) } }
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
       get().openTab(sessionId, target)
       return
@@ -438,7 +459,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   openTemplatePreview: async (sessionId, templateId) => {
     const target: WorkspaceTabTarget = { kind: 'browser', url: '', template: { id: templateId } }
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
       get().openTab(sessionId, target)
       return
@@ -450,13 +471,13 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   activateTab: (sessionId, tabId) =>
     set((state) => {
-      const panel = getSessionPanelState(state.panelBySession, sessionId)
+      const panel = getSessionPanelState(state.panelByTab, sessionId)
       if (!panel.tabs.some((tab) => tab.id === tabId)) return state
-      return { panelBySession: patchSessionPanel(state.panelBySession, sessionId, { activeTabId: tabId }) }
+      return { panelByTab: patchSessionPanel(state.panelByTab, sessionId, { activeTabId: tabId }) }
     }),
 
   closeTab: (sessionId, tabId) => {
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     const index = panel.tabs.findIndex((tab) => tab.id === tabId)
     if (index < 0) return
     disposeTab(panel.tabs[index]!)
@@ -465,7 +486,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       ? tabs[Math.min(index, tabs.length - 1)]?.id ?? null
       : panel.activeTabId
     set((state) => ({
-      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
         tabs,
         activeTabId,
         ...(tabs.length === 0 ? { isOpen: false, expanded: false } : {}),
@@ -475,13 +496,13 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   patchTab: (sessionId, tabId, patch) =>
     set((state) => {
-      const panel = state.panelBySession[sessionId]
+      const panel = state.panelByTab[sessionId]
       const tab = panel?.tabs.find((candidate) => candidate.id === tabId)
       if (!panel || !tab) return state
       const next = { ...tab, ...patch } as WorkspaceTab
       if (Object.keys(patch).every((key) => tab[key as keyof WorkspaceTab] === next[key as keyof WorkspaceTab])) return state
       return {
-        panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+        panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
           tabs: panel.tabs.map((candidate) => candidate.id === tabId ? next : candidate),
         }),
       }
@@ -489,14 +510,14 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   closePanel: (sessionId) =>
     set((state) => ({
-      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
         isOpen: false,
         expanded: false,
       }),
     })),
 
   togglePanel: (sessionId) => {
-    const panel = getSessionPanelState(get().panelBySession, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     if (panel.isOpen) {
       get().closePanel(sessionId)
       return
@@ -505,13 +526,13 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       get().openTab(sessionId, { kind: 'launcher' })
       return
     }
-    set((state) => ({ panelBySession: patchSessionPanel(state.panelBySession, sessionId, { isOpen: true }) }))
+    set((state) => ({ panelByTab: patchSessionPanel(state.panelByTab, sessionId, { isOpen: true }) }))
   },
 
   toggleExpanded: (sessionId) =>
     set((state) => ({
-      panelBySession: patchSessionPanel(state.panelBySession, sessionId, {
-        expanded: !getSessionPanelState(state.panelBySession, sessionId).expanded,
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
+        expanded: !getSessionPanelState(state.panelByTab, sessionId).expanded,
       }),
     })),
 
@@ -730,7 +751,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     const cached = get().previewsBySession[sessionId] ?? {}
     const shownIds = new Set([
       ...get().expandedPreviewIdsBySession[sessionId] ?? [],
-      ...getSessionPanelState(get().panelBySession, sessionId).tabs
+      ...getSessionPanelState(get().panelByTab, sessionId).tabs
         .flatMap((tab) => tab.kind === 'file' ? [getWorkspacePreviewId(tab.path, 'file')] : []),
     ])
     const kept = Object.fromEntries(
@@ -756,7 +777,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   },
 
   releaseSession: (sessionId) => {
-    const panel = get().panelBySession[sessionId]
+    const panel = get().panelByTab[sessionId]
     panel?.tabs.forEach(disposeTab)
     invalidateRequest(statusRequestIds, sessionId)
     invalidateSessionScopedRequests(treeRequestIds, sessionId)
@@ -765,14 +786,14 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     set((state) => {
       const tabs = panel?.tabs.filter((tab) => tab.kind !== 'terminal') ?? []
       return {
-        panelBySession: panel
-          ? patchSessionPanel(state.panelBySession, sessionId, {
+        panelByTab: panel
+          ? patchSessionPanel(state.panelByTab, sessionId, {
             tabs,
             activeTabId: tabs.some((tab) => tab.id === panel.activeTabId) ? panel.activeTabId : tabs.at(-1)?.id ?? null,
             isOpen: panel.isOpen && tabs.length > 0,
             expanded: false,
           })
-          : state.panelBySession,
+          : state.panelByTab,
         statusBySession: removeRecordKey(state.statusBySession, sessionId),
         expandedPathsBySession: removeRecordKey(state.expandedPathsBySession, sessionId),
         treeBySessionPath: removeRecordKey(state.treeBySessionPath, sessionId),
@@ -794,7 +815,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   clearSession: (sessionId) => {
     get().releaseSession(sessionId)
-    set((state) => ({ panelBySession: removeRecordKey(state.panelBySession, sessionId) }))
+    set((state) => ({ panelByTab: removeRecordKey(state.panelByTab, sessionId) }))
   },
 }))
 
@@ -880,5 +901,5 @@ async function loadPreview(
 }
 
 useWorkspacePanelStore.subscribe((state, previous) => {
-  if (state.panelBySession !== previous.panelBySession) writeStoredPanels(state.panelBySession)
+  if (state.panelByTab !== previous.panelByTab) writeStoredPanels(state.panelByTab)
 })

@@ -1,7 +1,7 @@
-import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import type { FileReference, GoalEventAction, TaskNotification } from './classify.js'
 
-export type { SessionOrigin }
+export type { UserMessageOrigin }
 
 export type TranscriptAttachment =
   | FileReference
@@ -26,7 +26,7 @@ export type TranscriptItem =
       content: string
       modelContent?: string
       transcriptMessageId?: string
-      origin?: SessionOrigin
+      origin?: UserMessageOrigin
       timestamp: number
       attachments?: TranscriptAttachment[]
     }

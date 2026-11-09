@@ -3,8 +3,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from '../shared/ui/code-block'
 import { CodeViewer } from './CodeViewer'
 import { getToolIcon } from './toolIcons'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useChatStore } from '../../stores/chatStore'
+import { boardForProject, useKanbanStore } from '../../stores/kanbanStore'
+import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
@@ -20,11 +22,101 @@ type Props = {
   toolName: string
   input: unknown
   description?: string
+  alwaysAsks?: boolean
   resolution?: PermissionResolution
 }
 
-function extractToolDetails(toolName: string, input: unknown, t: (key: TranslationKey, params?: Record<string, string | number>) => string): { primary: string; secondary?: string } {
-  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
+type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string
+
+type SpecialDisplay = { title: string; primary: string; secondary?: string; preview?: ReactNode }
+
+type KanbanRole = 'owner' | 'reviewer'
+
+type KanbanAssign = {
+  card: number
+  role: KanbanRole
+  target: { kind: 'self' } | { kind: 'new' } | { kind: 'session'; sessionId: string }
+}
+
+const KANBAN_ASSIGN_TITLE: Record<KanbanRole, TranslationKey> = {
+  owner: 'permission.allowKanbanAssign.owner',
+  reviewer: 'permission.allowKanbanAssign.reviewer',
+}
+
+const KANBAN_START_TITLE: Record<KanbanRole, TranslationKey> = {
+  owner: 'permission.allowStartSessionForCard.owner',
+  reviewer: 'permission.allowStartSessionForCard.reviewer',
+}
+
+const KANBAN_ROLE_NOTE: Record<KanbanRole, TranslationKey> = {
+  owner: 'permission.kanbanRole.owner',
+  reviewer: 'permission.kanbanRole.reviewer',
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+}
+
+function kanbanRole(value: unknown): KanbanRole | null {
+  return value === 'owner' || value === 'reviewer' ? value : null
+}
+
+function kanbanAssign(toolName: string, input: unknown): KanbanAssign | null {
+  const obj = record(input)
+  if (toolName === 'StartSession') return typeof obj.card === 'number' ? { card: obj.card, role: kanbanRole(obj.role) ?? 'owner', target: { kind: 'new' } } : null
+  if (toolName !== 'KanbanUpdate') return null
+  const command = record(obj.command)
+  const role = kanbanRole(command.role)
+  if (command.type !== 'assign' || typeof command.card !== 'number' || !role) return null
+  if (command.target === 'self') return { card: command.card, role, target: { kind: 'self' } }
+  const sessionId = record(command.target).sessionId
+  return typeof sessionId === 'string' ? { card: command.card, role, target: { kind: 'session', sessionId } } : null
+}
+
+function kanbanCancel(toolName: string, input: unknown): { card: number; reason: string | null } | null {
+  if (toolName !== 'KanbanUpdate') return null
+  const command = record(record(input).command)
+  if (command.type !== 'cancel' || typeof command.card !== 'number') return null
+  return { card: command.card, reason: typeof command.reason === 'string' && command.reason.trim() ? command.reason : null }
+}
+
+function kanbanAcceptance(toolName: string, input: unknown): { card: number; items: string[] } | null {
+  if (toolName !== 'KanbanUpdate') return null
+  const command = record(record(input).command)
+  if (command.type !== 'edit_card' || typeof command.card !== 'number' || !Array.isArray(command.acceptance)) return null
+  return { card: command.card, items: command.acceptance.filter((item): item is string => typeof item === 'string') }
+}
+
+function AcceptanceChange({ before, after, t }: { before: readonly string[] | null; after: readonly string[]; t: Translate }) {
+  const removed = before?.filter((item) => !after.includes(item)) ?? []
+  const tag = (key: TranslationKey) => <span className="shrink-0 rounded bg-[var(--color-surface-container-high)] px-1.5 text-[10px] text-[var(--color-text-secondary)]">{t(key)}</span>
+  return (
+    <ul className="flex flex-col gap-1 text-xs text-[var(--color-text-primary)]">
+      {after.map((item) => (
+        <li key={`after-${item}`} className="flex items-start gap-2">
+          {before && !before.includes(item) ? tag('permission.kanbanAcceptance.added') : <span aria-hidden="true" className="mt-[5px] size-1.5 shrink-0 rounded-full bg-[var(--color-text-tertiary)]" />}
+          <span>{item}</span>
+        </li>
+      ))}
+      {removed.map((item) => (
+        <li key={`removed-${item}`} className="flex items-start gap-2 text-[var(--color-text-tertiary)]">
+          {tag('permission.kanbanAcceptance.removed')}
+          <span className="line-through">{item}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function kanbanAssignTitle(assign: KanbanAssign, targetTitle: string | null, t: Translate): string {
+  const { target } = assign
+  if (target.kind === 'new') return t(KANBAN_START_TITLE[assign.role], { card: assign.card })
+  const who = target.kind === 'self' ? t('permission.kanbanAssign.self') : targetTitle || target.sessionId
+  return t(KANBAN_ASSIGN_TITLE[assign.role], { card: assign.card, target: who })
+}
+
+function extractToolDetails(toolName: string, input: unknown, t: Translate): { primary: string; secondary?: string } {
+  const obj = record(input)
 
   switch (toolName) {
     case 'Bash': {
@@ -54,13 +146,17 @@ function extractToolDetails(toolName: string, input: unknown, t: (key: Translati
       return { primary: typeof obj.query === 'string' ? obj.query : '' }
     case 'WebFetch':
       return { primary: typeof obj.url === 'string' ? obj.url : '' }
-    default:
-      return { primary: typeof input === 'string' ? input : JSON.stringify(input, null, 2) }
+    case 'KanbanCreate':
+      return { primary: typeof obj.title === 'string' ? obj.title : '', secondary: typeof obj.description === 'string' && obj.description ? obj.description : undefined }
+    default: {
+      const raw = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
+      return { primary: raw === '{}' ? '' : raw }
+    }
   }
 }
 
-function getPermissionTitle(toolName: string, input: unknown, t: (key: TranslationKey, params?: Record<string, string | number>) => string) {
-  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
+function getPermissionTitle(toolName: string, input: unknown, alwaysAsks: boolean, t: Translate) {
+  const obj = record(input)
   const filePath = typeof obj.file_path === 'string' ? obj.file_path : ''
   const fileName = filePath ? filePath.split('/').pop() || filePath : ''
 
@@ -70,6 +166,8 @@ function getPermissionTitle(toolName: string, input: unknown, t: (key: Translati
       return fileName ? t('permission.allowEditFile', { toolName, fileName }) : t('permission.allowEditFileGeneric', { toolName: toolName.toLowerCase() })
     case 'Bash':
       return t('permission.allowBash')
+    case 'KanbanCreate':
+      return t(alwaysAsks ? 'permission.allowKanbanBoard' : 'permission.allowKanbanCard')
     default:
       return t('permission.allowTool', { toolName })
   }
@@ -104,7 +202,7 @@ function resolutionLabelKey(resolution: PermissionResolution | undefined): Trans
   return resolution.outcome === 'allowed' ? 'permission.allowedElsewhere' : 'permission.deniedElsewhere'
 }
 
-export function PermissionDialog({ sessionId, requestId, toolName, input, description, resolution }: Props) {
+export function PermissionDialog({ sessionId, requestId, toolName, input, description, alwaysAsks, resolution }: Props) {
   const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
@@ -113,17 +211,47 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
   )
   const t = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
+  const projectRoot = useSessionStore((s) => s.sessions.find((session) => session.id === targetSessionId)?.projectRoot)
+  const assign = kanbanAssign(toolName, input)
+  const cancel = kanbanCancel(toolName, input)
+  const acceptance = kanbanAcceptance(toolName, input)
+  const boardCard = assign?.card ?? cancel?.card ?? acceptance?.card ?? null
+  const loadedCard = useKanbanStore((s) => {
+    const board = boardCard === null ? null : boardForProject(s.boards, projectRoot)
+    return board ? s.views[board.key]?.cards.find((card) => card.id === boardCard) ?? null : null
+  })
+  const boardCardTitle = loadedCard?.title ?? null
+  const boardCardLabel = boardCard === null ? null : boardCardTitle ? `#${boardCard} ${boardCardTitle}` : `#${boardCard}`
+  const assignTarget = useSessionStore((s) => {
+    const target = assign?.target
+    return target?.kind === 'session' ? s.sessions.find((session) => session.id === target.sessionId)?.title ?? null : null
+  })
 
   const cua = getCuaToolDisplay(toolName, input, t)
   const Icon = getToolIcon(toolName, cua?.icon)
-  const details = cua ? { primary: cua.summary } : extractToolDetails(toolName, input, t)
+  const card = boardCardLabel ?? ''
+  const special: SpecialDisplay | null = cua
+    ? { title: cua.permissionTitle, primary: cua.summary }
+    : assign
+      ? { title: kanbanAssignTitle(assign, assignTarget, t), primary: card, secondary: t(KANBAN_ROLE_NOTE[assign.role]) }
+      : cancel
+        ? { title: t('permission.allowKanbanCancel', { card: cancel.card }), primary: card, secondary: cancel.reason ?? t('permission.kanbanCancel.note') }
+        : acceptance
+          ? {
+              title: t('permission.allowKanbanAcceptance', { card: acceptance.card }),
+              primary: card,
+              secondary: t('permission.kanbanAcceptance.note'),
+              preview: <AcceptanceChange before={isPending ? loadedCard?.acceptance ?? null : null} after={acceptance.items} t={t} />,
+            }
+          : null
+  const details = special ?? extractToolDetails(toolName, input, t)
   const rawInput = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
-  const preview = cua ? null : renderPermissionPreview(toolName, input)
-  const title = cua ? cua.permissionTitle : getPermissionTitle(toolName, input, t)
+  const preview = special ? special.preview ?? null : renderPermissionPreview(toolName, input)
+  const title = special?.title ?? getPermissionTitle(toolName, input, alwaysAsks === true, t)
   // CLI-supplied descriptions for MCP tools quote the raw `mcp__cua__…` name; hide those.
   const shownDescription = cua && description && /mcp__|\bMCP\b/i.test(description) ? undefined : description
   const DetailIcon = cua ? Icon : toolName === 'Glob' || toolName === 'Grep' ? Search : FolderOpen
-  const allowRawToggle = !preview
+  const allowRawToggle = !preview && rawInput !== '{}'
 
   return (
     <Card size="sm" className={`mb-4 gap-0 py-0 border ${
@@ -201,14 +329,16 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             <Check data-icon="inline-start" aria-hidden="true" />
             {t('permission.allow')}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true, { rule: 'always' })}
-          >
-            <BadgeCheck data-icon="inline-start" aria-hidden="true" />
-            {t('permission.allowForSession')}
-          </Button>
+          {!alwaysAsks && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true, { rule: 'always' })}
+            >
+              <BadgeCheck data-icon="inline-start" aria-hidden="true" />
+              {t('permission.allowForSession')}
+            </Button>
+          )}
           <div className="flex-1" />
           <Button
             variant="destructive"

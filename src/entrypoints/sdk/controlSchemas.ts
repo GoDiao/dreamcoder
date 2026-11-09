@@ -117,6 +117,10 @@ export const SDKControlPermissionRequestSchema = lazySchema(() =>
       tool_use_id: z.string(),
       agent_id: z.string().optional(),
       description: z.string().optional(),
+      always_asks: z
+        .boolean()
+        .optional()
+        .describe('The tool asks every time: an allow rule for it is ignored, so the host should not offer to remember the answer.'),
     })
     .describe('Requests permission to use a tool with the given input.'),
 )
@@ -595,8 +599,10 @@ export const SDKControlSessionStartRequestSchema = lazySchema(() =>
       title: z.string(),
       context: z.enum(['fresh', 'fork']),
       worktree: z.boolean(),
+      card: z.number().int().positive().optional(),
+      role: z.enum(KANBAN_ROLES).optional(),
     })
-    .describe('Asks the host to start a new session that begins with the given prompt.'),
+    .describe('Asks the host to start a new session that begins with the given prompt, as the owner or reviewer of a board card when one is given.'),
 )
 
 export const SDKControlSessionStartResponseSchema = lazySchema(() =>
@@ -707,6 +713,193 @@ export type SDKSessionListEntry = z.infer<
 // Control Request/Response Wrappers
 // ============================================================================
 
+export const KANBAN_CARD_STATUSES = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'blocked',
+  'review',
+  'done',
+  'cancelled',
+] as const
+export const KANBAN_PRIORITIES = ['high', 'normal', 'low'] as const
+export const KANBAN_ROLES = ['owner', 'reviewer'] as const
+export const KANBAN_UPDATE_KINDS = ['progress', 'comment', 'decision'] as const
+const KANBAN_NOTIFY_EXTRA = ['creator'] as const
+const KANBAN_CREATE_APPROVALS = ['task', 'board'] as const
+export const KANBAN_LIST_SCOPES = ['mine', 'all'] as const
+
+const kanbanCard = () => z.number().int().positive()
+const kanbanText = () => z.string().trim().min(1)
+export const KANBAN_NOTE_LIMIT = 2000
+const NOTE_TOO_LONG = `Keep it under ${KANBAN_NOTE_LIMIT} characters. Write longer content, such as a review report, to a file and put its path in links.`
+const kanbanNote = () => kanbanText().max(KANBAN_NOTE_LIMIT, NOTE_TOO_LONG)
+const kanbanOptionalNote = () => z.string().max(KANBAN_NOTE_LIMIT, NOTE_TOO_LONG).optional()
+const kanbanLinks = () => z.array(kanbanText()).optional()
+
+const KanbanAssignmentTargetSchema = lazySchema(() =>
+  z.union([
+    z.object({ sessionId: z.string().min(1) }).strict(),
+    z.object({ newSession: z.literal(true) }).strict(),
+  ]),
+)
+
+const KanbanRepositoryOptionsSchema = lazySchema(() =>
+  z
+    .object({
+      branch: z.string().nullable().optional(),
+      worktree: z.boolean().optional(),
+    })
+    .strict(),
+)
+
+const kanbanCreateCard = () =>
+  z.object({
+    type: z.literal('create_card'),
+    title: kanbanText(),
+    description: z.string().optional(),
+    acceptance: z.array(kanbanText()).optional(),
+    parent: kanbanCard().optional(),
+    priority: z.enum(KANBAN_PRIORITIES).optional(),
+    status: z.enum(['backlog', 'todo']).optional(),
+    dependsOn: z.array(kanbanCard()).optional(),
+  })
+
+const kanbanUpdateCommands = () => [
+  z.object({
+    type: z.literal('edit_card'),
+    card: kanbanCard(),
+    title: kanbanText().optional(),
+    description: z.string().optional(),
+    acceptance: z.array(kanbanText()).optional(),
+    priority: z.enum(KANBAN_PRIORITIES).optional(),
+  }),
+  z.object({
+    type: z.literal('move_card'),
+    card: kanbanCard(),
+    status: z.enum(['backlog', 'todo']),
+    order: z.number().optional(),
+  }),
+  z.object({ type: z.literal('start'), card: kanbanCard() }),
+  z.object({ type: z.literal('block'), card: kanbanCard(), reason: kanbanNote() }),
+  z.object({ type: z.literal('unblock'), card: kanbanCard() }),
+  z.object({
+    type: z.literal('submit'),
+    card: kanbanCard(),
+    summary: kanbanNote(),
+    links: kanbanLinks(),
+  }),
+  z.object({ type: z.literal('request_changes'), card: kanbanCard(), reason: kanbanNote(), links: kanbanLinks() }),
+  z.object({ type: z.literal('accept'), card: kanbanCard(), summary: kanbanNote(), links: kanbanLinks() }),
+  z.object({ type: z.literal('reset'), card: kanbanCard(), reason: kanbanOptionalNote() }),
+  z.object({ type: z.literal('cancel'), card: kanbanCard(), reason: kanbanOptionalNote() }),
+  z.object({ type: z.literal('add_dependency'), card: kanbanCard(), dependsOn: kanbanCard() }),
+  z.object({ type: z.literal('remove_dependency'), card: kanbanCard(), dependsOn: kanbanCard() }),
+  z.object({ type: z.literal('revoke_assignment'), assignment: z.string().min(1), reason: kanbanNote() }),
+] as const
+
+export const KanbanCommandSchema = lazySchema(() =>
+  z.discriminatedUnion('type', [
+    kanbanCreateCard(),
+    ...kanbanUpdateCommands(),
+    z.object({
+      type: z.literal('add_update'),
+      card: kanbanCard(),
+      kind: z.enum(KANBAN_UPDATE_KINDS),
+      text: kanbanNote(),
+      notify: z.array(z.enum(KANBAN_NOTIFY_EXTRA)).optional(),
+    }),
+    z.object({ type: z.literal('reopen'), card: kanbanCard(), reason: kanbanOptionalNote() }),
+    z.object({
+      type: z.literal('assign'),
+      card: kanbanCard(),
+      role: z.enum(KANBAN_ROLES),
+      target: KanbanAssignmentTargetSchema(),
+      note: kanbanOptionalNote(),
+      repository: KanbanRepositoryOptionsSchema().optional(),
+    }),
+    z.object({ type: z.literal('archive'), card: kanbanCard() }),
+    z.object({ type: z.literal('unarchive'), card: kanbanCard() }),
+    z.object({ type: z.literal('resend_notification'), notification: z.number().int().positive() }),
+  ]),
+)
+
+export const KanbanCreateCardCommandSchema = lazySchema(kanbanCreateCard)
+
+const kanbanSessionUpdateCommands = () => [
+  ...kanbanUpdateCommands(),
+  z.strictObject({
+    type: z.literal('add_update'),
+    card: kanbanCard(),
+    kind: z.enum(KANBAN_UPDATE_KINDS),
+    text: kanbanNote(),
+  }),
+  z.strictObject({
+    type: z.literal('assign'),
+    card: kanbanCard(),
+    role: z.enum(KANBAN_ROLES),
+    target: z.union([z.literal('self'), z.strictObject({ sessionId: z.string().min(1) })]),
+    note: kanbanOptionalNote(),
+  }),
+] as const
+
+export const KanbanAgentUpdateCommandSchema = lazySchema(() => z.discriminatedUnion('type', kanbanSessionUpdateCommands()))
+
+const KanbanSessionCommandSchema = lazySchema(() => z.discriminatedUnion('type', [kanbanCreateCard(), ...kanbanSessionUpdateCommands()]))
+
+export const SDKControlKanbanQueryRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('kanban_query'),
+      list: z
+        .object({
+          scope: z.enum(KANBAN_LIST_SCOPES),
+          status: z.array(z.enum(KANBAN_CARD_STATUSES)).optional(),
+        })
+        .optional(),
+      card: kanbanCard().optional(),
+      history: z.boolean().optional(),
+      create: z.object({ parent: kanbanCard().optional() }).optional(),
+    })
+    .describe('Asks the host for cards on the project board of the calling session, or what creating a card needs the user to approve.'),
+)
+
+export const SDKControlKanbanQueryResponseSchema = lazySchema(() =>
+  z
+    .object({
+      board: z.object({ project: z.string() }).optional(),
+      cards: z.array(z.record(z.string(), z.unknown())).optional(),
+      card: z.record(z.string(), z.unknown()).optional(),
+      approval: z.enum(KANBAN_CREATE_APPROVALS).nullable().optional(),
+    })
+    .describe('Response from the host for a kanban_query request.'),
+)
+
+export const SDKControlKanbanCommandRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('kanban_command'),
+      command: KanbanSessionCommandSchema(),
+    })
+    .describe('Asks the host to apply a command to the project board of the calling session.'),
+)
+
+export const SDKControlKanbanCommandResponseSchema = lazySchema(() =>
+  z
+    .object({
+      card: z.record(z.string(), z.unknown()).optional(),
+      warnings: z.array(z.string()),
+    })
+    .describe('Response from the host for a kanban_command request.'),
+)
+
+export type KanbanCommand = z.infer<ReturnType<typeof KanbanCommandSchema>>
+export type KanbanRepositoryOptions = z.infer<ReturnType<typeof KanbanRepositoryOptionsSchema>>
+export type KanbanSessionCommand = z.infer<ReturnType<typeof KanbanSessionCommandSchema>>
+export type SDKControlKanbanQueryRequest = z.infer<ReturnType<typeof SDKControlKanbanQueryRequestSchema>>
+export type SDKControlKanbanQueryResponse = z.infer<ReturnType<typeof SDKControlKanbanQueryResponseSchema>>
+export type SDKControlKanbanCommandResponse = z.infer<ReturnType<typeof SDKControlKanbanCommandResponseSchema>>
+
 export const SDKControlRequestInnerSchema = lazySchema(() =>
   z.union([
     SDKControlInterruptRequestSchema(),
@@ -735,6 +928,8 @@ export const SDKControlRequestInnerSchema = lazySchema(() =>
     SDKControlSessionSendRequestSchema(),
     SDKControlSessionListRequestSchema(),
     SDKControlSessionRenameRequestSchema(),
+    SDKControlKanbanQueryRequestSchema(),
+    SDKControlKanbanCommandRequestSchema(),
   ]),
 )
 

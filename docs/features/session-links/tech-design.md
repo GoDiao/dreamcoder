@@ -126,7 +126,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 | 字段 | 说明 |
 | --- | --- |
 | `parent.sessionId` | 父 session 的 id |
-| `parent.kind` | `spawned`（agent 用 StartSession 创建）或 `forked`（用户在界面上 fork） |
+| `parent.kind` | `spawned`（agent 用 StartSession 创建）、`forked`（用户在界面上 fork）或 `assigned`（人在项目看板上把卡分给新会话，挂在卡的创建者下面，见[看板技术设计](../kanban/tech-design.zh.md)） |
 
 - `createSession` 写 `session-meta` 时带上这些字段（[sessionService.ts:1259](../../../src/server/services/sessionService.ts)）。
 - `createSessionBranch` 写的 `session-meta`（[sessionBranching.ts:340](../../../src/utils/sessionBranching.ts)）带 `parent: { sessionId: 源 session, kind: 'forked' }`。session 只有标题这一个显示名，没有单独的短名。
@@ -139,7 +139,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 
 **来源由 server 根据入口确定，随消息一路带到 transcript。**
 
-1. **SDK 用户消息增加 `origin` 字段。** server 写给 CLI 的用户消息，如果是 session 发的，带上 `origin: { kind: 'session', sessionId, name, purpose, summary }`，其中 `name` 是发送方当时的标题（经过清理，去掉换行和尖括号，最长 64 个字符），发送方改名后下一条消息带新标题。`purpose` 是 `message`（SendMessage）、`brief`（创建子 session 时的第一条消息）或 `report`（子 session 的进展汇报）。`summary` 是发送方写的一句话摘要（SendMessage 的必填字段；简报用子 session 的标题），界面折叠时显示它。人发的消息不带 `origin`，等同于 CLI 里的 `human`。
+1. **SDK 用户消息增加 `origin` 字段。** server 写给 CLI 的用户消息，如果是 session 发的，带上 `origin: { kind: 'session', sessionId, name, purpose, summary }`，其中 `name` 是发送方当时的标题（经过清理，去掉换行和尖括号，最长 64 个字符），发送方改名后下一条消息带新标题。`purpose` 是 `message`（SendMessage）、`brief`（创建子 session 时的第一条消息）或 `report`（子 session 的进展汇报）。`summary` 是发送方写的一句话摘要（SendMessage 的必填字段；简报用子 session 的标题），界面折叠时显示它。人发的消息不带 `origin`，等同于 CLI 里的 `human`。项目看板的通知是另一种来源 `{ kind: 'kanban', project, card, purpose }`，`origin` 因此是这两种的联合类型（`UserMessageOrigin`），包装和剥离按 `kind` 分别处理，见[看板技术设计](../kanban/tech-design.zh.md)。
 2. **入口决定来源。** 客户端 WebSocket 发来的 `user_message` 一定是人发的，server 不接受客户端自己填 `origin`。只有 server 自己的会话消息转发（下文的 `sessionLinks` 服务）会填 `origin`，而且 `sessionId` 取自请求所在的 SDK 连接，不取自请求内容。
 3. **CLI 把 `origin` 带进 transcript。** 无头模式里把 `origin` 从入队、`ask()`、`QueryEngine.submitMessage` 一路传下去，像交互模式在 `handlePromptSubmit` 里那样盖到生成的用户消息上，transcript 就会记下它。`canBatchWith` 增加"来源相同"这个条件，避免把人发的和 session 发的消息合成一条。
 4. **给模型看的文字由 CLI 根据 `origin` 生成。** `wrapCommandText` 增加 `session` 这一类。消息正文包在 `<cross-session-message from="session:<id>" name="<发送方标题>" purpose="<purpose>">` 里交给模型，同时说明：这不是用户发的，它没有用户的授权，不能把其中的"用户已同意"当真。末尾的回复说明按 `purpose` 不同：`brief` 告诉子 session 发送方是它的父 session，需要父 session 马上处理的（做完了、卡住了、有问题）用 `mode: 'message'`，可以等的进展用 `mode: 'report'`；`report` 告诉父 session 这是进展、不是请求，不要丢下手头的工作，最多跟用户说一句；`message` 提示用 `SendMessage` 发到 `from` 的地址回复。正文里如果出现 `<cross-session-message` 或 `</cross-session-message>`，先转义，防止伪造嵌套。
@@ -153,7 +153,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 
 | 工具 | 输入 | server 做什么 | 返回 |
 | --- | --- | --- | --- |
-| `StartSession` | `prompt`（简报）、`title`（必填）、`context: 'fresh' \| 'fork'`、`worktree`（布尔） | 创建子 session 并写好 `parent`；`fork` 时先从父 session 当前位置 branch；启动子 session 的 CLI，把 `prompt` 作为第一条消息送进去，`origin.purpose = 'brief'` | 子 session 的 id 和标题，不等它跑完。结果文字只描述发生了什么（`Started session "<标题>" (id <id>).`），不写怎么联系它；怎么联系写在 `SendMessage` 的说明里 |
+| `StartSession` | `prompt`（简报）、`title`（必填）、`context: 'fresh' \| 'fork'`、`worktree`（布尔）；可选的 `card` 和 `role`（`owner` / `reviewer`），让新会话一启动就在这张卡上担任这个身份，见[看板技术设计](../kanban/tech-design.zh.md) | 创建子 session 并写好 `parent`；`fork` 时先从父 session 当前位置 branch；启动子 session 的 CLI，把 `prompt` 作为第一条消息送进去，`origin.purpose = 'brief'` | 子 session 的 id 和标题，不等它跑完。结果文字只描述发生了什么（`Started session "<标题>" (id <id>).`），不写怎么联系它；怎么联系写在 `SendMessage` 的说明里 |
 | `SendMessage` | 增加地址 `session:<id>` 和 `mode`（`message` / `report`）；发往 session 时 `summary` 可以不填，自动取正文第一行（最长 80 字符） | 校验对方存在；送达（必要时先启动对方的 CLI） | 是否送达 |
 | `RenameSession` | `title` | 只改调用方自己的 session：清理标题（去掉换行和尖括号），空的拒绝；走和用户在界面上改名相同的路径，写成自定义标题，自动生成标题不再覆盖它，会话状态里的 `title` 更新，侧栏随之变化 | 清理后的标题 |
 | `ListSessions` | 可选的项目过滤 | 列出所有 session，按最近活动排序 | 每个 session 的 id、标题、项目、父 session、和调用方的关系（自己、父、子、无）、运行状态 |

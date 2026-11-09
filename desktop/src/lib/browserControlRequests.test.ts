@@ -25,7 +25,7 @@ import { useTabStore } from '../stores/tabStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 
 function panelOf(sessionId: string) {
-  const panel = useWorkspacePanelStore.getState().panelBySession[sessionId]
+  const panel = useWorkspacePanelStore.getState().panelByTab[sessionId]
   if (!panel) throw new Error(`no panel for ${sessionId}`)
   return panel
 }
@@ -43,7 +43,7 @@ afterEach(() => {
   vi.clearAllMocks()
   useSessionStore.setState({ sessions: [] })
   useTabStore.setState({ tabs: [], activeTabId: null })
-  useWorkspacePanelStore.setState({ panelBySession: {} })
+  useWorkspacePanelStore.setState({ panelByTab: {} })
   localStorage.clear()
 })
 
@@ -93,7 +93,7 @@ describe('browser open-tab request', () => {
     await handleOpenTabRequest({ requestId: 'r1', sessionId: 'missing', url: null })
 
     expect(warn).toHaveBeenCalledWith('[browser] open-tab request for an unknown session', 'missing')
-    expect(useWorkspacePanelStore.getState().panelBySession.missing).toBeUndefined()
+    expect(useWorkspacePanelStore.getState().panelByTab.missing).toBeUndefined()
     expect(mocks.finishBrowserOpenTab).not.toHaveBeenCalled()
   })
 
@@ -113,7 +113,7 @@ describe('browser open-tab request', () => {
 describe('browser activate request', () => {
   function seedPanel(isOpen: boolean) {
     useWorkspacePanelStore.setState({
-      panelBySession: {
+      panelByTab: {
         s: {
           isOpen,
           expanded: false,

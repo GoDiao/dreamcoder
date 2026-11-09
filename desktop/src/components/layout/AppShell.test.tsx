@@ -498,6 +498,20 @@ describe('AppShell boot flow', () => {
     })
   })
 
+  it('stays on a project board in browser H5 mobile', async () => {
+    mocks.isMobile = true
+    mocks.tabState.activeTabId = '__kanban__:/work/alpha'
+    mocks.tabState.tabs = [
+      { sessionId: '__kanban__:/work/alpha', title: 'Project board', type: 'kanban', status: 'idle' },
+      { sessionId: 'session-1', title: 'Existing session', type: 'session', status: 'idle' },
+    ]
+
+    render(<AppShell />)
+
+    await screen.findByText('content loaded')
+    expect(mocks.setActiveTab).not.toHaveBeenCalled()
+  })
+
   it('shows the first-launch screen instead of the shell when no provider exists', async () => {
     mocks.listProviders.mockResolvedValue({ providers: [], activeId: null })
 

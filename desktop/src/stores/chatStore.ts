@@ -4,6 +4,7 @@ import { wsManager } from '../api/websocket'
 import { sessionsApi } from '../api/sessions'
 import { useArtifactStore } from './artifactStore'
 import { useTeamStore } from './teamStore'
+import { useKanbanStore } from './kanbanStore'
 import { useSessionStore } from './sessionStore'
 import { useCLITaskStore } from './cliTaskStore'
 import { isEffortLevel, useSessionRuntimeStore } from './sessionRuntimeStore'
@@ -156,7 +157,10 @@ type ChatStore = {
   handleServerMessage: (sessionId: string, msg: ServerMessage) => void
 }
 
-const START_SESSION_TOOL = 'StartSession'
+const REFRESH_ON_RESULT: Record<string, () => Promise<unknown>> = {
+  StartSession: () => Promise.all([useSessionStore.getState().fetchSessions(), useKanbanStore.getState().refreshAll()]),
+  KanbanCreate: () => useKanbanStore.getState().refreshAll(),
+}
 const TASK_TOOL_NAMES = new Set(['TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TodoWrite'])
 const TASK_STOP_TOOL_NAMES = new Set(['TaskStop', 'KillShell'])
 const MAX_MESSAGES = 5000
@@ -193,7 +197,7 @@ function consumePendingTaskToolUseId(sessionId: string, toolUseId: string): bool
   return true
 }
 
-const pendingStartSessionToolUseIds = new Set<string>()
+const pendingRefreshToolUseIds = new Map<string, string>()
 
 function clearPendingTaskToolUseIds(sessionId: string): void {
   pendingTaskToolUseIdsBySession.delete(sessionId)
@@ -1382,8 +1386,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         } else if (TASK_TOOL_NAMES.has(toolName)) {
           const useId = msg.toolUseId || session?.activeToolUseId
           if (useId) addPendingTaskToolUseId(sessionId, useId)
-        } else if (toolName === START_SESSION_TOOL && toolUseId) {
-          pendingStartSessionToolUseIds.add(toolUseId)
+        } else if (Object.hasOwn(REFRESH_ON_RESULT, toolName) && toolUseId) {
+          pendingRefreshToolUseIds.set(toolUseId, toolName)
         }
         break
       }
@@ -1416,8 +1420,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         if (consumePendingTaskToolUseId(sessionId, msg.toolUseId)) {
           useCLITaskStore.getState().refreshTasks(sessionId)
         }
-        if (pendingStartSessionToolUseIds.delete(msg.toolUseId) && !msg.isError) {
-          void useSessionStore.getState().fetchSessions()
+        const refreshTool = pendingRefreshToolUseIds.get(msg.toolUseId)
+        if (refreshTool) {
+          pendingRefreshToolUseIds.delete(msg.toolUseId)
+          if (!msg.isError) {
+            REFRESH_ON_RESULT[refreshTool]!().catch((error: unknown) => console.warn(`[chat] refresh after ${refreshTool} failed`, error))
+          }
         }
         break
       }
@@ -1820,6 +1828,7 @@ function applyMirror(sessionId: string, next: SessionState): void {
         toolUseId: request.toolUseId,
         input: request.input,
         description: request.description,
+        ...(request.alwaysAsks ? { alwaysAsks: true as const } : {}),
         timestamp: now,
       })
     }
