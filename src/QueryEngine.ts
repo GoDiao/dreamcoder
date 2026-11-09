@@ -21,8 +21,8 @@ import { EMPTY_USAGE } from 'src/services/api/logging.js'
 import stripAnsi from 'strip-ansi'
 import type { Command } from './commands.js'
 import type {
-  SessionOrigin,
   SessionReport,
+  UserMessageOrigin,
 } from './entrypoints/sdk/coreSchemas.js'
 import { getSlashCommandToolSkills } from './commands.js'
 import {
@@ -223,7 +223,7 @@ export class QueryEngine {
     options?: {
       uuid?: string
       isMeta?: boolean
-      origin?: SessionOrigin
+      origin?: UserMessageOrigin
       reports?: SessionReport[]
     },
   ): AsyncGenerator<SDKMessage, void, unknown> {
@@ -1319,7 +1319,7 @@ export async function* ask({
   prompt: string | Array<ContentBlockParam>
   promptUuid?: string
   isMeta?: boolean
-  origin?: SessionOrigin
+  origin?: UserMessageOrigin
   reports?: SessionReport[]
   cwd: string
   tools: Tools

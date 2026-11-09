@@ -1,16 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { SessionMessageCard } from './SessionMessageCard'
+import { OriginMessageCard } from './OriginMessageCard'
 import { MessageBlock } from './MessageList'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
-import type { SessionOrigin, UIMessage } from '../../types/chat'
+import type { KanbanOrigin, SessionOrigin, UIMessage } from '../../types/chat'
+import { useKanbanStore } from '../../stores/kanbanStore'
+import { useWorkspacePanelStore } from '../../stores/workspacePanelStore'
+
+const kanbanApiMock = vi.hoisted(() => ({ listBoards: vi.fn() }))
+vi.mock('../../api/kanban', () => ({ kanbanApi: kanbanApiMock }))
 
 const origin: SessionOrigin = { kind: 'session', sessionId: 'child-1', name: 'docs-reorg', purpose: 'report' }
+const kanbanOrigin: KanbanOrigin = { kind: 'kanban', project: '/repo', card: { id: 12, title: 'OAuth module' }, purpose: 'assignment' }
 
-describe('SessionMessageCard', () => {
+describe('OriginMessageCard', () => {
   const connectToSession = vi.fn()
 
   beforeEach(() => {
@@ -23,7 +29,7 @@ describe('SessionMessageCard', () => {
   afterEach(() => cleanup())
 
   it('is collapsed by default and shows the summary as the preview', () => {
-    render(<SessionMessageCard content={'Result: **all green**'} origin={{ ...origin, summary: 'Docs moved, links fixed' }} />)
+    render(<OriginMessageCard content={'Result: **all green**'} origin={{ ...origin, summary: 'Docs moved, links fixed' }} />)
 
     expect(screen.getByText('docs-reorg')).toBeInTheDocument()
     expect(screen.getByText('Report')).toBeInTheDocument()
@@ -33,7 +39,7 @@ describe('SessionMessageCard', () => {
   })
 
   it('expands to the body as markdown, with the copy action', () => {
-    render(<SessionMessageCard content={'Result: **all green**'} origin={origin} />)
+    render(<OriginMessageCard content={'Result: **all green**'} origin={origin} />)
 
     fireEvent.click(screen.getByText('Report'))
 
@@ -46,7 +52,7 @@ describe('SessionMessageCard', () => {
     ['brief', 'Brief'],
     ['report', 'Report'],
   ] as const)('labels the %s purpose', (purpose, label) => {
-    render(<SessionMessageCard content="x" origin={{ ...origin, purpose }} />)
+    render(<OriginMessageCard content="x" origin={{ ...origin, purpose }} />)
     expect(screen.getByText(label)).toBeInTheDocument()
   })
 
@@ -57,7 +63,7 @@ describe('SessionMessageCard', () => {
         projectPath: '/p', workDir: '/p', workDirExists: true,
       }],
     })
-    render(<SessionMessageCard content="x" origin={origin} />)
+    render(<OriginMessageCard content="x" origin={origin} />)
 
     expect(screen.getByRole('button', { name: 'Open session Project manager' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open session docs-reorg' })).not.toBeInTheDocument()
@@ -70,13 +76,13 @@ describe('SessionMessageCard', () => {
         projectPath: '/p', workDir: '/p', workDirExists: true,
       }],
     })
-    render(<SessionMessageCard content="x" origin={{ kind: 'session', sessionId: 'child-1', purpose: 'message' }} />)
+    render(<OriginMessageCard content="x" origin={{ kind: 'session', sessionId: 'child-1', purpose: 'message' }} />)
 
     expect(screen.getByRole('button', { name: 'Open session Reorganise docs' })).toBeInTheDocument()
   })
 
   it('opens the source session when the title is clicked', () => {
-    render(<SessionMessageCard content="x" origin={origin} />)
+    render(<OriginMessageCard content="x" origin={origin} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open session docs-reorg' }))
 
@@ -86,7 +92,7 @@ describe('SessionMessageCard', () => {
   })
 
   it('keeps the open-session control outside the collapsible trigger as a native button', () => {
-    render(<SessionMessageCard content="x" origin={origin} />)
+    render(<OriginMessageCard content="x" origin={origin} />)
 
     const open = screen.getByRole('button', { name: 'Open session docs-reorg' })
     expect(open.tagName).toBe('BUTTON')
@@ -95,11 +101,62 @@ describe('SessionMessageCard', () => {
   })
 
   it('offers copy but no fork action', () => {
-    render(<SessionMessageCard content="x" origin={origin} />)
+    render(<OriginMessageCard content="x" origin={origin} />)
     fireEvent.click(screen.getByText('Report'))
 
     expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Fork a new conversation' })).not.toBeInTheDocument()
+  })
+})
+
+describe('OriginMessageCard for the project board', () => {
+  afterEach(() => cleanup())
+
+  beforeEach(() => {
+    useKanbanStore.setState({ boards: null, views: {} })
+    useWorkspacePanelStore.setState(useWorkspacePanelStore.getInitialState(), true)
+    useTabStore.setState({ tabs: [{ sessionId: 'worker', title: 'Worker', type: 'session', status: 'idle' }], activeTabId: 'worker' })
+    kanbanApiMock.listBoards.mockResolvedValue({ boards: [{ key: 'repo', project: '/repo' }] })
+  })
+
+  it('opens the card as a task tab in the current session panel when its number is clicked', async () => {
+    render(<OriginMessageCard content={'Card #12 is yours'} origin={kanbanOrigin} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open task #12' }))
+
+    await vi.waitFor(() => expect(useWorkspacePanelStore.getState().getActiveTab('worker')).toMatchObject({ kind: 'task', board: 'repo', card: 12 }))
+    expect(useWorkspacePanelStore.getState().isPanelOpen('worker')).toBe(true)
+    expect(useTabStore.getState().activeTabId).toBe('worker')
+    expect(screen.queryByText('Card #12 is yours')).not.toBeInTheDocument()
+  })
+
+  it('shows the board, the card and the purpose, collapsed', () => {
+    render(<OriginMessageCard content={'Card #12 is yours'} origin={kanbanOrigin} />)
+
+    expect(screen.getByText('Project board')).toBeInTheDocument()
+    expect(screen.getByText('#12 OAuth module')).toBeInTheDocument()
+    expect(screen.getByText('Assignment')).toBeInTheDocument()
+    expect(screen.queryByText('Card #12 is yours')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open session/ })).not.toBeInTheDocument()
+  })
+
+  it('expands to the notification body', () => {
+    render(<OriginMessageCard content={'Card #12 is yours'} origin={kanbanOrigin} />)
+
+    fireEvent.click(screen.getByText('Assignment'))
+
+    expect(screen.getByText('Card #12 is yours')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['assignment', 'Assignment'],
+    ['revocation', 'Unassigned'],
+    ['comment', 'Comment'],
+    ['review', 'Ready for review'],
+    ['blocked', 'Blocked'],
+  ] as const)('labels the %s purpose', (purpose, label) => {
+    render(<OriginMessageCard content="x" origin={{ ...kanbanOrigin, purpose }} />)
+    expect(screen.getByText(label)).toBeInTheDocument()
   })
 })
 
@@ -124,6 +181,14 @@ describe('MessageBlock user messages', () => {
     const { container } = renderMessage({ ...base, origin })
 
     expect(container.querySelector('[data-message-shell="session"]')).not.toBeNull()
+    expect(container.querySelector('[data-message-shell="user"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Fork a new conversation' })).not.toBeInTheDocument()
+  })
+
+  it('renders a message with a project board origin as a card, without the fork action', () => {
+    const { container } = renderMessage({ ...base, origin: kanbanOrigin })
+
+    expect(container.querySelector('[data-message-shell="kanban"]')).not.toBeNull()
     expect(container.querySelector('[data-message-shell="user"]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Fork a new conversation' })).not.toBeInTheDocument()
   })

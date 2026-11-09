@@ -116,7 +116,7 @@ beforeEach(() => {
   document.body.appendChild(layer)
   setBrowserGuestLayer(layer)
   useWorkspacePanelStore.setState({
-    panelBySession: {
+    panelByTab: {
       s: {
         isOpen: true,
         expanded: false,
@@ -132,7 +132,7 @@ beforeEach(() => {
 })
 
 function browserTab(tabId: string) {
-  return useWorkspacePanelStore.getState().panelBySession.s?.tabs.find((tab) => tab.id === tabId)
+  return useWorkspacePanelStore.getState().panelByTab.s?.tabs.find((tab) => tab.id === tabId)
 }
 
 afterEach(() => {
@@ -141,7 +141,7 @@ afterEach(() => {
   setBrowserGuestLayer(null)
   document.body.innerHTML = ''
   useBrowserStore.setState(useBrowserStore.getInitialState(), true)
-  useWorkspacePanelStore.setState({ panelBySession: {} })
+  useWorkspacePanelStore.setState({ panelByTab: {} })
   useWorkspaceChatContextStore.setState(useWorkspaceChatContextStore.getInitialState(), true)
   useSettingsStore.setState(useSettingsStore.getInitialState(), true)
   localStorage.clear()
@@ -613,14 +613,14 @@ describe('a page that belongs to no chat', () => {
   it('does not touch any panel tab or chat context when it navigates, is closed or has text selected', () => {
     openBrowserUrl(null, 'viewer', 'https://example.com/')
     const webview = makeReady('viewer', { id: 31 })
-    const panels = useWorkspacePanelStore.getState().panelBySession
+    const panels = useWorkspacePanelStore.getState().panelByTab
     const references = useWorkspaceChatContextStore.getState().referencesBySession
 
     webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'https://example.com/next' }))
     addBrowserSelectionToChat({ guestId: 31, text: 'picked', truncated: false, title: 'T', url: 'https://example.com/' })
     closeBrowser('viewer')
 
-    expect(useWorkspacePanelStore.getState().panelBySession).toBe(panels)
+    expect(useWorkspacePanelStore.getState().panelByTab).toBe(panels)
     expect(useWorkspaceChatContextStore.getState().referencesBySession).toBe(references)
   })
 

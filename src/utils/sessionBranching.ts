@@ -97,9 +97,17 @@ export type SessionBranchResult = {
   contentReplacementRecords: ContentReplacementRecord[]
 }
 
+const SESSION_PARENT_KINDS = ['spawned', 'forked', 'assigned'] as const
+
+type SessionParentKind = (typeof SESSION_PARENT_KINDS)[number]
+
+export function isSessionParentKind(value: unknown): value is SessionParentKind {
+  return SESSION_PARENT_KINDS.includes(value as SessionParentKind)
+}
+
 export type SessionParent = {
   sessionId: string
-  kind: 'spawned' | 'forked'
+  kind: SessionParentKind
 }
 
 export type CreateSessionBranchOptions = {

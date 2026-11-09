@@ -61,6 +61,7 @@ function toPendingPermission(cliMsg: any): PendingPermission {
     input: request.input && typeof request.input === 'object' ? request.input : {},
     ...(typeof request.description === 'string' && request.description.trim() ? { description: request.description } : {}),
     ...(Array.isArray(request.permission_suggestions) ? { suggestions: request.permission_suggestions } : {}),
+    ...(request.always_asks === true ? { alwaysAsks: true as const } : {}),
   }
 }
 

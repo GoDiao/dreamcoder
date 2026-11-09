@@ -45,3 +45,31 @@ describe('StructuredIO.requestHost', () => {
     await expect(pending).rejects.toThrow('no such project')
   })
 })
+
+describe('StructuredIO permission prompts', () => {
+  async function promptFor(decisionReason: Record<string, unknown>) {
+    const { io } = connect()
+    const abortController = new AbortController()
+    const canUseTool = io.createCanUseTool()
+    void canUseTool(
+      { name: 'StartSession' } as never,
+      {},
+      { abortController, getAppState: () => ({ toolPermissionContext: {} }), options: {} } as never,
+      {} as never,
+      'tool-1',
+      { behavior: 'ask', message: 'Start a new session?', decisionReason } as never,
+    ).catch(() => undefined)
+    const sent = (await io.outbound.next()).value as { request: Record<string, unknown> }
+    abortController.abort()
+    return sent.request
+  }
+
+  test('tells the host when a tool asks every time, so it does not offer to remember the answer', async () => {
+    expect(await promptFor({ type: 'safetyCheck', reason: 'always asks', classifierApprovable: false })).toMatchObject({
+      subtype: 'can_use_tool',
+      tool_name: 'StartSession',
+      always_asks: true,
+    })
+    expect(await promptFor({ type: 'other', reason: 'ask' })).not.toHaveProperty('always_asks')
+  })
+})

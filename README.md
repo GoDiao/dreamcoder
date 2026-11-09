@@ -44,6 +44,7 @@ DreamCoder runs its desktop app and session service locally, bringing model conf
 *   **Follow the work**: Review sessions, file changes, terminal activity, and tool calls on your desktop.
 *   **See it, not just read it**: The agent can answer with interactive pages (charts, diagrams, step-by-step walkthroughs) shown right in the conversation, and a built-in browser shows your dev server next to the chat.
 *   **Design and clone**: Start from 60+ templates and 156+ design systems with `/design`: the agent interviews you first, then builds a web page or app prototype. It can also clone a website. Results are kept in your project's `dc_artifacts/`, ready to export, keep editing, or compare side by side on a canvas.
+*   **Plan work on a board**: A project board keeps tasks, owners, reviewers and progress for you and your sessions, across sessions and worktrees.
 *   **Continue on your phone**: Enable H5 Access to reach desktop sessions from a phone browser on the same LAN. Access across networks requires a reverse proxy you configure yourself.
 *   **Learn how a coding agent works**: A seven-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
 
@@ -121,7 +122,30 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 
 The templates and most of the design systems are converted from [Open Design](https://github.com/nexu-io/open-design) (Apache-2.0); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-### 4. Multi-Provider Configuration
+### 4. Project Board
+*   **One board for you and your sessions**: Each project gets a persistent board of tasks and sub-tasks. You create and assign tasks there; sessions read the board, split their work into sub-tasks, record progress and submit a report when they finish. The board outlives the sessions, and every worktree of the project shares it.
+*   **Owner, reviewer and creator**: Each task records who does it, who reviews it and who created it. The reviewer checks the delivery against the acceptance criteria and accepts it or sends it back; without a reviewer, you accept it. The hierarchy view shows the whole task tree, and Needs me collects what waits on you: a blocked task with the session's question, or a delivery to accept.
+*   **You stay in charge**: The creator sets a task's acceptance criteria. When another session wants to change them, it asks you every time, and the card shows which criteria are added and removed. Sessions also ask before they create the board, start a session on a task, cancel a task or make themselves a reviewer.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban.png">
+  <img src="./assets/kanban.png" alt="The project board with a task open in the side panel: status, owner, reviewer with review instructions, and the delivery report" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-approval.png">
+  <img src="./assets/kanban-approval.png" alt="A session asks to change a task's acceptance criteria; the card lists the added and removed criteria" width="49%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-tree.png">
+  <img src="./assets/kanban-tree.png" alt="The hierarchy view: tasks and sub-tasks with status, assignee and dependencies" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/dark/kanban-inbox.png">
+  <img src="./assets/kanban-inbox.png" alt="Needs me: a blocked task with the session's question and a delivery waiting for acceptance" width="49%">
+</picture>
+
+### 5. Multi-Provider Configuration
 *   **Presets and custom endpoints**: Set the API key, endpoint, and model mapping for your chosen provider.
 *   **Connection check**: Test the availability and latency of configured endpoints in Settings.
 
@@ -130,7 +154,7 @@ The templates and most of the design systems are converted from [Open Design](ht
   <img src="./assets/setting_provider.png" alt="Adding a provider from a preset">
 </picture>
 
-### 5. Claude Code Workflows
+### 6. Claude Code Workflows
 *   **Computer Use**: operates desktop apps and browsers in the background through UI elements, powered by [cua-driver](https://github.com/trycua/cua) (MIT). DreamCoder downloads it when you turn Computer Use on; no Python needed. Verified on macOS; Windows needs community testing, Linux is a preview.
 *   **Transparent tool execution**: File edits and terminal commands are surfaced clearly, so it's easy to understand and review what the agent is doing.
 *   **MCP extensibility**: Expand context and tooling through the Model Context Protocol.
@@ -140,11 +164,11 @@ The templates and most of the design systems are converted from [Open Design](ht
   <img src="./assets/setting_computeruse.png" alt="Computer Use settings">
 </picture>
 
-### 6. Continue on Your Phone over LAN
+### 7. Continue on Your Phone over LAN
 *   **H5 Access**: Enable access in Settings, manage the token, and use the QR code to connect a phone on the same LAN.
 *   **Access scope**: Keep the desktop app running. Cross-network access requires your own reverse proxy; the deployment guide is still in progress.
 
-### 7. MCP Extensions
+### 8. MCP Extensions
 *   **Visual configuration**: Manage MCP servers in the UI instead of editing JSON by hand.
 
 <picture>

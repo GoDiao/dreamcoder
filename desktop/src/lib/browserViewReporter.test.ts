@@ -16,8 +16,8 @@ const browserTab = (id: string): WorkspaceTab => ({ id, kind: 'browser', url: ''
 
 function setPanel(sessionId: string, activeTabId: string | null, tabIds: string[]) {
   useWorkspacePanelStore.setState((state) => ({
-    panelBySession: {
-      ...state.panelBySession,
+    panelByTab: {
+      ...state.panelByTab,
       [sessionId]: { isOpen: true, expanded: false, tabs: tabIds.map(browserTab), activeTabId, recentFiles: [] },
     },
   }))
@@ -47,7 +47,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const tabId of registered.splice(0)) unregisterGuestView(tabId)
-  useWorkspacePanelStore.setState({ panelBySession: {} })
+  useWorkspacePanelStore.setState({ panelByTab: {} })
   useTabStore.setState({ tabs: [], activeTabId: null })
   vi.restoreAllMocks()
   vi.clearAllMocks()

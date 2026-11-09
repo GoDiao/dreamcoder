@@ -14,6 +14,10 @@ import { BriefTool } from './tools/BriefTool/BriefTool.js'
 import { ArtifactCheckTool } from './tools/ArtifactCheckTool/ArtifactCheckTool.js'
 import { ArtifactCopyTool } from './tools/ArtifactCopyTool/ArtifactCopyTool.js'
 import { ListSessionsTool } from './tools/ListSessionsTool/ListSessionsTool.js'
+import { KanbanCreateTool } from './tools/KanbanCreateTool/KanbanCreateTool.js'
+import { KanbanGetTool } from './tools/KanbanGetTool/KanbanGetTool.js'
+import { KanbanListTool } from './tools/KanbanListTool/KanbanListTool.js'
+import { KanbanUpdateTool } from './tools/KanbanUpdateTool/KanbanUpdateTool.js'
 import { RenameSessionTool } from './tools/RenameSessionTool/RenameSessionTool.js'
 import { ChooseDesignTemplateTool } from './tools/ChooseDesignTemplateTool/ChooseDesignTemplateTool.js'
 import { UseDesignSystemTool } from './tools/UseDesignSystemTool/UseDesignSystemTool.js'
@@ -245,6 +249,10 @@ export function getAllBaseTools(): Tools {
     StartSessionTool,
     ListSessionsTool,
     RenameSessionTool,
+    KanbanListTool,
+    KanbanGetTool,
+    KanbanCreateTool,
+    KanbanUpdateTool,
     ArtifactCheckTool,
     ArtifactCopyTool,
     ChooseDesignTemplateTool,

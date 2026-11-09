@@ -90,7 +90,7 @@ describe('workspacePanelStore', () => {
     changedFiles,
   })
 
-  const panel = (sessionId: string) => useWorkspacePanelStore.getState().panelBySession[sessionId]
+  const panel = (sessionId: string) => useWorkspacePanelStore.getState().panelByTab[sessionId]
   const kinds = (sessionId: string) => panel(sessionId)?.tabs.map((tab) => tab.kind)
 
   it('uses hoisted session api mocks', () => {
@@ -255,7 +255,7 @@ describe('workspacePanelStore', () => {
 
     vi.resetModules()
     const restarted = await import('./workspacePanelStore')
-    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+    const restored = restarted.useWorkspacePanelStore.getState().panelByTab
 
     expect(restored.s).toEqual({
       isOpen: true,
@@ -278,7 +278,7 @@ describe('workspacePanelStore', () => {
     vi.resetModules()
     const restarted = await import('./workspacePanelStore')
 
-    expect(restarted.useWorkspacePanelStore.getState().panelBySession).toEqual({
+    expect(restarted.useWorkspacePanelStore.getState().panelByTab).toEqual({
       s: { isOpen: false, expanded: false, tabs: [], activeTabId: null, recentFiles: [] },
     })
 
@@ -286,7 +286,7 @@ describe('workspacePanelStore', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.resetModules()
     const broken = await import('./workspacePanelStore')
-    expect(broken.useWorkspacePanelStore.getState().panelBySession).toEqual({})
+    expect(broken.useWorkspacePanelStore.getState().panelByTab).toEqual({})
     expect(warn).toHaveBeenCalledWith('[workspace] Failed to restore side panel tabs', expect.any(SyntaxError))
   })
 
@@ -616,7 +616,7 @@ describe('workspacePanelStore', () => {
     const state = useWorkspacePanelStore.getState()
     expect(mocks.destroyTerminalRuntime).toHaveBeenCalledWith(terminal)
     expect(mocks.closeBrowser).toHaveBeenCalledWith(browser)
-    expect(state.panelBySession.s).toMatchObject({
+    expect(state.panelByTab.s).toMatchObject({
       isOpen: true,
       tabs: [{ id: file, kind: 'file', path: 'src/a.ts' }, { id: browser, kind: 'browser' }],
       activeTabId: browser,
@@ -641,7 +641,7 @@ describe('workspacePanelStore', () => {
     store.clearSession('s')
 
     expect(mocks.closeBrowser).toHaveBeenCalledWith(browser)
-    expect(useWorkspacePanelStore.getState().panelBySession.s).toBeUndefined()
+    expect(useWorkspacePanelStore.getState().panelByTab.s).toBeUndefined()
     expect(JSON.parse(localStorage.getItem('dreamcoder-workspace-panels') ?? '{}')).not.toHaveProperty('s')
     expect(kinds('other')).toEqual(['changes'])
   })
@@ -668,7 +668,7 @@ describe('artifact tabs', () => {
 
     await useWorkspacePanelStore.getState().openArtifact('s1', item, root)
 
-    const tab = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]!
+    const tab = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs[0]!
     expect(tab).toMatchObject({ kind: 'browser', root: '/repo/dc_artifacts', artifact: { id: 'id-report', name: 'report', mtimeMs: 42 } })
     expect(mocks.openArtifactMock).toHaveBeenCalledWith('/repo/dc_artifacts', 'report')
     expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s1', tab.id, '/repo/dc_artifacts/report/index.html', '/repo/dc_artifacts')
@@ -679,7 +679,7 @@ describe('artifact tabs', () => {
 
     await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'a', id: 'id-a' }, 'global')
 
-    expect(useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]).toMatchObject({ root: 'global' })
+    expect(useWorkspacePanelStore.getState().panelByTab['s1']!.tabs[0]).toMatchObject({ root: 'global' })
     expect(mocks.openArtifactMock).toHaveBeenCalledWith('global', 'a')
   })
 
@@ -692,7 +692,7 @@ describe('artifact tabs', () => {
 
     await useWorkspacePanelStore.getState().openArtifact('s1', item, root)
 
-    const panel = useWorkspacePanelStore.getState().panelBySession['s1']!
+    const panel = useWorkspacePanelStore.getState().panelByTab['s1']!
     expect(panel.tabs.map((tab) => tab.kind)).toEqual(['browser', 'files'])
     expect(panel.activeTabId).toBe(panel.tabs[0]!.id)
     expect(mocks.openArtifactMock).not.toHaveBeenCalled()
@@ -704,7 +704,7 @@ describe('artifact tabs', () => {
 
     await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
 
-    const tab = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs[0]!
+    const tab = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs[0]!
     expect(tab).toMatchObject({ kind: 'browser', root: '/app/design-templates/saas', template: { id: 'saas' } })
     expect(mocks.previewTemplateMock).toHaveBeenCalledWith('saas')
     expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s1', tab.id, '/app/design-templates/saas/index.html', '/app/design-templates/saas')
@@ -719,7 +719,7 @@ describe('artifact tabs', () => {
 
     await useWorkspacePanelStore.getState().openTemplatePreview('s1', 'saas')
 
-    const panel = useWorkspacePanelStore.getState().panelBySession['s1']!
+    const panel = useWorkspacePanelStore.getState().panelByTab['s1']!
     expect(panel.tabs.map((tab) => tab.kind)).toEqual(['browser', 'files'])
     expect(panel.activeTabId).toBe(panel.tabs[0]!.id)
     expect(mocks.previewTemplateMock).not.toHaveBeenCalled()
@@ -730,7 +730,7 @@ describe('artifact tabs', () => {
     mocks.previewTemplateMock.mockRejectedValue(new Error('Template not found: nope'))
 
     await expect(useWorkspacePanelStore.getState().openTemplatePreview('s1', 'nope')).rejects.toThrow('not found')
-    expect(useWorkspacePanelStore.getState().panelBySession['s1']).toBeUndefined()
+    expect(useWorkspacePanelStore.getState().panelByTab['s1']).toBeUndefined()
   })
 
   it('restores a template preview tab after a restart and drops one with a malformed template', async () => {
@@ -742,7 +742,7 @@ describe('artifact tabs', () => {
 
     vi.resetModules()
     const restarted = await import('./workspacePanelStore')
-    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+    const restored = restarted.useWorkspacePanelStore.getState().panelByTab
 
     expect(restored.s1?.tabs[0]).toMatchObject({ kind: 'browser', template: { id: 'saas' } })
     expect(restored.s2?.tabs).toEqual([])
@@ -754,7 +754,7 @@ describe('artifact tabs', () => {
     await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'flow', id: 'id-flow', manifest: { version: 1, id: 'id-flow', kind: 'canvas', title: 'Flow', entry: 'index.html' } }, root)
     await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'report', id: 'id-report', manifest: { version: 1, id: 'id-report', kind: 'page', title: 'Report', entry: 'index.html' } }, root)
 
-    const tabs = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs
+    const tabs = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs
     expect(tabs[0]).toMatchObject({ artifact: { id: 'id-flow', canvas: true } })
     expect(tabs[1] && 'artifact' in tabs[1] ? tabs[1].artifact : null).not.toHaveProperty('canvas')
   })
@@ -780,7 +780,7 @@ describe('artifact tabs', () => {
 
     vi.resetModules()
     const restarted = await import('./workspacePanelStore')
-    const restored = restarted.useWorkspacePanelStore.getState().panelBySession
+    const restored = restarted.useWorkspacePanelStore.getState().panelByTab
 
     expect(restored.s1?.tabs.map((tab) => ('artifact' in tab ? tab.artifact : null))).toEqual([
       { id: 'id-flow', name: 'flow', mtimeMs: 1, canvas: true },
@@ -816,7 +816,7 @@ describe('artifact tabs', () => {
     }))
     vi.resetModules()
     return import('./workspacePanelStore').then(({ useWorkspacePanelStore: restored }) => {
-      const tabs = restored.getState().panelBySession['s1']!.tabs
+      const tabs = restored.getState().panelByTab['s1']!.tabs
       expect(tabs.map((tab) => tab.id)).toEqual(['a', 'd'])
       expect(tabs[0]).toMatchObject({ root: '/repo/dc_artifacts', artifact: { id: 'id-a', name: 'a', mtimeMs: 1 } })
     })

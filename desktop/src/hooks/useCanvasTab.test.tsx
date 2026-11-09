@@ -41,7 +41,7 @@ describe('useCanvasTab', () => {
     mocks.submitBrowserInput.mockResolvedValue(undefined)
     useWorkspacePanelStore.setState({
       ...initialPanel,
-      panelBySession: {
+      panelByTab: {
         s1: { isOpen: true, expanded: false, activeTabId: 't1', recentFiles: [], tabs: [{ id: 't1', kind: 'browser', url: 'dreamcoder-project://id/flow/index.html', title: '', root: '/repo/dc_artifacts', artifact: canvasArtifact }] },
       },
     })
@@ -69,7 +69,7 @@ describe('useCanvasTab', () => {
     handlerOf()({ type: 'move', id: 'home', x: 1, y: 2, width: 300, height: 200 })
     await flush()
     expect(mocks.moveBoard).toHaveBeenCalledWith({ dir: '/repo/dc_artifacts', name: 'flow', boardId: 'home', x: 1, y: 2, width: 300, height: 200 })
-    const tab = useWorkspacePanelStore.getState().panelBySession.s1?.tabs[0]
+    const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs[0]
     expect(tab && 'artifact' in tab ? tab.artifact : null).toEqual({ ...canvasArtifact, mtimeMs: 777 })
   })
 
@@ -78,7 +78,7 @@ describe('useCanvasTab', () => {
     handlerOf()({ type: 'move', id: 'home', x: 1, y: 2, width: 3, height: 4 })
     await flush()
     expect(mocks.moveBoard).toHaveBeenCalledTimes(1)
-    const tab = useWorkspacePanelStore.getState().panelBySession.s1?.tabs[0]
+    const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs[0]
     expect(tab && 'artifact' in tab ? tab.artifact?.mtimeMs : null).toBe(1)
   })
 
@@ -87,7 +87,7 @@ describe('useCanvasTab', () => {
     handlerOf()({ type: 'open', id: 'home' })
     await flush()
     expect(mocks.open).toHaveBeenCalledWith('/repo/dc_artifacts', 'flow', 'home')
-    const tabs = useWorkspacePanelStore.getState().panelBySession.s1!.tabs
+    const tabs = useWorkspacePanelStore.getState().panelByTab.s1!.tabs
     expect(tabs).toHaveLength(2)
     expect(tabs[1]).toMatchObject({ root: '/repo/dc_artifacts', artifact: { id: 'id-flow', name: 'flow', mtimeMs: 1, board: 'home' } })
     expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s1', tabs[1]!.id, '/repo/dc_artifacts/flow/home.html', '/repo/dc_artifacts')
@@ -99,10 +99,10 @@ describe('useCanvasTab', () => {
     await flush()
     handlerOf()({ type: 'open', id: 'home' })
     await flush()
-    expect(useWorkspacePanelStore.getState().panelBySession.s1!.tabs).toHaveLength(2)
+    expect(useWorkspacePanelStore.getState().panelByTab.s1!.tabs).toHaveLength(2)
     handlerOf()({ type: 'open', id: 'detail' })
     await flush()
-    expect(useWorkspacePanelStore.getState().panelBySession.s1!.tabs).toHaveLength(3)
+    expect(useWorkspacePanelStore.getState().panelByTab.s1!.tabs).toHaveLength(3)
   })
 
   it('opens a board in the same page when the page belongs to no chat', async () => {
@@ -110,7 +110,7 @@ describe('useCanvasTab', () => {
     handlerOf()({ type: 'open', id: 'home' })
     await flush()
     expect(mocks.submitBrowserInput).toHaveBeenCalledWith(null, 't1', '/repo/dc_artifacts/flow/home.html', '/repo/dc_artifacts')
-    expect(useWorkspacePanelStore.getState().panelBySession.s1!.tabs).toHaveLength(1)
+    expect(useWorkspacePanelStore.getState().panelByTab.s1!.tabs).toHaveLength(1)
   })
 
   it('tells the user when the write or the open fails', async () => {

@@ -4,12 +4,25 @@
  * that needs Node or the SDK.
  */
 import type { BackgroundTaskEvent, TaskNotification, TaskUsage } from '../transcript/classify.js'
-import type { SessionOrigin, TranscriptItem } from '../transcript/items.js'
+import type { TranscriptItem, UserMessageOrigin } from '../transcript/items.js'
 import type { SessionState, SessionStatePatch } from '../session/state/types.js'
 
 export type { BackgroundTaskEvent, TaskNotification, TaskUsage }
 export type { GoalEventAction } from '../transcript/classify.js'
-export type { MemoryEventFile, SessionOrigin, TranscriptAttachment, TranscriptItem } from '../transcript/items.js'
+export type { MemoryEventFile, TranscriptAttachment, TranscriptItem, UserMessageOrigin } from '../transcript/items.js'
+export type { KanbanCommand } from '../../entrypoints/sdk/controlSchemas.js'
+export type {
+  Assignment as KanbanAssignment,
+  BoardListing,
+  BoardView,
+  CardStatus,
+  CardView,
+  HandledItem,
+  InboxItem,
+  KanbanActor,
+  KanbanEvent,
+  KanbanServiceErrorCode,
+} from '../services/kanbanModel.js'
 export type {
   ActiveGoal,
   BackgroundTaskSummary,
@@ -87,7 +100,7 @@ export type ServerMessage =
   | { type: 'connected'; sessionId: string }
   | { type: 'session_snapshot'; state: SessionState }
   | { type: 'session_patch'; version: number; changes: SessionStatePatch }
-  | { type: 'user_message'; id: string; content: string; origin?: SessionOrigin }
+  | { type: 'user_message'; id: string; content: string; origin?: UserMessageOrigin }
   | { type: 'message_id'; id: string }
   | { type: 'content_start'; blockType: 'text' | 'tool_use'; toolName?: string; toolUseId?: string; parentToolUseId?: string }
   | { type: 'content_delta'; text?: string; toolInput?: string }

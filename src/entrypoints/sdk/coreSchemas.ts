@@ -1293,6 +1293,39 @@ export type SessionOrigin = z.infer<
   ReturnType<typeof SDKSessionOriginSchema>
 >
 
+const KANBAN_NOTIFICATION_PURPOSES = [
+  'assignment',
+  'revocation',
+  'comment',
+  'review',
+  'blocked',
+  'changes_requested',
+  'accepted',
+  'unblocked',
+  'reset',
+  'cancelled',
+  'reopened',
+] as const
+
+export const SDKKanbanOriginSchema = lazySchema(() =>
+  z.object({
+    kind: z.literal('kanban'),
+    project: z.string(),
+    card: z.object({ id: z.number().int().positive(), title: z.string() }),
+    purpose: z.enum(KANBAN_NOTIFICATION_PURPOSES),
+  }),
+)
+
+export type KanbanOrigin = z.infer<ReturnType<typeof SDKKanbanOriginSchema>>
+
+export const SDKUserMessageOriginSchema = lazySchema(() =>
+  z.union([SDKSessionOriginSchema(), SDKKanbanOriginSchema()]),
+)
+
+export type UserMessageOrigin = z.infer<
+  ReturnType<typeof SDKUserMessageOriginSchema>
+>
+
 // SDKUserMessage content without uuid/session_id
 const SDKUserMessageContentSchema = lazySchema(() =>
   z.object({
@@ -1302,7 +1335,7 @@ const SDKUserMessageContentSchema = lazySchema(() =>
     isSynthetic: z.boolean().optional(),
     tool_use_result: z.unknown().optional(),
     priority: z.enum(['now', 'next', 'later']).optional(),
-    origin: SDKSessionOriginSchema().optional(),
+    origin: SDKUserMessageOriginSchema().optional(),
     reports: z.array(SDKSessionReportSchema()).optional(),
     timestamp: z
       .string()

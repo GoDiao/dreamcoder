@@ -1,4 +1,4 @@
-import { AppWindow, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, Copy, Ellipsis, FileCode, FileDiffIcon, Folder, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Globe, ImageOffIcon, LayoutGrid, Layers, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, PanelRight, Plus, RefreshCw, SearchXIcon, SquareTerminal, X, type LucideIcon } from 'lucide-react'
+import { AppWindow, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, Copy, Ellipsis, FileCode, FileDiffIcon, Folder, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Globe, ImageOffIcon, LayoutGrid, Layers, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, PanelRight, Plus, RefreshCw, SearchXIcon, SquareKanban, SquareTerminal, Inbox, X, type LucideIcon } from 'lucide-react'
 import type { UiPageSummary } from '@protocol'
 import { toast } from 'sonner'
 import { getTextSelectionFromContainer, type WorkspaceTextSelection } from './workspaceSelection'
@@ -33,6 +33,9 @@ import {
   type WorkspaceTabTarget,
 } from '../../stores/workspacePanelStore'
 import { useChatStore } from '../../stores/chatStore'
+import { useKanbanStore } from '../../stores/kanbanStore'
+import { TaskDetail } from '../kanban/TaskDetail'
+import { InboxView } from '../kanban/InboxView'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { TerminalSettings } from '../../pages/TerminalSettings'
 import { ArtifactsView } from './ArtifactsView'
@@ -940,7 +943,7 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
   const [draft, setDraft] = useState('')
   const openTab = useWorkspacePanelStore((state) => state.openTab)
   const openAddress = useWorkspacePanelStore((state) => state.openAddress)
-  const recentFiles = useWorkspacePanelStore((state) => state.panelBySession[sessionId]?.recentFiles ?? EMPTY_IDS)
+  const recentFiles = useWorkspacePanelStore((state) => state.panelByTab[sessionId]?.recentFiles ?? EMPTY_IDS)
   const uiPages = useChatStore((state) => state.sessions[sessionId]?.mirror?.uiPages ?? EMPTY_UI_PAGES)
   const desktop = isDesktopRuntime()
   const tools: Array<{ target: WorkspaceTabTarget; kind: WorkspaceTabKind; label: string }> = [
@@ -1030,9 +1033,11 @@ const TAB_ICONS: Record<WorkspaceTabKind, LucideIcon> = {
   browser: Globe,
   terminal: SquareTerminal,
   uiPage: AppWindow,
+  task: SquareKanban,
+  inbox: Inbox,
 }
 
-function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab) {
+function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab, taskTitles: Record<string, string>) {
   switch (tab.kind) {
     case 'launcher':
       return t('workspace.newTab')
@@ -1050,7 +1055,16 @@ function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab) {
       return `${tab.shell ?? t('terminal.defaultName')} ${tab.index}`
     case 'uiPage':
       return t('uiPage.revision', { title: tab.title, revision: tab.revision })
+    case 'task':
+      return `#${tab.card} ${taskTitles[tab.id] ?? ''}`.trim()
+    case 'inbox':
+      return t('kanban.inbox.title')
   }
+}
+
+function WorkspaceRefresh({ sessionId }: { sessionId: string }) {
+  useWorkspaceRefresh(sessionId)
+  return null
 }
 
 function useWorkspaceRefresh(sessionId: string) {
@@ -1072,32 +1086,34 @@ function useWorkspaceRefresh(sessionId: string) {
   }, [chatState, loadStatus, refreshPreviews, sessionId, statusLoading])
 }
 
-type WorkspacePanelProps = {
-  sessionId: string
+export type WorkspacePanelProps = {
+  panelId: string
   sessionTitle: string
   titleRowStyle?: CSSProperties
   titleRowClass?: string
   terminalCwd?: string
   contextLabel?: string
   projectRoot?: string | null
+  tasksOnly?: boolean
 }
 
 export function WorkspacePanel(props: WorkspacePanelProps) {
-  const isOpen = useWorkspacePanelStore((state) => state.isPanelOpen(props.sessionId))
+  const isOpen = useWorkspacePanelStore((state) => state.isPanelOpen(props.panelId))
   return isOpen ? <OpenWorkspacePanel {...props} /> : null
 }
 
-function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowClass = '', terminalCwd, contextLabel, projectRoot = null }: WorkspacePanelProps) {
+function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, titleRowClass = '', terminalCwd, contextLabel, projectRoot = null, tasksOnly = false }: WorkspacePanelProps) {
   const t = useTranslation()
-  const tabs = useWorkspacePanelStore((state) => state.panelBySession[sessionId]?.tabs ?? EMPTY_TABS)
-  const activeTabId = useWorkspacePanelStore((state) => state.panelBySession[sessionId]?.activeTabId ?? null)
+  const tabs = useWorkspacePanelStore((state) => state.panelByTab[sessionId]?.tabs ?? EMPTY_TABS)
+  const activeTabId = useWorkspacePanelStore((state) => state.panelByTab[sessionId]?.activeTabId ?? null)
   const expanded = useWorkspacePanelStore((state) => state.isPanelExpanded(sessionId))
   const openTab = useWorkspacePanelStore((state) => state.openTab)
   const activateTab = useWorkspacePanelStore((state) => state.activateTab)
   const closeTab = useWorkspacePanelStore((state) => state.closeTab)
   const toggleExpanded = useWorkspacePanelStore((state) => state.toggleExpanded)
   const closePanel = useWorkspacePanelStore((state) => state.closePanel)
-  useWorkspaceRefresh(sessionId)
+  const taskTitles = useKanbanStore(useShallow((state) => Object.fromEntries(tabs.flatMap((tab) =>
+    tab.kind === 'task' ? [[tab.id, state.views[tab.board]?.cards.find((card) => card.id === tab.card)?.title ?? '']] : []))))
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const expandLabel = expanded ? t('workspace.restorePanel') : t('workspace.expandPanel')
@@ -1113,11 +1129,15 @@ function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowCl
       case 'artifacts':
         return <ArtifactsView sessionId={sessionId} />
       case 'file':
-        return <FileTabView sessionId={sessionId} path={tab.path} />
+        return <FileTabView sessionId={tab.sessionId ?? sessionId} path={tab.path} />
       case 'browser':
         return <BrowserView sessionId={sessionId} tab={tab} projectRoot={projectRoot} />
       case 'uiPage':
         return <UiPageTabView sessionId={sessionId} tab={tab} />
+      case 'task':
+        return <TaskDetail panelId={sessionId} board={tab.board} card={tab.card} poll={!tasksOnly} />
+      case 'inbox':
+        return <InboxView panelId={sessionId} board={tab.board} />
       case 'terminal':
         return null
     }
@@ -1130,6 +1150,7 @@ function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowCl
         aria-label={t('workspace.panelTabs')}
         className="flex h-full min-h-0 w-full min-w-0 flex-col bg-[var(--color-surface)]"
       >
+        {!tasksOnly && <WorkspaceRefresh sessionId={sessionId} />}
         <div style={titleRowStyle} className={`window-drag-region flex shrink-0 select-none items-center gap-0.5 border-b border-[var(--color-border)] pl-2 pr-2 ${titleRowClass}`}>
           {expanded && (
             <HintTooltip content={t('workspace.backToChat')}>
@@ -1146,7 +1167,7 @@ function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowCl
           )}
           <TabsList aria-label={t('workspace.panelTabs')} variant="line" className="min-w-0 flex-1 justify-start overflow-x-auto overflow-y-hidden">
             {tabs.map((tab) => {
-              const title = getTabTitle(t, tab)
+              const title = getTabTitle(t, tab, taskTitles)
               const Icon = TAB_ICONS[tab.kind]
               const selected = tab.id === activeTabId
               return (
@@ -1181,11 +1202,13 @@ function OpenWorkspacePanel({ sessionId, sessionTitle, titleRowStyle, titleRowCl
               )
             })}
           </TabsList>
-          <HintTooltip content={t('workspace.newTab')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('workspace.newTab')} onClick={() => openTab(sessionId, { kind: 'launcher' })}>
-              <Plus aria-hidden="true" />
-            </Button>
-          </HintTooltip>
+          {!tasksOnly && (
+            <HintTooltip content={t('workspace.newTab')}>
+              <Button variant="ghost" size="icon-sm" aria-label={t('workspace.newTab')} onClick={() => openTab(sessionId, { kind: 'launcher' })}>
+                <Plus aria-hidden="true" />
+              </Button>
+            </HintTooltip>
+          )}
           <HintTooltip content={expandLabel}>
             <Button variant="ghost" size="icon-sm" aria-label={expandLabel} onClick={() => toggleExpanded(sessionId)}>
               {expanded ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}

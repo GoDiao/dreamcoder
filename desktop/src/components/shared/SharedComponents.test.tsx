@@ -131,6 +131,11 @@ describe('shared components', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('focuses the field of a confirmation that asks for text', async () => {
+    render(<ConfirmDialog open onClose={vi.fn()} onConfirm={vi.fn()} title="Send back" body={<input aria-label="Reason" />} confirmLabel="Send back" cancelLabel="Cancel" />)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Reason' })).toHaveFocus())
+  })
+
   it('opens a dropdown with the keyboard, selects an item and restores trigger focus', async () => {
     const onChange = vi.fn()
     render(<Dropdown trigger={<button>Provider</button>} value="a" onChange={onChange} items={[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]} />)

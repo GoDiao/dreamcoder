@@ -41,6 +41,18 @@ describe('StartSession permission', () => {
   })
 })
 
+describe('StartSession input', () => {
+  test('refuses a role without a card', async () => {
+    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', role: 'reviewer' }), {} as never)
+    expect(result).toMatchObject({ result: false })
+  })
+
+  test('accepts a role with its card', async () => {
+    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', card: 3, role: 'reviewer' }), {} as never)
+    expect(result).toEqual({ result: true })
+  })
+})
+
 describe('StartSession call', () => {
   test('sends session_start with the input and returns the id and title', async () => {
     const requests = installFakeHost(() => ({ sessionId: 's-1', title: 'Research' }))
@@ -49,6 +61,23 @@ describe('StartSession call', () => {
       { subtype: 'session_start', prompt: 'investigate', title: 'Research', context: 'fork', worktree: true },
     ])
     expect(result.data).toEqual({ sessionId: 's-1', title: 'Research' })
+  })
+
+  test('passes the card and the role the new session takes on it, owner by default', async () => {
+    const requests = installFakeHost(() => ({ sessionId: 's-3', title: 'Tokens' }))
+    await run({ prompt: 'p', title: 'Tokens', context: 'fresh', card: 3 })
+    await run({ prompt: 'check it', title: 'Check', context: 'fresh', card: 3, role: 'reviewer' })
+    expect(requests).toEqual([
+      { subtype: 'session_start', prompt: 'p', title: 'Tokens', context: 'fresh', worktree: false, card: 3, role: 'owner' },
+      { subtype: 'session_start', prompt: 'check it', title: 'Check', context: 'fresh', worktree: false, card: 3, role: 'reviewer' },
+    ])
+    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Tokens', context: 'fresh', card: 3 }), {} as never)).toMatchObject({
+      behavior: 'ask',
+      message: 'Start a new session "Tokens" as the owner of card #3?',
+    })
+    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Check', context: 'fresh', card: 3, role: 'reviewer' }), {} as never)).toMatchObject({
+      message: 'Start a new session "Check" as the reviewer of card #3?',
+    })
   })
 
   test('defaults worktree to false', async () => {

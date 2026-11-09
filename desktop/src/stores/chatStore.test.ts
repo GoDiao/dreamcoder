@@ -23,6 +23,7 @@ const {
   updateTabStatusMock,
   updateSessionTitleMock,
   fetchSessionsMock,
+  refreshAllMock,
   sessionStoreSnapshot,
   cliTaskStoreSnapshot,
 } = vi.hoisted(() => ({
@@ -44,6 +45,7 @@ const {
   updateTabStatusMock: vi.fn(),
   updateSessionTitleMock: vi.fn(),
   fetchSessionsMock: vi.fn(async () => {}),
+  refreshAllMock: vi.fn(async () => {}),
   sessionStoreSnapshot: {
     sessions: [] as Array<{
       id: string
@@ -120,6 +122,12 @@ vi.mock('./sessionStore', () => ({
       updateSessionTitle: updateSessionTitleMock,
       fetchSessions: fetchSessionsMock,
     }),
+  },
+}))
+
+vi.mock('./kanbanStore', () => ({
+  useKanbanStore: {
+    getState: () => ({ refreshAll: refreshAllMock }),
   },
 }))
 
@@ -3119,6 +3127,7 @@ describe('chatStore messages from other sessions', () => {
 
   beforeEach(() => {
     fetchSessionsMock.mockClear()
+    refreshAllMock.mockClear()
     useChatStore.setState({ ...initialState, sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
   })
 
@@ -3170,7 +3179,7 @@ describe('chatStore messages from other sessions', () => {
     ])
   })
 
-  it('refreshes the session list when StartSession returns, and not for other tools or failures', () => {
+  it('refreshes the session list and the boards when StartSession returns, and not for other tools or failures', () => {
     const store = useChatStore.getState()
     store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'StartSession', toolUseId: 'start-1', input: {} })
     store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'Read', toolUseId: 'read-1', input: {} })
@@ -3183,5 +3192,17 @@ describe('chatStore messages from other sessions', () => {
 
     store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_result', toolUseId: 'start-1', content: 'started', isError: false })
     expect(fetchSessionsMock).toHaveBeenCalledTimes(1)
+    expect(refreshAllMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads the boards when a session adds a card, which can create its board', () => {
+    const store = useChatStore.getState()
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_use_complete', toolName: 'KanbanCreate', toolUseId: 'card-1', input: { title: 'Plan' } })
+    expect(refreshAllMock).not.toHaveBeenCalled()
+
+    store.handleServerMessage(TEST_SESSION_ID, { type: 'tool_result', toolUseId: 'card-1', content: 'created', isError: false })
+
+    expect(refreshAllMock).toHaveBeenCalledTimes(1)
+    expect(fetchSessionsMock).not.toHaveBeenCalled()
   })
 })

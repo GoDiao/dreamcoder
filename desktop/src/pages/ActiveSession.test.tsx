@@ -66,13 +66,13 @@ vi.mock('../components/chat/SessionTaskBar', () => ({
 
 vi.mock('../components/workspace/WorkspacePanel', () => ({
   WorkspacePanel: ({
-    sessionId,
+    panelId,
     sessionTitle,
     titleRowStyle,
     terminalCwd,
     contextLabel,
   }: {
-    sessionId: string
+    panelId: string
     sessionTitle: string
     titleRowStyle?: { paddingLeft?: string }
     terminalCwd?: string
@@ -85,7 +85,7 @@ vi.mock('../components/workspace/WorkspacePanel', () => ({
       data-cwd={terminalCwd ?? ''}
       data-context={contextLabel ?? ''}
     >
-      workspace:{sessionId}
+      workspace:{panelId}
     </div>
   ),
 }))
@@ -617,7 +617,7 @@ describe('ActiveSession task polling', () => {
     expect(within(contentRow).getByTestId('workspace-panel')).toHaveTextContent(`workspace:${sessionId}`)
     expect(within(chatColumn).getByTestId('chat-input')).toBeInTheDocument()
     expect(within(chatColumn).getByTestId('chat-input')).toHaveAttribute('data-compact', 'true')
-    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
+    expect(panelMocks.panelProps['main-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
     expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 280, maxSize: 680 })
     expect(contentRow.children[0]).toContainElement(chatColumn)
     expect(contentRow.children[1]).toBe(resizeHandle)
@@ -943,7 +943,7 @@ describe('ActiveSession task polling', () => {
     render(<ActiveSession />)
 
     expect(screen.getByTestId('active-session-chat-column')).not.toBeVisible()
-    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ maxSize: 0 })
+    expect(panelMocks.panelProps['main-panel']).toMatchObject({ maxSize: 0 })
     expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 0, maxSize: '100%' })
     expect(screen.queryByTestId('workspace-resize-handle')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Expanded Session' })).not.toBeInTheDocument()
@@ -953,7 +953,7 @@ describe('ActiveSession task polling', () => {
       useWorkspacePanelStore.getState().toggleExpanded(sessionId)
     })
     expect(screen.getByTestId('active-session-chat-column')).toBeVisible()
-    expect(panelMocks.panelProps['conversation-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
+    expect(panelMocks.panelProps['main-panel']).toMatchObject({ minSize: 320, maxSize: undefined })
     expect(panelMocks.panelProps['workspace-panel']).toMatchObject({ minSize: 280, maxSize: 680 })
     expect(screen.getByTestId('workspace-resize-handle')).toBeInTheDocument()
     expect(screen.getByTestId('workspace-panel')).toHaveAttribute('data-inset', 'false')

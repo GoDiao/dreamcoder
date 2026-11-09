@@ -608,6 +608,7 @@ export class StructuredIO {
             ),
             tool_use_id: toolUseID,
             agent_id: toolUseContext.agentId,
+            ...(mainPermissionResult.decisionReason?.type === 'safetyCheck' ? { always_asks: true } : {}),
           },
           permissionToolOutputSchema(),
           hookAbortController.signal,

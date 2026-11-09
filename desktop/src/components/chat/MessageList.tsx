@@ -13,7 +13,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n/locales/en'
 import { UserMessage } from './UserMessage'
-import { SessionMessageCard } from './SessionMessageCard'
+import { OriginMessageCard } from './OriginMessageCard'
 import { AssistantMessage } from './AssistantMessage'
 import { StreamingReply } from './StreamingReply'
 import { ThinkingBlock } from './ThinkingBlock'
@@ -2045,8 +2045,8 @@ export const MessageBlock = memo(function MessageBlock({
 
   switch (message.type) {
     case 'user_text':
-      if (message.origin?.kind === 'session') {
-        return <SessionMessageCard content={message.content} origin={message.origin} timestamp={message.timestamp} />
+      if (message.origin) {
+        return <OriginMessageCard content={message.content} origin={message.origin} timestamp={message.timestamp} />
       }
       return (
         <SelectableChatMessage
@@ -2134,6 +2134,7 @@ export const MessageBlock = memo(function MessageBlock({
           toolName={message.toolName}
           input={message.input}
           description={message.description}
+          alwaysAsks={message.alwaysAsks}
           resolution={message.resolution}
         />
       )

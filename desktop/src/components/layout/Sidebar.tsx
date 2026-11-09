@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, Layers, FolderPlus, Bot, GitBranch, GitFork, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquarePen, Trash2, X } from 'lucide-react'
+import { CheckIcon, ChevronDown, ChevronRight, FolderOpen, Layers, FolderPlus, Bot, GitBranch, GitFork, ListChecks, LoaderCircle, Pencil, Pin, PinOff, Plus, SquareKanban, SquarePen, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { Button } from '../shared/ui/button'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
@@ -12,7 +12,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { SessionListItem, SessionParent } from '../../types/session'
-import { useTabStore, ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
+import { useTabStore, ARTIFACTS_TAB_ID, SCHEDULED_TAB_ID, kanbanTabId, openBoardTab } from '../../stores/tabStore'
+import { boardForProject, useInboxCount, useKanbanStore } from '../../stores/kanbanStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
@@ -24,11 +25,12 @@ import { ReportProblemDialog } from './ReportProblemDialog'
 import { SearchField } from '../shared/SearchField'
 import { openSessionTab } from '../../lib/sessionNavigation'
 import { buildSessionTreeRows, unfoldSessionTreeRows, type SessionTreeRow } from './sessionTree'
+import { useVisiblePolling } from '../../hooks/useVisiblePolling'
+import { TreeConnector, treeGuides } from '../shared/TreeConnector'
 
 const isDesktop = isDesktopRuntime()
 const isWindows = typeof navigator !== 'undefined' && /Win/.test(navigator.platform)
-const SESSION_LIST_AUTO_REFRESH_MS = 30_000
-const SESSION_LIST_FOCUS_REFRESH_MIN_MS = 5_000
+const SESSION_LIST_POLLING = { intervalMs: 30_000, focusMinMs: 5_000 }
 const PROJECT_ORDER_STORAGE_KEY = 'dreamcoder-sidebar-project-order'
 const PROJECT_PINNED_STORAGE_KEY = 'dreamcoder-sidebar-pinned-projects'
 const PROJECT_HIDDEN_STORAGE_KEY = 'dreamcoder-sidebar-hidden-projects'
@@ -107,7 +109,9 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const [projectDropTarget, setProjectDropTarget] = useState<{ key: string; position: 'before' | 'after' } | null>(null)
   const suppressProjectClickRef = useRef<string | null>(null)
   const sidebarPreferenceRevisionRef = useRef(0)
-  const refreshSessionsNow = useSessionListAutoRefresh(fetchSessions)
+  const refreshSessionsNow = useVisiblePolling(fetchSessions, SESSION_LIST_POLLING)
+  const boards = useKanbanStore((s) => s.boards)
+  useVisiblePolling(useKanbanStore((s) => s.refreshAll), SESSION_LIST_POLLING)
 
   const filteredSessions = useMemo(() => {
     let result = sessions
@@ -785,6 +789,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                 const unfoldedRows = unfoldSessionTreeRows(project.rows, searchQuery ? EMPTY_ID_SET : collapsedSessionIds)
                 const visibleItems = projectCollapsed ? [] : getVisibleProjectRows(unfoldedRows, sessionsExpanded, activeTabId)
                 const hiddenCount = unfoldedRows.length - visibleItems.length
+                const guides = treeGuides(visibleItems.map((item) => Math.min(item.depth, SESSION_MAX_INDENT_DEPTH)))
                 const groupIds = project.sessions.map((session) => session.id)
                 const groupSelectedCount = groupIds.filter((id) => selectedSessionIds.has(id)).length
                 const hasInternalScroll = sessionsExpanded && unfoldedRows.length > PROJECT_GROUP_SCROLL_COUNT
@@ -792,6 +797,12 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                 const isProjectPinned = pinnedProjectKeys.has(project.key)
                 const dropBefore = projectDropTarget?.key === project.key && projectDropTarget.position === 'before'
                 const dropAfter = projectDropTarget?.key === project.key && projectDropTarget.position === 'after'
+                const projectBoard = boardForProject(boards, project.key)
+                const boardTabId = kanbanTabId(project.key)
+                const openBoard = () => {
+                  openBoardTab(project.key, t('kanban.title'))
+                  closeMobileDrawer()
+                }
                 return (
                   <section
                     key={project.key}
@@ -810,6 +821,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                     )}
                     <RowActionMenu disabled={isBatchMode} actions={[
                       { id: 'pin', label: t(isProjectPinned ? 'sidebar.unpinProject' : 'sidebar.pinProject'), icon: isProjectPinned ? <PinOff size={18} /> : <Pin size={18} />, onSelect: () => togglePinnedProject(project.key) },
+                      { id: 'board', label: t(projectBoard ? 'sidebar.openBoard' : 'sidebar.createBoard'), icon: <SquareKanban size={18} />, onSelect: openBoard },
                       { id: 'open', label: t('sidebar.openInFinder'), icon: <FolderOpen size={18} />, onSelect: () => void openProjectInFinder(project) },
                       { id: 'hide', label: t('sidebar.hideProjectFromSidebar'), icon: <X size={18} />, danger: true, onSelect: () => toggleHiddenProject(project) },
                     ]}>
@@ -878,7 +890,15 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                           className={hasInternalScroll ? 'max-h-[420px] overflow-y-auto pr-1' : undefined}
                           data-testid={`sidebar-project-session-list-${domSafeProjectKey(project.key)}`}
                         >
-                          {visibleItems.map(({ session, depth, childCount }) => {
+                          {projectBoard && (
+                            <ProjectBoardRow
+                              board={projectBoard.key}
+                              active={activeTabId === boardTabId}
+                              touch={isMobile}
+                              onOpen={openBoard}
+                            />
+                          )}
+                          {visibleItems.map(({ session, depth, childCount }, rowIndex) => {
                             const rowCollapsed = !searchQuery && collapsedSessionIds.has(session.id)
                             const isSelected = selectedSessionIds.has(session.id)
                             const isCurrent = session.id === activeTabId
@@ -894,15 +914,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                               className="relative mb-0.5 last:mb-0"
                               style={depth > 0 ? { paddingLeft: Math.min(depth, SESSION_MAX_INDENT_DEPTH) * SESSION_INDENT_PX } : undefined}
                             >
-                              {depth > 0 && Array.from({ length: Math.min(depth, SESSION_MAX_INDENT_DEPTH) }, (_, level) => (
-                                <span
-                                  key={level}
-                                  aria-hidden="true"
-                                  data-testid="sidebar-session-connector"
-                                  className="pointer-events-none absolute -bottom-0.5 top-0 w-px bg-[var(--color-border)]"
-                                  style={{ left: (level + 1) * SESSION_INDENT_PX - 7 }}
-                                />
-                              ))}
+                              <TreeConnector guide={guides[rowIndex]!} indent={SESSION_INDENT_PX} extend={2} />
                               {renamingId === session.id ? (
                                 <input
                                   autoFocus
@@ -1124,58 +1136,28 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   )
 }
 
-function useSessionListAutoRefresh(fetchSessions: () => Promise<void>): () => Promise<void> {
-  const inFlightRef = useRef<Promise<void> | null>(null)
-  const lastStartedAtRef = useRef(0)
-
-  const refreshSessions = useCallback((force = false) => {
-    if (inFlightRef.current) return inFlightRef.current
-
-    const now = Date.now()
-    if (!force && now - lastStartedAtRef.current < SESSION_LIST_FOCUS_REFRESH_MIN_MS) {
-      return Promise.resolve()
-    }
-
-    lastStartedAtRef.current = now
-    const request = Promise.resolve()
-      .then(() => fetchSessions())
-      .catch(() => undefined)
-      .finally(() => {
-        if (inFlightRef.current === request) {
-          inFlightRef.current = null
-        }
-      })
-    inFlightRef.current = request
-    return request
-  }, [fetchSessions])
-
-  useEffect(() => {
-    void refreshSessions(true)
-
-    const refreshIfVisible = () => {
-      if (!isDocumentVisible()) return
-      void refreshSessions()
-    }
-
-    window.addEventListener('focus', refreshIfVisible)
-    document.addEventListener('visibilitychange', refreshIfVisible)
-    const timer = window.setInterval(() => {
-      if (!isDocumentVisible()) return
-      void refreshSessions(true)
-    }, SESSION_LIST_AUTO_REFRESH_MS)
-
-    return () => {
-      window.removeEventListener('focus', refreshIfVisible)
-      document.removeEventListener('visibilitychange', refreshIfVisible)
-      window.clearInterval(timer)
-    }
-  }, [refreshSessions])
-
-  return useCallback(() => refreshSessions(true), [refreshSessions])
-}
-
-function isDocumentVisible(): boolean {
-  return typeof document === 'undefined' || document.visibilityState !== 'hidden'
+function ProjectBoardRow({ board, active, touch, onOpen }: { board: string; active: boolean; touch: boolean; onOpen: () => void }) {
+  const t = useTranslation()
+  const count = useInboxCount(board)
+  return (
+    <div
+      data-testid="sidebar-project-board"
+      data-current={active ? 'true' : undefined}
+      className={`sidebar-row sidebar-session-row mb-0.5 flex items-center ${touch ? 'sidebar-row--touch' : ''} ${active ? 'sidebar-session-row--active text-[var(--color-text-primary)]' : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'}`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none ${touch ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+      >
+        <SquareKanban className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{t('kanban.title')}</span>
+        {count > 0 && (
+          <span aria-label={t('kanban.inbox.count', { count })} className="flex h-[18px] min-w-[18px] flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-brand)] px-1.5 text-[11px] font-semibold text-[var(--color-btn-primary-fg)]">{count}</span>
+        )}
+      </button>
+    </div>
+  )
 }
 
 function ProjectHeaderActions({ title, createLabel, onCreateBlank, onUseExisting }: {
@@ -1504,14 +1486,7 @@ function SessionRowMeta({
         >
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2.2} aria-hidden="true" />
         </span></HintTooltip>
-        <HintTooltip content={relation === 'forked' ? t('sidebar.sessionForked') : t('sidebar.sessionSpawned')}><span hidden={!relation}
-          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
-        >
-          {relation === 'forked'
-            ? <GitFork className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-            : <Bot className="h-3 w-3" strokeWidth={2} aria-hidden="true" />}
-          {relation && <span className="sr-only">{relation === 'forked' ? t('sidebar.sessionForked') : t('sidebar.sessionSpawned')}</span>}
-        </span></HintTooltip>
+        <SessionRelationMark relation={relation} t={t} />
         <HintTooltip content={t('sidebar.worktree')}><span hidden={!isWorktree}
           className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
         >
@@ -1519,6 +1494,31 @@ function SessionRowMeta({
           {isWorktree && <span className="sr-only">{t('sidebar.worktree')}</span>}
         </span></HintTooltip>
     </span>
+  )
+}
+
+const SESSION_RELATION_MARKS: Record<SessionParent['kind'], { icon: LucideIcon; label: TranslationKey }> = {
+  spawned: { icon: Bot, label: 'sidebar.sessionSpawned' },
+  forked: { icon: GitFork, label: 'sidebar.sessionForked' },
+  assigned: { icon: SquareKanban, label: 'sidebar.sessionAssigned' },
+}
+
+function SessionRelationMark({
+  relation,
+  t,
+}: {
+  relation: SessionParent['kind'] | undefined
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
+}) {
+  const mark = SESSION_RELATION_MARKS[relation ?? 'spawned']
+  const Icon = mark.icon
+  return (
+    <HintTooltip content={t(mark.label)}><span hidden={!relation}
+      className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center"
+    >
+      <Icon className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+      {relation && <span className="sr-only">{t(mark.label)}</span>}
+    </span></HintTooltip>
   )
 }
 

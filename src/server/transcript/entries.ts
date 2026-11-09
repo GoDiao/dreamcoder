@@ -1,5 +1,5 @@
-import type { SessionOrigin } from '../../entrypoints/sdk/coreSchemas.js'
-import { isSessionOrigin } from '../../utils/crossSessionEnvelope.js'
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import { isUserMessageOrigin } from '../../utils/crossSessionEnvelope.js'
 import {
   extractLocalCommandOutput,
   extractTextBlocks,
@@ -43,7 +43,7 @@ export type MessageEntry = {
   parentUuid?: string
   parentToolUseId?: string
   isSidechain?: boolean
-  origin?: SessionOrigin
+  origin?: UserMessageOrigin
   /** Set on the summary message that follows a compaction. */
   compactMetadata?: CompactMetadata
 }
@@ -84,7 +84,7 @@ function entryToMessage(entry: TranscriptEntry, parentToolUseId?: string): Messa
     parentUuid: entry.parentUuid ?? undefined,
     parentToolUseId,
     isSidechain: entry.isSidechain,
-    ...(msg.role === 'user' && isSessionOrigin(entry.origin) ? { origin: entry.origin } : {}),
+    ...(msg.role === 'user' && isUserMessageOrigin(entry.origin) ? { origin: entry.origin } : {}),
   }
 }
 
@@ -148,9 +148,9 @@ function queuedCommandToMessage(entry: TranscriptEntry): MessageEntry | null {
   if (typeof prompt !== 'string' && !Array.isArray(prompt)) return null
   if (isTaskNotificationContent(prompt)) return null
 
-  const sessionOrigin = isSessionOrigin(origin) ? origin : undefined
+  const messageOrigin = isUserMessageOrigin(origin) ? origin : undefined
   const human = origin === undefined && isMeta !== true
-  if (!sessionOrigin && !human) return null
+  if (!messageOrigin && !human) return null
 
   return {
     id: queuedCommandSourceUuid(entry) ?? (entry.uuid || crypto.randomUUID()),
@@ -159,7 +159,7 @@ function queuedCommandToMessage(entry: TranscriptEntry): MessageEntry | null {
     timestamp: entry.timestamp || new Date().toISOString(),
     parentUuid: entry.parentUuid ?? undefined,
     isSidechain: entry.isSidechain,
-    ...(sessionOrigin ? { origin: sessionOrigin } : {}),
+    ...(messageOrigin ? { origin: messageOrigin } : {}),
   }
 }
 
