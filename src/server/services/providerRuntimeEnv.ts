@@ -34,6 +34,8 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   ATTRIBUTION_HEADER_ENV_KEY,
   MODEL_CONTEXT_WINDOWS_ENV_KEY,
   'DREAMCODER_OPENAI_OAUTH_PROVIDER',
+  'DREAMCODER_ACTIVE_PROVIDER_ID',
+  'DREAMCODER_FAST_MODEL_ID',
   'OPENAI_CODEX_OAUTH_FILE',
 ] as const
 
@@ -144,13 +146,16 @@ export function normalizeSavedDecisionProvider(
   const preset = DECISION_PROVIDER_PRESETS.find((entry) => (
     entry.id === provider.presetId && entry.apiFormat === provider.apiFormat && entry.models.length > 0
   ))
-  const supportedIds = new Set(preset?.models.map((model) => model.id) ?? [])
-  const supportedModels = normalizedModels.filter((model) => supportedIds.has(model.id))
+  const legacyModelId = normalizedModels.length === 1 ? normalizedModels[0]!.id : ''
+  const matchingPresetModels = preset?.models.filter((model) => legacyModelId.includes(model.id)) ?? []
+  const concatenatedLegacyModel = matchingPresetModels.length > 0 &&
+    !matchingPresetModels.some((model) => legacyModelId === model.id) &&
+    (matchingPresetModels.length > 1 || (legacyModelId.match(/gpt-/gi)?.length ?? 0) > 1)
   return {
     ...provider,
     deployment: isLoopbackDecisionProviderUrl(provider.baseUrl) ? 'local' : 'hosted',
-    models: preset
-      ? supportedModels.length > 0 ? supportedModels : preset.models
+    models: concatenatedLegacyModel || normalizedModels.length === 0
+      ? preset?.models ?? []
       : normalizedModels,
   }
 }
@@ -160,7 +165,11 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
     return null
   }
 
-  const { activeProviderId: legacyActiveProviderId, ...rest } = value
+  const {
+    activeProviderId: legacyActiveProviderId,
+    activeDecisionProviderId: _legacyActiveDecisionProviderId,
+    ...rest
+  } = value
   const providers = value.providers
     .filter(isSavedProvider)
     .map((provider) => normalizeSavedProvider(provider))
@@ -178,18 +187,11 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
         .filter(isSavedDecisionProvider)
         .map((provider) => normalizeSavedDecisionProvider(provider))
     : []
-  const activeDecisionProviderId =
-    typeof value.activeDecisionProviderId === 'string' &&
-    decisionProviders.some((provider) => provider.id === value.activeDecisionProviderId)
-      ? value.activeDecisionProviderId
-      : null
-
   return {
     ...rest,
     schemaVersion: typeof value.schemaVersion === 'number' ? value.schemaVersion : 1,
     activeId,
     providers,
-    activeDecisionProviderId,
     decisionProviders,
   }
 }
@@ -271,9 +273,10 @@ export function buildProviderManagedEnv(
 
   const models = normalizeProviderModels(provider.models)
   const selectedModel = options?.modelId?.trim() || models[0]?.id || ''
-  const fastModel = provider.fastModel && models.some((model) => model.id === provider.fastModel)
+  const configuredFastModel = provider.fastModel && models.some((model) => model.id === provider.fastModel)
     ? provider.fastModel
-    : selectedModel
+    : undefined
+  const fastModel = configuredFastModel ?? selectedModel
   const modelContextWindows = {
     ...getPresetModelContextWindows(provider.presetId),
     ...(provider.modelContextWindows ?? {}),
@@ -302,6 +305,8 @@ export function buildProviderManagedEnv(
     ANTHROPIC_SMALL_FAST_MODEL: stripContextSuffix(fastModel),
     ANTHROPIC_DEFAULT_SONNET_MODEL: stripContextSuffix(selectedModel),
     ANTHROPIC_DEFAULT_OPUS_MODEL: stripContextSuffix(selectedModel),
+    DREAMCODER_ACTIVE_PROVIDER_ID: provider.id,
+    DREAMCODER_FAST_MODEL_ID: stripContextSuffix(fastModel),
     ...attributionHeaderEnvForModel(selectedModel),
   }
 }

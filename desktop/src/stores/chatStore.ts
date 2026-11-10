@@ -1756,7 +1756,11 @@ function applyMirror(sessionId: string, next: SessionState): void {
   const previous = session.mirror ?? null
   const previousRequests = new Set(previous?.pendingPermissions.map((request) => request.requestId) ?? [])
   const nextRequests = new Set(next.pendingPermissions.map((request) => request.requestId))
-  const openedRequests = next.pendingPermissions.filter((request) => !previousRequests.has(request.requestId))
+  const previousActiveRequestId = previous?.pendingPermissions[0]?.requestId
+  const nextActiveRequest = next.pendingPermissions[0]
+  const activatedRequest = nextActiveRequest?.requestId !== previousActiveRequestId
+    ? nextActiveRequest
+    : undefined
   const closedRequestIds = [...previousRequests].filter((requestId) => !nextRequests.has(requestId))
   const wasRunning = previous ? previous.turn.phase !== 'idle' : session.chatState !== 'idle'
   const isRunning = next.turn.phase !== 'idle'
@@ -1768,17 +1772,20 @@ function applyMirror(sessionId: string, next: SessionState): void {
     let messages = current.messages
     let streamingText = current.streamingText
 
-    for (const request of openedRequests) {
-      if (isInlineQuestionTool(request.toolName) || hasPermissionRequestMessage(messages, request.requestId)) continue
+    if (
+      activatedRequest &&
+      !isInlineQuestionTool(activatedRequest.toolName) &&
+      !hasPermissionRequestMessage(messages, activatedRequest.requestId)
+    ) {
       messages = appendMessage(messages, {
         id: nextId(),
         type: 'permission_request',
-        requestId: request.requestId,
-        toolName: request.toolName,
-        toolUseId: request.toolUseId,
-        input: request.input,
-        description: request.description,
-        guardrail: request.guardrail,
+        requestId: activatedRequest.requestId,
+        toolName: activatedRequest.toolName,
+        toolUseId: activatedRequest.toolUseId,
+        input: activatedRequest.input,
+        description: activatedRequest.description,
+        guardrail: activatedRequest.guardrail,
         timestamp: now,
       })
     }
@@ -1825,13 +1832,13 @@ function applyMirror(sessionId: string, next: SessionState): void {
     }
   })
 
-  for (const request of openedRequests) {
+  if (activatedRequest) {
     notifyDesktop({
-      dedupeKey: `permission:${request.requestId}`,
+      dedupeKey: `permission:${activatedRequest.requestId}`,
       cooldownScope: 'permission-prompt',
       requestAttention: true,
       title: t('notifications.permissionPrompt.title'),
-      body: t('notifications.permissionPrompt.toolBody', { toolName: request.toolName || 'A tool' }),
+      body: t('notifications.permissionPrompt.toolBody', { toolName: activatedRequest.toolName || 'A tool' }),
       target: { type: 'session', sessionId },
     })
   }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ThinkingBlock } from './ThinkingBlock'
 import { ToolCallBlock } from './ToolCallBlock'
 import { PermissionDialog } from './PermissionDialog'
@@ -170,6 +170,24 @@ describe('chat blocks', () => {
 
     expect(container.textContent).toContain('Bash')
     expect(container.textContent).toContain('fatal: unrecognized argument: --no-stat')
+  })
+
+  it('shows a copyable plain-text window for workspace permission denials', async () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolName="PowerShell"
+        input={{ command: 'Remove-Item -Force .\\guardrail-hard-deny.txt' }}
+        result={{
+          content: 'Permission to use PowerShell with command Remove-Item -Force .\\guardrail-hard-deny.txt has been denied.',
+          isError: true,
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('status').textContent).toContain('Blocked by workspace permission rule')
+    await waitFor(() => expect(screen.getByLabelText('text').textContent).toContain('Remove-Item -Force .\\guardrail-hard-deny.txt'))
+    expect(container.textContent).toContain('.claude/settings.local.json')
+    expect(screen.getByRole('status').querySelector('[data-slot="code-block"]')).not.toBeNull()
   })
 
   it('expands tool errors so full Computer Use gate messages are readable', () => {

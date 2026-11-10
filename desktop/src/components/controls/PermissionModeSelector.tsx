@@ -11,7 +11,7 @@ import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { MobileBottomSheet } from '../shared/MobileBottomSheet'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { Tooltip } from '../shared/Tooltip'
-import { Check, ChevronDown, FilePenLine, Folder, NotebookPen, ShieldCheck, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
+import { Bot, Check, ChevronDown, FilePenLine, Folder, NotebookPen, ShieldCheck, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
 import { useMenuAction } from '../../hooks/useMenuAction'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '../shared/ui/dropdown-menu'
 import { Button } from '../shared/ui/button'
@@ -21,6 +21,7 @@ const MODE_ICONS: Record<PermissionMode, LucideIcon> = {
   default: ShieldCheck,
   acceptEdits: FilePenLine,
   plan: NotebookPen,
+  auto: Bot,
   bypassPermissions: Zap,
   dontAsk: Zap,
 }
@@ -68,6 +69,11 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
       description: t('permMode.planModeDesc'),
     },
     {
+      value: 'auto',
+      label: t('permMode.label.auto'),
+      description: t('permMode.autoDesc'),
+    },
+    {
       value: 'bypassPermissions',
       label: t('permMode.label.bypassPermissions'),
       description: t('permMode.bypassDesc'),
@@ -79,6 +85,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
     default: t('permMode.label.default'),
     acceptEdits: t('permMode.label.acceptEdits'),
     plan: t('permMode.label.plan'),
+    auto: t('permMode.label.auto'),
     bypassPermissions: t('permMode.label.bypassPermissions'),
     dontAsk: t('permMode.label.dontAsk'),
   }

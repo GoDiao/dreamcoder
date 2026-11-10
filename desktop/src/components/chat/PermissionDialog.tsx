@@ -165,16 +165,18 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" aria-hidden="true" />
             <div className="min-w-0 space-y-1">
               <div className="font-medium text-[var(--color-text-primary)]">
-                {t('settings.permissionGuardrail.title')}
+                {t('settings.autoPermission.title')}
               </div>
               <div className="flex flex-wrap gap-x-2 gap-y-1">
                 <span>{guardrail.modelId}</span>
-                <span>{t(guardrail.preset === 'safetyNet'
-                  ? 'settings.permissionGuardrail.safetyNet'
-                  : 'settings.permissionGuardrail.fewerPrompts')}</span>
+                <span>{t(guardrail.source === 'decisionProvider'
+                  ? 'chat.permissionGuardrail.decisionProvider'
+                  : 'chat.permissionGuardrail.fastModel')}</span>
                 <span>{t('chat.permissionGuardrail.decision', { decision: guardrail.decision })}</span>
                 <span>{guardrailScore}</span>
+                <span>{t('chat.permissionGuardrail.policyVersion', { version: String(guardrail.policyVersion) })}</span>
               </div>
+              {guardrail.reason ? <div>{guardrail.reason}</div> : null}
             </div>
           </div>
         )}

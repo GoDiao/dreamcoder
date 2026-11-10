@@ -236,7 +236,7 @@ function decisionReasonToOTelSource(
       return 'hook'
     case 'mode':
     case 'classifier':
-    case 'permissionGuardrail':
+    case 'autoPermission':
     case 'subcommandResults':
     case 'asyncAgent':
     case 'sandboxOverride':
@@ -996,7 +996,7 @@ async function checkPermissionsAndCallTool(
 
   if (
     permissionDecision.behavior === 'allow' &&
-    permissionDecision.decisionReason?.type === 'permissionGuardrail'
+    permissionDecision.decisionReason?.type === 'autoPermission'
   ) {
     resultingMessages.push({
       message: createAttachmentMessage({
@@ -1005,8 +1005,10 @@ async function checkPermissionsAndCallTool(
         toolUseID,
         providerId: permissionDecision.decisionReason.providerId,
         modelId: permissionDecision.decisionReason.modelId,
-        preset: permissionDecision.decisionReason.preset,
+        source: permissionDecision.decisionReason.source,
         score: permissionDecision.decisionReason.score,
+        policyVersion: permissionDecision.decisionReason.policyVersion,
+        reason: permissionDecision.decisionReason.reason,
       }),
     })
   }

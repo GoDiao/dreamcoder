@@ -33,9 +33,11 @@ export type SessionRepository = {
 export type PermissionGuardrailDetails = {
   providerId: string
   modelId: string
-  preset: 'fewerPrompts' | 'safetyNet'
+  source: 'decisionProvider' | 'fastModel'
   decision: 'allow' | 'ask'
   score: number | null
+  policyVersion: number
+  reason?: string
 }
 
 export type PendingPermission = {

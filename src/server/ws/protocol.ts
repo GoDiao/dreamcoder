@@ -29,15 +29,15 @@ export type {
 } from '../session/state/types.js'
 
 /** The permission modes a client may set; mirrors the CLI's `ExternalPermissionMode`. */
-export type PermissionMode = 'acceptEdits' | 'bypassPermissions' | 'default' | 'dontAsk' | 'plan'
+export type PermissionMode = 'acceptEdits' | 'auto' | 'bypassPermissions' | 'default' | 'dontAsk' | 'plan'
 
-export const PERMISSION_MODES: readonly PermissionMode[] = ['acceptEdits', 'bypassPermissions', 'default', 'dontAsk', 'plan']
+export const PERMISSION_MODES: readonly PermissionMode[] = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'plan']
 
 export type ClientKind = 'desktop' | 'h5'
 
 export type DefaultPermissionMode = Exclude<PermissionMode, 'dontAsk'>
 
-export const DEFAULT_PERMISSION_MODES: readonly DefaultPermissionMode[] = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
+export const DEFAULT_PERMISSION_MODES: readonly DefaultPermissionMode[] = ['default', 'acceptEdits', 'plan', 'auto', 'bypassPermissions']
 
 export const BROWSER_SEARCH_ENGINE_IDS = ['bing', 'google', 'duckduckgo', 'baidu'] as const
 

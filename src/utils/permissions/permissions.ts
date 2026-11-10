@@ -103,7 +103,7 @@ import {
   classifyYoloAction,
   formatActionForClassifier,
 } from './yoloClassifier.js'
-import { evaluatePermissionGuardrail } from './permissionGuardrail.js'
+import { evaluateAutoPermission } from './permissionGuardrail.js'
 
 const CLASSIFIER_FAIL_CLOSED_REFRESH_MS = 30 * 60 * 1000 // 30 minutes
 
@@ -482,37 +482,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
 
   const appState = context.getAppState()
 
-  if (
-    result.behavior === 'allow' &&
-    appState.toolPermissionContext.mode === 'bypassPermissions' &&
-    result.decisionReason?.type === 'mode' &&
-    result.decisionReason.mode === 'bypassPermissions'
-  ) {
-    const evaluation = await evaluatePermissionGuardrail('safetyNet', {
-      toolName: tool.name,
-      input,
-      messages: context.messages,
-    })
-    if (evaluation) {
-      const decisionReason = {
-        type: 'permissionGuardrail' as const,
-        providerId: evaluation.providerId,
-        modelId: evaluation.modelId,
-        preset: evaluation.preset,
-        decision: evaluation.behavior,
-        score: evaluation.score,
-      }
-      if (evaluation.behavior === 'allow') {
-        return { ...result, decisionReason }
-      }
-      return {
-        behavior: 'ask',
-        message: 'Permission guardrail requires confirmation',
-        decisionReason,
-      }
-    }
-  }
-
   // Reset consecutive denials on any allowed tool use in auto mode.
   // This ensures that a successful tool use (even one auto-allowed by rules)
   // breaks the consecutive denial streak.
@@ -545,25 +514,31 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         message: DONT_ASK_REJECT_MESSAGE(tool.name),
       }
     }
-    if (
-      (appState.toolPermissionContext.mode === 'default' ||
-        appState.toolPermissionContext.mode === 'acceptEdits') &&
-      result.decisionReason?.type !== 'safetyCheck' &&
-      !tool.requiresUserInteraction?.()
-    ) {
-      const evaluation = await evaluatePermissionGuardrail('fewerPrompts', {
+    if (appState.toolPermissionContext.mode === 'auto') {
+      if (
+        result.decisionReason?.type === 'safetyCheck' &&
+        !result.decisionReason.classifierApprovable
+      ) {
+        return result
+      }
+      if (tool.requiresUserInteraction?.()) return result
+
+      const evaluation = await evaluateAutoPermission({
         toolName: tool.name,
         input,
         messages: context.messages,
+        signal: context.abortController.signal,
       })
       if (evaluation) {
         const decisionReason = {
-          type: 'permissionGuardrail' as const,
+          type: 'autoPermission' as const,
           providerId: evaluation.providerId,
           modelId: evaluation.modelId,
-          preset: evaluation.preset,
+          source: evaluation.source,
           decision: evaluation.behavior,
           score: evaluation.score,
+          policyVersion: evaluation.policyVersion,
+          reason: evaluation.reason,
         }
         if (evaluation.behavior === 'allow') {
           return {
@@ -579,9 +554,8 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
     // Check this BEFORE shouldAvoidPermissionPrompts so classifiers work in headless mode
     if (
       feature('TRANSCRIPT_CLASSIFIER') &&
-      (appState.toolPermissionContext.mode === 'auto' ||
-        (appState.toolPermissionContext.mode === 'plan' &&
-          (autoModeStateModule?.isAutoModeActive() ?? false)))
+      appState.toolPermissionContext.mode === 'plan' &&
+      (autoModeStateModule?.isAutoModeActive() ?? false)
     ) {
       // Non-classifier-approvable safetyCheck decisions stay immune to ALL
       // auto-approve paths: the acceptEdits fast-path, the safe-tool allowlist,

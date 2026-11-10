@@ -5,18 +5,20 @@ import {
   serializePermissionGuardrail,
 } from './structuredIO.js'
 
-describe('structured permission guardrail response', () => {
-  test('preserves the guardrail decision after desktop approval', () => {
+describe('structured Auto permission response', () => {
+  test('preserves the model decision after desktop approval', () => {
     const source: PermissionDecision = {
       behavior: 'ask',
       message: 'Confirm',
       decisionReason: {
-        type: 'permissionGuardrail',
+        type: 'autoPermission',
         providerId: 'provider',
         modelId: 'model',
-        preset: 'safetyNet',
+        source: 'decisionProvider',
         decision: 'ask',
         score: 0.98,
+        policyVersion: 1,
+        reason: 'Risky write',
       },
     }
     const response: PermissionDecision = {
@@ -44,20 +46,24 @@ describe('structured permission guardrail response', () => {
     expect(preservePermissionGuardrailReason(source, response)).toBe(response)
   })
 
-  test('serializes guardrail details for the permission request', () => {
+  test('serializes Auto details for the permission request', () => {
     expect(serializePermissionGuardrail({
-      type: 'permissionGuardrail',
+      type: 'autoPermission',
       providerId: 'provider-1',
       modelId: 'gpt-6-luna',
-      preset: 'safetyNet',
+      source: 'decisionProvider',
       decision: 'ask',
       score: 0.812,
+      policyVersion: 1,
+      reason: 'Sensitive command',
     })).toEqual({
       provider_id: 'provider-1',
       model_id: 'gpt-6-luna',
-      preset: 'safetyNet',
+      source: 'decisionProvider',
       decision: 'ask',
       score: 0.812,
+      policy_version: 1,
+      reason: 'Sensitive command',
     })
   })
 })

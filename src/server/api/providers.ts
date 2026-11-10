@@ -149,8 +149,7 @@ async function handleDecisionProviders(
   }
   if (!id) {
     if (req.method === 'GET') {
-      const { providers, activeId } = await providerService.listDecisionProviders()
-      return Response.json({ providers, activeId })
+      return Response.json(await providerService.listDecisionProviders())
     }
     if (req.method === 'POST') {
       const input = CreateDecisionProviderSchema.parse(await parseJsonBody(req))
@@ -158,11 +157,6 @@ async function handleDecisionProviders(
       return Response.json({ provider }, { status: 201 })
     }
     throw methodNotAllowed(req.method)
-  }
-  if (action === 'activate') {
-    if (req.method !== 'POST') throw methodNotAllowed(req.method)
-    await providerService.activateDecisionProvider(id)
-    return Response.json({ ok: true })
   }
   if (action === 'test') {
     if (req.method !== 'POST') throw methodNotAllowed(req.method)

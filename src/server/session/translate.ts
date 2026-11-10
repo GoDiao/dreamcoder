@@ -75,23 +75,29 @@ function toPermissionGuardrailDetails(
   if (
     typeof details.provider_id !== 'string' ||
     typeof details.model_id !== 'string' ||
-    (details.preset !== 'fewerPrompts' && details.preset !== 'safetyNet') ||
+    (details.source !== 'decisionProvider' && details.source !== 'fastModel') ||
     (details.decision !== 'allow' && details.decision !== 'ask') ||
     (score !== null && (
       typeof score !== 'number' ||
       !Number.isFinite(score) ||
       score < 0 ||
       score > 1
-    ))
+    )) ||
+    typeof details.policy_version !== 'number' ||
+    !Number.isInteger(details.policy_version) ||
+    details.policy_version < 0 ||
+    (details.reason !== undefined && typeof details.reason !== 'string')
   ) {
     return undefined
   }
   return {
     providerId: details.provider_id,
     modelId: details.model_id,
-    preset: details.preset,
+    source: details.source,
     decision: details.decision,
     score,
+    policyVersion: details.policy_version,
+    ...(typeof details.reason === 'string' ? { reason: details.reason } : {}),
   }
 }
 
@@ -615,15 +621,20 @@ function permissionGuardrailDecision(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const marker = value as Record<string, unknown>
   const decision = marker.decision
-  const preset = marker.preset
+  const source = marker.source
   const score = marker.score
+  const policyVersion = marker.policy_version
   if (
     (decision !== 'allow' && decision !== 'ask') ||
-    (preset !== 'fewerPrompts' && preset !== 'safetyNet') ||
+    (source !== 'decisionProvider' && source !== 'fastModel') ||
     typeof marker.tool_use_id !== 'string' ||
     typeof marker.provider_id !== 'string' ||
     typeof marker.model_id !== 'string' ||
-    (score !== null && (typeof score !== 'number' || score < 0 || score > 1))
+    (score !== null && (typeof score !== 'number' || score < 0 || score > 1)) ||
+    typeof policyVersion !== 'number' ||
+    !Number.isInteger(policyVersion) ||
+    policyVersion < 0 ||
+    (marker.reason !== undefined && typeof marker.reason !== 'string')
   ) {
     return null
   }
@@ -633,8 +644,10 @@ function permissionGuardrailDecision(
     toolUseId: marker.tool_use_id,
     providerId: marker.provider_id,
     modelId: marker.model_id,
-    preset,
+    source,
     score,
+    policyVersion,
+    ...(typeof marker.reason === 'string' ? { reason: marker.reason } : {}),
   }
 }
 

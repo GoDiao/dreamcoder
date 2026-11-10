@@ -459,8 +459,9 @@ describe('MessageList nested tool calls', () => {
             toolUseId: 'tool-1',
             providerId: 'provider-1',
             modelId: 'gpt-6-luna',
-            preset: 'safetyNet',
+            source: 'decisionProvider',
             score: 0.237,
+            policyVersion: 1,
             timestamp: 1,
           }],
         }),
@@ -469,9 +470,9 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList />)
 
-    expect(screen.getByText('Auto-approved by permission guardrail')).toBeTruthy()
+    expect(screen.getByText('Auto-approved')).toBeTruthy()
     expect(screen.getByText('gpt-6-luna')).toBeTruthy()
-    expect(screen.getByText('safetyNet')).toBeTruthy()
+    expect(screen.getByText('Decision provider')).toBeTruthy()
     expect(screen.getByText('Decision: allow')).toBeTruthy()
     expect(screen.getByText('Score: 0.237')).toBeTruthy()
   })
@@ -480,9 +481,10 @@ describe('MessageList nested tool calls', () => {
     const guardrail = {
       providerId: 'provider-1',
       modelId: 'gpt-6-luna',
-      preset: 'safetyNet' as const,
+      source: 'decisionProvider' as const,
       decision: 'ask' as const,
       score: 0.812,
+      policyVersion: 1,
     }
     useChatStore.setState({
       sessions: {
@@ -510,9 +512,9 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList />)
 
-    expect(screen.getByText('Permission guardrail')).toBeTruthy()
+    expect(screen.getByText('Auto permission model')).toBeTruthy()
     expect(screen.getByText('gpt-6-luna')).toBeTruthy()
-    expect(screen.getByText('Safety net')).toBeTruthy()
+    expect(screen.getByText('Decision provider')).toBeTruthy()
     expect(screen.getByText('Decision: ask')).toBeTruthy()
     expect(screen.getByText('Score: 0.812')).toBeTruthy()
   })

@@ -79,7 +79,7 @@ function serializeDecisionReason(
     case 'mode':
     case 'subcommandResults':
     case 'permissionPromptTool':
-    case 'permissionGuardrail':
+    case 'autoPermission':
       return undefined
     case 'hook':
     case 'asyncAgent':
@@ -95,7 +95,7 @@ export function preservePermissionGuardrailReason(
   source: PermissionDecision,
   response: PermissionDecision,
 ): PermissionDecision {
-  return source.decisionReason?.type === 'permissionGuardrail'
+  return source.decisionReason?.type === 'autoPermission'
     ? { ...response, decisionReason: source.decisionReason }
     : response
 }
@@ -103,13 +103,15 @@ export function preservePermissionGuardrailReason(
 export function serializePermissionGuardrail(
   reason: PermissionDecisionReason | undefined,
 ) {
-  if (reason?.type !== 'permissionGuardrail') return undefined
+  if (reason?.type !== 'autoPermission') return undefined
   return {
     provider_id: reason.providerId,
     model_id: reason.modelId,
-    preset: reason.preset,
+    source: reason.source,
     decision: reason.decision,
     score: reason.score,
+    policy_version: reason.policyVersion,
+    reason: reason.reason,
   }
 }
 

@@ -13,7 +13,7 @@ import {
   type DefaultPermissionMode,
 } from '../ws/protocol.js'
 import { isDefaultPermissionMode } from './permissionModes.js'
-import { PermissionGuardrailSettingsSchema } from '../../types/permissionGuardrail.js'
+import { AutoPermissionSettingsSchema } from '../../types/permissionGuardrail.js'
 
 export class SettingsService {
   private static writeLocks = new Map<string, Promise<unknown>>()
@@ -130,12 +130,12 @@ export class SettingsService {
         `Invalid browserSearchEngine. Valid engines: ${BROWSER_SEARCH_ENGINE_IDS.join(', ')}`,
       )
     }
-    if (Object.prototype.hasOwnProperty.call(settings, 'permissionGuardrail')) {
-      const result = PermissionGuardrailSettingsSchema.safeParse(settings.permissionGuardrail)
+    if (Object.prototype.hasOwnProperty.call(settings, 'autoPermission')) {
+      const result = AutoPermissionSettingsSchema.safeParse(settings.autoPermission)
       if (!result.success) {
-        throw ApiError.badRequest('Invalid permission guardrail settings')
+        throw ApiError.badRequest('Invalid Auto permission settings')
       }
-      settings.permissionGuardrail = result.data
+      settings.autoPermission = result.data
     }
     const filePath = this.getUserSettingsPath()
     await this.withWriteLock(filePath, async () => {

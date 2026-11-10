@@ -388,8 +388,10 @@ export type PermissionGuardrailDecisionAttachment = {
   toolUseID: string
   providerId: string
   modelId: string
-  preset: 'fewerPrompts' | 'safetyNet'
+  source: 'decisionProvider' | 'fastModel'
   score: number | null
+  policyVersion: number
+  reason?: string
 }
 
 export type HookSystemMessageAttachment = {

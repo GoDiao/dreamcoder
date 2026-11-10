@@ -17,7 +17,7 @@ import {
   type H5AccessDiagnostics,
   type H5AccessSettings,
   type NetworkSettings,
-  type PermissionGuardrailSettings,
+  type AutoPermissionSettings,
   type DefaultPermissionMode,
   type EffortLevel,
   type ModelInfo,
@@ -75,7 +75,7 @@ function getStoredOnboardingCompleted(): boolean {
 
 type SettingsStore = {
   permissionMode: DefaultPermissionMode
-  permissionGuardrail: PermissionGuardrailSettings
+  autoPermission: AutoPermissionSettings
   currentModel: ModelInfo | null
   effortLevel: EffortLevel
   thinkingEnabled: boolean
@@ -107,7 +107,7 @@ type SettingsStore = {
   fetchAll: () => Promise<void>
   fetchH5Access: () => Promise<void>
   setPermissionMode: (mode: DefaultPermissionMode) => Promise<void>
-  setPermissionGuardrail: (settings: PermissionGuardrailSettings) => Promise<void>
+  setAutoPermission: (settings: AutoPermissionSettings) => Promise<void>
   setModel: (modelId: string) => Promise<void>
   setEffort: (level: EffortLevel) => Promise<void>
   setThinkingEnabled: (enabled: boolean) => Promise<void>
@@ -166,29 +166,20 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   },
 }
 
-export const DEFAULT_PERMISSION_GUARDRAIL_SETTINGS: PermissionGuardrailSettings = {
-  enabled: false,
+export const DEFAULT_AUTO_PERMISSION_SETTINGS: AutoPermissionSettings = {
   providerId: null,
   modelId: '',
-  preset: 'safetyNet',
-  threshold: 0.95,
   privacyNoticeVersion: 0,
 }
 
-function normalizePermissionGuardrailSettings(value: unknown): PermissionGuardrailSettings {
+function normalizeAutoPermissionSettings(value: unknown): AutoPermissionSettings {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_PERMISSION_GUARDRAIL_SETTINGS
+    return DEFAULT_AUTO_PERMISSION_SETTINGS
   }
-  const settings = value as Partial<PermissionGuardrailSettings>
-  const threshold = typeof settings.threshold === 'number' && settings.threshold >= 0 && settings.threshold <= 1
-    ? settings.threshold
-    : DEFAULT_PERMISSION_GUARDRAIL_SETTINGS.threshold
+  const settings = value as Partial<AutoPermissionSettings>
   return {
-    enabled: settings.enabled === true,
     providerId: typeof settings.providerId === 'string' ? settings.providerId : null,
     modelId: typeof settings.modelId === 'string' ? settings.modelId : '',
-    preset: settings.preset === 'fewerPrompts' ? 'fewerPrompts' : 'safetyNet',
-    threshold,
     privacyNoticeVersion: typeof settings.privacyNoticeVersion === 'number'
       ? Math.max(0, Math.floor(settings.privacyNoticeVersion))
       : 0,
@@ -197,7 +188,7 @@ function normalizePermissionGuardrailSettings(value: unknown): PermissionGuardra
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   permissionMode: 'default',
-  permissionGuardrail: DEFAULT_PERMISSION_GUARDRAIL_SETTINGS,
+  autoPermission: DEFAULT_AUTO_PERMISSION_SETTINGS,
   currentModel: null,
   effortLevel: 'medium',
   thinkingEnabled: true,
@@ -258,7 +249,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       useUIStore.getState().setTheme(theme)
       set({
         permissionMode: mode,
-        permissionGuardrail: normalizePermissionGuardrailSettings(userSettings.permissionGuardrail),
+        autoPermission: normalizeAutoPermissionSettings(userSettings.autoPermission),
         availableModels: modelsRes.models,
         activeProviderName: modelsRes.provider?.name ?? null,
         currentModel: model,
@@ -308,13 +299,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 
-  setPermissionGuardrail: async (settings) => {
-    const previous = get().permissionGuardrail
-    set({ permissionGuardrail: settings })
+  setAutoPermission: async (settings) => {
+    const previous = get().autoPermission
+    set({ autoPermission: settings })
     try {
-      await settingsApi.updateUser({ permissionGuardrail: settings })
+      await settingsApi.updateUser({ autoPermission: settings })
     } catch (error) {
-      set({ permissionGuardrail: previous })
+      set({ autoPermission: previous })
       throw error
     }
   },

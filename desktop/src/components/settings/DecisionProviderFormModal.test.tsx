@@ -50,7 +50,10 @@ describe('DecisionProviderFormModal', () => {
     expect(screen.getByText('decision-model-a')).toBeInTheDocument()
   })
 
-  it('repairs a previously concatenated OpenAI model value', () => {
+  it('keeps a manually configured model even after discovery does not return it', async () => {
+    useDecisionProviderStore.setState({
+      discoverModels: vi.fn(async () => [{ id: 'gpt-6-luna' }]),
+    })
     render(
       <DecisionProviderFormModal
         open={true}
@@ -64,12 +67,18 @@ describe('DecisionProviderFormModal', () => {
           apiFormat: 'openai_decisions',
           baseUrl: 'https://api.openai.com/v1',
           apiKey: '',
-          models: [{ id: 'gpt-3.5-turbogpt-5.6-lunagpt-6-luna' }],
+          models: [{ id: 'no-auto-decision-model' }],
         }}
       />,
     )
 
-    expect(screen.getByText('gpt-6-luna')).toBeInTheDocument()
-    expect(screen.queryByText('gpt-3.5-turbogpt-5.6-lunagpt-6-luna')).not.toBeInTheDocument()
+    expect(screen.getByText('no-auto-decision-model')).toBeInTheDocument()
+    expect(screen.queryByText('gpt-6-luna')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fetch models' })).toBeEnabled())
+    expect(screen.getByText('no-auto-decision-model')).toBeInTheDocument()
+    expect(screen.queryByText('gpt-6-luna')).not.toBeInTheDocument()
   })
 })

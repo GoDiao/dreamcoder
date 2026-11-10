@@ -35,10 +35,7 @@ function initialModels(
   preset: DecisionProviderPreset | undefined,
 ): ProviderModel[] {
   const configured = provider?.models ?? preset?.models ?? []
-  if (!provider || !preset?.models.length) return configured.map((model) => ({ ...model }))
-  const supportedIds = new Set(preset.models.map((model) => model.id))
-  const supported = configured.filter((model) => supportedIds.has(model.id))
-  return (supported.length > 0 ? supported : preset.models).map((model) => ({ ...model }))
+  return configured.map((model) => ({ ...model }))
 }
 
 function DecisionProviderFormModal({ open, onClose, provider, presets }: Props) {
@@ -82,12 +79,9 @@ function DecisionProviderFormModal({ open, onClose, provider, presets }: Props) 
     try {
       const discovered = await discoverModels({ presetId, baseUrl, apiKey, apiFormat })
       setDiscoveredModels(discovered)
-      setModels((current) => {
-        const discoveredIds = new Set(discovered.map((model) => model.id))
-        const retained = current.filter((model) => discoveredIds.has(model.id))
-        if (retained.length > 0) return retained
-        return discovered.length === 1 ? discovered : []
-      })
+      setModels((current) => current.map((model) => (
+        discovered.find((candidate) => candidate.id === model.id) ?? model
+      )))
       setNewModelId('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))

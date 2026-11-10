@@ -46,8 +46,8 @@ import {
 } from './settingsCache.js'
 import { type SettingsJson, SettingsSchema } from './types.js'
 import {
-  PermissionGuardrailSettingsSchema,
-  type PermissionGuardrailSettings,
+  AutoPermissionSettingsSchema,
+  type AutoPermissionSettings,
 } from '../../types/permissionGuardrail.js'
 import {
   filterInvalidPermissionRules,
@@ -931,14 +931,14 @@ export function getUseAutoModeDuringPlan(): boolean {
   return true
 }
 
-export function getPermissionGuardrailSettings(): PermissionGuardrailSettings | undefined {
+export function getAutoPermissionSettings(): AutoPermissionSettings | undefined {
   for (const source of [
     'policySettings',
     'flagSettings',
     'userSettings',
   ] as const) {
-    const value = getSettingsForSource(source)?.permissionGuardrail
-    const result = PermissionGuardrailSettingsSchema.safeParse(value)
+    const value = getSettingsForSource(source)?.autoPermission
+    const result = AutoPermissionSettingsSchema.safeParse(value)
     if (result.success) return result.data
   }
   return undefined

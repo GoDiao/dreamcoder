@@ -55,6 +55,30 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_SMALL_FAST_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'active-main',
+      DREAMCODER_ACTIVE_PROVIDER_ID: 'provider-1',
+      DREAMCODER_FAST_MODEL_ID: 'active-main',
+    })
+  })
+
+  test('prefers an explicitly configured fast model for Auto permission', async () => {
+    await writeJson(path.join(tmpDir, 'dreamcoder', 'providers.json'), {
+      activeId: 'provider-1',
+      providers: [{
+        id: 'provider-1',
+        presetId: 'custom',
+        name: 'Active Provider',
+        apiKey: 'sk-active',
+        baseUrl: 'https://api.example.com/anthropic',
+        apiFormat: 'anthropic',
+        models: [{ id: 'active-main' }, { id: 'active-fast' }],
+        fastModel: 'active-fast',
+      }],
+    })
+
+    expect(readActiveProviderManagedEnv(tmpDir)).toMatchObject({
+      DREAMCODER_ACTIVE_PROVIDER_ID: 'provider-1',
+      DREAMCODER_FAST_MODEL_ID: 'active-fast',
+      ANTHROPIC_SMALL_FAST_MODEL: 'active-fast',
     })
   })
 
@@ -168,7 +192,7 @@ describe('providerRuntimeEnv', () => {
       ],
     })
 
-    expect(index?.activeDecisionProviderId).toBe('local')
+    expect(index).not.toHaveProperty('activeDecisionProviderId')
     expect(index?.decisionProviders.map((provider) => provider.deployment)).toEqual([
       'local',
       'hosted',
@@ -196,10 +220,28 @@ describe('providerRuntimeEnv', () => {
     expect(index?.decisionProviders[0]?.models).toEqual([{ id: 'gpt-6-luna', name: 'GPT-6 Luna' }])
   })
 
+  test('preserves manually configured decision models outside the preset', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      decisionProviders: [{
+        id: 'openai',
+        presetId: 'openai',
+        name: 'OpenAI Decisions',
+        deployment: 'hosted',
+        apiFormat: 'openai_decisions',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'secret',
+        models: [{ id: 'vendor/gpt-6-luna-tuned' }],
+      }],
+    })
+
+    expect(index?.decisionProviders[0]?.models).toEqual([{ id: 'vendor/gpt-6-luna-tuned' }])
+  })
+
   test('defaults missing decision provider fields for legacy indexes', () => {
     const index = normalizeProvidersIndex({ activeId: null, providers: [] })
 
-    expect(index?.activeDecisionProviderId).toBeNull()
     expect(index?.decisionProviders).toEqual([])
   })
 })

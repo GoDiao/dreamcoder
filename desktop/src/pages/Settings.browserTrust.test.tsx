@@ -9,6 +9,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useUIStore } from '../stores/uiStore'
 import { ELECTRON_BRIDGE_KEY } from '../lib/shell/electronBridge'
 import { useDecisionProviderStore } from '../stores/decisionProviderStore'
+import { useProviderStore } from '../stores/providerStore'
 
 function setDesktop(enabled: boolean) {
   const target = window as unknown as Record<string, unknown>
@@ -20,17 +21,30 @@ describe('Settings permissions tab', () => {
   beforeEach(() => {
     useSettingsStore.setState({
       locale: 'en',
-      permissionGuardrail: {
-        enabled: false,
+      permissionMode: 'default',
+      autoPermission: {
         providerId: null,
         modelId: '',
-        preset: 'safetyNet',
-        threshold: 0.95,
         privacyNoticeVersion: 0,
       },
     })
     useDecisionProviderStore.setState({
       providers: [],
+      fetchProviders: vi.fn(async () => {}),
+    })
+    useProviderStore.setState({
+      providers: [{
+        id: 'provider-1',
+        presetId: 'openai',
+        name: 'OpenAI',
+        apiKey: '',
+        baseUrl: 'https://api.openai.com/v1',
+        apiFormat: 'openai_responses',
+        runtimeKind: 'anthropic_compatible',
+        models: [{ id: 'gpt-5' }, { id: 'gpt-5-mini' }],
+        fastModel: 'gpt-5-mini',
+      }],
+      activeId: 'provider-1',
       fetchProviders: vi.fn(async () => {}),
     })
     useUIStore.setState({ settingsTab: 'permissions' })
@@ -42,6 +56,7 @@ describe('Settings permissions tab', () => {
     useSettingsStore.setState(useSettingsStore.getInitialState(), true)
     useUIStore.setState(useUIStore.getInitialState(), true)
     useDecisionProviderStore.setState(useDecisionProviderStore.getInitialState(), true)
+    useProviderStore.setState(useProviderStore.getInitialState(), true)
   })
 
   it('shows the trusted sites section in the desktop app', async () => {
@@ -58,11 +73,37 @@ describe('Settings permissions tab', () => {
     expect(screen.queryByRole('heading', { name: 'Trusted sites' })).not.toBeInTheDocument()
   })
 
-  it('shows the permission guardrail disabled by default', () => {
+  it('shows Auto configuration only when Auto mode is selected', () => {
     render(<Settings />)
 
-    expect(screen.getByRole('heading', { name: 'Permission guardrail' })).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Enable permission guardrail' })).not.toBeChecked()
+    expect(screen.queryByRole('heading', { name: 'Auto permission model' })).not.toBeInTheDocument()
+
+    cleanup()
+    useSettingsStore.setState({ permissionMode: 'auto' })
+    render(<Settings />)
+
+    expect(screen.getByRole('heading', { name: 'Auto permission model' })).toBeInTheDocument()
+    expect(screen.getByText('Auto will use gpt-5-mini from OpenAI.')).toBeInTheDocument()
+    expect(screen.getByText('Active provider fast model')).toBeInTheDocument()
+  })
+
+  it('uses the selected model when the active provider has no separate fast model', () => {
+    useSettingsStore.setState({
+      permissionMode: 'auto',
+      autoPermission: {
+        providerId: null,
+        modelId: '',
+        privacyNoticeVersion: 1,
+      },
+    })
+    useProviderStore.setState((state) => ({
+      providers: state.providers.map((provider) => ({ ...provider, fastModel: undefined })),
+    }))
+
+    render(<Settings />)
+
+    expect(screen.getByText('Auto will use gpt-5 from OpenAI.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
   it('shows the project rule configuration path and reload guidance', () => {

@@ -63,9 +63,11 @@ describe('WebSocket permission guardrail events', () => {
         permission_guardrail: {
           provider_id: 'provider-1',
           model_id: 'gpt-6-luna',
-          preset: 'safetyNet',
+          source: 'decisionProvider',
           decision: 'ask',
           score: 0.812,
+          policy_version: 1,
+          reason: 'Potential deletion',
         },
       },
     }, createStreamState())).toEqual({
@@ -81,9 +83,11 @@ describe('WebSocket permission guardrail events', () => {
           guardrail: {
             providerId: 'provider-1',
             modelId: 'gpt-6-luna',
-            preset: 'safetyNet',
+            source: 'decisionProvider',
             decision: 'ask',
             score: 0.812,
+            policyVersion: 1,
+            reason: 'Potential deletion',
           },
         },
       }],
@@ -98,8 +102,10 @@ describe('WebSocket permission guardrail events', () => {
       tool_use_id: 'tool-1',
       provider_id: 'provider-1',
       model_id: 'gpt-6-luna',
-      preset: 'safetyNet',
+      source: 'decisionProvider',
       score: 0.237,
+      policy_version: 1,
+      reason: 'Requested action is low risk',
     }, 'session-1')).toEqual([
       liveItem({
         type: 'permission_guardrail_decision',
@@ -107,8 +113,10 @@ describe('WebSocket permission guardrail events', () => {
         toolUseId: 'tool-1',
         providerId: 'provider-1',
         modelId: 'gpt-6-luna',
-        preset: 'safetyNet',
+        source: 'decisionProvider',
         score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
       }),
     ])
   })

@@ -12,12 +12,10 @@ function DecisionProviderSettingsSection() {
   const t = useTranslation()
   const {
     providers,
-    activeId,
     presets,
     isLoading,
     fetchProviders,
     fetchPresets,
-    activateProvider,
     deleteProvider,
     testProvider,
   } = useDecisionProviderStore()
@@ -77,7 +75,6 @@ function DecisionProviderSettingsSection() {
       ) : (
         <div className="flex flex-col">
           {providers.map((provider) => {
-            const active = provider.id === activeId
             const test = testResults[provider.id]
             return (
               <div key={provider.id} className="flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5">
@@ -85,7 +82,6 @@ function DecisionProviderSettingsSection() {
                   <div className="flex flex-wrap items-center gap-2">
                     <ShieldCheck size={15} className="text-[var(--color-text-secondary)]" aria-hidden="true" />
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">{provider.name}</span>
-                    {active && <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{t('settings.providers.default')}</span>}
                     <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
                       {provider.deployment === 'local' ? t('settings.decisionProviders.local') : t('settings.decisionProviders.hosted')}
                     </span>
@@ -102,10 +98,9 @@ function DecisionProviderSettingsSection() {
                   )}
                 </div>
                 <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
-                  {!active && <Button variant="outline" size="xs" onClick={() => activateProvider(provider.id)}>{t('settings.providers.setDefault')}</Button>}
                   <Button variant="outline" size="xs" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
                   <Button variant="outline" size="xs" onClick={() => setEditing(provider)}>{t('settings.providers.edit')}</Button>
-                  {!active && <Button variant="outline" size="xs" className="text-[var(--color-error)] hover:text-[var(--color-error)]" onClick={() => setPendingDelete(provider)}>{t('common.delete')}</Button>}
+                  <Button variant="outline" size="xs" className="text-[var(--color-error)] hover:text-[var(--color-error)]" onClick={() => setPendingDelete(provider)}>{t('common.delete')}</Button>
                 </div>
               </div>
             )

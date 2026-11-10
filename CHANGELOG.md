@@ -6,10 +6,11 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Added
 
-- An opt-in permission guardrail can use separately configured OpenAI, OpenRouter, Ollama, or custom decision providers after deterministic permission rules. It defaults off, fails back to asking, preserves deny and bypass-immune checks, and records model-assisted permission decisions in the transcript. The desktop `/permissions` command opens permission settings, which document the project rule file and cross-platform shell rule names (#146).
+- Auto is a separate permission mode that applies deterministic rules first and asks a configured decision model only for unresolved confirmations. It can use a dedicated decision provider or the active provider's explicit fast model, fails back to asking on unsupported models and request errors, preserves deny and bypass-immune checks, and records versioned model decisions in the transcript. The desktop `/permissions` command opens permission settings, which document the project rule file and cross-platform shell rule names (#146).
 
 ### Fixed
 
+- Permission guardrail settings preserve manually entered decision model IDs, concurrent tool requests show one confirmation at a time, and workspace-rule denials show the blocked command in a copyable plain-text card. Auto uses the active provider's selected model when no separate fast model is configured (#146).
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.
 
 ## [0.8.0] — 2026-11-01

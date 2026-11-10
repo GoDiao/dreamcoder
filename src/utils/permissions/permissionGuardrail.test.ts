@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import type { SavedDecisionProvider } from '../../server/types/provider.js'
 import {
-  isPermissionGuardrailAutoAllowCalibrated,
+  getDecisionPolicy,
+  parseFastModelDecision,
   parsePermissionGuardrailAskProbability,
-  resolvePermissionGuardrailBehavior,
-  resolvePermissionGuardrailProviderBehavior,
 } from './permissionGuardrail.js'
 
 function provider(
   apiFormat: SavedDecisionProvider['apiFormat'],
+  modelId = 'model',
 ): SavedDecisionProvider {
   return {
     id: 'provider',
@@ -18,11 +18,11 @@ function provider(
     apiFormat,
     baseUrl: 'https://example.com/v1',
     apiKey: 'secret',
-    models: [{ id: 'model' }],
+    models: [{ id: modelId }],
   }
 }
 
-describe('permission guardrail', () => {
+describe('Auto permission evaluator', () => {
   test('parses OpenAI predicate answers from the answers array', () => {
     expect(parsePermissionGuardrailAskProbability(
       provider('openai_decisions'),
@@ -37,7 +37,7 @@ describe('permission guardrail', () => {
     )).toBe(0.73)
   })
 
-  test('parses chat risk without treating malformed output as safe', () => {
+  test('does not treat malformed chat output as safe', () => {
     expect(parsePermissionGuardrailAskProbability(
       provider('openai_chat'),
       { choices: [{ message: { content: '{"risk":64}' } }] },
@@ -48,24 +48,21 @@ describe('permission guardrail', () => {
     )).toBeNull()
   })
 
-  test('uses opposite threshold directions for the two presets', () => {
-    expect(resolvePermissionGuardrailBehavior('fewerPrompts', 0.01, 0.95)).toBe('allow')
-    expect(resolvePermissionGuardrailBehavior('fewerPrompts', 0.1, 0.95)).toBe('ask')
-    expect(resolvePermissionGuardrailBehavior('safetyNet', 0.98, 0.95)).toBe('ask')
-    expect(resolvePermissionGuardrailBehavior('safetyNet', 0.2, 0.95)).toBe('allow')
+  test('registers a fixed policy only for the validated OpenAI Decisions model', () => {
+    expect(getDecisionPolicy(provider('openai_decisions', 'gpt-6-luna'), 'gpt-6-luna')).toEqual({
+      threshold: 0.5,
+      policyVersion: 1,
+    })
+    expect(getDecisionPolicy(provider('openrouter_decisions', 'gpt-6-luna'), 'gpt-6-luna')).toBeNull()
+    expect(getDecisionPolicy(provider('openai_decisions', 'other'), 'other')).toBeNull()
   })
 
-  test('does not auto-allow an uncalibrated model', () => {
-    expect(isPermissionGuardrailAutoAllowCalibrated(
-      provider('openai_decisions'),
-      'gpt-6-luna',
-    )).toBe(false)
-    expect(resolvePermissionGuardrailProviderBehavior(
-      provider('openai_decisions'),
-      'gpt-6-luna',
-      'fewerPrompts',
-      0.01,
-      0.95,
-    )).toBe('ask')
+  test('parses forced fast-model output conservatively', () => {
+    expect(parseFastModelDecision({ behavior: 'allow', reason: 'Requested read' })).toEqual({
+      behavior: 'allow',
+      reason: 'Requested read',
+    })
+    expect(parseFastModelDecision({ behavior: 'allowish' })).toBeNull()
+    expect(parseFastModelDecision(null)).toBeNull()
   })
 })

@@ -153,7 +153,7 @@ describe('Business Flow: Permission Modes', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions']
+  const VALID_MODES = ['default', 'acceptEdits', 'plan', 'auto', 'bypassPermissions']
 
   it('should default to "default" mode', async () => {
     const { data } = await api('GET', '/api/permissions/mode')
@@ -175,12 +175,6 @@ describe('Business Flow: Permission Modes', () => {
       expect(verify.mode).toBe(mode)
     })
   }
-
-  it('should reject invalid mode "auto"', async () => {
-    const { status, data } = await api('PUT', '/api/permissions/mode', { mode: 'auto' })
-    expect(status).toBe(400)
-    expect(data.message).toContain('Invalid permission mode')
-  })
 
   it('should reject missing mode field', async () => {
     const { status } = await api('PUT', '/api/permissions/mode', {})

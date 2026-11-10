@@ -55,7 +55,6 @@ describe('ProviderSettings provider icons', () => {
           models: [{ id: 'gpt-6-luna' }],
         },
       ],
-      activeId: 'guardrail-1',
       presets: [],
       isLoading: false,
       fetchProviders: vi.fn(async () => {}),
@@ -68,7 +67,7 @@ describe('ProviderSettings provider icons', () => {
 
     expect(screen.getByText('DeepSeek').parentElement?.querySelector('[data-testid="provider-icon-deepseek"]')).toBeInTheDocument()
     expect(screen.getByText('My Custom Provider').parentElement?.querySelector('[data-testid="provider-icon-fallback"]')).toBeInTheDocument()
-    expect(screen.getByText('Permission guardrail providers')).toBeInTheDocument()
+    expect(screen.getByText('Decision model providers')).toBeInTheDocument()
     expect(screen.getByText('OpenAI Decisions')).toBeInTheDocument()
   })
 

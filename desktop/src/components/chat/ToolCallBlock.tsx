@@ -4,7 +4,7 @@ import { Trace, TraceCollapsible, TraceCollapsibleTrigger, TraceDescription, Tra
 import { CollapsibleContent } from '../shared/ui/collapsible'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { memo, useMemo, useState } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, ShieldX } from 'lucide-react'
 import { getToolIcon } from './toolIcons'
 import { CodeViewer } from './CodeViewer'
 import { DiffViewer } from './DiffViewer'
@@ -60,8 +60,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   )
   const diff = useMemo(() => renderDiff(toolName, obj), [obj, toolName])
   const inputView = useMemo(() => (diff || streamingPreview ? null : getInputView(toolName, obj, cua !== null)), [cua, diff, obj, streamingPreview, toolName])
-  // Read results are whole files; the transcript shows the call, not the contents.
   const outputText = toolName === 'Read' || diff ? null : stripAnsi(extractTextContent(result?.content) ?? '').trimEnd() || null
+  const permissionRuleDenied = result?.isError === true && isPermissionRuleDenial(result.content)
+  const deniedInput = typeof obj.command === 'string'
+    ? obj.command
+    : inputView?.text ?? (Object.keys(obj).length > 0 ? JSON.stringify(obj, null, 2) : '')
   const expandable = Boolean(diff || streamingPreview || inputView || outputText || resultImages.length > 0)
 
   const line = (
@@ -105,42 +108,56 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   )
 
   return (
-    <Trace className={compact ? 'mb-0' : 'mb-2'}>
-      {expandable ? (
-        <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="gap-2">
-          <TraceCollapsibleTrigger className="w-full select-none">{line}</TraceCollapsibleTrigger>
-          {cuaSettingsLink}
-          <CollapsibleContent>
-            <div className="mb-1 mt-1 space-y-2 pl-[22px]">
-              <ToolResultImages images={resultImages} />
-              {diff}
-              {streamingPreview}
-              {(inputView || outputText) && (
-                <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-                  {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
-                  {outputText && (
-                    <ToolSection
-                      copyText={outputText}
-                      t={t}
-                      className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
-                    >
-                      <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
-                        {outputText}
-                      </CodeBlockContent>
-                    </ToolSection>
-                  )}
-                </div>
-              )}
+    <>
+      <Trace className={compact ? 'mb-0' : 'mb-2'}>
+        {expandable ? (
+          <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="gap-2">
+            <TraceCollapsibleTrigger className="w-full select-none">{line}</TraceCollapsibleTrigger>
+            {cuaSettingsLink}
+            <CollapsibleContent>
+              <div className="mb-1 mt-1 space-y-2 pl-[22px]">
+                <ToolResultImages images={resultImages} />
+                {diff}
+                {streamingPreview}
+                {(inputView || outputText) && (
+                  <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
+                    {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
+                    {outputText && (
+                      <ToolSection
+                        copyText={outputText}
+                        t={t}
+                        className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
+                      >
+                        <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
+                          {outputText}
+                        </CodeBlockContent>
+                      </ToolSection>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </TraceCollapsible>
+        ) : (
+          <>
+            {line}
+            {cuaSettingsLink}
+          </>
+        )}
+      </Trace>
+      {permissionRuleDenied && deniedInput ? (
+        <div role="status" className="mb-3 ml-[22px] rounded-xl border border-[var(--color-error)]/25 bg-[var(--color-error-container)]/20 p-3">
+          <div className="mb-3 flex items-start gap-2.5">
+            <ShieldX className="mt-0.5 size-4 shrink-0 text-[var(--color-error)]" aria-hidden="true" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-[var(--color-text-primary)]">{t('permission.ruleDeniedTitle')}</div>
+              <div className="mt-0.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{t('permission.ruleDeniedDescription')}</div>
             </div>
-          </CollapsibleContent>
-        </TraceCollapsible>
-      ) : (
-        <>
-          {line}
-          {cuaSettingsLink}
-        </>
-      )}
-    </Trace>
+          </div>
+          <CodeViewer code={deniedInput} language="text" />
+        </div>
+      ) : null}
+    </>
   )
 })
 
@@ -156,6 +173,11 @@ type InputView = {
 }
 
 const SECTION_PRE_CLASS = 'overflow-auto whitespace-pre-wrap break-words py-2 pl-3 pr-14 font-[var(--font-mono)] text-[12px] leading-[1.45]'
+
+function isPermissionRuleDenial(content: unknown): boolean {
+  const text = extractTextContent(content)
+  return typeof text === 'string' && /Permission to use .+ has been denied\./i.test(text)
+}
 
 // The most useful input field per tool; anything else stays behind "Show full input".
 const PRIMARY_INPUT_FIELD: Record<string, string> = {

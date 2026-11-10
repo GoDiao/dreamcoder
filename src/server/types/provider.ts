@@ -93,7 +93,6 @@ export const ProvidersIndexSchema = z.object({
   schemaVersion: z.number().int().positive().optional(),
   activeId: z.string().nullable(),
   providers: z.array(SavedProviderSchema),
-  activeDecisionProviderId: z.string().nullable().default(null),
   decisionProviders: z.array(SavedDecisionProviderSchema).default([]),
 })
 

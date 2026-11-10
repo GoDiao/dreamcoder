@@ -44,10 +44,9 @@ import { Button } from '../components/shared/ui/button'
 import { SearchField } from '../components/shared/SearchField'
 import { moveRovingFocus } from '../lib/rovingFocus'
 import { useDecisionProviderStore } from '../stores/decisionProviderStore'
-import type { PermissionGuardrailSettings as PermissionGuardrailSettingsValue } from '../types/settings'
+import { useProviderStore } from '../stores/providerStore'
+import type { AutoPermissionSettings as AutoPermissionSettingsValue } from '../types/settings'
 import { FormSelect } from '../components/shared/FormSelect'
-import { LabeledInput } from '../components/shared/LabeledInput'
-import { Switch } from '../components/shared/ui/switch'
 import { Checkbox } from '../components/shared/ui/checkbox'
 
 type SettingsNavGroup = {
@@ -199,6 +198,7 @@ const PERMISSION_MODES: Array<{ mode: DefaultPermissionMode; Icon: LucideIcon; d
   { mode: 'default', Icon: ShieldCheck, descKey: 'permMode.askPermDesc' },
   { mode: 'acceptEdits', Icon: FilePenLine, descKey: 'permMode.autoAcceptDesc' },
   { mode: 'plan', Icon: NotebookPen, descKey: 'permMode.planModeDesc' },
+  { mode: 'auto', Icon: Bot, descKey: 'permMode.autoDesc' },
   { mode: 'bypassPermissions', Icon: Zap, descKey: 'permMode.bypassDesc' },
 ]
 
@@ -284,69 +284,68 @@ function PermissionSettings() {
         </p>
       </section>
 
-      <PermissionGuardrailSettings />
+      {permissionMode === 'auto' ? <AutoPermissionSettings /> : null}
 
       {isDesktopRuntime() ? <BrowserTrustSettings /> : null}
     </div>
   )
 }
 
-function PermissionGuardrailSettings() {
+function AutoPermissionSettings() {
   const t = useTranslation()
-  const saved = useSettingsStore((state) => state.permissionGuardrail)
-  const save = useSettingsStore((state) => state.setPermissionGuardrail)
-  const providers = useDecisionProviderStore((state) => state.providers)
-  const fetchProviders = useDecisionProviderStore((state) => state.fetchProviders)
-  const [draft, setDraft] = useState<PermissionGuardrailSettingsValue>(saved)
+  const saved = useSettingsStore((state) => state.autoPermission)
+  const save = useSettingsStore((state) => state.setAutoPermission)
+  const decisionProviders = useDecisionProviderStore((state) => state.providers)
+  const fetchDecisionProviders = useDecisionProviderStore((state) => state.fetchProviders)
+  const providers = useProviderStore((state) => state.providers)
+  const activeProviderId = useProviderStore((state) => state.activeId)
+  const fetchProviders = useProviderStore((state) => state.fetchProviders)
+  const [draft, setDraft] = useState<AutoPermissionSettingsValue>(saved)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    void fetchDecisionProviders()
     void fetchProviders()
-  }, [fetchProviders])
+  }, [fetchDecisionProviders, fetchProviders])
 
   useEffect(() => {
     setDraft(saved)
   }, [saved])
 
-  const provider = providers.find((entry) => entry.id === draft.providerId) ?? null
+  const provider = decisionProviders.find((entry) => entry.id === draft.providerId) ?? null
+  const activeProvider = providers.find((entry) => entry.id === activeProviderId) ?? null
+  const fastModel = activeProvider?.fastModel ?? activeProvider?.models[0]?.id ?? null
   const privacyAccepted = draft.privacyNoticeVersion >= 1
+  const usesFastModel = draft.providerId === null
+  const requiresPrivacy = usesFastModel || provider?.deployment === 'hosted'
   const saveDisabled = saving || (
-    draft.enabled && (
-      !provider ||
-      !draft.modelId ||
-      (provider.deployment === 'hosted' && !privacyAccepted)
-    )
+    usesFastModel
+      ? !activeProvider || !fastModel || !privacyAccepted
+      : !provider || !draft.modelId || (requiresPrivacy && !privacyAccepted)
   )
 
-  const update = <K extends keyof PermissionGuardrailSettingsValue>(
+  const update = <K extends keyof AutoPermissionSettingsValue>(
     key: K,
-    value: PermissionGuardrailSettingsValue[K],
+    value: AutoPermissionSettingsValue[K],
   ) => setDraft((current) => ({ ...current, [key]: value }))
 
   return (
     <section className="mt-10 border-t border-[var(--color-border-separator)] pt-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.title')}</h3>
-          <p className="mt-1 max-w-[70ch] text-xs leading-[1.6] text-[var(--color-text-secondary)]">
-            {t('settings.permissionGuardrail.description')}
-          </p>
-        </div>
-        <Switch
-          checked={draft.enabled}
-          onCheckedChange={(checked) => update('enabled', checked)}
-          aria-label={t('settings.permissionGuardrail.enabled')}
-        />
+      <div>
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.autoPermission.title')}</h3>
+        <p className="mt-1 max-w-[70ch] text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.autoPermission.description')}
+        </p>
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.provider')}</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.autoPermission.provider')}</label>
           <FormSelect
             value={draft.providerId ?? ''}
             onChange={(providerId) => {
-              const next = providers.find((entry) => entry.id === providerId)
+              const next = decisionProviders.find((entry) => entry.id === providerId)
               setDraft((current) => ({
                 ...current,
                 providerId: providerId || null,
@@ -354,65 +353,45 @@ function PermissionGuardrailSettings() {
                 privacyNoticeVersion: next?.deployment === 'local' ? 1 : 0,
               }))
             }}
-            label={t('settings.permissionGuardrail.provider')}
+            label={t('settings.autoPermission.provider')}
             options={[
-              { value: '', label: t('settings.permissionGuardrail.selectProvider') },
-              ...providers.map((entry) => ({ value: entry.id, label: entry.name })),
+              { value: '', label: t('settings.autoPermission.fastModel') },
+              ...decisionProviders.map((entry) => ({ value: entry.id, label: entry.name })),
             ]}
           />
         </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.model')}</label>
-          <FormSelect
-            value={draft.modelId}
-            onChange={(modelId) => update('modelId', modelId)}
-            label={t('settings.permissionGuardrail.model')}
-            options={[
-              { value: '', label: t('settings.permissionGuardrail.selectModel') },
-              ...(provider?.models ?? []).map((model) => ({ value: model.id, label: model.name ?? model.id })),
-            ]}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.permissionGuardrail.preset')}</label>
-          <FormSelect
-            value={draft.preset}
-            onChange={(preset) => update('preset', preset)}
-            label={t('settings.permissionGuardrail.preset')}
-            options={[
-              { value: 'safetyNet', label: t('settings.permissionGuardrail.safetyNet') },
-              { value: 'fewerPrompts', label: t('settings.permissionGuardrail.fewerPrompts') },
-            ]}
-          />
-        </div>
-        <LabeledInput
-          label={t('settings.permissionGuardrail.threshold')}
-          type="number"
-          min="0"
-          max="1"
-          step="0.01"
-          value={draft.threshold}
-          onChange={(event) => update('threshold', Math.min(1, Math.max(0, Number(event.target.value))))}
-        />
+        {provider ? (
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.autoPermission.model')}</label>
+            <FormSelect
+              value={draft.modelId}
+              onChange={(modelId) => update('modelId', modelId)}
+              label={t('settings.autoPermission.model')}
+              options={provider.models.map((model) => ({ value: model.id, label: model.name ?? model.id }))}
+            />
+          </div>
+        ) : null}
       </div>
 
-      {draft.preset === 'fewerPrompts' && (
-        <p role="note" className="mt-3 rounded-[8px] border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-          {t('settings.permissionGuardrail.calibrationRequired')}
+      {usesFastModel ? (
+        <p role="note" className="mt-3 rounded-[8px] border border-[var(--color-border-default)] bg-[var(--color-surface-secondary)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+          {activeProvider && fastModel
+            ? t('settings.autoPermission.fastModelReady', { provider: activeProvider.name, model: fastModel })
+            : t('settings.autoPermission.fastModelMissing')}
         </p>
-      )}
+      ) : null}
 
       <p className="mt-3 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
-        {t('settings.permissionGuardrail.experimentNote')}
+        {t('settings.autoPermission.policyNote')}
       </p>
 
-      {provider?.deployment === 'hosted' && (
+      {requiresPrivacy && (
         <label className="mt-4 flex items-start gap-2 text-xs leading-[1.5] text-[var(--color-text-secondary)]">
           <Checkbox
             checked={privacyAccepted}
             onCheckedChange={(checked) => update('privacyNoticeVersion', checked === true ? 1 : 0)}
           />
-          <span>{t('settings.permissionGuardrail.privacyNotice')}</span>
+          <span>{t('settings.autoPermission.privacyNotice')}</span>
         </label>
       )}
 

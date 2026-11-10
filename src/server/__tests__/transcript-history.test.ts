@@ -461,8 +461,10 @@ describe('entriesToMessages', () => {
         toolUseID: 'tool-1',
         providerId: 'provider-1',
         modelId: 'gpt-6-luna',
-        preset: 'safetyNet',
+        source: 'decisionProvider',
         score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
       })
       const persistedEntries = JSON.parse(
         JSON.stringify(cleanMessagesForLogging([attachment])),
@@ -476,8 +478,10 @@ describe('entriesToMessages', () => {
         toolUseId: 'tool-1',
         providerId: 'provider-1',
         modelId: 'gpt-6-luna',
-        preset: 'safetyNet',
+        source: 'decisionProvider',
         score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
         timestamp: Date.parse(attachment.timestamp),
       }])
     } finally {

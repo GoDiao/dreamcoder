@@ -11,11 +11,13 @@ describe('permission modes', () => {
     expect([...DEFAULT_PERMISSION_MODES].sort()).toEqual(PERMISSION_MODES.filter((mode) => mode !== 'dontAsk').sort())
     expect(isDefaultPermissionMode('dontAsk')).toBe(false)
     expect(isDefaultPermissionMode('plan')).toBe(true)
+    expect(isDefaultPermissionMode('auto')).toBe(true)
   })
 
   test('Bypass starts the CLI with --dangerously-skip-permissions, other modes with --permission-mode', () => {
     expect(permissionModeCliArgs('bypassPermissions')).toEqual(['--dangerously-skip-permissions'])
     expect(permissionModeCliArgs('plan')).toEqual(['--permission-mode', 'plan'])
+    expect(permissionModeCliArgs('auto')).toEqual(['--permission-mode', 'auto'])
     expect(permissionModeCliArgs(undefined)).toEqual(['--permission-mode', 'default'])
   })
 
@@ -47,8 +49,9 @@ describe('permission modes', () => {
     ).toBe('acceptEdits')
   })
 
-  test('ignores unknown modes and returns null when nothing is recorded', () => {
-    expect(permissionModeFromTranscriptEntries([{ type: 'permission-mode', permissionMode: 'auto' }])).toBeNull()
+  test('restores Auto mode and ignores unknown modes', () => {
+    expect(permissionModeFromTranscriptEntries([{ type: 'permission-mode', permissionMode: 'auto' }])).toBe('auto')
+    expect(permissionModeFromTranscriptEntries([{ type: 'permission-mode', permissionMode: 'legacy' }])).toBeNull()
     expect(permissionModeFromTranscriptEntries([])).toBeNull()
   })
 })

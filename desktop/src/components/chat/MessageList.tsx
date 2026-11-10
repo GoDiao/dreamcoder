@@ -869,11 +869,15 @@ function PermissionGuardrailDecisionCard({ message }: { message: PermissionGuard
         <span aria-hidden="true">·</span>
         <span>{message.modelId}</span>
         <span aria-hidden="true">·</span>
-        <span>{message.preset}</span>
+        <span>{t(message.source === 'decisionProvider'
+          ? 'chat.permissionGuardrail.decisionProvider'
+          : 'chat.permissionGuardrail.fastModel')}</span>
         <span aria-hidden="true">·</span>
         <span>{t('chat.permissionGuardrail.decision', { decision: message.decision })}</span>
         <span aria-hidden="true">·</span>
         <span>{score}</span>
+        <span aria-hidden="true">·</span>
+        <span>{t('chat.permissionGuardrail.policyVersion', { version: String(message.policyVersion) })}</span>
       </div>
     </div>
   )
@@ -1032,7 +1036,7 @@ function getMessageContentWeight(message: UIMessage): number {
     case 'memory_event':
       return (message.message?.length ?? 0) + message.files.reduce((total, file) => total + file.path.length + (file.summary?.length ?? 0), 0)
     case 'permission_guardrail_decision':
-      return message.modelId.length + message.preset.length
+      return message.modelId.length + message.source.length + (message.reason?.length ?? 0)
     case 'background_task':
       return getShallowStringWeight(message.task)
     case 'task_summary':

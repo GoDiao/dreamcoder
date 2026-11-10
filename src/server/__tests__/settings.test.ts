@@ -201,22 +201,19 @@ describe('SettingsService', () => {
     expect(settings.model).toBe('claude-opus-4-7')
   })
 
-  it('validates permission guardrail settings before saving', async () => {
+  it('validates Auto permission settings before saving', async () => {
     const svc = new SettingsService()
-    const permissionGuardrail = {
-      enabled: false,
+    const autoPermission = {
       providerId: null,
       modelId: '',
-      preset: 'safetyNet',
-      threshold: 0.95,
       privacyNoticeVersion: 0,
     }
 
-    await svc.updateUserSettings({ permissionGuardrail })
+    await svc.updateUserSettings({ autoPermission })
 
-    expect((await svc.getUserSettings()).permissionGuardrail).toEqual(permissionGuardrail)
+    expect((await svc.getUserSettings()).autoPermission).toEqual(autoPermission)
     await expect(svc.updateUserSettings({
-      permissionGuardrail: { ...permissionGuardrail, threshold: 2 },
+      autoPermission: { ...autoPermission, privacyNoticeVersion: -1 },
     })).rejects.toMatchObject({ statusCode: 400 })
   })
 

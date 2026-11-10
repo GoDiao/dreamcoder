@@ -43,7 +43,6 @@ const DEFAULT_INDEX: ProvidersIndex = {
   schemaVersion: CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
   activeId: null,
   providers: [],
-  activeDecisionProviderId: null,
   decisionProviders: [],
 }
 
@@ -115,15 +114,9 @@ export class ProviderService {
     return { providers: index.providers, activeId: index.activeId }
   }
 
-  async listDecisionProviders(): Promise<{
-    providers: SavedDecisionProvider[]
-    activeId: string | null
-  }> {
+  async listDecisionProviders(): Promise<{ providers: SavedDecisionProvider[] }> {
     const index = await this.readIndex()
-    return {
-      providers: index.decisionProviders,
-      activeId: index.activeDecisionProviderId,
-    }
+    return { providers: index.decisionProviders }
   }
 
   async getDecisionProvider(id: string): Promise<SavedDecisionProvider> {
@@ -173,19 +166,7 @@ export class ProviderService {
     if (providerIndex === -1) {
       throw ApiError.notFound(`Decision provider not found: ${id}`)
     }
-    if (index.activeDecisionProviderId === id) {
-      throw ApiError.conflict('Cannot delete the active decision provider')
-    }
     index.decisionProviders.splice(providerIndex, 1)
-    await this.writeIndex(index)
-  }
-
-  async activateDecisionProvider(id: string): Promise<void> {
-    const index = await this.readIndex()
-    if (!index.decisionProviders.some((entry) => entry.id === id)) {
-      throw ApiError.notFound(`Decision provider not found: ${id}`)
-    }
-    index.activeDecisionProviderId = id
     await this.writeIndex(index)
   }
 

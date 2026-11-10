@@ -336,7 +336,7 @@ export const PermissionResultSchema = lazySchema(() =>
 
 export const PermissionModeSchema = lazySchema(() =>
   z
-    .enum(['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk'])
+    .enum(['default', 'acceptEdits', 'auto', 'bypassPermissions', 'plan', 'dontAsk'])
     .describe(
       'Permission mode for controlling how tool executions are handled. ' +
         "'default' - Standard behavior, prompts for dangerous operations. " +
@@ -1549,8 +1549,10 @@ export const SDKPermissionGuardrailDecisionMessageSchema = lazySchema(() =>
     tool_use_id: z.string(),
     provider_id: z.string(),
     model_id: z.string(),
-    preset: z.enum(['fewerPrompts', 'safetyNet']),
+    source: z.enum(['decisionProvider', 'fastModel']),
     score: z.number().min(0).max(1).nullable(),
+    policy_version: z.number().int().nonnegative(),
+    reason: z.string().optional(),
     uuid: UUIDPlaceholder(),
     session_id: z.string(),
   }),

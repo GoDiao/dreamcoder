@@ -116,9 +116,11 @@ export const SDKControlPermissionRequestSchema = lazySchema(() =>
         .object({
           provider_id: z.string(),
           model_id: z.string(),
-          preset: z.enum(['fewerPrompts', 'safetyNet']),
+          source: z.enum(['decisionProvider', 'fastModel']),
           decision: z.enum(['allow', 'ask']),
           score: z.number().min(0).max(1).nullable(),
+          policy_version: z.number().int().nonnegative(),
+          reason: z.string().optional(),
         })
         .optional(),
       title: z.string().optional(),

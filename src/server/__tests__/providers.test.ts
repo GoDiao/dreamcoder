@@ -1479,16 +1479,25 @@ describe('Providers API', () => {
     const modelProvider = await svc.addProvider(sampleInput())
     const decisionProvider = await svc.addDecisionProvider(sampleDecisionInput())
 
-    await svc.activateDecisionProvider(decisionProvider.id)
-
     expect(await svc.listProviders()).toEqual({
       providers: [modelProvider],
       activeId: null,
     })
     expect(await svc.listDecisionProviders()).toEqual({
       providers: [decisionProvider],
-      activeId: decisionProvider.id,
     })
+  })
+
+  test('preserves manually configured decision model ids', async () => {
+    const svc = new ProviderService()
+    const created = await svc.addDecisionProvider(sampleDecisionInput({
+      models: [{ id: 'no-auto-decision-model' }],
+    }))
+
+    expect(created.models).toEqual([{ id: 'no-auto-decision-model' }])
+    expect((await svc.listDecisionProviders()).providers[0]?.models).toEqual([
+      { id: 'no-auto-decision-model' },
+    ])
   })
 
   test('derives decision provider deployment from the endpoint', async () => {

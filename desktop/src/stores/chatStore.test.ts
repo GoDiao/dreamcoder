@@ -2882,9 +2882,10 @@ describe('chatStore permission requests shared across clients', () => {
     guardrail: {
       providerId: 'provider-1',
       modelId: 'gpt-6-luna',
-      preset: 'safetyNet' as const,
+      source: 'decisionProvider' as const,
       decision: 'ask' as const,
       score: 0.812,
+      policyVersion: 1,
     },
   }
 
@@ -2915,6 +2916,31 @@ describe('chatStore permission requests shared across clients', () => {
       guardrail: request.guardrail,
     })
     expect(session().chatState).toBe('permission_pending')
+  })
+
+  it('shows concurrent permission requests one at a time', () => {
+    const queued = {
+      ...request,
+      requestId: 'perm-shared-2',
+      toolUseId: 'tool-shared-2',
+      input: { command: 'pwd' },
+    }
+
+    sendPatch(2, {
+      pendingPermissions: [request, queued],
+      turn: { phase: 'awaiting_permission', startedAt: 1, activity: 'tool' },
+    })
+
+    expect(session().messages.filter((message) => message.type === 'permission_request')).toHaveLength(1)
+    expect(session().pendingPermission?.requestId).toBe('perm-shared-1')
+
+    sendPatch(3, {
+      pendingPermissions: [queued],
+      turn: { phase: 'awaiting_permission', startedAt: 1, activity: 'tool' },
+    })
+
+    expect(session().messages.filter((message) => message.type === 'permission_request')).toHaveLength(2)
+    expect(session().pendingPermission?.requestId).toBe('perm-shared-2')
   })
 
   it('closes the dialog and records who answered when another client replies', () => {

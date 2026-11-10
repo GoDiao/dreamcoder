@@ -26,7 +26,7 @@ type AuthStatusResponse = {
   source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'
   activeProvider?: string
 }
-type DecisionProvidersResponse = { providers: SavedDecisionProvider[]; activeId: string | null }
+type DecisionProvidersResponse = { providers: SavedDecisionProvider[] }
 type DecisionProviderResponse = { provider: SavedDecisionProvider }
 type DecisionPresetsResponse = { presets: DecisionProviderPreset[] }
 
@@ -97,10 +97,6 @@ export const providersApi = {
 
   deleteDecision(id: string) {
     return api.delete<{ ok: true }>(`/api/providers/decisions/${id}`)
-  },
-
-  activateDecision(id: string) {
-    return api.post<{ ok: true }>(`/api/providers/decisions/${id}/activate`)
   },
 
   testDecision(id: string, modelId?: string) {

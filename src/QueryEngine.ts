@@ -869,8 +869,10 @@ export class QueryEngine {
               tool_use_id: message.attachment.toolUseID,
               provider_id: message.attachment.providerId,
               model_id: message.attachment.modelId,
-              preset: message.attachment.preset,
+              source: message.attachment.source,
               score: message.attachment.score,
+              policy_version: message.attachment.policyVersion,
+              reason: message.attachment.reason,
               uuid: message.uuid,
               session_id: getSessionId(),
             } as SDKMessage

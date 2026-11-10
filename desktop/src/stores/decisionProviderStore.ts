@@ -13,7 +13,6 @@ import type {
 
 type DecisionProviderStore = {
   providers: SavedDecisionProvider[]
-  activeId: string | null
   presets: DecisionProviderPreset[]
   isLoading: boolean
   error: string | null
@@ -22,7 +21,6 @@ type DecisionProviderStore = {
   createProvider: (input: CreateDecisionProviderInput) => Promise<SavedDecisionProvider>
   updateProvider: (id: string, input: UpdateDecisionProviderInput) => Promise<SavedDecisionProvider>
   deleteProvider: (id: string) => Promise<void>
-  activateProvider: (id: string) => Promise<void>
   testProvider: (id: string, modelId?: string) => Promise<ProviderTestResult>
   testConfig: (input: TestDecisionProviderInput) => Promise<ProviderTestResult>
   discoverModels: (input: DiscoverDecisionProviderModelsInput) => Promise<DiscoveredProviderModel[]>
@@ -30,7 +28,6 @@ type DecisionProviderStore = {
 
 export const useDecisionProviderStore = create<DecisionProviderStore>((set, get) => ({
   providers: [],
-  activeId: null,
   presets: [],
   isLoading: false,
   error: null,
@@ -38,8 +35,8 @@ export const useDecisionProviderStore = create<DecisionProviderStore>((set, get)
   fetchProviders: async () => {
     set({ isLoading: true, error: null })
     try {
-      const { providers, activeId } = await providersApi.listDecisions()
-      set({ providers, activeId, isLoading: false })
+      const { providers } = await providersApi.listDecisions()
+      set({ providers, isLoading: false })
     } catch (error) {
       set({
         isLoading: false,
@@ -71,11 +68,6 @@ export const useDecisionProviderStore = create<DecisionProviderStore>((set, get)
 
   deleteProvider: async (id) => {
     await providersApi.deleteDecision(id)
-    await get().fetchProviders()
-  },
-
-  activateProvider: async (id) => {
-    await providersApi.activateDecision(id)
     await get().fetchProviders()
   },
 

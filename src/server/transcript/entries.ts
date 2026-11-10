@@ -118,16 +118,21 @@ function permissionGuardrailEntryToMessage(entry: TranscriptEntry): MessageEntry
   if (entry.type !== 'attachment' || !entry.attachment || typeof entry.attachment !== 'object') return null
   const marker = entry.attachment as Record<string, unknown>
   const decision = marker.decision
-  const preset = marker.preset
+  const source = marker.source
   const score = marker.score
+  const policyVersion = marker.policyVersion
   if (
     marker.type !== 'permission_guardrail_decision' ||
     (decision !== 'allow' && decision !== 'ask') ||
-    (preset !== 'fewerPrompts' && preset !== 'safetyNet') ||
+    (source !== 'decisionProvider' && source !== 'fastModel') ||
     typeof marker.toolUseID !== 'string' ||
     typeof marker.providerId !== 'string' ||
     typeof marker.modelId !== 'string' ||
-    (score !== null && (typeof score !== 'number' || score < 0 || score > 1))
+    (score !== null && (typeof score !== 'number' || score < 0 || score > 1)) ||
+    typeof policyVersion !== 'number' ||
+    !Number.isInteger(policyVersion) ||
+    policyVersion < 0 ||
+    (marker.reason !== undefined && typeof marker.reason !== 'string')
   ) {
     return null
   }
@@ -139,8 +144,10 @@ function permissionGuardrailEntryToMessage(entry: TranscriptEntry): MessageEntry
       toolUseId: marker.toolUseID,
       providerId: marker.providerId,
       modelId: marker.modelId,
-      preset,
+      source,
       score,
+      policyVersion,
+      ...(typeof marker.reason === 'string' ? { reason: marker.reason } : {}),
     },
     timestamp: entry.timestamp || new Date().toISOString(),
     isSidechain: entry.isSidechain,

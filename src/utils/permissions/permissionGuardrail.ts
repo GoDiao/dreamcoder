@@ -2,126 +2,192 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { normalizeProvidersIndex } from '../../server/services/providerRuntimeEnv.js'
 import type { SavedDecisionProvider } from '../../server/types/provider.js'
-import type { PermissionGuardrailPreset } from '../../types/permissionGuardrail.js'
 import { getClaudeConfigHomeDir } from '../envUtils.js'
-import { getPermissionGuardrailSettings } from '../settings/settings.js'
+import { sideQuery } from '../sideQuery.js'
+import { getAutoPermissionSettings } from '../settings/settings.js'
 
 const MAX_INPUT_CHARS = 1500
 const REQUEST_TIMEOUT_MS = 5000
-export const PERMISSION_GUARDRAIL_PRIVACY_NOTICE_VERSION = 1
+export const AUTO_PERMISSION_PRIVACY_NOTICE_VERSION = 1
 
 const POLICY =
   'Ask the user first if the call could delete or overwrite data, discard uncommitted work, change system, security, account or permission settings, read, copy or send secrets, credentials or private data, send data to or change remote services, install or run code from untrusted sources, or do something the user did not ask for. Otherwise allow reads, searches, builds, tests and requested edits.'
 
-const CALIBRATED_AUTO_ALLOW_MODELS = new Set<string>()
+const DECISION_POLICIES = new Map([
+  ['openai_decisions:gpt-6-luna', { threshold: 0.5, policyVersion: 1 }],
+])
 
-export type PermissionGuardrailEvaluation = {
+const AUTO_PERMISSION_TOOL = {
+  name: 'auto_permission_decision',
+  description: 'Decide whether the tool call can run or requires user confirmation',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      behavior: { type: 'string', enum: ['allow', 'ask'] },
+      reason: { type: 'string' },
+    },
+    required: ['behavior', 'reason'],
+  },
+}
+
+export type AutoPermissionEvaluation = {
   behavior: 'allow' | 'ask'
   providerId: string
   modelId: string
-  preset: PermissionGuardrailPreset
+  source: 'decisionProvider' | 'fastModel'
   score: number | null
+  policyVersion: number
+  reason?: string
 }
 
-type PermissionGuardrailInput = {
+type AutoPermissionInput = {
   toolName: string
   input: Record<string, unknown>
   messages: unknown[]
+  signal?: AbortSignal
 }
 
-export function isPermissionGuardrailAutoAllowCalibrated(
+export function getDecisionPolicy(
   provider: SavedDecisionProvider,
   modelId: string,
-): boolean {
-  return CALIBRATED_AUTO_ALLOW_MODELS.has(`${provider.apiFormat}:${modelId}`)
+): { threshold: number; policyVersion: number } | null {
+  return DECISION_POLICIES.get(`${provider.apiFormat}:${modelId}`) ?? null
 }
 
-export async function evaluatePermissionGuardrail(
-  expectedPreset: PermissionGuardrailPreset,
-  value: PermissionGuardrailInput,
-): Promise<PermissionGuardrailEvaluation | null> {
-  const settings = getPermissionGuardrailSettings()
-  if (
-    !settings?.enabled ||
-    settings.preset !== expectedPreset ||
-    !settings.providerId ||
-    !settings.modelId
-  ) {
-    return null
+export async function evaluateAutoPermission(
+  value: AutoPermissionInput,
+): Promise<AutoPermissionEvaluation | null> {
+  const settings = getAutoPermissionSettings()
+  if (!settings) return null
+
+  if (settings.providerId) {
+    return evaluateDecisionProvider(settings, value)
   }
 
-  const provider = readDecisionProvider(settings.providerId)
+  const providerId = process.env.DREAMCODER_ACTIVE_PROVIDER_ID?.trim()
+  const modelId = process.env.DREAMCODER_FAST_MODEL_ID?.trim()
+  if (!providerId || !modelId) return null
+  if (settings.privacyNoticeVersion < AUTO_PERMISSION_PRIVACY_NOTICE_VERSION) {
+    return fallback(providerId, modelId, 'fastModel', 1, 'Privacy confirmation is required')
+  }
+
+  return evaluateFastModel(providerId, modelId, value)
+}
+
+async function evaluateDecisionProvider(
+  settings: { providerId: string | null; modelId: string; privacyNoticeVersion: number },
+  value: AutoPermissionInput,
+): Promise<AutoPermissionEvaluation> {
+  const providerId = settings.providerId ?? ''
+  const provider = readDecisionProvider(providerId)
   if (!provider || !provider.models.some((model) => model.id === settings.modelId)) {
-    return fallback(settings.providerId, settings.modelId, expectedPreset)
+    return fallback(providerId, settings.modelId, 'decisionProvider', 0, 'Decision provider or model is unavailable')
+  }
+
+  const policy = getDecisionPolicy(provider, settings.modelId)
+  if (!policy) {
+    return fallback(provider.id, settings.modelId, 'decisionProvider', 0, 'The selected model does not have an Auto policy')
   }
   if (
     provider.deployment === 'hosted' &&
-    settings.privacyNoticeVersion < PERMISSION_GUARDRAIL_PRIVACY_NOTICE_VERSION
+    settings.privacyNoticeVersion < AUTO_PERMISSION_PRIVACY_NOTICE_VERSION
   ) {
-    return fallback(provider.id, settings.modelId, expectedPreset)
+    return fallback(provider.id, settings.modelId, 'decisionProvider', policy.policyVersion, 'Privacy confirmation is required')
   }
   if (!provider.apiKey && provider.apiFormat !== 'ollama_chat') {
-    return fallback(provider.id, settings.modelId, expectedPreset)
+    return fallback(provider.id, settings.modelId, 'decisionProvider', policy.policyVersion, 'API key is missing')
   }
+
   let input: string
   try {
     input = renderInput(value)
   } catch {
-    return fallback(provider.id, settings.modelId, expectedPreset)
+    return fallback(provider.id, settings.modelId, 'decisionProvider', policy.policyVersion, 'Tool context could not be serialized')
   }
 
-  const score = await requestAskProbability(provider, settings.modelId, input)
-  if (score === null) return fallback(provider.id, settings.modelId, expectedPreset)
-
-  const behavior = resolvePermissionGuardrailProviderBehavior(
-    provider,
-    settings.modelId,
-    expectedPreset,
-    score,
-    settings.threshold,
-  )
+  const score = await requestAskProbability(provider, settings.modelId, input, value.signal)
+  if (score === null) {
+    return fallback(provider.id, settings.modelId, 'decisionProvider', policy.policyVersion, 'Decision request failed')
+  }
 
   return {
-    behavior,
+    behavior: score >= policy.threshold ? 'ask' : 'allow',
     providerId: provider.id,
     modelId: settings.modelId,
-    preset: expectedPreset,
+    source: 'decisionProvider',
     score,
+    policyVersion: policy.policyVersion,
   }
 }
 
-export function resolvePermissionGuardrailProviderBehavior(
-  provider: SavedDecisionProvider,
+async function evaluateFastModel(
+  providerId: string,
   modelId: string,
-  preset: PermissionGuardrailPreset,
-  pAsk: number,
-  threshold: number,
-): 'allow' | 'ask' {
-  if (
-    preset === 'fewerPrompts' &&
-    !isPermissionGuardrailAutoAllowCalibrated(provider, modelId)
-  ) {
-    return 'ask'
+  value: AutoPermissionInput,
+): Promise<AutoPermissionEvaluation> {
+  try {
+    const response = await sideQuery({
+      querySource: 'auto_mode_critique',
+      model: modelId,
+      system: POLICY,
+      skipSystemPromptPrefix: true,
+      messages: [{ role: 'user', content: renderInput(value) }],
+      tools: [AUTO_PERMISSION_TOOL],
+      tool_choice: { type: 'tool', name: AUTO_PERMISSION_TOOL.name },
+      max_tokens: 128,
+      maxRetries: 0,
+      signal: combineSignal(value.signal),
+      temperature: 0,
+      thinking: false,
+    })
+    const block = response.content.find((content) => content.type === 'tool_use')
+    const parsed = parseFastModelDecision(block?.type === 'tool_use' ? block.input : null)
+    if (!parsed) {
+      return fallback(providerId, modelId, 'fastModel', 1, 'Decision response could not be parsed')
+    }
+    return {
+      behavior: parsed.behavior,
+      providerId,
+      modelId,
+      source: 'fastModel',
+      score: null,
+      policyVersion: 1,
+      reason: parsed.reason,
+    }
+  } catch {
+    return fallback(providerId, modelId, 'fastModel', 1, 'Decision request failed')
   }
-  return resolvePermissionGuardrailBehavior(preset, pAsk, threshold)
 }
 
-export function resolvePermissionGuardrailBehavior(
-  preset: PermissionGuardrailPreset,
-  pAsk: number,
-  threshold: number,
-): 'allow' | 'ask' {
-  return preset === 'fewerPrompts'
-    ? 1 - pAsk >= threshold ? 'allow' : 'ask'
-    : pAsk >= threshold ? 'ask' : 'allow'
+export function parseFastModelDecision(
+  value: unknown,
+): { behavior: 'allow' | 'ask'; reason?: string } | null {
+  const record = asRecord(value)
+  if (record?.behavior !== 'allow' && record?.behavior !== 'ask') return null
+  return {
+    behavior: record.behavior,
+    ...(typeof record.reason === 'string' && record.reason.trim()
+      ? { reason: record.reason.trim() }
+      : {}),
+  }
 }
 
 function fallback(
   providerId: string,
   modelId: string,
-  preset: PermissionGuardrailPreset,
-): PermissionGuardrailEvaluation {
-  return { behavior: 'ask', providerId, modelId, preset, score: null }
+  source: AutoPermissionEvaluation['source'],
+  policyVersion: number,
+  reason: string,
+): AutoPermissionEvaluation {
+  return {
+    behavior: 'ask',
+    providerId,
+    modelId,
+    source,
+    score: null,
+    policyVersion,
+    reason,
+  }
 }
 
 function readDecisionProvider(id: string): SavedDecisionProvider | null {
@@ -134,7 +200,7 @@ function readDecisionProvider(id: string): SavedDecisionProvider | null {
   }
 }
 
-function renderInput(value: PermissionGuardrailInput): string {
+function renderInput(value: AutoPermissionInput): string {
   const userRequest = findLatestUserText(value.messages)
   const text = [
     `User request:\n${userRequest || '(not available)'}`,
@@ -183,6 +249,7 @@ async function requestAskProbability(
   provider: SavedDecisionProvider,
   modelId: string,
   input: string,
+  signal?: AbortSignal,
 ): Promise<number | null> {
   try {
     const response = await fetch(requestEndpoint(provider), {
@@ -192,13 +259,18 @@ async function requestAskProbability(
         ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
       },
       body: JSON.stringify(requestBody(provider, modelId, input)),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: combineSignal(signal),
     })
     if (!response.ok) return null
     return parsePermissionGuardrailAskProbability(provider, await response.json())
   } catch {
     return null
   }
+}
+
+function combineSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
 function requestEndpoint(provider: SavedDecisionProvider): string {

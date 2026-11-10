@@ -91,7 +91,7 @@ export type UserSettings = {
   alwaysThinkingEnabled?: boolean
   autoCompactPercent?: number
   permissionMode?: PermissionMode
-  permissionGuardrail?: PermissionGuardrailSettings
+  autoPermission?: AutoPermissionSettings
   theme?: ThemeMode
   skipWebFetchPreflight?: boolean
   desktopNotificationsEnabled?: boolean
@@ -109,12 +109,9 @@ export type UserSettings = {
   [key: string]: unknown
 }
 
-export type PermissionGuardrailSettings = {
-  enabled: boolean
+export type AutoPermissionSettings = {
   providerId: string | null
   modelId: string
-  preset: 'fewerPrompts' | 'safetyNet'
-  threshold: number
   privacyNoticeVersion: number
 }
 

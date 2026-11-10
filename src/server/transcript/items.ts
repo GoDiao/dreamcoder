@@ -85,8 +85,10 @@ export type TranscriptItem =
       toolUseId: string
       providerId: string
       modelId: string
-      preset: 'fewerPrompts' | 'safetyNet'
+      source: 'decisionProvider' | 'fastModel'
       score: number | null
+      policyVersion: number
+      reason?: string
       timestamp: number
     }
 
