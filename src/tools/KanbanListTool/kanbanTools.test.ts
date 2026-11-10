@@ -154,7 +154,7 @@ describe('kanban tools', () => {
     const input = KanbanUpdateTool.inputSchema.parse({ command: { type: 'cancel', card: 4, reason: 'not needed' } })
     expect(await KanbanUpdateTool.checkPermissions(input, {} as never)).toMatchObject({
       behavior: 'ask',
-      message: 'Cancel card #4?',
+      message: 'Cancel card #4 and remove dependencies on the cancelled cards?',
       decisionReason: { type: 'safetyCheck', classifierApprovable: false },
     })
     expect((await hasPermissionsToUseTool(KanbanUpdateTool, input, context as never, undefined as never, 'id')).behavior).toBe('ask')

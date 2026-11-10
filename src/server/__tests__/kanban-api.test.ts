@@ -140,6 +140,22 @@ describe('/api/kanban', () => {
     expect((await api('GET', `/api/kanban/boards/${key}/cards/abc/history`)).status).toBe(400)
   })
 
+  test('reads a linked project file without the session that delivered it', async () => {
+    const key = await createBoard()
+    const report = path.join(project, 'review.md')
+    await fs.writeFile(report, '# verified')
+    const worker = await createSession()
+    await sessionService.deleteSession(worker)
+
+    const response = await api('GET', `/api/kanban/boards/${key}/files?path=${encodeURIComponent(report)}`)
+
+    expect(response.status).toBe(200)
+    expect(await json(response)).toMatchObject({ state: 'ok', content: '# verified', language: 'markdown' })
+    const outside = path.join(configDir, 'outside.md')
+    await fs.writeFile(outside, 'private')
+    expect((await api('GET', `/api/kanban/boards/${key}/files?path=${encodeURIComponent(outside)}`)).status).toBe(403)
+  })
+
   test('delivers an assignment to the session CLI as a project board message', async () => {
     const worker = await createSession()
     const key = await createBoard()

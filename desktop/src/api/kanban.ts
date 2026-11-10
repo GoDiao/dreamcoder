@@ -1,5 +1,6 @@
 import type { BoardListing, BoardView, KanbanCommand, KanbanEvent } from '@protocol'
 import { api } from './client'
+import type { WorkspaceReadFileResult } from './sessions'
 
 export type BoardPoll = { changed: true; view: BoardView } | { changed: false; etag: string }
 
@@ -28,5 +29,9 @@ export const kanbanApi = {
 
   history(key: string, card: number) {
     return api.get<{ events: KanbanEvent[] }>(`${boardPath(key)}/cards/${card}/history`)
+  },
+
+  file(key: string, path: string) {
+    return api.get<WorkspaceReadFileResult>(`${boardPath(key)}/files?path=${encodeURIComponent(path)}`)
   },
 }

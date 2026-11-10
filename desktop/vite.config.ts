@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+export const viteWatchIgnored = [
+  /[\\/]\.[^\\/]+\.bun-build$/,
+  /[\\/]\.bun-cache(?:[\\/]|$)/,
+  /[\\/]binaries(?:[\\/]|$)/,
+]
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
@@ -24,5 +30,8 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      ignored: viteWatchIgnored,
+    },
   },
 })

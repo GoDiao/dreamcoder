@@ -31,7 +31,7 @@ As the creator:
 - When the owner questions an acceptance criterion, decide whether to change it. Change it with edit_card and tell the owner, or tell the owner why it stays. When the user should decide, ask the user in this session first.
 - Choose the reviewer: assign with role "reviewer", or start a new session in that role with ${START_SESSION_TOOL_NAME}. Whoever reviews now is replaced and told so. Put its review instructions in note: what to check and by which standard, for example reviewing the code or helping the user try the result; without a note it gets general instructions. When you also own the card, the user approves every reviewer you choose.
 - move_card (between Backlog and Todo), reset (back to Todo) and revoke_assignment. Reset tells the owner.
-- cancel, when the card is no longer needed. The user approves every cancel. It tells the owner, and the result lists the open cards that depend on it and its unfinished sub-cards: remove those dependencies or cancel those cards too, so nothing is left waiting on it.
+- cancel, when the card is no longer needed. The user approves every cancel. Set cancelDependents to cancel open cards that depend on it and cancelChildren to cancel its unfinished sub-cards; both choices apply transitively. Without cancelDependents, dependencies on every cancelled card are removed atomically so nothing is left waiting on it.
 
 Any session may add_update: record progress, a comment or a decision (kind "progress", "comment" or "decision"). It is saved on the card and notifies nobody.
 

@@ -81,9 +81,13 @@ export const KanbanUpdateTool = buildTool({
   async checkPermissions(input) {
     const { command } = input
     if (command.type === 'cancel') {
+      const effects = [
+        command.cancelDependents ? 'cancel open dependent cards transitively' : 'remove dependencies on the cancelled cards',
+        ...(command.cancelChildren ? ['cancel unfinished sub-cards transitively'] : []),
+      ]
       return {
         behavior: 'ask',
-        message: `Cancel card #${command.card}?`,
+        message: `Cancel card #${command.card} and ${effects.join(' and ')}?`,
         updatedInput: input,
         decisionReason: { type: 'safetyCheck', reason: KANBAN_CANCEL_PERMISSION_REASON, classifierApprovable: false },
       }

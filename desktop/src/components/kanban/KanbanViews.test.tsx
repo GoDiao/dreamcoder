@@ -76,19 +76,21 @@ function MoveButton({ card, to }: { card: number; to: CardStatus }) {
 }
 
 describe('cancelling a task', () => {
-  it('lists the open tasks that wait on it and its unfinished subtasks before the person confirms', async () => {
+  it('lets the person choose whether to cancel dependents and unfinished subtasks', async () => {
     kanbanApiMock.command.mockResolvedValue({ view: hierarchy(), warnings: [] })
     render(<MoveButton card={3} to="cancelled" />)
     fireEvent.click(screen.getByRole('button', { name: 'Move it' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getAllByRole('note').map((note) => note.textContent)).toEqual(['kanban.prompt.cancelDependents #2'])
+    const dependents = within(dialog).getByRole('checkbox', { name: 'kanban.prompt.cancelDependents #2' })
+    expect(dependents).not.toBeChecked()
+    fireEvent.click(dependents)
     fireEvent.click(within(dialog).getByRole('button', { name: 'kanban.action.cancelTask' }))
-    await waitFor(() => expect(kanbanApiMock.command).toHaveBeenCalledWith(FIXTURE_BOARD, { type: 'cancel', card: 3 }))
+    await waitFor(() => expect(kanbanApiMock.command).toHaveBeenCalledWith(FIXTURE_BOARD, { type: 'cancel', card: 3, cancelDependents: true, cancelChildren: false }))
 
     cleanup()
     render(<MoveButton card={1} to="cancelled" />)
     fireEvent.click(screen.getByRole('button', { name: 'Move it' }))
-    expect(within(await screen.findByRole('alertdialog')).getAllByRole('note').map((note) => note.textContent)).toEqual(['kanban.prompt.cancelChildren #2'])
+    expect(within(await screen.findByRole('alertdialog')).getByRole('checkbox', { name: 'kanban.prompt.cancelChildren #2' })).not.toBeChecked()
   })
 })
 
@@ -424,7 +426,7 @@ describe('TaskDetail', () => {
     expect(within(delivery).getByText('Token store').tagName).toBe('STRONG')
   })
 
-  it('opens a delivered report file in the panel through the session that wrote it', () => {
+  it('opens a delivered report file in the panel through the board', () => {
     const view = hierarchy()
     const reviewed = { ...view.cards[2]!, deliveries: [{ id: 'd', summary: 'See the report', links: ['/repo/review.md', 'feat/tokens'], actor: { kind: 'session' as const, sessionId: 'worker' }, at: '' }] }
     useKanbanStore.setState({ views: { [FIXTURE_BOARD]: { ...view, cards: [view.cards[0]!, view.cards[1]!, reviewed] } } })
@@ -433,7 +435,7 @@ describe('TaskDetail', () => {
     expect(screen.queryByRole('button', { name: 'feat/tokens' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '/repo/review.md' }))
 
-    expect(useWorkspacePanelStore.getState().getActiveTab('board-tab')).toMatchObject({ kind: 'file', path: '/repo/review.md', sessionId: 'worker' })
+    expect(useWorkspacePanelStore.getState().getActiveTab('board-tab')).toMatchObject({ kind: 'file', path: '/repo/review.md', board: FIXTURE_BOARD })
   })
 
   it('opens a related task as another tab in the same panel', () => {

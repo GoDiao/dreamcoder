@@ -286,7 +286,7 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
               {card.deliveries.map((delivery) => (
                 <div key={delivery.id} className="flex flex-col gap-1 text-[13px]">
                   <ClampedMarkdown content={delivery.summary} />
-                  <CardLinks panelId={panelId} projectRoot={view.project} links={delivery.links} author={delivery.actor} />
+                  <CardLinks panelId={panelId} board={board} projectRoot={view.project} links={delivery.links} author={delivery.actor} />
                 </div>
               ))}
               {card.status === 'review' && (

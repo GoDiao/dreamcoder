@@ -889,11 +889,11 @@ function FilesView({ sessionId }: { sessionId: string }) {
   )
 }
 
-function FileTabView({ sessionId, path }: { sessionId: string; path: string }) {
+function FileTabView({ sessionId, path, board }: { sessionId: string; path: string; board?: string }) {
   const ensurePreview = useWorkspacePanelStore((state) => state.ensurePreview)
   useEffect(() => {
-    void ensurePreview(sessionId, path, 'file')
-  }, [ensurePreview, path, sessionId])
+    void ensurePreview(sessionId, path, 'file', board)
+  }, [board, ensurePreview, path, sessionId])
   return <PreviewBody sessionId={sessionId} path={path} kind="file" fill />
 }
 
@@ -1129,7 +1129,7 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
       case 'artifacts':
         return <ArtifactsView sessionId={sessionId} />
       case 'file':
-        return <FileTabView sessionId={tab.sessionId ?? sessionId} path={tab.path} />
+        return <FileTabView sessionId={tab.sessionId ?? sessionId} path={tab.path} board={tab.board} />
       case 'browser':
         return <BrowserView sessionId={sessionId} tab={tab} projectRoot={projectRoot} />
       case 'uiPage':

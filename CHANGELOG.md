@@ -16,6 +16,8 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Building the desktop sidecar while Vite is running no longer crashes the Windows file watcher on Bun compiler temporary files, and concurrent dev launches no longer reuse an unrelated Vite instance.
+- Project boards now keep distinct storage for project paths that sanitize to the same name, recover new events after a partial JSONL write, resolve cancellation dependencies atomically with optional dependent and subtask cascading, and keep delivered file links readable after the author session is deleted.
 - Permission prompts that ask every time, such as starting a session or editing files under `.git/`, no longer offer "Allow for this session", which could not take effect (#242).
 - Tools sent to providers through the OpenAI Responses API are no longer in strict mode, so their optional parameters stay optional (#242).
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.

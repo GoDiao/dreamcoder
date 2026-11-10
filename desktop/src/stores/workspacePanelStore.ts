@@ -6,6 +6,7 @@ import {
   type WorkspaceStatusResult,
   type WorkspaceTreeResult,
 } from '../api/sessions'
+import { kanbanApi } from '../api/kanban'
 import { artifactsApi } from '../api/artifacts'
 import { designApi } from '../api/design'
 import { closeBrowser, submitBrowserInput } from '../lib/browserGuests'
@@ -38,6 +39,7 @@ export type WorkspacePreviewEntry = {
   state?: WorkspacePreviewState
   error?: string
   size?: number
+  board?: string
 }
 
 export type BrowserTabArtifact = { id: string; name: string; mtimeMs: number; canvas?: true; board?: string }
@@ -49,7 +51,7 @@ export type WorkspaceTab =
   | { id: string; kind: 'changes' }
   | { id: string; kind: 'files' }
   | { id: string; kind: 'artifacts' }
-  | { id: string; kind: 'file'; path: string; sessionId?: string }
+  | { id: string; kind: 'file'; path: string; sessionId?: string; board?: string }
   | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { id: string; kind: 'terminal'; index: number; shell?: string }
   | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
@@ -60,7 +62,7 @@ export type WorkspaceTabKind = WorkspaceTab['kind']
 
 export type WorkspaceTabTarget =
   | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' | 'terminal' }
-  | { kind: 'file'; path: string; sessionId?: string }
+  | { kind: 'file'; path: string; sessionId?: string; board?: string }
   | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { kind: 'uiPage'; pageId: string; revision: number; title: string }
   | { kind: 'task'; board: string; card: number }
@@ -118,7 +120,7 @@ type WorkspacePanelStore = {
   expandPreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
   collapsePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => void
   togglePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
-  ensurePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
+  ensurePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind, board?: string) => Promise<void>
   refreshPreviews: (sessionId: string) => Promise<void>
   releaseSession: (sessionId: string) => void
   clearSession: (sessionId: string) => void
@@ -233,7 +235,7 @@ function isSameTarget(tab: WorkspaceTab, target: WorkspaceTabTarget) {
     case 'artifacts':
       return tab.kind === target.kind
     case 'file':
-      return tab.kind === 'file' && tab.path === target.path && tab.sessionId === target.sessionId
+      return tab.kind === 'file' && tab.path === target.path && tab.sessionId === target.sessionId && tab.board === target.board
     case 'uiPage':
       return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision
     case 'task':
@@ -252,7 +254,7 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
   const id = newTabId()
   switch (target.kind) {
     case 'file':
-      return { id, kind: 'file', path: target.path, ...(target.sessionId ? { sessionId: target.sessionId } : {}) }
+      return { id, kind: 'file', path: target.path, ...(target.sessionId ? { sessionId: target.sessionId } : {}), ...(target.board ? { board: target.board } : {}) }
     case 'browser':
       return {
         id,
@@ -319,7 +321,9 @@ function isStoredTab(value: unknown): value is WorkspaceTab {
     case 'artifacts':
       return true
     case 'file':
-      return typeof tab.path === 'string' && (tab.sessionId === undefined || typeof tab.sessionId === 'string')
+      return typeof tab.path === 'string'
+        && (tab.sessionId === undefined || typeof tab.sessionId === 'string')
+        && (tab.board === undefined || typeof tab.board === 'string')
     case 'browser':
       return typeof tab.url === 'string' && typeof tab.title === 'string'
         && (tab.root === undefined || typeof tab.root === 'string')
@@ -740,10 +744,10 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     await get().expandPreview(sessionId, path, kind)
   },
 
-  ensurePreview: async (sessionId, path, kind) => {
+  ensurePreview: async (sessionId, path, kind, board) => {
     const existing = get().previewsBySession[sessionId]?.[getWorkspacePreviewId(path, kind)]
     if (existing && existing.state !== 'error') return
-    await loadPreview(sessionId, path, kind)
+    await loadPreview(sessionId, path, kind, { board })
   },
 
   refreshPreviews: async (sessionId) => {
@@ -772,7 +776,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       },
     }))
     await Promise.all(
-      Object.values(kept).map((entry) => loadPreview(sessionId, entry.path, entry.kind, { background: true })),
+      Object.values(kept).map((entry) => loadPreview(sessionId, entry.path, entry.kind, { background: true, board: entry.board })),
     )
   },
 
@@ -850,7 +854,7 @@ async function loadPreview(
   sessionId: string,
   path: string,
   kind: WorkspacePreviewKind,
-  { background = false }: { background?: boolean } = {},
+  { background = false, board }: { background?: boolean; board?: string } = {},
 ) {
   const previewId = getWorkspacePreviewId(path, kind)
   const requestKey = makePreviewKey(sessionId, previewId)
@@ -861,6 +865,7 @@ async function loadPreview(
     kind,
     title: getPathTitle(path),
     state: 'loading',
+    ...(board ? { board } : {}),
   }
   const existing = useWorkspacePanelStore.getState().previewsBySession[sessionId]?.[previewId]
   if (!background || !existing || existing.state === 'loading') {
@@ -880,7 +885,7 @@ async function loadPreview(
       return
     }
 
-    const result = await sessionsApi.getWorkspaceFile(sessionId, path)
+    const result = board ? await kanbanApi.file(board, path) : await sessionsApi.getWorkspaceFile(sessionId, path)
     if (!isLatestRequest(previewRequestIds, requestKey, requestId)) return
     setPreviewEntry(sessionId, previewId, {
       ...baseEntry,

@@ -32,6 +32,7 @@ artifacts/coverage/
 desktop/dist/
 desktop/build-artifacts/
 desktop/binaries/
+desktop/.bun-cache/
 desktop/.electron-cache/
 desktop/electron-dist/
 desktop/electron-release/
