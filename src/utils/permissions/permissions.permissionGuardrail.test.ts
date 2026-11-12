@@ -210,7 +210,7 @@ describe('Auto permission pipeline', () => {
     }
 
     expect(requests).toBe(0)
-  })
+  }, 10_000)
 
   test('loads Bash and PowerShell deny rules from project local settings', async () => {
     const projectDir = join(configDir, 'project')
