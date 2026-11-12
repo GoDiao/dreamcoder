@@ -1,5 +1,5 @@
 import type { SettingsTab } from '../../stores/uiStore'
-import { ApiError } from '../../api/client'
+import { apiErrorCode } from '../../api/client'
 import type { TranslationKey } from '../../i18n'
 import type { RepositoryLaunchError } from '../shared/RepositoryLaunchControls'
 
@@ -227,15 +227,8 @@ export function insertSlashTrigger(
 
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string
 
-function getApiErrorCode(error: unknown): string | null {
-  if (!(error instanceof ApiError)) return null
-  const body = error.body
-  if (!body || typeof body !== 'object' || !('error' in body)) return null
-  return typeof body.error === 'string' ? body.error : null
-}
-
 export function resolveCreateSessionErrorMessage(error: unknown, t: Translate): string {
-  const code = getApiErrorCode(error)
+  const code = apiErrorCode(error)
   switch (code) {
     case 'WORKDIR_MISSING':
     case 'WORKDIR_NOT_DIRECTORY':
@@ -268,7 +261,7 @@ export function resolveCreateSessionErrorMessage(error: unknown, t: Translate): 
  * Returns null for errors that are not about the chosen branch or working tree.
  */
 export function resolveRepositoryLaunchError(error: unknown, t: Translate): RepositoryLaunchError | null {
-  const code = getApiErrorCode(error)
+  const code = apiErrorCode(error)
   const message = resolveCreateSessionErrorMessage(error, t)
   switch (code) {
     case 'REPOSITORY_BRANCH_NOT_FOUND':

@@ -3,6 +3,7 @@ import { UI_PAGE_ROUTE_PREFIX } from './h5AccessPolicy.js'
 import { sessionService } from './services/sessionService.js'
 import { contentTypeForPath, resolveDistAsset } from './staticH5.js'
 import { UI_PAGE_BOOTSTRAP_HTML } from './uiPageBootstrap.js'
+import { SESSION_ID_PATTERN } from './sessionId.js'
 
 const UI_PAGE_READER_PREFIX = '/showai-reader/'
 const READER_ENTRY = `${UI_PAGE_READER_PREFIX}reader.js`
@@ -19,7 +20,6 @@ export const UI_PAGE_CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
 ].join('; ')
 
-const SESSION_ID_PATTERN = /^[0-9a-zA-Z_-]{1,64}$/
 const ROUTE_PATTERN = /^\/ui-pages\/([^/]+)\/([^/]+)\/(\d+)$/
 
 const PAGE_HEADERS = {

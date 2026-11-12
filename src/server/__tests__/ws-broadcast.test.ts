@@ -11,6 +11,7 @@ import { sessionService } from '../services/sessionService.js'
 import { sessionStateStore } from '../session/state/store.js'
 import type { ClientKind } from '../ws/protocol.js'
 import { SessionBrowserGrants } from '../browserHost/grants.js'
+import { setServerEndpoint } from '../ws/sessionRuntime.js'
 
 type FakeSocket = ServerWebSocket<WebSocketData> & { sent: string[] }
 
@@ -23,8 +24,6 @@ function makeClientSocket(sessionId: string, clientKind: ClientKind = 'desktop')
       channel: 'client',
       clientKind,
       sdkToken: null,
-      serverPort: 0,
-      serverHost: '127.0.0.1',
     },
     send: mock((payload: string) => {
       sent.push(payload)
@@ -216,6 +215,24 @@ describe('WebSocket permission replies', () => {
     }
   })
 
+  it('marks a permission request the CLI asks for every time, so clients do not offer to remember it', () => {
+    const sessionId = `permission-always-${crypto.randomUUID()}`
+    const cli = fakeCli()
+    const desktop = makeClientSocket(sessionId)
+    handleWebSocket.open(desktop)
+
+    cli.emit({ type: 'control_request', request_id: 'req-board', request: { subtype: 'can_use_tool', tool_name: 'StartSession', input: {}, always_asks: true } })
+    cli.emit({ type: 'control_request', request_id: 'req-bash', request: { subtype: 'can_use_tool', tool_name: 'Bash', input: {} } })
+
+    const latest = received(desktop)
+      .filter((msg) => msg.type === 'session_patch' && msg.changes.pendingPermissions)
+      .at(-1)!.changes.pendingPermissions
+    expect(latest).toEqual([
+      expect.objectContaining({ requestId: 'req-board', alwaysAsks: true }),
+      expect.not.objectContaining({ alwaysAsks: true }),
+    ])
+  })
+
   it('tells every client when the CLI withdraws a permission request', () => {
     const sessionId = `permission-cancel-${crypto.randomUUID()}`
     const cli = fakeCli()
@@ -239,9 +256,11 @@ describe('WebSocket permission replies', () => {
 describe('WebSocket restarts wait for the turn to end', () => {
   beforeEach(() => {
     spyOn(console, 'log').mockImplementation(() => {})
+    setServerEndpoint({ serverHost: '127.0.0.1', serverPort: 3456 })
   })
 
   afterEach(() => {
+    setServerEndpoint(null)
     __resetWebSocketHandlerStateForTests()
     mock.restore()
   })

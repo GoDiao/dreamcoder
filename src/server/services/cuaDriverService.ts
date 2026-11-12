@@ -4,7 +4,7 @@
  * through cua's official installer, reads permissions and telemetry state, and
  * runs `doctor`. The CLI imports `resolveCuaDriverPath` directly (no HTTP).
  *
- * Design: docs/computer-use/cua-driver-tech-design.md, ADR-0001 to ADR-0004.
+ * Design: docs/features/computer-use/tech-design.md, ADR-0001 to ADR-0004.
  */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'

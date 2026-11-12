@@ -1061,7 +1061,16 @@ export async function getQueuedCommandAttachments(
   const filtered = queuedCommands.filter(_ =>
     INLINE_NOTIFICATION_MODES.has(_.mode),
   )
-  return Promise.all(
+  const reportAttachments = filtered.flatMap(_ =>
+    (_.reports ?? []).map(report => ({
+      type: 'queued_command' as const,
+      prompt: report.message,
+      source_uuid: report.id as UUID,
+      commandMode: 'prompt' as const,
+      origin: report.origin,
+    })),
+  )
+  const commandAttachments = await Promise.all(
     filtered.map(async _ => {
       const imageBlocks = await buildImageContentBlocks(_.pastedContents)
       let prompt: string | Array<ContentBlockParam> = _.value
@@ -1084,6 +1093,7 @@ export async function getQueuedCommandAttachments(
       }
     }),
   )
+  return [...reportAttachments, ...commandAttachments]
 }
 
 export function getAgentPendingMessageAttachments(

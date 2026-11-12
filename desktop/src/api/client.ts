@@ -69,6 +69,13 @@ export class ApiError extends Error {
   }
 }
 
+export function apiErrorCode(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null
+  const body = error.body
+  if (!body || typeof body !== 'object' || !('error' in body)) return null
+  return typeof body.error === 'string' ? body.error : null
+}
+
 async function request<T>(method: string, path: string, body?: unknown, options?: { timeout?: number }): Promise<T> {
   const url = `${baseUrl}${path}`
   const headers = buildHeaders()

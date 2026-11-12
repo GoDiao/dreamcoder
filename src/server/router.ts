@@ -25,6 +25,7 @@ import { handleMemoryApi } from './api/memory.js'
 import { handleDesktopUiApi } from './api/desktop-ui.js'
 import { handleClaudeCodeImportApi } from './api/claude-code-import.js'
 import { handleTerminalApi } from './api/terminal.js'
+import { handleKanbanApi } from './api/kanban.js'
 
 export async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -56,6 +57,9 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
 
     case 'scheduled-tasks':
       return handleScheduledTasksApi(req, url, segments)
+
+    case 'kanban':
+      return handleKanbanApi(req, url, segments)
 
     case 'search':
       return handleSearchApi(req, url, segments)

@@ -325,7 +325,7 @@ export default function App() {
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-caramel">{t.accessEyebrow}</p>
               <h2 className="mt-3 font-serif text-4xl font-semibold text-brand-text-title md:text-5xl">{t.accessTitle}</h2>
               <p className="mt-5 text-sm leading-8">{t.accessBody}</p>
-              <a href={`${github}/blob/main/docs/ROADMAP_${lang}.md`} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-caramel hover:underline">{t.accessLink}<ArrowRight size={15} /></a>
+              <a href={`${github}/blob/main/docs/general/ROADMAP_${lang}.md`} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-caramel hover:underline">{t.accessLink}<ArrowRight size={15} /></a>
             </div>
           </div>
         </section>
@@ -371,7 +371,7 @@ export default function App() {
       <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-xs text-brand-text-muted md:px-8">
         <span>{t.footer}</span>
         <div className="flex gap-5">
-          <a href={`${github}/blob/main/docs/CONTRIBUTING_${lang}.md`} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">{t.contribute}</a>
+          <a href={`${github}/blob/main/docs/general/CONTRIBUTING_${lang}.md`} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">{t.contribute}</a>
           <a href={github} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">GitHub</a>
           <a href={atomgit} target="_blank" rel="noreferrer" className="hover:text-brand-caramel">AtomGit</a>
         </div>

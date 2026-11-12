@@ -84,7 +84,7 @@ async function flushReactWork() {
 async function renderPanel(sessionId: string) {
   let view!: ReturnType<typeof render>
   await act(async () => {
-    view = render(<WorkspacePanel sessionId={sessionId} sessionTitle="Session" />)
+    view = render(<WorkspacePanel panelId={sessionId} sessionTitle="Session" />)
     await Promise.resolve()
   })
   return view
@@ -294,8 +294,8 @@ function seedExpandedPreviews(
     changedFiles: [],
   }
   return {
-    panelBySession: {
-      ...state.panelBySession,
+    panelByTab: {
+      ...state.panelByTab,
       [sessionId]: fileEntries.length > 0
         ? panelState(...fileEntries.map((entry) => ({ id: `file:${entry.path}`, kind: 'file' as const, path: entry.path })))
         : panelState({ id: 'changes', kind: 'changes' }),
@@ -491,7 +491,7 @@ describe('WorkspacePanel', () => {
 
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: { ...state.panelBySession, 'session-stale': panelState({ id: 'changes', kind: 'changes' }) },
+      panelByTab: { ...state.panelByTab, 'session-stale': panelState({ id: 'changes', kind: 'changes' }) },
       statusBySession: {
         ...state.statusBySession,
         'session-stale': { state: 'ok', workDir: '/repo', repoName: 'repo', branch: 'main', isGitRepo: true, changedFiles: [] },
@@ -821,8 +821,8 @@ describe('WorkspacePanel', () => {
   it('renders image previews from workspace files', async () => {
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-image-preview': panelState({ id: 'files', kind: 'files' }),
       },
       treeBySessionPath: {
@@ -972,8 +972,8 @@ describe('WorkspacePanel', () => {
   it('adds a workspace file to the chat context from the file tree menu', async () => {
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-add-file': panelState({ id: 'files', kind: 'files' }),
       },
       statusBySession: {
@@ -1023,8 +1023,8 @@ describe('WorkspacePanel', () => {
   it('adds a workspace directory to the chat context from the file tree menu', async () => {
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-add-directory': panelState({ id: 'files', kind: 'files' }),
       },
       statusBySession: {
@@ -1094,8 +1094,8 @@ describe('WorkspacePanel', () => {
     })
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-cite-file': panelState({ id: 'files', kind: 'files' }),
       },
       statusBySession: {
@@ -1152,8 +1152,8 @@ describe('WorkspacePanel', () => {
     try {
       await setWorkspaceState((state) => ({
         ...state,
-        panelBySession: {
-          ...state.panelBySession,
+        panelByTab: {
+          ...state.panelByTab,
           'session-copy-file': panelState({ id: 'files', kind: 'files' }),
         },
         statusBySession: {
@@ -1391,8 +1391,8 @@ describe('WorkspacePanel', () => {
     await setSettingsState({ ...settingsInitialState, locale: 'zh' })
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-zh': panelState({ id: 'changes', kind: 'changes' }, { id: 'launcher', kind: 'launcher' }),
       },
     }))
@@ -1407,8 +1407,8 @@ describe('WorkspacePanel', () => {
   it('switches, adds and closes tabs, and expands, restores and closes the panel', async () => {
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-tabs': panelState({ id: 'changes', kind: 'changes' }, { id: 'files', kind: 'files' }),
       },
     }))
@@ -1442,7 +1442,7 @@ describe('WorkspacePanel', () => {
     await clickElement(view.getByRole('button', { name: 'Close panel' }))
     expect(useWorkspacePanelStore.getState().isPanelOpen('session-tabs')).toBe(false)
     expect(view.queryByTestId('workspace-panel')).toBeNull()
-    expect(useWorkspacePanelStore.getState().panelBySession['session-tabs']?.tabs).toHaveLength(2)
+    expect(useWorkspacePanelStore.getState().panelByTab['session-tabs']?.tabs).toHaveLength(2)
   })
 
   it('keeps every terminal tab mounted and names it after its shell', async () => {
@@ -1461,7 +1461,7 @@ describe('WorkspacePanel', () => {
     expect(panels).toHaveLength(2)
     expect(panels.every((panel) => panel.hidden)).toBe(true)
 
-    const [first] = useWorkspacePanelStore.getState().panelBySession['session-terminals']!.tabs
+    const [first] = useWorkspacePanelStore.getState().panelByTab['session-terminals']!.tabs
     await act(() => {
       useWorkspacePanelStore.getState().patchTab('session-terminals', first!.id, { shell: 'zsh' })
     })
@@ -1483,8 +1483,8 @@ describe('WorkspacePanel', () => {
     })
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-launcher': { ...panelState({ id: 'launcher', kind: 'launcher' }), recentFiles: ['src/app.ts'] },
       },
     }))
@@ -1535,7 +1535,7 @@ describe('WorkspacePanel', () => {
 
     let view!: ReturnType<typeof render>
     await act(async () => {
-      view = render(<WorkspacePanel sessionId="session-web" sessionTitle="Session" projectRoot="/repo" />)
+      view = render(<WorkspacePanel panelId="session-web" sessionTitle="Session" projectRoot="/repo" />)
     })
 
     expect(view.getByRole('tab', { name: 'Dev server' }).getAttribute('aria-selected')).toBe('true')
@@ -1546,8 +1546,8 @@ describe('WorkspacePanel', () => {
     getMocks().getWorkspaceStatusMock.mockImplementation(() => new Promise(() => {}))
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-loading': panelState({ id: 'changes', kind: 'changes' }),
       },
     }))
@@ -1561,8 +1561,8 @@ describe('WorkspacePanel', () => {
   it('shows explicit empty and error states in the changed view', async () => {
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-empty': panelState({ id: 'changes', kind: 'changes' }),
       },
       statusBySession: {
@@ -1599,8 +1599,8 @@ describe('WorkspacePanel', () => {
 
     await setWorkspaceState((state) => ({
       ...state,
-      panelBySession: {
-        ...state.panelBySession,
+      panelByTab: {
+        ...state.panelByTab,
         'session-error': panelState({ id: 'changes', kind: 'changes' }),
       },
       errors: {
@@ -1613,7 +1613,7 @@ describe('WorkspacePanel', () => {
     }))
 
     await act(async () => {
-      view.rerender(<WorkspacePanel sessionId="session-error" sessionTitle="Session" />)
+      view.rerender(<WorkspacePanel panelId="session-error" sessionTitle="Session" />)
       await Promise.resolve()
       await Promise.resolve()
     })

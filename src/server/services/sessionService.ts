@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import { ApiError } from '../middleware/errorHandler.js'
 import { LITE_READ_BUF_SIZE, sanitizePath as sanitizePortablePath } from '../../utils/sessionStoragePortable.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
-import { findCanonicalGitRoot } from '../../utils/git.js'
+import { resolveProjectRoot } from '../../utils/projectRoot.js'
 import { calculateUSDCost, MODEL_COSTS } from '../../utils/modelCost.js'
 import {
   calculateCurrentContextTokenTotal,
@@ -25,6 +25,8 @@ import { cleanSessionTitleSource } from '../../utils/sessionTitleText.js'
 import { extractTextBlocks, parseLocalCommand } from '../transcript/classify.js'
 import {
   collectTaskNotifications,
+  pendingReportsFromEntries,
+  type SessionReportEntry,
   entriesToMessages,
   findSubagentLinks,
   shouldHideTranscriptEntry,
@@ -35,14 +37,21 @@ import { buildSessionTranscript } from '../transcript/history.js'
 import type { SessionTranscript } from '../transcript/items.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import type { PermissionMode } from '../ws/protocol.js'
-import type { TitleSource } from '../session/state/types.js'
+import type { PendingReport, TitleSource } from '../session/state/types.js'
 import { permissionModeFromTranscriptEntries } from './permissionModes.js'
 import { runtimeSelectionFromTranscriptEntries } from './runtimeSelection.js'
 import type { RuntimeSelection } from '../session/state/types.js'
+import { queuedCommandSourceUuid } from '../../utils/queuedCommandEntry.js'
+import { isSessionParentKind, type SessionParent } from '../../utils/sessionBranching.js'
+
+export type SessionRelation = {
+  parent?: SessionParent
+}
 
 export type SessionListItem = {
   id: string
   title: string
+  parent?: SessionParent
   createdAt: string
   modifiedAt: string
   messageCount: number
@@ -167,6 +176,22 @@ function lastEntryOfType(entries: RawEntry[], type: string): RawEntry | undefine
     if (entries[i]?.type === type) return entries[i]
   }
   return undefined
+}
+
+function sessionRelationFromEntries(entries: RawEntry[]): SessionRelation {
+  const relation: SessionRelation = {}
+  for (const entry of entries) {
+    if (entry.type !== 'session-meta') continue
+    const parent = entry.parent as Partial<SessionParent> | undefined
+    if (
+      parent &&
+      typeof parent.sessionId === 'string' &&
+      isSessionParentKind(parent.kind)
+    ) {
+      relation.parent = { sessionId: parent.sessionId, kind: parent.kind }
+    }
+  }
+  return relation
 }
 
 function entryTime(entry: RawEntry | undefined): number | null {
@@ -519,27 +544,7 @@ export class SessionService {
       workDir ||
       (fallbackProjectDir ? this.desanitizePath(fallbackProjectDir) : null)
 
-    if (!candidate) return null
-
-    const canonicalCandidate = await this.canonicalizeProjectPath(candidate)
-    const gitRoot = findCanonicalGitRoot(canonicalCandidate)
-    if (gitRoot) return gitRoot
-
-    if (workDir) {
-      const marker = `${path.sep}.claude${path.sep}worktrees${path.sep}`
-      const markerIndex = canonicalCandidate.indexOf(marker)
-      if (markerIndex > 0) return canonicalCandidate.slice(0, markerIndex)
-    }
-
-    return canonicalCandidate
-  }
-
-  private async canonicalizeProjectPath(projectPath: string): Promise<string> {
-    try {
-      return normalizeDriveRootPathForPlatform(await fs.realpath(projectPath)).normalize('NFC')
-    } catch {
-      return projectPath.normalize('NFC')
-    }
+    return candidate ? resolveProjectRoot(candidate) : null
   }
 
   private countTranscriptMessages(entries: RawEntry[]): number {
@@ -1108,6 +1113,7 @@ export class SessionService {
         return {
           id: sessionId,
           title,
+          ...sessionRelationFromEntries(headEntries),
           createdAt,
           modifiedAt: stat.mtime.toISOString(),
           messageCount,
@@ -1184,6 +1190,7 @@ export class SessionService {
     return {
       id: sessionId,
       title,
+      ...sessionRelationFromEntries(entries),
       createdAt,
       modifiedAt: stat.mtime.toISOString(),
       messageCount: messages.length,
@@ -1218,6 +1225,7 @@ export class SessionService {
     repositoryOptions?: CreateSessionRepositoryOptions,
     permissionMode?: PermissionMode,
     runtime?: RuntimeSelection,
+    relation?: SessionRelation,
   ): Promise<{ sessionId: string; workDir: string }> {
     const resolvedWorkDir = workDir || os.homedir()
     const sessionId = crypto.randomUUID()
@@ -1261,6 +1269,7 @@ export class SessionService {
       isMeta: true,
       workDir: absWorkDir,
       repository: preparedWorkspace.repository,
+      ...(relation?.parent ? { parent: relation.parent } : {}),
       timestamp: now,
     }
 
@@ -1385,6 +1394,21 @@ export class SessionService {
     return this.resolveWorkDirFromEntries(entries, found.projectDir)
   }
 
+  async getSessionLinkInfo(sessionId: string): Promise<(SessionRelation & { title: string }) | null> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) return null
+
+    const { entries } = await this.scanSessionFileHead(found.filePath, 100, 100)
+    return { title: this.extractTitle(entries), ...sessionRelationFromEntries(entries) }
+  }
+
+  async getPendingReports(sessionId: string): Promise<SessionReportEntry[]> {
+    const found = await this.findSessionFile(sessionId)
+    if (!found) return []
+
+    return pendingReportsFromEntries(await this.readJsonlFile(found.filePath))
+  }
+
   async getSessionMessageCwd(
     sessionId: string,
     messageId: string,
@@ -1474,6 +1498,7 @@ export class SessionService {
       isMeta: true,
       workDir,
       repository,
+      ...sessionRelationFromEntries(entries),
       timestamp: now,
     }
 
@@ -1503,6 +1528,7 @@ export class SessionService {
     projectRoot: string | null
     repository?: PreparedSessionWorkspace['repository']
     workDirExists: boolean
+    pendingReports: PendingReport[]
   } | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null
@@ -1518,6 +1544,7 @@ export class SessionService {
       projectRoot: workDir ? await this.resolveProjectRootFromEntries(entries, workDir, found.projectDir) : null,
       ...(repository ? { repository } : {}),
       workDirExists: workDir ? await this.pathExists(workDir) : false,
+      pendingReports: pendingReportsFromEntries(entries).map(({ message: _message, ...report }) => report),
     }
   }
 
@@ -1538,6 +1565,19 @@ export class SessionService {
 
   appendSessionRuntimeConfig(sessionId: string, runtime: RuntimeSelection | null): Promise<void> {
     return this.appendSessionEntry(sessionId, this.runtimeConfigEntry(sessionId, runtime))
+  }
+
+  appendSessionReport(sessionId: string, report: SessionReportEntry): Promise<void> {
+    return this.appendSessionEntry(sessionId, { type: 'session-report', ...report, sessionId })
+  }
+
+  appendSessionReportsDelivered(sessionId: string, ids: string[]): Promise<void> {
+    return this.appendSessionEntry(sessionId, {
+      type: 'session-report-delivered',
+      ids,
+      sessionId,
+      timestamp: new Date().toISOString(),
+    })
   }
 
   private appendSessionEntry(sessionId: string, entry: Record<string, unknown>): Promise<void> {
@@ -1581,6 +1621,7 @@ export class SessionService {
           isMeta: true,
           workDir,
           repository,
+          ...sessionRelationFromEntries(entries),
           timestamp: new Date().toISOString(),
         })
       }
@@ -1632,6 +1673,8 @@ export class SessionService {
       (entry) => {
         if (typeof entry.uuid !== 'string') return true
         if (removedIds.has(entry.uuid)) return false
+        const sourceUuid = queuedCommandSourceUuid(entry)
+        if (sourceUuid && removedIds.has(sourceUuid)) return false
         if (
           entry.message?.role &&
           (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'system')

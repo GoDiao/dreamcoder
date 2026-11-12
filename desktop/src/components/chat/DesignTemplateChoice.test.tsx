@@ -163,7 +163,7 @@ describe('DesignTemplateChoice', () => {
       '/app/design-templates/saas/index.html',
       '/app/design-templates/saas',
     ))
-    expect(useWorkspacePanelStore.getState().panelBySession[SESSION]?.tabs[0]).toMatchObject({ kind: 'browser', template: { id: 'saas' } })
+    expect(useWorkspacePanelStore.getState().panelByTab[SESSION]?.tabs[0]).toMatchObject({ kind: 'browser', template: { id: 'saas' } })
   })
 
   it('tells the user when the preview could not be opened', async () => {

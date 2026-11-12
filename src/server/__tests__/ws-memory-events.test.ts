@@ -60,6 +60,7 @@ describe('WebSocket permission guardrail events', () => {
         tool_name: 'Bash',
         tool_use_id: 'tool-1',
         input: { command: 'rm guarded.txt' },
+        always_asks: true,
         permission_guardrail: {
           provider_id: 'provider-1',
           model_id: 'gpt-6-luna',
@@ -80,6 +81,7 @@ describe('WebSocket permission guardrail events', () => {
           toolName: 'Bash',
           toolUseId: 'tool-1',
           input: { command: 'rm guarded.txt' },
+          alwaysAsks: true,
           guardrail: {
             providerId: 'provider-1',
             modelId: 'gpt-6-luna',

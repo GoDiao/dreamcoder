@@ -106,7 +106,13 @@ import {
   isShuttingDown,
 } from 'src/utils/gracefulShutdown.js'
 import { registerCleanup } from 'src/utils/cleanupRegistry.js'
+import { isUserMessageOrigin } from 'src/utils/crossSessionEnvelope.js'
+import { setHostRequester } from 'src/utils/hostRequests.js'
 import { createIdleTimeoutManager } from 'src/utils/idleTimeout.js'
+import {
+  SDKSessionReportSchema,
+  SDKUserMessageOriginSchema,
+} from 'src/entrypoints/sdk/coreSchemas.js'
 import type {
   SDKStatus,
   ModelInfo,
@@ -344,6 +350,7 @@ import {
   markMessagesAsRead,
   isShutdownApproved,
 } from '../utils/teammateMailbox.js'
+import { restoreLeaderTeamNameOnResume } from '../utils/swarm/reconnection.js'
 import { removeTeammateFromTeamFile } from '../utils/swarm/teamHelpers.js'
 import { unassignTeammateTasks } from '../utils/tasks.js'
 import { getRunningTasks } from '../utils/task/framework.js'
@@ -435,6 +442,27 @@ export function joinPromptValues(values: PromptValue[]): PromptValue {
   return values.flatMap(toBlocks)
 }
 
+function sameOrigin(
+  a: QueuedCommand['origin'],
+  b: QueuedCommand['origin'],
+): boolean {
+  if (a === undefined || b === undefined) return a === b
+  if (a.kind === 'kanban' || b.kind === 'kanban') {
+    return (
+      a.kind === b.kind &&
+      a.project === b.project &&
+      a.card?.id === b.card?.id &&
+      a.purpose === b.purpose
+    )
+  }
+  return (
+    a.kind === b.kind &&
+    a.sessionId === b.sessionId &&
+    a.purpose === b.purpose &&
+    a.summary === b.summary
+  )
+}
+
 /**
  * Whether `next` can be batched into the same ask() call as `head`. Only
  * prompt-mode commands batch, and only when the workload tag matches (so the
@@ -450,8 +478,19 @@ export function canBatchWith(
     next !== undefined &&
     next.mode === 'prompt' &&
     next.workload === head.workload &&
-    next.isMeta === head.isMeta
+    next.isMeta === head.isMeta &&
+    sameOrigin(head.origin, next.origin)
   )
+}
+
+export function mergeBatchedCommands(batch: QueuedCommand[]): QueuedCommand {
+  const head = batch[0]!
+  return {
+    ...head,
+    value: joinPromptValues(batch.map(c => c.value)),
+    uuid: batch.findLast(c => c.uuid)?.uuid ?? head.uuid,
+    reports: batch.flatMap(c => c.reports ?? []),
+  }
 }
 
 export async function runHeadless(
@@ -587,6 +626,9 @@ export async function runHeadless(
   }
 
   const structuredIO = getStructuredIO(inputPrompt, options)
+  setHostRequester((request, schema, signal) =>
+    structuredIO.requestHost(request, schema, signal),
+  )
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
   // prints, dependency console.log, library banners) breaks the client's
@@ -733,6 +775,10 @@ export async function runHeadless(
   // unnecessary work while the process winds down.
   if (initialMessages.length === 0 && process.exitCode !== undefined) {
     return
+  }
+
+  if (options.continue || options.resume) {
+    restoreLeaderTeamNameOnResume()
   }
 
   // Handle --rewind-files: restore filesystem and exit immediately
@@ -1954,13 +2000,7 @@ function runHeadlessStreaming(
             while (canBatchWith(command, peek(isMainThread))) {
               batch.push(dequeue(isMainThread)!)
             }
-            if (batch.length > 1) {
-              command = {
-                ...command,
-                value: joinPromptValues(batch.map(c => c.value)),
-                uuid: batch.findLast(c => c.uuid)?.uuid ?? command.uuid,
-              }
-            }
+            if (batch.length > 1) command = mergeBatchedCommands(batch)
           }
           const batchUuids = batch.map(c => c.uuid).filter(u => u !== undefined)
 
@@ -2159,6 +2199,8 @@ function runHeadlessStreaming(
               prompt: input,
               promptUuid: cmd.uuid,
               isMeta: cmd.isMeta,
+              origin: isUserMessageOrigin(cmd.origin) ? cmd.origin : undefined,
+              reports: cmd.reports,
               cwd: cwd(),
               tools: allTools,
               verbose: options.verbose,
@@ -2685,19 +2727,6 @@ function runHeadlessStreaming(
         output.done()
       }
     }
-  }
-
-  // Set up UDS inbox callback so the query loop is kicked off
-  // when a message arrives via the UDS socket in headless mode.
-  if (feature('UDS_INBOX')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { setOnEnqueue } = require('../utils/udsMessaging.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    setOnEnqueue(() => {
-      if (!inputClosed) {
-        void run()
-      }
-    })
   }
 
   // Cron scheduler: runs scheduled_tasks.json tasks in SDK/-p mode.
@@ -4116,6 +4145,9 @@ function runHeadlessStreaming(
         value: await resolveAndPrepend(message, message.message.content),
         uuid: message.uuid,
         priority: message.priority,
+        origin: SDKUserMessageOriginSchema().safeParse(message.origin).data,
+        reports: SDKSessionReportSchema().array().safeParse(message.reports)
+          .data,
       })
       // Increment prompt count for attribution tracking and save snapshot
       // The snapshot persists promptCount so it survives compaction

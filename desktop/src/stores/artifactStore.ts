@@ -19,7 +19,7 @@ function isArtifactTab(tab: WorkspaceTab): tab is ArtifactTab {
 }
 
 function sessionsWithArtifactTabs() {
-  const panels = useWorkspacePanelStore.getState().panelBySession
+  const panels = useWorkspacePanelStore.getState().panelByTab
   return Object.entries(panels).flatMap(([sessionId, panel]) => {
     const tabs = panel?.tabs.filter(isArtifactTab) ?? []
     return tabs.length > 0 ? [{ sessionId, tabs }] : []

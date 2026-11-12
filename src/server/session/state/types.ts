@@ -1,4 +1,5 @@
 import type { BackgroundTaskEvent, GoalEventAction } from '../../transcript/classify.js'
+import type { SessionReportEntry } from '../../transcript/entries.js'
 import type { ClientKind, PermissionMode } from '../../ws/protocol.js'
 
 export type UiPageSummary = {
@@ -48,6 +49,7 @@ export type PendingPermission = {
   description?: string
   suggestions?: unknown[]
   guardrail?: PermissionGuardrailDetails
+  alwaysAsks?: true
 }
 
 export type PendingBrowserGrant = {
@@ -91,6 +93,15 @@ export type RestartReason = 'permission' | 'runtime'
 
 export type ProcessDetail = 'creating_worktree'
 
+export type PendingReport = Omit<SessionReportEntry, 'message'>
+
+export type QueuedMessage = {
+  id: string
+  content: string
+  attachmentCount: number
+  createdAt: number
+}
+
 export type SessionState = {
   id: string
   version: number
@@ -128,6 +139,8 @@ export type SessionState = {
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
   uiPages: UiPageSummary[]
+  pendingReports: PendingReport[]
+  queuedMessages: QueuedMessage[]
   team: { name: string; role: 'lead' | 'member' } | null
   clientCount: number
 }
@@ -142,6 +155,7 @@ export type RestoredSessionFields = {
   title: SessionState['title']
   workspace: SessionState['workspace']
   uiPages: UiPageSummary[]
+  pendingReports: PendingReport[]
 }
 
 export type SessionStateEvent =
@@ -171,6 +185,11 @@ export type SessionStateEvent =
   | { type: 'goal_reported'; goal: Omit<ActiveGoal, 'updatedAt'>; at: number }
   | { type: 'background_task_reported'; task: BackgroundTaskEvent; at: number }
   | { type: 'ui_page_reported'; page: UiPageSummary }
+  | { type: 'report_queued'; report: PendingReport }
+  | { type: 'reports_delivered'; ids: string[] }
+  | { type: 'message_queued'; message: QueuedMessage }
+  | { type: 'queued_message_started'; id: string; at: number }
+  | { type: 'queued_message_cancelled'; id: string }
   | { type: 'team_changed'; team: SessionState['team'] }
   | { type: 'clients_changed'; count: number }
   | { type: 'conversation_cleared' }

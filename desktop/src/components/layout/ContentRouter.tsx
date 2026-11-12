@@ -4,6 +4,7 @@ import { EmptySession } from '../../pages/EmptySession'
 import { ActiveSession } from '../../pages/ActiveSession'
 import { ScheduledTasks } from '../../pages/ScheduledTasks'
 import { ArtifactsPage } from '../../pages/ArtifactsPage'
+import { KanbanPage } from '../../pages/KanbanPage'
 
 export function ContentRouter() {
   const activeTabId = useTabStore((s) => s.activeTabId)
@@ -23,6 +24,8 @@ export function ContentRouter() {
     page = <ScheduledTasks />
   } else if (activeTabType === 'artifacts') {
     page = <ArtifactsPage />
+  } else if (activeTabType === 'kanban') {
+    page = <KanbanPage />
   } else {
     page = <ActiveSession />
   }

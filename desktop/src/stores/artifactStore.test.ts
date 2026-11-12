@@ -76,7 +76,7 @@ describe('artifactStore', () => {
 
     expect(mocks.browserReload).toHaveBeenCalledTimes(1)
     expect(mocks.browserReload).toHaveBeenCalledWith(changed)
-    const tabs = useWorkspacePanelStore.getState().panelBySession['s1']!.tabs
+    const tabs = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs
     expect(tabs.find((tab) => tab.id === changed)).toMatchObject({ artifact: { id: 'id-report', name: 'report', mtimeMs: 250 } })
     expect(tabs.find((tab) => tab.id === unchanged)).toMatchObject({ artifact: { id: 'id-other', name: 'other', mtimeMs: 100 } })
   })
@@ -111,7 +111,7 @@ describe('artifactStore', () => {
 
     expect(mocks.refreshCanvas).toHaveBeenCalledWith(canvas)
     expect(mocks.browserReload).not.toHaveBeenCalled()
-    const tab = useWorkspacePanelStore.getState().panelBySession.s1?.tabs.find((candidate) => candidate.id === canvas)
+    const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs.find((candidate) => candidate.id === canvas)
     expect(tab && 'artifact' in tab ? tab.artifact?.mtimeMs : null).toBe(200)
   })
 
@@ -126,7 +126,7 @@ describe('artifactStore', () => {
 
     expect(mocks.browserReload).toHaveBeenCalledWith(board)
     expect(mocks.refreshCanvas).not.toHaveBeenCalled()
-    const tab = useWorkspacePanelStore.getState().panelBySession.s1?.tabs.find((candidate) => candidate.id === board)
+    const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs.find((candidate) => candidate.id === board)
     expect(tab && 'artifact' in tab ? tab.artifact : null).toEqual({ id: 'id-flow', name: 'flow', mtimeMs: 200, board: 'home' })
   })
 

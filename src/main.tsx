@@ -1541,7 +1541,7 @@ async function run(): Promise<CommanderCommand> {
     }
 
     // Computer Use: cua-driver as the built-in `cua` stdio MCP server
-    // (docs/computer-use/cua-driver-tech-design.md). Only read-only tools are
+    // (docs/features/computer-use/tech-design.md). Only read-only tools are
     // pre-allowed; actions go through the normal permission prompt. Path
     // resolution is local file checks only — nothing is downloaded here.
     //
@@ -1881,12 +1881,8 @@ async function run(): Promise<CommanderCommand> {
     profileCheckpoint('action_before_setup');
     logForDebugging('[STARTUP] Running setup()...');
     const setupStart = Date.now();
-    const messagingSocketPath = feature('UDS_INBOX') ? (options as {
-      messagingSocketPath?: string;
-    }).messagingSocketPath : undefined;
-    // Parallelize setup() with commands+agents loading. setup()'s ~28ms is
-    // mostly startUdsMessaging (socket bind, ~20ms) — not disk-bound, so it
-    // doesn't contend with getCommands' file reads. Gated on !worktreeEnabled
+    // Parallelize setup() with commands+agents loading. setup() does not
+    // contend with getCommands' file reads. Gated on !worktreeEnabled
     // since --worktree makes setup() process.chdir() (setup.ts:203), and
     // commands/agents need the post-chdir cwd.
     const preSetupCwd = getCwd();
@@ -1906,7 +1902,7 @@ async function run(): Promise<CommanderCommand> {
       const {
         setup
       } = await import('./setup.js');
-      await setup(preSetupCwd, permissionMode, allowDangerouslySkipPermissions, worktreeEnabled, worktreeName, tmuxEnabled, sessionId ? validateUuid(sessionId) : undefined, worktreePRNumber, worktreeBaseRef, messagingSocketPath);
+      await setup(preSetupCwd, permissionMode, allowDangerouslySkipPermissions, worktreeEnabled, worktreeName, tmuxEnabled, sessionId ? validateUuid(sessionId) : undefined, worktreePRNumber, worktreeBaseRef);
     })();
     const commandsPromise = worktreeEnabled ? null : getCommands(preSetupCwd);
     const agentDefsPromise = worktreeEnabled ? null : getAgentDefinitionsWithOverrides(preSetupCwd);
@@ -1918,20 +1914,6 @@ async function run(): Promise<CommanderCommand> {
     logForDebugging(`[STARTUP] setup() completed in ${Date.now() - setupStart}ms`);
     profileCheckpoint('action_after_setup');
 
-    // Replay user messages into stream-json only when the socket was
-    // explicitly requested. The auto-generated socket is passive — it
-    // lets tools inject if they want to, but turning it on by default
-    // shouldn't reshape stream-json for SDK consumers who never touch it.
-    // Callers who inject and also want those injections visible in the
-    // stream pass --messaging-socket-path explicitly (or --replay-user-messages).
-    let effectiveReplayUserMessages = !!options.replayUserMessages;
-    if (feature('UDS_INBOX')) {
-      if (!effectiveReplayUserMessages && outputFormat === 'stream-json') {
-        effectiveReplayUserMessages = !!(options as {
-          messagingSocketPath?: string;
-        }).messagingSocketPath;
-      }
-    }
     if (getIsNonInteractiveSession()) {
       // Apply full merged settings env now (including project-scoped
       // .claude/settings.json PATH/GIT_DIR/GIT_WORK_TREE) so gitExe() and
@@ -2866,7 +2848,7 @@ async function run(): Promise<CommanderCommand> {
         fallbackModel: userSpecifiedFallbackModel,
         teleport,
         sdkUrl,
-        replayUserMessages: effectiveReplayUserMessages,
+        replayUserMessages: !!options.replayUserMessages,
         includePartialMessages: effectiveIncludePartialMessages,
         forkSession: options.forkSession || false,
         resumeSessionAt: options.resumeSessionAt || undefined,
@@ -3852,9 +3834,6 @@ async function run(): Promise<CommanderCommand> {
   }
   if (feature('PROACTIVE') || feature('KAIROS')) {
     program.addOption(new Option('--proactive', 'Start in proactive autonomous mode'));
-  }
-  if (feature('UDS_INBOX')) {
-    program.addOption(new Option('--messaging-socket-path <path>', 'Unix domain socket path for the UDS messaging server (defaults to a tmp path)'));
   }
   if (feature('KAIROS') || feature('KAIROS_BRIEF')) {
     program.addOption(new Option('--brief', 'Enable SendUserMessage tool for agent-to-user communication'));

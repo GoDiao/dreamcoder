@@ -1,4 +1,5 @@
 import z from 'zod/v4'
+import type { ToolPermissionContext } from '../../Tool.js'
 import { PAUSE_ICON } from '../../constants/figures.js'
 // Types extracted to src/types/permissions.ts to break import cycles
 import {
@@ -117,6 +118,15 @@ export function permissionModeTitle(mode: PermissionMode): string {
 
 export function isDefaultMode(mode: PermissionMode | undefined): boolean {
   return mode === 'default' || mode === undefined
+}
+
+export function isBypassPermissionsActive(
+  context: ToolPermissionContext,
+): boolean {
+  return (
+    context.mode === 'bypassPermissions' ||
+    (context.mode === 'plan' && context.isBypassPermissionsModeAvailable)
+  )
 }
 
 export function permissionModeShortTitle(mode: PermissionMode): string {

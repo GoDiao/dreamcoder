@@ -1,8 +1,11 @@
 import memoize from 'lodash-es/memoize.js'
+import picomatch from 'picomatch'
 import { allowsOwnArtifactWrite, artifactDenialFor, OWN_ARTIFACT_WRITE_REASON } from './artifactLocation.js'
+import { readdirSync } from 'node:fs'
 import { homedir } from 'os'
-import { dirname, isAbsolute, resolve } from 'path'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import type { ToolPermissionContext } from '../../Tool.js'
+import { logForDebugging } from '../debug.js'
 import { getPlatform } from '../../utils/platform.js'
 import {
   getFsImplementation,
@@ -16,11 +19,17 @@ import {
   checkEditableInternalPath,
   checkPathSafetyForAutoEdit,
   checkReadableInternalPath,
+  checkSensitiveReadPermission,
+  getSensitiveReadPermission,
+  isSensitiveReadFilePattern,
   matchingRuleForInput,
   pathInAllowedWorkingPath,
   pathInWorkingPath,
 } from './filesystem.js'
-import type { PermissionDecisionReason } from './PermissionResult.js'
+import type {
+  PermissionDecision,
+  PermissionDecisionReason,
+} from './PermissionResult.js'
 
 const MAX_DIRS_TO_LIST = 5
 const GLOB_PATTERN_REGEX = /[*?[\]{}]/
@@ -89,6 +98,48 @@ export function expandTilde(path: string): string {
   return path
 }
 
+function checkSensitiveGlobReadPermission(
+  path: string,
+  cwd: string,
+  context: ToolPermissionContext,
+): PermissionDecision | null {
+  const absolutePattern = isAbsolute(path) ? path : resolve(cwd, path)
+  const directory = dirname(absolutePattern)
+  if (GLOB_PATTERN_REGEX.test(directory)) {
+    const filePattern = basename(absolutePattern)
+    if (!isSensitiveReadFilePattern(filePattern)) return null
+    return getSensitiveReadPermission(
+      absolutePattern,
+      absolutePattern,
+      context,
+    )
+  }
+
+  let entries: string[]
+  try {
+    entries = readdirSync(directory)
+  } catch (error) {
+    logForDebugging(
+      `Unable to inspect glob directory ${directory}: ${String(error)}`,
+    )
+    return checkSensitiveReadPermission(absolutePattern, context, [
+      absolutePattern,
+    ])
+  }
+
+  const pattern = basename(absolutePattern)
+  for (const entry of entries) {
+    if (!picomatch.isMatch(entry, pattern)) continue
+    const matchedPath = join(directory, entry)
+    const result = checkSensitiveReadPermission(matchedPath, context)
+    if (result) return result
+  }
+
+  return checkSensitiveReadPermission(absolutePattern, context, [
+    absolutePattern,
+  ])
+}
+
 /**
  * Checks if a resolved path is writable according to the sandbox write allowlist.
  * When the sandbox is enabled, the user has explicitly configured which directories
@@ -145,6 +196,10 @@ export function isPathAllowed(
   operationType: FileOperationType,
   precomputedPathsToCheck?: readonly string[],
 ): PathCheckResult {
+  const pathsToCheck =
+    operationType === 'read'
+      ? (precomputedPathsToCheck ?? getPathsForPermissionCheck(resolvedPath))
+      : precomputedPathsToCheck
   // Determine which permission type to check based on operation
   const permissionType = operationType === 'read' ? 'read' : 'edit'
 
@@ -162,11 +217,28 @@ export function isPathAllowed(
     }
   }
 
-  const artifactDenial = artifactDenialFor(precomputedPathsToCheck ?? [resolvedPath], operationType)
+  const artifactDenial = artifactDenialFor(
+    pathsToCheck ?? [resolvedPath],
+    operationType,
+  )
   if (artifactDenial) {
     return {
       allowed: false,
       decisionReason: artifactDenial,
+    }
+  }
+
+  if (operationType === 'read') {
+    const sensitiveReadResult = checkSensitiveReadPermission(
+      resolvedPath,
+      context,
+      pathsToCheck,
+    )
+    if (sensitiveReadResult) {
+      return {
+        allowed: false,
+        decisionReason: sensitiveReadResult.decisionReason,
+      }
     }
   }
 
@@ -217,7 +289,7 @@ export function isPathAllowed(
   const isInWorkingDir = pathInAllowedWorkingPath(
     resolvedPath,
     context,
-    precomputedPathsToCheck,
+    pathsToCheck,
   )
   if (isInWorkingDir) {
     if (operationType === 'read' || context.mode === 'acceptEdits') {
@@ -469,13 +541,27 @@ export function validatePath(
       }
     }
 
-    // For read operations, validate the base directory where the glob would expand
-    return validateGlobPattern(
+    const result = validateGlobPattern(
       cleanPath,
       cwd,
       toolPermissionContext,
       operationType,
     )
+    if (!result.allowed) return result
+    const absolutePath = isAbsolute(cleanPath)
+      ? cleanPath
+      : resolve(cwd, cleanPath)
+    const sensitiveReadResult = checkSensitiveGlobReadPermission(
+      cleanPath,
+      cwd,
+      toolPermissionContext,
+    )
+    if (!sensitiveReadResult) return result
+    return {
+      allowed: false,
+      resolvedPath: absolutePath,
+      decisionReason: sensitiveReadResult.decisionReason,
+    }
   }
 
   // Resolve path
@@ -493,6 +579,19 @@ export function validatePath(
     operationType,
     isCanonical ? [resolvedPath] : undefined,
   )
+  if (result.allowed && operationType === 'read') {
+    const sensitiveReadResult = checkSensitiveReadPermission(
+      absolutePath,
+      toolPermissionContext,
+    )
+    if (sensitiveReadResult) {
+      return {
+        allowed: false,
+        resolvedPath: absolutePath,
+        decisionReason: sensitiveReadResult.decisionReason,
+      }
+    }
+  }
   return {
     allowed: result.allowed,
     resolvedPath,

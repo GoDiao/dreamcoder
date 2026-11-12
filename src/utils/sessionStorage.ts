@@ -4410,9 +4410,8 @@ export function isLoggableMessage(m: Message): boolean {
   // When enabled, we allow hook_additional_context through since it contains
   // user-configured hook output that is useful for session context on resume.
   if (m.type === 'attachment' && getUserType() !== 'ant') {
-    if (m.attachment.type === 'permission_guardrail_decision') {
-      return true
-    }
+    if (m.attachment.type === 'permission_guardrail_decision') return true
+    if (m.attachment.type === 'queued_command') return true
     if (
       m.attachment.type === 'hook_additional_context' &&
       isEnvTruthy(process.env.CLAUDE_CODE_SAVE_HOOK_ADDITIONAL_CONTEXT)

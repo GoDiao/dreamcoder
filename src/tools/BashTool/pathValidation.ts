@@ -36,6 +36,16 @@ export type PathCommand =
   | 'mv'
   | 'cp'
   | 'cat'
+  | 'tac'
+  | 'rev'
+  | 'fold'
+  | 'expand'
+  | 'unexpand'
+  | 'fmt'
+  | 'pr'
+  | 'comm'
+  | 'cmp'
+  | 'tsort'
   | 'head'
   | 'tail'
   | 'sort'
@@ -277,6 +287,16 @@ export const PATH_EXTRACTORS: Record<
   mv: filterOutFlags,
   cp: filterOutFlags,
   cat: filterOutFlags,
+  tac: filterOutFlags,
+  rev: filterOutFlags,
+  fold: filterOutFlags,
+  expand: filterOutFlags,
+  unexpand: filterOutFlags,
+  fmt: filterOutFlags,
+  pr: filterOutFlags,
+  comm: filterOutFlags,
+  cmp: filterOutFlags,
+  tsort: filterOutFlags,
   head: filterOutFlags,
   tail: filterOutFlags,
   sort: filterOutFlags,
@@ -522,6 +542,16 @@ const ACTION_VERBS: Record<PathCommand, string> = {
   mv: 'move files to/from',
   cp: 'copy files to/from',
   cat: 'concatenate files from',
+  tac: 'concatenate files from',
+  rev: 'reverse text from files in',
+  fold: 'wrap text from files in',
+  expand: 'expand tabs in files from',
+  unexpand: 'compress spaces in files from',
+  fmt: 'format text from files in',
+  pr: 'paginate files from',
+  comm: 'compare files from',
+  cmp: 'compare files from',
+  tsort: 'sort dependencies from files in',
   head: 'read the beginning of files from',
   tail: 'read the end of files from',
   sort: 'sort contents of files from',
@@ -561,6 +591,16 @@ export const COMMAND_OPERATION_TYPE: Record<PathCommand, FileOperationType> = {
   mv: 'write',
   cp: 'write',
   cat: 'read',
+  tac: 'read',
+  rev: 'read',
+  fold: 'read',
+  expand: 'read',
+  unexpand: 'read',
+  fmt: 'read',
+  pr: 'read',
+  comm: 'read',
+  cmp: 'read',
+  tsort: 'read',
   head: 'read',
   tail: 'read',
   sort: 'read',
@@ -747,9 +787,13 @@ export function createPathChecker(
       const operationType =
         operationTypeOverride ?? COMMAND_OPERATION_TYPE[command]
       const suggestions: PermissionUpdate[] = []
+      const isSensitiveReadCheck =
+        operationType === 'read' &&
+        result.decisionReason?.type === 'safetyCheck' &&
+        !result.decisionReason.classifierApprovable
 
       // Only suggest adding directory/rules if we have a blocked path
-      if (result.blockedPath) {
+      if (result.blockedPath && !isSensitiveReadCheck) {
         if (operationType === 'read') {
           // For read operations, suggest a Read rule for the directory (only if it exists)
           const dirPath = getDirectoryForPath(result.blockedPath)

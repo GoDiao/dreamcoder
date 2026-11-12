@@ -142,8 +142,6 @@ function makeClientSocket(sessionId: string) {
       channel: 'client',
       clientKind: 'desktop',
       sdkToken: null,
-      serverPort: 0,
-      serverHost: '127.0.0.1',
     },
     send: mock((payload: string) => {
       sent.push(payload)

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sessionsApi } from '../api/sessions'
 import type { SessionListItem } from '../types/session'
-import { useTabStore } from './tabStore'
+import { kanbanTabId, kanbanTabProject, useTabStore } from './tabStore'
 
 describe('tabStore', () => {
   beforeEach(() => {
@@ -164,6 +164,19 @@ describe('tabStore', () => {
     expect(list).not.toHaveBeenCalled()
     expect(useTabStore.getState().tabs).toEqual([{ sessionId: '__artifacts__', title: 'Artifacts', type: 'artifacts', status: 'idle' }])
     expect(useTabStore.getState().activeTabId).toBe('__artifacts__')
+  })
+
+  it('restores a project board tab without looking for a session of that name', async () => {
+    const id = kanbanTabId('/work/alpha')
+    useTabStore.getState().openTab(id, 'Project board', 'kanban')
+    useTabStore.setState({ tabs: [], activeTabId: null })
+    const list = vi.spyOn(sessionsApi, 'list')
+
+    await useTabStore.getState().restoreTabs()
+
+    expect(list).not.toHaveBeenCalled()
+    expect(useTabStore.getState().tabs).toEqual([{ sessionId: id, title: 'Project board', type: 'kanban', status: 'idle' }])
+    expect(kanbanTabProject(useTabStore.getState().activeTabId)).toBe('/work/alpha')
   })
 
   it('keeps persisted tabs intact when a later page fails so restore can be retried', async () => {

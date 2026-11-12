@@ -1,4 +1,7 @@
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import type { FileReference, GoalEventAction, TaskNotification } from './classify.js'
+
+export type { UserMessageOrigin }
 
 export type TranscriptAttachment =
   | FileReference
@@ -23,6 +26,7 @@ export type TranscriptItem =
       content: string
       modelContent?: string
       transcriptMessageId?: string
+      origin?: UserMessageOrigin
       timestamp: number
       attachments?: TranscriptAttachment[]
     }

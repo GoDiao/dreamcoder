@@ -24,6 +24,7 @@ import type { EffortValue } from './effort.js'
 import type { FileHistoryState } from './fileHistory.js'
 import { fileHistoryEnabled, fileHistoryMakeSnapshot } from './fileHistory.js'
 import { gracefulShutdownSync } from './gracefulShutdown.js'
+import { stampUserMessageOrigin } from './messages.js'
 import { enqueue } from './messageQueueManager.js'
 import { resolveSkillModelOverride } from './model/model.js'
 import type { ProcessUserInputContext } from './processUserInput/processUserInput.js'
@@ -506,9 +507,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
             ? ({ kind: 'task-notification' } as const)
             : undefined)
         if (origin) {
-          for (const m of result.messages) {
-            if (m.type === 'user') m.origin = origin
-          }
+          stampUserMessageOrigin(result.messages, origin)
         }
         newMessages.push(...result.messages)
         if (isFirst) {

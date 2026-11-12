@@ -36,6 +36,7 @@ import type {
 } from 'src/utils/permissions/PermissionResult.js'
 import { hasPermissionsToUseTool } from 'src/utils/permissions/permissions.js'
 import { writeToStdout } from 'src/utils/process.js'
+import type { HostRequest } from 'src/utils/hostRequests.js'
 import { jsonStringify } from 'src/utils/slowOperations.js'
 import { z } from 'zod/v4'
 import { notifyCommandLifecycle } from '../utils/commandLifecycle.js'
@@ -555,6 +556,14 @@ export class StructuredIO {
     }
   }
 
+  requestHost<T>(
+    request: HostRequest,
+    schema: z.ZodType<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.sendRequest<T>(request as SDKControlRequest['request'], schema, signal)
+  }
+
   createCanUseTool(
     onPermissionPrompt?: (details: RequiresActionDetails) => void,
   ): CanUseToolFn {
@@ -637,6 +646,7 @@ export class StructuredIO {
             ),
             tool_use_id: toolUseID,
             agent_id: toolUseContext.agentId,
+            ...(mainPermissionResult.decisionReason?.type === 'safetyCheck' ? { always_asks: true } : {}),
           },
           permissionToolOutputSchema(),
           hookAbortController.signal,

@@ -35,7 +35,7 @@ describe('useReleaseIdleSessions', () => {
   afterEach(() => {
     useTabStore.setState(useTabStore.getInitialState(), true)
     useBrowserStore.setState(useBrowserStore.getInitialState(), true)
-    useWorkspacePanelStore.setState({ panelBySession: {} })
+    useWorkspacePanelStore.setState({ panelByTab: {} })
     localStorage.clear()
   })
 
@@ -51,7 +51,7 @@ describe('useReleaseIdleSessions', () => {
     renderHook(() => useReleaseIdleSessions())
 
     expect(Object.keys(useBrowserStore.getState().pageByTab)).toEqual([kept])
-    expect(useWorkspacePanelStore.getState().panelBySession['session-0']?.tabs).toEqual([
+    expect(useWorkspacePanelStore.getState().panelByTab['session-0']?.tabs).toEqual([
       { id: released, kind: 'browser', url: 'https://old.test/', title: '' },
     ])
   })

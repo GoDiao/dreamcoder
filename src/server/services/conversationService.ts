@@ -24,6 +24,9 @@ import { SettingsService } from './settingsService.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { permissionModeCliArgs } from './permissionModes.js'
 import { SHOW_UI_ENABLED_ENV } from '../../tools/ShowUITool/constants.js'
+import { SESSION_LINKS_ENABLED_ENV } from '../../tools/StartSessionTool/constants.js'
+import type { SessionReport, UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import { errorMessage } from '../../utils/errors.js'
 
 const MAX_CAPTURED_PROCESS_LINES = 80
 const MAX_CAPTURED_SDK_MESSAGES = 40
@@ -57,6 +60,8 @@ type SessionProcess = {
   sdkMessages: any[]
   initMessage: any | null
 }
+
+export type HostRequest = { request_id?: unknown; request?: { subtype?: unknown } & Record<string, unknown> }
 
 export type ProcessExitEvent = { sessionId: string; generation: number }
 
@@ -483,6 +488,9 @@ export class ConversationService {
     content: string,
     attachments?: AttachmentRef[],
     uuid?: string,
+    origin?: UserMessageOrigin,
+    reports?: SessionReport[],
+    priority?: 'now' | 'next' | 'later',
   ): boolean {
     return this.sendSdkMessage(sessionId, {
       type: 'user',
@@ -493,6 +501,48 @@ export class ConversationService {
       parent_tool_use_id: null,
       session_id: '',
       ...(uuid ? { uuid } : {}),
+      ...(origin ? { origin } : {}),
+      ...(reports && reports.length > 0 ? { reports } : {}),
+      ...(priority ? { priority } : {}),
+    })
+  }
+
+  async cancelQueuedMessage(sessionId: string, messageId: string): Promise<boolean> {
+    const response = await this.requestControl(sessionId, {
+      subtype: 'cancel_async_message',
+      message_uuid: messageId,
+    })
+    return response.cancelled === true
+  }
+
+  answerHostRequest(
+    sessionId: string,
+    cliMsg: HostRequest,
+    subtypes: ReadonlySet<string>,
+    work: (subtype: string) => Promise<Record<string, unknown>>,
+    formatError: (error: unknown) => string = errorMessage,
+  ): boolean {
+    const subtype = cliMsg.request?.subtype
+    if (typeof subtype !== 'string' || !subtypes.has(subtype)) return false
+    const requestId = cliMsg.request_id
+    if (typeof requestId !== 'string') return true
+    void work(subtype).then(
+      (response) => this.respondToHostRequest(sessionId, requestId, { response }),
+      (error: unknown) => this.respondToHostRequest(sessionId, requestId, { error: formatError(error) }),
+    )
+    return true
+  }
+
+  respondToHostRequest(
+    sessionId: string,
+    requestId: string,
+    result: { response: Record<string, unknown> } | { error: string },
+  ): boolean {
+    return this.sendSdkMessage(sessionId, {
+      type: 'control_response',
+      response: 'error' in result
+        ? { subtype: 'error', request_id: requestId, error: result.error }
+        : { subtype: 'success', request_id: requestId, response: result.response },
     })
   }
 
@@ -1004,6 +1054,8 @@ export class ConversationService {
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
       CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: '1',
       [SHOW_UI_ENABLED_ENV]: '1',
+      [SESSION_LINKS_ENABLED_ENV]: '1',
+      CLAUDE_CODE_EAGER_FLUSH: '1',
       CLAUDE_CODE_DIAGNOSTICS_FILE: cliDiagnosticsPath,
       CLAUDE_COWORK_MEMORY_PATH_OVERRIDE: this.resolveDesktopAutoMemoryPath(workDir),
       CALLER_DIR: workDir,

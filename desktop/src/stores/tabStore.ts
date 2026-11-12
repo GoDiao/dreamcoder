@@ -13,9 +13,20 @@ const memLog = (label: string) => {
 
 export const SCHEDULED_TAB_ID = '__scheduled__'
 export const ARTIFACTS_TAB_ID = '__artifacts__'
+const KANBAN_TAB_PREFIX = '__kanban__:'
 
 /** Tabs are the internal current-page router; there is no visible tab bar. */
-export type TabType = 'session' | 'scheduled' | 'artifacts'
+export type TabType = 'session' | 'scheduled' | 'artifacts' | 'kanban'
+
+const PAGE_TAB_TYPES: ReadonlySet<string | undefined> = new Set<TabType>(['scheduled', 'artifacts', 'kanban'])
+
+export function kanbanTabId(project: string) {
+  return `${KANBAN_TAB_PREFIX}${project}`
+}
+
+export function kanbanTabProject(tabId: string | null | undefined) {
+  return tabId?.startsWith(KANBAN_TAB_PREFIX) ? tabId.slice(KANBAN_TAB_PREFIX.length) : null
+}
 
 export type Tab = {
   sessionId: string
@@ -165,7 +176,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       memLog('restoreTabs:start')
       const restorableTabs = data.openTabs.filter((tab) => !isRetiredTab(tab))
       const pendingSessionIds = new Set(restorableTabs
-        .filter((tab) => tab.type !== 'scheduled' && tab.type !== 'artifacts')
+        .filter((tab) => !PAGE_TAB_TYPES.has(tab.type))
         .map((tab) => tab.sessionId))
       const sessionTitles = new Map<string, string>()
       const pageSize = 200
@@ -181,9 +192,9 @@ export const useTabStore = create<TabStore>((set, get) => ({
       memLog(`restoreTabs:after-list (resolved ${sessionTitles.size} sessions)`)
 
       const validTabs: Tab[] = restorableTabs
-        .filter((t) => t.type === 'scheduled' || t.type === 'artifacts' || sessionTitles.has(t.sessionId))
+        .filter((t) => PAGE_TAB_TYPES.has(t.type) || sessionTitles.has(t.sessionId))
         .map((t) => {
-          if (t.type === 'scheduled' || t.type === 'artifacts') {
+          if (t.type === 'scheduled' || t.type === 'artifacts' || t.type === 'kanban') {
             return { sessionId: t.sessionId, title: t.title, type: t.type, status: 'idle' as const }
           }
           return {
@@ -208,3 +219,9 @@ export const useTabStore = create<TabStore>((set, get) => ({
     } catch { }
   },
 }))
+
+export function openBoardTab(project: string, title: string): string {
+  const tabId = kanbanTabId(project)
+  useTabStore.getState().openTab(tabId, title, 'kanban')
+  return tabId
+}

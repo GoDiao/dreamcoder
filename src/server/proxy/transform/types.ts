@@ -118,6 +118,7 @@ export type OpenAIResponsesRequest = {
     name: string
     description?: string
     parameters?: Record<string, unknown>
+    strict: false
   }>
   tool_choice?: unknown
   reasoning?: { effort?: 'low' | 'medium' | 'high' }

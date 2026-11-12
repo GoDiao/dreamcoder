@@ -32,6 +32,8 @@ function mirror(browserActivity: SessionState['browserActivity']): SessionState 
     activeGoal: null,
     backgroundTasks: [],
     uiPages: [],
+    pendingReports: [],
+    queuedMessages: [],
     team: null,
     clientCount: 1,
   }

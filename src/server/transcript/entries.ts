@@ -1,3 +1,5 @@
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
+import { isUserMessageOrigin } from '../../utils/crossSessionEnvelope.js'
 import {
   extractLocalCommandOutput,
   extractTextBlocks,
@@ -9,6 +11,7 @@ import {
   type CompactMetadata,
   type TaskNotification,
 } from './classify.js'
+import { queuedCommandSourceUuid } from '../../utils/queuedCommandEntry.js'
 
 /** One line of a CLI transcript JSONL file, as far as transcript interpretation reads it. */
 export type TranscriptEntry = {
@@ -40,6 +43,7 @@ export type MessageEntry = {
   parentUuid?: string
   parentToolUseId?: string
   isSidechain?: boolean
+  origin?: UserMessageOrigin
   /** Set on the summary message that follows a compaction. */
   compactMetadata?: CompactMetadata
 }
@@ -80,6 +84,7 @@ function entryToMessage(entry: TranscriptEntry, parentToolUseId?: string): Messa
     parentUuid: entry.parentUuid ?? undefined,
     parentToolUseId,
     isSidechain: entry.isSidechain,
+    ...(msg.role === 'user' && isUserMessageOrigin(entry.origin) ? { origin: entry.origin } : {}),
   }
 }
 
@@ -172,6 +177,30 @@ export function shouldHideTranscriptEntry(entry: TranscriptEntry): boolean {
   }
 
   return false
+}
+
+function queuedCommandToMessage(entry: TranscriptEntry): MessageEntry | null {
+  if (entry.type !== 'attachment') return null
+  const attachment = entry.attachment as Record<string, unknown> | undefined
+  if (attachment?.type !== 'queued_command') return null
+  const { prompt, origin, commandMode, isMeta } = attachment
+  if (commandMode !== undefined && commandMode !== 'prompt') return null
+  if (typeof prompt !== 'string' && !Array.isArray(prompt)) return null
+  if (isTaskNotificationContent(prompt)) return null
+
+  const messageOrigin = isUserMessageOrigin(origin) ? origin : undefined
+  const human = origin === undefined && isMeta !== true
+  if (!messageOrigin && !human) return null
+
+  return {
+    id: queuedCommandSourceUuid(entry) ?? (entry.uuid || crypto.randomUUID()),
+    type: 'user',
+    content: prompt,
+    timestamp: entry.timestamp || new Date().toISOString(),
+    parentUuid: entry.parentUuid ?? undefined,
+    isSidechain: entry.isSidechain,
+    ...(messageOrigin ? { origin: messageOrigin } : {}),
+  }
 }
 
 /** `/goal` breadcrumbs are the only local command entries the conversation shows. */
@@ -295,6 +324,13 @@ export function entriesToMessages(entries: TranscriptEntry[]): MessageEntry[] {
       continue
     }
 
+    const queuedMessage = queuedCommandToMessage(entry)
+    if (queuedMessage) {
+      suppressTaskNotificationResponse = false
+      messages.push(queuedMessage)
+      continue
+    }
+
     if (!entry.message?.role) continue
     if (entry.isMeta) continue
 
@@ -322,6 +358,51 @@ export function entriesToMessages(entries: TranscriptEntry[]): MessageEntry[] {
     messages.push(compactMetadata ? { ...msg, compactMetadata } : msg)
   }
   return messages
+}
+
+export type SessionReportEntry = {
+  id: string
+  from: { sessionId: string; name?: string }
+  summary: string
+  message: string
+  createdAt: number
+}
+
+function toSessionReportEntry(entry: TranscriptEntry): SessionReportEntry | null {
+  const from = entry.from as { sessionId?: unknown; name?: unknown } | undefined
+  const { id, summary, message } = entry
+  const createdAt: unknown = entry.createdAt
+  if (
+    entry.type !== 'session-report' ||
+    typeof id !== 'string' ||
+    typeof summary !== 'string' ||
+    typeof message !== 'string' ||
+    typeof createdAt !== 'number' ||
+    typeof from?.sessionId !== 'string' ||
+    (from.name !== undefined && typeof from.name !== 'string')
+  ) {
+    return null
+  }
+  return {
+    id,
+    from: { sessionId: from.sessionId, ...(from.name === undefined ? {} : { name: from.name as string }) },
+    summary,
+    message,
+    createdAt,
+  }
+}
+
+export function pendingReportsFromEntries(entries: TranscriptEntry[]): SessionReportEntry[] {
+  const delivered = new Set<string>()
+  for (const entry of entries) {
+    if (entry.type === 'session-report-delivered' && Array.isArray(entry.ids)) {
+      for (const id of entry.ids) if (typeof id === 'string') delivered.add(id)
+    }
+  }
+  return entries.flatMap((entry) => {
+    const report = toSessionReportEntry(entry)
+    return report && !delivered.has(report.id) ? [report] : []
+  })
 }
 
 /** Terminal background-task notifications recorded in the transcript. */

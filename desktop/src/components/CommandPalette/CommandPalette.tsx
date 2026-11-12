@@ -2,8 +2,7 @@ import { useRef, useState } from 'react'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { useSessionStore } from '../../stores/sessionStore'
-import { useTabStore } from '../../stores/tabStore'
-import { useChatStore } from '../../stores/chatStore'
+import { openSessionTab } from '../../lib/sessionNavigation'
 import type { SessionListItem } from '../../types/session'
 import { useOverlayReturnFocus } from '../../hooks/useOverlayReturnFocus'
 import { Dialog, DialogContent, DialogTitle } from '../shared/ui/dialog'
@@ -32,8 +31,7 @@ function CommandPaletteContent() {
         ? state.sessions.map((item) => item.id === session.id ? { ...item, ...session } : item)
         : [...state.sessions, session],
     }))
-    useTabStore.getState().openTab(session.id, session.title)
-    useChatStore.getState().connectToSession(session.id)
+    openSessionTab(session.id, session.title)
     close()
   }
 

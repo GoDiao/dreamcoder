@@ -63,6 +63,7 @@ function toPendingPermission(cliMsg: any): PendingPermission {
     ...(typeof request.description === 'string' && request.description.trim() ? { description: request.description } : {}),
     ...(Array.isArray(request.permission_suggestions) ? { suggestions: request.permission_suggestions } : {}),
     ...(guardrail ? { guardrail } : {}),
+    ...(request.always_asks === true ? { alwaysAsks: true as const } : {}),
   }
 }
 
@@ -270,6 +271,9 @@ function translateMessages(
 
     case 'user': {
       const messages: ServerMessage[] = []
+      if (cliMsg.isReplay && typeof cliMsg.uuid === 'string') {
+        events.push({ type: 'queued_message_started', id: cliMsg.uuid, at: now })
+      }
       const echo = replayedUserMessage(cliMsg)
       if (echo) return [echo]
 

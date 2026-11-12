@@ -47,4 +47,4 @@
 ## 参与与反馈
 
 - 发现文中描述与代码不符，或有讲得不清楚的地方，欢迎提交 [issue](https://github.com/GoDiao/dreamcoder/issues)。
-- 想动手改进 DreamCoder，可以先读[贡献指南](../CONTRIBUTING_zh.md)，再从 [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 开始。
+- 想动手改进 DreamCoder，可以先读[贡献指南](../general/CONTRIBUTING_zh.md)，再从 [good first issue](https://github.com/GoDiao/dreamcoder/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 开始。

@@ -20,6 +20,10 @@ import type { NonNullableUsage } from 'src/services/api/logging.js'
 import { EMPTY_USAGE } from 'src/services/api/logging.js'
 import stripAnsi from 'strip-ansi'
 import type { Command } from './commands.js'
+import type {
+  SessionReport,
+  UserMessageOrigin,
+} from './entrypoints/sdk/coreSchemas.js'
 import { getSlashCommandToolSkills } from './commands.js'
 import {
   COMMAND_NAME_TAG,
@@ -61,7 +65,13 @@ import {
 import { headlessProfilerCheckpoint } from './utils/headlessProfiler.js'
 import { registerStructuredOutputEnforcement } from './utils/hooks/hookHelpers.js'
 import { getInMemoryErrors } from './utils/log.js'
-import { countToolCalls, SYNTHETIC_MESSAGES } from './utils/messages.js'
+import {
+  countToolCalls,
+  createSessionReportMessages,
+  stampUserMessageOrigin,
+  SYNTHETIC_MESSAGES,
+  wrapCrossSessionPrompt,
+} from './utils/messages.js'
 import {
   getMainLoopModel,
   parseUserSpecifiedModel,
@@ -210,7 +220,12 @@ export class QueryEngine {
 
   async *submitMessage(
     prompt: string | ContentBlockParam[],
-    options?: { uuid?: string; isMeta?: boolean },
+    options?: {
+      uuid?: string
+      isMeta?: boolean
+      origin?: UserMessageOrigin
+      reports?: SessionReport[]
+    },
   ): AsyncGenerator<SDKMessage, void, unknown> {
     const {
       cwd,
@@ -416,7 +431,9 @@ export class QueryEngine {
       model: modelFromUserInput,
       resultText,
     } = await processUserInput({
-      input: prompt,
+      input: options?.origin
+        ? wrapCrossSessionPrompt(prompt, options.origin)
+        : prompt,
       mode: 'prompt',
       setToolJSX: () => {},
       context: {
@@ -426,11 +443,18 @@ export class QueryEngine {
       messages: this.mutableMessages,
       uuid: options?.uuid,
       isMeta: options?.isMeta,
+      skipSlashCommands: options?.origin !== undefined,
       querySource: 'sdk',
     })
 
+    if (options?.origin) {
+      stampUserMessageOrigin(messagesFromUserInput, options.origin)
+    }
+
+    const reportMessages = createSessionReportMessages(options?.reports ?? [])
+
     // Push new messages, including user input and any attachments
-    this.mutableMessages.push(...messagesFromUserInput)
+    this.mutableMessages.push(...reportMessages, ...messagesFromUserInput)
 
     // Update params to reflect updates from processing /slash commands
     const messages = [...this.mutableMessages]
@@ -449,7 +473,10 @@ export class QueryEngine {
     // kill-mid-request. The await is ~4ms on SSD, ~30ms under disk contention
     // — the single largest controllable critical-path cost after module eval.
     // Transcript is still written (for post-hoc debugging); just not blocking.
-    if (persistSession && messagesFromUserInput.length > 0) {
+    if (
+      persistSession &&
+      (messagesFromUserInput.length > 0 || reportMessages.length > 0)
+    ) {
       const transcriptPromise = recordTranscript(messages)
       if (isBareMode()) {
         void transcriptPromise
@@ -1277,6 +1304,8 @@ export async function* ask({
   prompt,
   promptUuid,
   isMeta,
+  origin,
+  reports,
   cwd,
   tools,
   mcpClients,
@@ -1308,6 +1337,8 @@ export async function* ask({
   prompt: string | Array<ContentBlockParam>
   promptUuid?: string
   isMeta?: boolean
+  origin?: UserMessageOrigin
+  reports?: SessionReport[]
   cwd: string
   tools: Tools
   verbose?: boolean
@@ -1377,6 +1408,8 @@ export async function* ask({
     yield* engine.submitMessage(prompt, {
       uuid: promptUuid,
       isMeta,
+      origin,
+      reports,
     })
   } finally {
     setReadFileCache(engine.getReadFileState())

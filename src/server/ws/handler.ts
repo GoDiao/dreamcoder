@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from 'bun'
-import type { ClientKind, ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
+import type { AttachmentRef, ClientKind, ClientMessage, PermissionMode, ServerMessage } from './protocol.js'
+import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import type { ExternalPermissionMode } from '../../types/permissions.js'
 import * as os from 'node:os'
@@ -27,10 +28,10 @@ import {
   disposeAllSessionRuntimes,
   disposeSessionRuntime,
   getConnectedSessionIds,
+  getServerEndpoint,
   getSessionRuntime,
   peekSessionRuntime,
   resetConversationState,
-  type SessionEndpoint,
   type SessionSlashCommand,
 } from './sessionRuntime.js'
 import { sessionStateStore, type SessionStateChange } from '../session/state/store.js'
@@ -40,6 +41,10 @@ import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
 import { artifactService } from '../services/artifactService.js'
+import { createLinkedSession, createSessionLinks, discardSession, isSessionRunning } from '../services/sessionLinksService.js'
+import { createKanban } from '../services/kanbanService.js'
+import { createKanbanControl } from '../services/kanbanControl.js'
+import { createTurnQueue } from '../services/turnQueueService.js'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
@@ -51,6 +56,33 @@ const CLIENT_DISCONNECT_CLEANUP_MS = 30_000
 const PENDING_PERMISSION_DISCONNECT_CLEANUP_MS = 30 * 60_000
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 5 * 60_000
 const MESSAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const turnQueue = createTurnQueue(
+  (sessionId, message) => broadcastToSession(sessionId, message),
+  (sessionId, content, options) => deliverUserTurn(sessionId, content, options),
+)
+
+export const kanban = createKanban({
+  sessionInfo: async (sessionId) => {
+    const info = await sessionService.getSessionLinkInfo(sessionId)
+    return info
+      ? { title: info.title, exists: true, running: isSessionRunning(sessionId) }
+      : { title: '', exists: false, running: false }
+  },
+  sessionWorkspace: async (sessionId) => (await store.read(sessionId)).workspace,
+  deliver: (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
+  createLinkedSession,
+  discardSession,
+})
+
+const kanbanControl = createKanbanControl(kanban)
+
+const sessionLinks = createSessionLinks({
+  deliver: (sessionId, content, origin) => deliverUserTurn(sessionId, content, { origin }),
+  queueReport: turnQueue.queueReport,
+  onRenamed: (sessionId, title) => noteSessionRenamed(sessionId, title),
+  startCardAssignee: kanbanControl.startAssignee,
+})
 
 installSessionPersistence(store)
 store.subscribe(relayStateChange)
@@ -92,8 +124,6 @@ export type WebSocketData = {
   channel: 'client' | 'sdk'
   clientKind: ClientKind
   sdkToken: string | null
-  serverPort: number
-  serverHost: string
 }
 
 export const handleWebSocket = {
@@ -122,7 +152,6 @@ export const handleWebSocket = {
 
     sendMessage(ws, { type: 'connected', sessionId })
     runtime.clients.add(ws)
-    runtime.endpoint = { serverHost: ws.data.serverHost, serverPort: ws.data.serverPort }
     store.apply(sessionId, { type: 'clients_changed', count: runtime.clients.size })
     ensurePipelineAttached(sessionId)
     void sendSnapshot(ws)
@@ -178,6 +207,14 @@ export const handleWebSocket = {
           handleStopGeneration(ws)
           break
 
+        case 'cancel_queued_message':
+          void turnQueue.cancelMessage(ws.data.sessionId, message.id)
+          break
+
+        case 'send_queued_now':
+          turnQueue.interrupt(ws.data.sessionId)
+          break
+
         case 'ping':
           ws.send(JSON.stringify({ type: 'pong' } satisfies ServerMessage))
           break
@@ -210,19 +247,7 @@ export const handleWebSocket = {
       return
     }
 
-    const cleanupDelayMs = getDisconnectCleanupDelayMs(sessionId)
-    const cleanupTimer = setTimeout(() => {
-      const current = peekSessionRuntime(sessionId)
-      if (current) current.disconnectCleanupTimer = undefined
-      if (!hasActiveClients(sessionId)) {
-        console.log(`[WS] Session ${sessionId} not reconnected after ${cleanupDelayMs}ms, stopping CLI subprocess`)
-        conversationService.stopSession(sessionId)
-        disposeSessionRuntime(sessionId)
-        store.dispose(sessionId)
-        conversationService.forgetSession(sessionId)
-      }
-    }, cleanupDelayMs)
-    getSessionRuntime(sessionId).disconnectCleanupTimer = cleanupTimer
+    scheduleClientlessCleanup(sessionId)
   },
 
   drain(ws: ServerWebSocket<WebSocketData>) {
@@ -280,6 +305,12 @@ export function handleRawCliMessage(sessionId: string, cliMsg: any): void {
     })
     return
   }
+  if (
+    cliMsg.type === 'control_request' &&
+    (sessionLinks.handleControlRequest(sessionId, cliMsg) || kanbanControl.handleControlRequest(sessionId, cliMsg))
+  ) {
+    return
+  }
   if (cliMsg.type !== 'control_response') return
   const requestId = cliMsg.response?.request_id
   const runtime = peekSessionRuntime(sessionId)
@@ -326,12 +357,18 @@ function relayStateChange({ sessionId, event, patch, previous, state }: SessionS
 
   if (patch.turn && previous.turn.phase === 'idle' && state.turn.phase !== 'idle') {
     trackArtifactTurn(sessionId, 'beginTurn')
+    const runtime = peekSessionRuntime(sessionId)
+    if (runtime?.disconnectCleanupTimer) {
+      clearTimeout(runtime.disconnectCleanupTimer)
+      runtime.disconnectCleanupTimer = undefined
+    }
   }
 
   if (patch.turn && previous.turn.phase !== 'idle' && state.turn.phase === 'idle') {
     trackArtifactTurn(sessionId, 'endTurn')
     peekSessionRuntime(sessionId)?.answeredPermissions.clear()
     runQueuedRestart(sessionId)
+    if (!hasActiveClients(sessionId)) scheduleClientlessCleanup(sessionId)
   }
 }
 
@@ -347,7 +384,29 @@ async function handleUserMessage(
   ws: ServerWebSocket<WebSocketData>,
   message: Extract<ClientMessage, { type: 'user_message' }>
 ) {
-  const { sessionId } = ws.data
+  const result = await deliverUserTurn(ws.data.sessionId, message.content, {
+    attachments: message.attachments,
+    id: message.id,
+  })
+  if (!result.ok && result.code === 'INVALID_SLASH_COMMAND_ARGS') {
+    sendMessage(ws, { type: 'error', message: result.message ?? '', code: result.code })
+  }
+}
+
+export type DeliverUserTurnOptions = {
+  attachments?: AttachmentRef[]
+  id?: unknown
+  origin?: UserMessageOrigin
+}
+
+export type DeliverUserTurnResult = { ok: boolean; code?: string; message?: string }
+
+export async function deliverUserTurn(
+  sessionId: string,
+  content: string,
+  options: DeliverUserTurnOptions = {},
+): Promise<DeliverUserTurnResult> {
+  const { origin } = options
   getBrowserRuntime().service.resume(sessionId)
 
   const runtime = peekSessionRuntime(sessionId)
@@ -356,23 +415,24 @@ async function handleUserMessage(
     clearPrewarmState(runtime)
   }
 
-  const desktopSlashCommand = getDesktopSlashCommand(message.content)
+  const desktopSlashCommand = origin ? null : getDesktopSlashCommand(content)
   if (desktopSlashCommand?.commandName === 'clear' && desktopSlashCommand.args.trim()) {
-    sendMessage(ws, {
-      type: 'error',
-      message: 'The /clear command does not accept arguments.',
+    return {
+      ok: false,
       code: 'INVALID_SLASH_COMMAND_ARGS',
-    })
-    return
+      message: 'The /clear command does not accept arguments.',
+    }
   }
 
   if (desktopSlashCommand?.commandName === 'clear') {
-    await handleDesktopClearCommand(ws)
-    return
+    await handleDesktopClearCommand(sessionId)
+    return { ok: true }
   }
 
   const initialRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(sessionId)
-  if (!initialRuntimeTransition.ok) return
+  if (!initialRuntimeTransition.ok) {
+    return { ok: false, code: 'CLI_RESTART_FAILED', message: initialRuntimeTransition.message ?? '' }
+  }
 
   let titleState = peekSessionRuntime(sessionId)?.title
   if (!titleState) {
@@ -386,7 +446,7 @@ async function handleUserMessage(
     }
     getSessionRuntime(sessionId).title = titleState
   }
-  const titleInput = getTitleInputForUserMessage(message.content, desktopSlashCommand)
+  const titleInput = getTitleInputForUserMessage(content, desktopSlashCommand)
   if (titleInput) {
     titleState.userMessageCount++
     titleState.allUserMessages.push(titleInput)
@@ -397,24 +457,36 @@ async function handleUserMessage(
   }
 
   try {
-    await ensureCliSessionStarted(ws.data, sessionId, 'user_message')
+    await ensureCliSessionStarted(sessionId, 'user_message')
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     const code =
       err instanceof ConversationStartupError ? err.code : 'CLI_START_FAILED'
     console.error(`[WS] CLI start failed for ${sessionId}: ${errMsg}`)
+    const message = await buildSessionStartupDiagnosticMessage(sessionId, errMsg)
     broadcastToSession(sessionId, {
       type: 'error',
-      message: await buildSessionStartupDiagnosticMessage(sessionId, errMsg),
+      message,
       code,
       retryable:
         err instanceof ConversationStartupError ? err.retryable : false,
     })
-    return
+    return { ok: false, code, message }
   }
 
   const startupRuntimeTransition = await waitForRuntimeTransitionBeforeUserTurn(sessionId)
-  if (!startupRuntimeTransition.ok) return
+  if (!startupRuntimeTransition.ok) {
+    return { ok: false, code: 'CLI_RESTART_FAILED', message: startupRuntimeTransition.message ?? '' }
+  }
+
+  const requestedId = messageIdFrom(options.id)
+  if (turnQueue.shouldQueue(sessionId, content, origin)) {
+    ensurePipelineAttached(sessionId)
+    const queued = turnQueue.queueMessage(sessionId, requestedId ?? crypto.randomUUID(), content, options.attachments)
+    return queued ? { ok: true } : reportCliNotRunning(sessionId)
+  }
+
+  const reports = await turnQueue.claimReports(sessionId)
 
   const shouldForwardCurrentTurnLocalCommand =
     createCurrentTurnLocalCommandForwarder(desktopSlashCommand)
@@ -424,30 +496,37 @@ async function handleUserMessage(
   pipeline.gate = (cliMsg) =>
     (cliMsg.type === 'result' && cliMsg.is_error) || shouldForwardCurrentTurnLocalCommand(cliMsg)
 
+  const messageId = requestedId ?? (origin ? crypto.randomUUID() : undefined)
   const sent = conversationService.sendMessage(
     sessionId,
-    message.content,
-    message.attachments,
-    typeof message.id === 'string' && MESSAGE_ID_PATTERN.test(message.id) ? message.id : undefined,
+    content,
+    options.attachments,
+    messageId,
+    origin,
+    reports,
   )
-  if (!sent) {
-    broadcastToSession(sessionId, {
-      type: 'error',
-      message: 'CLI process is not running. The session may have ended or the process crashed.',
-      code: 'CLI_NOT_RUNNING',
-    })
-    return
-  }
+  if (!sent) return reportCliNotRunning(sessionId)
 
   pipeline.gate = undefined
+  await turnQueue.markReportsDelivered(sessionId, reports)
+  if (origin && messageId) {
+    broadcastToSession(sessionId, { type: 'user_message', id: messageId, content, origin })
+  }
   store.apply(sessionId, { type: 'turn_started', at: Date.now() })
+  return { ok: true }
 }
 
-async function handleDesktopClearCommand(
-  ws: ServerWebSocket<WebSocketData>,
-) {
-  const { sessionId } = ws.data
+function messageIdFrom(id: unknown): string | undefined {
+  return typeof id === 'string' && MESSAGE_ID_PATTERN.test(id) ? id : undefined
+}
 
+function reportCliNotRunning(sessionId: string): DeliverUserTurnResult {
+  const message = 'CLI process is not running. The session may have ended or the process crashed.'
+  broadcastToSession(sessionId, { type: 'error', message, code: 'CLI_NOT_RUNNING' })
+  return { ok: false, code: 'CLI_NOT_RUNNING', message }
+}
+
+async function handleDesktopClearCommand(sessionId: string) {
   const workDir = conversationService.getSessionWorkDir(sessionId)
   conversationService.stopSession(sessionId)
   const runtime = peekSessionRuntime(sessionId)
@@ -490,7 +569,7 @@ async function handlePrewarmSession(ws: ServerWebSocket<WebSocketData>) {
   }
 
   getSessionRuntime(sessionId).prewarm.pending = true
-  void ensureCliSessionStarted(ws.data, sessionId, 'prewarm_session')
+  void ensureCliSessionStarted(sessionId, 'prewarm_session')
     .then(() => {
       const runtime = peekSessionRuntime(sessionId)
       if (!runtime?.prewarm.pending) return
@@ -579,15 +658,14 @@ function handleSetPermissionMode(
   if (!conversationService.hasSession(sessionId) && (pendingStartup || runtime.runtimeTransition)) {
     void enqueueRuntimeTransition(sessionId, async () => {
       await pendingStartup?.catch(() => undefined)
-      await applyPermissionModeToCli(ws.data, sessionId, { inTransition: true })
+      await applyPermissionModeToCli(sessionId, { inTransition: true })
     })
   } else {
-    void applyPermissionModeToCli(ws.data, sessionId)
+    void applyPermissionModeToCli(sessionId)
   }
 }
 
 async function applyPermissionModeToCli(
-  endpoint: SessionEndpoint,
   sessionId: string,
   { inTransition = false } = {},
 ): Promise<void> {
@@ -596,12 +674,12 @@ async function applyPermissionModeToCli(
   if (!cliMode || cliMode === mode) return
 
   if (mode === 'bypassPermissions' || cliMode === 'bypassPermissions') {
-    if (deferRestartUntilTurnEnds(endpoint, sessionId, 'permission')) return
+    if (deferRestartUntilTurnEnds(sessionId, 'permission')) return
     if (inTransition) {
-      await restartSession(endpoint, sessionId, 'permission')
+      await restartSession(sessionId, 'permission')
     } else {
       await enqueueRuntimeTransition(sessionId, () =>
-        applyPermissionModeToCli(endpoint, sessionId, { inTransition: true }),
+        applyPermissionModeToCli(sessionId, { inTransition: true }),
       )
     }
     return
@@ -610,18 +688,18 @@ async function applyPermissionModeToCli(
   if (requestId) getSessionRuntime(sessionId).pendingModeRequests.set(requestId, mode)
 }
 
-function deferRestartUntilTurnEnds(endpoint: SessionEndpoint, sessionId: string, reason: RestartReason): boolean {
+function deferRestartUntilTurnEnds(sessionId: string, reason: RestartReason): boolean {
   if (store.get(sessionId).turn.phase === 'idle' || !conversationService.hasSession(sessionId)) return false
-  getSessionRuntime(sessionId).endpoint = endpoint
   store.apply(sessionId, { type: 'restart_queued', reason })
   console.log(`[WS] Deferring CLI restart for ${sessionId} until the current turn ends`)
+  void turnQueue.withdrawFromCli(sessionId)
   return true
 }
 
 function runQueuedRestart(sessionId: string): void {
   const reason = store.peek(sessionId)?.process.pendingRestart
-  const endpoint = peekSessionRuntime(sessionId)?.endpoint
-  if (!reason || !endpoint) return
+  if (!reason) return
+  const heldIds = turnQueue.heldMessageIds(sessionId)
   void enqueueRuntimeTransition(sessionId, async () => {
     if (!store.peek(sessionId)?.process.pendingRestart) return
     const runtime = peekSessionRuntime(sessionId)
@@ -631,8 +709,12 @@ function runQueuedRestart(sessionId: string): void {
       store.apply(sessionId, { type: 'restart_cancelled' })
       return
     }
-    await restartSession(endpoint, sessionId, reason)
+    await restartSession(sessionId, reason)
   })
+    .then(() => turnQueue.redeliver(sessionId, heldIds))
+    .catch((error: unknown) => {
+      console.warn(`[WS] Could not resend the queued messages of ${sessionId} after a restart:`, error)
+    })
 }
 
 function queuedRestartStillNeeded(sessionId: string): boolean {
@@ -703,7 +785,7 @@ async function handleSetRuntimeConfig(
         ) {
           return
         }
-        await restartSession(ws.data, sessionId, 'runtime')
+        await restartSession(sessionId, 'runtime')
       })
     }
     return
@@ -712,15 +794,14 @@ async function handleSetRuntimeConfig(
   if (store.get(sessionId).turn.phase !== 'idle' && !runtime.queuedFromRuntime) {
     runtime.queuedFromRuntime = { selection: previousSelection }
   }
-  if (deferRestartUntilTurnEnds(ws.data, sessionId, 'runtime')) return
+  if (deferRestartUntilTurnEnds(sessionId, 'runtime')) return
 
   await enqueueRuntimeTransition(sessionId, () =>
-    restartSession(ws.data, sessionId, 'runtime'),
+    restartSession(sessionId, 'runtime'),
   )
 }
 
 async function restartSession(
-  endpoint: SessionEndpoint,
   sessionId: string,
   reason: RestartReason,
 ): Promise<void> {
@@ -731,7 +812,7 @@ async function restartSession(
     store.apply(sessionId, { type: 'process_phase_changed', phase: 'restarting', generation })
 
     const runtimeSettings = await getRuntimeSettings(sessionId)
-    await conversationService.startSession(sessionId, workDir, buildSdkUrl(endpoint, sessionId), runtimeSettings)
+    await conversationService.startSession(sessionId, workDir, buildSdkUrl(sessionId), runtimeSettings)
     console.log(`[WS] Restarted CLI for ${sessionId} (${reason})`)
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
@@ -762,7 +843,8 @@ async function restartSession(
   }
 }
 
-function buildSdkUrl(endpoint: SessionEndpoint, sessionId: string): string {
+function buildSdkUrl(sessionId: string): string {
+  const endpoint = getServerEndpoint()
   return `ws://${endpoint.serverHost}:${endpoint.serverPort}/sdk/${sessionId}` +
     `?token=${encodeURIComponent(crypto.randomUUID())}`
 }
@@ -770,6 +852,7 @@ function buildSdkUrl(endpoint: SessionEndpoint, sessionId: string): string {
 function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   const { sessionId } = ws.data
   console.log(`[WS] Stop generation requested for session: ${sessionId}`)
+  if (turnQueue.interrupt(sessionId)) return
   getBrowserRuntime().service.stop(sessionId)
 
   getPipeline(sessionId).stream.stopRequested = true
@@ -889,7 +972,6 @@ async function resolveSessionWorkDir(sessionId: string, fallback = os.homedir())
 }
 
 async function ensureCliSessionStarted(
-  endpoint: SessionEndpoint,
   sessionId: string,
   reason: 'user_message' | 'prewarm_session',
 ): Promise<void> {
@@ -907,7 +989,7 @@ async function ensureCliSessionStarted(
     const runtimeSettings = await getRuntimeSettings(sessionId)
     await sendRepositoryStartupStatus(sessionId, reason)
     console.log(`[WS] Starting CLI for ${sessionId} due to ${reason}`)
-    await conversationService.startSession(sessionId, workDir, buildSdkUrl(endpoint, sessionId), runtimeSettings)
+    await conversationService.startSession(sessionId, workDir, buildSdkUrl(sessionId), runtimeSettings)
   })()
 
   getSessionRuntime(sessionId).startup = startup
@@ -933,6 +1015,23 @@ function sendMessage(ws: ServerWebSocket<WebSocketData>, message: ServerMessage)
 
 function sendError(ws: ServerWebSocket<WebSocketData>, message: string, code: string) {
   sendMessage(ws, { type: 'error', message, code })
+}
+
+function scheduleClientlessCleanup(sessionId: string): void {
+  const runtime = getSessionRuntime(sessionId)
+  if (runtime.disconnectCleanupTimer) clearTimeout(runtime.disconnectCleanupTimer)
+  const cleanupDelayMs = getDisconnectCleanupDelayMs(sessionId)
+  runtime.disconnectCleanupTimer = setTimeout(() => {
+    const current = peekSessionRuntime(sessionId)
+    if (current) current.disconnectCleanupTimer = undefined
+    if (!hasActiveClients(sessionId)) {
+      console.log(`[WS] Session ${sessionId} not reconnected after ${cleanupDelayMs}ms, stopping CLI subprocess`)
+      conversationService.stopSession(sessionId)
+      disposeSessionRuntime(sessionId)
+      store.dispose(sessionId)
+      conversationService.forgetSession(sessionId)
+    }
+  }, cleanupDelayMs)
 }
 
 function getDisconnectCleanupDelayMs(sessionId: string): number {
@@ -1208,7 +1307,7 @@ function enqueueRuntimeTransition(
 
 async function waitForRuntimeTransitionBeforeUserTurn(
   sessionId: string,
-): Promise<{ ok: boolean; waited: boolean }> {
+): Promise<{ ok: boolean; waited: boolean; message?: string }> {
   let waited = false
   let pendingRuntimeTransition = peekSessionRuntime(sessionId)?.runtimeTransition
   while (pendingRuntimeTransition) {
@@ -1225,12 +1324,9 @@ async function waitForRuntimeTransitionBeforeUserTurn(
         details: err,
       })
       console.error(`[WS] Runtime transition failed before handling user message for ${sessionId}: ${errMsg}`)
-      broadcastToSession(sessionId, {
-        type: 'error',
-        message: `Failed to switch provider/model: ${errMsg}`,
-        code: 'CLI_RESTART_FAILED',
-      })
-      return { ok: false, waited }
+      const message = `Failed to switch provider/model: ${errMsg}`
+      broadcastToSession(sessionId, { type: 'error', message, code: 'CLI_RESTART_FAILED' })
+      return { ok: false, waited, message }
     }
 
     const nextTransition = peekSessionRuntime(sessionId)?.runtimeTransition
@@ -1317,4 +1413,5 @@ export function getActiveSessionIds(): string[] {
 export function __resetWebSocketHandlerStateForTests(): void {
   disposeAllSessionRuntimes()
   store.clear()
+  kanban.clear()
 }

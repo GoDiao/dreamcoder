@@ -3,6 +3,7 @@ import type {
   TaskNotification,
   TaskUsage,
   TranscriptItem,
+  UserMessageOrigin,
 } from '@protocol'
 
 export type {
@@ -19,9 +20,13 @@ export type {
   SessionStatePatch,
   TeamMemberStatus,
   TokenUsage,
+  UserMessageOrigin,
 } from '@protocol'
 export type { PermissionGuardrailDetails }
 import type { ClientKind, GoalEventAction } from '@protocol'
+
+export type SessionOrigin = Extract<UserMessageOrigin, { kind: 'session' }>
+export type KanbanOrigin = Extract<UserMessageOrigin, { kind: 'kanban' }>
 
 export type PermissionResolution = {
   outcome: 'allowed' | 'denied' | 'withdrawn'
@@ -93,7 +98,7 @@ export type TaskSummaryItem = {
 type SharedItem<T extends TranscriptItem['type']> = Extract<TranscriptItem, { type: T }>
 
 export type UIMessage =
-  | { id: string; type: 'user_text'; content: string; modelContent?: string; transcriptMessageId?: string; timestamp: number; attachments?: UIAttachment[]; pending?: boolean }
+  | { id: string; type: 'user_text'; content: string; modelContent?: string; transcriptMessageId?: string; origin?: UserMessageOrigin; timestamp: number; attachments?: UIAttachment[]; pending?: boolean }
   | SharedItem<'assistant_text'>
   | SharedItem<'thinking'>
   | {
@@ -123,6 +128,7 @@ export type UIMessage =
       input: unknown
       description?: string
       guardrail?: PermissionGuardrailDetails
+      alwaysAsks?: true
       timestamp: number
       resolution?: PermissionResolution
     }

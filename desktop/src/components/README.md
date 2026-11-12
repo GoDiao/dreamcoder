@@ -63,6 +63,7 @@ that only renames props or passes them through does not belong here.
 | `FormSelect` | Select with labelled triggers and empty application values encoded as nonempty Radix item values |
 | `Modal` | Dialog, localized close action and existing modal props |
 | `ConfirmDialog` | Alert Dialog with application confirmation callbacks |
+| `TreeConnector` | Elbow lines between nested rows, shared by the sidebar session tree and the board's hierarchy view |
 | `MobileBottomSheet` | Drawer with localized title and close control |
 | `Tooltip` | The tooltip entry point: a Tooltip and content wrapper that keeps the trigger mounted when the content is empty; the single `TooltipProvider` (400 ms delay) is mounted in `App`. `ActivitySettings` and `TerminalSettings` use `ui/tooltip` directly because they need an instant delay, a controlled open state or custom content |
 | `ActionMenu` | Shared Dropdown Menu and Context Menu actions/focus handling; the dropdown also takes single-choice submenus (`MenuChoiceGroup`) |
@@ -149,7 +150,7 @@ Generate through the CLI, then review imports, icons, dependencies, tokens and
 accessibility against the local adaptations above. Do not overwrite local
 behavior with unreviewed registry output.
 
-See [CONTRIBUTING](../../../docs/CONTRIBUTING_en.md#development-environment) for
+See [CONTRIBUTING](../../../docs/general/CONTRIBUTING_en.md#development-environment) for
 setup. Run `bun run lint` and `bun run test -- --run`
 from `desktop/`, plus `bun test` from the repository root before a PR. Automated
 checks do not replace seven-theme/bilingual desktop and H5 visual acceptance,
