@@ -171,7 +171,10 @@ describe('Auto permission pipeline', () => {
     expect(requests).toBe(0)
   })
 
-  test('keeps Bash and PowerShell deny rules ahead of Auto and bypass', async () => {
+  test.each([
+    [BASH_TOOL_NAME, 'rm guardrail-deny-rule.txt', bashToolHasPermission],
+    [POWERSHELL_TOOL_NAME, 'Remove-Item guardrail-deny-rule.txt', powershellToolHasPermission],
+  ] as const)('keeps %s deny rules ahead of Auto and bypass', async (name, command, checkPermissions) => {
     let requests = 0
     globalThis.fetch = mock(async () => {
       requests += 1
@@ -181,47 +184,29 @@ describe('Auto permission pipeline', () => {
     }) as unknown as typeof fetch
 
     const inputSchema = z.object({ command: z.string() })
-    const shellTools = [
-      {
-        name: BASH_TOOL_NAME,
-        command: 'rm guardrail-deny-rule.txt',
-        checkPermissions: bashToolHasPermission,
-      },
-      {
-        name: POWERSHELL_TOOL_NAME,
-        command: 'Remove-Item guardrail-deny-rule.txt',
-        checkPermissions: powershellToolHasPermission,
-      },
-    ]
     const denyRules = [
       'Bash(*guardrail-deny-rule.txt*)',
       'PowerShell(*guardrail-deny-rule.txt*)',
     ]
 
     for (const mode of ['auto', 'bypassPermissions'] as const) {
-      for (const shellTool of shellTools) {
-        const tool = {
-          name: shellTool.name,
-          inputSchema,
-          checkPermissions: shellTool.checkPermissions,
-        } as unknown as Tool
-        const result = await hasPermissionsToUseTool(
-          tool,
-          { command: shellTool.command },
-          context(mode, denyRules),
-          {} as AssistantMessage,
-          `tool-${mode}-${shellTool.name}`,
-        )
+      const tool = { name, inputSchema, checkPermissions } as unknown as Tool
+      const result = await hasPermissionsToUseTool(
+        tool,
+        { command },
+        context(mode, denyRules),
+        {} as AssistantMessage,
+        `tool-${mode}-${name}`,
+      )
 
-        expect(result.behavior).toBe('deny')
-        expect(result.decisionReason).toMatchObject({
-          type: 'rule',
-          rule: {
-            ruleBehavior: 'deny',
-            ruleValue: { toolName: shellTool.name },
-          },
-        })
-      }
+      expect(result.behavior).toBe('deny')
+      expect(result.decisionReason).toMatchObject({
+        type: 'rule',
+        rule: {
+          ruleBehavior: 'deny',
+          ruleValue: { toolName: name },
+        },
+      })
     }
 
     expect(requests).toBe(0)
