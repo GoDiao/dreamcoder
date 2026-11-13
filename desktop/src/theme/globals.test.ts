@@ -29,42 +29,21 @@ function getThemeBlock(selector: ':root,\n[data-theme="light"]' | '[data-theme="
 describe('desktop theme tokens', () => {
   const themes = [':root,\n[data-theme="light"]', '[data-theme="white"]', '[data-theme="dark"]'] as const
   const requiredTokens = [
-    '--color-activity-heat-0',
-    '--color-activity-heat-1',
-    '--color-activity-heat-2',
-    '--color-activity-heat-3',
-    '--color-activity-heat-4',
-    '--color-activity-cell-border',
-    '--color-activity-cell-border-hover',
-    '--color-activity-cell-border-active',
-    '--color-activity-tooltip-surface',
-    '--color-activity-tooltip-border',
-    '--color-activity-tooltip-text',
-    '--color-activity-tooltip-muted',
-    '--color-success-container',
-    '--color-info',
-    '--color-info-container',
-    '--color-warning-container',
-    '--color-memory-accent',
-    '--color-memory-surface',
-    '--color-memory-border',
-    '--color-memory-icon-bg',
-    '--color-goal-accent',
-    '--color-goal-surface',
-    '--color-goal-border',
-    '--color-goal-icon-bg',
-    '--color-goal-chip-bg',
-    '--color-goal-chip-border',
-    '--color-text-secondary-a72',
-    '--color-text-secondary-a68',
-    '--color-text-primary-a88',
-    '--color-text-primary-a82',
-    '--color-text-primary-a78',
-    '--color-surface-hover-a34',
-    '--color-surface-hover-a54',
-    '--color-outline-a72',
-    '--color-outline-a78',
-    '--color-outline-a92',
+    '--theme-activity-heat-0',
+    '--theme-activity-heat-1',
+    '--theme-activity-heat-2',
+    '--theme-activity-heat-3',
+    '--theme-activity-heat-4',
+    '--theme-activity-cell-border',
+    '--theme-activity-cell-border-hover',
+    '--theme-success-container',
+    '--theme-info',
+    '--theme-info-container',
+    '--theme-warning-container',
+    '--theme-memory-accent',
+    '--theme-memory-surface',
+    '--theme-memory-border',
+    '--theme-memory-icon-bg',
   ]
 
   it('lets only the base light block use a bare :root, so later blocks cannot override other themes', () => {
@@ -76,20 +55,12 @@ describe('desktop theme tokens', () => {
 
   it('gives the dark theme its own error surface instead of the light default', () => {
     const block = getThemeBlock('[data-theme="dark"]')
-    expect(block).toContain('--color-error-container:')
-    expect(block).toContain('--color-on-error-container:')
+    expect(block).toContain('--theme-error-container:')
   })
 
-  it('gives every dark theme its own diff colors instead of the light defaults', () => {
-    const diffTokens = ['--color-diff-added-bg', '--color-diff-removed-bg', '--color-diff-added-text', '--color-diff-removed-text']
-    const darkBlocks = normalizedCss.split('[data-theme="dark"] {').slice(1).map((rest) => rest.slice(0, rest.indexOf('\n}')))
-    for (const token of diffTokens) {
-      expect(darkBlocks.some((block) => block.includes(`${token}:`)), `dark should define ${token}`).toBe(true)
-    }
-    const aurora = getThemeBlock('[data-theme="aurora"]')
-    for (const token of diffTokens) {
-      expect(aurora, `Aurora should define ${token}`).toContain(`${token}:`)
-    }
+  it('derives diff colors from each theme\'s status colors', () => {
+    expect(normalizedCss).toContain('--diff-added: color-mix(in srgb, var(--success) 14%, var(--code));')
+    expect(normalizedCss).toContain('--diff-removed: color-mix(in srgb, var(--destructive) 10%, var(--code));')
   })
 
   it('defines activity and status tokens for every supported theme', () => {
@@ -117,17 +88,13 @@ function auroraColor(token: string): string {
   return alias ? auroraColor(alias[1]!) : value
 }
 
-it('keeps Aurora text readable on chat, sidebar, terminal, code, and primary buttons', () => {
+it('keeps Aurora text readable on chat, sidebar, code, and primary buttons', () => {
   const pairs = [
-    ['--color-text-primary', '--color-surface'],
-    ['--color-text-secondary', '--color-surface-sidebar'],
-    ['--color-text-tertiary', '--color-surface-container-highest'],
-    ['--color-terminal-fg', '--color-terminal-bg'],
-    ['--color-terminal-muted', '--color-terminal-header'],
-    ['--color-btn-primary-fg', '--color-primary'],
-    ['--color-btn-primary-fg', '--color-primary-container'],
-    ['--color-on-error', '--color-error'],
-    ['--color-code-fg', '--color-code-bg'],
+    ['--theme-text-primary', '--theme-surface'],
+    ['--theme-text-secondary', '--theme-surface-sidebar'],
+    ['--theme-text-tertiary', '--theme-surface-container-highest'],
+    ['--theme-btn-primary-fg', '--theme-primary'],
+    ['--theme-code-fg', '--theme-code-bg'],
   ]
   for (const [foreground, background] of pairs) {
     const values = [luminance(auroraColor(foreground!)), luminance(auroraColor(background!))]

@@ -27,7 +27,7 @@ describe('Modal', () => {
     )
 
     const dialog = screen.getByRole('dialog', { name: 'Provider' })
-    expect(dialog.classList.contains('glass-panel')).toBe(true)
+    expect(dialog.classList.contains('outline-none')).toBe(true)
     expect(dialog.classList.contains('glass-panel-focus')).toBe(false)
   })
 

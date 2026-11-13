@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useUIStore } from '../stores/uiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { destroyTerminalRuntime } from '../lib/terminalRuntime'
 
@@ -15,6 +16,7 @@ const terminalMocks = vi.hoisted(() => {
     write: vi.fn(),
     writeln: vi.fn(),
     clear: vi.fn(),
+    options: {} as { theme?: Record<string, string> },
   }
   const fitInstance = {
     fit: vi.fn(),
@@ -34,6 +36,7 @@ const terminalMocks = vi.hoisted(() => {
       onDisconnect: () => void
     },
     detectDefaultShell: vi.fn(),
+    loadFont: vi.fn(),
   }
 })
 
@@ -60,6 +63,10 @@ describe('TerminalSettings', () => {
   afterEach(() => {
     cleanup()
     useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+    useUIStore.setState(useUIStore.getInitialState(), true)
+    document.documentElement.style.removeProperty('--terminal')
+    document.documentElement.style.removeProperty('--font-mono')
+    Reflect.deleteProperty(document, 'fonts')
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -107,6 +114,9 @@ describe('TerminalSettings', () => {
       disconnect = vi.fn()
     })
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    document.documentElement.style.setProperty('--font-mono', "'JetBrains Mono', monospace")
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { load: terminalMocks.loadFont } })
+    terminalMocks.loadFont.mockReset().mockResolvedValue([])
   })
 
   it('shows a desktop-runtime empty state outside the desktop app', () => {
@@ -303,7 +313,64 @@ describe('TerminalSettings', () => {
     expect(terminalMocks.resize).toHaveBeenCalledWith(80, 24)
   })
 
-  it('renders the docked panel layout with icon actions, leading tabs and a meta line', async () => {
+  it('loads the mono font and passes its resolved family to the terminal', async () => {
+    terminalMocks.available = true
+    const { Terminal } = await import('@xterm/xterm')
+    render(<TerminalSettings />)
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
+    expect(terminalMocks.loadFont).toHaveBeenCalledWith("12px 'JetBrains Mono', monospace")
+    expect(Terminal).toHaveBeenLastCalledWith(expect.objectContaining({ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }))
+  })
+
+  it('starts one terminal when the start is re-run before the first one finishes', async () => {
+    terminalMocks.available = true
+    const { Terminal } = await import('@xterm/xterm')
+    vi.mocked(Terminal).mockClear()
+    const pendingFonts: Array<() => void> = []
+    terminalMocks.loadFont.mockImplementation(() => new Promise<void>((resolve) => { pendingFonts.push(resolve) }))
+    const view = render(<TerminalSettings docked runtimeId="rerun-runtime" preserveOnUnmount />)
+    await waitFor(() => expect(terminalMocks.loadFont).toHaveBeenCalledTimes(1))
+    view.rerender(<TerminalSettings docked runtimeId="rerun-runtime" preserveOnUnmount cwd="/repo" />)
+    await waitFor(() => expect(terminalMocks.loadFont).toHaveBeenCalledTimes(2))
+    await act(async () => { pendingFonts.forEach((resolve) => resolve()) })
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
+    expect(Terminal).toHaveBeenCalledTimes(1)
+    expect(terminalMocks.open).toHaveBeenCalledTimes(1)
+    expect(terminalMocks.open).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repo' }))
+    destroyTerminalRuntime('rerun-runtime')
+  })
+
+  it('closes a shell that finishes opening after a restart replaced it', async () => {
+    terminalMocks.available = true
+    const stale = { shell: '/bin/bash', cwd: '/old', warning: null, write: vi.fn(), resize: vi.fn(), close: vi.fn() }
+    let finishStale: (connection: typeof stale) => void = () => undefined
+    terminalMocks.open.mockImplementationOnce(() => new Promise((resolve) => { finishStale = resolve }))
+    render(<TerminalSettings docked runtimeId="restart-runtime" preserveOnUnmount />)
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(1))
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restart' })) })
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalledTimes(2))
+    await act(async () => { finishStale(stale) })
+
+    expect(stale.close).toHaveBeenCalled()
+    expect(terminalMocks.close).not.toHaveBeenCalled()
+    destroyTerminalRuntime('restart-runtime')
+  })
+
+  it('re-applies the terminal palette when the app theme changes', async () => {
+    terminalMocks.available = true
+    document.documentElement.style.setProperty('--terminal', 'rgb(1, 2, 3)')
+    render(<TerminalSettings />)
+    await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
+    expect(terminalMocks.terminalInstance.options.theme).toHaveProperty('background')
+    terminalMocks.terminalInstance.options.theme = undefined
+
+    await act(async () => { useUIStore.setState({ theme: 'dark' }) })
+
+    expect(terminalMocks.terminalInstance.options.theme).toHaveProperty('background')
+  })
+
+  it('renders the docked panel layout with a context row above the terminal', async () => {
     terminalMocks.available = true
     const onShellChange = vi.fn()
 
@@ -311,15 +378,15 @@ describe('TerminalSettings', () => {
       <TerminalSettings
         docked
         runtimeId="docked-runtime"
-        toolbarLeading={<span>tabs-slot</span>}
         meta="dreamcoder · main"
         onShellChange={onShellChange}
       />,
     )
 
     await waitFor(() => expect(terminalMocks.open).toHaveBeenCalled())
-    expect(screen.getByText('tabs-slot')).toBeInTheDocument()
-    expect(screen.getByTestId('terminal-meta')).toHaveTextContent('dreamcoder · main')
+    expect(screen.getByTestId('docked-terminal-actions')).toHaveTextContent('dreamcoder · main')
+    expect(screen.getByTestId('docked-terminal-actions').nextElementSibling).toHaveAttribute('data-testid', 'settings-terminal-frame')
+    expect(screen.queryByTestId('settings-terminal-toolbar')).not.toBeInTheDocument()
     expect(screen.queryByText('Terminal')).not.toBeInTheDocument()
     await waitFor(() => expect(onShellChange).toHaveBeenCalledWith('/bin/zsh'))
 

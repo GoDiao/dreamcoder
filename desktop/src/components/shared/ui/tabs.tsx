@@ -1,7 +1,7 @@
 import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Tabs as TabsPrimitive } from "radix-ui"
+import { XIcon } from "lucide-react"
 
 function Tabs({
   className,
@@ -22,32 +22,17 @@ function Tabs({
   )
 }
 
-const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-ui-muted-foreground group-data-[orientation=horizontal]/tabs:h-8 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
-  {
-    variants: {
-      variant: {
-        default: "bg-ui-muted",
-        line: "gap-1 bg-transparent",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
 function TabsList({
   className,
-  variant = "default",
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants>) {
+}: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(
+        "group/tabs-list inline-flex w-fit items-center gap-1 text-muted-foreground group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:items-stretch",
+        className
+      )}
       {...props}
     />
   )
@@ -61,14 +46,52 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-ui-foreground/60 transition-[color,background-color,border-color,box-shadow,transform,opacity] group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-ui-foreground focus-visible:border-ui-ring focus-visible:ring-[3px] focus-visible:ring-ui-ring/50 focus-visible:outline-1 focus-visible:outline-ui-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-[var(--shadow-dropdown)] group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:bg-ui-background data-[state=active]:text-ui-foreground",
-        "after:absolute after:bg-ui-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
+        "inline-flex h-6 min-w-0 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs whitespace-nowrap text-muted-foreground transition-[color,background-color,box-shadow] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground group-data-[orientation=vertical]/tabs:justify-start [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        "hover:bg-hover data-[state=active]:bg-selected",
         className
       )}
       {...props}
     />
+  )
+}
+
+function TabsClosableTrigger({
+  className,
+  icon,
+  closeLabel,
+  onClose,
+  children,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> & {
+  icon: React.ReactNode
+  closeLabel: string
+  onClose: () => void
+}) {
+  return (
+    <div
+      data-slot="tabs-closable"
+      className={cn(
+        "group/tab relative inline-flex h-6 min-w-0 shrink-0 items-center rounded-md text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground has-data-[state=active]:bg-selected has-data-[state=active]:text-foreground",
+        className
+      )}
+    >
+      <TabsPrimitive.Trigger
+        data-slot="tabs-trigger"
+        className="inline-flex h-full min-w-0 items-center gap-1 rounded-md pr-2 pl-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5"
+        {...props}
+      >
+        <span className="flex size-3.5 shrink-0 items-center justify-center group-focus-within/tab:invisible group-hover/tab:invisible pointer-coarse:invisible">{icon}</span>
+        <span className="min-w-0 truncate">{children}</span>
+      </TabsPrimitive.Trigger>
+      <button
+        type="button"
+        aria-label={closeLabel}
+        onClick={onClose}
+        className="absolute top-1/2 left-1.5 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground opacity-0 outline-none group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:bg-selected hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50 pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5"
+      >
+        <XIcon className="size-3" aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 
@@ -85,4 +108,4 @@ function TabsContent({
   )
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+export { Tabs, TabsList, TabsTrigger, TabsClosableTrigger, TabsContent }

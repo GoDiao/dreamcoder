@@ -162,9 +162,9 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         </>
       }
     >
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-[var(--color-surface-container)] mb-5">
-        <InfoIcon className="shrink-0 text-[var(--color-text-secondary)]" aria-hidden="true" size={18} />
-        <span className="text-xs text-[var(--color-text-secondary)]">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-muted mb-5">
+        <InfoIcon className="shrink-0 text-muted-foreground" aria-hidden="true" size={18} />
+        <span className="text-xs text-muted-foreground">
           {t('newTask.localWarning')}
         </span>
       </div>
@@ -233,17 +233,17 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
         {frequency === 'customCron' && (
           <div className="flex flex-col gap-1">
             <Input
+              font="mono"
               aria-label={t('newTask.customCron')}
               aria-invalid={!!customCron.trim() && !isValidCron(customCron)}
               type="text"
               value={customCron}
               onChange={(e) => setCustomCron(e.target.value)}
               placeholder={t('newTask.cronFormatHint')}
-              className="font-mono"
             />
-            <span className="text-xs text-[var(--color-text-tertiary)]">{t('newTask.cronFormatHint')}</span>
+            <span className="text-xs text-subtle-foreground">{t('newTask.cronFormatHint')}</span>
             {customCron.trim() && !isValidCron(customCron) && (
-              <span className="text-xs text-[var(--color-error)]">{t('newTask.invalidCron')}</span>
+              <span className="text-xs text-destructive">{t('newTask.invalidCron')}</span>
             )}
           </div>
         )}
@@ -259,20 +259,20 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           />
         )}
 
-        <div className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-border p-3">
           <label className="flex items-center gap-3 cursor-pointer">
             <Checkbox
               checked={notifyEnabled}
               onCheckedChange={(checked) => setNotifyEnabled(checked === true)}
             />
             <div>
-              <span className="text-sm font-medium text-[var(--color-text-primary)]">{t('newTask.notifyOnComplete')}</span>
-              <p className="text-xs text-[var(--color-text-tertiary)]">{t('newTask.notifyHint')}</p>
+              <span className="text-sm font-medium text-foreground">{t('newTask.notifyOnComplete')}</span>
+              <p className="text-xs text-subtle-foreground">{t('newTask.notifyHint')}</p>
             </div>
           </label>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--color-surface-container)] text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-xs text-muted-foreground">
           <ClockIcon aria-hidden="true" size={16} />
           <span>
             {frequency === 'customCron' && customCron.trim() && !isValidCron(customCron)
@@ -282,7 +282,7 @@ export function NewTaskModal({ open, onClose, editTask }: Props) {
           </span>
         </div>
 
-        <p className="text-xs text-[var(--color-text-tertiary)]">
+        <p className="text-xs text-subtle-foreground">
           {t('newTask.delayNote')}
         </p>
       </div>

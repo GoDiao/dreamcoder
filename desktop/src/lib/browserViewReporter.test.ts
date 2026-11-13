@@ -18,7 +18,7 @@ function setPanel(sessionId: string, activeTabId: string | null, tabIds: string[
   useWorkspacePanelStore.setState((state) => ({
     panelByTab: {
       ...state.panelByTab,
-      [sessionId]: { isOpen: true, expanded: false, tabs: tabIds.map(browserTab), activeTabId, recentFiles: [] },
+      [sessionId]: { isOpen: true, expanded: false, tabs: tabIds.map(browserTab), activeTabId, recentFiles: [], selectedFile: null },
     },
   }))
 }

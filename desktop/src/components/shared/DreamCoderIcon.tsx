@@ -13,12 +13,12 @@ export function DreamCoderIcon({ size = 32, className }: { size?: number; classN
       style={{ flexShrink: 0 }}
       aria-hidden="true"
     >
-      <rect width="64" height="64" rx="14.4" fill="var(--color-brand)" />
-      <g transform="translate(7.1 7.1) scale(0.778)" fill="#FFFAF4">
+      <rect width="64" height="64" rx="14.4" fill="var(--primary)" />
+      <g transform="translate(7.1 7.1) scale(0.778)" fill="var(--primary-foreground)">
         <g transform="translate(1 -3)">
           <path
             d="M12 14 L29 32 L12 50 A40 40 0 0 0 12 14 Z"
-            stroke="#FFFAF4"
+            stroke="var(--primary-foreground)"
             strokeWidth="2"
             strokeLinejoin="round"
           />

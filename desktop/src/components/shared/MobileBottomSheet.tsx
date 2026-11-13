@@ -24,7 +24,7 @@ export function MobileBottomSheet({ open, onClose, onExited, title, children, cl
   return (
     <Drawer open={open} onOpenChange={(next) => { if (!next) onClose() }} shouldScaleBackground={false}>
       <DrawerContent {...focus} aria-label={ariaLabel} aria-describedby={undefined} data-testid={testId} className="max-h-[78dvh] min-h-0">
-        <div className="shrink-0 border-b border-ui-border px-4 py-3">
+        <div className="shrink-0 border-b border-border px-4 py-3">
           <div className="flex min-h-10 items-center justify-between gap-3">
             <DrawerTitle>{title}</DrawerTitle>
             <DrawerClose asChild><Button variant="ghost" size="icon-lg" aria-label={closeLabel ?? t('common.close')}><X /></Button></DrawerClose>

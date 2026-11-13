@@ -69,7 +69,7 @@ export function McpCatalogBrowse({ installedNames, onInstall }: {
       {visible.length === 0 ? (
         <CatalogState title={t('settings.mcp.browse.empty')} />
       ) : (
-        <div className="border-t border-[var(--color-border-separator)]">
+        <div className="border-t border-border">
           {visible.map((entry) => (
             <CatalogEntry
               key={entry.id}
@@ -87,11 +87,11 @@ export function McpCatalogBrowse({ installedNames, onInstall }: {
 function CatalogEntry({ entry, installed, onInstall }: { entry: McpCatalogEntry; installed: boolean; onInstall: () => void }) {
   const t = useTranslation()
   return (
-    <article className="border-b border-[var(--color-border-separator)] px-3 py-3.5">
+    <article className="border-b border-border px-3 py-3.5">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{entry.name}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{entry.name}</h3>
         {installed && (
-          <span className="text-xs text-[var(--color-success)]">
+          <span className="text-xs text-success">
             {t('settings.mcp.browse.installed')}
           </span>
         )}
@@ -99,22 +99,22 @@ function CatalogEntry({ entry, installed, onInstall }: { entry: McpCatalogEntry;
           href={entry.homepage}
           target="_blank"
           rel="noreferrer"
-          className="ml-auto text-xs font-medium text-[var(--color-text-accent)] hover:underline"
+          className="ml-auto text-xs font-medium text-primary hover:underline"
         >
           {t('settings.mcp.browse.homepage')}
         </a>
       </div>
-      <p className="mt-1 text-xs leading-[1.6] text-[var(--color-text-secondary)]">{entry.description}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{entry.description}</p>
       {entry.tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-[5px]">
+        <div className="mt-2 flex flex-wrap gap-1.25">
           {entry.tags.map((value) => (
-            <span key={value} className="rounded-full bg-[var(--color-surface-hover)] px-2 py-px text-[11px] text-[var(--color-text-secondary)]">
+            <span key={value} className="rounded-full bg-hover px-2 py-px text-2xs text-muted-foreground">
               {value}
             </span>
           ))}
         </div>
       )}
-      <dl className="mt-2 space-y-0.5 text-[11px] text-[var(--color-text-tertiary)]">
+      <dl className="mt-2 space-y-0.5 text-2xs text-subtle-foreground">
         <CatalogField label={t('settings.mcp.browse.command')} value={[entry.command, ...entry.args].join(' ')} mono />
         <CatalogField label={t('settings.mcp.browse.runtime')} value={`${entry.runtime}${entry.version ? ` ${entry.version}` : ''}`} />
         {entry.env.length > 0 && (
@@ -137,7 +137,7 @@ function CatalogField({ label, value, mono = false }: { label: string; value: st
   return (
     <div>
       <dt className="inline font-medium">{label}: </dt>
-      <dd className={`inline ${mono ? 'font-[var(--font-mono)]' : ''}`}>{value}</dd>
+      <dd className={`inline ${mono ? 'font-mono' : ''}`}>{value}</dd>
     </div>
   )
 }
@@ -145,8 +145,8 @@ function CatalogField({ label, value, mono = false }: { label: string; value: st
 function CatalogState({ title, detail }: { title: string; detail?: string }) {
   return (
     <div role="status" className="py-10 text-center">
-      <p className="text-[13px] text-[var(--color-text-secondary)]">{title}</p>
-      {detail && <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{detail}</p>}
+      <p className="text-sm text-muted-foreground">{title}</p>
+      {detail && <p className="mt-1 text-xs text-subtle-foreground">{detail}</p>}
     </div>
   )
 }

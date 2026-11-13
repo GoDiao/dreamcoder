@@ -95,12 +95,12 @@ export function UiPageFrame({ sessionId, pageId, revision, title, maxHeight }: P
         </div>
       ) : null}
       {status === 'failed' ? (
-        <div className="absolute inset-x-0 top-0 px-3 py-2 text-xs text-[var(--color-error)]" role="alert">
+        <div className="absolute inset-x-0 top-0 px-3 py-2 text-xs text-destructive" role="alert">
           {t('uiPage.loadFailed')}
         </div>
       ) : null}
       {scriptError ? (
-        <div className="border-t border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-warning)]" role="status">
+        <div className="border-t border-border px-3 py-1.5 text-xs text-warning" role="status">
           {t('uiPage.scriptError', { message: scriptError })}
         </div>
       ) : null}

@@ -12,7 +12,7 @@ describe('CardButton', () => {
 
     const card = screen.getByTestId('card')
     expect(card).toHaveAttribute('type', 'button')
-    expect(card).toHaveClass('border-dashed', 'p-4', 'rounded-lg', 'hover:bg-[var(--color-surface-hover)]')
+    expect(card).toHaveClass('border-dashed', 'p-4', 'rounded-lg', 'hover:bg-hover')
     fireEvent.click(card)
     expect(onClick).toHaveBeenCalledOnce()
   })

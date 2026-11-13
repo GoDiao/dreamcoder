@@ -31,19 +31,19 @@ export function ProviderGateCard({ className = '', testId = 'provider-required-n
     <div
       data-testid={testId}
       role="status"
-      className={`flex min-h-[78px] flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-3.5 pl-[18px] pr-3.5 ${className}`}
+      className={`flex min-h-[78px] flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl border border-border bg-popover py-3.5 pl-4.5 pr-3.5 ${className}`}
     >
       <div className="grid min-w-0 flex-1 gap-0.5 text-left">
-        <strong className="text-ui-body font-semibold text-[var(--color-text-primary)]">
+        <strong className="text-sm font-semibold text-foreground">
           {hasProviders ? t('chat.providerGate.noDefaultTitle') : t('chat.providerGate.noneTitle')}
         </strong>
-        <span className="text-ui-aux text-[var(--color-text-secondary)]">
+        <span className="text-xs text-muted-foreground">
           {hasProviders
             ? t('chat.providerGate.noDefaultBody', { count: providerCount })
             : t('chat.providerGate.noneBody')}
         </span>
       </div>
-      <Button size="xs" className="h-8 shrink-0 px-3.5 text-[13px]" onClick={openProviderSettings}>
+      <Button className="shrink-0" onClick={openProviderSettings}>
         {hasProviders ? t('chat.providerGate.choose') : t('settings.providers.addProvider')}
       </Button>
     </div>

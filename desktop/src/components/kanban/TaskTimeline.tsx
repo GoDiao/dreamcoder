@@ -115,29 +115,29 @@ export function TaskTimeline({ panelId, board, view, card }: { panelId: string; 
     return () => { cancelled = true }
   }, [board, card.id, card.updatedAt, card.failedNotifications.length, t])
 
-  if (error) return <p role="alert" className="text-[12px] text-[var(--color-error)]">{error}</p>
-  if (!events) return <p className="text-[12px] text-[var(--color-text-tertiary)]">{t('common.loading')}</p>
+  if (error) return <p role="alert" className="text-xs text-destructive">{error}</p>
+  if (!events) return <p className="text-xs text-subtle-foreground">{t('common.loading')}</p>
   const now = Date.now()
   const entries = entriesFor(t, view, card, events).reverse()
 
   return (
     <ol data-testid="kanban-timeline" className="flex flex-col gap-3">
       {entries.map(({ event, line, status }) => (
-        <li key={event.seq} className={`flex flex-col gap-1 text-[12px] ${line.detail ? '' : 'border-l-2 border-[var(--color-border-separator)] pl-3'}`}>
+        <li key={event.seq} className={`flex flex-col gap-1 text-xs ${line.detail ? '' : 'border-l-2 border-border pl-3'}`}>
           <span className="flex items-baseline gap-2">
-            <span className={`min-w-0 flex-1 ${line.detail ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-tertiary)]'}`}>{line.text}</span>
-            <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{relativeTimeLabel(t, now - Date.parse(event.at))}</span>
+            <span className={`min-w-0 flex-1 ${line.detail ? 'text-muted-foreground' : 'text-subtle-foreground'}`}>{line.text}</span>
+            <span className="shrink-0 text-2xs text-subtle-foreground">{relativeTimeLabel(t, now - Date.parse(event.at))}</span>
           </span>
           {status && (
-            <span data-testid="kanban-timeline-status" className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)]">
+            <span data-testid="kanban-timeline-status" className="flex items-center gap-1.5 text-2xs text-subtle-foreground">
               {t('kanban.detail.status')}
               <span>{t(STATUS_LABEL[status.from])}</span>
               <ArrowRight className="size-3" aria-hidden="true" />
-              <span className="text-[var(--color-text-secondary)]">{t(STATUS_LABEL[status.to])}</span>
+              <span className="text-muted-foreground">{t(STATUS_LABEL[status.to])}</span>
             </span>
           )}
           {line.detail && (
-            <div className="rounded-lg bg-[var(--color-surface-container)] px-2.5 py-1.5 text-[13px] text-[var(--color-text-primary)]">
+            <div className="rounded-lg bg-muted px-2.5 py-1.5 text-sm text-foreground">
               <MarkdownRenderer content={line.detail} variant="compact" className="break-words" />
             </div>
           )}

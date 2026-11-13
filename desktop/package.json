@@ -29,10 +29,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "lint": "tsc --noEmit && tsc --noEmit -p electron"
+    "lint": "tsc --noEmit && tsc --noEmit -p electron && oxlint src"
   },
   "dependencies": {
     "@pierre/diffs": "^1.6.1",
+    "@pierre/trees": "1.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dompurify": "^3.2.0",
     "@xterm/addon-fit": "^0.11.0",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@shadcn/lint": "0.2.5",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
@@ -70,6 +72,7 @@
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
     "jsdom": "^25.0.1",
+    "oxlint": "^1.93.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.10",

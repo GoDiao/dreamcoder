@@ -41,7 +41,7 @@ describe('MarkdownRenderer', () => {
 
     const root = container.firstChild as HTMLDivElement
     expect(root).toBeInTheDocument()
-    expect(root.className).toContain('prose-p:text-[15px]')
+    expect(root.className).toContain('prose-p:text-sm')
     expect(root.className).toContain('prose-h2:border-b')
     expect(root.className).toContain('mx-auto')
     expect(root.className).toContain('max-w-[72ch]')
@@ -56,7 +56,7 @@ describe('MarkdownRenderer', () => {
 
     const root = container.firstChild as HTMLDivElement
     expect(root).toBeInTheDocument()
-    expect(root.className).not.toContain('prose-p:text-[15px]')
+    expect(root.className).not.toContain('prose-p:text-sm')
     expect(root.className).not.toContain('prose-h2:border-b')
     expect(screen.getByText('Default Heading')).toBeInTheDocument()
     expect(screen.getByText('Body copy.')).toBeInTheDocument()
@@ -85,9 +85,9 @@ describe('MarkdownRenderer', () => {
 
     const root = container.firstChild as HTMLDivElement
     expect(root).toBeInTheDocument()
-    expect(root.className).toContain('prose-code:text-[var(--color-code-fg)]')
-    expect(root.className).toContain('prose-code:bg-[var(--color-code-bg)]')
-    expect(root.className).not.toContain('prose-code:text-[var(--color-primary-fixed)]')
+    expect(root.className).toContain('prose-code:text-code-foreground')
+    expect(root.className).toContain('prose-code:bg-code')
+    expect(root.className).not.toContain('prose-code:text-primary-surface')
     expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument()
   })
 

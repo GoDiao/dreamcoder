@@ -219,7 +219,7 @@ export function H5AccessSettings() {
             title={t('settings.general.h5AccessEnabled')}
             description={
               <>
-                <span className={h5Access.enabled ? 'text-[var(--color-success)]' : undefined}>
+                <span className={h5Access.enabled ? 'text-success' : undefined}>
                   {h5Access.enabled ? t('settings.general.h5AccessStatusEnabled') : t('settings.general.h5AccessDisabledValue')}
                 </span>
                 {' · '}
@@ -245,12 +245,12 @@ export function H5AccessSettings() {
           {h5AccessDiagnostics?.storedHostStaleness === 'unreachable' && h5AccessDiagnostics.storedPublicBaseUrl ? (
             <div
               data-testid="h5-access-stale-host-banner"
-              className="mt-4 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-3 text-xs leading-5 text-[var(--color-text-primary)]"
+              className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-3 text-xs leading-5 text-foreground"
             >
               <div className="font-semibold">
                 {t('settings.general.h5AccessStaleHostTitle')}
               </div>
-              <div className="mt-1 text-[var(--color-text-secondary)]">
+              <div className="mt-1 text-muted-foreground">
                 {h5AccessDiagnostics.suggestedHost
                   ? t('settings.general.h5AccessStaleHostBody', {
                       storedHost: extractHostnameFromUrl(h5AccessDiagnostics.storedPublicBaseUrl) ?? h5AccessDiagnostics.storedPublicBaseUrl,
@@ -279,14 +279,14 @@ export function H5AccessSettings() {
           {h5AccessDiagnostics?.storedHostStaleness === 'proxy' ? (
             <div
               data-testid="h5-access-proxy-note"
-              className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-3 py-2 text-xs leading-5 text-[var(--color-text-tertiary)]"
+              className="mt-4 rounded-lg border border-border bg-popover px-3 py-2 text-xs leading-5 text-subtle-foreground"
             >
               {t('settings.general.h5AccessProxyNote')}
             </div>
           ) : null}
 
           <div className="mt-4 grid grid-cols-1 gap-3">
-            <h3 className="text-[13px] font-medium text-[var(--color-text-secondary)]">{t('settings.h5.addressTitle')}</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{t('settings.h5.addressTitle')}</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
               <LabeledInput
                 id="h5-access-public-url"
@@ -300,11 +300,10 @@ export function H5AccessSettings() {
                 label={t('settings.general.h5AccessCurrentPort')}
                 value={h5AccessPort ?? t('settings.general.h5AccessCurrentPortUnknown')}
                 readOnly
-                className="text-[var(--color-text-tertiary)]"
               />
             </div>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+              <p className="text-xs leading-normal text-subtle-foreground">
                 {t('settings.general.h5AccessOpenHint')}
               </p>
               <Button
@@ -320,13 +319,13 @@ export function H5AccessSettings() {
           </div>
 
           {h5AccessUrl && (
-            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-4">
+            <div className="mt-4 border-t border-border pt-4">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-[var(--color-text-secondary)]">
+                  <div className="text-xs text-muted-foreground">
                     {t('settings.general.h5AccessUrl')}
                   </div>
-                  <div className="mt-1 break-all font-mono text-xs text-[var(--color-text-primary)]">
+                  <div className="mt-1 break-all font-mono text-xs text-foreground">
                     {h5AccessUrl}
                   </div>
                 </div>
@@ -345,9 +344,9 @@ export function H5AccessSettings() {
           )}
 
           {h5Access.enabled && h5AccessUrl && (
-            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-4">
+            <div className="mt-4 border-t border-border pt-4">
               <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="flex h-48 w-48 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white p-3">
+                <div className="flex h-48 w-48 shrink-0 items-center justify-center rounded-lg border border-border bg-white p-3">
                   {h5QrDataUrl ? (
                     <img
                       src={h5QrDataUrl}
@@ -356,24 +355,24 @@ export function H5AccessSettings() {
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-3 px-4 text-center">
-                      <QrCode className="h-12 w-12 text-neutral-400" aria-hidden="true" />
-                      <p className="text-xs leading-5 text-neutral-500">
+                      <QrCode className="h-12 w-12 text-black/40" aria-hidden="true" />
+                      <p className="text-xs leading-5 text-black/60">
                         {t('settings.general.h5AccessQrEmptyHint')}
                       </p>
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-[var(--color-text-secondary)]">
+                  <div className="text-xs text-muted-foreground">
                     {t('settings.general.h5AccessQrTitle')}
                   </div>
-                  <p className="mt-1 text-xs leading-5 text-[var(--color-text-tertiary)]">
+                  <p className="mt-1 text-xs leading-5 text-subtle-foreground">
                     {h5GeneratedToken
                       ? t('settings.general.h5AccessQrHint')
                       : t('settings.general.h5AccessQrRefreshHint')}
                   </p>
                   {h5LaunchUrl && (
-                    <div className="mt-2 break-all font-mono text-xs text-[var(--color-text-primary)]">
+                    <div className="mt-2 break-all font-mono text-xs text-foreground">
                       {h5LaunchUrl}
                     </div>
                   )}
@@ -403,13 +402,13 @@ export function H5AccessSettings() {
           )}
 
           {h5Access.enabled && (
-            <div className="mt-4 border-t border-[var(--color-border-separator)] pt-3">
+            <div className="mt-4 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs text-[var(--color-text-secondary)]">
+                  <div className="text-xs text-muted-foreground">
                     {t('settings.general.h5AccessTokenPreview')}
                   </div>
-                  <div className="mt-px break-all text-[13px] text-[var(--color-text-primary)]">
+                  <div className="mt-px break-all text-sm text-foreground">
                     {h5TokenVisible && h5GeneratedToken
                       ? h5GeneratedToken
                       : h5Access.tokenPreview || t('settings.general.h5AccessTokenNotAvailable')}
@@ -441,11 +440,11 @@ export function H5AccessSettings() {
             </div>
           )}
 
-          <p className="mt-4 border-l-2 border-[var(--color-border)] py-1.5 pl-3 text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+          <p className="mt-4 border-l-2 border-border py-1.5 pl-3 text-xs leading-relaxed text-muted-foreground">
             {t('settings.general.h5AccessSafetyNote')}
           </p>
           {h5AccessError && (
-            <p className="mt-2 text-xs text-[var(--color-error)]">
+            <p className="mt-2 text-xs text-destructive">
               {h5AccessError}
             </p>
           )}

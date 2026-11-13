@@ -20,7 +20,7 @@ export function ElapsedTime({ startedAt }: { startedAt: number }) {
   if (elapsedSeconds === 0) return null
 
   return (
-    <span className="text-[10px] text-[var(--color-text-tertiary)]">
+    <span className="text-3xs text-subtle-foreground">
       {formatElapsed(elapsedSeconds)}
     </span>
   )

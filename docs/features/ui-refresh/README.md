@@ -2,13 +2,15 @@
 
 本目录记录 DreamCoder 桌面端的设计讨论、用户反馈和演示样稿。后续修改先看当前约束，再看过程记录，避免把早期方案重新带回来。
 
+- [视觉重构实施记录](./visual-refresh.zh.md)：2026-11 按 t3code 方向落地到正式前端的决定、实现位置和已知限制。
+- [t3code 对照调研](./t3code-comparison.zh.md)：视觉重构前对 t3code 的调研和可借鉴之处。
 - [现有功能覆盖核对](./coverage-audit.zh.md)：以 `main@5721c21` 对照当前样稿，记录缺口和待迁移流程。
 - [设计决策与修改过程](./design-log.zh.md)：用户明确要求、样稿采用的方案、待确认项及检查清单。
 - [设置页面样稿](./settings-ui.zh.md)：14 个分类的内容、源码对应及演示边界。
 - [可直接打开的演示样稿](./mockups/dreamcoder-preview.html)：独立 HTML，保留演示交互。
 - [样稿源片段](./mockups/dreamcoder-complete-study.html)：用于继续编辑和重新导出。
 
-当前为设计阶段。样稿使用模拟数据，页面中的任务、文件变化、终端输出和设置反馈不代表真实应用执行结果。
+`mockups/` 下的样稿使用模拟数据，页面中的任务、文件变化、终端输出和设置反馈不代表真实应用执行结果。
 
 记录基线：2026-10-17，`feat/ui-refresh`，从当时本地 `main`（`d5ee9159`）建立。2026-10-18 样稿内容对齐到 `main@ac0ea44`，分支本身尚未 rebase。原有 `refactor/typed-live-events` 工作目录保持原状。
 

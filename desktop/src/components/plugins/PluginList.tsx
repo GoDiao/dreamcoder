@@ -81,16 +81,16 @@ export function PluginList() {
   }
 
   if (error) {
-    return <div className="text-sm text-[var(--color-error)] py-4">{error}</div>
+    return <div className="text-sm text-destructive py-4">{error}</div>
   }
 
   if (plugins.length === 0) {
     return (
       <div className="py-10 text-center">
-        <p className="text-[13px] text-[var(--color-text-secondary)]">
+        <p className="text-sm text-muted-foreground">
           {t('settings.plugins.empty')}
         </p>
-        <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+        <p className="text-xs text-subtle-foreground mt-1">
           {t('settings.plugins.emptyHint')}
         </p>
       </div>
@@ -129,7 +129,7 @@ export function PluginList() {
       />
 
       {lastReloadSummary && (
-        <p className="-mt-3 mb-4 text-xs text-[var(--color-text-tertiary)]">
+        <p className="-mt-3 mb-4 text-xs text-subtle-foreground">
           {t('settings.plugins.lastReload', {
             enabled: String(lastReloadSummary.enabled),
             skills: String(lastReloadSummary.skills),
@@ -140,7 +140,7 @@ export function PluginList() {
 
       {marketplaces.length > 0 && (
         <SettingsSection title={t('settings.plugins.marketplacesTitle')} count={marketplaces.length}>
-          <p className="-mt-1.5 mb-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+          <p className="-mt-1.5 mb-1 text-xs leading-normal text-subtle-foreground">
             {t('settings.plugins.marketplacesHint')}
           </p>
           {marketplaces.map((marketplace) => (
@@ -190,28 +190,28 @@ function renderGroup(
       {items.map((plugin) => (
         <Button
           key={plugin.id}
+          type="button"
           variant="ghost"
-          size="row"
+          size="row-flush"
           onClick={() => void fetchPluginDetail(plugin.id, cwd)}
-          className="gap-3 rounded-none border-0 border-b border-[var(--color-border-separator)] px-0 py-2.5"
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
-              <span className="break-all text-[13px] font-medium text-[var(--color-text-primary)]">
+              <span className="break-all text-sm font-medium text-foreground">
                 {plugin.name}
               </span>
               <StatusPill plugin={plugin} />
               <ScopePill scope={plugin.scope} />
               {plugin.version && (
-                <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
+                <span className="rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">
                   v{plugin.version}
                 </span>
               )}
             </span>
-            <span className="mt-px block break-words text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+            <span className="mt-px block break-words text-xs leading-normal text-muted-foreground">
               {plugin.description || t('settings.plugins.noDescription')}
             </span>
-            <span className="mt-px flex flex-wrap items-center gap-x-3 text-[11px] text-[var(--color-text-tertiary)]">
+            <span className="mt-px flex flex-wrap items-center gap-x-3 text-2xs text-subtle-foreground">
               <span>{plugin.marketplace}</span>
               {plugin.componentCounts.skills > 0 && (
                 <span>{t('settings.plugins.capability.skills', { count: String(plugin.componentCounts.skills) })}</span>
@@ -223,13 +223,13 @@ function renderGroup(
                 <span>{t('settings.plugins.capability.mcpServers', { count: String(plugin.componentCounts.mcpServers) })}</span>
               )}
               {plugin.errors.length > 0 && (
-                <span className="text-[var(--color-error)]">
+                <span className="text-destructive">
                   {t('settings.plugins.errorCount', { count: String(plugin.errors.length) })}
                 </span>
               )}
             </span>
           </span>
-          <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
+          <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-subtle-foreground" />
         </Button>
       ))}
     </SettingsSection>
@@ -241,17 +241,17 @@ function StatusPill({ plugin }: { plugin: PluginSummary }) {
 
   if (plugin.hasErrors) {
     return (
-      <span className="rounded-[4px] bg-[var(--color-error)]/12 px-1.5 py-0.5 text-[11px] text-[var(--color-error)]">
+      <span className="rounded-sm bg-destructive/12 px-1.5 py-0.5 text-2xs text-destructive">
         {t('settings.plugins.status.attention')}
       </span>
     )
   }
 
   return (
-    <span className={`rounded-[4px] px-1.5 py-0.5 text-[11px] ${
+    <span className={`rounded-sm px-1.5 py-0.5 text-2xs ${
       plugin.enabled
-        ? 'bg-[var(--color-success-container)] text-[var(--color-success)]'
-        : 'bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]'
+        ? 'bg-success-surface text-success'
+        : 'bg-secondary text-subtle-foreground'
     }`}>
       {plugin.enabled
         ? t('settings.plugins.status.enabled')
@@ -263,7 +263,7 @@ function StatusPill({ plugin }: { plugin: PluginSummary }) {
 function ScopePill({ scope }: { scope: PluginSummary['scope'] }) {
   const t = useTranslation()
   return (
-    <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
+    <span className="rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">
       {t(`settings.plugins.scope.${scope}`)}
     </span>
   )

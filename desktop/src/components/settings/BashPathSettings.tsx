@@ -80,11 +80,11 @@ export function BashPathSettings() {
   }
 
   return (
-    <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
-      <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-primary)]">
+    <div className="mt-4 rounded-md border border-border bg-card px-4 py-3">
+      <label className="mb-1.5 block text-sm font-medium text-foreground">
         {t('settings.terminal.bashPathLabel')}
       </label>
-      <p className="mb-2 text-xs text-[var(--color-text-tertiary)]">
+      <p className="mb-2 text-xs text-subtle-foreground">
         {t('settings.terminal.bashPathDescription')}
       </p>
       <div className="flex gap-2">
@@ -96,7 +96,8 @@ export function BashPathSettings() {
           disabled={saving}
           onChange={(e) => { setBashPathDraft(e.target.value); setInvalid(false); setSaved(false); setSaveError(null) }}
           placeholder={t('settings.terminal.bashPathLabel')}
-          className="min-w-0 flex-1 font-mono"
+          font="mono"
+          className="min-w-0 flex-1"
         />
         <Button variant="outline"
           type="button"
@@ -122,10 +123,10 @@ export function BashPathSettings() {
         </Button>
       </div>
       {saveError && (
-        <p role="alert" className="mt-1.5 text-xs text-[var(--color-error)]">{saveError}</p>
+        <p role="alert" className="mt-1.5 text-xs text-destructive">{saveError}</p>
       )}
       {invalid && (
-        <p className="mt-1.5 text-xs text-[var(--color-error)]">
+        <p className="mt-1.5 text-xs text-destructive">
           {t('settings.terminal.bashPathInvalid')}
         </p>
       )}

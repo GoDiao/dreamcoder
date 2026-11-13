@@ -20,7 +20,8 @@ export function ComposerPopover({ anchorRef, inputRef, label, onClose, preserveI
         sideOffset={8}
         collisionPadding={12}
         aria-label={label}
-        className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0"
+        size="flush"
+        className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)]"
         onOpenAutoFocus={(event) => { if (preserveInputFocus) event.preventDefault() }}
         onCloseAutoFocus={(event) => {
           event.preventDefault()

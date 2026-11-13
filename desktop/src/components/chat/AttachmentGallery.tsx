@@ -54,7 +54,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                 <button
                   type="button"
                   onClick={() => setActiveImageIndex(images.findIndex((image) => image.src === src))}
-                  className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)]"
+                  className="overflow-hidden rounded-xl border border-border bg-card"
                 >
                   <img
                     src={src}
@@ -66,7 +66,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                   <button
                     type="button"
                     onClick={() => onRemove(attachment.id!)}
-                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-error)] text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-3xs text-white opacity-0 transition-opacity group-hover:opacity-100"
                     aria-label={`Remove ${attachment.name}`}
                   >
                     ×
@@ -87,20 +87,20 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
             <div
               key={attachment.id || `${attachment.name}-${index}`}
               className={[
-                'group/file inline-flex max-w-full min-w-0 border border-[var(--color-border)]',
-                'bg-[var(--color-surface-container-low)] text-[var(--color-text-secondary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+                'group/file inline-flex max-w-full min-w-0 border border-border',
+                'bg-card text-muted-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
                 hasQuotePreview
-                  ? 'items-start gap-2 rounded-[8px] px-2.5 py-2'
+                  ? 'items-start gap-2 rounded-lg px-2.5 py-2'
                   : 'h-9 items-center gap-2 rounded-full px-3',
               ].join(' ')}
             >
-              <AttachmentIcon className={`shrink-0 text-[var(--color-text-tertiary)] ${hasQuotePreview ? 'mt-0.5' : ''}`} aria-hidden="true" size={17} />
+              <AttachmentIcon className={`shrink-0 text-subtle-foreground ${hasQuotePreview ? 'mt-0.5' : ''}`} aria-hidden="true" size={17} />
               <span className="min-w-0">
-                <span className="block min-w-0 max-w-[260px] truncate text-[13px] font-medium leading-5 text-[var(--color-text-primary)]">
+                <span className="block min-w-0 max-w-[260px] truncate text-sm font-medium leading-5 text-foreground">
                   {attachment.name}{lineLabel}
                 </span>
                 {hasQuotePreview && (
-                  <span className="mt-0.5 block max-w-[320px] truncate font-[var(--font-mono)] text-[11px] leading-4 text-[var(--color-text-tertiary)]">
+                  <span className="mt-0.5 block max-w-[320px] truncate font-mono text-2xs leading-4 text-subtle-foreground">
                     {quotePreview}
                   </span>
                 )}
@@ -109,7 +109,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
                 <button
                   type="button"
                   onClick={() => onRemove(attachment.id!)}
-                  className={`${hasQuotePreview ? 'mt-0.5' : 'ml-0.5'} flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]`}
+                  className={`${hasQuotePreview ? 'mt-0.5' : 'ml-0.5'} flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-subtle-foreground transition-colors hover:text-foreground`}
                   aria-label={`Remove ${attachment.name}`}
                 >
                   <XIcon aria-hidden="true" size={17} />

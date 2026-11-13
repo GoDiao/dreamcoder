@@ -34,12 +34,12 @@ const AGENT_SOURCE_ORDER: AgentSource[] = [
 ]
 
 function getAgentDotColor(color?: string) {
-  return color && AGENT_COLORS[color] ? AGENT_COLORS[color] : 'var(--color-text-tertiary)'
+  return color && AGENT_COLORS[color] ? AGENT_COLORS[color] : 'var(--subtle-foreground)'
 }
 
 function MetaPill({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
+    <span className="inline-flex items-center rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">
       {children}
     </span>
   )
@@ -52,19 +52,16 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 min-w-0">
       <div>
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]"
-        >
-          <ArrowLeftIcon aria-hidden="true" size={16} />
+        <Button type="button" variant="ghost-muted" size="sm" onClick={onBack}>
+          <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
           {t('settings.agents.backToList')}
-        </button>
+        </Button>
       </div>
 
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] overflow-hidden">
+      <section className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] lg:items-start">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--color-text-tertiary)] mb-2">
+            <div className="text-2xs font-semibold uppercase tracking-widest text-subtle-foreground mb-2">
               {t('settings.agents.entryEyebrow')}
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -72,7 +69,7 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
                 className="h-3 w-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: getAgentDotColor(agent.color) }}
               />
-              <h3 className="text-[22px] font-semibold leading-tight text-[var(--color-text-primary)] break-all">
+              <h3 className="text-xl font-semibold leading-tight text-foreground break-all">
                 {agent.agentType}
               </h3>
               <MetaPill>{sourceLabel}</MetaPill>
@@ -90,12 +87,12 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
                 </MetaPill>
               )}
             </div>
-            <div className="max-w-4xl text-sm leading-6 text-[var(--color-text-secondary)]">
+            <div className="max-w-4xl text-sm leading-6 text-muted-foreground">
               <MarkdownRenderer
                 content={agent.description || t('settings.agents.noDescription')}
               />
             </div>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-text-tertiary)]">
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-subtle-foreground">
               <span>
                 {agent.tools?.length
                   ? t('settings.agents.toolCount', { count: String(agent.tools.length) })
@@ -131,10 +128,10 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
       </section>
 
       {agent.tools && agent.tools.length > 0 && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4">
+        <section className="rounded-2xl border border-border bg-background px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <WrenchIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={18} />
-            <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <WrenchIcon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={18} />
+            <h4 className="text-sm font-semibold text-foreground">
               {t('settings.agents.tools')}
             </h4>
           </div>
@@ -146,27 +143,27 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
         </section>
       )}
 
-      <section className="flex flex-1 min-h-0 min-w-0 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <section className="flex flex-1 min-h-0 min-w-0 overflow-hidden rounded-2xl border border-border bg-background">
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono text-[var(--color-text-secondary)] break-all">
+                <span className="text-xs font-mono text-muted-foreground break-all">
                   {agent.baseDir || sourceLabel}
                 </span>
               </div>
-              <div className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
+              <div className="mt-1 text-2xs text-subtle-foreground">
                 {t('settings.agents.promptHint')}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)] border border-[var(--color-border)]">
+              <span className="rounded-full bg-background px-2.5 py-1 text-3xs font-semibold uppercase tracking-widest text-subtle-foreground border border-border">
                 {t('settings.agents.systemPrompt')}
               </span>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-container-lowest)]">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-popover">
             {agent.systemPrompt ? (
               <div className="px-6 py-5 lg:px-8">
                 <MarkdownRenderer
@@ -177,8 +174,8 @@ function AgentDetailView({ agent, onBack }: { agent: AgentDefinition; onBack: ()
               </div>
             ) : (
               <div className="px-6 py-10 text-center">
-                <FileTextIcon className="mx-auto shrink-0 text-[var(--color-text-tertiary)] mb-2 block" aria-hidden="true" size={32} />
-                <p className="text-sm text-[var(--color-text-tertiary)]">
+                <FileTextIcon className="mx-auto shrink-0 text-subtle-foreground mb-2 block" aria-hidden="true" size={32} />
+                <p className="text-sm text-subtle-foreground">
                   {t('settings.agents.noSystemPrompt')}
                 </p>
               </div>
@@ -245,19 +242,19 @@ export function AgentsSettings() {
         <LoadingBlock />
       ) : error ? (
         <div className="text-center py-12 px-4">
-          <CircleAlertIcon className="mx-auto shrink-0 text-[var(--color-error)] mb-3 block" aria-hidden="true" size={40} />
-          <p className="text-sm text-[var(--color-error)] mb-2">{error}</p>
+          <CircleAlertIcon className="mx-auto shrink-0 text-destructive mb-3 block" aria-hidden="true" size={40} />
+          <p className="text-sm text-destructive mb-2">{error}</p>
           <button
             onClick={() => void fetchAgents(currentWorkDir)}
-            className="text-xs text-[var(--color-text-accent)] hover:underline"
+            className="text-xs text-primary hover:underline"
           >
             {t('common.retry')}
           </button>
         </div>
       ) : allAgents.length === 0 ? (
         <div className="py-10 text-center">
-          <p className="text-sm text-[var(--color-text-secondary)] mb-1">{t('settings.agents.empty')}</p>
-          <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.agents.emptyHint')}</p>
+          <p className="text-sm text-muted-foreground mb-1">{t('settings.agents.empty')}</p>
+          <p className="text-xs text-subtle-foreground">{t('settings.agents.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -279,10 +276,11 @@ export function AgentsSettings() {
                 {group.map((agent) => (
                   <Button
                     key={`${agent.source}-${agent.agentType}`}
+                    type="button"
                     variant="ghost"
-                    size="row"
+                    size="row-flush"
                     onClick={() => selectAgent(agent, 'agents')}
-                    className="group gap-3 rounded-none border-0 border-b border-[var(--color-border-separator)] px-0 py-2.5"
+                    className="group"
                   >
                     <span
                       aria-hidden="true"
@@ -291,7 +289,7 @@ export function AgentsSettings() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="break-all text-[13px] font-medium text-[var(--color-text-primary)]">
+                        <span className="break-all text-sm font-medium text-foreground">
                           {agent.agentType}
                         </span>
                         {agent.modelDisplay && <MetaPill>{agent.modelDisplay}</MetaPill>}
@@ -308,19 +306,19 @@ export function AgentsSettings() {
                           </MetaPill>
                         )}
                       </span>
-                      <span className="mt-px block break-words text-xs leading-[1.5] text-[var(--color-text-secondary)] [&_.prose]:text-xs [&_.prose]:leading-[1.5] [&_.prose]:text-[var(--color-text-secondary)] [&_p]:my-0">
+                      <span className="mt-px block break-words text-xs leading-normal text-muted-foreground [&_.prose]:text-xs [&_.prose]:leading-normal [&_.prose]:text-muted-foreground [&_p]:my-0">
                         <MarkdownRenderer
                           content={agent.description || t('settings.agents.noDescription')}
                         />
                       </span>
-                      <span className="mt-px block text-[11px] text-[var(--color-text-tertiary)]">
+                      <span className="mt-px block text-2xs text-subtle-foreground">
                         {agent.tools?.length
                           ? t('settings.agents.toolCount', { count: String(agent.tools.length) })
                           : t('settings.agents.noTools')}
                         {agent.baseDir ? <span className="break-all"> · {agent.baseDir}</span> : null}
                       </span>
                     </span>
-                    <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-[var(--color-text-tertiary)]" />
+                    <ChevronRight size={14} aria-hidden="true" className="mr-1 flex-shrink-0 text-subtle-foreground" />
                   </Button>
                 ))}
               </SettingsSection>

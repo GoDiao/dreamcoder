@@ -1,5 +1,5 @@
 import { Check, BadgeCheck, ChevronDown, FolderOpen, Search, X } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../shared/ui/card'
+import { CardTitle } from '../shared/ui/card'
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from '../shared/ui/code-block'
 import { CodeViewer } from './CodeViewer'
 import { getToolIcon } from './toolIcons'
@@ -89,17 +89,17 @@ function kanbanAcceptance(toolName: string, input: unknown): { card: number; ite
 
 function AcceptanceChange({ before, after, t }: { before: readonly string[] | null; after: readonly string[]; t: Translate }) {
   const removed = before?.filter((item) => !after.includes(item)) ?? []
-  const tag = (key: TranslationKey) => <span className="shrink-0 rounded bg-[var(--color-surface-container-high)] px-1.5 text-[10px] text-[var(--color-text-secondary)]">{t(key)}</span>
+  const tag = (key: TranslationKey) => <span className="shrink-0 rounded bg-secondary px-1.5 text-3xs text-muted-foreground">{t(key)}</span>
   return (
-    <ul className="flex flex-col gap-1 text-xs text-[var(--color-text-primary)]">
+    <ul className="flex flex-col gap-1 text-xs text-foreground">
       {after.map((item) => (
         <li key={`after-${item}`} className="flex items-start gap-2">
-          {before && !before.includes(item) ? tag('permission.kanbanAcceptance.added') : <span aria-hidden="true" className="mt-[5px] size-1.5 shrink-0 rounded-full bg-[var(--color-text-tertiary)]" />}
+          {before && !before.includes(item) ? tag('permission.kanbanAcceptance.added') : <span aria-hidden="true" className="mt-1.25 size-1.5 shrink-0 rounded-full bg-subtle-foreground" />}
           <span>{item}</span>
         </li>
       ))}
       {removed.map((item) => (
-        <li key={`removed-${item}`} className="flex items-start gap-2 text-[var(--color-text-tertiary)]">
+        <li key={`removed-${item}`} className="flex items-start gap-2 text-subtle-foreground">
           {tag('permission.kanbanAcceptance.removed')}
           <span className="line-through">{item}</span>
         </li>
@@ -254,38 +254,38 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
   const allowRawToggle = !preview && rawInput !== '{}'
 
   return (
-    <Card size="sm" className={`mb-4 gap-0 py-0 border ${
+    <div className={`mb-4 flex flex-col overflow-hidden rounded-xl border text-sm text-card-foreground ${
       isPending
-        ? 'border-[var(--color-warning)] bg-[var(--color-surface-container-lowest)]'
-        : 'border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-low)] opacity-70'
+        ? 'border-warning bg-popover'
+        : 'border-border/40 bg-card opacity-70'
     }`}>
-      <CardHeader className={`flex flex-row items-center gap-3 px-4 py-3 ${
+      <div className={`flex items-center gap-3 px-4 py-3 ${
         isPending
-          ? 'bg-[var(--color-surface-container)]'
-          : 'bg-[var(--color-surface-container-low)]'
+          ? 'bg-muted'
+          : 'bg-card'
       }`}>
-        <Icon className="size-5 shrink-0 text-ui-muted-foreground" aria-hidden="true" />
+        <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <CardTitle>{title}</CardTitle>
             {isPending && <AwaitingApprovalBadge />}
             {!isPending && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-bold uppercase tracking-wider bg-secondary text-subtle-foreground">
                 {t(resolutionLabelKey(resolution))}
               </span>
             )}
           </div>
           {shownDescription && (
-            <CardDescription className="truncate">{shownDescription}</CardDescription>
+            <div className="truncate text-sm text-muted-foreground">{shownDescription}</div>
           )}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="border-t border-ui-border px-4 py-3">
+      <div className="border-t border-border px-4 py-3">
         {preview ? (
           <div className="space-y-2">
             {details.primary && toolName !== 'Bash' ? (
-              <div className="flex items-center gap-2 rounded-md bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
+              <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs font-mono text-muted-foreground">
                 <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{details.primary}</span>
               </div>
@@ -294,7 +294,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
           </div>
         ) : details.primary ? (
           <div className="mb-2">
-            <div className="flex items-center gap-2 rounded-md bg-[var(--color-surface-container)] px-3 py-2 text-xs font-[var(--font-mono)] text-[var(--color-text-secondary)]">
+            <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs font-mono text-muted-foreground">
               <DetailIcon className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">{details.primary}</span>
             </div>
@@ -302,13 +302,13 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         ) : null}
 
         {details.secondary && (
-          <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{details.secondary}</p>
+          <p className="mt-2 text-xs text-subtle-foreground">{details.secondary}</p>
         )}
 
         {allowRawToggle && (
-          <Button variant="ghost" size="xs" aria-expanded={showRaw}
+          <Button variant="link" size="inline" aria-expanded={showRaw}
             onClick={() => setShowRaw(!showRaw)}
-            className="mt-2 flex cursor-pointer items-center gap-1 text-[11px] text-[var(--color-text-accent)] hover:underline"
+            className="mt-2"
           >
             <ChevronDown className={showRaw ? 'rotate-180' : undefined} aria-hidden="true" />
             {showRaw ? t('permission.hideDetails') : t('permission.showFullInput')}
@@ -318,10 +318,10 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         {allowRawToggle && showRaw && (
           <CodeViewer code={rawInput} language={typeof input === 'string' ? 'text' : 'json'} />
         )}
-      </CardContent>
+      </div>
 
       {isPending && (
-        <CardFooter className="gap-2 px-4 py-3">
+        <div className="flex items-center gap-2 px-4 py-3">
           <Button
             size="sm"
             onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true)}
@@ -348,8 +348,8 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             <X data-icon="inline-start" aria-hidden="true" />
             {t('permission.deny')}
           </Button>
-        </CardFooter>
+        </div>
       )}
-    </Card>
+    </div>
   )
 }

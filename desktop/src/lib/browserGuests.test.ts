@@ -121,7 +121,7 @@ beforeEach(() => {
         isOpen: true,
         expanded: false,
         activeTabId: 'a',
-        recentFiles: [],
+        recentFiles: [], selectedFile: null,
         tabs: [
           { id: 'a', kind: 'browser', url: '', title: '' },
           { id: 'b', kind: 'browser', url: '', title: '' },

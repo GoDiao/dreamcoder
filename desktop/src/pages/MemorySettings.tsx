@@ -1,4 +1,3 @@
-import { Textarea } from '../components/shared/ui/textarea'
 import { Tooltip as HintTooltip } from '../components/shared/Tooltip'
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, FileText, RefreshCw } from 'lucide-react'
@@ -191,15 +190,15 @@ export function MemorySettings() {
       />
 
       {error && (
-        <div className="mb-3 rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-2 text-xs text-[var(--color-error)]">
+        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {error}
         </div>
       )}
 
-      <div className="grid min-h-[440px] flex-1 grid-cols-1 border-t border-[var(--color-border-separator)] min-[760px]:grid-cols-[184px_minmax(0,1fr)]">
+      <div className="grid min-h-[440px] flex-1 grid-cols-1 border-t border-border min-[760px]:grid-cols-[184px_minmax(0,1fr)]">
         <aside
           aria-label={t('settings.memory.files')}
-          className="flex min-w-0 flex-col gap-px border-b border-[var(--color-border-separator)] py-3 min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:pr-3"
+          className="flex min-w-0 flex-col gap-px border-b border-border py-3 min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:pr-3"
         >
           <SearchField
             value={resourceQuery}
@@ -209,9 +208,9 @@ export function MemorySettings() {
             className="mb-2.5"
           />
           {projects.length === 0 && !isLoadingProjects ? (
-            <p className="px-2 py-1 text-xs text-[var(--color-text-tertiary)]">{t('settings.memory.emptyProjects')}</p>
+            <p className="px-2 py-1 text-xs text-subtle-foreground">{t('settings.memory.emptyProjects')}</p>
           ) : filteredProjects.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-[var(--color-text-tertiary)]">{t('settings.memory.noFileMatches')}</p>
+            <p className="px-2 py-1 text-xs text-subtle-foreground">{t('settings.memory.noFileMatches')}</p>
           ) : (
             filteredProjects.map((project) => {
               const isExpanded = project.id === expandedProjectId
@@ -239,28 +238,28 @@ export function MemorySettings() {
         </aside>
 
         <section aria-label={selectedFileName ?? t('settings.memory.noFileSelected')} className="flex min-w-0 flex-col">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-separator)] py-3 min-[760px]:pl-5">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 min-[760px]:pl-5">
             <div className="grid min-w-0 gap-px">
               <div className="flex min-w-0 items-center gap-2.5">
-                <h3 className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                <h3 className="truncate text-sm font-semibold text-foreground">
                   {selectedFileName ?? t('settings.memory.noFileSelected')}
                 </h3>
                 {selectedFile ? (
                   <span
-                    className={`inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap text-[11px] ${
-                      isDirty ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-secondary)]'
+                    className={`inline-flex shrink-0 items-center gap-1.25 whitespace-nowrap text-2xs ${
+                      isDirty ? 'text-primary' : 'text-muted-foreground'
                     }`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`h-1.5 w-1.5 rounded-full ${isDirty ? 'bg-[var(--color-brand)]' : 'bg-[var(--color-success)]'}`}
+                      className={`h-1.5 w-1.5 rounded-full ${isDirty ? 'bg-primary' : 'bg-success'}`}
                     />
                     {isDirty ? t('settings.memory.unsaved') : t('settings.memory.saved')}
                   </span>
                 ) : null}
               </div>
               <HintTooltip content={selectedProject && selectedFile ? `${selectedProject.memoryDir}/${selectedFile.path}` : undefined}><span
-                className="truncate text-[11px] text-[var(--color-text-tertiary)]"
+                className="truncate text-2xs text-subtle-foreground"
               >
                 {selectedProject
                   ? [
@@ -307,12 +306,12 @@ export function MemorySettings() {
           {selectedFile ? (
             <div className="flex min-h-0 flex-1 py-4 min-[760px]:pl-5">
               {viewMode === 'edit' ? (
-                <Textarea
+                <textarea
                   aria-label={t('settings.memory.editor')}
                   value={draftContent}
                   onChange={(event) => updateDraft(event.target.value)}
                   spellCheck={false}
-                  className="field-sizing-fixed min-h-[360px] w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-[13px] leading-[1.8] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus-visible:outline-none"
+                  className="field-sizing-fixed min-h-[360px] w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-subtle-foreground focus:outline-none focus-visible:outline-none"
                 />
               ) : (
                 <div className="min-w-0 max-w-[62ch] flex-1">
@@ -325,7 +324,7 @@ export function MemorySettings() {
               )}
             </div>
           ) : (
-            <div className="flex flex-1 items-center justify-center p-8 text-xs text-[var(--color-text-tertiary)]">
+            <div className="flex flex-1 items-center justify-center p-8 text-xs text-subtle-foreground">
               {isLoadingFile ? t('common.loading') : t('settings.memory.selectFile')}
             </div>
           )}
@@ -370,30 +369,30 @@ function ProjectTreeRow({
   const display = projectDisplayName(project.label)
   return (
     <div>
-      <HintTooltip content={project.label}><Button variant="ghost"
+      <HintTooltip content={project.label}><button
         type="button"
         data-testid="memory-project-row"
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={t('settings.memory.toggleFolder', { name: display })}
-        className={ROW_CLASS}
+        className={`${ROW_CLASS} text-sm text-foreground hover:bg-hover`}
       >
         {expanded
-          ? <ChevronDown size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-          : <ChevronRight size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />}
+          ? <ChevronDown size={14} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
+          : <ChevronRight size={14} className="shrink-0 text-subtle-foreground" aria-hidden="true" />}
         <span className="min-w-0 flex-1 truncate">{display}</span>
         {!project.exists ? (
-          <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{t('settings.memory.missing')}</span>
+          <span className="shrink-0 text-2xs text-subtle-foreground">{t('settings.memory.missing')}</span>
         ) : (
-          <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{fileCount}</span>
+          <span className="shrink-0 text-2xs text-subtle-foreground">{fileCount}</span>
         )}
-      </Button></HintTooltip>
+      </button></HintTooltip>
 
       {expanded ? (
         loading ? (
-          <p className="py-1 pl-7 pr-2 text-xs text-[var(--color-text-tertiary)]">{t('common.loading')}</p>
+          <p className="py-1 pl-7 pr-2 text-xs text-subtle-foreground">{t('common.loading')}</p>
         ) : fileTree.length === 0 ? (
-          <p className="py-1 pl-7 pr-2 text-xs text-[var(--color-text-tertiary)]">{emptyText}</p>
+          <p className="py-1 pl-7 pr-2 text-xs text-subtle-foreground">{emptyText}</p>
         ) : (
           fileTree.map((node) => (
             <MemoryTreeRow
@@ -415,7 +414,7 @@ function ProjectTreeRow({
 }
 
 const ROW_CLASS =
-  'flex h-auto w-full justify-start min-w-0 items-center gap-1.5 rounded-[7px] px-2 py-[5px] text-left text-[13px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none'
+  'flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50'
 
 function rowIndent(depth: number): number {
   return 8 + depth * 18
@@ -436,29 +435,28 @@ function FileRow({
 }) {
   const t = useTranslation()
   return (
-    <Button
-      variant="ghost"
+    <button
       type="button"
       onClick={onSelect}
       aria-current={active ? 'true' : undefined}
       style={{ paddingLeft: `${rowIndent(depth)}px` }}
       className={`${ROW_CLASS} text-xs ${
         active
-          ? 'bg-[var(--color-surface-selected)] !text-[var(--color-text-primary)] hover:bg-[var(--color-surface-selected)]'
-          : '!text-[var(--color-text-secondary)]'
+          ? 'bg-selected text-foreground'
+          : 'text-muted-foreground hover:bg-hover'
       }`}
     >
-      <FileText size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+      <FileText size={14} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{file.title}</span>
       {dirty ? (
         <span
           data-testid="memory-dirty-dot"
           role="img"
           aria-label={t('settings.memory.unsaved')}
-          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)]"
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
         />
       ) : null}
-    </Button>
+    </button>
   )
 }
 
@@ -497,21 +495,20 @@ function MemoryTreeRow({
   const isCollapsed = !forceExpanded && collapsedFolders.has(node.path)
   return (
     <div>
-      <Button
-        variant="ghost"
+      <button
         type="button"
         onClick={() => onToggleFolder(node.path)}
         aria-expanded={!isCollapsed}
         aria-label={t('settings.memory.toggleFolder', { name: node.name })}
-        className={`${ROW_CLASS} text-xs !text-[var(--color-text-secondary)]`}
+        className={`${ROW_CLASS} text-xs text-muted-foreground hover:bg-hover`}
         style={{ paddingLeft: `${rowIndent(depth)}px` }}
       >
         {isCollapsed
-          ? <ChevronRight size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-          : <ChevronDown size={14} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />}
+          ? <ChevronRight size={14} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
+          : <ChevronDown size={14} className="shrink-0 text-subtle-foreground" aria-hidden="true" />}
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
-        <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{node.fileCount}</span>
-      </Button>
+        <span className="shrink-0 text-2xs text-subtle-foreground">{node.fileCount}</span>
+      </button>
       {!isCollapsed
         ? node.children.map((child) => (
             <MemoryTreeRow

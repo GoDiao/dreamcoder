@@ -93,6 +93,7 @@ async function selectMessageText(element: Element, text: string) {
   window.getSelection()?.addRange(range)
 
   await act(async () => {
+    fireEvent.mouseDown(element, { button: 0 })
     fireEvent.mouseUp(element, { clientX: 260, clientY: 104 })
     await Promise.resolve()
   })
@@ -526,7 +527,7 @@ describe('MessageList nested tool calls', () => {
     const card = screen.getByTestId('background-task-event-card')
     expect(card.getAttribute('data-status')).toBe('stopped')
     expect(card.textContent).toContain('stopped')
-    expect(card.querySelector('.text-\\[var\\(--color-error\\)\\]')).toBeNull()
+    expect(card.querySelector('.text-destructive')).toBeNull()
   })
 
   it('uses user-facing labels for workflow and unknown background tasks', () => {
@@ -1007,8 +1008,8 @@ describe('MessageList nested tool calls', () => {
     const preview = screen.getByRole('button', { name: '/Users/test/.claude/projects/example/memory/preferences.md' })
     expect(preview).toBeTruthy()
     const memoryCardClassName = screen.getByTestId('memory-tool-activity-card').className
-    expect(memoryCardClassName).toContain('border-[var(--color-memory-border)]')
-    expect(memoryCardClassName).toContain('bg-[var(--color-memory-surface)]')
+    expect(memoryCardClassName).toContain('border-memory-border')
+    expect(memoryCardClassName).toContain('bg-memory-surface')
   })
 
   it('promotes memory file reads into collapsible memory references', () => {
@@ -2755,7 +2756,7 @@ describe('MessageList nested tool calls', () => {
     expect(assistantShell?.className).toContain('items-start')
     expect(assistantShell?.className).not.toContain('ml-10')
     expect(assistantShell?.getAttribute('data-layout')).toBe('plain')
-    expect(assistantShell?.querySelector('[class*="shadow-[var(--shadow-dropdown)]"]')).toBeNull()
+    expect(assistantShell?.querySelector('[class*="shadow-popover"]')).toBeNull()
     expect(assistantShell?.querySelector('[class*="rounded-[20px]"]')).toBeNull()
     expect(userActions?.getAttribute('data-align')).toBe('end')
     expect(assistantActions?.getAttribute('data-align')).toBe('start')

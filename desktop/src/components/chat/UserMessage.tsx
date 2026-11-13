@@ -36,7 +36,7 @@ export const UserMessage = memo(function UserMessage({ content: rawContent, atta
         )}
 
         {hasText && (
-          <div className="w-fit max-w-full min-w-0 self-end overflow-hidden rounded-xl rounded-br-sm border border-transparent bg-[var(--color-surface-user-msg)] px-4 py-2.5 text-ui-body leading-[1.7] text-[var(--color-text-primary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]">
+          <div className="w-fit max-w-full min-w-0 self-end overflow-hidden rounded-xl rounded-br-sm border border-transparent bg-message px-4 py-2.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]">
             {content}
           </div>
         )}

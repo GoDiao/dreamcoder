@@ -71,16 +71,16 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
   const ToggleIcon = task.enabled ? CirclePauseIcon : CirclePlayIcon
   const RunIcon = isRunning ? RefreshCwIcon : PlayIcon
   return (
-    <div className="border-b border-[var(--color-border-separator)]">
-      <div className="flex items-center justify-between px-4 py-3 hover:bg-[var(--color-surface-hover)] transition-colors group">
+    <div className="border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 hover:bg-hover transition-colors group">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.enabled ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-tertiary)]'}`} />
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.enabled ? 'bg-success' : 'bg-subtle-foreground'}`} />
           <div className="min-w-0">
-            <div className="text-sm font-medium text-[var(--color-text-primary)] truncate">{task.name}</div>
+            <div className="text-sm font-medium text-foreground truncate">{task.name}</div>
             {task.description && (
-              <div className="text-xs text-[var(--color-text-secondary)] truncate">{task.description}</div>
+              <div className="text-xs text-muted-foreground truncate">{task.description}</div>
             )}
-            <div className="flex items-center gap-3 text-[11px] text-[var(--color-text-tertiary)] mt-0.5">
+            <div className="flex items-center gap-3 text-2xs text-subtle-foreground mt-0.5">
               <span>{t('tasks.createdAt')}{new Date(task.createdAt).toLocaleDateString()}</span>
               {task.lastFiredAt && (
                 <span>{t('tasks.lastRunAt')}{new Date(task.lastFiredAt).toLocaleDateString()}</span>
@@ -90,39 +90,38 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
-          <HintTooltip content={task.cron}><span className="text-xs text-[var(--color-text-tertiary)]">
+          <HintTooltip content={task.cron}><span className="text-xs text-subtle-foreground">
             {describeCron(task.cron, t)}
           </span></HintTooltip>
 
           <div className="flex items-center gap-0.5">
             <HintTooltip content={task.enabled ? t('tasks.runNow') : undefined}>
               <Button
-                variant="ghost"
+                variant="ghost-muted"
                 size="icon-sm"
                 onClick={() => requestConfirmation('run')}
                 disabled={submitting || !task.enabled}
-                className={task.enabled ? 'text-[var(--color-brand)] hover:text-[var(--color-brand)]' : 'text-[var(--color-text-tertiary)]'}
                 aria-label={t('tasks.runNow')}
               >
-                <RunIcon className={isRunning ? 'animate-spin' : ''} aria-hidden="true" size={18} />
+                <RunIcon className={`${isRunning ? 'animate-spin ' : ''}${task.enabled ? 'text-primary' : ''}`} aria-hidden="true" size={18} />
               </Button>
             </HintTooltip>
 
             <HintTooltip content={t('tasks.viewLogs')}>
               <Button
-                variant="ghost"
+                variant="ghost-muted"
                 size="icon-sm"
                 onClick={onToggleLogs}
-                className={showLogs ? 'bg-ui-muted text-[var(--color-brand)] hover:text-[var(--color-brand)]' : 'text-[var(--color-text-tertiary)]'}
+                aria-pressed={showLogs}
                 aria-label={t('tasks.viewLogs')}
               >
-                <ScrollTextIcon aria-hidden="true" size={18} />
+                <ScrollTextIcon className={showLogs ? 'text-primary' : ''} aria-hidden="true" size={18} />
               </Button>
             </HintTooltip>
 
             <ActionMenu
               label={t('tasks.actions')}
-              trigger={<Button variant="ghost" size="icon-sm" aria-label={t('tasks.actions')} disabled={submitting} className="text-[var(--color-text-tertiary)]">
+              trigger={<Button variant="ghost-muted" size="icon-sm" aria-label={t('tasks.actions')} disabled={submitting}>
                 <EllipsisVerticalIcon aria-hidden="true" size={18} />
               </Button>}
               actions={[
@@ -140,7 +139,7 @@ export function TaskRow({ task, showLogs, onToggleLogs }: Props) {
         onClose={() => requestConfirmation(null)}
         onConfirm={handleConfirm}
         title={confirmLabel}
-        body={<><p>{task.name}</p><p>{confirmMessage}</p>{actionError && <p role="alert" className="text-ui-destructive">{actionError}</p>}</>}
+        body={<><p>{task.name}</p><p>{confirmMessage}</p>{actionError && <p role="alert" className="text-destructive">{actionError}</p>}</>}
         confirmLabel={confirmLabel}
         cancelLabel={t('common.cancel')}
         confirmVariant={confirmAction === 'delete' ? 'destructive' : 'default'}

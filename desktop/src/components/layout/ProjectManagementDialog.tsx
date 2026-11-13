@@ -123,7 +123,7 @@ export function ProjectManagementDialog({
 
         <SettingsGroup title={t('sidebar.projects')}>
           {projects.length === 0 && (
-            <p className="py-2.5 text-xs text-[var(--color-text-tertiary)]">{t('sidebar.noSessions')}</p>
+            <p className="py-2.5 text-xs text-subtle-foreground">{t('sidebar.noSessions')}</p>
           )}
           {projects.map((project) => (
             <SettingsRow
@@ -132,10 +132,10 @@ export function ProjectManagementDialog({
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate">{project.title}</span>
                   {project.pinned && (
-                    <Pin size={12} className="flex-shrink-0 text-[var(--color-text-tertiary)]" aria-label={t('sidebar.pinnedBadge')} />
+                    <Pin size={12} className="flex-shrink-0 text-subtle-foreground" aria-label={t('sidebar.pinnedBadge')} />
                   )}
                   {project.hidden && (
-                    <span className="flex-shrink-0 rounded-[4px] bg-[var(--color-surface-container-high)] px-1.5 text-ui-aux text-[var(--color-text-tertiary)]">
+                    <span className="flex-shrink-0 rounded-sm bg-secondary px-1.5 text-xs text-subtle-foreground">
                       {t('sidebar.hiddenBadge')}
                     </span>
                   )}

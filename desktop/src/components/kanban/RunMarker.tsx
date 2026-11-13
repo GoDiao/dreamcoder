@@ -1,7 +1,12 @@
+import type { ComponentProps } from 'react'
 import type { BoardView, CardView } from '@protocol'
 import { useTranslation } from '../../i18n'
 import { Spinner } from '../shared/ui/spinner'
 import { activeAssignee, waitingForYou } from './board'
+
+export function RunningSpinner(props: ComponentProps<typeof Spinner>) {
+  return <span className="flex shrink-0 text-success"><Spinner {...props} /></span>
+}
 
 export function RunMarker({ view, card }: { view: BoardView; card: CardView }) {
   const t = useTranslation()
@@ -11,10 +16,10 @@ export function RunMarker({ view, card }: { view: BoardView; card: CardView }) {
   const waiting = !undelivered && waitingForYou(view, card.id)
   if (!running && !undelivered && !waiting) return null
   return (
-    <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium">
-      {undelivered && <span className="whitespace-nowrap text-[var(--color-error)]">{t('kanban.marker.undelivered')}</span>}
-      {waiting && <span className="whitespace-nowrap text-[var(--color-brand)]">{t('kanban.marker.waitingForYou')}</span>}
-      {running && <Spinner className="size-3 text-[var(--color-success)]" aria-label={t('kanban.marker.running')} role="img" />}
+    <span className="flex shrink-0 items-center gap-1.5 text-2xs font-medium">
+      {undelivered && <span className="whitespace-nowrap text-destructive">{t('kanban.marker.undelivered')}</span>}
+      {waiting && <span className="whitespace-nowrap text-primary">{t('kanban.marker.waitingForYou')}</span>}
+      {running && <RunningSpinner className="size-3" aria-label={t('kanban.marker.running')} role="img" />}
     </span>
   )
 }

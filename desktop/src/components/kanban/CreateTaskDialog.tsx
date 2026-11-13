@@ -111,7 +111,7 @@ export function CreateTaskDialog({ board, view, defaults, onClose, onCreated }: 
           {dependsOn.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {dependsOn.map((id) => (
-                <li key={id} className="inline-flex h-6 items-center gap-1 rounded-lg border border-[var(--color-border)] pl-2 text-[12px]">
+                <li key={id} className="inline-flex h-6 items-center gap-1 rounded-lg border border-border pl-2 text-xs">
                   #{id} {candidates.find((card) => card.id === id)?.title}
                   <Button variant="ghost" size="icon-xs" aria-label={t('kanban.create.removeDependency', { card: `#${id}` })} onClick={() => setDependsOn((current) => current.filter((candidate) => candidate !== id))}>
                     <X aria-hidden="true" />

@@ -67,37 +67,37 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   const line = (
     <TraceLine status={pendingSummary ? 'running' : result?.isError ? 'error' : undefined} className="min-h-7 w-full">
       <TraceIcon><IconComponent size={14} /></TraceIcon>
-      <TraceTitle className="shrink-0 font-medium">{title}</TraceTitle>
+      <TraceTitle className="shrink-0">{title}</TraceTitle>
       {summary ? (
-        <HintTooltip content={summary}><span className="min-w-0 flex-1 truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+        <HintTooltip content={summary}><span className="min-w-0 flex-1 truncate font-mono text-2xs text-subtle-foreground">
           {summary}
         </span></HintTooltip>
       ) : null}
       {pendingSummary ? (
-        <TraceDescription className="text-[10px]">{pendingSummary}</TraceDescription>
+        <TraceDescription>{pendingSummary}</TraceDescription>
       ) : result && outputSummary ? (
         <HintTooltip content={outputSummary}><span
-          className={`min-w-0 max-w-[45%] truncate text-[10px] ${
+          className={`min-w-0 max-w-[45%] truncate text-3xs ${
             result.isError
-              ? 'text-[var(--color-error)]'
-              : 'text-[var(--color-outline)]'
+              ? 'text-destructive'
+              : 'text-subtle-foreground'
           }`}
         >
           {outputSummary}
         </span></HintTooltip>
       ) : null}
       {result?.isError && (
-        <AlertCircle size={14} className="shrink-0 text-[var(--color-error)]" />
+        <AlertCircle size={14} className="shrink-0 text-destructive" />
       )}
     </TraceLine>
   )
 
   const cuaSettingsLink = showCuaSettingsLink && (
-    <div className="pb-1 pl-[22px] text-xs">
-      <Button variant="ghost"
+    <div className="pb-1 pl-5.5 text-xs">
+      <Button variant="link" size="inline"
         type="button"
         onClick={() => useUIStore.getState().openSettings('computerUse')}
-        className="select-none font-medium text-[var(--color-brand)] hover:underline"
+        className="select-none"
       >
         {t('cuaTool.openSettings')}
       </Button>
@@ -107,27 +107,25 @@ export const ToolCallBlock = memo(function ToolCallBlock({ toolName, input, resu
   return (
     <Trace className={compact ? 'mb-0' : 'mb-2'}>
       {expandable ? (
-        <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="gap-2">
+        <TraceCollapsible open={expanded} onOpenChange={setExpanded}>
           <TraceCollapsibleTrigger className="w-full select-none">{line}</TraceCollapsibleTrigger>
           {cuaSettingsLink}
           <CollapsibleContent>
-            <div className="mb-1 mt-1 space-y-2 pl-[22px]">
+            <div className="mb-1 mt-1 space-y-2 pl-5.5">
               <ToolResultImages images={resultImages} />
               {diff}
               {streamingPreview}
               {(inputView || outputText) && (
-                <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
+                <div className="overflow-hidden rounded-lg border border-border bg-card">
                   {inputView && <ToolInputSection view={inputView} obj={obj} t={t} />}
                   {outputText && (
-                    <ToolSection
-                      copyText={outputText}
-                      t={t}
-                      className={`${inputView ? 'border-t border-[var(--color-border)]/60' : ''} ${result?.isError ? 'bg-[var(--color-error-container)]/40' : ''}`}
-                    >
-                      <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[360px] ${result?.isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}`}>
-                        {outputText}
-                      </CodeBlockContent>
-                    </ToolSection>
+                    <div className={`${inputView ? 'border-t border-border/60' : ''} ${result?.isError ? 'bg-destructive-surface/40' : ''}`}>
+                      <ToolSection copyText={outputText} t={t}>
+                        <CodeBlockContent wrap className="max-h-[360px]">
+                          <span className={result?.isError ? 'text-destructive' : 'text-muted-foreground'}>{outputText}</span>
+                        </CodeBlockContent>
+                      </ToolSection>
+                    </div>
                   )}
                 </div>
               )}
@@ -154,8 +152,6 @@ type InputView = {
   /** True when obj has fields the view leaves out, so the raw input is worth offering. */
   hasMore: boolean
 }
-
-const SECTION_PRE_CLASS = 'overflow-auto whitespace-pre-wrap break-words py-2 pl-3 pr-14 font-[var(--font-mono)] text-[12px] leading-[1.45]'
 
 // The most useful input field per tool; anything else stays behind "Show full input".
 const PRIMARY_INPUT_FIELD: Record<string, string> = {
@@ -191,30 +187,34 @@ function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<strin
 
   return (
     <ToolSection copyText={showRaw ? rawText : view.text} t={t}>
-      <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[240px] text-[var(--color-text-primary)]`}>
+      <CodeBlockContent wrap className="max-h-[240px]">
         <CodeBlockLine>
         {view.note && (
-          <span className="block text-[var(--color-text-tertiary)]">{`# ${view.note}`}</span>
+          <span className="block text-subtle-foreground">{`# ${view.note}`}</span>
         )}
         {view.kind === 'command' && (
-          <span className="select-none text-[var(--color-brand)]">$ </span>
+          <span className="select-none text-primary">$ </span>
         )}
         {view.text}
         </CodeBlockLine>
       </CodeBlockContent>
       {view.hasMore && (
         <>
-          <Button variant="ghost"
-            type="button"
-            onClick={() => setShowRaw((value) => !value)}
-            className="select-none px-3 pb-2 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)]"
-          >
-            {showRaw ? t('tool.hideFullInput') : t('tool.showFullInput')}
-          </Button>
+          <div className="px-3 pb-2">
+            <Button variant="link-muted" size="inline"
+              type="button"
+              onClick={() => setShowRaw((value) => !value)}
+              className="select-none"
+            >
+              {showRaw ? t('tool.hideFullInput') : t('tool.showFullInput')}
+            </Button>
+          </div>
           {showRaw && (
-            <CodeBlockContent wrap className={`${SECTION_PRE_CLASS} max-h-[240px] border-t border-dashed border-[var(--color-border)]/60 text-[var(--color-text-secondary)]`}>
-              {rawText}
-            </CodeBlockContent>
+            <div className="border-t border-dashed border-border/60">
+              <CodeBlockContent wrap className="max-h-[240px]">
+                <span className="text-muted-foreground">{rawText}</span>
+              </CodeBlockContent>
+            </div>
           )}
         </>
       )}
@@ -222,15 +222,14 @@ function ToolInputSection({ view, obj, t }: { view: InputView; obj: Record<strin
   )
 }
 
-function ToolSection({ copyText, t, className = '', children }: { copyText: string; t: Translate; className?: string; children: React.ReactNode }) {
+function ToolSection({ copyText, t, children }: { copyText: string; t: Translate; children: React.ReactNode }) {
   return (
-    <CodeBlock size="sm" className={`group/section ${className}`}>
+    <CodeBlock size="sm">
       {children}
       <CodeBlockActions><CopyButton
         text={copyText}
         label={t('tool.copy')}
         copiedLabel={t('tool.copied')}
-        className="absolute right-2 top-1.5 select-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:text-[var(--color-text-primary)] focus-visible:opacity-100 group-hover/section:opacity-100"
       /></CodeBlockActions>
     </CodeBlock>
   )
@@ -348,8 +347,8 @@ function renderWriterPreview(
   const isWindowed = lineWindowed || charTruncated
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] select-none px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border select-none px-3 py-2 text-3xs uppercase tracking-widest text-subtle-foreground">
         <span>{t?.('tool.writerPreview') ?? 'Writer'}</span>
         {isWindowed ? (
           <span className="normal-case tracking-normal">
@@ -357,9 +356,11 @@ function renderWriterPreview(
           </span>
         ) : null}
       </div>
-      <CodeBlockContent wrap className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words bg-[var(--color-code-bg)] px-3 py-2 font-[var(--font-mono)] text-[12px] leading-[1.45] text-[var(--color-code-fg)]">
-        {visibleContent}
-      </CodeBlockContent>
+      <div className="bg-code text-code-foreground">
+        <CodeBlockContent wrap className="max-h-[420px]">
+          {visibleContent}
+        </CodeBlockContent>
+      </div>
     </div>
   )
 }
@@ -369,8 +370,8 @@ function renderPartialInput(
   t?: (key: TranslationKey, params?: Record<string, string | number>) => string,
 ) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="border-b border-[var(--color-border)] select-none px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="border-b border-border select-none px-3 py-2 text-3xs uppercase tracking-widest text-subtle-foreground">
         {t?.('tool.partialInput') ?? 'Partial input'}
       </div>
       <CodeViewer code={partialInput} language="json" maxLines={8} />

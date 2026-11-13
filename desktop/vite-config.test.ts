@@ -11,12 +11,4 @@ describe('desktop build compatibility', () => {
 
     expect(config).toContain("target: ['es2021', 'safari17.5']")
   })
-
-  it('does not rely on CSS color-mix for startup-critical shell chrome', () => {
-    const css = readFileSync(join(desktopRoot, 'src', 'theme', 'globals.css'), 'utf8')
-
-    expect(css).not.toContain('color-mix(')
-    expect(css).toContain('--color-text-secondary-a72')
-    expect(css).toContain('--color-outline-a92')
-  })
 })

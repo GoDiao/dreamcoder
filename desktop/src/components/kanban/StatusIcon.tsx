@@ -1,13 +1,13 @@
 import type { CardStatus } from '@protocol'
 
 const COLOR: Record<CardStatus, string> = {
-  backlog: 'var(--color-text-tertiary)',
-  todo: 'var(--color-text-secondary)',
-  in_progress: 'var(--color-warning)',
-  blocked: 'var(--color-error)',
-  review: 'var(--color-info)',
-  done: 'var(--color-success)',
-  cancelled: 'var(--color-text-tertiary)',
+  backlog: 'var(--subtle-foreground)',
+  todo: 'var(--muted-foreground)',
+  in_progress: 'var(--warning)',
+  blocked: 'var(--destructive)',
+  review: 'var(--info)',
+  done: 'var(--success)',
+  cancelled: 'var(--subtle-foreground)',
 }
 
 export function StatusIcon({ status, size = 14, label }: { status: CardStatus; size?: number; label?: string }) {
@@ -38,7 +38,7 @@ export function StatusIcon({ status, size = 14, label }: { status: CardStatus; s
       {status === 'done' && (
         <>
           <circle cx="8" cy="8" r="6.8" fill={color} />
-          <path d="m5.2 8.2 1.9 1.9 3.7-3.9" stroke="var(--color-surface)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m5.2 8.2 1.9 1.9 3.7-3.9" stroke="var(--background)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )}
       {status === 'cancelled' && (

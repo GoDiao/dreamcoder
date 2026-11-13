@@ -1160,7 +1160,7 @@ describe('ChatInput file mentions', () => {
     expect(screen.queryByText('Run')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-input-toolbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-input-shell')).toHaveClass('px-3')
-    expect(screen.getByTestId('chat-input-shell').className).toContain('safe-area-inset-bottom')
+    expect(screen.getByTestId('chat-input-shell').className).toContain('pb-safe-2.5')
     expect(screen.getByTestId('chat-input-panel')).toHaveClass('rounded-2xl')
     expect(screen.getByTestId('chat-input-panel')).not.toHaveClass('rounded-b-none')
 

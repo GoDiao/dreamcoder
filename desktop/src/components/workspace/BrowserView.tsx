@@ -63,8 +63,8 @@ function ToolbarButton({ label, disabled, pressed, onClick, children }: ToolbarB
     <Tooltip content={label}>
       <Button
         type="button"
-        variant={pressed ? 'secondary' : 'ghost'}
-        size="icon-sm"
+        variant="ghost-muted"
+        size="icon-xs"
         aria-label={label}
         aria-pressed={pressed}
         disabled={disabled}
@@ -157,7 +157,7 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="browser-view">
-      <form onSubmit={submit} className="flex shrink-0 items-center gap-0.5 border-b border-[var(--color-border)] px-2 py-1.5">
+      <form onSubmit={submit} className="relative flex h-9 shrink-0 items-center gap-0.5 px-2">
         <ToolbarButton label={t('browser.back')} disabled={!page?.canGoBack} onClick={() => browserGoBack(tab.id)}>
           <ArrowLeft aria-hidden="true" />
         </ToolbarButton>
@@ -181,7 +181,9 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="mx-1 h-7 flex-1"
+          variant="ghost"
+          size="sm"
+          className="mx-1 flex-1"
         />
         <ToolbarButton
           label={picking ? t('browser.pickStop') : t('browser.pick')}
@@ -208,7 +210,7 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
         <ActionMenu
           label={t('browser.moreActions')}
           trigger={
-            <Button type="button" variant="ghost" size="icon-sm" aria-label={t('browser.moreActions')}>
+            <Button type="button" variant="ghost-muted" size="icon-xs" aria-label={t('browser.moreActions')}>
               <MoreHorizontal aria-hidden="true" />
             </Button>
           }
@@ -237,6 +239,9 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
             },
           ]}
         />
+        {page?.loading && (
+          <div aria-hidden="true" data-testid="browser-progress" className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left animate-load-progress rounded-r-full bg-primary motion-reduce:animate-none" />
+        )}
       </form>
 
       <BrowserActivityBar sessionId={sessionId} tabId={tab.id} />
@@ -245,11 +250,11 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
         <div
           role="status"
           data-testid="browser-notice"
-          className="flex shrink-0 items-start gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-container)] px-3 py-2 text-ui-aux text-[var(--color-text-secondary)]"
+          className="flex shrink-0 items-start gap-2 bg-muted px-3 py-2 text-xs text-muted-foreground"
         >
           <div className="min-w-0 flex-1">
             <div>{noticeText}</div>
-            {noticeDetail && <div className="truncate text-[var(--color-text-tertiary)]">{noticeDetail}</div>}
+            {noticeDetail && <div className="truncate text-subtle-foreground">{noticeDetail}</div>}
           </div>
           <Button type="button" variant="ghost" size="icon-xs" aria-label={t('browser.dismissNotice')} onClick={() => setNotice(tab.id, null)}>
             <X aria-hidden="true" />

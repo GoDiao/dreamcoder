@@ -51,8 +51,8 @@ export function DesignSystemLibrary({ systems, loading, error, selectedId, onSel
           />
         </div>
       </div>
-      <p className="mb-4 text-ui-aux text-[var(--color-text-tertiary)]">{t('design.systemNote')}</p>
-      {error && <p role="alert" className="mb-4 text-sm text-[var(--color-error)]">{t('design.systemsLoadFailed', { reason: error })}</p>}
+      <p className="mb-4 text-xs text-subtle-foreground">{t('design.systemNote')}</p>
+      {error && <p role="alert" className="mb-4 text-sm text-destructive">{t('design.systemsLoadFailed', { reason: error })}</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {visible.map((system) => {
           const selected = system.id === selectedId
@@ -60,15 +60,15 @@ export function DesignSystemLibrary({ systems, loading, error, selectedId, onSel
             <div
               key={system.id}
               data-testid="design-system-card"
-              className={`flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface)] ${selected ? 'border-[var(--color-brand)]' : 'border-[var(--color-border)]'}`}
+              className={`flex flex-col overflow-hidden rounded-lg border bg-background ${selected ? 'border-primary' : 'border-border'}`}
             >
               <SystemSwatches colors={system.swatches} />
               <div className="flex flex-1 flex-col gap-1 p-3">
-                <span className="text-sm font-medium text-[var(--color-text-primary)]">{localizedText(system.name, locale)}</span>
-                <span className="text-ui-aux text-[var(--color-text-tertiary)]">
+                <span className="text-sm font-medium text-foreground">{localizedText(system.name, locale)}</span>
+                <span className="text-xs text-subtle-foreground">
                   {[system.category, t(DESIGN_SYSTEM_SOURCE_LABELS[system.origin])].join(' · ')}
                 </span>
-                <span className="line-clamp-3 text-ui-aux text-[var(--color-text-secondary)]">{localizedText(system.description, locale)}</span>
+                <span className="line-clamp-3 text-xs text-muted-foreground">{localizedText(system.description, locale)}</span>
                 <div className="mt-auto pt-2">
                   <Button
                     size="sm"
@@ -87,7 +87,7 @@ export function DesignSystemLibrary({ systems, loading, error, selectedId, onSel
       </div>
       {loading && systems.length === 0 && <LoadingBlock className="py-16" spinnerClassName="size-6" />}
       {!loading && !error && visible.length === 0 && (
-        <p role="status" className="py-8 text-center text-sm text-[var(--color-text-tertiary)]">{t('design.systemsEmpty')}</p>
+        <p role="status" className="py-8 text-center text-sm text-subtle-foreground">{t('design.systemsEmpty')}</p>
       )}
     </div>
   )

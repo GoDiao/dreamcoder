@@ -27,7 +27,8 @@ export function SettingsModal() {
         }}
         showCloseButton={false}
         aria-describedby={undefined}
-        className="flex h-[min(700px,calc(100dvh-64px))] w-[min(1000px,calc(100vw-64px))] gap-0 overflow-hidden border border-ui-border p-0 sm:max-w-none max-[700px]:h-[calc(100dvh-20px)] max-[700px]:w-[calc(100vw-20px)]"
+        size="flush"
+        className="flex h-[min(700px,calc(100dvh-64px))] w-[min(1000px,calc(100vw-64px))] sm:max-w-none max-[700px]:h-[calc(100dvh-20px)] max-[700px]:w-[calc(100vw-20px)]"
       >
         <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
         <Tooltip content={t('settings.close')}>
@@ -46,7 +47,7 @@ export function SettingsModal() {
 function SettingsLoading() {
   const t = useTranslation()
   return (
-    <div role="status" aria-label={t('common.loading')} className="flex min-h-0 min-w-0 flex-1 items-center justify-center bg-ui-background text-ui-muted-foreground">
+    <div role="status" aria-label={t('common.loading')} className="flex min-h-0 min-w-0 flex-1 items-center justify-center bg-background text-muted-foreground">
       <Spinner aria-hidden="true" />
     </div>
   )

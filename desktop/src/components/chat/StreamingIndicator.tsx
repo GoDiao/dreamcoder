@@ -59,21 +59,21 @@ export function StreamingIndicator() {
         data-testid="api-retry-indicator"
         role="status"
         aria-live="polite"
-        className="mb-2 flex w-full max-w-[min(720px,100%)] flex-wrap items-center gap-2 rounded-md border border-amber-500/35 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 shadow-sm dark:border-amber-400/25 dark:bg-amber-950/30 dark:text-amber-100"
+        className="mb-2 flex w-full max-w-[min(720px,100%)] flex-wrap items-center gap-2 rounded-md border border-warning/35 bg-warning-surface px-3 py-2 text-xs text-foreground"
       >
-        <RefreshCw size={14} strokeWidth={2.2} className="shrink-0 animate-spin text-amber-700 dark:text-amber-300" aria-hidden="true" />
+        <RefreshCw size={14} strokeWidth={2.2} className="shrink-0 animate-spin text-warning" aria-hidden="true" />
         <span className="font-medium">{t('chat.retry.title')}</span>
-        <span className="rounded-[4px] border border-amber-700/20 bg-white/70 px-1.5 py-0.5 font-mono text-[11px] leading-none text-amber-900 dark:border-amber-300/20 dark:bg-black/15 dark:text-amber-100">
+        <span className="rounded-sm border border-warning/20 bg-background/70 px-1.5 py-0.5 font-mono text-2xs leading-none text-foreground">
           {t('chat.retry.attempt', { attempt: apiRetry.attempt, max: apiRetry.maxRetries })}
         </span>
-        <span className="rounded-[4px] border border-amber-700/20 bg-white/70 px-1.5 py-0.5 font-mono text-[11px] leading-none text-amber-900 dark:border-amber-300/20 dark:bg-black/15 dark:text-amber-100">
+        <span className="rounded-sm border border-warning/20 bg-background/70 px-1.5 py-0.5 font-mono text-2xs leading-none text-foreground">
           {statusText}
         </span>
-        <span className="text-amber-800 dark:text-amber-200">
+        <span className="text-muted-foreground">
           {t('chat.retry.waiting', { seconds: formatRetrySeconds(remainingMs) })}
         </span>
         {detailText && (
-          <HintTooltip content={detailText}><span className="min-w-0 max-w-full truncate text-amber-700 dark:text-amber-200">
+          <HintTooltip content={detailText}><span className="min-w-0 max-w-full truncate text-muted-foreground">
             {detailText}
           </span></HintTooltip>
         )}
@@ -95,12 +95,12 @@ export function StreamingIndicator() {
   }
 
   return (
-    <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)]/40 bg-[var(--color-surface-container-low)] px-3 py-1">
-      <span className="text-[var(--color-brand)] animate-shimmer text-xs">✦</span>
-      <span className="text-xs font-medium text-[var(--color-text-secondary)]">{verb}...</span>
+    <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-border/40 bg-card px-3 py-1">
+      <span className="text-primary animate-shimmer text-xs">✦</span>
+      <span className="text-xs font-medium text-muted-foreground">{verb}...</span>
       {turnStartedAt !== undefined && <ElapsedTime startedAt={turnStartedAt} />}
       {outputTokens > 0 && (
-        <span className="text-[10px] text-[var(--color-text-tertiary)]">
+        <span className="text-3xs text-subtle-foreground">
           · ↓ {outputTokens}
         </span>
       )}

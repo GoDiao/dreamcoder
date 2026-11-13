@@ -685,7 +685,7 @@ describe('Content-only pages render without errors', () => {
     expect(sendMessage).not.toHaveBeenCalled()
     expect(await screen.findByText('Session inspector')).toBeInTheDocument()
     expect(vi.mocked(sessionsApi.getInspection)).toHaveBeenCalledWith(SESSION_ID, { includeContext: false })
-    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).toContain('bg-[var(--color-inspector-surface)]')
+    expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).toContain('bg-background')
     expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#fbfaf6]')
     expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('bg-[#f4f2ed]')
     expect(screen.getByRole('dialog', { name: /slash commands/i }).innerHTML).not.toContain('border-[#d8b3a8]')
@@ -1287,9 +1287,8 @@ describe('Design system compliance', () => {
       expect(
         html.includes('C47A5A') ||
         html.includes('8F482F') ||
-        html.includes('var(--color-brand)') ||
-        html.includes('bg-[var(--color-brand)]') ||
-        html.includes('var(--gradient-btn-primary)'),
+        html.includes('var(--primary)') ||
+        html.includes('bg-primary'),
       ).toBe(true)
       unmount()
     }

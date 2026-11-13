@@ -1,6 +1,6 @@
 name: CI
 
-# Runs the server tests, the desktop tests and the desktop typecheck on every
+# Runs the server tests, the desktop tests and the desktop typecheck and design lint on every
 # pull request to main and on every push to main.
 on:
   pull_request:
@@ -99,5 +99,5 @@ jobs:
           bun install --frozen-lockfile
           cd .. && bun install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Typecheck and design lint
         run: bun run lint

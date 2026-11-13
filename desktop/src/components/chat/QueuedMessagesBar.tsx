@@ -35,7 +35,7 @@ export function QueuedMessagesBar({ sessionId }: { sessionId: string | null | un
       </div>
       <ul className="flex max-h-[160px] flex-col gap-1.5 overflow-y-auto">
         {queued.map((message) => (
-          <li key={message.id} className="flex min-w-0 items-center gap-2 text-ui-aux">
+          <li key={message.id} className="flex min-w-0 items-center gap-2 text-xs">
             <span className="min-w-0 flex-1 truncate">{message.content}</span>
             {message.attachmentCount > 0 && (
               <TraceDescription>{t('chat.queued.attachments', { count: message.attachmentCount })}</TraceDescription>

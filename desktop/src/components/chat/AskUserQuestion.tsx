@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../shared/ui/card'
+import { Card, CardTitle, CardContent } from '../shared/ui/card'
 import { Textarea } from '../shared/ui/textarea'
 import { Button } from '../shared/ui/button'
 import { Check, MessageCircleQuestion } from 'lucide-react'
@@ -214,11 +214,11 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
       <section
         data-testid="ask-user-question-answered"
         aria-label={t(terminalWithoutAnswers ? 'question.completed' : 'question.answered')}
-        className="mb-4 border-y border-[var(--color-border)] py-3 text-ui-body"
+        className="mb-4 border-y border-border py-3 text-sm"
       >
-        <div className="flex items-center gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
-          <Check size={14} aria-hidden="true" className={terminalWithoutAnswers ? '' : 'text-[var(--color-success)]'} />
-          <span className={terminalWithoutAnswers ? '' : 'text-[var(--color-success)]'}>
+        <div className="flex items-center gap-2 text-xs text-subtle-foreground">
+          <Check size={14} aria-hidden="true" className={terminalWithoutAnswers ? '' : 'text-success'} />
+          <span className={terminalWithoutAnswers ? '' : 'text-success'}>
             {t(terminalWithoutAnswers ? 'question.completed' : 'question.answered')}
           </span>
           <span className="flex-1" />
@@ -226,7 +226,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         </div>
 
         {terminalWithoutAnswers ? (
-          <p className="mt-2 text-ui-body text-[var(--color-text-secondary)] [overflow-wrap:anywhere]">
+          <p className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
             {t('question.resultPrefix')}{answeredText}
           </p>
         ) : (
@@ -234,20 +234,20 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
             {questions.map((question, index) => (
               <div
                 key={index}
-                className="flex gap-4 border-b border-[var(--color-border)] py-1.5 text-[13px] last:border-b-0"
+                className="flex gap-4 border-b border-border py-1.5 text-sm last:border-b-0"
               >
-                <dt className="min-w-[56px] shrink-0 text-[var(--color-text-tertiary)]">{questionLabel(question, index)}</dt>
-                <dd className="min-w-0 text-[var(--color-text-primary)] [overflow-wrap:anywhere]">{answerFor(question, index) || '—'}</dd>
+                <dt className="min-w-[56px] shrink-0 text-subtle-foreground">{questionLabel(question, index)}</dt>
+                <dd className="min-w-0 text-foreground [overflow-wrap:anywhere]">{answerFor(question, index) || '—'}</dd>
               </div>
             ))}
           </dl>
         )}
 
-        <details className="mt-2 text-[13px]">
-          <summary className="cursor-pointer text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]">
+        <details className="mt-2 text-sm">
+          <summary className="cursor-pointer text-subtle-foreground hover:text-muted-foreground">
             {t('question.viewOriginal')}
           </summary>
-          <ul className="mt-1.5 space-y-1 text-[var(--color-text-secondary)]">
+          <ul className="mt-1.5 space-y-1 text-muted-foreground">
             {questions.map((question, index) => (
               <li key={index}>{question.question}</li>
             ))}
@@ -268,9 +268,9 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     <Card role="region" size="sm"
       data-testid="ask-user-question"
       aria-label={t('question.needsInput')}
-      className="mb-4 gap-0"
+      className="mb-4"
     >
-      <CardHeader className="flex items-center gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
+      <div className="flex items-center gap-2 px-3 text-xs text-subtle-foreground">
         <MessageCircleQuestion size={14} aria-hidden="true" />
         <CardTitle>{t('question.needsInput')}</CardTitle>
         <span className="flex-1" />
@@ -279,36 +279,36 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         ) : activeIsMultiSelect ? (
           <span>{t('question.multiSelectHint')}</span>
         ) : null}
-      </CardHeader>
+      </div>
       <CardContent>
       {isMultiQuestion && (
         <nav aria-label={t('question.steps')} className="mt-3 flex flex-wrap gap-1.5">
           {questions.map((question, index) => {
             const current = safeActiveTab === index
             return (
-              <Button variant="ghost" size="xs"
+              <button
                 key={index}
                 type="button"
                 aria-current={current ? 'step' : undefined}
                 onClick={() => setActiveTab(index)}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-ui-aux transition-colors focus-visible:outline-none ${
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                   current
-                    ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                    ? 'bg-selected text-foreground'
+                    : 'text-muted-foreground hover:bg-hover'
                 }`}
               >
-                {isAnswered(index) && <Check size={12} aria-hidden="true" className="text-[var(--color-success)]" />}
+                {isAnswered(index) && <Check size={12} aria-hidden="true" className="text-success" />}
                 <span>{index + 1} · {questionLabel(question, index)}</span>
-              </Button>
+              </button>
             )
           })}
         </nav>
       )}
 
-      <h3 className="mb-2 mt-3 text-[15px] font-medium leading-snug text-[var(--color-text-primary)]">
+      <h3 className="mb-2 mt-3 text-sm font-medium leading-snug text-foreground">
         {activeQuestion.question}
         {isMultiQuestion && activeIsMultiSelect && (
-          <span className="ml-2 text-ui-aux font-normal text-[var(--color-text-tertiary)]">{t('question.multiSelectHint')}</span>
+          <span className="ml-2 text-xs font-normal text-subtle-foreground">{t('question.multiSelectHint')}</span>
         )}
       </h3>
 
@@ -322,28 +322,26 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => handleSelect(safeActiveTab, opt.label)}
-                className={`items-start ${
-                  isSelected ? 'bg-[var(--color-surface-selected)] hover:bg-[var(--color-surface-selected)]' : ''
-                }`}
+                className="items-start"
               >
                 <span
                   aria-hidden="true"
-                  className={`mt-[3px] flex h-[15px] w-[15px] shrink-0 items-center justify-center border transition-colors ${
-                    activeIsMultiSelect ? 'rounded-[4px]' : 'rounded-full'
+                  className={`mt-0.75 flex h-[15px] w-[15px] shrink-0 items-center justify-center border transition-colors ${
+                    activeIsMultiSelect ? 'rounded-sm' : 'rounded-full'
                   } ${
                     isSelected
-                      ? 'border-ui-primary bg-ui-primary text-ui-primary-foreground'
-                      : 'border-[var(--color-outline)]'
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-subtle-foreground'
                   }`}
                 >
                   {isSelected && (activeIsMultiSelect
                     ? <Check size={11} strokeWidth={3} />
-                    : <span className="h-[5px] w-[5px] rounded-full bg-ui-primary-foreground" />)}
+                    : <span className="h-[5px] w-[5px] rounded-full bg-primary-foreground" />)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-ui-body text-[var(--color-text-primary)]">{opt.label}</span>
+                  <span className="block text-sm text-foreground">{opt.label}</span>
                   {opt.description && (
-                    <span className="mt-0.5 block text-ui-aux text-[var(--color-text-tertiary)]">{opt.description}</span>
+                    <span className="mt-0.5 block text-xs text-subtle-foreground">{opt.description}</span>
                   )}
                 </span>
               </Button>
@@ -352,7 +350,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         </div>
       )}
 
-      <label className="mt-3 block text-ui-aux text-[var(--color-text-tertiary)]">
+      <label className="mt-3 block text-xs text-subtle-foreground">
         {t('question.customResponse')}
         <Textarea
           value={freeTexts[safeActiveTab] ?? ''}
@@ -369,12 +367,12 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
           placeholder={t('question.typePlaceholder')}
           rows={2}
           wrap="soft"
-          className="mt-1.5 block max-h-48 min-h-[40px] w-full resize-y rounded-lg border border-[var(--color-border)] bg-transparent px-2.5 py-2 text-ui-body leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:outline-none"
+          className="mt-1.5 block max-h-48 min-h-[40px] w-full resize-y"
         />
       </label>
 
       </CardContent>
-      <CardFooter className="mt-3 flex-wrap gap-2 text-ui-aux text-[var(--color-text-tertiary)]">
+      <div className="flex flex-wrap items-center gap-2 px-3 text-xs text-subtle-foreground">
         <span className="min-w-0 flex-1">{footHint}</span>
         {isMultiQuestion && safeActiveTab > 0 && (
           <Button variant="ghost" size="xs" onClick={() => setActiveTab(safeActiveTab - 1)}>
@@ -393,7 +391,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
         >
           {t('question.submit')}
         </Button>
-      </CardFooter>
+      </div>
     </Card>
   )
 }

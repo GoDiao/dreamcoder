@@ -15,10 +15,11 @@ shadcn/ui's MIT license is reproduced in [`THIRD_PARTY_NOTICES.md`](../../../THI
 
 | Files | Source and runtime |
 | --- | --- |
-| `button` | shadcn Button with a local `loading` state (disabled, `aria-busy`, leading Spinner), a local `gradient` variant for the composer send button, and local `row` (full-width list row) and `icon-xl` (mobile touch target) sizes; Radix Slot and class-variance-authority |
-| `input`, `textarea` | shadcn native input and textarea wrappers |
+| `button` | shadcn Button with a local `loading` state (disabled, `aria-busy`, leading Spinner), local variants `ghost-muted`, `ghost-destructive` and `link-muted` (the ghost variants also style keyboard-highlighted rows, `data-highlighted`, and the current item, `aria-current`), and local sizes `toolbar` (compact toolbar button), `row` / `row-sm` (full-width list rows), `row-lg` (list rows with page-width padding), `row-flush` (unpadded rows with a bottom divider), `inline`, `inline-text` (a link inside running text, at the text's size), `icon-pill` / `icon-xl-pill` (composer send) and `icon-xl` (mobile touch target); Radix Slot and class-variance-authority |
+| `input`, `textarea` | shadcn native input and textarea wrappers; Input and Input Group take a local `ghost` variant (borderless until hover or focus) |
 | `field`, `label`, `input-group` | shadcn Field, Radix Label and Input Group |
 | `card`, `empty`, `skeleton`, `kbd` | shadcn presentation components |
+| `button-group` | shadcn Button Group (horizontal only): joins adjacent buttons into one control, used by the split "open in" button |
 | `progress` | shadcn Progress; Radix Progress |
 | `switch`, `checkbox` | shadcn Switch and Checkbox; Radix primitives |
 | `select` | shadcn Select; Radix Select |
@@ -66,7 +67,7 @@ that only renames props or passes them through does not belong here.
 | `TreeConnector` | Elbow lines between nested rows, shared by the sidebar session tree and the board's hierarchy view |
 | `MobileBottomSheet` | Drawer with localized title and close control |
 | `Tooltip` | The tooltip entry point: a Tooltip and content wrapper that keeps the trigger mounted when the content is empty; the single `TooltipProvider` (400 ms delay) is mounted in `App`. `ActivitySettings` and `TerminalSettings` use `ui/tooltip` directly because they need an instant delay, a controlled open state or custom content |
-| `ActionMenu` | Shared Dropdown Menu and Context Menu actions/focus handling; the dropdown also takes single-choice submenus (`MenuChoiceGroup`) |
+| `ActionMenu` | Shared Dropdown Menu and Context Menu actions/focus handling; entries can be plain submenus (`MenuSubmenu`) in both menus, and the dropdown also takes single-choice submenus (`MenuChoiceGroup`). `RowActionMenu` with `selectable` keeps text selectable inside its right-click region, as the workspace code and Markdown previews need; `AnchoredActionMenu` opens the same menu at a given screen rectangle, for menus another library positions (the file tree) |
 | `ResponsivePopover` | Popover on desktop and bottom sheet on mobile |
 | `CopyButton` | Button, Tooltip and `useCopyAndNotify`, which wraps the clipboard helper with localized success and failure toasts |
 | `DirectoryPicker`, `RepositoryLaunchControls` | DreamCoder project/branch workflows using shared popovers, Command and controls |
@@ -98,7 +99,7 @@ picker through `ui/input`.
 | `chat/ThinkingBlock`, `chat/ToolCallBlock` | Trace lines; running-title shimmer in the theme stylesheet, with the existing `ToolCallGroup` grouping and Bash command summaries |
 | `chat/CodeViewer`, code in tool output | Code Block + the shared Shiki loader; GitHub light/dark syntax themes, plain text during loading or failure |
 | `chat/DiffViewer`, `workspace/WorkspaceCodeSurface` (`WorkspaceDiffSurface`) | Pierre FileDiff; workspace line comments, selection quotes and large-diff virtualization remain local integrations |
-| `workspace/WorkspacePanel` file tree | Collapsible + Button composition following the [Radix File Tree pattern](https://ui.shadcn.com/docs/ai-elements/radix/file-tree); `WorkspaceTreeNavigation` owns arrow/Home/End navigation and asynchronous focus handling |
+| `workspace/WorkspaceFileTree` | `@pierre/trees` file tree with token overrides; directories load from the workspace store when expanded, and its menu is `AnchoredActionMenu`: folders get the path bar's folder menu, files add Open in new tab and the editor and file-manager entries (opened by right-click on desktop and by a row button on the H5 page). The Files tab shows it beside the selected file's preview in a Resizable split |
 | `workspace/WorkspacePanel` empty, error and loading states | Empty for empty and error messages, Skeleton with a status label while loading |
 | `layout/AppShell`, `pages/ActiveSession` panel groups | Resizable; `usePanelWidthPersistence` keeps existing pixel-width preferences |
 | `chat/ContextUsageIndicator` | [Context](https://ui.shadcn.com/docs/ai-elements/radix/context): Hover Card, outline icon Button with a usage ring, and Progress, with the existing usage breakdown and mobile drawer |
@@ -121,8 +122,11 @@ cards and the browser panel are outside this migration.
 
 ## Local adaptations and updates
 
-- Use the existing seven-theme tokens, with the `ui-` Tailwind color namespace,
-  theme radii and shadows. Sonner and Pierre follow the app theme: `dark`,
+- Use the semantic theme tokens from `theme/globals.css` (`background`, `foreground`,
+  `muted-foreground`, `subtle-foreground`, `hover`, `selected`, status colors and
+  their `-surface` tints), Tailwind's standard radius scale (controls `rounded-lg`,
+  8px) and the type scale with `text-2xs` / `text-3xs`. Each of the seven themes
+  only supplies `--theme-*` palette values; components never read those directly. Sonner and Pierre follow the app theme: `dark`,
   `midnight` and `aurora` use dark mode; the other themes use light mode.
 - Use lucide SVG icons. Material Symbols and its font are removed. Keep Inter,
   Manrope and JetBrains Mono for application text and code; brand/provider

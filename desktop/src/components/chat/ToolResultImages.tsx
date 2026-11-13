@@ -42,7 +42,7 @@ export function ToolResultImages({ images }: { images: ToolResultImage[] }) {
   return (
     <>
       <div className="space-y-1.5" data-testid="tool-result-images">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-outline)]">
+        <div className="text-3xs uppercase tracking-widest text-subtle-foreground">
           {t('toolResult.images', { count: images.length })}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -52,7 +52,7 @@ export function ToolResultImages({ images }: { images: ToolResultImage[] }) {
               type="button"
               onClick={() => setActiveIndex(index)}
               aria-label={image.name}
-              className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] transition-colors hover:border-[var(--color-brand)]/40"
+              className="overflow-hidden rounded-lg border border-border bg-background transition-colors hover:border-primary/40"
             >
               <img src={image.src} alt={image.name} loading="lazy" className="h-28 max-w-[240px] object-contain" />
             </button>

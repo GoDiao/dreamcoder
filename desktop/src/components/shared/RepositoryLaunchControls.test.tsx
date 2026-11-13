@@ -140,7 +140,7 @@ describe('RepositoryLaunchControls', () => {
     const bar = trigger.parentElement
     expect(bar).toHaveClass('bg-transparent')
     expect(bar).not.toHaveClass('rounded-b-xl', 'border-t')
-    expect(bar).not.toHaveClass('bg-[var(--color-surface-container-low)]')
+    expect(bar).not.toHaveClass('bg-card')
   })
 
   it('uses the full-width mobile bottom sheet in H5 mobile browser mode', async () => {

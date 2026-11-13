@@ -8,12 +8,8 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import type { SavedProvider } from '../../types/provider'
 import type { RuntimeSelection } from '../../types/runtime'
 import type { EffortLevel, ModelInfo } from '../../types/settings'
-import { cn } from '../../lib/utils'
 import { Tooltip } from '../shared/Tooltip'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '../shared/ui/select'
-import { PICKER_TRIGGER_CLASS } from './controlStyles'
-
-const SELECT_TRIGGER_CLASS = cn(PICKER_TRIGGER_CLASS, 'w-auto justify-between border-0 py-0 pl-1.5 pr-1 data-[size=sm]:rounded-[7px]')
 
 function runtimeOptionKey(providerId: string | null, modelId: string) {
   return JSON.stringify([providerId, modelId])
@@ -179,7 +175,7 @@ export function ModelSelector({
     <>
       <Select value={selectedModelKey} onValueChange={handleModelChange} disabled={disabled}>
         <Tooltip content={triggerTitle}>
-          <SelectTrigger size="sm" aria-label={`${t('model.selectModel')}: ${buttonModelLabel}`} className={cn(SELECT_TRIGGER_CLASS, compact ? 'max-w-[132px]' : 'max-w-[260px]')}>
+          <SelectTrigger variant="ghost" size="toolbar" aria-label={`${t('model.selectModel')}: ${buttonModelLabel}`} className={compact ? 'max-w-[132px]' : 'max-w-[260px]'}>
             <SelectValue>{buttonModelLabel}</SelectValue>
           </SelectTrigger>
         </Tooltip>
@@ -202,7 +198,7 @@ export function ModelSelector({
       </Select>
 
       <Select value={selectedEffort} onValueChange={(next) => handleEffortChange(next as EffortLevel)} disabled={disabled}>
-        <SelectTrigger size="sm" aria-label={`${t('model.effort')}: ${selectedEffortLabel}`} className={SELECT_TRIGGER_CLASS}>
+        <SelectTrigger variant="ghost" size="toolbar" aria-label={`${t('model.effort')}: ${selectedEffortLabel}`}>
           <SelectValue>{compact ? selectedEffortLabel : `${t('model.effort')} ${selectedEffortLabel}`}</SelectValue>
         </SelectTrigger>
         <SelectContent position="popper" align="start" collisionPadding={8}>

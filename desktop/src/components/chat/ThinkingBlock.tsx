@@ -22,11 +22,11 @@ export function ThinkingBlock({ content, isActive = false }: { content: string; 
           <TraceLine status={isActive ? 'running' : undefined}>
             <TraceIcon><Brain /></TraceIcon>
             <TraceTitle>{t('thinking.label')}</TraceTitle>
-            {!expanded && preview && <span className="min-w-0 flex-1 truncate text-ui-muted-foreground">{preview}</span>}
+            {!expanded && preview && <span className="min-w-0 flex-1 truncate text-muted-foreground">{preview}</span>}
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>
-          <div ref={contentRef} className="max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-ui-aux leading-[1.6]">{content}</div>
+          <div ref={contentRef} className="max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">{content}</div>
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>

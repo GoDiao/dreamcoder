@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BadgeCheck, Check, Globe, X } from 'lucide-react'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../shared/ui/card'
+import { CardTitle } from '../shared/ui/card'
 import { Button } from '../shared/ui/button'
 import { useChatStore } from '../../stores/chatStore'
 import { useTranslation } from '../../i18n'
@@ -27,40 +27,39 @@ function BrowserGrantCard({ grant }: { grant: PendingBrowserGrant }) {
   }
 
   return (
-    <Card
-      size="sm"
+    <div
       role="group"
       aria-label={t('browserGrant.title')}
-      className="mb-4 gap-0 border border-[var(--color-warning)] bg-[var(--color-surface-container-lowest)] py-0"
+      className="mb-4 flex flex-col overflow-hidden rounded-xl border border-warning bg-popover text-sm text-card-foreground"
     >
-      <CardHeader className="flex flex-row items-center gap-3 bg-[var(--color-surface-container)] px-4 py-3">
-        <Globe className="size-5 shrink-0 text-ui-muted-foreground" aria-hidden="true" />
+      <div className="flex items-center gap-3 bg-muted px-4 py-3">
+        <Globe className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <CardTitle>{t('browserGrant.title')}</CardTitle>
           <AwaitingApprovalBadge />
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="border-t border-ui-border px-4 py-3">
+      <div className="border-t border-border px-4 py-3">
         <div
           data-testid="browser-grant-origin"
-          className="break-all rounded-md bg-[var(--color-surface-container)] px-3 py-2 font-[var(--font-mono)] text-sm font-semibold text-[var(--color-text-primary)]"
+          className="break-all rounded-md bg-muted px-3 py-2 font-mono text-sm font-semibold text-foreground"
         >
           {grant.origin}
         </div>
-        <p className="mt-2 break-words text-xs text-[var(--color-text-secondary)]">{grant.action}</p>
+        <p className="mt-2 break-words text-xs text-muted-foreground">{grant.action}</p>
         {grant.allowOnce ? null : (
-          <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{t('browserGrant.bypassNote')}</p>
+          <p className="mt-2 text-xs text-subtle-foreground">{t('browserGrant.bypassNote')}</p>
         )}
         {grant.allowSession ? null : (
-          <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{t('browserGrant.onceOnlyNote')}</p>
+          <p className="mt-2 text-xs text-subtle-foreground">{t('browserGrant.onceOnlyNote')}</p>
         )}
         {failed ? (
-          <p role="alert" className="mt-2 text-xs text-[var(--color-error)]">{t('browserGrant.replyFailed')}</p>
+          <p role="alert" className="mt-2 text-xs text-destructive">{t('browserGrant.replyFailed')}</p>
         ) : null}
-      </CardContent>
+      </div>
 
-      <CardFooter className="gap-2 px-4 py-3">
+      <div className="flex items-center gap-2 px-4 py-3">
         {grant.allowOnce ? (
           <Button size="sm" disabled={pending !== null} loading={pending === 'once'} onClick={() => reply('once')}>
             <Check data-icon="inline-start" aria-hidden="true" />
@@ -90,8 +89,8 @@ function BrowserGrantCard({ grant }: { grant: PendingBrowserGrant }) {
           <X data-icon="inline-start" aria-hidden="true" />
           {t('permission.deny')}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   )
 }
 

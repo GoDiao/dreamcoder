@@ -26,15 +26,15 @@ export function McpEditorLayout({
   const t = useTranslation()
   return (
     <div className="min-w-0">
-      <Button variant="ghost" size="xs" onClick={onBack} disabled={backDisabled} className="mb-5 text-[var(--color-text-secondary)]">
+      <Button variant="ghost-muted" size="xs" onClick={onBack} disabled={backDisabled} className="mb-5">
         <ArrowLeftIcon aria-hidden="true" />
         {t('settings.mcp.form.back')}
       </Button>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{title}</h2>
-          <p className="mt-1.5 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{description}</p>
-          {notice && <p className="mt-2 text-xs leading-[1.7] text-[var(--color-text-secondary)]">{notice}</p>}
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          <p className="mt-1.5 max-w-[60ch] text-xs leading-relaxed text-muted-foreground">{description}</p>
+          {notice && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{notice}</p>}
           {status && <div className="mt-4 flex flex-wrap items-center gap-3">{status}</div>}
         </div>
         {headerActions && <div className="flex items-center gap-3">{headerActions}</div>}
@@ -51,9 +51,9 @@ export function McpEditorSection({ title, description, children }: {
   children: ReactNode
 }) {
   return (
-    <section aria-label={title} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-      {title && <h3 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>}
-      {description && <p className="mb-3 text-xs leading-5 text-[var(--color-text-tertiary)]">{description}</p>}
+    <section aria-label={title} className="rounded-xl border border-border bg-background p-5">
+      {title && <h3 className="mb-2 text-sm font-semibold text-foreground">{title}</h3>}
+      {description && <p className="mb-3 text-xs leading-5 text-subtle-foreground">{description}</p>}
       {children}
     </section>
   )
@@ -120,11 +120,11 @@ export function McpEditorFields({
               aria-pressed={scope === choice}
               onClick={() => onScopeChange(choice)}
               className={`rounded-md border p-3 text-left transition-colors ${scope === choice
-                ? 'border-[var(--color-border-focus)] bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
+                ? 'border-ring bg-selected text-foreground'
+                : 'border-border bg-background text-muted-foreground hover:bg-hover'}`}
             >
               <span className="block text-sm font-semibold">{t(`settings.mcp.scope.${choice}`)}</span>
-              <span id={`${scopeDescriptionId}-${choice}`} className="mt-1 block text-xs leading-5 text-[var(--color-text-tertiary)]">{t(`settings.mcp.scopeDesc.${choice}`)}</span>
+              <span id={`${scopeDescriptionId}-${choice}`} className="mt-1 block text-xs leading-5 text-subtle-foreground">{t(`settings.mcp.scopeDesc.${choice}`)}</span>
             </button>
           ))}
         </div>
@@ -133,14 +133,14 @@ export function McpEditorFields({
         <McpEditorSection>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-sm font-semibold text-foreground">
                 {needsProject ? t('settings.mcp.targetProject.title') : t('settings.mcp.targetProject.globalTitle')}
               </h3>
-              <p className="mt-1 text-xs leading-5 text-[var(--color-text-tertiary)]">{targetHint}</p>
+              <p className="mt-1 text-xs leading-5 text-subtle-foreground">{targetHint}</p>
             </div>
             {needsProject && <DirectoryPicker value={projectPath} onChange={onProjectPathChange} />}
           </div>
-          {scope === 'project' && projectWarning && <p className="text-sm text-[var(--color-warning)]">{projectWarning}</p>}
+          {scope === 'project' && projectWarning && <p className="text-sm text-warning">{projectWarning}</p>}
         </McpEditorSection>
       )}
     </>

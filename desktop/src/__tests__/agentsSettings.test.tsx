@@ -368,7 +368,7 @@ describe('Settings > Skills tab', () => {
     const rendererRoot = screen.getByRole('heading', { name: 'Heading' }).closest('div[class*="prose"]')
     expect(rendererRoot?.className).toContain('max-w-[72ch]')
     expect(rendererRoot?.className).toContain('prose-h2:border-b')
-    expect(rendererRoot?.className).toContain('prose-p:text-[15px]')
+    expect(rendererRoot?.className).toContain('prose-p:text-sm')
     expect(screen.getByText('Helpful quote')).toBeInTheDocument()
   })
 

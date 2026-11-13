@@ -50,7 +50,7 @@ export function BoardColumns({ view, cards, compact, showCancelled, selectedCard
           .sort((a, b) => a.order - b.order || a.id - b.id)
         const label = t(STATUS_LABEL[status])
         const folded = compact && COMPACT_FOLDED.has(status) && !unfolded.has(status)
-        const border = index > 0 ? 'border-l border-[var(--color-border)]' : ''
+        const border = index > 0 ? 'border-l border-border' : ''
         if (folded) {
           return (
             <Tooltip key={status} content={t('kanban.column.expand', { status: label })}>
@@ -62,11 +62,11 @@ export function BoardColumns({ view, cards, compact, showCancelled, selectedCard
                 onDragOver={(event) => { if (draggable) event.preventDefault() }}
                 onDrop={(event) => handleDrop(event, status)}
                 aria-label={t('kanban.column.expand', { status: label })}
-                className={`flex w-9 shrink-0 flex-col items-center gap-2 py-3 text-[12px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] ${border}`}
+                className={`flex w-9 shrink-0 flex-col items-center gap-2 py-3 text-xs text-muted-foreground hover:bg-hover ${border}`}
               >
                 <StatusIcon status={status} />
                 <span className="[writing-mode:vertical-rl]">{label}</span>
-                <span className="tabular-nums text-[var(--color-text-tertiary)]">{columnCards.length}</span>
+                <span className="tabular-nums text-subtle-foreground">{columnCards.length}</span>
               </button>
             </Tooltip>
           )
@@ -85,21 +85,21 @@ export function BoardColumns({ view, cards, compact, showCancelled, selectedCard
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget((current) => current === status ? null : current)
             }}
             onDrop={(event) => handleDrop(event, status)}
-            className={`flex min-h-0 shrink-0 flex-col ${compact ? 'w-[164px]' : 'w-[264px]'} ${border} ${dropTarget === status ? 'bg-[var(--color-surface-hover)]' : ''}`}
+            className={`flex min-h-0 shrink-0 flex-col ${compact ? 'w-[164px]' : 'w-[264px]'} ${border} ${dropTarget === status ? 'bg-hover' : ''}`}
           >
-            <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-[12px]">
+            <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs">
               {compact && COMPACT_FOLDED.has(status) ? (
                 <button type="button" onClick={() => toggleFold(status)} aria-label={t('kanban.column.collapse', { status: label })} className="flex min-w-0 items-center gap-2">
                   <StatusIcon status={status} />
-                  <span className="truncate font-medium text-[var(--color-text-primary)]">{label}</span>
+                  <span className="truncate font-medium text-foreground">{label}</span>
                 </button>
               ) : (
                 <>
                   <StatusIcon status={status} />
-                  <span className="truncate font-medium text-[var(--color-text-primary)]">{label}</span>
+                  <span className="truncate font-medium text-foreground">{label}</span>
                 </>
               )}
-              <span className="tabular-nums text-[var(--color-text-tertiary)]">{columnCards.length}</span>
+              <span className="tabular-nums text-subtle-foreground">{columnCards.length}</span>
               <span className="flex-1" />
               {(status === 'backlog' || status === 'todo') && (
                 <Tooltip content={t('kanban.column.add', { status: label })}>

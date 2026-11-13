@@ -14,10 +14,11 @@ type Props = {
   children: ReactNode
   triggerTooltip?: string
   contentClassName?: string
+  size?: 'default' | 'flush'
   testId?: string
 }
 
-export function ResponsivePopover({ open, onOpenChange, title, trigger, children, triggerTooltip, contentClassName, testId }: Props) {
+export function ResponsivePopover({ open, onOpenChange, title, trigger, children, triggerTooltip, contentClassName, size, testId }: Props) {
   const mobile = useMobileViewport() && !isDesktopRuntime()
   if (mobile) return (
     <>
@@ -30,7 +31,7 @@ export function ResponsivePopover({ open, onOpenChange, title, trigger, children
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <Tooltip content={triggerTooltip}><PopoverTrigger asChild>{trigger}</PopoverTrigger></Tooltip>
-      <PopoverContent aria-label={title} align="start" sideOffset={8} collisionPadding={12} className={contentClassName} data-testid={testId}>
+      <PopoverContent aria-label={title} align="start" sideOffset={8} collisionPadding={12} size={size} className={contentClassName} data-testid={testId}>
         {children}
       </PopoverContent>
     </Popover>

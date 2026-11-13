@@ -1,4 +1,4 @@
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from '../shared/ui/input-group'
+import { InputGroup, InputGroupTextarea } from '../shared/ui/input-group'
 import { TriangleAlertIcon } from 'lucide-react'
 import { PermissionModeSelector } from '../controls/PermissionModeSelector'
 import { ModelSelector } from '../controls/ModelSelector'
@@ -50,11 +50,11 @@ export function PromptEditor({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="field-sizing-fixed w-full resize-y bg-transparent px-3 py-2.5 text-sm leading-relaxed text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
+        className="field-sizing-fixed w-full resize-y"
         style={{ minHeight: 120 }}
       />
 
-      <InputGroupAddon align="block-end" className="items-stretch border-t flex-col">
+      <div role="group" data-align="block-end" className="order-last flex w-full flex-col items-stretch gap-2 border-t border-border px-2.5 py-2">
         <div className="flex items-center justify-between">
           <PermissionModeSelector value={permissionMode} onChange={onPermissionModeChange} workDir={folderPath || undefined} />
           <ModelSelector
@@ -71,12 +71,12 @@ export function PromptEditor({
         </div>
 
         {permissionMode === 'bypassPermissions' && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-[var(--color-error)]/8 text-[10px] text-[var(--color-error)]">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-destructive/8 text-3xs text-destructive">
             <TriangleAlertIcon aria-hidden="true" size={12} />
             {t('promptEditor.bypassWarning')}{folderPath ? ` ${t('promptEditor.within')} ${folderPath}` : ` ${t('promptEditor.selectFolder')}`}.
           </div>
         )}
-      </InputGroupAddon>
+      </div>
     </InputGroup>
   )
 }

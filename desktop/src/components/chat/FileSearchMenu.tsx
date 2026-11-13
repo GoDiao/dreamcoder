@@ -1,4 +1,5 @@
 import { ChevronRightIcon, FileTextIcon, FolderIcon, FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
+import { Kbd } from '../shared/ui/kbd'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { forwardRef, useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { ApiError } from '../../api/client'
@@ -203,38 +204,38 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
         key={entry.path}
         data-index={index}
         className={`group flex items-stretch px-1.5 py-0.5 ${
-          selected ? 'bg-[var(--color-surface-hover)]' : ''
+          selected ? 'bg-hover' : ''
         }`}
         onMouseEnter={() => setSelectedIndex(index)}
       >
         <button
           type="button"
           onClick={() => selectEntry(entry)}
-          className={`flex min-w-0 flex-1 items-center rounded-lg px-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/40 ${
+          className={`flex min-w-0 flex-1 items-center rounded-lg px-2.5 text-left transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
             isSearchMode ? 'gap-2.5 py-2' : 'gap-3 py-2'
           }`}
           role="option"
           aria-selected={selected}
         >
-          <EntryIcon className={`shrink-0 ${entry.isDirectory ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-secondary)]'}`} aria-hidden="true" size={17} />
+          <EntryIcon className={`shrink-0 ${entry.isDirectory ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden="true" size={17} />
           <span className="min-w-0 flex-1">
             {isSearchMode ? (
               <HintTooltip content={displayPath}><span
-                className="block truncate font-[var(--font-mono)] text-sm text-[var(--color-text-primary)]"
+                className="block truncate font-mono text-sm text-foreground"
               >
                 {displayPath}
               </span></HintTooltip>
             ) : (
               <>
-                <span className="block truncate text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</span>
-                <span className="block truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+                <span className="block truncate text-sm font-medium text-foreground">{entry.name}</span>
+                <span className="block truncate font-mono text-2xs text-subtle-foreground">
                   {parentPath || (entry.isDirectory ? t('fileSearch.directory') : t('fileSearch.currentDirectory'))}
                 </span>
               </>
             )}
           </span>
           {!isSearchMode ? (
-            <span className="shrink-0 rounded-md border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.02em] text-[var(--color-text-tertiary)]">
+            <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-subtle-foreground">
               {entry.isDirectory ? t('fileSearch.folderTag') : t('fileSearch.fileTag')}
             </span>
           ) : null}
@@ -247,7 +248,7 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
               event.stopPropagation()
               navigateEntry(entry)
             }}
-            className="my-1 flex w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-tertiary)] opacity-70 transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/40 group-hover:opacity-100"
+            className="my-1 flex w-9 shrink-0 items-center justify-center rounded-lg text-subtle-foreground opacity-70 transition hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group-hover:opacity-100"
           >
             <ChevronRightIcon aria-hidden="true" size={16} />
           </button></HintTooltip>
@@ -259,51 +260,51 @@ export const FileSearchMenu = forwardRef<FileSearchMenuHandle, Props>(({ cwd, fi
   return (
     <div
       id="file-search-menu"
-      className={`w-full overflow-hidden bg-ui-popover ${
+      className={`w-full overflow-hidden bg-popover ${
         compact ? 'min-w-0' : ''
       }`}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-1.5 border-b border-[var(--color-border)] px-3 py-2 text-[11px]">
-        <FolderOpenIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={14} />
-        <span className="text-[var(--color-text-tertiary)] font-mono">{cwd.split('/').pop() || cwd}</span>
+      <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-2xs">
+        <FolderOpenIcon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={14} />
+        <span className="text-subtle-foreground font-mono">{cwd.split('/').pop() || cwd}</span>
         {breadcrumbs.map((seg, i) => (
           <span key={i} className="flex items-center gap-1">
-            <span className="text-[var(--color-text-tertiary)]">/</span>
-            <span className="text-[var(--color-text-primary)] font-mono">{seg}</span>
+            <span className="text-subtle-foreground">/</span>
+            <span className="text-foreground font-mono">{seg}</span>
           </span>
         ))}
         {isSearchMode && filter ? (
-          <span className="ml-auto truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">@{filter}</span>
+          <span className="ml-auto truncate font-mono text-2xs text-subtle-foreground">@{filter}</span>
         ) : null}
         {loading && (
-          <LoaderCircleIcon className="shrink-0 text-[var(--color-text-tertiary)] animate-spin ml-1" aria-hidden="true" size={12} />
+          <LoaderCircleIcon className="shrink-0 text-subtle-foreground animate-spin ml-1" aria-hidden="true" size={12} />
         )}
       </div>
 
       <div ref={listRef} className="max-h-[300px] overflow-y-auto py-1">
         {loading && entries.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">{t('fileSearch.searching')}</div>
+          <div className="px-4 py-6 text-center text-xs text-subtle-foreground">{t('fileSearch.searching')}</div>
         ) : (errorKey || errorMessage) ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-error)]">
+          <div className="px-4 py-6 text-center text-xs text-destructive">
             {errorKey ? t(errorKey) : errorMessage}
           </div>
         ) : entries.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">
+          <div className="px-4 py-6 text-center text-xs text-subtle-foreground">
             {filter ? t('fileSearch.noMatch') : t('fileSearch.noFiles')}
           </div>
         ) : entries.map(renderEntry)}
       </div>
 
       {!compact ? (
-        <div className="flex items-center gap-1.5 border-t border-[var(--color-border)] px-3 py-1.5 text-[10px] text-[var(--color-text-tertiary)]">
-          <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-0.5 font-mono">↑↓</kbd>
+        <div className="flex items-center gap-1.5 border-t border-border px-3 py-1.5 text-3xs text-subtle-foreground">
+          <Kbd>↑↓</Kbd>
           <span>{t('fileSearch.navigate')}</span>
-          <kbd className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-0.5 font-mono">Enter</kbd>
+          <Kbd className="ml-2">Enter</Kbd>
           <span>{t('fileSearch.select')}</span>
-          <kbd className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-0.5 font-mono">→</kbd>
+          <Kbd className="ml-2">→</Kbd>
           <span>{t('fileSearch.open')}</span>
-          <kbd className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1 py-0.5 font-mono">Esc</kbd>
+          <Kbd className="ml-2">Esc</Kbd>
           <span>{t('fileSearch.close')}</span>
         </div>
       ) : null}

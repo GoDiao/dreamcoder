@@ -15,10 +15,10 @@ export function TaskTraceItems({ tasks }: { tasks: Task[] }) {
             <TraceLine status={task.status === 'in_progress' ? 'running' : task.status === 'pending' ? 'pending' : undefined}>
               <TraceIcon><Icon /></TraceIcon>
               <TraceDescription>#{task.id}</TraceDescription>
-              <TraceTitle className={task.status === 'completed' ? 'line-through' : undefined}>{task.subject}</TraceTitle>
+              <TraceTitle>{task.status === 'completed' ? <span className="line-through">{task.subject}</span> : task.subject}</TraceTitle>
             </TraceLine>
-            {task.status === 'in_progress' && task.activeForm && <TraceDescription className="ml-6 text-xs">{task.activeForm}</TraceDescription>}
-            {task.owner && <TraceLine className="ml-6 text-xs"><TraceIcon><UserRound /></TraceIcon><TraceDescription>{task.owner}</TraceDescription></TraceLine>}
+            {task.status === 'in_progress' && task.activeForm && <TraceDescription className="ml-6">{task.activeForm}</TraceDescription>}
+            {task.owner && <TraceLine className="ml-6"><TraceIcon><UserRound /></TraceIcon><TraceDescription>{task.owner}</TraceDescription></TraceLine>}
           </li>
         )
       })}

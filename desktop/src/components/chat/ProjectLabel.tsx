@@ -41,18 +41,18 @@ export function ProjectLabel({
   return (
     <HintTooltip content={title}><span
       data-testid="composer-project-label"
-      className="inline-flex h-7 min-w-0 max-w-[280px] items-center gap-1.5 px-1.5 text-ui-aux text-[var(--color-text-secondary)]"
+      className="inline-flex h-7 min-w-0 max-w-[280px] items-center gap-1.5 px-1.5 text-xs text-muted-foreground"
     >
       <Folder size={14} className="shrink-0" aria-hidden="true" />
-      <span className="truncate font-medium text-[var(--color-text-primary)]">{label}</span>
+      <span className="truncate font-medium text-foreground">{label}</span>
       {branch && !isWorktree && (
         <>
-          <GitBranch size={13} className="ml-1 shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+          <GitBranch size={13} className="ml-1 shrink-0 text-subtle-foreground" aria-hidden="true" />
           <span className="truncate">{branch}</span>
         </>
       )}
       {isWorktree && (
-        <span className="shrink-0 rounded-[4px] border border-[var(--color-border)] px-1 text-[10px] uppercase leading-4 text-[var(--color-text-tertiary)]">
+        <span className="shrink-0 rounded-sm border border-border px-1 text-3xs uppercase leading-4 text-subtle-foreground">
           worktree
         </span>
       )}

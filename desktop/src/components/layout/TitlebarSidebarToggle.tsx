@@ -1,5 +1,4 @@
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
-import type { CSSProperties } from 'react'
 import { PanelLeft } from 'lucide-react'
 import { Button } from '../shared/ui/button'
 import { useTranslation } from '../../i18n'
@@ -10,7 +9,7 @@ import { useUIStore } from '../../stores/uiStore'
  * the same place whether the sidebar is open or hidden: on macOS right of the
  * traffic lights, elsewhere at the left of the top strip.
  */
-export function TitlebarSidebarToggle({ className = '', style }: { className?: string; style?: CSSProperties }) {
+export function TitlebarSidebarToggle() {
   const t = useTranslation()
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
@@ -21,7 +20,7 @@ export function TitlebarSidebarToggle({ className = '', style }: { className?: s
 
   return (
     <HintTooltip content={label}><Button
-      variant="ghost"
+      variant="ghost-muted"
       size="icon-sm"
       type="button"
       data-testid="titlebar-sidebar-toggle"
@@ -30,8 +29,7 @@ export function TitlebarSidebarToggle({ className = '', style }: { className?: s
       aria-expanded={sidebarOpen}
       aria-controls="sidebar-shell"
       disabled={settingsOpen}
-      style={style}
-      className={`rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:invisible ${className}`}
+      className="disabled:invisible"
     >
       <PanelLeft size={17} strokeWidth={1.9} aria-hidden="true" />
     </Button></HintTooltip>

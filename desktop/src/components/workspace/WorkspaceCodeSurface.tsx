@@ -3,9 +3,8 @@ import { parseDiffFromFile, parsePatchFiles } from '@pierre/diffs'
 import { Virtualizer } from '@pierre/diffs/react'
 import { PierreDiffSurface } from '../shared/PierreDiffSurface'
 import { useUIStore } from '../../stores/uiStore'
-import { Button } from '../shared/ui/button'
-import { Textarea } from '../shared/ui/textarea'
-import { MessageCircle } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '../shared/ui/input-group'
 import { getTextSelectionFromContainer, type WorkspaceQuoteSelection, type WorkspaceTextSelection } from './workspaceSelection'
 import { useQuoteSelection } from '../../lib/selectionPopover'
 import { PreviewLimitBar } from './PreviewLimitBar'
@@ -98,49 +97,51 @@ export function LineCommentEditor({
   onSubmit,
 }: {
   lineNumber: number
-  /** Owned by the surface so the draft outlives re-renders of the line it is attached to. */
   draft: string
   onDraftChange: (draft: string) => void
   onCancel: () => void
   onSubmit: (note: string) => void
 }) {
   const t = useTranslation()
+  const note = draft.trim()
+  const submit = () => {
+    if (note) onSubmit(note)
+  }
 
   return (
-    <div className="grid grid-cols-[48px_minmax(0,720px)] gap-3 bg-[var(--color-brand)]/10 px-3 py-2">
-      <span aria-hidden="true" />
-      <div className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] font-[var(--font-body)] shadow-sm has-[textarea:focus-visible]:border-ui-ring has-[textarea:focus-visible]:ring-3 has-[textarea:focus-visible]:ring-ui-ring/50">
-        <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2">
-          <MessageCircle className="size-4 text-ui-muted-foreground" aria-hidden="true" />
-          <span className="text-[12px] font-semibold text-[var(--color-text-primary)]">{t('workspace.localComment')}</span>
-          <span className="ml-auto text-[11px] text-[var(--color-text-tertiary)]">
-            {t('workspace.commentLineTarget', { line: lineNumber })}
-          </span>
-        </div>
-        <Textarea
+    <div
+      className="max-w-180 font-body"
+      onBlur={(event) => {
+        if (!note && document.hasFocus() && !event.currentTarget.contains(event.relatedTarget)) onCancel()
+      }}
+    >
+      <div className="mb-1 text-2xs text-subtle-foreground">{t('workspace.commentLineTarget', { line: lineNumber })}</div>
+      <InputGroup className="items-end">
+        <InputGroupTextarea
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              onCancel()
+            } else if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              submit()
+            }
+          }}
           autoFocus
-          rows={3}
+          rows={1}
+          aria-label={t('workspace.commentLineTarget', { line: lineNumber })}
           placeholder={t('workspace.commentPlaceholder')}
-          className="block w-full resize-none rounded-none border-0 whitespace-pre-wrap bg-transparent px-3 py-3 text-[13px] leading-6 text-[var(--color-text-primary)] shadow-none outline-none focus-visible:ring-0 placeholder:text-[var(--color-text-tertiary)]"
+          className="max-h-40 min-h-0"
         />
-        <div className="flex justify-end gap-2 px-3 pb-3">
-          <Button variant="ghost" size="sm" type="button" onClick={onCancel} className="text-[var(--color-text-secondary)]">
-            {t('common.cancel')}
-          </Button>
-          <Button
-            size="sm"
-            type="button"
-            onClick={() => {
-              if (draft.trim()) onSubmit(draft.trim())
-            }}
-            disabled={!draft.trim()}
-          >
-            {t('workspace.addCommentToChat')}
-          </Button>
-        </div>
-      </div>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton size="icon-xs" aria-label={t('workspace.addCommentToChat')} onClick={submit} disabled={!note}>
+            <ArrowUp aria-hidden="true" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
     </div>
   )
 }
@@ -162,7 +163,7 @@ export function limitUnifiedDiff(value: string, lineLimit: number) {
   return lines.join('\n') + '\n'
 }
 
-export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 overflow-auto', lineLimit = WORKSPACE_PREVIEW_LINE_LIMIT, hideFileHeaders = false, onAddLineComment, onAddSelection, commentRequest = 0 }: {
+export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 overflow-auto', lineLimit = WORKSPACE_PREVIEW_LINE_LIMIT, hideFileHeaders = false, onAddLineComment, onAddSelection }: {
   value: string
   path: string
   className?: string
@@ -170,7 +171,6 @@ export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 
   hideFileHeaders?: boolean
   onAddLineComment?: (line: number, note: string, quote: string) => void
   onAddSelection?: (selection: WorkspaceTextSelection) => void
-  commentRequest?: number
 }) {
   const t = useTranslation()
   const theme = useUIStore((state) => state.theme)
@@ -212,13 +212,6 @@ export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 
   useEffect(() => {
     if (activeCommentLine !== null && !newLines.has(activeCommentLine)) openComment(null)
   }, [newLines, activeCommentLine, openComment])
-  const previousRequest = useRef(commentRequest)
-  useEffect(() => {
-    if (previousRequest.current === commentRequest) return
-    previousRequest.current = commentRequest
-    const line = parsedLines.find((line) => line.kind === 'add' && line.newLine)?.newLine ?? newLines.keys().next().value
-    if (commentRequest > 0 && line !== undefined) openComment(line)
-  }, [commentRequest, parsedLines, newLines, openComment])
 
   const commentLine = useCallback((line: number) => {
     if (newLines.has(line)) openComment(line)
@@ -230,16 +223,18 @@ export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 
       onCommentLine={onAddLineComment ? commentLine : undefined}
       lineAnnotations={lineAnnotations}
       renderAnnotation={onAddLineComment && activeCommentLine !== null ? () => (
-        <LineCommentEditor lineNumber={activeCommentLine} draft={commentDraft} onDraftChange={setCommentDraft} onCancel={() => openComment(null)} onSubmit={(note) => {
-          onAddLineComment(activeCommentLine, note, newLines.get(activeCommentLine) ?? '')
-          openComment(null)
-        }} />
+        <div className="px-3 py-1.5">
+          <LineCommentEditor lineNumber={activeCommentLine} draft={commentDraft} onDraftChange={setCommentDraft} onCancel={() => openComment(null)} onSubmit={(note) => {
+            onAddLineComment(activeCommentLine, note, newLines.get(activeCommentLine) ?? '')
+            openComment(null)
+          }} />
+        </div>
       ) : undefined}
     />
   ))
 
   return (
-    <div ref={surfaceRef} className={className} data-testid="workspace-code" data-workspace-code="" onMouseUp={quote.onMouseUp}>
+    <div ref={surfaceRef} className={className} data-testid="workspace-code" data-workspace-code="" onMouseDown={quote.onMouseDown}>
       {diff.error ? <div role="alert">{t('workspace.diffParseError')}</div> : parsedLines.length > 200
         ? <Virtualizer style={{ height: 400, overflow: 'auto' }}>{content}</Virtualizer>
         : content}

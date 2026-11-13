@@ -10,12 +10,12 @@ export type SettingsSummaryItem = {
 /** A flat row of key numbers under a settings page title. */
 export function SettingsSummary({ items, className = '' }: { items: SettingsSummaryItem[]; className?: string }) {
   return (
-    <dl className={`mb-[22px] flex flex-wrap gap-7 border-b border-[var(--color-border-separator)] py-4 ${className}`}>
+    <dl className={`mb-5.5 flex flex-wrap gap-7 border-b border-border py-4 ${className}`}>
       {items.map((item, index) => (
         <div key={index} className="min-w-0">
-          <dt className="mb-[5px] text-[11px] text-[var(--color-text-secondary)]">{item.label}</dt>
-          <dd className="text-[21px] font-medium leading-tight tracking-[-0.4px] text-[var(--color-text-primary)]">{item.value}</dd>
-          {item.hint ? <dd className="text-[11px] text-[var(--color-text-secondary)]">{item.hint}</dd> : null}
+          <dt className="mb-1.25 text-2xs text-muted-foreground">{item.label}</dt>
+          <dd className="text-xl font-medium leading-tight tracking-tight text-foreground">{item.value}</dd>
+          {item.hint ? <dd className="text-2xs text-muted-foreground">{item.hint}</dd> : null}
         </div>
       ))}
     </dl>
@@ -35,11 +35,11 @@ export function SettingsSection({
   className?: string
 }) {
   return (
-    <section className={`mt-[25px] min-w-0 first:mt-0 ${className}`}>
-      <h3 className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-[var(--color-text-secondary)]">
+    <section className={`mt-6.25 min-w-0 first:mt-0 ${className}`}>
+      <h3 className="mb-2.5 flex items-center gap-2 text-sm font-medium text-muted-foreground">
         {title}
         {typeof count === 'number' ? (
-          <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-[var(--color-surface-hover)] px-1.5 py-px text-[11px] font-normal">
+          <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-hover px-1.5 py-px text-2xs font-normal">
             {count}
           </span>
         ) : null}
@@ -63,12 +63,12 @@ export function SettingsListRow({
 }) {
   return (
     <div
-      className={`flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5 text-[13px] ${className}`}
+      className={`flex min-w-0 items-center justify-between gap-4.5 border-b border-border py-2.5 text-sm ${className}`}
     >
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-        <div className="font-medium text-[var(--color-text-primary)]">{title}</div>
+        <div className="font-medium text-foreground">{title}</div>
         {description ? (
-          <div className="mt-px text-xs leading-[1.5] text-[var(--color-text-secondary)]">{description}</div>
+          <div className="mt-px text-xs leading-normal text-muted-foreground">{description}</div>
         ) : null}
       </div>
       {actions ? <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">{actions}</div> : null}
@@ -78,7 +78,7 @@ export function SettingsListRow({
 
 export function MetaPill({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
+    <span className="rounded-full border border-border bg-background px-2.5 py-1 text-3xs font-semibold uppercase tracking-widest text-subtle-foreground">
       {children}
     </span>
   )
@@ -94,12 +94,12 @@ export function DetailStat({
   icon: LucideIcon
 }) {
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
+    <div className="rounded-xl border border-border bg-background px-3 py-3">
+      <div className="flex items-center gap-2 text-2xs uppercase tracking-widest text-subtle-foreground">
         <Icon aria-hidden="true" size={14} />
         <span>{label}</span>
       </div>
-      <div className="mt-2 text-base font-semibold text-[var(--color-text-primary)] break-all">
+      <div className="mt-2 text-base font-semibold text-foreground break-all">
         {value}
       </div>
     </div>

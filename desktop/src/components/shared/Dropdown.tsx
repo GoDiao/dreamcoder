@@ -33,7 +33,7 @@ export function Dropdown<T extends string>({ items, value, onChange, trigger, wi
             <DropdownMenuRadioItem key={item.value} value={item.value}>
               <div className="min-w-0 flex-1">
                 <div>{item.label}</div>
-                {item.description && <div className="text-xs text-ui-muted-foreground">{item.description}</div>}
+                {item.description && <div className="text-xs text-muted-foreground">{item.description}</div>}
               </div>
             </DropdownMenuRadioItem>
           ))}

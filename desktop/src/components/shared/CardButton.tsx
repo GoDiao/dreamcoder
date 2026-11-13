@@ -6,7 +6,7 @@ export function CardButton({ className, type = 'button', ...props }: ComponentPr
     <button
       type={type}
       className={cn(
-        'rounded-lg bg-[var(--color-surface)] text-left transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]',
+        'rounded-lg bg-background text-left transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         className,
       )}
       {...props}

@@ -11,6 +11,7 @@ type Props = {
   label?: string
   copiedLabel?: string
   iconOnly?: boolean
+  variant?: VariantProps<typeof buttonVariants>['variant']
   size?: VariantProps<typeof buttonVariants>['size']
   onClick?: MouseEventHandler<HTMLButtonElement>
   className?: string
@@ -21,6 +22,7 @@ export function CopyButton({
   label,
   copiedLabel,
   iconOnly = false,
+  variant = 'ghost-muted',
   size = 'xs',
   onClick,
   className = '',
@@ -45,7 +47,7 @@ export function CopyButton({
 
   return (
     <HintTooltip content={currentLabel}><Button
-      variant="ghost"
+      variant={variant}
       size={size}
       type="button"
       onClick={(event) => {

@@ -338,8 +338,8 @@ describe('AppShell boot flow', () => {
 
     render(<AppShell />)
     const toggle = await screen.findByTestId('titlebar-sidebar-toggle')
-    expect(toggle.style.left).toBe('var(--traffic-lights-end)')
-    expect(toggle).toHaveClass('window-no-drag')
+    expect(toggle.parentElement!.style.left).toBe('var(--traffic-lights-end)')
+    expect(toggle.parentElement).toHaveClass('window-no-drag')
     const panels = document.querySelector('[data-slot="resizable-panel-group"]')!
     expect(panels.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByTestId('window-drag-strip')).not.toBeInTheDocument()

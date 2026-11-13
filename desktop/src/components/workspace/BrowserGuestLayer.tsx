@@ -91,7 +91,7 @@ export function BrowserGuestLayer() {
         body={
           <>
             <p>{t('browser.externalBody')}</p>
-            <p className="mt-2 break-all font-mono text-ui-aux">{externalUrl}</p>
+            <p className="mt-2 break-all font-mono text-xs">{externalUrl}</p>
           </>
         }
         confirmLabel={t('browser.externalConfirm')}

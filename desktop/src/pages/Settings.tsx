@@ -105,10 +105,10 @@ export function Settings() {
   )
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 bg-[var(--color-surface)] max-[700px]:flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 bg-background max-[700px]:flex-col">
       <nav
         aria-label={t('settings.navLabel')}
-        className="flex w-[196px] flex-shrink-0 flex-col gap-px overflow-y-auto overscroll-contain border-r border-[var(--color-border)] bg-[var(--color-surface-sidebar)] px-2.5 py-3 max-[700px]:max-h-[150px] max-[700px]:w-auto max-[700px]:flex-row max-[700px]:flex-wrap max-[700px]:border-b max-[700px]:border-r-0"
+        className="flex w-[196px] flex-shrink-0 flex-col gap-px overflow-y-auto overscroll-contain border-r border-border bg-sidebar px-2.5 py-3 max-[700px]:max-h-[150px] max-[700px]:w-auto max-[700px]:flex-row max-[700px]:flex-wrap max-[700px]:border-b max-[700px]:border-r-0"
       >
         <SearchField
           value={navQuery}
@@ -120,7 +120,7 @@ export function Settings() {
         {visibleGroups.map((group, index) => (
           <div key={group.titleKey ?? `group-${index}`} className="contents">
             {group.titleKey ? (
-              <span className="px-2.5 pb-1 pt-3 text-[11px] text-[var(--color-text-tertiary)] max-[700px]:hidden">
+              <span className="px-2.5 pb-1 pt-3 text-2xs text-subtle-foreground max-[700px]:hidden">
                 {t(group.titleKey)}
               </span>
             ) : (
@@ -138,12 +138,12 @@ export function Settings() {
           </div>
         ))}
         {visibleGroups.length === 0 ? (
-          <p className="px-2.5 py-2 text-xs text-[var(--color-text-tertiary)]">{t('settings.navNoResults')}</p>
+          <p className="px-2.5 py-2 text-xs text-subtle-foreground">{t('settings.navNoResults')}</p>
         ) : null}
       </nav>
 
       <div
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-14 pt-[26px] max-[700px]:px-[18px] max-[700px]:py-5"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-14 pt-6.5 max-[700px]:px-4.5 max-[700px]:py-5"
       >
         <div className={`max-w-[760px] motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
           {activeTab === 'providers' && <ProviderSettings />}
@@ -168,22 +168,14 @@ export function Settings() {
 function NavButton({ Icon, label, active, onClick }: { Icon: LucideIcon; label: string; active: boolean; onClick: () => void }) {
   return (
     <Button
-      variant="ghost"
+      type="button"
+      variant="ghost-muted"
       size="row"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`gap-[9px] rounded-[8px] py-1.5 text-[13px] max-[700px]:w-auto ${
-        active
-          ? 'bg-[var(--color-surface-selected)] font-medium text-[var(--color-text-primary)]'
-          : 'text-[var(--color-text-secondary)]'
-      }`}
+      className="max-[700px]:w-auto"
     >
-      <Icon
-        size={15}
-        strokeWidth={1.7}
-        aria-hidden="true"
-        className={`flex-shrink-0 ${active ? '' : 'text-[var(--color-text-secondary)]'}`}
-      />
+      <Icon size={15} strokeWidth={1.7} aria-hidden="true" className="flex-shrink-0" />
       <span className="whitespace-nowrap">{label}</span>
     </Button>
   )
@@ -212,8 +204,8 @@ function PermissionSettings() {
 
   return (
     <div>
-      <h2 className="mb-1.5 text-ui-title font-semibold text-[var(--color-text-primary)]">{t('settings.permissions.title')}</h2>
-      <p className="mb-6 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{t('settings.permissions.description')}</p>
+      <h2 className="mb-1.5 text-xl font-semibold text-foreground">{t('settings.permissions.title')}</h2>
+      <p className="mb-6 max-w-[60ch] text-xs leading-relaxed text-muted-foreground">{t('settings.permissions.description')}</p>
 
       <div
         role="radiogroup"
@@ -228,33 +220,32 @@ function PermissionSettings() {
           const isSelected = permissionMode === mode
           const tabbable = isSelected || (index === 0 && !PERMISSION_MODES.some((entry) => entry.mode === permissionMode))
           return (
-            <Button
+            <button
               key={mode}
-              variant="ghost"
-              size="row"
+              type="button"
               role="radio"
               aria-checked={isSelected}
               tabIndex={tabbable ? 0 : -1}
               data-value={mode}
               onClick={() => setPermissionMode(mode)}
-              className={`gap-3.5 rounded-none border-0 border-b border-[var(--color-border-separator)] px-3 py-4 last:border-b-0 ${
-                isSelected ? 'rounded-[8px] bg-[var(--color-surface-hover)]' : ''
+              className={`flex w-full min-w-0 items-center gap-3.5 border-b border-border px-3 py-4 text-left outline-none transition-colors last:border-b-0 hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                isSelected ? 'rounded-lg bg-hover' : ''
               }`}
             >
-              <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="flex-shrink-0 text-[var(--color-text-secondary)]" />
+              <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="flex-shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium text-[var(--color-text-primary)]">{t(`permMode.label.${mode}` as const)}</span>
-                <span className="mt-px block text-xs leading-[1.5] text-[var(--color-text-secondary)]">{t(descKey)}</span>
+                <span className="block text-sm font-medium text-foreground">{t(`permMode.label.${mode}` as const)}</span>
+                <span className="mt-px block text-xs leading-normal text-muted-foreground">{t(descKey)}</span>
                 {mode === 'bypassPermissions' && computerUseEnabled ? (
-                  <span role="note" className="mt-1 block text-xs leading-[1.5] text-[var(--color-error)]">
+                  <span role="note" className="mt-1 block text-xs leading-normal text-destructive">
                     {t('permMode.computerUseBypassWarning')}
                   </span>
                 ) : null}
               </span>
-              <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-brand)]">
+              <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center text-primary">
                 {isSelected ? <Check size={16} strokeWidth={2} aria-hidden="true" /> : null}
               </span>
-            </Button>
+            </button>
           )
         })}
       </div>
@@ -278,10 +269,10 @@ function PluginSettings() {
 
   return (
     <div className="w-full min-w-0">
-      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+      <h2 className="text-base font-semibold text-foreground mb-1">
         {t('settings.plugins.title')}
       </h2>
-      <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
+      <p className="text-sm text-subtle-foreground mb-4">
         {t('settings.plugins.description')}
       </p>
       <PluginList />

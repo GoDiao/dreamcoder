@@ -100,7 +100,7 @@ function ProviderSettings() {
         <p
           data-testid="provider-settings-no-default"
           role="status"
-          className="mb-3 rounded-[8px] border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 px-3 py-2 text-xs leading-[1.5] text-[var(--color-text-secondary)]"
+          className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs leading-normal text-muted-foreground"
         >
           {t('chat.providerRequired.noDefault')}
         </p>
@@ -109,7 +109,7 @@ function ProviderSettings() {
       {isLoading && providers.length === 0 ? (
         <LoadingBlock className="py-8" />
       ) : hasLoadedProviders && providers.length === 0 ? (
-        <p className="py-6 text-xs text-[var(--color-text-tertiary)]">{t('settings.providers.empty')}</p>
+        <p className="py-6 text-xs text-subtle-foreground">{t('settings.providers.empty')}</p>
       ) : (
         <div className="flex flex-col">
           {providers.map((provider) => {
@@ -119,32 +119,32 @@ function ProviderSettings() {
             return (
               <div
                 key={provider.id}
-                className="flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5"
+                className="flex min-w-0 items-center justify-between gap-4.5 border-b border-border py-2.5"
               >
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                  <div className="flex flex-wrap items-center gap-[9px]">
-                    <span className="inline-flex min-w-0 max-w-full items-start gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+                  <div className="flex flex-wrap items-center gap-2.25">
+                    <span className="inline-flex min-w-0 max-w-full items-start gap-2 text-sm font-medium text-foreground">
                       <ProviderIcon presetId={provider.presetId} className="mt-0.5" />
                       <span className="min-w-0 [overflow-wrap:anywhere]">{provider.name}</span>
                     </span>
                     {isActive && (
-                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{t('settings.providers.default')}</span>
+                      <span className="rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">{t('settings.providers.default')}</span>
                     )}
                     {preset && preset.id !== 'custom' && (
-                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">{preset.name}</span>
+                      <span className="rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">{preset.name}</span>
                     )}
                     {provider.apiFormat && provider.apiFormat !== 'anthropic' && (
-                      <span className="rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-warning)]">
+                      <span className="rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-warning">
                         {provider.apiFormat === 'openai_chat' ? 'OpenAI Chat' : 'OpenAI Responses'}
                       </span>
                     )}
                   </div>
-                  <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+                  <div className="mt-px truncate text-xs leading-normal text-muted-foreground">
                     {provider.baseUrl} &middot; {provider.models[0]?.name || provider.models[0]?.id}
                   </div>
                   {test && !test.loading && test.result && (
                     <div
-                      className={`mt-px text-xs leading-[1.5] ${test.result.connectivity.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}
+                      className={`mt-px text-xs leading-normal ${test.result.connectivity.success ? 'text-success' : 'text-destructive'}`}
                     >
                       {test.result.connectivity.success
                         ? t('settings.providers.connectivityOk', { latency: String(test.result.connectivity.latencyMs) })
@@ -159,7 +159,7 @@ function ProviderSettings() {
                   <Button variant="outline" size="xs" onClick={() => handleTest(provider)} loading={test?.loading}>{t('settings.providers.test')}</Button>
                   <Button variant="outline" size="xs" onClick={() => setEditingProvider(provider)}>{t('settings.providers.edit')}</Button>
                   {!isActive && (
-                    <Button variant="outline" size="xs" onClick={() => handleDelete(provider)} className="text-[var(--color-error)] hover:text-[var(--color-error)]">{t('common.delete')}</Button>
+                    <Button variant="destructive" size="xs" onClick={() => handleDelete(provider)}>{t('common.delete')}</Button>
                   )}
                 </div>
               </div>

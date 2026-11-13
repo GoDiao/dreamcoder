@@ -52,7 +52,7 @@ export function KanbanPage() {
   if (!tabId || !project) return null
   if (!boards) {
     return listError
-      ? <p role="alert" className="p-10 text-[13px] text-[var(--color-error)]">{listError}</p>
+      ? <p role="alert" className="p-10 text-sm text-destructive">{listError}</p>
       : <div className="flex flex-1 items-center justify-center"><Spinner /></div>
   }
   const listing = boardForProject(boards, project)
@@ -65,8 +65,8 @@ function PageHeader({ project, aside }: { project: string; aside?: React.ReactNo
   return (
     <div className="window-drag-region flex shrink-0 select-none items-start justify-between gap-4 px-10 pb-3 pt-8 max-[700px]:px-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('kanban.title')}</h1>
-        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] text-[var(--color-text-secondary)]">
+        <h1 className="text-2xl font-bold text-foreground">{t('kanban.title')}</h1>
+        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
           <span className="truncate">{projectName(project)}</span>
         </p>
       </div>
@@ -94,7 +94,7 @@ function CreateBoard({ project }: { project: string }) {
   return (
     <div data-testid="kanban-create-board" className="flex flex-1 flex-col overflow-y-auto">
       <PageHeader project={project} />
-      <Empty className="flex-none py-16">
+      <Empty className="flex-none">
         <EmptyHeader>
           <EmptyTitle>{t('kanban.empty.title')}</EmptyTitle>
           <EmptyDescription>{t('kanban.empty.description')}</EmptyDescription>
@@ -141,12 +141,12 @@ function BoardPage({ tabId, project, board }: { tabId: string; project: string; 
 
   if (!view) {
     return loadError
-      ? <p role="alert" className="p-10 text-[13px] text-[var(--color-error)]">{loadError}</p>
+      ? <p role="alert" className="p-10 text-sm text-destructive">{loadError}</p>
       : <div className="flex flex-1 items-center justify-center"><Spinner /></div>
   }
 
   return (
-    <div data-testid="kanban-page" className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
+    <div data-testid="kanban-page" className="relative flex flex-1 flex-col overflow-hidden bg-background text-foreground">
       <WorkspaceSplit
         showPanel={showPanel}
         panelExpanded={panelExpanded}
@@ -166,7 +166,7 @@ function BoardPage({ tabId, project, board }: { tabId: string; project: string; 
             )}
           />
           {loadError && (
-            <p role="alert" className="mx-10 mb-3 rounded-lg bg-[var(--color-error-container)] px-3 py-2 text-[12px] text-[var(--color-error)] max-[700px]:mx-4">
+            <p role="alert" className="mx-10 mb-3 rounded-lg bg-destructive-surface px-3 py-2 text-xs text-destructive max-[700px]:mx-4">
               {t('kanban.error.refreshFailed', { message: loadError })}
             </p>
           )}
@@ -207,7 +207,7 @@ function BoardPage({ tabId, project, board }: { tabId: string; project: string; 
           {mobile ? (
             <MobileTaskList view={view} cards={cards} onOpen={open} />
           ) : mode === 'board' ? (
-            <div className="flex min-h-0 flex-1 border-t border-[var(--color-border)]">
+            <div className="flex min-h-0 flex-1 border-t border-border">
               <BoardColumns
                 view={view}
                 cards={cards}
@@ -236,7 +236,7 @@ function MobileTaskList({ view, cards, onOpen }: { view: BoardView; cards: CardV
   const t = useTranslation()
   const [closed, setClosed] = useState<ReadonlySet<CardStatus>>(new Set(['done', 'cancelled']))
   return (
-    <div data-testid="kanban-mobile-list" className="min-h-0 flex-1 overflow-y-auto border-t border-[var(--color-border)]">
+    <div data-testid="kanban-mobile-list" className="min-h-0 flex-1 overflow-y-auto border-t border-border">
       {ALL_STATUSES.map((status) => {
         const group = cards.filter((card) => card.status === status)
         if (group.length === 0) return null
@@ -248,22 +248,22 @@ function MobileTaskList({ view, cards, onOpen }: { view: BoardView; cards: CardV
             else updated.add(status)
             return updated
           })}>
-            <CollapsibleTrigger className="flex min-h-11 w-full items-center gap-2 px-4 text-[13px] font-medium">
+            <CollapsibleTrigger className="flex min-h-11 w-full items-center gap-2 px-4 text-sm font-medium">
               {isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
               <StatusIcon status={status} />
               {t(STATUS_LABEL[status])}
-              <span className="text-[var(--color-text-tertiary)]">{group.length}</span>
+              <span className="text-subtle-foreground">{group.length}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <ul>
                 {group.map((card) => (
                   <li key={card.id}>
-                    <button type="button" onClick={() => onOpen(card)} className="flex min-h-11 w-full min-w-0 flex-col gap-0.5 border-b border-[var(--color-border-separator)] px-4 py-2 text-left">
-                      <span className="flex w-full min-w-0 items-center gap-2 text-[14px]">
+                    <button type="button" onClick={() => onOpen(card)} className="flex min-h-11 w-full min-w-0 flex-col gap-0.5 border-b border-border px-4 py-2 text-left">
+                      <span className="flex w-full min-w-0 items-center gap-2 text-sm">
                         <span className="min-w-0 flex-1 truncate">{card.title}</span>
                         <RunMarker view={view} card={card} />
                       </span>
-                      <span className="flex w-full min-w-0 gap-2 text-[12px] text-[var(--color-text-tertiary)]">
+                      <span className="flex w-full min-w-0 gap-2 text-xs text-subtle-foreground">
                         <span className="font-mono">#{card.id}</span>
                         {card.status === 'blocked' ? <span className="truncate">{cardNote(t, card)}</span> : <AssigneeName view={view} card={card} />}
                       </span>

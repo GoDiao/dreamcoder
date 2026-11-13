@@ -22,21 +22,20 @@ export function DiffViewer({ filePath, oldString, newString }: Props) {
   const placeholderHeight = Math.min(DIFF_MAX_HEIGHT_PX, (oldLines.length + additions) * DIFF_ROW_HEIGHT_PX)
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5">
+    <div className="overflow-hidden rounded-lg border border-border/50 bg-card">
+      <div className="flex items-center justify-between border-b border-border/40 bg-muted px-3 py-1.5">
         <div className="min-w-0">
-          <div className="truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+          <div className="truncate font-mono text-2xs text-subtle-foreground">
             {filePath}
           </div>
-          <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
-            <span className="rounded-full bg-[var(--color-diff-added-bg)] px-2 py-0.5 text-[var(--color-diff-added-text)]">+{additions}</span>
-            <span className="rounded-full bg-[var(--color-diff-removed-bg)] px-2 py-0.5 text-[var(--color-diff-removed-text)]">-{deletions}</span>
+          <div className="mt-1 flex items-center gap-2 text-3xs uppercase tracking-widest">
+            <span className="rounded-full bg-diff-added px-2 py-0.5 text-diff-added-foreground">+{additions}</span>
+            <span className="rounded-full bg-diff-removed px-2 py-0.5 text-diff-removed-foreground">-{deletions}</span>
           </div>
         </div>
         <CopyButton
           text={`--- ${filePath}\n+++ ${filePath}`}
           label={t('workspace.copyPath')}
-          className="rounded-md border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] px-2 py-1 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)]"
         />
       </div>
 
@@ -46,7 +45,7 @@ export function DiffViewer({ filePath, oldString, newString }: Props) {
             <div
               role="status"
               aria-label={t('workspace.loadingDiff')}
-              className="bg-[var(--color-code-bg)]"
+              className="bg-code"
               style={{ height: placeholderHeight }}
             />
           }

@@ -5,7 +5,7 @@ import { designTemplateThumbnailUrl } from '../../api/design'
 export function TemplateThumbnail({ templateId, className = 'h-32 w-full' }: { templateId: string; className?: string }) {
   const [failed, setFailed] = useState(false)
   return (
-    <span className={`flex items-center justify-center overflow-hidden bg-[var(--color-surface-container)] text-[var(--color-text-tertiary)] ${className}`}>
+    <span className={`flex items-center justify-center overflow-hidden bg-muted text-subtle-foreground ${className}`}>
       {failed ? (
         <LayoutTemplate aria-hidden="true" size={28} strokeWidth={1.6} />
       ) : (

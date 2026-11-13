@@ -20,7 +20,7 @@ export function ClampedMarkdown({ content }: { content: string }) {
         <MarkdownRenderer content={content} variant="compact" className="break-words" />
       </div>
       {(overflows || expanded) && (
-        <Button variant="link" size="sm" className="h-auto px-0" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        <Button variant="link" size="inline" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
           {t(expanded ? 'kanban.detail.showLess' : 'kanban.detail.showMore')}
         </Button>
       )}

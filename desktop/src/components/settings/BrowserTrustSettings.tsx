@@ -70,7 +70,7 @@ export function BrowserTrustSettings() {
 
   return (
     <SettingsGroup title={t('settings.browserTrust.title')} className="mt-8">
-      <p className="mb-3 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+      <p className="mb-3 max-w-[60ch] text-xs leading-relaxed text-muted-foreground">
         {t('settings.browserTrust.description')}
       </p>
 
@@ -96,20 +96,20 @@ export function BrowserTrustSettings() {
       </form>
 
       {loadFailed ? (
-        <div role="alert" className="flex items-center gap-3 py-3 text-xs text-[var(--color-error)]">
+        <div role="alert" className="flex items-center gap-3 py-3 text-xs text-destructive">
           <span>{t('settings.browserTrust.loadFailed')}</span>
           <Button variant="outline" size="sm" onClick={load}>{t('settings.browserTrust.retry')}</Button>
         </div>
       ) : origins === null ? (
         <LoadingBlock className="py-6" />
       ) : origins.length === 0 ? (
-        <p className="py-3 text-xs text-[var(--color-text-tertiary)]">{t('settings.browserTrust.empty')}</p>
+        <p className="py-3 text-xs text-subtle-foreground">{t('settings.browserTrust.empty')}</p>
       ) : (
         <ul aria-label={t('settings.browserTrust.title')}>
           {origins.map((origin) => (
             <li key={origin}>
               <SettingsRow
-                title={<span className="break-all font-[var(--font-mono)]">{origin}</span>}
+                title={<span className="break-all font-mono">{origin}</span>}
                 control={
                   <Button
                     variant="ghost"
@@ -128,7 +128,7 @@ export function BrowserTrustSettings() {
       )}
 
       {removeErrorKey ? (
-        <p role="alert" className="py-2 text-xs text-[var(--color-error)]">{t(removeErrorKey)}</p>
+        <p role="alert" className="py-2 text-xs text-destructive">{t(removeErrorKey)}</p>
       ) : null}
     </SettingsGroup>
   )

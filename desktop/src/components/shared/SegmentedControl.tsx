@@ -14,7 +14,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange, l
     <ToggleGroup type="single" value={value} onValueChange={(next) => {
       const option = options.find((candidate) => candidate.value === next)
       if (option) onChange(option.value)
-    }} aria-label={label} disabled={disabled} className={className} spacing={1} size="sm">
+    }} aria-label={label} disabled={disabled} className={className} variant="segmented" size="segmented">
       {options.map((option) => <ToggleGroupItem key={option.value} value={option.value} onFocus={() => { if (!disabled && value !== option.value) onChange(option.value) }}>{option.label}</ToggleGroupItem>)}
     </ToggleGroup>
   )

@@ -199,14 +199,14 @@ export function ContextUsageIndicator({
   const maxTokens = displayContext?.rawMaxTokens ?? 0
   const freeTokens = Math.max(0, maxTokens - usedTokens)
   const ringColor = percentage >= 90
-    ? 'var(--color-error)'
+    ? 'var(--destructive)'
     : percentage >= 75
-      ? 'var(--color-warning)'
-      : 'var(--color-secondary)'
+      ? 'var(--warning)'
+      : 'var(--success)'
   const ringStyle = {
     background: displayContext
-      ? `conic-gradient(${ringColor} ${percentage * 3.6}deg, var(--color-surface-container-high) 0deg)`
-      : 'var(--color-surface-container-high)',
+      ? `conic-gradient(${ringColor} ${percentage * 3.6}deg, var(--secondary) 0deg)`
+      : 'var(--secondary)',
   }
   const displayPercent = displayContext ? formatPercent(percentage) : '--'
   const displayModel = firstNonEmpty(context?.model, inspectionModel, fallbackModelLabel)
@@ -221,12 +221,12 @@ export function ContextUsageIndicator({
   const detailsContent = (
     <>
         <div className="flex items-center justify-between gap-3 text-sm">
-          <span className="font-medium text-[var(--color-text-primary)]">{t('contextIndicator.title')}</span>
-          <span className="font-mono text-ui-muted-foreground">
+          <span className="font-medium text-foreground">{t('contextIndicator.title')}</span>
+          <span className="font-mono text-muted-foreground">
             {displayContext && maxTokens > 0 ? t('contextIndicator.usedOfWindow', { used: formatNumber(usedTokens), window: formatNumber(maxTokens) }) : displayPercent}
           </span>
         </div>
-        <div className="mt-1 truncate text-xs text-[var(--color-text-tertiary)]">
+        <div className="mt-1 truncate text-xs text-subtle-foreground">
           {displayModel ?? t('contextIndicator.modelUnknown')}
         </div>
 
@@ -235,12 +235,12 @@ export function ContextUsageIndicator({
             <Progress value={percentage} aria-label={t('contextIndicator.title')} className="mt-4" />
             <div className="mt-4 grid grid-cols-2 gap-3 font-mono text-xs">
               <div>
-                <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.used')}</div>
-                <div className="mt-1 text-[var(--color-text-primary)]">{formatNumber(usedTokens)}</div>
+                <div className="text-subtle-foreground">{t('contextIndicator.used')}</div>
+                <div className="mt-1 text-foreground">{formatNumber(usedTokens)}</div>
               </div>
               <div>
-                <div className="text-[var(--color-text-tertiary)]">{t('contextIndicator.free')}</div>
-                <div className="mt-1 text-[var(--color-text-primary)]">{formatNumber(freeTokens)}</div>
+                <div className="text-subtle-foreground">{t('contextIndicator.free')}</div>
+                <div className="mt-1 text-foreground">{formatNumber(freeTokens)}</div>
               </div>
             </div>
             {details.length > 0 && (
@@ -250,8 +250,8 @@ export function ContextUsageIndicator({
                   return (
                     <div key={category.name}>
                       <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="min-w-0 truncate text-[var(--color-text-secondary)]">{category.name}</span>
-                        <span className="shrink-0 font-mono text-[var(--color-text-tertiary)]">{formatNumber(category.tokens)}</span>
+                        <span className="min-w-0 truncate text-muted-foreground">{category.name}</span>
+                        <span className="shrink-0 font-mono text-subtle-foreground">{formatNumber(category.tokens)}</span>
                       </div>
                       <Progress value={percent} aria-label={category.name} className="mt-1" />
                     </div>
@@ -259,21 +259,21 @@ export function ContextUsageIndicator({
                 })}
               </div>
             )}
-            <div className="mt-4 text-[11px] text-[var(--color-text-tertiary)]">
+            <div className="mt-4 text-2xs text-subtle-foreground">
               {formatUpdatedAt(updatedAt, t)}
               {contextSource === 'estimate' && (
-                <span className="ml-2 inline-flex rounded-full border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]">
+                <span className="ml-2 inline-flex rounded-full border border-border px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider">
                   {t('contextIndicator.estimate')}
                 </span>
               )}
             </div>
           </>
         ) : isPendingContext ? (
-          <div className="mt-4 text-sm leading-6 text-[var(--color-text-secondary)]">
+          <div className="mt-4 text-sm leading-6 text-muted-foreground">
             {t('contextIndicator.pendingDetail')}
           </div>
         ) : (
-          <div className="mt-4 text-sm leading-6 text-[var(--color-text-secondary)]">
+          <div className="mt-4 text-sm leading-6 text-muted-foreground">
             {loading ? t('contextIndicator.loading') : t('contextIndicator.unavailableDetail')}
           </div>
         )}
@@ -282,7 +282,7 @@ export function ContextUsageIndicator({
 
   const trigger = (
     <Button
-      variant="outline"
+      variant="ghost-muted"
       size="icon-sm"
       type="button"
       aria-label={ariaLabel}
@@ -296,10 +296,10 @@ export function ContextUsageIndicator({
       className="shrink-0"
     >
       {loading && !displayContext ? (
-        <Spinner aria-hidden="true" className="size-4 text-[var(--color-text-tertiary)] motion-reduce:animate-none" />
+        <Spinner aria-hidden="true" />
       ) : (
         <span data-testid="context-usage-ring" className="relative grid size-4 place-items-center rounded-full" style={ringStyle}>
-          <span className="absolute inset-[3px] rounded-full bg-ui-background" />
+          <span className="absolute inset-[3px] rounded-full bg-background" />
         </span>
       )}
     </Button>
@@ -326,7 +326,7 @@ export function ContextUsageIndicator({
   return (
     <HoverCard openDelay={10} closeDelay={100}>
       <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
-      <HoverCardContent side="top" align="end" sideOffset={8} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)] p-4">
+      <HoverCardContent side="top" align="end" sideOffset={8} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)]">
         {detailsContent}
       </HoverCardContent>
     </HoverCard>

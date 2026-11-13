@@ -99,6 +99,26 @@ describe('WorkspaceDiffSurface', () => {
     expect(onAddLineComment).toHaveBeenCalledWith(12, 'rename', 'const three = 3')
   })
 
+  it('offers a comment button in the diff gutter for new lines only', async () => {
+    render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" hideFileHeaders onAddLineComment={vi.fn()} />)
+    const shadow = document.querySelector('diffs-container')!.shadowRoot!
+    await waitFor(() => expect(shadow.querySelector('[data-line-type="change-addition"]')).toBeTruthy())
+    const hover = (selector: string) => {
+      const line = shadow.querySelector(selector)!
+      line.dispatchEvent(Object.assign(new MouseEvent('pointermove', { bubbles: true, composed: true }), { pointerType: 'mouse' }))
+    }
+    const button = () => document.querySelector<HTMLButtonElement>('[slot] button')!
+
+    hover('[data-line-type="change-deletion"]')
+    await waitFor(() => expect(button()).toHaveAttribute('data-hidden'))
+
+    hover('[data-line-type="change-addition"]')
+    await waitFor(() => expect(button()).not.toHaveAttribute('data-hidden'))
+    expect(button()).toHaveAccessibleName('workspace.commentLine:11')
+    fireEvent.click(button())
+    expect(screen.getByText('workspace.commentLineTarget:11')).toBeInTheDocument()
+  })
+
   it('keeps the rendered diff while a comment is typed', async () => {
     render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} />)
     const shadow = document.querySelector('diffs-container')!.shadowRoot!
@@ -126,6 +146,7 @@ describe('WorkspaceDiffSurface', () => {
     const getComposedRanges = () => [{ startContainer: start, startOffset: 0, endContainer: end, endOffset: end.childNodes.length }]
     vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false, getComposedRanges, removeAllRanges: () => {} } as unknown as Selection)
 
+    fireEvent.mouseDown(screen.getByTestId('workspace-code'), { button: 0 })
     fireEvent.mouseUp(screen.getByTestId('workspace-code'), { clientX: 10, clientY: 10 })
     fireEvent.click(await screen.findByRole('button', { name: 'workspace.addSelectionToChat' }))
 
@@ -146,16 +167,6 @@ describe('WorkspaceDiffSurface', () => {
     await waitFor(() => expect(shadowText()).not.toContain('line 11'))
     expect(shadowText()).toContain('line 10')
   })
-
-  it('opens the comment editor on the first added line when requested', () => {
-    const { rerender } = render(
-      <WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} commentRequest={0} />,
-    )
-    expect(screen.queryByPlaceholderText('workspace.commentPlaceholder')).not.toBeInTheDocument()
-
-    rerender(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} commentRequest={1} />)
-    expect(screen.getByText('workspace.commentLineTarget:11')).toBeInTheDocument()
-  })
 })
 
 describe('LineCommentEditor focus', () => {
@@ -163,5 +174,47 @@ describe('LineCommentEditor focus', () => {
     render(<LineCommentEditor lineNumber={1} draft="" onDraftChange={() => {}} onCancel={() => {}} onSubmit={() => {}} />)
     const textarea = screen.getByPlaceholderText('workspace.commentPlaceholder')
     expect(textarea).toHaveFocus()
+  })
+
+  it('submits with Enter, keeps Shift+Enter for new lines and cancels with Escape', () => {
+    const onSubmit = vi.fn()
+    const onCancel = vi.fn()
+    render(<LineCommentEditor lineNumber={3} draft="  Rename this  " onDraftChange={() => {}} onCancel={onCancel} onSubmit={onSubmit} />)
+    const textarea = screen.getByPlaceholderText('workspace.commentPlaceholder')
+
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true })
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(onSubmit).toHaveBeenCalledWith('Rename this')
+    fireEvent.keyDown(textarea, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalled()
+  })
+
+  it('closes when focus leaves it while empty, and keeps a written comment open', () => {
+    const onCancel = vi.fn()
+    const { rerender } = render(<><LineCommentEditor lineNumber={3} draft="" onDraftChange={() => {}} onCancel={onCancel} onSubmit={() => {}} /><button type="button">elsewhere</button></>)
+    fireEvent.blur(screen.getByPlaceholderText('workspace.commentPlaceholder'), { relatedTarget: screen.getByRole('button', { name: 'elsewhere' }) })
+    expect(onCancel).toHaveBeenCalledTimes(1)
+
+    rerender(<><LineCommentEditor lineNumber={3} draft="keep me" onDraftChange={() => {}} onCancel={onCancel} onSubmit={() => {}} /><button type="button">elsewhere</button></>)
+    fireEvent.blur(screen.getByPlaceholderText('workspace.commentPlaceholder'), { relatedTarget: screen.getByRole('button', { name: 'elsewhere' }) })
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves Enter and Escape to the input method while composing', () => {
+    const onSubmit = vi.fn()
+    const onCancel = vi.fn()
+    render(<LineCommentEditor lineNumber={3} draft="ship it" onDraftChange={() => {}} onCancel={onCancel} onSubmit={onSubmit} />)
+    const textarea = screen.getByPlaceholderText('workspace.commentPlaceholder')
+
+    fireEvent.keyDown(textarea, { key: 'Escape', isComposing: true })
+    fireEvent.keyDown(textarea, { key: 'Enter', keyCode: 229 })
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('disables sending an empty comment', () => {
+    render(<LineCommentEditor lineNumber={3} draft="   " onDraftChange={() => {}} onCancel={() => {}} onSubmit={() => {}} />)
+    expect(screen.getByRole('button', { name: 'workspace.addCommentToChat' })).toBeDisabled()
   })
 })

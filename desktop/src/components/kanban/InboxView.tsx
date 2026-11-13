@@ -6,7 +6,7 @@ import { openSessionTab } from '../../lib/sessionNavigation'
 import { inboxItemKey, useKanbanStore } from '../../stores/kanbanStore'
 import { useWorkspacePanelStore } from '../../stores/workspacePanelStore'
 import { Button } from '../shared/ui/button'
-import { Empty, EmptyHeader, EmptyTitle } from '../shared/ui/empty'
+import { Empty, EmptyDescription, EmptyHeader } from '../shared/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../shared/ui/tabs'
 import { assigneeState, blockReason, cardTitle, type Translate } from './board'
 import { useKanbanCommand } from './useKanbanCommand'
@@ -91,14 +91,14 @@ export function InboxView({ panelId, board }: { panelId: string; board: string }
   const row = (item: InboxItem, isSnoozed: boolean) => {
     const key = inboxItemKey(item)
     return (
-      <li key={key} data-testid={`kanban-inbox-${key}`} className="flex flex-col gap-1.5 border-b border-[var(--color-border-separator)] px-4 py-3">
-        <span className="flex min-w-0 items-baseline gap-2 text-[13px]">
-          <span className="shrink-0 text-[12px] font-medium text-[var(--color-brand)]">{t(KIND_LABEL[item.kind])}</span>
+      <li key={key} data-testid={`kanban-inbox-${key}`} className="flex flex-col gap-1.5 border-b border-border px-4 py-3">
+        <span className="flex min-w-0 items-baseline gap-2 text-sm">
+          <span className="shrink-0 text-xs font-medium text-primary">{t(KIND_LABEL[item.kind])}</span>
           <button type="button" onClick={() => openTask(item.card)} className="min-w-0 truncate text-left hover:underline">
-            <span className="font-mono text-[11px] text-[var(--color-text-tertiary)]">#{item.card}</span> {cardTitle(view, item.card)}
+            <span className="font-mono text-2xs text-subtle-foreground">#{item.card}</span> {cardTitle(view, item.card)}
           </button>
         </span>
-        <span className="line-clamp-2 text-[12px] text-[var(--color-text-secondary)]">{itemNote(t, view, item)}</span>
+        <span className="line-clamp-2 text-xs text-muted-foreground">{itemNote(t, view, item)}</span>
         <span className="flex flex-wrap gap-2">
           {actionsFor(item)}
           <Button variant="ghost" size="sm" onClick={() => setSnoozed(board, key, !isSnoozed)}>{t(isSnoozed ? 'kanban.inbox.unsnooze' : 'kanban.inbox.snooze')}</Button>
@@ -108,13 +108,13 @@ export function InboxView({ panelId, board }: { panelId: string; board: string }
   }
 
   const empty = (label: TranslationKey) => (
-    <Empty className="flex-none py-10"><EmptyHeader><EmptyTitle className="text-[13px] font-normal text-[var(--color-text-secondary)]">{t(label)}</EmptyTitle></EmptyHeader></Empty>
+    <Empty className="flex-none"><EmptyHeader><EmptyDescription>{t(label)}</EmptyDescription></EmptyHeader></Empty>
   )
 
   return (
     <>
       <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
-        <TabsList variant="line" className="mx-3 mt-2 shrink-0">
+        <TabsList className="mx-3 mt-2 shrink-0">
           <TabsTrigger value="needs">{t('kanban.inbox.needs', { count: needs.length })}</TabsTrigger>
           <TabsTrigger value="later">{t('kanban.inbox.later', { count: later.length })}</TabsTrigger>
           <TabsTrigger value="handled">{t('kanban.inbox.handledTab')}</TabsTrigger>
@@ -129,12 +129,12 @@ export function InboxView({ panelId, board }: { panelId: string; board: string }
           {view.handled?.length ? (
             <ul>
               {view.handled.map((item) => (
-                <li key={item.seq} className="flex items-baseline gap-2 border-b border-[var(--color-border-separator)] px-4 py-2.5 text-[13px]">
-                  <span className="shrink-0 text-[12px] text-[var(--color-text-secondary)]">{t(HANDLED_LABEL[item.kind])}</span>
+                <li key={item.seq} className="flex items-baseline gap-2 border-b border-border px-4 py-2.5 text-sm">
+                  <span className="shrink-0 text-xs text-muted-foreground">{t(HANDLED_LABEL[item.kind])}</span>
                   <button type="button" onClick={() => openTask(item.card)} className="min-w-0 flex-1 truncate text-left hover:underline">
-                    <span className="font-mono text-[11px] text-[var(--color-text-tertiary)]">#{item.card}</span> {cardTitle(view, item.card)}
+                    <span className="font-mono text-2xs text-subtle-foreground">#{item.card}</span> {cardTitle(view, item.card)}
                   </button>
-                  <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{relativeTimeLabel(t, now - Date.parse(item.at))}</span>
+                  <span className="shrink-0 text-2xs text-subtle-foreground">{relativeTimeLabel(t, now - Date.parse(item.at))}</span>
                 </li>
               ))}
             </ul>

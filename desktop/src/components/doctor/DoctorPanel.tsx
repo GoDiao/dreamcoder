@@ -37,14 +37,14 @@ export function DoctorPanel({ compact = false }: DoctorPanelProps) {
   const statusText = result ? getDoctorStatusMessage(t, result) : null
 
   return (
-    <section className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] ${compact ? 'p-3' : 'p-4'} `}>
+    <section className={`rounded-lg border border-border bg-background ${compact ? 'p-3' : 'p-4'} `}>
       <div className={`flex ${compact ? 'flex-col gap-3' : 'items-start justify-between gap-4'}`}>
         <div className="min-w-0">
-          <div className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.diagnostics.doctorTitle')}</div>
-          <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+          <div className="text-sm font-medium text-foreground">{t('settings.diagnostics.doctorTitle')}</div>
+          <p className="mt-1 text-xs text-subtle-foreground">
             {t('settings.diagnostics.doctorDescription')}
           </p>
-          <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+          <p className="mt-1 text-xs text-subtle-foreground">
             {t('settings.diagnostics.doctorProtectedData')}
           </p>
         </div>
@@ -60,12 +60,12 @@ export function DoctorPanel({ compact = false }: DoctorPanelProps) {
         </div>
       </div>
 
-      <div className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-tertiary)]">
+      <div className="mt-2 text-2xs leading-relaxed text-subtle-foreground">
         {t('settings.diagnostics.doctorSafeKeys')}
       </div>
 
       {statusText ? (
-        <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2.5 py-2 text-xs text-[var(--color-text-secondary)]">
+        <div className="mt-2 rounded-md border border-border bg-muted px-2.5 py-2 text-xs text-muted-foreground">
           {statusText}
         </div>
       ) : null}

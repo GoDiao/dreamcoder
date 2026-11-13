@@ -1,0 +1,71 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "off"
+  },
+  "jsPlugins": [
+    "@shadcn/lint"
+  ],
+  "settings": {
+    "shadcn": {
+      "componentImports": [
+        "(^|/)shared/ui/"
+      ]
+    }
+  },
+  "rules": {
+    "shadcn/no-arbitrary-values": [
+      "error",
+      {
+        "allow": [
+          "layout",
+          "transition",
+          "rounded-[inherit]",
+          "text-[length:inherit]"
+        ]
+      }
+    ],
+    "shadcn/no-raw-colors": "error",
+    "shadcn/no-restyle": [
+      "error",
+      {
+        "allow": [
+          "layout"
+        ],
+        "contracts": [
+          {
+            "pattern": "^(Collapsible|CollapsibleTrigger|CollapsibleContent|Tabs|TabsContent|ResizablePanelGroup|ResizablePanel)$",
+            "allow": [
+              "layout",
+              "color",
+              "typography",
+              "spacing",
+              "shape",
+              "effects",
+              "motion"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/components/shared/ui/**"
+      ],
+      "rules": {
+        "shadcn/no-restyle": "off",
+        "shadcn/no-arbitrary-values": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "electron-dist",
+    "web-clone",
+    "design-templates",
+    "design-systems"
+  ]
+}
