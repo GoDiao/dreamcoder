@@ -176,10 +176,10 @@ export function cardTreeRows(cards: readonly CardView[], collapsed: ReadonlySet<
   return rows
 }
 
-export type LinkTarget = { kind: 'url'; url: string } | { kind: 'file'; path: string; sessionId: string }
+export type LinkTarget = { kind: 'url'; url: string } | { kind: 'file'; path: string }
 
 export function linkTarget(link: string, author: KanbanActor): LinkTarget | null {
   if (/^https?:\/\//i.test(link)) return { kind: 'url', url: link }
   const absolute = link.startsWith('/') || /^[A-Za-z]:[\\/]/.test(link)
-  return absolute && author.kind === 'session' ? { kind: 'file', path: link, sessionId: author.sessionId } : null
+  return absolute && author.kind === 'session' ? { kind: 'file', path: link } : null
 }

@@ -69,9 +69,9 @@ describe('actorName', () => {
 describe('linkTarget', () => {
   const author = { kind: 'session', sessionId: 'reviewer' } as const
 
-  it('opens web addresses in the browser and absolute files through the session that wrote them', () => {
+  it('opens web addresses in the browser and absolute files through the board', () => {
     expect(linkTarget('https://example.test/pr/1', author)).toEqual({ kind: 'url', url: 'https://example.test/pr/1' })
-    expect(linkTarget('/repo/docs/review.md', author)).toEqual({ kind: 'file', path: '/repo/docs/review.md', sessionId: 'reviewer' })
+    expect(linkTarget('/repo/docs/review.md', author)).toEqual({ kind: 'file', path: '/repo/docs/review.md' })
   })
 
   it('leaves branch names, relative paths and files from a person as plain text', () => {

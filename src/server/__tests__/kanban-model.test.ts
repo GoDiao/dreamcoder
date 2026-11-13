@@ -185,27 +185,38 @@ describe('permission table', () => {
     expect(h.status(t1)).toBe('review')
   })
 
-  it('tells a session that cancels a card which open cards wait on it and which sub-cards are unfinished', () => {
+  it('removes dependencies on a cancelled card while leaving its unfinished sub-cards open by default', () => {
     const { h } = splitExample()
     const root = h.card('Docs', c)
     const child = h.card('Guide', c, { parent: root })
     const waiting = h.card('Release notes', human, { dependsOn: [root] })
-    const finished = h.card('Old notes', human, { dependsOn: [root] })
-    h.run({ type: 'cancel', card: finished }, human)
+    const finished = h.card('Old notes', human)
+    h.assign(finished, 'owner', 'b')
+    submitted(h, finished, b)
+    h.run({ type: 'accept', card: finished, summary: 'checked' }, human)
+    h.run({ type: 'add_dependency', card: finished, dependsOn: root }, human)
 
-    const warnings = h.run({ type: 'cancel', card: root, reason: 'plan changed' }, c)
+    h.run({ type: 'cancel', card: root, reason: 'plan changed' }, c)
 
     expect(h.status(root)).toBe('cancelled')
-    expect(warnings).toEqual([
-      `#${waiting} still depend on card #${root} and cannot start until it is done. Remove that dependency from them, or cancel them too.`,
-      `Card #${root} still has unfinished sub-cards: #${child}. Cancel them too if they are no longer needed.`,
-    ])
+    expect(h.status(child)).toBe('todo')
+    expect(h.board.cards[waiting]!.dependsOn).toEqual([])
+    expect(h.board.cards[finished]!.dependsOn).toEqual([])
   })
 
-  it('does not repeat the cancel impact to a person, whose confirmation already listed it', () => {
-    const { h, t1 } = splitExample()
-    h.card('Release notes', human, { dependsOn: [t1] })
-    expect(h.run({ type: 'cancel', card: t1 }, human)).toEqual([])
+  it('atomically cancels selected dependents and unfinished sub-cards transitively', () => {
+    const { h } = splitExample()
+    const root = h.card('Docs', c)
+    const child = h.card('Guide', c, { parent: root })
+    const grandchild = h.card('Examples', c, { parent: child })
+    const waiting = h.card('Release notes', human, { dependsOn: [root] })
+    const transitive = h.card('Publish', human, { dependsOn: [waiting] })
+
+    h.run({ type: 'cancel', card: root, cancelDependents: true, cancelChildren: true }, human)
+
+    expect([root, child, grandchild, waiting, transitive].map((id) => h.status(id))).toEqual(Array(5).fill('cancelled'))
+    expect(h.board.cards[waiting]!.dependsOn).toEqual([])
+    expect(h.board.cards[transitive]!.dependsOn).toEqual([])
   })
 
   it('lets the reviewer and a person request changes and accept', () => {

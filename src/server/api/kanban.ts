@@ -50,6 +50,12 @@ export async function handleKanbanApi(req: Request, url: URL, segments: string[]
       return Response.json({ events: await kanban.history(key, cardId(childId)) })
     }
 
+    if (key && child === 'files' && !childId && method === 'GET') {
+      const filePath = url.searchParams.get('path')
+      if (!filePath) throw ApiError.badRequest('path query parameter is required for a board file')
+      return Response.json(await kanban.readFile(key, filePath))
+    }
+
     throw new ApiError(405, `Method ${method} not allowed on ${url.pathname}`, 'METHOD_NOT_ALLOWED')
   } catch (error) {
     return errorResponse(toApiError(error))

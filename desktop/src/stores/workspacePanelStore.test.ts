@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceTreeMock: vi.fn(),
   getWorkspaceFileMock: vi.fn(),
   getWorkspaceDiffMock: vi.fn(),
+  getBoardFileMock: vi.fn(),
   openArtifactMock: vi.fn(),
   previewTemplateMock: vi.fn(),
 }))
@@ -27,6 +28,10 @@ vi.mock('../api/sessions', () => ({
     getWorkspaceFile: mocks.getWorkspaceFileMock,
     getWorkspaceDiff: mocks.getWorkspaceDiffMock,
   },
+}))
+
+vi.mock('../api/kanban', () => ({
+  kanbanApi: { file: mocks.getBoardFileMock },
 }))
 
 vi.mock('../api/artifacts', () => ({
@@ -432,6 +437,28 @@ describe('workspacePanelStore', () => {
     })
     expect(getWorkspacePreviewId('src/a.ts', 'diff')).toBe('diff:src/a.ts')
     expect(setItemSpy).not.toHaveBeenCalled()
+  })
+
+  it('loads a board file without using its author session', async () => {
+    mocks.getBoardFileMock.mockResolvedValue({
+      state: 'ok',
+      path: '/repo/review.md',
+      content: '# verified',
+      language: 'markdown',
+      size: 10,
+    })
+    const store = useWorkspacePanelStore.getState()
+
+    store.openTab('board-tab', { kind: 'file', path: '/repo/review.md', board: 'board-key' })
+    await store.ensurePreview('board-tab', '/repo/review.md', 'file', 'board-key')
+
+    expect(mocks.getBoardFileMock).toHaveBeenCalledWith('board-key', '/repo/review.md')
+    expect(mocks.getWorkspaceFileMock).not.toHaveBeenCalled()
+    expect(useWorkspacePanelStore.getState().previewsBySession['board-tab']?.['file:/repo/review.md']).toMatchObject({
+      board: 'board-key',
+      content: '# verified',
+      state: 'ok',
+    })
   })
 
   it('keeps the cache when collapsing and allows several files open at once', async () => {

@@ -99,6 +99,16 @@ describe('kanban service', () => {
     await expectKanbanError(kanban.createBoard(project), 'CONFLICT')
   })
 
+  it('keeps finding boards written with the original sanitized project key', async () => {
+    const key = project.replace(/[^a-zA-Z0-9]/g, '-')
+    const file = await boardFile(key)
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(file, `${JSON.stringify({ type: 'board_created', project, seq: 1, at: '2026-11-10T00:00:00.000Z', actor: human })}\n`)
+
+    expect(await kanban.boardForSession('worker')).toBe(key)
+    await expectKanbanError(kanban.createBoard(project), 'CONFLICT')
+  })
+
   it('restores the board from its log after a restart', async () => {
     const { key } = await kanban.createBoard(project)
     await kanban.execute(key, { type: 'create_card', title: 'Write docs', status: 'todo', acceptance: ['links work'] }, human)
@@ -127,14 +137,37 @@ describe('kanban service', () => {
     expect(history.every((event) => !Number.isNaN(Date.parse(event.at)))).toBe(true)
   })
 
-  it('skips a half-written last line and keeps the events before it', async () => {
+  it('keeps new events recoverable after a half-written last line', async () => {
     const { key } = await kanban.createBoard(project)
     await kanban.execute(key, { type: 'create_card', title: 'Kept' }, human)
     await fs.appendFile(await boardFile(key), '{"type":"card_created","card":2,"ti')
 
-    const view = await service().view(key, human)
+    const recovered = service()
+    const view = await recovered.view(key, human)
+    await recovered.execute(key, { type: 'create_card', title: 'After recovery' }, human)
 
     expect(view.cards.map((card) => card.title)).toEqual(['Kept'])
+    expect((await service().view(key, human)).cards.map((card) => card.title)).toEqual(['Kept', 'After recovery'])
+  })
+
+  it('uses distinct keys for project paths with the same sanitized form', async () => {
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'kanban-collision-'))
+    const dotted = path.join(parent, 'repo.one')
+    const dashed = path.join(parent, 'repo-one')
+    await fs.mkdir(dotted)
+    await fs.mkdir(dashed)
+    try {
+      const first = await kanban.createBoard(dotted)
+      const second = await kanban.createBoard(dashed)
+      facts.set('dotted', fact({ projectRoot: await fs.realpath(dotted) }))
+      facts.set('dashed', fact({ projectRoot: await fs.realpath(dashed) }))
+
+      expect(second.key).not.toBe(first.key)
+      expect(await kanban.boardForSession('dotted')).toBe(first.key)
+      expect(await kanban.boardForSession('dashed')).toBe(second.key)
+    } finally {
+      await fs.rm(parent, { recursive: true, force: true })
+    }
   })
 
   it('applies concurrent commands one at a time without losing events', async () => {

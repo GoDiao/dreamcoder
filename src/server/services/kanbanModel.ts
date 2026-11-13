@@ -363,14 +363,35 @@ function cardList(cards: readonly Card[]): string {
   return cards.map((each) => `#${each.id}`).join(', ')
 }
 
-function cancelWarnings(board: Board, card: Card): string[] {
-  const open = (each: Card) => OPEN_STATUSES.has(each.status)
-  const dependents = Object.values(board.cards).filter((each) => open(each) && each.dependsOn.includes(card.id))
-  const children = childrenOf(board, card).filter(open)
-  return [
-    ...(dependents.length ? [`${cardList(dependents)} still depend on card #${card.id} and cannot start until it is done. Remove that dependency from them, or cancel them too.`] : []),
-    ...(children.length ? [`Card #${card.id} still has unfinished sub-cards: ${cardList(children)}. Cancel them too if they are no longer needed.`] : []),
-  ]
+function cancellationEvents(
+  board: Board,
+  card: Card,
+  command: Extract<KanbanCommand, { type: 'cancel' }>,
+): KanbanEventBody[] {
+  const cancelled = new Set([card.id])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const candidate of Object.values(board.cards)) {
+      if (cancelled.has(candidate.id) || !OPEN_STATUSES.has(candidate.status)) continue
+      const child = command.cancelChildren === true && candidate.parent !== null && cancelled.has(candidate.parent)
+      const dependent = command.cancelDependents === true && candidate.dependsOn.some((id) => cancelled.has(id))
+      if (!child && !dependent) continue
+      cancelled.add(candidate.id)
+      changed = true
+    }
+  }
+  const cards = [card, ...[...cancelled]
+    .filter((id) => id !== card.id)
+    .sort((a, b) => a - b)
+    .map((id) => board.cards[id]!)]
+  const events: KanbanEventBody[] = cards.map((candidate) => transition(candidate, 'cancelled', command.reason))
+  for (const candidate of Object.values(board.cards).sort((a, b) => a.id - b.id)) {
+    for (const dependency of candidate.dependsOn.filter((id) => cancelled.has(id))) {
+      events.push({ type: 'dependency_removed', card: candidate.id, dependsOn: dependency })
+    }
+  }
+  return events
 }
 
 function requireStatus(card: Card, allowed: CardStatus[], action: string): CommandResult | null {
@@ -539,7 +560,7 @@ function validateCardCommand(board: Board, card: Card, command: CardCommand, act
     case 'cancel': {
       const invalid = requireStatus(card, OPEN, 'cancel')
       if (invalid) return invalid
-      return ok([transition(card, 'cancelled', command.reason)], actor.kind === 'session' ? cancelWarnings(board, card) : [])
+      return ok(cancellationEvents(board, card, command))
     }
 
     case 'reopen': {

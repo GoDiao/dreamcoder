@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import type { CardStatus, CardView, KanbanCommand } from '@protocol'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
+import { Checkbox } from '../shared/ui/checkbox'
 import { Textarea } from '../shared/ui/textarea'
 import { STATUS_LABEL, cancelImpact, moveIntent } from './board'
 import { useKanbanStore } from '../../stores/kanbanStore'
@@ -14,27 +15,33 @@ type Prompt = {
   confirmLabel: string
   required: boolean
   destructive?: boolean
-  notes?: string[]
-  command: (text: string) => KanbanCommand
+  cancel?: { dependents: number[]; children: number[] }
+  command: (text: string, choices: CancelChoices) => KanbanCommand
 }
+
+type CancelChoices = { dependents: boolean; children: boolean }
 
 function useReasonPrompt(board: string): { ask: (prompt: Prompt) => void; dialog: ReactNode } {
   const t = useTranslation()
   const run = useKanbanCommand(board)
   const fieldId = useId()
+  const dependentsId = useId()
+  const childrenId = useId()
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [text, setText] = useState('')
+  const [choices, setChoices] = useState<CancelChoices>({ dependents: false, children: false })
   const [busy, setBusy] = useState(false)
 
   const ask = useCallback((next: Prompt) => {
     setText('')
+    setChoices({ dependents: false, children: false })
     setPrompt(next)
   }, [])
 
   const confirm = async () => {
     if (!prompt) return
     setBusy(true)
-    const ok = await run(prompt.command(text.trim()))
+    const ok = await run(prompt.command(text.trim(), choices))
     setBusy(false)
     if (ok) setPrompt(null)
   }
@@ -47,9 +54,18 @@ function useReasonPrompt(board: string): { ask: (prompt: Prompt) => void; dialog
       title={prompt?.title ?? ''}
       body={(
         <div className="flex flex-col gap-2 pt-1">
-          {prompt?.notes?.map((note) => (
-            <p key={note} role="note" className="rounded-lg bg-[var(--color-warning-container)] px-3 py-2 text-[12px] text-[var(--color-text-primary)]">{note}</p>
-          ))}
+          {prompt?.cancel?.dependents.length ? (
+            <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-container)] px-3 py-2 text-[12px] text-[var(--color-text-primary)]">
+              <Checkbox id={dependentsId} checked={choices.dependents} onCheckedChange={(checked) => setChoices((current) => ({ ...current, dependents: checked === true }))} />
+              <label htmlFor={dependentsId}>{t('kanban.prompt.cancelDependents', { cards: prompt.cancel.dependents.map((id) => `#${id}`).join(' ') })}</label>
+            </div>
+          ) : null}
+          {prompt?.cancel?.children.length ? (
+            <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-container)] px-3 py-2 text-[12px] text-[var(--color-text-primary)]">
+              <Checkbox id={childrenId} checked={choices.children} onCheckedChange={(checked) => setChoices((current) => ({ ...current, children: checked === true }))} />
+              <label htmlFor={childrenId}>{t('kanban.prompt.cancelChildren', { cards: prompt.cancel.children.map((id) => `#${id}`).join(' ') })}</label>
+            </div>
+          ) : null}
           <label htmlFor={fieldId} className="text-[12px] text-[var(--color-text-secondary)]">{prompt?.label}</label>
           <Textarea id={fieldId} value={text} onChange={(event) => setText(event.target.value)} rows={3} />
         </div>
@@ -105,19 +121,17 @@ export function useMoveCard(board: string) {
     const copy = REASON_PROMPTS[intent.type]
     const view = useKanbanStore.getState().views[board]
     const impact = intent.type === 'cancel' && view ? cancelImpact(view, card) : null
-    const cards = (ids: number[]) => ids.map((id) => `#${id}`).join(' ')
     ask({
-      notes: impact ? [
-        ...(impact.dependents.length ? [t('kanban.prompt.cancelDependents', { cards: cards(impact.dependents) })] : []),
-        ...(impact.children.length ? [t('kanban.prompt.cancelChildren', { cards: cards(impact.children) })] : []),
-      ] : undefined,
+      cancel: impact ?? undefined,
       title: t(copy.title, { card: `#${card.id}` }),
       label: t(copy.label),
       confirmLabel: t(copy.confirm),
       required: intent.required,
       destructive: intent.type === 'cancel',
-      command: (reason) => intent.type === 'cancel' || intent.type === 'reopen'
-        ? { type: intent.type, card: card.id, ...(reason ? { reason } : {}) }
+      command: (reason, choices) => intent.type === 'cancel'
+        ? { type: 'cancel', card: card.id, cancelDependents: choices.dependents, cancelChildren: choices.children, ...(reason ? { reason } : {}) }
+        : intent.type === 'reopen'
+          ? { type: intent.type, card: card.id, ...(reason ? { reason } : {}) }
         : { type: intent.type, card: card.id, reason },
     })
   }, [ask, board, run, t])

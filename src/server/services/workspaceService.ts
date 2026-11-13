@@ -402,7 +402,14 @@ export class WorkspaceService {
     sessionId: string,
     filePath: string,
   ): Promise<WorkspaceReadFileResult> {
-    const resolvedPath = await this.resolveWorkspacePath(sessionId, filePath)
+    return this.readFileFromRoot(await this.requireWorkDir(sessionId), filePath)
+  }
+
+  async readFileFromRoot(
+    workDir: string,
+    filePath: string,
+  ): Promise<WorkspaceReadFileResult> {
+    const resolvedPath = await this.resolveWorkspacePathFromRoot(workDir, filePath)
 
     const stat = await this.safeStat(resolvedPath.absolutePath)
     if (stat.kind === 'error') {
@@ -1049,6 +1056,13 @@ export class WorkspaceService {
     requestedPath: string,
   ): Promise<WorkspacePathResolution> {
     const workDir = await this.requireWorkDir(sessionId)
+    return this.resolveWorkspacePathFromRoot(workDir, requestedPath)
+  }
+
+  private async resolveWorkspacePathFromRoot(
+    workDir: string,
+    requestedPath: string,
+  ): Promise<WorkspacePathResolution> {
     const workspaceRoot = await this.getWorkspaceRoot(workDir)
     if (workspaceRoot.kind === 'missing') {
       throw new Error(`Workspace root is missing: ${workDir}`)

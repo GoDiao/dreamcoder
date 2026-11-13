@@ -141,7 +141,7 @@ export function TaskTimeline({ panelId, board, view, card }: { panelId: string; 
               <MarkdownRenderer content={line.detail} variant="compact" className="break-words" />
             </div>
           )}
-          {line.links && <CardLinks panelId={panelId} projectRoot={view.project} links={line.links} author={event.actor} />}
+          {line.links && <CardLinks panelId={panelId} board={board} projectRoot={view.project} links={line.links} author={event.actor} />}
           {line.resend !== undefined && (
             <Button variant="outline" size="sm" className="self-start" onClick={() => void run({ type: 'resend_notification', notification: line.resend! })}>
               {t('kanban.action.resend')}

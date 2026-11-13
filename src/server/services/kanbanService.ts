@@ -10,6 +10,7 @@ import type { LinkedSessionOptions } from './sessionLinksService.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'
 import { diagnosticsService } from './diagnosticsService.js'
 import { readJsonlFile } from './jsonlFile.js'
+import { WorkspaceService, type WorkspaceReadFileResult } from './workspaceService.js'
 import {
   NEW_SESSION,
   applyEvent,
@@ -40,6 +41,7 @@ const BOARD_KEY_PATTERN = /^[A-Za-z0-9-]+$/
 const EVENTS_FILE = 'events.jsonl'
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
 const FIRST_LINE_BYTES = 64 * 1024
+const workspaceFiles = new WorkspaceService(async () => null)
 
 const ERROR_STATUS: Record<KanbanServiceErrorCode, number> = {
   FORBIDDEN: 403,
@@ -105,6 +107,12 @@ function digest(value: unknown): string {
   return createHash('sha1').update(JSON.stringify(value)).digest('hex')
 }
 
+function projectBoardKey(project: string): string {
+  const prefix = sanitizePath(project)
+  const suffix = createHash('sha256').update(project).digest('hex').slice(0, 16)
+  return `${prefix}-${suffix}`
+}
+
 async function readFirstLine(filePath: string): Promise<string | null> {
   const handle = await fs.open(filePath, 'r').catch(() => null)
   if (!handle) return null
@@ -167,7 +175,19 @@ export function createKanban(deps: KanbanDeps) {
     const filePath = eventsPath(key)
     try {
       await fs.mkdir(path.dirname(filePath), { recursive: true })
-      await fs.appendFile(filePath, events.map((event) => JSON.stringify(event) + '\n').join(''), 'utf-8')
+      const handle = await fs.open(filePath, 'a+')
+      try {
+        const { size } = await handle.stat()
+        let boundary = ''
+        if (size > 0) {
+          const last = Buffer.alloc(1)
+          await handle.read(last, 0, 1, size - 1)
+          if (last[0] !== 10) boundary = '\n'
+        }
+        await handle.writeFile(boundary + events.map((event) => JSON.stringify(event) + '\n').join(''), 'utf-8')
+      } finally {
+        await handle.close()
+      }
     } catch (error) {
       void diagnosticsService.recordEvent({
         type: 'kanban_write_failed',
@@ -306,8 +326,22 @@ export function createKanban(deps: KanbanDeps) {
     await deps.discardSession(started.sessionId)
   }
 
-  async function boardExists(key: string): Promise<boolean> {
-    return loaded.has(key) || Boolean(await readFirstLine(eventsPath(key)))
+  async function boardProject(key: string): Promise<string | null> {
+    const line = await readFirstLine(eventsPath(key))
+    if (!line) return null
+    try {
+      const first = JSON.parse(line) as KanbanEvent
+      return first.type === 'board_created' ? first.project : null
+    } catch {
+      return null
+    }
+  }
+
+  async function findBoardKey(project: string): Promise<string | null> {
+    const key = projectBoardKey(project)
+    if ((await boardProject(key)) === project) return key
+    const legacy = sanitizePath(project)
+    return (await boardProject(legacy)) === project ? legacy : null
   }
 
   async function resend(key: string, failed: FailedNotification): Promise<string[]> {
@@ -343,9 +377,9 @@ export function createKanban(deps: KanbanDeps) {
     async createBoard(project: string): Promise<BoardView> {
       const actor: KanbanActor = { kind: 'human' }
       const root = await resolveProjectRoot(project)
-      const key = sanitizePath(root)
+      const key = projectBoardKey(root)
       await serialize(key, async () => {
-        if (await boardExists(key)) {
+        if (await findBoardKey(root)) {
           throw new KanbanError('CONFLICT', 'This project already has a board.')
         }
         const state: LoadedBoard = { board: emptyBoard(root), events: [] }
@@ -358,13 +392,15 @@ export function createKanban(deps: KanbanDeps) {
     async boardForSession(sessionId: string, create = false): Promise<string | null> {
       const fact = (await factsFor([sessionId])).get(sessionId)!
       if (!fact.exists || !fact.projectRoot) return null
-      const key = sanitizePath(fact.projectRoot)
-      if (await boardExists(key)) return key
+      const key = await findBoardKey(fact.projectRoot)
+      if (key) return key
       if (!create) return null
-      await this.createBoard(fact.projectRoot).catch((error: unknown) => {
+      try {
+        return (await this.createBoard(fact.projectRoot)).key
+      } catch (error) {
         if (!(error instanceof KanbanError && error.code === 'CONFLICT')) throw error
-      })
-      return key
+        return findBoardKey(fact.projectRoot)
+      }
     },
 
     async view(key: string, actor: KanbanActor): Promise<BoardView> {
@@ -411,6 +447,18 @@ export function createKanban(deps: KanbanDeps) {
       const state = await load(key)
       if (!state.board.cards[card]) throw new KanbanError('NOT_FOUND', `Card #${card} does not exist.`)
       return eventsForCard(state.events, card)
+    },
+
+    async readFile(key: string, filePath: string): Promise<WorkspaceReadFileResult> {
+      const state = await load(key)
+      try {
+        return await workspaceFiles.readFileFromRoot(state.board.project, filePath)
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('outside workspace')) {
+          throw new KanbanError('FORBIDDEN', error.message)
+        }
+        throw error
+      }
     },
 
     clear(): void {
