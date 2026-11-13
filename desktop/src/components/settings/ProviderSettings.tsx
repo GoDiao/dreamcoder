@@ -10,6 +10,7 @@ import { ProviderFormModal } from './ProviderFormModal'
 import { ProviderIcon } from './ProviderIcon'
 import { SettingsPageHeader } from './SettingsPageHeader'
 import { Plus } from 'lucide-react'
+import { DecisionProviderSettingsSection } from './DecisionProviderSettingsSection'
 
 function ProviderSettings() {
   const {
@@ -190,6 +191,7 @@ function ProviderSettings() {
         confirmVariant="destructive"
         loading={isDeletingProvider}
       />
+      <DecisionProviderSettingsSection />
     </div>
   )
 }

@@ -17,6 +17,7 @@ import {
   type H5AccessDiagnostics,
   type H5AccessSettings,
   type NetworkSettings,
+  type AutoPermissionSettings,
   type DefaultPermissionMode,
   type EffortLevel,
   type ModelInfo,
@@ -74,6 +75,7 @@ function getStoredOnboardingCompleted(): boolean {
 
 type SettingsStore = {
   permissionMode: DefaultPermissionMode
+  autoPermission: AutoPermissionSettings
   currentModel: ModelInfo | null
   effortLevel: EffortLevel
   thinkingEnabled: boolean
@@ -105,6 +107,7 @@ type SettingsStore = {
   fetchAll: () => Promise<void>
   fetchH5Access: () => Promise<void>
   setPermissionMode: (mode: DefaultPermissionMode) => Promise<void>
+  setAutoPermission: (settings: AutoPermissionSettings) => Promise<void>
   setModel: (modelId: string) => Promise<void>
   setEffort: (level: EffortLevel) => Promise<void>
   setThinkingEnabled: (enabled: boolean) => Promise<void>
@@ -163,8 +166,29 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   },
 }
 
+export const DEFAULT_AUTO_PERMISSION_SETTINGS: AutoPermissionSettings = {
+  providerId: null,
+  modelId: '',
+  privacyNoticeVersion: 0,
+}
+
+function normalizeAutoPermissionSettings(value: unknown): AutoPermissionSettings {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DEFAULT_AUTO_PERMISSION_SETTINGS
+  }
+  const settings = value as Partial<AutoPermissionSettings>
+  return {
+    providerId: typeof settings.providerId === 'string' ? settings.providerId : null,
+    modelId: typeof settings.modelId === 'string' ? settings.modelId : '',
+    privacyNoticeVersion: typeof settings.privacyNoticeVersion === 'number'
+      ? Math.max(0, Math.floor(settings.privacyNoticeVersion))
+      : 0,
+  }
+}
+
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   permissionMode: 'default',
+  autoPermission: DEFAULT_AUTO_PERMISSION_SETTINGS,
   currentModel: null,
   effortLevel: 'medium',
   thinkingEnabled: true,
@@ -225,6 +249,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       useUIStore.getState().setTheme(theme)
       set({
         permissionMode: mode,
+        autoPermission: normalizeAutoPermissionSettings(userSettings.autoPermission),
         availableModels: modelsRes.models,
         activeProviderName: modelsRes.provider?.name ?? null,
         currentModel: model,
@@ -271,6 +296,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       await settingsApi.setPermissionMode(mode)
     } catch {
       set({ permissionMode: prev })
+    }
+  },
+
+  setAutoPermission: async (settings) => {
+    const previous = get().autoPermission
+    set({ autoPermission: settings })
+    try {
+      await settingsApi.updateUser({ autoPermission: settings })
+    } catch (error) {
+      set({ autoPermission: previous })
+      throw error
     }
   },
 

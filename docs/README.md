@@ -14,6 +14,7 @@
   - [computer-use](features/computer-use/tech-design.md): Computer Use through cua-driver, with its [decision records](features/computer-use/adr.md).
   - [kanban](features/kanban/README.md): a persistent project board shared by people and agent sessions (first version implemented on `feat/kanban`).
   - [performance](features/performance/optimization-report.md): performance audit report.
+  - [permission-guardrail](features/permission-guardrail/tech-design.md): model-assisted Auto permission mode behind deterministic permission rules.
   - [session-links](features/session-links/tech-design.md): sessions that start other sessions and message each other.
   - [session-state](features/session-state/tech-design.md): session state owned by the server.
   - [ui-refresh](features/ui-refresh/README.md): the UI refresh design log, mockups and checks.

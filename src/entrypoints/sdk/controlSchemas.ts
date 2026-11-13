@@ -112,6 +112,17 @@ export const SDKControlPermissionRequestSchema = lazySchema(() =>
       permission_suggestions: z.array(PermissionUpdateSchema()).optional(),
       blocked_path: z.string().optional(),
       decision_reason: z.string().optional(),
+      permission_guardrail: z
+        .object({
+          provider_id: z.string(),
+          model_id: z.string(),
+          source: z.enum(['decisionProvider', 'fastModel']),
+          decision: z.enum(['allow', 'ask']),
+          score: z.number().min(0).max(1).nullable(),
+          policy_version: z.number().int().nonnegative(),
+          reason: z.string().optional(),
+        })
+        .optional(),
       title: z.string().optional(),
       display_name: z.string().optional(),
       tool_use_id: z.string(),

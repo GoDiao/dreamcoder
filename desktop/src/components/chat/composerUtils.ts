@@ -64,6 +64,9 @@ export type SlashUiAction =
 
 export function resolveSlashUiAction(value: string): SlashUiAction | null {
   const normalizedValue = SLASH_COMMAND_ALIASES.find((alias) => alias.name === value)?.target ?? value
+  if (normalizedValue === 'permissions') {
+    return { type: 'settings', tab: 'permissions' }
+  }
   const panelCommand = PANEL_SLASH_COMMANDS.find((command) => command.name === normalizedValue)
   if (panelCommand) {
     return { type: 'panel', command: panelCommand.name }

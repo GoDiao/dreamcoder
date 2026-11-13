@@ -82,6 +82,19 @@ export type TranscriptItem =
       teamCount?: number
       timestamp: number
     }
+  | {
+      id: string
+      type: 'permission_guardrail_decision'
+      decision: 'allow' | 'ask'
+      toolUseId: string
+      providerId: string
+      modelId: string
+      source: 'decisionProvider' | 'fastModel'
+      score: number | null
+      policyVersion: number
+      reason?: string
+      timestamp: number
+    }
 
 export type TodoItem = { content: string; status: string; activeForm?: string }
 

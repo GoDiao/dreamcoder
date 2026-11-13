@@ -1,4 +1,4 @@
-import { Check, BadgeCheck, ChevronDown, FolderOpen, Search, X } from 'lucide-react'
+import { Check, BadgeCheck, ChevronDown, FolderOpen, Search, ShieldCheck, X } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../shared/ui/card'
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from '../shared/ui/code-block'
 import { CodeViewer } from './CodeViewer'
@@ -14,7 +14,7 @@ import { Button } from '../shared/ui/button'
 import { AwaitingApprovalBadge } from './AwaitingApprovalBadge'
 import { DiffViewer } from './DiffViewer'
 import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
-import type { PermissionResolution } from '../../types/chat'
+import type { PermissionGuardrailDetails, PermissionResolution } from '../../types/chat'
 
 type Props = {
   sessionId?: string | null
@@ -22,6 +22,7 @@ type Props = {
   toolName: string
   input: unknown
   description?: string
+  guardrail?: PermissionGuardrailDetails
   alwaysAsks?: boolean
   resolution?: PermissionResolution
 }
@@ -202,7 +203,7 @@ function resolutionLabelKey(resolution: PermissionResolution | undefined): Trans
   return resolution.outcome === 'allowed' ? 'permission.allowedElsewhere' : 'permission.deniedElsewhere'
 }
 
-export function PermissionDialog({ sessionId, requestId, toolName, input, description, alwaysAsks, resolution }: Props) {
+export function PermissionDialog({ sessionId, requestId, toolName, input, description, guardrail, alwaysAsks, resolution }: Props) {
   const respondToPermission = useChatStore((s) => s.respondToPermission)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const targetSessionId = sessionId ?? activeTabId
@@ -252,6 +253,11 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
   const shownDescription = cua && description && /mcp__|\bMCP\b/i.test(description) ? undefined : description
   const DetailIcon = cua ? Icon : toolName === 'Glob' || toolName === 'Grep' ? Search : FolderOpen
   const allowRawToggle = !preview && rawInput !== '{}'
+  const guardrailScore = guardrail?.score === null
+    ? t('chat.permissionGuardrail.scoreUnavailable')
+    : guardrail
+      ? t('chat.permissionGuardrail.score', { score: guardrail.score.toFixed(3) })
+      : null
 
   return (
     <Card size="sm" className={`mb-4 gap-0 py-0 border ${
@@ -282,6 +288,26 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
       </CardHeader>
 
       <CardContent className="border-t border-ui-border px-4 py-3">
+        {guardrail && (
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-[var(--color-warning)]/35 bg-[var(--color-warning-container)]/35 px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" aria-hidden="true" />
+            <div className="min-w-0 space-y-1">
+              <div className="font-medium text-[var(--color-text-primary)]">
+                {t('settings.autoPermission.title')}
+              </div>
+              <div className="flex flex-wrap gap-x-2 gap-y-1">
+                <span>{guardrail.modelId}</span>
+                <span>{t(guardrail.source === 'decisionProvider'
+                  ? 'chat.permissionGuardrail.decisionProvider'
+                  : 'chat.permissionGuardrail.fastModel')}</span>
+                <span>{t('chat.permissionGuardrail.decision', { decision: guardrail.decision })}</span>
+                <span>{guardrailScore}</span>
+                <span>{t('chat.permissionGuardrail.policyVersion', { version: String(guardrail.policyVersion) })}</span>
+              </div>
+              {guardrail.reason ? <div>{guardrail.reason}</div> : null}
+            </div>
+          </div>
+        )}
         {preview ? (
           <div className="space-y-2">
             {details.primary && toolName !== 'Bash' ? (

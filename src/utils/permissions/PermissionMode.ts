@@ -1,4 +1,3 @@
-import { feature } from 'bun:bundle'
 import z from 'zod/v4'
 import type { ToolPermissionContext } from '../../Tool.js'
 import { PAUSE_ICON } from '../../constants/figures.js'
@@ -78,17 +77,13 @@ const PERMISSION_MODE_CONFIG: Partial<
     color: 'error',
     external: 'dontAsk',
   },
-  ...(feature('TRANSCRIPT_CLASSIFIER')
-    ? {
-        auto: {
-          title: 'Auto mode',
-          shortTitle: 'Auto',
-          symbol: '⏵⏵',
-          color: 'warning' as ModeColorKey,
-          external: 'default' as ExternalPermissionMode,
-        },
-      }
-    : {}),
+  auto: {
+    title: 'Auto mode',
+    shortTitle: 'Auto',
+    symbol: '⏵⏵',
+    color: 'warning',
+    external: 'auto',
+  },
 }
 
 /**
@@ -98,11 +93,7 @@ const PERMISSION_MODE_CONFIG: Partial<
 export function isExternalPermissionMode(
   mode: PermissionMode,
 ): mode is ExternalPermissionMode {
-  // External users can't have auto, so always true for them
-  if (process.env.USER_TYPE !== 'ant') {
-    return true
-  }
-  return mode !== 'auto' && mode !== 'bubble'
+  return (EXTERNAL_PERMISSION_MODES as readonly string[]).includes(mode)
 }
 
 function getModeConfig(mode: PermissionMode): PermissionModeConfig {

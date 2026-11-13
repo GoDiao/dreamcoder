@@ -448,6 +448,77 @@ describe('MessageList nested tool calls', () => {
     expect(screen.getByText('Budget: 0 / unlimited tokens')).toBeTruthy()
   })
 
+  it('renders permission guardrail transcript markers with their score', () => {
+    useChatStore.setState({
+      sessions: {
+        [ACTIVE_TAB]: makeSessionState({
+          messages: [{
+            id: 'guardrail-1',
+            type: 'permission_guardrail_decision',
+            decision: 'allow',
+            toolUseId: 'tool-1',
+            providerId: 'provider-1',
+            modelId: 'gpt-6-luna',
+            source: 'decisionProvider',
+            score: 0.237,
+            policyVersion: 1,
+            timestamp: 1,
+          }],
+        }),
+      },
+    })
+
+    render(<MessageList />)
+
+    expect(screen.getByText('Auto-approved')).toBeTruthy()
+    expect(screen.getByText('gpt-6-luna')).toBeTruthy()
+    expect(screen.getByText('Decision provider')).toBeTruthy()
+    expect(screen.getByText('Decision: allow')).toBeTruthy()
+    expect(screen.getByText('Score: 0.237')).toBeTruthy()
+  })
+
+  it('shows guardrail details on permission requests', () => {
+    const guardrail = {
+      providerId: 'provider-1',
+      modelId: 'gpt-6-luna',
+      source: 'decisionProvider' as const,
+      decision: 'ask' as const,
+      score: 0.812,
+      policyVersion: 1,
+    }
+    useChatStore.setState({
+      sessions: {
+        [ACTIVE_TAB]: makeSessionState({
+          pendingPermission: {
+            requestId: 'request-1',
+            toolName: 'Bash',
+            toolUseId: 'tool-1',
+            input: { command: 'rm guarded.txt' },
+            guardrail,
+          },
+          messages: [{
+            id: 'permission-1',
+            type: 'permission_request',
+            requestId: 'request-1',
+            toolName: 'Bash',
+            toolUseId: 'tool-1',
+            input: { command: 'rm guarded.txt' },
+            guardrail,
+            timestamp: 1,
+          }],
+        }),
+      },
+    })
+
+    render(<MessageList />)
+
+    expect(screen.getByText('Auto permission model')).toBeTruthy()
+    expect(screen.getByText('gpt-6-luna')).toBeTruthy()
+    expect(screen.getByText('Decision provider')).toBeTruthy()
+    expect(screen.getByText('Decision: ask')).toBeTruthy()
+    expect(screen.getByText('Score: 0.812')).toBeTruthy()
+  })
+
   it('renders non-agent background progress inline in the transcript', () => {
     useChatStore.setState({
       sessions: {

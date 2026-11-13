@@ -28,12 +28,14 @@ vi.mock('../../i18n', () => ({
     'permMode.askPermDesc': 'Ask before changing files or running commands',
     'permMode.autoAcceptDesc': 'Automatically accept edit operations',
     'permMode.planModeDesc': 'Plan before executing',
+    'permMode.autoDesc': 'Use a model for unresolved confirmations',
     'permMode.bypassDesc': 'Run without permission prompts',
     'permMode.executionPermissions': 'Execution Permissions',
     'permMode.label.default': 'Manual',
     'permMode.defaultTag': 'default',
     'permMode.label.acceptEdits': 'Accept edits',
     'permMode.label.plan': 'Plan',
+    'permMode.label.auto': 'Auto',
     'permMode.label.bypassPermissions': 'Bypass permissions',
     'permMode.label.dontAsk': "Don't ask",
     'permMode.enableBypassTitle': 'Enable bypass mode',
@@ -179,6 +181,7 @@ describe('PermissionModeSelector', () => {
       expect.stringContaining('Manual'),
       expect.stringContaining('Accept edits'),
       expect.stringContaining('Plan'),
+      expect.stringContaining('Auto'),
       expect.stringContaining('Bypass permissions'),
     ])
     expect(screen.getByRole('menuitemradio', { name: /Plan/ })).toHaveAttribute('aria-checked', 'true')

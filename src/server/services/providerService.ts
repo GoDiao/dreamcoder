@@ -15,9 +15,11 @@ import {
   getPresetDefaultEnv,
   normalizeProviderModels,
   normalizeProvidersIndex,
+  normalizeSavedDecisionProvider,
 } from './providerRuntimeEnv.js'
 import { loadNetworkSettings } from './networkSettings.js'
 import { fetchUpstreamModels, resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
+import { DECISION_PROVIDER_PRESETS } from '../config/decisionProviderPresets.js'
 import type {
   SavedProvider,
   ProvidersIndex,
@@ -29,6 +31,11 @@ import type {
   ProviderAuthStrategy,
   DiscoverProviderModelsInput,
   DiscoveredProviderModel,
+  SavedDecisionProvider,
+  CreateDecisionProviderInput,
+  UpdateDecisionProviderInput,
+  TestDecisionProviderInput,
+  DiscoverDecisionProviderModelsInput,
 } from '../types/provider.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
@@ -36,6 +43,7 @@ const DEFAULT_INDEX: ProvidersIndex = {
   schemaVersion: CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
   activeId: null,
   providers: [],
+  decisionProviders: [],
 }
 
 export class ProviderService {
@@ -104,6 +112,62 @@ export class ProviderService {
   async listProviders(): Promise<{ providers: SavedProvider[]; activeId: string | null }> {
     const index = await this.readIndex()
     return { providers: index.providers, activeId: index.activeId }
+  }
+
+  async listDecisionProviders(): Promise<{ providers: SavedDecisionProvider[] }> {
+    const index = await this.readIndex()
+    return { providers: index.decisionProviders }
+  }
+
+  async getDecisionProvider(id: string): Promise<SavedDecisionProvider> {
+    const index = await this.readIndex()
+    const provider = index.decisionProviders.find((entry) => entry.id === id)
+    if (!provider) throw ApiError.notFound(`Decision provider not found: ${id}`)
+    return provider
+  }
+
+  async addDecisionProvider(
+    input: CreateDecisionProviderInput,
+  ): Promise<SavedDecisionProvider> {
+    const index = await this.readIndex()
+    const provider = normalizeSavedDecisionProvider({
+      id: crypto.randomUUID(),
+      ...input,
+      deployment: 'hosted',
+      models: normalizeProviderModels(input.models),
+    })
+    index.decisionProviders.push(provider)
+    await this.writeIndex(index)
+    return provider
+  }
+
+  async updateDecisionProvider(
+    id: string,
+    input: UpdateDecisionProviderInput,
+  ): Promise<SavedDecisionProvider> {
+    const index = await this.readIndex()
+    const providerIndex = index.decisionProviders.findIndex((entry) => entry.id === id)
+    if (providerIndex === -1) {
+      throw ApiError.notFound(`Decision provider not found: ${id}`)
+    }
+    const provider = normalizeSavedDecisionProvider({
+      ...index.decisionProviders[providerIndex],
+      ...input,
+      ...(input.models ? { models: normalizeProviderModels(input.models) } : {}),
+    })
+    index.decisionProviders[providerIndex] = provider
+    await this.writeIndex(index)
+    return provider
+  }
+
+  async deleteDecisionProvider(id: string): Promise<void> {
+    const index = await this.readIndex()
+    const providerIndex = index.decisionProviders.findIndex((entry) => entry.id === id)
+    if (providerIndex === -1) {
+      throw ApiError.notFound(`Decision provider not found: ${id}`)
+    }
+    index.decisionProviders.splice(providerIndex, 1)
+    await this.writeIndex(index)
   }
 
   async getProvider(id: string): Promise<SavedProvider> {
@@ -309,6 +373,101 @@ export class ProviderService {
     }, input.presetId)
   }
 
+  async discoverDecisionModels(
+    input: DiscoverDecisionProviderModelsInput,
+  ): Promise<DiscoveredProviderModel[]> {
+    const endpoint = decisionModelsEndpoint(input.baseUrl, input.apiFormat)
+    const response = await fetch(endpoint, {
+      headers: input.apiKey ? { Authorization: `Bearer ${input.apiKey}` } : {},
+    })
+    if (!response.ok) {
+      throw new ApiError(502, `Model discovery failed with HTTP ${response.status}`, 'MODEL_DISCOVERY_FAILED')
+    }
+    const payload = await response.json() as unknown
+    return filterDecisionModels(input, parseDecisionModels(payload))
+  }
+
+  async testDecisionProvider(
+    id: string,
+    modelId?: string,
+  ): Promise<ProviderTestResult> {
+    const provider = await this.getDecisionProvider(id)
+    return this.testDecisionProviderConfig({
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey,
+      apiFormat: provider.apiFormat,
+      modelId: modelId || provider.models[0]?.id || '',
+    })
+  }
+
+  async testDecisionProviderConfig(
+    input: TestDecisionProviderInput,
+  ): Promise<ProviderTestResult> {
+    if (!input.modelId || (!input.apiKey && input.apiFormat !== 'ollama_chat')) {
+      return {
+        connectivity: {
+          success: false,
+          latencyMs: 0,
+          error: 'Missing model or API key',
+        },
+      }
+    }
+    const { aiRequestTimeoutMs } = await loadNetworkSettings()
+    const startedAt = Date.now()
+    try {
+      const response = await fetch(decisionRequestEndpoint(input.baseUrl, input.apiFormat), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(input.apiKey ? { Authorization: `Bearer ${input.apiKey}` } : {}),
+        },
+        body: JSON.stringify(decisionTestBody(input.apiFormat, input.modelId)),
+        signal: AbortSignal.timeout(aiRequestTimeoutMs),
+      })
+      const latencyMs = Date.now() - startedAt
+      if (!response.ok) {
+        return {
+          connectivity: {
+            success: false,
+            latencyMs,
+            error: `HTTP ${response.status}`,
+            httpStatus: response.status,
+            modelUsed: input.modelId,
+          },
+        }
+      }
+      const payload = await response.json() as unknown
+      if (!isValidDecisionTestResponse(input.apiFormat, payload)) {
+        return {
+          connectivity: {
+            success: false,
+            latencyMs,
+            error: 'Response did not match the selected API format',
+            httpStatus: response.status,
+            modelUsed: input.modelId,
+          },
+        }
+      }
+      return {
+        connectivity: {
+          success: true,
+          latencyMs,
+          httpStatus: response.status,
+          modelUsed: input.modelId,
+        },
+      }
+    } catch (error) {
+      return {
+        connectivity: {
+          success: false,
+          latencyMs: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : String(error),
+          modelUsed: input.modelId,
+        },
+      }
+    }
+  }
+
   private async fetchModels(target: UpstreamTarget, presetId?: string): Promise<DiscoveredProviderModel[]> {
     const result = await fetchUpstreamModels(target, presetId)
     if (!result.ok) {
@@ -373,6 +532,131 @@ export class ProviderService {
       connectivity: { success: true, latencyMs, modelUsed: outcome.model || modelId, httpStatus: result.httpStatus },
     }
   }
+}
+
+function appendEndpoint(baseUrl: string, pathName: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/${pathName.replace(/^\/+/, '')}`
+}
+
+function decisionRequestEndpoint(baseUrl: string, apiFormat: TestDecisionProviderInput['apiFormat']): string {
+  if (apiFormat === 'ollama_chat') return appendEndpoint(baseUrl, 'api/chat')
+  if (apiFormat === 'openai_chat') return appendEndpoint(baseUrl, 'chat/completions')
+  return appendEndpoint(baseUrl, 'decisions')
+}
+
+function decisionModelsEndpoint(baseUrl: string, apiFormat: TestDecisionProviderInput['apiFormat']): string {
+  if (apiFormat === 'ollama_chat') return appendEndpoint(baseUrl, 'api/tags')
+  if (apiFormat === 'openrouter_decisions') {
+    return `${new URL(baseUrl).origin}/api/v1/models`
+  }
+  return appendEndpoint(baseUrl, 'models')
+}
+
+function decisionTestBody(
+  apiFormat: TestDecisionProviderInput['apiFormat'],
+  modelId: string,
+): Record<string, unknown> {
+  if (apiFormat === 'openai_decisions') {
+    return {
+      model: modelId,
+      input: 'A connection test.',
+      questions: [{
+        type: 'predicate',
+        name: 'connected',
+        instructions: 'Return the probability that this is a connection test.',
+      }],
+    }
+  }
+  if (apiFormat === 'openrouter_decisions') {
+    return {
+      model: modelId,
+      state: { situation: 'A connection test.' },
+      questions: {
+        connected: {
+          type: 'noul',
+          instructions: 'Is this a connection test?',
+          criteria: [{ description: 'This is a connection test.' }],
+        },
+      },
+    }
+  }
+  if (apiFormat === 'ollama_chat') {
+    return {
+      model: modelId,
+      stream: false,
+      messages: [{ role: 'user', content: 'Reply with ok.' }],
+    }
+  }
+  return {
+    model: modelId,
+    max_tokens: 8,
+    messages: [{ role: 'user', content: 'Reply with ok.' }],
+  }
+}
+
+function parseDecisionModels(payload: unknown): DiscoveredProviderModel[] {
+  if (!payload || typeof payload !== 'object') return []
+  const record = payload as Record<string, unknown>
+  const values = Array.isArray(record.data)
+    ? record.data
+    : Array.isArray(record.models)
+      ? record.models
+      : []
+  const models = values.flatMap((value): DiscoveredProviderModel[] => {
+    if (!value || typeof value !== 'object') return []
+    const model = value as Record<string, unknown>
+    const id = typeof model.id === 'string'
+      ? model.id
+      : typeof model.name === 'string'
+        ? model.name
+        : typeof model.model === 'string'
+          ? model.model
+          : ''
+    if (!id) return []
+    const name = typeof model.name === 'string' && model.name !== id
+      ? model.name
+      : undefined
+    return [{ id, ...(name ? { name } : {}) }]
+  })
+  return normalizeProviderModels(models)
+}
+
+function filterDecisionModels(
+  input: DiscoverDecisionProviderModelsInput,
+  models: DiscoveredProviderModel[],
+): DiscoveredProviderModel[] {
+  const preset = DECISION_PROVIDER_PRESETS.find((entry) => entry.id === input.presetId)
+  if (!preset || preset.models.length === 0 || preset.apiFormat !== input.apiFormat) return models
+  const supportedIds = new Set(preset.models.map((model) => model.id))
+  return models.filter((model) => supportedIds.has(model.id))
+}
+
+function isValidDecisionTestResponse(
+  apiFormat: TestDecisionProviderInput['apiFormat'],
+  payload: unknown,
+): boolean {
+  if (!payload || typeof payload !== 'object') return false
+  const record = payload as Record<string, unknown>
+  if (apiFormat === 'openai_decisions') {
+    return Array.isArray(record.answers) && record.answers.some((value) => {
+      if (!value || typeof value !== 'object') return false
+      const answer = value as Record<string, unknown>
+      return answer.name === 'connected' && typeof answer.probability === 'number'
+    })
+  }
+  if (apiFormat === 'openrouter_decisions') {
+    const answers = record.answers
+    if (!answers || typeof answers !== 'object') return false
+    const connected = (answers as Record<string, unknown>).connected
+    return !!connected && typeof connected === 'object' &&
+      typeof (connected as Record<string, unknown>).noul === 'number'
+  }
+  if (apiFormat === 'ollama_chat') {
+    const message = record.message
+    return !!message && typeof message === 'object' &&
+      typeof (message as Record<string, unknown>).content === 'string'
+  }
+  return Array.isArray(record.choices) && record.choices.length > 0
 }
 
 async function readAnthropicStream(

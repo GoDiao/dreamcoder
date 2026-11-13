@@ -10,6 +10,11 @@ describe('isLoggableMessage', () => {
     expect(isLoggableMessage(attachment('queued_command'))).toBe(true)
   })
 
+  test('keeps permission guardrail decisions with queued messages', () => {
+    expect(isLoggableMessage(attachment('permission_guardrail_decision'))).toBe(true)
+    expect(isLoggableMessage(attachment('queued_command'))).toBe(true)
+  })
+
   test('still drops other attachments', () => {
     expect(isLoggableMessage(attachment('date_change'))).toBe(false)
   })

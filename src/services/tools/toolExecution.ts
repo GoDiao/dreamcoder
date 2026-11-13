@@ -236,6 +236,7 @@ function decisionReasonToOTelSource(
       return 'hook'
     case 'mode':
     case 'classifier':
+    case 'autoPermission':
     case 'subcommandResults':
     case 'asyncAgent':
     case 'sandboxOverride':
@@ -989,6 +990,25 @@ async function checkPermissionsAndCallTool(
         decision: permissionDecision.behavior,
         toolUseID,
         hookEvent: 'PermissionRequest',
+      }),
+    })
+  }
+
+  if (
+    permissionDecision.behavior === 'allow' &&
+    permissionDecision.decisionReason?.type === 'autoPermission'
+  ) {
+    resultingMessages.push({
+      message: createAttachmentMessage({
+        type: 'permission_guardrail_decision',
+        decision: permissionDecision.decisionReason.decision,
+        toolUseID,
+        providerId: permissionDecision.decisionReason.providerId,
+        modelId: permissionDecision.decisionReason.modelId,
+        source: permissionDecision.decisionReason.source,
+        score: permissionDecision.decisionReason.score,
+        policyVersion: permissionDecision.decisionReason.policyVersion,
+        reason: permissionDecision.decisionReason.reason,
       }),
     })
   }

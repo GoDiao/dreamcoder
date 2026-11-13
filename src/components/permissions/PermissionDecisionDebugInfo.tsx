@@ -25,6 +25,8 @@ function decisionReasonDisplayString(decisionReason: PermissionDecisionReason & 
     return `${chalk.bold(decisionReason.classifier)} classifier: ${decisionReason.reason}`;
   }
   switch (decisionReason.type) {
+    case 'autoPermission':
+      return `${chalk.bold(decisionReason.modelId)} Auto permission: ${decisionReason.decision} (${decisionReason.score ?? 'unavailable'})`;
     case 'rule':
       return `${chalk.bold(permissionRuleValueToString(decisionReason.rule.ruleValue))} rule from ${getSettingSourceDisplayNameLowercase(decisionReason.rule.source)}`;
     case 'mode':

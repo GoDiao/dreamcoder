@@ -31,6 +31,16 @@ export type SessionRepository = {
   worktreeSlug?: string
 }
 
+export type PermissionGuardrailDetails = {
+  providerId: string
+  modelId: string
+  source: 'decisionProvider' | 'fastModel'
+  decision: 'allow' | 'ask'
+  score: number | null
+  policyVersion: number
+  reason?: string
+}
+
 export type PendingPermission = {
   requestId: string
   toolName: string
@@ -38,6 +48,7 @@ export type PendingPermission = {
   input: unknown
   description?: string
   suggestions?: unknown[]
+  guardrail?: PermissionGuardrailDetails
   alwaysAsks?: true
 }
 

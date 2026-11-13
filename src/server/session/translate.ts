@@ -54,6 +54,7 @@ export function createStreamState(): SessionStreamState {
 
 function toPendingPermission(cliMsg: any): PendingPermission {
   const request = cliMsg.request ?? {}
+  const guardrail = toPermissionGuardrailDetails(request.permission_guardrail)
   return {
     requestId: cliMsg.request_id,
     toolName: typeof request.tool_name === 'string' && request.tool_name ? request.tool_name : 'Unknown',
@@ -61,7 +62,43 @@ function toPendingPermission(cliMsg: any): PendingPermission {
     input: request.input && typeof request.input === 'object' ? request.input : {},
     ...(typeof request.description === 'string' && request.description.trim() ? { description: request.description } : {}),
     ...(Array.isArray(request.permission_suggestions) ? { suggestions: request.permission_suggestions } : {}),
+    ...(guardrail ? { guardrail } : {}),
     ...(request.always_asks === true ? { alwaysAsks: true as const } : {}),
+  }
+}
+
+function toPermissionGuardrailDetails(
+  value: unknown,
+): PendingPermission['guardrail'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const details = value as Record<string, unknown>
+  const score = details.score
+  if (
+    typeof details.provider_id !== 'string' ||
+    typeof details.model_id !== 'string' ||
+    (details.source !== 'decisionProvider' && details.source !== 'fastModel') ||
+    (details.decision !== 'allow' && details.decision !== 'ask') ||
+    (score !== null && (
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > 1
+    )) ||
+    typeof details.policy_version !== 'number' ||
+    !Number.isInteger(details.policy_version) ||
+    details.policy_version < 0 ||
+    (details.reason !== undefined && typeof details.reason !== 'string')
+  ) {
+    return undefined
+  }
+  return {
+    providerId: details.provider_id,
+    modelId: details.model_id,
+    source: details.source,
+    decision: details.decision,
+    score,
+    policyVersion: details.policy_version,
+    ...(typeof details.reason === 'string' ? { reason: details.reason } : {}),
   }
 }
 
@@ -486,6 +523,10 @@ function translateMessages(
         const saved = parseMemorySaved(cliMsg)
         return saved ? [liveItem({ type: 'memory_event', event: 'saved', ...saved })] : []
       }
+      if (subtype === 'permission_guardrail_decision') {
+        const marker = permissionGuardrailDecision(cliMsg)
+        return marker ? [liveItem(marker)] : []
+      }
       if (subtype === 'status') {
         if (isPermissionMode(cliMsg.permissionMode)) {
           events.push({ type: 'permission_effective_reported', mode: cliMsg.permissionMode })
@@ -576,6 +617,42 @@ function translateMessages(
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function permissionGuardrailDecision(
+  value: unknown,
+): LiveItemContent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const marker = value as Record<string, unknown>
+  const decision = marker.decision
+  const source = marker.source
+  const score = marker.score
+  const policyVersion = marker.policy_version
+  if (
+    (decision !== 'allow' && decision !== 'ask') ||
+    (source !== 'decisionProvider' && source !== 'fastModel') ||
+    typeof marker.tool_use_id !== 'string' ||
+    typeof marker.provider_id !== 'string' ||
+    typeof marker.model_id !== 'string' ||
+    (score !== null && (typeof score !== 'number' || score < 0 || score > 1)) ||
+    typeof policyVersion !== 'number' ||
+    !Number.isInteger(policyVersion) ||
+    policyVersion < 0 ||
+    (marker.reason !== undefined && typeof marker.reason !== 'string')
+  ) {
+    return null
+  }
+  return {
+    type: 'permission_guardrail_decision',
+    decision,
+    toolUseId: marker.tool_use_id,
+    providerId: marker.provider_id,
+    modelId: marker.model_id,
+    source,
+    score,
+    policyVersion,
+    ...(typeof marker.reason === 'string' ? { reason: marker.reason } : {}),
+  }
 }
 
 function normalizeRetryCount(value: unknown): number | null {

@@ -50,6 +50,80 @@ describe('WebSocket memory events', () => {
   })
 })
 
+describe('WebSocket permission guardrail events', () => {
+  it('includes guardrail details in pending permission requests', () => {
+    expect(translateCliOutput({
+      type: 'control_request',
+      request_id: 'request-1',
+      request: {
+        subtype: 'can_use_tool',
+        tool_name: 'Bash',
+        tool_use_id: 'tool-1',
+        input: { command: 'rm guarded.txt' },
+        always_asks: true,
+        permission_guardrail: {
+          provider_id: 'provider-1',
+          model_id: 'gpt-6-luna',
+          source: 'decisionProvider',
+          decision: 'ask',
+          score: 0.812,
+          policy_version: 1,
+          reason: 'Potential deletion',
+        },
+      },
+    }, createStreamState())).toEqual({
+      messages: [],
+      events: [{
+        type: 'permission_request_opened',
+        at: expect.any(Number),
+        request: {
+          requestId: 'request-1',
+          toolName: 'Bash',
+          toolUseId: 'tool-1',
+          input: { command: 'rm guarded.txt' },
+          alwaysAsks: true,
+          guardrail: {
+            providerId: 'provider-1',
+            modelId: 'gpt-6-luna',
+            source: 'decisionProvider',
+            decision: 'ask',
+            score: 0.812,
+            policyVersion: 1,
+            reason: 'Potential deletion',
+          },
+        },
+      }],
+    })
+  })
+
+  it('forwards permission guardrail scores to the desktop client', () => {
+    expect(translateCliMessage({
+      type: 'system',
+      subtype: 'permission_guardrail_decision',
+      decision: 'allow',
+      tool_use_id: 'tool-1',
+      provider_id: 'provider-1',
+      model_id: 'gpt-6-luna',
+      source: 'decisionProvider',
+      score: 0.237,
+      policy_version: 1,
+      reason: 'Requested action is low risk',
+    }, 'session-1')).toEqual([
+      liveItem({
+        type: 'permission_guardrail_decision',
+        decision: 'allow',
+        toolUseId: 'tool-1',
+        providerId: 'provider-1',
+        modelId: 'gpt-6-luna',
+        source: 'decisionProvider',
+        score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
+      }),
+    ])
+  })
+})
+
 describe('WebSocket AskUserQuestion events', () => {
   it('forwards structured AskUserQuestion answers from the CLI tool_use_result field', () => {
     expect(translateCliMessage({

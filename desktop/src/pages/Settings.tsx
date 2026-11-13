@@ -43,6 +43,11 @@ import { AboutSettings } from '../components/settings/AboutSettings'
 import { Button } from '../components/shared/ui/button'
 import { SearchField } from '../components/shared/SearchField'
 import { moveRovingFocus } from '../lib/rovingFocus'
+import { useDecisionProviderStore } from '../stores/decisionProviderStore'
+import { useProviderStore } from '../stores/providerStore'
+import type { AutoPermissionSettings as AutoPermissionSettingsValue } from '../types/settings'
+import { FormSelect } from '../components/shared/FormSelect'
+import { Checkbox } from '../components/shared/ui/checkbox'
 
 type SettingsNavGroup = {
   titleKey: TranslationKey | null
@@ -193,6 +198,7 @@ const PERMISSION_MODES: Array<{ mode: DefaultPermissionMode; Icon: LucideIcon; d
   { mode: 'default', Icon: ShieldCheck, descKey: 'permMode.askPermDesc' },
   { mode: 'acceptEdits', Icon: FilePenLine, descKey: 'permMode.autoAcceptDesc' },
   { mode: 'plan', Icon: NotebookPen, descKey: 'permMode.planModeDesc' },
+  { mode: 'auto', Icon: Bot, descKey: 'permMode.autoDesc' },
   { mode: 'bypassPermissions', Icon: Zap, descKey: 'permMode.bypassDesc' },
 ]
 
@@ -259,8 +265,158 @@ function PermissionSettings() {
         })}
       </div>
 
+      <section className="mt-8 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-secondary)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.permissions.rulesTitle')}</h3>
+        <p className="mt-1 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesDescription')}
+        </p>
+        <div className="mt-3 text-xs text-[var(--color-text-secondary)]">
+          <span className="font-medium text-[var(--color-text-primary)]">{t('settings.permissions.rulesFile')}</span>
+          <code className="ml-2 rounded bg-[var(--color-surface-primary)] px-1.5 py-0.5 text-[var(--color-text-primary)]">
+            .claude/settings.local.json
+          </code>
+        </div>
+        <p className="mt-3 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesShellNames')}
+        </p>
+        <p className="mt-1 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.permissions.rulesReload')}
+        </p>
+      </section>
+
+      {permissionMode === 'auto' ? <AutoPermissionSettings /> : null}
+
       {isDesktopRuntime() ? <BrowserTrustSettings /> : null}
     </div>
+  )
+}
+
+function AutoPermissionSettings() {
+  const t = useTranslation()
+  const saved = useSettingsStore((state) => state.autoPermission)
+  const save = useSettingsStore((state) => state.setAutoPermission)
+  const decisionProviders = useDecisionProviderStore((state) => state.providers)
+  const fetchDecisionProviders = useDecisionProviderStore((state) => state.fetchProviders)
+  const providers = useProviderStore((state) => state.providers)
+  const activeProviderId = useProviderStore((state) => state.activeId)
+  const fetchProviders = useProviderStore((state) => state.fetchProviders)
+  const [draft, setDraft] = useState<AutoPermissionSettingsValue>(saved)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetchDecisionProviders()
+    void fetchProviders()
+  }, [fetchDecisionProviders, fetchProviders])
+
+  useEffect(() => {
+    setDraft(saved)
+  }, [saved])
+
+  const provider = decisionProviders.find((entry) => entry.id === draft.providerId) ?? null
+  const activeProvider = providers.find((entry) => entry.id === activeProviderId) ?? null
+  const fastModel = activeProvider?.fastModel ?? activeProvider?.models[0]?.id ?? null
+  const privacyAccepted = draft.privacyNoticeVersion >= 1
+  const usesFastModel = draft.providerId === null
+  const requiresPrivacy = usesFastModel || provider?.deployment === 'hosted'
+  const saveDisabled = saving || (
+    usesFastModel
+      ? !activeProvider || !fastModel || !privacyAccepted
+      : !provider || !draft.modelId || (requiresPrivacy && !privacyAccepted)
+  )
+
+  const update = <K extends keyof AutoPermissionSettingsValue>(
+    key: K,
+    value: AutoPermissionSettingsValue[K],
+  ) => setDraft((current) => ({ ...current, [key]: value }))
+
+  return (
+    <section className="mt-10 border-t border-[var(--color-border-separator)] pt-6">
+      <div>
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.autoPermission.title')}</h3>
+        <p className="mt-1 max-w-[70ch] text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+          {t('settings.autoPermission.description')}
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.autoPermission.provider')}</label>
+          <FormSelect
+            value={draft.providerId ?? ''}
+            onChange={(providerId) => {
+              const next = decisionProviders.find((entry) => entry.id === providerId)
+              setDraft((current) => ({
+                ...current,
+                providerId: providerId || null,
+                modelId: next?.models[0]?.id ?? '',
+                privacyNoticeVersion: next?.deployment === 'local' ? 1 : 0,
+              }))
+            }}
+            label={t('settings.autoPermission.provider')}
+            options={[
+              { value: '', label: t('settings.autoPermission.fastModel') },
+              ...decisionProviders.map((entry) => ({ value: entry.id, label: entry.name })),
+            ]}
+          />
+        </div>
+        {provider ? (
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-primary)]">{t('settings.autoPermission.model')}</label>
+            <FormSelect
+              value={draft.modelId}
+              onChange={(modelId) => update('modelId', modelId)}
+              label={t('settings.autoPermission.model')}
+              options={provider.models.map((model) => ({ value: model.id, label: model.name ?? model.id }))}
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {usesFastModel ? (
+        <p role="note" className="mt-3 rounded-[8px] border border-[var(--color-border-default)] bg-[var(--color-surface-secondary)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+          {activeProvider && fastModel
+            ? t('settings.autoPermission.fastModelReady', { provider: activeProvider.name, model: fastModel })
+            : t('settings.autoPermission.fastModelMissing')}
+        </p>
+      ) : null}
+
+      <p className="mt-3 text-xs leading-[1.6] text-[var(--color-text-secondary)]">
+        {t('settings.autoPermission.policyNote')}
+      </p>
+
+      {requiresPrivacy && (
+        <label className="mt-4 flex items-start gap-2 text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+          <Checkbox
+            checked={privacyAccepted}
+            onCheckedChange={(checked) => update('privacyNoticeVersion', checked === true ? 1 : 0)}
+          />
+          <span>{t('settings.autoPermission.privacyNotice')}</span>
+        </label>
+      )}
+
+      <div className="mt-5 flex items-center gap-3">
+        <Button
+          size="xs"
+          disabled={saveDisabled}
+          loading={saving}
+          onClick={async () => {
+            setSaving(true)
+            setError(null)
+            try {
+              await save(draft)
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : String(reason))
+            } finally {
+              setSaving(false)
+            }
+          }}
+        >
+          {t('common.save')}
+        </Button>
+        {error && <span role="alert" className="text-xs text-[var(--color-error)]">{error}</span>}
+      </div>
+    </section>
   )
 }
 

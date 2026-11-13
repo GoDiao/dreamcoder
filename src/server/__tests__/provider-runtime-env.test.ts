@@ -7,6 +7,7 @@ import {
   mergeActiveProviderManagedEnv,
   readActiveProviderManagedEnv,
   resolveProviderDefaultModel,
+  normalizeProvidersIndex,
 } from '../services/providerRuntimeEnv.js'
 import type { SavedProvider } from '../types/provider.js'
 
@@ -54,6 +55,30 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_SMALL_FAST_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'active-main',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'active-main',
+      DREAMCODER_ACTIVE_PROVIDER_ID: 'provider-1',
+      DREAMCODER_FAST_MODEL_ID: 'active-main',
+    })
+  })
+
+  test('prefers an explicitly configured fast model for Auto permission', async () => {
+    await writeJson(path.join(tmpDir, 'dreamcoder', 'providers.json'), {
+      activeId: 'provider-1',
+      providers: [{
+        id: 'provider-1',
+        presetId: 'custom',
+        name: 'Active Provider',
+        apiKey: 'sk-active',
+        baseUrl: 'https://api.example.com/anthropic',
+        apiFormat: 'anthropic',
+        models: [{ id: 'active-main' }, { id: 'active-fast' }],
+        fastModel: 'active-fast',
+      }],
+    })
+
+    expect(readActiveProviderManagedEnv(tmpDir)).toMatchObject({
+      DREAMCODER_ACTIVE_PROVIDER_ID: 'provider-1',
+      DREAMCODER_FAST_MODEL_ID: 'active-fast',
+      ANTHROPIC_SMALL_FAST_MODEL: 'active-fast',
     })
   })
 
@@ -136,5 +161,87 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gpt-5.5',
       DISABLE_AUTOUPDATER: '1',
     })
+  })
+
+  test('normalizes decision providers without widening model providers', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      activeDecisionProviderId: 'local',
+      decisionProviders: [
+        {
+          id: 'local',
+          presetId: 'custom',
+          name: 'Loopback',
+          deployment: 'hosted',
+          apiFormat: 'openai_chat',
+          baseUrl: 'http://127.0.0.1:9000/v1',
+          apiKey: '',
+          models: [{ id: 'guard' }],
+        },
+        {
+          id: 'remote',
+          presetId: 'custom',
+          name: 'LAN',
+          deployment: 'local',
+          apiFormat: 'openai_chat',
+          baseUrl: 'http://192.168.1.10:9000/v1',
+          apiKey: 'secret',
+          models: [{ id: 'guard' }],
+        },
+      ],
+    })
+
+    expect(index).not.toHaveProperty('activeDecisionProviderId')
+    expect(index?.decisionProviders.map((provider) => provider.deployment)).toEqual([
+      'local',
+      'hosted',
+    ])
+    expect(index?.providers).toEqual([])
+  })
+
+  test('repairs invalid models saved for a curated decision provider preset', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      activeDecisionProviderId: 'openai',
+      decisionProviders: [{
+        id: 'openai',
+        presetId: 'openai',
+        name: 'OpenAI Decisions',
+        deployment: 'hosted',
+        apiFormat: 'openai_decisions',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'secret',
+        models: [{ id: 'gpt-3.5-turbogpt-5.6-lunagpt-6-luna' }],
+      }],
+    })
+
+    expect(index?.decisionProviders[0]?.models).toEqual([{ id: 'gpt-6-luna', name: 'GPT-6 Luna' }])
+  })
+
+  test('preserves manually configured decision models outside the preset', () => {
+    const index = normalizeProvidersIndex({
+      activeId: null,
+      providers: [],
+      decisionProviders: [{
+        id: 'openai',
+        presetId: 'openai',
+        name: 'OpenAI Decisions',
+        deployment: 'hosted',
+        apiFormat: 'openai_decisions',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'secret',
+        models: [{ id: 'vendor/gpt-6-luna-tuned' }],
+      }],
+    })
+
+    expect(index?.decisionProviders[0]?.models).toEqual([{ id: 'vendor/gpt-6-luna-tuned' }])
+  })
+
+  test('defaults missing decision provider fields for legacy indexes', () => {
+    const index = normalizeProvidersIndex({ activeId: null, providers: [] })
+
+    expect(index?.decisionProviders).toEqual([])
   })
 })

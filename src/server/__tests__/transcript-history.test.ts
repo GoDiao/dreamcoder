@@ -2,8 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { createAttachmentMessage } from '../../utils/attachments.js'
+import { cleanMessagesForLogging } from '../../utils/sessionStorage.js'
 import { SessionService } from '../services/sessionService.js'
-import { collectTaskNotifications, entriesToMessages, type MessageEntry } from '../transcript/entries.js'
+import {
+  collectTaskNotifications,
+  entriesToMessages,
+  type MessageEntry,
+  type TranscriptEntry,
+} from '../transcript/entries.js'
 import {
   collectAgentNotifications,
   findLastTodos,
@@ -442,6 +449,45 @@ describe('entriesToMessages', () => {
     ])
 
     expect(messages.map((message) => message.id)).toEqual(['goal-command', 'goal-output'])
+  })
+
+  it('restores permission guardrail decisions from transcript attachments', () => {
+    const originalUserType = process.env.USER_TYPE
+    process.env.USER_TYPE = 'external'
+    try {
+      const attachment = createAttachmentMessage({
+        type: 'permission_guardrail_decision',
+        decision: 'allow',
+        toolUseID: 'tool-1',
+        providerId: 'provider-1',
+        modelId: 'gpt-6-luna',
+        source: 'decisionProvider',
+        score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
+      })
+      const persistedEntries = JSON.parse(
+        JSON.stringify(cleanMessagesForLogging([attachment])),
+      ) as TranscriptEntry[]
+      const messages = entriesToMessages(persistedEntries)
+
+      expect(interpretTranscript(messages)).toEqual([{
+        id: attachment.uuid,
+        type: 'permission_guardrail_decision',
+        decision: 'allow',
+        toolUseId: 'tool-1',
+        providerId: 'provider-1',
+        modelId: 'gpt-6-luna',
+        source: 'decisionProvider',
+        score: 0.237,
+        policyVersion: 1,
+        reason: 'Requested action is low risk',
+        timestamp: Date.parse(attachment.timestamp),
+      }])
+    } finally {
+      if (originalUserType === undefined) delete process.env.USER_TYPE
+      else process.env.USER_TYPE = originalUserType
+    }
   })
 })
 

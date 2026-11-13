@@ -31,7 +31,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path === 'permissions.defaultMode' && ctx.code === 'invalid_value',
     tip: {
       suggestion:
-        'Valid modes: "acceptEdits" (ask before file changes), "plan" (analysis only), "bypassPermissions" (auto-accept all), or "default" (standard behavior)',
+        'Valid modes: "acceptEdits" (ask before file changes), "plan" (analysis only), "auto" (model-assisted unresolved prompts), "bypassPermissions" (auto-accept all), or "default" (standard behavior)',
       docLink: `${DOCUMENTATION_BASE}/iam#permission-modes`,
     },
   },

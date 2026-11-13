@@ -201,6 +201,22 @@ describe('SettingsService', () => {
     expect(settings.model).toBe('claude-opus-4-7')
   })
 
+  it('validates Auto permission settings before saving', async () => {
+    const svc = new SettingsService()
+    const autoPermission = {
+      providerId: null,
+      modelId: '',
+      privacyNoticeVersion: 0,
+    }
+
+    await svc.updateUserSettings({ autoPermission })
+
+    expect((await svc.getUserSettings()).autoPermission).toEqual(autoPermission)
+    await expect(svc.updateUserSettings({
+      autoPermission: { ...autoPermission, privacyNoticeVersion: -1 },
+    })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
   it('should write and read the pure white theme setting', async () => {
     const svc = new SettingsService()
     await svc.updateUserSettings({ theme: 'white' })

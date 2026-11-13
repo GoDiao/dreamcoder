@@ -1,4 +1,10 @@
-import type { TaskNotification, TaskUsage, TranscriptItem, UserMessageOrigin } from '@protocol'
+import type {
+  PermissionGuardrailDetails,
+  TaskNotification,
+  TaskUsage,
+  TranscriptItem,
+  UserMessageOrigin,
+} from '@protocol'
 
 export type {
   AttachmentRef,
@@ -16,6 +22,7 @@ export type {
   TokenUsage,
   UserMessageOrigin,
 } from '@protocol'
+export type { PermissionGuardrailDetails }
 import type { ClientKind, GoalEventAction } from '@protocol'
 
 export type SessionOrigin = Extract<UserMessageOrigin, { kind: 'session' }>
@@ -111,6 +118,7 @@ export type UIMessage =
   | SharedItem<'compact_summary'>
   | SharedItem<'goal_event'>
   | SharedItem<'memory_event'>
+  | SharedItem<'permission_guardrail_decision'>
   | {
       id: string
       type: 'permission_request'
@@ -119,6 +127,7 @@ export type UIMessage =
       toolUseId?: string
       input: unknown
       description?: string
+      guardrail?: PermissionGuardrailDetails
       alwaysAsks?: true
       timestamp: number
       resolution?: PermissionResolution

@@ -5,7 +5,7 @@ import * as os from 'os'
 import { ProviderService } from '../services/providerService.js'
 import { handleProvidersApi } from '../api/providers.js'
 import { handleProxyRequest } from '../proxy/handler.js'
-import type { CreateProviderInput } from '../types/provider.js'
+import type { CreateDecisionProviderInput, CreateProviderInput } from '../types/provider.js'
 
 let tmpDir: string
 let originalConfigDir: string | undefined
@@ -55,6 +55,20 @@ function sampleInput(overrides?: Partial<CreateProviderInput>): CreateProviderIn
       { id: 'model-haiku' },
     ],
     fastModel: 'model-haiku',
+    ...overrides,
+  }
+}
+
+function sampleDecisionInput(
+  overrides?: Partial<CreateDecisionProviderInput>,
+): CreateDecisionProviderInput {
+  return {
+    presetId: 'openai',
+    name: 'OpenAI Decisions',
+    baseUrl: 'https://api.openai.com/v1',
+    apiKey: 'decision-key',
+    apiFormat: 'openai_decisions',
+    models: [{ id: 'gpt-6-luna' }],
     ...overrides,
   }
 }
@@ -1458,5 +1472,170 @@ describe('Providers API', () => {
     const res = await handleProvidersApi(req, url, segments)
 
     expect(res.status).toBe(405)
+  })
+
+  test('stores decision providers in an independent index collection', async () => {
+    const svc = new ProviderService()
+    const modelProvider = await svc.addProvider(sampleInput())
+    const decisionProvider = await svc.addDecisionProvider(sampleDecisionInput())
+
+    expect(await svc.listProviders()).toEqual({
+      providers: [modelProvider],
+      activeId: null,
+    })
+    expect(await svc.listDecisionProviders()).toEqual({
+      providers: [decisionProvider],
+    })
+  })
+
+  test('preserves manually configured decision model ids', async () => {
+    const svc = new ProviderService()
+    const created = await svc.addDecisionProvider(sampleDecisionInput({
+      models: [{ id: 'no-auto-decision-model' }],
+    }))
+
+    expect(created.models).toEqual([{ id: 'no-auto-decision-model' }])
+    expect((await svc.listDecisionProviders()).providers[0]?.models).toEqual([
+      { id: 'no-auto-decision-model' },
+    ])
+  })
+
+  test('derives decision provider deployment from the endpoint', async () => {
+    const svc = new ProviderService()
+    const local = await svc.addDecisionProvider(sampleDecisionInput({
+      presetId: 'custom',
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      apiKey: '',
+      apiFormat: 'openai_chat',
+    }))
+    const remote = await svc.addDecisionProvider(sampleDecisionInput({
+      presetId: 'custom',
+      baseUrl: 'http://10.0.0.5:8080/v1',
+      apiFormat: 'openai_chat',
+    }))
+
+    expect(local.deployment).toBe('local')
+    expect(remote.deployment).toBe('hosted')
+  })
+
+  test('serves decision provider CRUD without exposing it as a model provider', async () => {
+    const create = makeRequest('POST', '/api/providers/decisions', sampleDecisionInput())
+    const createResponse = await handleProvidersApi(create.req, create.url, create.segments)
+    const created = await createResponse.json() as { provider: { id: string } }
+
+    const list = makeRequest('GET', '/api/providers/decisions')
+    const listResponse = await handleProvidersApi(list.req, list.url, list.segments)
+    const listBody = await listResponse.json() as { providers: Array<{ id: string }> }
+    const modelList = makeRequest('GET', '/api/providers')
+    const modelListResponse = await handleProvidersApi(modelList.req, modelList.url, modelList.segments)
+    const modelListBody = await modelListResponse.json() as { providers: unknown[] }
+
+    expect(createResponse.status).toBe(201)
+    expect(listBody.providers.map((provider) => provider.id)).toEqual([created.provider.id])
+    expect(modelListBody.providers).toEqual([])
+  })
+
+  test('tests an OpenAI decision provider with the predicate response shape', async () => {
+    const originalFetch = globalThis.fetch
+    let requestUrl = ''
+    let requestBody: Record<string, unknown> = {}
+    globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      requestUrl = String(url)
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({
+        answers: [{ type: 'predicate', name: 'connected', probability: 0.99 }],
+      })
+    }) as unknown as typeof fetch
+
+    try {
+      const result = await new ProviderService().testDecisionProviderConfig({
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'decision-key',
+        apiFormat: 'openai_decisions',
+        modelId: 'gpt-6-luna',
+      })
+
+      expect(result.connectivity.success).toBe(true)
+      expect(requestUrl).toBe('https://api.openai.com/v1/decisions')
+      expect(requestBody.model).toBe('gpt-6-luna')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('filters OpenAI model discovery to models supported by the Decisions API', async () => {
+    const originalFetch = globalThis.fetch
+    let requestUrl = ''
+    let authorization = ''
+    globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      requestUrl = String(url)
+      authorization = new Headers(init?.headers).get('Authorization') ?? ''
+      return Response.json({
+        data: [
+          { id: 'gpt-5.6-luna' },
+          { id: 'gpt-realtime' },
+          { id: 'gpt-6-luna' },
+        ],
+      })
+    }) as unknown as typeof fetch
+
+    try {
+      const models = await new ProviderService().discoverDecisionModels({
+        presetId: 'openai',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'decision-key',
+        apiFormat: 'openai_decisions',
+      })
+
+      expect(requestUrl).toBe('https://api.openai.com/v1/models')
+      expect(authorization).toBe('Bearer decision-key')
+      expect(models).toEqual([{ id: 'gpt-6-luna' }])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('keeps discovered models for custom Decisions-compatible providers', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock(async () => Response.json({
+      data: [{ id: 'custom-decision-model' }, { id: 'gpt-6-luna' }],
+    })) as unknown as typeof fetch
+
+    try {
+      const models = await new ProviderService().discoverDecisionModels({
+        presetId: 'custom',
+        baseUrl: 'https://decisions.example.com/v1',
+        apiKey: 'decision-key',
+        apiFormat: 'openai_decisions',
+      })
+
+      expect(models).toEqual([{ id: 'custom-decision-model' }, { id: 'gpt-6-luna' }])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('filters OpenRouter model discovery to curated Decisions models', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock(async () => Response.json({
+      data: [
+        { id: 'anthropic/claude-haiku-5.5' },
+        { id: 'liquid/d1-ultra' },
+        { id: 'typesafe/jev-1.14' },
+      ],
+    })) as unknown as typeof fetch
+
+    try {
+      const models = await new ProviderService().discoverDecisionModels({
+        presetId: 'openrouter',
+        baseUrl: 'https://openrouter.ai/api/alpha',
+        apiKey: 'decision-key',
+        apiFormat: 'openrouter_decisions',
+      })
+
+      expect(models).toEqual([{ id: 'liquid/d1-ultra' }, { id: 'typesafe/jev-1.14' }])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

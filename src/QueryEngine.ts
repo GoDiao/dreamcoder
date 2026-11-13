@@ -886,6 +886,24 @@ export class QueryEngine {
           if (message.attachment.type === 'structured_output') {
             structuredOutputFromTool = message.attachment.data
           }
+          else if (
+            message.attachment.type === 'permission_guardrail_decision'
+          ) {
+            yield {
+              type: 'system',
+              subtype: 'permission_guardrail_decision',
+              decision: message.attachment.decision,
+              tool_use_id: message.attachment.toolUseID,
+              provider_id: message.attachment.providerId,
+              model_id: message.attachment.modelId,
+              source: message.attachment.source,
+              score: message.attachment.score,
+              policy_version: message.attachment.policyVersion,
+              reason: message.attachment.reason,
+              uuid: message.uuid,
+              session_id: getSessionId(),
+            } as SDKMessage
+          }
           // Handle max turns reached signal from query.ts
           else if (message.attachment.type === 'max_turns_reached') {
             if (persistSession) {

@@ -106,6 +106,7 @@ import {
   classifyYoloAction,
   formatActionForClassifier,
 } from './yoloClassifier.js'
+import { evaluateAutoPermission } from './permissionGuardrail.js'
 
 const CLASSIFIER_FAIL_CLOSED_REFRESH_MS = 30 * 60 * 1000 // 30 minutes
 
@@ -482,12 +483,12 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
 ): Promise<PermissionDecision> => {
   const result = await hasPermissionsToUseToolInner(tool, input, context)
 
+  const appState = context.getAppState()
 
   // Reset consecutive denials on any allowed tool use in auto mode.
   // This ensures that a successful tool use (even one auto-allowed by rules)
   // breaks the consecutive denial streak.
   if (result.behavior === 'allow') {
-    const appState = context.getAppState()
     if (feature('TRANSCRIPT_CLASSIFIER')) {
       const currentDenialState =
         context.localDenialTracking ?? appState.denialTracking
@@ -506,8 +507,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
   // Apply dontAsk mode transformation: convert 'ask' to 'deny'
   // This is done at the end so it can't be bypassed by early returns
   if (result.behavior === 'ask') {
-    const appState = context.getAppState()
-
     if (appState.toolPermissionContext.mode === 'dontAsk') {
       return {
         behavior: 'deny',
@@ -518,13 +517,48 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         message: DONT_ASK_REJECT_MESSAGE(tool.name),
       }
     }
+    if (appState.toolPermissionContext.mode === 'auto') {
+      if (
+        result.decisionReason?.type === 'safetyCheck' &&
+        !result.decisionReason.classifierApprovable
+      ) {
+        return result
+      }
+      if (tool.requiresUserInteraction?.()) return result
+
+      const evaluation = await evaluateAutoPermission({
+        toolName: tool.name,
+        input,
+        messages: context.messages,
+        signal: context.abortController.signal,
+      })
+      if (evaluation) {
+        const decisionReason = {
+          type: 'autoPermission' as const,
+          providerId: evaluation.providerId,
+          modelId: evaluation.modelId,
+          source: evaluation.source,
+          decision: evaluation.behavior,
+          score: evaluation.score,
+          policyVersion: evaluation.policyVersion,
+          reason: evaluation.reason,
+        }
+        if (evaluation.behavior === 'allow') {
+          return {
+            behavior: 'allow',
+            updatedInput: input,
+            decisionReason,
+          }
+        }
+        return { ...result, decisionReason }
+      }
+    }
     // Apply auto mode: use AI classifier instead of prompting user
     // Check this BEFORE shouldAvoidPermissionPrompts so classifiers work in headless mode
     if (
       feature('TRANSCRIPT_CLASSIFIER') &&
-      (appState.toolPermissionContext.mode === 'auto' ||
-        (appState.toolPermissionContext.mode === 'plan' &&
-          (autoModeStateModule?.isAutoModeActive() ?? false)))
+      appState.toolPermissionContext.mode === 'plan' &&
+      (autoModeStateModule?.isAutoModeActive() ?? false)
     ) {
       // Non-classifier-approvable safetyCheck decisions stay immune to ALL
       // auto-approve paths: the acceptEdits fast-path, the safe-tool allowlist,

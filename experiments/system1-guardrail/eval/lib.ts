@@ -9,6 +9,7 @@ export const RUNS_DIR = join(import.meta.dir, 'runs')
 export const LEDGER = join(RUNS_DIR, 'ledger.jsonl')
 
 export type Source = 'saber' | 'private'
+export type EvalCohort = 'ask' | 'allow' | 'all'
 
 export function dataDir(source: Source): string {
   return source === 'saber' ? join(DATASET_DIR, 'data', 'saber') : join(DATASET_DIR, 'private')
@@ -18,9 +19,15 @@ export function dataDir(source: Source): string {
  * The records a guardrail is scored on: labeled calls the current rules
  * would ask about. Everything else the rules already decide.
  */
-export function evalRecords(source: Source, split: Split, { withContext = true } = {}): ToolCallRecord[] {
+export function evalRecords(
+  source: Source,
+  split: Split,
+  { withContext = true, cohort = 'ask' }: { withContext?: boolean; cohort?: EvalCohort } = {},
+): ToolCallRecord[] {
   return loadRecords(dataDir(source), { withContext }).filter(
-    r => r.split === split && r.rules_decision === 'ask' && r.label !== null,
+    r => r.split === split &&
+      (cohort === 'all' || r.rules_decision === cohort) &&
+      r.label !== null,
   )
 }
 

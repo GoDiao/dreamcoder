@@ -1,6 +1,6 @@
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useRef, useEffect, useMemo, memo, useState, useCallback, useDeferredValue, useLayoutEffect, type ReactNode } from 'react'
-import { ArrowDown, BookMarked, Bot, CheckCircle2, ChevronDown, ChevronRight, CircleStop, FileStack, LoaderCircle, Settings, Target, XCircle } from 'lucide-react'
+import { ArrowDown, BookMarked, Bot, CheckCircle2, ChevronDown, ChevronRight, CircleStop, FileStack, LoaderCircle, Settings, ShieldCheck, Target, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
 import { useChatStore, useSessionField } from '../../stores/chatStore'
@@ -45,6 +45,7 @@ type MemoryEvent = Extract<UIMessage, { type: 'memory_event' }>
 type GoalEvent = Extract<UIMessage, { type: 'goal_event' }>
 type BackgroundTaskEvent = Extract<UIMessage, { type: 'background_task' }>
 type CompactSummaryEvent = Extract<UIMessage, { type: 'compact_summary' }>
+type PermissionGuardrailDecision = Extract<UIMessage, { type: 'permission_guardrail_decision' }>
 type ThinkingMessage = Extract<UIMessage, { type: 'thinking' }>
 type ActivityStep = ToolCall | ThinkingMessage
 
@@ -852,6 +853,38 @@ function MemoryEventCard({ message }: { message: MemoryEvent }) {
   )
 }
 
+function PermissionGuardrailDecisionCard({ message }: { message: PermissionGuardrailDecision }) {
+  const t = useTranslation()
+  const score = message.score === null
+    ? t('chat.permissionGuardrail.scoreUnavailable')
+    : t('chat.permissionGuardrail.score', { score: message.score.toFixed(3) })
+
+  return (
+    <div className="mb-3 flex justify-center px-3">
+      <div className="flex w-full max-w-2xl items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+        <ShieldCheck size={15} className="shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+        <span className="font-medium text-[var(--color-text-primary)]">
+          {t(message.decision === 'allow'
+            ? 'chat.permissionGuardrail.autoApproved'
+            : 'chat.permissionGuardrail.confirmationApproved')}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>{message.modelId}</span>
+        <span aria-hidden="true">·</span>
+        <span>{t(message.source === 'decisionProvider'
+          ? 'chat.permissionGuardrail.decisionProvider'
+          : 'chat.permissionGuardrail.fastModel')}</span>
+        <span aria-hidden="true">·</span>
+        <span>{t('chat.permissionGuardrail.decision', { decision: message.decision })}</span>
+        <span aria-hidden="true">·</span>
+        <span>{score}</span>
+        <span aria-hidden="true">·</span>
+        <span>{t('chat.permissionGuardrail.policyVersion', { version: String(message.policyVersion) })}</span>
+      </div>
+    </div>
+  )
+}
+
 type MessageListProps = {
   sessionId?: string | null
   compact?: boolean
@@ -1004,6 +1037,8 @@ function getMessageContentWeight(message: UIMessage): number {
       return (message.objective?.length ?? 0) + (message.message?.length ?? 0)
     case 'memory_event':
       return (message.message?.length ?? 0) + message.files.reduce((total, file) => total + file.path.length + (file.summary?.length ?? 0), 0)
+    case 'permission_guardrail_decision':
+      return message.modelId.length + message.source.length + (message.reason?.length ?? 0)
     case 'background_task':
       return getShallowStringWeight(message.task)
     case 'task_summary':
@@ -1064,6 +1099,7 @@ function estimateMessageHeight(message: UIMessage): number {
     case 'background_task':
     case 'goal_event':
     case 'memory_event':
+    case 'permission_guardrail_decision':
     case 'permission_request':
     case 'task_summary':
       return 110
@@ -1099,6 +1135,8 @@ function getMessageMetricSignature(message: UIMessage): string {
       return `${message.type}:${message.action}:${message.status ?? ''}:${message.objective?.length ?? 0}:${message.message?.length ?? 0}`
     case 'memory_event':
       return `${message.type}:${message.event}:${message.files.length}:${message.message?.length ?? 0}`
+    case 'permission_guardrail_decision':
+      return `${message.type}:${message.toolUseId}:${message.decision}:${message.score ?? ''}`
     case 'background_task':
       return `${message.type}:${message.task.taskId}:${message.task.status}:${message.task.updatedAt}`
     case 'permission_request':
@@ -2134,6 +2172,7 @@ export const MessageBlock = memo(function MessageBlock({
           toolName={message.toolName}
           input={message.input}
           description={message.description}
+          guardrail={message.guardrail}
           alwaysAsks={message.alwaysAsks}
           resolution={message.resolution}
         />
@@ -2161,6 +2200,8 @@ export const MessageBlock = memo(function MessageBlock({
       return <InlineTaskSummary tasks={message.tasks} />
     case 'memory_event':
       return <MemoryEventCard message={message} />
+    case 'permission_guardrail_decision':
+      return <PermissionGuardrailDecisionCard message={message} />
     case 'compact_summary':
       return <CompactStatusDivider message={message} state={message.phase === 'compacting' ? 'compacting' : 'complete'} />
     case 'goal_event':
