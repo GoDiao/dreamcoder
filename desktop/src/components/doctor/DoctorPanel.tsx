@@ -2,7 +2,7 @@ import { Stethoscope } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../shared/ui/button'
 import { useTranslation } from '../../i18n'
-import { runDoctorRepair, type DoctorRepairResult } from '../../lib/doctorRepair'
+import { runLocalDoctorRepair, type LocalDoctorRepairResult } from '../../lib/doctorRepair'
 import { useUIStore } from '../../stores/uiStore'
 
 type DoctorPanelProps = {
@@ -12,26 +12,15 @@ type DoctorPanelProps = {
 export function DoctorPanel({ compact = false }: DoctorPanelProps) {
   const t = useTranslation()
   const addToast = useUIStore((s) => s.addToast)
-  const [isRunning, setIsRunning] = useState(false)
-  const [result, setResult] = useState<DoctorRepairResult | null>(null)
+  const [result, setResult] = useState<LocalDoctorRepairResult | null>(null)
 
-  const handleRunDoctor = async () => {
-    setIsRunning(true)
-    try {
-      const nextResult = await runDoctorRepair()
-      setResult(nextResult)
-      addToast({
-        type: nextResult.local.failedKeys.length === 0 ? 'success' : 'warning',
-        message: getDoctorToastMessage(t, nextResult),
-      })
-    } catch (error) {
-      addToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : t('settings.diagnostics.doctorFailed'),
-      })
-    } finally {
-      setIsRunning(false)
-    }
+  const handleRunDoctor = () => {
+    const nextResult = runLocalDoctorRepair()
+    setResult(nextResult)
+    addToast({
+      type: nextResult.failedKeys.length === 0 ? 'success' : 'warning',
+      message: getDoctorToastMessage(t, nextResult),
+    })
   }
 
   const statusText = result ? getDoctorStatusMessage(t, result) : null
@@ -52,7 +41,6 @@ export function DoctorPanel({ compact = false }: DoctorPanelProps) {
           <Button
             size="sm"
             onClick={handleRunDoctor}
-            loading={isRunning}
           >
             <Stethoscope data-icon="inline-start" className="h-4 w-4" aria-hidden="true" />
             {t('settings.diagnostics.runDoctor')}
@@ -75,31 +63,22 @@ export function DoctorPanel({ compact = false }: DoctorPanelProps) {
 
 function getDoctorToastMessage(
   t: ReturnType<typeof useTranslation>,
-  result: DoctorRepairResult,
+  result: LocalDoctorRepairResult,
 ): string {
-  if (result.local.failedKeys.length > 0) {
-    return t('settings.diagnostics.doctorPartial', { count: String(result.local.failedKeys.length) })
+  if (result.failedKeys.length > 0) {
+    return t('settings.diagnostics.doctorPartial', { count: String(result.failedKeys.length) })
   }
   return t('settings.diagnostics.doctorCompleted')
 }
 
 function getDoctorStatusMessage(
   t: ReturnType<typeof useTranslation>,
-  result: DoctorRepairResult,
+  result: LocalDoctorRepairResult,
 ): string {
-  const clearedCount = result.local.removedKeys.length
-  const base = t('settings.diagnostics.doctorResultLocal', { count: String(clearedCount) })
+  const base = t('settings.diagnostics.doctorResultLocal', { count: String(result.removedKeys.length) })
 
-  if (result.local.failedKeys.length > 0) {
-    return `${base} ${t('settings.diagnostics.doctorResultFailedKeys', { count: String(result.local.failedKeys.length) })}`
-  }
-
-  if (result.server) {
-    return `${base} ${t('settings.diagnostics.doctorServerRan')}`
-  }
-
-  if (result.serverError) {
-    return `${base} ${t('settings.diagnostics.doctorServerUnavailable')}`
+  if (result.failedKeys.length > 0) {
+    return `${base} ${t('settings.diagnostics.doctorResultFailedKeys', { count: String(result.failedKeys.length) })}`
   }
 
   return base

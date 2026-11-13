@@ -12,7 +12,6 @@ vi.mock('../components/settings/AboutSettings', () => ({ AboutSettings: () => <d
 vi.mock('./ComputerUseSettings', () => ({ ComputerUseSettings: () => null }))
 vi.mock('./McpSettings', () => ({ McpSettings: () => null }))
 vi.mock('./TerminalSettings', () => ({ TerminalSettings: () => null }))
-vi.mock('./DiagnosticsSettings', () => ({ DiagnosticsSettings: () => null }))
 vi.mock('./ActivitySettings', () => ({ ActivitySettings: () => null }))
 vi.mock('./MemorySettings', () => ({ MemorySettings: () => <div>memory page</div> }))
 vi.mock('../components/plugins/PluginList', () => ({ PluginList: () => null }))

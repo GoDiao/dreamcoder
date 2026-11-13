@@ -95,7 +95,7 @@
 - 工作区：变更 / 全部文件、过滤、预览、差异、引用文件、行评论、路径复制。
 - 终端：显示 / 收起、输入、清理、重启、展开 / 返回会话和停靠方式的演示入口；不再使用「独立标签」文案。
 - 定时任务：列表、新建、编辑、暂停 / 启用、删除、关联会话。
-- 设置：服务商、权限、通用、H5、终端、MCP、Agents、Skills、记忆、插件、Computer Use、活动、诊断、关于。
+- 设置：服务商、权限、通用、H5、终端、MCP、Agents、Skills、记忆、插件、Computer Use、活动、关于。
 
 主要源码定位：`desktop/src/components/layout/Sidebar.tsx`、`AppShell.tsx`、`TabBar.tsx`、`ContentRouter.tsx`；聊天区的 `ChatInput.tsx`、`MessageList.tsx`、`ActiveSession.tsx`、`WorkspacePanel.tsx` 等组件。文件可能随重构迁移，不能只凭旧文件名认定入口仍有效。
 

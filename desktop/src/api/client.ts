@@ -107,7 +107,9 @@ async function request<T>(method: string, path: string, body?: unknown, options?
       reportApiFailure(method, path, timeoutError, sensitiveValues)
       throw timeoutError
     }
-    reportApiFailure(method, path, err, sensitiveValues)
+    if (!(err instanceof TypeError)) {
+      reportApiFailure(method, path, err, sensitiveValues)
+    }
     throw err
   }
 }
