@@ -6,6 +6,7 @@ import { diffLines } from 'diff'
 import type { MessageEntry } from '../transcript/entries.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { detectImageMimeType } from './imageMime.js'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
@@ -43,17 +44,6 @@ const LANGUAGE_MAP: Record<string, string> = {
   xml: 'xml',
   yaml: 'yaml',
   yml: 'yaml',
-}
-
-const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
-  apng: 'image/apng',
-  avif: 'image/avif',
-  gif: 'image/gif',
-  jpeg: 'image/jpeg',
-  jpg: 'image/jpeg',
-  png: 'image/png',
-  svg: 'image/svg+xml',
-  webp: 'image/webp',
 }
 
 export type WorkspaceFileStatus =
@@ -424,7 +414,7 @@ export class WorkspaceService {
     }
 
     const language = this.detectLanguage(resolvedPath.absolutePath)
-    const imageMimeType = this.detectImageMimeType(resolvedPath.absolutePath)
+    const imageMimeType = detectImageMimeType(resolvedPath.absolutePath)
 
     let content: Buffer
     try {
@@ -1227,11 +1217,6 @@ export class WorkspaceService {
   private detectLanguage(filePath: string): string {
     const ext = path.extname(filePath).slice(1).toLowerCase()
     return LANGUAGE_MAP[ext] || 'text'
-  }
-
-  private detectImageMimeType(filePath: string): string | null {
-    const ext = path.extname(filePath).slice(1).toLowerCase()
-    return IMAGE_MIME_BY_EXTENSION[ext] ?? null
   }
 
   private async safeStat(targetPath: string): Promise<WorkspaceStatResult> {

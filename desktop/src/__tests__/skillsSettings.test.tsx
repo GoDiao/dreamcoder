@@ -45,10 +45,6 @@ vi.mock('../stores/agentStore', () => ({
   }),
 }))
 
-vi.mock('../components/chat/CodeViewer', () => ({
-  CodeViewer: ({ code }: { code: string }) => <pre data-testid="code-viewer">{code}</pre>,
-}))
-
 const MOCK_FETCH_SKILLS = vi.fn()
 const MOCK_FETCH_SKILL_DETAIL = vi.fn()
 const MOCK_CLEAR_SELECTION = vi.fn()
@@ -215,7 +211,7 @@ describe('Settings > Skills tab', () => {
         selectedSkill: {
           meta: useSkillStore.getState().skills[0]!,
           tree: [{ name: 'SKILL.md', path: 'SKILL.md', type: 'file' }],
-          files: [{ path: 'SKILL.md', content: '# Alpha', body: '# Alpha', language: 'markdown', isEntry: true }],
+          files: [{ path: 'SKILL.md', kind: 'text', content: '# Alpha', body: '# Alpha', language: 'markdown', isEntry: true }],
           skillRoot: '/tmp/alpha',
         },
       })
@@ -262,13 +258,13 @@ describe('Settings > Skills tab', () => {
     expect(fetchSkills).toHaveBeenCalledWith('/workspace/project')
   })
 
-  it('opens skill detail with metadata cards and parsed markdown body', () => {
+  it('opens skill detail on the overview and shows the entry file under contents', () => {
     useSkillStore.setState({
       selectedSkill: {
         meta: {
           name: 'alpha',
           displayName: 'Alpha Skill',
-          description: 'First skill description',
+          description: 'Frontmatter description',
           source: 'user',
           userInvocable: true,
           version: '1.0.0',
@@ -282,6 +278,7 @@ describe('Settings > Skills tab', () => {
         files: [
           {
             path: 'SKILL.md',
+            kind: 'text',
             content: '# Hello\n\nBody content',
             body: '# Hello\n\nBody content',
             language: 'markdown',
@@ -294,6 +291,7 @@ describe('Settings > Skills tab', () => {
           },
           {
             path: 'run.ts',
+            kind: 'text',
             content: 'console.log("hello")',
             language: 'typescript',
             isEntry: false,
@@ -307,11 +305,14 @@ describe('Settings > Skills tab', () => {
     render(<Settings />)
     switchToSkillsTab()
 
-    expect(screen.getByText('Skill metadata')).toBeInTheDocument()
-    expect(screen.getByText('/slash')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('data-state', 'active')
+    expect(screen.getByText('/alpha')).toBeInTheDocument()
     expect(screen.getByText('Frontmatter description')).toBeInTheDocument()
     expect(screen.getByText('Read, Edit')).toBeInTheDocument()
-    expect(screen.getByText('Hello')).toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Contents · 2' }))
+
+    expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument()
     expect(screen.queryByText(/^---$/)).not.toBeInTheDocument()
   })
 
@@ -331,6 +332,7 @@ describe('Settings > Skills tab', () => {
         files: [
           {
             path: 'SKILL.md',
+            kind: 'text',
             content: '# Access',
             body: '# Access',
             language: 'markdown',
@@ -346,7 +348,7 @@ describe('Settings > Skills tab', () => {
     switchToSkillsTab()
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Back to list'))
+      fireEvent.click(screen.getByRole('button', { name: 'All plugins' }))
       await Promise.resolve()
     })
 

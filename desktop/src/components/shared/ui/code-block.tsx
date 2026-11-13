@@ -12,6 +12,7 @@ const codeBlockVariants = cva(
           "border border-input text-foreground has-[>[data-slot=code-block-content]:focus-visible]:border-ring",
         destructive:
           "border border-destructive/30 text-destructive",
+        plain: "rounded-none text-foreground",
       },
     },
     defaultVariants: {

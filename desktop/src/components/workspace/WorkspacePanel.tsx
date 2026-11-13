@@ -553,7 +553,7 @@ function FileExpandedBody({
   menus: PathMenus
 }) {
   const t = useTranslation()
-  const [showPreview, setShowPreview] = useState(false)
+  const [showPreview, setShowPreview] = useState(true)
   const [wrap, setWrap] = useState(true)
   const state = loading || !entry ? 'loading' : entry.state ?? 'loading'
   const isDiff = entry?.kind === 'diff'

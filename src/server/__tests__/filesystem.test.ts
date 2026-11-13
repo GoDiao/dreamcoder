@@ -85,6 +85,27 @@ describe('filesystem API', () => {
     expect(body.entries.some((entry) => entry.name === 'note.txt')).toBe(true)
   })
 
+  it('serves files with the image types the previews recognize', async () => {
+    const homeFixtureDir = await fsp.mkdtemp(path.join(os.homedir(), 'claude-filesystem-test-'))
+    cleanupDirs.add(homeFixtureDir)
+    await fsp.writeFile(path.join(homeFixtureDir, 'spin.apng'), 'apng')
+    await fsp.writeFile(path.join(homeFixtureDir, 'favicon.ico'), 'ico')
+    await fsp.writeFile(path.join(homeFixtureDir, 'note.txt'), 'hello')
+
+    const serve = (name: string) => handleFilesystemRoute(
+      '/api/filesystem/file',
+      makeUrl('/api/filesystem/file', { path: path.join(homeFixtureDir, name) }),
+    )
+
+    const apng = await serve('spin.apng')
+    expect(apng.status).toBe(200)
+    expect(apng.headers.get('Content-Type')).toBe('image/apng')
+    const ico = await serve('favicon.ico')
+    expect(ico.status).toBe(200)
+    expect(ico.headers.get('Content-Type')).toBe('image/x-icon')
+    expect((await serve('note.txt')).status).toBe(400)
+  })
+
   it('allows browsing a selected workspace outside the default home/tmp roots', async () => {
     const externalFixtureDir = await makeExternalFixtureDir()
     if (!externalFixtureDir) return

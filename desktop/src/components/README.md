@@ -24,7 +24,7 @@ shadcn/ui's MIT license is reproduced in [`THIRD_PARTY_NOTICES.md`](../../../THI
 | `switch`, `checkbox` | shadcn Switch and Checkbox; Radix primitives |
 | `select` | shadcn Select; Radix Select |
 | `toggle`, `toggle-group` | shadcn Toggle and Toggle Group; Radix primitives |
-| `tabs` | shadcn Tabs; Radix Tabs |
+| `tabs` | shadcn Tabs; Radix Tabs; `TabsList` variant `line` draws underlined tabs over a full-width divider |
 | `collapsible` | shadcn Collapsible; Radix Collapsible |
 | `dialog`, `alert-dialog` | shadcn Dialog and Alert Dialog; Radix primitives |
 | `dropdown-menu`, `context-menu` | shadcn menus; Radix Dropdown Menu and Context Menu |
@@ -35,7 +35,7 @@ shadcn/ui's MIT license is reproduced in [`THIRD_PARTY_NOTICES.md`](../../../THI
 | `spinner` | shadcn Spinner; lucide icon, a status with a localized label unless `aria-hidden` is passed |
 | `resizable` | shadcn Resizable; react-resizable-panels |
 | `trace` | shadcn Trace and its Collapsible composition |
-| `code-block` | shadcn Code Block presentation; highlighting is supplied by DreamCoder |
+| `code-block` | shadcn Code Block presentation; highlighting is supplied by DreamCoder; variant `plain` drops the frame for a code view that fills its container |
 
 Radix imports use the aggregate `radix-ui` package. The registry's `cn` helper
 is resolved to [`../lib/utils.ts`](../lib/utils.ts), which uses `clsx` and
@@ -100,6 +100,7 @@ picker through `ui/input`.
 | `chat/CodeViewer`, code in tool output | Code Block + the shared Shiki loader; GitHub light/dark syntax themes, plain text during loading or failure |
 | `chat/DiffViewer`, `workspace/WorkspaceCodeSurface` (`WorkspaceDiffSurface`) | Pierre FileDiff; workspace line comments, selection quotes and large-diff virtualization remain local integrations |
 | `workspace/WorkspaceFileTree` | `@pierre/trees` file tree with token overrides; directories load from the workspace store when expanded, and its menu is `AnchoredActionMenu`: folders get the path bar's folder menu, files add Open in new tab and the editor and file-manager entries (opened by right-click on desktop and by a row button on the H5 page). The Files tab shows it beside the selected file's preview in a Resizable split |
+| `skills/SkillFileTree` | `@pierre/trees` tree of a skill's files, fully expanded, with the entry file first; shares the token overrides in `shared/fileTreeCss` with `WorkspaceFileTree` |
 | `workspace/WorkspacePanel` empty, error and loading states | Empty for empty and error messages, Skeleton with a status label while loading |
 | `layout/AppShell`, `pages/ActiveSession` panel groups | Resizable; `usePanelWidthPersistence` keeps existing pixel-width preferences |
 | `chat/ContextUsageIndicator` | [Context](https://ui.shadcn.com/docs/ai-elements/radix/context): Hover Card, outline icon Button with a usage ring, and Progress, with the existing usage breakdown and mobile drawer |

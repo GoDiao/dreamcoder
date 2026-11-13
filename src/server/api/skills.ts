@@ -13,6 +13,7 @@ import { isCommandEnabled } from '../../types/command.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import type { LoadedPlugin } from '../../types/plugin.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
+import { detectImageMimeType } from '../services/imageMime.js'
 
 type SkillMeta = {
   name: string
@@ -38,6 +39,7 @@ type FileTreeNode = {
 
 type SkillFile = {
   path: string
+  kind: 'text' | 'image' | 'binary' | 'too_large'
   content: string
   language: string
   frontmatter?: Record<string, unknown>
@@ -125,6 +127,19 @@ async function loadSkillMeta(
   }
 }
 
+async function readSkillFile(fullPath: string, relPath: string): Promise<SkillFile> {
+  if (detectImageMimeType(fullPath)) return { path: relPath, kind: 'image', content: '', language: 'image' }
+  const { size } = await fs.stat(fullPath)
+  const language = detectLanguage(path.basename(fullPath))
+  if (size > MAX_FILE_SIZE) return { path: relPath, kind: 'too_large', content: '', language }
+  const data = await fs.readFile(fullPath)
+  if (data.includes(0)) return { path: relPath, kind: 'binary', content: '', language: 'binary' }
+  const content = data.toString('utf8')
+  if (relPath !== 'SKILL.md' || language !== 'markdown') return { path: relPath, kind: 'text', content, language }
+  const { frontmatter, body } = normalizeFrontmatter(content, fullPath)
+  return { path: relPath, kind: 'text', content, body, frontmatter, language, isEntry: true }
+}
+
 async function buildFileTree(
   dirPath: string,
 ): Promise<{ tree: FileTreeNode[]; files: SkillFile[] }> {
@@ -152,7 +167,7 @@ async function buildFileTree(
       if (SKIP_ENTRIES.has(entry.name) || entry.name.startsWith('.')) continue
 
       const fullPath = path.join(currentPath, entry.name)
-      const relPath = path.relative(dirPath, fullPath)
+      const relPath = path.relative(dirPath, fullPath).split(path.sep).join('/')
 
       if (entry.isDirectory()) {
         const node: FileTreeNode = {
@@ -165,36 +180,12 @@ async function buildFileTree(
         await walk(fullPath, node.children!)
         if (node.children!.length === 0) delete node.children
       } else if (entry.isFile()) {
-        nodes.push({ name: entry.name, path: relPath, type: 'file' })
-
         try {
-          const stat = await fs.stat(fullPath)
-          if (stat.size <= MAX_FILE_SIZE) {
-            const content = await fs.readFile(fullPath, 'utf-8')
-            const language = detectLanguage(entry.name)
-            const isEntry = relPath === 'SKILL.md'
-
-            if (isEntry && language === 'markdown') {
-              const { frontmatter, body } = normalizeFrontmatter(content, fullPath)
-              files.push({
-                path: relPath,
-                content: body,
-                body,
-                frontmatter,
-                language,
-                isEntry: true,
-              })
-            } else {
-              files.push({
-                path: relPath,
-                content,
-                language,
-                isEntry: false,
-              })
-            }
-            fileCount++
-          }
-        } catch {
+          files.push(await readSkillFile(fullPath, relPath))
+          nodes.push({ name: entry.name, path: relPath, type: 'file' })
+          fileCount++
+        } catch (error) {
+          console.error('[Skills] Failed to read skill file:', fullPath, error)
         }
       }
     }

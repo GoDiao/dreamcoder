@@ -2,6 +2,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Tabs as TabsPrimitive } from "radix-ui"
 import { XIcon } from "lucide-react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 function Tabs({
   className,
@@ -22,19 +23,52 @@ function Tabs({
   )
 }
 
+type TabsVariant = "default" | "line"
+
+const TabsVariantContext = React.createContext<TabsVariant>("default")
+
+const tabsListVariants = cva(
+  "group/tabs-list inline-flex items-center text-muted-foreground group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:items-stretch",
+  {
+    variants: {
+      variant: {
+        default: "w-fit gap-1",
+        line: "w-full gap-5 border-b border-border",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  }
+)
+
+const tabsTriggerVariants = cva(
+  "inline-flex min-w-0 shrink-0 items-center justify-center gap-1 whitespace-nowrap text-muted-foreground transition-[color,background-color,box-shadow] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground group-data-[orientation=vertical]/tabs:justify-start [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+  {
+    variants: {
+      variant: {
+        default: "h-6 rounded-md px-2 text-xs hover:bg-hover data-[state=active]:bg-selected",
+        line: "relative h-9 rounded-sm px-0.5 text-sm after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-foreground after:opacity-0 data-[state=active]:after:opacity-100",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  }
+)
+
 function TabsList({
   className,
+  variant = "default",
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List>) {
+}: React.ComponentProps<typeof TabsPrimitive.List> &
+  VariantProps<typeof tabsListVariants>) {
+  const resolved = variant ?? "default"
   return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      className={cn(
-        "group/tabs-list inline-flex w-fit items-center gap-1 text-muted-foreground group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:items-stretch",
-        className
-      )}
-      {...props}
-    />
+    <TabsVariantContext.Provider value={resolved}>
+      <TabsPrimitive.List
+        data-slot="tabs-list"
+        data-variant={resolved}
+        className={cn(tabsListVariants({ variant: resolved }), className)}
+        {...props}
+      />
+    </TabsVariantContext.Provider>
   )
 }
 
@@ -42,14 +76,11 @@ function TabsTrigger({
   className,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+  const variant = React.useContext(TabsVariantContext)
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      className={cn(
-        "inline-flex h-6 min-w-0 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs whitespace-nowrap text-muted-foreground transition-[color,background-color,box-shadow] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground group-data-[orientation=vertical]/tabs:justify-start [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
-        "hover:bg-hover data-[state=active]:bg-selected",
-        className
-      )}
+      className={cn(tabsTriggerVariants({ variant }), className)}
       {...props}
     />
   )

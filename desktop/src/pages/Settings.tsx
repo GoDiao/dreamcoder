@@ -145,7 +145,7 @@ export function Settings() {
       <div
         className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-8 pl-9 pr-14 pt-6.5 max-[700px]:px-4.5 max-[700px]:py-5"
       >
-        <div className={`max-w-[760px] motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
+        <div className={`flex min-h-full max-w-[760px] flex-col motion-page-transition${tabContentVisible ? ' motion-page-transition--visible' : ''}`}>
           {activeTab === 'providers' && <ProviderSettings />}
           {activeTab === 'permissions' && <PermissionSettings />}
           {activeTab === 'activity' && <ActivitySettings />}

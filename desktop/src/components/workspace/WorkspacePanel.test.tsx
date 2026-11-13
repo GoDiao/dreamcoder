@@ -1149,7 +1149,7 @@ describe('WorkspacePanel', () => {
     expect(image.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
   })
 
-  it('shows markdown source first and the formatted document from the preview toggle', async () => {
+  it('shows the formatted markdown document first and the source from the preview toggle', async () => {
     await setWorkspaceState((state) => ({
       ...state,
       ...seedExpandedPreviews(state, 'session-markdown-preview', [{
@@ -1166,16 +1166,17 @@ describe('WorkspacePanel', () => {
 
     const view = await renderPanel('session-markdown-preview')
 
-    expect(previewText(view)).toContain('# Project Notes')
-    expect(view.queryByRole('heading', { name: 'Project Notes' })).toBeNull()
-
-    await clickElement(view.getByRole('button', { name: 'Show preview' }))
-
     expect(view.getByRole('button', { name: 'Show preview' }).getAttribute('aria-pressed')).toBe('true')
     expect(view.getByRole('heading', { name: 'Project Notes', level: 1 })).toBeTruthy()
     expect(view.getByText('Done')).toBeTruthy()
     expect(view.container.textContent).toContain('export const ok = true')
     expect(view.queryByTestId('workspace-code')).toBeNull()
+
+    await clickElement(view.getByRole('button', { name: 'Show preview' }))
+
+    expect(view.getByRole('button', { name: 'Show preview' }).getAttribute('aria-pressed')).toBe('false')
+    expect(previewText(view)).toContain('# Project Notes')
+    expect(view.queryByRole('heading', { name: 'Project Notes' })).toBeNull()
   })
 
   it('comments on a diff line and adds the file from the changed row menu', async () => {
@@ -1318,7 +1319,6 @@ describe('WorkspacePanel', () => {
     }))
 
     const view = await renderPanel('session-markdown-menu')
-    await clickElement(view.getByRole('button', { name: 'Show preview' }))
     const paragraph = view.getByText('Ship the release.')
     const openMenu = () => act(async () => {
       fireEvent.contextMenu(paragraph, { clientX: 40, clientY: 40 })

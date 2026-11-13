@@ -23,6 +23,7 @@ export type SkillFrontmatter = Record<string, unknown>
 
 export type SkillFile = {
   path: string
+  kind: 'text' | 'image' | 'binary' | 'too_large'
   content: string
   language: string
   frontmatter?: SkillFrontmatter

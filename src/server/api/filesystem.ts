@@ -8,6 +8,7 @@ import { findGitRoot, gitExe } from '../../utils/git.js'
 import { ripGrep } from '../../utils/ripgrep.js'
 import { getInitialSettings } from '../../utils/settings/settings.js'
 import { isWithinRegisteredFilesystemRoot } from '../services/filesystemAccessRoots.js'
+import { detectImageMimeType } from '../services/imageMime.js'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
@@ -26,18 +27,6 @@ type ScoredFilesystemEntry = FilesystemEntry & {
 
 const FILE_SEARCH_TIMEOUT_MS = 10_000
 const VCS_METADATA_DIRECTORY_NAMES = new Set(['.git', '.svn', '.hg', '.bzr', '.jj', '.sl'])
-
-const IMAGE_MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.bmp': 'image/bmp',
-  '.ico': 'image/x-icon',
-  '.avif': 'image/avif',
-}
 
 function isWithinRoot(targetPath: string, rootPath: string): boolean {
   return isSameOrInsidePathForPlatform(targetPath, rootPath)
@@ -90,8 +79,7 @@ async function handleServeFile(url: URL): Promise<Response> {
     return json({ error: 'Access denied: path outside allowed directory' }, 403)
   }
 
-  const ext = path.extname(resolvedPath).toLowerCase()
-  const mimeType = IMAGE_MIME_TYPES[ext]
+  const mimeType = detectImageMimeType(resolvedPath)
 
   if (!mimeType) {
     return json({ error: 'Unsupported file type' }, 400)
