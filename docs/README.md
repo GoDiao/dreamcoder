@@ -2,7 +2,7 @@
 
 - [general/](general): documents about the project as a whole.
   - [Contributing guide](general/CONTRIBUTING_en.md) ([中文](general/CONTRIBUTING_zh.md))
-  - [Roadmap](general/ROADMAP_en.md) ([中文](general/ROADMAP_zh.md))
+  - [Feature overview](https://github.com/GoDiao/dreamcoder/issues/244): features done, in progress, planned and dropped.
   - [Sponsorship policy](general/SPONSORS_en.md) ([中文](general/SPONSORS_zh.md))
   - [Troubleshooting](general/TROUBLESHOOTING.md) ([中文](general/TROUBLESHOOTING_zh.md))
   - [Using DreamCoder in a browser](general/WEB_USAGE.md) ([中文](general/WEB_USAGE_zh.md))

@@ -218,14 +218,7 @@ To learn how a coding agent works under the hood, read the [Coding Agent Impleme
 
 ## 📅 Roadmap
 
-- [x] **Phase 1**: Desktop GUI implementation + Multi-Provider System + Project Workspace
-- [x] **Phase 2**: CLI Backend Integration + Computer Use + MCP + Skills + Agent Teams
-- [x] **Phase 2.5**: Performance — bundle splitting, polling throttle, terminal LRU, sessionStore refactor
-- [x] **Phase 3**: H5 LAN Access (access desktop sessions from a phone/browser after enabling it)
-- [ ] **Phase 4**: Release Automation + Auto-update
-- [ ] **Phase 5**: Remote Agent Backend (run the agent on a remote host over SSH / WebSocket)
-
-See [ROADMAP](docs/general/ROADMAP_en.md)
+What DreamCoder has, what is being built, and what is planned or dropped: see the [Feature overview](https://github.com/GoDiao/dreamcoder/issues/244).
 
 ---
 
