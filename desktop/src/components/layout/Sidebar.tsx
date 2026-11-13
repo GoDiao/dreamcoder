@@ -586,7 +586,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
 
   return (
     <aside
-      className="sidebar-panel relative h-full flex flex-col bg-[var(--color-surface-sidebar)] border-r border-[var(--color-border)] select-none"
+      className="sidebar-panel relative h-full flex flex-col bg-sidebar border-r border-border select-none"
       data-state={expanded ? 'open' : 'closed'}
       aria-label="Sidebar"
     >
@@ -602,7 +602,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} flex flex-col min-w-0`}
             >
               <span
-                className="text-[13px] font-semibold tracking-tight text-[var(--color-text-primary)] truncate"
+                className="text-sm font-semibold tracking-tight text-foreground truncate"
                 style={{ fontFamily: 'var(--font-headline)' }}
               >
                 DreamCoder
@@ -614,7 +614,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               href="https://github.com/GoDiao/dreamcoder"
               target="_blank"
               rel="noopener noreferrer"
-              className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} inline-flex items-center justify-center rounded-md p-1 text-[var(--color-text-tertiary)] transition-colors hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]`}
+              className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} inline-flex items-center justify-center rounded-md p-1 text-subtle-foreground transition-colors hover:text-foreground hover:bg-hover`}
               aria-label={t('settings.about.repo')}
               tabIndex={expanded ? undefined : -1}
               aria-hidden={!expanded}
@@ -625,7 +625,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               <HintTooltip content={t('sidebar.collapse')}><button
                 type="button"
                 onClick={closeMobileDrawer}
-                className="sidebar-toggle-button flex h-11 w-11 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-sidebar)]"
+                className="sidebar-toggle-button flex h-11 w-11 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                 aria-label={t('sidebar.collapse')}
               >
                 <X aria-hidden="true" size={20} />
@@ -636,7 +636,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                 type="button"
                 onClick={toggleSidebar}
                 data-testid={expanded ? 'sidebar-collapse-button' : 'sidebar-expand-button'}
-                className={`sidebar-toggle-button ${expanded ? 'sidebar-toggle-button--open h-8 w-8' : 'sidebar-toggle-button--collapsed h-8 w-8'} flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-sidebar)]`}
+                className={`sidebar-toggle-button ${expanded ? 'sidebar-toggle-button--open h-8 w-8' : 'sidebar-toggle-button--collapsed h-8 w-8'} flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar`}
                 aria-label={expanded ? t('sidebar.collapse') : t('sidebar.expand')}
               >
                 <SidebarToggleIcon collapsed={!expanded} />
@@ -702,7 +702,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
               onChange={setSearchQuery}
               placeholder={t('sidebar.searchPlaceholder')}
               aria-label={t('sidebar.searchPlaceholder')}
-              className={`w-full bg-[var(--color-sidebar-search-bg)] ${isMobile ? 'h-11' : ''}`}
+              className={`w-full ${isMobile ? 'h-11' : ''}`}
             />
           </div>
 
@@ -711,15 +711,15 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             className="sidebar-section sidebar-section--visible flex flex-1 min-h-0 flex-col"
           >
             {isBatchMode && (
-              <div className="mx-3 mb-2 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 shadow-sm">
+              <div className="mx-3 mb-2 rounded-lg border border-border bg-background px-2.5 py-2 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 text-xs font-medium text-[var(--color-text-primary)]">
+                  <span className="min-w-0 text-xs font-medium text-foreground">
                     {t('sidebar.batchSelectedCount', { count: selectedCount })}
                   </span>
                   <HintTooltip content={t('sidebar.batchExit')}><button
                     type="button"
                     onClick={handleExitBatchMode}
-                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={t('sidebar.batchExit')}
                   >
                     <X aria-hidden="true" size={17} />
@@ -736,7 +736,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                       }
                     }}
                     disabled={filteredSessionIds.length === 0}
-                    className="rounded-md border border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+                    className="rounded-md border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-hover disabled:opacity-50"
                   >
                     {filteredSessionIds.length > 0 && filteredSessionIds.every((id) => selectedSessionIds.has(id))
                       ? t('sidebar.batchDeselectAll')
@@ -746,7 +746,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                     type="button"
                     onClick={() => requestBatchDelete([...selectedSessionIds])}
                     disabled={selectedCount === 0}
-                    className="rounded-md bg-[var(--color-error)] px-2 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="rounded-md bg-destructive px-2 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     {t('sidebar.batchDeleteSelected', { count: selectedCount })}
                   </button>
@@ -755,23 +755,20 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
             )}
             <div className="sidebar-scroll-area min-h-0 flex-1 overflow-y-auto px-3 pb-20">
               {error && (
-                <div className="mx-1 mt-2 rounded-md border border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-3 py-2">
-                  <div className="text-xs font-medium text-[var(--color-error)]">{t('sidebar.sessionListFailed')}</div>
-                  <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] break-words">{error}</div>
-                  <button
-                    onClick={() => fetchSessions()}
-                    className="mt-2 text-[11px] font-medium text-[var(--color-brand)] hover:underline"
-                  >
+                <div className="mx-1 mt-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-2xs">
+                  <div className="text-xs font-medium text-destructive">{t('sidebar.sessionListFailed')}</div>
+                  <div className="mt-1 text-2xs text-muted-foreground break-words">{error}</div>
+                  <Button type="button" variant="link" size="inline-text" onClick={() => fetchSessions()} className="mt-2">
                     {t('common.retry')}
-                  </button>
+                  </Button>
                 </div>
               )}
               {showInitialLoading ? (
-                <div className="px-3 py-4 text-center text-xs text-[var(--color-text-tertiary)]">
+                <div className="px-3 py-4 text-center text-xs text-subtle-foreground">
                   {t('common.loading')}
                 </div>
               ) : filteredSessions.length === 0 && (
-                <div className="px-3 py-4 text-center text-xs text-[var(--color-text-tertiary)]">
+                <div className="px-3 py-4 text-center text-xs text-subtle-foreground">
                   {searchQuery ? t('sidebar.noMatching') : t('sidebar.noSessions')}
                 </div>
               )}
@@ -817,7 +814,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                     className={`group/project relative mb-3.5 transition-opacity ${isProjectDragging ? 'opacity-50' : ''}`}
                   >
                     {dropBefore && (
-                      <div className="pointer-events-none absolute -top-1 left-1 right-1 z-10 h-0.5 rounded-full bg-[var(--color-brand)]" />
+                      <div className="pointer-events-none absolute -top-1 left-1 right-1 z-10 h-0.5 rounded-full bg-primary" />
                     )}
                     <RowActionMenu disabled={isBatchMode} actions={[
                       { id: 'pin', label: t(isProjectPinned ? 'sidebar.unpinProject' : 'sidebar.pinProject'), icon: isProjectPinned ? <PinOff size={18} /> : <Pin size={18} />, onSelect: () => togglePinnedProject(project.key) },
@@ -837,30 +834,30 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                         onDragStart={(event) => handleProjectDragStart(event, project.key)}
                         onDragEnd={clearProjectDragState}
                         onClick={() => toggleProjectCollapsed(project.key)}
-                        className={`flex min-w-0 flex-1 cursor-grab items-center gap-1.5 bg-transparent px-1.5 text-left active:cursor-grabbing focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+                        className={`flex min-w-0 flex-1 items-center gap-1.5 bg-transparent px-1.5 text-left focus-visible:outline-none ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                         aria-expanded={!projectCollapsed}
                         aria-label={t(projectCollapsed ? 'sidebar.expandProject' : 'sidebar.collapseProject', { project: project.title })}
                       >
-                        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-text-tertiary)]">
+                        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center text-subtle-foreground">
                           {projectCollapsed
                             ? <ChevronRight className="h-[13px] w-[13px]" strokeWidth={2} aria-hidden="true" />
                             : <ChevronDown className="h-[13px] w-[13px]" strokeWidth={2} aria-hidden="true" />}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-ui-aux font-medium leading-5 text-[var(--color-text-secondary)]">
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium leading-5 text-muted-foreground">
                           {project.title}
                         </span>
                         {isProjectPinned && (
-                          <Pin className="h-3 w-3 flex-shrink-0 text-[var(--color-text-tertiary)]" strokeWidth={1.8} aria-hidden="true" />
+                          <Pin className="h-3 w-3 flex-shrink-0 text-subtle-foreground" strokeWidth={1.8} aria-hidden="true" />
                         )}
                       </button></HintTooltip>
                       {isBatchMode ? (
                         <button
                           type="button"
                           onClick={() => toggleGroupSelection(groupIds)}
-                          className={`mr-1 flex-shrink-0 rounded-md bg-transparent px-1.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none ${
+                          className={`mr-1 flex-shrink-0 rounded-md bg-transparent px-1.5 py-1 text-2xs font-medium transition-colors focus-visible:outline-none ${
                             groupSelectedCount > 0
-                              ? 'text-[var(--color-brand)]'
-                              : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                              ? 'text-primary'
+                              : 'text-subtle-foreground hover:text-muted-foreground'
                           }`}
                           aria-label={t('sidebar.batchSelectGroup', { group: project.title })}
                         >
@@ -869,17 +866,18 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                             : t('sidebar.batchSelectAll')}
                         </button>
                       ) : (
-                        <HintTooltip content={t('sidebar.newSessionInProject', { project: project.title })}><button
+                        <span className="sidebar-row-action flex shrink-0"><HintTooltip content={t('sidebar.newSessionInProject', { project: project.title })}><Button
                           type="button"
+                          variant="ghost-muted"
+                          size="icon-sm"
                           onClick={(event) => {
                             event.stopPropagation()
                             void openNewSession(project.workDir)
                           }}
-                          className="sidebar-row-action"
                           aria-label={t('sidebar.newSessionInProject', { project: project.title })}
                         >
-                          <Plus className="h-[14px] w-[14px]" strokeWidth={2} aria-hidden="true" />
-                        </button></HintTooltip>
+                          <Plus strokeWidth={2} aria-hidden="true" />
+                        </Button></HintTooltip></span>
                       )}
                     </div>
                       )}
@@ -904,7 +902,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                             const isCurrent = session.id === activeTabId
                             const title = session.title || t('session.untitled')
                             return (
-                            <RowActionMenu key={session.id} disabled={isBatchMode || (!sidebarOpen && !isMobile)} triggerLabel={t('sidebar.sessionActions', { title })} triggerClassName="sidebar-row-action sidebar-session-more" testId="sidebar-session-menu" actions={[
+                            <RowActionMenu key={session.id} disabled={isBatchMode || (!sidebarOpen && !isMobile)} triggerLabel={t('sidebar.sessionActions', { title })} testId="sidebar-session-menu" actions={[
                               { id: 'rename', label: t('common.rename'), icon: <Pencil size={15} />, afterClose: true, onSelect: () => handleStartRename(session.id, title) },
                               { id: 'batch', label: t('sidebar.batchManage'), icon: <ListChecks size={15} />, onSelect: enterBatchMode },
                               { id: 'delete', label: t('common.delete'), icon: <Trash2 size={15} />, danger: true, separatorBefore: true, afterClose: true, onSelect: () => handleDelete(session.id) },
@@ -929,7 +927,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                     }
                                   }}
                                   aria-label={t('common.rename')}
-                                  className={`w-full rounded-lg border border-[var(--color-border-focus)] bg-[var(--color-surface)] px-2.5 text-ui-nav text-[var(--color-text-primary)] outline-none ${isMobile ? 'h-11' : 'h-[30px]'}`}
+                                  className={`w-full rounded-lg border border-ring bg-background px-2.5 text-sm text-foreground outline-none ${isMobile ? 'h-11' : 'h-[30px]'}`}
                                 />
                               ) : (
                                 <div
@@ -938,10 +936,10 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                   data-menu-open={menuOpen ? 'true' : undefined}
                                   className={`sidebar-row sidebar-session-row flex items-center ${isMobile ? 'sidebar-row--touch' : ''} ${
                                     isSelected
-                                      ? 'sidebar-session-row--selected text-[var(--color-text-primary)]'
+                                      ? 'sidebar-session-row--selected text-foreground'
                                       : isCurrent
-                                      ? 'sidebar-session-row--active text-[var(--color-text-primary)]'
-                                      : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                                      ? 'sidebar-session-row--active text-foreground'
+                                      : 'sidebar-session-row--idle text-muted-foreground hover:text-foreground'
                                   }`}
                                 >
                                   <HintTooltip content={title}><button
@@ -955,15 +953,15 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                       closeMobileDrawer()
                                     }}
                                     aria-label={title}
-                                    className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent pr-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none pl-2.5 ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+                                    className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent pr-2.5 text-left text-sm leading-4.5 focus-visible:outline-none pl-2.5 ${isMobile ? 'min-h-[44px]' : 'min-h-[30px]'}`}
                                     aria-pressed={isBatchMode ? isSelected : undefined}
                                   >
                                     {isBatchMode ? (
                                       <span
-                                        className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
+                                        className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm border transition-colors ${
                                           isSelected
-                                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                                            : 'border-[var(--color-border)] bg-[var(--color-surface)]'
+                                            ? 'border-primary bg-primary text-white'
+                                            : 'border-border bg-background'
                                         }`}
                                         aria-hidden="true"
                                       >
@@ -975,7 +973,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                     <span className="min-w-0 flex-1 truncate">{title}</span>
                                     {!session.workDirExists && (
                                       <HintTooltip content={session.workDir ?? ''}><span
-                                        className="flex-shrink-0 text-[10px] text-[var(--color-warning)]"
+                                        className="flex-shrink-0 text-3xs text-warning"
                                       >
                                         {t('sidebar.missingDir')}
                                       </span></HintTooltip>
@@ -994,7 +992,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                       aria-expanded={!rowCollapsed}
                                       aria-label={t(rowCollapsed ? 'sidebar.expandChildren' : 'sidebar.collapseChildren', { title })}
                                       data-testid="sidebar-session-children-toggle"
-                                      className={`mr-0.5 flex flex-shrink-0 items-center gap-0.5 rounded bg-transparent px-1 text-[11px] tabular-nums text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] ${isMobile ? 'min-h-[44px] min-w-[44px] justify-center' : 'h-5'}`}
+                                      className={`mr-0.5 flex flex-shrink-0 items-center gap-0.5 rounded bg-transparent px-1 text-2xs tabular-nums text-subtle-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isMobile ? 'min-h-[44px] min-w-[44px] justify-center' : 'h-5'}`}
                                     >
                                       <span>{childCount}</span>
                                       {rowCollapsed
@@ -1002,7 +1000,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                         : <ChevronDown className="h-3 w-3" strokeWidth={2} aria-hidden="true" />}
                                     </button>
                                   )}
-                                  {menuTrigger}
+                                  {menuTrigger && <span className="sidebar-row-action sidebar-session-more flex shrink-0">{menuTrigger}</span>}
                                 </div>
                               )}
                             </div>
@@ -1016,7 +1014,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                             <button
                               type="button"
                               onClick={() => toggleProjectSessionExpansion(project.key)}
-                              className="inline-flex items-center justify-start py-1 text-[13px] font-semibold text-[var(--color-text-tertiary)] opacity-75 transition-[color,opacity] hover:text-[var(--color-text-secondary)] hover:opacity-100 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+                              className="inline-flex items-center justify-start py-1 text-sm font-semibold text-subtle-foreground opacity-75 transition-[color,opacity] hover:text-muted-foreground hover:opacity-100 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               aria-expanded={sessionsExpanded}
                             >
                               {sessionsExpanded
@@ -1028,7 +1026,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                       </div>
                     </div>
                     {dropAfter && (
-                      <div className="pointer-events-none absolute -bottom-1 left-1 right-1 z-10 h-0.5 rounded-full bg-[var(--color-brand)]" />
+                      <div className="pointer-events-none absolute -bottom-1 left-1 right-1 z-10 h-0.5 rounded-full bg-primary" />
                     )}
                   </section>
                 )
@@ -1105,21 +1103,21 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
         title={t('common.delete')}
         body={(
           <div className="space-y-3">
-            <p className="text-sm leading-6 text-[var(--color-text-secondary)]">
+            <p className="text-sm leading-6 text-muted-foreground">
               {t('sidebar.batchDeleteConfirm', { count: pendingBatchDeleteSessionIds?.length ?? 0 })}
             </p>
             <div>
-              <div className="mb-1.5 text-xs font-medium text-[var(--color-text-primary)]">
+              <div className="mb-1.5 text-xs font-medium text-foreground">
                 {t('sidebar.batchDeleteConfirmBody')}
               </div>
-              <ul className="max-h-40 space-y-1 overflow-y-auto rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-2">
+              <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border bg-card p-2">
                 {pendingBatchDeleteSessions.slice(0, 5).map((session) => (
-                  <li key={session.id} className="truncate text-xs text-[var(--color-text-secondary)]">
+                  <li key={session.id} className="truncate text-xs text-muted-foreground">
                     {session.title || 'Untitled'}
                   </li>
                 ))}
                 {(pendingBatchDeleteSessionIds?.length ?? 0) > 5 && (
-                  <li className="text-xs text-[var(--color-text-tertiary)]">
+                  <li className="text-xs text-subtle-foreground">
                     {t('sidebar.batchDeleteMore', { count: (pendingBatchDeleteSessionIds?.length ?? 0) - 5 })}
                   </li>
                 )}
@@ -1143,17 +1141,17 @@ function ProjectBoardRow({ board, active, touch, onOpen }: { board: string; acti
     <div
       data-testid="sidebar-project-board"
       data-current={active ? 'true' : undefined}
-      className={`sidebar-row sidebar-session-row mb-0.5 flex items-center ${touch ? 'sidebar-row--touch' : ''} ${active ? 'sidebar-session-row--active text-[var(--color-text-primary)]' : 'sidebar-session-row--idle text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'}`}
+      className={`sidebar-row sidebar-session-row mb-0.5 flex items-center ${touch ? 'sidebar-row--touch' : ''} ${active ? 'sidebar-session-row--active text-foreground' : 'sidebar-session-row--idle text-muted-foreground hover:text-foreground'}`}
     >
       <button
         type="button"
         onClick={onOpen}
-        className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-ui-nav leading-[18px] focus-visible:outline-none ${touch ? 'min-h-[44px]' : 'min-h-[30px]'}`}
+        className={`flex min-w-0 flex-1 items-center gap-2 bg-transparent px-2.5 text-left text-sm leading-4.5 focus-visible:outline-none ${touch ? 'min-h-[44px]' : 'min-h-[30px]'}`}
       >
         <SquareKanban className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{t('kanban.title')}</span>
         {count > 0 && (
-          <span aria-label={t('kanban.inbox.count', { count })} className="flex h-[18px] min-w-[18px] flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-brand)] px-1.5 text-[11px] font-semibold text-[var(--color-btn-primary-fg)]">{count}</span>
+          <span aria-label={t('kanban.inbox.count', { count })} className="flex h-[18px] min-w-[18px] flex-shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-2xs font-semibold text-primary-foreground">{count}</span>
         )}
       </button>
     </div>
@@ -1169,12 +1167,12 @@ function ProjectHeaderActions({ title, createLabel, onCreateBlank, onUseExisting
   const t = useTranslation()
   return (
     <div data-testid="sidebar-projects-header" className="flex items-center justify-between pb-1 pl-2 pr-1 pt-1">
-      <div className="text-ui-aux font-semibold text-[var(--color-text-tertiary)]">{title}</div>
+      <div className="text-xs font-semibold text-subtle-foreground">{title}</div>
       <ActionMenu label={createLabel} actions={[
         { id: 'blank', label: t('sidebar.newBlankProject'), icon: <FolderPlus size={18} />, onSelect: onCreateBlank },
         { id: 'existing', label: t('sidebar.useExistingFolder'), icon: <FolderOpen size={18} />, onSelect: onUseExisting },
       ]} trigger={
-        <Button variant="ghost" size="icon-sm" aria-label={createLabel} className="text-ui-muted-foreground">
+        <Button variant="ghost-muted" size="icon-sm" aria-label={createLabel}>
           <SquarePen size={15} aria-hidden="true" />
         </Button>
       } />
@@ -1479,9 +1477,9 @@ function SessionRowMeta({
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
   return (
-    <span hidden={!isRunning && !isWorktree && !relation} className="flex h-[18px] flex-shrink-0 items-center gap-1 text-[var(--color-text-tertiary)]">
+    <span hidden={!isRunning && !isWorktree && !relation} className="flex h-[18px] flex-shrink-0 items-center gap-1 text-subtle-foreground">
         <HintTooltip content={t('sidebar.sessionRunning')}><span hidden={!isRunning}
-          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-success)]"
+          className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-success"
           aria-label={isRunning ? t('sidebar.sessionRunning') : undefined}
         >
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2.2} aria-hidden="true" />
@@ -1545,10 +1543,10 @@ function NavItem({
       aria-label={label}
       className={`
         flex items-center transition-colors duration-200
-        ${collapsed ? 'h-10 w-10 justify-center rounded-md px-0 py-0' : `w-full gap-2.5 rounded-[12px] px-3 ${touchFriendly ? 'py-3' : 'py-2.5'} text-sm`}
+        ${collapsed ? 'h-10 w-10 justify-center rounded-md px-0 py-0' : `w-full gap-2.5 rounded-xl px-3 ${touchFriendly ? 'py-3' : 'py-2.5'} text-sm`}
         ${active
-          ? 'bg-[var(--color-sidebar-item-active)] font-medium text-[var(--color-text-primary)]'
-          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]'
+          ? 'bg-selected font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-hover hover:text-foreground'
         }
       `}
     >

@@ -17,10 +17,15 @@ export function readComposedSelection(root: HTMLElement | null) {
   return { shadows, selection }
 }
 
-export function useQuoteSelection<T>(read: (event: MouseEvent<HTMLElement>) => T | null, resetKey: unknown) {
+export function useQuoteSelection<T>(read: (pointer: { clientX: number; clientY: number }) => T | null, resetKey: unknown) {
   const [selection, setSelection] = useState<T | null>(null)
   const containerRef = useRef<HTMLElement | null>(null)
+  const readRef = useRef(read)
   const clear = useCallback(() => setSelection(null), [])
+
+  useEffect(() => {
+    readRef.current = read
+  })
 
   useEffect(clear, [clear, resetKey])
 
@@ -42,9 +47,10 @@ export function useQuoteSelection<T>(read: (event: MouseEvent<HTMLElement>) => T
 
   return {
     selection,
-    onMouseUp: (event: MouseEvent<HTMLElement>) => {
+    onMouseDown: (event: MouseEvent<HTMLElement>) => {
+      if (event.button !== 0) return
       containerRef.current = event.currentTarget
-      setSelection(read(event))
+      document.addEventListener('mouseup', (up) => setSelection(readRef.current(up)), { capture: true, once: true })
     },
     contains: (target: EventTarget | null) => target instanceof Node && Boolean(containerRef.current?.contains(target)),
     clear,

@@ -11,7 +11,7 @@ function themeVariables(theme: string) {
   const values = new Map<string, string>()
   for (const match of `${css}\n${auroraCss}`.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selectors = match[1]!.trim().split(',').map((selector) => selector.trim())
-    if (!selectors.some((selector) => ['@theme', ':root', ':root[data-theme]', `[data-theme="${theme}"]`, `:root[data-theme="${theme}"]`].includes(selector))) continue
+    if (!selectors.some((selector) => ['html', ':root', `[data-theme="${theme}"]`, `:root[data-theme="${theme}"]`].includes(selector))) continue
     for (const declaration of match[2]!.matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
       values.set(declaration[1]!, declaration[2]!.trim())
     }
@@ -31,7 +31,7 @@ describe('shadcn theme bridge', () => {
     const values = themeVariables(theme)
     for (const alias of aliases) {
       expect(resolveToken(`--${alias}`, values)).not.toContain('var(')
-      if (alias !== 'radius') expect(css).toContain(`--color-ui-${alias}: var(--${alias});`)
+      if (alias !== 'radius') expect(css).toContain(`--color-${alias}: var(--${alias});`)
     }
   })
 

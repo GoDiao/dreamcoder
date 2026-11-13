@@ -93,7 +93,7 @@ git checkout main && git checkout -b feat/your-feature
    bun run prepare:ripgrep    # 准备固定版本的搜索程序
    bun test                  # 服务端/CLI 测试
    cd desktop
-   bun run lint              # TypeScript 类型检查
+   bun run lint              # 类型检查和设计系统 lint
    bun run test -- --run     # 桌面端测试
    ```
    每个提到 `main` 的 PR,CI 都会跑这三项检查。
@@ -179,7 +179,7 @@ bun run electron:dev
 
 桌面端使用 Radix 版本的 shadcn/ui，由 `desktop/components.json` 生成到 `desktop/src/components/shared/ui`。
 调用方直接使用这些组件；`desktop/src/components/shared` 里的组合组件只增加行为，不做改名或转发。
-[组件说明](../../desktop/src/components/README.md)列出了全部组件、本地改动（`ui-` 命名空间的主题 token、Shiki、Pierre、H5 最低 Safari 17.5）以及用 shadcn CLI 更新组件的方法。
+[组件说明](../../desktop/src/components/README.md)列出了全部组件、本地改动（语义主题 token、Shiki、Pierre、H5 最低 Safari 17.5）以及用 shadcn CLI 更新组件的方法。
 
 ### 随包提供 ripgrep
 

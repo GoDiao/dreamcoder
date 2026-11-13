@@ -52,14 +52,14 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
       <div className="space-y-5" data-testid="shortcuts-dialog">
         {groups.map((group) => (
           <section key={group.title}>
-            <h3 className="mb-1 text-ui-aux font-semibold text-[var(--color-text-tertiary)]">{t(group.title)}</h3>
+            <h3 className="mb-1 text-xs font-semibold text-subtle-foreground">{t(group.title)}</h3>
             <dl>
               {group.items.map((item) => (
                 <div
                   key={item.label}
-                  className="flex min-h-[36px] items-center justify-between gap-4 border-b border-[var(--color-border-separator)] last:border-b-0"
+                  className="flex min-h-[36px] items-center justify-between gap-4 border-b border-border last:border-b-0"
                 >
-                  <dt className="text-ui-nav text-[var(--color-text-primary)]">{t(item.label)}</dt>
+                  <dt className="text-sm text-foreground">{t(item.label)}</dt>
                   <dd className="flex flex-shrink-0 items-center gap-1">
                     {item.keys.map((key) => (
                       <Kbd

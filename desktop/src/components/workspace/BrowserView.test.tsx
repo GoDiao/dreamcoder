@@ -247,6 +247,16 @@ describe('BrowserView', () => {
     expect(screen.queryByRole('button', { name: 'Reload' })).toBeNull()
   })
 
+  it('shows a progress bar only while a page loads', () => {
+    useBrowserStore.getState().patchPage('t1', { loading: true })
+    const { rerender } = render(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+    expect(screen.getByTestId('browser-progress')).toBeTruthy()
+
+    act(() => useBrowserStore.getState().patchPage('t1', { loading: false }))
+    rerender(<BrowserView sessionId="s1" tab={tab('t1', 'https://example.com/')} projectRoot="/repo" />)
+    expect(screen.queryByTestId('browser-progress')).toBeNull()
+  })
+
   it('submits the typed address with the session project', () => {
     render(<BrowserView sessionId="s1" tab={tab('t1')} projectRoot="/repo" />)
     const input = screen.getByRole('textbox', { name: 'Address' })

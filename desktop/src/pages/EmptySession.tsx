@@ -466,7 +466,7 @@ export function EmptySession() {
 
       {slashMenuOpen && filteredCommands.length > 0 && (
         <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setSlashMenuOpen(false)} preserveInputFocus><div
-          className="overflow-hidden bg-ui-popover"
+          className="overflow-hidden bg-popover"
         >
           <div className="max-h-[260px] overflow-y-auto p-1">
             {filteredCommands.map((command, index) => (
@@ -476,18 +476,18 @@ export function EmptySession() {
                 onClick={() => selectSlashCommand(command.name)}
                 onMouseEnter={() => setSlashSelectedIndex(index)}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                  index === slashSelectedIndex ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'
+                  index === slashSelectedIndex ? 'bg-hover' : 'hover:bg-hover'
                 }`}
               >
                 <span className="flex min-w-0 max-w-[52%] shrink-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-ui-body font-medium text-[var(--color-text-primary)]">/{command.name}</span>
+                  <span className="shrink-0 text-sm font-medium text-foreground">/{command.name}</span>
                   {command.argumentHint ? (
-                    <span className="min-w-0 truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">
+                    <span className="min-w-0 truncate font-mono text-2xs text-subtle-foreground">
                       {command.argumentHint}
                     </span>
                   ) : null}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-ui-aux text-[var(--color-text-tertiary)]">{command.description}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-subtle-foreground">{command.description}</span>
               </button>
             ))}
           </div>
@@ -497,13 +497,13 @@ export function EmptySession() {
   )
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
       <div className={`flex flex-1 flex-col overflow-y-auto ${isMobileComposer ? 'px-5 pt-10' : 'px-8 pt-12'}`}>
         <div className="mx-auto w-full max-w-[760px]">
-          <h1 className="text-ui-title font-semibold tracking-[-0.01em] text-[var(--color-text-primary)]">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             {t('empty.title')}
           </h1>
-          <p className="mt-1.5 text-ui-body text-[var(--color-text-secondary)]">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {t('empty.subtitle')}
           </p>
         </div>
@@ -511,8 +511,8 @@ export function EmptySession() {
 
       <div
         data-testid="empty-session-composer-shell"
-        className={`shrink-0 bg-[var(--color-surface)] ${
-          isMobileComposer ? 'px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2' : 'px-8 pb-5 pt-3'
+        className={`shrink-0 bg-background ${
+          isMobileComposer ? 'px-3 pb-safe-2.5 pt-2' : 'px-8 pb-5 pt-3'
         }`}
       >
         <div className={`mx-auto flex w-full flex-col ${isMobileComposer ? 'max-w-none' : 'max-w-[760px]'}`}>

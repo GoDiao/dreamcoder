@@ -2,7 +2,6 @@ import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { type DragEventHandler, type ReactNode, type RefObject, type TextareaHTMLAttributes } from 'react'
 import { ArrowUp, Paperclip, Plus, Square } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../shared/ui/dropdown-menu'
-import { Textarea } from '../shared/ui/textarea'
 import { Button } from '../shared/ui/button'
 
 export const COMPOSER_TEXTAREA_MAX_HEIGHT = 200
@@ -74,11 +73,11 @@ export function ComposerBox({
     >
       {overlays}
 
-      <Textarea
+      <textarea
         ref={textareaRef}
         rows={1}
         {...textareaProps}
-        className={`block min-h-8 min-w-0 flex-1 resize-none self-center border-0 bg-transparent py-[5px] text-ui-message leading-[22px] text-[var(--color-text-primary)] shadow-none outline-none ring-0 placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-50 ${
+        className={`block min-h-8 min-w-0 flex-1 resize-none self-center border-0 bg-transparent py-1.25 text-sm leading-5.5 text-foreground shadow-none outline-none ring-0 placeholder:text-subtle-foreground focus:outline-none focus-visible:ring-0 focus-visible:outline-none disabled:opacity-50 ${
           plusMenu ? '' : 'pl-1.5'
         }`}
         style={{ maxHeight: COMPOSER_TEXTAREA_MAX_HEIGHT, fontFamily: 'var(--font-body)' }}
@@ -87,13 +86,12 @@ export function ComposerBox({
       {plusMenu && <ComposerPlusMenu {...plusMenu} mobile={mobile} />}
 
       <HintTooltip content={action.title ?? action.label}><Button
-        variant={actionActive ? 'gradient' : 'ghost'}
-        size={mobile ? 'icon-xl' : 'icon'}
+        variant={actionActive ? 'default' : 'ghost-muted'}
+        size={mobile ? 'icon-xl-pill' : 'icon-pill'}
         type="button"
         onClick={action.onClick}
         disabled={action.disabled}
         aria-label={action.label}
-        className={`rounded-full ${actionActive ? '' : 'text-[var(--color-text-tertiary)]'}`}
       >
         <ActionIcon
           size={action.mode === 'stop' ? 12 : 16}
@@ -147,7 +145,7 @@ function ComposerPlusMenu({
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={(next) => { if (next) onToggle(); else onClose() }}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size={mobile ? 'icon-xl' : 'icon'} aria-label={toggleLabel} className={mobile ? 'order-first rounded-xl' : 'order-first'}>
+        <Button variant="ghost" size={mobile ? 'icon-xl' : 'icon'} aria-label={toggleLabel} className="order-first">
           <Plus size={18} aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>

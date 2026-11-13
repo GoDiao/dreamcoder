@@ -122,7 +122,7 @@ export function McpCatalogInstall({ entry, servers, onCancel, onManual, onConfir
                           autoComplete="off"
                           spellCheck={false}
                         />
-                        <p id={`catalog-env-${variable.name}`} className="text-xs text-[var(--color-text-secondary)]">
+                        <p id={`catalog-env-${variable.name}`} className="text-xs text-muted-foreground">
                           {variable.description} {!required && t('settings.mcp.install.optional')}
                         </p>
                       </div>
@@ -138,13 +138,13 @@ export function McpCatalogInstall({ entry, servers, onCancel, onManual, onConfir
             description={`${entry.command} · ${entry.version ?? t('settings.mcp.install.unpinned')}`}
           >
             <pre className="overflow-x-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(preview.config, null, 2)}</pre>
-            <p className="mt-3 text-xs text-[var(--color-text-secondary)]">{t('settings.mcp.install.previewHint')}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{t('settings.mcp.install.previewHint')}</p>
           </McpEditorSection>
 
-          {!prepared.ok && <p role="status" className="text-sm text-[var(--color-warning)]">{t(`settings.mcp.install.error.${prepared.error.code}`, { name: prepared.error.name ?? '' })}</p>}
-          {duplicate && <p role="alert" className="text-sm text-[var(--color-error)]">{t('settings.mcp.install.duplicate')}</p>}
-          {shadowed && <p role="alert" className="text-sm text-[var(--color-error)]">{t('settings.mcp.install.shadowed')}</p>}
-          {failure && <div role="alert" className="space-y-1 text-sm text-[var(--color-error)]"><p>{failure}</p><p>{t('settings.mcp.install.retryHint')}</p></div>}
+          {!prepared.ok && <p role="status" className="text-sm text-warning">{t(`settings.mcp.install.error.${prepared.error.code}`, { name: prepared.error.name ?? '' })}</p>}
+          {duplicate && <p role="alert" className="text-sm text-destructive">{t('settings.mcp.install.duplicate')}</p>}
+          {shadowed && <p role="alert" className="text-sm text-destructive">{t('settings.mcp.install.shadowed')}</p>}
+          {failure && <div role="alert" className="space-y-1 text-sm text-destructive"><p>{failure}</p><p>{t('settings.mcp.install.retryHint')}</p></div>}
         </>
       )}
     </McpEditorLayout>

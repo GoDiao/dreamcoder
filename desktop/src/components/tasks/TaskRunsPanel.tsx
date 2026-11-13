@@ -13,7 +13,7 @@ function RunOutput({ run }: { run: TaskRun }) {
 
   if (run.error) {
     return (
-      <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-sm border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/28 p-2.5 text-xs text-[var(--color-error)]">
+      <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-sm border border-destructive/20 bg-destructive-surface/28 p-2.5 text-xs text-destructive">
         {run.error}
       </div>
     )
@@ -23,14 +23,14 @@ function RunOutput({ run }: { run: TaskRun }) {
 
   if (!text) {
     return (
-      <div className="mt-2 p-2.5 rounded-sm bg-[var(--color-surface-container)] text-xs text-[var(--color-text-tertiary)] italic">
+      <div className="mt-2 p-2.5 rounded-sm bg-muted text-xs text-subtle-foreground italic">
         {run.sessionId ? t('tasks.outputHintSession') : t('tasks.noOutputText')}
       </div>
     )
   }
 
   return (
-    <div className="mt-2 max-h-48 overflow-y-auto rounded-sm bg-[var(--color-surface-container)] p-2.5">
+    <div className="mt-2 max-h-48 overflow-y-auto rounded-sm bg-muted p-2.5">
       <MarkdownRenderer
         content={text}
         variant="compact"
@@ -47,10 +47,10 @@ type Props = {
 }
 
 const STATUS_CONFIG: Record<string, { icon: LucideIcon; color: string }> = {
-  running:   { icon: RefreshCwIcon,         color: 'var(--color-warning)' },
-  completed: { icon: CircleCheckIcon, color: 'var(--color-success)' },
-  failed:    { icon: CircleAlertIcon,        color: 'var(--color-error)' },
-  timeout:   { icon: TimerOffIcon,    color: 'var(--color-error)' },
+  running:   { icon: RefreshCwIcon,         color: 'var(--warning)' },
+  completed: { icon: CircleCheckIcon, color: 'var(--success)' },
+  failed:    { icon: CircleAlertIcon,        color: 'var(--destructive)' },
+  timeout:   { icon: TimerOffIcon,    color: 'var(--destructive)' },
 }
 
 export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
@@ -92,13 +92,13 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
   }, [hasRunning, taskId, refreshKey])
 
   return (
-    <div className="mt-2 mb-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--color-surface-container)]">
-        <span className="text-xs font-medium text-[var(--color-text-primary)]">{t('tasks.logsTitle')}</span>
+    <div className="mt-2 mb-1 rounded-md border border-border bg-background overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-muted">
+        <span className="text-xs font-medium text-foreground">{t('tasks.logsTitle')}</span>
         <button
           onClick={onClose}
           aria-label={t('common.close')}
-          className="p-0.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="p-0.5 text-subtle-foreground hover:text-foreground transition-colors"
         >
           <XIcon aria-hidden="true" size={16} />
         </button>
@@ -108,11 +108,11 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
         {loading ? (
           <LoadingBlock className="py-6" spinnerClassName="size-4" />
         ) : runs.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">
+          <div className="px-4 py-6 text-center text-xs text-subtle-foreground">
             {t('tasks.noLogs')}
           </div>
         ) : (
-          <div className="divide-y divide-[var(--color-border-separator)]">
+          <div className="divide-y divide-border">
             {runs.map((run) => {
               const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.failed!
               const isExpanded = expandedId === run.id
@@ -126,12 +126,12 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                       {t(`tasks.runStatus.${run.status}` as any)}
                     </span>
 
-                    <span className="text-xs text-[var(--color-text-tertiary)]">
+                    <span className="text-xs text-subtle-foreground">
                       {new Date(run.startedAt).toLocaleString()}
                     </span>
 
                     {run.durationMs != null && (
-                      <span className="text-xs text-[var(--color-text-tertiary)]">
+                      <span className="text-xs text-subtle-foreground">
                         {t('tasks.duration', { s: Math.round(run.durationMs / 1000) })}
                       </span>
                     )}
@@ -140,7 +140,7 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                       {run.sessionId && run.status !== 'running' && (
                         <button
                           onClick={() => openSessionTab(run.sessionId!, run.taskName || 'Task Run')}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[var(--color-brand)] bg-[var(--color-brand)]/8 hover:bg-[var(--color-brand)]/15 rounded-sm transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary bg-primary/8 hover:bg-primary/15 rounded-sm transition-colors"
                         >
                           <ExternalLinkIcon aria-hidden="true" size={14} />
                           {t('tasks.openSession')}
@@ -150,7 +150,7 @@ export function TaskRunsPanel({ taskId, onClose, refreshKey }: Props) {
                       {(run.output || run.error) && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : run.id)}
-                          className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+                          className="text-xs text-subtle-foreground hover:text-muted-foreground transition-colors"
                         >
                           {isExpanded ? t('tasks.hideOutput') : t('tasks.viewOutput')}
                         </button>

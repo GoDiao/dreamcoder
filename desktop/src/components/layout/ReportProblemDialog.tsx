@@ -79,18 +79,18 @@ export function ReportProblemDialog({ open, onClose }: { open: boolean; onClose:
       }
     >
       <div className="space-y-3" data-testid="report-problem-dialog">
-        <p className="text-ui-body text-[var(--color-text-secondary)]">{t('reportProblem.description')}</p>
+        <p className="text-sm text-muted-foreground">{t('reportProblem.description')}</p>
         {loadError ? (
-          <p className="text-ui-body text-[var(--color-error)]">{t('reportProblem.loadFailed')}</p>
+          <p className="text-sm text-destructive">{t('reportProblem.loadFailed')}</p>
         ) : (
           <pre
             aria-label={t('reportProblem.previewLabel')}
-            className="max-h-[300px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-3 py-2 font-[var(--font-mono)] text-[12px] leading-[1.45] text-[var(--color-text-primary)]"
+            className="max-h-[300px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs leading-normal text-foreground"
           >
             {report ? text : t('reportProblem.loading')}
           </pre>
         )}
-        <p className="text-ui-aux text-[var(--color-text-tertiary)]">{t('reportProblem.privacyNote')}</p>
+        <p className="text-xs text-subtle-foreground">{t('reportProblem.privacyNote')}</p>
       </div>
     </Modal>
   )

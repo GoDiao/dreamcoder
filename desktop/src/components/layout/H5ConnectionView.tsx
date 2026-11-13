@@ -38,13 +38,13 @@ export function H5ConnectionView({
   }
 
   return (
-    <div className="h-screen flex items-center justify-center bg-[var(--color-surface)] px-6">
-      <section className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-6 shadow-[var(--shadow-md)]">
+    <div className="h-screen flex items-center justify-center bg-background px-6">
+      <section className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-md">
         <div className="mb-5">
-          <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
+          <h1 className="text-lg font-semibold text-foreground">
             Connect to H5 Access
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+          <p className="mt-2 text-sm text-muted-foreground">
             Enter the server URL and H5 access token from the desktop app.
           </p>
         </div>
@@ -69,7 +69,7 @@ export function H5ConnectionView({
           />
 
           {error ? (
-            <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 px-3 py-2 text-sm text-[var(--color-error)]">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2 text-sm text-destructive">
               {error}
             </div>
           ) : null}

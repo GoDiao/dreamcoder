@@ -42,7 +42,7 @@ describe('useCanvasTab', () => {
     useWorkspacePanelStore.setState({
       ...initialPanel,
       panelByTab: {
-        s1: { isOpen: true, expanded: false, activeTabId: 't1', recentFiles: [], tabs: [{ id: 't1', kind: 'browser', url: 'dreamcoder-project://id/flow/index.html', title: '', root: '/repo/dc_artifacts', artifact: canvasArtifact }] },
+        s1: { isOpen: true, expanded: false, activeTabId: 't1', recentFiles: [], selectedFile: null, tabs: [{ id: 't1', kind: 'browser', url: 'dreamcoder-project://id/flow/index.html', title: '', root: '/repo/dc_artifacts', artifact: canvasArtifact }] },
       },
     })
   })

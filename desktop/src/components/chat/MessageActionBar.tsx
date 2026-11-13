@@ -29,9 +29,6 @@ type Props = {
 // and no hover, but the composited layer is not redrawn). Show and hide at once.
 const blurAfterClick = (event: MouseEvent<HTMLButtonElement>) => event.currentTarget.blur()
 
-const ICON_BUTTON_CLASS =
-  'rounded-md text-[var(--color-text-tertiary)] transition-none hover:border-[var(--color-border)]/70 hover:bg-[var(--color-surface-container-low)] hover:text-[var(--color-text-primary)]'
-
 export function MessageActionBar({
   copyText,
   copyLabel,
@@ -53,9 +50,9 @@ export function MessageActionBar({
     >
       <div className="flex items-center gap-0.5">
         {timestamp ? <MessageTime timestamp={timestamp} /> : null}
-        {hasCopy ? <CopyButton text={copyText!} label={copyLabel} iconOnly size="icon-sm" onClick={blurAfterClick} className={ICON_BUTTON_CLASS} /> : null}
+        {hasCopy ? <CopyButton text={copyText!} label={copyLabel} iconOnly size="icon-sm" onClick={blurAfterClick} /> : null}
         {branchAction ? (
-          <HintTooltip content={branchAction.label}><Button variant="ghost" size="icon-sm"
+          <HintTooltip content={branchAction.label}><Button variant="ghost-muted" size="icon-sm"
             type="button"
             onClick={(event) => {
               blurAfterClick(event)
@@ -63,7 +60,6 @@ export function MessageActionBar({
             }}
             disabled={branchAction.loading}
             aria-label={branchAction.label}
-            className={ICON_BUTTON_CLASS}
           >
             <Split size={14} strokeWidth={2} aria-hidden="true" />
           </Button></HintTooltip>
@@ -85,7 +81,7 @@ function MessageTime({ timestamp }: { timestamp: number }) {
   return (
     <HintTooltip content={sent.toLocaleString()}><time
       dateTime={sent.toISOString()}
-      className="mr-1 text-[11px] text-[var(--color-text-tertiary)]"
+      className="mr-1 text-2xs text-subtle-foreground"
     >
       {label}
     </time></HintTooltip>

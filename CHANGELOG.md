@@ -12,10 +12,18 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Changed
 
+- **A cleaner desktop look.** All seven themes share one set of semantic colors, the conversation, sidebar and panels use one type scale (14px body text), and corners use one radius scale. The pages of the side panel (terminal, browser, files, changes) no longer draw their own frames; the terminal follows the light or dark theme, its project and branch sit in a row above the output with the clear and restart buttons, and the browser shows a loading bar under its address field.
+- **The Files tab previews a file beside the tree.** Clicking a file in the tree previews it in place instead of opening a tab; the tree's right-click menu can still open it in its own tab, and recent files and typed paths on the new-tab page select the file in the Files tab. A path bar above the preview holds an editor button with a menu of editors and file managers, a preview toggle for Markdown (which opens as source), a line-wrap toggle (on by default) and a tree toggle; in a narrow panel the tree shows until you pick a file, then hides. Each part of the path has a menu (add to chat and copy path; folders can also open in an editor, the file manager or a terminal tab started there), shows its full path on hover, and is revealed in the tree when clicked. Right-clicking a file's content adds the file or the selection to the chat, copies its path or contents, and in source view comments on the clicked line or selects all. The file tree is built on `@pierre/trees`.
+- **Changed files** have an open-file button and a menu on each row (add to chat, copy path, open file, open in an editor or the file manager).
+- **Line comments are lighter.** A comment icon appears beside the line number under the pointer in code and diffs; clicking the number opens a small box with the line label, where Enter adds the comment, Shift+Enter starts a new line and Escape cancels. An empty box closes when you click elsewhere.
+- The "open project" button in the session header is a split button: the icon opens the project in the editor you used last, the arrow lists the other editors and file managers.
 - **A message you send while the agent is working waits for the next turn.** It used to be slipped into the running turn. Queued messages are listed above the message box, where you can withdraw one or send the queue now, which stops the current turn and starts the next one; Stop does the same while messages are queued. Queued messages survive a model or permission change that restarts the agent at the end of the turn (#239).
 
 ### Fixed
 
+- Terminal text is no longer spaced out. The terminal measured its character width with a fallback font instead of the mono font it draws with.
+- A terminal tab starts one shell. When a terminal was started again before the first start finished, for example because its working folder arrived late or Restart was clicked twice, two terminals and two shells were created, the second showing as a dark strip under the first.
+- The reply-to-selection button appears when a text selection in a message ends outside the message.
 - Permission prompts that ask every time, such as starting a session or editing files under `.git/`, no longer offer "Allow for this session", which could not take effect (#242).
 - Tools sent to providers through the OpenAI Responses API are no longer in strict mode, so their optional parameters stay optional (#242).
 - Confirmation dialogs keep long workspace paths inside their bounds, so Cancel and Enable remain visible when enabling bypass permissions (#226). Thanks @imshah-id.

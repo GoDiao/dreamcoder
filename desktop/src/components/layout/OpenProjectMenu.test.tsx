@@ -81,7 +81,7 @@ describe('OpenProjectMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('renders a dropdown with detected IDEs and Finder', async () => {
+  it('opens the primary target directly and lists every target in the dropdown', async () => {
     storeMocks.state.targets = [
       { id: 'vscode', kind: 'ide', label: 'VS Code', icon: 'vscode', iconUrl: '/api/open-targets/icons/vscode', platform: 'darwin' },
       { id: 'finder', kind: 'file_manager', label: 'Finder', icon: 'finder', iconUrl: '/api/open-targets/icons/finder', platform: 'darwin' },
@@ -90,6 +90,11 @@ describe('OpenProjectMenu', () => {
     storeMocks.openTarget.mockResolvedValue(undefined)
 
     const { container } = render(<OpenProjectMenu path="/repo" />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open in VS Code' }))
+    })
+    expect(storeMocks.openTarget).toHaveBeenCalledWith('vscode', '/repo')
 
     await act(async () => {
       fireEvent.keyDown(screen.getByRole('button', { name: 'Open project' }), { key: 'ArrowDown' })

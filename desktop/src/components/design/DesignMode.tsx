@@ -115,11 +115,11 @@ export function DesignMode() {
           <ArrowLeft aria-hidden="true" />
           {t('artifactsPage.back')}
         </Button>
-        <h1 className="min-w-0 flex-1 text-2xl font-bold text-[var(--color-text-primary)]">{t('design.title')}</h1>
+        <h1 className="min-w-0 flex-1 text-2xl font-bold text-foreground">{t('design.title')}</h1>
       </div>
       <div className="px-10 pb-8">
         {projects.length === 0 ? (
-          <p role="status" className="py-16 text-center text-sm text-[var(--color-text-tertiary)]">{t('design.noProject')}</p>
+          <p role="status" className="py-16 text-center text-sm text-subtle-foreground">{t('design.noProject')}</p>
         ) : (
           <>
             <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -162,11 +162,11 @@ export function DesignMode() {
               )}
             </div>
             {system && (
-              <div data-testid="design-system-chip" className="mb-4 flex w-fit max-w-full items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 pr-1 pl-2">
+              <div data-testid="design-system-chip" className="mb-4 flex w-fit max-w-full items-center gap-2 rounded-lg border border-border bg-background py-1 pr-1 pl-2">
                 <span className="w-16 shrink-0 overflow-hidden rounded-sm">
                   <SystemSwatches colors={system.swatches} />
                 </span>
-                <span className="min-w-0 truncate text-sm text-[var(--color-text-primary)]">{t('design.systemChip', { name: localizedText(system.name, locale) })}</span>
+                <span className="min-w-0 truncate text-sm text-foreground">{t('design.systemChip', { name: localizedText(system.name, locale) })}</span>
                 <Button variant="ghost" size="icon-xs" aria-label={t('design.systemClear')} onClick={() => setSystemId(null)}>
                   <X aria-hidden="true" />
                 </Button>
@@ -176,18 +176,18 @@ export function DesignMode() {
               <DesignSystemLibrary systems={systems} loading={systemsLoading} error={systemsError} selectedId={systemId} onSelect={setSystemId} />
             ) : (
               <>
-                {error && <p role="alert" className="mb-4 text-sm text-[var(--color-error)]">{t('design.loadFailed', { reason: error })}</p>}
+                {error && <p role="alert" className="mb-4 text-sm text-destructive">{t('design.loadFailed', { reason: error })}</p>}
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
                   <CardButton
                     disabled={busy}
                     onClick={() => void start()}
                     data-testid="design-scratch"
-                    className="flex min-h-48 flex-col items-start justify-between gap-3 border border-dashed border-[var(--color-border)] p-4"
+                    className="flex min-h-48 flex-col items-start justify-between gap-3 border border-dashed border-border p-4"
                   >
-                    <PencilRuler aria-hidden="true" size={28} strokeWidth={1.6} className="text-[var(--color-text-tertiary)]" />
+                    <PencilRuler aria-hidden="true" size={28} strokeWidth={1.6} className="text-subtle-foreground" />
                     <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[var(--color-text-primary)]">{t('design.scratchTitle')}</span>
-                      <span className="text-ui-aux text-[var(--color-text-secondary)]">{t('design.scratchHint')}</span>
+                      <span className="text-sm font-medium text-foreground">{t('design.scratchTitle')}</span>
+                      <span className="text-xs text-muted-foreground">{t('design.scratchHint')}</span>
                     </span>
                   </CardButton>
                   <form
@@ -196,12 +196,12 @@ export function DesignMode() {
                       event.preventDefault()
                       void startClone()
                     }}
-                    className="flex min-h-48 flex-col justify-between gap-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                    className="flex min-h-48 flex-col justify-between gap-3 rounded-lg border border-dashed border-border bg-background p-4"
                   >
-                    <Globe aria-hidden="true" size={28} strokeWidth={1.6} className="text-[var(--color-text-tertiary)]" />
+                    <Globe aria-hidden="true" size={28} strokeWidth={1.6} className="text-subtle-foreground" />
                     <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[var(--color-text-primary)]">{t('design.cloneTitle')}</span>
-                      <span className="text-ui-aux text-[var(--color-text-secondary)]">{t('design.cloneHint')}</span>
+                      <span className="text-sm font-medium text-foreground">{t('design.cloneTitle')}</span>
+                      <span className="text-xs text-muted-foreground">{t('design.cloneHint')}</span>
                     </span>
                     <Input
                       value={cloneInput}
@@ -216,20 +216,20 @@ export function DesignMode() {
                       autoCapitalize="off"
                       autoCorrect="off"
                     />
-                    {cloneInvalid && <span role="alert" className="text-ui-aux text-[var(--color-error)]">{t('design.cloneInvalid')}</span>}
+                    {cloneInvalid && <span role="alert" className="text-xs text-destructive">{t('design.cloneInvalid')}</span>}
                     <Button type="submit" size="sm" disabled={busy || cloneInput.trim() === ''}>{t('design.cloneStart')}</Button>
                   </form>
                   {visible.map((template) => (
-                    <div key={template.id} data-testid="design-template-card" className="flex flex-col overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+                    <div key={template.id} data-testid="design-template-card" className="flex flex-col overflow-hidden rounded-lg border border-border bg-background">
                       <TemplateThumbnail templateId={template.id} />
                       <div className="flex flex-1 flex-col gap-1 p-3">
-                        <span className="text-sm font-medium text-[var(--color-text-primary)]">{localizedText(template.title, locale)}</span>
-                        <span className="text-ui-aux text-[var(--color-text-tertiary)]">
+                        <span className="text-sm font-medium text-foreground">{localizedText(template.title, locale)}</span>
+                        <span className="text-xs text-subtle-foreground">
                           {[t(DESIGN_CATEGORY_LABELS[template.category]), template.platform && t(DESIGN_PLATFORM_LABELS[template.platform])].filter(Boolean).join(' · ')}
                         </span>
-                        <span className="text-ui-aux text-[var(--color-text-secondary)]">{localizedText(template.description, locale)}</span>
+                        <span className="text-xs text-muted-foreground">{localizedText(template.description, locale)}</span>
                         {system && !template.acceptsDesignSystem && (
-                          <span className="text-ui-aux text-[var(--color-text-tertiary)]">{t('design.systemFixedLook')}</span>
+                          <span className="text-xs text-subtle-foreground">{t('design.systemFixedLook')}</span>
                         )}
                         <div className="mt-auto flex gap-2 pt-2">
                           <Button variant="outline" size="sm" onClick={() => setPreviewing(template)}>{t('design.preview')}</Button>
@@ -241,7 +241,7 @@ export function DesignMode() {
                 </div>
                 {loading && templates.length === 0 && <LoadingBlock className="py-16" spinnerClassName="size-6" />}
                 {!loading && !error && visible.length === 0 && (
-                  <p role="status" className="py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+                  <p role="status" className="py-8 text-center text-sm text-subtle-foreground">
                     {t(templateQuery.trim() === '' ? 'design.empty' : 'design.templateNoMatch')}
                   </p>
                 )}

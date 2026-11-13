@@ -19,6 +19,7 @@ export type TerminalRuntime = {
   error: string | null
   warning: string | null
   shellInfo: TerminalShellInfo | null
+  starts: number
   listeners: Set<() => void>
 }
 
@@ -55,6 +56,7 @@ export function getTerminalRuntime(id: string, initialStatus: TerminalStatus): T
     error: null,
     warning: null,
     shellInfo: null,
+    starts: 0,
     listeners: new Set(),
   }
   runtimes.set(id, runtime)
@@ -102,6 +104,7 @@ export function destroyTerminalRuntime(id: string) {
   if (!runtime) return
   runtimes.delete(id)
   xtermMemLog('destroy', id)
+  runtime.starts += 1
 
   runtime.connection?.close()
   runtime.connection = null

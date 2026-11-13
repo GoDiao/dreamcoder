@@ -25,12 +25,12 @@ const DOWNLOAD_SIZE_MB: Record<string, number> = { darwin: 76, win32: 31, linux:
 function StatusDot({ tone }: { tone: Tone }) {
   const color =
     tone === 'ok'
-      ? 'bg-green-500'
+      ? 'bg-success'
       : tone === 'warn'
-        ? 'bg-amber-500'
+        ? 'bg-warning'
         : tone === 'error'
-          ? 'bg-red-400'
-          : 'bg-[var(--color-text-tertiary)]'
+          ? 'bg-destructive'
+          : 'bg-subtle-foreground'
   return <span aria-hidden className={`inline-block h-2 w-2 flex-shrink-0 rounded-full ${color}`} />
 }
 
@@ -41,10 +41,10 @@ function StatusLine({ tone, label, detail, action }: {
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--color-border-separator)] py-2.5 last:border-b-0">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border py-2.5 last:border-b-0">
       <StatusDot tone={tone} />
-      <div className="min-w-[96px] text-[13px] text-[var(--color-text-primary)]">{label}</div>
-      <div className="min-w-0 flex-1 text-xs leading-[1.5] text-[var(--color-text-secondary)] [overflow-wrap:anywhere]">
+      <div className="min-w-[96px] text-sm text-foreground">{label}</div>
+      <div className="min-w-0 flex-1 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]">
         {detail}
       </div>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
@@ -55,12 +55,12 @@ function StatusLine({ tone, label, detail, action }: {
 function Notice({ tone, children }: { tone: 'warn' | 'error' | 'info'; children: React.ReactNode }) {
   const border =
     tone === 'error'
-      ? 'border-red-400/40 bg-red-400/5'
+      ? 'border-destructive/40 bg-destructive/5'
       : tone === 'warn'
-        ? 'border-amber-500/40 bg-amber-500/5'
-        : 'border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
+        ? 'border-warning/40 bg-warning/5'
+        : 'border-border bg-card'
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-md border px-3 py-2.5 text-xs leading-[1.6] text-[var(--color-text-secondary)] ${border}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-md border px-3 py-2.5 text-xs leading-relaxed text-muted-foreground ${border}`}>
       {children}
     </div>
   )
@@ -204,7 +204,7 @@ export function ComputerUseSettings() {
     return (
       <div className="min-w-0 space-y-6">
         <SettingsPageHeader title={t('settings.computerUse.title')} description={t('settings.computerUse.description')} />
-        <div className="text-[13px] text-[var(--color-text-secondary)]">{t('settings.computerUse.checking')}</div>
+        <div className="text-sm text-muted-foreground">{t('settings.computerUse.checking')}</div>
       </div>
     )
   }
@@ -214,7 +214,7 @@ export function ComputerUseSettings() {
       <div className="min-w-0 space-y-4">
         <SettingsPageHeader title={t('settings.computerUse.title')} description={t('settings.computerUse.description')} />
         <Notice tone="error">
-          <div className="font-medium text-[var(--color-text-primary)]">{t('settings.computerUse.checkFailed')}</div>
+          <div className="font-medium text-foreground">{t('settings.computerUse.checkFailed')}</div>
           <div className="mt-1 [overflow-wrap:anywhere]">{checkError}</div>
         </Notice>
         <Button size="xs" variant="outline" onClick={() => void fetchStatus()}>
@@ -347,12 +347,12 @@ export function ComputerUseSettings() {
           ) : undefined}
         />
         {customOutdated ? (
-          <div className="pb-2 pl-5 text-xs text-[var(--color-text-tertiary)]">
+          <div className="pb-2 pl-5 text-xs text-subtle-foreground">
             {t('settings.computerUse.customOutdated')}
           </div>
         ) : null}
         {status.newerThanVerified && status.state === 'installed' ? (
-          <div className="pb-2 pl-5 text-xs text-[var(--color-text-tertiary)]">
+          <div className="pb-2 pl-5 text-xs text-subtle-foreground">
             {t('settings.computerUse.newerThanVerified', { verified: status.verifiedVersion })}
           </div>
         ) : null}
@@ -382,17 +382,17 @@ export function ComputerUseSettings() {
       </section>
 
       {installRunning && install?.output.length ? (
-        <pre className="max-h-40 overflow-auto rounded-md bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+        <pre className="max-h-40 overflow-auto rounded-md bg-card p-3 text-2xs leading-normal text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">
           {install.output.join('\n')}
         </pre>
       ) : null}
 
       {installFailed && !installRunning ? (
         <Notice tone="error">
-          <div className="font-medium text-[var(--color-text-primary)]">{t('settings.computerUse.installFailed')}</div>
+          <div className="font-medium text-foreground">{t('settings.computerUse.installFailed')}</div>
           <div className="mt-1 [overflow-wrap:anywhere]">{install?.error}</div>
           {install?.output.length ? (
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] [overflow-wrap:anywhere]">{install.output.join('\n')}</pre>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-2xs [overflow-wrap:anywhere]">{install.output.join('\n')}</pre>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <Button size="xs" onClick={() => setConfirm(lastInstall)} disabled={controlsDisabled}>
@@ -487,7 +487,7 @@ export function ComputerUseSettings() {
 
       {doctorOutput !== null ? (
         <section aria-label={t('settings.computerUse.doctor')}>
-          <pre className="max-h-72 overflow-auto rounded-md bg-[var(--color-surface-container-low)] p-3 text-[11px] leading-[1.5] text-[var(--color-text-secondary)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          <pre className="max-h-72 overflow-auto rounded-md bg-card p-3 text-2xs leading-normal text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">
             {doctorOutput}
           </pre>
         </section>
@@ -508,7 +508,7 @@ export function ComputerUseSettings() {
         />
       ) : null}
 
-      <p className="text-xs leading-[1.6] text-[var(--color-text-tertiary)]">{t('settings.computerUse.footer')}</p>
+      <p className="text-xs leading-relaxed text-subtle-foreground">{t('settings.computerUse.footer')}</p>
 
       <ConfirmDialog
         open={confirm === 'enable' || confirm === 'install' || confirm === 'upgrade'}
@@ -520,7 +520,7 @@ export function ComputerUseSettings() {
           ? t('settings.computerUse.installVersion', { version: status.verifiedVersion })
           : t('settings.computerUse.confirmInstallTitle')}
         body={(
-          <div className="space-y-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+          <div className="space-y-2 text-sm leading-6 text-muted-foreground">
             <p>
               {isMac
                 ? t('settings.computerUse.confirmInstallMac', { size: DOWNLOAD_SIZE_MB.darwin ?? 76 })

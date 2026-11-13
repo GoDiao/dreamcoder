@@ -7,6 +7,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { Button } from '../shared/ui/button'
+import { CardButton } from '../shared/CardButton'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import type { PluginCapabilityKey } from '../../types/plugin'
 import { useSkillStore } from '../../stores/skillStore'
@@ -173,23 +174,20 @@ export function PluginDetail() {
   return (
     <div className="flex flex-col gap-4 min-w-0">
       <div>
-        <button
-          onClick={clearSelection}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]"
-        >
-          <ArrowLeftIcon aria-hidden="true" size={16} />
+        <Button type="button" variant="ghost-muted" size="sm" onClick={clearSelection}>
+          <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
           {t('settings.plugins.back')}
-        </button>
+        </Button>
       </div>
 
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] overflow-hidden">
+      <section className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] lg:items-start">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--color-text-tertiary)] mb-2">
+            <div className="text-2xs font-semibold uppercase tracking-widest text-subtle-foreground mb-2">
               {t('settings.plugins.entryEyebrow')}
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <h3 className="text-[22px] font-semibold leading-tight text-[var(--color-text-primary)] break-all">
+              <h3 className="text-xl font-semibold leading-tight text-foreground break-all">
                 {selectedPlugin.name}
               </h3>
               <StatusPill enabled={selectedPlugin.enabled} hasErrors={selectedPlugin.hasErrors} />
@@ -197,10 +195,10 @@ export function PluginDetail() {
               <MetaPill>{selectedPlugin.marketplace}</MetaPill>
               {selectedPlugin.version && <MetaPill>v{selectedPlugin.version}</MetaPill>}
             </div>
-            <p className="max-w-4xl text-sm leading-6 text-[var(--color-text-secondary)]">
+            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
               {selectedPlugin.description || t('settings.plugins.noDescription')}
             </p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-text-tertiary)]">
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-subtle-foreground">
               {selectedPlugin.authorName && (
                 <span>{t('settings.plugins.author', { value: selectedPlugin.authorName })}</span>
               )}
@@ -238,7 +236,7 @@ export function PluginDetail() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4">
+      <section className="rounded-2xl border border-border bg-background px-5 py-4">
         <div className="flex flex-wrap gap-2">
           {canMutate && (
             selectedPlugin.enabled ? (
@@ -296,23 +294,23 @@ export function PluginDetail() {
         </div>
 
         {!canMutate && (
-          <p className="mt-3 text-xs text-[var(--color-text-tertiary)]">
+          <p className="mt-3 text-xs text-subtle-foreground">
             {selectedPlugin.scope === 'managed'
               ? t('settings.plugins.managedHint')
               : t('settings.plugins.builtinHint')}
           </p>
         )}
 
-        <p className="mt-3 text-xs text-[var(--color-text-tertiary)]">
+        <p className="mt-3 text-xs text-subtle-foreground">
           {t('settings.plugins.applyHint')}
         </p>
       </section>
 
       {selectedPlugin.errors.length > 0 && (
-        <section className="rounded-2xl border border-[var(--color-error)]/20 bg-[var(--color-error)]/6 px-5 py-4">
+        <section className="rounded-2xl border border-destructive/20 bg-destructive/6 px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <CircleAlertIcon className="shrink-0 text-[var(--color-error)]" aria-hidden="true" size={18} />
-            <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <CircleAlertIcon className="shrink-0 text-destructive" aria-hidden="true" size={18} />
+            <h4 className="text-sm font-semibold text-foreground">
               {t('settings.plugins.errorsTitle')}
             </h4>
           </div>
@@ -320,7 +318,7 @@ export function PluginDetail() {
             {selectedPlugin.errors.map((error) => (
               <div
                 key={error}
-                className="rounded-xl border border-[var(--color-error)]/15 bg-[var(--color-surface)] px-3 py-3 text-sm text-[var(--color-text-secondary)]"
+                className="rounded-xl border border-destructive/15 bg-background px-3 py-3 text-sm text-muted-foreground"
               >
                 {error}
               </div>
@@ -329,12 +327,12 @@ export function PluginDetail() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-container-low)]">
-          <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+      <section className="rounded-2xl border border-border bg-background overflow-hidden">
+        <div className="px-5 py-4 border-b border-border bg-card">
+          <h4 className="text-sm font-semibold text-foreground">
             {t('settings.plugins.capabilitiesTitle')}
           </h4>
-          <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+          <p className="text-xs text-subtle-foreground mt-1">
             {t('settings.plugins.capabilitiesHint')}
           </p>
         </div>
@@ -446,13 +444,13 @@ export function PluginDetail() {
             {otherCapabilityItems.map(({ key, items }) => (
               <div
                 key={key}
-                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-3"
+                className="rounded-xl border border-border bg-card px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  <div className="text-sm font-semibold text-foreground">
                     {t(`settings.plugins.capabilityLabel.${key}`)}
                   </div>
-                  <span className="text-[11px] text-[var(--color-text-tertiary)]">
+                  <span className="text-2xs text-subtle-foreground">
                     {items.length}
                   </span>
                 </div>
@@ -461,14 +459,14 @@ export function PluginDetail() {
                     {items.map((item) => (
                       <span
                         key={item}
-                        className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] break-all"
+                        className="rounded-full border border-border bg-background px-2.5 py-1 text-2xs text-muted-foreground break-all"
                       >
                         {item}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-xs text-[var(--color-text-tertiary)]">
+                  <div className="text-xs text-subtle-foreground">
                     {t('settings.plugins.capabilityEmpty')}
                   </div>
                 )}
@@ -513,17 +511,17 @@ function CapabilityPreviewSection({
   hint?: string
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
-        <div className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</div>
-        <div className="text-[11px] text-[var(--color-text-tertiary)]">{count}</div>
+    <section className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <div className="text-2xs text-subtle-foreground">{count}</div>
       </div>
       <div className="p-4">
         {hint && count > 0 && (
-          <div className="mb-3 text-xs text-[var(--color-text-tertiary)]">{hint}</div>
+          <div className="mb-3 text-xs text-subtle-foreground">{hint}</div>
         )}
         {count > 0 ? children : (
-          <div className="text-xs text-[var(--color-text-tertiary)]">{emptyLabel}</div>
+          <div className="text-xs text-subtle-foreground">{emptyLabel}</div>
         )}
       </div>
     </section>
@@ -549,29 +547,28 @@ function SkillPreviewCard({
   const slashName = rawName || name
 
   return (
-    <button
-      type="button"
+    <CardButton
       onClick={onClick}
       disabled={disabled}
-      className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] disabled:cursor-default disabled:opacity-70 disabled:hover:border-[var(--color-border)] disabled:hover:bg-[var(--color-surface)]"
+      className="group rounded-xl border border-border px-4 py-3 hover:border-ring disabled:hover:border-border disabled:hover:bg-background"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="text-sm font-semibold text-[var(--color-text-primary)] break-all">{name}</span>
+          <span className="text-sm font-semibold text-foreground break-all">{name}</span>
           {version && (
-            <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-tertiary)]">
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-3xs font-medium text-subtle-foreground">
               v{version}
             </span>
           )}
-          <span className="rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-tertiary)]">
+          <span className="rounded-full border border-border px-2 py-0.5 text-3xs font-medium text-subtle-foreground">
             {t('settings.skills.slashCommand')}
           </span>
         </div>
-        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
+        <ChevronRightIcon className="shrink-0 text-subtle-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
-      <div className="mt-1 text-[11px] text-[var(--color-text-tertiary)] break-all">/{slashName}</div>
-      <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">{description}</div>
-    </button>
+      <div className="mt-1 text-2xs text-subtle-foreground break-all">/{slashName}</div>
+      <div className="mt-2 text-xs leading-5 text-muted-foreground break-words">{description}</div>
+    </CardButton>
   )
 }
 
@@ -583,9 +580,9 @@ function CommandPreviewCard({
   description: string
 }) {
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-      <div className="text-sm font-semibold text-[var(--color-text-primary)] break-all">/{name}</div>
-      <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">{description}</div>
+    <div className="rounded-xl border border-border bg-background px-4 py-3">
+      <div className="text-sm font-semibold text-foreground break-all">/{name}</div>
+      <div className="mt-2 text-xs leading-5 text-muted-foreground break-words">{description}</div>
     </div>
   )
 }
@@ -602,20 +599,19 @@ function AgentPreviewCard({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="button"
+    <CardButton
       onClick={onClick}
       disabled={disabled}
-      className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] disabled:cursor-default disabled:opacity-70 disabled:hover:border-[var(--color-border)] disabled:hover:bg-[var(--color-surface)]"
+      className="group rounded-xl border border-border px-4 py-3 hover:border-ring disabled:hover:border-border disabled:hover:bg-background"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-[var(--color-text-primary)] break-all">{name}</div>
-          <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-words">{description}</div>
+          <div className="text-sm font-semibold text-foreground break-all">{name}</div>
+          <div className="mt-2 text-xs leading-5 text-muted-foreground break-words">{description}</div>
         </div>
-        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
+        <ChevronRightIcon className="shrink-0 text-subtle-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
-    </button>
+    </CardButton>
   )
 }
 
@@ -633,25 +629,24 @@ function McpPreviewCard({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="button"
+    <CardButton
       onClick={onClick}
       disabled={disabled}
-      className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] disabled:cursor-default disabled:opacity-70 disabled:hover:border-[var(--color-border)] disabled:hover:bg-[var(--color-surface)]"
+      className="group rounded-xl border border-border px-4 py-3 hover:border-ring disabled:hover:border-border disabled:hover:bg-background"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-[var(--color-text-primary)] break-all">{name}</span>
-            <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--color-text-tertiary)]">
+            <span className="text-sm font-semibold text-foreground break-all">{name}</span>
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-3xs font-medium uppercase tracking-widest text-subtle-foreground">
               {transport}
             </span>
           </div>
-          <div className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)] break-all">{summary}</div>
+          <div className="mt-2 text-xs leading-5 text-muted-foreground break-all">{summary}</div>
         </div>
-        <ChevronRightIcon className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
+        <ChevronRightIcon className="shrink-0 text-subtle-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" size={18} />
       </div>
-    </button>
+    </CardButton>
   )
 }
 
@@ -665,11 +660,11 @@ function HookPreviewCard({
   actions: string[]
 }) {
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+    <div className="rounded-xl border border-border bg-background px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-[var(--color-text-primary)] break-all">{event}</span>
+        <span className="text-sm font-semibold text-foreground break-all">{event}</span>
         {matcher && (
-          <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-tertiary)] break-all">
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-3xs font-medium text-subtle-foreground break-all">
             {matcher}
           </span>
         )}
@@ -678,7 +673,7 @@ function HookPreviewCard({
         {actions.map((action) => (
           <span
             key={action}
-            className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] break-all"
+            className="rounded-full border border-border bg-card px-2.5 py-1 text-2xs text-muted-foreground break-all"
           >
             {action}
           </span>
@@ -697,10 +692,10 @@ function StatusPill({
 }) {
   const t = useTranslation()
   const classes = hasErrors
-    ? 'bg-[var(--color-error)]/12 text-[var(--color-error)]'
+    ? 'bg-destructive/12 text-destructive'
     : enabled
-      ? 'bg-[var(--color-success-container)] text-[var(--color-success)]'
-      : 'bg-[var(--color-surface-container-high)] text-[var(--color-text-tertiary)]'
+      ? 'bg-success-surface text-success'
+      : 'bg-secondary text-subtle-foreground'
 
   const label = hasErrors
     ? t('settings.plugins.status.attention')
@@ -709,7 +704,7 @@ function StatusPill({
       : t('settings.plugins.status.disabled')
 
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${classes}`}>
+    <span className={`rounded-full px-2 py-0.5 text-3xs font-medium ${classes}`}>
       {label}
     </span>
   )

@@ -1,7 +1,7 @@
 import { execFile as execFileCallback, spawn } from 'node:child_process'
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { extname, join, posix as posixPath, resolve, win32 as winPath } from 'node:path'
+import { dirname, extname, join, posix as posixPath, resolve, win32 as winPath } from 'node:path'
 import { promisify } from 'node:util'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -598,7 +598,7 @@ async function resolveLaunchPlan(
   return null
 }
 
-async function validateDirectory(targetPath: string): Promise<string> {
+async function resolveOpenPath(targetPath: string, kind: OpenTargetKind): Promise<string> {
   const resolvedPath = resolve(targetPath)
   let entry
   try {
@@ -606,20 +606,20 @@ async function validateDirectory(targetPath: string): Promise<string> {
   } catch {
     throw openTargetError(
       400,
-      `Directory does not exist: ${resolvedPath}`,
+      `Path does not exist: ${resolvedPath}`,
       'OPEN_TARGET_PATH_MISSING',
     )
   }
 
-  if (!entry.isDirectory()) {
+  if (entry.isDirectory()) return resolvedPath
+  if (!entry.isFile()) {
     throw openTargetError(
       400,
-      `Path is not a directory: ${resolvedPath}`,
-      'OPEN_TARGET_PATH_NOT_DIRECTORY',
+      `Path is neither a file nor a directory: ${resolvedPath}`,
+      'OPEN_TARGET_PATH_UNSUPPORTED',
     )
   }
-
-  return resolvedPath
+  return kind === 'file_manager' ? dirname(resolvedPath) : resolvedPath
 }
 
 function normalizeIconFileName(iconFile: string): string {
@@ -957,7 +957,7 @@ export function createOpenTargetService(overrides: Partial<Runtime> = {}) {
       )
     }
 
-    const resolvedPath = await validateDirectory(input.path)
+    const resolvedPath = await resolveOpenPath(input.path, definition.kind)
     const launchPlan = await resolveLaunchPlan(definition, runtime, resolvedPath)
     if (!launchPlan) {
       throw openTargetError(

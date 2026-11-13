@@ -18,7 +18,7 @@ import { useWorkspacePanelStore } from '../../stores/workspacePanelStore'
 import { TemplateThumbnail } from '../design/TemplateThumbnail'
 import { CardButton } from '../shared/CardButton'
 import { Button } from '../shared/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../shared/ui/card'
+import { Card, CardHeader, CardTitle } from '../shared/ui/card'
 
 type Props = {
   sessionId: string
@@ -59,12 +59,12 @@ export function DesignTemplateChoice({ sessionId, toolUseId, input, result }: Pr
       : t('design.notChosen')
 
   return (
-    <Card data-testid="design-template-choice" className="my-2">
+    <Card size="sm" data-testid="design-template-choice" className="my-2">
       <CardHeader>
-        <CardTitle className="text-sm">{t('design.choiceTitle')}</CardTitle>
+        <CardTitle>{t('design.choiceTitle')}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {resolved && <p role="status" className="text-ui-aux text-[var(--color-text-secondary)]">{summary}</p>}
+      <div className="flex flex-col gap-3 px-3">
+        {resolved && <p role="status" className="text-xs text-muted-foreground">{summary}</p>}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
           {candidates.map((candidate) => {
             const template = templates.find((item) => item.id === candidate.id)
@@ -74,21 +74,21 @@ export function DesignTemplateChoice({ sessionId, toolUseId, input, result }: Pr
                 key={candidate.id}
                 data-testid="design-choice-card"
                 data-picked={picked}
-                className={`flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface)] ${picked ? 'border-[var(--color-brand)]' : 'border-[var(--color-border)]'}`}
+                className={`flex flex-col overflow-hidden rounded-lg border bg-background ${picked ? 'border-primary' : 'border-border'}`}
               >
                 <TemplateThumbnail templateId={candidate.id} className="h-24 w-full" />
                 <div className="flex flex-1 flex-col gap-1 p-2.5">
-                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                  <span className="text-sm font-medium text-foreground">
                     {template ? localizedText(template.title, locale) : candidate.id}
                   </span>
-                  {template && <span className="text-ui-aux text-[var(--color-text-tertiary)]">{t(DESIGN_CATEGORY_LABELS[template.category])}</span>}
-                  <span className="text-ui-aux text-[var(--color-text-secondary)]">{candidate.reason}</span>
+                  {template && <span className="text-xs text-subtle-foreground">{t(DESIGN_CATEGORY_LABELS[template.category])}</span>}
+                  <span className="text-xs text-muted-foreground">{candidate.reason}</span>
                   <div className="mt-auto flex gap-2 pt-2">
                     {desktop && (
                       <Button variant="outline" size="xs" onClick={() => preview(candidate.id)}>{t('design.preview')}</Button>
                     )}
                     {picked ? (
-                      <Check aria-hidden="true" className="ml-auto size-4 text-[var(--color-brand)]" />
+                      <Check aria-hidden="true" className="ml-auto size-4 text-primary" />
                     ) : (
                       <Button size="xs" disabled={!answerable} onClick={() => choose(candidate.id)}>{t('design.useTemplate')}</Button>
                     )}
@@ -102,16 +102,16 @@ export function DesignTemplateChoice({ sessionId, toolUseId, input, result }: Pr
             data-picked={chosen === SCRATCH_CHOICE}
             onClick={() => choose(SCRATCH_CHOICE)}
             data-testid="design-choice-scratch"
-            className={`flex min-h-24 flex-col items-start justify-between gap-2 border border-dashed p-3 ${chosen === SCRATCH_CHOICE ? 'border-[var(--color-brand)]' : 'border-[var(--color-border)]'}`}
+            className={`flex min-h-24 flex-col items-start justify-between gap-2 border border-dashed p-3 ${chosen === SCRATCH_CHOICE ? 'border-primary' : 'border-border'}`}
           >
-            <PencilRuler aria-hidden="true" size={22} strokeWidth={1.6} className="text-[var(--color-text-tertiary)]" />
+            <PencilRuler aria-hidden="true" size={22} strokeWidth={1.6} className="text-subtle-foreground" />
             <span className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-[var(--color-text-primary)]">{t('design.choiceScratch')}</span>
-              <span className="text-ui-aux text-[var(--color-text-secondary)]">{t('design.choiceScratchHint')}</span>
+              <span className="text-sm font-medium text-foreground">{t('design.choiceScratch')}</span>
+              <span className="text-xs text-muted-foreground">{t('design.choiceScratchHint')}</span>
             </span>
           </CardButton>
         </div>
-      </CardContent>
+      </div>
     </Card>
   )
 }

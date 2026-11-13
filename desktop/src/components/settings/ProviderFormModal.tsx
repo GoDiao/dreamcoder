@@ -1,5 +1,4 @@
 import { FormSelect } from '../shared/FormSelect'
-import { Textarea } from '../shared/ui/textarea'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupButton } from '../shared/ui/input-group'
 import { ArrowDownIcon, ArrowUpIcon, ArrowUpRightIcon, Box, ChevronDown, EyeIcon, EyeOffIcon, KeyRoundIcon, Plus, Trash2Icon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef } from 'react'
@@ -13,7 +12,7 @@ import { LabeledInput } from '../shared/LabeledInput'
 import { Button } from '../shared/ui/button'
 import { getPresetDisplayName } from './presetDisplayName'
 import { ProviderIcon } from './ProviderIcon'
-import { Command, CommandItem, CommandList } from '../shared/ui/command'
+import { CommandItem, CommandList } from '../shared/ui/command'
 import { Popover, PopoverAnchor, PopoverContent } from '../shared/ui/popover'
 import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ProviderModel, DiscoveredProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
@@ -299,10 +298,10 @@ function ModelDiscoveryCombobox({
   }
 
   return (
-    <Command label={label} shouldFilter={false} className="block size-auto overflow-visible rounded-none! bg-transparent p-0">
+    <CommandPrimitive label={label} shouldFilter={false}>
       <Popover open={expanded} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
-          <div className="relative">
+          <InputGroup>
             <CommandPrimitive.Input
               asChild
               value={value}
@@ -311,7 +310,7 @@ function ModelDiscoveryCombobox({
                 if (models.length > 0) setOpen(true)
               }}
             >
-              <Input
+              <InputGroupInput
                 autoComplete="off"
                 onFocus={() => {
                   if (models.length > 0) setOpen(true)
@@ -320,13 +319,14 @@ function ModelDiscoveryCombobox({
                   if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && models.length > 0) setOpen(true)
                 }}
                 placeholder={placeholder}
-                className="pr-8"
               />
             </CommandPrimitive.Input>
             {models.length > 0 && (
-              <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+              <InputGroupAddon align="inline-end">
+                <ChevronDown aria-hidden="true" />
+              </InputGroupAddon>
             )}
-          </div>
+          </InputGroup>
         </PopoverAnchor>
         <PopoverContent
           align="start"
@@ -337,13 +337,13 @@ function ModelDiscoveryCombobox({
             if (event.target instanceof Element && event.target.closest('[cmdk-root]')) event.preventDefault()
           }}
           onMouseDown={(event) => event.preventDefault()}
-          className="w-[var(--radix-popover-trigger-width)] p-1"
+          className="w-[var(--radix-popover-trigger-width)]"
         >
           <CommandList aria-label={label} className="max-h-[240px]">
             {offerTyped && (
-              <CommandItem value={`custom-model:${typed}`} onSelect={() => setOpen(false)} className="gap-2 px-3 py-2">
-                <Plus aria-hidden="true" className="text-[var(--color-text-secondary)]" />
-                <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]">{useCustomLabel(typed)}</span>
+              <CommandItem value={`custom-model:${typed}`} onSelect={() => setOpen(false)}>
+                <Plus aria-hidden="true" className="text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{useCustomLabel(typed)}</span>
               </CommandItem>
             )}
             {filteredModels.map((model) => (
@@ -352,19 +352,18 @@ function ModelDiscoveryCombobox({
                 value={model.id}
                 data-checked={model.id === value}
                 onSelect={() => selectModel(model)}
-                className="gap-2 px-3 py-2"
               >
-                <Box aria-hidden="true" className="text-[var(--color-text-secondary)]" />
+                <Box aria-hidden="true" className="text-muted-foreground" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-[var(--color-text-primary)]">{model.name || model.id}</span>
-                  {model.name && <span className="block truncate text-[11px] text-[var(--color-text-tertiary)]">{model.id}</span>}
+                  <span className="block truncate text-sm font-medium text-foreground">{model.name || model.id}</span>
+                  {model.name && <span className="block truncate text-2xs text-subtle-foreground">{model.id}</span>}
                 </span>
               </CommandItem>
             ))}
           </CommandList>
         </PopoverContent>
       </Popover>
-    </Command>
+    </CommandPrimitive>
   )
 }
 
@@ -626,19 +625,19 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       .filter((name, index, names) => names.indexOf(name) !== index),
   )
   const renderPresetButton = (preset: ProviderPreset) => (
-    <Button
-      variant="ghost"
+    <button
+      type="button"
       key={preset.id}
       onClick={() => handlePresetChange(preset)}
-      className={`inline-flex max-w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs font-medium rounded-full border transition-all ${
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-xs font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-ring/50 ${
         selectedPreset.id === preset.id
-          ? 'border-[var(--color-brand)] bg-[var(--color-surface-container-high)] text-[var(--color-brand)] ring-3 ring-ui-ring/50'
-          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)]'
+          ? 'border-primary bg-secondary text-primary ring-3 ring-ring/50'
+          : 'border-border text-muted-foreground hover:border-ring hover:bg-hover'
       }`}
     >
       <ProviderIcon presetId={preset.id} />
       <span className="min-w-0 [overflow-wrap:anywhere]">{getPresetDisplayName(preset, t)}</span>
-    </Button>
+    </button>
   )
 
   const handleSubmit = async () => {
@@ -739,12 +738,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       footer={
         <>
           {settingsLoadFailed && (
-            <p role="alert" className="mr-auto self-center text-xs text-[var(--color-error)]">
+            <p role="alert" className="mr-auto self-center text-xs text-destructive">
               {t('settings.providers.settingsLoadFailed')}
             </p>
           )}
           {saveError && (
-            <p role="alert" className="mr-auto self-center text-xs text-[var(--color-error)] [overflow-wrap:anywhere]">
+            <p role="alert" className="mr-auto self-center text-xs text-destructive [overflow-wrap:anywhere]">
               {t('settings.providers.saveFailed', { error: saveError })}
             </p>
           )}
@@ -758,7 +757,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       <div className="flex flex-col gap-4">
         {mode === 'create' && (
           <div>
-            <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.preset')}</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">{t('settings.providers.preset')}</label>
             <div className="flex flex-wrap gap-2">
               {presets.map(renderPresetButton)}
             </div>
@@ -790,13 +789,13 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
 
         {(isCustom || mode === 'edit') ? (
           <div>
-            <label htmlFor="provider-api-format" className="text-sm font-medium text-[var(--color-text-primary)] mb-1 block">{t('settings.providers.apiFormat')}</label>
+            <label htmlFor="provider-api-format" className="text-sm font-medium text-foreground mb-1 block">{t('settings.providers.apiFormat')}</label>
             <FormSelect id="provider-api-format" label={t('settings.providers.apiFormat')} options={apiFormatOptions} value={apiFormat} onChange={handleApiFormatChange} description={apiFormat !== 'anthropic' ? t('settings.providers.proxyHint') : undefined} />
           </div>
         ) : apiFormat !== 'anthropic' ? (
           <div>
-            <label className="text-sm font-medium text-[var(--color-text-primary)] mb-1 block">{t('settings.providers.apiFormat')}</label>
-            <div className="text-xs text-[var(--color-text-tertiary)] px-3 py-2 rounded-md bg-[var(--color-surface-container-low)] border border-[var(--color-border)]">
+            <label className="text-sm font-medium text-foreground mb-1 block">{t('settings.providers.apiFormat')}</label>
+            <div className="text-xs text-subtle-foreground px-3 py-2 rounded-md bg-card border border-border">
               {apiFormat === 'openai_chat' ? t('settings.providers.apiFormatOpenaiChat') : t('settings.providers.apiFormatOpenaiResponses')}
             </div>
           </div>
@@ -804,15 +803,15 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
 
         {apiFormat === 'anthropic' && (
           <div>
-            <label htmlFor="provider-auth-strategy" className="text-sm font-medium text-[var(--color-text-primary)] mb-1 block">{t('settings.providers.authStrategy')}</label>
+            <label htmlFor="provider-auth-strategy" className="text-sm font-medium text-foreground mb-1 block">{t('settings.providers.authStrategy')}</label>
             <FormSelect id="provider-auth-strategy" label={t('settings.providers.authStrategy')} options={authStrategyOptions} value={authStrategy} onChange={handleAuthStrategyChange} description={authStrategyOptions.find((option) => option.value === authStrategy)?.description} />
           </div>
         )}
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="provider-api-key" className="text-sm font-medium text-[var(--color-text-primary)]">
+          <label htmlFor="provider-api-key" className="text-sm font-medium text-foreground">
             {t('settings.providers.apiKey')}
-            {mode === 'create' && requiresApiKey && <span className="text-[var(--color-error)] ml-0.5">*</span>}
+            {mode === 'create' && requiresApiKey && <span className="text-destructive ml-0.5">*</span>}
           </label>
           <InputGroup>
             <InputGroupInput
@@ -831,33 +830,32 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         </div>
 
         {apiKeyUrl && (
-          <Button
-            variant="ghost"
+          <button
             type="button"
             onClick={() => openExternalUrl(apiKeyUrl)}
-            className="group -mt-2 inline-flex h-6 w-fit cursor-pointer items-center gap-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1.5 text-[11px] font-medium leading-none text-[var(--color-brand)] transition-colors hover:border-[var(--color-border-focus)] hover:bg-[var(--color-surface-hover)] focus:outline-none"
+            className="group -mt-2 inline-flex h-6 w-fit cursor-pointer items-center gap-1 rounded-sm border border-border bg-card px-1.5 text-2xs font-medium leading-none text-primary outline-none transition-colors hover:border-ring hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <KeyRoundIcon aria-hidden="true" size={13} />
             {t('settings.providers.getApiKey')}
             <ArrowUpRightIcon className="shrink-0 opacity-60 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" size={9} />
-          </Button>
+          </button>
         )}
 
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.providers.models')}</label>
+            <label className="text-sm font-medium text-foreground">{t('settings.providers.models')}</label>
             <Button variant="outline" size="sm" onClick={handleDiscoverModels} loading={isDiscovering} disabled={!baseUrl.trim()}>
               {t('settings.providers.fetchModels')}
             </Button>
           </div>
           {discoveryError && (
-            <p role="alert" className="mb-2 text-[11px] text-[var(--color-error)]">{discoveryError}</p>
+            <p role="alert" className="mb-2 text-2xs text-destructive">{discoveryError}</p>
           )}
           {models.length > 0 && apiFormat !== modelsApiFormat && (
-            <p role="status" className="mb-2 text-[11px] text-[var(--color-warning)]">{t('settings.providers.apiFormatChangedModels')}</p>
+            <p role="status" className="mb-2 text-2xs text-warning">{t('settings.providers.apiFormatChangedModels')}</p>
           )}
           {discoveryCount !== null && (
-            <p role="status" className="mb-2 text-[11px] text-[var(--color-text-secondary)]">
+            <p role="status" className="mb-2 text-2xs text-muted-foreground">
               {discoveryCount > 0
                 ? t('settings.providers.modelsFound', { count: discoveryCount })
                 : t('settings.providers.noModelsReturned')}
@@ -865,7 +863,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           )}
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">{t('settings.providers.modelId')}</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t('settings.providers.modelId')}</label>
               <ModelDiscoveryCombobox
                 models={discoveredModels}
                 value={newModelId}
@@ -898,7 +896,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
             {models.map((model, index) => {
               const errorKey = getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
               return (
-                <div key={model.id} className="flex flex-wrap items-start gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-2">
+                <div key={model.id} className="flex flex-wrap items-start gap-2 rounded-md border border-border bg-card p-2">
                   <div className="min-w-0 flex-1">
                     <Input
                       aria-label={t('settings.providers.displayName')}
@@ -910,12 +908,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                       )))}
                       placeholder={model.id}
                     />
-                    <div className="mt-1 truncate text-[11px] text-[var(--color-text-tertiary)]">{model.id}</div>
+                    <div className="mt-1 truncate text-2xs text-subtle-foreground">{model.id}</div>
                     {index === 0 && (
-                      <div className="mt-1 text-[11px] font-medium text-[var(--color-brand)]">{t('settings.providers.defaultModel')}</div>
+                      <div className="mt-1 text-2xs font-medium text-primary">{t('settings.providers.defaultModel')}</div>
                     )}
                     {model.name && duplicateModelNames.has(model.name.trim()) && (
-                      <div className="mt-1 text-[11px] text-[var(--color-warning)]">{t('settings.providers.duplicateDisplayName')}</div>
+                      <div className="mt-1 text-2xs text-warning">{t('settings.providers.duplicateDisplayName')}</div>
                     )}
                   </div>
                   <div className="w-36 min-w-0">
@@ -927,7 +925,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                       onChange={(event) => handleModelContextWindowChange(model.id, event.target.value)}
                       placeholder={t('settings.providers.contextWindowPlaceholder')}
                     />
-                    <div className={`mt-1 text-[11px] ${errorKey ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}>
+                    <div className={`mt-1 text-2xs ${errorKey ? 'text-destructive' : 'text-subtle-foreground'}`}>
                       {errorKey
                         ? t(errorKey === 'number'
                           ? 'settings.providers.modelContextWindowNumberError'
@@ -936,31 +934,28 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
                     </div>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="ghost-muted"
                     size="icon"
                     disabled={index === 0}
                     onClick={() => moveModel(index, -1)}
                     aria-label={t('settings.providers.moveModelUp')}
-                    className="text-[var(--color-text-tertiary)]"
                   >
                     <ArrowUpIcon aria-hidden="true" size={18} />
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="ghost-muted"
                     size="icon"
                     disabled={index === models.length - 1}
                     onClick={() => moveModel(index, 1)}
                     aria-label={t('settings.providers.moveModelDown')}
-                    className="text-[var(--color-text-tertiary)]"
                   >
                     <ArrowDownIcon aria-hidden="true" size={18} />
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="ghost-destructive"
                     size="icon"
                     onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
                     aria-label={t('common.delete')}
-                    className="text-[var(--color-text-tertiary)] hover:text-[var(--color-error)]"
                   >
                     <Trash2Icon aria-hidden="true" size={18} />
                   </Button>
@@ -968,11 +963,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
               )
             })}
           </div>
-          <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
+          <p className="mt-1 text-2xs text-subtle-foreground">
             {t('settings.providers.modelContextWindowsDesc')}
           </p>
           <div className="mt-3">
-            <label htmlFor="provider-fast-model" className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">{t('settings.providers.fastModel')}</label>
+            <label htmlFor="provider-fast-model" className="mb-1 block text-sm font-medium text-foreground">{t('settings.providers.fastModel')}</label>
             <FormSelect
               id="provider-fast-model"
               label={t('settings.providers.fastModel')}
@@ -996,7 +991,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           </Button>
           {testResult && (
             <div className="flex flex-col gap-0.5">
-              <span className={`text-xs ${testResult.connectivity.success ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>
+              <span className={`text-xs ${testResult.connectivity.success ? 'text-success' : 'text-destructive'}`}>
                 {testResult.connectivity.success
                   ? t('settings.providers.connectivityOk', { latency: String(testResult.connectivity.latencyMs) })
                   : t('settings.providers.connectivityFailed', { error: testResult.connectivity.error || '' })}
@@ -1006,8 +1001,8 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         </div>
 
         <div>
-          <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">{t('settings.providers.settingsJson')}</label>
-          <Textarea
+          <label className="text-sm font-medium text-foreground mb-2 block">{t('settings.providers.settingsJson')}</label>
+          <textarea
             aria-label={t('settings.providers.settingsJson')}
             aria-invalid={!!settingsJsonError}
             disabled={!settingsReady}
@@ -1062,17 +1057,17 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
             }}
             rows={16}
             spellCheck={false}
-            className={`field-sizing-fixed w-full text-xs px-3 py-3 rounded-md bg-[var(--color-surface-container-low)] border font-mono leading-relaxed resize-y text-[var(--color-text-secondary)] outline-none ${
+            className={`field-sizing-fixed w-full resize-y rounded-lg border bg-card px-3 py-3 font-mono text-xs leading-relaxed text-muted-foreground outline-none ${
               settingsJsonError
-                ? 'border-[var(--color-error)] focus:border-[var(--color-error)]'
-                : 'border-[var(--color-border)]'
+                ? 'border-destructive focus:border-destructive'
+                : 'border-border'
             }`}
           />
           {settingsJsonError && (
-            <p className="text-[11px] text-[var(--color-error)] mt-1">{t('settings.providers.jsonError', { error: settingsJsonError })}</p>
+            <p className="text-2xs text-destructive mt-1">{t('settings.providers.jsonError', { error: settingsJsonError })}</p>
           )}
-          <p className="text-[11px] text-[var(--color-text-tertiary)] mt-1">{t('settings.providers.settingsJsonModelsGenerated')}</p>
-          <p className="text-[11px] text-[var(--color-text-tertiary)] mt-1">{t('settings.providers.settingsJsonDesc')}</p>
+          <p className="text-2xs text-subtle-foreground mt-1">{t('settings.providers.settingsJsonModelsGenerated')}</p>
+          <p className="text-2xs text-subtle-foreground mt-1">{t('settings.providers.settingsJsonDesc')}</p>
         </div>
       </div>
     </Modal>

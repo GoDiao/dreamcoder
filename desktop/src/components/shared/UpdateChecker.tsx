@@ -53,7 +53,7 @@ function UpdatePrompt() {
   if (!availableVersion) return null
 
   return (
-    <Card className="w-full gap-3 py-4">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>
           {t('update.available', { version: availableVersion })}
@@ -61,10 +61,10 @@ function UpdatePrompt() {
       </CardHeader>
       <CardContent>
         {releaseNotes && (
-          <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-[var(--color-border)]/60 bg-[var(--color-surface)]/70 px-3 py-2">
+          <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border/60 bg-background/70 px-3 py-2">
             <MarkdownRenderer
               content={releaseNotes}
-              className="text-xs leading-5 text-[var(--color-text-secondary)] [&_h1]:mb-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_p]:my-1.5 [&_p]:text-xs [&_p]:leading-5 [&_ul]:my-1.5 [&_ol]:my-1.5"
+              className="text-xs leading-5 text-muted-foreground [&_h1]:mb-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_p]:my-1.5 [&_p]:text-xs [&_p]:leading-5 [&_ul]:my-1.5 [&_ol]:my-1.5"
             />
           </div>
         )}
@@ -73,7 +73,7 @@ function UpdatePrompt() {
           <div className="mt-3">
             <Progress aria-label={t('update.downloading')} value={hasKnownProgress || status === 'restarting' ? Math.min(progressPercent, 100) : null} />
             {statusText && (
-              <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+              <p className="text-xs text-subtle-foreground mt-1">
                 {statusText}
                 {status === 'downloading' && hasKnownProgress ? ` ${progressPercent}%` : ''}
               </p>
@@ -82,14 +82,14 @@ function UpdatePrompt() {
         )}
 
         {error && (
-          <p className="mt-2 text-xs text-[var(--color-error)]">
+          <p className="mt-2 text-xs text-destructive">
             {t('update.failed', { error })}
           </p>
         )}
 
       </CardContent>
         {status === 'available' && (
-          <CardFooter className="gap-2">
+          <CardFooter>
             <Button size="sm"
               onClick={() => void installUpdate()}
             >

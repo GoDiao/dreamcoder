@@ -26,7 +26,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-[var(--color-overlay-scrim)] duration-100 supports-backdrop-filter:backdrop-blur-xs",
+        "fixed inset-0 isolate z-50 bg-overlay supports-backdrop-filter:backdrop-blur-xs",
         className
       )}
       {...props}
@@ -38,9 +38,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "default",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  size?: "default" | "flush"
 }) {
   const t = useTranslation()
   return (
@@ -48,9 +50,10 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-size={size}
         aria-modal="true"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-ui-popover p-4 text-sm text-ui-popover-foreground ring-1 ring-ui-foreground/10 duration-100 outline-none sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-2xl shadow-black/20 ring-1 ring-foreground/10 outline-none sm:max-w-sm data-[size=flush]:gap-0 data-[size=flush]:overflow-hidden data-[size=flush]:p-0",
           className
         )}
         {...props}

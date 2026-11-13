@@ -6,7 +6,7 @@ import { useTranslation } from '../../i18n'
 export function TaskEmptyState({ onCreateTask }: { onCreateTask: () => void }) {
   const t = useTranslation()
   return (
-    <Empty className="py-20">
+    <Empty>
       <EmptyHeader>
         <EmptyMedia variant="icon"><Clock aria-hidden="true" /></EmptyMedia>
         <EmptyTitle>{t('tasks.emptyTitle')}</EmptyTitle>

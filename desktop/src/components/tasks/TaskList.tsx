@@ -36,9 +36,9 @@ export function TaskList({ tasks }: Props) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-4 py-3 rounded-lg bg-[var(--color-surface-info)]">
-      <div className="text-2xl font-bold text-[var(--color-text-primary)]">{value}</div>
-      <div className="text-xs text-[var(--color-text-secondary)]">{label}</div>
+    <div className="px-4 py-3 rounded-lg bg-muted">
+      <div className="text-2xl font-bold text-foreground">{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   )
 }

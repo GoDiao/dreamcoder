@@ -64,8 +64,8 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
   const header = (
     <div className="mb-5 flex flex-wrap items-center gap-2.5">
       <div className="mr-auto flex items-baseline gap-2.5">
-        <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{t('settings.skills.pageTitle')}</h2>
-        <span className="text-xs text-[var(--color-text-secondary)]">
+        <h2 className="text-xl font-semibold text-foreground">{t('settings.skills.pageTitle')}</h2>
+        <span className="text-xs text-muted-foreground">
           {t('settings.skills.installedCount', { count: String(skills.length) })}
         </span>
       </div>
@@ -93,7 +93,7 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
     return (
       <div className="min-w-0">
         {header}
-        <div className="text-sm text-[var(--color-error)] py-4">{error}</div>
+        <div className="text-sm text-destructive py-4">{error}</div>
       </div>
     )
   }
@@ -104,13 +104,13 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
 
       {skills.length === 0 ? (
         <div className="py-10 text-center">
-          <p className="text-[13px] text-[var(--color-text-secondary)]">{t('settings.skills.empty')}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{t('settings.skills.emptyHint')}</p>
+          <p className="text-sm text-muted-foreground">{t('settings.skills.empty')}</p>
+          <p className="mt-1 text-xs text-subtle-foreground">{t('settings.skills.emptyHint')}</p>
         </div>
       ) : filteredSkills.length === 0 ? (
         <div className="py-10 text-center">
-          <p className="text-[13px] text-[var(--color-text-secondary)]">{t('settings.skills.noSearchResults')}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{t('settings.skills.noSearchResultsHint')}</p>
+          <p className="text-sm text-muted-foreground">{t('settings.skills.noSearchResults')}</p>
+          <p className="mt-1 text-xs text-subtle-foreground">{t('settings.skills.noSearchResultsHint')}</p>
         </div>
       ) : (
         SOURCE_ORDER.map((source) => {
@@ -119,10 +119,10 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
           const sourceLabel = t(`settings.skills.source.${source}`)
 
           return (
-            <section key={source} aria-label={sourceLabel} className="mb-[22px] last:mb-0">
-              <h3 className="mb-[5px] flex items-center gap-[9px] text-sm font-semibold text-[var(--color-text-primary)]">
+            <section key={source} aria-label={sourceLabel} className="mb-5.5 last:mb-0">
+              <h3 className="mb-1.25 flex items-center gap-2.25 text-sm font-semibold text-foreground">
                 {t('settings.skills.groupTitle', { source: sourceLabel })}
-                <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-[var(--color-surface-hover)] px-1.5 py-px text-[11px] font-normal text-[var(--color-text-secondary)]">
+                <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-hover px-1.5 py-px text-2xs font-normal text-muted-foreground">
                   {group.length}
                 </span>
               </h3>
@@ -137,21 +137,21 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
                       fetchSkillDetail(skill.source, skill.name, currentWorkDir, 'skills')
                     }
                     disabled={!skill.hasDirectory}
-                    className="skill-row group relative flex w-full min-w-0 items-center gap-[11px] rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:bg-[var(--color-surface-hover)] focus-visible:outline-none active:bg-[var(--color-surface-hover)] disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-[var(--color-border-separator)] after:content-[''] hover:after:opacity-0 focus-visible:after:opacity-0 active:after:opacity-0 [&:has(+.skill-row:hover)]:after:opacity-0 [&:has(+.skill-row:focus-visible)]:after:opacity-0"
+                    className="skill-row group relative flex w-full min-w-0 items-center gap-2.75 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-hover focus-visible:bg-hover focus-visible:outline-none active:bg-hover disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border after:content-[''] hover:after:opacity-0 focus-visible:after:opacity-0 active:after:opacity-0 [&:has(+.skill-row:hover)]:after:opacity-0 [&:has(+.skill-row:focus-visible)]:after:opacity-0"
                   >
-                    <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[7px] border border-[var(--color-border)] text-[var(--color-text-secondary)]">
+                    <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg border border-border text-muted-foreground">
                       <FileText size={17} strokeWidth={1.7} aria-hidden="true" />
                     </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      <span className="flex min-w-0 items-center gap-[9px]">
-                        <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.75">
+                      <span className="flex min-w-0 items-center gap-2.25">
+                        <span className="truncate text-sm font-medium text-foreground">
                           {skill.displayName || skill.name}
                         </span>
                         {source === 'project' && projectName ? <SkillBadge>{projectName}</SkillBadge> : null}
                         {skill.version ? <SkillBadge>v{skill.version}</SkillBadge> : null}
                         {skill.userInvocable ? <SkillBadge>{t('settings.skills.slashCommand')}</SkillBadge> : null}
                       </span>
-                      <span className="truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+                      <span className="truncate text-xs leading-normal text-muted-foreground">
                         <span>{sourceLabel}</span>
                         {skill.pluginName ? <> · <span>{skill.pluginName}</span></> : null}
                         {skill.description ? <> · <span>{skill.description}</span></> : null}
@@ -160,7 +160,7 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
                     <ChevronRight
                       size={14}
                       aria-hidden="true"
-                      className="mr-1 flex-none text-[var(--color-text-tertiary)]"
+                      className="mr-1 flex-none text-subtle-foreground"
                     />
                   </button>
                 ))}
@@ -175,7 +175,7 @@ export function SkillList({ query, onQueryChange }: SkillListProps) {
 
 function SkillBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex flex-none items-center rounded-[4px] bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-secondary)]">
+    <span className="inline-flex flex-none items-center rounded-sm bg-hover px-1.5 py-0.5 text-2xs text-muted-foreground">
       {children}
     </span>
   )

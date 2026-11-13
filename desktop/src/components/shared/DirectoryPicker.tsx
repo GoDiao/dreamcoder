@@ -102,83 +102,75 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
   const isWorkbar = variant === 'workbar'
   const selectedLabel = selectedProject?.repoName || selectedProject?.projectName || projectNameFromPath(value)
   const showGitIcon = selectedProject?.isGit || isGitProject
-  const triggerClassName = isWorkbar
-    ? 'inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-md border border-transparent px-1.5 text-ui-aux font-medium leading-none text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none'
-    : 'flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-container-low)] hover:bg-[var(--color-surface-hover)] rounded-full text-xs transition-colors border border-[var(--color-border)]'
-  const emptyTriggerClassName = isWorkbar
-    ? 'flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-transparent px-1.5 text-ui-aux font-medium leading-none text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus-visible:outline-none'
-    : 'flex items-center gap-2 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors'
+  const triggerVariant = isWorkbar ? 'ghost-muted' : value ? 'outline' : 'link-muted'
+  const triggerSize = isWorkbar ? 'toolbar' : value ? 'sm' : 'inline'
 
   const dropdownTitle = mode === 'recent' ? t('dirPicker.recent') : t('dirPicker.chooseProjectFolder')
   const dropdownContent = mode === 'recent' ? (
     <>
       {!isMobileBrowser && (
-        <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-outline)]">
+        <div className="px-4 py-2 text-3xs font-bold uppercase tracking-widest text-subtle-foreground">
           {t('dirPicker.recent')}
         </div>
       )}
       <div className={`${isMobileBrowser ? '' : 'max-h-[300px]'} overflow-y-auto`}>
         {loading ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">{t('common.loading')}</div>
+          <div className="px-4 py-6 text-center text-xs text-subtle-foreground">{t('common.loading')}</div>
         ) : projects.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-tertiary)]">{t('dirPicker.noRecent')}</div>
+          <div className="px-4 py-6 text-center text-xs text-subtle-foreground">{t('dirPicker.noRecent')}</div>
         ) : (
           projects.map((project) => {
             const isSelected = project.realPath === value
             return (
-              <Button variant="ghost" size="row"
+              <Button
+                type="button"
+                variant="ghost"
+                size="row-lg"
                 key={project.projectPath}
                 onClick={() => handleSelect(project.realPath)}
-                className={`gap-3 px-4 ${
-                  isMobileBrowser ? 'min-h-[72px] py-3.5' : 'py-3'
-                } ${
-                  isSelected ? 'bg-[var(--color-surface-selected)]' : ''
-                }`}
+                aria-current={isSelected ? 'true' : undefined}
+                className={isMobileBrowser ? 'min-h-18' : undefined}
               >
                 {project.isGit ? (
-                  <GitBranch size={20} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
+                  <GitBranch size={20} aria-hidden="true" className="shrink-0 text-muted-foreground" />
                 ) : (
-                  <Folder size={18} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
+                  <Folder size={18} aria-hidden="true" className="shrink-0 text-muted-foreground" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                  <div className="truncate text-sm font-semibold text-foreground">
                     {project.repoName || project.projectName}
                   </div>
-                  <div className="truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
+                  <div className="truncate font-mono text-2xs text-subtle-foreground">
                     {project.realPath}
                   </div>
                 </div>
                 {isSelected && (
-                  <Check size={18} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
+                  <Check size={18} aria-hidden="true" className="shrink-0 text-muted-foreground" />
                 )}
               </Button>
             )
           })
         )}
       </div>
-      <div className="border-t border-[var(--color-border)]">
-        <Button variant="ghost" size="row"
-          onClick={handleChooseFolder}
-          className="gap-3 px-4 py-3"
-        >
-          <FolderPlus size={18} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
-          <span className="text-sm text-[var(--color-text-secondary)]">{t('dirPicker.chooseFolder')}</span>
+      <div className="border-t border-border">
+        <Button type="button" variant="ghost-muted" size="row-lg" onClick={handleChooseFolder}>
+          <FolderPlus size={18} aria-hidden="true" className="shrink-0" />
+          {t('dirPicker.chooseFolder')}
         </Button>
       </div>
     </>
   ) : (
     <>
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--color-border)] px-3 py-2">
-        <Button variant="ghost" onClick={() => setMode('recent')} className="mr-2 text-xs text-[var(--color-text-accent)] hover:underline">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border px-3 py-2">
+        <Button variant="link" size="inline" onClick={() => setMode('recent')} className="mr-2">
           {'← ' + t('dirPicker.recent')}
         </Button>
-        <Button variant="ghost" onClick={() => loadBrowseDir('/')} className="text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]">/</Button>
+        <Button variant="link-muted" size="inline" onClick={() => loadBrowseDir('/')}>/</Button>
         {browsePath.split('/').filter(Boolean).map((seg, i, arr) => (
           <span key={i} className="flex items-center gap-1">
-            <span className="text-[10px] text-[var(--color-text-tertiary)]">/</span>
-            <Button variant="ghost"
+            <span className="text-3xs text-subtle-foreground">/</span>
+            <Button variant="link" size="inline"
               onClick={() => loadBrowseDir('/' + arr.slice(0, i + 1).join('/'))}
-              className="text-[10px] text-[var(--color-text-accent)] hover:underline"
             >{seg}</Button>
           </span>
         ))}
@@ -186,31 +178,24 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
 
       <div className={`${isMobileBrowser ? '' : 'max-h-[240px]'} overflow-y-auto`}>
         {loading ? (
-          <div className="px-3 py-4 text-center text-xs text-[var(--color-text-tertiary)]">{t('common.loading')}</div>
+          <div className="px-3 py-4 text-center text-xs text-subtle-foreground">{t('common.loading')}</div>
         ) : (
           <>
             {browseParent && browseParent !== browsePath && (
-              <Button variant="ghost" size="row" onClick={() => loadBrowseDir(browseParent)} className="gap-2 px-3">
-                <ArrowUp size={18} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
-                <span className="text-xs text-[var(--color-text-secondary)]">..</span>
+              <Button variant="ghost" size="row" onClick={() => loadBrowseDir(browseParent)}>
+                <ArrowUp size={18} aria-hidden="true" className="shrink-0 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">..</span>
               </Button>
             )}
             {browseEntries.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-[var(--color-text-tertiary)]">{t('dirPicker.noSubdirs')}</div>
+              <div className="px-3 py-4 text-center text-xs text-subtle-foreground">{t('dirPicker.noSubdirs')}</div>
             ) : browseEntries.map((entry) => (
-              <div
-                key={entry.path}
-                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-[var(--color-surface-hover)]"
-              >
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => loadBrowseDir(entry.path)}
-                  className="h-auto min-w-0 flex-1 justify-start px-0 text-left"
-                >
-                  <Folder size={18} aria-hidden="true" className="shrink-0 text-ui-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-text-primary)]">{entry.name}</span>
+              <div key={entry.path} className="flex w-full items-center gap-2 pr-3">
+                <Button variant="ghost" size="row" onClick={() => loadBrowseDir(entry.path)} className="flex-1">
+                  <Folder size={18} aria-hidden="true" className="shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-xs">{entry.name}</span>
                 </Button>
-                <Button variant="ghost" type="button" onClick={() => handleSelect(entry.path)} className="rounded px-2 py-0.5 text-[10px] font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-primary-fixed)]">
+                <Button variant="secondary" size="xs" type="button" onClick={() => handleSelect(entry.path)}>
                   {t('common.select')}
                 </Button>
               </div>
@@ -219,8 +204,8 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-[var(--color-border)] px-3 py-2">
-        <span className="truncate font-[var(--font-mono)] text-[10px] text-[var(--color-text-tertiary)]">{browsePath}</span>
+      <div className="flex items-center justify-between border-t border-border px-3 py-2">
+        <span className="truncate font-mono text-3xs text-subtle-foreground">{browsePath}</span>
         <Button onClick={() => handleSelect(browsePath)} size="sm">
           {t('dirPicker.useThisFolder')}
         </Button>
@@ -235,10 +220,11 @@ export function DirectoryPicker({ value, onChange, variant = 'chip', isGitProjec
         onOpenChange={(open) => { setIsOpen(open); if (open) setMode('recent') }}
         title={dropdownTitle}
         triggerTooltip={value || t('dirPicker.selectProject')}
-        contentClassName="w-[min(400px,calc(100vw-24px))] gap-0 overflow-hidden p-0"
+        size="flush"
+        contentClassName="w-[min(400px,calc(100vw-24px))]"
         testId="directory-picker-menu"
         trigger={
-          <Button variant="ghost" disabled={disabled} className={value ? triggerClassName : emptyTriggerClassName}>
+          <Button variant={triggerVariant} size={triggerSize} disabled={disabled} className="max-w-full min-w-0">
             {value && showGitIcon ? <GitBranch size={15} aria-hidden="true" /> : <FolderOpen size={15} aria-hidden="true" />}
             <span className="min-w-0 flex-1 truncate">{value ? selectedLabel : t('dirPicker.selectProject')}</span>
             {value && <ChevronDown size={13} aria-hidden="true" />}

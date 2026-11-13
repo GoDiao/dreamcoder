@@ -16,9 +16,9 @@ import type { WorkspacePanelProps } from './WorkspacePanel'
 const WorkspacePanel = lazy(() => import('./WorkspacePanel').then((m) => ({ default: m.WorkspacePanel })))
 
 const SIDE_PANEL_CLASS = [
-  'relative flex border-l border-[var(--color-border)] bg-[var(--color-surface)]',
+  'relative flex border-l border-border bg-background',
   'max-[850px]:absolute max-[850px]:inset-y-0 max-[850px]:right-0 max-[850px]:z-20',
-  'max-[850px]:w-[min(380px,100%)]! max-[850px]:max-w-full max-[850px]:shadow-[var(--shadow-dropdown)]',
+  'max-[850px]:w-[min(380px,100%)]! max-[850px]:max-w-full max-[850px]:shadow-popover',
 ].join(' ')
 
 export function useWorkspaceSplitState(panelId: string | null, enabled: boolean) {
@@ -62,7 +62,7 @@ export function WorkspaceSplit({ showPanel, panelExpanded, panel, testId, childr
               <div
                 role="status"
                 aria-label={t('common.loading')}
-                className="flex h-full min-h-0 w-full min-w-0 items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-tertiary)]"
+                className="flex h-full min-h-0 w-full min-w-0 items-center justify-center bg-background text-subtle-foreground"
               >
                 <Spinner aria-hidden="true" />
               </div>

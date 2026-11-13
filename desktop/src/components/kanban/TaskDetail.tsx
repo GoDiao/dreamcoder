@@ -12,6 +12,7 @@ import { Button } from '../shared/ui/button'
 import { Checkbox } from '../shared/ui/checkbox'
 import { Input } from '../shared/ui/input'
 import { Spinner } from '../shared/ui/spinner'
+import { RunningSpinner } from './RunMarker'
 import { Textarea } from '../shared/ui/textarea'
 import { AcceptanceEditor, AcceptanceMarker, acceptanceItems } from './AcceptanceEditor'
 import { AssigneePicker } from './AssigneePicker'
@@ -54,9 +55,9 @@ export function TaskDetail({ panelId, board, card: id, poll }: Props) {
     <div data-testid="kanban-task-detail" className="flex min-h-0 flex-1 flex-col">
       {poll && <BoardPoller board={board} />}
       {!view ? (
-        loadError ? <p role="alert" className="p-4 text-[13px] text-[var(--color-error)]">{loadError}</p> : <div className="flex flex-1 items-center justify-center"><Spinner /></div>
+        loadError ? <p role="alert" className="p-4 text-sm text-destructive">{loadError}</p> : <div className="flex flex-1 items-center justify-center"><Spinner /></div>
       ) : !card ? (
-        <p className="p-4 text-[13px] text-[var(--color-text-secondary)]">{t('kanban.detail.notFound', { card: `#${id}` })}</p>
+        <p className="p-4 text-sm text-muted-foreground">{t('kanban.detail.notFound', { card: `#${id}` })}</p>
       ) : (
         <TaskDetailBody panelId={panelId} board={board} view={view} card={card} />
       )}
@@ -66,8 +67,8 @@ export function TaskDetail({ panelId, board, card: id, poll }: Props) {
 
 function Property({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[84px_minmax(0,1fr)] items-center gap-2 text-[13px]">
-      <span className="text-[var(--color-text-tertiary)]">{label}</span>
+    <div className="grid grid-cols-[84px_minmax(0,1fr)] items-center gap-2 text-sm">
+      <span className="text-subtle-foreground">{label}</span>
       <div className="flex min-w-0 flex-wrap items-center gap-1">{children}</div>
     </div>
   )
@@ -88,15 +89,15 @@ function AssigneeRow({ board, view, card, role }: { board: string; view: BoardVi
         <div data-testid={`kanban-${role}`} className="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
           <AssigneePicker board={board} view={view} card={card} slot={role} trigger={
             <Button variant="ghost" size="sm" className="min-w-0 max-w-full" title={state.kind === 'session' ? state.title : undefined}>
-              <span className={`truncate ${state.kind === 'missing' ? 'text-[var(--color-error)]' : state.kind === 'none' ? 'text-[var(--color-text-tertiary)]' : ''}`}>
+              <span className={`truncate ${state.kind === 'missing' ? 'text-destructive' : state.kind === 'none' ? 'text-subtle-foreground' : ''}`}>
                 {state.kind === 'session' ? state.title || t('session.untitled') : t(state.kind === 'missing' ? 'kanban.owner.missing' : EMPTY_ASSIGNEE[role])}
               </span>
             </Button>
           } />
           {state.kind === 'session' && (
             <>
-              <span className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--color-text-tertiary)]">
-                {state.running ? <Spinner className="size-3 text-[var(--color-success)]" aria-hidden="true" /> : <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--color-text-tertiary)]" />}
+              <span className="flex shrink-0 items-center gap-1 text-xs text-subtle-foreground">
+                {state.running ? <RunningSpinner className="size-3" aria-hidden="true" /> : <span aria-hidden="true" className="size-1.5 rounded-full bg-subtle-foreground" />}
                 {t(state.running ? 'kanban.owner.running' : 'kanban.owner.idle')}
               </span>
               <Button variant="ghost" size="icon-xs" className="shrink-0" aria-label={t('kanban.detail.openSession')} title={t('kanban.detail.openSession')} onClick={() => openSessionTab(state.sessionId, state.title)}>
@@ -107,7 +108,7 @@ function AssigneeRow({ board, view, card, role }: { board: string; view: BoardVi
         </div>
       </Property>
       {instructions && (
-        <div data-testid={`kanban-${role}-instructions`} className="pl-[92px] text-[12px] text-[var(--color-text-secondary)]">
+        <div data-testid={`kanban-${role}-instructions`} className="pl-23 text-xs text-muted-foreground">
           <ClampedMarkdown content={instructions} />
         </div>
       )}
@@ -117,8 +118,8 @@ function AssigneeRow({ board, view, card, role }: { board: string; view: BoardVi
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 border-t border-[var(--color-border-separator)] pt-4">
-      <h3 className="text-[12px] font-medium text-[var(--color-text-tertiary)]">{title}</h3>
+    <section className="flex flex-col gap-2 border-t border-border pt-4">
+      <h3 className="text-xs font-medium text-subtle-foreground">{title}</h3>
       {children}
     </section>
   )
@@ -184,11 +185,11 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
     const status = cardStatus(view, target)
     return (
       <li key={target}>
-        <button type="button" onClick={() => open(target)} className="flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-[13px] hover:bg-[var(--color-surface-hover)]">
+        <Button type="button" variant="ghost" size="row" onClick={() => open(target)}>
           {status && <StatusIcon status={status} label={t(STATUS_LABEL[status])} />}
-          <span className="font-mono text-[11px] text-[var(--color-text-tertiary)]">#{target}</span>
+          <span className="font-mono text-2xs text-subtle-foreground">#{target}</span>
           <span className="truncate">{cardTitle(view, target) ?? ''}</span>
-        </button>
+        </Button>
       </li>
     )
   }
@@ -203,7 +204,7 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-[12px] text-[var(--color-text-tertiary)]">
+          <div className="flex items-center gap-2 text-xs text-subtle-foreground">
             <StatusIcon status={card.status} />
             <span className="font-mono">#{card.id}</span>
             {card.archived && <span>{t('kanban.detail.archived')}</span>}
@@ -220,8 +221,8 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
               <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(null)}>{t('common.cancel')}</Button>
             </form>
           ) : (
-            <h2 className="text-[17px] font-semibold leading-snug">
-              <button type="button" onClick={() => startEdit('title')} aria-label={t('kanban.detail.editTitle')} className="cursor-text rounded-md text-left hover:bg-[var(--color-surface-hover)]">{card.title}</button>
+            <h2 className="text-base font-semibold leading-snug">
+              <button type="button" onClick={() => startEdit('title')} aria-label={t('kanban.detail.editTitle')} className="cursor-text rounded-md text-left hover:bg-hover">{card.title}</button>
             </h2>
           )}
 
@@ -234,18 +235,18 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => startEdit('description')} className="rounded-lg text-left text-[13px] hover:bg-[var(--color-surface-hover)]" aria-label={t('kanban.detail.editDescription')}>
+            <button type="button" onClick={() => startEdit('description')} className="rounded-lg text-left text-sm hover:bg-hover" aria-label={t('kanban.detail.editDescription')}>
               {card.description
                 ? <MarkdownRenderer content={card.description} />
-                : <span className="text-[var(--color-text-tertiary)]">{t('kanban.detail.addDescription')}</span>}
+                : <span className="text-subtle-foreground">{t('kanban.detail.addDescription')}</span>}
             </button>
           )}
-          {owner.kind === 'missing' && <p className="rounded-lg bg-[var(--color-error-container)] px-3 py-2 text-[12px] text-[var(--color-error)]">{t('kanban.detail.ownerMissing')}</p>}
+          {owner.kind === 'missing' && <p className="rounded-lg bg-destructive-surface px-3 py-2 text-xs text-destructive">{t('kanban.detail.ownerMissing')}</p>}
 
           <div className="flex flex-col gap-1.5">
             <Property label={t('kanban.detail.status')}>
               <ActionMenu label={t('kanban.detail.changeStatus')} actions={statusActions} trigger={
-                <Button variant="ghost" size="sm" className="gap-1.5" aria-label={t('kanban.detail.changeStatus')}>
+                <Button variant="ghost" size="sm" aria-label={t('kanban.detail.changeStatus')}>
                   <StatusIcon status={card.status} />{t(STATUS_LABEL[card.status])}
                 </Button>
               } />
@@ -260,13 +261,13 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
             <AssigneeRow board={board} view={view} card={card} role="owner" />
             <AssigneeRow board={board} view={view} card={card} role="reviewer" />
             <Property label={t('kanban.detail.creator')}>
-              <span className="truncate px-2.5 text-[13px]" title={creatorName}>{creatorName}</span>
+              <span className="truncate px-2.5 text-sm" title={creatorName}>{creatorName}</span>
             </Property>
             <Property label={t('kanban.detail.dependencies')}>
               {card.dependsOn.map((dependency) => {
                 const status = cardStatus(view, dependency)
                 return (
-                  <span key={dependency} className="inline-flex h-6 items-center gap-1 rounded-lg border border-[var(--color-border)] pl-2 text-[12px]">
+                  <span key={dependency} className="inline-flex h-6 items-center gap-1 rounded-lg border border-border pl-2 text-xs">
                     {status && <StatusIcon status={status} size={12} />}#{dependency}
                     <Button variant="ghost" size="icon-xs" aria-label={t('kanban.create.removeDependency', { card: `#${dependency}` })} onClick={() => void run({ type: 'remove_dependency', card: card.id, dependsOn: dependency })}>
                       <X aria-hidden="true" />
@@ -274,7 +275,7 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
                   </span>
                 )
               })}
-              {card.dependsOn.length === 0 && <span className="px-2.5 text-[var(--color-text-tertiary)]">{t('kanban.detail.none')}</span>}
+              {card.dependsOn.length === 0 && <span className="px-2.5 text-subtle-foreground">{t('kanban.detail.none')}</span>}
               {dependencyOptions.length > 0 && (
                 <ActionMenu label={t('kanban.create.addDependency')} actions={dependencyOptions} trigger={<Button variant="ghost" size="sm">{t('kanban.create.addDependency')}</Button>} />
               )}
@@ -284,7 +285,7 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
           {(card.deliveries.length > 0 || card.status === 'review') && (
             <Section title={t('kanban.detail.deliveries')}>
               {card.deliveries.map((delivery) => (
-                <div key={delivery.id} className="flex flex-col gap-1 text-[13px]">
+                <div key={delivery.id} className="flex flex-col gap-1 text-sm">
                   <ClampedMarkdown content={delivery.summary} />
                   <CardLinks panelId={panelId} projectRoot={view.project} links={delivery.links} author={delivery.actor} />
                 </div>
@@ -308,11 +309,11 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
                 </div>
               </div>
             ) : (
-              <button type="button" onClick={() => startEdit('acceptance')} aria-label={t('kanban.detail.editAcceptance')} className="flex flex-col gap-1 rounded-lg text-left text-[13px] hover:bg-[var(--color-surface-hover)]">
-                {card.acceptance.length === 0 && <span className="text-[var(--color-text-tertiary)]">{t('kanban.detail.addAcceptance')}</span>}
+              <button type="button" onClick={() => startEdit('acceptance')} aria-label={t('kanban.detail.editAcceptance')} className="flex flex-col gap-1 rounded-lg text-left text-sm hover:bg-hover">
+                {card.acceptance.length === 0 && <span className="text-subtle-foreground">{t('kanban.detail.addAcceptance')}</span>}
                 {card.acceptance.map((item) => (
                   <span key={item} className="flex items-start gap-2">
-                    <AcceptanceMarker className="mt-[7px]" />
+                    <AcceptanceMarker className="mt-1.75" />
                     {item}
                   </span>
                 ))}
@@ -323,11 +324,11 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
           <Section title={t('kanban.detail.relations')}>
             {relations.filter((relation) => relation.ids.length > 0).map((relation) => (
               <div key={relation.label} className="flex flex-col gap-0.5">
-                <span className="text-[11px] text-[var(--color-text-tertiary)]">{relation.label}</span>
+                <span className="text-2xs text-subtle-foreground">{relation.label}</span>
                 <ul>{relation.ids.map(relationRow)}</ul>
               </div>
             ))}
-            {relations.every((relation) => relation.ids.length === 0) && <span className="text-[13px] text-[var(--color-text-tertiary)]">{t('kanban.detail.none')}</span>}
+            {relations.every((relation) => relation.ids.length === 0) && <span className="text-sm text-subtle-foreground">{t('kanban.detail.none')}</span>}
           </Section>
 
           <Section title={t('kanban.detail.activity')}>
@@ -335,13 +336,13 @@ function TaskDetailBody({ panelId, board, view, card }: { panelId: string; board
           </Section>
         </div>
       </div>
-      <form className="flex shrink-0 flex-col gap-2 border-t border-[var(--color-border)] px-4 py-3" onSubmit={(event) => { event.preventDefault(); void sendComment() }}>
+      <form className="flex shrink-0 flex-col gap-2 border-t border-border px-4 py-3" onSubmit={(event) => { event.preventDefault(); void sendComment() }}>
         <Textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} placeholder={t('kanban.detail.commentPlaceholder')} aria-label={t('kanban.detail.comment')} />
         <div className="flex items-center gap-2">
           {canAlsoNotifyCreator && (
             <>
               <Checkbox id={commentId} checked={alsoCreator} onCheckedChange={(checked) => setAlsoCreator(checked === true)} />
-              <label htmlFor={commentId} className="text-[12px] text-[var(--color-text-secondary)]">{t('kanban.detail.alsoCreator', { name: creatorName })}</label>
+              <label htmlFor={commentId} className="text-xs text-muted-foreground">{t('kanban.detail.alsoCreator', { name: creatorName })}</label>
             </>
           )}
           <span className="flex-1" />

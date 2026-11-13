@@ -66,7 +66,7 @@ export function ExportSessionDialog({ sessionId, open, onClose }: { sessionId: s
   }
 
   const option = (checked: boolean, onChange: (value: boolean) => void, label: string, disabled = false) => (
-    <label className={`flex items-center gap-2 text-ui-body ${disabled ? 'text-[var(--color-text-tertiary)]' : 'text-[var(--color-text-primary)]'}`}>
+    <label className={`flex items-center gap-2 text-sm ${disabled ? 'text-subtle-foreground' : 'text-foreground'}`}>
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => onChange(value === true)} />
       {label}
     </label>
@@ -104,7 +104,7 @@ export function ExportSessionDialog({ sessionId, open, onClose }: { sessionId: s
           {option(fullToolOutput, setFullToolOutput, t('exportSession.fullToolOutput'), !markdown)}
           {option(redact, setRedact, t('exportSession.redact'))}
         </div>
-        <p className="text-ui-aux text-[var(--color-text-tertiary)]">
+        <p className="text-xs text-subtle-foreground">
           {markdown ? t('exportSession.privacyNote') : t('exportSession.jsonNote')}
         </p>
       </div>

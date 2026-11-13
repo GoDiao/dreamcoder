@@ -26,7 +26,7 @@ export function DayOfWeekPicker({ selected, onChange }: Props) {
       if (values.length > 0) onChange(values.map(Number))
     }}>
       {DAY_ORDER.map((day) => (
-        <ToggleGroupItem key={day} value={String(day)} className="size-8 p-0">
+        <ToggleGroupItem key={day} value={String(day)} className="size-8">
           {t(DAY_KEYS[day]!)}
         </ToggleGroupItem>
       ))}

@@ -162,34 +162,34 @@ function CompactStatusDivider({ message, state }: { message?: CompactSummaryEven
   return (
     <section data-testid="compact-status-divider" className="my-4 w-full px-1">
       <div className="flex w-full items-center gap-3">
-        <div className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
+        <div className="h-px flex-1 bg-border" aria-hidden="true" />
         <button
           type="button"
           aria-expanded={hasDetails ? expanded : undefined}
           onClick={() => hasDetails && setExpanded((value) => !value)}
           disabled={!hasDetails}
-          className="group inline-flex min-h-8 max-w-[min(78vw,520px)] items-center gap-2 rounded-md px-2.5 py-1 text-[13px] font-semibold text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] disabled:cursor-default disabled:hover:text-[var(--color-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/30"
+          className="group inline-flex min-h-8 max-w-[min(78vw,520px)] items-center gap-2 rounded-md px-2.5 py-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           {state === 'compacting' ? (
-            <LoaderCircle size={16} strokeWidth={2.1} className="shrink-0 animate-spin text-[var(--color-text-tertiary)]" aria-hidden="true" />
+            <LoaderCircle size={16} strokeWidth={2.1} className="shrink-0 animate-spin text-subtle-foreground" aria-hidden="true" />
           ) : (
-            <FileStack size={16} strokeWidth={2.05} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+            <FileStack size={16} strokeWidth={2.05} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
           )}
-          <span className="min-w-0 truncate font-medium text-[var(--color-text-primary)]">
+          <span className="min-w-0 truncate font-medium text-foreground">
             {title}
           </span>
         </button>
-        <div className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
+        <div className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
       {hasDetails && expanded && (
-        <div className="mx-auto mt-1.5 w-full max-w-[620px] rounded-md border border-[var(--color-border)]/65 bg-[var(--color-surface-container-lowest)] px-3 py-2">
+        <div className="mx-auto mt-1.5 w-full max-w-[620px] rounded-md border border-border/65 bg-popover px-3 py-2">
           {meta.length > 0 && (
-            <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium text-[var(--color-text-tertiary)]">
+            <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1 text-2xs font-medium text-subtle-foreground">
               {meta.map((item) => <span key={item}>{item}</span>)}
             </div>
           )}
           {message?.summary && (
-            <div className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--color-text-secondary)]">
+            <div className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
               {message.summary}
             </div>
           )}
@@ -214,39 +214,39 @@ function GoalEventCard({ message }: { message: GoalEvent }) {
     <div className="mb-2">
       <div
         data-testid="goal-event-card"
-        className="overflow-hidden rounded-lg border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)]"
+        className="overflow-hidden rounded-lg border border-memory-border bg-memory-surface"
       >
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]/50"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-hover/50"
         >
           {expanded ? (
-            <ChevronDown size={15} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+            <ChevronDown size={15} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
           ) : (
-            <ChevronRight size={15} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+            <ChevronRight size={15} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
           )}
-          <Target size={15} className="shrink-0 text-[var(--color-memory-accent)]" strokeWidth={2.25} aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+          <Target size={15} className="shrink-0 text-memory" strokeWidth={2.25} aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {title}
           </span>
           {message.status ? (
-            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] text-[var(--color-text-tertiary)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-memory-accent)]" aria-hidden="true" />
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-subtle-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-memory" aria-hidden="true" />
               {message.status}
             </span>
           ) : null}
         </button>
 
         {expanded ? (
-          <div className="border-t border-[var(--color-border)]/55 px-3 py-2.5">
+          <div className="border-t border-border/55 px-3 py-2.5">
             <div className="space-y-1.5">
               {message.objective ? (
-                <div className="line-clamp-2 rounded-md px-2 py-1 text-[12px] leading-5 text-[var(--color-text-secondary)]">
+                <div className="line-clamp-2 rounded-md px-2 py-1 text-xs leading-5 text-muted-foreground">
                   {t('chat.goalEvent.objective', { value: message.objective })}
                 </div>
               ) : message.message ? (
-                <div className="whitespace-pre-wrap rounded-md px-2 py-1 text-[12px] leading-5 text-[var(--color-text-secondary)]">
+                <div className="whitespace-pre-wrap rounded-md px-2 py-1 text-xs leading-5 text-muted-foreground">
                   {message.message}
                 </div>
               ) : null}
@@ -255,7 +255,7 @@ function GoalEventCard({ message }: { message: GoalEvent }) {
                   {metaDetails.map((detail) => (
                     <span
                       key={detail}
-                      className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
+                      className="rounded-sm border border-border bg-background px-1.5 py-0.5 text-2xs font-medium text-muted-foreground"
                     >
                       {detail}
                     </span>
@@ -293,40 +293,40 @@ function BackgroundTaskEventCard({ message }: { message: BackgroundTaskEvent }) 
       <div
         data-testid="background-task-event-card"
         data-status={task.status}
-        className="flex min-w-0 items-start gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-3 py-2"
+        className="flex min-w-0 items-start gap-2 rounded-lg border border-border bg-card px-3 py-2"
       >
         <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
           {isRunning ? (
-            <LoaderCircle size={15} strokeWidth={2.25} className="animate-spin text-[var(--color-brand)]" aria-hidden="true" />
+            <LoaderCircle size={15} strokeWidth={2.25} className="animate-spin text-primary" aria-hidden="true" />
           ) : isFailed ? (
-            <XCircle size={15} strokeWidth={2.25} className="text-[var(--color-error)]" aria-hidden="true" />
+            <XCircle size={15} strokeWidth={2.25} className="text-destructive" aria-hidden="true" />
           ) : isStopped ? (
-            <CircleStop size={15} strokeWidth={2.25} className="text-[var(--color-text-tertiary)]" aria-hidden="true" />
+            <CircleStop size={15} strokeWidth={2.25} className="text-subtle-foreground" aria-hidden="true" />
           ) : (
-            <CheckCircle2 size={15} strokeWidth={2.25} className="text-[var(--color-success)]" aria-hidden="true" />
+            <CheckCircle2 size={15} strokeWidth={2.25} className="text-success" aria-hidden="true" />
           )}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <Bot size={14} strokeWidth={2.25} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-            <span className="shrink-0 text-[12px] font-medium text-[var(--color-text-primary)]">
+            <Bot size={14} strokeWidth={2.25} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
+            <span className="shrink-0 text-xs font-medium text-foreground">
               {label}
             </span>
-            <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">
+            <span className="shrink-0 text-2xs text-subtle-foreground">
               {t(`chat.backgroundAgents.status.${task.status}`)}
             </span>
             {task.usage?.totalTokens ? (
-              <span className="hidden shrink-0 text-[11px] text-[var(--color-text-tertiary)] sm:inline">
+              <span className="hidden shrink-0 text-2xs text-subtle-foreground sm:inline">
                 {t('chat.backgroundAgents.tokens', { count: task.usage.totalTokens.toLocaleString() })}
               </span>
             ) : null}
             {duration ? (
-              <span className="hidden shrink-0 text-[11px] text-[var(--color-text-tertiary)] sm:inline">
+              <span className="hidden shrink-0 text-2xs text-subtle-foreground sm:inline">
                 {duration}
               </span>
             ) : null}
           </div>
-          <div className="mt-0.5 truncate text-[12px] leading-5 text-[var(--color-text-secondary)]">
+          <div className="mt-0.5 truncate text-xs leading-5 text-muted-foreground">
             {detail}
           </div>
         </div>
@@ -391,7 +391,7 @@ function SelectableChatMessage({
   return (
     <div
       ref={rootRef}
-      onMouseUp={quote.onMouseUp}
+      onMouseDown={quote.onMouseDown}
     >
       {children}
       <SelectionPopover quote={quote} label={t('chat.replyToSelection')} onAdd={addCurrentSelectionToChat} />
@@ -809,38 +809,38 @@ function MemoryEventCard({ message }: { message: MemoryEvent }) {
 
   return (
     <div className="mb-3 flex justify-center px-3">
-      <div className="w-full max-w-2xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-3.5 py-3 text-xs shadow-sm">
+      <div className="w-full max-w-2xl rounded-lg border border-border bg-card px-3.5 py-3 text-xs shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-brand)]">
+          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-primary">
             <BookMarked size={15} aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-medium text-[var(--color-text-primary)]">
+              <div className="font-medium text-foreground">
                 {t('chat.memorySavedTitle', { count: message.files.length })}
               </div>
               <button
                 type="button"
                 onClick={() => openMemorySettings(message.files[0]?.path)}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[11px] font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-brand)]/50 hover:text-[var(--color-text-primary)]"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
               >
                 <Settings size={13} aria-hidden="true" />
                 {t('chat.memoryOpenSettings')}
               </button>
             </div>
             {message.message ? (
-              <div className="mt-1 text-[var(--color-text-tertiary)]">{message.message}</div>
+              <div className="mt-1 text-subtle-foreground">{message.message}</div>
             ) : null}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {visibleFiles.map((file) => (
                 <HintTooltip key={file.path} content={file.path}><span
-                  className="max-w-full truncate rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-mono text-[10px] text-[var(--color-text-secondary)]"
+                  className="max-w-full truncate rounded-sm border border-border bg-background px-2 py-1 font-mono text-3xs text-muted-foreground"
                 >
                   {memoryFileLabel(file.path)}
                 </span></HintTooltip>
               ))}
               {hiddenCount > 0 ? (
-                <span className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-mono text-[10px] text-[var(--color-text-tertiary)]">
+                <span className="rounded-sm border border-border bg-background px-2 py-1 font-mono text-3xs text-subtle-foreground">
                   {t('chat.memoryMoreFiles', { count: hiddenCount })}
                 </span>
               ) : null}
@@ -872,16 +872,16 @@ const EMPTY_AGENT_TASK_NOTIFICATIONS: Record<string, AgentTaskNotification> = {}
 const CHAT_SCROLL_AREA_CLASS = [
   'chat-scroll-area',
   '[scrollbar-width:auto]',
-  '[scrollbar-color:color-mix(in_srgb,var(--color-outline)_72%,transparent)_transparent]',
+  '[scrollbar-color:color-mix(in_srgb,var(--subtle-foreground)_72%,transparent)_transparent]',
   '[&::-webkit-scrollbar]:w-2.5',
   '[&::-webkit-scrollbar-track]:bg-transparent',
   '[&::-webkit-scrollbar-thumb]:rounded-full',
   '[&::-webkit-scrollbar-thumb]:border-[3px]',
   '[&::-webkit-scrollbar-thumb]:border-transparent',
-  '[&::-webkit-scrollbar-thumb]:bg-[color-mix(in_srgb,var(--color-outline)_74%,transparent)]',
+  '[&::-webkit-scrollbar-thumb]:bg-[color-mix(in_srgb,var(--subtle-foreground)_74%,transparent)]',
   '[&::-webkit-scrollbar-thumb]:bg-clip-content',
   '[&::-webkit-scrollbar-thumb:hover]:border-2',
-  '[&::-webkit-scrollbar-thumb:hover]:bg-[color-mix(in_srgb,var(--color-outline)_90%,transparent)]',
+  '[&::-webkit-scrollbar-thumb:hover]:bg-[color-mix(in_srgb,var(--subtle-foreground)_90%,transparent)]',
 ].join(' ')
 const CHAT_RENDER_ITEM_CLASS = [
   'chat-render-item',
@@ -1974,7 +1974,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           )}
 
           {!isLoadingTurnChangeCards && turnChangeCards.length === 0 && turnChangeLoadError && (
-            <div className="mx-auto mb-5 w-full max-w-[860px] rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error-container)]/18 px-4 py-3 text-xs text-[var(--color-error)]">
+            <div className="mx-auto mb-5 w-full max-w-[860px] rounded-lg border border-destructive/25 bg-destructive-surface/18 px-4 py-3 text-xs text-destructive">
               {turnChangeLoadError}
             </div>
           )}
@@ -1988,7 +1988,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           type="button"
           onClick={handleJumpToLatest}
           aria-label={t('chat.jumpToLatest')}
-          className="absolute bottom-4 right-5 z-20 flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] px-3 text-xs font-medium text-[var(--color-text-primary)] shadow-[var(--shadow-dropdown)] transition-colors hover:border-[var(--color-brand)]/50 hover:bg-[var(--color-surface-container-low)]"
+          className="absolute bottom-4 right-5 z-20 flex h-9 items-center gap-2 rounded-full border border-border bg-popover px-3 text-xs font-medium text-foreground shadow-popover transition-colors hover:border-primary/50 hover:bg-card"
         >
           <ArrowDown size={15} aria-hidden="true" />
           <span>{t('chat.jumpToLatest')}</span>
@@ -2147,10 +2147,10 @@ export const MessageBlock = memo(function MessageBlock({
         message.message.trim() !== '' &&
         message.message !== displayMessage
       return (
-        <div className="mb-3 px-4 py-2.5 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/28 text-sm text-[var(--color-error)]">
+        <div className="mb-3 px-4 py-2.5 rounded-lg border border-destructive/20 bg-destructive-surface/28 text-sm text-destructive">
           <strong>Error:</strong> {displayMessage}
           {showRawDetail && (
-            <div className="mt-1 whitespace-pre-wrap text-xs text-[var(--color-on-error-container)]/85">
+            <div className="mt-1 whitespace-pre-wrap text-xs text-destructive/85">
               {message.message}
             </div>
           )}
@@ -2169,7 +2169,7 @@ export const MessageBlock = memo(function MessageBlock({
       return <BackgroundTaskEventCard message={message} />
     case 'system':
       return (
-        <div className="mb-3 text-center text-xs text-[var(--color-text-tertiary)]">
+        <div className="mb-3 text-center text-xs text-subtle-foreground">
           {message.content}
         </div>
       )

@@ -62,24 +62,24 @@ function ArtifactRow({
     <div className="flex items-center gap-0.5">
       <Button
         variant="ghost"
-        size="row"
+        size="row-sm"
         disabled={disabled}
         onClick={() => onOpen(item)}
-        className="min-w-0 flex-1 gap-2 rounded-[6px] py-[7px] pr-1.5 pl-1.5 text-left text-[12px] text-[var(--color-text-primary)]"
+        className="min-w-0 flex-1"
       >
-        <Layers size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+        <Layers size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <span className="truncate">{title}</span>
-            {mark === 'tool' && <span className="shrink-0 text-[10px] text-[var(--color-brand)]">{t('artifacts.modifiedHere')}</span>}
-            {mark === 'snapshot' && <span className="shrink-0 text-[10px] text-[var(--color-text-tertiary)]">{t('artifacts.maybeModifiedHere')}</span>}
+            {mark === 'tool' && <span className="shrink-0 text-3xs text-primary">{t('artifacts.modifiedHere')}</span>}
+            {mark === 'snapshot' && <span className="shrink-0 text-3xs text-subtle-foreground">{t('artifacts.maybeModifiedHere')}</span>}
           </span>
-          <span className={`block truncate text-[11px] ${item.error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}>
+          <span className={`block truncate text-2xs ${item.error ? 'text-destructive' : 'text-subtle-foreground'}`}>
             {detail}
           </span>
         </span>
         {(location || branch) && (
-          <span className="flex max-w-[45%] shrink-0 items-center gap-1 truncate text-[11px] text-[var(--color-text-tertiary)]">
+          <span className="flex max-w-[45%] shrink-0 items-center gap-1 truncate text-2xs text-subtle-foreground">
             {branch && <GitBranchIcon size={11} aria-hidden="true" />}
             <span className="truncate">{branch ?? location}</span>
           </span>
@@ -102,13 +102,13 @@ function SystemRow({ item, onAddToChat }: { item: DesignSystemListItem; onAddToC
 
   return (
     <div className="flex items-center gap-0.5">
-      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[6px] py-[7px] pr-1.5 pl-1.5 text-[12px] text-[var(--color-text-primary)]">
-        <Palette size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-[var(--color-text-tertiary)]" />
+      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.75 pr-1.5 pl-1.5 text-xs text-foreground">
+        <Palette size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{title}</span>
-          <span className={`block truncate text-[11px] ${item.error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}>{detail}</span>
+          <span className={`block truncate text-2xs ${item.error ? 'text-destructive' : 'text-subtle-foreground'}`}>{detail}</span>
         </span>
-        {location && <span className="max-w-[45%] shrink-0 truncate text-[11px] text-[var(--color-text-tertiary)]">{location}</span>}
+        {location && <span className="max-w-[45%] shrink-0 truncate text-2xs text-subtle-foreground">{location}</span>}
       </div>
       <AddToChatButton title={title} onClick={() => onAddToChat(item)} />
     </div>
@@ -127,7 +127,7 @@ function Section<T extends Pick<ArtifactListItem, 'artifactsDir' | 'name'>>({
   if (items.length === 0) return null
   return (
     <section className="mt-3 first:mt-0">
-      <h3 className="mb-1 px-1.5 text-[11px] font-medium text-[var(--color-text-tertiary)]">{title}</h3>
+      <h3 className="mb-1 px-1.5 text-2xs font-medium text-subtle-foreground">{title}</h3>
       {items.map((item) => (
         <Fragment key={artifactKey(item)}>{renderItem(item)}</Fragment>
       ))}
@@ -206,8 +206,8 @@ export function ArtifactsView({ sessionId }: { sessionId: string }) {
 
   return (
     <div data-testid="artifacts-view" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-3 py-1.5">
-        <h2 className="text-[12px] font-medium text-[var(--color-text-primary)]">{t('artifacts.title')}</h2>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
+        <h2 className="text-xs font-medium text-foreground">{t('artifacts.title')}</h2>
         <HintTooltip content={t('artifacts.refresh')}>
           <Button variant="ghost" size="icon-sm" aria-label={t('artifacts.refresh')} disabled={loading} onClick={() => void load()}>
             <RefreshCw aria-hidden="true" />

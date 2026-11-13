@@ -79,11 +79,11 @@ const MCP_GROUP_ORDER: McpGroupKey[] = [
 ]
 
 const STATUS_TONE: Record<McpServerRecord['status'], string> = {
-  connected: 'bg-[var(--color-inspector-success-bg)] text-[var(--color-inspector-success)] border-[var(--color-border)]',
-  checking: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] border-[var(--color-border)]',
-  'needs-auth': 'bg-[var(--color-surface-container-low)] text-[var(--color-warning)] border-[var(--color-border)]',
-  failed: 'bg-[var(--color-inspector-danger-bg)] text-[var(--color-inspector-danger)] border-[var(--color-border)]',
-  disabled: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] border-[var(--color-border)]',
+  connected: 'bg-success-surface text-success border-border',
+  checking: 'bg-hover text-muted-foreground border-border',
+  'needs-auth': 'bg-card text-warning border-border',
+  failed: 'bg-destructive-surface text-destructive border-border',
+  disabled: 'bg-hover text-muted-foreground border-border',
 }
 
 function createStringRow(value = ''): StringRow {
@@ -260,7 +260,7 @@ function scopeLabel(server: McpServerRecord, t: ReturnType<typeof useTranslation
 
 function StatusBadge({ server }: { server: McpServerRecord }) {
   return (
-    <span className={`inline-flex flex-shrink-0 items-center rounded-full border px-1.5 py-px text-[11px] font-medium ${STATUS_TONE[server.status]}`}>
+    <span className={`inline-flex flex-shrink-0 items-center rounded-full border px-1.5 py-px text-2xs font-medium ${STATUS_TONE[server.status]}`}>
       {server.statusLabel}
     </span>
   )
@@ -313,10 +313,9 @@ function ArraySection({
               placeholder={valuePlaceholder}
             />
             <Button
-              variant="ghost"
+              variant="ghost-muted"
               size="icon"
               onClick={() => onRemove(row.id)}
-              className="text-[var(--color-text-tertiary)]"
               aria-label={addLabel}
             >
               <Trash2Icon aria-hidden="true" size={18} />
@@ -326,7 +325,7 @@ function ArraySection({
         <button
           type="button"
           onClick={onAdd}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-hover text-muted-foreground transition-colors hover:text-foreground"
         >
           <Plus aria-hidden="true" size={18} />
           {addLabel}
@@ -341,10 +340,10 @@ function LoadingState({ label }: { label: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center"
+      className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center text-primary"
     >
-      <Spinner aria-hidden="true" className="size-7 text-[var(--color-brand)]" />
-      <div className="text-sm font-medium text-[var(--color-text-secondary)]">{label}</div>
+      <Spinner aria-hidden="true" className="size-7" />
+      <div className="text-sm font-medium text-muted-foreground">{label}</div>
     </div>
   )
 }
@@ -369,22 +368,22 @@ function ServerRow({
     server.summary,
   ].filter((part): part is string => !!part)
   return (
-    <div className="flex min-w-0 items-center justify-between gap-[18px] border-b border-[var(--color-border-separator)] py-2.5">
+    <div className="flex min-w-0 items-center justify-between gap-4.5 border-b border-border py-2.5">
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{server.name}</span>
+          <span className="truncate text-sm font-medium text-foreground">{server.name}</span>
           <StatusBadge server={server} />
         </div>
-        <HintTooltip content={details.join(' · ')}><div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-secondary)]">
+        <HintTooltip content={details.join(' · ')}><div className="mt-px truncate text-xs leading-normal text-muted-foreground">
           {details.map((part, index) => (
             <span key={index}>
               {index > 0 ? ' · ' : null}
-              <span className={part === server.projectPath ? 'font-[var(--font-mono)]' : undefined}>{part}</span>
+              <span className={part === server.projectPath ? 'font-mono' : undefined}>{part}</span>
             </span>
           ))}
         </div></HintTooltip>
         {server.statusDetail && (
-          <div className="mt-px truncate text-xs leading-[1.5] text-[var(--color-text-tertiary)]">{server.statusDetail}</div>
+          <div className="mt-px truncate text-xs leading-normal text-subtle-foreground">{server.statusDetail}</div>
         )}
       </div>
 
@@ -396,10 +395,9 @@ function ServerRow({
           onCheckedChange={onToggle}
         />
         <Button
-          variant="ghost"
+          variant="ghost-muted"
           size="icon"
           onClick={onOpen}
-          className="text-[var(--color-text-secondary)]"
           aria-label={`Open ${server.name}`}
         >
           <Settings2 size={15} aria-hidden="true" />
@@ -653,7 +651,7 @@ export function McpSettings() {
         </>
       )}
     >
-      <p className="text-sm leading-6 text-[var(--color-text-secondary)]">
+      <p className="text-sm leading-6 text-muted-foreground">
         {pendingDeleteServer ? t('settings.mcp.form.deleteConfirmBody', { name: pendingDeleteServer.name }) : ''}
       </p>
     </Modal>
@@ -772,19 +770,19 @@ export function McpSettings() {
     return (
       <>
         <div className="min-w-0">
-          <Button variant="ghost" size="xs" onClick={() => setView({ type: 'list' })} className="mb-5 text-[var(--color-text-secondary)]">
+          <Button variant="ghost-muted" size="xs" onClick={() => setView({ type: 'list' })} className="mb-5">
             <ArrowLeftIcon aria-hidden="true" />
             {t('settings.mcp.form.back')}
           </Button>
 
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">{server.name}</h2>
-              <p className="mt-1.5 max-w-[60ch] text-xs leading-[1.7] text-[var(--color-text-secondary)]">{server.summary}</p>
+              <h2 className="text-xl font-semibold text-foreground">{server.name}</h2>
+              <p className="mt-1.5 max-w-[60ch] text-xs leading-relaxed text-muted-foreground">{server.summary}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <StatusBadge server={server} />
                 {server.statusDetail && (
-                  <span className="text-sm text-[var(--color-text-tertiary)]">{server.statusDetail}</span>
+                  <span className="text-sm text-subtle-foreground">{server.statusDetail}</span>
                 )}
               </div>
             </div>
@@ -796,7 +794,7 @@ export function McpSettings() {
             )}
           </div>
 
-          <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <section className="rounded-xl border border-border bg-background p-6">
             <div className="grid gap-4 md:grid-cols-2">
               <InfoPair label={t('settings.mcp.form.transport')} value={transportLabel(server.transport, t)} />
               <InfoPair label={t('settings.mcp.form.scope')} value={scopeLabel(server, t)} />
@@ -804,8 +802,8 @@ export function McpSettings() {
               <InfoPair label={t('settings.mcp.form.location')} value={server.configLocation} />
             </div>
             <div className="mt-5">
-              <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">{t('settings.mcp.form.rawConfig')}</div>
-              <pre className="overflow-x-auto rounded-lg bg-[var(--color-surface-hover)] p-4 text-xs text-[var(--color-text-secondary)]">
+              <div className="text-sm font-semibold text-foreground mb-2">{t('settings.mcp.form.rawConfig')}</div>
+              <pre className="overflow-x-auto rounded-lg bg-hover p-4 text-xs text-muted-foreground">
                 {JSON.stringify(server.config, null, 2)}
               </pre>
             </div>
@@ -830,7 +828,7 @@ export function McpSettings() {
           onBack={() => setView({ type: 'list' })}
           status={editing && targetServer && <>
             <StatusBadge server={targetServer} />
-            {targetServer.statusDetail && <span className="text-sm text-[var(--color-text-tertiary)]">{targetServer.statusDetail}</span>}
+            {targetServer.statusDetail && <span className="text-sm text-subtle-foreground">{targetServer.statusDetail}</span>}
           </>}
           headerActions={editing && targetServer && <>
             {targetServer.canReconnect && (
@@ -841,8 +839,7 @@ export function McpSettings() {
             )}
             {targetServer.canRemove && (
               <Button
-                variant="ghost"
-                className="text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/8"
+                variant="destructive"
                 onClick={() => handleDelete(targetServer)}
                 loading={isDeleting}
               >
@@ -868,7 +865,7 @@ export function McpSettings() {
             currentWorkDir={currentWorkDir}
           />
 
-          <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+          <section className="rounded-xl border border-border bg-background overflow-hidden">
             <div className="grid grid-cols-3">
               {(['stdio', 'http', 'sse'] as TransportKind[]).map((transport) => {
                 const active = draft.transport === transport
@@ -880,8 +877,8 @@ export function McpSettings() {
                     onClick={() => setDraftField('transport', transport)}
                     className={`h-14 text-sm font-semibold transition-colors ${
                       active
-                        ? 'bg-[var(--color-surface-selected)] text-[var(--color-text-primary)]'
-                        : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                        ? 'bg-selected text-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-hover'
                     } ${transportLocked ? 'cursor-not-allowed opacity-70' : ''}`}
                   >
                     {transport === 'stdio' ? 'STDIO' : transportLabel(transport, t)}
@@ -892,7 +889,7 @@ export function McpSettings() {
           </section>
 
           {editing && (
-            <div className="text-sm text-[var(--color-text-tertiary)]">
+            <div className="text-sm text-subtle-foreground">
               {t('settings.mcp.form.transportLocked')}
             </div>
           )}
@@ -907,7 +904,7 @@ export function McpSettings() {
                   onChange={(event) => setDraftField('command', event.target.value)}
                   placeholder={t('settings.mcp.form.commandPlaceholder')}
                 />
-                <p className="mt-2 text-xs leading-5 text-[var(--color-text-tertiary)]">
+                <p className="mt-2 text-xs leading-5 text-subtle-foreground">
                   {t('settings.mcp.form.commandHostHint')}
                 </p>
               </McpEditorSection>
@@ -1030,11 +1027,11 @@ export function McpSettings() {
 
           {error && (
             <div role="alert" className="py-10 text-center">
-              <p className="mb-2 text-[13px] text-[var(--color-error)]">{error}</p>
+              <p className="mb-2 text-sm text-destructive">{error}</p>
               <button
                 type="button"
                 onClick={() => void fetchServers(projectPathsForFetchRef.current, currentWorkDir)}
-                className="text-xs text-[var(--color-text-accent)] hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 {t('common.retry')}
               </button>
@@ -1042,8 +1039,8 @@ export function McpSettings() {
           )}
           {servers.length === 0 ? (!error && (
             <div className="py-10 text-center">
-              <p className="mb-1 text-[13px] text-[var(--color-text-secondary)]">{t('settings.mcp.empty')}</p>
-              <p className="text-xs text-[var(--color-text-tertiary)]">{t('settings.mcp.emptyHint')}</p>
+              <p className="mb-1 text-sm text-muted-foreground">{t('settings.mcp.empty')}</p>
+              <p className="text-xs text-subtle-foreground">{t('settings.mcp.emptyHint')}</p>
             </div>
           )) : (
             MCP_GROUP_ORDER.map((group) => {
@@ -1079,9 +1076,9 @@ export function McpSettings() {
 
 function InfoPair({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-[var(--color-surface-hover)] px-4 py-3">
-      <div className="text-xs uppercase tracking-[0.16em] font-semibold text-[var(--color-text-tertiary)] mb-2">{label}</div>
-      <div className="text-sm text-[var(--color-text-primary)] break-all">{value}</div>
+    <div className="rounded-lg bg-hover px-4 py-3">
+      <div className="text-xs uppercase tracking-widest font-semibold text-subtle-foreground mb-2">{label}</div>
+      <div className="text-sm text-foreground break-all">{value}</div>
     </div>
   )
 }

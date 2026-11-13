@@ -25,17 +25,17 @@ export function ClaudeCodeImportSettings() {
             ? t('claudeCodeImport.settingsDescription', { dir: status.claudeCodeDir })
             : t('claudeCodeImport.unavailable')}
           {running && (
-            <span className="block text-[var(--color-text-secondary)]" role="status">
+            <span className="block text-muted-foreground" role="status">
               {t('claudeCodeImport.progress', { done: job.copied + job.skipped, total: job.total })}
             </span>
           )}
           {job?.state === 'done' && (
-            <span className="block text-[var(--color-text-secondary)]" role="status">
+            <span className="block text-muted-foreground" role="status">
               {t('claudeCodeImport.doneBody', { copied: job.copied, skipped: job.skipped })}
             </span>
           )}
           {(error || job?.state === 'failed') && (
-            <span className="block text-[var(--color-error)]" role="alert">
+            <span className="block text-destructive" role="alert">
               {t('claudeCodeImport.failed')}{error ?? job?.error}
             </span>
           )}

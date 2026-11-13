@@ -100,7 +100,7 @@ export function ArtifactsPage() {
   return (
     <div data-testid="artifacts-page" className="flex-1 overflow-y-auto">
       <div className="window-drag-region flex select-none items-center justify-between gap-4 px-10 pb-4 pt-8">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('artifacts.title')}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('artifacts.title')}</h1>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -119,7 +119,6 @@ export function ArtifactsPage() {
               key={value}
               value={value}
               aria-label={t(label)}
-              className="text-[var(--color-text-tertiary)] data-[state=on]:bg-[var(--color-surface-container-highest)] data-[state=on]:text-[var(--color-text-primary)]"
             >
               <Icon aria-hidden="true" />
             </ToggleGroupItem>
@@ -127,7 +126,7 @@ export function ArtifactsPage() {
         </ToggleGroup>
       </div>
       <div className="px-10 pb-8">
-        <p className="mb-2 text-ui-aux text-[var(--color-text-tertiary)]">{t('artifactsPage.makeNew')}</p>
+        <p className="mb-2 text-xs text-subtle-foreground">{t('artifactsPage.makeNew')}</p>
         <div className="mb-6 flex items-center gap-6">
           <button
             type="button"
@@ -135,17 +134,17 @@ export function ArtifactsPage() {
             data-testid="design-entry"
             className="group flex w-36 flex-col gap-2 text-left focus-visible:outline-none"
           >
-            <span className="flex h-24 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-brand)_14%,var(--color-surface-container))] text-[var(--color-brand)] transition-colors group-hover:bg-[color-mix(in_srgb,var(--color-brand)_22%,var(--color-surface-container))] group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-border-focus)]">
+            <span className="flex h-24 items-center justify-center rounded-lg border border-border bg-primary/15 text-primary transition-colors group-hover:bg-primary/20 group-focus-visible:ring-2 group-focus-visible:ring-ring">
               <Palette aria-hidden="true" size={40} strokeWidth={1.5} />
             </span>
-            <span className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
               {t('design.entry')}
-              <span aria-hidden="true" className="rounded-full border border-[var(--color-brand)] px-1.5 text-[0.65rem] font-normal text-[var(--color-brand)]">
+              <span aria-hidden="true" className="rounded-full border border-primary px-1.5 text-3xs font-normal text-primary">
                 {t('artifactsPage.badgeNew')}
               </span>
             </span>
           </button>
-          <p className="text-sm text-[var(--color-text-tertiary)]">{t('artifactsPage.moreSoon')}</p>
+          <p className="text-sm text-subtle-foreground">{t('artifactsPage.moreSoon')}</p>
         </div>
         <div className="mb-5 flex items-center gap-3">
           <SearchField
@@ -164,11 +163,11 @@ export function ArtifactsPage() {
             </Button>
           </HintTooltip>
         </div>
-        {error && <p role="alert" className="mb-4 text-sm text-[var(--color-error)]">{error}</p>}
+        {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
         {items.length === 0 && loading ? (
           <LoadingBlock className="py-16" spinnerClassName="size-6" />
         ) : visible.length === 0 ? (
-          <p role="status" className="py-16 text-center text-sm text-[var(--color-text-tertiary)]">
+          <p role="status" className="py-16 text-center text-sm text-subtle-foreground">
             {items.length === 0 ? t('artifacts.empty') : t('artifactsPage.noMatches')}
           </p>
         ) : (

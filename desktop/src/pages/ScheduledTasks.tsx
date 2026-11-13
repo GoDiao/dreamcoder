@@ -24,20 +24,20 @@ export function ScheduledTasks() {
       <div className="px-10 py-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('scheduledPage.title')}</h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            <h1 className="text-2xl font-bold text-foreground">{t('scheduledPage.title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               {(() => {
                 const parts = t('scheduledPage.subtitle').split('{code}')
-                return <>{parts[0]}<code className="px-1 py-0.5 rounded bg-[var(--color-surface-container)] text-xs font-[var(--font-mono)]">/schedule</code>{parts[1]}</>
+                return <>{parts[0]}<code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">/schedule</code>{parts[1]}</>
               })()}
             </p>
           </div>
           <Button onClick={() => openModal('new-task')}>{t('tasks.newTask')}</Button>
         </div>
 
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/15 mb-6">
-          <ClockIcon className="shrink-0 text-[var(--color-warning)]" aria-hidden="true" size={18} />
-          <span className="text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-md bg-warning/8 border border-warning/15 mb-6">
+          <ClockIcon className="shrink-0 text-warning" aria-hidden="true" size={18} />
+          <span className="text-xs text-muted-foreground">
             {t('scheduledPage.desktopNotice')}
           </span>
         </div>

@@ -40,8 +40,8 @@ export function AboutSettings() {
       <div className="mb-6 flex items-center gap-3">
         <DreamCoderIcon size={40} />
         <div className="min-w-0">
-          <h2 className="text-ui-title font-semibold text-[var(--color-text-primary)]">DreamCoder</h2>
-          <p className="text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+          <h2 className="text-xl font-semibold text-foreground">DreamCoder</h2>
+          <p className="text-xs leading-relaxed text-muted-foreground">
             {version ? `${t('settings.about.version')} ${version} · ` : ''}{t('settings.about.tagline')}
           </p>
         </div>
@@ -69,7 +69,7 @@ export function AboutSettings() {
       />
 
       <SettingsSection title={t('settings.about.updates')}>
-        <p className="border-l-2 border-[var(--color-border)] py-1.5 pl-3 text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+        <p className="border-l-2 border-border py-1.5 pl-3 text-xs leading-relaxed text-muted-foreground">
           {t('settings.about.updatesNotAvailable')}
         </p>
       </SettingsSection>

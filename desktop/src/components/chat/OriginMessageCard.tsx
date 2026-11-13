@@ -6,8 +6,8 @@ import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '../shared/ui/trace'
 import { MessageActionBar } from './MessageActionBar'
 import { SessionLink } from './SessionLink'
-import { toast } from 'sonner'
 import { Button } from '../shared/ui/button'
+import { toast } from 'sonner'
 import { boardForProject, useKanbanStore } from '../../stores/kanbanStore'
 import { openBoardTab, useTabStore } from '../../stores/tabStore'
 import { useWorkspacePanelStore } from '../../stores/workspacePanelStore'
@@ -71,9 +71,10 @@ function KanbanCardLink({ origin }: { origin: KanbanOrigin }) {
     <Button
       type="button"
       variant="link"
+      size="inline-text"
       onClick={() => void openKanbanCard(t, origin, card.id, inPanel)}
       aria-label={t('chat.kanbanMessage.open', { card: `#${card.id}` })}
-      className="h-auto min-w-0 max-w-[40%] justify-start px-0 text-[length:inherit]"
+      className="max-w-[40%]"
     >
       <span className="truncate">#{card.id} {card.title}</span>
     </Button>
@@ -121,13 +122,13 @@ export const OriginMessageCard = memo(function OriginMessageCard({ content, orig
             {header.source}
             <TraceCollapsibleTrigger className="min-w-0 flex-1 select-none">
               <TraceLine>
-                <span className="flex-shrink-0 text-ui-muted-foreground/70">{t(header.purpose)}</span>
-                {!expanded && header.preview && <span className="min-w-0 flex-1 truncate text-ui-muted-foreground">{header.preview}</span>}
+                <span className="flex-shrink-0 text-muted-foreground/70">{t(header.purpose)}</span>
+                {!expanded && header.preview && <span className="min-w-0 flex-1 truncate text-muted-foreground">{header.preview}</span>}
               </TraceLine>
             </TraceCollapsibleTrigger>
           </div>
           <TraceCollapsibleContent>
-            <div className="text-ui-message leading-[1.7] text-[var(--color-text-primary)]">
+            <div className="text-sm leading-relaxed text-foreground">
               <MarkdownRenderer content={content} />
             </div>
             <MessageActionBar

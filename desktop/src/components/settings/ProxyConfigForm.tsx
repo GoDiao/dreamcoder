@@ -84,7 +84,7 @@ export function ProxyConfigForm({
             onChange={(event) => onUrlChange(event.target.value)}
           />
           {!proxyError && (
-            <p className="mt-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+            <p className="mt-1 text-xs leading-normal text-subtle-foreground">
               {labels.urlHint}
             </p>
           )}
@@ -94,7 +94,7 @@ export function ProxyConfigForm({
       {children}
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="min-w-0 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+        <p className="min-w-0 text-xs leading-normal text-subtle-foreground">
           {labels.scopeHint}
         </p>
         <Button
@@ -110,7 +110,7 @@ export function ProxyConfigForm({
       </div>
 
       {error && (
-        <p className="mt-2 text-xs leading-[1.5] text-[var(--color-error)]">
+        <p className="mt-2 text-xs leading-normal text-destructive">
           {error}
         </p>
       )}

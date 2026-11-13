@@ -79,14 +79,14 @@ describe('ToolCallGroup', () => {
 
     const header = screen.getByRole('button', { name: /Read 3 files/ })
     expect(header).toHaveAttribute('aria-expanded', 'false')
-    expect(header.querySelector('.text-\\[var\\(--color-error\\)\\]')).not.toBeNull()
+    expect(header.querySelector('.text-destructive')).not.toBeNull()
   })
 
   it('does not mark the group as failed when a later call of the same tool succeeded, but keeps the failed row', () => {
     renderGroup([resultFor('a', true), resultFor('b', true), resultFor('c')])
 
     const header = screen.getByRole('button', { name: /Read 3 files/ })
-    expect(header.querySelector('.text-\\[var\\(--color-error\\)\\]')).toBeNull()
+    expect(header.querySelector('.text-destructive')).toBeNull()
     fireEvent.click(header)
     expect(screen.getAllByText('boom')).toHaveLength(2)
   })

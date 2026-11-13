@@ -145,27 +145,27 @@ export function DiagnosticsSettings() {
           </Button>
         }
       />
-      <div className="mt-[18px] flex flex-wrap items-center gap-1.5">
+      <div className="mt-4.5 flex flex-wrap items-center gap-1.5">
         <Button variant="outline" size="xs" onClick={handleExport} loading={isExporting}>
           {t('settings.diagnostics.exportBundle')}
         </Button>
         <Button variant="outline" size="xs" onClick={handleCopySummary}>
           {t('settings.diagnostics.copySummary')}
         </Button>
-        <Button variant="outline" size="xs" onClick={handleClear} loading={isClearing} className="text-[var(--color-error)] hover:text-[var(--color-error)]">
+        <Button variant="destructive" size="xs" onClick={handleClear} loading={isClearing}>
           {t('settings.diagnostics.clearLogs')}
         </Button>
         {lastExportPath && (
-          <span className="text-xs text-[var(--color-text-tertiary)] font-mono break-all">
+          <span className="text-xs text-subtle-foreground font-mono break-all">
             {lastExportPath}
           </span>
         )}
       </div>
 
       <SettingsSection title={t('settings.diagnostics.recentEvents')}>
-        <p className="-mt-1.5 mb-1 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">{t('settings.diagnostics.privacyNote')}</p>
+        <p className="-mt-1.5 mb-1 text-xs leading-normal text-subtle-foreground">{t('settings.diagnostics.privacyNote')}</p>
         {events.length === 0 ? (
-          <div className="py-6 text-center text-xs text-[var(--color-text-tertiary)]">
+          <div className="py-6 text-center text-xs text-subtle-foreground">
             {isLoading ? t('common.loading') : t('settings.diagnostics.noEvents')}
           </div>
         ) : (
@@ -193,32 +193,32 @@ function EventRow({
 }) {
   const severityClass =
     event.severity === 'error'
-      ? 'text-[var(--color-error)]'
+      ? 'text-destructive'
       : event.severity === 'warn'
-        ? 'text-[var(--color-warning)]'
-        : 'text-[var(--color-text-tertiary)]'
+        ? 'text-warning'
+        : 'text-subtle-foreground'
   const detailsText = formatDetails(event.details)
 
   return (
-    <div className="grid grid-cols-[120px_64px_1fr] items-start gap-3 border-b border-[var(--color-border-separator)] py-2.5">
-      <div className="text-xs text-[var(--color-text-tertiary)] font-mono">
+    <div className="grid grid-cols-[120px_64px_1fr] items-start gap-3 border-b border-border py-2.5">
+      <div className="text-xs text-subtle-foreground font-mono">
         {new Date(event.timestamp).toLocaleString()}
       </div>
       <div className={`text-xs font-medium ${severityClass}`}>{event.severity}</div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[13px] font-medium text-[var(--color-text-primary)] truncate">{event.type}</span>
+          <span className="text-sm font-medium text-foreground truncate">{event.type}</span>
           {event.sessionId && (
-            <span className="text-[11px] text-[var(--color-text-tertiary)] font-mono truncate">{event.sessionId}</span>
+            <span className="text-2xs text-subtle-foreground font-mono truncate">{event.sessionId}</span>
           )}
         </div>
-        <div className="mt-px text-xs leading-[1.5] text-[var(--color-text-secondary)] break-words">{event.summary}</div>
+        <div className="mt-px text-xs leading-normal text-muted-foreground break-words">{event.summary}</div>
         {detailsText && (
           <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-[var(--color-text-tertiary)] select-none">
+            <summary className="cursor-pointer text-xs text-subtle-foreground select-none">
               {detailsLabel}
             </summary>
-            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2 text-2xs leading-relaxed text-muted-foreground">
               {detailsText}
             </pre>
           </details>

@@ -266,50 +266,47 @@ function MemoryToolActivityGroup({
         open={expanded}
         onOpenChange={setExpanded}
         data-testid="memory-tool-activity-card"
-        className="overflow-hidden rounded-lg border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)]"
+        className="overflow-hidden rounded-lg border border-memory-border bg-memory-surface"
       >
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="row"
-            type="button"
-            className="px-3 py-2 hover:bg-[var(--color-surface-hover)]/50"
-          >
-            <ChevronRight size={15} className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
-            <BookMarked size={15} className="shrink-0 text-[var(--color-memory-accent)]" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+          <Button variant="ghost" size="row" type="button">
+            <ChevronRight size={15} className="shrink-0 text-subtle-foreground transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
+            <BookMarked size={15} className="shrink-0 text-memory" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
               {t(titleKey, { count: activity.files.length })}
             </span>
             {isStreaming ? (
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-memory-accent)] animate-pulse-dot" />
+              <span className="h-1.5 w-1.5 rounded-full bg-memory animate-pulse-dot" />
             ) : null}
           </Button>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="border-t border-[var(--color-border)]/55 px-3 py-2.5">
+          <div className="border-t border-border/55 px-3 py-2.5">
             <div className="space-y-1.5">
               {visibleFiles.map((file) => (
                 <HintTooltip key={file.path} content={file.path}><Button variant="ghost" size="row"
                   type="button"
                   aria-label={file.path}
                   onClick={() => openMemorySettings(file.path)}
-                  className="group items-start gap-2 rounded-md px-2 py-1.5"
+                  className="group items-start"
                 >
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-[var(--color-memory-border)] bg-[var(--color-memory-icon-bg)] text-[var(--color-text-tertiary)] group-hover:text-[var(--color-memory-accent)]">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-memory-border bg-memory-icon text-subtle-foreground group-hover:text-memory">
                     <Settings size={12} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+                      <span className="truncate text-sm font-medium text-foreground">
                         {file.label}
                       </span>
                       {file.lineHint ? (
-                        <span className="shrink-0 text-[12px] text-[var(--color-text-tertiary)]">
+                        <span className="shrink-0 text-xs text-subtle-foreground">
                           {file.lineHint}
                         </span>
                       ) : null}
                     </span>
                     {file.preview ? (
-                      <span className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-[var(--color-text-secondary)]">
+                      <span className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
                         {file.preview}
                       </span>
                     ) : null}
@@ -317,16 +314,16 @@ function MemoryToolActivityGroup({
                 </Button></HintTooltip>
               ))}
               {hiddenCount > 0 ? (
-                <div className="px-2 py-1 text-[12px] text-[var(--color-text-tertiary)]">
+                <div className="px-2 py-1 text-xs text-subtle-foreground">
                   {t('chat.memoryMoreFiles', { count: hiddenCount })}
                 </div>
               ) : null}
             </div>
 
-            <Button variant="ghost"
+            <Button variant="outline" size="xs"
               type="button"
               onClick={() => setDetailsExpanded((value) => !value)}
-              className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--color-border)] px-2 text-[11px] font-medium text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+              className="mt-2"
             >
               {detailsExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               {t('chat.memoryTechnicalDetails')}
@@ -384,29 +381,29 @@ function AgentToolGroup({
 
   return (
     <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="mb-2">
-      <TraceCollapsibleTrigger className="min-h-7 w-full gap-2 text-ui-aux">
-        {isAnyRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
-        {!isAnyRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
-        {!isAnyRunning && !errorPresent && allComplete && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
+      <TraceCollapsibleTrigger className="min-h-7 w-full">
+        {isAnyRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse-dot" aria-hidden="true" />}
+        {!isAnyRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-destructive" />}
+        {!isAnyRunning && !errorPresent && allComplete && <Check size={14} aria-hidden="true" className="shrink-0 text-success" />}
         {!isAnyRunning && !errorPresent && !allComplete && !anyStopped && <CircleDot size={13} aria-hidden="true" className="shrink-0" />}
         {!isAnyRunning && !errorPresent && !allComplete && anyStopped && <Square size={12} aria-hidden="true" className="shrink-0" />}
         <TraceLine status={isAnyRunning ? 'running' : errorPresent ? 'error' : undefined}><TraceTitle>
           {toolCalls.length === 1 ? t('toolGroup.agentOne') : t('toolGroup.agentMany', { count: toolCalls.length })}
         </TraceTitle></TraceLine>
         {isAnyRunning && (
-          <span className="shrink-0 text-[var(--color-text-tertiary)] before:mr-1 before:content-['·']">{t('agentStatus.running')}</span>
+          <span className="shrink-0 text-subtle-foreground before:mr-1 before:content-['·']">{t('agentStatus.running')}</span>
         )}
       </TraceCollapsibleTrigger>
 
       <CollapsibleContent>
         <div className="relative mt-2 pl-5">
-          <div className="absolute bottom-6 left-[11px] top-4 w-px rounded-full bg-[var(--color-border)]/45" />
+          <div className="absolute bottom-6 left-[11px] top-4 w-px rounded-full bg-border/45" />
           <div className="space-y-2">
             {toolCalls.map((toolCall) => (
               <div key={toolCall.id} className="relative pl-7">
                 <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                  <div className="absolute left-[11px] top-1/2 h-px w-4 -translate-y-1/2 bg-[var(--color-border)]/45" />
-                  <div className="absolute left-[8px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[var(--color-border)]/65 bg-[var(--color-surface-container-lowest)] shadow-[0_0_0_2px_var(--color-surface)]" />
+                  <div className="absolute left-[11px] top-1/2 h-px w-4 -translate-y-1/2 bg-border/45" />
+                  <div className="absolute left-[8px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-border/65 bg-popover ring-2 ring-background" />
                 </div>
                 <AgentCallCard
                   toolCall={toolCall}
@@ -441,25 +438,27 @@ function ToolCallGroupMulti({
 
   return (
     <TraceCollapsible open={expanded} onOpenChange={setExpanded} className="mb-2">
-      <TraceCollapsibleTrigger className="min-h-7 w-full gap-2 text-ui-aux">
-        {!isRunning && !errorPresent && <Check size={14} aria-hidden="true" className="shrink-0 text-[var(--color-success)]" />}
-        {!isRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-[var(--color-error)]" />}
-        {isRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-brand)] animate-pulse-dot" aria-hidden="true" />}
+      <TraceCollapsibleTrigger className="min-h-7 w-full">
+        {!isRunning && !errorPresent && <Check size={14} aria-hidden="true" className="shrink-0 text-success" />}
+        {!isRunning && errorPresent && <CircleAlert size={14} aria-hidden="true" className="shrink-0 text-destructive" />}
+        {isRunning && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse-dot" aria-hidden="true" />}
         <TraceLine status={isRunning ? 'running' : errorPresent ? 'error' : undefined}><TraceTitle>{summary}</TraceTitle></TraceLine>
       </TraceCollapsibleTrigger>
 
-      <TraceCollapsibleContent className="ml-[6px] mt-1.5 space-y-1 pl-[18px]">
-        {steps.map((step) => step.type === 'thinking'
-          ? <ThinkingBlock key={step.id} content={step.content} isActive={step.id === activeThinkingId} />
-          : (
-            <ToolCallTree
-              key={step.id}
-              toolCall={step}
-              resultMap={resultMap}
-              childToolCallsByParent={childToolCallsByParent}
-              compact
-            />
-          ))}
+      <TraceCollapsibleContent className="ml-1.5 mt-1.5">
+        <div className="space-y-1">
+          {steps.map((step) => step.type === 'thinking'
+            ? <ThinkingBlock key={step.id} content={step.content} isActive={step.id === activeThinkingId} />
+            : (
+              <ToolCallTree
+                key={step.id}
+                toolCall={step}
+                resultMap={resultMap}
+                childToolCallsByParent={childToolCallsByParent}
+                compact
+              />
+            ))}
+        </div>
       </TraceCollapsibleContent>
     </TraceCollapsible>
   )
@@ -517,18 +516,18 @@ function AgentCallCard({
   const description = typeof input.description === 'string' ? input.description : ''
 
   return (
-    <Collapsible open={expanded} onOpenChange={setExpanded} className="overflow-hidden rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-surface-container-lowest)]">
-      <div className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)]/50">
+    <Collapsible open={expanded} onOpenChange={setExpanded} className="overflow-hidden rounded-lg border border-border/50 bg-popover">
+      <div className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-hover/50">
         <TraceIcon><Bot /></TraceIcon>
         <div className="min-w-0 flex-1">
           <TraceLine status={status === 'running' || status === 'starting' ? 'running' : status === 'failed' ? 'error' : undefined}>
             <TraceTitle>Agent</TraceTitle>
             {description && (
-              <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>
+              <TraceDescription className="min-w-0 shrink"><span className="block truncate">{description}</span></TraceDescription>
             )}
           </TraceLine>
           {!expanded && outputSummary && (
-            <div className="mt-1 line-clamp-2 text-[11px] text-[var(--color-text-tertiary)]">
+            <div className="mt-1 line-clamp-2 text-2xs text-subtle-foreground">
               {outputSummary}
             </div>
           )}
@@ -537,7 +536,7 @@ function AgentCallCard({
               {recentToolCalls.map((recentToolCall) => (
                 <div
                   key={recentToolCall.id}
-                  className="truncate text-[11px] text-[var(--color-text-tertiary)]"
+                  className="truncate text-2xs text-subtle-foreground"
                 >
                   {formatRecentToolUseSummary(recentToolCall, resultMap, t)}
                 </div>
@@ -545,30 +544,29 @@ function AgentCallCard({
             </div>
           )}
           {!expanded && !outputSummary && !recentToolCalls.length && errorText && (
-            <div className="mt-1 truncate text-[11px] text-[var(--color-error)]">
+            <div className="mt-1 truncate text-2xs text-destructive">
               {errorText}
             </div>
           )}
         </div>
         {outputSummary && (
-          <Button variant="ghost"
+          <Button variant="outline" size="xs"
             type="button"
             onClick={(event) => {
               event.stopPropagation()
               setPreviewOpen(true)
             }}
-            className="shrink-0 rounded-md border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+            className="shrink-0"
           >
             {t('agentStatus.viewResult')}
           </Button>
         )}
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClassName}`}>
+        <span className={`rounded-full px-2 py-0.5 text-3xs font-semibold ${statusClassName}`}>
           {statusLabel}
         </span>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="icon-sm"
+          <Button variant="ghost-muted" size="icon-sm"
             type="button"
-            className="rounded-full text-[var(--color-outline)] hover:bg-[var(--color-surface-hover)]"
             aria-label={t(expanded ? 'agentStatus.collapse' : 'agentStatus.expand')}
           >
             <ChevronDown className="group-data-[state=open]/button:rotate-180" aria-hidden="true" />
@@ -577,9 +575,9 @@ function AgentCallCard({
       </div>
 
       <CollapsibleContent>
-        <div className="border-t border-[var(--color-border)]/60 px-3 py-3">
+        <div className="border-t border-border/60 px-3 py-3">
           {errorText && (
-            <div className="mb-3 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error-container)]/60 px-3 py-2 text-[11px] text-[var(--color-error)]">
+            <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive-surface/60 px-3 py-2 text-2xs text-destructive">
               {errorText}
             </div>
           )}
@@ -596,11 +594,11 @@ function AgentCallCard({
               ))}
             </div>
           ) : outputSummary ? (
-            <div className="text-[11px] text-[var(--color-text-tertiary)]">
+            <div className="text-2xs text-subtle-foreground">
               {t('agentStatus.noActivity')}
             </div>
           ) : (
-            <div className="text-[11px] text-[var(--color-text-tertiary)]">
+            <div className="text-2xs text-subtle-foreground">
               {status === 'starting' ? t('agentStatus.starting') : t('agentStatus.noActivity')}
             </div>
           )}
@@ -645,7 +643,7 @@ function ToolCallTree({
         partialInput={toolCall.partialInput}
       />
       {childToolCalls.length > 0 && (
-        <div className={compact ? 'ml-4 border-l border-[var(--color-border)]/60 pl-3' : 'mb-2 ml-16 border-l border-[var(--color-border)]/60 pl-3'}>
+        <div className={compact ? 'ml-4 border-l border-border/60 pl-3' : 'mb-2 ml-16 border-l border-border/60 pl-3'}>
           <div className="space-y-1">
             {childToolCalls.map((childToolCall) => (
               <ToolCallTree
@@ -815,16 +813,16 @@ function getAgentStatusLabel(
 function getAgentStatusClassName(status: AgentStatus): string {
   switch (status) {
     case 'failed':
-      return 'bg-[var(--color-error)]/10 text-[var(--color-error)]'
+      return 'bg-destructive/10 text-destructive'
     case 'stopped':
-      return 'bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]'
+      return 'bg-secondary text-muted-foreground'
     case 'done':
-      return 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+      return 'bg-success/10 text-success'
     case 'running':
-      return 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+      return 'bg-warning/10 text-warning'
     case 'starting':
     default:
-      return 'bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]'
+      return 'bg-secondary text-muted-foreground'
   }
 }
 

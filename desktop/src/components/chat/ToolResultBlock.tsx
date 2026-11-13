@@ -1,4 +1,3 @@
-import { Button } from '../shared/ui/button'
 import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
 import { CodeViewer } from './CodeViewer'
 import { memo, useState } from 'react'
@@ -26,37 +25,37 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
   return (
     <div className={`mb-2 overflow-hidden rounded-xl border ${
       isError
-        ? 'border-[var(--color-error)]/20'
-        : 'border-[var(--color-outline-variant)]/20'
+        ? 'border-destructive/20'
+        : 'border-border/20'
     }`}>
-      <Button variant="ghost" size="row"
+      <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
-        className={`justify-between px-3 text-[10px] font-bold uppercase tracking-wider ${
+        className={`flex w-full items-center justify-between px-3 py-1.5 text-3xs font-bold uppercase tracking-wider outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 ${
           isError
-            ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
-            : 'bg-[var(--color-surface-container-high)] text-[var(--color-outline)]'
+            ? 'bg-destructive-surface text-destructive'
+            : 'bg-secondary text-subtle-foreground'
         }`}
       >
         <span className="flex items-center gap-1.5">
           <ResultIcon aria-hidden="true" size={12} />
           {toolName ? t('tool.result', { toolName }) : t('tool.resultGeneric')}
         </span>
-        <span className={`px-2 py-0.5 rounded-full text-[9px] ${
+        <span className={`px-2 py-0.5 rounded-full text-3xs ${
           isError
-            ? 'bg-[var(--color-error)]/10'
-            : 'bg-[var(--color-diff-added-bg)] text-[var(--color-diff-added-text)]'
+            ? 'bg-destructive/10'
+            : 'bg-diff-added text-diff-added-foreground'
         }`}>
           {isError ? t('tool.error') : t('tool.success')}
         </span>
-      </Button>
+      </button>
 
       <InlineImageGallery text={text} />
 
       {expanded ? (
         isError ? (
-          <div className="bg-[var(--color-error-container)]/50 px-3 py-2.5 font-[var(--font-mono)] text-[11px] leading-[1.5] whitespace-pre-wrap break-words text-[var(--color-error)]">
+          <div className="bg-destructive-surface/50 px-3 py-2.5 font-mono text-2xs leading-normal whitespace-pre-wrap break-words text-destructive">
             {text}
           </div>
         ) : (
@@ -67,19 +66,20 @@ export const ToolResultBlock = memo(function ToolResultBlock({ content, isError,
           />
         )
       ) : (
-        <div className="bg-[var(--color-surface-container-lowest)] px-3 py-2 font-[var(--font-mono)] text-[10px] leading-[1.35] text-[var(--color-text-tertiary)]">
+        <div className="bg-popover px-3 py-2 font-mono text-3xs leading-snug text-subtle-foreground">
           {preview}
           {hasMore ? '…' : ''}
         </div>
       )}
 
       {hasMore && (
-        <Button variant="ghost" size="row"
+        <button
+          type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="justify-center py-1 text-center text-[10px] font-medium text-[var(--color-text-accent)] hover:underline bg-[var(--color-surface-container-low)] border-t border-[var(--color-outline-variant)]/10"
+          className="w-full border-t border-border/10 bg-card py-1 text-center text-3xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
         >
           {expanded ? t('tool.showLess') : t('tool.showMore', { count: text.length - 200 })}
-        </Button>
+        </button>
       )}
     </div>
   )

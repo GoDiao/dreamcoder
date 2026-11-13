@@ -212,12 +212,14 @@ describe('workspacePanelStore', () => {
     const store = useWorkspacePanelStore.getState()
 
     await store.openAddress('h5', 'localhost:3000', null)
-    expect(useWorkspacePanelStore.getState().getActiveTab('h5')).toMatchObject({ kind: 'file', path: 'localhost:3000' })
+    expect(useWorkspacePanelStore.getState().getActiveTab('h5')).toMatchObject({ kind: 'files' })
+    expect(useWorkspacePanelStore.getState().panelByTab.h5?.selectedFile).toBe('localhost:3000')
     expect(mocks.getWorkspaceFileMock).not.toHaveBeenCalled()
 
     Object.assign(window, { [ELECTRON_BRIDGE_KEY]: {} })
     await store.openAddress('s', '  src/a.ts ', '/repo')
-    expect(useWorkspacePanelStore.getState().getActiveTab('s')).toMatchObject({ kind: 'file', path: 'src/a.ts' })
+    expect(useWorkspacePanelStore.getState().getActiveTab('s')).toMatchObject({ kind: 'files' })
+    expect(useWorkspacePanelStore.getState().panelByTab.s?.selectedFile).toBe('src/a.ts')
 
     await store.openAddress('s', 'localhost:3000', '/repo')
     const browser = useWorkspacePanelStore.getState().getActiveTab('s')
@@ -225,7 +227,7 @@ describe('workspacePanelStore', () => {
     expect(mocks.submitBrowserInput).toHaveBeenCalledWith('s', browser?.id, 'localhost:3000', '/repo')
 
     await store.openAddress('s', '   ', '/repo')
-    expect(kinds('s')).toEqual(['file', 'browser'])
+    expect(kinds('s')).toEqual(['files', 'browser'])
   })
 
   it('expands and restores the panel and resets expansion on close', () => {
@@ -248,6 +250,8 @@ describe('workspacePanelStore', () => {
     const store = useWorkspacePanelStore.getState()
     const file = store.openTab('s', { kind: 'file', path: 'src/a.ts' })
     const browser = store.openTab('s', { kind: 'browser', url: 'http://localhost:3000/' })
+    store.selectFile('s', 'src/b.ts')
+    const files = panel('s')?.activeTabId
     const terminal = store.openTab('s', { kind: 'terminal' })
     store.openTab('closed', { kind: 'changes' })
     store.closePanel('closed')
@@ -263,23 +267,24 @@ describe('workspacePanelStore', () => {
       tabs: [
         { id: file, kind: 'file', path: 'src/a.ts' },
         { id: browser, kind: 'browser', url: 'http://localhost:3000/', title: '' },
+        { id: files, kind: 'files' },
       ],
-      activeTabId: browser,
-      recentFiles: ['src/a.ts'],
+      activeTabId: files,
+      recentFiles: ['src/b.ts', 'src/a.ts'], selectedFile: 'src/b.ts',
     })
     expect(restored.closed?.isOpen).toBe(false)
   })
 
   it('ignores saved tabs it cannot read', async () => {
     localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify({
-      s: { isOpen: true, tabs: [{ id: 't1', kind: 'terminal', index: 1 }, { id: 'x', kind: 'file' }, { kind: 'files' }], activeTabId: 't1' },
+      s: { isOpen: true, tabs: [{ id: 't1', kind: 'terminal', index: 1 }, { id: 'x', kind: 'file' }, { kind: 'files' }], activeTabId: 't1', selectedFile: 7 },
       t: 'nonsense',
     }))
     vi.resetModules()
     const restarted = await import('./workspacePanelStore')
 
     expect(restarted.useWorkspacePanelStore.getState().panelByTab).toEqual({
-      s: { isOpen: false, expanded: false, tabs: [], activeTabId: null, recentFiles: [] },
+      s: { isOpen: false, expanded: false, tabs: [], activeTabId: null, recentFiles: [], selectedFile: null },
     })
 
     localStorage.setItem('dreamcoder-workspace-panels', '{')
@@ -338,33 +343,6 @@ describe('workspacePanelStore', () => {
     expect(useWorkspacePanelStore.getState().statusBySession['session-err']).toBeUndefined()
     expect(useWorkspacePanelStore.getState().loading.statusBySession['session-err']).toBe(false)
     expect(useWorkspacePanelStore.getState().errors.statusBySession['session-err']).toBe('status failed')
-  })
-
-  it('lazily loads tree nodes when expanding and reuses cached results', async () => {
-    mocks.getWorkspaceTreeMock.mockResolvedValue({
-      state: 'ok',
-      path: '',
-      entries: [
-        { name: 'src', path: 'src', isDirectory: true },
-        { name: 'README.md', path: 'README.md', isDirectory: false },
-      ],
-    })
-
-    await useWorkspacePanelStore.getState().toggleTreeNode('session-tree', '')
-
-    expect(mocks.getWorkspaceTreeMock).toHaveBeenCalledTimes(1)
-    expect(mocks.getWorkspaceTreeMock).toHaveBeenCalledWith('session-tree', '')
-    expect(useWorkspacePanelStore.getState().expandedPathsBySession['session-tree']).toEqual([''])
-    expect(useWorkspacePanelStore.getState().treeBySessionPath['session-tree']?.['']).toMatchObject({
-      entries: [{ path: 'src' }, { path: 'README.md' }],
-    })
-
-    await useWorkspacePanelStore.getState().toggleTreeNode('session-tree', '')
-    expect(useWorkspacePanelStore.getState().expandedPathsBySession['session-tree']).toEqual([])
-
-    await useWorkspacePanelStore.getState().toggleTreeNode('session-tree', '')
-    expect(mocks.getWorkspaceTreeMock).toHaveBeenCalledTimes(1)
-    expect(useWorkspacePanelStore.getState().expandedPathsBySession['session-tree']).toEqual([''])
   })
 
   it('ignores stale tree responses for the same session path', async () => {
@@ -491,6 +469,19 @@ describe('workspacePanelStore', () => {
     expect(previews?.['diff:b.ts']).toBeUndefined()
   })
 
+  it('keeps and refetches the file selected in the Files tab when previews refresh', async () => {
+    let version = 1
+    mocks.getWorkspaceFileMock.mockImplementation(async (_sessionId: string, path: string) => ({ state: 'ok', path, content: `${path} v${version}` }))
+    const store = useWorkspacePanelStore.getState()
+    store.selectFile('session-selected', 'src/a.ts')
+    await store.ensurePreview('session-selected', 'src/a.ts', 'file')
+
+    version = 2
+    await store.refreshPreviews('session-selected')
+
+    expect(useWorkspacePanelStore.getState().previewsBySession['session-selected']?.['file:src/a.ts']?.content).toBe('src/a.ts v2')
+  })
+
   it('keeps loaded previews visible without a loading state while they refresh', async () => {
     mocks.getWorkspaceDiffMock.mockResolvedValueOnce({ state: 'ok', path: 'a.ts', diff: 'v1' })
     const store = useWorkspacePanelStore.getState()
@@ -603,7 +594,6 @@ describe('workspacePanelStore', () => {
     store.openTab('other', { kind: 'changes' })
     useWorkspacePanelStore.setState((state) => ({
       statusBySession: { s: okStatus(), other: okStatus() },
-      expandedPathsBySession: { s: ['src'] },
       treeBySessionPath: { s: { src: { state: 'ok', path: 'src', entries: [] } } },
       previewsBySession: { s: { 'file:src/a.ts': { id: 'file:src/a.ts', path: 'src/a.ts', kind: 'file', title: 'a.ts' } } },
       expandedPreviewIdsBySession: { s: ['diff:src/a.ts'] },
@@ -622,7 +612,6 @@ describe('workspacePanelStore', () => {
       activeTabId: browser,
     })
     expect(state.statusBySession).toEqual({ other: okStatus() })
-    expect(state.expandedPathsBySession.s).toBeUndefined()
     expect(state.treeBySessionPath.s).toBeUndefined()
     expect(state.previewsBySession.s).toBeUndefined()
     expect(state.expandedPreviewIdsBySession.s).toBeUndefined()
@@ -805,7 +794,7 @@ describe('artifact tabs', () => {
       s1: {
         isOpen: true,
         activeTabId: 'a',
-        recentFiles: [],
+        recentFiles: [], selectedFile: null,
         tabs: [
           { id: 'a', kind: 'browser', url: 'dreamcoder-project://x/a/index.html', title: '', root: '/repo/dc_artifacts', artifact: { id: 'id-a', name: 'a', mtimeMs: 1 } },
           { id: 'b', kind: 'browser', url: 'u', title: '', root: 5 },

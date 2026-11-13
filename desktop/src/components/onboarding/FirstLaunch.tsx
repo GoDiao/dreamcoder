@@ -66,7 +66,7 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
   let importStatus
   if (running) {
     importStatus = (
-      <span role="status" className="inline-flex items-center gap-1.5 whitespace-nowrap text-ui-aux text-[var(--color-text-secondary)]">
+      <span role="status" className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
         <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
         {t('firstLaunch.importProgress', {
           done: (job.copied + job.skipped).toLocaleString(),
@@ -76,7 +76,7 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
     )
   } else if (done) {
     importStatus = (
-      <span role="status" className="inline-flex items-center gap-1.5 whitespace-nowrap text-ui-aux text-[var(--color-success)]">
+      <span role="status" className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-success">
         <Check size={14} aria-hidden="true" />
         {t('firstLaunch.importDone')}
       </span>
@@ -90,24 +90,24 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[var(--color-surface)] p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-6">
       <div className="w-full max-w-[400px] text-center">
-        <DreamCoderIcon size={56} className="mx-auto mb-[22px]" />
-        <h1 className="mb-2.5 text-[22px] font-semibold text-[var(--color-text-primary)]">
+        <DreamCoderIcon size={56} className="mx-auto mb-5.5" />
+        <h1 className="mb-2.5 text-xl font-semibold text-foreground">
           {t('onboarding.welcome')}
         </h1>
-        <p className="mb-6 text-ui-body leading-[1.7] text-[var(--color-text-secondary)]">
+        <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
           {t('onboarding.tagline')}
         </p>
 
         {showImport && (
-          <div className="mb-[18px] flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-lowest)] py-3 pl-3.5 pr-3 text-left">
-            <Download size={18} className="shrink-0 text-[var(--color-text-secondary)]" aria-hidden="true" />
+          <div className="mb-4.5 flex items-center gap-3 rounded-xl border border-border bg-popover py-3 pl-3.5 pr-3 text-left">
+            <Download size={18} className="shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="grid min-w-0 flex-1 gap-0.5">
-              <strong className="text-ui-nav font-semibold text-[var(--color-text-primary)]">
+              <strong className="text-sm font-semibold text-foreground">
                 {t('firstLaunch.importTitle')}
               </strong>
-              <span className="text-ui-aux leading-[1.55] text-[var(--color-text-secondary)]">
+              <span className="text-xs leading-normal text-muted-foreground">
                 {done
                   ? t('firstLaunch.importDoneDescription', {
                     copied: job.copied.toLocaleString(),
@@ -116,7 +116,7 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
                   : t('firstLaunch.importDescription', { dir: status?.claudeCodeDir ?? '~/.claude' })}
               </span>
               {failure !== null && !running && (
-                <span role="alert" className="text-ui-aux leading-[1.55] text-[var(--color-error)]">
+                <span role="alert" className="text-xs leading-normal text-destructive">
                   {t('claudeCodeImport.failed')}{failure}
                 </span>
               )}
@@ -146,7 +146,7 @@ export function FirstLaunch({ onFinish }: { onFinish: () => void }) {
             </>
           )}
           {presetsError !== null && (
-            <p role="alert" className="text-ui-aux text-[var(--color-error)]">
+            <p role="alert" className="text-xs text-destructive">
               {t('onboarding.presetsLoadFailed')}{presetsError}
             </p>
           )}

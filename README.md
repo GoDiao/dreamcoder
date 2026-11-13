@@ -56,7 +56,7 @@ Provider settings and API keys are stored in local files. When you use a cloud m
 
 ### 1. Native Desktop Experience
 *   **Smoother session management**: Visual history, a sidebar with several ways to organize sessions, and a full-height side panel per session.
-*   **A side panel of tabs**: Changes, the file tree, single files, web pages, terminals and pages each open as a tab from the new tab page. Each session keeps its own tabs, and they come back after a restart (terminals excepted).
+*   **A side panel of tabs**: Changes, Files (a file tree beside a preview of the selected file), web pages, terminals and pages each open as a tab from the new tab page; a single file can also get its own tab from the file tree's menu. Each session keeps its own tabs, and they come back after a restart (terminals excepted).
 *   **Terminal built into the workflow**: Built-in PTY (PowerShell/Bash/Zsh) with xterm.js.
 *   **Settings you can manage visually**: Configure providers, API keys, and preferences without editing JSON files.
 

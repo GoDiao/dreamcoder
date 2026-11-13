@@ -28,9 +28,9 @@ export function BrowserActivityBar({ sessionId, tabId }: { sessionId: string; ta
     <div
       role="status"
       data-testid="browser-activity"
-      className="flex shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-info-container)] px-3 py-1.5 text-ui-aux text-[var(--color-text-primary)]"
+      className="flex shrink-0 items-center gap-2 bg-info-surface px-3 py-1.5 text-xs text-foreground"
     >
-      <MousePointerClick className="size-3.5 shrink-0 text-[var(--color-info)]" aria-hidden="true" />
+      <MousePointerClick className="size-3.5 shrink-0 text-info" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{t('browserActivity.operating')}</span>
       <Button type="button" variant="outline" size="xs" loading={stopping} onClick={stop}>
         {t(stopping ? 'browserActivity.stopping' : 'browserActivity.stop')}

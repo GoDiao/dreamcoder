@@ -87,7 +87,7 @@ describe('PermissionModeSelector', () => {
     renderSelector({ compact: true, workDir: '/repo' })
 
     const trigger = screen.getByRole('button', { name: 'Manual' })
-    expect(trigger).toHaveClass('h-11', 'w-11')
+    expect(trigger).toHaveAttribute('data-size', 'icon-xl')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 

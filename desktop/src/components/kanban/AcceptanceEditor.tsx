@@ -16,7 +16,7 @@ export function acceptanceItems(items: readonly string[]): string[] {
 }
 
 export function AcceptanceMarker({ className = '' }: { className?: string }) {
-  return <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full bg-[var(--color-text-tertiary)] ${className}`} />
+  return <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full bg-subtle-foreground ${className}`} />
 }
 
 export function AcceptanceEditor({ items, onChange, label, autoFocus = false }: Props) {
@@ -68,7 +68,7 @@ export function AcceptanceEditor({ items, onChange, label, autoFocus = false }: 
       <ul aria-label={label} className="flex flex-col gap-1.5">
         {rows.map((item, index) => (
           <li key={index} className="flex items-start gap-2">
-            <AcceptanceMarker className="mt-[11px]" />
+            <AcceptanceMarker className="mt-2.75" />
             <Textarea
               rows={1}
               ref={(element) => { inputs.current[index] = element }}
@@ -78,7 +78,7 @@ export function AcceptanceEditor({ items, onChange, label, autoFocus = false }: 
               onChange={(event) => onChange(rows.map((row, each) => each === index ? event.target.value : row))}
               onKeyDown={handleKeyDown(index)}
               onPaste={handlePaste(index)}
-              className="min-h-7 resize-none py-1 text-[13px] md:text-[13px]"
+              className="min-h-7 resize-none"
             />
             <Button
               variant="ghost"

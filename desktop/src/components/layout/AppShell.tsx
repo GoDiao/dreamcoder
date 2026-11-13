@@ -245,7 +245,7 @@ export function AppShell() {
 
   if (!ready || firstLaunch.state === 'pending') {
     return (
-      <div className="app-shell-viewport flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+      <div className="app-shell-viewport flex items-center justify-center bg-background text-muted-foreground">
         {t('app.launching')}
       </div>
     )
@@ -257,7 +257,7 @@ export function AppShell() {
 
   const SidebarIcon = effectiveSidebarOpen ? XIcon : MenuIcon
   return (
-    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-[var(--color-surface)]${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
+    <div className={`app-shell app-shell-viewport flex overflow-hidden bg-background${isMobileShell ? ' app-shell--mobile' : ''}${titlebarToggle ? ' app-shell--titlebar-toggle' : ''}`}>
       {isMobileShell && effectiveSidebarMounted ? (
         <button
           type="button"
@@ -311,7 +311,7 @@ export function AppShell() {
         {isMobileShell ? (
           <div
             data-testid="mobile-session-header"
-            className="flex shrink-0 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2"
+            className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-3 py-2"
           >
             <button
               type="button"
@@ -320,19 +320,19 @@ export function AppShell() {
               aria-expanded={effectiveSidebarOpen}
               aria-label={effectiveSidebarOpen ? t('sidebar.collapse') : t('sidebar.expand')}
               onClick={toggleEffectiveSidebar}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <SidebarIcon aria-hidden="true" size={20} />
             </button>
             {isActiveChatTab ? (
               <div className="min-w-0 flex-1">
-                <h1 className="truncate text-[15px] font-bold leading-tight text-[var(--color-text-primary)]">
+                <h1 className="truncate text-sm font-bold leading-tight text-foreground">
                   {mobileSessionTitle}
                 </h1>
-                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-medium text-[var(--color-text-tertiary)]">
+                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-3xs font-medium text-subtle-foreground">
                   {activeTab?.status === 'running' ? (
-                    <span className="flex shrink-0 items-center gap-1 text-[var(--color-text-secondary)]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
+                    <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
                       {t('session.active')}
                     </span>
                   ) : null}
@@ -363,10 +363,12 @@ export function AppShell() {
       </ResizablePanel>
       </ResizablePanelGroup>
       {macTitlebar ? (
-        <TitlebarSidebarToggle
+        <div
           className="window-no-drag fixed z-[60]"
           style={{ left: 'var(--traffic-lights-end)', top: 'calc((var(--titlebar-height) - 1.75rem) / 2)' }}
-        />
+        >
+          <TitlebarSidebarToggle />
+        </div>
       ) : null}
       {desktopShell ? <BrowserGuestLayer /> : null}
       <SettingsModal />

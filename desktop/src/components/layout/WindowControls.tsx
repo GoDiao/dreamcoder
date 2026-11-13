@@ -47,7 +47,7 @@ export function WindowControls() {
       <button
         onClick={() => runWindowAction(() => win.minimize())}
         aria-label="Minimize window"
-        className="w-[46px] h-full flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+        className="w-[46px] h-full flex items-center justify-center text-muted-foreground hover:bg-hover transition-colors"
       >
         <svg width="10" height="1" viewBox="0 0 10 1">
           <rect width="10" height="1" fill="currentColor" />
@@ -57,7 +57,7 @@ export function WindowControls() {
       <button
         onClick={() => runWindowAction(() => win.toggleMaximize())}
         aria-label={maximized ? 'Restore window' : 'Maximize window'}
-        className="w-[46px] h-full flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+        className="w-[46px] h-full flex items-center justify-center text-muted-foreground hover:bg-hover transition-colors"
       >
         {maximized ? (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
@@ -74,7 +74,7 @@ export function WindowControls() {
       <button
         onClick={() => runWindowAction(() => win.close())}
         aria-label="Close window"
-        className="w-[46px] h-full flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-window-close-hover)] hover:text-white transition-colors"
+        className="w-[46px] h-full flex items-center justify-center text-muted-foreground hover:bg-window-close hover:text-white transition-colors"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
           <line x1="0" y1="0" x2="10" y2="10" />

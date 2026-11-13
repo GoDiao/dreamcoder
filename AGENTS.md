@@ -18,7 +18,7 @@ CI runs three checks on every PR to `main`. Run them locally before opening a PR
 ```bash
 bun test                    # server and CLI tests; needs ripgrep on PATH
 cd desktop
-bun run lint                # TypeScript type check (tsc --noEmit)
+bun run lint                # TypeScript type check (tsc --noEmit) and design-system lint (oxlint + @shadcn/lint)
 bun run test -- --run       # desktop tests (vitest)
 ```
 
@@ -27,7 +27,8 @@ bun run test -- --run       # desktop tests (vitest)
 - **New code has no comments.** No JSDoc, no inline comments, no comments in tests. Names and structure carry the meaning. Existing comments in code you don't touch can stay.
 - TypeScript strict mode; avoid `any`. Match the style of the surrounding code.
 - User-facing text goes through i18n keys, with both `desktop/src/i18n/locales/en.ts` and `zh.ts` updated. Don't hard-code strings.
-- Use theme tokens for colors (e.g. `desktop/src/theme/`) and check both light and dark themes.
+- Use the semantic theme tokens (`text-muted-foreground`, `bg-hover`, `border-border`, … defined in `desktop/src/theme/globals.css`) and the type scale (`text-3xs` 10px, `text-2xs` 11px, `text-xs`, `text-sm` for body text). No arbitrary values such as `text-[13px]` or `bg-[var(--x)]`, and no raw palette colors. Check both light and dark themes.
+- Shared components own their look. On a component from `desktop/src/components/shared/ui` (and compositions such as `CopyButton`), pick a `variant` or `size`; `className` carries layout only (width, flex or grid placement, margin, position). If no variant fits and the look is a generic concept, add a variant to the component; a look that belongs to one feature stays in that feature's own element. `bun run lint` enforces this for `shared/ui` (`shadcn/no-restyle`, `shadcn/no-arbitrary-values`, `shadcn/no-raw-colors`); compositions are checked in review.
 - Subscribe to the store with selectors for the fields a component uses, never the whole session object or the whole store. Use `useSessionField` and the other helpers in `desktop/src/stores/chatStore.ts`.
 
 ## Design

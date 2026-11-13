@@ -43,7 +43,7 @@ function ShowUIPage({ sessionId, page }: { sessionId: string; page: UiPageSummar
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="mb-3 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-low)]"
+      className="mb-3 overflow-hidden rounded-lg border border-border bg-card"
       data-testid="show-ui-card"
     >
       <div className="flex items-center gap-1 pr-2">
@@ -53,15 +53,15 @@ function ShowUIPage({ sessionId, page }: { sessionId: string; page: UiPageSummar
             size="row"
             type="button"
             aria-label={open ? t('uiPage.collapse') : t('uiPage.expand')}
-            className="min-w-0 flex-1 px-3 py-2"
+            className="min-w-0 flex-1"
           >
-            <ChevronRight size={15} className="shrink-0 text-[var(--color-text-tertiary)] transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
-            <AppWindow size={15} className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+            <ChevronRight size={15} className="shrink-0 text-subtle-foreground transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
+            <AppWindow size={15} className="shrink-0 text-subtle-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
               {t('uiPage.revision', { title: page.title, revision: page.revision })}
             </span>
             {isLatest ? (
-              <span className="shrink-0 text-[11px] text-[var(--color-text-tertiary)]">{t('uiPage.latest')}</span>
+              <span className="shrink-0 text-2xs text-subtle-foreground">{t('uiPage.latest')}</span>
             ) : null}
           </Button>
         </CollapsibleTrigger>
@@ -82,7 +82,7 @@ function ShowUIPage({ sessionId, page }: { sessionId: string; page: UiPageSummar
         ) : null}
       </div>
       <CollapsibleContent>
-        <div className="border-t border-[var(--color-border)]/55">
+        <div className="border-t border-border/55">
           <UiPageFrame sessionId={sessionId} pageId={page.pageId} revision={page.revision} title={page.title} />
         </div>
       </CollapsibleContent>

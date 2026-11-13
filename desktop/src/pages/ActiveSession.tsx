@@ -79,21 +79,21 @@ function ActiveGoalStrip({
       <div
         data-testid="active-goal-strip"
         className={[
-          'flex max-w-full items-center gap-2 rounded-[8px] border border-[var(--color-memory-border)] bg-[var(--color-memory-surface)] px-2.5 py-1.5',
-          compact ? 'text-[11px]' : 'text-[12px]',
+          'flex max-w-full items-center gap-2 rounded-lg border border-memory-border bg-memory-surface px-2.5 py-1.5',
+          compact ? 'text-2xs' : 'text-xs',
         ].join(' ')}
       >
-        <Target size={compact ? 13 : 14} className="shrink-0 text-[var(--color-memory-accent)]" strokeWidth={2.25} aria-hidden="true" />
-        <span className="shrink-0 font-semibold text-[var(--color-text-primary)]">
+        <Target size={compact ? 13 : 14} className="shrink-0 text-memory" strokeWidth={2.25} aria-hidden="true" />
+        <span className="shrink-0 font-semibold text-foreground">
           {t('chat.activeGoal.title')}
         </span>
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-memory-accent)]" aria-hidden="true" />
-        <span className="shrink-0 text-[var(--color-text-tertiary)]">{statusLabel}</span>
-        <HintTooltip content={objective}><span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-memory" aria-hidden="true" />
+        <span className="shrink-0 text-subtle-foreground">{statusLabel}</span>
+        <HintTooltip content={objective}><span className="min-w-0 flex-1 truncate font-medium text-foreground">
           {objective}
         </span></HintTooltip>
         {meta.length > 0 ? (
-          <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-[var(--color-text-tertiary)] lg:flex">
+          <span className="hidden shrink-0 items-center gap-1.5 text-2xs text-subtle-foreground lg:flex">
             {meta.map((item) => (
               <span key={item} className="max-w-[140px] truncate">{item}</span>
             ))}
@@ -207,7 +207,7 @@ export function ActiveSession() {
   const showHeader = !isMemberSession && !isMobileLayout
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)] text-[var(--color-text-primary)]">
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-background text-foreground">
       <WorkspaceSplit
         showPanel={showPanel}
         panelExpanded={panelExpanded}
@@ -229,34 +229,33 @@ export function ActiveSession() {
             <header
               data-testid="session-header"
               style={titleRowStyle(true)}
-              className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 ${titleRowClass}`}
+              className={`window-drag-region flex shrink-0 select-none items-center justify-between gap-4 border-b border-border px-6 ${titleRowClass}`}
             >
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <h1 className="truncate text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--color-text-primary)]">
+                <h1 className="truncate text-base font-semibold leading-snug tracking-tight text-foreground">
                   {session?.title || t('session.untitled')}
                 </h1>
                 {isActive && (
                   <span
                     data-testid="session-header-running"
-                    className="flex shrink-0 items-center gap-1 text-ui-aux text-[var(--color-text-secondary)]"
+                    className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse-dot" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
                     {t('session.active')}
                   </span>
                 )}
               </div>
               {canUsePanel && (
-                <div className="flex shrink-0 items-center gap-[3px]">
+                <div className="flex shrink-0 items-center gap-0.75">
                   {isDesktopRuntime() && <OpenProjectMenu path={openProjectPath} />}
                   <SessionHeaderMenu sessionId={activeTabId} title={session?.title || ''} />
                   {!showPanel && (
                     <HintTooltip content={t('workspace.openSidePanel')}>
                       <Button
-                        variant="ghost"
+                        variant="ghost-muted"
                         size="icon-sm"
                         aria-label={t('workspace.openSidePanel')}
                         onClick={() => useWorkspacePanelStore.getState().togglePanel(activeTabId)}
-                        className="text-[var(--color-text-secondary)]"
                       >
                         <PanelRight size={17} strokeWidth={1.9} aria-hidden="true" />
                       </Button>
@@ -268,27 +267,27 @@ export function ActiveSession() {
           )}
 
           {isMemberSession && (
-            <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface-container)]">
+            <div className="shrink-0 border-b border-border bg-muted">
               <div className="mx-auto max-w-[860px] flex items-center justify-between gap-4 px-8 py-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     {memberInfo?.status === 'running' && (
-                      <span className="flex h-2 w-2 rounded-full bg-[var(--color-warning)] animate-pulse-dot" />
+                      <span className="flex h-2 w-2 rounded-full bg-warning animate-pulse-dot" />
                     )}
                     {memberInfo?.status === 'completed' && (
-                      <CircleCheckIcon className="shrink-0 text-[var(--color-success)]" aria-hidden="true" size={14} />
+                      <CircleCheckIcon className="shrink-0 text-success" aria-hidden="true" size={14} />
                     )}
-                    <BotIcon className="shrink-0 text-[var(--color-text-tertiary)]" aria-hidden="true" size={14} />
-                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    <BotIcon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={14} />
+                    <span className="text-sm font-semibold text-foreground">
                       {memberInfo?.role}
                     </span>
                     {activeTeam && (
-                      <span className="text-[10px] text-[var(--color-text-tertiary)]">
+                      <span className="text-3xs text-subtle-foreground">
                         @ {activeTeam.name}
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
+                  <p className="mt-1 text-2xs text-subtle-foreground">
                     {t('teams.memberSessionHint')}
                   </p>
                 </div>
@@ -303,7 +302,7 @@ export function ActiveSession() {
                     }
                   }}
                   disabled={!activeTeam?.leadSessionId}
-                  className="flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-50 disabled:hover:text-[var(--color-text-secondary)]"
+                  className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:hover:text-muted-foreground"
                 >
                   <ArrowLeftIcon aria-hidden="true" size={14} />
                   {t('teams.backToLeader')}
@@ -323,8 +322,8 @@ export function ActiveSession() {
               <div className="flex max-w-md flex-col items-center text-center">
                 {isMemberSession ? (
                   <>
-                    <BotIcon className="shrink-0 mb-4 text-[var(--color-text-tertiary)]" aria-hidden="true" size={48} />
-                    <p className="text-[var(--color-text-secondary)]">
+                    <BotIcon className="shrink-0 mb-4 text-subtle-foreground" aria-hidden="true" size={48} />
+                    <p className="text-muted-foreground">
                       {memberInfo?.status === 'running'
                         ? `${memberInfo.role} ${t('teams.working')}`
                         : t('teams.noMessages')}
@@ -332,10 +331,10 @@ export function ActiveSession() {
                   </>
                 ) : (
                   <>
-                    <h2 className="text-ui-title font-semibold tracking-[-0.01em] text-[var(--color-text-primary)]">
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground">
                       {t('empty.title')}
                     </h2>
-                    <p className="mt-1.5 text-ui-body text-[var(--color-text-secondary)]">
+                    <p className="mt-1.5 text-sm text-muted-foreground">
                       {t('empty.subtitle')}
                     </p>
                   </>

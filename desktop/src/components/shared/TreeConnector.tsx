@@ -18,7 +18,7 @@ export function treeGuides(depths: readonly number[]): TreeGuide[] {
   return guides
 }
 
-const LINE = 'pointer-events-none absolute border-[var(--color-border)]'
+const LINE = 'pointer-events-none absolute border-border'
 
 export function TreeConnector({ guide, indent, extend = 0 }: { guide: TreeGuide; indent: number; extend?: number }) {
   if (guide.depth === 0) return null
@@ -32,7 +32,7 @@ export function TreeConnector({ guide, indent, extend = 0 }: { guide: TreeGuide;
       <span
         aria-hidden="true"
         data-testid="tree-connector-elbow"
-        className={`${LINE} rounded-bl-[5px] border-b border-l`}
+        className={`${LINE} rounded-bl-sm border-b border-l`}
         style={{ left: x(guide.depth), top: -extend, height: `calc(50% + ${extend}px)`, width: indent / 2 - 2 }}
       />
       {!guide.last && <span aria-hidden="true" className={`${LINE} border-l`} style={rail(guide.depth, '50%')} />}

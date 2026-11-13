@@ -48,9 +48,9 @@ function useReasonPrompt(board: string): { ask: (prompt: Prompt) => void; dialog
       body={(
         <div className="flex flex-col gap-2 pt-1">
           {prompt?.notes?.map((note) => (
-            <p key={note} role="note" className="rounded-lg bg-[var(--color-warning-container)] px-3 py-2 text-[12px] text-[var(--color-text-primary)]">{note}</p>
+            <p key={note} role="note" className="rounded-lg bg-warning-surface px-3 py-2 text-xs text-foreground">{note}</p>
           ))}
-          <label htmlFor={fieldId} className="text-[12px] text-[var(--color-text-secondary)]">{prompt?.label}</label>
+          <label htmlFor={fieldId} className="text-xs text-muted-foreground">{prompt?.label}</label>
           <Textarea id={fieldId} value={text} onChange={(event) => setText(event.target.value)} rows={3} />
         </div>
       )}

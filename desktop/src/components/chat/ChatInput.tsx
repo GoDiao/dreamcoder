@@ -1,6 +1,7 @@
 import { TriangleAlertIcon } from 'lucide-react'
-import { Button } from '../shared/ui/button'
+import { Kbd } from '../shared/ui/kbd'
 import { ComposerPopover } from './ComposerPopover'
+import { Button } from '../shared/ui/button'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from '../../i18n'
@@ -903,42 +904,43 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
 
       {!isMemberSession && slashMenuOpen && filteredCommands.length > 0 && (
         <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setSlashMenuOpen(false)} preserveInputFocus><div
-          className="overflow-hidden bg-ui-popover"
+          className="overflow-hidden bg-popover"
         >
           <div className="max-h-[300px] overflow-y-auto p-1">
             {filteredCommands.map((command, index) => (
-              <Button variant="ghost" size="row"
+              <Button
+                type="button"
+                variant="ghost"
+                size="row"
                 key={command.name}
                 ref={(el) => { slashItemRefs.current[index] = el }}
                 onClick={() => selectSlashCommand(command.name)}
                 onMouseEnter={() => setSlashSelectedIndex(index)}
-                className={`items-center gap-3 px-3 ${
-                  index === slashSelectedIndex ? 'bg-[var(--color-surface-hover)]' : ''
-                }`}
+                data-highlighted={index === slashSelectedIndex ? '' : undefined}
               >
                 <span className="flex min-w-0 max-w-[52%] shrink-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-ui-body font-medium text-[var(--color-text-primary)]">
+                  <span className="shrink-0 text-sm font-medium text-foreground">
                     /{command.name}
                   </span>
                   {command.argumentHint ? (
-                    <span className="min-w-0 truncate font-mono text-[11px] text-[var(--color-text-tertiary)]">
+                    <span className="min-w-0 truncate font-mono text-2xs text-subtle-foreground">
                       {command.argumentHint}
                     </span>
                   ) : null}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-ui-aux text-[var(--color-text-tertiary)]">
+                <span className="min-w-0 flex-1 truncate text-xs text-subtle-foreground">
                   {command.description}
                 </span>
               </Button>
             ))}
           </div>
           {!isMobileComposer ? (
-            <div className="flex items-center gap-1.5 border-t border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-tertiary)]">
-              <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1.5 py-0.5 font-mono text-[10px]">Up/Down</kbd>
+            <div className="flex items-center gap-1.5 border-t border-border px-4 py-2 text-xs text-subtle-foreground">
+              <Kbd>Up/Down</Kbd>
               <span>{t('chat.navigate')}</span>
-              <kbd className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
+              <Kbd className="ml-2">Enter</Kbd>
               <span>{t('chat.select')}</span>
-              <kbd className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
+              <Kbd className="ml-2">Esc</Kbd>
               <span>{t('chat.dismiss')}</span>
             </div>
           ) : null}
@@ -952,8 +954,8 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       data-testid="chat-input-shell"
       className={
         compact
-          ? `bg-[var(--color-surface)] ${isMobileComposer ? 'px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2' : 'px-3 pb-3 pt-2'}`
-          : `bg-[var(--color-surface)] ${isMobileComposer ? 'px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2' : isHeroComposer ? 'px-8 pb-5 pt-3' : 'px-6 pb-5 pt-3'}`
+          ? `bg-background ${isMobileComposer ? 'px-3 pb-safe-2.5 pt-2' : 'px-3 pb-3 pt-2'}`
+          : `bg-background ${isMobileComposer ? 'px-3 pb-safe-2.5 pt-2' : isHeroComposer ? 'px-8 pb-5 pt-3' : 'px-6 pb-5 pt-3'}`
       }
     >
       <div
@@ -977,7 +979,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               <div
                 data-testid="workspace-missing-notice"
                 role="status"
-                className="mb-2 flex items-center gap-2 rounded-lg border border-[var(--color-error)]/20 bg-[var(--color-error)]/8 px-3 py-1.5 text-[11px] text-[var(--color-error)]"
+                className="mb-2 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/8 px-3 py-1.5 text-2xs text-destructive"
               >
                 <TriangleAlertIcon className="shrink-0" aria-hidden="true" size={14} />
                 <HintTooltip content={activeSession?.workDir || undefined}><span className="min-w-0 truncate">

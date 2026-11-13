@@ -118,7 +118,7 @@ describe('browser activate request', () => {
           isOpen,
           expanded: false,
           activeTabId: 'files',
-          recentFiles: [],
+          recentFiles: [], selectedFile: null,
           tabs: [{ id: 'files', kind: 'files' }, { id: 'a', kind: 'browser', url: '', title: '' }],
         },
       },

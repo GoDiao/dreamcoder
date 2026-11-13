@@ -28,7 +28,7 @@ export function FormSelect<T extends string>({ value, options, onChange, label, 
           </SelectGroup>
         </SelectContent>
       </Select>
-      {description && <p id={descriptionId} className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">{description}</p>}
+      {description && <p id={descriptionId} className="mt-1 text-2xs text-subtle-foreground">{description}</p>}
     </>
   )
 }

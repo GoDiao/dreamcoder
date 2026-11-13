@@ -421,7 +421,7 @@ describe('Sidebar', () => {
     const expandButton = screen.getByRole('button', { name: 'Expand display' })
     expect(expandButton).toHaveAttribute('aria-expanded', 'false')
     expect(expandButton.parentElement).toHaveClass('justify-start')
-    expect(expandButton).toHaveClass('text-[var(--color-text-tertiary)]', 'opacity-75')
+    expect(expandButton).toHaveClass('text-subtle-foreground', 'opacity-75')
 
     fireEvent.click(expandButton)
 
@@ -536,8 +536,8 @@ describe('Sidebar', () => {
     const row = screen.getByTestId('sidebar-project-row-workspace-alpha')
     const plus = within(row).getByRole('button', { name: 'New session in alpha' })
     expect(row).toHaveClass('sidebar-row')
-    expect(plus).toHaveClass('sidebar-row-action')
-    expect(plus.parentElement).toBe(row)
+    expect(plus.parentElement).toHaveClass('sidebar-row-action')
+    expect(plus.parentElement?.parentElement).toBe(row)
     expect(screen.queryByRole('button', { name: 'Project actions for alpha' })).not.toBeInTheDocument()
   })
 
@@ -1392,8 +1392,8 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     const moreButton = screen.getByRole('button', { name: 'Actions for Open Session' })
-    expect(moreButton).toHaveClass('sidebar-session-more')
-    expect(moreButton.parentElement).toBe(screen.getByTestId('sidebar-session-row-session-1'))
+    expect(moreButton.parentElement).toHaveClass('sidebar-session-more')
+    expect(moreButton.parentElement?.parentElement).toBe(screen.getByTestId('sidebar-session-row-session-1'))
 
     clickMenuTrigger(moreButton)
     expect(moreButton).toHaveAttribute('aria-expanded', 'true')

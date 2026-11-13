@@ -51,7 +51,7 @@ export type WorkspaceTab =
   | { id: string; kind: 'artifacts' }
   | { id: string; kind: 'file'; path: string; sessionId?: string }
   | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
-  | { id: string; kind: 'terminal'; index: number; shell?: string }
+  | { id: string; kind: 'terminal'; index: number; shell?: string; cwd?: string }
   | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
   | { id: string; kind: 'task'; board: string; card: number }
   | { id: string; kind: 'inbox'; board: string }
@@ -59,7 +59,8 @@ export type WorkspaceTab =
 export type WorkspaceTabKind = WorkspaceTab['kind']
 
 export type WorkspaceTabTarget =
-  | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' | 'terminal' }
+  | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' }
+  | { kind: 'terminal'; cwd?: string }
   | { kind: 'file'; path: string; sessionId?: string }
   | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
   | { kind: 'uiPage'; pageId: string; revision: number; title: string }
@@ -72,6 +73,7 @@ export type WorkspacePanelSessionState = {
   tabs: WorkspaceTab[]
   activeTabId: string | null
   recentFiles: string[]
+  selectedFile: string | null
 }
 
 type WorkspacePanelLoadingState = {
@@ -90,7 +92,6 @@ type WorkspacePanelStore = {
   panelByTab: Record<string, WorkspacePanelSessionState | undefined>
   width: number
   statusBySession: Record<string, WorkspaceStatusResult | undefined>
-  expandedPathsBySession: Record<string, string[] | undefined>
   treeBySessionPath: Record<string, Record<string, WorkspaceTreeResult | undefined> | undefined>
   previewsBySession: Record<string, Record<string, WorkspacePreviewEntry | undefined> | undefined>
   expandedPreviewIdsBySession: Record<string, string[] | undefined>
@@ -101,6 +102,7 @@ type WorkspacePanelStore = {
   isPanelExpanded: (sessionId: string) => boolean
   getActiveTab: (sessionId: string) => WorkspaceTab | null
   openTab: (sessionId: string, target: WorkspaceTabTarget) => string
+  selectFile: (sessionId: string, path: string) => void
   openAddress: (sessionId: string, input: string, projectRoot: string | null) => Promise<void>
   openUrl: (sessionId: string, url: string, projectRoot: string | null) => Promise<void>
   openArtifact: (sessionId: string, item: Pick<ArtifactListItem, 'name' | 'latestMtimeMs' | 'id'> & Partial<Pick<ArtifactListItem, 'manifest'>>, root: string) => Promise<void>
@@ -114,7 +116,6 @@ type WorkspacePanelStore = {
   setWidth: (width: number) => void
   loadStatus: (sessionId: string) => Promise<void>
   loadTree: (sessionId: string, path?: string) => Promise<void>
-  toggleTreeNode: (sessionId: string, path: string) => Promise<void>
   expandPreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
   collapsePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => void
   togglePreview: (sessionId: string, path: string, kind: WorkspacePreviewKind) => Promise<void>
@@ -135,6 +136,7 @@ const DEFAULT_PANEL_STATE: WorkspacePanelSessionState = {
   tabs: [],
   activeTabId: null,
   recentFiles: [],
+  selectedFile: null,
 }
 
 const statusRequestIds = new Map<string, number>()
@@ -168,7 +170,11 @@ function getSessionPanelState(
   return panelByTab[sessionId] ?? DEFAULT_PANEL_STATE
 }
 
-function makeTreeKey(sessionId: string, path: string) {
+function pushRecentFile(recentFiles: string[], path: string) {
+  return [path, ...recentFiles.filter((candidate) => candidate !== path)].slice(0, MAX_RECENT_FILES)
+}
+
+export function makeTreeKey(sessionId: string, path: string) {
   return `${sessionId}::${path}`
 }
 
@@ -176,7 +182,7 @@ export function getWorkspacePreviewId(path: string, kind: WorkspacePreviewKind) 
   return `${kind}:${path}`
 }
 
-function makePreviewKey(sessionId: string, tabId: string) {
+export function makePreviewKey(sessionId: string, tabId: string) {
   return `${sessionId}::${tabId}`
 }
 
@@ -271,7 +277,7 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
       return { id, kind: 'inbox', board: target.board }
     case 'terminal': {
       const index = Math.max(0, ...tabs.map((tab) => tab.kind === 'terminal' ? tab.index : 0)) + 1
-      return { id, kind: 'terminal', index }
+      return { id, kind: 'terminal', index, ...(target.cwd && { cwd: target.cwd }) }
     }
     default:
       return { id, kind: target.kind }
@@ -294,7 +300,7 @@ export function getShellDisplayName(shell: string | undefined) {
   return name || undefined
 }
 
-type StoredPanel = Pick<WorkspacePanelSessionState, 'isOpen' | 'tabs' | 'activeTabId' | 'recentFiles'>
+type StoredPanel = Pick<WorkspacePanelSessionState, 'isOpen' | 'tabs' | 'activeTabId' | 'recentFiles' | 'selectedFile'>
 
 function isStoredBrowserTabArtifact(value: unknown): value is BrowserTabArtifact {
   if (!value || typeof value !== 'object') return false
@@ -342,7 +348,8 @@ function restorePanel(value: unknown): WorkspacePanelSessionState | null {
   const tabs = Array.isArray(stored.tabs) ? stored.tabs.filter(isStoredTab) : []
   const activeTabId = tabs.some((tab) => tab.id === stored.activeTabId) ? stored.activeTabId as string : tabs.at(-1)?.id ?? null
   const recentFiles = Array.isArray(stored.recentFiles) ? stored.recentFiles.filter((path): path is string => typeof path === 'string') : []
-  return { ...DEFAULT_PANEL_STATE, isOpen: stored.isOpen === true && tabs.length > 0, tabs, activeTabId, recentFiles }
+  const selectedFile = typeof stored.selectedFile === 'string' ? stored.selectedFile : null
+  return { ...DEFAULT_PANEL_STATE, isOpen: stored.isOpen === true && tabs.length > 0, tabs, activeTabId, recentFiles, selectedFile }
 }
 
 function readStoredPanels(): Record<string, WorkspacePanelSessionState | undefined> {
@@ -369,7 +376,7 @@ function writeStoredPanels(panelByTab: Record<string, WorkspacePanelSessionState
       if (!panel) return []
       const tabs = panel.tabs.filter((tab) => tab.kind !== 'terminal')
       if (tabs.length === 0 && panel.recentFiles.length === 0) return []
-      const value: StoredPanel = { isOpen: panel.isOpen, tabs, activeTabId: panel.activeTabId, recentFiles: panel.recentFiles }
+      const value: StoredPanel = { isOpen: panel.isOpen, tabs, activeTabId: panel.activeTabId, recentFiles: panel.recentFiles, selectedFile: panel.selectedFile }
       return [[sessionId, value]]
     }),
   )
@@ -384,7 +391,6 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   panelByTab: readStoredPanels(),
   width: WORKSPACE_PANEL_DEFAULT_WIDTH,
   statusBySession: {},
-  expandedPathsBySession: {},
   treeBySessionPath: {},
   previewsBySession: {},
   expandedPreviewIdsBySession: {},
@@ -420,20 +426,27 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       : replaced
         ? panel.tabs.map((candidate) => candidate === replaced ? tab : candidate)
         : [...panel.tabs, tab]
-    const recentFiles = target.kind === 'file'
-      ? [target.path, ...panel.recentFiles.filter((path) => path !== target.path)].slice(0, MAX_RECENT_FILES)
-      : panel.recentFiles
+    const recentFiles = target.kind === 'file' ? pushRecentFile(panel.recentFiles, target.path) : panel.recentFiles
     set((state) => ({
       panelByTab: patchSessionPanel(state.panelByTab, sessionId, { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
     }))
     return tab.id
   },
 
+  selectFile: (sessionId, path) => {
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
+    const recentFiles = pushRecentFile(panel.recentFiles, path)
+    set((state) => ({
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, { selectedFile: path, recentFiles }),
+    }))
+    get().openTab(sessionId, { kind: 'files' })
+  },
+
   openAddress: async (sessionId, input, projectRoot) => {
     const value = input.trim()
     if (!value) return
     if (!isDesktopRuntime() || await isWorkspaceFile(sessionId, value)) {
-      get().openTab(sessionId, { kind: 'file', path: value })
+      get().selectFile(sessionId, value)
       return
     }
     await get().openUrl(sessionId, value, projectRoot)
@@ -674,33 +687,6 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     }
   },
 
-  toggleTreeNode: async (sessionId, path) => {
-    let shouldLoad = false
-
-    set((state) => {
-      const expanded = new Set(state.expandedPathsBySession[sessionId] ?? [])
-      if (expanded.has(path)) {
-        expanded.delete(path)
-      } else {
-        expanded.add(path)
-        if (!state.treeBySessionPath[sessionId]?.[path]) {
-          shouldLoad = true
-        }
-      }
-
-      return {
-        expandedPathsBySession: {
-          ...state.expandedPathsBySession,
-          [sessionId]: [...expanded],
-        },
-      }
-    })
-
-    if (shouldLoad) {
-      await get().loadTree(sessionId, path)
-    }
-  },
-
   expandPreview: async (sessionId, path, kind) => {
     const previewId = getWorkspacePreviewId(path, kind)
     set((state) => {
@@ -749,10 +735,11 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   refreshPreviews: async (sessionId) => {
     invalidateSessionScopedRequests(previewRequestIds, sessionId)
     const cached = get().previewsBySession[sessionId] ?? {}
+    const panel = getSessionPanelState(get().panelByTab, sessionId)
     const shownIds = new Set([
       ...get().expandedPreviewIdsBySession[sessionId] ?? [],
-      ...getSessionPanelState(get().panelByTab, sessionId).tabs
-        .flatMap((tab) => tab.kind === 'file' ? [getWorkspacePreviewId(tab.path, 'file')] : []),
+      ...panel.tabs.flatMap((tab) => tab.kind === 'file' ? [getWorkspacePreviewId(tab.path, 'file')] : []),
+      ...(panel.selectedFile ? [getWorkspacePreviewId(panel.selectedFile, 'file')] : []),
     ])
     const kept = Object.fromEntries(
       Object.entries(cached).filter(([id, entry]) => entry && shownIds.has(id)),
@@ -795,7 +782,6 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
           })
           : state.panelByTab,
         statusBySession: removeRecordKey(state.statusBySession, sessionId),
-        expandedPathsBySession: removeRecordKey(state.expandedPathsBySession, sessionId),
         treeBySessionPath: removeRecordKey(state.treeBySessionPath, sessionId),
         previewsBySession: removeRecordKey(state.previewsBySession, sessionId),
         expandedPreviewIdsBySession: removeRecordKey(state.expandedPreviewIdsBySession, sessionId),

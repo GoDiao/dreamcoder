@@ -556,10 +556,10 @@ export function GeneralSettings() {
           >
             <div className="mt-3">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <label htmlFor="network-timeout-seconds" className="text-xs text-[var(--color-text-secondary)]">
+                <label htmlFor="network-timeout-seconds" className="text-xs text-muted-foreground">
                   {t('settings.general.networkTimeout')}
                 </label>
-                <span className="text-xs text-[var(--color-text-tertiary)]">
+                <span className="text-xs text-subtle-foreground">
                   {t('settings.general.networkTimeoutValue', { seconds: String(timeoutSeconds) })}
                 </span>
               </div>
@@ -568,7 +568,7 @@ export function GeneralSettings() {
                   type="button"
                   size="xs"
                   variant="outline"
-                  className="w-12 px-0"
+                  className="w-12"
                   aria-label={t('settings.general.networkTimeoutDecrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) - NETWORK_TIMEOUT_STEP_SECONDS)}
                 >
@@ -598,13 +598,13 @@ export function GeneralSettings() {
                       }
                       setNetworkSaveError(null)
                     }}
-                    className={`h-9 w-full rounded-md border bg-[var(--color-surface-container-lowest)] px-3 pr-12 text-[13px] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--color-text-tertiary)] ${
+                    className={`h-9 w-full rounded-md border bg-popover px-3 pr-12 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-subtle-foreground ${
                       networkTimeoutError
-                        ? 'border-[var(--color-error)] focus:shadow-[var(--shadow-error-ring)]'
-                        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)] focus:ring-3 focus:ring-ui-ring/50'
+                        ? 'border-destructive focus:ring-2 focus:ring-destructive/20'
+                        : 'border-border focus:border-ring focus:ring-3 focus:ring-ring/50'
                     }`}
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-tertiary)]">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-subtle-foreground">
                     {t('settings.general.networkTimeoutUnit')}
                   </span>
                 </div>
@@ -612,7 +612,7 @@ export function GeneralSettings() {
                   type="button"
                   size="xs"
                   variant="outline"
-                  className="w-12 px-0"
+                  className="w-12"
                   aria-label={t('settings.general.networkTimeoutIncrease')}
                   onClick={() => setNetworkTimeoutSeconds((parsedNetworkTimeoutSeconds ?? timeoutSeconds) + NETWORK_TIMEOUT_STEP_SECONDS)}
                 >
@@ -621,7 +621,7 @@ export function GeneralSettings() {
               </div>
               <p
                 id="network-timeout-help"
-                className={`mt-1.5 text-xs leading-[1.5] ${networkTimeoutError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}
+                className={`mt-1.5 text-xs leading-normal ${networkTimeoutError ? 'text-destructive' : 'text-subtle-foreground'}`}
               >
                 {networkTimeoutError ?? t('settings.general.networkTimeoutHint')}
               </p>
@@ -658,14 +658,14 @@ export function GeneralSettings() {
                   })
                 }
               />
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-normal text-subtle-foreground">
                 <span>{t('settings.general.webSearchTavilyFreeHint')}</span>
                 <a
                   href="https://app.tavily.com/home"
                   target="_blank"
                   rel="noreferrer"
                   aria-label={t('settings.general.webSearchTavilyApiKeyLink')}
-                  className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
+                  className="font-medium text-primary hover:underline whitespace-nowrap"
                 >
                   {t('settings.general.webSearchGetApiKey')}
                 </a>
@@ -686,14 +686,14 @@ export function GeneralSettings() {
                   })
                 }
               />
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-[1.5] text-[var(--color-text-tertiary)]">
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-normal text-subtle-foreground">
                 <span>{t('settings.general.webSearchBraveFreeHint')}</span>
                 <a
                   href="https://api-dashboard.search.brave.com/app/keys"
                   target="_blank"
                   rel="noreferrer"
                   aria-label={t('settings.general.webSearchBraveApiKeyLink')}
-                  className="font-medium text-[var(--color-brand)] hover:underline whitespace-nowrap"
+                  className="font-medium text-primary hover:underline whitespace-nowrap"
                 >
                   {t('settings.general.webSearchGetApiKey')}
                 </a>
@@ -712,7 +712,7 @@ export function GeneralSettings() {
             </Button>
           </div>
           <SettingsRow
-            className="mt-2 border-t border-[var(--color-border-separator)]"
+            className="mt-2 border-t border-border"
             title={t('settings.general.webFetchPreflightEnabled')}
             description={t('settings.general.webFetchPreflightDescription')}
             control={
@@ -769,7 +769,8 @@ export function GeneralSettings() {
                         setPortableDirDraft(event.target.value)
                         setModeError(null)
                       }}
-                      className="w-full font-mono text-xs"
+                      font="mono"
+                      className="w-full"
                     />
                   </div>
                   <Button
@@ -784,7 +785,7 @@ export function GeneralSettings() {
                 </div>
                 <button
                   type="button"
-                  className="mt-2 text-xs font-medium text-[var(--color-brand)] hover:underline"
+                  className="mt-2 text-xs font-medium text-primary hover:underline"
                   onClick={() => {
                     setPortableDirDraft(appMode.defaultPortableDir ?? '')
                     setModeError(null)
@@ -795,7 +796,7 @@ export function GeneralSettings() {
               </div>
             )}
 
-            <div className="mt-4 border-l-2 border-[var(--color-border)] py-1 pl-3 text-xs leading-[1.7] text-[var(--color-text-secondary)]">
+            <div className="mt-4 border-l-2 border-border py-1 pl-3 text-xs leading-relaxed text-muted-foreground">
               {activeConfigDir && (
                 <div>
                   {t('settings.general.storageActiveDir')}: <span className="break-all font-mono">{activeConfigDir}</span>
@@ -805,19 +806,19 @@ export function GeneralSettings() {
             </div>
 
             {isEnvironmentConfigDir && (
-              <div className="mt-3 rounded-lg border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+              <div className="mt-3 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-xs leading-5 text-muted-foreground">
                 {t('settings.general.storageEnvironmentHint')}
               </div>
             )}
 
             {appModeRequiresRestart && (
-              <div className="mt-3 rounded-lg border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+              <div className="mt-3 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-xs leading-5 text-muted-foreground">
                 {t('settings.general.storageRestartHint')}
               </div>
             )}
 
             {modeError && (
-              <div className="mt-3 text-xs text-[var(--color-error)]" role="alert">
+              <div className="mt-3 text-xs text-destructive" role="alert">
                 {modeError}
               </div>
             )}
@@ -847,14 +848,14 @@ export function GeneralSettings() {
         onConfirm={() => void confirmModeSwitch()}
         title={t('settings.general.modeSwitchTitle')}
         body={(
-          <div className="space-y-3 text-sm leading-6 text-[var(--color-text-secondary)]">
+          <div className="space-y-3 text-sm leading-6 text-muted-foreground">
             <p>
               {pendingMode === 'portable'
                 ? t('settings.general.storageSwitchPortableBody')
                 : t('settings.general.storageSwitchDefaultBody')}
             </p>
             {pendingMode === 'portable' && pendingPortableDir && (
-              <div className="rounded-lg bg-[var(--color-surface-container-low)] px-3 py-2 font-mono text-xs break-all text-[var(--color-text-secondary)]">
+              <div className="rounded-lg bg-card px-3 py-2 font-mono text-xs break-all text-muted-foreground">
                 {pendingPortableDir}
               </div>
             )}

@@ -95,7 +95,7 @@ function DesktopTerminalShellSettings() {
   return (
     <div>
       {!detection ? (
-        <p role={detectionError ? 'alert' : 'status'} className="py-2.5 text-xs text-[var(--color-text-secondary)]">
+        <p role={detectionError ? 'alert' : 'status'} className="py-2.5 text-xs text-muted-foreground">
           {detectionError ?? t('settings.terminal.detectingShell')}
         </p>
       ) : (
@@ -135,12 +135,12 @@ function DesktopTerminalShellSettings() {
           )}
 
           {preferencesError && startupShell !== 'custom' && (
-            <p className="mt-2 text-xs text-[var(--color-error)]">{preferencesError}</p>
+            <p className="mt-2 text-xs text-destructive">{preferencesError}</p>
           )}
 
           <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
             {preferencesSaved && (
-              <span className="text-xs text-[var(--color-text-secondary)]">
+              <span className="text-xs text-muted-foreground">
                 {t('settings.terminal.saveShellSuccess')}
               </span>
             )}

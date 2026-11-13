@@ -12,7 +12,7 @@ export function useMenuAction() {
     const action = pendingAction.current
     pendingAction.current = null
     if (!action) return
-    triggerRef.current?.focus()
+    triggerRef.current?.focus({ preventScroll: true })
     action()
   }
 

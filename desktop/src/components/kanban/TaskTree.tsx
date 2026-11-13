@@ -4,8 +4,8 @@ import type { BoardView, CardView } from '@protocol'
 import { useTranslation } from '../../i18n'
 import { relativeTimeLabel } from '../../lib/relativeTime'
 import { TreeConnector, treeGuides } from '../shared/TreeConnector'
-import { Spinner } from '../shared/ui/spinner'
 import { STATUS_LABEL, activeAssignee, cardTreeRows, waitedBy } from './board'
+import { RunningSpinner } from './RunMarker'
 import { StatusIcon } from './StatusIcon'
 import { AssigneeName } from './TaskCard'
 
@@ -32,8 +32,8 @@ export function TaskTree({ view, cards, selectedCard, onOpen }: { view: BoardVie
   })
 
   return (
-    <div data-testid="kanban-tree" role="table" aria-label={t('kanban.view.tree')} className="@container min-h-0 flex-1 overflow-auto text-[13px]">
-      <div role="row" className={`${GRID} h-9 border-b border-[var(--color-border)] text-[12px] text-[var(--color-text-tertiary)]`}>
+    <div data-testid="kanban-tree" role="table" aria-label={t('kanban.view.tree')} className="@container min-h-0 flex-1 overflow-auto text-sm">
+      <div role="row" className={`${GRID} h-9 border-b border-border text-xs text-subtle-foreground`}>
         <span role="columnheader">{t('kanban.tree.task')}</span>
         <span role="columnheader">{t('kanban.tree.status')}</span>
         <span role="columnheader">{t('kanban.tree.owner')}</span>
@@ -50,7 +50,7 @@ export function TaskTree({ view, cards, selectedCard, onOpen }: { view: BoardVie
             role="row"
             data-testid={`kanban-tree-row-${card.id}`}
             data-related={related.has(card.id) || undefined}
-            className={`${GRID} min-h-10 border-b border-[var(--color-border-separator)] ${isSelected ? 'bg-[var(--color-surface-selected)]' : 'hover:bg-[var(--color-surface-hover)]'} ${related.has(card.id) ? 'shadow-[inset_3px_0_0_var(--color-info)]' : ''}`}
+            className={`${GRID} min-h-10 border-b border-border ${isSelected ? 'bg-selected' : 'hover:bg-hover'} ${related.has(card.id) ? 'inset-shadow-marker inset-shadow-info' : ''}`}
           >
             <span role="cell" className="relative flex min-w-0 items-center gap-2 self-stretch overflow-hidden" style={{ paddingLeft: depth * INDENT }}>
               <TreeConnector guide={guides[index]!} indent={INDENT} />
@@ -60,29 +60,29 @@ export function TaskTree({ view, cards, selectedCard, onOpen }: { view: BoardVie
                   onClick={() => toggle(card.id)}
                   aria-expanded={!collapsed.has(card.id)}
                   aria-label={t(collapsed.has(card.id) ? 'kanban.tree.expand' : 'kanban.tree.collapse', { card: `#${card.id}` })}
-                  className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center text-subtle-foreground hover:text-foreground"
                 >
                   {collapsed.has(card.id) ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
                 </button>
               ) : <span className="w-4 shrink-0" />}
               <button type="button" onClick={() => onOpen(card)} className="flex min-w-0 items-center gap-2 text-left">
-                <span className="font-mono text-[11px] text-[var(--color-text-tertiary)]">#{card.id}</span>
+                <span className="font-mono text-2xs text-subtle-foreground">#{card.id}</span>
                 <span className={`truncate ${depth === 0 || isSelected ? 'font-medium' : ''}`}>{card.title}</span>
               </button>
-              {childCount > 0 && <span className="shrink-0 text-[12px] text-[var(--color-text-tertiary)]">{t('kanban.card.children', { done: doneChildren, total: childCount })}</span>}
+              {childCount > 0 && <span className="shrink-0 text-xs text-subtle-foreground">{t('kanban.card.children', { done: doneChildren, total: childCount })}</span>}
             </span>
             <span role="cell" className="flex items-center gap-1.5"><StatusIcon status={card.status} />{t(STATUS_LABEL[card.status])}</span>
             <span role="cell" className="flex min-w-0 items-center gap-1.5">
               <AssigneeName view={view} card={card} />
-              {assignee.kind === 'session' && assignee.running && <Spinner className="size-3 shrink-0 text-[var(--color-success)]" role="img" aria-label={t('kanban.marker.running')} />}
+              {assignee.kind === 'session' && assignee.running && <RunningSpinner className="size-3" role="img" aria-label={t('kanban.marker.running')} />}
             </span>
-            <span role="cell" className="truncate text-[12px] text-[var(--color-text-secondary)]">
+            <span role="cell" className="truncate text-xs text-muted-foreground">
               {[
                 card.dependsOn.length ? t('kanban.tree.waitsOn', { cards: card.dependsOn.map((id) => `#${id}`).join(' ') }) : null,
                 waiting.length ? t('kanban.tree.waitedBy', { cards: waiting.map((id) => `#${id}`).join(' ') }) : null,
               ].filter(Boolean).join(' · ')}
             </span>
-            <span role="cell" className="text-right text-[12px] text-[var(--color-text-tertiary)]">{relativeTimeLabel(t, now - Date.parse(card.updatedAt))}</span>
+            <span role="cell" className="text-right text-xs text-subtle-foreground">{relativeTimeLabel(t, now - Date.parse(card.updatedAt))}</span>
           </div>
         )
       })}

@@ -22,11 +22,11 @@ export function SelectionPopover({ quote, label, onAdd }: {
   return (
     <Popover open={selection !== null} onOpenChange={(open) => { if (!open) quote.clear() }}>
       <PopoverAnchor virtualRef={anchor} />
-      <PopoverContent side="top" align="start" sideOffset={6} collisionPadding={12} className="w-auto p-1" aria-label={label}
+      <PopoverContent side="top" align="start" sideOffset={6} collisionPadding={12} size="flush" className="w-auto" aria-label={label}
         onMouseUp={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}
         onInteractOutside={(event) => { if (quote.contains(event.target)) event.preventDefault() }}
         onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()}>
-        <Button variant="ghost" size="sm" onMouseDown={(event) => event.preventDefault()} onClick={onAdd}>
+        <Button variant="ghost" size="xs" onMouseDown={(event) => event.preventDefault()} onClick={onAdd}>
           {label}
         </Button>
       </PopoverContent>

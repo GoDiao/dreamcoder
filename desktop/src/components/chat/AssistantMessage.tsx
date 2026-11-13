@@ -26,7 +26,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
         data-layout={documentLayout ? 'document' : 'plain'}
         className="flex w-full min-w-0 max-w-full flex-col items-start gap-1.5"
       >
-        <div className="w-full min-w-0 text-ui-message leading-[1.75] text-[var(--color-text-primary)]">
+        <div className="w-full min-w-0 text-sm leading-relaxed text-foreground">
           {incremental ? (
             <StreamingMarkdownRenderer
               content={content}
@@ -42,7 +42,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
           )}
           {!isStreaming && <InlineImageGallery text={content} />}
           {isStreaming && (
-            <span className="ml-0.5 inline-block h-4 w-0.5 animate-shimmer bg-[var(--color-brand)] align-text-bottom" />
+            <span className="ml-0.5 inline-block h-4 w-0.5 animate-shimmer bg-primary align-text-bottom" />
           )}
         </div>
 
@@ -60,7 +60,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isStre
 })
 
 /** Replies read as plain text at message size, without a card around them. */
-const MESSAGE_PROSE_CLASSES = '!text-ui-message !leading-[1.75] prose-p:!text-ui-message prose-p:!leading-[1.75] prose-li:!text-ui-message'
+const MESSAGE_PROSE_CLASSES = '!text-sm !leading-relaxed prose-p:!text-sm prose-p:!leading-relaxed prose-li:!text-sm'
 
 function shouldUseDocumentLayout(content: string) {
   const normalized = content.trim()

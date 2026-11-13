@@ -196,17 +196,21 @@ describe('openTargetService', () => {
     }
   })
 
-  it('rejects non-directory paths', async () => {
+  it('opens a file in an IDE and its folder in a file manager', async () => {
     const dir = await makeDir()
     const file = join(dir, 'note.txt')
-    await writeFile(file, 'not a directory')
-    const { service } = createService('darwin', {
+    await writeFile(file, 'hello')
+    const { service, launched } = createService('darwin', {
       paths: { '/Applications/Visual Studio Code.app': true },
     })
 
     try {
-      await expect(service.openTarget({ targetId: 'vscode', path: file }))
-        .rejects.toMatchObject({ code: 'OPEN_TARGET_PATH_NOT_DIRECTORY' })
+      await service.openTarget({ targetId: 'vscode', path: file })
+      await service.openTarget({ targetId: 'finder', path: file })
+      expect(launched).toEqual([
+        { command: 'open', args: ['-a', '/Applications/Visual Studio Code.app', file] },
+        { command: 'open', args: [dir] },
+      ])
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

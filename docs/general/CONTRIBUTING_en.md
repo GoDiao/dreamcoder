@@ -93,7 +93,7 @@ git checkout main && git checkout -b feat/your-feature
    bun run prepare:ripgrep    # prepare the pinned search binary
    bun test                  # server/CLI tests
    cd desktop
-   bun run lint              # TypeScript type checking
+   bun run lint              # type check and design-system lint
    bun run test -- --run     # desktop tests
    ```
    CI runs the same three checks on every PR to `main`.
@@ -183,8 +183,8 @@ The desktop uses the Radix variant of shadcn/ui, generated from
 those primitives directly; the compositions in `desktop/src/components/shared`
 add behavior and do not rename or forward props. The
 [component source inventory](../../desktop/src/components/README.md) lists every
-primitive and composition, the local adaptations (theme tokens in the `ui-`
-namespace, Shiki, Pierre, Safari 17.5 as the minimum H5 browser) and how to
+primitive and composition, the local adaptations (semantic theme tokens,
+Shiki, Pierre, Safari 17.5 as the minimum H5 browser) and how to
 update components with the shadcn CLI.
 
 ### Bundled ripgrep

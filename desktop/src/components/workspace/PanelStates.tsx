@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../shared/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia } from '../shared/ui/empty'
 import { Skeleton } from '../shared/ui/skeleton'
 
 export function PanelMessage({
@@ -13,22 +13,22 @@ export function PanelMessage({
   tone?: 'muted' | 'error'
   compact?: boolean
 }) {
-  const toneClass = tone === 'error' ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'
+  const toneClass = tone === 'error' ? 'text-destructive' : 'text-subtle-foreground'
 
   if (compact) {
     return (
-      <Empty role={tone === 'error' ? 'alert' : 'status'} className={`flex-row justify-start gap-2 rounded-none p-0 px-4 py-2 text-left text-[11px] ${toneClass}`}>
+      <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 px-4 py-2 text-left text-2xs ${toneClass}`}>
         <Icon className="shrink-0" aria-hidden="true" size={16} />
-        <EmptyDescription className={`min-w-0 text-[11px] leading-relaxed ${toneClass}`}>{message}</EmptyDescription>
-      </Empty>
+        <p className="min-w-0 leading-relaxed">{message}</p>
+      </div>
     )
   }
 
   return (
-    <Empty role={tone === 'error' ? 'alert' : 'status'} className="gap-2 px-4 py-8">
+    <Empty role={tone === 'error' ? 'alert' : 'status'}>
       <EmptyHeader>
-        <EmptyMedia variant="icon" className={toneClass}><Icon aria-hidden="true" /></EmptyMedia>
-        <EmptyDescription className={`text-xs ${toneClass}`}>{message}</EmptyDescription>
+        <EmptyMedia variant="icon"><Icon aria-hidden="true" className={toneClass} /></EmptyMedia>
+        <p className={`text-xs ${toneClass}`}>{message}</p>
       </EmptyHeader>
     </Empty>
   )

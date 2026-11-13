@@ -73,6 +73,23 @@ describe('DirectoryPicker', () => {
     expect(trigger).not.toHaveTextContent('main')
   })
 
+  it('marks the selected recent project as the current one', async () => {
+    const project = (path: string, name: string) => ({
+      projectPath: path, realPath: path, projectName: name, repoName: null, branch: null, isGit: false,
+      modifiedAt: '2026-05-07T00:00:00.000Z', sessionCount: 1,
+    })
+    vi.mocked(sessionsApi.getRecentProjects).mockResolvedValue({
+      projects: [project('/workspace/alpha', 'alpha'), project('/workspace/beta', 'beta')],
+    })
+
+    render(<DirectoryPicker value="/workspace/beta" onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button'))
+
+    const beta = await waitFor(() => screen.getByRole('button', { name: /beta\s*\/workspace\/beta/ }))
+    expect(beta).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('button', { name: /alpha/ })).not.toHaveAttribute('aria-current')
+  })
+
   it('supports the flat workbar trigger variant without changing the selected label', () => {
     render(
       <DirectoryPicker
@@ -84,8 +101,8 @@ describe('DirectoryPicker', () => {
 
     const trigger = screen.getByRole('button')
     expect(trigger).toHaveTextContent('project')
-    expect(trigger.className).toContain('rounded-md')
-    expect(trigger.className).not.toContain('rounded-full')
+    expect(trigger).toHaveAttribute('data-variant', 'ghost-muted')
+    expect(trigger).not.toHaveAttribute('data-variant', 'outline')
   })
 
   it('constrains long workbar project names and exposes the full path through a tooltip', async () => {

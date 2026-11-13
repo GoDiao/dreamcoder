@@ -36,7 +36,7 @@ export function SidebarMoreMenu({ collapsed, onOpenProjectManagement, onOpenSett
     <DropdownMenu open={view !== null} onOpenChange={(open) => setView(open ? 'main' : null)}>
       <Tooltip content={collapsed ? t('sidebar.more') : undefined}>
         <DropdownMenuTrigger asChild>
-          <Button ref={menu.triggerRef} variant="ghost" aria-label={t('sidebar.more')} className={collapsed ? 'h-10 w-10' : 'h-9 w-full justify-start gap-2.5'}>
+          <Button ref={menu.triggerRef} variant="ghost" size={collapsed ? 'icon-lg' : 'lg'} aria-label={t('sidebar.more')} className={collapsed ? 'size-10' : 'w-full justify-start'}>
             <Ellipsis aria-hidden="true" />
             {!collapsed && <span className="truncate">{t('sidebar.more')}</span>}
           </Button>

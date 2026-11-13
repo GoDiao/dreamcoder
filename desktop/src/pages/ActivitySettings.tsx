@@ -33,11 +33,11 @@ const HEAT_LABEL_WIDTH = 38
 const HEAT_CELL_MIN = 6
 const HEAT_CELL_MAX = 22
 const HEAT_COLORS = [
-  'var(--color-activity-heat-0)',
-  'var(--color-activity-heat-1)',
-  'var(--color-activity-heat-2)',
-  'var(--color-activity-heat-3)',
-  'var(--color-activity-heat-4)',
+  'var(--heat-0)',
+  'var(--heat-1)',
+  'var(--heat-2)',
+  'var(--heat-3)',
+  'var(--heat-4)',
 ]
 const DATE_LOCALES: Record<Locale, string> = {
   en: 'en-US',
@@ -297,12 +297,12 @@ export function ActivitySettings() {
 
       <div className="min-w-0">
         {isLoading ? (
-          <div className="flex min-h-[190px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
+          <div className="flex min-h-[190px] items-center justify-center text-sm text-subtle-foreground">
             <LoaderCircleIcon className="shrink-0 mr-2 animate-spin" aria-hidden="true" size={18} />
             {t('common.loading')}
           </div>
         ) : error ? (
-          <div className="rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : (
@@ -310,7 +310,7 @@ export function ActivitySettings() {
             <div ref={heatmapMeasureRef} className="min-w-0 pb-2">
               <div className="relative" style={{ width: heatmapWidth, maxWidth: '100%' }}>
                 <div
-                  className="mb-4 grid h-5 text-[11px] leading-none text-[var(--color-text-tertiary)]"
+                  className="mb-4 grid h-5 text-2xs leading-none text-subtle-foreground"
                   style={{
                     marginLeft: HEAT_LABEL_WIDTH,
                     gridTemplateColumns: `repeat(${WEEK_COUNT}, ${heatCellSize}px)`,
@@ -326,7 +326,7 @@ export function ActivitySettings() {
 
                 <div className="flex items-start" style={{ gap: HEAT_CELL_GAP }}>
                   <div
-                    className="grid shrink-0 grid-rows-7 text-[11px] leading-none text-[var(--color-text-tertiary)]"
+                    className="grid shrink-0 grid-rows-7 text-2xs leading-none text-subtle-foreground"
                     style={{ width: HEAT_LABEL_WIDTH, height: heatGridHeight, rowGap: HEAT_CELL_GAP }}
                   >
                     <div className="row-start-2 flex items-center">{t(WEEKDAY_LABEL_KEYS[0])}</div>
@@ -352,13 +352,13 @@ export function ActivitySettings() {
                             type="button"
                             role="gridcell"
                             aria-label={`${formatDateLabel(day.date, locale)}: ${formatSessionCount(day.sessionCount, t)}, ${t('settings.activity.tokenCount', { count: formatTokens(day.tokens) })}`}
-                            className="rounded-sm border border-[var(--color-activity-cell-border)] transition-[border-color,transform] hover:scale-110 hover:border-[var(--color-activity-cell-border-hover)] data-[state=instant-open]:border-[var(--color-activity-cell-border-active)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface)]"
+                            className="rounded-sm border border-heat-border transition-[border-color,transform] hover:scale-110 hover:border-heat-border-hover data-[state=instant-open]:border-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
                             style={{ width: heatCellSize, height: heatCellSize, backgroundColor: HEAT_COLORS[day.level] }}
                           />
                         </TooltipTrigger>
-                        <TooltipContent className="block min-w-[172px] border border-[var(--color-activity-tooltip-border)] bg-[var(--color-activity-tooltip-surface)] text-xs shadow-[var(--shadow-dropdown)]">
-                          <div className="font-medium text-[var(--color-activity-tooltip-text)]">{formatDateLabel(day.date, locale)}</div>
-                          <div className="mt-1 text-[var(--color-activity-tooltip-muted)]">{formatSessionCount(day.sessionCount, t)} · {t('settings.activity.tokenCount', { count: formatTokens(day.tokens) })}</div>
+                        <TooltipContent className="block min-w-[172px]">
+                          <div className="font-medium">{formatDateLabel(day.date, locale)}</div>
+                          <div className="mt-1 opacity-70">{formatSessionCount(day.sessionCount, t)} · {t('settings.activity.tokenCount', { count: formatTokens(day.tokens) })}</div>
                         </TooltipContent>
                       </Tooltip>
                     ))}
@@ -368,13 +368,13 @@ export function ActivitySettings() {
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-end gap-2 text-xs text-[var(--color-text-tertiary)] xl:mt-4">
+            <div className="mt-3 flex items-center justify-end gap-2 text-xs text-subtle-foreground xl:mt-4">
               <span>{t('settings.activity.less')}</span>
               {HEAT_COLORS.map((color) => (
                 <span
                   key={color}
                   aria-hidden="true"
-                  className="rounded-[3px] border border-[var(--color-activity-cell-border)]"
+                  className="rounded-sm border border-heat-border"
                   style={{ width: heatCellSize, height: heatCellSize, backgroundColor: color }}
                 />
               ))}
