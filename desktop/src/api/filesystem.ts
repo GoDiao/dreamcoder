@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, getBaseUrl } from './client'
 
 type DirEntry = {
   name: string
@@ -27,5 +27,9 @@ export const filesystemApi = {
     const q = new URLSearchParams({ search: query, maxResults: '200', includeFiles: 'true' })
     if (cwd) q.set('path', cwd)
     return api.get<BrowseResult>(`/api/filesystem/browse?${q}`)
+  },
+
+  fileUrl(path: string) {
+    return `${getBaseUrl()}/api/filesystem/file?path=${encodeURIComponent(path)}`
   },
 }

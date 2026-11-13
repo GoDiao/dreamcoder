@@ -1,17 +1,21 @@
-import { ArrowLeftIcon, BracesIcon, ChevronDownIcon, ChevronRightIcon, FileCodeIcon, FileIcon, FileTextIcon, FolderIcon, FolderOpenIcon, LayersIcon, NotepadTextIcon, SlidersHorizontalIcon, TerminalIcon, type LucideIcon } from 'lucide-react'
-import { Button } from '../shared/ui/button'
-import { DetailStat, MetaPill } from '../settings/SettingsSummary'
-import { LoadingBlock } from '../shared/LoadingBlock'
+import { ArrowLeftIcon, CodeIcon, EyeIcon, FileWarningIcon, ScrollTextIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useSkillStore } from '../../stores/skillStore'
-import { useTranslation } from '../../i18n'
+import { Button } from '../shared/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../shared/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '../shared/ui/toggle-group'
+import { CodeBlock, CodeBlockContent, CodeBlockLine } from '../shared/ui/code-block'
+import { LoadingBlock } from '../shared/LoadingBlock'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
-import { CodeViewer } from '../chat/CodeViewer'
-import type { FileTreeNode, SkillFrontmatter } from '../../types/skill'
+import { PanelMessage } from '../workspace/PanelStates'
+import { SkillFileTree } from './SkillFileTree'
+import { useSkillStore } from '../../stores/skillStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTranslation } from '../../i18n'
+import { useHighlightedCode } from '../../hooks/useHighlightedCode'
+import { filesystemApi } from '../../api/filesystem'
+import type { SkillFile, SkillFrontmatter } from '../../types/skill'
 
 const META_PRIORITY = [
-  'description',
   'when_to_use',
   'argument-hint',
   'model',
@@ -20,312 +24,215 @@ const META_PRIORITY = [
   'paths',
   'agent',
   'context',
-  'version',
-  'user-invocable',
 ] as const
 
-export function SkillDetail() {
-  const { selectedSkill, selectedSkillReturnTab, isDetailLoading, clearSelection } = useSkillStore()
-  const t = useTranslation()
-  const [selectedFile, setSelectedFile] = useState<string>('SKILL.md')
+const SHOWN_ELSEWHERE = new Set(['name', 'description', 'version', 'user-invocable'])
 
-  const normalizedSelection = useMemo(() => {
-    if (!selectedSkill) return 'SKILL.md'
-    return selectedSkill.files.some((file) => file.path === selectedFile)
-      ? selectedFile
-      : selectedSkill.files[0]?.path || 'SKILL.md'
+type ViewMode = 'preview' | 'source'
+
+type Fact = { label: string; value: string; mono?: boolean }
+
+export function SkillDetail() {
+  const selectedSkill = useSkillStore((state) => state.selectedSkill)
+  const returnTab = useSkillStore((state) => state.selectedSkillReturnTab)
+  const isDetailLoading = useSkillStore((state) => state.isDetailLoading)
+  const clearSelection = useSkillStore((state) => state.clearSelection)
+  const t = useTranslation()
+  const [selectedFile, setSelectedFile] = useState('SKILL.md')
+  const [viewMode, setViewMode] = useState<ViewMode>('preview')
+
+  const currentFile = useMemo(() => {
+    if (!selectedSkill) return undefined
+    return selectedSkill.files.find((file) => file.path === selectedFile) ?? selectedSkill.files[0]
   }, [selectedFile, selectedSkill])
 
-  const handleBack = () => {
-    const returnTab = selectedSkillReturnTab
-    clearSelection()
-    if (returnTab === 'plugins') {
-      useUIStore.getState().openSettings('plugins')
-    }
-  }
-
-  if (isDetailLoading) {
-    return (
-      <LoadingBlock />
-    )
-  }
-
+  if (isDetailLoading) return <LoadingBlock />
   if (!selectedSkill) return null
 
-  const { meta, tree, files } = selectedSkill
-  const currentFile = files.find((f) => f.path === normalizedSelection) || files[0]
-  const frontmatter = currentFile?.frontmatter
-  const metaEntries = getMetaEntries(frontmatter)
+  const { meta, tree, files, skillRoot } = selectedSkill
+  const entryFile = files.find((file) => file.isEntry)
+  const sourceLabel = t(`settings.skills.source.${meta.source}`)
+  const tokens = new Intl.NumberFormat().format(Math.ceil(meta.contentLength / 4))
+  const byline = [sourceLabel, meta.pluginName, meta.version && `v${meta.version}`].filter(Boolean).join(' · ')
+  const sections: Fact[] = [
+    { label: t('settings.skills.detail.description'), value: meta.description },
+    ...getMetaEntries(entryFile?.frontmatter).map(([key, value]) => ({ label: formatMetaKey(key), value: formatMetaValue(value) })),
+  ]
+  const facts: Fact[] = [
+    { label: t('settings.skills.detail.source'), value: sourceLabel },
+    ...(meta.pluginName ? [{ label: t('settings.skills.detail.plugin'), value: meta.pluginName }] : []),
+    ...(meta.userInvocable ? [{ label: t('settings.skills.detail.command'), value: `/${meta.name}`, mono: true }] : []),
+    ...(meta.version ? [{ label: t('settings.skills.detail.version'), value: meta.version }] : []),
+    { label: t('settings.skills.detail.size'), value: t('settings.skills.detail.sizeValue', { tokens }) },
+    { label: t('settings.skills.detail.location'), value: skillRoot, mono: true },
+  ]
+
+  const handleBack = () => {
+    clearSelection()
+    if (returnTab === 'plugins') useUIStore.getState().openSettings('plugins')
+  }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 min-w-0">
+    <div className="absolute inset-0 flex min-w-0 flex-col">
       <div>
         <Button type="button" variant="ghost-muted" size="sm" onClick={handleBack}>
           <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
-          {t('settings.skills.back')}
+          {t(returnTab === 'plugins' ? 'settings.skills.detail.backToPlugins' : 'settings.skills.detail.backToSkills')}
         </Button>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] lg:items-start">
-          <div className="min-w-0">
-            <div className="text-2xs font-semibold uppercase tracking-widest text-subtle-foreground mb-2">
-              {t('settings.skills.entryEyebrow')}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <h3 className="text-xl font-semibold leading-tight text-foreground break-all">
-                {meta.displayName || meta.name}
-              </h3>
-              <MetaPill>{t(`settings.skills.source.${meta.source}`)}</MetaPill>
-              {meta.version && <MetaPill>v{meta.version}</MetaPill>}
-              {meta.userInvocable && <MetaPill>{t('settings.skills.slashCommand')}</MetaPill>}
-            </div>
-            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-              {meta.description}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-subtle-foreground">
-              <span>{t('settings.skills.tokenEstimate', { count: String(Math.ceil(meta.contentLength / 4)) })}</span>
-              <span>
-                {files.length} {t('settings.skills.files')}
-              </span>
-              <span>{currentFile?.isEntry ? t('settings.skills.entryFile') : currentFile?.path}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-            <DetailStat
-              label={t('settings.skills.summary.totalFiles')}
-              value={String(files.length)}
-              icon={FolderOpenIcon}
-            />
-            <DetailStat
-              label={t('settings.skills.summary.tokens')}
-              value={t('settings.skills.tokenEstimateShort', { count: String(Math.ceil(meta.contentLength / 4)) })}
-              icon={NotepadTextIcon}
-            />
-            <DetailStat
-              label={t('settings.skills.summary.source')}
-              value={t(`settings.skills.source.${meta.source}`)}
-              icon={LayersIcon}
-            />
-            <DetailStat
-              label={t('settings.skills.summary.entry')}
-              value={files.some((file) => file.isEntry) ? 'SKILL.md' : '—'}
-              icon={FileTextIcon}
-            />
-          </div>
+      <header className="mt-4 flex min-w-0 items-center gap-3.5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+          <ScrollTextIcon className="size-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-semibold text-foreground">{meta.displayName || meta.name}</h3>
+          <p className="truncate text-sm text-muted-foreground">{byline}</p>
         </div>
-      </section>
+      </header>
 
-      {metaEntries.length > 0 && (
-        <section className="rounded-2xl border border-border bg-background px-5 py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <SlidersHorizontalIcon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={18} />
-            <h4 className="text-sm font-semibold text-foreground">
-              {t('settings.skills.metaTitle')}
-            </h4>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {metaEntries.map(([key, value]) => (
-              <div
-                key={key}
-                className="rounded-xl border border-border bg-card px-3 py-3 min-w-0"
-              >
-                <div className="text-2xs font-semibold uppercase tracking-widest text-subtle-foreground">
-                  {formatMetaKey(key)}
+      <Tabs defaultValue="overview" className="mt-5 min-h-0 flex-1 gap-0">
+        <TabsList variant="line">
+          <TabsTrigger value="overview">{t('settings.skills.detail.overview')}</TabsTrigger>
+          <TabsTrigger value="contents">{t('settings.skills.detail.contents', { count: String(files.length) })}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="@container min-h-0 overflow-y-auto pt-6">
+          <div className="grid gap-8 @2xl:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-6 @2xl:col-span-2">
+              {sections.map(({ label, value }) => (
+                <section key={label} className="min-w-0">
+                  <h4 className="text-xs text-muted-foreground first-letter:uppercase">{label}</h4>
+                  <p className="mt-2 text-sm leading-6 whitespace-pre-wrap text-foreground wrap-break-word">{value}</p>
+                </section>
+              ))}
+            </div>
+            <dl className="flex min-w-0 flex-col gap-4 self-start rounded-xl bg-muted p-4">
+              {facts.map(({ label, value, mono }) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className={`mt-1 text-foreground break-all ${mono ? 'font-mono text-xs' : 'text-sm'}`}>{value}</dd>
                 </div>
-                <div className="mt-2 text-sm leading-6 text-foreground break-words">
-                  {formatMetaValue(value)}
-                </div>
-              </div>
-            ))}
+              ))}
+            </dl>
           </div>
-        </section>
-      )}
+        </TabsContent>
 
-      <section className="flex flex-1 min-h-0 min-w-0 overflow-hidden rounded-2xl border border-border bg-background">
-        <aside className="hidden w-[250px] flex-shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
-          <div className="border-b border-border px-4 py-3">
-            <div className="text-2xs font-semibold uppercase tracking-widest text-subtle-foreground">
-              {t('settings.skills.filesPanel')}
+        <TabsContent value="contents" className="@container flex min-h-0 pt-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border @lg:flex-row">
+            <div className="flex h-40 shrink-0 flex-col border-b border-border p-1.5 @lg:h-auto @lg:w-56 @lg:border-r @lg:border-b-0">
+              <SkillFileTree
+                key={skillRoot}
+                tree={tree}
+                entryPath={entryFile?.path}
+                selectedPath={currentFile?.path ?? selectedFile}
+                label={t('settings.skills.detail.filesLabel')}
+                onSelect={setSelectedFile}
+              />
             </div>
-            <p className="mt-1 text-xs leading-5 text-subtle-foreground">
-              {t('settings.skills.filesPanelHint')}
-            </p>
+            {currentFile && <SkillFileView file={currentFile} skillRoot={skillRoot} viewMode={viewMode} onViewModeChange={setViewMode} />}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            <TreeView
-              nodes={tree}
-              selectedPath={normalizedSelection}
-              onSelect={setSelectedFile}
-              depth={0}
-            />
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono text-muted-foreground break-all">
-                  {currentFile?.path}
-                </span>
-                {currentFile?.isEntry && <MetaPill>{t('settings.skills.entryFile')}</MetaPill>}
-              </div>
-              <div className="mt-1 text-2xs text-subtle-foreground">
-                {t('settings.skills.readingMode', {
-                  mode:
-                    currentFile?.language === 'markdown'
-                      ? t('settings.skills.docMode')
-                      : t('settings.skills.codeMode'),
-                })}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-background px-2.5 py-1 text-3xs font-semibold uppercase tracking-widest text-subtle-foreground border border-border">
-                {currentFile?.language}
-              </span>
-            </div>
-          </div>
-
-          <div className="lg:hidden border-b border-border bg-background px-3 py-2 overflow-x-auto">
-            <div className="flex gap-2 min-w-max">
-              {files.map((file) => {
-                const active = file.path === normalizedSelection
-                return (
-                  <button
-                    key={file.path}
-                    onClick={() => setSelectedFile(file.path)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      active
-                        ? 'border-primary bg-primary-surface text-foreground'
-                        : 'border-border text-muted-foreground hover:bg-hover'
-                    }`}
-                  >
-                    {file.path}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto bg-popover">
-            {currentFile && (
-              <div className={currentFile.language === 'markdown' ? 'px-6 py-5 lg:px-8' : 'p-4'}>
-                {currentFile.language === 'markdown' ? (
-                  <MarkdownRenderer
-                    content={currentFile.body ?? currentFile.content}
-                    variant="document"
-                    className="mx-auto max-w-[72ch]"
-                  />
-                ) : (
-                  <CodeViewer
-                    code={currentFile.content}
-                    language={currentFile.language}
-                    maxLines={9999}
-                    showLineNumbers
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
-function TreeView({
-  nodes,
-  selectedPath,
-  onSelect,
-  depth,
+function SkillFileView({
+  file,
+  skillRoot,
+  viewMode,
+  onViewModeChange,
 }: {
-  nodes: FileTreeNode[]
-  selectedPath: string
-  onSelect: (path: string) => void
-  depth: number
+  file: SkillFile
+  skillRoot: string
+  viewMode: ViewMode
+  onViewModeChange: (mode: ViewMode) => void
 }) {
-  return nodes.map((node) => (
-    <TreeItem
-      key={node.path}
-      node={node}
-      selectedPath={selectedPath}
-      onSelect={onSelect}
-      depth={depth}
-    />
-  ))
-}
-
-function TreeItem({
-  node,
-  selectedPath,
-  onSelect,
-  depth,
-}: {
-  node: FileTreeNode
-  selectedPath: string
-  onSelect: (path: string) => void
-  depth: number
-}) {
-  const [expanded, setExpanded] = useState(true)
-  const isSelected = node.path === selectedPath
-  const isDir = node.type === 'directory'
-
-  const ExpandIcon = expanded ? ChevronDownIcon : ChevronRightIcon
-  const Icon = isDir ? (expanded ? FolderOpenIcon : FolderIcon) : fileIcon(node.name)
+  const t = useTranslation()
+  const isMarkdown = file.kind === 'text' && file.language === 'markdown'
+  const showPreview = isMarkdown && viewMode === 'preview'
 
   return (
-    <div>
-      <button
-        onClick={() => (isDir ? setExpanded(!expanded) : onSelect(node.path))}
-        className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-          isSelected
-            ? 'bg-selected text-foreground font-medium'
-            : 'text-muted-foreground hover:bg-hover'
-        }`}
-        style={{ marginLeft: `${depth * 12}px`, width: `calc(100% - ${depth * 12}px)` }}
-      >
-        {isDir ? (
-          <ExpandIcon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={12} />
-        ) : (
-          <span style={{ width: 12 }} />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border pr-2 pl-4">
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">/{file.path}</span>
+        {isMarkdown && (
+          <ToggleGroup
+            type="single"
+            variant="segmented"
+            size="segmented"
+            value={viewMode}
+            onValueChange={(next) => { if (next === 'preview' || next === 'source') onViewModeChange(next) }}
+            aria-label={t('settings.skills.detail.viewMode')}
+          >
+            <ToggleGroupItem value="preview" aria-label={t('settings.skills.detail.preview')}>
+              <EyeIcon aria-hidden="true" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="source" aria-label={t('settings.skills.detail.sourceCode')}>
+              <CodeIcon aria-hidden="true" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         )}
-        <Icon className="shrink-0 text-subtle-foreground" aria-hidden="true" size={14} />
-        <span className="truncate">{node.name}</span>
-      </button>
-
-      {isDir && expanded && node.children && (
-        <TreeView
-          nodes={node.children}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-          depth={depth + 1}
-        />
-      )}
+      </div>
+      <SkillFileBody file={file} skillRoot={skillRoot} showPreview={showPreview} />
     </div>
+  )
+}
+
+function SkillFileBody({ file, skillRoot, showPreview }: { file: SkillFile; skillRoot: string; showPreview: boolean }) {
+  const t = useTranslation()
+  if (file.kind === 'image') {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
+        <img src={filesystemApi.fileUrl(`${skillRoot}/${file.path}`)} alt={file.path} className="max-h-full max-w-full object-contain" />
+      </div>
+    )
+  }
+  if (file.kind !== 'text') {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <PanelMessage icon={FileWarningIcon} message={t(file.kind === 'too_large' ? 'workspace.previewState.tooLarge' : 'workspace.previewState.binary')} />
+      </div>
+    )
+  }
+  if (showPreview) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <MarkdownRenderer content={file.body ?? file.content} variant="document" className="mx-auto max-w-[72ch]" />
+      </div>
+    )
+  }
+  return <SkillCode code={file.content} language={file.language} />
+}
+
+function SkillCode({ code, language }: { code: string; language: string }) {
+  const t = useTranslation()
+  const lines = useHighlightedCode(code, language || 'text')
+  return (
+    <CodeBlock variant="plain" size="sm" className="min-h-0 flex-1">
+      <CodeBlockContent lineNumbers wrap className="flex-1" aria-label={language || t('codeViewer.code')}>
+        {lines.map((line, index) => <CodeBlockLine key={index}>{line}</CodeBlockLine>)}
+      </CodeBlockContent>
+    </CodeBlock>
   )
 }
 
 function getMetaEntries(frontmatter?: SkillFrontmatter): Array<[string, unknown]> {
   if (!frontmatter) return []
 
-  const entries = Object.entries(frontmatter).filter(([, value]) => {
-    if (value == null) return false
+  const entries = Object.entries(frontmatter).filter(([key, value]) => {
+    if (SHOWN_ELSEWHERE.has(key) || value == null) return false
     if (typeof value === 'string') return value.trim().length > 0
     if (Array.isArray(value)) return value.length > 0
     return true
   })
 
-  entries.sort((a, b) => {
-    const aIndex = META_PRIORITY.indexOf(a[0] as (typeof META_PRIORITY)[number])
-    const bIndex = META_PRIORITY.indexOf(b[0] as (typeof META_PRIORITY)[number])
-    const normalizedA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex
-    const normalizedB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex
-    return normalizedA - normalizedB || a[0].localeCompare(b[0])
-  })
-
-  return entries
+  const rank = (key: string) => {
+    const index = META_PRIORITY.indexOf(key as (typeof META_PRIORITY)[number])
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index
+  }
+  return entries.sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]))
 }
 
 function formatMetaKey(key: string) {
@@ -333,40 +240,7 @@ function formatMetaKey(key: string) {
 }
 
 function formatMetaValue(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).join(', ')
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false'
-  }
-  if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value)
-  }
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(', ')
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value)
   return String(value)
-}
-
-function fileIcon(filename: string): LucideIcon {
-  const ext = filename.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'md':
-      return FileTextIcon
-    case 'ts':
-    case 'tsx':
-    case 'js':
-    case 'jsx':
-    case 'py':
-    case 'rs':
-    case 'go':
-      return FileCodeIcon
-    case 'json':
-    case 'yaml':
-    case 'yml':
-    case 'toml':
-      return BracesIcon
-    case 'sh':
-    case 'bash':
-      return TerminalIcon
-    default:
-      return FileIcon
-  }
 }

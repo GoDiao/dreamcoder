@@ -203,6 +203,32 @@ describe('Skills API', () => {
     )
   })
 
+  it('marks images, binary and oversized files instead of reading them as text, with forward-slash paths', async () => {
+    const skillsRoot = path.join(tmpHome, '.claude', 'skills')
+    const skillMd = ['---', 'description: Asset skill', '---', '', 'asset body'].join('\n')
+    await writeSkill(skillsRoot, 'asset-skill', skillMd)
+    const skillDir = path.join(skillsRoot, 'asset-skill')
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])
+    await fs.mkdir(path.join(skillDir, 'assets'))
+    await fs.writeFile(path.join(skillDir, 'assets', 'logo.png'), png)
+    await fs.writeFile(path.join(skillDir, 'tool.bin'), Buffer.from([0x01, 0x00, 0x02]))
+    await fs.writeFile(path.join(skillDir, 'big.txt'), 'x'.repeat(100 * 1024 + 1))
+
+    const { req, url, segments } = makeRequest('/api/skills/detail?source=user&name=asset-skill')
+    const res = await handleSkillsApi(req, url, segments)
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      detail: { files: Array<{ path: string; kind: string; content: string; body?: string }> }
+    }
+    const byPath = new Map(body.detail.files.map((file) => [file.path, file]))
+
+    expect(byPath.get('SKILL.md')).toMatchObject({ kind: 'text', content: skillMd, body: 'asset body' })
+    expect(byPath.get('assets/logo.png')).toEqual({ path: 'assets/logo.png', kind: 'image', content: '', language: 'image' })
+    expect(byPath.get('tool.bin')).toMatchObject({ kind: 'binary', content: '' })
+    expect(byPath.get('big.txt')).toMatchObject({ kind: 'too_large', content: '' })
+  })
+
   it('lists plugin skills after reload rereads an external enable toggle', async () => {
     const marketplaceRoot = path.join(tmpHome, 'marketplace-root')
     const pluginRoot = path.join(marketplaceRoot, 'plugins', 'draw')

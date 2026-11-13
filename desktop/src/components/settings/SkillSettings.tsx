@@ -9,7 +9,7 @@ export function SkillSettings() {
 
   if (selectedSkill) {
     return (
-      <div className="w-full min-w-0">
+      <div className="relative min-w-0 grow">
         <SkillDetail />
       </div>
     )

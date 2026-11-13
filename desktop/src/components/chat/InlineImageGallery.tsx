@@ -1,7 +1,7 @@
 import { ImageIcon, MaximizeIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ImageGalleryModal } from './ImageGalleryModal'
-import { getBaseUrl } from '../../api/client'
+import { filesystemApi } from '../../api/filesystem'
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i
 
@@ -22,10 +22,6 @@ export function extractImagePaths(text: string): string[] {
   return paths
 }
 
-function fileUrl(filePath: string): string {
-  return `${getBaseUrl()}/api/filesystem/file?path=${encodeURIComponent(filePath)}`
-}
-
 function fileName(filePath: string): string {
   return filePath.split('/').pop() || filePath
 }
@@ -40,7 +36,7 @@ export function InlineImageGallery({ text }: Props) {
   const imagePaths = useMemo(() => extractImagePaths(text), [text])
 
   const images = useMemo(
-    () => imagePaths.map((p) => ({ src: fileUrl(p), name: fileName(p) })),
+    () => imagePaths.map((p) => ({ src: filesystemApi.fileUrl(p), name: fileName(p) })),
     [imagePaths],
   )
 
