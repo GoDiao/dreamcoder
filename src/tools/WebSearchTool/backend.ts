@@ -7,14 +7,16 @@ export type WebSearchMode =
   | 'anthropic'
   | 'tavily'
   | 'brave'
+  | 'keenable'
   | 'disabled'
 
-export type WebSearchProvider = 'anthropic' | 'tavily' | 'brave' | 'disabled'
+export type WebSearchProvider = 'anthropic' | 'tavily' | 'brave' | 'keenable' | 'disabled'
 
 export type WebSearchSettings = {
   mode?: WebSearchMode
   tavilyApiKey?: string
   braveApiKey?: string
+  keenableApiKey?: string
 }
 
 export type ResolvedWebSearch = {
@@ -32,6 +34,7 @@ const WEB_SEARCH_MODES = new Set<WebSearchMode>([
   'anthropic',
   'tavily',
   'brave',
+  'keenable',
   'disabled',
 ])
 
@@ -59,6 +62,7 @@ export function getConfiguredWebSearchSettings(
     mode: WEB_SEARCH_MODES.has(modeCandidate) ? modeCandidate : 'auto',
     tavilyApiKey: normalizeApiKey(raw.tavilyApiKey),
     braveApiKey: normalizeApiKey(raw.braveApiKey),
+    keenableApiKey: normalizeApiKey(raw.keenableApiKey),
   }
 }
 
@@ -80,6 +84,10 @@ export function resolveWebSearchProvider(
     return { provider: settings.braveApiKey ? 'brave' : 'disabled', settings }
   }
 
+  if (mode === 'keenable') {
+    return { provider: settings.keenableApiKey ? 'keenable' : 'disabled', settings }
+  }
+
   if (mode === 'anthropic') {
     return {
       provider: canUseAnthropicNativeWebSearch(model) ? 'anthropic' : 'disabled',
@@ -97,6 +105,10 @@ export function resolveWebSearchProvider(
 
   if (settings.braveApiKey) {
     return { provider: 'brave', settings }
+  }
+
+  if (settings.keenableApiKey) {
+    return { provider: 'keenable', settings }
   }
 
   return { provider: 'disabled', settings }
@@ -136,7 +148,9 @@ export async function searchWithExternalProvider(
   const hits =
     provider === 'tavily'
       ? await searchWithTavily(input, apiKey, signal)
-      : await searchWithBrave(input, apiKey, signal)
+      : provider === 'keenable'
+        ? await searchWithKeenable(input, apiKey, signal)
+        : await searchWithBrave(input, apiKey, signal)
   const durationSeconds = (performance.now() - startTime) / 1000
 
   return makeExternalSearchOutput(provider, input.query, hits, durationSeconds)
@@ -151,6 +165,9 @@ export function getFallbackProvider(
   if (settings.braveApiKey) {
     return 'brave'
   }
+  if (settings.keenableApiKey) {
+    return 'keenable'
+  }
   return null
 }
 
@@ -158,9 +175,13 @@ export function getApiKeyForProvider(
   provider: Exclude<WebSearchProvider, 'anthropic' | 'disabled'>,
   settings: WebSearchSettings,
 ): string | null {
-  return provider === 'tavily'
-    ? settings.tavilyApiKey ?? null
-    : settings.braveApiKey ?? null
+  if (provider === 'tavily') {
+    return settings.tavilyApiKey ?? null
+  }
+  if (provider === 'keenable') {
+    return settings.keenableApiKey ?? null
+  }
+  return settings.braveApiKey ?? null
 }
 
 export function makeWebSearchUnavailableOutput(
@@ -254,6 +275,38 @@ async function searchWithBrave(
   }
 
   return (body.web?.results ?? [])
+    .map(hit => normalizeHit(hit.title, hit.url))
+    .filter((hit): hit is ExternalSearchHit => hit != null)
+}
+
+async function searchWithKeenable(
+  input: Input,
+  apiKey: string,
+  signal: AbortSignal,
+): Promise<ExternalSearchHit[]> {
+  const response = await fetch('https://api.keenable.ai/v1/search', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiKey,
+      'X-Keenable-Title': 'DreamCoder',
+    },
+    body: JSON.stringify({
+      query: applyDomainFiltersToQuery(input),
+      max_results: 8,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Keenable search failed: ${response.status} ${await readErrorBody(response)}`)
+  }
+
+  const body = (await response.json()) as {
+    results?: Array<{ title?: unknown; url?: unknown }>
+  }
+
+  return (body.results ?? [])
     .map(hit => normalizeHit(hit.title, hit.url))
     .filter((hit): hit is ExternalSearchHit => hit != null)
 }

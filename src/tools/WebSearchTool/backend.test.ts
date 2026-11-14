@@ -51,6 +51,24 @@ describe('WebSearch backend resolver', () => {
         braveApiKey: 'brave-key',
       }).provider,
     ).toBe('brave')
+    expect(resolveWebSearchProvider('gpt-5.4', { mode: 'keenable' }).provider).toBe(
+      'disabled',
+    )
+    expect(
+      resolveWebSearchProvider('gpt-5.4', {
+        mode: 'keenable',
+        keenableApiKey: 'keenable-key',
+      }).provider,
+    ).toBe('keenable')
+  })
+
+  test('auto mode falls back to Keenable when it is the only key', () => {
+    expect(
+      resolveWebSearchProvider('gpt-5.4', {
+        mode: 'auto',
+        keenableApiKey: 'keenable-key',
+      }).provider,
+    ).toBe('keenable')
   })
 
   test('isEnabled reflects native Claude or external fallback availability', () => {

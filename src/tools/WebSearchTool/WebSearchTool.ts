@@ -254,12 +254,16 @@ export const WebSearchTool = buildTool({
         data: makeWebSearchUnavailableOutput(
           query,
           durationSeconds,
-          'Web search is not configured for this model. Use a Claude model for native web search or add a Tavily/Brave API key in Settings.',
+          'Web search is not configured for this model. Use a Claude model for native web search or add a Tavily/Brave/Keenable API key in Settings.',
         ),
       }
     }
 
-    if (resolved.provider === 'tavily' || resolved.provider === 'brave') {
+    if (
+      resolved.provider === 'tavily' ||
+      resolved.provider === 'brave' ||
+      resolved.provider === 'keenable'
+    ) {
       onProgress?.({
         toolUseID: `${resolved.provider}-web-search`,
         data: {
@@ -317,7 +321,7 @@ export const WebSearchTool = buildTool({
           data: makeWebSearchUnavailableOutput(
             query,
             durationSeconds,
-            'Native Anthropic web search failed for this endpoint, and no Tavily/Brave API key is configured for fallback.',
+            'Native Anthropic web search failed for this endpoint, and no Tavily/Brave/Keenable API key is configured for fallback.',
           ),
         }
       }
