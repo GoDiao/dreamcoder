@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cliTasksApi } from '../api/cliTasks'
 import type { CLITask, TaskStatus } from '../types/cliTask'
-import { useCLITaskStore } from './cliTaskStore'
+import { getSessionTasks, useCLITaskStore } from './cliTaskStore'
 
 vi.mock('../api/cliTasks', () => ({
   cliTasksApi: {
@@ -22,51 +22,29 @@ function makeTask(taskListId: string, status: TaskStatus = 'in_progress'): CLITa
   }
 }
 
+function tasksOf(sessionId: string) {
+  return getSessionTasks(useCLITaskStore.getState(), sessionId)
+}
+
 describe('cliTaskStore', () => {
   beforeEach(() => {
-    useCLITaskStore.getState().clearTasks()
+    useCLITaskStore.setState({ bySession: {} })
     vi.clearAllMocks()
   })
 
   afterEach(() => {
-    useCLITaskStore.getState().clearTasks()
+    useCLITaskStore.setState({ bySession: {} })
   })
 
-  it('clears stale tasks immediately when switching tracked sessions', async () => {
-    let resolveRequest: ((value: { tasks: ReturnType<typeof makeTask>[] }) => void) | null = null
+  it('keeps each session’s tasks when another session fetches its own', async () => {
+    vi.mocked(cliTasksApi.getTasksForList).mockResolvedValue({ tasks: [makeTask('session-2', 'completed')] })
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'main task', status: 'in_progress' }], 'session-1')
+    useCLITaskStore.getState().toggleExpanded('session-1')
 
-    vi.mocked(cliTasksApi.getTasksForList).mockImplementation(
-      (sessionId: string) =>
-        new Promise<{ tasks: ReturnType<typeof makeTask>[] }>((resolve) => {
-          if (sessionId === 'session-2') resolveRequest = resolve
-        }),
-    )
+    await useCLITaskStore.getState().fetchSessionTasks('session-2')
 
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [makeTask('session-1')],
-      expanded: true,
-      completedAndDismissed: true,
-      dismissedCompletionKey: 'session-1::done',
-    })
-
-    const fetchPromise = useCLITaskStore.getState().fetchSessionTasks('session-2')
-
-    expect(useCLITaskStore.getState()).toMatchObject({
-      sessionId: 'session-2',
-      tasks: [],
-      expanded: false,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
-
-    expect(resolveRequest).not.toBeNull()
-    resolveRequest!({ tasks: [makeTask('session-2', 'completed')] })
-    await fetchPromise
-
-    expect(useCLITaskStore.getState().tasks).toMatchObject([
-      { taskListId: 'session-2', status: 'completed' },
-    ])
+    expect(tasksOf('session-1')).toMatchObject({ expanded: true, tasks: [{ subject: 'main task', taskListId: 'session-1' }] })
+    expect(tasksOf('session-2').tasks).toMatchObject([{ taskListId: 'session-2', status: 'completed' }])
   })
 
   it('resets a completed task list locally before clearing it remotely', async () => {
@@ -79,20 +57,24 @@ describe('cliTaskStore', () => {
     )
 
     useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [
-        makeTask('session-1', 'completed'),
-        { ...makeTask('session-1', 'completed'), id: '2', subject: 'Second completed task' },
-      ],
-      expanded: true,
-      completedAndDismissed: true,
-      dismissedCompletionKey: 'session-1::done',
+      bySession: {
+        'session-1': {
+          tasks: [
+            makeTask('session-1', 'completed'),
+            { ...makeTask('session-1', 'completed'), id: '2', subject: 'Second completed task' },
+          ],
+          resetting: false,
+          expanded: true,
+          completedAndDismissed: true,
+          dismissedCompletionKey: 'session-1::done',
+        },
+      },
     })
 
-    const resetPromise = useCLITaskStore.getState().resetCompletedTasks()
+    const resetPromise = useCLITaskStore.getState().resetCompletedTasks('session-1')
 
     expect(vi.mocked(cliTasksApi.resetTaskList)).toHaveBeenCalledWith('session-1')
-    expect(useCLITaskStore.getState()).toMatchObject({
+    expect(tasksOf('session-1')).toMatchObject({
       tasks: [],
       resetting: true,
       completedAndDismissed: false,
@@ -104,80 +86,69 @@ describe('cliTaskStore', () => {
     resolveReset!({ ok: true })
     await resetPromise
 
-    expect(useCLITaskStore.getState().resetting).toBe(false)
+    expect(tasksOf('session-1').resetting).toBe(false)
   })
 
-  it('refreshes tasks for the currently tracked session by default', async () => {
+  it('refreshes the named session’s tasks', async () => {
     vi.mocked(cliTasksApi.getTasksForList).mockResolvedValue({
       tasks: [makeTask('session-1', 'in_progress')],
     })
 
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [],
-      expanded: false,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
-
-    await useCLITaskStore.getState().refreshTasks()
+    await useCLITaskStore.getState().refreshTasks('session-1')
 
     expect(cliTasksApi.getTasksForList).toHaveBeenCalledWith('session-1')
-    expect(useCLITaskStore.getState().tasks).toMatchObject([
+    expect(tasksOf('session-1').tasks).toMatchObject([
       { taskListId: 'session-1', status: 'in_progress' },
     ])
   })
 
-  it('marks completed tasks dismissed for the currently tracked session by default', () => {
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [makeTask('session-1', 'completed')],
-      expanded: true,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
+  it('marks a completed task list dismissed for its session only', () => {
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'Keep current session isolated', status: 'completed' }], 'session-1')
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'other', status: 'completed' }], 'session-2')
 
-    useCLITaskStore.getState().markCompletedAndDismissed()
+    useCLITaskStore.getState().markCompletedAndDismissed('session-1')
 
-    expect(useCLITaskStore.getState()).toMatchObject({
+    expect(tasksOf('session-1')).toMatchObject({
       completedAndDismissed: true,
       dismissedCompletionKey: 'session-1::1::Keep current session isolated::completed::::',
       expanded: false,
     })
-  })
-
-  it('ignores TodoWrite updates for a session that is not currently tracked', () => {
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [makeTask('session-1', 'in_progress')],
-      expanded: true,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
-
-    useCLITaskStore.getState().setTasksFromTodos([
-      { content: 'Session 2 task', status: 'completed' },
-    ], 'session-2')
-
-    expect(useCLITaskStore.getState().tasks).toMatchObject([
-      { taskListId: 'session-1', subject: 'Keep current session isolated' },
-    ])
+    expect(tasksOf('session-2').completedAndDismissed).toBe(false)
   })
 
   it('does not reset completed tasks for a different session', async () => {
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [makeTask('session-1', 'completed')],
-      expanded: true,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'done', status: 'completed' }], 'session-1')
 
     await useCLITaskStore.getState().resetCompletedTasks('session-2')
 
     expect(vi.mocked(cliTasksApi.resetTaskList)).not.toHaveBeenCalled()
-    expect(useCLITaskStore.getState().tasks).toMatchObject([
-      { taskListId: 'session-1', status: 'completed' },
-    ])
+    expect(tasksOf('session-1').tasks).toMatchObject([{ taskListId: 'session-1', status: 'completed' }])
+  })
+
+  it('drops a task list that arrives after its session was disconnected', async () => {
+    let answerFetch!: (value: { tasks: CLITask[] }) => void
+    let answerRefresh!: (value: { tasks: CLITask[] }) => void
+    vi.mocked(cliTasksApi.getTasksForList)
+      .mockReturnValueOnce(new Promise((resolve) => { answerFetch = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { answerRefresh = resolve }))
+
+    const fetching = useCLITaskStore.getState().fetchSessionTasks('session-1')
+    const refreshing = useCLITaskStore.getState().refreshTasks('session-1')
+    useCLITaskStore.getState().clearTasks('session-1')
+    answerFetch({ tasks: [makeTask('session-1')] })
+    answerRefresh({ tasks: [makeTask('session-1')] })
+    await Promise.all([fetching, refreshing])
+
+    expect(useCLITaskStore.getState().bySession).toEqual({})
+  })
+
+  it('forgets only the cleared session’s tasks', () => {
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'done', status: 'completed' }], 'session-1')
+    useCLITaskStore.getState().setTasksFromTodos([{ content: 'side work', status: 'pending' }], 'session-2')
+
+    useCLITaskStore.getState().clearTasks('session-1')
+
+    expect(Object.keys(useCLITaskStore.getState().bySession)).toEqual(['session-2'])
+    expect(tasksOf('session-2').tasks).toMatchObject([{ subject: 'side work' }])
   })
 })

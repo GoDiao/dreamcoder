@@ -1067,11 +1067,12 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 
-  it('selects and deletes multiple sessions from batch mode', async () => {
+  it('selects and deletes multiple sessions from batch mode, counting only the selected ones', async () => {
     deleteSessions.mockResolvedValue({
       ok: true,
-      successes: ['session-1', 'session-2'],
+      successes: ['session-1', 'session-2', 'side-of-session-1'],
       failures: [],
+      sideChatFailures: [],
     })
     const now = new Date().toISOString()
     useSessionStore.setState({

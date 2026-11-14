@@ -2,7 +2,6 @@ import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useChatStore, useSessionField } from '../../stores/chatStore'
-import { useTabStore } from '../../stores/tabStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
 import { ElapsedTime } from './ElapsedTime'
 
@@ -27,18 +26,17 @@ function formatErrorType(errorType: string | undefined): string | null {
     .trim()
 }
 
-export function StreamingIndicator() {
+export function StreamingIndicator({ sessionId }: { sessionId: string }) {
   const t = useTranslation()
   const [now, setNow] = useState(() => Date.now())
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const chatState = useSessionField(activeTabId, 'chatState') ?? 'idle'
-  const statusVerb = useSessionField(activeTabId, 'statusVerb') ?? ''
-  const apiRetry = useSessionField(activeTabId, 'apiRetry') ?? null
+  const chatState = useSessionField(sessionId, 'chatState') ?? 'idle'
+  const statusVerb = useSessionField(sessionId, 'statusVerb') ?? ''
+  const apiRetry = useSessionField(sessionId, 'apiRetry') ?? null
   const turnStartedAt = useChatStore((s) => {
-    const turn = activeTabId ? s.sessions[activeTabId]?.mirror?.turn : undefined
+    const turn = s.sessions[sessionId]?.mirror?.turn
     return turn && turn.phase !== 'idle' ? turn.startedAt : undefined
   })
-  const outputTokens = useChatStore((s) => activeTabId ? s.sessions[activeTabId]?.tokenUsage?.output_tokens ?? 0 : 0)
+  const outputTokens = useChatStore((s) => s.sessions[sessionId]?.tokenUsage?.output_tokens ?? 0)
 
   useEffect(() => {
     if (!apiRetry) return undefined

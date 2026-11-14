@@ -5,13 +5,8 @@ import { exportFileName, renderSessionJson, renderSessionMarkdown } from '../tra
 import { version as packageVersion } from '../../../package.json'
 import { conversationService } from '../services/conversationService.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import {
-  closeSessionConnection,
-  getSlashCommands,
-  noteSessionRenamed,
-  resolveSessionPermissionMode,
-  resolveSessionRuntimeSelection,
-} from '../ws/handler.js'
+import { getSlashCommands, noteSessionRenamed, resolveSessionPermissionMode } from '../ws/handler.js'
+import { detachSideChat, forkSession, removeSessions, SIDE_CHAT_NOTE, SIDE_CHAT_TITLE } from '../services/sessionLinksService.js'
 import { isPermissionMode } from '../services/permissionModes.js'
 import { normalizeRuntimeSelection } from '../services/runtimeSelection.js'
 import { listSkillSlashCommands, type SkillSlashCommand } from './skills.js'
@@ -29,10 +24,7 @@ import {
   previewSessionRewind,
   type RewindTargetSelector,
 } from '../services/sessionRewindService.js'
-import {
-  createSessionBranch,
-  SessionBranchingError,
-} from '../../utils/sessionBranching.js'
+import { SessionBranchingError } from '../../utils/sessionBranching.js'
 import { registerFilesystemAccessRoot } from '../services/filesystemAccessRoots.js'
 
 const workspaceService = new WorkspaceService(
@@ -123,6 +115,16 @@ export async function handleSessionsApi(
         )
       }
       return await rewindSession(req, sessionId)
+    }
+
+    if (subResource === 'side-chats') {
+      if (req.method !== 'GET') {
+        return Response.json(
+          { error: 'METHOD_NOT_ALLOWED', message: `Method ${req.method} not allowed` },
+          { status: 405 }
+        )
+      }
+      return Response.json({ sessions: await sessionService.listSideChats(sessionId) })
     }
 
     if (subResource === 'branch') {
@@ -385,15 +387,9 @@ function isSessionNotFoundError(error: unknown): error is Error {
 }
 
 async function deleteSession(sessionId: string): Promise<Response> {
-  conversationService.markSessionDeleted(sessionId)
-  try {
-    await sessionService.deleteSession(sessionId)
-  } catch (error) {
-    conversationService.unmarkSessionDeleted(sessionId)
-    throw error
-  }
-  closeSessionConnection(sessionId, 'session deleted')
-  return Response.json({ ok: true })
+  const { failures: [failure], sideChatFailures } = await removeSessions([sessionId])
+  if (failure) throw new ApiError(failure.code === 'NOT_FOUND' ? 404 : 500, failure.message, failure.code)
+  return Response.json({ ok: true, sideChatFailures })
 }
 
 async function batchDeleteSessions(req: Request): Promise<Response> {
@@ -404,23 +400,8 @@ async function batchDeleteSessions(req: Request): Promise<Response> {
     throw ApiError.badRequest('Invalid JSON body')
   }
 
-  const sessionIds = normalizeSessionIds(body.sessionIds)
-  conversationService.markSessionsDeleted(sessionIds)
-  const result = await sessionService.deleteSessions(sessionIds)
-
-  if (result.failures.length > 0) {
-    conversationService.unmarkSessionsDeleted(result.failures.map((failure) => failure.sessionId))
-  }
-
-  for (const sessionId of result.successes) {
-    closeSessionConnection(sessionId, 'session deleted')
-  }
-
-  return Response.json({
-    ok: result.failures.length === 0,
-    successes: result.successes,
-    failures: result.failures,
-  })
+  const { successes, failures, sideChatFailures } = await removeSessions(normalizeSessionIds(body.sessionIds))
+  return Response.json({ ok: failures.length === 0, successes, failures, sideChatFailures })
 }
 
 function normalizeSessionIds(value: unknown): string[] {
@@ -736,49 +717,45 @@ async function rewindSession(req: Request, sessionId: string): Promise<Response>
 }
 
 async function branchSession(req: Request, sessionId: string): Promise<Response> {
-  let body: { targetMessageId?: unknown; title?: unknown }
+  let body: { targetMessageId?: unknown; title?: unknown; kind?: unknown }
   try {
-    body = (await req.json()) as { targetMessageId?: unknown; title?: unknown }
+    body = (await req.json()) as { targetMessageId?: unknown; title?: unknown; kind?: unknown }
   } catch {
     throw ApiError.badRequest('Invalid JSON body')
   }
 
-  if (typeof body.targetMessageId !== 'string' || body.targetMessageId.trim().length === 0) {
+  if (body.kind !== undefined && body.kind !== 'side') {
+    throw ApiError.badRequest('kind must be "side" when given')
+  }
+  const side = body.kind === 'side'
+
+  if (!side && (typeof body.targetMessageId !== 'string' || body.targetMessageId.trim().length === 0)) {
     throw ApiError.badRequest('targetMessageId (string) is required in request body')
+  }
+  if (side && body.targetMessageId !== undefined && typeof body.targetMessageId !== 'string') {
+    throw ApiError.badRequest('targetMessageId must be a string')
   }
 
   if (body.title !== undefined && typeof body.title !== 'string') {
     throw ApiError.badRequest('title must be a string')
   }
 
-  const launchInfo = await sessionService.getSessionLaunchInfo(sessionId)
-  if (!launchInfo) {
-    throw ApiError.notFound(`Session not found: ${sessionId}`)
-  }
-
+  const targetMessageId = typeof body.targetMessageId === 'string' ? body.targetMessageId.trim() || undefined : undefined
   try {
-    const result = await createSessionBranch({
-      sourceSessionId: sessionId,
-      sourceTranscriptPath: launchInfo.filePath,
-      targetMessageId: body.targetMessageId.trim(),
-      title: body.title?.trim() || undefined,
-      sourceWorkDir: launchInfo.workDir,
-      sourceRepository: launchInfo.repository,
-      sourceWorktreeSession: launchInfo.worktreeSession,
+    const result = await forkSession({
+      sourceId: sessionId,
+      targetMessageId,
+      parentKind: side ? 'side' : 'forked',
+      title: side ? SIDE_CHAT_TITLE : body.title?.trim() || undefined,
+      exactTitle: side,
+      ...(side ? { note: SIDE_CHAT_NOTE } : {}),
     })
-    await sessionService.appendSessionPermissionMode(
-      result.sessionId,
-      await resolveSessionPermissionMode(sessionId),
-    )
-    const runtime = await resolveSessionRuntimeSelection(sessionId)
-    if (runtime) await sessionService.appendSessionRuntimeConfig(result.sessionId, runtime)
-
     return Response.json({
       sessionId: result.sessionId,
       title: result.title,
-      workDir: result.workDir ?? launchInfo.workDir,
+      workDir: result.workDir,
       sourceSessionId: sessionId,
-      targetMessageId: body.targetMessageId.trim(),
+      ...(targetMessageId ? { targetMessageId } : {}),
     }, { status: 201 })
   } catch (error) {
     if (error instanceof SessionBranchingError) {
@@ -827,11 +804,16 @@ async function getTurnCheckpointDiff(sessionId: string, url: URL): Promise<Respo
 }
 
 async function patchSession(req: Request, sessionId: string): Promise<Response> {
-  let body: { title?: string }
+  let body: { title?: unknown; detach?: unknown }
   try {
-    body = (await req.json()) as { title?: string }
+    body = (await req.json()) as { title?: unknown; detach?: unknown }
   } catch {
     throw ApiError.badRequest('Invalid JSON body')
+  }
+
+  if (body.detach === true) {
+    await detachSideChat(sessionId)
+    return Response.json({ ok: true })
   }
 
   if (!body.title || typeof body.title !== 'string') {

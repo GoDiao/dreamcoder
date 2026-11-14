@@ -144,7 +144,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('assistant transcript line 219')).toBeTruthy()
     expect(screen.queryByText('assistant transcript line 0')).toBeNull()
@@ -175,7 +175,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const renderItems = container.querySelectorAll('.chat-render-item')
 
     expect(renderItems).toHaveLength(2)
@@ -195,7 +195,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const column = container.querySelector('.chat-render-item')?.parentElement
     expect(column?.className).toContain('shrink-0')
     expect(column?.className).toContain('w-full')
@@ -225,7 +225,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(container.querySelector('[data-virtual-message-item]')).not.toBeNull()
     expect(screen.getByText('latest assistant reply')).toBeTruthy()
@@ -417,7 +417,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Goal set')).toBeTruthy()
     expect(screen.getByText('Objective: ship the smoke test')).toBeTruthy()
@@ -442,7 +442,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Goal set')).toBeTruthy()
     expect(screen.getByText('Objective: ship the replacement target')).toBeTruthy()
@@ -490,7 +490,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const card = screen.getByTestId('background-task-event-card')
     expect(card.textContent).toContain('Background command')
@@ -522,7 +522,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const card = screen.getByTestId('background-task-event-card')
     expect(card.getAttribute('data-status')).toBe('stopped')
@@ -565,7 +565,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const cards = screen.getAllByTestId('background-task-event-card')
     expect(cards).toHaveLength(2)
@@ -595,7 +595,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.queryByTestId('background-task-event-card')).toBeNull()
     expect(screen.queryByText('local_agent')).toBeNull()
@@ -615,7 +615,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scrollArea = container.querySelector('.chat-scroll-area') as HTMLElement
     Object.defineProperty(scrollArea, 'clientHeight', { configurable: true, value: 500 })
     Object.defineProperty(scrollArea, 'scrollHeight', { configurable: true, value: 220 * 112 })
@@ -663,7 +663,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scrollArea = container.querySelector('.chat-scroll-area') as HTMLElement
     Object.defineProperty(scrollArea, 'clientHeight', { configurable: true, value: 500 })
     Object.defineProperty(scrollArea, 'scrollHeight', { configurable: true, value: 222 * 112 })
@@ -696,7 +696,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scrollArea = container.querySelector('.chat-scroll-area') as HTMLElement
     Object.defineProperty(scrollArea, 'clientHeight', { configurable: true, value: 500 })
     Object.defineProperty(scrollArea, 'scrollHeight', { configurable: true, value: 240 * 200 })
@@ -758,7 +758,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getAllByText('Running').length).toBeGreaterThan(0)
     expect(screen.getByText(/Read .*example\.ts.*done/i)).toBeTruthy()
@@ -775,7 +775,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const divider = screen.getByTestId('compact-status-divider')
     expect(within(divider).getByText('Compacting context')).toBeTruthy()
@@ -799,7 +799,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByTestId('api-retry-indicator')).toBeTruthy()
     expect(screen.getByText('Request failed, retrying')).toBeTruthy()
@@ -827,7 +827,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const divider = screen.getByTestId('compact-status-divider')
     expect(within(divider).getByText('Context automatically compacted')).toBeTruthy()
@@ -893,7 +893,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const groupSummary = screen.getByText('TaskUpdate (1), ran a command')
     const groupButton = groupSummary.closest('button')
@@ -934,7 +934,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     expect(container.querySelectorAll('[data-message-shell="assistant"]')).toHaveLength(0)
   })
 
@@ -1307,7 +1307,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Failed')).toBeTruthy()
     expect(screen.getByText('Explore agent unavailable in this session')).toBeTruthy()
@@ -1350,7 +1350,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Done')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'View result' })).toBeTruthy()
@@ -1391,7 +1391,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getAllByText('Running').length).toBeGreaterThan(0)
     expect(screen.queryByText('Done')).toBeNull()
@@ -1436,7 +1436,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Done')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'View result' }))
@@ -1490,7 +1490,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText(/最终报告应该按 Markdown 展示。/)).toBeTruthy()
     expect(screen.queryByText(/raw structured JSON should not be shown/)).toBeNull()
@@ -1553,7 +1553,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText(/git:v0\.2\.6\.\.v0\.2\.7:0/)).toBeTruthy()
     expect(screen.queryByText(/\{"results"/)).toBeNull()
@@ -1602,7 +1602,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeTruthy()
 
@@ -1629,7 +1629,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const userText = screen.getByText('Please inspect the workspace selection behavior.')
     await selectMessageText(userText, 'workspace selection behavior')
@@ -1667,7 +1667,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const assistantText = screen.getByText(/First inspect the file tree/)
     await selectMessageText(assistantText, 'quote the selected lines')
@@ -1699,7 +1699,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const assistantText = screen.getByText(/Clicking outside should clear/)
     await selectMessageText(assistantText, 'selected reply')
@@ -1718,7 +1718,7 @@ describe('MessageList nested tool calls', () => {
     useChatStore.setState({ sessions: {
       [ACTIVE_TAB]: makeSessionState({ messages: [{ id: 'assistant-1', type: 'assistant_text', content: 'Reply to this selection.', timestamp: 1 }] }),
     } })
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
     await selectMessageText(screen.getByText('Reply to this selection.'), 'this selection')
     const button = screen.getByRole('button', { name: 'Reply' })
     await act(async () => {
@@ -1752,7 +1752,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const firstText = screen.getByText(/First assistant reply/)
     const secondText = screen.getByText(/Second assistant reply/)
@@ -1799,7 +1799,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 120
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1000 })
@@ -1858,7 +1858,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 552
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1000 })
@@ -1913,7 +1913,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     const readScrollHeight = vi.fn(() => {
       throw new Error('scrollHeight should not be read while pinning to bottom')
@@ -1991,7 +1991,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 552
     let scrollHeight = 1000
@@ -2075,7 +2075,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 552
     let scrollHeight = 1000
@@ -2147,7 +2147,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 600
     let scrollTopWriteCount = 0
@@ -2250,7 +2250,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 180
     let scrollHeight = 1400
@@ -2332,7 +2332,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 260
     let scrollHeight = 1800
@@ -2394,7 +2394,8 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const view = render(<MessageList sessionId='session-a' />)
+    const { container } = view
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 180
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1200 })
@@ -2411,9 +2412,7 @@ describe('MessageList nested tool calls', () => {
     fireEvent.scroll(scroller)
     expect(screen.getByRole('button', { name: 'Latest' })).toBeTruthy()
 
-    act(() => {
-      useTabStore.setState({ activeTabId: 'session-b' })
-    })
+    view.rerender(<MessageList sessionId='session-b' />)
     await waitFor(() => {
       expect(screen.getByText('B response')).toBeTruthy()
     })
@@ -2422,9 +2421,7 @@ describe('MessageList nested tool calls', () => {
     await waitForProgrammaticScrollReset()
     fireEvent.scroll(scroller)
 
-    act(() => {
-      useTabStore.setState({ activeTabId: 'session-a' })
-    })
+    view.rerender(<MessageList sessionId='session-a' />)
     await waitFor(() => {
       expect(screen.getByText('A response')).toBeTruthy()
     })
@@ -2464,7 +2461,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container, rerender } = render(<MessageList sessionId='session-a' />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1200 })
     Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 400 })
@@ -2477,9 +2474,7 @@ describe('MessageList nested tool calls', () => {
     fireEvent.scroll(scroller)
     scrollIntoView.mockClear()
 
-    act(() => {
-      useTabStore.setState({ activeTabId: 'session-fresh' })
-    })
+    rerender(<MessageList sessionId='session-fresh' />)
 
     await waitFor(() => {
       expect(screen.getByText('Fresh latest response')).toBeTruthy()
@@ -2512,7 +2507,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 120
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1000 })
@@ -2582,7 +2577,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 120
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1000 })
@@ -2657,7 +2652,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    const { container } = render(<MessageList />)
+    const { container } = render(<MessageList sessionId={ACTIVE_TAB} />)
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
     let scrollTop = 120
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1000 })
@@ -2743,7 +2738,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const userShell = screen.getByText('请把这条 prompt 放在右侧').closest('[data-message-shell="user"]')
     const assistantShell = screen.getByText('这条回复应该停在左侧。').closest('[data-message-shell="assistant"]')
@@ -2789,7 +2784,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const assistantShell = screen.getByText('交付结果').closest('[data-message-shell="assistant"]')
     expect(assistantShell?.getAttribute('data-layout')).toBe('document')
@@ -2837,7 +2832,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(await screen.findByRole('button', { name: 'Undo current turn changes' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Rewind to here' })).toBeNull()
@@ -2888,7 +2883,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const branchButtons = screen.getAllByRole('button', { name: 'Fork a new conversation' })
     expect(branchButtons).toHaveLength(2)
@@ -2942,7 +2937,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.queryByRole('button', { name: 'Fork a new conversation' })).toBeNull()
   })
@@ -2971,7 +2966,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(await screen.findByText('两个文件均已优化完成，功能保持不变。')).toBeTruthy()
     await waitFor(() => {
@@ -3071,7 +3066,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const cards = await screen.findAllByLabelText('Turn changed files')
     expect(cards).toHaveLength(2)
@@ -3155,7 +3150,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
@@ -3224,7 +3219,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
@@ -3289,7 +3284,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(await screen.findByText('src/live.ts')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Show diff for src/live.ts' }))
@@ -3342,7 +3337,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(await screen.findByText('src/blank-response.ts')).toBeTruthy()
   })
@@ -3387,7 +3382,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(await screen.findByText('src/first.ts')).toBeTruthy()
 
@@ -3510,7 +3505,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const historicalCard = (await screen.findAllByRole('region', { name: 'Turn changed files' })).find((card) => within(card).queryByText('src/first.ts'))
     expect(historicalCard).toBeTruthy()
@@ -3609,7 +3604,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     const cards = await screen.findAllByLabelText('Turn changed files')
     expect(cards).toHaveLength(1)
@@ -3635,7 +3630,7 @@ describe('MessageList nested tool calls', () => {
       },
     })
 
-    render(<MessageList />)
+    render(<MessageList sessionId={ACTIVE_TAB} />)
 
     expect(screen.getByText('Failed to start CLI process.')).toBeTruthy()
     expect(

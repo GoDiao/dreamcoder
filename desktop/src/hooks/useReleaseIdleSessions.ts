@@ -37,10 +37,13 @@ export function useReleaseIdleSessions() {
 
   useEffect(() => {
     const chatSessions = useChatStore.getState().sessions
-    const isBusy = (id: string) => {
+    const { panelByTab } = useWorkspacePanelStore.getState()
+    const isRunning = (id: string) => {
       const session = chatSessions[id]
       return !!session && session.chatState !== 'idle'
     }
+    const isBusy = (id: string) =>
+      isRunning(id) || (panelByTab[id]?.tabs ?? []).some((tab) => tab.kind === 'sideChat' && isRunning(tab.sessionId))
     const released = selectSessionsToRelease(tabs, activeTabId, isBusy)
     if (released.length === 0) return
     for (const id of released) {

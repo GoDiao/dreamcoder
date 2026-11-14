@@ -597,3 +597,110 @@ describe('stopping the CLI of a session without clients', () => {
     expect(cli.sendMessage.mock.calls[0]?.[0]).toBe(targetId)
   })
 })
+
+describe('side chat titles', () => {
+  let parentId: string
+  let sideId: string
+  beforeEach(async () => {
+    parentId = crypto.randomUUID()
+    sideId = crypto.randomUUID()
+    await writeSession(parentId, { title: 'Parent' })
+    await writeSession(sideId, { relation: { parent: { sessionId: parentId, kind: 'side' } }, title: 'btw' })
+  })
+
+  it('names only the side chat after its first message and keeps that name for later messages', async () => {
+    const plainId = crypto.randomUUID()
+    await writeSession(plainId, { title: 'btw' })
+    fakeCli({ running: true })
+
+    await deliverUserTurn(sideId, 'Why does the login test flake on CI?')
+    await deliverUserTurn(sideId, 'And what about the signup test?')
+    await deliverUserTurn(plainId, 'Hello')
+
+    expect(await sessionService.getCustomTitle(sideId)).toBe('btw: Why does the login test flake on CI?')
+    expect(sessionStateStore.peek(sideId)?.title).toEqual({ text: 'btw: Why does the login test flake on CI?', source: 'custom' })
+    expect(await sessionService.getCustomTitle(plainId)).toBe('btw')
+  })
+
+  it('does not rename the side chat again after the server restarts', async () => {
+    fakeCli({ running: true })
+    await deliverUserTurn(sideId, 'First question')
+    __resetWebSocketHandlerStateForTests()
+
+    await deliverUserTurn(sideId, 'A question after the restart')
+
+    expect(await sessionService.getCustomTitle(sideId)).toBe('btw: First question')
+  })
+
+  it('keeps the name btw when the first message has no text to name the side chat by', async () => {
+    fakeCli({ running: true })
+
+    await deliverUserTurn(sideId, '<command-message>review</command-message>')
+
+    expect(await sessionService.getCustomTitle(sideId)).toBe('btw')
+  })
+
+  it('still delivers the first message when naming the side chat fails', async () => {
+    const cli = fakeCli({ running: true })
+    spyOn(sessionService, 'renameSession').mockRejectedValue(new Error('disk full'))
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    await deliverUserTurn(sideId, 'Why does the login test flake on CI?')
+
+    expect(cli.sendMessage).toHaveBeenCalledTimes(1)
+    expect(cli.sendMessage.mock.calls[0]![0]).toBe(sideId)
+    expect(await sessionService.getCustomTitle(sideId)).toBe('btw')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'))
+  })
+
+  it('keeps a name the user gave the side chat', async () => {
+    fakeCli({ running: true })
+    await deliverUserTurn(sideId, 'Why does the login test flake on CI?')
+    expect(await sessionService.getCustomTitle(sideId)).toBe('btw: Why does the login test flake on CI?')
+    await sessionService.renameSession(sideId, 'Flaky tests')
+    __resetWebSocketHandlerStateForTests()
+
+    await deliverUserTurn(sideId, 'Any news?')
+
+    expect(await sessionService.getCustomTitle(sideId)).toBe('Flaky tests')
+  })
+})
+
+describe('prewarming a session with a repository record', () => {
+  const repository = { requestedWorkDir: '/repo', repoRoot: '/repo', branch: 'feature', worktree: false, baseRef: 'feature' }
+
+  async function prewarm(sessionId: string): Promise<void> {
+    const viewer = makeClientSocket(sessionId)
+    handleWebSocket.open(viewer)
+    handleWebSocket.message(viewer, JSON.stringify({ type: 'prewarm_session' }))
+  }
+
+  it('prewarms a session that already has messages, such as a side chat forked from a repository session', async () => {
+    const sideId = crypto.randomUUID()
+    await writeSession(sideId, { relation: { repository, parent: { sessionId: crypto.randomUUID(), kind: 'side' } }, title: 'btw' })
+    const cli = fakeCli({ running: false })
+
+    await prewarm(sideId)
+
+    await waitFor(() => cli.startSession.mock.calls.length === 1)
+    expect(cli.startSession.mock.calls[0]?.[0]).toBe(sideId)
+  })
+
+  it('still skips a new session whose branch or worktree has not been set up yet', async () => {
+    const newId = crypto.randomUUID()
+    const dir = path.join(configDir, 'projects', sanitizePath(workDir))
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(
+      path.join(dir, `${newId}.jsonl`),
+      `${JSON.stringify({ type: 'session-meta', isMeta: true, workDir, repository, timestamp: '2026-01-01T00:00:00.000Z' })}\n`,
+      'utf-8',
+    )
+    const cli = fakeCli({ running: false })
+
+    await prewarm(newId)
+
+    await waitFor(() => (console.log as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .some(([line]) => String(line).includes(`Skipping prewarm for pending repository launch session ${newId}`)))
+    expect(cli.startSession).not.toHaveBeenCalled()
+  })
+})

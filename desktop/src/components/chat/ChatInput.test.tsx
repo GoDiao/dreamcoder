@@ -177,7 +177,7 @@ describe('ChatInput file mentions', () => {
     mocks.getRepositoryContext.mockResolvedValue(okRepositoryContext())
     mocks.getRecentProjects.mockResolvedValue({ projects: [] })
     mocks.create.mockResolvedValue({ sessionId: 'created-session', workDir: '/repo' })
-    mocks.delete.mockResolvedValue({ ok: true })
+    mocks.delete.mockResolvedValue({ ok: true, sideChatFailures: [] })
     mocks.list.mockResolvedValue({ sessions: [], total: 0 })
     mocks.getTranscript.mockResolvedValue({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })
     mocks.getInspection.mockResolvedValue({ errors: {} })
@@ -253,7 +253,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput variant="hero" />)
+    const view = render(<ChatInput sessionId={sessionId} variant="hero" />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, {
@@ -261,9 +261,7 @@ describe('ChatInput file mentions', () => {
     })
     expect(input.value).toBe('new tab draft')
 
-    act(() => {
-      useTabStore.setState({ activeTabId: historySessionId })
-    })
+    view.rerender(<ChatInput sessionId={historySessionId} variant="hero" />)
 
     await waitFor(() => {
       expect(input.value).toBe('')
@@ -273,17 +271,13 @@ describe('ChatInput file mentions', () => {
       target: { value: 'history tab draft', selectionStart: 17 },
     })
 
-    act(() => {
-      useTabStore.setState({ activeTabId: sessionId })
-    })
+    view.rerender(<ChatInput sessionId={sessionId} variant="hero" />)
 
     await waitFor(() => {
       expect(input.value).toBe('new tab draft')
     })
 
-    act(() => {
-      useTabStore.setState({ activeTabId: historySessionId })
-    })
+    view.rerender(<ChatInput sessionId={historySessionId} variant="hero" />)
 
     await waitFor(() => {
       expect(input.value).toBe('history tab draft')
@@ -291,7 +285,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('restores an unsent composer draft after the composer unmounts', async () => {
-    const { unmount } = render(<ChatInput compact />)
+    const { unmount } = render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, {
@@ -300,7 +294,7 @@ describe('ChatInput file mentions', () => {
     expect(input.value).toBe('keep this prompt while I inspect another tab')
 
     unmount()
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     await waitFor(() => {
       expect(screen.getByRole('textbox')).toHaveValue('keep this prompt while I inspect another tab')
@@ -341,7 +335,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput variant="hero" />)
+    render(<ChatInput sessionId={sessionId} variant="hero" />)
 
     const panel = screen.getByTestId('chat-input-panel')
     expect(panel).toHaveClass('rounded-2xl')
@@ -357,6 +351,20 @@ describe('ChatInput file mentions', () => {
     expect(controls).toContainElement(screen.getByRole('button', { name: 'Permissions' }))
     expect(controls).toContainElement(screen.getByRole('button', { name: 'Model' }))
     expect(branchButton.parentElement).toHaveClass('bg-transparent')
+  })
+
+  it('never offers new-session launch controls in a side chat whose history has not loaded yet', async () => {
+    const sideId = 'side-loading'
+    useChatStore.setState((state) => ({
+      sessions: { ...state.sessions, [sideId]: { ...state.sessions[sessionId]!, messages: [] } },
+    }))
+
+    render(<ChatInput sessionId={sideId} variant="hero" primary={false} />)
+
+    await waitFor(() => expect(mocks.getGitInfo).toHaveBeenCalledWith(sideId))
+    expect(screen.queryByRole('button', { name: /Select branch/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Select a project...')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Ask Claude to edit, debug or explain...')
   })
 
   it('uses the persisted message count to keep reopened sessions in context mode while history loads', async () => {
@@ -393,7 +401,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput variant="hero" />)
+    render(<ChatInput sessionId={sessionId} variant="hero" />)
 
     expect(await screen.findByText('repo')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
@@ -419,7 +427,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const trigger = await screen.findByRole('button', { name: /21%/ })
     fireEvent.click(trigger)
@@ -448,7 +456,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     fireEvent.click(await screen.findByRole('button', { name: /21%/ }))
 
@@ -489,7 +497,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     const notice = await screen.findByTestId('workspace-missing-notice')
     expect(notice).toHaveTextContent('/repo/deleted-app')
@@ -532,7 +540,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput variant="hero" />)
+    render(<ChatInput sessionId={sessionId} variant="hero" />)
 
     fireEvent.click(await screen.findByRole('button', { name: /Select branch: main/ }))
     fireEvent.click(await screen.findByRole('option', { name: /feature\/a/ }))
@@ -596,7 +604,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput variant="hero" />)
+    render(<ChatInput sessionId={sessionId} variant="hero" />)
 
     fireEvent.click(await screen.findByRole('button', { name: /Select branch: main/ }))
     fireEvent.click(await screen.findByRole('option', { name: /feature\/a/ }))
@@ -635,7 +643,7 @@ describe('ChatInput file mentions', () => {
       ],
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     const mention = '@backend/src/conditions.py'
@@ -680,7 +688,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('inserts queued inline workspace citations at the current cursor and keeps file context attached', async () => {
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, {
@@ -753,7 +761,7 @@ describe('ChatInput file mentions', () => {
       ],
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, {
@@ -831,7 +839,7 @@ describe('ChatInput file mentions', () => {
     mocks.syncMarks.mockResolvedValue(['12'])
     useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'fix this' } })
@@ -864,7 +872,7 @@ describe('ChatInput file mentions', () => {
     mocks.syncMarks.mockResolvedValue([])
     useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'fix this' } })
@@ -882,7 +890,7 @@ describe('ChatInput file mentions', () => {
     mocks.syncMarks.mockRejectedValue(new Error('the sidecar is not connected'))
     useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'fix this' } })
@@ -903,7 +911,7 @@ describe('ChatInput file mentions', () => {
       browser: { url: 'https://example.com/a', title: 'Example', text: 'quoted', truncated: false },
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'fix this' } })
@@ -911,6 +919,50 @@ describe('ChatInput file mentions', () => {
 
     expect(mocks.wsSend).toHaveBeenCalled()
     expect(mocks.syncMarks).not.toHaveBeenCalled()
+  })
+
+  it('sends to the session it is given, not to the active tab', async () => {
+    const sideId = 'side-session'
+    useChatStore.setState((state) => ({
+      sessions: { ...state.sessions, [sideId]: { ...state.sessions[sessionId]!, messages: [{ id: 'side', type: 'assistant_text', content: 'side', timestamp: 1 }] } },
+    }))
+
+    render(<ChatInput sessionId={sideId} compact primary={false} />)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'side question' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(mocks.wsSend).toHaveBeenCalledWith(sideId, expect.objectContaining({ type: 'user_message', content: 'side question' }))
+    expect(mocks.wsSend).not.toHaveBeenCalledWith(sessionId, expect.anything())
+  })
+
+  it('leaves typing elsewhere on the page alone in a side chat', () => {
+    const sideId = 'side-typing'
+    useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))
+    render(<ChatInput sessionId={sideId} compact primary={false} />)
+
+    fireEvent.keyDown(document.body, { key: 'a' })
+
+    expect(screen.getByRole('textbox')).not.toHaveFocus()
+  })
+
+  it('keeps focus where it is when a side chat starts or finishes a reply', () => {
+    const sideId = 'side-running'
+    useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))
+    render(
+      <>
+        <button type="button">elsewhere</button>
+        <ChatInput sessionId={sideId} compact primary={false} />
+      </>,
+    )
+    const elsewhere = screen.getByRole('button', { name: 'elsewhere' })
+    elsewhere.focus()
+
+    act(() => useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: { ...state.sessions[sideId]!, chatState: 'streaming' } } })))
+    expect(elsewhere).toHaveFocus()
+    act(() => useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: { ...state.sessions[sideId]!, chatState: 'idle' } } })))
+    expect(elsewhere).toHaveFocus()
   })
 
   it('blocks sending while a picked element is still being read, and says why', async () => {
@@ -923,7 +975,7 @@ describe('ChatInput file mentions', () => {
       browser: { url: '', title: '', tabId: 'tab-1', text: '', truncated: false, pendingPickId: 'p1' },
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     expect(screen.getByText('Picking…')).toBeInTheDocument()
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
@@ -946,7 +998,7 @@ describe('ChatInput file mentions', () => {
     mocks.syncMarks.mockReturnValue(new Promise<string[]>((resolve) => { finishCheck = resolve }))
     useWorkspaceChatContextStore.getState().addReference(sessionId, pickedElement())
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'fix this' } })
@@ -988,7 +1040,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     expect(screen.getByText('Password and card fields are never carried; only where the element is.')).toBeInTheDocument()
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
@@ -1013,7 +1065,7 @@ describe('ChatInput file mentions', () => {
       'C:\\Users\\Nanmi\\Desktop\\large-b.zip',
     ])
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     fireEvent.keyDown(screen.getByLabelText('Open composer tools'), { key: 'Enter' })
     fireEvent.click(screen.getByText('Add files or photos'))
@@ -1063,7 +1115,7 @@ describe('ChatInput file mentions', () => {
     })
     const dataTransfer = { types: ['Files'], files: [droppedFile], dropEffect: '' }
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const panel = screen.getByTestId('chat-input-panel')
     fireEvent.dragOver(panel, { dataTransfer })
@@ -1108,7 +1160,7 @@ describe('ChatInput file mentions', () => {
       ],
     })
 
-    render(<ChatInput compact />)
+    render(<ChatInput sessionId={sessionId} compact />)
 
     const panel = screen.getByTestId('chat-input-panel')
     const input = screen.getByRole('textbox') as HTMLTextAreaElement
@@ -1145,7 +1197,7 @@ describe('ChatInput file mentions', () => {
       ],
     })
 
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     await waitFor(() => {
       expect(mocks.getGitInfo).toHaveBeenCalledWith(sessionId)
@@ -1176,7 +1228,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('keeps the controls row below the input box so a multiline caret cannot render behind it', async () => {
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     await waitFor(() => {
       expect(mocks.getGitInfo).toHaveBeenCalledWith(sessionId)
@@ -1196,7 +1248,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('replaces the composer with the provider card and keeps the draft', async () => {
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     fireEvent.change(screen.getByRole('textbox'), {
       target: { value: 'unsent draft', selectionStart: 12 },
@@ -1248,7 +1300,7 @@ describe('ChatInput file mentions', () => {
       },
     })
 
-    render(<ChatInput />)
+    render(<ChatInput sessionId={sessionId} />)
 
     await waitFor(() => {
       expect(mocks.getGitInfo).toHaveBeenCalledWith(sessionId)

@@ -6,6 +6,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useUIStore } from '../stores/uiStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
+import { useChatStore } from '../stores/chatStore'
 import { useNewSessionStore } from '../stores/newSessionStore'
 import { Modal } from '../components/shared/Modal'
 import { ConfirmDialog } from '../components/shared/ConfirmDialog'
@@ -203,5 +204,61 @@ describe('useKeyboardShortcuts app zoom', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(window.localStorage.getItem(APP_ZOOM_STORAGE_KEY)).toBe('0.9')
+  })
+})
+
+describe('useKeyboardShortcuts stop generation', () => {
+  const stopGeneration = vi.fn()
+  const initialChatState = useChatStore.getState()
+
+  beforeEach(() => {
+    useTabStore.setState({ ...useTabStore.getInitialState(), activeTabId: 'main' }, true)
+    useUIStore.setState({ activeModal: null })
+    useChatStore.setState({
+      stopGeneration,
+      sessions: {
+        main: { ...useChatStore.getState().getSession('main'), chatState: 'streaming' },
+        side: { ...useChatStore.getState().getSession('side'), chatState: 'streaming' },
+      },
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    stopGeneration.mockReset()
+    useChatStore.setState(initialChatState, true)
+    useTabStore.setState(useTabStore.getInitialState(), true)
+  })
+
+  function renderViews() {
+    render(
+      <>
+        <ShortcutHost />
+        <div data-session-view="main"><textarea aria-label="Main composer" /></div>
+        <div data-session-view="side"><textarea aria-label="Side composer" /></div>
+        <button type="button">Elsewhere</button>
+      </>,
+    )
+  }
+
+  it('stops the session view that has the focus', () => {
+    renderViews()
+    const side = document.querySelector<HTMLTextAreaElement>('[aria-label="Side composer"]')!
+    side.focus()
+
+    fireEvent.keyDown(side, { key: '.', metaKey: true })
+
+    expect(stopGeneration).toHaveBeenCalledTimes(1)
+    expect(stopGeneration).toHaveBeenCalledWith('side')
+  })
+
+  it('stops the main session when the focus is outside every session view', () => {
+    renderViews()
+    const elsewhere = document.querySelector<HTMLButtonElement>('button')!
+    elsewhere.focus()
+
+    fireEvent.keyDown(elsewhere, { key: '.', metaKey: true })
+
+    expect(stopGeneration).toHaveBeenCalledWith('main')
   })
 })

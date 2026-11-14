@@ -1,16 +1,14 @@
 import { ListTodo, X } from 'lucide-react'
-import { useCLITaskStore } from '../../stores/cliTaskStore'
+import { getSessionTasks, useCLITaskStore } from '../../stores/cliTaskStore'
 import { useTranslation } from '../../i18n'
 import { Button } from '../shared/ui/button'
 import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '../shared/ui/trace'
 import { ChatTraceBar } from './ChatTraceBar'
 import { TaskTraceItems } from './TaskTraceItems'
 
-export function SessionTaskBar() {
-  const tasks = useCLITaskStore((state) => state.tasks)
-  const expanded = useCLITaskStore((state) => state.expanded)
+export function SessionTaskBar({ sessionId }: { sessionId: string }) {
+  const { tasks, expanded, completedAndDismissed } = useCLITaskStore((state) => getSessionTasks(state, sessionId))
   const toggleExpanded = useCLITaskStore((state) => state.toggleExpanded)
-  const completedAndDismissed = useCLITaskStore((state) => state.completedAndDismissed)
   const resetCompletedTasks = useCLITaskStore((state) => state.resetCompletedTasks)
   const t = useTranslation()
   if (tasks.length === 0) return null
@@ -20,7 +18,7 @@ export function SessionTaskBar() {
 
   return (
     <ChatTraceBar>
-      <TraceCollapsible open={expanded} onOpenChange={toggleExpanded}>
+      <TraceCollapsible open={expanded} onOpenChange={() => toggleExpanded(sessionId)}>
         <div className="flex items-center gap-2">
           <TraceCollapsibleTrigger className="flex-1" aria-label={t('tasks.title')}>
             <TraceLine status={tasks.some((task) => task.status === 'in_progress') ? 'running' : undefined}>
@@ -29,7 +27,7 @@ export function SessionTaskBar() {
               <TraceDescription>{t('tasks.progress', { done: completedCount, total: tasks.length })}</TraceDescription>
             </TraceLine>
           </TraceCollapsibleTrigger>
-          {allCompleted && <Button variant="ghost" size="icon-xs" aria-label={t('tasks.dismissCompleted')} onClick={() => { void resetCompletedTasks() }}><X /></Button>}
+          {allCompleted && <Button variant="ghost" size="icon-xs" aria-label={t('tasks.dismissCompleted')} onClick={() => { void resetCompletedTasks(sessionId) }}><X /></Button>}
         </div>
         <TraceCollapsibleContent className="max-h-[240px] overflow-y-auto">
           <TaskTraceItems tasks={tasks} />

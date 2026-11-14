@@ -91,7 +91,7 @@ describe('StreamingIndicator elapsed time', () => {
   })
 
   it('counts from the turn start the server reported and ticks every second', () => {
-    render(<StreamingIndicator />)
+    render(<StreamingIndicator sessionId="a" />)
     expect(screen.getByText('1m 5s')).toBeInTheDocument()
 
     act(() => {
@@ -101,15 +101,15 @@ describe('StreamingIndicator elapsed time', () => {
   })
 
   it('shows the time of the session switched to', () => {
-    render(<StreamingIndicator />)
-    showTab('b')
+    const view = render(<StreamingIndicator sessionId="a" />)
+    view.rerender(<StreamingIndicator sessionId="b" />)
 
     expect(screen.getByText('3s')).toBeInTheDocument()
     expect(screen.queryByText('1m 5s')).not.toBeInTheDocument()
   })
 
   it('keeps counting from the same start after a reconnect snapshot', () => {
-    render(<StreamingIndicator />)
+    render(<StreamingIndicator sessionId="a" />)
     act(() => {
       vi.advanceTimersByTime(2000)
       useChatStore.setState({
@@ -125,7 +125,7 @@ describe('StreamingIndicator elapsed time', () => {
 
   it('shows no time when the server has not started a turn', () => {
     useChatStore.setState({ sessions: { a: sessionWithTurn('a', { phase: 'idle' }) } })
-    render(<StreamingIndicator />)
+    render(<StreamingIndicator sessionId="a" />)
 
     act(() => {
       vi.advanceTimersByTime(5000)

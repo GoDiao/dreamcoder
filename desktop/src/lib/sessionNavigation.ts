@@ -3,10 +3,18 @@ import { useTranslation } from '../i18n'
 import { useChatStore } from '../stores/chatStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
+import { findSideChatParent, useWorkspacePanelStore } from '../stores/workspacePanelStore'
 
 export function openSessionTab(sessionId: string, title: string): void {
-  useTabStore.getState().openTab(sessionId, title)
-  useChatStore.getState().connectToSession(sessionId)
+  const panels = useWorkspacePanelStore.getState()
+  const parentId = findSideChatParent(panels.panelByTab, sessionId)
+  const tabSessionId = parentId ?? sessionId
+  const tabTitle = parentId
+    ? useSessionStore.getState().sessions.find((session) => session.id === parentId)?.title ?? title
+    : title
+  useTabStore.getState().openTab(tabSessionId, tabTitle)
+  useChatStore.getState().connectToSession(tabSessionId)
+  if (parentId) panels.openTab(parentId, { kind: 'sideChat', sessionId })
 }
 
 export function useSessionLink({ sessionId, sentTitle }: { sessionId: string; sentTitle?: string }) {

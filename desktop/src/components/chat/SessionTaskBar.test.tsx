@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { SessionTaskBar } from './SessionTaskBar'
-import { useCLITaskStore } from '../../stores/cliTaskStore'
+import { getSessionTasks, useCLITaskStore } from '../../stores/cliTaskStore'
 
 vi.mock('../../api/cliTasks', () => ({
   cliTasksApi: {
@@ -23,40 +23,36 @@ vi.mock('../../i18n', () => ({
   },
 }))
 
+const SESSION_ID = 'session-1'
+
 describe('SessionTaskBar', () => {
   beforeEach(() => {
-    useCLITaskStore.setState({
-      sessionId: 'session-1',
-      tasks: [],
-      expanded: false,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-    })
+    useCLITaskStore.setState({ bySession: {} })
   })
 
   afterEach(() => {
     cleanup()
-    useCLITaskStore.getState().clearTasks()
+    useCLITaskStore.setState({ bySession: {} })
   })
 
   it('keeps expansion in the store and updates progress as tasks complete', () => {
     useCLITaskStore.getState().setTasksFromTodos([
       { content: 'first', status: 'completed' },
       { content: 'second', status: 'in_progress', activeForm: 'working' },
-    ])
-    render(<SessionTaskBar />)
+    ], SESSION_ID)
+    render(<SessionTaskBar sessionId={SESSION_ID} />)
     const trigger = screen.getByRole('button', { name: 'Tasks' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('working')).toBeNull()
     expect(screen.getByText('1 of 2 done')).toBeInTheDocument()
     expect(screen.getByText('Tasks').closest('[data-slot="trace-line"]')).toHaveAttribute('data-status', 'running')
     fireEvent.click(trigger)
-    expect(useCLITaskStore.getState().expanded).toBe(true)
+    expect(getSessionTasks(useCLITaskStore.getState(), SESSION_ID).expanded).toBe(true)
     expect(screen.getByText('working')).toBeVisible()
     act(() => useCLITaskStore.getState().setTasksFromTodos([
       { content: 'first', status: 'completed' },
       { content: 'second', status: 'completed' },
-    ]))
+    ], SESSION_ID))
     expect(screen.queryByText('working')).toBeNull()
     expect(screen.getByText('2 of 2 done')).toBeInTheDocument()
     expect(screen.getByText('Tasks').closest('[data-slot="trace-line"]')).not.toHaveAttribute('data-status')
@@ -68,11 +64,11 @@ describe('SessionTaskBar', () => {
       useCLITaskStore.getState().setTasksFromTodos([
         { content: 'first', status: 'completed' },
         { content: 'second', status: 'in_progress', activeForm: 'working' },
-      ])
+      ], SESSION_ID)
     })
 
     act(() => {
-      render(<SessionTaskBar />)
+      render(<SessionTaskBar sessionId={SESSION_ID} />)
     })
 
     expect(screen.getByText('Tasks')).toBeInTheDocument()
@@ -84,11 +80,11 @@ describe('SessionTaskBar', () => {
       useCLITaskStore.getState().setTasksFromTodos([
         { content: 'first', status: 'completed' },
         { content: 'second', status: 'completed' },
-      ])
+      ], SESSION_ID)
     })
 
     act(() => {
-      render(<SessionTaskBar />)
+      render(<SessionTaskBar sessionId={SESSION_ID} />)
     })
 
     await act(async () => {
@@ -97,18 +93,18 @@ describe('SessionTaskBar', () => {
     })
 
     expect(screen.queryByText('Tasks')).toBeNull()
-    expect(useCLITaskStore.getState().tasks).toEqual([])
+    expect(getSessionTasks(useCLITaskStore.getState(), SESSION_ID).tasks).toEqual([])
   })
 
   it('shows the bar again for a new task cycle after a previous completed set was dismissed', async () => {
     act(() => {
       useCLITaskStore.getState().setTasksFromTodos([
         { content: 'first', status: 'completed' },
-      ])
+      ], SESSION_ID)
     })
 
     act(() => {
-      render(<SessionTaskBar />)
+      render(<SessionTaskBar sessionId={SESSION_ID} />)
     })
 
     await act(async () => {
@@ -120,7 +116,7 @@ describe('SessionTaskBar', () => {
     act(() => {
       useCLITaskStore.getState().setTasksFromTodos([
         { content: 'next task', status: 'in_progress', activeForm: 'running next task' },
-      ])
+      ], SESSION_ID)
     })
 
     expect(screen.getByText('Tasks')).toBeInTheDocument()
@@ -129,7 +125,7 @@ describe('SessionTaskBar', () => {
     act(() => {
       useCLITaskStore.getState().setTasksFromTodos([
         { content: 'next task', status: 'completed' },
-      ])
+      ], SESSION_ID)
     })
 
     expect(screen.getByText('Tasks')).toBeInTheDocument()

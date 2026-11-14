@@ -7,9 +7,14 @@ import { conversationService } from '../services/conversationService.js'
 import {
   createLinkedSession,
   createSessionLinks,
+  detachSideChat,
+  forkSession,
+  removeSessions,
+  SIDE_CHAT_NOTE,
   type CardAssigneeLaunch,
   type UserTurnDelivery,
 } from '../services/sessionLinksService.js'
+import { handleSessionsApi } from '../api/sessions.js'
 import { sessionService } from '../services/sessionService.js'
 import { createTurnQueue } from '../services/turnQueueService.js'
 import { sessionStateStore } from '../session/state/store.js'
@@ -267,7 +272,7 @@ describe('session relations in session-meta', () => {
       sourceSessionId: sourceId,
       sourceTranscriptPath: sourcePath,
       sourceWorkDir: workDir,
-      openToolUseResult: 'you are the fork',
+      note: { text: 'you are the fork', always: false },
     })
 
     const messages = (await readEntries(branch.sessionId)).filter((entry) => entry.type === 'user' || entry.type === 'assistant')
@@ -289,6 +294,382 @@ describe('session relations in session-meta', () => {
 
     const messages = (await readEntries(branch.sessionId)).filter((entry) => entry.type === 'user' || entry.type === 'assistant')
     expect(messages.at(-1)?.uuid).toBe(open.uuid)
+  })
+})
+
+describe('side chats', () => {
+  async function sideChatOf(parentId: string): Promise<string> {
+    const { sessionId } = await forkSession({ sourceId: parentId, parentKind: 'side', title: 'btw', exactTitle: true, note: SIDE_CHAT_NOTE })
+    return sessionId
+  }
+
+  function conversationMessages(entries: Entry[]) {
+    return entries.filter((entry) => entry.type === 'user' || entry.type === 'assistant')
+  }
+
+  it('forks from the latest message and adds the side chat note when no tool call is open', async () => {
+    const parentId = crypto.randomUUID()
+    const first = userEntry(parentId, 'first question')
+    const firstReply = assistantEntry(parentId, 'first answer', first.uuid)
+    const second = userEntry(parentId, 'second question', { parentUuid: firstReply.uuid, timestamp: '2026-01-01T00:03:00.000Z' })
+    const secondReply: Entry = { ...assistantEntry(parentId, 'second answer', second.uuid), timestamp: '2026-01-01T00:04:00.000Z' }
+    await writeTranscript(parentId, [metaEntry(), first, firstReply, second, secondReply])
+
+    const sideId = await sideChatOf(parentId)
+
+    const entries = await readEntries(sideId)
+    const messages = conversationMessages(entries)
+    expect(messages.slice(0, 4).map((entry) => (entry.forkedFrom as Entry).messageUuid)).toEqual([first.uuid, firstReply.uuid, second.uuid, secondReply.uuid])
+    const [note, sentinel] = messages.slice(4)
+    expect(note).toMatchObject({ isMeta: true, parentUuid: secondReply.uuid })
+    expect((note!.message as Entry).content).toContain('This is a side chat')
+    expect(sentinel?.message).toMatchObject({ content: [{ type: 'text', text: 'No response requested.' }] })
+    expect(entries.find((entry) => entry.type === 'session-meta')?.parent).toEqual({ sessionId: parentId, kind: 'side' })
+    expect(entries.filter((entry) => entry.type === 'custom-title').map((entry) => entry.customTitle)).toEqual(['btw'])
+  })
+
+  it('answers the tool calls the parent left open with the side chat note', async () => {
+    const parentId = crypto.randomUUID()
+    const user = userEntry(parentId, 'run it')
+    const open = toolUseEntry(parentId, 'tool-open', user.uuid)
+    await writeTranscript(parentId, [metaEntry(), user, open])
+
+    const sideId = await sideChatOf(parentId)
+
+    const [closing, sentinel] = conversationMessages(await readEntries(sideId)).slice(-2)
+    const content = (closing!.message as Entry).content as Array<Record<string, unknown>>
+    expect(content).toHaveLength(1)
+    expect(content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'tool-open' })
+    expect(content[0]!.content).toContain('This is a side chat')
+    expect(sentinel?.message).toMatchObject({ content: [{ type: 'text', text: 'No response requested.' }] })
+  })
+
+  it('creates a side chat through the branch route without a target message', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+
+    const response = await handleSessionsApi(
+      new Request(`http://localhost/api/sessions/${parentId}/branch`, { method: 'POST', body: JSON.stringify({ kind: 'side' }) }),
+      new URL(`http://localhost/api/sessions/${parentId}/branch`),
+      ['api', 'sessions', parentId, 'branch'],
+    )
+
+    expect(response.status).toBe(201)
+    const body = await response.json() as { sessionId: string; title: string }
+    expect(body.title).toBe('btw')
+    expect((await sessionService.getSessionLinkInfo(body.sessionId))?.parent).toEqual({ sessionId: parentId, kind: 'side' })
+    const listed = await handleSessionsApi(
+      new Request(`http://localhost/api/sessions/${parentId}/side-chats`),
+      new URL(`http://localhost/api/sessions/${parentId}/side-chats`),
+      ['api', 'sessions', parentId, 'side-chats'],
+    )
+    expect(((await listed.json()) as { sessions: Array<{ id: string }> }).sessions.map((session) => session.id)).toEqual([body.sessionId])
+  })
+
+  it('pages the session list by file and leaves side chats out of each page', async () => {
+    const older = crypto.randomUUID()
+    const newer = crypto.randomUUID()
+    const olderPath = await writeConversation(older, {}, 'Older')
+    const newerPath = await writeConversation(newer, {}, 'Newer')
+    const sideA = await sideChatOf(newer)
+    const sideB = await sideChatOf(newer)
+    await fs.utimes(olderPath, new Date('2026-01-01'), new Date('2026-01-01'))
+    await fs.utimes(newerPath, new Date('2026-01-02'), new Date('2026-01-02'))
+    for (const sideId of [sideA, sideB]) {
+      const found = await sessionService.findSessionFile(sideId)
+      await fs.utimes(found!.filePath, new Date('2026-01-03'), new Date('2026-01-03'))
+    }
+
+    const first = await sessionService.listSessions({ limit: 3 })
+    const second = await sessionService.listSessions({ limit: 3, offset: 3 })
+
+    expect(first).toMatchObject({ total: 4, sessions: [{ id: newer }] })
+    expect(first.sessions).toHaveLength(1)
+    expect(second).toMatchObject({ total: 4, sessions: [{ id: older }] })
+    expect(second.sessions).toHaveLength(1)
+  })
+
+  it('reads only the relation of sessions that are not side chats of the parent', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    await forkSession({ sourceId: parentId, parentKind: 'forked' })
+    const built = spyOn(sessionService as unknown as { buildSessionListItem: (file: { sessionId: string }) => Promise<unknown> }, 'buildSessionListItem')
+
+    const sideChats = await sessionService.listSideChats(parentId)
+
+    expect(sideChats.map((session) => session.id)).toEqual([sideId])
+    expect(built.mock.calls.map(([file]) => file.sessionId)).toEqual([sideId])
+  })
+
+  it('scans a project folder once for all the parents removed from it, a bounded number of files at a time', async () => {
+    const parents = [crypto.randomUUID(), crypto.randomUUID()]
+    for (const parentId of parents) await writeConversation(parentId, {}, 'Parent')
+    for (let index = 0; index < 30; index++) await writeConversation(crypto.randomUUID(), {}, `Other ${index}`)
+    const service = sessionService as unknown as {
+      sessionFilesInProjectDir: (dir: string) => Promise<unknown[]>
+      readSessionRelation: (filePath: string) => Promise<Record<string, unknown>>
+    }
+    const scanned = spyOn(service, 'sessionFilesInProjectDir')
+    let inFlight = 0
+    let mostInFlight = 0
+    const readRelation = service.readSessionRelation.bind(sessionService)
+    spyOn(service, 'readSessionRelation').mockImplementation(async (filePath) => {
+      inFlight++
+      mostInFlight = Math.max(mostInFlight, inFlight)
+      await Promise.resolve()
+      try {
+        return await readRelation(filePath)
+      } finally {
+        inFlight--
+      }
+    })
+
+    await removeSessions(parents)
+
+    expect(scanned).toHaveBeenCalledTimes(1)
+    expect(mostInFlight).toBeGreaterThan(1)
+    expect(mostInFlight).toBeLessThanOrEqual(16)
+  })
+
+  it('reports and logs a side chat that could not be removed with its parent', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const deleteSession = sessionService.deleteSession.bind(sessionService)
+    spyOn(sessionService, 'deleteSession').mockImplementation(async (id) => {
+      if (id === sideId) throw new Error('locked')
+      return deleteSession(id)
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    const response = await handleSessionsApi(
+      new Request(`http://localhost/api/sessions/${parentId}`, { method: 'DELETE' }),
+      new URL(`http://localhost/api/sessions/${parentId}`),
+      ['api', 'sessions', parentId],
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, sideChatFailures: [{ sessionId: sideId, message: 'locked' }] })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`side chat ${sideId}`))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('locked'))
+  })
+
+  it('reports a side chat that could not be removed in a batch apart from the sessions that were asked for', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const deleteSession = sessionService.deleteSession.bind(sessionService)
+    spyOn(sessionService, 'deleteSession').mockImplementation(async (id) => {
+      if (id === sideId) throw new Error('locked')
+      return deleteSession(id)
+    })
+    spyOn(console, 'warn').mockImplementation(() => {})
+
+    const response = await handleSessionsApi(
+      new Request('http://localhost/api/sessions/batch-delete', { method: 'POST', body: JSON.stringify({ sessionIds: [parentId] }) }),
+      new URL('http://localhost/api/sessions/batch-delete'),
+      ['api', 'sessions', 'batch-delete'],
+    )
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      successes: [parentId],
+      failures: [],
+      sideChatFailures: [{ sessionId: sideId, message: 'locked' }],
+    })
+  })
+
+  it('lists the caller’s own side chats to the CLI, and not those of other sessions', async () => {
+    const callerId = crypto.randomUUID()
+    const otherId = crypto.randomUUID()
+    await writeConversation(callerId, {}, 'Caller')
+    await writeConversation(otherId, {}, 'Other')
+    const ownSide = await sideChatOf(callerId)
+    const otherSide = await sideChatOf(otherId)
+    const replies: Array<Record<string, any>> = []
+    spyOn(conversationService, 'respondToHostRequest').mockImplementation((_sessionId, _requestId, result) => {
+      replies.push(result as Record<string, any>)
+      return true
+    })
+    const links = createSessionLinks({
+      deliver: async () => ({ ok: true }),
+      queueReport: async () => {},
+      onRenamed: () => {},
+      startCardAssignee: async () => {
+        throw new Error('Not on a board')
+      },
+    })
+
+    links.handleControlRequest(callerId, { request_id: crypto.randomUUID(), request: { subtype: 'session_list' } })
+    const deadline = Date.now() + 5_000
+    while (replies.length === 0 && Date.now() < deadline) await Bun.sleep(5)
+
+    const listed = new Map<string, Record<string, any>>(replies[0]!.response.sessions.map((entry: Record<string, any>) => [entry.sessionId, entry]))
+    expect(listed.get(ownSide)).toMatchObject({ relation: 'child', parentSessionId: callerId })
+    expect(listed.has(otherSide)).toBe(false)
+    expect(listed.has(otherId)).toBe(true)
+  })
+
+  it('removes the side chats of a deleted session and keeps its other children', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const forked = await forkSession({ sourceId: parentId, parentKind: 'forked' })
+    const children = await Promise.all((['spawned', 'assigned'] as const).map((kind) =>
+      sessionService.createSession(workDir, undefined, undefined, undefined, { parent: { sessionId: parentId, kind } })))
+
+    const result = await removeSessions([parentId])
+
+    expect(result.failures).toEqual([])
+    expect(result.successes.sort()).toEqual([parentId, sideId].sort())
+    expect(await sessionService.findSessionFile(parentId)).toBeNull()
+    expect(await sessionService.findSessionFile(sideId)).toBeNull()
+    for (const kept of [forked.sessionId, ...children.map((child) => child.sessionId)]) {
+      expect(await sessionService.findSessionFile(kept)).not.toBeNull()
+    }
+  })
+
+  it('waits for each CLI process to exit before deleting its transcript', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const order: string[] = []
+    const exits = new Map<string, () => void>()
+    let bothStopping!: () => void
+    const stopping = new Promise<void>((resolve) => { bothStopping = resolve })
+    spyOn(conversationService, 'stopSessionAndWait').mockImplementation((sessionId) => new Promise<void>((resolve) => {
+      exits.set(sessionId, () => {
+        order.push(`stopped ${sessionId}`)
+        resolve()
+      })
+      if (exits.size === 2) bothStopping()
+    }))
+    const deleteSessions = sessionService.deleteSessions.bind(sessionService)
+    spyOn(sessionService, 'deleteSessions').mockImplementation(async (ids) => {
+      order.push(`deleted ${[...ids].sort().join(',')}`)
+      return deleteSessions(ids)
+    })
+
+    const removal = removeSessions([parentId])
+    await stopping
+    expect(order).toEqual([])
+    exits.get(sideId)!()
+    await Promise.resolve()
+    expect(order).toEqual([`stopped ${sideId}`])
+    exits.get(parentId)!()
+    await removal
+
+    expect(order.slice(0, 2).sort()).toEqual([`stopped ${parentId}`, `stopped ${sideId}`].sort())
+    expect(order[2]).toBe(`deleted ${[parentId, sideId].sort().join(',')}`)
+  })
+
+  it('rewrites every session-meta and keeps the detached relation after the transcript grows past the scanned head and tail', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const stop = spyOn(conversationService, 'stopSessionAndWait')
+    const found = await sessionService.findSessionFile(sideId)
+    const meta = (await readEntries(sideId)).find((entry) => entry.type === 'session-meta')
+    await fs.appendFile(found!.filePath, `${JSON.stringify(meta)}\n`)
+
+    await detachSideChat(sideId)
+    let parentUuid: unknown = null
+    const lines: string[] = []
+    for (let index = 0; index < 150; index++) {
+      const entry = userEntry(sideId, `line ${index}`, { parentUuid })
+      parentUuid = entry.uuid
+      lines.push(JSON.stringify(entry))
+    }
+    await fs.appendFile(found!.filePath, `${lines.join('\n')}\n`)
+
+    expect(stop).toHaveBeenCalledWith(sideId)
+    const parents = (await readEntries(sideId)).filter((entry) => entry.type === 'session-meta' && entry.parent).map((entry) => entry.parent)
+    expect(parents).toEqual([{ sessionId: parentId, kind: 'forked' }, { sessionId: parentId, kind: 'forked' }])
+    expect((await sessionService.getSessionLinkInfo(sideId))?.parent).toEqual({ sessionId: parentId, kind: 'forked' })
+    expect((await sessionService.listSessions()).sessions.map((session) => session.id)).toContain(sideId)
+  })
+
+  it('refuses to detach a side chat while it is running', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    spyOn(conversationService, 'hasSession').mockImplementation((id) => id === sideId)
+    sessionStateStore.apply(sideId, { type: 'turn_started', at: 1 })
+    const rewrite = spyOn(sessionService, 'setSessionParent')
+
+    await expect(detachSideChat(sideId)).rejects.toMatchObject({ statusCode: 409 })
+    expect(rewrite).not.toHaveBeenCalled()
+  })
+
+  it('keeps the CLI from starting while the detached relation is being written', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    let finishRewrite!: () => void
+    const rewriting = new Promise<void>((resolve) => { finishRewrite = resolve })
+    let rewriteStarted!: () => void
+    const started = new Promise<void>((resolve) => { rewriteStarted = resolve })
+    const setSessionParent = sessionService.setSessionParent.bind(sessionService)
+    spyOn(sessionService, 'setSessionParent').mockImplementation(async (id, parent) => {
+      rewriteStarted()
+      await rewriting
+      return setSessionParent(id, parent)
+    })
+
+    const detaching = detachSideChat(sideId)
+    await started
+    const start = await conversationService.startSession(sideId, workDir, 'ws://127.0.0.1:1/sdk/test').then(
+      () => 'started',
+      (error: { code?: string }) => error.code,
+    )
+    finishRewrite()
+    await detaching
+
+    expect(start).toBe('SESSION_DETACHING')
+    expect((conversationService as unknown as { blockedStarts: Map<string, string> }).blockedStarts.has(sideId)).toBe(false)
+  })
+
+  it('detaches a side chat through the session route and refuses a session that is not one', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const sideId = await sideChatOf(parentId)
+    const forked = await forkSession({ sourceId: parentId, parentKind: 'forked' })
+    const detach = (sessionId: string) => handleSessionsApi(
+      new Request(`http://localhost/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ detach: true }) }),
+      new URL(`http://localhost/api/sessions/${sessionId}`),
+      ['api', 'sessions', sessionId],
+    )
+
+    expect((await detach(sideId)).status).toBe(200)
+    expect((await sessionService.getSessionLinkInfo(sideId))?.parent).toEqual({ sessionId: parentId, kind: 'forked' })
+    expect((await detach(forked.sessionId)).status).toBe(400)
+  })
+
+  it.each([
+    [{ kind: 'other' }, 'kind must be "side" when given'],
+    [{ kind: 'side', targetMessageId: 5 }, 'targetMessageId must be a string'],
+    [{}, 'targetMessageId (string) is required in request body'],
+  ])('refuses a branch request with %j', async (body, error) => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+
+    const response = await handleSessionsApi(
+      new Request(`http://localhost/api/sessions/${parentId}/branch`, { method: 'POST', body: JSON.stringify(body) }),
+      new URL(`http://localhost/api/sessions/${parentId}/branch`),
+      ['api', 'sessions', parentId, 'branch'],
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ message: error })
+  })
+
+  it('refuses to detach a session that is not a side chat', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId, {}, 'Parent')
+    const forked = await forkSession({ sourceId: parentId, parentKind: 'forked' })
+
+    await expect(detachSideChat(forked.sessionId)).rejects.toThrow('Only a side chat can be detached')
   })
 })
 
@@ -775,6 +1156,28 @@ describe('session links service', () => {
       expect((await sessionService.listSessions()).sessions.map((session) => session.id)).toEqual([callerId])
     })
 
+    it('keeps the caller worktree when a fork without its own worktree cannot start', async () => {
+      await initRepo()
+      const created = await sessionService.createSession(workDir, { worktree: true })
+      const callerFile = (await sessionService.findSessionFile(created.sessionId))!.filePath
+      const repository = (await readEntries(created.sessionId)).find((entry) => entry.type === 'session-meta')!.repository as {
+        worktreePath: string
+        worktreeBranch: string
+        baseRef: string
+      }
+      git(workDir, 'worktree', 'add', '-b', repository.worktreeBranch, repository.worktreePath, repository.baseRef)
+      const user = userEntry(created.sessionId, 'work in the tree')
+      await fs.appendFile(callerFile, `${JSON.stringify(user)}\n${JSON.stringify(assistantEntry(created.sessionId, 'ok', user.uuid))}\n`)
+      deliver = async () => ({ ok: false, message: 'CLI failed to start' })
+
+      const reply = await request({ subtype: 'session_start', prompt: 'go', title: 'Shared tree', context: 'fork', worktree: false }, created.sessionId)
+
+      expect(reply.error).toBe('CLI failed to start')
+      expect(await exists(repository.worktreePath)).toBe(true)
+      expect(gitOutput(workDir, 'worktree', 'list')).toContain(repository.worktreePath)
+      expect((await sessionService.listSessions()).sessions.map((session) => session.id)).toEqual([created.sessionId])
+    })
+
     it('removes the worktree of a fork when branching the conversation fails', async () => {
       await initRepo()
       await writeTranscript(callerId, [metaEntry()])
@@ -857,12 +1260,12 @@ describe('session links service', () => {
       await writeConversation(callerId)
       deliver = async () => ({ ok: false, message: 'CLI failed to start' })
       spyOn(sessionService, 'deleteSession').mockRejectedValue(new Error('locked'))
-      const unmark = spyOn(conversationService, 'unmarkSessionDeleted')
+      const unmark = spyOn(conversationService, 'unblockStarts')
 
       const reply = await request({ subtype: 'session_start', prompt: 'go', title: 'Stuck', context: 'fresh', worktree: false })
 
       expect(reply.error).toBe('CLI failed to start')
-      expect(unmark).toHaveBeenCalledTimes(1)
+      expect(unmark).toHaveBeenCalledWith([expect.any(String)])
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('locked'))
     })
 

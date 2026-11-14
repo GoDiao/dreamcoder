@@ -482,7 +482,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
       } else {
         addToast({
           type: 'success',
-          message: t('sidebar.batchDeleteSucceeded', { count: result.successes.length }),
+          message: t('sidebar.batchDeleteSucceeded', { count: ids.filter((id) => result.successes.includes(id)).length }),
         })
         handleExitBatchMode()
       }
@@ -981,7 +981,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
                                     <SessionRowMeta
                                       isRunning={runningSessionIds.has(session.id)}
                                       isWorktree={isWorktreeSession(session)}
-                                      relation={session.parent?.kind}
+                                      relation={session.parent?.kind === 'side' ? undefined : session.parent?.kind}
                                       t={t}
                                     />
                                   </button></HintTooltip>
@@ -1473,7 +1473,7 @@ function SessionRowMeta({
 }: {
   isRunning: boolean
   isWorktree: boolean
-  relation: SessionParent['kind'] | undefined
+  relation: ListedRelation | undefined
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
   return (
@@ -1495,7 +1495,9 @@ function SessionRowMeta({
   )
 }
 
-const SESSION_RELATION_MARKS: Record<SessionParent['kind'], { icon: LucideIcon; label: TranslationKey }> = {
+type ListedRelation = Exclude<SessionParent['kind'], 'side'>
+
+const SESSION_RELATION_MARKS: Record<ListedRelation, { icon: LucideIcon; label: TranslationKey }> = {
   spawned: { icon: Bot, label: 'sidebar.sessionSpawned' },
   forked: { icon: GitFork, label: 'sidebar.sessionForked' },
   assigned: { icon: SquareKanban, label: 'sidebar.sessionAssigned' },
@@ -1505,7 +1507,7 @@ function SessionRelationMark({
   relation,
   t,
 }: {
-  relation: SessionParent['kind'] | undefined
+  relation: ListedRelation | undefined
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }) {
   const mark = SESSION_RELATION_MARKS[relation ?? 'spawned']

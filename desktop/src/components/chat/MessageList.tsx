@@ -6,7 +6,6 @@ import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
 import { useChatStore, useSessionField } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
-import { useTabStore } from '../../stores/tabStore'
 import { openSessionTab } from '../../lib/sessionNavigation'
 import { useTeamStore } from '../../stores/teamStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -361,7 +360,7 @@ function SelectableChatMessage({
   content,
   children,
 }: {
-  sessionId?: string | null
+  sessionId: string
   messageId: string
   role: ChatMessageRole
   content: string
@@ -376,7 +375,7 @@ function SelectableChatMessage({
     : t('chat.userMessageReference')
 
   const addCurrentSelectionToChat = () => {
-    if (!sessionId || !quote.selection) return
+    if (!quote.selection) return
     addReference(sessionId, {
       kind: 'chat-selection',
       path: `chat://${role}/${messageId}`,
@@ -853,7 +852,7 @@ function MemoryEventCard({ message }: { message: MemoryEvent }) {
 }
 
 type MessageListProps = {
-  sessionId?: string | null
+  sessionId: string
   compact?: boolean
 }
 
@@ -1268,31 +1267,29 @@ const MeasuredRenderItem = memo(function MeasuredRenderItem({
   )
 })
 
-export function MessageList({ sessionId, compact = false }: MessageListProps = {}) {
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const resolvedSessionId = sessionId ?? activeTabId
+export function MessageList({ sessionId, compact = false }: MessageListProps) {
   const branchSession = useSessionStore((s) => s.branchSession)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
   const reloadHistory = useChatStore((s) => s.reloadHistory)
   const queueComposerPrefill = useChatStore((s) => s.queueComposerPrefill)
   const isMemberSession = useTeamStore((s) =>
-    resolvedSessionId ? Boolean(s.getMemberBySessionId(resolvedSessionId)) : false,
+    Boolean(s.getMemberBySessionId(sessionId)),
   )
   const addToast = useUIStore((s) => s.addToast)
-  const messages = useSessionField(resolvedSessionId, 'messages') ?? EMPTY_MESSAGES
-  const chatState = useSessionField(resolvedSessionId, 'chatState') ?? 'idle'
+  const messages = useSessionField(sessionId, 'messages') ?? EMPTY_MESSAGES
+  const chatState = useSessionField(sessionId, 'chatState') ?? 'idle'
   const hasStreamingText = useChatStore((s) => {
-    const text = resolvedSessionId ? s.sessions[resolvedSessionId]?.streamingText : undefined
+    const text = s.sessions[sessionId]?.streamingText
     return Boolean(text && /\S/.test(text))
   })
-  const activeThinkingId = useSessionField(resolvedSessionId, 'activeThinkingId') ?? null
-  const agentTaskNotifications = useSessionField(resolvedSessionId, 'agentTaskNotifications') ?? EMPTY_AGENT_TASK_NOTIFICATIONS
+  const activeThinkingId = useSessionField(sessionId, 'activeThinkingId') ?? null
+  const agentTaskNotifications = useSessionField(sessionId, 'agentTaskNotifications') ?? EMPTY_AGENT_TASK_NOTIFICATIONS
   const activeAskUserQuestionToolUseId = useChatStore((s) => {
-    const pending = resolvedSessionId ? s.sessions[resolvedSessionId]?.pendingPermission : undefined
+    const pending = s.sessions[sessionId]?.pendingPermission
     return isInlineQuestionTool(pending?.toolName) ? pending?.toolUseId ?? null : null
   })
   const hasActiveTool = useChatStore((s) => {
-    const sessionState = resolvedSessionId ? s.sessions[resolvedSessionId] : undefined
+    const sessionState = s.sessions[sessionId]
     return Boolean(sessionState?.activeToolUseId) || Boolean(sessionState?.activeToolName)
   })
   const shouldFollowContentResize =
@@ -1304,10 +1301,10 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollContentRef = useRef<HTMLDivElement>(null)
   const virtualItemHeightsRef = useRef<Map<string, number>>(
-    resolvedSessionId ? getHeightsForSession(resolvedSessionId) : new Map<string, number>(),
+    getHeightsForSession(sessionId),
   )
   const virtualItemMetricCacheRef = useRef<Map<string, VirtualRenderItemMetric>>(
-    resolvedSessionId ? getMetricsForSession(resolvedSessionId) : new Map<string, VirtualRenderItemMetric>(),
+    getMetricsForSession(sessionId),
   )
   const pendingMeasuredHeightsRef = useRef(false)
   const measureFlushFrameRef = useRef<number | null>(null)
@@ -1322,7 +1319,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   const isProgrammaticScrollingRef = useRef(false)
   const ignoreProgrammaticScrollUntilRef = useRef(0)
   const ignoreProgrammaticScrollTopRef = useRef<number | null>(null)
-  const lastSessionIdRef = useRef<string | null | undefined>(resolvedSessionId)
+  const lastSessionIdRef = useRef<string | null | undefined>(sessionId)
   const lastTailMessageIdBySessionRef = useRef(new Map<string, string | null>())
   const t = useTranslation()
   const [turnChangeCards, setTurnChangeCards] = useState<TurnChangeCardModel[]>([])
@@ -1390,8 +1387,8 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
       scrollTop: SCROLL_BOTTOM_SENTINEL,
       viewportHeight: current.viewportHeight,
     }))
-    if (container && resolvedSessionId) {
-      sessionScrollSnapshots.set(resolvedSessionId, {
+    if (container && sessionId) {
+      sessionScrollSnapshots.set(sessionId, {
         scrollTop: container.scrollTop,
         wasAtBottom: true,
       })
@@ -1408,16 +1405,14 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
         )
       ) {
         setScrollToBottomWithoutLayoutRead(latestContainer, 'auto')
-        if (resolvedSessionId) {
-          sessionScrollSnapshots.set(resolvedSessionId, {
-            scrollTop: latestContainer.scrollTop,
-            wasAtBottom: true,
-          })
-        }
+        sessionScrollSnapshots.set(sessionId, {
+          scrollTop: latestContainer.scrollTop,
+          wasAtBottom: true,
+        })
       }
       isProgrammaticScrollingRef.current = false
     })
-  }, [resolvedSessionId])
+  }, [sessionId])
 
   const scheduleStickToBottom = useCallback(() => {
     if (!shouldAutoScrollRef.current) {
@@ -1438,14 +1433,12 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           ? current
           : { scrollTop: SCROLL_BOTTOM_SENTINEL, viewportHeight: current.viewportHeight })
       }
-      if (resolvedSessionId) {
-        sessionScrollSnapshots.set(resolvedSessionId, {
-          scrollTop: container.scrollTop,
-          wasAtBottom: true,
-        })
-      }
+      sessionScrollSnapshots.set(sessionId, {
+        scrollTop: container.scrollTop,
+        wasAtBottom: true,
+      })
     })
-  }, [resolvedSessionId])
+  }, [sessionId])
 
   const flushMeasuredHeightVersion = useCallback(() => {
     if (!pendingMeasuredHeightsRef.current) return
@@ -1491,21 +1484,19 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     shouldAutoScrollRef.current = isAtBottom
     setShowJumpToLatest(!isAtBottom)
 
-    if (resolvedSessionId) {
-      rememberSessionScroll(resolvedSessionId, container)
-    }
-  }, [resolvedSessionId, syncVirtualViewportFromContainer])
+    rememberSessionScroll(sessionId, container)
+  }, [sessionId, syncVirtualViewportFromContainer])
 
   useLayoutEffect(() => {
-    if (lastSessionIdRef.current !== resolvedSessionId) {
-      const snapshot = resolvedSessionId ? sessionScrollSnapshots.get(resolvedSessionId) : undefined
+    if (lastSessionIdRef.current !== sessionId) {
+      const snapshot = sessionScrollSnapshots.get(sessionId)
       shouldAutoScrollRef.current = snapshot?.wasAtBottom ?? true
-      lastSessionIdRef.current = resolvedSessionId
-      virtualItemHeightsRef.current = resolvedSessionId
-        ? getHeightsForSession(resolvedSessionId)
+      lastSessionIdRef.current = sessionId
+      virtualItemHeightsRef.current = sessionId
+        ? getHeightsForSession(sessionId)
         : new Map<string, number>()
-      virtualItemMetricCacheRef.current = resolvedSessionId
-        ? getMetricsForSession(resolvedSessionId)
+      virtualItemMetricCacheRef.current = sessionId
+        ? getMetricsForSession(sessionId)
         : new Map<string, VirtualRenderItemMetric>()
       pendingMeasuredHeightsRef.current = false
       lastContentResizeFollowHeightRef.current = null
@@ -1536,33 +1527,29 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           viewportHeight: container.clientHeight || current.viewportHeight || VIRTUAL_DEFAULT_VIEWPORT_HEIGHT,
         }))
         setShowJumpToLatest(false)
-        if (resolvedSessionId) {
-          sessionScrollSnapshots.set(resolvedSessionId, {
-            scrollTop: container.scrollTop,
-            wasAtBottom: true,
-          })
-        }
+        sessionScrollSnapshots.set(sessionId, {
+          scrollTop: container.scrollTop,
+          wasAtBottom: true,
+        })
       } else {
         scrollToBottom('auto')
       }
     }
-  }, [resolvedSessionId, scrollToBottom])
+  }, [sessionId, scrollToBottom])
 
   const tailMessage = messages[messages.length - 1] ?? null
   const tailMessageId = tailMessage?.id ?? null
   const tailMessageType = tailMessage?.type ?? null
 
   useEffect(() => {
-    if (!resolvedSessionId) return
-
-    const previousTailMessageId = lastTailMessageIdBySessionRef.current.get(resolvedSessionId)
-    lastTailMessageIdBySessionRef.current.set(resolvedSessionId, tailMessageId)
+    const previousTailMessageId = lastTailMessageIdBySessionRef.current.get(sessionId)
+    lastTailMessageIdBySessionRef.current.set(sessionId, tailMessageId)
     if (previousTailMessageId === undefined || previousTailMessageId === tailMessageId) return
 
     if (tailMessageType === 'user_text') {
       scrollToBottom('auto')
     }
-  }, [resolvedSessionId, scrollToBottom, tailMessageId, tailMessageType])
+  }, [sessionId, scrollToBottom, tailMessageId, tailMessageType])
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) {
@@ -1571,7 +1558,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     }
 
     scrollToBottom('auto')
-  }, [messages.length, resolvedSessionId, scrollToBottom])
+  }, [messages.length, sessionId, scrollToBottom])
 
   const handleJumpToLatest = useCallback(() => {
     scrollToBottom('auto')
@@ -1703,7 +1690,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
   }, [renderItemKeys])
 
   useEffect(() => {
-    if (!resolvedSessionId || completedTurnTargets.length === 0 || isMemberSession) {
+    if (completedTurnTargets.length === 0 || isMemberSession) {
       setTurnChangeCards([])
       setTurnChangeLoadError(null)
       setIsLoadingTurnChangeCards(false)
@@ -1721,8 +1708,8 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     setTurnChangeLoadError(null)
 
     Promise.all([
-      sessionsApi.getTurnCheckpoints(resolvedSessionId),
-      sessionsApi.getWorkspaceStatus(resolvedSessionId).catch(() => null),
+      sessionsApi.getTurnCheckpoints(sessionId),
+      sessionsApi.getWorkspaceStatus(sessionId).catch(() => null),
     ])
       .then(([checkpointResponse, workspaceStatus]) => {
         if (cancelled) return
@@ -1764,10 +1751,10 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     return () => {
       cancelled = true
     }
-  }, [chatState, completedTurnTargets, isMemberSession, latestCompletedTurnId, resolvedSessionId])
+  }, [chatState, completedTurnTargets, isMemberSession, latestCompletedTurnId, sessionId])
 
   const handleUndoCurrentTurn = useCallback(async () => {
-    if (!resolvedSessionId || !confirmTurnCard || rewindingTurnId) return
+    if (!confirmTurnCard || rewindingTurnId) return
 
     const target = confirmTurnCard.target
     setRewindingTurnId(target.messageId)
@@ -1780,17 +1767,17 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
 
     try {
       if (chatState !== 'idle') {
-        stopGeneration(resolvedSessionId)
+        stopGeneration(sessionId)
       }
 
-      const result = await sessionsApi.rewind(resolvedSessionId, {
+      const result = await sessionsApi.rewind(sessionId, {
         targetUserMessageId: target.messageId,
         userMessageIndex: target.userMessageIndex,
         expectedContent: target.expectedContent,
       })
 
-      await reloadHistory(resolvedSessionId)
-      queueComposerPrefill(resolvedSessionId, {
+      await reloadHistory(sessionId)
+      queueComposerPrefill(sessionId, {
         text: target.content,
         attachments: target.attachments,
       })
@@ -1822,18 +1809,18 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     confirmTurnCard,
     queueComposerPrefill,
     reloadHistory,
-    resolvedSessionId,
+    sessionId,
     rewindingTurnId,
     stopGeneration,
     t,
   ])
 
   const handleBranchMessage = useCallback(async (target: BranchableMessageTarget) => {
-    if (!resolvedSessionId || branchingMessageId) return
+    if (branchingMessageId) return
 
     setBranchingMessageId(target.uiMessageId)
     try {
-      const result = await branchSession(resolvedSessionId, target.transcriptMessageId)
+      const result = await branchSession(sessionId, target.transcriptMessageId)
       const title = result.title.trim() || t('sidebar.newSession')
       openSessionTab(result.sessionId, title)
       addToast({
@@ -1848,7 +1835,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     } finally {
       setBranchingMessageId(null)
     }
-  }, [addToast, branchSession, branchingMessageId, resolvedSessionId, t])
+  }, [addToast, branchSession, branchingMessageId, sessionId, t])
 
   const branchActionByMessageId = useMemo(() => {
     if (branchableMessageTargets.size === 0) {
@@ -1886,7 +1873,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           />
         ) : (
           <MessageBlock
-            sessionId={resolvedSessionId}
+            sessionId={sessionId}
             message={item.message}
             activeThinkingId={activeThinkingId}
             agentTaskNotifications={agentTaskNotifications}
@@ -1900,10 +1887,10 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
           />
         )}
 
-        {resolvedSessionId && cardsForItem.map((card) => (
+        {cardsForItem.map((card) => (
           <CurrentTurnChangeCard
             key={`turn-change-${card.target.messageId}`}
-            sessionId={resolvedSessionId}
+            sessionId={sessionId}
             targetUserMessageId={card.checkpoint.target.targetUserMessageId}
             checkpoint={card.checkpoint}
             workDir={card.workDir}
@@ -1961,16 +1948,16 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
             <VirtualSpacer height={virtualTranscriptWindow.afterHeight} position="bottom" />
           ) : null}
 
-          <StreamingReply sessionId={resolvedSessionId} onGrow={scheduleStickToBottom} />
+          <StreamingReply sessionId={sessionId} onGrow={scheduleStickToBottom} />
 
-          <BrowserGrantRequests sessionId={resolvedSessionId} />
+          <BrowserGrantRequests sessionId={sessionId} />
 
           {chatState === 'compacting' && !hasCompactingDivider && (
             <CompactStatusDivider state="compacting" />
           )}
 
           {(chatState === 'tool_executing' || (chatState === 'thinking' && !activeThinkingId)) && (
-            <StreamingIndicator />
+            <StreamingIndicator sessionId={sessionId} />
           )}
 
           {!isLoadingTurnChangeCards && turnChangeCards.length === 0 && turnChangeLoadError && (
@@ -2029,7 +2016,7 @@ export const MessageBlock = memo(function MessageBlock({
   branchAction,
   replyCopyText,
 }: {
-  sessionId?: string | null
+  sessionId: string
   message: UIMessage
   activeThinkingId: string | null
   agentTaskNotifications: Record<string, AgentTaskNotification>
@@ -2081,7 +2068,7 @@ export const MessageBlock = memo(function MessageBlock({
     case 'thinking':
       return <ThinkingBlock content={message.content} isActive={message.id === activeThinkingId} />
     case 'tool_use':
-      if (message.toolName === CHOOSE_DESIGN_TEMPLATE_TOOL && sessionId && !message.isPending) {
+      if (message.toolName === CHOOSE_DESIGN_TEMPLATE_TOOL && !message.isPending) {
         return (
           <DesignTemplateChoice
             sessionId={sessionId}
@@ -2101,7 +2088,7 @@ export const MessageBlock = memo(function MessageBlock({
           />
         )
       }
-      if (message.toolName === 'ShowUI' && sessionId) {
+      if (message.toolName === 'ShowUI') {
         return <ShowUIBlock sessionId={sessionId} input={message.input} result={toolResult} />
       }
       return (

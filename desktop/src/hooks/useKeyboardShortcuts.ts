@@ -8,6 +8,7 @@ import {
   nextAppZoomLevel,
 } from '../lib/appZoom'
 import { useSettingsStore } from '../stores/settingsStore'
+import { focusedSessionViewId } from '../lib/sessionView'
 
 export function useKeyboardShortcuts() {
   const openNewSession = useNewSessionStore((s) => s.open)
@@ -16,14 +17,11 @@ export function useKeyboardShortcuts() {
   const activeModal = useUIStore((s) => s.activeModal)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const chatState = useChatStore((s) => activeTabId ? s.sessions[activeTabId]?.chatState ?? 'idle' : 'idle')
   const uiZoom = useSettingsStore((s) => s.uiZoom)
   const setUiZoom = useSettingsStore((s) => s.setUiZoom)
 
   const activeModalRef = useRef(activeModal)
   activeModalRef.current = activeModal
-  const chatStateRef = useRef(chatState)
-  chatStateRef.current = chatState
   const activeTabIdRef = useRef(activeTabId)
   activeTabIdRef.current = activeTabId
   const appZoomLevelRef = useRef(uiZoom)
@@ -73,9 +71,11 @@ export function useKeyboardShortcuts() {
       }
 
       if (meta && e.key === '.') {
-        if (chatStateRef.current !== 'idle' && activeTabIdRef.current) {
+        const sessionId = focusedSessionViewId() ?? activeTabIdRef.current
+        const chatState = sessionId ? useChatStore.getState().sessions[sessionId]?.chatState ?? 'idle' : 'idle'
+        if (sessionId && chatState !== 'idle') {
           e.preventDefault()
-          stopGeneration(activeTabIdRef.current)
+          stopGeneration(sessionId)
         }
       }
     }

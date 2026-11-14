@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceDiffMock: vi.fn(),
   openArtifactMock: vi.fn(),
   previewTemplateMock: vi.fn(),
+  listSideChatsMock: vi.fn(),
+  branchMock: vi.fn(),
+  deleteMock: vi.fn(),
+  disconnectSession: vi.fn(),
 }))
 
 vi.mock('../api/sessions', () => ({
@@ -26,7 +30,14 @@ vi.mock('../api/sessions', () => ({
     getWorkspaceTree: mocks.getWorkspaceTreeMock,
     getWorkspaceFile: mocks.getWorkspaceFileMock,
     getWorkspaceDiff: mocks.getWorkspaceDiffMock,
+    listSideChats: mocks.listSideChatsMock,
+    branch: mocks.branchMock,
+    delete: mocks.deleteMock,
   },
+}))
+
+vi.mock('./chatStore', () => ({
+  useChatStore: { getState: () => ({ disconnectSession: mocks.disconnectSession }) },
 }))
 
 vi.mock('../api/artifacts', () => ({
@@ -47,6 +58,7 @@ vi.mock('../lib/terminalRuntime', () => ({
 }))
 
 import { sessionsApi } from '../api/sessions'
+import { useSessionStore } from './sessionStore'
 import { ELECTRON_BRIDGE_KEY } from '../lib/shell/electronBridge'
 import {
   WORKSPACE_PANEL_DEFAULT_WIDTH,
@@ -808,6 +820,190 @@ describe('artifact tabs', () => {
       const tabs = restored.getState().panelByTab['s1']!.tabs
       expect(tabs.map((tab) => tab.id)).toEqual(['a', 'd'])
       expect(tabs[0]).toMatchObject({ root: '/repo/dc_artifacts', artifact: { id: 'id-a', name: 'a', mtimeMs: 1 } })
+    })
+  })
+
+  describe('side chats', () => {
+    function openSideChat(parentId: string, sideId: string) {
+      return useWorkspacePanelStore.getState().openTab(parentId, { kind: 'sideChat', sessionId: sideId })
+    }
+
+    it('opens a page, a browser tab and a file of a side chat in its parent panel and records the side chat on the tab', () => {
+      const sideTab = openSideChat('parent', 'side')
+
+      const store = useWorkspacePanelStore.getState()
+      const pageTabId = store.openTab('side', { kind: 'uiPage', pageId: 'page-1', revision: 2, title: 'Plan' })
+      const browserTabId = store.openTab('side', { kind: 'browser', url: 'https://example.com' })
+      const fileTabId = store.openTab('side', { kind: 'file', path: 'README.md' })
+
+      const { panelByTab } = useWorkspacePanelStore.getState()
+      expect(panelByTab.side).toBeUndefined()
+      expect(panelByTab.parent?.tabs.find((tab) => tab.id === pageTabId)).toMatchObject({ kind: 'uiPage', pageId: 'page-1', sessionId: 'side' })
+      expect(panelByTab.parent?.tabs.find((tab) => tab.id === browserTabId)).toMatchObject({ kind: 'browser', sessionId: 'side' })
+      expect(panelByTab.parent?.tabs.find((tab) => tab.id === fileTabId)).toMatchObject({ kind: 'file', path: 'README.md', sessionId: 'side' })
+      expect(panelByTab.parent?.activeTabId).toBe(sideTab)
+    })
+
+    it('keeps the side chat tab active when the side chat opens a tab, and switches when the parent does', () => {
+      const sideTab = openSideChat('parent', 'side')
+
+      const sideBrowser = useWorkspacePanelStore.getState().openTab('side', { kind: 'browser', url: 'https://example.com' })
+      expect(useWorkspacePanelStore.getState().panelByTab.parent).toMatchObject({ isOpen: true, activeTabId: sideTab })
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.tabs.map((tab) => tab.id)).toEqual([sideTab, sideBrowser])
+
+      const parentBrowser = useWorkspacePanelStore.getState().openTab('parent', { kind: 'browser', url: 'https://example.org' })
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.activeTabId).toBe(parentBrowser)
+
+      useWorkspacePanelStore.getState().openTab('side', { kind: 'files' })
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.activeTabId).toBe(parentBrowser)
+    })
+
+    it('records what a side chat browser tab reports on the parent panel', () => {
+      openSideChat('parent', 'side')
+      const tabId = useWorkspacePanelStore.getState().openTab('side', { kind: 'browser', url: '' })
+
+      useWorkspacePanelStore.getState().patchTab('side', tabId, { url: 'https://example.com', title: 'Example' })
+
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.tabs.find((tab) => tab.id === tabId)).toMatchObject({ url: 'https://example.com', title: 'Example' })
+    })
+
+    it('adds the side chats the server has and drops those it no longer has, keeping the local order and active tab', async () => {
+      const kept = openSideChat('parent', 'side-kept')
+      openSideChat('parent', 'side-gone')
+      useWorkspacePanelStore.getState().openTab('parent', { kind: 'files' })
+      useWorkspacePanelStore.getState().activateTab('parent', kept)
+      mocks.listSideChatsMock.mockResolvedValue({ sessions: [{ id: 'side-new' }, { id: 'side-kept' }] })
+
+      await useWorkspacePanelStore.getState().syncSideChats('parent')
+
+      const panel = useWorkspacePanelStore.getState().panelByTab.parent!
+      expect(panel.tabs.map((tab) => tab.kind === 'sideChat' ? tab.sessionId : tab.kind)).toEqual(['side-kept', 'files', 'side-new'])
+      expect(panel.activeTabId).toBe(kept)
+      expect(mocks.disconnectSession).toHaveBeenCalledWith('side-gone')
+    })
+
+    it('applies the tab and panel actions of a side chat to its parent panel', () => {
+      const sideTab = openSideChat('parent', 'side')
+      const browserTab = useWorkspacePanelStore.getState().openTab('parent', { kind: 'browser', url: 'https://example.com' })
+      const store = useWorkspacePanelStore.getState()
+
+      store.activateTab('side', sideTab)
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.activeTabId).toBe(sideTab)
+
+      store.closeTab('side', browserTab)
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.tabs.map((tab) => tab.id)).toEqual([sideTab])
+
+      store.selectFile('side', 'README.md')
+      expect(useWorkspacePanelStore.getState().panelByTab.parent).toMatchObject({ selectedFile: 'README.md', recentFiles: ['README.md'] })
+
+      store.togglePanel('side')
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.isOpen).toBe(false)
+      store.togglePanel('side')
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.isOpen).toBe(true)
+      store.closePanel('side')
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.isOpen).toBe(false)
+
+      expect(useWorkspacePanelStore.getState().panelByTab.side).toBeUndefined()
+    })
+
+    it('loads the workspace status of a side chat into its parent panel', async () => {
+      openSideChat('parent', 'side')
+      mocks.getWorkspaceStatusMock.mockResolvedValue({ state: 'ok', workDir: '/repo', repoName: 'repo', branch: 'main', isGitRepo: true, changedFiles: [] })
+
+      await useWorkspacePanelStore.getState().loadStatus('side')
+
+      expect(mocks.getWorkspaceStatusMock).toHaveBeenCalledWith('parent')
+      expect(useWorkspacePanelStore.getState().statusBySession.parent).toMatchObject({ state: 'ok', branch: 'main' })
+      expect(useWorkspacePanelStore.getState().statusBySession.side).toBeUndefined()
+    })
+
+    it('closes the parent panel when the server has none of its side chats left', async () => {
+      openSideChat('parent', 'side-gone')
+      mocks.listSideChatsMock.mockResolvedValue({ sessions: [] })
+
+      await useWorkspacePanelStore.getState().syncSideChats('parent')
+
+      expect(useWorkspacePanelStore.getState().panelByTab.parent).toMatchObject({ tabs: [], activeTabId: null, isOpen: false, expanded: false })
+    })
+
+    it('activates the last tab when the active side chat is gone from the server', async () => {
+      openSideChat('parent', 'side-kept')
+      const gone = openSideChat('parent', 'side-gone')
+      useWorkspacePanelStore.getState().activateTab('parent', gone)
+      mocks.listSideChatsMock.mockResolvedValue({ sessions: [{ id: 'side-kept' }, { id: 'side-new' }] })
+
+      await useWorkspacePanelStore.getState().syncSideChats('parent')
+
+      const panel = useWorkspacePanelStore.getState().panelByTab.parent!
+      expect(panel.tabs.map((tab) => tab.kind === 'sideChat' ? tab.sessionId : tab.kind)).toEqual(['side-kept', 'side-new'])
+      expect(panel.activeTabId).toBe(panel.tabs.at(-1)?.id)
+    })
+
+    it('keeps a side chat started while the list was on its way', async () => {
+      openSideChat('parent', 'side-kept')
+      let answer!: (value: { sessions: Array<{ id: string }> }) => void
+      mocks.listSideChatsMock.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+
+      const syncing = useWorkspacePanelStore.getState().syncSideChats('parent')
+      const started = openSideChat('parent', 'side-started')
+      answer({ sessions: [{ id: 'side-kept' }] })
+      await syncing
+
+      const panel = useWorkspacePanelStore.getState().panelByTab.parent!
+      expect(panel.tabs.map((tab) => tab.kind === 'sideChat' ? tab.sessionId : tab.kind)).toEqual(['side-kept', 'side-started'])
+      expect(panel.activeTabId).toBe(started)
+      expect(mocks.disconnectSession).not.toHaveBeenCalledWith('side-started')
+    })
+
+    it('does not bring back a side chat deleted while the list was on its way', async () => {
+      const tabId = openSideChat('parent', 'side-deleted')
+      let answer!: (value: { sessions: Array<{ id: string }> }) => void
+      mocks.listSideChatsMock.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+      mocks.deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [] })
+
+      const syncing = useWorkspacePanelStore.getState().syncSideChats('parent')
+      await useSessionStore.getState().deleteSession('side-deleted')
+      useWorkspacePanelStore.getState().closeTab('parent', tabId)
+      answer({ sessions: [{ id: 'side-deleted' }] })
+      await syncing
+
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.tabs ?? []).toEqual([])
+    })
+
+    it('restores side chat tabs, and the side chat of browser and page tabs, on the next start', async () => {
+      const sideTab = openSideChat('parent', 'side')
+      const store = useWorkspacePanelStore.getState()
+      const browserTab = store.openTab('side', { kind: 'browser', url: 'https://example.com' })
+      const pageTab = store.openTab('side', { kind: 'uiPage', pageId: 'page-1', revision: 1, title: 'Plan' })
+
+      vi.resetModules()
+      const restarted = await import('./workspacePanelStore')
+
+      expect(restarted.useWorkspacePanelStore.getState().panelByTab.parent?.tabs).toEqual([
+        { id: sideTab, kind: 'sideChat', sessionId: 'side' },
+        { id: browserTab, kind: 'browser', url: 'https://example.com', title: '', sessionId: 'side' },
+        { id: pageTab, kind: 'uiPage', pageId: 'page-1', revision: 1, title: 'Plan', sessionId: 'side' },
+      ])
+    })
+
+    it('starts a side chat from the parent and shows it as a tab', async () => {
+      mocks.branchMock.mockResolvedValue({ sessionId: 'side-created', title: 'btw', workDir: '/repo', sourceSessionId: 'parent' })
+
+      await useWorkspacePanelStore.getState().createSideChat('parent')
+
+      expect(mocks.branchMock).toHaveBeenCalledWith('parent', { kind: 'side' })
+      const panel = useWorkspacePanelStore.getState().panelByTab.parent!
+      expect(panel.isOpen).toBe(true)
+      expect(panel.tabs).toMatchObject([{ kind: 'sideChat', sessionId: 'side-created' }])
+    })
+
+    it('disconnects the side chats of a parent that is released', () => {
+      openSideChat('parent', 'side')
+
+      useWorkspacePanelStore.getState().releaseSession('parent')
+
+      expect(mocks.disconnectSession).toHaveBeenCalledWith('side')
+      expect(useWorkspacePanelStore.getState().panelByTab.parent?.tabs).toMatchObject([{ kind: 'sideChat', sessionId: 'side' }])
     })
   })
 })

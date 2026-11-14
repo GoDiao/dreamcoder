@@ -431,8 +431,7 @@ describe('ActiveSession task polling', () => {
     const fetchSessionTasks = vi.fn().mockResolvedValue(undefined)
 
     useCLITaskStore.setState({
-      sessionId,
-      tasks: [],
+      bySession: {},
       fetchSessionTasks,
     })
 
@@ -497,8 +496,7 @@ describe('ActiveSession task polling', () => {
     const fetchSessionTasks = vi.fn().mockResolvedValue(undefined)
 
     useCLITaskStore.setState({
-      sessionId: null,
-      tasks: [],
+      bySession: {},
       fetchSessionTasks,
     })
 

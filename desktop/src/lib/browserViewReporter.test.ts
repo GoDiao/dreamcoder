@@ -54,6 +54,21 @@ afterEach(() => {
 })
 
 describe('browser view reporter', () => {
+  it('reports a side chat browser tab by the panel and page of its parent', async () => {
+    useWorkspacePanelStore.setState((state) => ({
+      panelByTab: {
+        ...state.panelByTab,
+        s: { ...state.panelByTab.s!, tabs: [...state.panelByTab.s!.tabs, { id: 'side-chat-tab', kind: 'sideChat', sessionId: 'side' }] },
+      },
+    }))
+    registered.push('a')
+
+    await register('side', 'a', { value: true })
+
+    expect(shellMocks.registerBrowserView).toHaveBeenCalledWith({ sessionId: 'side', tabId: 'a', webContentsId: 5 })
+    expect(shellMocks.updateBrowserView).toHaveBeenLastCalledWith({ tabId: 'a', shown: true, active: true, foreground: true })
+  })
+
   it('registers the view and then sends its first state', async () => {
     const shown = { value: true }
     registered.push('a')

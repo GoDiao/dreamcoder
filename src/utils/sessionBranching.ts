@@ -97,7 +97,7 @@ export type SessionBranchResult = {
   contentReplacementRecords: ContentReplacementRecord[]
 }
 
-const SESSION_PARENT_KINDS = ['spawned', 'forked', 'assigned'] as const
+const SESSION_PARENT_KINDS = ['spawned', 'forked', 'assigned', 'side'] as const
 
 type SessionParentKind = (typeof SESSION_PARENT_KINDS)[number]
 
@@ -121,8 +121,11 @@ export type CreateSessionBranchOptions = {
   parentKind?: SessionParent['kind']
   sessionId?: UUID
   workspace?: { workDir: string; repository: unknown }
-  openToolUseResult?: string
+  exactTitle?: boolean
+  note?: BranchNote
 }
+
+export type BranchNote = { text: string; always: boolean }
 
 export class SessionBranchingError extends Error {
   constructor(
@@ -231,17 +234,19 @@ function findOpenToolUseIds(messages: TranscriptMessage[]): string[] {
   ))
 }
 
-function closeOpenToolUses(messages: TranscriptMessage[], result: string) {
+function closingNoteMessages(messages: TranscriptMessage[], note: BranchNote) {
   const openToolUseIds = findOpenToolUseIds(messages)
-  if (openToolUseIds.length === 0) return []
+  if (openToolUseIds.length === 0 && !note.always) return []
   return [
-    createUserMessage({
-      content: openToolUseIds.map((id) => ({
-        type: 'tool_result' as const,
-        tool_use_id: id,
-        content: result,
-      })),
-    }),
+    openToolUseIds.length > 0
+      ? createUserMessage({
+        content: openToolUseIds.map((id) => ({
+          type: 'tool_result' as const,
+          tool_use_id: id,
+          content: note.text,
+        })),
+      })
+      : createUserMessage({ content: note.text, isMeta: true }),
     createAssistantMessage({ content: NO_RESPONSE_REQUESTED }),
   ]
 }
@@ -453,7 +458,8 @@ export async function createSessionBranch(
     sourceWorktreeSession,
     parentKind = 'forked',
     workspace,
-    openToolUseResult,
+    exactTitle,
+    note,
   } = options
 
   const sourceProjectDirPath = path.dirname(sourceTranscriptPath)
@@ -572,9 +578,7 @@ export async function createSessionBranch(
   }
 
   const lastEntry = branchMessageEntries[branchMessageEntries.length - 1]!
-  const closingMessages = openToolUseResult
-    ? closeOpenToolUses(branchMessageEntries, openToolUseResult)
-    : []
+  const closingMessages = note ? closingNoteMessages(branchMessageEntries, note) : []
   for (const message of closingMessages) {
     const closingMessage: SerializedMessage = {
       ...message,
@@ -595,7 +599,7 @@ export async function createSessionBranch(
         message.type === 'user',
     ),
   )
-  const effectiveTitle = await getUniqueForkName(title ?? firstPrompt, projectDirPath)
+  const effectiveTitle = title && exactTitle ? title : await getUniqueForkName(title ?? firstPrompt, projectDirPath)
 
   let metadataEntries = buildPreservedMetadataEntries(
     sourceEntries,

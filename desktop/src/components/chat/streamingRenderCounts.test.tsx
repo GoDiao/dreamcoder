@@ -120,8 +120,8 @@ describe('render counts during one streaming reply', () => {
   it('re-renders each component only when the fields it shows change', () => {
     render(
       <>
-        <Counted id="ChatInput"><ChatInput /></Counted>
-        <Counted id="StreamingIndicator"><StreamingIndicator /></Counted>
+        <Counted id="ChatInput"><ChatInput sessionId={SCENARIO_SESSION_ID} /></Counted>
+        <Counted id="StreamingIndicator"><StreamingIndicator sessionId={SCENARIO_SESSION_ID} /></Counted>
         <Counted id="MessageList"><MessageList sessionId={SCENARIO_SESSION_ID} /></Counted>
         <Counted id="PermissionDialog">
           <PermissionDialog sessionId={SCENARIO_SESSION_ID} requestId="perm-1" toolName="Bash" input={{ command: 'bun test' }} />
@@ -169,7 +169,7 @@ describe('components still update on the fields they use', () => {
   })
 
   it('ChatInput follows permissionMode, the effective mode and composerPrefill', () => {
-    render(<ChatInput />)
+    render(<ChatInput sessionId={SCENARIO_SESSION_ID} />)
 
     patchSession({ permissionMode: 'plan' })
     expect(screen.getByTestId('permission-mode')).toHaveAttribute('data-value', 'plan')
@@ -185,7 +185,7 @@ describe('components still update on the fields they use', () => {
   })
 
   it('ChatInput follows slashCommands and chatState', () => {
-    render(<ChatInput />)
+    render(<ChatInput sessionId={SCENARIO_SESSION_ID} />)
 
     patchSession({ slashCommands: [{ name: 'deploy-now', description: 'Ship it' }] })
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '/deploy', selectionStart: 7 } })
@@ -198,7 +198,7 @@ describe('components still update on the fields they use', () => {
 
   it('StreamingIndicator follows statusVerb, tokenUsage and apiRetry', () => {
     patchSession({ chatState: 'thinking' })
-    render(<StreamingIndicator />)
+    render(<StreamingIndicator sessionId={SCENARIO_SESSION_ID} />)
 
     patchSession({ statusVerb: 'Pondering' })
     expect(screen.getByText('Pondering...')).toBeInTheDocument()

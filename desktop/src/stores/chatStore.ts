@@ -6,7 +6,7 @@ import { useArtifactStore } from './artifactStore'
 import { useTeamStore } from './teamStore'
 import { useKanbanStore } from './kanbanStore'
 import { useSessionStore } from './sessionStore'
-import { useCLITaskStore } from './cliTaskStore'
+import { getSessionTasks, useCLITaskStore } from './cliTaskStore'
 import { isEffortLevel, useSessionRuntimeStore } from './sessionRuntimeStore'
 import { randomUUID } from '../lib/uuid'
 import { isInlineQuestionTool } from '../lib/inlineQuestionTools'
@@ -118,7 +118,8 @@ type ChatStore = {
   sessions: Record<string, PerSessionState>
 
   getSession: (sessionId: string) => PerSessionState
-  connectToSession: (sessionId: string) => void
+  connectToSession: (sessionId: string, options?: { prewarm?: boolean }) => void
+  prewarmSession: (sessionId: string) => void
   disconnectSession: (sessionId: string) => void
   sendMessage: (
     sessionId: string,
@@ -740,7 +741,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   getSession: (sessionId) => get().sessions[sessionId] ?? createDefaultSessionState(),
 
-  connectToSession: (sessionId) => {
+  connectToSession: (sessionId, { prewarm = true } = {}) => {
     void useCLITaskStore.getState().fetchSessionTasks(sessionId)
 
     const existing = get().sessions[sessionId]
@@ -771,7 +772,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       get().handleServerMessage(sessionId, msg)
     })
 
-    prewarmPending.add(sessionId)
+    if (prewarm) prewarmPending.add(sessionId)
 
     get().loadHistory(sessionId)
     console.log('[mem] connectToSession:loadHistory-called')
@@ -788,6 +789,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       })
   },
 
+  prewarmSession: (sessionId) => {
+    if (get().sessions[sessionId]?.mirror) wsManager.send(sessionId, { type: 'prewarm_session' })
+    else prewarmPending.add(sessionId)
+  },
+
   disconnectSession: (sessionId) => {
     prewarmPending.delete(sessionId)
     reconnectingSessions.delete(sessionId)
@@ -798,6 +804,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     clearPendingToolInputDelta(sessionId)
     clearPendingTaskToolUseIds(sessionId)
+    useCLITaskStore.getState().clearTasks(sessionId)
     wsManager.disconnect(sessionId)
     set((s) => {
       const { [sessionId]: _, ...rest } = s.sessions
@@ -833,7 +840,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     const taskStore = useCLITaskStore.getState()
-    const sessionTasks = taskStore.sessionId === sessionId ? taskStore.tasks : []
+    const sessionTasks = getSessionTasks(taskStore, sessionId).tasks
     const allTasksDone = sessionTasks.length > 0 && sessionTasks.every((t) => t.status === 'completed')
     const completedTaskSummary = allTasksDone
       ? sessionTasks.map((t) => ({ id: t.id, subject: t.subject, status: t.status, activeForm: t.activeForm }))
@@ -1018,7 +1025,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       })
       if (lastTodos && lastTodos.length > 0) {
         const taskStore = useCLITaskStore.getState()
-        if (taskStore.sessionId === sessionId && taskStore.tasks.length === 0) taskStore.setTasksFromTodos(lastTodos, sessionId)
+        if (getSessionTasks(taskStore, sessionId).tasks.length === 0) taskStore.setTasksFromTodos(lastTodos, sessionId)
       } else {
         useCLITaskStore.getState().setTasksFromTodos([], sessionId)
       }

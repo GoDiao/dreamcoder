@@ -62,8 +62,10 @@ type GitInfo = SessionGitInfo
 type Attachment = ComposerAttachment
 
 type ChatInputProps = {
+  sessionId: string
   variant?: 'default' | 'hero'
   compact?: boolean
+  primary?: boolean
 }
 
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
@@ -106,7 +108,7 @@ function insertComposerTokenAtRange(value: string, start: number, end: number, t
   }
 }
 
-export function ChatInput({ variant = 'default', compact = false }: ChatInputProps) {
+export function ChatInput({ sessionId, variant = 'default', compact = false, primary = true }: ChatInputProps) {
   const t = useTranslation()
   const isMobileComposer = useMobileViewport() && !isDesktopRuntime()
   const [input, setInput] = useState('')
@@ -128,12 +130,12 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   const [noticeSlot, setNoticeSlot] = useState<HTMLDivElement | null>(null)
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  useTypeToFocus(textareaRef, !isMobileComposer)
+  useTypeToFocus(textareaRef, primary && !isMobileComposer)
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fileSearchRef = useRef<FileSearchMenuHandle>(null)
   const slashItemRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const previousActiveTabIdRef = useRef<string | null>(null)
+  const previousSessionIdRef = useRef<string | null>(null)
   const inputRef = useRef(input)
   const attachmentsRef = useRef(attachments)
   const setComposerInput = useCallback((value: string) => {
@@ -151,54 +153,53 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   const stopGeneration = useChatStore((s) => s.stopGeneration)
   const clearComposerInsertion = useChatStore((s) => s.clearComposerInsertion)
   const setSessionPermissionMode = useChatStore((s) => s.setSessionPermissionMode)
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const chatState = useSessionField(activeTabId, 'chatState') ?? 'idle'
-  const slashCommands = useSessionField(activeTabId, 'slashCommands') ?? EMPTY_SLASH_COMMANDS
-  const composerPrefill = useSessionField(activeTabId, 'composerPrefill') ?? null
-  const composerInsertion = useSessionField(activeTabId, 'composerInsertion') ?? null
+  const chatState = useSessionField(sessionId, 'chatState') ?? 'idle'
+  const slashCommands = useSessionField(sessionId, 'slashCommands') ?? EMPTY_SLASH_COMMANDS
+  const composerPrefill = useSessionField(sessionId, 'composerPrefill') ?? null
+  const composerInsertion = useSessionField(sessionId, 'composerInsertion') ?? null
   const defaultPermissionMode = useSettingsStore((s) => s.permissionMode)
-  const permissionMode = useSessionField(activeTabId, 'permissionMode') ?? defaultPermissionMode
+  const permissionMode = useSessionField(sessionId, 'permissionMode') ?? defaultPermissionMode
   const effectivePermissionMode = useChatStore((s) =>
-    activeTabId ? s.sessions[activeTabId]?.mirror?.permission.effective ?? undefined : undefined,
+    s.sessions[sessionId]?.mirror?.permission.effective ?? undefined,
   )
-  const runtimeSelection = useSessionRuntimeSelection(activeTabId)
+  const runtimeSelection = useSessionRuntimeSelection(sessionId)
   const currentModel = useSettingsStore((state) => state.currentModel)
   const runtimeSelectionKey = runtimeSelection
     ? `${runtimeSelection.providerId ?? 'none'}:${runtimeSelection.modelId}`
     : undefined
   const providerMissing = useProviderMissing(runtimeSelection)
   const runtimeModelLabel = runtimeSelection?.modelId || currentModel?.name || currentModel?.id
-  const activeSession = useSessionStore((state) => activeTabId ? state.sessions.find((session) => session.id === activeTabId) ?? null : null)
-  const loadedMessageCount = useChatStore((s) => activeTabId ? s.sessions[activeTabId]?.messages?.length ?? 0 : 0)
+  const activeSession = useSessionStore((state) => state.sessions.find((session) => session.id === sessionId) ?? null)
+  const loadedMessageCount = useChatStore((s) => s.sessions[sessionId]?.messages?.length ?? 0)
   const messageCount = Math.max(loadedMessageCount, activeSession?.messageCount ?? 0)
-  const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
+  const memberInfo = useTeamStore((s) => s.getMemberBySessionId(sessionId))
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null)
   const workspaceReferences = useWorkspaceChatContextStore(
-    (s) => activeTabId ? s.referencesBySession[activeTabId] ?? EMPTY_WORKSPACE_REFERENCES : EMPTY_WORKSPACE_REFERENCES,
+    (s) => s.referencesBySession[sessionId] ?? EMPTY_WORKSPACE_REFERENCES,
   )
   const addWorkspaceReference = useWorkspaceChatContextStore((s) => s.addReference)
   const removeWorkspaceReference = useWorkspaceChatContextStore((s) => s.removeReference)
   const clearWorkspaceReferences = useWorkspaceChatContextStore((s) => s.clearReferences)
-  const saveComposerDraft = useCallback((sessionId: string) => {
+  const saveComposerDraft = useCallback((draftSessionId: string) => {
     const draft = {
       input: inputRef.current,
       attachments: attachmentsRef.current,
     }
     const chatStore = useChatStore.getState()
     if (draft.input.length === 0 && draft.attachments.length === 0) {
-      chatStore.clearComposerDraft(sessionId)
+      chatStore.clearComposerDraft(draftSessionId)
       return
     }
-    chatStore.setComposerDraft(sessionId, draft)
+    chatStore.setComposerDraft(draftSessionId, draft)
   }, [])
 
   const isMemberSession = !!memberInfo
   const isActive = chatState !== 'idle'
   const isWorkspaceMissing = activeSession?.workDirExists === false
   const hasWorkspaceReferences = !isMemberSession && workspaceReferences.length > 0
-  const isHeroComposer = variant === 'hero' && !isMemberSession && !compact
+  const isHeroComposer = variant === 'hero' && primary && !isMemberSession && !compact
   const resolvedWorkDir = activeSession?.workDir || gitInfo?.workDir || undefined
-  const showLaunchControls = !isMemberSession && messageCount === 0
+  const showLaunchControls = primary && !isMemberSession && messageCount === 0
   const useCompactControls = compact || isMobileComposer
   const activeLaunchWorkDir = showLaunchControls ? (launchWorkDir || resolvedWorkDir || '') : (resolvedWorkDir || '')
   const pendingSlashUiAction = !isMemberSession && input.trim().startsWith('/')
@@ -227,15 +228,15 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   }, [attachments])
 
   useEffect(() => {
-    const previousActiveTabId = previousActiveTabIdRef.current
+    const previousSessionId = previousSessionIdRef.current
 
-    if (previousActiveTabId === activeTabId) return
+    if (previousSessionId === sessionId) return
 
-    if (previousActiveTabId) {
-      saveComposerDraft(previousActiveTabId)
+    if (previousSessionId) {
+      saveComposerDraft(previousSessionId)
     }
 
-    const nextDraft = activeTabId ? useChatStore.getState().sessions[activeTabId]?.composerDraft : undefined
+    const nextDraft = useChatStore.getState().sessions[sessionId]?.composerDraft
     setComposerInput(nextDraft?.input ?? '')
     setComposerAttachments(nextDraft?.attachments ?? [])
     setPlusMenuOpen(false)
@@ -246,19 +247,19 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     setAtFilter('')
     setAtCursorPos(-1)
     setLaunchError(null)
-    previousActiveTabIdRef.current = activeTabId
-  }, [activeTabId, saveComposerDraft, setComposerAttachments, setComposerInput])
+    previousSessionIdRef.current = sessionId
+  }, [sessionId, saveComposerDraft, setComposerAttachments, setComposerInput])
 
   useEffect(() => {
     return () => {
-      const currentActiveTabId = previousActiveTabIdRef.current
-      if (currentActiveTabId) saveComposerDraft(currentActiveTabId)
+      const currentSessionId = previousSessionIdRef.current
+      if (currentSessionId) saveComposerDraft(currentSessionId)
     }
   }, [saveComposerDraft])
 
   useEffect(() => {
-    textareaRef.current?.focus()
-  }, [isActive])
+    if (primary) textareaRef.current?.focus()
+  }, [isActive, primary])
 
   useEffect(() => {
     if (!composerPrefill) return
@@ -292,7 +293,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   }, [composerPrefill, setComposerAttachments, setComposerInput])
 
   useEffect(() => {
-    if (!composerInsertion || !activeTabId || isMemberSession) return
+    if (!composerInsertion || isMemberSession) return
 
     const el = textareaRef.current
     const currentInput = inputRef.current
@@ -301,21 +302,21 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     const next = insertComposerTokenAtRange(currentInput, start, end, composerInsertion.text)
 
     if (composerInsertion.reference) {
-      addWorkspaceReference(activeTabId, composerInsertion.reference)
+      addWorkspaceReference(sessionId, composerInsertion.reference)
     }
     setComposerInput(next.value)
     setFileSearchOpen(false)
     setSlashMenuOpen(false)
     setAtFilter('')
     setAtCursorPos(-1)
-    clearComposerInsertion(activeTabId, composerInsertion.nonce)
+    clearComposerInsertion(sessionId, composerInsertion.nonce)
 
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
       textareaRef.current?.setSelectionRange(next.cursorPos, next.cursorPos)
     })
   }, [
-    activeTabId,
+    sessionId,
     addWorkspaceReference,
     clearComposerInsertion,
     composerInsertion,
@@ -324,26 +325,22 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
   ])
 
   const refreshGitInfo = useCallback(() => {
-    if (!activeTabId) {
-      setGitInfo(null)
-      return
-    }
     if (isMemberSession) {
       setGitInfo(null)
       return
     }
-    sessionsApi.getGitInfo(activeTabId).then(setGitInfo).catch(() => setGitInfo(null))
-  }, [activeTabId, isMemberSession])
+    sessionsApi.getGitInfo(sessionId).then(setGitInfo).catch(() => setGitInfo(null))
+  }, [sessionId, isMemberSession])
 
   useEffect(() => {
     refreshGitInfo()
   }, [refreshGitInfo])
 
   useEffect(() => {
-    if (!activeTabId || isMemberSession || messageCount === 0) return
+    if (isMemberSession || messageCount === 0) return
     const timeout = setTimeout(refreshGitInfo, chatState === 'idle' ? 0 : 500)
     return () => clearTimeout(timeout)
-  }, [activeTabId, chatState, isMemberSession, messageCount, refreshGitInfo, slashCommandCount])
+  }, [sessionId, chatState, isMemberSession, messageCount, refreshGitInfo, slashCommandCount])
 
   useEffect(() => {
     if (!isMemberSession) return
@@ -351,7 +348,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     setPlusMenuOpen(false)
     setSlashMenuOpen(false)
     setFileSearchOpen(false)
-  }, [isMemberSession, activeTabId])
+  }, [isMemberSession, sessionId])
 
   useEffect(() => {
     if (!showLaunchControls) return
@@ -363,7 +360,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       setLaunchReady(!nextWorkDir)
       return nextWorkDir
     })
-  }, [activeSession?.workDir, activeTabId, gitInfo?.workDir, showLaunchControls])
+  }, [activeSession?.workDir, sessionId, gitInfo?.workDir, showLaunchControls])
 
   useEffect(() => {
     resizeComposerTextarea(textareaRef.current)
@@ -475,8 +472,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     workDir: string,
     repository?: { branch?: string | null; worktree?: boolean },
   ) => {
-    if (!activeTabId) return null
-    const oldId = activeTabId
+    const oldId = sessionId
     const { createSession, deleteSession } = useSessionStore.getState()
     const { replaceTabSession } = useTabStore.getState()
     const { disconnectSession, connectToSession, sessions } = useChatStore.getState()
@@ -492,7 +488,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     connectToSession(newId)
     deleteSession(oldId).catch(() => {})
     return newId
-  }, [activeTabId])
+  }, [sessionId])
 
   const handleLaunchWorkDirChange = useCallback(async (newWorkDir: string) => {
     setLaunchWorkDir(newWorkDir)
@@ -500,7 +496,6 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     setLaunchUseWorktree(false)
     setLaunchReady(!newWorkDir)
     setLaunchError(null)
-    if (!activeTabId) return
 
     setLaunchTransitioning(true)
     try {
@@ -513,7 +508,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     } finally {
       setLaunchTransitioning(false)
     }
-  }, [activeTabId, replaceEmptySession, t])
+  }, [replaceEmptySession, t])
 
   const handleSubmit = async () => {
     const text = input.trim()
@@ -553,9 +548,9 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     if (hasWorkspaceReferences && blockedByPendingPick(workspaceReferences)) return
 
     if (hasWorkspaceReferences && workspaceReferences.some((reference) => reference.browser?.element)) {
-      await refreshBrowserMarksBeforeSend(activeTabId!)
+      await refreshBrowserMarksBeforeSend(sessionId)
     }
-    const references = useWorkspaceChatContextStore.getState().referencesBySession[activeTabId!] ?? EMPTY_WORKSPACE_REFERENCES
+    const references = useWorkspaceChatContextStore.getState().referencesBySession[sessionId] ?? EMPTY_WORKSPACE_REFERENCES
     if (blockedByPendingPick(references)) return
 
     const workspaceReferencePrompt = !isMemberSession
@@ -615,7 +610,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       }),
     ]
 
-    let targetSessionId = activeTabId!
+    let targetSessionId = sessionId
     if (showLaunchControls && activeLaunchWorkDir && launchBranch) {
       const shouldReplaceForRepositoryLaunch =
         launchUseWorktree ||
@@ -652,11 +647,11 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
     })
     setComposerInput('')
     setComposerAttachments([])
-    useChatStore.getState().clearComposerDraft(activeTabId!)
-    if (targetSessionId !== activeTabId) useChatStore.getState().clearComposerDraft(targetSessionId)
+    useChatStore.getState().clearComposerDraft(sessionId)
+    if (targetSessionId !== sessionId) useChatStore.getState().clearComposerDraft(targetSessionId)
     if (!isMemberSession) {
-      clearWorkspaceReferences(activeTabId!)
-      if (targetSessionId !== activeTabId) clearWorkspaceReferences(targetSessionId)
+      clearWorkspaceReferences(sessionId)
+      if (targetSessionId !== sessionId) clearWorkspaceReferences(targetSessionId)
     }
     setPlusMenuOpen(false)
     setSlashMenuOpen(false)
@@ -798,7 +793,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
 
   const removeAttachment = (id: string) => {
     setComposerAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
-    if (activeTabId) removeWorkspaceReference(activeTabId, id)
+    removeWorkspaceReference(sessionId, id)
   }
 
   const insertSlashCommand = () => {
@@ -870,15 +865,13 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               const spacer = beforeToken && afterToken && !/\s$/.test(beforeToken) && !/^\s/.test(afterToken) ? ' ' : ''
               const newValue = `${beforeToken}${spacer}${afterToken}`
               const newCursorPos = atCursorPos + spacer.length
-              if (activeTabId) {
-                addWorkspaceReference(activeTabId, {
-                  kind: 'file',
-                  path,
-                  absolutePath: path,
-                  name: isDirectory ? `${referenceName}/` : referenceName,
-                  isDirectory,
-                })
-              }
+              addWorkspaceReference(sessionId, {
+                kind: 'file',
+                path,
+                absolutePath: path,
+                name: isDirectory ? `${referenceName}/` : referenceName,
+                isDirectory,
+              })
               setComposerInput(newValue)
               setFileSearchOpen(false)
               setAtFilter('')
@@ -895,7 +888,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
       {!isMemberSession && localSlashPanel && (
         <ComposerPopover anchorRef={panelRef} inputRef={textareaRef} label={t('chat.slashCommands')} onClose={() => setLocalSlashPanel(null)}><LocalSlashCommandPanel
           command={localSlashPanel}
-          sessionId={activeTabId ?? undefined}
+          sessionId={sessionId}
           cwd={activeLaunchWorkDir || resolvedWorkDir}
           commands={allSlashCommands}
           onClose={() => setLocalSlashPanel(null)}
@@ -1022,7 +1015,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
               action={{
                 mode: isStopAction ? 'stop' : 'send',
                 disabled: isStopAction ? false : !canSubmit,
-                onClick: isStopAction ? () => stopGeneration(activeTabId!) : () => { void handleSubmit() },
+                onClick: isStopAction ? () => stopGeneration(sessionId) : () => { void handleSubmit() },
                 label: actionLabel,
                 title: isStopAction ? t('chat.stopTitle') : actionLabel,
               }}
@@ -1060,20 +1053,21 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                       />
                     )}
                     <PermissionModeSelector
+                      workDir={resolvedWorkDir}
                       compact={useCompactControls}
                       value={permissionMode}
                       effectiveValue={effectivePermissionMode as typeof permissionMode | undefined}
                       onChange={(mode) => {
-                        if (activeTabId) setSessionPermissionMode(activeTabId, mode)
+                        setSessionPermissionMode(sessionId, mode)
                       }}
                     />
                   </>
                 )}
-                right={activeTabId ? (
+                right={(
                   <>
-                    <ModelSelector runtimeKey={activeTabId} disabled={isActive} compact={useCompactControls} />
+                    <ModelSelector runtimeKey={sessionId} disabled={isActive} compact={useCompactControls} />
                     <ContextUsageIndicator
-                      sessionId={activeTabId}
+                      sessionId={sessionId}
                       chatState={chatState}
                       messageCount={messageCount}
                       runtimeSelectionKey={runtimeSelectionKey}
@@ -1081,7 +1075,7 @@ export function ChatInput({ variant = 'default', compact = false }: ChatInputPro
                       mobile={isMobileComposer}
                     />
                   </>
-                ) : null}
+                )}
               />
             )}
             <div ref={setNoticeSlot} className="empty:hidden [&>*]:mt-2" />
