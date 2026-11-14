@@ -35,6 +35,10 @@ All notable changes to DreamCoder will be documented in this file.
 - A lead session that is resumed after a restart keeps using its team's task list (#216). The lead looked for tasks in a list named after its session, so `TaskList` returned nothing and new tasks went to a different list than the one the teammates read. The lead now goes back to the team it created when the session is resumed. Thanks @WhitePepperLambSoup.
 - **Context usage no longer treats screenshot base64 as text** (#230). The estimate-only path and the Messages breakdown score images and documents as 2000 tokens instead of counting their base64 as text, so a session with many browser screenshots no longer shows a nearly full context bar when the provider still reports a modest input size. An @-mentioned image or PDF is estimated from the message the API receives, so that payload is no longer counted as text and the attachment line in `/context` stays in line with the total. Thanks @Oscar-Williams.
 
+### Removed
+
+- **The Diagnostics settings page, the `/doctor` command and the dry-run server Doctor.** Report a problem in the sidebar already collects the recent errors and exports the diagnostics bundle, and Doctor still appears where it is needed, on the crash screen and the startup error screen. The Diagnostics tab and the `/doctor` command opened a page whose warning count was mostly requests failing while the server was starting. The desktop Doctor now only clears the safe UI keys, `DoctorService` and the `/api/doctor` routes are gone, and a request that fails because the server never answered is no longer recorded as a diagnostic event; a request the server rejects still is.
+
 ## [0.8.0] — 2026-11-01
 
 The first stable release of the Electron desktop app. These notes cover everything since 0.7.0, including 0.8.0-beta.1 and 0.8.0-beta.2.

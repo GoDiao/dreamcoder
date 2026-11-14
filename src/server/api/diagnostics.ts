@@ -4,26 +4,11 @@ import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 
 export async function handleDiagnosticsApi(
   req: Request,
-  url: URL,
+  _url: URL,
   segments: string[],
 ): Promise<Response> {
   try {
     const action = segments[2]
-
-    if (!action && req.method === 'DELETE') {
-      await diagnosticsService.clear()
-      return Response.json({ ok: true })
-    }
-
-    if (action === 'status' && req.method === 'GET') {
-      return Response.json(await diagnosticsService.getStatus())
-    }
-
-    if (action === 'events' && req.method === 'GET') {
-      const limit = Number.parseInt(url.searchParams.get('limit') || '100', 10)
-      const events = await diagnosticsService.readRecentEvents(Number.isFinite(limit) ? limit : 100)
-      return Response.json({ events })
-    }
 
     if (action === 'events' && req.method === 'POST') {
       const body = await parseJsonBody(req)
@@ -61,11 +46,6 @@ export async function handleDiagnosticsApi(
       } catch {
         throw ApiError.badRequest('Unknown export file')
       }
-      return Response.json({ ok: true })
-    }
-
-    if (action === 'open-log-dir' && req.method === 'POST') {
-      await diagnosticsService.openLogDir()
       return Response.json({ ok: true })
     }
 

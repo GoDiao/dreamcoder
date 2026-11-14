@@ -191,8 +191,6 @@ export type GlobalConfig = {
   autoUpdates?: boolean
   // Flag to distinguish protection-based disabling from user preference
   autoUpdatesProtectedForNative?: boolean
-  // Session count when Doctor was last shown
-  doctorShownAtSession?: number
   userID?: string
   theme: ThemeSetting
   hasCompletedOnboarding?: boolean

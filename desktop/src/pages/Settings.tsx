@@ -15,7 +15,6 @@ import {
   SettingsIcon,
   ShieldCheck,
   Smartphone,
-  Wrench,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -31,7 +30,6 @@ import { H5AccessSettings } from '../components/settings/H5AccessSettings'
 import { BrowserTrustSettings } from '../components/settings/BrowserTrustSettings'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 import { McpSettings } from './McpSettings'
-import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { ActivitySettings } from './ActivitySettings'
 import { MemorySettings } from './MemorySettings'
 import { useUIStore, type SettingsTab } from '../stores/uiStore'
@@ -64,7 +62,6 @@ const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     items: [
       { tab: 'h5Access', Icon: Smartphone },
       { tab: 'computerUse', Icon: Monitor },
-      { tab: 'diagnostics', Icon: Wrench },
     ],
   },
   {
@@ -157,7 +154,6 @@ export function Settings() {
           {activeTab === 'memory' && <MemorySettings />}
           {activeTab === 'plugins' && <PluginSettings />}
           {activeTab === 'computerUse' && <ComputerUseSettings />}
-          {activeTab === 'diagnostics' && <DiagnosticsSettings />}
           {activeTab === 'about' && <AboutSettings />}
         </div>
       </div>

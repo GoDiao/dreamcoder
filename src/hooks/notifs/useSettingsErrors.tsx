@@ -35,7 +35,7 @@ export function useSettingsErrors() {
         return;
       }
       if (errors_0.length > 0) {
-        const message = `Found ${errors_0.length} settings ${errors_0.length === 1 ? "issue" : "issues"} · /doctor for details`;
+        const message = `Found ${errors_0.length} settings ${errors_0.length === 1 ? "issue" : "issues"} · dreamcoder doctor for details`;
         addNotification({
           key: SETTINGS_ERRORS_NOTIFICATION_KEY,
           text: message,

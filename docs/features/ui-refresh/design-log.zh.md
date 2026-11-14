@@ -95,7 +95,7 @@
 - 工作区：变更 / 全部文件、过滤、预览、差异、引用文件、行评论、路径复制。
 - 终端：显示 / 收起、输入、清理、重启、展开 / 返回会话和停靠方式的演示入口；不再使用「独立标签」文案。
 - 定时任务：列表、新建、编辑、暂停 / 启用、删除、关联会话。
-- 设置：服务商、权限、通用、H5、终端、MCP、Agents、Skills、记忆、插件、Computer Use、活动、诊断、关于。
+- 设置：服务商、权限、通用、H5、终端、MCP、Agents、Skills、记忆、插件、Computer Use、活动、关于。
 
 主要源码定位：`desktop/src/components/layout/Sidebar.tsx`、`AppShell.tsx`、`TabBar.tsx`、`ContentRouter.tsx`；聊天区的 `ChatInput.tsx`、`MessageList.tsx`、`ActiveSession.tsx`、`WorkspacePanel.tsx` 等组件。文件可能随重构迁移，不能只凭旧文件名认定入口仍有效。
 
@@ -336,7 +336,7 @@
 - 关闭方式：右上角 ×、按 Esc 或点遮罩都能关闭，关闭后焦点回到打开前的位置，下面的会话和草稿保持不变。弹窗或下拉菜单打开时，按 Esc 先关它们。
 - 左侧导航：顶部是搜索框，按分类名过滤。分类按四组排列：
   - 设置：模型服务商、通用、权限、活动
-  - 本机：终端、H5 访问、Computer Use、诊断
+  - 本机：终端、H5 访问、Computer Use
   - 自定义：MCP、Agents、Skills、记忆、插件
   - 关于：单独放在最后
 - 右侧内容：单独滚动，内容最大宽度 760px。不再显示固定的「设置」标题，应用侧栏被遮罩盖住，不再与设置导航并排占宽度。

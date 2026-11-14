@@ -26,20 +26,6 @@ export type DiagnosticEvent = {
   details?: unknown
 }
 
-export type DiagnosticsStatus = {
-  logDir: string
-  diagnosticsPath: string
-  cliDiagnosticsPath: string
-  runtimeErrorsPath: string
-  exportDir: string
-  retentionDays: number
-  maxBytes: number
-  totalBytes: number
-  eventCount: number
-  recentErrorCount: number
-  lastEventAt: string | null
-}
-
 export type DiagnosticsExportResult = {
   path: string
   fileName: string
@@ -163,29 +149,6 @@ export class DiagnosticsService {
     })
   }
 
-  async getStatus(): Promise<DiagnosticsStatus> {
-    await this.ensureLogDir()
-    const events = await this.readRecentEvents(500)
-    const totalBytes = await this.getDirectorySize(this.getLogDir())
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000
-    return {
-      logDir: this.getLogDir(),
-      diagnosticsPath: this.getDiagnosticsPath(),
-      cliDiagnosticsPath: this.getCliDiagnosticsPath(),
-      runtimeErrorsPath: this.getRuntimeErrorsPath(),
-      exportDir: this.getExportDir(),
-      retentionDays: RETENTION_DAYS,
-      maxBytes: MAX_BYTES,
-      totalBytes,
-      eventCount: events.length,
-      recentErrorCount: events.filter((event) =>
-        (event.severity === 'error' || event.severity === 'warn') &&
-        Date.parse(event.timestamp) >= cutoff
-      ).length,
-      lastEventAt: events[0]?.timestamp ?? null,
-    }
-  }
-
   async readRecentEvents(limit = 100): Promise<DiagnosticEvent[]> {
     const boundedLimit = Math.max(1, Math.min(limit, 1000))
     let raw = ''
@@ -258,20 +221,6 @@ export class DiagnosticsService {
     return { path: outPath, fileName, bytes: archive.byteLength }
   }
 
-  async openLogDir(): Promise<void> {
-    await this.ensureLogDir()
-    const dir = this.getLogDir()
-    if (process.platform === 'darwin') {
-      Bun.spawn(['open', dir], { stdout: 'ignore', stderr: 'ignore' })
-      return
-    }
-    if (process.platform === 'win32') {
-      Bun.spawn(['cmd', '/c', 'start', '', dir], { stdout: 'ignore', stderr: 'ignore', windowsHide: true })
-      return
-    }
-    Bun.spawn(['xdg-open', dir], { stdout: 'ignore', stderr: 'ignore' })
-  }
-
   /** Shows an exported bundle in Finder or Explorer. Only names a file inside the export folder. */
   async revealExport(fileName: string): Promise<void> {
     if (!fileName || fileName === '.' || fileName === '..' || path.basename(fileName) !== fileName) {
@@ -288,11 +237,6 @@ export class DiagnosticsService {
       return
     }
     Bun.spawn(['xdg-open', this.getExportDir()], { stdout: 'ignore', stderr: 'ignore' })
-  }
-
-  async clear(): Promise<void> {
-    await fs.rm(this.getLogDir(), { recursive: true, force: true })
-    await this.ensureLogDir()
   }
 
   sanitizeValue(value: unknown, depth = 0): unknown {
@@ -562,10 +506,6 @@ export class DiagnosticsService {
       await fs.rm(file.path, { force: true })
       total -= file.size
     }
-  }
-
-  private async getDirectorySize(dir: string): Promise<number> {
-    return (await this.listFiles(dir)).reduce((sum, file) => sum + file.size, 0)
   }
 
   private async listFiles(dir: string): Promise<Array<{ path: string; size: number; mtimeMs: number }>> {

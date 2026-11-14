@@ -581,7 +581,7 @@ function getSandboxUnavailableReason(): string | undefined {
     const platform = getPlatform()
     const hint =
       platform === 'macos'
-        ? 'run /sandbox or /doctor for details'
+        ? 'run /sandbox or dreamcoder doctor for details'
         : 'install missing tools (e.g. apt install bubblewrap socat) or run /sandbox for details'
     return `sandbox.enabled is set but dependencies are missing: ${deps.errors.join(', ')} · ${hint}`
   }

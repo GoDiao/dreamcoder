@@ -116,7 +116,6 @@ describe('composerUtils', () => {
   it('resolves hidden settings aliases without displaying duplicate fallback rows', () => {
     expect(resolveSlashUiAction('plugins')).toEqual({ type: 'settings', tab: 'plugins' })
     expect(resolveSlashUiAction('memory')).toEqual({ type: 'settings', tab: 'memory' })
-    expect(resolveSlashUiAction('doctor')).toEqual({ type: 'settings', tab: 'diagnostics' })
     expect(mergeSlashCommands([]).map((command) => command.name)).toContain('plugin')
     expect(mergeSlashCommands([]).map((command) => command.name)).toContain('memory')
     expect(mergeSlashCommands([]).map((command) => command.name)).not.toContain('plugins')

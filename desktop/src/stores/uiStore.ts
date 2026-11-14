@@ -56,7 +56,6 @@ export type SettingsTab =
   | 'memory'
   | 'plugins'
   | 'computerUse'
-  | 'diagnostics'
   | 'about'
 
 type UIStore = {

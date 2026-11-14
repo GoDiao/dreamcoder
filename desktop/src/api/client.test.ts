@@ -102,6 +102,15 @@ describe('api diagnostics reporting', () => {
     expect(JSON.stringify(body)).not.toContain('h5_super_secret')
   })
 
+  it('does not record a request the server never answered', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    await expect(api.get('/api/status')).rejects.toThrow('Failed to fetch')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('does not recursively report diagnostics endpoint failures', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'diagnostics down' }), {

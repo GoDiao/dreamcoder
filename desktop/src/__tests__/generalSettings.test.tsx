@@ -688,12 +688,10 @@ describe('Settings > General tab', () => {
     expect(screen.getByText('The storage change has been saved. Restart the app for the new data directory to take effect.')).toBeInTheDocument()
   })
 
-  it('opens the Token usage tab from Settings navigation above Diagnostics', () => {
+  it('opens the Token usage tab from Settings navigation', () => {
     render(<Settings />)
 
     const usageTab = screen.getByText('Token usage')
-    const diagnosticsTab = screen.getByText('Diagnostics')
-    expect((usageTab.compareDocumentPosition(diagnosticsTab) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
 
     fireEvent.click(usageTab)
 
