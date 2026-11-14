@@ -5,12 +5,12 @@ import type { SessionStateEvent } from '../session/state/types.js'
 import type { ServerMessage } from '../ws/protocol.js'
 import {
   __resetWebSocketHandlerStateForTests,
-  closeSessionConnection,
   getSessionState,
   handleWebSocket,
   type WebSocketData,
 } from '../ws/handler.js'
 import { conversationService } from '../services/conversationService.js'
+import { closeSessionConnection } from '../services/sessionLinksService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SessionStateStore, sessionStateStore } from '../session/state/store.js'
 import { peekSessionRuntime } from '../ws/sessionRuntime.js'

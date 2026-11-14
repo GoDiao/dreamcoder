@@ -71,11 +71,12 @@ describe('AskUserQuestion', () => {
   })
 
   it('renders nothing for empty input and then shows questions once they stream in', () => {
-    const view = render(<AskUserQuestion toolUseId="tool-1" input={{}} />)
+    const view = render(<AskUserQuestion sessionId={ACTIVE_TAB} toolUseId="tool-1" input={{}} />)
     expect(view.container.innerHTML).toBe('')
 
     view.rerender(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{ questions: [{ question: 'Should we persist data?', options: [{ label: 'No' }, { label: 'Yes' }] }] }}
       />,
@@ -86,6 +87,7 @@ describe('AskUserQuestion', () => {
   it('submits answers through permission_response updatedInput instead of sending a chat message', () => {
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [
@@ -122,6 +124,7 @@ describe('AskUserQuestion', () => {
   it('allows multiple selections when a question is marked multiSelect', () => {
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [
@@ -169,6 +172,7 @@ describe('AskUserQuestion', () => {
   it('preserves multiSelect for single-question input shape', () => {
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           question: 'Which tasks should run?',
@@ -289,6 +293,7 @@ describe('AskUserQuestion', () => {
 
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={input}
       />,
@@ -332,6 +337,7 @@ describe('AskUserQuestion', () => {
   it('uses a multiline custom response box and submits it with Ctrl+Enter', () => {
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [
@@ -388,6 +394,7 @@ describe('AskUserQuestion', () => {
 
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [
@@ -409,6 +416,7 @@ describe('AskUserQuestion', () => {
   it('steps through multiple questions with progress and submits once all are answered', () => {
     render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [
@@ -440,6 +448,7 @@ describe('AskUserQuestion', () => {
   it('marks multi-select questions and shows the answered record without an edit action', () => {
     const { rerender } = render(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{ questions: [{ question: 'Which checks?', multiSelect: true, options: [{ label: 'Lint' }, { label: 'Tests' }] }] }}
       />,
@@ -449,6 +458,7 @@ describe('AskUserQuestion', () => {
 
     rerender(
       <AskUserQuestion
+        sessionId={ACTIVE_TAB}
         toolUseId="tool-1"
         input={{
           questions: [

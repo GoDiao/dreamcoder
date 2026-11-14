@@ -1,6 +1,6 @@
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
-import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
+import { findSideChatParent, useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { isBrowserGuestShown, openBrowserUrl } from './browserGuests'
 import {
   finishBrowserActivate,
@@ -17,6 +17,7 @@ const SHOWN_POLL_TIMEOUT_MS = 1000
 function isKnownSession(sessionId: string) {
   return useSessionStore.getState().sessions.some((session) => session.id === sessionId)
     || useTabStore.getState().tabs.some((tab) => tab.sessionId === sessionId)
+    || findSideChatParent(useWorkspacePanelStore.getState().panelByTab, sessionId) !== null
 }
 
 function findTabOwner(tabId: string) {

@@ -1,5 +1,5 @@
 import { useTabStore } from '../stores/tabStore'
-import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
+import { findSideChatParent, useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { registerBrowserView, unregisterBrowserView, updateBrowserView, type BrowserViewState } from './shell'
 
 type ViewEntry = {
@@ -18,12 +18,13 @@ function isForeground(sessionId: string) {
 }
 
 function currentState(tabId: string, entry: ViewEntry): BrowserViewState {
-  const panel = useWorkspacePanelStore.getState().panelByTab[entry.sessionId]
+  const { panelByTab } = useWorkspacePanelStore.getState()
+  const owner = findSideChatParent(panelByTab, entry.sessionId) ?? entry.sessionId
   return {
     tabId,
     shown: entry.readShown(),
-    active: panel?.activeTabId === tabId,
-    foreground: isForeground(entry.sessionId),
+    active: panelByTab[owner]?.activeTabId === tabId,
+    foreground: isForeground(owner),
   }
 }
 

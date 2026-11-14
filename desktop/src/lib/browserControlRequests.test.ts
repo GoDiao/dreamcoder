@@ -48,6 +48,19 @@ afterEach(() => {
 })
 
 describe('browser open-tab request', () => {
+  it('accepts a request from a side chat and opens the tab in its parent panel under the side chat, leaving the side chat in front', async () => {
+    const sideTab = useWorkspacePanelStore.getState().openTab('s', { kind: 'sideChat', sessionId: 'side' })
+
+    await handleOpenTabRequest({ requestId: 'r1', sessionId: 'side', url: 'http://localhost:3000/' })
+
+    const tab = panelOf('s').tabs.find((candidate) => candidate.kind === 'browser')
+    expect(tab).toMatchObject({ kind: 'browser', url: 'http://localhost:3000/', sessionId: 'side' })
+    expect(panelOf('s').activeTabId).toBe(sideTab)
+    expect(useWorkspacePanelStore.getState().panelByTab.side).toBeUndefined()
+    expect(mocks.openBrowserUrl).toHaveBeenCalledWith('side', tab?.id, 'http://localhost:3000/')
+    expect(mocks.finishBrowserOpenTab).toHaveBeenCalledWith({ requestId: 'r1', tabId: tab?.id })
+  })
+
   it('opens the panel on a new active browser tab, loads the address and replies with the tab id', async () => {
     await handleOpenTabRequest({ requestId: 'r1', sessionId: 's', url: 'http://localhost:3000/' })
 

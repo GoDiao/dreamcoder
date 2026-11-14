@@ -126,13 +126,13 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 | 字段 | 说明 |
 | --- | --- |
 | `parent.sessionId` | 父 session 的 id |
-| `parent.kind` | `spawned`（agent 用 StartSession 创建）、`forked`（用户在界面上 fork）或 `assigned`（人在项目看板上把卡分给新会话，挂在卡的创建者下面，见[看板技术设计](../kanban/tech-design.zh.md)） |
+| `parent.kind` | `spawned`（agent 用 StartSession 创建）、`forked`（用户在界面上 fork）、`assigned`（人在项目看板上把卡分给新会话，挂在卡的创建者下面，见[看板技术设计](../kanban/tech-design.zh.md)）或 `side`（side chat：从父 session 最新位置分叉，显示在父 session 的右侧面板里，会话列表默认不返回；Detach 把它原地改成 `forked`；随父 session 一起删除。旧版本不认识 `side`，会把它当成没有父 session 的普通会话显示。见 [Side chat 技术设计](../side-chat/tech-design.md)） |
 
 - `createSession` 写 `session-meta` 时带上这些字段（[sessionService.ts:1259](../../../src/server/services/sessionService.ts)）。
 - `createSessionBranch` 写的 `session-meta`（[sessionBranching.ts:340](../../../src/utils/sessionBranching.ts)）带 `parent: { sessionId: 源 session, kind: 'forked' }`。session 只有标题这一个显示名，没有单独的短名。
 - 列表接口从 `session-meta` 读出 `parent`，放进 `SessionListItem`。哪些 session 是某个 session 的子 session，由客户端从列表里推出来，不另外存。
 - 从属关系只用于两件事：侧栏嵌套显示，以及进展汇报只能发给自己的父 session（见"汇报"）。普通消息往来不受它限制。
-- 父 session 被删除后，子 session 的 `parent` 指向一个不存在的 session，此时把它当成根 session 显示。不做级联删除。
+- 父 session 被删除后，`spawned`、`forked`、`assigned` 的子 session 不随之删除，它们的 `parent` 指向一个不存在的 session，此时当成根 session 显示。`side` 的子 session 随父 session 一起删除（`removeSessions`）。
 - 已有的 fork 没有这个字段，继续平铺显示，不做回填。
 
 ### 消息来源
@@ -156,7 +156,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 | `StartSession` | `prompt`（简报）、`title`（必填）、`context: 'fresh' \| 'fork'`、`worktree`（布尔）；可选的 `card` 和 `role`（`owner` / `reviewer`），让新会话一启动就在这张卡上担任这个身份，见[看板技术设计](../kanban/tech-design.zh.md) | 创建子 session 并写好 `parent`；`fork` 时先从父 session 当前位置 branch；启动子 session 的 CLI，把 `prompt` 作为第一条消息送进去，`origin.purpose = 'brief'` | 子 session 的 id 和标题，不等它跑完。结果文字只描述发生了什么（`Started session "<标题>" (id <id>).`），不写怎么联系它；怎么联系写在 `SendMessage` 的说明里 |
 | `SendMessage` | 增加地址 `session:<id>` 和 `mode`（`message` / `report`）；发往 session 时 `summary` 可以不填，自动取正文第一行（最长 80 字符） | 校验对方存在；送达（必要时先启动对方的 CLI） | 是否送达 |
 | `RenameSession` | `title` | 只改调用方自己的 session：清理标题（去掉换行和尖括号），空的拒绝；走和用户在界面上改名相同的路径，写成自定义标题，自动生成标题不再覆盖它，会话状态里的 `title` 更新，侧栏随之变化 | 清理后的标题 |
-| `ListSessions` | 可选的项目过滤 | 列出所有 session，按最近活动排序 | 每个 session 的 id、标题、项目、父 session、和调用方的关系（自己、父、子、无）、运行状态 |
+| `ListSessions` | 可选的项目过滤 | 列出所有 session，按最近活动排序；side chat 只列出调用方自己的 | 每个 session 的 id、标题、项目、父 session、和调用方的关系（自己、父、子、无）、运行状态 |
 
 - **子 session 继承父 session 的工作目录、权限模式和模型设置。** `worktree: true` 时，在父 session 的仓库里新建一个 worktree：fresh 用的是 `createSession` 现有的 `repository` 参数；fork 先用 `prepareSessionWorkspace` 建好 worktree，再把它作为 `workspace` 传给 `createSessionBranch`。
 - **`StartSession` 每次都要用户确认，不受权限模式影响。** `bypassPermissions` 和自动模式也跳不过：它返回 `safetyCheck` 类型的 ask，并设 `classifierApprovable: false`，和原来 `bridge:` 发送的做法一样（[SendMessageTool.ts:586](../../../src/tools/SendMessageTool/SendMessageTool.ts)）。`SendMessage` 发往 session 不需要确认。更细的权限规则留给 agent teams（#162）去定。`StartSession` 和 `RenameSession` 一样在 `ALL_AGENT_DISALLOWED_TOOLS` 里，子 agent 不能用。
@@ -259,7 +259,7 @@ B -> B : 包装成 <cross-session-message from="session:A">\n闲着则开一轮
 
 - **目标不存在：** `SendMessage` 返回失败和原因，不送达。
 - **目标 CLI 启动失败：** 返回失败，带上启动错误，和用户发消息时看到的错误一致。
-- **子 session 创建失败**（例如 worktree 建不出来、CLI 启动失败、简报送不进去）：`StartSession` 返回失败，已经写下的 transcript 文件删掉，为它新建的 worktree 和分支也删掉。删除本身失败时只记日志，返回的仍是原来的错误。
+- **子 session 创建失败**（例如 worktree 建不出来、CLI 启动失败、简报送不进去）：`StartSession` 返回失败，已经写下的 transcript 文件删掉，为它新建的 worktree 和分支也删掉。worktree 记录里的 `worktreeOwnerSessionId` 是建它的 session，fork 照抄父 session 的记录时不改它，所以没有另建 worktree 的 fork 失败时不会删掉父 session 的 worktree。删除本身失败时只记日志，返回的仍是原来的错误。
 - **汇报发给不是自己父 session 的 session：** 返回失败。
 - **父 session 已被删除：** 汇报和消息都返回目标不存在。
 - **父 session 的一轮在 server 判断"在跑"之后、汇报送到之前结束：** 这条汇报会让 CLI 开新的一轮。不加额外处理。

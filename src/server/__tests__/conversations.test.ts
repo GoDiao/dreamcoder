@@ -65,7 +65,7 @@ describe('ConversationService', () => {
     const svc = new ConversationService()
     const sid = crypto.randomUUID()
 
-    svc.markSessionDeleted(sid)
+    svc.blockStarts([sid], 'deleted')
 
     try {
       await svc.startSession(sid, process.cwd(), 'ws://127.0.0.1:1/sdk/test')

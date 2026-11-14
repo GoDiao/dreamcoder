@@ -100,7 +100,8 @@ export class ConversationStartupError extends Error {
       | 'CLI_START_FAILED'
       | 'CLI_SPAWN_FAILED'
       | 'PROVIDER_NOT_CONFIGURED'
-      | 'SESSION_DELETED',
+      | 'SESSION_DELETED'
+      | 'SESSION_DETACHING',
     readonly retryable = false,
   ) {
     super(message)
@@ -108,12 +109,14 @@ export class ConversationStartupError extends Error {
   }
 }
 
+export type StartBlock = 'deleted' | 'detaching'
+
 export class ConversationService {
   private sessions = new Map<string, SessionProcess>()
   private generations = new Map<string, number>()
   private lifecycleListeners = new Set<ProcessLifecycleListener>()
   private exitListeners = new Set<ProcessExitListener>()
-  private deletedSessions = new Set<string>()
+  private blockedStarts = new Map<string, StartBlock>()
   private providerService = new ProviderService()
 
   private buildSessionCliArgs(
@@ -234,12 +237,7 @@ export class ConversationService {
     generation: number,
     options?: SessionStartOptions,
   ): Promise<number> {
-    if (this.deletedSessions.has(sessionId)) {
-      throw new ConversationStartupError(
-        `Session was deleted before startup completed: ${sessionId}`,
-        'SESSION_DELETED',
-      )
-    }
+    this.assertStartAllowed(sessionId)
     const launchInfo = await sessionService.getSessionLaunchInfo(sessionId)
     const shouldResume = !!launchInfo && launchInfo.transcriptMessageCount > 0
     const shouldReplacePlaceholder =
@@ -249,12 +247,7 @@ export class ConversationService {
     const hasMaterializedWorktree =
       !!launchInfo && isMaterializedWorktreeLaunch(launchInfo)
 
-    if (this.deletedSessions.has(sessionId)) {
-      throw new ConversationStartupError(
-        `Session was deleted before startup completed: ${sessionId}`,
-        'SESSION_DELETED',
-      )
-    }
+    this.assertStartAllowed(sessionId)
 
     if (!fs.existsSync(workDir) || !fs.statSync(workDir).isDirectory()) {
       throw new ConversationStartupError(
@@ -813,24 +806,29 @@ export class ConversationService {
     await this.waitForProcessOutputDrain(session, timeoutMs)
   }
 
-  markSessionDeleted(sessionId: string): void {
-    this.deletedSessions.add(sessionId)
-    this.stopSession(sessionId)
-  }
-
-  markSessionsDeleted(sessionIds: string[]): void {
+  blockStarts(sessionIds: string[], reason: StartBlock): void {
     for (const sessionId of sessionIds) {
-      this.markSessionDeleted(sessionId)
+      this.blockedStarts.set(sessionId, reason)
     }
   }
 
-  unmarkSessionDeleted(sessionId: string): void {
-    this.deletedSessions.delete(sessionId)
+  unblockStarts(sessionIds: string[]): void {
+    for (const sessionId of sessionIds) {
+      this.blockedStarts.delete(sessionId)
+    }
   }
 
-  unmarkSessionsDeleted(sessionIds: string[]): void {
-    for (const sessionId of sessionIds) {
-      this.unmarkSessionDeleted(sessionId)
+  private assertStartAllowed(sessionId: string): void {
+    const reason = this.blockedStarts.get(sessionId)
+    if (reason === 'deleted') {
+      throw new ConversationStartupError(`Session was deleted before startup completed: ${sessionId}`, 'SESSION_DELETED')
+    }
+    if (reason === 'detaching') {
+      throw new ConversationStartupError(
+        `Session is being detached into a regular session; send the message again in a moment: ${sessionId}`,
+        'SESSION_DETACHING',
+        true,
+      )
     }
   }
 

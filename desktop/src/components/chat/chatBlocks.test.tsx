@@ -226,6 +226,7 @@ describe('chat blocks', () => {
     await act(async () => {
       container = render(
         <PermissionDialog
+          sessionId="active-tab"
           requestId="perm-1"
           toolName="Edit"
           input={{

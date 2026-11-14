@@ -126,7 +126,7 @@ describe('PermissionModeSelector', () => {
     expect(document.getElementById(controlled!)).toBe(screen.getByRole('menu'))
   })
 
-  it('uses the active tab workspace when showing the bypass confirmation path', async () => {
+  it('shows the workspace it is given in the bypass confirmation, not the active tab one', async () => {
     useSessionStore.setState({
       activeSessionId: 'previous-session',
       sessions: [
@@ -155,11 +155,11 @@ describe('PermissionModeSelector', () => {
       ],
     })
     useTabStore.setState({
-      activeTabId: 'current-tab',
-      tabs: [{ sessionId: 'current-tab', title: 'Current', type: 'session', status: 'idle' }],
+      activeTabId: 'previous-session',
+      tabs: [{ sessionId: 'previous-session', title: 'Previous', type: 'session', status: 'idle' }],
     })
 
-    renderSelector({ compact: true })
+    renderSelector({ compact: true, workDir: 'C:\\Users\\LinTan\\MyScript\\test5' })
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Manual' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Bypass permissions/ }))

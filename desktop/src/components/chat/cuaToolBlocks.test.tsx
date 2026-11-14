@@ -131,6 +131,7 @@ describe('cua tool display in chat blocks', () => {
     await act(async () => {
       container = render(
         <PermissionDialog
+          sessionId="active-tab"
           requestId="perm-cua"
           toolName="mcp__cua__launch_app"
           input={{ bundle_id: 'com.apple.Safari' }}
@@ -148,7 +149,7 @@ describe('cua tool display in chat blocks', () => {
   it('uses the generic Computer Use permission title for click', async () => {
     let container!: HTMLElement
     await act(async () => {
-      container = render(<PermissionDialog requestId="perm-click" toolName="mcp__cua__click" input={{ pid: 3, element_token: 's0000abcd:1' }} />).container
+      container = render(<PermissionDialog sessionId="active-tab" requestId="perm-click" toolName="mcp__cua__click" input={{ pid: 3, element_token: 's0000abcd:1' }} />).container
       await Promise.resolve()
     })
     expect(container.textContent).toContain('Allow Computer Use to click?')

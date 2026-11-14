@@ -8,21 +8,32 @@ type TodoItem = {
   activeForm?: string
 }
 
-type CLITaskStore = {
-  sessionId: string | null
+export type SessionTasks = {
   tasks: CLITask[]
   resetting: boolean
   expanded: boolean
   completedAndDismissed: boolean
   dismissedCompletionKey: string | null
+}
+
+type CLITaskStore = {
+  bySession: Record<string, SessionTasks | undefined>
 
   fetchSessionTasks: (sessionId: string) => Promise<void>
-  refreshTasks: (sessionId?: string) => Promise<void>
-  setTasksFromTodos: (todos: TodoItem[], sessionId?: string) => void
-  markCompletedAndDismissed: (sessionId?: string) => void
-  resetCompletedTasks: (sessionId?: string) => Promise<void>
-  clearTasks: (sessionId?: string) => void
-  toggleExpanded: () => void
+  refreshTasks: (sessionId: string) => Promise<void>
+  setTasksFromTodos: (todos: TodoItem[], sessionId: string) => void
+  markCompletedAndDismissed: (sessionId: string) => void
+  resetCompletedTasks: (sessionId: string) => Promise<void>
+  clearTasks: (sessionId: string) => void
+  toggleExpanded: (sessionId: string) => void
+}
+
+const EMPTY_SESSION_TASKS: SessionTasks = {
+  tasks: [],
+  resetting: false,
+  expanded: false,
+  completedAndDismissed: false,
+  dismissedCompletionKey: null,
 }
 
 function buildCompletedTaskKey(tasks: CLITask[]): string | null {
@@ -50,7 +61,7 @@ function resolveDismissState(tasks: CLITask[], dismissedCompletionKey: string | 
   }
 }
 
-function mapTodosToTasks(todos: TodoItem[], sessionId: string | null): CLITask[] {
+function mapTodosToTasks(todos: TodoItem[], sessionId: string): CLITask[] {
   return todos.map((todo, index) => ({
     id: String(index + 1),
     subject: todo.content,
@@ -61,120 +72,99 @@ function mapTodosToTasks(todos: TodoItem[], sessionId: string | null): CLITask[]
       : 'pending') as TaskStatus,
     blocks: [],
     blockedBy: [],
-    taskListId: sessionId || '',
+    taskListId: sessionId,
   }))
 }
 
-export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
-  sessionId: null,
-  tasks: [],
-  resetting: false,
-  expanded: false,
-  completedAndDismissed: false,
-  dismissedCompletionKey: null,
+const clearedCounts = new Map<string, number>()
 
-  fetchSessionTasks: async (sessionId) => {
-    if (get().sessionId !== sessionId) {
-      set({
-        sessionId,
+function clearCount(sessionId: string) {
+  return clearedCounts.get(sessionId) ?? 0
+}
+
+export function getSessionTasks(state: Pick<CLITaskStore, 'bySession'>, sessionId: string): SessionTasks {
+  return state.bySession[sessionId] ?? EMPTY_SESSION_TASKS
+}
+
+export const useCLITaskStore = create<CLITaskStore>((set, get) => {
+  const patch = (sessionId: string, update: (current: SessionTasks) => Partial<SessionTasks>) =>
+    set((state) => {
+      const current = getSessionTasks(state, sessionId)
+      return { bySession: { ...state.bySession, [sessionId]: { ...current, ...update(current) } } }
+    })
+
+  const applyTasks = (sessionId: string, tasks: CLITask[]) =>
+    patch(sessionId, (current) => ({ tasks, ...resolveDismissState(tasks, current.dismissedCompletionKey) }))
+
+  return {
+    bySession: {},
+
+    fetchSessionTasks: async (sessionId) => {
+      const cleared = clearCount(sessionId)
+      const current = () => clearCount(sessionId) === cleared && !getSessionTasks(get(), sessionId).resetting
+      try {
+        const { tasks } = await cliTasksApi.getTasksForList(sessionId)
+        if (current()) applyTasks(sessionId, tasks)
+      } catch {
+        if (current()) {
+          patch(sessionId, () => ({ tasks: [], completedAndDismissed: false, dismissedCompletionKey: null, expanded: false }))
+        }
+      }
+    },
+
+    refreshTasks: async (sessionId) => {
+      const cleared = clearCount(sessionId)
+      try {
+        const { tasks } = await cliTasksApi.getTasksForList(sessionId)
+        if (clearCount(sessionId) === cleared && !getSessionTasks(get(), sessionId).resetting) applyTasks(sessionId, tasks)
+      } catch (error) {
+        console.warn('[tasks] Failed to refresh the task list', sessionId, error)
+      }
+    },
+
+    setTasksFromTodos: (todos, sessionId) => {
+      applyTasks(sessionId, mapTodosToTasks(todos, sessionId))
+    },
+
+    markCompletedAndDismissed: (sessionId) => {
+      const completionKey = buildCompletedTaskKey(getSessionTasks(get(), sessionId).tasks)
+      if (!completionKey) return
+      patch(sessionId, () => ({
+        completedAndDismissed: true,
+        dismissedCompletionKey: completionKey,
+        expanded: false,
+      }))
+    },
+
+    resetCompletedTasks: async (sessionId) => {
+      if (!buildCompletedTaskKey(getSessionTasks(get(), sessionId).tasks)) return
+
+      patch(sessionId, () => ({
         tasks: [],
-        resetting: false,
+        resetting: true,
         completedAndDismissed: false,
         dismissedCompletionKey: null,
         expanded: false,
+      }))
+
+      try {
+        await cliTasksApi.resetTaskList(sessionId)
+      } finally {
+        if (get().bySession[sessionId]) patch(sessionId, () => ({ resetting: false }))
+      }
+    },
+
+    clearTasks: (sessionId) => {
+      clearedCounts.set(sessionId, clearCount(sessionId) + 1)
+      set((state) => {
+        if (!(sessionId in state.bySession)) return state
+        const { [sessionId]: _removed, ...rest } = state.bySession
+        return { bySession: rest }
       })
-    }
+    },
 
-    try {
-      const { tasks } = await cliTasksApi.getTasksForList(sessionId)
-      if (get().sessionId === sessionId && !get().resetting) {
-        set((state) => ({
-          tasks,
-          ...resolveDismissState(tasks, state.dismissedCompletionKey),
-        }))
-      }
-    } catch {
-      if (get().sessionId === sessionId && !get().resetting) {
-        set({ tasks: [], completedAndDismissed: false, dismissedCompletionKey: null, expanded: false })
-      }
-    }
-  },
-
-  refreshTasks: async (targetSessionId) => {
-    const sessionId = targetSessionId ?? get().sessionId
-    if (!sessionId) return
-    try {
-      const { tasks } = await cliTasksApi.getTasksForList(sessionId)
-      if (get().sessionId === sessionId && !get().resetting) {
-        set((state) => ({
-          tasks,
-          ...resolveDismissState(tasks, state.dismissedCompletionKey),
-        }))
-      }
-    } catch {
-    }
-  },
-
-  setTasksFromTodos: (todos, targetSessionId) => {
-    const sessionId = targetSessionId ?? get().sessionId
-    if (!sessionId || get().sessionId !== sessionId) return
-    const tasks = mapTodosToTasks(todos, sessionId)
-    set((state) => ({
-      tasks,
-      ...resolveDismissState(tasks, state.dismissedCompletionKey),
-    }))
-  },
-
-  markCompletedAndDismissed: (targetSessionId) => {
-    const sessionId = targetSessionId ?? get().sessionId
-    if (!sessionId || get().sessionId !== sessionId) return
-    const completionKey = buildCompletedTaskKey(get().tasks)
-    if (!completionKey) return
-
-    set({
-      completedAndDismissed: true,
-      dismissedCompletionKey: completionKey,
-      expanded: false,
-    })
-  },
-
-  resetCompletedTasks: async (targetSessionId) => {
-    const sessionId = targetSessionId ?? get().sessionId
-    if (!sessionId || get().sessionId !== sessionId) return
-    const { tasks } = get()
-    const completionKey = buildCompletedTaskKey(tasks)
-    if (!completionKey) return
-
-    set({
-      tasks: [],
-      resetting: true,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-      expanded: false,
-    })
-
-    try {
-      await cliTasksApi.resetTaskList(sessionId)
-    } finally {
-      if (get().sessionId === sessionId) {
-        set({ resetting: false })
-      }
-    }
-  },
-
-  clearTasks: (targetSessionId) => {
-    if (targetSessionId && get().sessionId !== targetSessionId) return
-    set({
-      sessionId: null,
-      tasks: [],
-      resetting: false,
-      completedAndDismissed: false,
-      dismissedCompletionKey: null,
-      expanded: false,
-    })
-  },
-
-  toggleExpanded: () => {
-    set((s) => ({ expanded: !s.expanded }))
-  },
-}))
+    toggleExpanded: (sessionId) => {
+      patch(sessionId, (current) => ({ expanded: !current.expanded }))
+    },
+  }
+})

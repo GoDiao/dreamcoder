@@ -1,4 +1,4 @@
-import { AppWindow, ArrowUpRight, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, ClipboardCopy, Copy, FileCode, FileDiffIcon, FolderOpen, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Eye, WrapText, Globe, ImageOffIcon, LayoutGrid, Layers, Maximize2, MessageSquare, MessageSquarePlus, Minimize2, PanelRight, Plus, RefreshCw, SearchXIcon, SquareKanban, SquareTerminal, TextSelect, Inbox, type LucideIcon } from 'lucide-react'
+import { AppWindow, ArrowUpRight, ChevronDown, ChevronRight, CircleAlertIcon, CircleCheckIcon, ClipboardCopy, Copy, FileCode, FileDiffIcon, FolderOpen, FolderOpenIcon, FolderTree, FolderXIcon, GitBranchIcon, Eye, WrapText, Globe, ImageOffIcon, LayoutGrid, Layers, Maximize2, MessageSquare, MessageSquarePlus, MessagesSquare, Minimize2, PanelRight, Pencil, Plus, RefreshCw, SearchXIcon, SquareArrowOutUpRight, SquareKanban, SquareTerminal, TextSelect, Inbox, X, type LucideIcon } from 'lucide-react'
 import type { UiPageSummary } from '@protocol'
 import { toast } from 'sonner'
 import { getTextSelectionFromContainer, type WorkspaceQuoteSelection, type WorkspaceTextSelection } from './workspaceSelection'
@@ -21,13 +21,14 @@ import type {
   WorkspaceStatusResult,
   WorkspaceTreeResult,
 } from '../../api/sessions'
-import { useTranslation } from '../../i18n'
+import { useTranslation, type TranslationKey } from '../../i18n'
 import { useShallow } from 'zustand/react/shallow'
 import {
   getShellDisplayName,
   getWorkspacePreviewId,
   makePreviewKey,
   makeTreeKey,
+  sideChatIds,
   useWorkspacePanelStore,
   type WorkspacePreviewEntry,
   type WorkspacePreviewKind,
@@ -44,6 +45,9 @@ import { TerminalSettings } from '../../pages/TerminalSettings'
 import { ArtifactsView } from './ArtifactsView'
 import { BrowserView } from './BrowserView'
 import { UiPageFrame } from '../chat/UiPageFrame'
+import { SessionConversation } from '../chat/SessionConversation'
+import { RenameSessionDialog } from '../layout/RenameSessionDialog'
+import { closeSideChat, detachSideChat } from '../../lib/sideChats'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { SearchField } from '../shared/SearchField'
 import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
@@ -1065,7 +1069,9 @@ const EMPTY_UI_PAGES: UiPageSummary[] = []
 function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRoot: string | null }) {
   const t = useTranslation()
   const [draft, setDraft] = useState('')
+  const [creatingSideChat, setCreatingSideChat] = useState(false)
   const openTab = useWorkspacePanelStore((state) => state.openTab)
+  const createSideChat = useWorkspacePanelStore((state) => state.createSideChat)
   const openAddress = useWorkspacePanelStore((state) => state.openAddress)
   const selectFile = useWorkspacePanelStore((state) => state.selectFile)
   const recentFiles = useWorkspacePanelStore((state) => state.panelByTab[sessionId]?.recentFiles ?? EMPTY_IDS)
@@ -1101,6 +1107,17 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
     })
   }
 
+  const startSideChat = async () => {
+    setCreatingSideChat(true)
+    try {
+      await createSideChat(sessionId)
+    } catch (error) {
+      toast.error(t('workspace.sideChat.createFailed', { error: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      setCreatingSideChat(false)
+    }
+  }
+
   return (
     <div data-testid="workspace-launcher" className="flex min-h-0 flex-1 items-center justify-center overflow-auto px-6 py-8">
       <div className="flex w-full max-w-xs flex-col gap-0.5">
@@ -1129,6 +1146,10 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
             </Button>
           )
         })}
+        <Button variant="ghost" size="row" loading={creatingSideChat} onClick={() => void startSideChat()}>
+          <MessagesSquare className="text-subtle-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate">{t('workspace.tabSideChat')}</span>
+        </Button>
         {recents.length > 0 && (
           <section className="mt-3 flex flex-col gap-0.5" aria-labelledby={`${sessionId}-launcher-recent`}>
             <h4 id={`${sessionId}-launcher-recent`} className="px-2 pb-1 text-xs text-subtle-foreground">
@@ -1164,9 +1185,10 @@ const TAB_ICONS: Record<WorkspaceTabKind, LucideIcon> = {
   uiPage: AppWindow,
   task: SquareKanban,
   inbox: Inbox,
+  sideChat: MessagesSquare,
 }
 
-function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab, taskTitles: Record<string, string>) {
+function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab, titles: Record<string, string>) {
   switch (tab.kind) {
     case 'launcher':
       return t('workspace.newTab')
@@ -1185,10 +1207,45 @@ function getTabTitle(t: ReturnType<typeof useTranslation>, tab: WorkspaceTab, ta
     case 'uiPage':
       return t('uiPage.revision', { title: tab.title, revision: tab.revision })
     case 'task':
-      return `#${tab.card} ${taskTitles[tab.id] ?? ''}`.trim()
+      return `#${tab.card} ${titles[tab.id] ?? ''}`.trim()
     case 'inbox':
       return t('kanban.inbox.title')
+    case 'sideChat':
+      return titles[tab.id] || t('workspace.tabSideChat')
   }
+}
+
+function SideChatTabTrigger({
+  panelId,
+  tab,
+  title,
+  children,
+}: {
+  panelId: string
+  tab: Extract<WorkspaceTab, { kind: 'sideChat' }>
+  title: string
+  children: (onClose: () => void) => ReactElement
+}) {
+  const t = useTranslation()
+  const [renaming, setRenaming] = useState(false)
+  const running = useChatStore((state) => (state.sessions[tab.sessionId]?.chatState ?? 'idle') !== 'idle')
+  const run = (action: (parentId: string, sideChat: typeof tab) => Promise<void>, failure: TranslationKey) => {
+    action(panelId, tab).catch((error: unknown) => {
+      toast.error(t(failure, { error: error instanceof Error ? error.message : String(error) }))
+    })
+  }
+  const close = () => run(closeSideChat, 'workspace.sideChat.closeFailed')
+  const actions: MenuAction[] = [
+    { id: 'rename', label: t('common.rename'), icon: <Pencil aria-hidden="true" />, afterClose: true, onSelect: () => setRenaming(true) },
+    { id: 'detach', label: t('workspace.sideChat.detach'), icon: <SquareArrowOutUpRight aria-hidden="true" />, disabled: running, onSelect: () => run(detachSideChat, 'workspace.sideChat.detachFailed') },
+    { id: 'close', label: t('workspace.sideChat.close'), icon: <X aria-hidden="true" />, danger: true, separatorBefore: true, onSelect: close },
+  ]
+  return (
+    <>
+      <RowActionMenu actions={actions}>{() => <div className="contents">{children(close)}</div>}</RowActionMenu>
+      <RenameSessionDialog sessionId={tab.sessionId} title={title} open={renaming} onClose={() => setRenaming(false)} />
+    </>
+  )
 }
 
 function WorkspaceRefresh({ sessionId }: { sessionId: string }) {
@@ -1241,8 +1298,25 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
   const closeTab = useWorkspacePanelStore((state) => state.closeTab)
   const toggleExpanded = useWorkspacePanelStore((state) => state.toggleExpanded)
   const closePanel = useWorkspacePanelStore((state) => state.closePanel)
+  const syncSideChats = useWorkspacePanelStore((state) => state.syncSideChats)
+  const connectToSession = useChatStore((state) => state.connectToSession)
   const taskTitles = useKanbanStore(useShallow((state) => Object.fromEntries(tabs.flatMap((tab) =>
     tab.kind === 'task' ? [[tab.id, state.views[tab.board]?.cards.find((card) => card.id === tab.card)?.title ?? '']] : []))))
+  const sideChatTitles = useChatStore(useShallow((state) => Object.fromEntries(tabs.flatMap((tab) =>
+    tab.kind === 'sideChat' ? [[tab.id, state.sessions[tab.sessionId]?.mirror?.title.text ?? '']] : []))))
+  const titles = useMemo(() => ({ ...taskTitles, ...sideChatTitles }), [taskTitles, sideChatTitles])
+  const connectedSideChats = sideChatIds(tabs).join(' ')
+
+  useEffect(() => {
+    if (tasksOnly) return
+    syncSideChats(sessionId).catch((error: unknown) => {
+      console.warn('[workspace] Failed to load side chats', sessionId, error)
+    })
+  }, [sessionId, syncSideChats, tasksOnly])
+
+  useEffect(() => {
+    for (const sideChatId of connectedSideChats.split(' ').filter(Boolean)) connectToSession(sideChatId, { prewarm: false })
+  }, [connectToSession, connectedSideChats])
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const expandLabel = expanded ? t('workspace.restorePanel') : t('workspace.expandPanel')
@@ -1260,9 +1334,11 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
       case 'file':
         return <FileTabView sessionId={tab.sessionId ?? sessionId} path={tab.path} />
       case 'browser':
-        return <BrowserView sessionId={sessionId} tab={tab} projectRoot={projectRoot} />
+        return <BrowserView sessionId={tab.sessionId ?? sessionId} tab={tab} projectRoot={projectRoot} />
       case 'uiPage':
-        return <UiPageTabView sessionId={sessionId} tab={tab} />
+        return <UiPageTabView sessionId={tab.sessionId ?? sessionId} tab={tab} />
+      case 'sideChat':
+        return <SessionConversation sessionId={tab.sessionId} compact primary={false} />
       case 'task':
         return <TaskDetail panelId={sessionId} board={tab.board} card={tab.card} poll={!tasksOnly} />
       case 'inbox':
@@ -1296,9 +1372,9 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
           )}
           <TabsList aria-label={t('workspace.panelTabs')} className="min-w-0 flex-1 justify-start overflow-x-auto overflow-y-hidden">
             {tabs.map((tab) => {
-              const title = getTabTitle(t, tab, taskTitles)
+              const title = getTabTitle(t, tab, titles)
               const Icon = TAB_ICONS[tab.kind]
-              return (
+              const trigger = (onClose: () => void) => (
                 <TabsClosableTrigger
                   key={tab.id}
                   value={tab.id}
@@ -1306,12 +1382,15 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
                   title={title}
                   icon={<Icon aria-hidden="true" />}
                   closeLabel={t('workspace.closeTab', { name: title })}
-                  onClose={() => closeTab(sessionId, tab.id)}
+                  onClose={onClose}
                   className="max-w-44"
                 >
                   {title}
                 </TabsClosableTrigger>
               )
+              return tab.kind === 'sideChat'
+                ? <SideChatTabTrigger key={tab.id} panelId={sessionId} tab={tab} title={title}>{trigger}</SideChatTabTrigger>
+                : trigger(() => closeTab(sessionId, tab.id))
             })}
           </TabsList>
           {!tasksOnly && (

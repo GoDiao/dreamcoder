@@ -7,7 +7,6 @@ import { useState, type ReactNode } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { boardForProject, useKanbanStore } from '../../stores/kanbanStore'
 import { useSessionStore } from '../../stores/sessionStore'
-import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { Button } from '../shared/ui/button'
@@ -17,7 +16,7 @@ import { getCuaToolDisplay } from '../../lib/cuaToolDisplay'
 import type { PermissionResolution } from '../../types/chat'
 
 type Props = {
-  sessionId?: string | null
+  sessionId: string
   requestId: string
   toolName: string
   input: unknown
@@ -204,14 +203,12 @@ function resolutionLabelKey(resolution: PermissionResolution | undefined): Trans
 
 export function PermissionDialog({ sessionId, requestId, toolName, input, description, alwaysAsks, resolution }: Props) {
   const respondToPermission = useChatStore((s) => s.respondToPermission)
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const targetSessionId = sessionId ?? activeTabId
   const isPending = useChatStore((s) =>
-    targetSessionId ? s.sessions[targetSessionId]?.pendingPermission?.requestId === requestId : false,
+    s.sessions[sessionId]?.pendingPermission?.requestId === requestId,
   )
   const t = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
-  const projectRoot = useSessionStore((s) => s.sessions.find((session) => session.id === targetSessionId)?.projectRoot)
+  const projectRoot = useSessionStore((s) => s.sessions.find((session) => session.id === sessionId)?.projectRoot)
   const assign = kanbanAssign(toolName, input)
   const cancel = kanbanCancel(toolName, input)
   const acceptance = kanbanAcceptance(toolName, input)
@@ -324,7 +321,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
         <div className="flex items-center gap-2 px-4 py-3">
           <Button
             size="sm"
-            onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true)}
+            onClick={() => respondToPermission(sessionId, requestId, true)}
           >
             <Check data-icon="inline-start" aria-hidden="true" />
             {t('permission.allow')}
@@ -333,7 +330,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, true, { rule: 'always' })}
+              onClick={() => respondToPermission(sessionId, requestId, true, { rule: 'always' })}
             >
               <BadgeCheck data-icon="inline-start" aria-hidden="true" />
               {t('permission.allowForSession')}
@@ -343,7 +340,7 @@ export function PermissionDialog({ sessionId, requestId, toolName, input, descri
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => targetSessionId && respondToPermission(targetSessionId, requestId, false)}
+            onClick={() => respondToPermission(sessionId, requestId, false)}
           >
             <X data-icon="inline-start" aria-hidden="true" />
             {t('permission.deny')}

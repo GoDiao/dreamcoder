@@ -9,6 +9,8 @@ import {
 import { artifactsApi } from '../api/artifacts'
 import { designApi } from '../api/design'
 import { closeBrowser, submitBrowserInput } from '../lib/browserGuests'
+import { useChatStore } from './chatStore'
+import { isDeletedSession } from './sessionStore'
 import type { ArtifactListItem } from '../types/artifact'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
 import { destroyTerminalRuntime } from '../lib/terminalRuntime'
@@ -50,11 +52,12 @@ export type WorkspaceTab =
   | { id: string; kind: 'files' }
   | { id: string; kind: 'artifacts' }
   | { id: string; kind: 'file'; path: string; sessionId?: string }
-  | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
+  | { id: string; kind: 'browser'; url: string; title: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate; sessionId?: string }
   | { id: string; kind: 'terminal'; index: number; shell?: string; cwd?: string }
-  | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string }
+  | { id: string; kind: 'uiPage'; pageId: string; revision: number; title: string; sessionId?: string }
   | { id: string; kind: 'task'; board: string; card: number }
   | { id: string; kind: 'inbox'; board: string }
+  | { id: string; kind: 'sideChat'; sessionId: string }
 
 export type WorkspaceTabKind = WorkspaceTab['kind']
 
@@ -62,10 +65,11 @@ export type WorkspaceTabTarget =
   | { kind: 'launcher' | 'changes' | 'files' | 'artifacts' }
   | { kind: 'terminal'; cwd?: string }
   | { kind: 'file'; path: string; sessionId?: string }
-  | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate }
-  | { kind: 'uiPage'; pageId: string; revision: number; title: string }
+  | { kind: 'browser'; url: string; root?: string; artifact?: BrowserTabArtifact; template?: BrowserTabTemplate; sessionId?: string }
+  | { kind: 'uiPage'; pageId: string; revision: number; title: string; sessionId?: string }
   | { kind: 'task'; board: string; card: number }
   | { kind: 'inbox'; board: string }
+  | { kind: 'sideChat'; sessionId: string }
 
 export type WorkspacePanelSessionState = {
   isOpen: boolean
@@ -123,6 +127,8 @@ type WorkspacePanelStore = {
   refreshPreviews: (sessionId: string) => Promise<void>
   releaseSession: (sessionId: string) => void
   clearSession: (sessionId: string) => void
+  createSideChat: (sessionId: string) => Promise<void>
+  syncSideChats: (sessionId: string) => Promise<void>
 }
 
 type WorkspaceTabPatch = { url?: string; title?: string; shell?: string; artifact?: BrowserTabArtifact }
@@ -241,7 +247,9 @@ function isSameTarget(tab: WorkspaceTab, target: WorkspaceTabTarget) {
     case 'file':
       return tab.kind === 'file' && tab.path === target.path && tab.sessionId === target.sessionId
     case 'uiPage':
-      return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision
+      return tab.kind === 'uiPage' && tab.pageId === target.pageId && tab.revision === target.revision && tab.sessionId === target.sessionId
+    case 'sideChat':
+      return tab.kind === 'sideChat' && tab.sessionId === target.sessionId
     case 'task':
       return tab.kind === 'task' && tab.board === target.board && tab.card === target.card
     case 'inbox':
@@ -268,9 +276,12 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
         ...(target.root !== undefined && { root: target.root }),
         ...(target.artifact !== undefined && { artifact: target.artifact }),
         ...(target.template !== undefined && { template: target.template }),
+        ...(target.sessionId !== undefined && { sessionId: target.sessionId }),
       }
     case 'uiPage':
-      return { id, kind: 'uiPage', pageId: target.pageId, revision: target.revision, title: target.title }
+      return { id, kind: 'uiPage', pageId: target.pageId, revision: target.revision, title: target.title, ...(target.sessionId ? { sessionId: target.sessionId } : {}) }
+    case 'sideChat':
+      return { id, kind: 'sideChat', sessionId: target.sessionId }
     case 'task':
       return { id, kind: 'task', board: target.board, card: target.card }
     case 'inbox':
@@ -287,6 +298,45 @@ function createTab(target: WorkspaceTabTarget, tabs: WorkspaceTab[]): WorkspaceT
 function disposeTab(tab: WorkspaceTab) {
   if (tab.kind === 'terminal') destroyTerminalRuntime(tab.id)
   if (tab.kind === 'browser') closeBrowser(tab.id)
+  if (tab.kind === 'sideChat') useChatStore.getState().disconnectSession(tab.sessionId)
+}
+
+export function findSideChatParent(
+  panelByTab: Record<string, WorkspacePanelSessionState | undefined>,
+  sessionId: string,
+): string | null {
+  for (const [parentId, panel] of Object.entries(panelByTab)) {
+    if (panel?.tabs.some((tab) => tab.kind === 'sideChat' && tab.sessionId === sessionId)) return parentId
+  }
+  return null
+}
+
+export function sideChatIds(tabs: WorkspaceTab[]): string[] {
+  return tabs.flatMap((tab) => tab.kind === 'sideChat' ? [tab.sessionId] : [])
+}
+
+function panelOwner(panelByTab: Record<string, WorkspacePanelSessionState | undefined>, sessionId: string) {
+  return findSideChatParent(panelByTab, sessionId) ?? sessionId
+}
+
+function withContentSession(target: WorkspaceTabTarget, sessionId: string): WorkspaceTabTarget {
+  switch (target.kind) {
+    case 'file':
+    case 'browser':
+    case 'uiPage':
+      return target.sessionId === undefined ? { ...target, sessionId } : target
+    default:
+      return target
+  }
+}
+
+function resolvePanelTarget(
+  panelByTab: Record<string, WorkspacePanelSessionState | undefined>,
+  requestedSessionId: string,
+  target: WorkspaceTabTarget,
+) {
+  const sessionId = panelOwner(panelByTab, requestedSessionId)
+  return { sessionId, target: sessionId === requestedSessionId ? target : withContentSession(target, requestedSessionId) }
 }
 
 async function isWorkspaceFile(sessionId: string, path: string) {
@@ -314,6 +364,10 @@ function isStoredBrowserTabTemplate(value: unknown): value is BrowserTabTemplate
   return !!value && typeof value === 'object' && typeof (value as Record<string, unknown>).id === 'string'
 }
 
+function isOptionalString(value: unknown) {
+  return value === undefined || typeof value === 'string'
+}
+
 function isStoredTab(value: unknown): value is WorkspaceTab {
   if (!value || typeof value !== 'object') return false
   const tab = value as Record<string, unknown>
@@ -325,14 +379,17 @@ function isStoredTab(value: unknown): value is WorkspaceTab {
     case 'artifacts':
       return true
     case 'file':
-      return typeof tab.path === 'string' && (tab.sessionId === undefined || typeof tab.sessionId === 'string')
+      return typeof tab.path === 'string' && isOptionalString(tab.sessionId)
     case 'browser':
       return typeof tab.url === 'string' && typeof tab.title === 'string'
-        && (tab.root === undefined || typeof tab.root === 'string')
+        && isOptionalString(tab.root)
         && (tab.artifact === undefined || isStoredBrowserTabArtifact(tab.artifact))
         && (tab.template === undefined || isStoredBrowserTabTemplate(tab.template))
+        && isOptionalString(tab.sessionId)
     case 'uiPage':
-      return typeof tab.pageId === 'string' && typeof tab.revision === 'number' && typeof tab.title === 'string'
+      return typeof tab.pageId === 'string' && typeof tab.revision === 'number' && typeof tab.title === 'string' && isOptionalString(tab.sessionId)
+    case 'sideChat':
+      return typeof tab.sessionId === 'string'
     case 'task':
       return typeof tab.board === 'string' && typeof tab.card === 'number'
     case 'inbox':
@@ -415,11 +472,13 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     return panel.tabs.find((tab) => tab.id === panel.activeTabId) ?? null
   },
 
-  openTab: (sessionId, target) => {
+  openTab: (requestedSessionId, requestedTarget) => {
+    const { sessionId, target } = resolvePanelTarget(get().panelByTab, requestedSessionId, requestedTarget)
+    const fromSideChat = sessionId !== requestedSessionId
     const panel = getSessionPanelState(get().panelByTab, sessionId)
     const existing = panel.tabs.find((tab) => isSameTarget(tab, target))
     const active = panel.tabs.find((tab) => tab.id === panel.activeTabId)
-    const replaced = active?.kind === 'launcher' && target.kind !== 'launcher' ? active : null
+    const replaced = !fromSideChat && active?.kind === 'launcher' && target.kind !== 'launcher' ? active : null
     const tab = existing ?? createTab(target, panel.tabs)
     const tabs = existing
       ? panel.tabs.filter((candidate) => candidate !== replaced)
@@ -428,12 +487,15 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
         : [...panel.tabs, tab]
     const recentFiles = target.kind === 'file' ? pushRecentFile(panel.recentFiles, target.path) : panel.recentFiles
     set((state) => ({
-      panelByTab: patchSessionPanel(state.panelByTab, sessionId, { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, fromSideChat
+        ? { tabs, recentFiles }
+        : { isOpen: true, tabs, activeTabId: tab.id, recentFiles }),
     }))
     return tab.id
   },
 
-  selectFile: (sessionId, path) => {
+  selectFile: (requestedSessionId, path) => {
+    const sessionId = panelOwner(get().panelByTab, requestedSessionId)
     const panel = getSessionPanelState(get().panelByTab, sessionId)
     const recentFiles = pushRecentFile(panel.recentFiles, path)
     set((state) => ({
@@ -460,7 +522,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   openArtifact: async (sessionId, item, root) => {
     if (!item.id) throw new Error('This artifact has no id')
     const target: WorkspaceTabTarget = { kind: 'browser', url: '', root, artifact: { id: item.id, name: item.name, mtimeMs: item.latestMtimeMs, ...(item.manifest?.kind === 'canvas' && { canvas: true as const }) } }
-    const panel = getSessionPanelState(get().panelByTab, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, panelOwner(get().panelByTab, sessionId))
     if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
       get().openTab(sessionId, target)
       return
@@ -472,7 +534,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   openTemplatePreview: async (sessionId, templateId) => {
     const target: WorkspaceTabTarget = { kind: 'browser', url: '', template: { id: templateId } }
-    const panel = getSessionPanelState(get().panelByTab, sessionId)
+    const panel = getSessionPanelState(get().panelByTab, panelOwner(get().panelByTab, sessionId))
     if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
       get().openTab(sessionId, target)
       return
@@ -482,14 +544,16 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     await submitBrowserInput(sessionId, tabId, opened.filePath, opened.rootDir)
   },
 
-  activateTab: (sessionId, tabId) =>
+  activateTab: (requestedSessionId, tabId) =>
     set((state) => {
+      const sessionId = panelOwner(state.panelByTab, requestedSessionId)
       const panel = getSessionPanelState(state.panelByTab, sessionId)
       if (!panel.tabs.some((tab) => tab.id === tabId)) return state
       return { panelByTab: patchSessionPanel(state.panelByTab, sessionId, { activeTabId: tabId }) }
     }),
 
-  closeTab: (sessionId, tabId) => {
+  closeTab: (requestedSessionId, tabId) => {
+    const sessionId = panelOwner(get().panelByTab, requestedSessionId)
     const panel = getSessionPanelState(get().panelByTab, sessionId)
     const index = panel.tabs.findIndex((tab) => tab.id === tabId)
     if (index < 0) return
@@ -507,8 +571,9 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
     }))
   },
 
-  patchTab: (sessionId, tabId, patch) =>
+  patchTab: (requestedSessionId, tabId, patch) =>
     set((state) => {
+      const sessionId = panelOwner(state.panelByTab, requestedSessionId)
       const panel = state.panelByTab[sessionId]
       const tab = panel?.tabs.find((candidate) => candidate.id === tabId)
       if (!panel || !tab) return state
@@ -521,15 +586,16 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
       }
     }),
 
-  closePanel: (sessionId) =>
+  closePanel: (requestedSessionId) =>
     set((state) => ({
-      panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
+      panelByTab: patchSessionPanel(state.panelByTab, panelOwner(state.panelByTab, requestedSessionId), {
         isOpen: false,
         expanded: false,
       }),
     })),
 
-  togglePanel: (sessionId) => {
+  togglePanel: (requestedSessionId) => {
+    const sessionId = panelOwner(get().panelByTab, requestedSessionId)
     const panel = getSessionPanelState(get().panelByTab, sessionId)
     if (panel.isOpen) {
       get().closePanel(sessionId)
@@ -551,7 +617,8 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   setWidth: (width) => set({ width: clampWorkspacePanelWidth(width) }),
 
-  loadStatus: async (sessionId) => {
+  loadStatus: async (requestedSessionId) => {
+    const sessionId = panelOwner(get().panelByTab, requestedSessionId)
     const requestId = nextRequestId(statusRequestIds, sessionId)
 
     set((state) => ({
@@ -802,6 +869,36 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   clearSession: (sessionId) => {
     get().releaseSession(sessionId)
     set((state) => ({ panelByTab: removeRecordKey(state.panelByTab, sessionId) }))
+  },
+
+  createSideChat: async (sessionId) => {
+    const created = await sessionsApi.branch(sessionId, { kind: 'side' })
+    get().openTab(sessionId, { kind: 'sideChat', sessionId: created.sessionId })
+  },
+
+  syncSideChats: async (sessionId) => {
+    const listed = new Set(sideChatIds(get().panelByTab[sessionId]?.tabs ?? []))
+    const sessions = (await sessionsApi.listSideChats(sessionId)).sessions.filter((session) => !isDeletedSession(session.id))
+    const existing = new Set(sessions.map((session) => session.id))
+    const panel = get().panelByTab[sessionId]
+    const tabs = panel?.tabs ?? []
+    const stale = tabs.filter((tab) => tab.kind === 'sideChat' && listed.has(tab.sessionId) && !existing.has(tab.sessionId))
+    const known = new Set(sideChatIds(tabs))
+    const missing = sessions.filter((session) => !known.has(session.id))
+    if (stale.length === 0 && missing.length === 0) return
+    stale.forEach(disposeTab)
+    const nextTabs = [
+      ...tabs.filter((tab) => !stale.includes(tab)),
+      ...missing.map((session): WorkspaceTab => ({ id: newTabId(), kind: 'sideChat', sessionId: session.id })),
+    ]
+    const activeTabId = nextTabs.some((tab) => tab.id === panel?.activeTabId) ? panel?.activeTabId ?? null : nextTabs.at(-1)?.id ?? null
+    set((state) => ({
+      panelByTab: patchSessionPanel(state.panelByTab, sessionId, {
+        tabs: nextTabs,
+        activeTabId,
+        ...(nextTabs.length === 0 ? { isOpen: false, expanded: false } : {}),
+      }),
+    }))
   },
 }))
 

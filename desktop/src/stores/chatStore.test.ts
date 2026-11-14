@@ -132,11 +132,12 @@ vi.mock('./kanbanStore', () => ({
 }))
 
 vi.mock('./cliTaskStore', () => ({
+  getSessionTasks: (state: { bySession: Record<string, { tasks: unknown[] } | undefined> }, sessionId: string) =>
+    state.bySession[sessionId] ?? { tasks: [] },
   useCLITaskStore: {
     getState: () => ({
       fetchSessionTasks: fetchSessionTasksMock,
-      tasks: cliTaskStoreSnapshot.tasks,
-      sessionId: cliTaskStoreSnapshot.sessionId,
+      bySession: cliTaskStoreSnapshot.sessionId ? { [cliTaskStoreSnapshot.sessionId]: { tasks: cliTaskStoreSnapshot.tasks } } : {},
       clearTasks: clearTasksMock,
       setTasksFromTodos: setTasksFromTodosMock,
       markCompletedAndDismissed: markCompletedAndDismissedMock,
@@ -1264,6 +1265,25 @@ describe('chatStore history mapping', () => {
     sendSnapshot(mirrorState({ version: 2 }))
 
     expect(sendMock.mock.calls.filter(([, message]) => message.type === 'prewarm_session')).toHaveLength(1)
+  })
+
+  it('connects a session without prewarming it when asked to', () => {
+    useChatStore.getState().connectToSession(TEST_SESSION_ID, { prewarm: false })
+    sendSnapshot(mirrorState())
+
+    expect(sendMock).not.toHaveBeenCalledWith(TEST_SESSION_ID, { type: 'prewarm_session' })
+  })
+
+  it('prewarms a session on request, once its snapshot has arrived or right away when it already has', () => {
+    useChatStore.getState().connectToSession(TEST_SESSION_ID, { prewarm: false })
+    useChatStore.getState().prewarmSession(TEST_SESSION_ID)
+    expect(sendMock).not.toHaveBeenCalledWith(TEST_SESSION_ID, { type: 'prewarm_session' })
+
+    sendSnapshot(mirrorState())
+    expect(sendMock.mock.calls.filter(([, message]) => message.type === 'prewarm_session')).toHaveLength(1)
+
+    useChatStore.getState().prewarmSession(TEST_SESSION_ID)
+    expect(sendMock.mock.calls.filter(([, message]) => message.type === 'prewarm_session')).toHaveLength(2)
   })
 
   it('does not prewarm team member sessions', () => {

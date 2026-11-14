@@ -1,4 +1,6 @@
 import * as fs from 'node:fs/promises'
+import type { Stats } from 'node:fs'
+import pMap from 'p-map'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -270,6 +272,10 @@ type PersistedWorktreeSession = {
   hookBased?: boolean
 }
 
+type SessionFile = { filePath: string; projectDir: string; sessionId: string }
+
+type StatedSessionFile = SessionFile & { stat: Stats }
+
 async function readWindow(handle: fs.FileHandle, position: number, length: number): Promise<Buffer> {
   if (length <= 0) return Buffer.alloc(0)
   const buf = Buffer.allocUnsafe(length)
@@ -310,6 +316,7 @@ function completeWindowLines(
 }
 
 const HEAD_READ_CHUNK = 64 * 1024
+const FILE_SCAN_CONCURRENCY = 16
 
 /**
  * First `limit` non-empty lines, then stop. A snapshot line can be larger
@@ -664,9 +671,7 @@ export class SessionService {
     return null
   }
 
-  private async discoverSessionFiles(projectFilter?: string): Promise<
-    Array<{ filePath: string; projectDir: string; sessionId: string }>
-  > {
+  private async discoverSessionFiles(projectFilter?: string): Promise<SessionFile[]> {
     const projectsDir = this.getProjectsDir()
     let projectDirs: string[]
 
@@ -681,37 +686,36 @@ export class SessionService {
       projectDirs = projectDirs.filter((d) => d === sanitized)
     }
 
-    const results: Array<{ filePath: string; projectDir: string; sessionId: string }> = []
-
+    const results: SessionFile[] = []
     for (const dir of projectDirs) {
-      const dirPath = path.join(projectsDir, dir)
+      results.push(...await this.sessionFilesInProjectDir(dir))
+    }
+    return results
+  }
 
-      try {
-        const stat = await fs.stat(dirPath)
-        if (!stat.isDirectory()) continue
-      } catch {
-        continue
-      }
-
-      let files: string[]
-      try {
-        files = await fs.readdir(dirPath)
-      } catch {
-        continue
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.jsonl')) continue
-        const sessionId = file.replace('.jsonl', '')
-        results.push({
-          filePath: path.join(dirPath, file),
-          projectDir: dir,
-          sessionId,
-        })
-      }
+  private async sessionFilesInProjectDir(dir: string): Promise<SessionFile[]> {
+    const dirPath = path.join(this.getProjectsDir(), dir)
+    try {
+      const stat = await fs.stat(dirPath)
+      if (!stat.isDirectory()) return []
+    } catch {
+      return []
     }
 
-    return results
+    let files: string[]
+    try {
+      files = await fs.readdir(dirPath)
+    } catch {
+      return []
+    }
+
+    return files
+      .filter((file) => file.endsWith('.jsonl'))
+      .map((file) => ({
+        filePath: path.join(dirPath, file),
+        projectDir: dir,
+        sessionId: file.replace('.jsonl', ''),
+      }))
   }
 
   desanitizePath(sanitized: string): string {
@@ -1066,10 +1070,83 @@ export class SessionService {
     limit?: number
     offset?: number
     includeLastAssistantMessage?: boolean
+    sideChatsOf?: string
   }): Promise<{ sessions: SessionListItem[]; total: number }> {
     const mem0 = process.memoryUsage()
     console.log(`[mem:sidecar] listSessions:start rss=${(mem0.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem0.heapUsed/1024/1024).toFixed(1)}MB`)
-    const sessionFiles = await this.discoverSessionFiles(options?.project)
+    const filesWithStats = await this.statSessionFiles(await this.discoverSessionFiles(options?.project))
+
+    const total = filesWithStats.length
+    const offset = options?.offset ?? 0
+    const limit = options?.limit ?? 50
+    const page = await Promise.all(
+      filesWithStats.slice(offset, offset + limit).map((file) => this.buildSessionListItem(file, options?.includeLastAssistantMessage)),
+    )
+    const items = page.filter((item): item is SessionListItem =>
+      item !== null && (
+        item.parent?.kind !== 'side' ||
+        item.id === options?.sideChatsOf ||
+        item.parent.sessionId === options?.sideChatsOf
+      ),
+    )
+
+    const mem1 = process.memoryUsage()
+    console.log(`[mem:sidecar] listSessions:done total=${total} returned=${items.length} rss=${(mem1.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem1.heapUsed/1024/1024).toFixed(1)}MB`)
+    return { sessions: items, total }
+  }
+
+  async listSideChats(parentId: string): Promise<SessionListItem[]> {
+    const files = await this.statSessionFiles(await this.findSideChatFiles([parentId]))
+    const items = await pMap(files, (file) => this.buildSessionListItem(file), { concurrency: FILE_SCAN_CONCURRENCY })
+    return items.filter((item): item is SessionListItem => item !== null)
+  }
+
+  async findSideChatIds(parentIds: string[]): Promise<string[]> {
+    return (await this.findSideChatFiles(parentIds)).map((file) => file.sessionId)
+  }
+
+  private async findSideChatFiles(parentIds: string[]): Promise<SessionFile[]> {
+    const parents = new Set(parentIds)
+    const projectDirs = new Set(
+      (await Promise.all(parentIds.map((parentId) => this.findSessionFile(parentId))))
+        .flatMap((found) => found ? [found.projectDir] : []),
+    )
+    const files = (await Promise.all([...projectDirs].map((dir) => this.sessionFilesInProjectDir(dir)))).flat()
+    const matches = await pMap(files, async (file) => {
+      try {
+        const { parent } = await this.readSessionRelation(file.filePath)
+        return parent?.kind === 'side' && parents.has(parent.sessionId) ? file : null
+      } catch (error) {
+        console.warn(`[SessionService] Could not read the relation of ${file.filePath}: ${error instanceof Error ? error.message : String(error)}`)
+        return null
+      }
+    }, { concurrency: FILE_SCAN_CONCURRENCY })
+    return matches.filter((file): file is SessionFile => file !== null)
+  }
+
+  private async readSessionRelation(filePath: string): Promise<SessionRelation> {
+    let handle: fs.FileHandle | undefined
+    try {
+      handle = await fs.open(filePath, 'r')
+      const { size } = await handle.stat()
+      const { lines } = await readHeadNonEmptyLines(handle, size, 100)
+      const entries = lines.flatMap((line) => {
+        try {
+          return [JSON.parse(line) as RawEntry]
+        } catch {
+          return []
+        }
+      })
+      return sessionRelationFromEntries(entries)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      throw error
+    } finally {
+      await handle?.close()
+    }
+  }
+
+  private async statSessionFiles(sessionFiles: SessionFile[]): Promise<StatedSessionFile[]> {
     const filesWithStats = (await Promise.all(sessionFiles.map(async (sessionFile) => {
       try {
         return {
@@ -1081,57 +1158,51 @@ export class SessionService {
       }
     }))).filter((item): item is NonNullable<typeof item> => item !== null)
 
-    filesWithStats.sort((a, b) => b.stat.mtime.getTime() - a.stat.mtime.getTime())
+    return filesWithStats.sort((a, b) => b.stat.mtime.getTime() - a.stat.mtime.getTime())
+  }
 
-    const total = filesWithStats.length
-    const offset = options?.offset ?? 0
-    const limit = options?.limit ?? 50
-    const paginatedFiles = filesWithStats.slice(offset, offset + limit)
+  private async buildSessionListItem(
+    { filePath, projectDir, sessionId, stat }: StatedSessionFile,
+    includeLastAssistantMessage?: boolean,
+  ): Promise<SessionListItem | null> {
+    try {
+      const { entries: headEntries, messageCount, lastAssistantMessage, messageCountExact } = await this.scanSessionFileHead(
+        filePath,
+        100,
+        100,
+        includeLastAssistantMessage,
+      )
+      const workDir = this.resolveWorkDirFromEntries(headEntries, projectDir)
+      const projectRoot = await this.resolveProjectRootFromEntries(headEntries, workDir, projectDir)
+      const workDirExists = await this.pathExists(workDir)
 
-    const items = (await Promise.all(paginatedFiles.map(async ({ filePath, projectDir, sessionId, stat }) => {
-      try {
-        const { entries: headEntries, messageCount, lastAssistantMessage, messageCountExact } = await this.scanSessionFileHead(
-          filePath,
-          100,
-          100,
-          options?.includeLastAssistantMessage,
-        )
-        const workDir = this.resolveWorkDirFromEntries(headEntries, projectDir)
-        const projectRoot = await this.resolveProjectRootFromEntries(headEntries, workDir, projectDir)
-        const workDirExists = await this.pathExists(workDir)
+      const title = this.extractTitle(headEntries)
 
-        const title = this.extractTitle(headEntries)
-
-        let createdAt = stat.birthtime.toISOString()
-        for (const e of headEntries) {
-          if (e.timestamp) {
-            createdAt = e.timestamp
-            break
-          }
+      let createdAt = stat.birthtime.toISOString()
+      for (const e of headEntries) {
+        if (e.timestamp) {
+          createdAt = e.timestamp
+          break
         }
-
-        return {
-          id: sessionId,
-          title,
-          ...sessionRelationFromEntries(headEntries),
-          createdAt,
-          modifiedAt: stat.mtime.toISOString(),
-          messageCount,
-          ...(messageCountExact ? {} : { messageCountExact: false }),
-          projectPath: projectDir,
-          projectRoot,
-          workDir,
-          workDirExists,
-          ...(options?.includeLastAssistantMessage ? { lastAssistantMessage } : {}),
-        }
-      } catch {
-        return null
       }
-    }))).filter((item): item is SessionListItem => item !== null)
 
-    const mem1 = process.memoryUsage()
-    console.log(`[mem:sidecar] listSessions:done total=${total} returned=${items.length} rss=${(mem1.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem1.heapUsed/1024/1024).toFixed(1)}MB`)
-    return { sessions: items, total }
+      return {
+        id: sessionId,
+        title,
+        ...sessionRelationFromEntries(headEntries),
+        createdAt,
+        modifiedAt: stat.mtime.toISOString(),
+        messageCount,
+        ...(messageCountExact ? {} : { messageCountExact: false }),
+        projectPath: projectDir,
+        projectRoot,
+        workDir,
+        workDirExists,
+        ...(includeLastAssistantMessage ? { lastAssistantMessage } : {}),
+      }
+    } catch {
+      return null
+    }
   }
 
   async listKnownWorkDirs(): Promise<Array<{ workDir: string; projectRoot: string | null }>> {
@@ -1453,6 +1524,24 @@ export class SessionService {
     const found = await this.findSessionFile(sessionId)
     if (!found) return
     await fs.unlink(found.filePath)
+  }
+
+  setSessionParent(sessionId: string, parent: SessionParent): Promise<void> {
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.writableSessionFile(sessionId)
+      if (!found) throw ApiError.notFound(`Session not found: ${sessionId}`)
+      const lines = (await fs.readFile(found.filePath, 'utf-8')).split('\n')
+      const rewritten = lines.map((line) => {
+        if (!line.includes('"session-meta"')) return line
+        try {
+          const entry = JSON.parse(line) as RawEntry
+          return entry.type === 'session-meta' && entry.parent ? JSON.stringify({ ...entry, parent }) : line
+        } catch {
+          return line
+        }
+      })
+      await fs.writeFile(found.filePath, rewritten.join('\n'), 'utf-8')
+    })
   }
 
   clearSessionTranscript(sessionId: string, fallbackWorkDir?: string): Promise<void> {

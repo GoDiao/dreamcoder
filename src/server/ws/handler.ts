@@ -41,7 +41,13 @@ import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
 import { artifactService } from '../services/artifactService.js'
-import { createLinkedSession, createSessionLinks, discardSession, isSessionRunning } from '../services/sessionLinksService.js'
+import {
+  createLinkedSession,
+  createSessionLinks,
+  discardSession,
+  isSessionRunning,
+  titleSideChat,
+} from '../services/sessionLinksService.js'
 import { createKanban } from '../services/kanbanService.js'
 import { createKanbanControl } from '../services/kanbanControl.js'
 import { createTurnQueue } from '../services/turnQueueService.js'
@@ -452,6 +458,7 @@ export async function deliverUserTurn(
     titleState.allUserMessages.push(titleInput)
     if (titleState.userMessageCount === 1) {
       titleState.firstUserMessage = titleInput
+      await renameSideChat(sessionId, titleInput)
     }
     triggerTitleGeneration(sessionId)
   }
@@ -563,7 +570,7 @@ async function handlePrewarmSession(ws: ServerWebSocket<WebSocketData>) {
   }
 
   const launchInfo = await sessionService.getSessionLaunchInfo(sessionId).catch(() => null)
-  if (launchInfo?.repository) {
+  if (launchInfo?.repository && launchInfo.transcriptMessageCount === 0) {
     console.log(`[WS] Skipping prewarm for pending repository launch session ${sessionId}`)
     return
   }
@@ -630,10 +637,6 @@ void permissionModesMatchCli
 
 export async function resolveSessionPermissionMode(sessionId: string): Promise<PermissionMode> {
   return (await store.read(sessionId)).permission.desired
-}
-
-export async function resolveSessionRuntimeSelection(sessionId: string): Promise<RuntimeSelection | null> {
-  return (await store.read(sessionId)).runtime.desired
 }
 
 function handleSetPermissionMode(
@@ -871,6 +874,15 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
   }
 
   store.apply(sessionId, { type: 'turn_ended' })
+}
+
+async function renameSideChat(sessionId: string, input: string): Promise<void> {
+  try {
+    const title = await titleSideChat(sessionId, input)
+    if (title) noteSessionRenamed(sessionId, title)
+  } catch (error) {
+    console.warn(`[WS] Could not title side chat ${sessionId}: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function triggerTitleGeneration(sessionId: string): void {
@@ -1371,19 +1383,6 @@ export function updateSessionSlashCommands(
   }
 
   return normalized
-}
-
-export function closeSessionConnection(sessionId: string, reason = 'session closed'): boolean {
-  // Dispose before closing sockets so their close events find no session and are ignored.
-  const clients = disposeSessionRuntime(sessionId)?.clients
-  store.dispose(sessionId)
-  conversationService.forgetSession(sessionId)
-  if (!clients || clients.size === 0) return false
-
-  for (const ws of clients) {
-    ws.close(1000, reason)
-  }
-  return true
 }
 
 export type TeamRole = 'lead' | 'member'

@@ -6,14 +6,17 @@ import type { WorkspaceArtifactsResult } from '../types/artifact'
 
 type SessionsResponse = { sessions: SessionListItem[]; total: number }
 type CreateSessionResponse = { sessionId: string; workDir?: string }
+export type DeleteSessionFailure = {
+  sessionId: string
+  message: string
+  code?: string
+}
+
 export type BatchDeleteSessionsResponse = {
   ok: boolean
   successes: string[]
-  failures: Array<{
-    sessionId: string
-    message: string
-    code?: string
-  }>
+  failures: DeleteSessionFailure[]
+  sideChatFailures: DeleteSessionFailure[]
 }
 export type SessionGitWorktreeInfo = {
   enabled: boolean
@@ -40,16 +43,15 @@ export type CreateSessionRequest = {
   permissionMode?: PermissionMode
   runtime?: RuntimeSelection
 }
-export type BranchSessionRequest = {
-  targetMessageId: string
-  title?: string
-}
+export type BranchSessionRequest =
+  | { targetMessageId: string; title?: string }
+  | { kind: 'side' }
 export type BranchSessionResponse = {
   sessionId: string
   title: string
   workDir: string | null
   sourceSessionId: string
-  targetMessageId: string
+  targetMessageId?: string
 }
 export type RepositoryBranchInfo = {
   name: string
@@ -348,8 +350,16 @@ export const sessionsApi = {
     return api.post<BranchSessionResponse>(`/api/sessions/${sessionId}/branch`, body)
   },
 
+  listSideChats(sessionId: string) {
+    return api.get<{ sessions: SessionListItem[] }>(`/api/sessions/${sessionId}/side-chats`)
+  },
+
+  detach(sessionId: string) {
+    return api.patch<{ ok: true }>(`/api/sessions/${sessionId}`, { detach: true })
+  },
+
   delete(sessionId: string) {
-    return api.delete<{ ok: true }>(`/api/sessions/${sessionId}`)
+    return api.delete<{ ok: true; sideChatFailures: DeleteSessionFailure[] }>(`/api/sessions/${sessionId}`)
   },
 
   batchDelete(sessionIds: string[]) {

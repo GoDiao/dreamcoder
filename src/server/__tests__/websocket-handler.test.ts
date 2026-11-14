@@ -5,7 +5,6 @@ import * as os from 'os'
 import * as path from 'path'
 import {
   __resetWebSocketHandlerStateForTests,
-  closeSessionConnection,
   getActiveSessionIds,
   getSessionState,
   getSlashCommands,
@@ -18,6 +17,7 @@ import {
 } from '../ws/handler.js'
 import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { conversationService } from '../services/conversationService.js'
+import { closeSessionConnection } from '../services/sessionLinksService.js'
 import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
 import { getSessionRuntime, setServerEndpoint } from '../ws/sessionRuntime.js'

@@ -14,18 +14,26 @@ import {
 import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import { buildSessionOrigin, sanitizeDisplayName } from '../../utils/crossSessionEnvelope.js'
 import { errorMessage } from '../../utils/errors.js'
-import { createSessionBranch, SessionBranchingError, type SessionParent } from '../../utils/sessionBranching.js'
+import { createSessionBranch, SessionBranchingError, type BranchNote, type SessionParent } from '../../utils/sessionBranching.js'
+import { ApiError } from '../middleware/errorHandler.js'
 import { SESSION_ID_PATTERN } from '../sessionId.js'
 import { sessionStateStore } from '../session/state/store.js'
+import { disposeSessionRuntime } from '../ws/sessionRuntime.js'
 import { conversationService, type HostRequest } from './conversationService.js'
 import { removeAgentWorktree } from '../../utils/worktree.js'
 import { prepareSessionWorkspace, type CreateSessionRepositoryOptions } from './repositoryLaunchService.js'
-import { sessionService } from './sessionService.js'
+import { sessionService, type DeleteSessionFailure, type DeleteSessionsResult } from './sessionService.js'
+import { deriveTitle } from './titleService.js'
 import type { QueuedReport } from './turnQueueService.js'
 
 const MAX_LISTED_SESSIONS = 500
 const FORKED_SESSION_NOTE =
   'This call started a new session forked from this conversation, and you are in that session now. The turn above belongs to the parent session, which carries on with it. Do only what the next message asks.'
+export const SIDE_CHAT_NOTE: BranchNote = {
+  always: true,
+  text: 'This is a side chat forked from the conversation above. The parent session carries on with the turn above; do only what the next message asks.',
+}
+export const SIDE_CHAT_TITLE = 'btw'
 
 export type SessionRenamed = (sessionId: string, title: string) => void
 
@@ -65,17 +73,128 @@ async function removeWorktree(
   if (!removed) console.warn(`[SessionLinks] Could not remove the worktree ${repository.worktreePath} of a failed start`)
 }
 
+export function closeSessionConnection(sessionId: string, reason = 'session closed'): boolean {
+  const clients = disposeSessionRuntime(sessionId)?.clients
+  sessionStateStore.dispose(sessionId)
+  conversationService.forgetSession(sessionId)
+  if (!clients || clients.size === 0) return false
+
+  for (const ws of clients) {
+    ws.close(1000, reason)
+  }
+  return true
+}
+
+export type RemovedSessions = DeleteSessionsResult & { sideChatFailures: DeleteSessionFailure[] }
+
+export async function removeSessions(sessionIds: string[]): Promise<RemovedSessions> {
+  const requested = new Set(sessionIds)
+  const ids = [...new Set([...sessionIds, ...await sessionService.findSideChatIds(sessionIds)])]
+  conversationService.blockStarts(ids, 'deleted')
+  await Promise.all(ids.map((sessionId) => conversationService.stopSessionAndWait(sessionId)))
+  const result = await sessionService.deleteSessions(ids)
+  conversationService.unblockStarts(result.failures.map((failure) => failure.sessionId))
+  for (const failure of result.failures) {
+    const role = requested.has(failure.sessionId) ? 'session' : 'side chat'
+    console.warn(`[SessionLinks] Could not remove ${role} ${failure.sessionId} while removing ${sessionIds.join(', ')}: ${failure.message}`)
+  }
+  for (const sessionId of result.successes) {
+    closeSessionConnection(sessionId, 'session deleted')
+  }
+  return {
+    successes: result.successes,
+    failures: result.failures.filter((failure) => requested.has(failure.sessionId)),
+    sideChatFailures: result.failures.filter((failure) => !requested.has(failure.sessionId)),
+  }
+}
+
 export async function discardSession(sessionId: string): Promise<void> {
   const repository = (await sessionService.getSessionLaunchInfo(sessionId))?.repository
-  conversationService.markSessionDeleted(sessionId)
+  const { failures } = await removeSessions([sessionId])
+  if (failures.length > 0) return
+  if (repository?.worktree && repository.worktreeOwnerSessionId === sessionId) await removeWorktree(repository)
+}
+
+export type ForkSessionOptions = {
+  sourceId: string
+  targetMessageId?: string
+  parentKind: SessionParent['kind']
+  title?: string
+  exactTitle?: boolean
+  note?: BranchNote
+  worktree?: boolean
+}
+
+export type ForkedSession = { sessionId: string; title: string; workDir: string }
+
+export async function forkSession({
+  sourceId,
+  targetMessageId,
+  parentKind,
+  title,
+  exactTitle,
+  note,
+  worktree,
+}: ForkSessionOptions): Promise<ForkedSession> {
+  const launch = await sessionService.getSessionLaunchInfo(sourceId)
+  if (!launch) throw new SessionBranchingError('SOURCE_NOT_FOUND', `Session not found: ${sourceId}`)
+  const source = await sessionStateStore.read(sourceId)
+  const sessionId = crypto.randomUUID()
+  const workspace = worktree
+    ? await prepareSessionWorkspace(conversationService.getSessionWorkDir(sourceId) || launch.workDir, { worktree: true }, sessionId)
+    : undefined
+  let branch: Awaited<ReturnType<typeof createSessionBranch>>
   try {
-    await sessionService.deleteSession(sessionId)
+    branch = await createSessionBranch({
+      sessionId,
+      sourceSessionId: sourceId,
+      sourceTranscriptPath: launch.filePath,
+      targetMessageId,
+      title,
+      exactTitle,
+      sourceWorkDir: launch.workDir,
+      sourceRepository: launch.repository,
+      sourceWorktreeSession: launch.worktreeSession,
+      parentKind,
+      note,
+      ...(workspace ? { workspace: { workDir: workspace.workDir, repository: workspace.repository } } : {}),
+    })
   } catch (error) {
-    conversationService.unmarkSessionDeleted(sessionId)
-    console.warn(`[SessionLinks] Could not remove session ${sessionId} after a failed start: ${errorMessage(error)}`)
-    return
+    await removeWorktree(workspace?.repository)
+    throw error
   }
-  if (repository?.worktree) await removeWorktree(repository)
+  try {
+    await sessionService.appendSessionPermissionMode(branch.sessionId, source.permission.desired)
+    if (source.runtime.desired) await sessionService.appendSessionRuntimeConfig(branch.sessionId, source.runtime.desired)
+  } catch (error) {
+    await discardSession(branch.sessionId)
+    throw error
+  }
+  return { sessionId: branch.sessionId, title: branch.title, workDir: branch.workDir ?? launch.workDir }
+}
+
+export async function detachSideChat(sessionId: string): Promise<void> {
+  const info = await sessionService.getSessionLinkInfo(sessionId)
+  if (!info) throw ApiError.notFound(`Session not found: ${sessionId}`)
+  if (info.parent?.kind !== 'side') throw ApiError.badRequest('Only a side chat can be detached')
+  if (isSessionRunning(sessionId)) throw ApiError.conflict('A side chat cannot be detached while it is running')
+  conversationService.blockStarts([sessionId], 'detaching')
+  try {
+    await conversationService.stopSessionAndWait(sessionId)
+    await sessionService.setSessionParent(sessionId, { sessionId: info.parent.sessionId, kind: 'forked' })
+  } finally {
+    conversationService.unblockStarts([sessionId])
+  }
+}
+
+export async function titleSideChat(sessionId: string, input: string): Promise<string | null> {
+  if ((await sessionStateStore.ensure(sessionId)).title.text !== SIDE_CHAT_TITLE) return null
+  if ((await sessionService.getSessionLinkInfo(sessionId))?.parent?.kind !== 'side') return null
+  const derived = deriveTitle(input)
+  if (!derived) return null
+  const title = `${SIDE_CHAT_TITLE}: ${derived}`
+  await sessionService.renameSession(sessionId, title)
+  return title
 }
 
 export type LinkedSessionOptions = {
@@ -116,53 +235,31 @@ export function createSessionLinks({ deliver, queueReport, onRenamed, startCardA
     request: SDKControlSessionStartRequest,
     title: string,
   ): Promise<string> {
+    if (request.context === 'fork') {
+      try {
+        const forked = await forkSession({
+          sourceId: callerId,
+          parentKind: 'spawned',
+          title,
+          exactTitle: true,
+          note: { text: FORKED_SESSION_NOTE, always: false },
+          worktree: request.worktree,
+        })
+        return forked.sessionId
+      } catch (error) {
+        if (error instanceof SessionBranchingError) throw new Error(error.message)
+        throw error
+      }
+    }
+
     const launch = await sessionService.getSessionLaunchInfo(callerId)
     if (!launch) throw new Error(`Session not found: ${callerId}`)
-    const workDir = conversationService.getSessionWorkDir(callerId) || launch.workDir
-
-    if (request.context !== 'fork') {
-      return createLinkedSession({
-        workDir,
-        repository: request.worktree ? { worktree: true } : undefined,
-        parent: { sessionId: callerId, kind: 'spawned' },
-        title,
-      })
-    }
-
-    const caller = await store.read(callerId)
-    const sessionId = crypto.randomUUID()
-    const workspace = request.worktree
-      ? await prepareSessionWorkspace(workDir, { worktree: true }, sessionId)
-      : undefined
-    let branchId: string
-    try {
-      const branch = await createSessionBranch({
-        sessionId,
-        sourceSessionId: callerId,
-        sourceTranscriptPath: launch.filePath,
-        title,
-        sourceWorkDir: launch.workDir,
-        sourceRepository: launch.repository,
-        sourceWorktreeSession: launch.worktreeSession,
-        parentKind: 'spawned',
-        openToolUseResult: FORKED_SESSION_NOTE,
-        ...(workspace ? { workspace: { workDir: workspace.workDir, repository: workspace.repository } } : {}),
-      })
-      branchId = branch.sessionId
-    } catch (error) {
-      await removeWorktree(workspace?.repository)
-      if (error instanceof SessionBranchingError) throw new Error(error.message)
-      throw error
-    }
-    try {
-      await sessionService.appendSessionPermissionMode(branchId, caller.permission.desired)
-      if (caller.runtime.desired) await sessionService.appendSessionRuntimeConfig(branchId, caller.runtime.desired)
-      await sessionService.renameSession(branchId, title)
-    } catch (error) {
-      await discardSession(branchId)
-      throw error
-    }
-    return branchId
+    return createLinkedSession({
+      workDir: conversationService.getSessionWorkDir(callerId) || launch.workDir,
+      repository: request.worktree ? { worktree: true } : undefined,
+      parent: { sessionId: callerId, kind: 'spawned' },
+      title,
+    })
   }
 
   async function startSession(callerId: string, request: SDKControlSessionStartRequest): Promise<SDKControlSessionStartResponse> {
@@ -219,7 +316,7 @@ export function createSessionLinks({ deliver, queueReport, onRenamed, startCardA
 
   async function listSessions(callerId: string, project?: string): Promise<SDKControlSessionListResponse> {
     const [{ sessions }, callerInfo] = await Promise.all([
-      sessionService.listSessions({ project, limit: MAX_LISTED_SESSIONS }),
+      sessionService.listSessions({ project, limit: MAX_LISTED_SESSIONS, sideChatsOf: callerId }),
       sessionService.getSessionLinkInfo(callerId),
     ])
     return {

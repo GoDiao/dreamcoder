@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { branchMock, createMock, listMock, deleteMock, batchDeleteMock } = vi.hoisted(() => ({
+const { branchMock, createMock, listMock, deleteMock, batchDeleteMock, detachMock } = vi.hoisted(() => ({
   branchMock: vi.fn(),
+  detachMock: vi.fn(),
   createMock: vi.fn(),
   listMock: vi.fn(),
   deleteMock: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('../api/sessions', () => ({
     list: listMock,
     delete: deleteMock,
     batchDelete: batchDeleteMock,
+    detach: detachMock,
     rename: vi.fn(),
   },
 }))
@@ -23,6 +25,7 @@ import { ApiError } from '../api/client'
 import { useSessionStore } from './sessionStore'
 import { useBrowserStore } from './browserStore'
 import { useTabStore } from './tabStore'
+import { useUIStore } from './uiStore'
 import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
 
@@ -62,6 +65,7 @@ describe('sessionStore', () => {
     listMock.mockReset()
     deleteMock.mockReset()
     batchDeleteMock.mockReset()
+    detachMock.mockReset()
     useSessionStore.setState({
       ...initialState,
       sessions: [],
@@ -217,8 +221,8 @@ describe('sessionStore', () => {
     useTabStore.getState().openTab(olderSession.id, olderSession.title)
     const refresh = createDeferred<{ sessions: SessionListItem[]; total: number }>()
     listMock.mockReturnValue(refresh.promise)
-    deleteMock.mockResolvedValue({ ok: true })
-    batchDeleteMock.mockResolvedValue({ successes: [olderSession.id], failures: [] })
+    deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [] })
+    batchDeleteMock.mockResolvedValue({ successes: [olderSession.id], failures: [], sideChatFailures: [] })
     const pendingRefresh = useSessionStore.getState().fetchSessions()
 
     if (mode === 'single') await useSessionStore.getState().deleteSession(olderSession.id)
@@ -236,8 +240,8 @@ describe('sessionStore', () => {
     useSessionStore.setState({ sessions: [deleted, kept] })
     const refresh = createDeferred<{ sessions: SessionListItem[]; total: number }>()
     listMock.mockReturnValue(refresh.promise)
-    deleteMock.mockResolvedValue({ ok: true })
-    batchDeleteMock.mockResolvedValue({ successes: [deleted.id], failures: [] })
+    deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [] })
+    batchDeleteMock.mockResolvedValue({ successes: [deleted.id], failures: [], sideChatFailures: [] })
     const pendingRefresh = useSessionStore.getState().fetchSessions()
 
     if (mode === 'single') await useSessionStore.getState().deleteSession(deleted.id)
@@ -269,6 +273,62 @@ describe('sessionStore', () => {
     expect(useSessionStore.getState().sessions).toEqual([kept])
   })
 
+  it('warns when side chats could not be deleted with the session', async () => {
+    const parent = session('parent-with-side-chats')
+    useSessionStore.setState({ sessions: [parent] })
+    deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [{ sessionId: 'side-a', message: 'busy' }, { sessionId: 'side-b', message: 'busy' }] })
+    const addToast = vi.spyOn(useUIStore.getState(), 'addToast').mockImplementation(() => {})
+
+    await useSessionStore.getState().deleteSession(parent.id)
+
+    expect(addToast).toHaveBeenCalledWith({ type: 'warning', message: '2 side chats could not be deleted with the session.' })
+    expect(useSessionStore.getState().sessions).toEqual([])
+    addToast.mockRestore()
+  })
+
+  it('warns when side chats could not be deleted with a batch of sessions', async () => {
+    const parent = session('batch-parent')
+    useSessionStore.setState({ sessions: [parent] })
+    batchDeleteMock.mockResolvedValue({ ok: true, successes: [parent.id], failures: [], sideChatFailures: [{ sessionId: 'side-a', message: 'busy' }] })
+    const addToast = vi.spyOn(useUIStore.getState(), 'addToast').mockImplementation(() => {})
+
+    await useSessionStore.getState().deleteSessions([parent.id])
+
+    expect(addToast).toHaveBeenCalledWith({ type: 'warning', message: '1 side chats could not be deleted with the session.' })
+    addToast.mockRestore()
+  })
+
+  it('does not warn when every side chat was deleted with the session', async () => {
+    const parent = session('parent-clean')
+    useSessionStore.setState({ sessions: [parent] })
+    deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [] })
+    const addToast = vi.spyOn(useUIStore.getState(), 'addToast').mockImplementation(() => {})
+
+    await useSessionStore.getState().deleteSession(parent.id)
+
+    expect(addToast).not.toHaveBeenCalled()
+    addToast.mockRestore()
+  })
+
+  it('refreshes the session list after detaching a side chat', async () => {
+    const detached = session('detached-side-chat', { parent: { sessionId: 'parent', kind: 'forked' } })
+    detachMock.mockResolvedValue({ ok: true })
+    listMock.mockResolvedValue({ sessions: [detached], total: 1 })
+
+    await useSessionStore.getState().detachSession(detached.id)
+
+    expect(detachMock).toHaveBeenCalledWith(detached.id)
+    expect(useSessionStore.getState().sessions).toEqual([detached])
+  })
+
+  it('does not refresh the session list when detaching fails', async () => {
+    detachMock.mockRejectedValue(new ApiError(409, { error: 'running' }))
+
+    await expect(useSessionStore.getState().detachSession('side')).rejects.toBeInstanceOf(ApiError)
+
+    expect(listMock).not.toHaveBeenCalled()
+  })
+
   it.each(['single', 'batch'] as const)('closes the browser of a session after a %s deletion', async (mode) => {
     const doomed = session('with-browser')
     useSessionStore.setState({ sessions: [doomed] })
@@ -276,8 +336,8 @@ describe('sessionStore', () => {
     const otherTab = useWorkspacePanelStore.getState().openTab('other', { kind: 'browser', url: 'https://other.test/' })
     useBrowserStore.getState().patchPage(doomedTab, { loading: true })
     useBrowserStore.getState().patchPage(otherTab, { loading: true })
-    deleteMock.mockResolvedValue({ ok: true })
-    batchDeleteMock.mockResolvedValue({ successes: [doomed.id], failures: [] })
+    deleteMock.mockResolvedValue({ ok: true, sideChatFailures: [] })
+    batchDeleteMock.mockResolvedValue({ successes: [doomed.id], failures: [], sideChatFailures: [] })
 
     if (mode === 'single') await useSessionStore.getState().deleteSession(doomed.id)
     else await useSessionStore.getState().deleteSessions([doomed.id])

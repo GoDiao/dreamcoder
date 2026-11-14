@@ -33,6 +33,7 @@ type WorkspaceApiMocks = {
   getWorkspaceTreeMock: ReturnType<typeof vi.fn>
   getWorkspaceFileMock: ReturnType<typeof vi.fn>
   getWorkspaceDiffMock: ReturnType<typeof vi.fn>
+  listSideChatsMock: ReturnType<typeof vi.fn>
 }
 
 var mocks: WorkspaceApiMocks | undefined
@@ -320,10 +321,32 @@ vi.mock('@pierre/trees/react', async () => {
 })
 
 vi.mock('./BrowserView', () => ({
-  BrowserView: ({ tab, projectRoot }: { tab: { id: string }; projectRoot: string | null }) => (
-    <div data-testid="browser-view" data-tab={tab.id} data-root={projectRoot ?? ''} />
+  BrowserView: ({ sessionId, tab, projectRoot }: { sessionId: string; tab: { id: string }; projectRoot: string | null }) => (
+    <div data-testid="browser-view" data-session={sessionId} data-tab={tab.id} data-root={projectRoot ?? ''} />
   ),
 }))
+
+vi.mock('../chat/UiPageFrame', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../chat/UiPageFrame')>()
+  return {
+    UiPageFrame: (props: Parameters<typeof actual.UiPageFrame>[0]) => (
+      <>
+        <div data-testid="ui-page" data-session={props.sessionId} data-page={props.pageId} />
+        <actual.UiPageFrame {...props} />
+      </>
+    ),
+  }
+})
+
+vi.mock('../chat/SessionConversation', () => ({
+  SessionConversation: ({ sessionId, compact, primary }: { sessionId: string; compact?: boolean; primary?: boolean }) => (
+    <div data-testid="side-chat-conversation" data-session={sessionId} data-compact={String(compact)} data-primary={String(primary)} />
+  ),
+}))
+
+const sideChatActions = vi.hoisted(() => ({ closeSideChat: vi.fn(async () => {}), detachSideChat: vi.fn(async () => {}) }))
+
+vi.mock('../../lib/sideChats', () => sideChatActions)
 
 vi.mock('../../api/sessions', () => ({
   sessionsApi: (() => {
@@ -333,6 +356,7 @@ vi.mock('../../api/sessions', () => ({
         getWorkspaceTreeMock: vi.fn(),
         getWorkspaceFileMock: vi.fn(),
         getWorkspaceDiffMock: vi.fn(),
+        listSideChatsMock: vi.fn(async () => ({ sessions: [] })),
       }
     }
 
@@ -341,6 +365,7 @@ vi.mock('../../api/sessions', () => ({
       getWorkspaceTree: mocks.getWorkspaceTreeMock,
       getWorkspaceFile: mocks.getWorkspaceFileMock,
       getWorkspaceDiff: mocks.getWorkspaceDiffMock,
+      listSideChats: mocks.listSideChatsMock,
     }
   })(),
 }))
@@ -2048,6 +2073,121 @@ describe('WorkspacePanel', () => {
 
     expect(view.getByRole('tab', { name: 'Dev server' }).getAttribute('aria-selected')).toBe('true')
     expect(view.getByTestId('browser-view').dataset).toMatchObject({ tab: tabId, root: '/repo' })
+  })
+
+  describe('side chats', () => {
+    const sideChatTab: WorkspaceTab = { id: 'side-tab', kind: 'sideChat', sessionId: 'side' }
+    const initialChatState = useChatStore.getState()
+
+    beforeEach(() => {
+      useChatStore.setState({ connectToSession: vi.fn() })
+    })
+
+    afterEach(() => {
+      cleanup()
+      useChatStore.setState(initialChatState, true)
+    })
+
+    async function renderParent(activeTab: WorkspaceTab) {
+      getMocks().listSideChatsMock.mockResolvedValue({ sessions: [{ id: 'side' }] })
+      getMocks().getWorkspaceStatusMock.mockResolvedValue({ state: 'ok', workDir: '/repo', repoName: 'repo', branch: 'main', isGitRepo: true, changedFiles: [] })
+      await setWorkspaceState((state) => ({
+        ...state,
+        panelByTab: {
+          ...state.panelByTab,
+          parent: { ...panelState(...(activeTab === sideChatTab ? [sideChatTab] : [activeTab, sideChatTab])), activeTabId: activeTab.id },
+        },
+      }))
+      return renderPanel('parent')
+    }
+
+    it('keeps a side chat browser tab under the side chat when it mounts again in the parent panel', async () => {
+      const view = await renderParent({ id: 'browser-tab', kind: 'browser', url: 'http://localhost:3000/', title: 'Dev', sessionId: 'side' })
+
+      expect(view.getByTestId('browser-view').dataset).toMatchObject({ session: 'side', tab: 'browser-tab' })
+    })
+
+    it('shows a side chat page from the side chat', async () => {
+      const view = await renderParent({ id: 'page-tab', kind: 'uiPage', pageId: 'page-1', revision: 1, title: 'Plan', sessionId: 'side' })
+
+      expect(view.getByTestId('ui-page').dataset).toMatchObject({ session: 'side', page: 'page-1' })
+    })
+
+    it('shows the side chat conversation in its tab without type-to-focus, titled by the side chat', async () => {
+      useChatStore.setState((state) => ({
+        sessions: { ...state.sessions, side: { ...state.getSession('side'), mirror: { title: { text: 'btw: flaky tests', source: 'custom' } } as never } },
+      }))
+      const view = await renderParent(sideChatTab)
+
+      expect(view.getByRole('tab', { name: 'btw: flaky tests' }).getAttribute('aria-selected')).toBe('true')
+      expect(view.getByTestId('side-chat-conversation').dataset).toMatchObject({ session: 'side', compact: 'true', primary: 'false' })
+    })
+
+    it('does not offer Detach while the side chat is running', async () => {
+      useChatStore.setState((state) => ({
+        sessions: { ...state.sessions, side: { ...state.getSession('side'), chatState: 'streaming' } },
+      }))
+      const view = await renderParent(sideChatTab)
+
+      await act(async () => {
+        fireEvent.contextMenu(view.getByRole('tab', { name: 'Side chat' }))
+        await Promise.resolve()
+      })
+
+      const detach = await waitFor(() => document.querySelector<HTMLElement>('[role="menuitem"][data-disabled]'))
+      expect(detach?.textContent).toContain('Detach')
+    })
+
+    async function openSideChatMenu() {
+      const view = await renderParent(sideChatTab)
+      await act(async () => {
+        fireEvent.contextMenu(view.getByRole('tab', { name: 'Side chat' }))
+        await Promise.resolve()
+      })
+      return view
+    }
+
+    it('detaches a side chat from its tab menu', async () => {
+      const view = await openSideChatMenu()
+
+      await clickElement(await view.findByRole('menuitem', { name: 'Detach' }))
+
+      expect(sideChatActions.detachSideChat).toHaveBeenCalledWith('parent', sideChatTab)
+    })
+
+    it('says why a side chat could not be detached', async () => {
+      sideChatActions.detachSideChat.mockRejectedValueOnce(new Error('busy'))
+      const view = await openSideChatMenu()
+
+      await clickElement(await view.findByRole('menuitem', { name: 'Detach' }))
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not detach the side chat: busy'))
+    })
+
+    it('renames a side chat from its tab menu', async () => {
+      const view = await openSideChatMenu()
+
+      await clickElement(await view.findByRole('menuitem', { name: 'Rename' }))
+
+      expect(await view.findByRole('dialog', { name: 'Rename' })).toBeTruthy()
+    })
+
+    it('says why a side chat could not be closed', async () => {
+      sideChatActions.closeSideChat.mockRejectedValueOnce(new Error('gone'))
+      const view = await renderParent(sideChatTab)
+
+      await clickElement(view.getByRole('button', { name: 'Close Side chat' }))
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not close the side chat: gone'))
+    })
+
+    it('closes a side chat by deleting it', async () => {
+      const view = await renderParent(sideChatTab)
+
+      await clickElement(view.getByRole('button', { name: 'Close Side chat' }))
+
+      expect(sideChatActions.closeSideChat).toHaveBeenCalledWith('parent', sideChatTab)
+    })
   })
 
   it('shows a labelled skeleton while the changed view loads', async () => {

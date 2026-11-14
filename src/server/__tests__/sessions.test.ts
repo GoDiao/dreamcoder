@@ -2351,13 +2351,13 @@ describe('Sessions API', () => {
     try {
       const res = await fetch(`${baseUrl}/api/sessions/${sessionId}`, { method: 'DELETE' })
       expect(res.status).toBe(500)
-      expect((conversationService as any).deletedSessions.has(sessionId)).toBe(false)
+      expect((conversationService as any).blockedStarts.has(sessionId)).toBe(false)
 
       const detailRes = await fetch(`${baseUrl}/api/sessions/${sessionId}`)
       expect(detailRes.status).toBe(200)
     } finally {
       sessionService.deleteSession = originalDeleteSession as typeof sessionService.deleteSession
-      conversationService.unmarkSessionDeleted(sessionId)
+      conversationService.unblockStarts([sessionId])
     }
   })
 
@@ -2378,6 +2378,7 @@ describe('Sessions API', () => {
       ok: true,
       successes: [sessionIdA, sessionIdB],
       failures: [],
+      sideChatFailures: [],
     })
 
     expect((await fetch(`${baseUrl}/api/sessions/${sessionIdA}`)).status).toBe(404)
@@ -2413,14 +2414,15 @@ describe('Sessions API', () => {
           sessionId: failedSessionId,
           message: 'simulated batch unlink failure',
         }],
+        sideChatFailures: [],
       })
-      expect((conversationService as any).deletedSessions.has(failedSessionId)).toBe(false)
+      expect((conversationService as any).blockedStarts.has(failedSessionId)).toBe(false)
       expect((await fetch(`${baseUrl}/api/sessions/${successSessionId}`)).status).toBe(404)
       expect((await fetch(`${baseUrl}/api/sessions/${failedSessionId}`)).status).toBe(200)
     } finally {
       sessionService.deleteSession = originalDeleteSession as typeof sessionService.deleteSession
-      conversationService.unmarkSessionDeleted(successSessionId)
-      conversationService.unmarkSessionDeleted(failedSessionId)
+      conversationService.unblockStarts([successSessionId])
+      conversationService.unblockStarts([failedSessionId])
     }
   })
 

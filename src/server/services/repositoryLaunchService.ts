@@ -81,6 +81,7 @@ export type PreparedSessionWorkspace = {
     worktreePath?: string
     worktreeBranch?: string
     worktreeSlug?: string
+    worktreeOwnerSessionId?: string
   }
 }
 
@@ -485,6 +486,7 @@ async function createDesktopWorktree(
       worktreePath,
       worktreeBranch: branchName,
       worktreeSlug: slug,
+      worktreeOwnerSessionId: sessionId,
     },
   }
 }
@@ -516,6 +518,7 @@ function planIsolatedWorktree(
       worktreePath,
       worktreeBranch: branchName,
       worktreeSlug: slug,
+      worktreeOwnerSessionId: sessionId,
     },
   }
 }

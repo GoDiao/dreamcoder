@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useSessionStore } from '../../stores/sessionStore'
-import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import { computerUseApi } from '../../api/computerUse'
 import type { PermissionMode } from '../../types/settings'
@@ -37,8 +35,6 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
   const t = useTranslation()
   const isMobile = useMobileViewport() && !isDesktopRuntime()
   const defaultMode = useSettingsStore((s) => s.permissionMode)
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const sessions = useSessionStore((s) => s.sessions)
   const [open, setOpen] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(false)
   const [computerUseEnabled, setComputerUseEnabled] = useState(false)
@@ -82,10 +78,7 @@ export function PermissionModeSelector({ workDir: workDirProp, compact = false, 
     dontAsk: t('permMode.label.dontAsk'),
   }
 
-  const activeSession = activeTabId
-    ? sessions.find((s) => s.id === activeTabId)
-    : null
-  const workDir = workDirProp || activeSession?.workDir || '~'
+  const workDir = workDirProp || '~'
   const triggerSize = compact ? (isMobile ? 'icon-xl' : 'icon-sm') : 'toolbar'
   const CurrentIcon = MODE_ICONS[currentMode]
   const menuId = 'permission-mode-menu'

@@ -29,6 +29,7 @@ export type SessionRepository = {
   worktreePath?: string
   worktreeBranch?: string
   worktreeSlug?: string
+  worktreeOwnerSessionId?: string
 }
 
 export type PendingPermission = {

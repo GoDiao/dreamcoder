@@ -5,14 +5,17 @@ import {
   type BatchDeleteSessionsResponse,
   type BranchSessionResponse,
   type CreateSessionRepositoryOptions,
+  type DeleteSessionFailure,
 } from '../api/sessions'
 import { useSessionRuntimeStore } from './sessionRuntimeStore'
 import { useTabStore } from './tabStore'
+import { useUIStore } from './uiStore'
 import { useWorkspacePanelStore } from './workspacePanelStore'
 import type { SessionListItem } from '../types/session'
 import type { PermissionMode } from '../types/settings'
 import type { RuntimeSelection } from '../types/runtime'
 import { isPlaceholderSessionTitle } from '../lib/sessionTitle'
+import { t } from '../i18n'
 
 type CreateSessionOptions = {
   repository?: CreateSessionRepositoryOptions
@@ -23,6 +26,10 @@ type CreateSessionOptions = {
 type BranchSessionResult = Pick<BranchSessionResponse, 'sessionId' | 'title' | 'workDir'>
 
 const deletedSessionIds = new Set<string>()
+
+export function isDeletedSession(sessionId: string): boolean {
+  return deletedSessionIds.has(sessionId)
+}
 
 type SessionStore = {
   sessions: SessionListItem[]
@@ -48,6 +55,7 @@ type SessionStore = {
   deselectSessions: (ids: string[]) => void
   clearSessionSelection: () => void
   renameSession: (id: string, title: string) => Promise<void>
+  detachSession: (id: string) => Promise<void>
   updateSessionTitle: (id: string, title: string) => void
   setActiveSession: (id: string | null) => void
 }
@@ -169,7 +177,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   deleteSession: async (id: string) => {
     try {
-      await sessionsApi.delete(id)
+      const { sideChatFailures } = await sessionsApi.delete(id)
+      warnSideChatFailures(sideChatFailures)
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 404)) throw err
     }
@@ -186,6 +195,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSessions: async (ids: string[]) => {
     const sessionIds = [...new Set(ids)].filter(Boolean)
     const result = await sessionsApi.batchDelete(sessionIds)
+    warnSideChatFailures(result.sideChatFailures)
     for (const id of result.successes) {
       deletedSessionIds.add(id)
       useSessionRuntimeStore.getState().clearSelection(id)
@@ -231,6 +241,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }))
   },
 
+  detachSession: async (id) => {
+    await sessionsApi.detach(id)
+    await get().fetchSessions()
+  },
+
   updateSessionTitle: (id, title) => {
     set((s) => ({
       sessions: s.sessions.map((session) =>
@@ -241,6 +256,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   setActiveSession: (id) => set({ activeSessionId: id }),
 }))
+
+function warnSideChatFailures(failures: DeleteSessionFailure[]): void {
+  if (failures.length === 0) return
+  useUIStore.getState().addToast({ type: 'warning', message: t('sidebar.sideChatDeleteFailed', { count: failures.length }) })
+}
 
 function removeIdsFromSet(selected: Set<string>, ids: string[]): Set<string> {
   if (ids.length === 0) return selected

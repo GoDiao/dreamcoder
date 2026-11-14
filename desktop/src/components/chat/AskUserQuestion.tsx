@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
 import { useChatStore } from '../../stores/chatStore'
-import { useTabStore } from '../../stores/tabStore'
 import { useTranslation } from '../../i18n'
 import { Card, CardTitle, CardContent } from '../shared/ui/card'
 import { Textarea } from '../shared/ui/textarea'
@@ -28,7 +27,7 @@ type AskUserInput = {
 }
 
 type Props = {
-  sessionId?: string | null
+  sessionId: string
   toolUseId: string
   input: unknown
   result?: unknown
@@ -64,10 +63,8 @@ function getSelectedAnswer(question: Question, selected: string[] | undefined) {
 
 export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) {
   const respondToPermission = useChatStore((s) => s.respondToPermission)
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const targetSessionId = sessionId ?? activeTabId
   const pendingRequestId = useChatStore((s) => {
-    const pending = targetSessionId ? s.sessions[targetSessionId]?.pendingPermission : undefined
+    const pending = s.sessions[sessionId]?.pendingPermission
     return pending?.toolUseId === toolUseId ? pending.requestId : null
   })
   const t = useTranslation()
@@ -173,7 +170,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     const response = parts.join('; ')
     if (!response) return
 
-    if (!targetSessionId || !pendingRequestId) return
+    if (!pendingRequestId) return
 
     const answers = questions.reduce<Record<string, string>>((acc, question, index) => {
       const freeText = freeTexts[index]?.trim()
@@ -187,7 +184,7 @@ export function AskUserQuestion({ sessionId, toolUseId, input, result }: Props) 
     }, {})
 
     setHasSubmitted(true)
-    respondToPermission(targetSessionId, pendingRequestId, true, {
+    respondToPermission(sessionId, pendingRequestId, true, {
       updatedInput: {
         ...inputObject,
         answers,
