@@ -229,9 +229,9 @@ const SECTION_BEHAVIORAL_RULES = [
 ].join('\n')
 
 const SECTION_DOCTOR = [
-  '## Validation with /doctor',
+  '## Validation with dreamcoder doctor',
   '',
-  'The `/doctor` command includes a "Keybinding Configuration Issues" section that validates `~/.dreamcoder/keybindings.json`.',
+  'The `dreamcoder doctor` command includes a "Keybinding Configuration Issues" section that validates `~/.dreamcoder/keybindings.json`.',
   '',
   '### Common Issues and Fixes',
   '',
@@ -276,7 +276,7 @@ const SECTION_DOCTOR = [
     ],
   ),
   '',
-  '### Example /doctor Output',
+  '### Example dreamcoder doctor Output',
   '',
   '```',
   'Keybinding Configuration Issues',

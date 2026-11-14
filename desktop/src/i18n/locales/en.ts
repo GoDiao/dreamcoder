@@ -435,7 +435,7 @@ export const en = {
   'settings.diagnostics.doctorResultLocal': 'Cleared {count} safe UI key(s).',
   'settings.diagnostics.doctorResultFailedKeys': '{count} key(s) could not be removed.',
   'errorBoundary.title': 'Something went wrong.',
-  'errorBoundary.description': 'The error was recorded in Diagnostics.',
+  'errorBoundary.description': 'The error was recorded in the diagnostics log.',
 
   'settings.providers.title': 'Providers',
   'settings.providers.description': 'Manage API providers for model access.',

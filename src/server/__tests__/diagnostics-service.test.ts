@@ -186,27 +186,13 @@ describe('DiagnosticsService', () => {
 })
 
 describe('diagnostics API', () => {
-  test('returns status, events, export path, and supports clearing logs', async () => {
+  test('accepts client events and returns an export path', async () => {
     const service = diagnosticsService
     await service.recordEvent({
       type: 'api_unhandled_error',
       severity: 'error',
       summary: 'boom',
     })
-
-    const statusReq = makeRequest('GET', '/api/diagnostics/status')
-    const statusRes = await handleDiagnosticsApi(statusReq.req, statusReq.url, statusReq.segments)
-    expect(statusRes.status).toBe(200)
-    const status = await statusRes.json() as { logDir: string; cliDiagnosticsPath: string; recentErrorCount: number }
-    expect(status.logDir).toContain(path.join('dreamcoder', 'diagnostics'))
-    expect(status.cliDiagnosticsPath).toContain('cli-diagnostics.jsonl')
-    expect(status.recentErrorCount).toBe(1)
-
-    const eventsReq = makeRequest('GET', '/api/diagnostics/events?limit=10')
-    const eventsRes = await handleDiagnosticsApi(eventsReq.req, eventsReq.url, eventsReq.segments)
-    expect(eventsRes.status).toBe(200)
-    const events = await eventsRes.json() as { events: Array<{ type: string }> }
-    expect(events.events[0].type).toBe('api_unhandled_error')
 
     const clientEventReq = new Request('http://localhost:3456/api/diagnostics/events', {
       method: 'POST',
@@ -235,11 +221,6 @@ describe('diagnostics API', () => {
     expect(exportRes.status).toBe(200)
     const exported = await exportRes.json() as { bundle: { path: string } }
     await expect(fs.stat(exported.bundle.path)).resolves.toBeTruthy()
-
-    const clearReq = makeRequest('DELETE', '/api/diagnostics')
-    const clearRes = await handleDiagnosticsApi(clearReq.req, clearReq.url, clearReq.segments)
-    expect(clearRes.status).toBe(200)
-    expect(await service.readRecentEvents()).toEqual([])
   })
 })
 

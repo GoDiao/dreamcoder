@@ -41,7 +41,7 @@ describe('ErrorBoundary', () => {
     )
 
     expect(screen.getByText('Something went wrong.')).toBeInTheDocument()
-    expect(screen.getByText('The error was recorded in Diagnostics.')).toBeInTheDocument()
+    expect(screen.getByText('The error was recorded in the diagnostics log.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     expect(await screen.findByTestId('doctor-panel')).toHaveTextContent('compact doctor')
     expect(reportReactError).toHaveBeenCalled()

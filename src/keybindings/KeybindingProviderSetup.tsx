@@ -54,7 +54,7 @@ type Props = {
  */
 /**
  * Display keybinding warnings to the user via notifications.
- * Shows a brief message pointing to /doctor for details.
+ * Shows a brief message pointing to `dreamcoder doctor` for details.
  */
 function useKeybindingWarnings(warnings, isReload) {
   const $ = _c(9);
@@ -81,7 +81,7 @@ function useKeybindingWarnings(warnings, isReload) {
           message = `Found ${warnCount} keybinding ${plural(warnCount, "warning")}`;
         }
       }
-      message = message + " \xB7 /doctor for details";
+      message = message + " \xB7 dreamcoder doctor for details";
       addNotification({
         key: "keybinding-config-warning",
         text: message,

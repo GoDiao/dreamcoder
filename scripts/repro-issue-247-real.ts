@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { startServer } from '../src/server/index.js'
+import { diagnosticsService } from '../src/server/services/diagnosticsService.js'
 
 type ServerMsg = {
   type: string
@@ -73,10 +74,10 @@ async function createSession(workDir: string): Promise<string> {
 }
 
 async function fetchDiagnostics(sessionId: string) {
-  const res = await fetch(`${baseUrl}/api/diagnostics/events?limit=200`)
-  if (!res.ok) return []
-  const body = await res.json() as { events?: Array<Record<string, unknown>> }
-  return (body.events ?? []).filter((event) => event.sessionId === sessionId)
+  // Read the log through the service instead of HTTP: the GET /api/diagnostics/events
+  // route this used to call only ever existed for the Diagnostics page.
+  const events = await diagnosticsService.readRecentEvents(200)
+  return events.filter((event) => event.sessionId === sessionId)
 }
 
 async function resolveProviderId(): Promise<string> {
