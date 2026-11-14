@@ -74,8 +74,6 @@ async function createSession(workDir: string): Promise<string> {
 }
 
 async function fetchDiagnostics(sessionId: string) {
-  // Read the log through the service instead of HTTP: the GET /api/diagnostics/events
-  // route this used to call only ever existed for the Diagnostics page.
   const events = await diagnosticsService.readRecentEvents(200)
   return events.filter((event) => event.sessionId === sessionId)
 }

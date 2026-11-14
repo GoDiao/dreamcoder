@@ -37,7 +37,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Removed
 
-- **The Diagnostics settings page, the `/doctor` command and the dry-run server Doctor.** Report a problem in the sidebar already collects the recent errors and exports the diagnostics bundle, and Doctor still appears where it is needed, on the crash screen and the startup error screen. The Diagnostics tab and the `/doctor` command opened a page whose warning count was mostly requests failing while the server was starting. The desktop Doctor now only clears the safe UI keys, `DoctorService` and the `/api/doctor` routes are gone, and a request that fails because the server never answered is no longer recorded as a diagnostic event; a request the server rejects still is.
+- **The Diagnostics settings page, the `/doctor` command and the dry-run server Doctor.** Report a problem in the sidebar already collects the recent errors and exports the diagnostics bundle, and Doctor still appears where it is needed, on the crash screen and the startup error screen. The Diagnostics tab and the `/doctor` command opened a page whose warning count was mostly requests failing while the server was starting. The desktop Doctor now only clears the safe UI keys, `DoctorService` and the `/api/doctor` routes are gone, and a request that fails because the server never answered is no longer recorded as a diagnostic event; a request the server rejects still is (#250). Thanks @iruzen-dono.
 
 ## [0.8.0] — 2026-11-01
 
