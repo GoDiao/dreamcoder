@@ -59,6 +59,7 @@ that only renames props or passes them through does not belong here.
 | `CardButton` | A button with the card surface, hover, disabled and focus styles; sizing and borders come from the caller |
 | `ViewerHeader` | The header of a full-screen page viewer: back button, title and actions, as the window's title row (drag region, title bar height on macOS) |
 | `SearchField` | Input Group, Input and lucide search/clear icons |
+| `FilePathLabel` | A file path inside a row: the file name, then its folder in the subtle text color, truncated together; shared by the Changes tab and the turn change card in the conversation |
 | `SegmentedControl` | Single-selection Toggle Group |
 | `Dropdown` | Dropdown Menu radio items with optional descriptions, shared by settings selects and the workspace view switch |
 | `FormSelect` | Select with labelled triggers and empty application values encoded as nonempty Radix item values |
@@ -71,7 +72,7 @@ that only renames props or passes them through does not belong here.
 | `ResponsivePopover` | Popover on desktop and bottom sheet on mobile |
 | `CopyButton` | Button, Tooltip and `useCopyAndNotify`, which wraps the clipboard helper with localized success and failure toasts |
 | `DirectoryPicker`, `RepositoryLaunchControls` | DreamCoder project/branch workflows using shared popovers, Command and controls |
-| `PierreDiffSurface` | DreamCoder adapter around [`@pierre/diffs`](https://diffs.com), with token overrides in [`pierre.css`](shared/pierre.css) |
+| `PierreDiffSurface` | DreamCoder adapter around [`@pierre/diffs`](https://diffs.com), with token overrides in [`pierre.css`](shared/pierre.css). Pierre's own file header is always off; the caller shows the file name |
 | `DreamCoderIcon` | DreamCoder brand artwork; not a general-purpose icon set |
 | `UpdateChecker` | Nonblocking persistent Sonner notification with Card, Button and Progress; updater state remains in the existing store |
 

@@ -50,6 +50,8 @@ import { RenameSessionDialog } from '../layout/RenameSessionDialog'
 import { closeSideChat, detachSideChat, useStartSideChat } from '../../lib/sideChats'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { SearchField } from '../shared/SearchField'
+import { FilePathLabel } from '../shared/FilePathLabel'
+import { getPathParts } from '../../lib/pathParts'
 import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
 import { useQuoteSelection } from '../../lib/selectionPopover'
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer'
@@ -398,12 +400,6 @@ function ImagePreview({ tab }: { tab: WorkspacePreviewEntry }) {
   )
 }
 
-function getPathParts(path: string) {
-  const segments = path.split('/').filter(Boolean)
-  const name = segments.pop() ?? path
-  return { name, dir: segments.join('/') }
-}
-
 function FileStatusLetter({ status }: { status: WorkspaceFileStatus }) {
   const meta = FILE_STATUS_META[status]
   return (
@@ -432,7 +428,6 @@ function ChangedFileItem({
   children?: ReactNode
 }) {
   const t = useTranslation()
-  const { name, dir } = getPathParts(file.path)
   const Chevron = expanded ? ChevronDown : ChevronRight
   return (
     <div data-testid="workspace-file-item">
@@ -447,10 +442,7 @@ function ChangedFileItem({
           >
             <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
             <FileCode size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
-            <span className="min-w-0 flex-1 truncate">
-              <span>{name}</span>
-              {dir && <span className="ml-1.5 text-2xs text-subtle-foreground">{dir}</span>}
-            </span>
+            <FilePathLabel path={file.path} />
             <span className="shrink-0 whitespace-nowrap font-mono text-2xs">
               <span className="text-success">+{file.additions}</span>{' '}
               <span className="text-destructive">−{file.deletions}</span>
@@ -582,7 +574,6 @@ function FileExpandedBody({
       <WorkspaceDiffSurface
         value={entry?.diff ?? ''}
         path={path}
-        hideFileHeaders
         className={codeSurfaceClass}
         onAddLineComment={onAddLineComment}
         onAddSelection={onAddSelection}

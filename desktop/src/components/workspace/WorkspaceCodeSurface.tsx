@@ -163,12 +163,11 @@ export function limitUnifiedDiff(value: string, lineLimit: number) {
   return lines.join('\n') + '\n'
 }
 
-export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 overflow-auto', lineLimit = WORKSPACE_PREVIEW_LINE_LIMIT, hideFileHeaders = false, onAddLineComment, onAddSelection }: {
+export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 overflow-auto', lineLimit = WORKSPACE_PREVIEW_LINE_LIMIT, onAddLineComment, onAddSelection }: {
   value: string
   path: string
   className?: string
   lineLimit?: number
-  hideFileHeaders?: boolean
   onAddLineComment?: (line: number, note: string, quote: string) => void
   onAddSelection?: (selection: WorkspaceTextSelection) => void
 }) {
@@ -219,7 +218,7 @@ export function WorkspaceDiffSurface({ value, path, className = 'min-h-0 flex-1 
   const lineAnnotations = useMemo(() => activeCommentLine !== null ? [{ side: 'additions' as const, lineNumber: activeCommentLine }] : [], [activeCommentLine])
 
   const content = diff.files.map((file, index) => (
-    <PierreDiffSurface key={`${path}:${index}`} fileDiff={file} theme={theme} hideFileHeader={hideFileHeaders}
+    <PierreDiffSurface key={`${path}:${index}`} fileDiff={file} theme={theme}
       onCommentLine={onAddLineComment ? commentLine : undefined}
       lineAnnotations={lineAnnotations}
       renderAnnotation={onAddLineComment && activeCommentLine !== null ? () => (

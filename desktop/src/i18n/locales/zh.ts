@@ -1506,8 +1506,6 @@ export const zh: Record<TranslationKey, string> = {
   'chat.turnChangesTitle': '{count} 个文件已更改',
   'chat.turnChangesLatestCardLabel': '轮次已更改文件',
   'chat.turnChangesHistoricalCardLabel': '轮次已更改文件',
-  'chat.turnChangesLatestSubtitle': '当前轮次检查点',
-  'chat.turnChangesHistoricalSubtitle': '历史轮次检查点',
   'chat.turnChangesLatestUndo': '撤销当前轮次',
   'chat.turnChangesHistoricalUndo': '回滚到这一轮之前',
   'chat.turnChangesUndoing': '正在撤销...',

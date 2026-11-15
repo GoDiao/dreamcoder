@@ -12,11 +12,10 @@ import './pierre.css'
 type Props = Omit<FileDiffProps<undefined, undefined>, 'options'> & {
   fileDiff: FileDiffMetadata
   theme: ThemeMode
-  hideFileHeader?: boolean
   onCommentLine?: (line: number) => void
 }
 
-export function PierreDiffSurface({ fileDiff, theme, className, hideFileHeader = true, onCommentLine, ...props }: Props) {
+export function PierreDiffSurface({ fileDiff, theme, className, onCommentLine, ...props }: Props) {
   const t = useTranslation()
   const commentButtonRef = useRef<HTMLButtonElement>(null)
   const options = useMemo<FileDiffProps<undefined, undefined>['options']>(() => ({
@@ -27,7 +26,7 @@ export function PierreDiffSurface({ fileDiff, theme, className, hideFileHeader =
     hunkSeparators: 'line-info',
     lineDiffType: 'word',
     overflow: 'scroll',
-    disableFileHeader: hideFileHeader,
+    disableFileHeader: true,
     onPostRender: onCommentLine ? (host, _, phase) => {
       if (phase === 'unmount') return
       for (const number of host.shadowRoot?.querySelectorAll<HTMLElement>('[data-column-number]') ?? []) {
@@ -55,7 +54,7 @@ export function PierreDiffSurface({ fileDiff, theme, className, hideFileHeader =
       button.toggleAttribute('data-hidden', annotationSide !== 'additions')
       button.setAttribute('aria-label', t('workspace.commentLine', { line: lineNumber }))
     } : undefined,
-  }), [theme, hideFileHeader, onCommentLine, t])
+  }), [theme, onCommentLine, t])
   return (
     <FileDiff
       fileDiff={fileDiff}
