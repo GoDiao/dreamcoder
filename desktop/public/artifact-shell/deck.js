@@ -13,6 +13,7 @@
   var SHEET_ID = 'dc-deck-sheet'
   var SHEET_FILE = 'deck.css'
   var SLIDE_ID = /^[A-Za-z0-9_-]{1,64}$/
+  var REFERENCES = 'iframe[src],img[src],video[src],audio[src],source[src]'
   var MODES = ['browse', 'overview', 'present']
   var TEXT = {
     en: { empty: 'This deck has no slides yet', failed: 'Could not read the deck', missing: 'Could not read this slide', keys: '← → slides · F present · O overview · Esc back' },
@@ -26,6 +27,7 @@
   var notice = null
   var entries = []
   var sheets = {}
+  var stamps = new WeakMap()
   var artifactId = null
   var mode = 'browse'
   var currentId = null
@@ -50,6 +52,7 @@
     '#dc-deck[data-mode=present]{background:#000}',
     '.dc-stage{position:absolute;left:0;top:0;width:' + WIDTH + 'px;height:' + HEIGHT + 'px;transform-origin:0 0;transform:translate(var(--dc-x,0px),var(--dc-y,0px)) scale(var(--dc-scale,1))}',
     '.dc-slide{position:absolute;left:0;top:0;width:' + WIDTH + 'px;height:' + HEIGHT + 'px;overflow:hidden;color-scheme:light;color:#000;background:#fff;visibility:hidden;opacity:0}',
+    '.dc-slide{counter-increment:dc-slide}',
     '.dc-slide[data-current]{visibility:visible;opacity:1}',
     '.dc-slide>section{position:relative;box-sizing:border-box;width:' + WIDTH + 'px;height:' + HEIGHT + 'px;overflow:hidden}',
     '#dc-deck[data-mode=overview] .dc-stage{display:grid;grid-template-columns:repeat(var(--dc-columns,1),' + WIDTH + 'px);gap:' + GRID_GAP + 'px;width:max-content;height:auto;padding-bottom:var(--dc-tail,0px)}',
@@ -438,8 +441,60 @@
       if (stage.children[index] !== entry.element) stage.insertBefore(entry.element, stage.children[index] || null)
     })
     entries = nextEntries
+    countSlides()
     notice.textContent = entries.length === 0 ? text.empty : ''
     return changed
+  }
+
+  function referenceUrl(element) {
+    try {
+      var url = new URL(element.getAttribute('src'), baseUrl)
+      url.hash = ''
+      return url.protocol === baseUrl.protocol && url.host === baseUrl.host ? url.toString() : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  function readStamp(url) {
+    return fetch(url, { method: 'HEAD', cache: 'no-store' }).then(
+      function (response) {
+        return response.status + ' ' + (response.headers.get('etag') || '')
+      },
+      function () {
+        return ''
+      },
+    )
+  }
+
+  function reloadReference(element) {
+    if (element.tagName !== 'SOURCE') element.setAttribute('src', element.getAttribute('src'))
+    else if (element.parentNode && element.parentNode.load) element.parentNode.load()
+  }
+
+  function syncReferences() {
+    var elementsByUrl = {}
+    entries.forEach(function (entry) {
+      Array.prototype.forEach.call(entry.element.querySelectorAll(REFERENCES), function (element) {
+        var url = referenceUrl(element)
+        if (url) (elementsByUrl[url] = elementsByUrl[url] || []).push(element)
+      })
+    })
+    return Promise.all(
+      Object.keys(elementsByUrl).map(function (url) {
+        return readStamp(url).then(function (stamp) {
+          elementsByUrl[url].forEach(function (element) {
+            var known = stamps.get(element)
+            stamps.set(element, stamp)
+            if (known !== undefined && known !== stamp) reloadReference(element)
+          })
+        })
+      }),
+    )
+  }
+
+  function countSlides() {
+    stage.style.setProperty('counter-reset', 'dc-slide 0 dc-slides ' + entries.length)
   }
 
   function keepPlace(preferred, fallbackIndex) {
@@ -457,17 +512,21 @@
   function refresh() {
     if (standalone) return Promise.resolve(false)
     queue = queue.then(function () {
-      return load().then(
-        function (data) {
+      return load()
+        .then(function (data) {
           var previous = indexOf(currentId)
           if (apply(data)) keepPlace(currentId, previous)
-          return true
-        },
-        function (error) {
-          console.warn('[deck] could not refresh the deck', error)
-          return true
-        },
-      )
+          return syncReferences()
+        })
+        .then(
+          function () {
+            return true
+          },
+          function (error) {
+            console.warn('[deck] could not refresh the deck', error)
+            return true
+          },
+        )
     })
     return queue
   }
@@ -609,6 +668,7 @@
       function (data) {
         apply(data)
         keepPlace(hashId(), 0)
+        return syncReferences()
       },
       function () {
         notice.textContent = text.failed
@@ -625,6 +685,7 @@
     entries = Array.prototype.map.call(stage.querySelectorAll(':scope > .dc-slide'), function (element) {
       return { id: element.getAttribute('data-slide'), element: element, source: undefined }
     })
+    countSlides()
     var hint = root.querySelector('.dc-hint') || root.appendChild(document.createElement('div'))
     hint.className = 'dc-hint'
     hint.textContent = text.keys

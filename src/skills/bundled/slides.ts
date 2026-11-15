@@ -3,7 +3,7 @@ import { ARTIFACT_CHECK_TOOL_NAME } from '../../tools/ArtifactCheckTool/constant
 import { USE_DESIGN_SYSTEM_TOOL_NAME } from '../../tools/UseDesignSystemTool/constants.js'
 import { readArtifactEntry } from '../../utils/artifacts.js'
 import { browserToolName } from '../../utils/browserControl/common.js'
-import { DECK_ENTRY_HTML, DECK_HEIGHT, DECK_STYLESHEET_FILE, DECK_WIDTH } from '../../utils/deck.js'
+import { DECK_ENTRY_HTML, DECK_HEIGHT, DECK_SLIDE_COUNTER, DECK_SLIDES_COUNTER, DECK_STYLESHEET_FILE, DECK_WIDTH } from '../../utils/deck.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 import {
   artifactFolderIn,
@@ -132,6 +132,20 @@ Never add a stylesheet link, a script or any content to it. The stage script loa
 - The name of a slide in references and messages is the text of its first heading (\`h1\` to \`h6\`); without a heading it is the id.
 - Fonts load from the web with \`@import\` or \`@font-face\` in ${DECK_STYLESHEET_FILE}, or from files in \`assets/\`. Give a fallback family: without a connection the web font does not load.
 
+## Page numbers
+
+The stage counts the slides in two CSS counters: \`${DECK_SLIDE_COUNTER}\` is the number of the slide, starting at 1 in the order of \`slides\`, and \`${DECK_SLIDES_COUNTER}\` is the number of slides. Write the page number once in ${DECK_STYLESHEET_FILE} and put one empty element into each slide:
+
+\`\`\`css
+.page-number::after { content: counter(${DECK_SLIDE_COUNTER}, decimal-leading-zero) " / " counter(${DECK_SLIDES_COUNTER}, decimal-leading-zero); }
+\`\`\`
+
+\`\`\`html
+<p class="page-number"></p>
+\`\`\`
+
+The numbers stay right when a slide is added, removed or moved, in the overview, in the presentation and in every export. Never type a number that depends on the order of the slides into a slide file: no \`03 / 12\`, and no numbered kicker or heading such as \`02 / Architecture\`. Such a number is wrong as soon as the order changes. Number with \`counter(${DECK_SLIDE_COUNTER})\` or leave the number out. Do not reset or increment these two counters yourself.
+
 ## Write the HTML the way a browser serializes it
 
 Slide files are meant to be read and written back by the browser's own HTML parser, so write them in the form that parser produces, and a later write changes only what was edited:
@@ -164,7 +178,8 @@ The frame is ${FRAME} pixels and is seen from across a room or in a small panel.
 ## One deck, few layouts
 
 - Decide a small set of slide kinds first and give each a class: for example \`slide-title\`, \`slide-section\`, \`slide-text\`, \`slide-two-columns\`, \`slide-figure\`, \`slide-quote\`, \`slide-closing\`. Every slide uses one of them; two slides of the same kind have the same structure and the same positions for title and body.
-- The title sits at the same place on every content slide. So does anything that repeats, such as a footer or a page marker: the stage adds nothing to a slide, so write these into each slide.
+- The title sits at the same place on every content slide. So does anything that repeats, such as a footer: the stage adds no element to a slide, so write it into each slide.
+- Page numbers are not written into the slides. Put one empty element into each slide and let ${DECK_STYLESHEET_FILE} fill it from the counters \`${DECK_SLIDE_COUNTER}\` and \`${DECK_SLIDES_COUNTER}\` (format.md, Page numbers). Do not type any number that depends on the order of the slides into a slide file, also not as a section number in a kicker or heading: adding, removing or moving a slide would make it wrong.
 - Use one accent color for emphasis and keep it for the same meaning through the deck.
 - Give every image a width and height in ${DECK_STYLESHEET_FILE} and \`object-fit\` so it cannot push the layout around when it loads.
 - Charts and diagrams: draw simple ones in inline SVG or CSS inside the slide; use an embedded page only when a library has to draw it.

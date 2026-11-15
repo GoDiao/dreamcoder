@@ -20,6 +20,8 @@ const PREFIX = 'dreamcoder-deck:'
 let manifest: Record<string, unknown> | null
 let files: Map<string, string>
 let fetched: string[]
+let tags: Map<string, string>
+let asked: string[]
 let logs: string[]
 let listeners: Array<{ target: EventTarget; type: string; listener: EventListenerOrEventListenerObject }>
 
@@ -82,14 +84,21 @@ beforeEach(() => {
     ['/talk/slides/numbers.html', section('<p>No heading here</p>')],
   ])
   fetched = []
+  tags = new Map()
+  asked = []
   logs = []
   listeners = []
   vi.spyOn(console, 'log').mockImplementation((entry: unknown) => {
     if (String(entry).startsWith(PREFIX)) logs.push(String(entry))
   })
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-  vi.stubGlobal('fetch', async (input: string) => {
+  vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
     const url = new URL(input)
+    if (init?.method === 'HEAD') {
+      asked.push(url.host === location.host ? url.pathname : url.href)
+      const tag = tags.get(url.pathname)
+      return tag === undefined ? new Response(null, { status: 404 }) : new Response(null, { headers: { etag: tag } })
+    }
     fetched.push(url.pathname)
     if (url.pathname === '/talk/artifact.json') return manifest ? new Response(JSON.stringify(manifest)) : new Response('', { status: 404 })
     const body = files.get(url.pathname)
@@ -430,6 +439,130 @@ describe('deck shell refresh', () => {
   })
 })
 
+describe('page numbers', () => {
+  const counters = () => stageStyle('counter-reset')
+
+  it('numbers every slide wrapper in a counter and keeps the number of slides in another, on the stage and not in the slides', async () => {
+    await start()
+    expect(document.getElementById('dc-deck-style')?.textContent).toContain('.dc-slide{counter-increment:dc-slide}')
+    expect(counters()).toBe('dc-slide 0 dc-slides 3')
+    expect(slide('cover').firstElementChild?.getAttribute('style')).toBeNull()
+  })
+
+  it('updates the number of slides when a refresh adds or removes slides', async () => {
+    await start()
+    files.set('/talk/slides/thanks.html', section('<h1>Thanks</h1>'))
+    manifest = { ...manifest, slides: ['cover', 'agenda', 'numbers', 'thanks'] }
+    await shell().refresh()
+    expect(counters()).toBe('dc-slide 0 dc-slides 4')
+
+    manifest = { ...manifest, slides: ['thanks'] }
+    await shell().refresh()
+    expect(counters()).toBe('dc-slide 0 dc-slides 1')
+
+    manifest = { ...manifest, slides: [] }
+    await shell().refresh()
+    expect(counters()).toBe('dc-slide 0 dc-slides 0')
+  })
+})
+
+describe('files a slide refers to', () => {
+  const EMBED = '/talk/embeds/demo.html'
+  const IMAGE = '/talk/assets/chart.png'
+  const frame = () => slide('cover').querySelector('iframe') as HTMLIFrameElement
+  const image = () => slide('cover').querySelector('img') as HTMLImageElement
+  const reloads = (element: Element) => vi.spyOn(element, 'setAttribute')
+
+  beforeEach(() => {
+    files.set('/talk/slides/cover.html', section('<h1>Cover</h1><iframe src="embeds/demo.html#top"></iframe><img src="assets/chart.png">'))
+  })
+
+  it('loads an embedded page again when its file appears after the slide was shown', async () => {
+    await start()
+    const section = slide('cover').firstElementChild
+    const reloaded = reloads(frame())
+    tags.set(EMBED, '"1"')
+    await shell().refresh()
+    expect(reloaded.mock.calls).toEqual([['src', 'embeds/demo.html#top']])
+    expect(slide('cover').firstElementChild).toBe(section)
+  })
+
+  it('loads an embedded page again when its file was changed', async () => {
+    tags.set(EMBED, '"1"')
+    await start()
+    const reloaded = reloads(frame())
+    tags.set(EMBED, '"2"')
+    await shell().refresh()
+    expect(reloaded).toHaveBeenCalledOnce()
+  })
+
+  it('loads an image again when its file appears after the slide was shown', async () => {
+    await start()
+    const reloaded = reloads(image())
+    tags.set(IMAGE, '"1"')
+    await shell().refresh()
+    expect(reloaded.mock.calls).toEqual([['src', 'assets/chart.png']])
+  })
+
+  it('loads an image again when its file was replaced, and shows it gone when the file was removed', async () => {
+    tags.set(IMAGE, '"1"')
+    await start()
+    const reloaded = reloads(image())
+    tags.set(IMAGE, '"2"')
+    await shell().refresh()
+    expect(reloaded).toHaveBeenCalledOnce()
+    tags.delete(IMAGE)
+    await shell().refresh()
+    expect(reloaded).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves an embedded page and an image alone when their files did not change, whatever else changed', async () => {
+    tags.set(EMBED, '"1"')
+    tags.set(IMAGE, '"1"')
+    await start()
+    const frameReloaded = reloads(frame())
+    const imageReloaded = reloads(image())
+    files.set('/talk/slides/numbers.html', section('<p>Changed</p>'))
+    await shell().refresh()
+    await shell().refresh()
+    expect(frameReloaded).not.toHaveBeenCalled()
+    expect(imageReloaded).not.toHaveBeenCalled()
+  })
+
+  it('reloads only the element whose file changed', async () => {
+    tags.set(EMBED, '"1"')
+    tags.set(IMAGE, '"1"')
+    await start()
+    const frameReloaded = reloads(frame())
+    const imageReloaded = reloads(image())
+    tags.set(IMAGE, '"2"')
+    await shell().refresh()
+    expect(imageReloaded).toHaveBeenCalledOnce()
+    expect(frameReloaded).not.toHaveBeenCalled()
+  })
+
+  it('loads audio and video again through their element, also when the file is named by a source element', async () => {
+    const load = vi.fn()
+    HTMLMediaElement.prototype.load = load
+    files.set('/talk/slides/cover.html', section('<audio src="assets/a.wav"></audio><video><source src="assets/v.webm"></video>'))
+    await start()
+    const audio = reloads(slide('cover').querySelector('audio')!)
+    tags.set('/talk/assets/a.wav', '"1"')
+    tags.set('/talk/assets/v.webm', '"1"')
+    await shell().refresh()
+    expect(audio.mock.calls).toEqual([['src', 'assets/a.wav']])
+    expect(load).toHaveBeenCalledOnce()
+    expect(load.mock.instances[0]).toBe(slide('cover').querySelector('video'))
+  })
+
+  it('asks once for a file that several elements use, without caching, and never asks another site', async () => {
+    files.set('/talk/slides/cover.html', section('<img src="assets/chart.png"><img src="https://example.com/x.png">'))
+    files.set('/talk/slides/agenda.html', section('<img src="assets/chart.png#again">'))
+    await start()
+    expect(asked).toEqual([IMAGE])
+  })
+})
+
 describe('deck shell measurements', () => {
   it('gives the place of the current slide in the viewport', async () => {
     await start()
@@ -482,6 +615,11 @@ describe('deck shell in an exported file', () => {
     expect(shownSlides()).toEqual(['cover'])
     expect(pending()).toEqual([])
     expect(Number(stageStyle('--dc-scale'))).toBeCloseTo(0.5)
+  })
+
+  it('counts the slides of the file, whether or not the export carried the count', async () => {
+    await startExported()
+    expect(stageStyle('counter-reset')).toBe('dc-slide 0 dc-slides 2')
   })
 
   it('does not add its styles a second time', async () => {

@@ -214,13 +214,14 @@ export async function resolveBrowserInput(
 
 export type ProjectFile = {
   size: number
+  mtimeMs: number
   contentType: string | null
   slice: (start: number, end: number) => BodyInit
 }
 
 export type OpenProjectFile = (file: string) => Promise<ProjectFile>
 
-export type ProjectRequest = { url: string; headers: { get(name: string): string | null } }
+export type ProjectRequest = { url: string; method: string; headers: { get(name: string): string | null } }
 
 type ByteRange = { start: number; end: number }
 
@@ -230,6 +231,7 @@ export function openProjectFile(fetchFile: (url: string) => Promise<Response>): 
     void probe.body?.cancel()
     return {
       size: info.size,
+      mtimeMs: info.mtimeMs,
       contentType: probe.headers.get('content-type'),
       slice: (start, end) => (end < start ? '' : (Readable.toWeb(createReadStream(file, { start, end })) as ReadableStream)),
     }
@@ -249,11 +251,12 @@ function parseByteRange(header: string | null, size: number): ByteRange | 'unsat
   return { start, end: match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1) }
 }
 
-async function respondWithFile(file: string, rangeHeader: string | null, openFile: OpenProjectFile): Promise<Response> {
+async function respondWithFile(file: string, request: ProjectRequest, openFile: OpenProjectFile): Promise<Response> {
   const opened = await openFile(file)
-  const headers: Record<string, string> = { 'Accept-Ranges': 'bytes' }
+  const headers: Record<string, string> = { 'Accept-Ranges': 'bytes', ETag: `"${opened.size.toString(16)}-${Math.round(opened.mtimeMs).toString(16)}"` }
   if (opened.contentType) headers['Content-Type'] = opened.contentType
-  const range = parseByteRange(rangeHeader, opened.size)
+  if (request.method === 'HEAD') return new Response(null, { status: 200, headers: { ...headers, 'Content-Length': String(opened.size) } })
+  const range = parseByteRange(request.headers.get('range'), opened.size)
   if (range === 'unsatisfiable') {
     return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${opened.size}` } })
   }
@@ -277,15 +280,14 @@ export async function serveProjectRequest(
   artifactShellDir: string,
 ): Promise<Response> {
   const url = new URL(request.url)
-  const range = request.headers.get('range')
   if (url.pathname.startsWith(ARTIFACT_SHELL_PREFIX)) {
     const name = url.pathname.slice(ARTIFACT_SHELL_PREFIX.length)
     if (!roots.has(url.hostname)) return new Response('Forbidden', { status: 403 })
     if (!ARTIFACT_SHELL_FILES.includes(name)) return new Response('Not found', { status: 404 })
-    return respondWithFile(path.join(artifactShellDir, name), range, openFile)
+    return respondWithFile(path.join(artifactShellDir, name), request, openFile)
   }
   const result = await roots.fileFor(url)
-  if ('file' in result) return respondWithFile(result.file, range, openFile)
+  if ('file' in result) return respondWithFile(result.file, request, openFile)
   return new Response(result.status === 403 ? 'Forbidden' : 'Not found', { status: result.status })
 }
 

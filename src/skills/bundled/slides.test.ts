@@ -157,6 +157,23 @@ describe('slides skill reference files', () => {
     expect(deckShell).toContain("querySelectorAll('.fragment')")
   })
 
+  it('has page numbers come from the counters of the stage instead of numbers typed into the slides', async () => {
+    const format = await reference('format.md')
+    expect(format).toContain('## Page numbers')
+    expect(format).toContain('.page-number::after { content: counter(dc-slide, decimal-leading-zero) " / " counter(dc-slides, decimal-leading-zero); }')
+    expect(format).toContain('<p class="page-number"></p>')
+    expect(format).toContain('Never type a number that depends on the order of the slides into a slide file')
+    expect(format).toContain('`02 / Architecture`')
+    expect(deckShell).toContain("'.dc-slide{counter-increment:dc-slide}'")
+    expect(deckShell).toContain("'dc-slide 0 dc-slides ' + entries.length")
+
+    const layout = await reference('layout.md')
+    expect(layout).toContain('Page numbers are not written into the slides')
+    expect(layout).toContain('the counters `dc-slide` and `dc-slides`')
+    expect(layout).toContain('also not as a section number in a kicker or heading')
+    expect(layout).not.toContain('page marker')
+  })
+
   it('asks about use, length, content and look in the interview, with the shared rules', async () => {
     const interview = await reference('interview.md')
     expect(interview).toContain('a speaker presents it to a room, or people read it on their own')
