@@ -125,7 +125,7 @@ type ChatStore = {
     sessionId: string,
     content: string,
     attachments?: AttachmentRef[],
-    options?: { displayContent?: string; displayAttachments?: AttachmentRef[] },
+    options?: { displayContent?: string; displayAttachments?: Array<AttachmentRef | UIAttachment>; title?: string },
   ) => void
   respondToPermission: (
     sessionId: string,
@@ -813,8 +813,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   sendMessage: (sessionId, content, attachments, options) => {
-    const userFacingContent =
-      options?.displayContent?.trim() || content.trim()
+    const userFacingContent = options?.displayContent !== undefined
+      ? options.displayContent.trim()
+      : content.trim()
     const modelFacingContent = buildModelContent(content, attachments)
     const isMemberSession = !!useTeamStore.getState().getMemberBySessionId(sessionId)
     const visibleAttachments = options?.displayAttachments ?? attachments
@@ -834,7 +835,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         : undefined
 
     const existingSession = get().sessions[sessionId]
-    if (!isMemberSession && existingSession && isTurnRunning(existingSession) && !userFacingContent.startsWith('/')) {
+    if (!isMemberSession && existingSession && isTurnRunning(existingSession) && !userFacingContent.startsWith('/') && !content.trim().startsWith('/')) {
       wsManager.send(sessionId, { type: 'user_message', content, attachments, id: randomUUID() })
       return
     }
@@ -851,7 +852,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     if (!isMemberSession) {
-      updateOptimisticSessionTitle(sessionId, userFacingContent)
+      updateOptimisticSessionTitle(sessionId, options?.title ?? userFacingContent)
     }
 
     const messageId = isMemberSession ? undefined : randomUUID()
@@ -921,7 +922,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return
     }
 
-    wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId })
+    wsManager.send(sessionId, { type: 'user_message', content, attachments, id: messageId, ...(options?.title && { title: options.title }) })
   },
 
   cancelQueuedMessage: (sessionId, id) => {

@@ -25,8 +25,10 @@ import {
 import { sessionsApi, type SessionGitInfo } from '../../api/sessions'
 import { PermissionModeSelector } from '../controls/PermissionModeSelector'
 import { ModelSelector } from '../controls/ModelSelector'
-import type { AttachmentRef } from '../../types/chat'
+import type { AttachmentRef, UIAttachment } from '../../types/chat'
 import { refreshBrowserMarksBeforeSend } from '../../lib/browserMarks'
+import { designStartLabel, designStartPlaceholder, prepareDesignStart } from '../../lib/designStart'
+import { errorMessage } from '../../lib/errorMessage'
 import { browserReferenceAttachment } from '../../lib/browserReferenceView'
 import { AttachmentGallery } from './AttachmentGallery'
 import { ComposerDropOverlay } from './ComposerDropOverlay'
@@ -70,6 +72,7 @@ type ChatInputProps = {
 }
 
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
+const DESIGN_START_ATTACHMENT_ID = 'design-start'
 const EMPTY_SLASH_COMMANDS: PerSessionState['slashCommands'] = []
 
 function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendingLabel: string): Attachment {
@@ -181,6 +184,8 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const addWorkspaceReference = useWorkspaceChatContextStore((s) => s.addReference)
   const removeWorkspaceReference = useWorkspaceChatContextStore((s) => s.removeReference)
   const clearWorkspaceReferences = useWorkspaceChatContextStore((s) => s.clearReferences)
+  const sessionDesignStart = useWorkspaceChatContextStore((s) => s.startsBySession[sessionId])
+  const clearDesignStart = useWorkspaceChatContextStore((s) => s.clearStart)
   const saveComposerDraft = useCallback((draftSessionId: string) => {
     const draft = {
       input: inputRef.current,
@@ -195,6 +200,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }, [])
 
   const isMemberSession = !!memberInfo
+  const designStart = isMemberSession ? undefined : sessionDesignStart
   const isActive = chatState !== 'idle'
   const isWorkspaceMissing = activeSession?.workDirExists === false
   const hasWorkspaceReferences = !isMemberSession && workspaceReferences.length > 0
@@ -204,20 +210,22 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const showLaunchControls = fullComposer && messageCount === 0
   const useCompactControls = compact || isMobileComposer
   const activeLaunchWorkDir = showLaunchControls ? (launchWorkDir || resolvedWorkDir || '') : (resolvedWorkDir || '')
-  const pendingSlashUiAction = !isMemberSession && input.trim().startsWith('/')
+  const pendingSlashUiAction = !isMemberSession && !designStart && input.trim().startsWith('/')
     ? resolveSlashUiAction(input.trim().slice(1))
     : null
   const canSubmit = !isWorkspaceMissing &&
     !launchTransitioning &&
     (!showLaunchControls || launchReady || !!pendingSlashUiAction) &&
-    (input.trim().length > 0 || (!isMemberSession && (attachments.length > 0 || hasWorkspaceReferences)))
+    (input.trim().length > 0 || (!isMemberSession && (attachments.length > 0 || hasWorkspaceReferences || !!designStart)))
   const pickingLabel = t('browser.picking')
+  const designStartName = designStart ? designStartLabel(designStart, t) : ''
   const composerAttachments = useMemo(
     () => [
+      ...(designStartName ? [{ id: DESIGN_START_ATTACHMENT_ID, type: 'artifact' as const, name: designStartName }] : []),
       ...attachments,
       ...workspaceReferences.map((reference) => workspaceReferenceToAttachment(reference, pickingLabel)),
     ],
-    [attachments, workspaceReferences, pickingLabel],
+    [designStartName, attachments, workspaceReferences, pickingLabel],
   )
   const slashCommandCount = slashCommands.length
 
@@ -269,7 +277,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     setComposerInput(composerPrefill.text)
     setComposerAttachments(
       (composerPrefill.attachments ?? [])
-        .filter((attachment) => attachment.type === 'image' || attachment.data)
+        .filter((attachment): attachment is UIAttachment & { type: 'file' | 'image' } => attachment.type === 'image' || (attachment.type === 'file' && !!attachment.data))
         .map((attachment, index) => ({
           id: `rewind-prefill-${composerPrefill.nonce}-${index}`,
           name: attachment.name,
@@ -510,7 +518,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
 
   const handleSubmit = async () => {
     const text = input.trim()
-    if ((!text && ((!attachments.length && !hasWorkspaceReferences) || isMemberSession)) || isWorkspaceMissing) return
+    if ((!text && ((!attachments.length && !hasWorkspaceReferences && !designStart) || isMemberSession)) || isWorkspaceMissing) return
 
     if (pendingSlashUiAction?.type === 'panel') {
       setLocalSlashPanel(pendingSlashUiAction.command as LocalSlashCommandName)
@@ -554,9 +562,8 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     const workspaceReferencePrompt = !isMemberSession
       ? formatWorkspaceReferencePrompt(references)
       : ''
-    const contentForModel = [workspaceReferencePrompt, text].filter(Boolean).join('\n\n')
     const displayContent = text || (
-      references.length > 0
+      references.length > 0 && !designStart
         ? t('chat.contextReferencesOnly', { count: references.length })
         : ''
     )
@@ -589,7 +596,8 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         note: reference.note,
         quote: reference.quote,
       }))
-    const visibleAttachmentPayload: AttachmentRef[] = [
+    const visibleAttachmentPayload: Array<AttachmentRef | UIAttachment> = [
+      ...(designStart ? [{ type: 'artifact' as const, name: designStartName }] : []),
       ...uploadAttachmentPayload,
       ...references.map((reference): AttachmentRef => {
         if (reference.kind === 'browser' && reference.browser) {
@@ -639,9 +647,27 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
       }
     }
 
+    let startCommand = ''
+    if (designStart) {
+      setLaunchTransitioning(true)
+      try {
+        startCommand = await prepareDesignStart(targetSessionId, designStart)
+      } catch (error) {
+        useUIStore.getState().addToast({ type: 'error', message: errorMessage(error) })
+        return
+      } finally {
+        setLaunchTransitioning(false)
+      }
+    }
+    const contentForModel = (startCommand
+      ? [[startCommand, text].filter(Boolean).join(' '), workspaceReferencePrompt]
+      : [workspaceReferencePrompt, text]
+    ).filter(Boolean).join('\n\n')
+
     sendMessage(targetSessionId, contentForModel, [...uploadAttachmentPayload, ...workspaceAttachmentPayload, ...browserScreenshotPayload], {
       displayContent,
       displayAttachments: visibleAttachmentPayload,
+      ...(designStart && { title: text || designStartName }),
     })
     setComposerInput('')
     setComposerAttachments([])
@@ -649,6 +675,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     if (targetSessionId !== sessionId) useChatStore.getState().clearComposerDraft(targetSessionId)
     if (!isMemberSession) {
       clearWorkspaceReferences(sessionId)
+      clearDesignStart(sessionId)
       if (targetSessionId !== sessionId) clearWorkspaceReferences(targetSessionId)
     }
     setPlusMenuOpen(false)
@@ -790,6 +817,10 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }
 
   const removeAttachment = (id: string) => {
+    if (id === DESIGN_START_ATTACHMENT_ID) {
+      clearDesignStart(sessionId)
+      return
+    }
     setComposerAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
     removeWorkspaceReference(sessionId, id)
   }
@@ -810,7 +841,9 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }
 
   const composerPlaceholder =
-    isHeroComposer
+    designStart
+      ? t(designStartPlaceholder(designStart))
+      : isHeroComposer
       ? t('empty.placeholder')
       : isWorkspaceMissing
         ? t('chat.placeholderMissing')

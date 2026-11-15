@@ -31,7 +31,7 @@ export type AgentTaskNotification = TaskNotification
 export type BackgroundAgentTaskUsage = TaskUsage
 
 export type UIAttachment = {
-  type: 'file' | 'image'
+  type: 'file' | 'image' | 'artifact'
   name: string
   path?: string
   data?: string

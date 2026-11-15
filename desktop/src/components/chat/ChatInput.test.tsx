@@ -22,6 +22,12 @@ const mocks = vi.hoisted(() => ({
   wsSend: vi.fn(),
   dialogOpen: vi.fn(),
   syncMarks: vi.fn(),
+  createArtifact: vi.fn(),
+  installSystem: vi.fn(),
+}))
+
+vi.mock('../../api/design', () => ({
+  designApi: { createArtifact: mocks.createArtifact, installSystem: mocks.installSystem },
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -1367,6 +1373,136 @@ describe('ChatInput file mentions', () => {
         .getAllByRole('button')
         .filter((button) => button.textContent?.startsWith('/'))
       expect(commandButtons[0]).toHaveTextContent('/superpowers:brainstorming')
+    })
+  })
+
+  describe('with a start from the Design or Slides page', () => {
+    const grove = { command: '/slides' as const, project: '/repo', template: { id: 'grove', title: 'Grove' } }
+    const lastMessage = () => useChatStore.getState().sessions[sessionId]?.messages.at(-1)
+
+    beforeEach(() => {
+      mocks.createArtifact.mockResolvedValue({ dir: '/repo/dc_artifacts/grove' })
+      mocks.installSystem.mockResolvedValue({ dir: '/repo/dc_artifacts/systems/paper' })
+    })
+
+    it('shows the start as a chip with a question for it in an empty chat, and takes the focus', async () => {
+      useSessionStore.setState({
+        sessions: [{ ...useSessionStore.getState().sessions[0]!, messageCount: 0 }],
+      })
+      useChatStore.setState({ sessions: { [sessionId]: { ...useChatStore.getState().sessions[sessionId]!, messages: [] } } })
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+
+      render(<ChatInput sessionId={sessionId} variant="hero" />)
+
+      expect(screen.getByText('Slides · Grove')).toBeInTheDocument()
+      const input = screen.getByRole('textbox')
+      expect(input).toHaveAttribute('placeholder', 'What is this deck about, and who is it for?')
+      expect(input).toHaveFocus()
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled())
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+    })
+
+    it('asks a question that fits the design start and the clone', () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', project: '/repo' })
+      const { unmount } = render(<ChatInput sessionId={sessionId} />)
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'What should this page do, and who is it for?')
+      unmount()
+
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', project: '/repo', cloneAddress: 'https://example.com/' })
+      render(<ChatInput sessionId={sessionId} />)
+      expect(screen.getByText('Clone example.com')).toBeInTheDocument()
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Anything to change in the copy?')
+    })
+
+    it('creates the artifact only when sent, and sends the same command as before when nothing was typed', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
+        type: 'user_message',
+        id: expect.any(String),
+        content: '/slides /repo/dc_artifacts/grove',
+        attachments: [],
+        title: 'Slides · Grove',
+      }))
+      expect(mocks.createArtifact).toHaveBeenCalledWith({ project: '/repo', templateId: 'grove', title: 'Grove' })
+      expect(lastMessage()).toMatchObject({ type: 'user_text', content: '', attachments: [{ type: 'artifact', name: 'Slides · Grove' }] })
+      expect(useWorkspaceChatContextStore.getState().startsBySession[sessionId]).toBeUndefined()
+      expect(screen.queryByText('Slides · Grove')).not.toBeInTheDocument()
+    })
+
+    it('puts the command first and the typed words after it, and shows the chip and the words in the chat', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: 'Q3 results for the board' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({
+        content: '/slides /repo/dc_artifacts/grove Q3 results for the board',
+        title: 'Q3 results for the board',
+      })))
+      expect(lastMessage()).toMatchObject({
+        content: 'Q3 results for the board',
+        modelContent: '/slides /repo/dc_artifacts/grove Q3 results for the board',
+        attachments: [{ type: 'artifact', name: 'Slides · Grove' }],
+      })
+      expect(input).toHaveValue('')
+    })
+
+    it('starts each design entry the same way: from scratch, with a design system, and as a clone', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', project: '/repo', designSystem: { id: 'paper', name: 'Paper' } })
+      render(<ChatInput sessionId={sessionId} />)
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design /repo/dc_artifacts/systems/paper' })))
+      expect(mocks.installSystem).toHaveBeenCalledWith(sessionId, 'paper')
+
+      act(() => useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', project: '/repo', cloneAddress: 'https://example.com/' }))
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design Clone a website https://example.com/' })))
+
+      act(() => useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', project: '/repo' }))
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design', title: 'Design' })))
+    })
+
+    it('keeps the chip and the typed words when the artifact could not be created, so the user can send again', async () => {
+      mocks.createArtifact.mockRejectedValueOnce(new Error('disk full'))
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Q3 results' } })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('disk full'))
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+      expect(input).toHaveValue('Q3 results')
+      expect(screen.getByText('Slides · Grove')).toBeInTheDocument()
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({ content: '/slides /repo/dc_artifacts/grove Q3 results' })))
+    })
+
+    it('sends a plain message once the chip is removed', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Slides · Grove' }))
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Ask Claude to edit, debug or explain...')
+      expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled()
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'hello' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, { type: 'user_message', id: expect.any(String), content: 'hello', attachments: [] })
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+      expect(useWorkspaceChatContextStore.getState().startsBySession[sessionId]).toBeUndefined()
     })
   })
 })

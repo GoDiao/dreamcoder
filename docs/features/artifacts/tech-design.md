@@ -338,8 +338,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 ## 入口与流程
 
 - **从 Artifacts 页**：点「新建」一栏里的「Design」方块（调色板图标，带「New」角标；旁边是「Slides」方块，见[幻灯片技术设计](../slides/tech-design.md)的「入口」），进入 Design 模式页面（和 Slides 共用按范围取参数的开始页 `StartPage`，Design 范围只有网页和原型模板）：上方选项目，下面是模板库（缩略图、标题、类型、标签）和「从零开始」。模板可搜索：搜索框在模板页签的工具栏，搜索词去首尾空格、不分大小写，在 `id`、中英文标题、中英文简介、`tags` 里做包含匹配，任一命中即算命中，和类别筛选同时生效；「从零开始」「复刻网站」两张入口卡不受搜索影响，没有匹配时显示「没有匹配的模板」。
-  - 「从零开始」：在这个项目里新开会话，发出 `/design`。
-  - 「用这个模板创建」：sidecar 把随应用打包的模板复制进 `dc_artifacts/<name>/` 并写清单，然后新开会话，发出 `/design <产物路径>`。
+  - 「从零开始」「用这个模板创建」「复刻网站」：在这个项目里新开会话，输入框里放一个写着所选内容的块（如「设计 · <模板名>」「复刻 example.com」），不发送，等用户说要做什么。按下发送时才创建：有模板时 sidecar 把随应用打包的模板复制进 `dc_artifacts/<name>/` 并写清单，选了设计系统而没有模板时把系统复制进会话的工作目录；发出的消息是 `/design`、`/design <产物路径或系统目录>` 或 `/design 复刻网站 <地址>`，用户的话跟在后面。做法和细节见[幻灯片技术设计](../slides/tech-design.md)的「入口」。
 - **在会话里输入 `/design`**：不弹对话框，当前会话直接进入设计模式。Agent 先访谈，再按需要推荐模板（见「在会话里选模板」）。
 
 ## 在会话里选模板
@@ -415,7 +414,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 ## 网站复刻
 
-复刻是 Design 模式里一条独立的流程，不是限制：用户要复刻某个网站，就按「忠实复刻」做，包括把站点的图片、字体、媒体批量下载到本地；不因为站点是商业站或有版权内容而降级（上游的 web-clone 也是这条纪律）。`/design` 在用户明确要求复刻某个网站时才读复刻参考文件。入口有两个：Design 模式页上的「复刻网站」（填网址，发 `/design <「复刻网站」的本地化标题> <网址>`（中文是 `复刻网站`，英文是 `Clone a website`），`startDesignSession.ts:20` 已经是 `/design` 加参数的形状），或用户在会话里直接说。不设「复刻标记」：模型自己调用 `/design` 时没有参数，参数也只是原文追加到用户请求（`design.ts:189-191`）。
+复刻是 Design 模式里一条独立的流程，不是限制：用户要复刻某个网站，就按「忠实复刻」做，包括把站点的图片、字体、媒体批量下载到本地；不因为站点是商业站或有版权内容而降级（上游的 web-clone 也是这条纪律）。`/design` 在用户明确要求复刻某个网站时才读复刻参考文件。入口有两个：Design 模式页上的「复刻网站」（填网址，发 `/design <「复刻网站」的本地化标题> <网址>`（中文是 `复刻网站`，英文是 `Clone a website`），开始页给出的命令已经是 `/design` 加参数的形状），或用户在会话里直接说。不设「复刻标记」：模型自己调用 `/design` 时没有参数，参数也只是原文追加到用户请求（`design.ts:189-191`）。
 
 **直接用 open-design 的 web-clone**（MIT，`refs/design-system/open-design/skills/web-clone`）：一套方法加 12 个脚本，分四类：侦察（`recon-site`、`route-crawl`、`interaction-probe`、`network-capture`、`sourcemap-hunt`）、取资源（`asset-harvest` 下载页面实际用到的图片、字体、媒体并生成自托管的 `fonts.css`，`mirror-site` 整套镜像静态构建站）、验收（`visual-diff`、`compare-recon`、`audit-clone`）、辅助（`init-clone`、`od-preview-rewrite`）。
 
@@ -716,7 +715,7 @@ A -> 用户 : 回复，附截图
 | 「预览标签工具栏上也有『用这个模板』」 | 会话里的预览标签只在 Agent 正等着选、且候选里有这个模板时才显示「用这个模板」，点了等于在卡片上选它；没有待选请求时不显示 | 会话里没有「选哪个项目」的上下文，单独创建没有意义 [assumption：是否要在没有待选请求时也能用，要看使用情况] | `desktop/src/components/workspace/BrowserView.tsx` |
 | 「Artifacts 页：点『Design』色块」 | Artifacts 页顶部一个整行的「设计」入口；Design 模式页是 Artifacts 页内的一个视图（和全屏查看同级，`artifactViewStore` 新增 `designing`，不写入 localStorage） | 左侧栏没有新页面，沿用「页内视图」的做法，状态只有一个来源 | `desktop/src/pages/ArtifactsPage.tsx`、`desktop/src/stores/artifactViewStore.ts` |
 | 「Design 模式页面：选项目」 | 项目列表取自会话（项目根，没有则工作目录，且文件夹还在），默认第一个；没有会话时提示先打开项目 | 服务端的 `POST /api/design/artifacts` 只接受已知项目，会话记录就是已知项目的来源 | `desktop/src/components/design/DesignMode.tsx` |
-| 「从零开始」「用这个模板创建」：新开会话，发出 `/design` 或 `/design <产物路径>` | `startDesignSession`：创建产物（有模板时）、新建会话、连接、发送文字、打开标签。`/design` 作为普通消息发送，由 CLI 当斜杠命令处理 [assumption：未在 dev app 里确认] | | `desktop/src/lib/startDesignSession.ts` |
+| 「从零开始」「用这个模板创建」：新开会话，发出 `/design` 或 `/design <产物路径>` | 后来改成两步（Slides 第二阶段，2026-11-15）：`openDesignStart` 新建会话、连接、在输入框里放块、打开标签，不发送；用户发送时 `prepareDesignStart` 创建产物（有模板时）或复制设计系统，命令放在消息最前面。`/design` 作为普通消息发送，由 CLI 当斜杠命令处理 | 维护者要用户先有机会说话，第一条消息和标题不再是路径 | `desktop/src/lib/designStart.ts`、`desktop/src/components/chat/ChatInput.tsx` |
 | 「H5 同步」 | H5 和桌面用同一套前端构建，不另写：卡片、聊天里的模板卡片和模板缩略图（`dist/design-templates/*.jpg`，由 `staticH5.ts` 提供）都随之可用；Design 模式页只有桌面端侧边栏有入口，H5 没有；H5 没有侧边浏览器，聊天里模板卡片的「预览」按钮只在桌面端显示 | 设计原文已说同一套构建 | `desktop/src/lib/desktopRuntime.ts`、`src/server/staticH5.ts` |
 | 缩略图地址 | `/design-templates/<id>.jpg`，根相对路径，和 `public/icons/…` 的用法一致；图片加载失败时显示图标占位 | | `desktop/src/api/design.ts`、`desktop/src/components/design/TemplateThumbnail.tsx` |
 
@@ -752,7 +751,7 @@ A -> 用户 : 回复，附截图
 |---|---|---|---|
 | 「Design 模式页面」：浏览库（名称、类别、简介、色板预览） | Design 页顶部用分段控件在「模板」和「设计系统」之间切换；设计系统视图有搜索框、类别下拉、提示「转换来的是风格参考，不是官方资产」和卡片（四色色带、名称、类别和来源、三行简介、「用这个系统」按钮）。色带取目录记录里存好的 `swatches`，运行时不解析 CSS。类别名直接显示库里的英文，没有翻译；转换来的名称和简介没有中文，界面回退英文 | 23 个类别、156 条目的翻译不在本批范围，设计里也说转换来的先只有英文 | `desktop/src/components/design/DesignSystemLibrary.tsx`、`desktop/src/components/design/SystemSwatches.tsx` |
 | 「创建模板产物时可选一个（模板接受时）」 | 选中的系统显示在页面上方的一条标签里（色带、名称、清除按钮），模板视图和设计系统视图共用；点「用这个模板」时，模板接受设计系统才把 `designSystemId` 发给服务端。不接受的模板卡片上写「固定风格：选中的设计系统不会套用到这个模板」，按钮仍可点，创建时不带系统 | 禁用按钮会逼用户先取消系统再用这个模板；不带系统并在卡片上说明，用户看得见发生了什么。是不是该禁用是会改变用户看到的行为的小选择 [assumption：用户倾向哪种，看使用情况] | `desktop/src/components/design/DesignMode.tsx` |
-| 「Design 模式」：「从零开始」 | 选了设计系统后「从零开始」和模板预览里的「用这个模板」也带上它。没有模板时先建会话，再用 `POST /api/sessions/:id/workspace/artifacts/systems` 把系统复制进该会话工作目录，发出 `/design <系统文件夹>`；`/design` 技能认出这个文件夹有 `system.json`，在提示词里放该系统的用法并跳过设计系统的选择。复制失败时已建的会话留着，不发消息，不开标签，报错给用户 | 没有模板就没有产物可指向系统；复制接口是按会话的，所以要先有会话 | `desktop/src/lib/startDesignSession.ts`、`src/skills/bundled/design.ts`（`designSystemOfFolder`） |
+| 「Design 模式」：「从零开始」 | 选了设计系统后「从零开始」和模板预览里的「用这个模板」也带上它。没有模板时先建会话，再用 `POST /api/sessions/:id/workspace/artifacts/systems` 把系统复制进该会话工作目录，发出 `/design <系统文件夹>`；`/design` 技能认出这个文件夹有 `system.json`，在提示词里放该系统的用法并跳过设计系统的选择。复制在用户发送时才做，失败时报错，块和输入的文字留在输入框里 | 没有模板就没有产物可指向系统；复制接口是按会话的，所以要先有会话 | `desktop/src/lib/designStart.ts`、`src/skills/bundled/design.ts`（`designSystemOfFolder`） |
 | 「Artifacts 页的会话入口要显示设计系统」 | 会话 Artifacts 面板在产物下面加「设计系统」分组：本工作目录的，以及「设计系统 · 其他位置（只读）」（同一项目的其他工作目录和全局存放区）。每项显示名称、来源（来自库、提取的）、位置，清单有误时显示原因；有「添加到对话」按钮，作为目录引用加入输入框。没有点击打开：设计系统没有页面可开。全局 Artifacts 页没有改 | 设计只要求会话入口；点开没有目标 | `desktop/src/components/workspace/ArtifactsView.tsx` |
 | 未写（状态的来源） | 模板和设计系统两个目录的「只加载一次、失败可重试」逻辑抽成 `stores/catalogStore.ts` 的 `createCatalogStore`，`designTemplateStore` 改为用它（字段 `templates` 改名 `items`），新增 `designSystemStore`；`templateText` 改名 `localizedText`（模板和设计系统共用），类型 `DesignTemplateText` 改名 `DesignText` | 同一段加载逻辑第二次出现，不复制 | `desktop/src/stores/catalogStore.ts`、`desktop/src/lib/designTemplates.ts`、`desktop/src/types/design.ts` |
 | 协议同步 | `GET /api/sessions/:id/workspace/artifacts` 多了 `systems`，桌面端类型 `WorkspaceArtifactsResult` 同步；H5 与桌面同一套构建，不另写，设计系统库在 H5 里同样可用，色带是纯色块，不依赖桌面；会话里的 Artifacts 入口只在桌面端的新标签页出现（打开产物要用桌面端的浏览器标签，H5 里会报「桥接不可用」并留下空白标签） | AGENTS.md「协议变化同时更新」 | `desktop/src/types/artifact.ts`、`desktop/src/api/design.ts` |
@@ -805,7 +804,7 @@ A -> 用户 : 回复，附截图
 | 「宿主通道」 | 协议新增 `background` 消息（`createTarget`、`closeTarget`、`cdp`、`destroySession`），回复复用现有的 `result`；新增 `background_event`（CDP 事件）和 `background_closed` 两种推送；`BrowserHostChannel` 把「发命令等回复」抽成 `dispatch`，`request` 和 `requestBackground` 共用，新增 `onBackgroundEvent`、`onDisconnect`。主进程的 `parseMessage` 对 `background` 命令逐字段校验 | 现有 `cdp` 命令绑定已登记标签，不能直接用 | `src/server/browserHost/protocol.ts`、`src/server/browserHost/hostChannel.ts`、`desktop/electron/browserHost.ts` |
 | 「主进程」：新模块 `backgroundBrowser.ts` | 照做：每个页面一个 `show: false` 的窗口，`sandbox`、`contextIsolation` 开，先 `loadURL('about:blank')` 再 `debugger.attach('1.3')`；用户代理去掉 Electron 标记；`will-navigate`、`will-redirect` 按 `classifyUrl`，`window.open` 改为在当前页加载；`Page.navigate` 在主进程再按 `classifyUrl` 检查一次；权限请求一律拒绝。窗口自己关闭时发 `background_closed`。每个会话共用一个分区（同一次复刻的页面共享 cookie） | 实测要点 | `desktop/electron/backgroundBrowser.ts` |
 | 「技能」：复刻参考文件、正文一句话、不设标记、`od-preview-rewrite` | 参考文件 `clone.md`（用自己的话按上游方法写：立场、产物放哪里、十步、脚本规则、能做和不能做）；`/design` 每次调用都在提示词末尾加「Website clone tools」一节：脚本目录的绝对路径和运行前缀 `BUN_BE_BUN=1 "<process.execPath>" <目录>/scripts/<脚本>.mjs`（路径在调用时求出，`process.execPath` 是 CLI 自己的路径），找不到脚本时写「本构建没有」；正文的一句话是「用户明确要求复刻时才读 `clone.md`，其他请求不读」；`od-preview-rewrite.mjs --project <产物文件夹>` 写进第七步，并说明原因（协议根目录是 `dc_artifacts/`）。Windows 的写法只写了 PowerShell 的环境变量设置，没有验证 | 设计原文；运行前缀要在调用时才知道 | `src/skills/bundled/design.ts`、`src/utils/webClone.ts` |
-| 「入口」：Design 模式页「复刻网站」 | Design 页模板视图里，「从零开始」卡片旁加「复刻网站」卡片：一个地址输入框和「开始复刻」；地址补 `https://`，只接受 http 和 https、不含用户名密码、主机名带点或是 localhost，否则在卡片内提示；点了发 `/design <本地化的「复刻网站」标题> <地址>`（`startDesignSession` 新增 `cloneAddress`），只在桌面端显示（脚本需要桌面端的浏览器），中英文两份文字 | 参考 `startDesignSession.ts` | `desktop/src/components/design/DesignMode.tsx`、`desktop/src/lib/cloneAddress.ts`、`desktop/src/lib/startDesignSession.ts` |
+| 「入口」：Design 模式页「复刻网站」 | Design 页模板视图里，「从零开始」卡片旁加「复刻网站」卡片：一个地址输入框和「开始复刻」；地址补 `https://`，只接受 http 和 https、不含用户名密码、主机名带点或是 localhost，否则在卡片内提示；点了新开会话，输入框里放「复刻 <地址>」的块，用户发送时发 `/design <本地化的「复刻网站」标题> <地址>`（块里记着 `cloneAddress`），只在桌面端显示（脚本需要桌面端的浏览器），中英文两份文字 | 参考 `designStart.ts` | `desktop/src/components/design/DesignMode.tsx`、`desktop/src/lib/cloneAddress.ts`、`desktop/src/lib/designStart.ts` |
 | 「放开设计系统提取的素材规则」 | 参考文件里「不复制标志、图片、字体文件」和「告知来自测量」两条删掉，改为：可以把标志、图片、字体文件下载进 `dc_artifacts/systems/<name>/`（例如 `assets/`，可用复刻脚本里的 `asset-harvest.mjs`），`evidence.md` 记每个文件的来源地址，`DESIGN.md` 用自己的话写、不复制站点的营销文字。原设计写的是 `design.ts:110-111`，代码在阶段 4 之后行号已变 | 设计原文 | `src/skills/bundled/design.ts`（`DESIGN_SYSTEMS_REFERENCE`） |
 | [未验证] | 没有在真实 Electron 里跑过：隐藏窗口的创建、`debugger` 转发、脚本对真实站点的运行都没有验证（只在 Bun 里用假宿主验证了适配器和 sidecar 接口的配合，包括 WebSocket 带 `Authorization` 头）；Windows 上的 `BUN_BE_BUN` 和 `process.execPath` 没验证；脚本自己的下载（`asset-harvest` 的 `--recon-only` 路径和 `BrowserRequestContext.get`）仍是脚本进程里的 `fetch`，不走应用的浏览器；对 apple.com 字体 404 的原因设计里已记为未查明 | 本会话不能开 dev app | |
 

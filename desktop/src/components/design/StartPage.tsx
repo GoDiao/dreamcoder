@@ -6,7 +6,7 @@ import { normalizeCloneAddress } from '../../lib/cloneAddress'
 import { getFileNameFromPath } from '../../lib/composerAttachments'
 import { errorMessage } from '../../lib/errorMessage'
 import { DESIGN_CATEGORY_LABELS, DESIGN_PLATFORM_LABELS, filterDesignTemplates, localizedText } from '../../lib/designTemplates'
-import { startDesignSession, type DesignStart, type StartCommand } from '../../lib/startDesignSession'
+import { openDesignStart, type DesignStart, type StartCommand } from '../../lib/designStart'
 import { useArtifactViewStore, type StartScope } from '../../stores/artifactViewStore'
 import { useDesignSystemStore } from '../../stores/designSystemStore'
 import { useDesignTemplateStore } from '../../stores/designTemplateStore'
@@ -103,11 +103,11 @@ export function StartPage({ scope }: { scope: StartScope }) {
     [templates, category, templateQuery, config],
   )
 
-  const run = async (options: DesignStart) => {
+  const run = async (options: Omit<DesignStart, 'command' | 'project'>) => {
     if (!project || busy) return
     setBusy(true)
     try {
-      await startDesignSession(project, config.command, options)
+      await openDesignStart({ command: config.command, project, ...options })
       close()
     } catch (failure) {
       toast.error(errorMessage(failure))
@@ -118,8 +118,8 @@ export function StartPage({ scope }: { scope: StartScope }) {
 
   const start = (template?: DesignTemplate) =>
     run({
-      template: template && { id: template.id, title: localizedText(template.title, locale) },
-      designSystemId: system && (template === undefined || template.acceptsDesignSystem) ? system.id : undefined,
+      ...(template && { template: { id: template.id, title: localizedText(template.title, locale) } }),
+      ...(system && (template === undefined || template.acceptsDesignSystem) && { designSystem: { id: system.id, name: localizedText(system.name, locale) } }),
     })
 
   const startClone = async () => {

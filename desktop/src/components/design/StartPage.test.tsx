@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   templates: vi.fn(),
   systemCatalog: vi.fn(),
   preview: vi.fn(),
-  startDesignSession: vi.fn(),
+  openDesignStart: vi.fn(),
   placeBrowserGuest: vi.fn(),
   release: vi.fn(),
   closeBrowser: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('../../api/design', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/design')>()),
   designApi: { templates: mocks.templates, systemCatalog: mocks.systemCatalog, preview: mocks.preview },
 }))
-vi.mock('../../lib/startDesignSession', () => ({ startDesignSession: mocks.startDesignSession }))
+vi.mock('../../lib/designStart', () => ({ openDesignStart: mocks.openDesignStart }))
 vi.mock('../../lib/browserGuests', () => ({
   placeBrowserGuest: mocks.placeBrowserGuest,
   closeBrowser: mocks.closeBrowser,
@@ -75,7 +75,7 @@ describe('StartPage', () => {
   beforeEach(() => {
     mocks.placeBrowserGuest.mockReturnValue(mocks.release)
     mocks.submitBrowserInput.mockResolvedValue(undefined)
-    mocks.startDesignSession.mockResolvedValue('s-new')
+    mocks.openDesignStart.mockResolvedValue('s-new')
     mocks.templates.mockResolvedValue({
       version: 1,
       templates: [template('saas', 'web'), template('app', 'prototype', 'mobile'), template('blog', 'web', null), template('talk', 'slides', null), template('pitch', 'slides', null)],
@@ -214,7 +214,7 @@ describe('StartPage', () => {
 
     fireEvent.click(screen.getByTestId('design-scratch'))
 
-    await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: undefined, designSystemId: undefined }))
+    await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha' }))
     await waitFor(() => expect(useArtifactViewStore.getState().starting).toBeNull())
   })
 
@@ -228,7 +228,7 @@ describe('StartPage', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'beta' }))
     fireEvent.click(screen.getByTestId('design-scratch'))
 
-    await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/beta', '/design', { template: undefined, designSystemId: undefined }))
+    await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/beta' }))
   })
 
   it('falls back to the first project when the chosen one is no longer listed', async () => {
@@ -246,7 +246,7 @@ describe('StartPage', () => {
     expect(trigger).toHaveTextContent('alpha')
     fireEvent.click(screen.getByTestId('design-scratch'))
 
-    await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: undefined, designSystemId: undefined }))
+    await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha' }))
   })
 
   it('creates the artifact from the chosen template in the project', async () => {
@@ -255,11 +255,11 @@ describe('StartPage', () => {
 
     fireEvent.click(within(card).getByRole('button', { name: 'Use this template' }))
 
-    await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: { id: 'saas', title: 'Title saas' }, designSystemId: undefined }))
+    await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', template: { id: 'saas', title: 'Title saas' } }))
   })
 
   it('tells the user when starting failed and stays on the page', async () => {
-    mocks.startDesignSession.mockRejectedValue(new Error('disk full'))
+    mocks.openDesignStart.mockRejectedValue(new Error('disk full'))
     render(<StartPage scope="design" />)
     await screen.findByText('Title saas')
 
@@ -283,7 +283,7 @@ describe('StartPage', () => {
       '/app/design-templates/saas',
     ))
     fireEvent.click(screen.getByRole('button', { name: 'Use this template' }))
-    await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: { id: 'saas', title: 'Title saas' }, designSystemId: undefined }))
+    await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', template: { id: 'saas', title: 'Title saas' } }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
   })
@@ -388,7 +388,7 @@ describe('StartPage', () => {
       const templateCard = (await screen.findByText('Title saas')).closest('[data-testid="design-template-card"]') as HTMLElement
       fireEvent.click(within(templateCard).getByRole('button', { name: 'Use this template' }))
 
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: { id: 'saas', title: 'Title saas' }, designSystemId: 'paper' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', template: { id: 'saas', title: 'Title saas' }, designSystem: { id: 'paper', name: 'System paper' } }))
     })
 
     it('passes the chosen system when starting from scratch and from the preview', async () => {
@@ -397,13 +397,13 @@ describe('StartPage', () => {
       fireEvent.click(screen.getByRole('radio', { name: 'Templates' }))
 
       fireEvent.click(await screen.findByTestId('design-scratch'))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: undefined, designSystemId: 'fin-one' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', designSystem: { id: 'fin-one', name: 'System fin-one' } }))
 
       const card = screen.getByText('Title saas').closest('[data-testid="design-template-card"]') as HTMLElement
       fireEvent.click(within(card).getByRole('button', { name: 'Preview' }))
       await screen.findByTestId('design-template-preview')
       fireEvent.click(screen.getByRole('button', { name: 'Use this template' }))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenLastCalledWith('/work/alpha', '/design', { template: { id: 'saas', title: 'Title saas' }, designSystemId: 'fin-one' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenLastCalledWith({ command: '/design', project: '/work/alpha', template: { id: 'saas', title: 'Title saas' }, designSystem: { id: 'fin-one', name: 'System fin-one' } }))
     })
 
     it('clears the chosen system', async () => {
@@ -415,7 +415,7 @@ describe('StartPage', () => {
       expect(screen.queryByTestId('design-system-chip')).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('radio', { name: 'Templates' }))
       fireEvent.click(await screen.findByTestId('design-scratch'))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: undefined, designSystemId: undefined }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha' }))
     })
 
     it('does not pass the system to a template with a fixed look and says so on its card', async () => {
@@ -429,7 +429,7 @@ describe('StartPage', () => {
       expect(screen.getAllByText('Fixed look: the chosen design system is not applied.')).toHaveLength(1)
       fireEvent.click(within(fixed).getByRole('button', { name: 'Use this template' }))
 
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { template: { id: 'fixed', title: 'Title fixed' }, designSystemId: undefined }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', template: { id: 'fixed', title: 'Title fixed' } }))
     })
   })
 
@@ -445,7 +445,7 @@ describe('StartPage', () => {
       fireEvent.change(within(clone).getByRole('textbox', { name: 'Website address' }), { target: { value: 'example.com' } })
       fireEvent.click(within(clone).getByRole('button', { name: 'Start cloning' }))
 
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { cloneAddress: 'https://example.com/' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', cloneAddress: 'https://example.com/' }))
       await waitFor(() => expect(useArtifactViewStore.getState().starting).toBeNull())
     })
 
@@ -454,7 +454,7 @@ describe('StartPage', () => {
       const input = within(clone).getByRole('textbox', { name: 'Website address' })
       fireEvent.change(input, { target: { value: 'https://example.com/page' } })
       fireEvent.submit(clone)
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/design', { cloneAddress: 'https://example.com/page' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/design', project: '/work/alpha', cloneAddress: 'https://example.com/page' }))
     })
 
     it('does not start with an address that is not a web address, and says so until the user types again', async () => {
@@ -464,7 +464,7 @@ describe('StartPage', () => {
       fireEvent.click(within(clone).getByRole('button', { name: 'Start cloning' }))
 
       expect(await within(clone).findByRole('alert')).toHaveTextContent('Enter a web address')
-      expect(mocks.startDesignSession).not.toHaveBeenCalled()
+      expect(mocks.openDesignStart).not.toHaveBeenCalled()
       fireEvent.change(input, { target: { value: 'example.com' } })
       expect(within(clone).queryByRole('alert')).not.toBeInTheDocument()
     })
@@ -475,7 +475,7 @@ describe('StartPage', () => {
     })
 
     it('tells the user when starting failed and stays on the page', async () => {
-      mocks.startDesignSession.mockRejectedValue(new Error('disk full'))
+      mocks.openDesignStart.mockRejectedValue(new Error('disk full'))
       const clone = await form()
       fireEvent.change(within(clone).getByRole('textbox', { name: 'Website address' }), { target: { value: 'example.com' } })
       fireEvent.click(within(clone).getByRole('button', { name: 'Start cloning' }))
@@ -505,25 +505,25 @@ describe('StartPage', () => {
       expect(screen.queryByText('Title saas')).not.toBeInTheDocument()
       expect(screen.queryByRole('radiogroup', { name: 'Template type' })).not.toBeInTheDocument()
       expect(screen.queryByTestId('design-clone')).not.toBeInTheDocument()
-      expect(screen.getByText('Start a chat in this project. The assistant asks a few questions, then builds the deck.')).toBeInTheDocument()
+      expect(screen.getByText('Start a chat in this project and say what the deck is for, or let the assistant ask a few questions first.')).toBeInTheDocument()
     })
 
     it('starts the slides skill from scratch, with a design system, and from a template', async () => {
       await renderSlides()
 
       fireEvent.click(screen.getByTestId('design-scratch'))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/slides', { template: undefined, designSystemId: undefined }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/slides', project: '/work/alpha' }))
       await waitFor(() => expect(useArtifactViewStore.getState().starting).toBeNull())
 
       fireEvent.click(screen.getByRole('radio', { name: 'Design systems' }))
       fireEvent.click(within((await screen.findByText('System paper')).closest('[data-testid="design-system-card"]') as HTMLElement).getByRole('button', { name: 'Use this system' }))
       fireEvent.click(screen.getByRole('radio', { name: 'Templates' }))
       fireEvent.click(await screen.findByTestId('design-scratch'))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenLastCalledWith('/work/alpha', '/slides', { template: undefined, designSystemId: 'paper' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenLastCalledWith({ command: '/slides', project: '/work/alpha', designSystem: { id: 'paper', name: 'System paper' } }))
 
       const card = screen.getByText('Title talk').closest('[data-testid="design-template-card"]') as HTMLElement
       fireEvent.click(within(card).getByRole('button', { name: 'Use this template' }))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenLastCalledWith('/work/alpha', '/slides', { template: { id: 'talk', title: 'Title talk' }, designSystemId: 'paper' }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenLastCalledWith({ command: '/slides', project: '/work/alpha', template: { id: 'talk', title: 'Title talk' }, designSystem: { id: 'paper', name: 'System paper' } }))
     })
 
     it('searches within the slide templates only', async () => {
@@ -569,7 +569,7 @@ describe('StartPage', () => {
       expect(within(controls).getByRole('button', { name: 'Present' })).toBeInTheDocument()
       expect(within(controls).queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Use this template' }))
-      await waitFor(() => expect(mocks.startDesignSession).toHaveBeenCalledWith('/work/alpha', '/slides', { template: { id: 'talk', title: 'Title talk' }, designSystemId: undefined }))
+      await waitFor(() => expect(mocks.openDesignStart).toHaveBeenCalledWith({ command: '/slides', project: '/work/alpha', template: { id: 'talk', title: 'Title talk' } }))
     })
   })
 })

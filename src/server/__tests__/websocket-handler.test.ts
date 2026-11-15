@@ -8,6 +8,7 @@ import {
   getActiveSessionIds,
   getSessionState,
   getSlashCommands,
+  getTitleInputForUserMessage,
   handleRawCliMessage,
   handleWebSocket,
   resolveSessionPermissionMode,
@@ -22,6 +23,7 @@ import { sessionService } from '../services/sessionService.js'
 import { SettingsService } from '../services/settingsService.js'
 import { getSessionRuntime, setServerEndpoint } from '../ws/sessionRuntime.js'
 import { sessionStateStore } from '../session/state/store.js'
+import { parseSlashCommand } from '../../utils/slashCommandParsing.js'
 
 function makeClientSocket(sessionId: string) {
   const sent: string[] = []
@@ -475,5 +477,18 @@ describe('WebSocket permission mode updates', () => {
 
     expect(translateCliMessage({ type: 'system', subtype: 'status', status: null }, sessionId)).toEqual([])
     expect(getSessionState(sessionId)?.turn.activity).toBe('thinking')
+  })
+})
+
+describe('the title input of a user message', () => {
+  it('takes the title the client gives over the message, so a command with a folder path is not the title', () => {
+    const content = '/slides /repo/dc_artifacts/grove Q3 results'
+    expect(getTitleInputForUserMessage(content, parseSlashCommand(content), 'Q3 results')).toBe('Q3 results')
+    expect(getTitleInputForUserMessage('/slides', parseSlashCommand('/slides'), 'Slides · Grove')).toBe('Slides · Grove')
+  })
+
+  it('falls back to the message without a title, and still reads a goal from its arguments', () => {
+    expect(getTitleInputForUserMessage('fix the login', null, undefined)).toBe('fix the login')
+    expect(getTitleInputForUserMessage('/goal ship it', parseSlashCommand('/goal ship it'), '  ')).toBe('ship it')
   })
 })
