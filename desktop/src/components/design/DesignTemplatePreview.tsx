@@ -1,6 +1,7 @@
 import { designApi } from '../../api/design'
 import { useStandaloneBrowserPage } from '../../hooks/useStandaloneBrowserPage'
 import { useTranslation } from '../../i18n'
+import { DeckControls } from '../artifacts/DeckControls'
 import { Button } from '../shared/ui/button'
 import { ViewerHeader } from '../shared/ViewerHeader'
 
@@ -23,6 +24,7 @@ export function DesignTemplatePreview({ templateId, title, busy, onBack, onUse }
       <ViewerHeader title={t('design.previewOf', { title })} onBack={onBack}>
         <Button size="sm" disabled={busy} onClick={onUse}>{t('design.useTemplate')}</Button>
       </ViewerHeader>
+      <DeckControls tabId={DESIGN_PREVIEW_TAB} />
       <div ref={stageRef} data-testid="design-preview-stage" className="min-h-0 flex-1" />
     </div>
   )

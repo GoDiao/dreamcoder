@@ -1,13 +1,13 @@
 import { ArrowLeft, Globe, PencilRuler, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { useTranslation } from '../../i18n'
+import { useTranslation, type TranslationKey } from '../../i18n'
 import { normalizeCloneAddress } from '../../lib/cloneAddress'
 import { getFileNameFromPath } from '../../lib/composerAttachments'
 import { errorMessage } from '../../lib/errorMessage'
 import { DESIGN_CATEGORY_LABELS, DESIGN_PLATFORM_LABELS, filterDesignTemplates, localizedText } from '../../lib/designTemplates'
-import { startDesignSession, type DesignStart } from '../../lib/startDesignSession'
-import { useArtifactViewStore } from '../../stores/artifactViewStore'
+import { startDesignSession, type DesignStart, type StartCommand } from '../../lib/startDesignSession'
+import { useArtifactViewStore, type StartScope } from '../../stores/artifactViewStore'
 import { useDesignSystemStore } from '../../stores/designSystemStore'
 import { useDesignTemplateStore } from '../../stores/designTemplateStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -28,10 +28,42 @@ import { TemplateThumbnail } from './TemplateThumbnail'
 type CategoryFilter = DesignTemplateCategory | 'all'
 type Library = 'templates' | 'systems'
 
-export function DesignMode() {
+type ScopeConfig = {
+  command: StartCommand
+  categories: readonly DesignTemplateCategory[]
+  title: TranslationKey
+  noProject: TranslationKey
+  scratchHint: TranslationKey
+  empty: TranslationKey
+  clone: boolean
+}
+
+const SCOPES: Record<StartScope, ScopeConfig> = {
+  design: {
+    command: '/design',
+    categories: ['web', 'prototype'],
+    title: 'design.title',
+    noProject: 'design.noProject',
+    scratchHint: 'design.scratchHint',
+    empty: 'design.empty',
+    clone: true,
+  },
+  slides: {
+    command: '/slides',
+    categories: ['slides'],
+    title: 'slides.title',
+    noProject: 'slides.noProject',
+    scratchHint: 'slides.scratchHint',
+    empty: 'slides.empty',
+    clone: false,
+  },
+}
+
+export function StartPage({ scope }: { scope: StartScope }) {
   const t = useTranslation()
+  const config = SCOPES[scope]
   const locale = useSettingsStore((state) => state.locale)
-  const close = useArtifactViewStore((state) => state.closeDesign)
+  const close = useArtifactViewStore((state) => state.closeStart)
   const sessions = useSessionStore((state) => state.sessions)
   const templates = useDesignTemplateStore((state) => state.items)
   const loading = useDesignTemplateStore((state) => state.loading)
@@ -67,15 +99,15 @@ export function DesignMode() {
   const project = chosenProject !== null && projects.includes(chosenProject) ? chosenProject : projects[0] ?? null
   const system = systems.find((candidate) => candidate.id === systemId) ?? null
   const visible = useMemo(
-    () => filterDesignTemplates(templates, category === 'all' ? null : category, templateQuery),
-    [templates, category, templateQuery],
+    () => filterDesignTemplates(templates, category === 'all' ? config.categories : [category], templateQuery),
+    [templates, category, templateQuery, config],
   )
 
   const run = async (options: DesignStart) => {
     if (!project || busy) return
     setBusy(true)
     try {
-      await startDesignSession(project, options)
+      await startDesignSession(project, config.command, options)
       close()
     } catch (failure) {
       toast.error(errorMessage(failure))
@@ -109,17 +141,17 @@ export function DesignMode() {
   }
 
   return (
-    <div data-testid="design-mode" className="flex-1 overflow-y-auto">
+    <div data-testid="start-page" data-scope={scope} className="flex-1 overflow-y-auto">
       <div className="window-drag-region flex select-none items-center gap-3 px-10 pb-5 pt-8">
         <Button variant="ghost" size="sm" onClick={close} aria-label={t('artifactsPage.back')}>
           <ArrowLeft aria-hidden="true" />
           {t('artifactsPage.back')}
         </Button>
-        <h1 className="min-w-0 flex-1 text-2xl font-bold text-foreground">{t('design.title')}</h1>
+        <h1 className="min-w-0 flex-1 text-2xl font-bold text-foreground">{t(config.title)}</h1>
       </div>
       <div className="px-10 pb-8">
         {projects.length === 0 ? (
-          <p role="status" className="py-16 text-center text-sm text-subtle-foreground">{t('design.noProject')}</p>
+          <p role="status" className="py-16 text-center text-sm text-subtle-foreground">{t(config.noProject)}</p>
         ) : (
           <>
             <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -149,15 +181,17 @@ export function DesignMode() {
                     placeholder={t('design.templateSearch')}
                     className="w-64"
                   />
-                  <SegmentedControl
-                    value={category}
-                    label={t('design.filter')}
-                    options={[
-                      { value: 'all', label: t('design.category.all') },
-                      ...(['web', 'prototype'] as const).map((value) => ({ value, label: t(DESIGN_CATEGORY_LABELS[value]) })),
-                    ]}
-                    onChange={setCategory}
-                  />
+                  {config.categories.length > 1 && (
+                    <SegmentedControl
+                      value={category}
+                      label={t('design.filter')}
+                      options={[
+                        { value: 'all', label: t('design.category.all') },
+                        ...config.categories.map((value) => ({ value, label: t(DESIGN_CATEGORY_LABELS[value]) })),
+                      ]}
+                      onChange={setCategory}
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -187,38 +221,40 @@ export function DesignMode() {
                     <PencilRuler aria-hidden="true" size={28} strokeWidth={1.6} className="text-subtle-foreground" />
                     <span className="flex flex-col gap-1">
                       <span className="text-sm font-medium text-foreground">{t('design.scratchTitle')}</span>
-                      <span className="text-xs text-muted-foreground">{t('design.scratchHint')}</span>
+                      <span className="text-xs text-muted-foreground">{t(config.scratchHint)}</span>
                     </span>
                   </CardButton>
-                  <form
-                    data-testid="design-clone"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void startClone()
-                    }}
-                    className="flex min-h-48 flex-col justify-between gap-3 rounded-lg border border-dashed border-border bg-background p-4"
-                  >
-                    <Globe aria-hidden="true" size={28} strokeWidth={1.6} className="text-subtle-foreground" />
-                    <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-foreground">{t('design.cloneTitle')}</span>
-                      <span className="text-xs text-muted-foreground">{t('design.cloneHint')}</span>
-                    </span>
-                    <Input
-                      value={cloneInput}
-                      onChange={(event) => {
-                        setCloneInput(event.target.value)
-                        setCloneInvalid(false)
+                  {config.clone && (
+                    <form
+                      data-testid="design-clone"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void startClone()
                       }}
-                      aria-label={t('design.cloneAddress')}
-                      aria-invalid={cloneInvalid}
-                      placeholder="example.com"
-                      spellCheck={false}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                    />
-                    {cloneInvalid && <span role="alert" className="text-xs text-destructive">{t('design.cloneInvalid')}</span>}
-                    <Button type="submit" size="sm" disabled={busy || cloneInput.trim() === ''}>{t('design.cloneStart')}</Button>
-                  </form>
+                      className="flex min-h-48 flex-col justify-between gap-3 rounded-lg border border-dashed border-border bg-background p-4"
+                    >
+                      <Globe aria-hidden="true" size={28} strokeWidth={1.6} className="text-subtle-foreground" />
+                      <span className="flex flex-col gap-1">
+                        <span className="text-sm font-medium text-foreground">{t('design.cloneTitle')}</span>
+                        <span className="text-xs text-muted-foreground">{t('design.cloneHint')}</span>
+                      </span>
+                      <Input
+                        value={cloneInput}
+                        onChange={(event) => {
+                          setCloneInput(event.target.value)
+                          setCloneInvalid(false)
+                        }}
+                        aria-label={t('design.cloneAddress')}
+                        aria-invalid={cloneInvalid}
+                        placeholder="example.com"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                      />
+                      {cloneInvalid && <span role="alert" className="text-xs text-destructive">{t('design.cloneInvalid')}</span>}
+                      <Button type="submit" size="sm" disabled={busy || cloneInput.trim() === ''}>{t('design.cloneStart')}</Button>
+                    </form>
+                  )}
                   {visible.map((template) => (
                     <div key={template.id} data-testid="design-template-card" className="flex flex-col overflow-hidden rounded-lg border border-border bg-background">
                       <TemplateThumbnail templateId={template.id} />
@@ -242,7 +278,7 @@ export function DesignMode() {
                 {loading && templates.length === 0 && <LoadingBlock className="py-16" spinnerClassName="size-6" />}
                 {!loading && !error && visible.length === 0 && (
                   <p role="status" className="py-8 text-center text-sm text-subtle-foreground">
-                    {t(templateQuery.trim() === '' ? 'design.empty' : 'design.templateNoMatch')}
+                    {t(templateQuery.trim() === '' ? config.empty : 'design.templateNoMatch')}
                   </p>
                 )}
               </>

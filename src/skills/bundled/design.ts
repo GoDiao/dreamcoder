@@ -5,12 +5,6 @@ import { USE_DESIGN_SYSTEM_TOOL_NAME } from '../../tools/UseDesignSystemTool/con
 import { readArtifactEntry } from '../../utils/artifacts.js'
 import { browserToolName } from '../../utils/browserControl/common.js'
 import { renderWebCloneSection, resolveWebCloneDir } from '../../utils/webClone.js'
-import {
-  designTemplateGuidance,
-  findDesignTemplate,
-  readDesignTemplateCatalog,
-  renderDesignTemplateIndex,
-} from '../../utils/designTemplates.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 import {
   artifactFolderIn,
@@ -22,6 +16,8 @@ import {
   languageRule,
   languageSection,
   NO_FORM_RULE,
+  templateIndexSection,
+  usedTemplateGuidance,
 } from './designSystemGuide.js'
 
 const navigate = browserToolName('navigate')
@@ -169,19 +165,13 @@ Tell the user what you made, which template it came from if any, and what you as
 async function templateSection(args: string): Promise<string[]> {
   const folder = args ? await artifactFolderIn(args) : null
   const manifest = folder ? (await readArtifactEntry(dirname(folder), basename(folder)))?.manifest ?? null : null
-  const templateId = manifest?.template?.id
-  const used = templateId ? await findDesignTemplate(templateId).catch(() => null) : null
+  const guidance = folder ? await usedTemplateGuidance(manifest) : null
   const system = folder ? await chosenDesignSystemUsage(folder, manifest, manifest?.kind ?? 'page') : null
   const systemPart = system ? [`## Design system of the artifact\n\nThe user chose this design system. Skip the choice in step 3 and apply it as \`design-systems.md\` describes.\n${system}`] : [await designSystemIndexSection()]
-  if (folder && used) {
-    return [`## Artifact to design\n\nThe user already created ${folder} from a template. Skip step 2.\n${designTemplateGuidance(used)}`, ...systemPart]
+  if (guidance) {
+    return [`## Artifact to design\n\nThe user already created ${folder} from a template. Skip step 2.\n${guidance}`, ...systemPart]
   }
-  try {
-    const catalog = await readDesignTemplateCatalog()
-    return [`## Template index\n\n${renderDesignTemplateIndex(catalog.templates)}`, ...systemPart]
-  } catch {
-    return ['## Template index\n\nThe template catalog is not available. Skip step 2 and write the artifact yourself.', ...systemPart]
-  }
+  return [await templateIndexSection(['web', 'prototype']), ...systemPart]
 }
 
 export function registerDesignSkill(): void {

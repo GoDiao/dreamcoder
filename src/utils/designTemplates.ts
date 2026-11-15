@@ -1,11 +1,13 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import {
   ARTIFACT_MANIFEST_FILE,
   isSafeArtifactName,
   newArtifactId,
+  parseArtifactManifest,
   type ArtifactManifest,
 } from './artifacts.js'
+import { DECK_STYLESHEET_FILE, DECK_SLIDES_DIR } from './deck.js'
 import { uniqueName } from './artifactTransfer.js'
 import { designSystemReference, installDesignSystem, type InstalledDesignSystem } from './designSystems.js'
 import {
@@ -23,7 +25,7 @@ import {
 
 export const DESIGN_TEMPLATES_DIRNAME = 'design-templates'
 
-export type DesignTemplateCategory = 'web' | 'prototype'
+export type DesignTemplateCategory = 'web' | 'prototype' | 'slides'
 
 export type DesignTemplateParam = {
   name: string
@@ -74,6 +76,15 @@ export function designTemplateFolder(templatesDir: string, template: DesignTempl
   return join(templatesDir, template.id)
 }
 
+async function deckSlidesOf(source: string, template: DesignTemplateRecord): Promise<string[]> {
+  const raw = await readFile(join(source, ARTIFACT_MANIFEST_FILE), 'utf-8').catch(() => null)
+  const parsed = raw === null ? null : parseArtifactManifest(raw).manifest
+  if (parsed?.kind !== 'deck' || !parsed.slides || parsed.entry !== template.entry) {
+    throw new Error(`The manifest of slide template ${template.id} is missing or is not a deck.`)
+  }
+  return parsed.slides
+}
+
 export type CreateFromTemplateOptions = {
   templateId: string
   artifactsDir: string
@@ -97,6 +108,7 @@ export async function createArtifactFromTemplate(
   const wanted = options.name ?? template.id
   if (!isSafeArtifactName(wanted)) throw new Error(`"${wanted}" is not an artifact name.`)
 
+  const slides = template.category === 'slides' ? await deckSlidesOf(source, template) : null
   if (options.designSystemId && !template.acceptsDesignSystem) {
     throw new Error(`Design template ${template.id} has its own look and does not take a design system.`)
   }
@@ -110,9 +122,10 @@ export async function createArtifactFromTemplate(
   const manifest: ArtifactManifest = {
     version: 1,
     id: newArtifactId(),
-    kind: 'page',
+    kind: slides ? 'deck' : 'page',
     title: options.title?.trim() || template.title.en,
     entry: template.entry,
+    ...(slides && { slides }),
     ...(designSystem && { designSystem: designSystemReference(designSystem.name) }),
     template: { id: template.id, commit: template.source.commit },
   }
@@ -128,9 +141,16 @@ export async function createArtifactFromTemplate(
   return { name, dir, manifest, designSystem }
 }
 
+function adaptTarget(template: DesignTemplateRecord): string {
+  if (template.category === 'slides') {
+    return `its ${template.entry} is the fixed stage file and stays as it is; the example to adapt is ${DECK_STYLESHEET_FILE}, the slides listed in artifact.json and their files in ${DECK_SLIDES_DIR}/, and DESIGN.md in the folder describes the look. The section numbers and the number of sections in the example are sample content: number them again for the sections of the new deck`
+  }
+  return `its entry file ${template.entry} is the example to adapt`
+}
+
 export function designTemplateGuidance(template: DesignTemplateRecord): string {
   return [
-    `The artifact was created from the design template "${template.title.en}" (${template.id}); its entry file ${template.entry} is the example to adapt.`,
+    `The artifact was created from the design template "${template.title.en}" (${template.id}); ${adaptTarget(template)}.`,
     `How to adapt it (English): ${template.prompt.en}`,
     `How to adapt it (中文): ${template.prompt.zh}`,
     template.acceptsDesignSystem ? null : 'This template has its own look and does not take another design system.',

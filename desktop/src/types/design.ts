@@ -1,4 +1,4 @@
-export type DesignTemplateCategory = 'web' | 'prototype'
+export type DesignTemplateCategory = 'web' | 'prototype' | 'slides'
 
 export type DesignText = { en: string; zh: string }
 

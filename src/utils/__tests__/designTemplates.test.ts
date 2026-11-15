@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { checkArtifact } from '../artifactCheck.js'
 import {
   createArtifactFromTemplate,
+  designTemplateGuidance,
   readDesignTemplateCatalog,
   renderDesignTemplateIndex,
   resolveDesignTemplatesDir,
 } from '../designTemplates.js'
-import { templateRecord, writeTemplates } from './designTemplateFixtures.js'
+import { deckTemplateFiles, slideTemplateRecord, templateRecord, writeTemplates } from './designTemplateFixtures.js'
 import { parseArtifactManifest } from '../artifacts.js'
 import { bundledDirCandidates } from '../bundledContent.js'
 import { systemRecord, writeSystems } from './designSystemFixtures.js'
@@ -106,6 +108,51 @@ describe('createArtifactFromTemplate', () => {
     await fs.rm(path.join(templates(), 'gone'), { recursive: true })
     await expect(createArtifactFromTemplate({ templateId: 'gone', artifactsDir: artifacts(), templatesDir: templates() })).rejects.toThrow('were not found')
     expect(await fs.readdir(artifacts()).catch(() => [])).toEqual([])
+  })
+})
+
+describe('createArtifactFromTemplate with a slide template', () => {
+  const templates = () => path.join(root, 'templates')
+  const artifacts = () => path.join(root, 'work', 'dc_artifacts')
+
+  it('keeps the kind and the slides of the template\'s own manifest, with a new id, title and template', async () => {
+    await writeTemplates(templates(), [slideTemplateRecord('poster')], { poster: deckTemplateFiles(['cover', 'agenda']) })
+    const created = await createArtifactFromTemplate({ templateId: 'poster', artifactsDir: artifacts(), templatesDir: templates(), title: 'Board review' })
+    const parsed = parseArtifactManifest(await fs.readFile(path.join(created.dir, 'artifact.json'), 'utf-8'))
+    expect(parsed.error).toBeNull()
+    expect(parsed.manifest).toMatchObject({
+      kind: 'deck',
+      title: 'Board review',
+      entry: 'index.html',
+      slides: ['cover', 'agenda'],
+      template: { id: 'poster', commit: 'def456' },
+    })
+    expect(parsed.manifest?.id).not.toBe('00000000-0000-4000-8000-000000000000')
+    expect(await fs.readFile(path.join(created.dir, 'slides', 'agenda.html'), 'utf-8')).toContain('<h1>agenda</h1>')
+    expect(await checkArtifact(created.dir)).toEqual([])
+  })
+
+  it('refuses a slide template whose manifest is missing or is not a deck, and creates nothing', async () => {
+    const files = deckTemplateFiles(['cover'])
+    await writeTemplates(templates(), [slideTemplateRecord('bare'), slideTemplateRecord('page')], {
+      bare: Object.fromEntries(Object.entries(files).filter(([file]) => file !== 'artifact.json')),
+      page: deckTemplateFiles(['cover'], { kind: 'page', slides: undefined }),
+    })
+    await expect(createArtifactFromTemplate({ templateId: 'bare', artifactsDir: artifacts(), templatesDir: templates() })).rejects.toThrow('is not a deck')
+    await expect(createArtifactFromTemplate({ templateId: 'page', artifactsDir: artifacts(), templatesDir: templates() })).rejects.toThrow('is not a deck')
+    expect(await fs.readdir(artifacts()).catch(() => [])).toEqual([])
+  })
+})
+
+describe('designTemplateGuidance', () => {
+  it('points a page at its entry file and a deck at deck.css, its slides and its design note, keeping the stage file', () => {
+    expect(designTemplateGuidance(templateRecord('saas'))).toContain('its entry file index.html is the example to adapt')
+    const deck = designTemplateGuidance(slideTemplateRecord('poster', { acceptsDesignSystem: false }))
+    expect(deck).toContain('index.html is the fixed stage file and stays as it is')
+    expect(deck).toContain('deck.css, the slides listed in artifact.json and their files in slides/')
+    expect(deck).toContain('DESIGN.md')
+    expect(deck).toContain('The section numbers and the number of sections in the example are sample content')
+    expect(deck).not.toContain('entry file index.html is the example')
   })
 })
 

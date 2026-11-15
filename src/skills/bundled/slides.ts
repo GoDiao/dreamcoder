@@ -1,5 +1,6 @@
 import { basename, dirname } from 'node:path'
 import { ARTIFACT_CHECK_TOOL_NAME } from '../../tools/ArtifactCheckTool/constants.js'
+import { CHOOSE_DESIGN_TEMPLATE_TOOL_NAME } from '../../tools/ChooseDesignTemplateTool/constants.js'
 import { USE_DESIGN_SYSTEM_TOOL_NAME } from '../../tools/UseDesignSystemTool/constants.js'
 import { readArtifactEntry } from '../../utils/artifacts.js'
 import { browserToolName } from '../../utils/browserControl/common.js'
@@ -15,6 +16,8 @@ import {
   languageRule,
   languageSection,
   NO_FORM_RULE,
+  templateIndexSection,
+  usedTemplateGuidance,
 } from './designSystemGuide.js'
 
 const navigate = browserToolName('navigate')
@@ -27,7 +30,7 @@ const FRAME = `${DECK_WIDTH} by ${DECK_HEIGHT}`
 
 export const SLIDES_SKILL_PROMPT = `# Slides
 
-The user wants a slide deck that is kept as an artifact: one HTML file per slide, shown by the app on a fixed ${FRAME} stage with paging, an overview and a presentation mode. Work in four steps. Where artifacts live, the manifest and the way to show an artifact are in the \`artifacts\` skill; load it with the Skill tool before you write any file. The reference files named below are in the base directory of this skill; read each one when its step comes.
+The user wants a slide deck that is kept as an artifact: one HTML file per slide, shown by the app on a fixed ${FRAME} stage with paging, an overview and a presentation mode. Work in five steps. Where artifacts live, the manifest and the way to show an artifact are in the \`artifacts\` skill; load it with the Skill tool before you write any file. The reference files named below are in the base directory of this skill; read each one when its step comes.
 
 For a web page or a prototype use the \`design\` skill instead of this one.
 
@@ -35,15 +38,24 @@ ${languageSection('/slides')}
 
 ## 1. Interview
 
-Read the user's message and any material they gave first. Then ask once with AskUserQuestion, at most 4 questions, only about decisions that change the deck: whether a speaker presents it or people read it on their own, about how many slides, where the content comes from, and the look. When the material is already enough, do not ask: say your assumptions and start. If the user hands a decision to you ("you decide", "anything", "你帮我判断", "随便"), treat it as a delegation: decide yourself, say in a few lines what you assumed, and do not ask that question again. Details are in \`interview.md\`.
+Read the user's message and any material they gave first. Then ask once with AskUserQuestion, at most 4 questions, only about decisions that change the deck: whether a speaker presents it or people read it on their own, about how many slides, where the content comes from, the look, and whether to start from a template. When the material is already enough, do not ask: say your assumptions and start. If the user hands a decision to you ("you decide", "anything", "你帮我判断", "随便"), treat it as a delegation: decide yourself, say in a few lines what you assumed, and do not ask that question again. Details are in \`interview.md\`.
 
-## 2. Design system
+## 2. Template or scratch
+
+Templates are complete example decks, each with its own look: fonts, colors, decoration and a set of slide kinds. The index below lists them. If one may fit, call ${CHOOSE_DESIGN_TEMPLATE_TOOL_NAME} with 2 to 4 candidates that differ from each other and a one-sentence reason each; the user sees cards with thumbnails and picks one, or picks "start from scratch". The tool copies the chosen template into dc_artifacts/ and returns the path and how to adapt it. If the user does not want a template, or none fits, skip this step and make the deck yourself.
+
+A template keeps its own look, so skip step 3 for it. Adapt it like this:
+- Keep ${DECK_STYLESHEET_FILE}, the classes, the layouts and the kinds of slide. Change ${DECK_STYLESHEET_FILE} only for a layout the deck needs and the template does not have, and build that layout from the template's own fonts, colors and decoration.
+- Replace every text, name, number and date of the example with the user's content; nothing of the example content may remain.
+- A slide you do not need: take its id out of \`slides\` and delete its file. A second slide of a kind: copy the file of a slide of that kind to a new id and add the id to \`slides\`.
+
+## 3. Design system
 
 A design system is a folder dc_artifacts/systems/<name>/ with DESIGN.md (tone, type, components) and tokens.css (CSS variables). A deck uses one by naming it in artifact.json; the app then loads the tokens before ${DECK_STYLESHEET_FILE}. If the user points at a website or at project code whose look they want, extract a system from it. Otherwise, if the look is not already decided, pick one from the library index below and call ${USE_DESIGN_SYSTEM_TOOL_NAME} with its id; the user confirms the copy. The library holds a few starters and styles converted from well-known brands: they are style references, not official assets, so never present them as the brand's own. When the user describes a look of their own, write it into ${DECK_STYLESHEET_FILE} without a system. Applying and extracting are in \`design-systems.md\`.
 
-## 3. Make it
+## 4. Make it
 
-\`format.md\` is the file format. Follow it exactly: the stage shows a placeholder for a slide that does not match it. \`layout.md\` says how to lay a slide out. Work in this order:
+\`format.md\` is the file format. Follow it exactly: the stage shows a placeholder for a slide that does not match it. \`layout.md\` says how to lay a slide out. From a template, open the deck in a new tab first and then adapt it slide by slide. From scratch, work in this order:
 
 1. Write artifact.json, index.html, ${DECK_STYLESHEET_FILE} and the first slide, and list that slide in \`slides\`.
 2. Open the deck in a new tab, as the \`artifacts\` skill describes, so the user watches it grow. The tab picks up every later change by itself and stays on the slide the user is looking at.
@@ -51,7 +63,7 @@ A design system is a folder dc_artifacts/systems/<name>/ with DESIGN.md (tone, t
 
 Use the user's real content. When the user delegated the content to you, write content that fits their purpose and audience; do not fill slides with placeholder text. Do not copy another deck's text, images or trademarks.
 
-## 4. Check it
+## 5. Check it
 
 Follow \`checks.md\`: ${ARTIFACT_CHECK_TOOL_NAME}, then the overflow check in the open tab, then look at the slides.
 `
@@ -67,6 +79,7 @@ Good questions change what you build:
 - Length: about how many slides, or how long the talk is. Without an answer, plan about one slide for each minute of a talk.
 - Content: the user supplies it, you draft it from a topic, or it comes from a file or a project folder.
 - Look: a design system from the library, the look of a site or project the user names, a mood in the user's words, or "no preference".
+- Template: start from one of the slide templates or not.
 
 Rules:
 ${SLIDES_INTERVIEW_RULES.map(rule => `- ${rule}`).join('\n')}
@@ -144,7 +157,9 @@ The stage counts the slides in two CSS counters: \`${DECK_SLIDE_COUNTER}\` is th
 <p class="page-number"></p>
 \`\`\`
 
-The numbers stay right when a slide is added, removed or moved, in the overview, in the presentation and in every export. Never type a number that depends on the order of the slides into a slide file: no \`03 / 12\`, and no numbered kicker or heading such as \`02 / Architecture\`. Such a number is wrong as soon as the order changes. Number with \`counter(${DECK_SLIDE_COUNTER})\` or leave the number out. Do not reset or increment these two counters yourself.
+The numbers stay right when a slide is added, removed or moved, in the overview, in the presentation and in every export. Never type a page number into a slide file, neither the number of the slide nor the number of slides: no \`03 / 12\`, no \`p. 14\` pointing at another slide. Do not reset or increment these two counters yourself.
+
+Section numbers are different: they are content. How many sections the deck has and which slide opens one is decided with the content, so a section number may be typed into a slide, such as the large \`02\` on a divider, \`Chapter 02\` in a kicker or \`Chapter 02 of 05\` in a footer. When you add, remove or move a section, renumber every section number after it and every total of sections in the same step.
 
 ## Write the HTML the way a browser serializes it
 
@@ -179,7 +194,8 @@ The frame is ${FRAME} pixels and is seen from across a room or in a small panel.
 
 - Decide a small set of slide kinds first and give each a class: for example \`slide-title\`, \`slide-section\`, \`slide-text\`, \`slide-two-columns\`, \`slide-figure\`, \`slide-quote\`, \`slide-closing\`. Every slide uses one of them; two slides of the same kind have the same structure and the same positions for title and body.
 - The title sits at the same place on every content slide. So does anything that repeats, such as a footer: the stage adds no element to a slide, so write it into each slide.
-- Page numbers are not written into the slides. Put one empty element into each slide and let ${DECK_STYLESHEET_FILE} fill it from the counters \`${DECK_SLIDE_COUNTER}\` and \`${DECK_SLIDES_COUNTER}\` (format.md, Page numbers). Do not type any number that depends on the order of the slides into a slide file, also not as a section number in a kicker or heading: adding, removing or moving a slide would make it wrong.
+- Page numbers are not written into the slides. Put one empty element into each slide and let ${DECK_STYLESHEET_FILE} fill it from the counters \`${DECK_SLIDE_COUNTER}\` and \`${DECK_SLIDES_COUNTER}\` (format.md, Page numbers).
+- Section numbers are content and are written into the slides, in the divider, kicker or footer of the sections. Keep them in the order of the sections and keep every "of 05" equal to the number of sections.
 - Use one accent color for emphasis and keep it for the same meaning through the deck.
 - Give every image a width and height in ${DECK_STYLESHEET_FILE} and \`object-fit\` so it cannot push the layout around when it loads.
 - Charts and diagrams: draw simple ones in inline SVG or CSS inside the slide; use an embedded page only when a library has to draw it.
@@ -198,7 +214,8 @@ After you add or change slides:
 2. Open the deck with \`${navigate}\` using the artifact folder as the url and \`newTab: true\`, unless you already opened it; then reuse the tab id with \`tabId\`. The open tab refreshes by itself when files change. Close it with \`${closeTab}\` only when the user no longer needs to see it.
 3. Find what leaves the frame: run \`window.__dreamcoderDeck.overflow()\` with \`${evaluate}\`. It returns, for each slide that has one, the elements that reach outside the ${FRAME} frame, with their class, the start of their text and their box in slide pixels. Fix each one by splitting the slide or changing its layout, as layout.md says; decoration that is meant to run off the edge can stay. An empty list does not mean the slides are fine: it does not find elements that overlap each other or text cut off inside a box, and the scroll height of a slide tells you nothing about either. For those you have to look.
 4. Look at the slides. A \`${snapshot}\` or \`${screenshot}\` shows only the current slide: go to a slide with \`window.__dreamcoderDeck.goTo('<id>')\` through \`${evaluate}\`, then take a \`${screenshot}\`. \`window.__dreamcoderDeck.state()\` tells you which slide and mode the tab is in. Look at every slide of a short deck; in a long one, look at one slide of each kind, every slide step 3 reported and every slide with an image, a chart or an embedded page. Check that text fits and does not overlap, that nothing is cut off, and that slides of the same kind line up. When you are done, go back to the slide the user was on if you moved away from it.
-5. Fix what is wrong and look once more at the slides you changed.
+5. Read the section numbers through the deck in the order of \`slides\`: they count up without a gap, each one belongs to the section it stands on, and every total of sections ("of 05", a table of contents) matches the sections the deck really has.
+6. Fix what is wrong and look once more at the slides you changed.
 
 Tell the user what you made, how many slides it has and what you assumed.
 `
@@ -206,15 +223,22 @@ Tell the user what you made, how many slides it has and what you assumed.
 async function deckSection(args: string): Promise<string[]> {
   const folder = args ? await artifactFolderIn(args) : null
   const manifest = folder ? (await readArtifactEntry(dirname(folder), basename(folder)))?.manifest ?? null : null
+  const deck = manifest?.kind === 'deck' ? folder : null
+  const guidance = deck ? await usedTemplateGuidance(manifest) : null
   const system = folder ? await chosenDesignSystemUsage(folder, manifest, 'deck') : null
   const systemPart = system
-    ? `## Design system of the deck\n\nThe user chose this design system. Skip the choice in step 2 and apply it as \`design-systems.md\` describes.\n${system}`
+    ? `## Design system of the deck\n\nThe user chose this design system. Skip the choice in step 3 and apply it as \`design-systems.md\` describes.\n${system}`
     : await designSystemIndexSection()
-  if (!folder || manifest?.kind !== 'deck') return [systemPart]
-  return [
-    `## Deck to work on\n\nThe deck ${folder} already exists. Read its artifact.json, ${DECK_STYLESHEET_FILE} and slides before you change anything, keep its layouts and classes, and ask in step 1 only what the deck does not already answer.`,
-    systemPart,
-  ]
+  if (guidance) {
+    return [`## Deck to work on\n\nThe user already created ${deck} from a template. Skip steps 2 and 3, and ask in step 1 only what the template does not already answer.\n${guidance}`]
+  }
+  if (deck) {
+    return [
+      `## Deck to work on\n\nThe deck ${deck} already exists. Skip step 2. Read its artifact.json, ${DECK_STYLESHEET_FILE} and slides before you change anything, keep its layouts and classes, and ask in step 1 only what the deck does not already answer.`,
+      systemPart,
+    ]
+  }
+  return [await templateIndexSection(['slides']), systemPart]
 }
 
 export function registerSlidesSkill(): void {

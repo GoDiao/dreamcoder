@@ -6,7 +6,7 @@ import { getOriginalCwd, setOriginalCwd } from '../../bootstrap/state.js'
 import { installDesignSystem } from '../../utils/designSystems.js'
 import { createArtifactFromTemplate } from '../../utils/designTemplates.js'
 import { systemRecord, writeSystems } from '../../utils/__tests__/designSystemFixtures.js'
-import { templateRecord, writeTemplates } from '../../utils/__tests__/designTemplateFixtures.js'
+import { deckTemplateFiles, slideTemplateRecord, templateRecord, writeTemplates } from '../../utils/__tests__/designTemplateFixtures.js'
 import { clearBundledSkills, getBundledSkillExtractDir, getBundledSkills } from '../bundledSkills.js'
 import { initBundledSkills } from './index.js'
 
@@ -28,7 +28,8 @@ beforeEach(async () => {
   await writeTemplates(join(root, 'Resources', 'design-templates'), [
     templateRecord('saas', { params: [{ name: 'product_name', type: 'string', required: true }] }),
     templateRecord('fixed-a', { category: 'prototype', acceptsDesignSystem: false }),
-  ])
+    slideTemplateRecord('poster'),
+  ], { poster: deckTemplateFiles(['cover']) })
   await writeSystems(join(root, 'Resources', 'design-systems'), [
     systemRecord('starter-one', { origin: 'starter', category: 'Editorial', name: { en: 'One', zh: '一' }, description: { en: 'Warm paper.', zh: '暖纸' } }),
     systemRecord('alpha', { category: 'Fintech' }),
@@ -93,6 +94,7 @@ describe('design skill', () => {
     expect(prompt).toContain('Takes a design system. Inputs: product_name*.')
     expect(prompt).toContain('- fixed-a (prototype, desktop, marketing): Title of fixed-a. d')
     expect(prompt).toContain('Fixed look, no design system.')
+    expect(prompt).not.toContain('poster')
     expect(prompt).toContain('## User Request\n\nmake a launch page')
   })
 

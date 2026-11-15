@@ -7,7 +7,8 @@ import { getOriginalCwd, setOriginalCwd } from '../../bootstrap/state.js'
 import { isDeckEntryHtml } from '../../utils/deck.js'
 import { designSystemUsage, installDesignSystem } from '../../utils/designSystems.js'
 import { systemRecord, writeSystems } from '../../utils/__tests__/designSystemFixtures.js'
-import { templateRecord, writeTemplates } from '../../utils/__tests__/designTemplateFixtures.js'
+import { deckTemplateFiles, slideTemplateRecord, templateRecord, writeTemplates } from '../../utils/__tests__/designTemplateFixtures.js'
+import { createArtifactFromTemplate } from '../../utils/designTemplates.js'
 import { clearBundledSkills, getBundledSkillExtractDir, getBundledSkills } from '../bundledSkills.js'
 import { initBundledSkills } from './index.js'
 
@@ -43,7 +44,10 @@ beforeEach(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'slides-skill-')))
   await mkdir(join(root, 'Resources', 'bin'), { recursive: true })
   process.env.CLAUDE_APP_ROOT = join(root, 'Resources', 'bin')
-  await writeTemplates(join(root, 'Resources', 'design-templates'), [templateRecord('saas')])
+  await writeTemplates(join(root, 'Resources', 'design-templates'), [
+    templateRecord('saas'),
+    slideTemplateRecord('poster', { title: { en: 'Poster', zh: '海报' }, description: { en: 'Loud red poster.', zh: '红色海报' } }),
+  ], { poster: deckTemplateFiles(['cover', 'close']) })
   await writeSystems(join(root, 'Resources', 'design-systems'), [
     systemRecord('starter-one', { origin: 'starter', category: 'Editorial', name: { en: 'One', zh: '一' }, description: { en: 'Warm paper.', zh: '暖纸' } }),
     systemRecord('alpha', { category: 'Fintech' }),
@@ -71,9 +75,10 @@ describe('slides skill', () => {
     expect(design?.whenToUse).toContain('use the slides skill')
   })
 
-  it('walks through interview, design system, making and checking, and defers the artifact rules to the artifacts skill', async () => {
+  it('walks through interview, template, design system, making and checking, and defers the artifact rules to the artifacts skill', async () => {
     const prompt = await promptOf('')
-    expect(prompt).toContain('four steps')
+    expect(prompt).toContain('five steps')
+    expect(prompt).toContain('ChooseDesignTemplate')
     expect(prompt).toContain('`artifacts` skill')
     expect(prompt).toContain('AskUserQuestion')
     expect(prompt).toContain('UseDesignSystem')
@@ -90,10 +95,10 @@ describe('slides skill', () => {
     expect(prompt).toContain('in the same step as you write its file')
   })
 
-  it('has no template step and lists no templates, while it lists the design system library', async () => {
+  it('lists only the slide templates and the design system library', async () => {
     const prompt = await promptOf('make a pitch deck')
-    expect(prompt).not.toContain('Template index')
-    expect(prompt).not.toContain('ChooseDesignTemplate')
+    expect(prompt).toContain('## Template index')
+    expect(prompt).toContain('- poster (slides): Poster. Loud red poster.')
     expect(prompt).not.toContain('saas')
     expect(prompt).toContain('## Design system library index')
     expect(prompt).toContain('- starter-one (One): Warm paper.')
@@ -110,6 +115,25 @@ describe('slides skill', () => {
     expect(prompt).toContain('Do not edit index.html')
     expect(prompt).not.toContain('<link rel="stylesheet"')
     expect(prompt).not.toContain('## Design system library index')
+  })
+
+  it('gives the template guidance and skips the template and system choices for a deck made from a template', async () => {
+    const created = await createArtifactFromTemplate({
+      templateId: 'poster',
+      artifactsDir: join(root, 'project', 'dc_artifacts'),
+      templatesDir: join(root, 'Resources', 'design-templates'),
+    })
+    const prompt = await promptOf(created.dir)
+    expect(prompt).toContain(`The user already created ${created.dir} from a template. Skip steps 2 and 3`)
+    expect(prompt).toContain('index.html is the fixed stage file and stays as it is')
+    expect(prompt).not.toContain('## Template index')
+    expect(prompt).not.toContain('## Design system library index')
+  })
+
+  it('skips the template step for an existing deck that was not made from a template', async () => {
+    const prompt = await promptOf(await writeDeck('talk'))
+    expect(prompt).toContain('already exists. Skip step 2.')
+    expect(prompt).not.toContain('## Template index')
   })
 
   it('does not treat a folder that is not a deck as a deck to work on', async () => {
@@ -162,15 +186,20 @@ describe('slides skill reference files', () => {
     expect(format).toContain('## Page numbers')
     expect(format).toContain('.page-number::after { content: counter(dc-slide, decimal-leading-zero) " / " counter(dc-slides, decimal-leading-zero); }')
     expect(format).toContain('<p class="page-number"></p>')
-    expect(format).toContain('Never type a number that depends on the order of the slides into a slide file')
-    expect(format).toContain('`02 / Architecture`')
+    expect(format).toContain('Never type a page number into a slide file')
+    expect(format).toContain('Section numbers are different: they are content.')
+    expect(format).toContain('renumber every section number after it and every total of sections')
     expect(deckShell).toContain("'.dc-slide{counter-increment:dc-slide}'")
     expect(deckShell).toContain("'dc-slide 0 dc-slides ' + entries.length")
 
     const layout = await reference('layout.md')
     expect(layout).toContain('Page numbers are not written into the slides')
     expect(layout).toContain('the counters `dc-slide` and `dc-slides`')
-    expect(layout).toContain('also not as a section number in a kicker or heading')
+    expect(layout).toContain('Section numbers are content and are written into the slides')
+    expect(layout).not.toContain('also not as a section number')
+
+    const checks = await reference('checks.md')
+    expect(checks).toContain('Read the section numbers through the deck in the order of `slides`')
     expect(layout).not.toContain('page marker')
   })
 

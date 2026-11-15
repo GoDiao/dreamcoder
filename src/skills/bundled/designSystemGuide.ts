@@ -15,6 +15,13 @@ import {
   readDesignSystemEntry,
   renderDesignSystemIndex,
 } from '../../utils/designSystems.js'
+import {
+  designTemplateGuidance,
+  findDesignTemplate,
+  readDesignTemplateCatalog,
+  renderDesignTemplateIndex,
+  type DesignTemplateCategory,
+} from '../../utils/designTemplates.js'
 
 const navigate = browserToolName('navigate')
 const snapshot = browserToolName('snapshot')
@@ -110,6 +117,21 @@ export async function designSystemIndexSection(): Promise<string> {
     return `## Design system library index\n\n${renderDesignSystemIndex(catalog.systems)}`
   } catch {
     return '## Design system library index\n\nThe design system library is not available. Skip the library; you can still extract a system from a website or project code.'
+  }
+}
+
+export async function usedTemplateGuidance(manifest: ArtifactManifest | null): Promise<string | null> {
+  const templateId = manifest?.template?.id
+  const used = templateId ? await findDesignTemplate(templateId).catch(() => null) : null
+  return used ? designTemplateGuidance(used) : null
+}
+
+export async function templateIndexSection(categories: readonly DesignTemplateCategory[]): Promise<string> {
+  try {
+    const catalog = await readDesignTemplateCatalog()
+    return `## Template index\n\n${renderDesignTemplateIndex(catalog.templates.filter(template => categories.includes(template.category)))}`
+  } catch {
+    return '## Template index\n\nThe template catalog is not available. Skip step 2 and write the artifact yourself.'
   }
 }
 
