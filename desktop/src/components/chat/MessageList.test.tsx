@@ -1732,6 +1732,7 @@ describe('MessageList nested tool calls', () => {
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Selected text' })).toBeNull())
       expect(branch).toHaveBeenCalledWith(ACTIVE_TAB, { kind: 'side' })
       expect(useWorkspacePanelStore.getState().panelByTab[ACTIVE_TAB]?.tabs).toMatchObject([{ kind: 'sideChat', sessionId: 'side-1' }])
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBe('side-1')
       expect(useWorkspaceChatContextStore.getState().referencesBySession).toEqual({
         'side-1': [expect.objectContaining({ kind: 'chat-selection', path: 'chat://assistant/assistant-1', messageId: 'assistant-1', quote: 'this part' })],
       })
@@ -1761,6 +1762,7 @@ describe('MessageList nested tool calls', () => {
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not start a side chat: busy'))
       expect(useWorkspaceChatContextStore.getState().referencesBySession).toEqual({})
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBeNull()
     })
   })
 

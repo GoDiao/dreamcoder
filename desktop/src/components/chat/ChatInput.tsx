@@ -66,6 +66,7 @@ type ChatInputProps = {
   variant?: 'default' | 'hero'
   compact?: boolean
   primary?: boolean
+  autoFocus?: boolean
 }
 
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
@@ -108,7 +109,7 @@ function insertComposerTokenAtRange(value: string, start: number, end: number, t
   }
 }
 
-export function ChatInput({ sessionId, variant = 'default', compact = false, primary = true }: ChatInputProps) {
+export function ChatInput({ sessionId, variant = 'default', compact = false, primary = true, autoFocus = false }: ChatInputProps) {
   const t = useTranslation()
   const isMobileComposer = useMobileViewport() && !isDesktopRuntime()
   const [input, setInput] = useState('')
@@ -258,8 +259,8 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }, [saveComposerDraft])
 
   useEffect(() => {
-    if (primary) textareaRef.current?.focus()
-  }, [isActive, primary])
+    if (primary || autoFocus) textareaRef.current?.focus()
+  }, [isActive, primary, autoFocus])
 
   useEffect(() => {
     if (!composerPrefill) return

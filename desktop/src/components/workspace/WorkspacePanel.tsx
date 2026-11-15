@@ -1236,6 +1236,15 @@ function SideChatTabTrigger({
   )
 }
 
+function SideChatView({ sessionId }: { sessionId: string }) {
+  const focusInput = useWorkspacePanelStore((state) => state.sideChatToFocus === sessionId)
+  const clearSideChatFocus = useWorkspacePanelStore((state) => state.clearSideChatFocus)
+  useEffect(() => {
+    if (focusInput) clearSideChatFocus(sessionId)
+  }, [clearSideChatFocus, focusInput, sessionId])
+  return <SessionConversation sessionId={sessionId} compact primary={false} focusInput={focusInput} />
+}
+
 function WorkspaceRefresh({ sessionId }: { sessionId: string }) {
   useWorkspaceRefresh(sessionId)
   return null
@@ -1326,7 +1335,7 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
       case 'uiPage':
         return <UiPageTabView sessionId={tab.sessionId ?? sessionId} tab={tab} />
       case 'sideChat':
-        return <SessionConversation sessionId={tab.sessionId} compact primary={false} />
+        return <SideChatView sessionId={tab.sessionId} />
       case 'task':
         return <TaskDetail panelId={sessionId} board={tab.board} card={tab.card} poll={!tasksOnly} />
       case 'inbox':

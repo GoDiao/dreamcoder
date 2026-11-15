@@ -937,6 +937,19 @@ describe('ChatInput file mentions', () => {
     expect(mocks.wsSend).not.toHaveBeenCalledWith(sessionId, expect.anything())
   })
 
+  it('takes the focus in a side chat when asked to', () => {
+    const sideId = 'side-focus'
+    useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))
+    render(
+      <>
+        <button type="button">elsewhere</button>
+        <ChatInput sessionId={sideId} compact primary={false} autoFocus />
+      </>,
+    )
+
+    expect(screen.getByRole('textbox')).toHaveFocus()
+  })
+
   it('leaves typing elsewhere on the page alone in a side chat', () => {
     const sideId = 'side-typing'
     useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))

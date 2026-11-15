@@ -113,12 +113,14 @@ export function SessionConversation({
   compact = false,
   primary = true,
   canStartSideChat = false,
+  focusInput = false,
   beforeInput,
 }: {
   sessionId: string
   compact?: boolean
   primary?: boolean
   canStartSideChat?: boolean
+  focusInput?: boolean
   beforeInput?: ReactNode
 }) {
   const t = useTranslation()
@@ -190,6 +192,7 @@ export function SessionConversation({
         variant={isEmpty && !isMemberSession && !compact ? 'hero' : 'default'}
         compact={compact}
         primary={primary}
+        autoFocus={focusInput}
       />
     </div>
   )

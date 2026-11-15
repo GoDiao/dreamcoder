@@ -95,6 +95,7 @@ type WorkspacePanelErrorState = {
 type WorkspacePanelStore = {
   panelByTab: Record<string, WorkspacePanelSessionState | undefined>
   width: number
+  sideChatToFocus: string | null
   statusBySession: Record<string, WorkspaceStatusResult | undefined>
   treeBySessionPath: Record<string, Record<string, WorkspaceTreeResult | undefined> | undefined>
   previewsBySession: Record<string, Record<string, WorkspacePreviewEntry | undefined> | undefined>
@@ -128,6 +129,7 @@ type WorkspacePanelStore = {
   releaseSession: (sessionId: string) => void
   clearSession: (sessionId: string) => void
   createSideChat: (sessionId: string) => Promise<string>
+  clearSideChatFocus: (sessionId: string) => void
   syncSideChats: (sessionId: string) => Promise<void>
 }
 
@@ -447,6 +449,7 @@ function writeStoredPanels(panelByTab: Record<string, WorkspacePanelSessionState
 export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => ({
   panelByTab: readStoredPanels(),
   width: WORKSPACE_PANEL_DEFAULT_WIDTH,
+  sideChatToFocus: null,
   statusBySession: {},
   treeBySessionPath: {},
   previewsBySession: {},
@@ -874,7 +877,12 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   createSideChat: async (sessionId) => {
     const created = await sessionsApi.branch(sessionId, { kind: 'side' })
     get().openTab(sessionId, { kind: 'sideChat', sessionId: created.sessionId })
+    set({ sideChatToFocus: created.sessionId })
     return created.sessionId
+  },
+
+  clearSideChatFocus: (sessionId) => {
+    if (get().sideChatToFocus === sessionId) set({ sideChatToFocus: null })
   },
 
   syncSideChats: async (sessionId) => {

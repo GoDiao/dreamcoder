@@ -159,7 +159,10 @@ side chat 标签：
 - 是否提供这个动作由 `canStartSideChat` 决定，`ActiveSession` 传入 `canUsePanel`（`ActiveSession.tsx:199`），也就是这个会话能不能用右侧面板。所以：
   - side chat 自己的消息里只有 Reply，不再开一层；
   - 手机布局（H5）和团队成员会话没有面板，也不提供。新标签页里的入口在这两种情况下同样看不到。
-- 新建后不把焦点移进 side chat 的输入框。side chat 的输入框不抢焦点（见上文 `primary`），要做到需要给它加一个"新建后聚焦"的信号，现有结构里没有。
+- 用户新建 side chat 后（两个入口都算），焦点进入它的输入框，可以直接打字：
+  - `createSideChat` 成功后把新会话 id 记进面板 store 的 `sideChatToFocus`。这个字段不写进 localStorage，失败时不设置。
+  - 面板里的 `SideChatView`（`WorkspacePanel.tsx`）发现它指向自己时，把 `focusInput` 传给 `SessionConversation`，再在 effect 里清掉。`ChatInput` 收到 `autoFocus`，在已有的自动聚焦 effect 里聚焦。子组件的 effect 先于父组件运行，所以聚焦发生在清除之前，之后不会再聚焦。
+  - 只有 `createSideChat` 设置这个信号。`syncSideChats` 补回的标签、重启后恢复的标签、切换标签、side chat 打开的页面都不会让输入框抢焦点；side chat 输入框平时仍然不抢焦点（见上文 `primary`）。
 
 面板归属：side chat 的面板就是父会话的面板。
 
@@ -222,7 +225,8 @@ side chat 标签：
   - Detach 运行中禁用；
   - 菜单的 Detach、重命名，以及失败提示；
   - × 关闭。
-- `WorkspacePanel.test.tsx` 的新标签页：新建 side chat 和失败提示。
+- `WorkspacePanel.test.tsx` 的新标签页：新建 side chat 和失败提示。"side chats" 组：新建的 side chat 聚焦一次，从新标签页新建后聚焦，对账补回的标签不聚焦。
+- `workspacePanelStore.test.ts`：新建后记下要聚焦的 side chat，失败和对账时不记，清除只清自己。
 - `MessageList.test.tsx` 的 "starting a side chat from a selection" 组：主会话里先 Start a side chat 再 Reply，side chat 里只有 Reply；新建后引用在新会话名下、弹出条关闭；创建期间不能重复点；失败提示。
 - `SelectionPopover.test.tsx`：多个动作各自生效，loading 的动作禁用。
 - `ActiveSession.test.tsx`：能用面板时提供入口，手机布局不提供。
@@ -233,7 +237,7 @@ side chat 标签：
   - 对账：补上、删掉、空列表关闭面板、激活标签失效时改激活最后一个、请求期间删除和新建；
   - 重启后从 localStorage 恢复。
 - 其他测试文件：
-  - `ChatInput.test.tsx`：`primary` 为假时不抢焦点、不显示启动控件，发送到传入的会话；
+  - `ChatInput.test.tsx`：`primary` 为假时不抢焦点、不显示启动控件，发送到传入的会话；传入 `autoFocus` 时获得焦点；
   - `lib/sideChats.test.ts`：接口失败时标签保留；
   - `sessionStore.test.ts`：Detach 后刷新列表；单个和批量删除的 side chat 警告；
   - `Sidebar.test.tsx`：批量删除的成功数只数选中的会话；
