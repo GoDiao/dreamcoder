@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import * as path from 'node:path'
@@ -1303,6 +1303,66 @@ describe('SessionService', () => {
 
     expect(await service.getCustomTitle(sessionId)).toBe('Kept title')
     expect((await service.getSessionLaunchInfo(sessionId))?.worktreeSession).toMatchObject({ worktreePath: path.join(workDir, 'wt') })
+  })
+
+  describe('a session deleted while something is being written to it', () => {
+    type FileStep = 'readJsonlFile' | 'appendJsonlEntry'
+    type FileSteps = Record<FileStep, (filePath: string, ...rest: unknown[]) => Promise<unknown>>
+
+    function holdNext(step: FileStep) {
+      const steps = service as unknown as FileSteps
+      const run = steps[step].bind(service)
+      let reach!: () => void
+      let release!: () => void
+      const reached = new Promise<void>((resolve) => { reach = resolve })
+      const released = new Promise<void>((resolve) => { release = resolve })
+      const spy = spyOn(steps, step).mockImplementationOnce(async (filePath, ...rest) => {
+        reach()
+        await released
+        return run(filePath, ...rest)
+      })
+      return { reached, release, restore: () => spy.mockRestore() }
+    }
+
+    const writes: Array<[string, FileStep, (sessionId: string) => Promise<unknown>]> = [
+      ['its process exits and its unchanged custom title is checked', 'readJsonlFile', (sessionId) => service.restoreCustomTitle(sessionId, 'Mine')],
+      ['its process exits and its custom title is written again', 'appendJsonlEntry', (sessionId) => service.restoreCustomTitle(sessionId, 'Renamed')],
+      ['it is renamed', 'appendJsonlEntry', (sessionId) => service.renameSession(sessionId, 'Renamed')],
+      ['its permission mode is recorded', 'appendJsonlEntry', (sessionId) => service.appendSessionPermissionMode(sessionId, 'acceptEdits')],
+    ]
+    const removals: Array<['deleteSession' | 'deleteSessionFile', (sessionId: string) => Promise<void>]> = [
+      ['deleteSession', (sessionId) => service.deleteSession(sessionId)],
+      ['deleteSessionFile', (sessionId) => service.deleteSessionFile(sessionId)],
+    ]
+
+    for (const [what, step, write] of writes) {
+      for (const [how, remove] of removals) {
+        it(`stays deleted when ${what} at that moment (${how})`, async () => {
+          const workDir = path.join(tmpDir, 'workspace', 'deleted-while-written')
+          await fs.mkdir(workDir, { recursive: true })
+          const { sessionId } = await service.createSession(workDir)
+          await service.renameSession(sessionId, 'Mine')
+          const hold = holdNext(step)
+          const lookups = spyOn(service, 'findSessionFile')
+          try {
+            const writing = write(sessionId)
+            await hold.reached
+            lookups.mockClear()
+            const removing = remove(sessionId)
+            const startedAtOnce = lookups.mock.calls.length > 0
+            if (startedAtOnce) await removing
+            hold.release()
+            await Promise.all([writing, removing])
+          } finally {
+            hold.restore()
+            lookups.mockRestore()
+          }
+
+          expect(await service.findSessionFile(sessionId)).toBeNull()
+          expect((await service.listSessions()).sessions.map((session) => session.id)).not.toContain(sessionId)
+        })
+      }
+    }
   })
 
   it('appends the custom title again only when the file ends with a different one', async () => {
