@@ -1,6 +1,6 @@
 # Side chat：技术设计
 
-状态：已实现。第一版随 PR #251 合并（`ee90358d`）；隐藏继承的消息和从选中文字新建在 `feat/side-chat-selection-entry` 分支上。文中的行号以这个分支的代码为准，之后代码变了，行号可能对不上。
+状态：已实现。第一版随 PR #251 合并（`ee90358d`）；隐藏继承的消息和从选中文字新建随 PR #252 加入。文中的行号以 PR #252 的代码为准，之后代码变了，行号可能对不上。
 
 ## 背景
 
@@ -47,7 +47,7 @@
 ### 显示：只显示 side chat 自己的消息
 
 - 分叉时复制来的每条记录都带 `forkedFrom`（`sessionBranching.ts:566`）。结尾的分叉说明和之后新写的记录不带。
-- `getSessionTranscript`（`sessionService.ts:1830`）发现会话的父关系是 `side` 时，先用 `withoutInheritedEntries`（`transcript/entries.ts:369`）去掉继承的记录，再转换成显示条目。去掉的有两类：
+- `getSessionTranscript`（`sessionService.ts:1830`）发现会话的父关系是 `side` 时，先用 `withoutInheritedEntries`（`transcript/entries.ts:379`）去掉继承的记录，再转换成显示条目。去掉的有两类：
   - 带 `forkedFrom` 的记录；
   - 只回答继承来的工具调用的 `tool_result` 消息。分叉点正好在一次工具调用中间时，分叉说明就是这样一条消息，它对应的工具调用已经去掉了，不能单独显示出来。
   - 另一条说明（isMeta 说明和 "No response requested."）本来就不显示。

@@ -360,6 +360,16 @@ export function pendingReportsFromEntries(entries: TranscriptEntry[]): SessionRe
 }
 
 /** Terminal background-task notifications recorded in the transcript. */
+export function collectTaskNotifications(entries: TranscriptEntry[]): TaskNotification[] {
+  const notifications: TaskNotification[] = []
+  for (const entry of entries) {
+    if (entry.message?.role !== 'user') continue
+    const notification = parseTaskNotification(entry.message.content, entry.timestamp)
+    if (notification) notifications.push(notification)
+  }
+  return notifications
+}
+
 function blocksOfType(entry: TranscriptEntry, type: string): ContentBlock[] {
   const content = entry.message?.content
   if (!Array.isArray(content)) return []
@@ -375,16 +385,6 @@ export function withoutInheritedEntries<T extends TranscriptEntry>(entries: T[])
     return results.length > 0 && results.every((block) => inheritedToolUseIds.has(block.tool_use_id))
   }
   return entries.filter((entry) => !entry.forkedFrom && !answersInheritedToolUses(entry))
-}
-
-export function collectTaskNotifications(entries: TranscriptEntry[]): TaskNotification[] {
-  const notifications: TaskNotification[] = []
-  for (const entry of entries) {
-    if (entry.message?.role !== 'user') continue
-    const notification = parseTaskNotification(entry.message.content, entry.timestamp)
-    if (notification) notifications.push(notification)
-  }
-  return notifications
 }
 
 function textOf(content: unknown): string {
