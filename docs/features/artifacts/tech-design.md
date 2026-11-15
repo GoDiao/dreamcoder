@@ -326,6 +326,8 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 幻灯片不在当前范围：清单种类、模板类别、Design 页和技能里都没有它。下面是已经做过的调研，以后再做时不必重来。
 
+后续设计见 [幻灯片技术设计](../slides/tech-design.md)（2026-11-15，草案）。
+
 - **`deck` 只是一个标签。** 从模板建出的幻灯片产物，清单里 `kind` 是 `deck`，卡片上显示种类标签，但在应用里和普通页面完全一样：没有翻页控件、大纲或演示模式。
 - **按设计的导出方式只出一页。** 对 `simple-deck`（6 页）和 `html-ppt-zhangzara-raw-grid`（10 页）用导出的真实参数（`printBackground: true, preferCSSPageSize: true`）做 `printToPDF`：两个都只输出 1 页 Letter 竖版，只有第一张幻灯片的内容（PDF 里 `/Count 1`，`pdfinfo` 也是 1 页）。「幻灯片按页分页靠产物自己的打印样式」这个假设不成立。
 - **open-design 的幻灯片模板翻页写法不统一。** 一种是 `section.slide` 横向滚动加脚本翻页，另一种是 `div.slide` 加 `active` 类，并靠 `@media print` 打印；各模板自带一套，没有共同结构。
