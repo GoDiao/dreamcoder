@@ -23,6 +23,7 @@ All notable changes to DreamCoder will be documented in this file.
 - **Starting from the Design page waits for you.** Using a template, starting from scratch or cloning a website opens a new chat with your choice as a chip in the message box and a question to answer, instead of sending a message with a folder path at once. The artifact is created when you send; you can also send the chip alone, or remove it. The chat shows the chip and your words, and is titled from them. The Slides page starts the same way, and typing `/design` or `/slides` in the message box turns it into the same chip.
 - The "open project" button in the session header is a split button: the icon opens the project in the editor you used last, the arrow lists the other editors and file managers.
 - **A message you send while the agent is working waits for the next turn.** It used to be slipped into the running turn. Queued messages are listed above the message box, where you can withdraw one or send the queue now, which stops the current turn and starts the next one; Stop does the same while messages are queued. Queued messages survive a model or permission change that restarts the agent at the end of the turn (#239).
+- The skill page and the Files tab read file previews through one shared reader, so both classify text, images, binary and oversized files the same way (#255). Thanks @iruzen-dono.
 
 ### Fixed
 
