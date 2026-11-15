@@ -1124,8 +1124,7 @@ describe('WorkspacePanel', () => {
           title: 'large-file.ts',
           content: longFile,
           language: 'typescript',
-          previewType: 'text',
-          state: 'ok',
+          state: 'text',
         }]),
     }))
 
@@ -1163,9 +1162,8 @@ describe('WorkspacePanel', () => {
     }))
 
     getMocks().getWorkspaceFileMock.mockResolvedValue({
-      state: 'ok',
+      state: 'image',
       path: 'logo.png',
-      previewType: 'image',
       dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
       mimeType: 'image/png',
       language: 'image',

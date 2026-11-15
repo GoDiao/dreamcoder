@@ -219,14 +219,14 @@ describe('Skills API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json() as {
-      detail: { files: Array<{ path: string; kind: string; content: string; body?: string }> }
+      detail: { files: Array<{ path: string; state: string; content: string; body?: string }> }
     }
     const byPath = new Map(body.detail.files.map((file) => [file.path, file]))
 
-    expect(byPath.get('SKILL.md')).toMatchObject({ kind: 'text', content: skillMd, body: 'asset body' })
-    expect(byPath.get('assets/logo.png')).toEqual({ path: 'assets/logo.png', kind: 'image', content: '', language: 'image' })
-    expect(byPath.get('tool.bin')).toMatchObject({ kind: 'binary', content: '' })
-    expect(byPath.get('big.txt')).toMatchObject({ kind: 'too_large', content: '' })
+    expect(byPath.get('SKILL.md')).toMatchObject({ state: 'text', content: skillMd, body: 'asset body' })
+    expect(byPath.get('assets/logo.png')).toEqual({ path: 'assets/logo.png', state: 'image', content: '', language: 'image' })
+    expect(byPath.get('tool.bin')).toMatchObject({ state: 'binary', content: '' })
+    expect(byPath.get('big.txt')).toMatchObject({ state: 'too_large', content: '' })
   })
 
   it('lists plugin skills after reload rereads an external enable toggle', async () => {

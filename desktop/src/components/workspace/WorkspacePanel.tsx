@@ -553,14 +553,15 @@ function FileExpandedBody({
   const [wrap, setWrap] = useState(true)
   const state = loading || !entry ? 'loading' : entry.state ?? 'loading'
   const isDiff = entry?.kind === 'diff'
-  const isImage = state === 'ok' && entry?.previewType === 'image'
-  const isMarkdownFile = state === 'ok' && !isDiff && !isImage && entry ? isMarkdownPreview(entry) : false
+  const isFileContent = state === 'text' || state === 'image' || state === 'ok'
+  const isImage = state === 'image'
+  const isMarkdownFile = isFileContent && !isDiff && !isImage && entry ? isMarkdownPreview(entry) : false
   const isMarkdown = isMarkdownFile && (showPreview || !fill)
-  const isCode = state === 'ok' && !isDiff && !isImage && !isMarkdown
+  const isCode = isFileContent && !isDiff && !isImage && !isMarkdown
   const isEmptyDiff = state === 'ok' && isDiff && !(entry?.diff ?? '').trim()
   const frameClass = `overflow-auto ${fill ? 'min-h-0 flex-1' : 'max-h-[420px] rounded-md'}`
   const codeSurfaceClass = `${frameClass} bg-code`
-  const contentMenu = fill && path !== null && state === 'ok' ? fileMenu : undefined
+  const contentMenu = fill && path !== null && isFileContent ? fileMenu : undefined
 
   let content: ReactNode
   if (path === null) {
@@ -590,7 +591,7 @@ function FileExpandedBody({
         className={`${frameClass} bg-background`}
       />
     )
-  } else if (state === 'ok') {
+  } else if (state === 'text' || state === 'ok') {
     content = (
       <CodeSurface
         path={path}
@@ -769,7 +770,7 @@ function PreviewBody({ sessionId, path, kind, fill = false, headerAction, aside,
   const fileMenu: FileMenu = [
     actions.addAction(filePath),
     actions.copySubmenu(filePath),
-    ...(entry?.state === 'ok' && entry.previewType !== 'image' && entry.content !== undefined ? [actions.copyContents(entry.content)] : []),
+    ...(entry?.state !== undefined && entry.state !== 'image' && entry.content !== undefined ? [actions.copyContents(entry.content)] : []),
   ]
   return (
     <FileExpandedBody

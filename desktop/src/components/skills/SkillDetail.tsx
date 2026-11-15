@@ -150,7 +150,7 @@ function SkillFileView({
   onViewModeChange: (mode: ViewMode) => void
 }) {
   const t = useTranslation()
-  const isMarkdown = file.kind === 'text' && file.language === 'markdown'
+  const isMarkdown = file.state === 'text' && file.language === 'markdown'
   const showPreview = isMarkdown && viewMode === 'preview'
 
   return (
@@ -182,17 +182,17 @@ function SkillFileView({
 
 function SkillFileBody({ file, skillRoot, showPreview }: { file: SkillFile; skillRoot: string; showPreview: boolean }) {
   const t = useTranslation()
-  if (file.kind === 'image') {
+  if (file.state === 'image') {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
         <img src={filesystemApi.fileUrl(`${skillRoot}/${file.path}`)} alt={file.path} className="max-h-full max-w-full object-contain" />
       </div>
     )
   }
-  if (file.kind !== 'text') {
+  if (file.state !== 'text') {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <PanelMessage icon={FileWarningIcon} message={t(file.kind === 'too_large' ? 'workspace.previewState.tooLarge' : 'workspace.previewState.binary')} />
+        <PanelMessage icon={FileWarningIcon} message={t(file.state === 'too_large' ? 'workspace.previewState.tooLarge' : 'workspace.previewState.binary')} />
       </div>
     )
   }

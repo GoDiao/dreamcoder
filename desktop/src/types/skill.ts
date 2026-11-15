@@ -21,9 +21,11 @@ export type FileTreeNode = {
 
 export type SkillFrontmatter = Record<string, unknown>
 
+export type SkillFileState = 'text' | 'image' | 'binary' | 'too_large'
+
 export type SkillFile = {
   path: string
-  kind: 'text' | 'image' | 'binary' | 'too_large'
+  state: SkillFileState
   content: string
   language: string
   frontmatter?: SkillFrontmatter

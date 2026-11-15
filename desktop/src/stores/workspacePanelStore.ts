@@ -35,7 +35,6 @@ export type WorkspacePreviewEntry = {
   content?: string
   dataUrl?: string
   mimeType?: string
-  previewType?: 'text' | 'image'
   diff?: string
   state?: WorkspacePreviewState
   error?: string
@@ -343,7 +342,7 @@ function resolvePanelTarget(
 
 async function isWorkspaceFile(sessionId: string, path: string) {
   const result = await sessionsApi.getWorkspaceFile(sessionId, path)
-  return result.state === 'ok' || result.state === 'binary' || result.state === 'too_large'
+  return result.state === 'text' || result.state === 'image' || result.state === 'binary' || result.state === 'too_large'
 }
 
 export function getShellDisplayName(shell: string | undefined) {
@@ -979,7 +978,6 @@ async function loadPreview(
       content: result.content,
       dataUrl: result.dataUrl,
       mimeType: result.mimeType,
-      previewType: result.previewType ?? 'text',
       language: result.language,
       size: result.size,
       state: result.state,
