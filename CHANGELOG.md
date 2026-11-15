@@ -23,6 +23,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- A deleted session no longer comes back as an empty session in the sidebar. It happened to sessions with a title you had set that were deleted while their agent was still running.
 - Terminal text is no longer spaced out. The terminal measured its character width with a fallback font instead of the mono font it draws with.
 - A terminal tab starts one shell. When a terminal was started again before the first start finished, for example because its working folder arrived late or Restart was clicked twice, two terminals and two shells were created, the second showing as a dark strip under the first.
 - The reply-to-selection button appears when a text selection in a message ends outside the message.

@@ -1360,13 +1360,19 @@ export class SessionService {
     return { sessionId, workDir: absWorkDir }
   }
 
+  private removeSessionFile(sessionId: string): Promise<boolean> {
+    return this.enqueueSessionWrite(sessionId, async () => {
+      const found = await this.findSessionFile(sessionId)
+      if (!found) return false
+      await fs.unlink(found.filePath)
+      return true
+    })
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
-    const found = await this.findSessionFile(sessionId)
-    if (!found) {
+    if (!(await this.removeSessionFile(sessionId))) {
       throw ApiError.notFound(`Session not found: ${sessionId}`)
     }
-
-    await fs.unlink(found.filePath)
   }
 
   async deleteSessions(sessionIds: string[]): Promise<DeleteSessionsResult> {
@@ -1522,9 +1528,7 @@ export class SessionService {
   }
 
   async deleteSessionFile(sessionId: string): Promise<void> {
-    const found = await this.findSessionFile(sessionId)
-    if (!found) return
-    await fs.unlink(found.filePath)
+    await this.removeSessionFile(sessionId)
   }
 
   setSessionParent(sessionId: string, parent: SessionParent): Promise<void> {
