@@ -27,7 +27,7 @@ import { PermissionModeSelector } from '../controls/PermissionModeSelector'
 import { ModelSelector } from '../controls/ModelSelector'
 import type { AttachmentRef, UIAttachment } from '../../types/chat'
 import { refreshBrowserMarksBeforeSend } from '../../lib/browserMarks'
-import { designStartLabel, designStartPlaceholder, prepareDesignStart } from '../../lib/designStart'
+import { DESIGN_START_ATTACHMENT_ID, designStartAttachment, designStartMessage, designStartOfCommand, designStartPlaceholder, typedDesignStart, type DesignStart } from '../../lib/designStart'
 import { errorMessage } from '../../lib/errorMessage'
 import { browserReferenceAttachment } from '../../lib/browserReferenceView'
 import { AttachmentGallery } from './AttachmentGallery'
@@ -72,7 +72,6 @@ type ChatInputProps = {
 }
 
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
-const DESIGN_START_ATTACHMENT_ID = 'design-start'
 const EMPTY_SLASH_COMMANDS: PerSessionState['slashCommands'] = []
 
 function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendingLabel: string): Attachment {
@@ -133,6 +132,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const [launchError, setLaunchError] = useState<RepositoryLaunchError | null>(null)
   const [noticeSlot, setNoticeSlot] = useState<HTMLDivElement | null>(null)
   const composingRef = useRef(false)
+  const pastingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useTypeToFocus(textareaRef, primary && !isMobileComposer)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -186,6 +186,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const clearWorkspaceReferences = useWorkspaceChatContextStore((s) => s.clearReferences)
   const sessionDesignStart = useWorkspaceChatContextStore((s) => s.startsBySession[sessionId])
   const clearDesignStart = useWorkspaceChatContextStore((s) => s.clearStart)
+  const setDesignStart = useWorkspaceChatContextStore((s) => s.setStart)
   const saveComposerDraft = useCallback((draftSessionId: string) => {
     const draft = {
       input: inputRef.current,
@@ -218,14 +219,13 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     (!showLaunchControls || launchReady || !!pendingSlashUiAction) &&
     (input.trim().length > 0 || (!isMemberSession && (attachments.length > 0 || hasWorkspaceReferences || !!designStart)))
   const pickingLabel = t('browser.picking')
-  const designStartName = designStart ? designStartLabel(designStart, t) : ''
   const composerAttachments = useMemo(
     () => [
-      ...(designStartName ? [{ id: DESIGN_START_ATTACHMENT_ID, type: 'artifact' as const, name: designStartName }] : []),
+      ...(designStart ? [designStartAttachment(designStart, t)] : []),
       ...attachments,
       ...workspaceReferences.map((reference) => workspaceReferenceToAttachment(reference, pickingLabel)),
     ],
-    [designStartName, attachments, workspaceReferences, pickingLabel],
+    [designStart, t, attachments, workspaceReferences, pickingLabel],
   )
   const slashCommandCount = slashCommands.length
 
@@ -449,10 +449,27 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     setFileSearchOpen(true)
   }, [])
 
+  const applyDesignStart = useCallback((start: DesignStart, rest: string) => {
+    setDesignStart(sessionId, start)
+    setComposerInput(rest)
+    setSlashMenuOpen(false)
+    setSlashFilter('')
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(rest.length, rest.length)
+    })
+  }, [sessionId, setDesignStart, setComposerInput])
+
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value
     if (isMemberSession) {
       setComposerInput(value)
+      return
+    }
+    const typed = typedDesignStart(value, { complete: pastingRef.current })
+    pastingRef.current = false
+    if (typed) {
+      applyDesignStart(typed.start, typed.rest)
       return
     }
     const cursorPos = event.target.selectionStart ?? value.length
@@ -465,6 +482,15 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     const el = textareaRef.current
     if (!el) return
     const cursorPos = el.selectionStart ?? input.length
+    const start = isMemberSession ? null : designStartOfCommand(command)
+    if (start) {
+      const trigger = findSlashTrigger(input, cursorPos)
+      const rest = trigger
+        ? [input.slice(0, trigger.slashPos).trimEnd(), input.slice(cursorPos).trimStart()].filter(Boolean).join(' ')
+        : input
+      applyDesignStart(start, rest)
+      return
+    }
     const replacement = replaceSlashToken(input, cursorPos, command)
     setComposerInput(replacement.value)
     setSlashMenuOpen(false)
@@ -472,7 +498,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
       el.focus()
       el.setSelectionRange(replacement.cursorPos, replacement.cursorPos)
     })
-  }, [input])
+  }, [input, isMemberSession, applyDesignStart, setComposerInput])
 
   const replaceEmptySession = useCallback(async (
     workDir: string,
@@ -489,6 +515,8 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
       ...(permissionMode ? { permissionMode } : {}),
       ...(runtime ? { runtime } : {}),
     })
+    const start = useWorkspaceChatContextStore.getState().startsBySession[oldId]
+    if (start) useWorkspaceChatContextStore.getState().setStart(newId, start)
     disconnectSession(oldId)
     replaceTabSession(oldId, newId)
     connectToSession(newId)
@@ -517,6 +545,11 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }, [replaceEmptySession, t])
 
   const handleSubmit = async () => {
+    const typed = isMemberSession ? null : typedDesignStart(input, { complete: true })
+    if (typed) {
+      applyDesignStart(typed.start, typed.rest)
+      return
+    }
     const text = input.trim()
     if ((!text && ((!attachments.length && !hasWorkspaceReferences && !designStart) || isMemberSession)) || isWorkspaceMissing) return
 
@@ -596,8 +629,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         note: reference.note,
         quote: reference.quote,
       }))
-    const visibleAttachmentPayload: Array<AttachmentRef | UIAttachment> = [
-      ...(designStart ? [{ type: 'artifact' as const, name: designStartName }] : []),
+    const visibleAttachmentPayload: AttachmentRef[] = [
       ...uploadAttachmentPayload,
       ...references.map((reference): AttachmentRef => {
         if (reference.kind === 'browser' && reference.browser) {
@@ -647,11 +679,11 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
       }
     }
 
-    let startCommand = ''
+    let startMessage: Awaited<ReturnType<typeof designStartMessage>> | null = null
     if (designStart) {
       setLaunchTransitioning(true)
       try {
-        startCommand = await prepareDesignStart(targetSessionId, designStart)
+        startMessage = await designStartMessage(targetSessionId, designStart, text)
       } catch (error) {
         useUIStore.getState().addToast({ type: 'error', message: errorMessage(error) })
         return
@@ -659,15 +691,15 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         setLaunchTransitioning(false)
       }
     }
-    const contentForModel = (startCommand
-      ? [[startCommand, text].filter(Boolean).join(' '), workspaceReferencePrompt]
+    const contentForModel = (startMessage
+      ? [startMessage.content, workspaceReferencePrompt]
       : [workspaceReferencePrompt, text]
     ).filter(Boolean).join('\n\n')
 
     sendMessage(targetSessionId, contentForModel, [...uploadAttachmentPayload, ...workspaceAttachmentPayload, ...browserScreenshotPayload], {
       displayContent,
-      displayAttachments: visibleAttachmentPayload,
-      ...(designStart && { title: text || designStartName }),
+      displayAttachments: startMessage ? [startMessage.chip, ...visibleAttachmentPayload] : visibleAttachmentPayload,
+      ...(startMessage && { title: startMessage.title }),
     })
     setComposerInput('')
     setComposerAttachments([])
@@ -676,7 +708,10 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
     if (!isMemberSession) {
       clearWorkspaceReferences(sessionId)
       clearDesignStart(sessionId)
-      if (targetSessionId !== sessionId) clearWorkspaceReferences(targetSessionId)
+      if (targetSessionId !== sessionId) {
+        clearWorkspaceReferences(targetSessionId)
+        clearDesignStart(targetSessionId)
+      }
     }
     setPlusMenuOpen(false)
     setSlashMenuOpen(false)
@@ -724,6 +759,12 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         return
       }
       if (event.key === 'Enter') {
+        const typed = isMemberSession ? null : typedDesignStart(input, { complete: true })
+        if (typed) {
+          event.preventDefault()
+          applyDesignStart(typed.start, typed.rest)
+          return
+        }
         if (exactSlashCommand && slashFilter.trim().toLowerCase() === exactSlashCommand.name.toLowerCase()) {
           event.preventDefault()
           handleSubmit()
@@ -754,12 +795,14 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }
 
   const handlePaste = (event: React.ClipboardEvent) => {
+    pastingRef.current = !!event.clipboardData?.getData?.('text')
     if (!fullComposer) return
     const items = event.clipboardData?.items
     if (!items) return
     const files = clipboardImageFiles(items)
     if (files.length === 0) return
     event.preventDefault()
+    pastingRef.current = false
     appendFiles(files)
   }
 

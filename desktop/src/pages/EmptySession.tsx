@@ -20,6 +20,7 @@ import { LocalSlashCommandPanel, type LocalSlashCommandName } from '../component
 import { useMobileViewport } from '../hooks/useMobileViewport'
 import { useTypeToFocus } from '../hooks/useTypeToFocus'
 import { isDesktopRuntime } from '../lib/desktopRuntime'
+import { DESIGN_START_ATTACHMENT_ID, designStartAttachment, designStartOfCommand, designStartPlaceholder, typedDesignStart, type DesignStart } from '../lib/designStart'
 import {
   clipboardImageFiles,
   filesToComposerAttachments,
@@ -54,6 +55,7 @@ export function EmptySession() {
   const updateDraft = useNewSessionStore((state) => state.updateDraft)
   const setWorkDir = useNewSessionStore((state) => state.setWorkDir)
   const submitDraft = useNewSessionStore((state) => state.submit)
+  const designStart = useNewSessionStore((state) => state.start)
   const setInput = (input: string) => updateDraft({ input })
   const setSelectedBranch = useCallback((branch: string | null) => updateDraft({ branch }), [updateDraft])
   const setUseWorktree = (useWorktree: boolean) => updateDraft({ useWorktree })
@@ -74,6 +76,7 @@ export function EmptySession() {
   const [launchError, setLaunchError] = useState<RepositoryLaunchError | null>(null)
   const [noticeSlot, setNoticeSlot] = useState<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pastingRef = useRef(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fileSearchRef = useRef<FileSearchMenuHandle>(null)
@@ -101,17 +104,9 @@ export function EmptySession() {
   useEffect(() => {
     let cancelled = false
 
-    skillsApi.list(workDir || undefined)
-      .then(({ skills }) => {
-        if (cancelled) return
-        setSlashCommands(
-          skills
-            .filter((skill) => skill.userInvocable)
-            .map((skill) => ({
-              name: skill.name,
-              description: skill.description,
-            })),
-        )
+    skillsApi.slashCommands(workDir || undefined)
+      .then(({ commands }) => {
+        if (!cancelled) setSlashCommands(commands)
       })
       .catch(() => {
         if (!cancelled) {
@@ -147,7 +142,8 @@ export function EmptySession() {
   }, [filteredCommands, slashFilter])
   const canSubmit = (
     input.trim().length > 0 ||
-    attachments.length > 0
+    attachments.length > 0 ||
+    !!designStart
   ) && !isSubmitting && repositoryLaunchReady
 
   useEffect(() => {
@@ -162,10 +158,15 @@ export function EmptySession() {
   }, [slashMenuOpen, slashSelectedIndex])
 
   const handleSubmit = async () => {
+    const typed = typedDesignStart(input, { complete: true })
+    if (typed) {
+      startDesign(typed.start, typed.rest)
+      return
+    }
     const text = input.trim()
     if (!canSubmit) return
 
-    const slashUiAction = text.startsWith('/') ? resolveSlashUiAction(text.slice(1)) : null
+    const slashUiAction = !designStart && text.startsWith('/') ? resolveSlashUiAction(text.slice(1)) : null
     if (slashUiAction?.type === 'panel') {
       setLocalSlashPanel(slashUiAction.command as LocalSlashCommandName)
       setInput('')
@@ -205,7 +206,23 @@ export function EmptySession() {
     }
   }
 
+  const startDesign = (start: DesignStart, rest: string) => {
+    updateDraft({ start, input: rest })
+    setSlashMenuOpen(false)
+    setSlashFilter('')
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(rest.length, rest.length)
+    })
+  }
+
   const handleInputChange = (value: string, cursorPos: number) => {
+    const typed = typedDesignStart(value, { complete: pastingRef.current })
+    pastingRef.current = false
+    if (typed) {
+      startDesign(typed.start, typed.rest)
+      return
+    }
     setInput(value)
     const token = findSlashToken(value, cursorPos)
     if (!token) {
@@ -273,6 +290,12 @@ export function EmptySession() {
         return
       }
       if (event.key === 'Enter' || event.key === 'Tab') {
+        const typed = event.key === 'Enter' ? typedDesignStart(input, { complete: true }) : null
+        if (typed) {
+          event.preventDefault()
+          startDesign(typed.start, typed.rest)
+          return
+        }
         if (
           event.key === 'Enter' &&
           exactSlashCommand &&
@@ -301,11 +324,13 @@ export function EmptySession() {
   }
 
   const handlePaste = (event: React.ClipboardEvent) => {
+    pastingRef.current = !!event.clipboardData?.getData?.('text')
     const items = event.clipboardData?.items
     if (!items) return
     const files = clipboardImageFiles(items)
     if (files.length === 0) return
     event.preventDefault()
+    pastingRef.current = false
     appendFiles(files)
   }
 
@@ -361,6 +386,10 @@ export function EmptySession() {
   }
 
   const removeAttachment = (id: string) => {
+    if (id === DESIGN_START_ATTACHMENT_ID) {
+      updateDraft({ start: null })
+      return
+    }
     setAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
   }
 
@@ -368,6 +397,12 @@ export function EmptySession() {
     const el = textareaRef.current
     if (!el) return
     const cursorPos = el.selectionStart ?? input.length
+    const start = designStartOfCommand(command)
+    const token = start ? findSlashToken(input, cursorPos) : null
+    if (start && token) {
+      startDesign(start, [input.slice(0, token.start).trimEnd(), input.slice(cursorPos).trimStart()].filter(Boolean).join(' '))
+      return
+    }
     const replacement = replaceSlashCommand(input, cursorPos, command)
     if (!replacement) return
     setInput(replacement.value)
@@ -516,9 +551,13 @@ export function EmptySession() {
             <ProviderGateCard testId="empty-session-no-provider" />
           ) : (
             <>
-              {attachments.length > 0 && (
+              {(attachments.length > 0 || designStart) && (
                 <div className="mb-2">
-                  <AttachmentGallery attachments={attachments} variant="composer" onRemove={removeAttachment} />
+                  <AttachmentGallery
+                    attachments={designStart ? [designStartAttachment(designStart, t), ...attachments] : attachments}
+                    variant="composer"
+                    onRemove={removeAttachment}
+                  />
                 </div>
               )}
 
@@ -546,7 +585,7 @@ export function EmptySession() {
                   onChange: (event) => handleInputChange(event.target.value, event.target.selectionStart ?? event.target.value.length),
                   onKeyDown: handleKeyDown,
                   onPaste: handlePaste,
-                  placeholder: t('empty.placeholder'),
+                  placeholder: designStart ? t(designStartPlaceholder(designStart)) : t('empty.placeholder'),
                   'aria-label': t('chat.inputLabel'),
                 }}
                 action={{

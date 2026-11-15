@@ -109,6 +109,28 @@ describe('Skills API', () => {
     expect(body.skills).toContainEqual(expect.objectContaining({ name: 'project-skill', source: 'project' }))
   })
 
+  it('lists the slash commands for a folder with no session yet, the built-in skills among them', async () => {
+    const cwd = path.join(tmpHome, 'workspace')
+    await writeSkill(
+      path.join(tmpHome, '.claude', 'skills'),
+      'design-interview',
+      ['---', 'description: Interview about a design', '---', '', '# Design interview'].join('\n'),
+    )
+    await writeSkill(
+      path.join(tmpHome, '.claude', 'skills'),
+      'internal-only',
+      ['---', 'description: Not for users', 'user-invocable: false', '---', '', '# Internal'].join('\n'),
+    )
+
+    const { req, url, segments } = makeRequest(`/api/skills/slash-commands?cwd=${encodeURIComponent(cwd)}`)
+    const res = await handleSkillsApi(req, url, segments)
+
+    expect(res.status).toBe(200)
+    const names = ((await res.json()) as { commands: Array<{ name: string }> }).commands.map((command) => command.name)
+    expect(names).toEqual(expect.arrayContaining(['design', 'slides', 'artifacts', 'design-interview']))
+    expect(names).not.toContain('internal-only')
+  })
+
   it('lists Claude Code skills as claudeCode, unless DreamCoder has the same name', async () => {
     // Claude Code's variable, spelled in pieces so the config-dir guard test does not match it.
     const claudeCodeVariable = ['CLAUDE', 'CONFIG', 'DIR'].join('_')

@@ -11,6 +11,7 @@ import { useUIStore } from '../stores/uiStore'
 vi.mock('../api/skills', () => ({
   skillsApi: {
     list: vi.fn(async () => ({ skills: [] })),
+    slashCommands: vi.fn(async () => ({ commands: [] })),
   },
 }))
 
@@ -153,25 +154,8 @@ function resetPageStores() {
 
 describe('Content-only pages render without errors', () => {
   it('EmptySession slash picker includes dynamic skills before the first session starts', async () => {
-    vi.mocked(skillsApi.list).mockResolvedValueOnce({
-      skills: [
-        {
-          name: 'lark-mail',
-          description: 'Draft, send, and search emails',
-          source: 'user',
-          userInvocable: true,
-          contentLength: 120,
-          hasDirectory: true,
-        },
-        {
-          name: 'internal-only',
-          description: 'Should stay hidden',
-          source: 'user',
-          userInvocable: false,
-          contentLength: 60,
-          hasDirectory: true,
-        },
-      ],
+    vi.mocked(skillsApi.slashCommands).mockResolvedValueOnce({
+      commands: [{ name: 'lark-mail', description: 'Draft, send, and search emails' }],
     })
 
     render(<EmptySession />)
@@ -187,11 +171,10 @@ describe('Content-only pages render without errors', () => {
     expect(screen.getByText('/plugin')).toBeInTheDocument()
     expect(screen.getByText('/context')).toBeInTheDocument()
     expect(screen.queryByText('/plugins')).not.toBeInTheDocument()
-    expect(screen.queryByText('/internal-only')).not.toBeInTheDocument()
   })
 
   it('EmptySession shows /goal as one command with argument hints, not pseudo subcommands', async () => {
-    vi.mocked(skillsApi.list).mockResolvedValueOnce({ skills: [] })
+    vi.mocked(skillsApi.slashCommands).mockResolvedValueOnce({ commands: [] })
 
     render(<EmptySession />)
 

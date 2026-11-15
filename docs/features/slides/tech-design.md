@@ -605,16 +605,18 @@ Slides 是独立入口，不并进 Design。
 - **Artifacts 页**：「新建」一栏是 Design 和 Slides 两个方块（调色板和 `Presentation` 图标，都带 New 角标），由一张两项的表画出来（`desktop/src/pages/ArtifactsPage.tsx`）；「更多类型敬请期待」这句和它的文案已删除。
 - **开始页**：原来的 `DesignMode` 改成按「范围」取参数的 `StartPage`（`desktop/src/components/design/StartPage.tsx`），不复制一份。范围是 `design` 或 `slides`，组件里一张表按范围给出：开始会话用的命令、可见的模板类别（design 是网页和原型，slides 只有幻灯片）、标题、没有项目时的提示、「从零开始」的提示、没有模板时的空状态、是否显示「复刻网站」（只有 design）。类别筛选只在本范围有不止一个类别时出现，「全部」只在本范围的类别里过滤。设计系统库两种范围都有。
   - 点任何一个入口（「用这个模板创建」「从零开始」「复刻网站」），都只是新开会话、打开它，在输入框里放一个「块」，焦点在输入框，**不发送**。块显示人能读的名字：「幻灯片 · Grove」「幻灯片」「设计 · <模板名>」，选了设计系统时后面加「设计系统：<名字>」，复刻是「复刻 example.com」。输入框的提示语按入口换成针对它的问题（幻灯片是「这份幻灯片要讲什么？给谁看？」）。
-  - 块只记着选了什么（命令、项目、模板、设计系统、复刻地址），产物推迟到按下发送时才创建：有模板时 sidecar 把模板复制进 `dc_artifacts/<name>/` 并写清单，没有模板但选了设计系统时把系统复制进这个会话的工作目录，然后发出 `/slides <产物路径或系统目录> <用户的话>`（复刻是 `/design 复刻网站 <地址> <用户的话>`）。斜杠命令在最前面，用户的话跟在后面；没输入文字也能发，发出的就是原来的 `/slides <路径>`、`/slides`、`/design 复刻网站 <地址>`，由 Agent 提问。创建失败时提示用户，块和已输入的文字都留在输入框里，可以再发。
+  - 块只记着选了什么（命令、模板和要复制进的项目、设计系统、复刻地址），产物推迟到按下发送时才创建：有模板时 sidecar 把模板复制进 `dc_artifacts/<name>/` 并写清单，没有模板但选了设计系统时把系统复制进这个会话的工作目录，然后发出 `/slides <产物路径或系统目录> <用户的话>`（复刻是 `/design 复刻网站 <地址> <用户的话>`）。斜杠命令在最前面，用户的话跟在后面；没输入文字也能发，发出的就是原来的 `/slides <路径>`、`/slides`、`/design 复刻网站 <地址>`，由 Agent 提问。创建失败时提示用户，块和已输入的文字都留在输入框里，可以再发。
   - 对话里这条消息显示块和用户的话，不显示路径；模型收到的仍是带路径的命令。会话标题取用户的话，没输入时取块的名字：`user_message` 多一个可选的 `title`，sidecar 用它代替消息正文去起标题（`getTitleInputForUserMessage`，`src/server/ws/handler.ts`），客户端的临时标题也用它。
   - 块可以像引用一样点叉去掉，去掉后就是普通的新会话。
   - 模板预览在页头下面显示幻灯片工具条（翻页、页码、总览、演示），复用 `DeckControls`，只看页面上报的状态；网页模板不上报，不显示。
 - **状态**：`artifactViewStore` 的 `designing` 改成 `starting: 'design' | 'slides' | null`，方法是 `openStart(scope)` 和 `closeStart()`。
-- **块和开始会话**（`desktop/src/lib/designStart.ts`）：`openDesignStart(start)` 新建会话、连接、把块放进输入框、打开标签；`prepareDesignStart(sessionId, start)` 在发送时创建产物或复制设计系统，返回要放在消息最前面的命令；`designStartLabel` 给块的名字。「创建产物、装设计系统、拼命令」只有发送时这一份。
+- **块和开始会话**（`desktop/src/lib/designStart.ts`）：`openDesignStart(project, start)` 在这个项目里新建会话、连接、把块放进输入框、打开标签；`prepareDesignStart(sessionId, start)` 在发送时创建产物或复制设计系统，返回要放在消息最前面的命令；`designStartLabel` 给块的名字。「创建产物、装设计系统、拼命令」只有发送时这一份。哪些命令有块也只在这里定义（`designStartOfCommand`、`typedDesignStart`，现在是 `/design` 和 `/slides`），输入框只问「这个命令有没有块」。
+  - 项目只记在模板里（`template.project`）：只有复制模板时用得到；手打的命令没有模板，也就不需要项目，不用替它找一个值。设计系统按会话复制，复刻不建东西。
   - 块存在 `workspaceChatContextStore` 里，和引用并列（`startsBySession`，每个会话最多一个），不是一种新的引用：引用可以有多个、会去重、发送时变成正文前面的上下文和附件，块最多一个、决定消息的前缀、发送时还要先异步创建产物，塞进引用的列表就得在去重、格式化、附件这几处都把它挑出来。共用的是存放位置和生命周期（按会话、只在客户端、会话删除时一起清掉）以及输入框里的显示（同一排附件卡片，图标是 Artifacts 的图标）。刷新或重连后和引用一样不保留。
-  - 首页的大输入框和会话里的输入框是同一个 `ChatInput`（空会话时 `variant="hero"`），块在两种样子里都显示。
+  - 已打开的空会话和会话里的输入框是同一个 `ChatInput`（空会话时 `variant="hero"`），块在两种样子里都显示。「新任务」页（还没有会话时的大输入框）是另一个组件 `EmptySession`，还没有会话，块记在这个页面的草稿里（`useNewSessionStore` 的 `start`），在这个页面上显示、换提示语、可以去掉。按发送时走这个页面原来的流程：按选好的项目、分支、worktree、权限模式和模型建会话，再创建产物、把命令放在消息最前面发出。发送那一步和会话里的输入框共用 `designStartMessage`（`designStart.ts`）：创建产物或复制设计系统，给出模型收到的正文、显示的文字、块和标题。
+  - 已打开的空会话里，在启动控件里换了文件夹、分支或 worktree，会话会被替换成新的（`replaceEmptySession`），块跟着搬到新会话上。
   - H5 页面没有 Artifacts 入口（侧栏只在桌面端显示），不涉及。
-- **会话里输入 `/slides`**：当前会话直接开始，Agent 先访谈，再按需要用选模板工具推荐幻灯片模板。对话里选模板卡片的「预览」开的是普通浏览器标签，第一阶段的工具条在那里已经有。
+- **会话里输入 `/slides` 或 `/design`**：和开始页「从零开始」进来的结果相同，输入框里的命令文字变成块（「幻灯片」或「设计」），提示语换成对应的问题，焦点留在输入框，不发送。在斜杠菜单里点选、用 Tab 或 Enter 选中，打完整命令后按 Enter，打完命令接一个空格（空格后面的字留下当作用户的话），粘贴一段以命令开头的文字，这几种方式都一样。之后和开始页进来的一样：再按发送才发出，可以只发块，块可以去掉。新会话和进行中的会话都适用；一轮正在运行时，带块的消息按斜杠命令的规则直接发出，不进排队。已经有块时再输入其中一个命令，换成新的块。其它斜杠命令和技能不变。即使斜杠菜单的列表里一时还没有这个命令，打完整的命令按 Enter 也先变成块，不会选中名字相近的别的命令。发出后 Agent 先访谈，再按需要用选模板工具推荐幻灯片模板。对话里选模板卡片的「预览」开的是普通浏览器标签，第一阶段的工具条在那里已经有。
 - **Design 页不出现幻灯片模板**，`/design` 的模板索引也不含（`templateIndexSection`，`src/skills/bundled/designSystemGuide.ts`，两个技能各传自己的类别）。
 
 ## 加了 `deck` 和 `slides` 之后要同步的地方
@@ -650,6 +652,7 @@ Slides 是独立入口，不并进 Design。
 | 内置技能 `/slides` | 用户、Agent | 可带产物路径；参考文件按需读取 |
 | 开始会话 | 渲染进程 | `openDesignStart` 只放块；发送时 `prepareDesignStart` 创建产物并给出命令 |
 | WebSocket `user_message` | 客户端 → sidecar | 可选 `title`：起会话标题用的文字，有它时不用消息正文 |
+| `GET /api/skills/slash-commands?cwd=` | 渲染进程 → sidecar | 没有会话时某个目录可用的斜杠命令，和会话的列表同一个来源（`listSkillSlashCommands`：内置技能、磁盘上的技能、旧式命令）。「新任务」页用它；原来用的 `/api/skills` 只列磁盘上的技能，菜单里没有 `/design`、`/slides` 这些内置技能 |
 
 三个新的 sidecar 接口放在 `/api/artifacts/` 下，目录校验用 `resolveArtifactsDir`，和画板写回同一套（`src/server/services/artifactService.ts:323`、`:361`）。
 
@@ -690,7 +693,7 @@ Slides 是独立入口，不并进 Design。
 
 后面阶段要加的：
 
-- 第二阶段（已有）：从幻灯片模板建出的清单保留 `kind` 和 `slides`、清单不对时什么也不建、模板说明按种类给、内置的每套幻灯片模板复制进项目后通过 `ArtifactCheck`（`src/utils/__tests__/designTemplates.test.ts`）；`/slides` 的索引只含幻灯片模板、从模板建的幻灯片给模板说明并跳过选模板和选设计系统，`/design` 的索引不含幻灯片模板（`src/skills/bundled/slides.test.ts`、`design.test.ts`）；长度换算（`scripts/design-templates/slideCss.test.ts`）、页面 id、草稿的提示、定稿的机械检查、目录记录、`DESIGN.md` 的声明位置、定稿和合并目录（`slides.test.ts`）、网页模板转换保留幻灯片模板（`convert.test.ts`）；开始页两种范围各自的模板、命令、类别筛选和复刻卡片，模板预览有工具条（`StartPage.test.tsx`），store 的新状态、Artifacts 页的两个方块（各自的测试文件）；入口的块：点入口后只放块、不发送、不创建（`desktop/src/lib/designStart.test.ts`），发送时才创建产物、只有块也能发且内容和原来一样、带文字时命令在前、创建失败时块和文字保留、去掉块后是普通消息、Design 三个入口和 Slides 两个入口、空会话的大输入框里显示块和提示语（`ChatInput.test.tsx`），消息显示块不显示路径、临时标题取给定的 `title`（`chatStore.test.ts`），sidecar 用 `title` 起标题（`websocket-handler.test.ts`）。草稿步骤要用本机的 Chrome，没有单元测试，靠试点的截图验证。
+- 第二阶段（已有）：从幻灯片模板建出的清单保留 `kind` 和 `slides`、清单不对时什么也不建、模板说明按种类给、内置的每套幻灯片模板复制进项目后通过 `ArtifactCheck`（`src/utils/__tests__/designTemplates.test.ts`）；`/slides` 的索引只含幻灯片模板、从模板建的幻灯片给模板说明并跳过选模板和选设计系统，`/design` 的索引不含幻灯片模板（`src/skills/bundled/slides.test.ts`、`design.test.ts`）；长度换算（`scripts/design-templates/slideCss.test.ts`）、页面 id、草稿的提示、定稿的机械检查、目录记录、`DESIGN.md` 的声明位置、定稿和合并目录（`slides.test.ts`）、网页模板转换保留幻灯片模板（`convert.test.ts`）；开始页两种范围各自的模板、命令、类别筛选和复刻卡片，模板预览有工具条（`StartPage.test.tsx`），store 的新状态、Artifacts 页的两个方块（各自的测试文件）；入口的块：点入口后只放块、不发送、不创建（`desktop/src/lib/designStart.test.ts`），发送时才创建产物、只有块也能发且内容和原来一样、带文字时命令在前、创建失败时块和文字保留、去掉块后是普通消息、Design 三个入口和 Slides 两个入口、空会话的大输入框里显示块和提示语，手打 `/slides`、`/design` 的六种方式都变成块、已有块时换块、别的斜杠命令不变、进行中的会话里也能用、列表里没有该命令时按 Enter 也变成块（`ChatInput.test.tsx`），新任务页的菜单有内置的 `/design`、菜单选中、完整命令加 Enter、命令加空格三种方式在这个页面上变成块、发送时按选好的项目和分支建会话并把命令放在最前、只发块和去掉块、别的命令照常发送（`EmptySession.test.tsx`），空会话被替换时块跟过去（`ChatInput.test.tsx`），没有会话时的斜杠命令列表含内置技能（`src/server/__tests__/skills.test.ts`），消息显示块不显示路径、临时标题取给定的 `title`（`chatStore.test.ts`），sidecar 用 `title` 起标题（`websocket-handler.test.ts`）。草稿步骤要用本机的 Chrome，没有单元测试，靠试点的截图验证。
 - 第三阶段：sidecar 的调序（同一组 id 通过，多一个或少一个 409）、删除页、内容写回（一致写入、不一致 409、id 不在清单里拒绝）；`order`、`edit` 触发对应接口；写回后不改标签的修改时间；编辑生成的新内容只改动目标元素、保留行内元素、不带运行状态。
 
 ## 分阶段
@@ -941,6 +944,8 @@ Slides 是独立入口，不并进 Design。
 | 没有提开始页的模板预览 | 预览里接上 `DeckControls` | 原来的预览没有工具条，幻灯片模板只能看第一页 | `desktop/src/components/design/DesignTemplatePreview.tsx` |
 | 「页码……页面文件里不出现任何随页序变化的数字，包括小标题里的章节序号」 | 页码用计数器；章节号是内容，可以写进页面，改章节结构时一起改，检查回路里核对 | 维护者看过试点后决定，理由见「页码」 | `src/skills/bundled/slides.ts`（`format.md`、`layout.md`、`checks.md`）、`src/utils/designTemplates.ts`（`adaptTarget`）、`scripts/design-templates/slides.ts`（`SLIDE_TEMPLATE_PROMPT`） |
 | 两个技能的模板索引各自过滤 | 抽成共用的 `templateIndexSection` 和 `usedTemplateGuidance`，两个技能各传自己的类别 | 不写两遍 | `src/skills/bundled/designSystemGuide.ts` |
+| 「新任务」页的斜杠菜单取 `/api/skills`，没有内置技能（`main` 上就是这样） | 改取 `/api/skills/slash-commands`；在那里输入 `/design`、`/slides` 也变成块，留在这个页面上，按发送时走这个页面的建会话流程 | 维护者在新任务页找不到 `/design` | `src/server/api/skills.ts`、`desktop/src/pages/EmptySession.tsx`、`desktop/src/stores/newSessionStore.ts` |
+| 会话里输入 `/slides`、`/design` 按普通斜杠命令直接发出 | 和开始页进来的一样变成块，等用户再发 | 维护者试了手打 `/slides`，期望和开始页同一个块 | `desktop/src/lib/designStart.ts`（`typedDesignStart`）、`desktop/src/components/chat/ChatInput.tsx` |
 | 点入口后新开会话，立刻发 `/slides <路径>`、`/design <路径>` 等 | 新开会话后只在输入框里放一个块，等用户输入再发；产物推迟到发送时创建；消息显示块和用户的话，标题取用户的话或块的名字 | 维护者看过第二阶段后决定：用户没有机会先说话，第一条消息和会话标题都是一串路径 | `desktop/src/lib/designStart.ts`、`desktop/src/components/chat/ChatInput.tsx`、`desktop/src/stores/workspaceChatContextStore.ts`、`src/server/ws/handler.ts` |
 
 **其余 31 套和上游相比**（逐套的清单在转换时的报告里，这里只列共同的和值得注意的）：
@@ -974,4 +979,4 @@ Slides 是独立入口，不并进 Design。
 6. **评论**。在第 2 页上点选一个元素、选中一段文字各一次，引用卡片显示「产物名 / 页标题」，Agent 收到的文本里有 `slides/<id>.html`。
 7. **两种主题和两种语言**下的工具条，以及留边的底色跟随主题。
 8. **Windows**：全屏、PNG 的像素比。
-9. **Slides 入口**（第二阶段）：Artifacts 页有 Design 和 Slides 两个方块；Slides 开始页里 34 套幻灯片模板都在、缩略图正确，没有类别筛选和复刻卡片，预览能翻页；用一个模板创建后新会话的输入框里有「幻灯片 · <模板名>」的块、提示语是针对幻灯片的问题、焦点在输入框、什么都没发，`dc_artifacts/` 下还没有新产物；输入一句话发送后才出现产物，对话里显示块和这句话，会话标题取这句话，Agent 不再问要不要用模板，改出来的幻灯片保留模板的版式；不输入直接发送时标题是块的名字；去掉块后发的是普通消息。Design 的三个入口（模板、从零开始、复刻网站）同样走一遍。Design 页没有幻灯片模板。sidecar 要重新构建才有新的技能文字和按 `title` 起标题。
+9. **Slides 入口**（第二阶段）：Artifacts 页有 Design 和 Slides 两个方块；Slides 开始页里 34 套幻灯片模板都在、缩略图正确，没有类别筛选和复刻卡片，预览能翻页；用一个模板创建后新会话的输入框里有「幻灯片 · <模板名>」的块、提示语是针对幻灯片的问题、焦点在输入框、什么都没发，`dc_artifacts/` 下还没有新产物；输入一句话发送后才出现产物，对话里显示块和这句话，会话标题取这句话，Agent 不再问要不要用模板，改出来的幻灯片保留模板的版式；不输入直接发送时标题是块的名字；去掉块后发的是普通消息。在会话里手打 `/slides` 按 Enter、打 `/slides ` 接着打字、从斜杠菜单选它，都应当变成「幻灯片」块而不是直接发出；`/review` 这类别的命令照旧。「新任务」页的斜杠菜单里有 `/design`、`/slides`；在那里打 `/design` 按 Enter、打 `/design ` 接着打字、从菜单选它，都应当在这个页面上出现「设计」块、提示语换成设计的问题；选个项目和分支后发送，新会话建在这个项目和分支上，对话里显示块和打的字。在已打开的空会话里放了块后换个文件夹，块还在。Design 的三个入口（模板、从零开始、复刻网站）同样走一遍。Design 页没有幻灯片模板。sidecar 要重新构建才有新的技能文字和按 `title` 起标题。

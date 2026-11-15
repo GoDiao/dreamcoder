@@ -453,6 +453,8 @@ export async function handleSkillsApi(
         return await listSkills(url)
       case 'detail':
         return await getSkillDetail(url)
+      case 'slash-commands':
+        return Response.json({ commands: await listSkillSlashCommands(getRequestedCwd(url)) })
       default:
         throw ApiError.notFound(`Unknown skills endpoint: ${sub}`)
     }

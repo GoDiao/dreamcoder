@@ -103,11 +103,11 @@ export function StartPage({ scope }: { scope: StartScope }) {
     [templates, category, templateQuery, config],
   )
 
-  const run = async (options: Omit<DesignStart, 'command' | 'project'>) => {
+  const run = async (options: Omit<DesignStart, 'command'>) => {
     if (!project || busy) return
     setBusy(true)
     try {
-      await openDesignStart({ command: config.command, project, ...options })
+      await openDesignStart(project, { command: config.command, ...options })
       close()
     } catch (failure) {
       toast.error(errorMessage(failure))
@@ -118,7 +118,7 @@ export function StartPage({ scope }: { scope: StartScope }) {
 
   const start = (template?: DesignTemplate) =>
     run({
-      ...(template && { template: { id: template.id, title: localizedText(template.title, locale) } }),
+      ...(template && project && { template: { id: template.id, title: localizedText(template.title, locale), project } }),
       ...(system && (template === undefined || template.acceptsDesignSystem) && { designSystem: { id: system.id, name: localizedText(system.name, locale) } }),
     })
 

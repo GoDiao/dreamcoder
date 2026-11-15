@@ -7,6 +7,11 @@ export const skillsApi = {
     return api.get<{ skills: SkillMeta[] }>(`/api/skills${query}`, { timeout: 120_000 })
   },
 
+  slashCommands: (cwd?: string) => {
+    const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''
+    return api.get<{ commands: Array<{ name: string; description: string; argumentHint?: string }> }>(`/api/skills/slash-commands${query}`, { timeout: 120_000 })
+  },
+
   detail: (source: string, name: string, cwd?: string) => {
     const query = new URLSearchParams({
       source,
