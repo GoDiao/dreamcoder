@@ -2,11 +2,11 @@ import { useState } from 'react'
 import '@testing-library/jest-dom'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { SelectionPopover } from './SelectionPopover'
+import { SelectionPopover, type SelectionPopoverAction } from './SelectionPopover'
 
 afterEach(cleanup)
 
-function Harness({ onAdd = () => {}, onClear = () => {} }: { onAdd?: () => void; onClear?: () => void }) {
+function Harness({ onAdd = () => {}, onClear = () => {}, actions }: { onAdd?: () => void; onClear?: () => void; actions?: SelectionPopoverAction[] }) {
   const [selection, setSelection] = useState<{ x: number; y: number } | null>({ x: 10, y: 10 })
   const quote = {
     selection,
@@ -15,7 +15,7 @@ function Harness({ onAdd = () => {}, onClear = () => {} }: { onAdd?: () => void;
   }
   return <div onMouseUp={() => setSelection(null)}>
     <p data-testid="source">source text</p>
-    <SelectionPopover label="Add to chat" quote={quote} onAdd={() => { if (selection) onAdd() }} />
+    <SelectionPopover label="Add to chat" quote={quote} actions={actions ?? [{ label: 'Add to chat', onSelect: () => { if (selection) onAdd() } }]} />
   </div>
 }
 
@@ -58,4 +58,23 @@ it('closes when the pointer goes down outside the selection source', async () =>
 it('opens above the selection', () => {
   render(<Harness />)
   expect(screen.getByRole('dialog', { name: 'Add to chat' })).toHaveAttribute('data-side', 'top')
+})
+
+it('offers each action and runs only the one clicked', () => {
+  const first = vi.fn()
+  const second = vi.fn()
+  render(<Harness actions={[{ label: 'First', onSelect: first }, { label: 'Second', onSelect: second }]} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Second' }))
+  expect(second).toHaveBeenCalledOnce()
+  expect(first).not.toHaveBeenCalled()
+})
+
+it('blocks an action while it is loading', () => {
+  const first = vi.fn()
+  render(<Harness actions={[{ label: 'First', onSelect: first, loading: true }, { label: 'Second', onSelect: () => {} }]} />)
+  const button = screen.getByRole('button', { name: 'First' })
+  fireEvent.click(button)
+  expect(button).toBeDisabled()
+  expect(first).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Second' })).toBeEnabled()
 })

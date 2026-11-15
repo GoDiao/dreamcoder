@@ -34,6 +34,7 @@ type WorkspaceApiMocks = {
   getWorkspaceFileMock: ReturnType<typeof vi.fn>
   getWorkspaceDiffMock: ReturnType<typeof vi.fn>
   listSideChatsMock: ReturnType<typeof vi.fn>
+  branchMock: ReturnType<typeof vi.fn>
 }
 
 var mocks: WorkspaceApiMocks | undefined
@@ -338,15 +339,18 @@ vi.mock('../chat/UiPageFrame', async (importOriginal) => {
   }
 })
 
+const sideChatRenders = vi.hoisted(() => [] as Array<{ sessionId: string; focusInput: boolean }>)
+
 vi.mock('../chat/SessionConversation', () => ({
-  SessionConversation: ({ sessionId, compact, primary }: { sessionId: string; compact?: boolean; primary?: boolean }) => (
-    <div data-testid="side-chat-conversation" data-session={sessionId} data-compact={String(compact)} data-primary={String(primary)} />
-  ),
+  SessionConversation: ({ sessionId, compact, primary, focusInput = false }: { sessionId: string; compact?: boolean; primary?: boolean; focusInput?: boolean }) => {
+    sideChatRenders.push({ sessionId, focusInput })
+    return <div data-testid="side-chat-conversation" data-session={sessionId} data-compact={String(compact)} data-primary={String(primary)} />
+  },
 }))
 
 const sideChatActions = vi.hoisted(() => ({ closeSideChat: vi.fn(async () => {}), detachSideChat: vi.fn(async () => {}) }))
 
-vi.mock('../../lib/sideChats', () => sideChatActions)
+vi.mock('../../lib/sideChats', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/sideChats')>()), ...sideChatActions }))
 
 vi.mock('../../api/sessions', () => ({
   sessionsApi: (() => {
@@ -357,6 +361,7 @@ vi.mock('../../api/sessions', () => ({
         getWorkspaceFileMock: vi.fn(),
         getWorkspaceDiffMock: vi.fn(),
         listSideChatsMock: vi.fn(async () => ({ sessions: [] })),
+        branchMock: vi.fn(),
       }
     }
 
@@ -366,6 +371,7 @@ vi.mock('../../api/sessions', () => ({
       getWorkspaceFile: mocks.getWorkspaceFileMock,
       getWorkspaceDiff: mocks.getWorkspaceDiffMock,
       listSideChats: mocks.listSideChatsMock,
+      branch: mocks.branchMock,
     }
   })(),
 }))
@@ -2007,6 +2013,26 @@ describe('WorkspacePanel', () => {
     })
   })
 
+  it.each([
+    ['starts', undefined, null],
+    ['says why it could not start', new Error('busy'), 'Could not start a side chat: busy'],
+  ] as const)('%s a side chat from the new tab page', async (_name, failure, message) => {
+    await setWorkspaceState((state) => ({
+      ...state,
+      panelByTab: { ...state.panelByTab, 'session-launcher': panelState({ id: 'launcher', kind: 'launcher' }) },
+    }))
+    const create = vi.spyOn(useWorkspacePanelStore.getState(), 'createSideChat')
+    if (failure) create.mockRejectedValue(failure)
+    else create.mockResolvedValue('side-1')
+
+    const view = await renderPanel('session-launcher')
+    await clickElement(within(view.getByTestId('workspace-launcher')).getByRole('button', { name: 'Side chat' }))
+
+    expect(create).toHaveBeenCalledWith('session-launcher')
+    if (message) await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
+    else expect(toast.error).not.toHaveBeenCalled()
+  })
+
   it('opens tools and recent pages and files from the new tab page', async () => {
     useChatStore.setState({
       sessions: {
@@ -2100,6 +2126,44 @@ describe('WorkspacePanel', () => {
       }))
       return renderPanel('parent')
     }
+
+    function focusRequests(sessionId: string) {
+      return sideChatRenders.filter((render) => render.sessionId === sessionId && render.focusInput)
+    }
+
+    it('focuses the composer of a side chat the user just started, once', async () => {
+      sideChatRenders.length = 0
+      await setWorkspaceState((state) => ({ ...state, sideChatToFocus: 'side' }))
+
+      const view = await renderParent(sideChatTab)
+
+      expect(view.getByTestId('side-chat-conversation').dataset.session).toBe('side')
+      expect(focusRequests('side')).toHaveLength(1)
+      expect(sideChatRenders.at(-1)).toEqual({ sessionId: 'side', focusInput: false })
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBeNull()
+    })
+
+    it('focuses the side chat started from the new tab page', async () => {
+      sideChatRenders.length = 0
+      getMocks().branchMock.mockResolvedValue({ sessionId: 'side-new', title: 'btw', workDir: '/repo', sourceSessionId: 'parent' })
+      await setWorkspaceState((state) => ({ ...state, panelByTab: { ...state.panelByTab, parent: panelState({ id: 'launcher', kind: 'launcher' }) } }))
+      const view = await renderPanel('parent')
+
+      await clickElement(within(view.getByTestId('workspace-launcher')).getByRole('button', { name: 'Side chat' }))
+
+      await waitFor(() => expect(focusRequests('side-new')).toHaveLength(1))
+    })
+
+    it('leaves the focus alone for a side chat tab brought back by syncing', async () => {
+      sideChatRenders.length = 0
+      getMocks().listSideChatsMock.mockResolvedValue({ sessions: [{ id: 'side' }] })
+      await setWorkspaceState((state) => ({ ...state, panelByTab: { ...state.panelByTab, parent: panelState() } }))
+
+      const view = await renderPanel('parent')
+
+      await waitFor(() => expect(view.getByTestId('side-chat-conversation').dataset.session).toBe('side'))
+      expect(focusRequests('side')).toEqual([])
+    })
 
     it('keeps a side chat browser tab under the side chat when it mounts again in the parent panel', async () => {
       const view = await renderParent({ id: 'browser-tab', kind: 'browser', url: 'http://localhost:3000/', title: 'Dev', sessionId: 'side' })

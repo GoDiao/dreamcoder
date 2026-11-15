@@ -878,6 +878,7 @@ describe('artifact tabs', () => {
 
       const panel = useWorkspacePanelStore.getState().panelByTab.parent!
       expect(panel.tabs.map((tab) => tab.kind === 'sideChat' ? tab.sessionId : tab.kind)).toEqual(['side-kept', 'files', 'side-new'])
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBeNull()
       expect(panel.activeTabId).toBe(kept)
       expect(mocks.disconnectSession).toHaveBeenCalledWith('side-gone')
     })
@@ -989,12 +990,31 @@ describe('artifact tabs', () => {
     it('starts a side chat from the parent and shows it as a tab', async () => {
       mocks.branchMock.mockResolvedValue({ sessionId: 'side-created', title: 'btw', workDir: '/repo', sourceSessionId: 'parent' })
 
-      await useWorkspacePanelStore.getState().createSideChat('parent')
+      await expect(useWorkspacePanelStore.getState().createSideChat('parent')).resolves.toBe('side-created')
+
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBe('side-created')
 
       expect(mocks.branchMock).toHaveBeenCalledWith('parent', { kind: 'side' })
       const panel = useWorkspacePanelStore.getState().panelByTab.parent!
       expect(panel.isOpen).toBe(true)
       expect(panel.tabs).toMatchObject([{ kind: 'sideChat', sessionId: 'side-created' }])
+    })
+
+    it('asks for no focus when the side chat could not be started', async () => {
+      mocks.branchMock.mockRejectedValue(new Error('busy'))
+
+      await expect(useWorkspacePanelStore.getState().createSideChat('parent')).rejects.toThrow('busy')
+
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBeNull()
+    })
+
+    it('clears the focus request only for the side chat it names', () => {
+      useWorkspacePanelStore.setState({ sideChatToFocus: 'side-a' })
+
+      useWorkspacePanelStore.getState().clearSideChatFocus('side-b')
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBe('side-a')
+      useWorkspacePanelStore.getState().clearSideChatFocus('side-a')
+      expect(useWorkspacePanelStore.getState().sideChatToFocus).toBeNull()
     })
 
     it('disconnects the side chats of a parent that is released', () => {

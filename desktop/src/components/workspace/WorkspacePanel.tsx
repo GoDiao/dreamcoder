@@ -47,7 +47,7 @@ import { BrowserView } from './BrowserView'
 import { UiPageFrame } from '../chat/UiPageFrame'
 import { SessionConversation } from '../chat/SessionConversation'
 import { RenameSessionDialog } from '../layout/RenameSessionDialog'
-import { closeSideChat, detachSideChat } from '../../lib/sideChats'
+import { closeSideChat, detachSideChat, useStartSideChat } from '../../lib/sideChats'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
 import { SearchField } from '../shared/SearchField'
 import { useCopyAndNotify } from '../../hooks/useCopyAndNotify'
@@ -1069,9 +1069,8 @@ const EMPTY_UI_PAGES: UiPageSummary[] = []
 function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRoot: string | null }) {
   const t = useTranslation()
   const [draft, setDraft] = useState('')
-  const [creatingSideChat, setCreatingSideChat] = useState(false)
+  const sideChat = useStartSideChat(sessionId)
   const openTab = useWorkspacePanelStore((state) => state.openTab)
-  const createSideChat = useWorkspacePanelStore((state) => state.createSideChat)
   const openAddress = useWorkspacePanelStore((state) => state.openAddress)
   const selectFile = useWorkspacePanelStore((state) => state.selectFile)
   const recentFiles = useWorkspacePanelStore((state) => state.panelByTab[sessionId]?.recentFiles ?? EMPTY_IDS)
@@ -1107,17 +1106,6 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
     })
   }
 
-  const startSideChat = async () => {
-    setCreatingSideChat(true)
-    try {
-      await createSideChat(sessionId)
-    } catch (error) {
-      toast.error(t('workspace.sideChat.createFailed', { error: error instanceof Error ? error.message : String(error) }))
-    } finally {
-      setCreatingSideChat(false)
-    }
-  }
-
   return (
     <div data-testid="workspace-launcher" className="flex min-h-0 flex-1 items-center justify-center overflow-auto px-6 py-8">
       <div className="flex w-full max-w-xs flex-col gap-0.5">
@@ -1146,7 +1134,7 @@ function LauncherView({ sessionId, projectRoot }: { sessionId: string; projectRo
             </Button>
           )
         })}
-        <Button variant="ghost" size="row" loading={creatingSideChat} onClick={() => void startSideChat()}>
+        <Button variant="ghost" size="row" loading={sideChat.starting} onClick={() => void sideChat.start()}>
           <MessagesSquare className="text-subtle-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">{t('workspace.tabSideChat')}</span>
         </Button>
@@ -1248,6 +1236,15 @@ function SideChatTabTrigger({
   )
 }
 
+function SideChatView({ sessionId }: { sessionId: string }) {
+  const focusInput = useWorkspacePanelStore((state) => state.sideChatToFocus === sessionId)
+  const clearSideChatFocus = useWorkspacePanelStore((state) => state.clearSideChatFocus)
+  useEffect(() => {
+    if (focusInput) clearSideChatFocus(sessionId)
+  }, [clearSideChatFocus, focusInput, sessionId])
+  return <SessionConversation sessionId={sessionId} compact primary={false} focusInput={focusInput} />
+}
+
 function WorkspaceRefresh({ sessionId }: { sessionId: string }) {
   useWorkspaceRefresh(sessionId)
   return null
@@ -1338,7 +1335,7 @@ function OpenWorkspacePanel({ panelId: sessionId, sessionTitle, titleRowStyle, t
       case 'uiPage':
         return <UiPageTabView sessionId={tab.sessionId ?? sessionId} tab={tab} />
       case 'sideChat':
-        return <SessionConversation sessionId={tab.sessionId} compact primary={false} />
+        return <SideChatView sessionId={tab.sessionId} />
       case 'task':
         return <TaskDetail panelId={sessionId} board={tab.board} card={tab.card} poll={!tasksOnly} />
       case 'inbox':

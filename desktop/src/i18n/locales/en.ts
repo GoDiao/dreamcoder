@@ -1334,6 +1334,8 @@ export const en = {
   'chat.browserPickPending': 'An element you picked is still being read. Send again in a moment.',
   'chat.attachmentFailed': 'Could not attach {name}.',
   'chat.replyToSelection': 'Reply',
+  'chat.startSideChat': 'Start a side chat',
+  'chat.selectionActions': 'Selected text',
   'chat.branchFromHere': 'Fork a new conversation',
   'chat.branchSuccess': 'Created forked conversation "{title}".',
   'chat.branchError': 'Failed to branch from this message. Detail: {detail}',

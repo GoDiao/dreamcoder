@@ -1,5 +1,5 @@
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
-import { type DragEventHandler, type ReactNode, type RefObject, type TextareaHTMLAttributes } from 'react'
+import { useEffect, type DragEventHandler, type ReactNode, type RefObject, type TextareaHTMLAttributes } from 'react'
 import { ArrowUp, Paperclip, Plus, Square } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../shared/ui/dropdown-menu'
 import { Button } from '../shared/ui/button'
@@ -61,6 +61,7 @@ export function ComposerBox({
 }: ComposerBoxProps) {
   const ActionIcon = action.mode === 'stop' ? Square : ArrowUp
   const actionActive = action.mode === 'stop' || !action.disabled
+  useComposerTextareaHeight(textareaRef, textareaProps.value)
 
   return (
     <div
@@ -124,10 +125,29 @@ export function ComposerControls({ left, right, testId = 'composer-controls' }: 
 }
 
 /** Auto-grows a textarea from one line up to the composer's max height. */
-export function resizeComposerTextarea(el: HTMLTextAreaElement | null) {
-  if (!el) return
+function resizeComposerTextarea(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
   el.style.height = `${Math.min(el.scrollHeight, COMPOSER_TEXTAREA_MAX_HEIGHT)}px`
+}
+
+function useComposerTextareaHeight(textareaRef: RefObject<HTMLTextAreaElement | null>, value: unknown) {
+  useEffect(() => {
+    if (textareaRef.current) resizeComposerTextarea(textareaRef.current)
+  }, [textareaRef, value])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let width: number | undefined
+    const observer = new ResizeObserver(([entry]) => {
+      const nextWidth = entry?.contentRect.width
+      if (nextWidth === undefined || nextWidth === width) return
+      width = nextWidth
+      resizeComposerTextarea(el)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [textareaRef])
 }
 
 

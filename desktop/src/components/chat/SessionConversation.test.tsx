@@ -3,8 +3,8 @@ import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 vi.mock('./ChatInput', () => ({
-  ChatInput: ({ sessionId, compact, primary }: { sessionId: string; compact?: boolean; primary?: boolean }) => (
-    <div data-testid="chat-input" data-session={sessionId} data-compact={String(compact)} data-primary={String(primary)} />
+  ChatInput: ({ sessionId, compact, primary, autoFocus }: { sessionId: string; compact?: boolean; primary?: boolean; autoFocus?: boolean }) => (
+    <div data-testid="chat-input" data-session={sessionId} data-compact={String(compact)} data-primary={String(primary)} data-auto-focus={String(autoFocus)} />
   ),
 }))
 
@@ -63,6 +63,12 @@ describe('SessionConversation', () => {
     expect(screen.getByText('0 of 1 done')).toBeInTheDocument()
     expect(screen.getByTestId('chat-input').dataset).toMatchObject({ session: 'side', compact: 'true', primary: 'false' })
     expect(container.querySelector('[data-session-view="side"]')).not.toBeNull()
+  })
+
+  it('passes a focus request on to its composer', () => {
+    render(<SessionConversation sessionId="side" compact primary={false} focusInput />)
+
+    expect(screen.getByTestId('chat-input').dataset.autoFocus).toBe('true')
   })
 
   it('shows the conversation, not the new-session placeholder, while a side chat’s history loads', () => {

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { Popover, PopoverAnchor, PopoverContent } from './ui/popover'
 import { Button } from './ui/button'
 
@@ -8,10 +8,16 @@ export type SelectionPopoverQuote = {
   clear: () => void
 }
 
-export function SelectionPopover({ quote, label, onAdd }: {
+export type SelectionPopoverAction = {
+  label: string
+  onSelect: () => void
+  loading?: boolean
+}
+
+export function SelectionPopover({ quote, label, actions }: {
   quote: SelectionPopoverQuote
   label: string
-  onAdd: () => void
+  actions: SelectionPopoverAction[]
 }) {
   const { selection } = quote
   const x = selection?.x ?? 0
@@ -26,9 +32,16 @@ export function SelectionPopover({ quote, label, onAdd }: {
         onMouseUp={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}
         onInteractOutside={(event) => { if (quote.contains(event.target)) event.preventDefault() }}
         onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()}>
-        <Button variant="ghost" size="xs" onMouseDown={(event) => event.preventDefault()} onClick={onAdd}>
-          {label}
-        </Button>
+        <div className="flex items-center">
+          {actions.map((action, index) => (
+            <Fragment key={action.label}>
+              {index > 0 && <span aria-hidden="true" className="h-4 w-px bg-border" />}
+              <Button variant="ghost" size="xs" loading={action.loading} onMouseDown={(event) => event.preventDefault()} onClick={action.onSelect}>
+                {action.label}
+              </Button>
+            </Fragment>
+          ))}
+        </div>
       </PopoverContent>
     </Popover>
   )

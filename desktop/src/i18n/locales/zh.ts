@@ -1336,6 +1336,8 @@ export const zh: Record<TranslationKey, string> = {
   'chat.browserPickPending': '你选取的元素还在读取中，请稍后再发送。',
   'chat.attachmentFailed': '无法添加附件 {name}。',
   'chat.replyToSelection': '回复',
+  'chat.startSideChat': '新建 side chat',
+  'chat.selectionActions': '选中的文字',
   'chat.branchFromHere': 'Fork 一个新对话',
   'chat.branchSuccess': '已 Fork 新对话“{title}”。',
   'chat.branchError': '从该消息 Fork 新对话失败。详情：{detail}',

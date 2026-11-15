@@ -11,7 +11,7 @@ import { RepositoryLaunchControls, type RepositoryLaunchError } from '../compone
 import { PermissionModeSelector } from '../components/controls/PermissionModeSelector'
 import { ModelSelector } from '../components/controls/ModelSelector'
 import { ProviderGateCard, useProviderMissing } from '../components/chat/ProviderRequiredNotice'
-import { ComposerBox, ComposerControls, resizeComposerTextarea } from '../components/chat/ComposerShell'
+import { ComposerBox, ComposerControls } from '../components/chat/ComposerShell'
 import { AttachmentGallery } from '../components/chat/AttachmentGallery'
 import { ComposerDropOverlay } from '../components/chat/ComposerDropOverlay'
 import { ContextUsageIndicator } from '../components/chat/ContextUsageIndicator'
@@ -97,10 +97,6 @@ export function EmptySession() {
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
-
-  useEffect(() => {
-    resizeComposerTextarea(textareaRef.current)
-  }, [input, providerMissing])
 
   useEffect(() => {
     let cancelled = false

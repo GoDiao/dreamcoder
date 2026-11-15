@@ -937,6 +937,58 @@ describe('ChatInput file mentions', () => {
     expect(mocks.wsSend).not.toHaveBeenCalledWith(sessionId, expect.anything())
   })
 
+  it('takes the focus in a side chat when asked to', () => {
+    const sideId = 'side-focus'
+    useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))
+    render(
+      <>
+        <button type="button">elsewhere</button>
+        <ChatInput sessionId={sideId} compact primary={false} autoFocus />
+      </>,
+    )
+
+    expect(screen.getByRole('textbox')).toHaveFocus()
+  })
+
+  it.each([
+    ['the main composer', true, true],
+    ['a side chat composer', false, false],
+  ] as const)('shows the tools menu and the controls row in %s: %s', (_name, primary, shown) => {
+    render(<ChatInput sessionId={sessionId} compact primary={primary} />)
+
+    expect(screen.queryByRole('button', { name: 'Open composer tools' }) !== null).toBe(shown)
+    expect(screen.queryByTestId('chat-input-controls') !== null).toBe(shown)
+  })
+
+  it.each([
+    ['the main composer', true, true],
+    ['a side chat composer', false, false],
+  ] as const)('takes dropped and pasted files in %s: %s', async (_name, primary, accepted) => {
+    Object.defineProperty(window, 'dreamcoderShell', { configurable: true, value: {} })
+    const droppedFile = new File(['log'], 'dropped.log', { type: 'text/plain' })
+    Object.defineProperty(droppedFile, 'path', { configurable: true, value: '/tmp/dropped.log' })
+    const dataTransfer = { types: ['Files'], files: [droppedFile], dropEffect: '' }
+    const image = new File(['png'], 'shot.png', { type: 'image/png' })
+    const imageItem = { kind: 'file', type: 'image/png', getAsFile: () => image }
+    render(<ChatInput sessionId={sessionId} compact primary={primary} />)
+
+    const panel = screen.getByTestId('chat-input-panel')
+    fireEvent.dragOver(panel, { dataTransfer })
+    expect(screen.queryByTestId('chat-input-drop-overlay') !== null).toBe(accepted)
+    fireEvent.drop(panel, { dataTransfer })
+    const imagePasteKept = fireEvent.paste(screen.getByRole('textbox'), { clipboardData: { items: [imageItem] } })
+    const textPasteKept = fireEvent.paste(screen.getByRole('textbox'), { clipboardData: { items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }] } })
+
+    expect(imagePasteKept).toBe(!accepted)
+    expect(textPasteKept).toBe(true)
+    if (accepted) expect(await screen.findByText('dropped.log')).toBeInTheDocument()
+    else {
+      await act(async () => { await Promise.resolve() })
+      expect(screen.queryByText('dropped.log')).not.toBeInTheDocument()
+      expect(screen.queryByText(/pasted-image/)).not.toBeInTheDocument()
+    }
+  })
+
   it('leaves typing elsewhere on the page alone in a side chat', () => {
     const sideId = 'side-typing'
     useChatStore.setState((state) => ({ sessions: { ...state.sessions, [sideId]: state.sessions[sessionId]! } }))

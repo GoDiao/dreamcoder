@@ -33,6 +33,7 @@ import {
   findSubagentLinks,
   shouldHideTranscriptEntry,
   subagentEntriesToMessages,
+  withoutInheritedEntries,
   type MessageEntry,
 } from '../transcript/entries.js'
 import { buildSessionTranscript } from '../transcript/history.js'
@@ -1832,7 +1833,10 @@ export class SessionService {
       throw ApiError.notFound(`Session not found: ${sessionId}`)
     }
 
-    const entries = await this.readJsonlFile(found.filePath)
+    const allEntries = await this.readJsonlFile(found.filePath)
+    const entries = sessionRelationFromEntries(allEntries).parent?.kind === 'side'
+      ? withoutInheritedEntries(allEntries)
+      : allEntries
     const messages = await this.appendSubagentToolMessages(
       found.projectDir,
       sessionId,

@@ -370,6 +370,23 @@ export function collectTaskNotifications(entries: TranscriptEntry[]): TaskNotifi
   return notifications
 }
 
+function blocksOfType(entry: TranscriptEntry, type: string): ContentBlock[] {
+  const content = entry.message?.content
+  if (!Array.isArray(content)) return []
+  return content.filter((block): block is ContentBlock => !!block && typeof block === 'object' && (block as ContentBlock).type === type)
+}
+
+export function withoutInheritedEntries<T extends TranscriptEntry>(entries: T[]): T[] {
+  const inheritedToolUseIds = new Set(
+    entries.filter((entry) => entry.forkedFrom).flatMap((entry) => blocksOfType(entry, 'tool_use').map((block) => block.id)),
+  )
+  const answersInheritedToolUses = (entry: T) => {
+    const results = blocksOfType(entry, 'tool_result')
+    return results.length > 0 && results.every((block) => inheritedToolUseIds.has(block.tool_use_id))
+  }
+  return entries.filter((entry) => !entry.forkedFrom && !answersInheritedToolUses(entry))
+}
+
 function textOf(content: unknown): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
