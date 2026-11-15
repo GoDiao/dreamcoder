@@ -218,7 +218,7 @@ describe('workspacePanelStore', () => {
 
   it('opens a typed address as a project file, or as a web page in the desktop app', async () => {
     mocks.getWorkspaceFileMock.mockImplementation(async (_sessionId: string, path: string) => (
-      path === 'src/a.ts' ? { state: 'ok', path, content: '' } : { state: 'missing', path }
+      path === 'src/a.ts' ? { state: 'text', path, content: '' } : { state: 'missing', path }
     ))
     mocks.submitBrowserInput.mockResolvedValue(undefined)
     const store = useWorkspacePanelStore.getState()

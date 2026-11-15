@@ -58,7 +58,7 @@ const SKILL: SkillDetailData = {
   files: [
     {
       path: 'SKILL.md',
-      kind: 'text',
+      state: 'text',
       content: '---\nname: skill-test\n---\n# Skill Body',
       body: '# Skill Body',
       language: 'markdown',
@@ -71,7 +71,7 @@ const SKILL: SkillDetailData = {
         model: 'sonnet',
       },
     },
-    { path: 'run.ts', kind: 'text', content: 'console.log("run")', language: 'typescript' },
+    { path: 'run.ts', state: 'text', content: 'console.log("run")', language: 'typescript' },
   ],
   skillRoot: '/tmp/skill-test',
 }
@@ -145,8 +145,8 @@ describe('SkillDetail', () => {
         ],
         files: [
           ...SKILL.files,
-          { path: 'assets/logo.png', kind: 'image', content: '', language: 'image' },
-          { path: 'tool.bin', kind: 'binary', content: '', language: 'binary' },
+          { path: 'assets/logo.png', state: 'image', content: '', language: 'image' },
+          { path: 'tool.bin', state: 'binary', content: '', language: 'binary' },
         ],
       },
     })

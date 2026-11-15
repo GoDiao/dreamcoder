@@ -211,7 +211,7 @@ describe('Settings > Skills tab', () => {
         selectedSkill: {
           meta: useSkillStore.getState().skills[0]!,
           tree: [{ name: 'SKILL.md', path: 'SKILL.md', type: 'file' }],
-          files: [{ path: 'SKILL.md', kind: 'text', content: '# Alpha', body: '# Alpha', language: 'markdown', isEntry: true }],
+          files: [{ path: 'SKILL.md', state: 'text', content: '# Alpha', body: '# Alpha', language: 'markdown', isEntry: true }],
           skillRoot: '/tmp/alpha',
         },
       })
@@ -278,7 +278,7 @@ describe('Settings > Skills tab', () => {
         files: [
           {
             path: 'SKILL.md',
-            kind: 'text',
+            state: 'text',
             content: '# Hello\n\nBody content',
             body: '# Hello\n\nBody content',
             language: 'markdown',
@@ -291,7 +291,7 @@ describe('Settings > Skills tab', () => {
           },
           {
             path: 'run.ts',
-            kind: 'text',
+            state: 'text',
             content: 'console.log("hello")',
             language: 'typescript',
             isEntry: false,
@@ -332,7 +332,7 @@ describe('Settings > Skills tab', () => {
         files: [
           {
             path: 'SKILL.md',
-            kind: 'text',
+            state: 'text',
             content: '# Access',
             body: '# Access',
             language: 'markdown',

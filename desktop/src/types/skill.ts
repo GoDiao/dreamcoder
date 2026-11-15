@@ -1,3 +1,5 @@
+import type { FilePreviewState } from '../api/sessions'
+
 export type SkillSource = 'user' | 'claudeCode' | 'project' | 'plugin' | 'mcp' | 'bundled'
 
 export type SkillMeta = {
@@ -21,9 +23,11 @@ export type FileTreeNode = {
 
 export type SkillFrontmatter = Record<string, unknown>
 
+export type SkillFileState = Exclude<FilePreviewState, 'missing' | 'error'>
+
 export type SkillFile = {
   path: string
-  kind: 'text' | 'image' | 'binary' | 'too_large'
+  state: SkillFileState
   content: string
   language: string
   frontmatter?: SkillFrontmatter

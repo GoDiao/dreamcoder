@@ -6,7 +6,7 @@ import { diffLines } from 'diff'
 import type { MessageEntry } from '../transcript/entries.js'
 import type { FileHistorySnapshot } from '../../utils/fileHistory.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { detectImageMimeType } from './imageMime.js'
+import { readFilePreview, type FilePreview } from './filePreview.js'
 import {
   isSameOrInsidePathForPlatform,
   normalizeDriveRootPathForPlatform,
@@ -74,18 +74,8 @@ export type WorkspaceStatusResult = {
   error?: string
 }
 
-export type WorkspaceReadFileResult = {
-  state: 'ok' | 'binary' | 'too_large' | 'missing' | 'error'
+export type WorkspaceReadFileResult = FilePreview & {
   path: string
-  previewType?: 'text' | 'image'
-  content?: string
-  dataUrl?: string
-  mimeType?: string
-  language: string
-  size: number
-  truncated?: boolean
-  readBytes?: number
-  error?: string
 }
 
 export type WorkspaceTreeEntry = {
@@ -393,87 +383,16 @@ export class WorkspaceService {
     filePath: string,
   ): Promise<WorkspaceReadFileResult> {
     const resolvedPath = await this.resolveWorkspacePath(sessionId, filePath)
+    const preview = await readFilePreview(resolvedPath.absolutePath, {
+      maxBytes: MAX_PREVIEW_BYTES,
+      oversize: 'truncate',
+      language: this.detectLanguage(resolvedPath.absolutePath),
+      inlineImage: true,
+      describeError: (error) =>
+        this.formatFsError('Failed to read workspace file', resolvedPath.absolutePath, error),
+    })
 
-    const stat = await this.safeStat(resolvedPath.absolutePath)
-    if (stat.kind === 'error') {
-      return {
-        state: 'error',
-        path: resolvedPath.relativePath,
-        language: this.detectLanguage(resolvedPath.absolutePath),
-        size: 0,
-        error: stat.message,
-      }
-    }
-    if (stat.kind === 'missing' || !stat.stat.isFile()) {
-      return {
-        state: 'missing',
-        path: resolvedPath.relativePath,
-        language: this.detectLanguage(resolvedPath.absolutePath),
-        size: 0,
-      }
-    }
-
-    const language = this.detectLanguage(resolvedPath.absolutePath)
-    const imageMimeType = detectImageMimeType(resolvedPath.absolutePath)
-
-    let content: Buffer
-    try {
-      if (!imageMimeType && stat.stat.size > MAX_PREVIEW_BYTES) {
-        const fileHandle = await fs.open(resolvedPath.absolutePath, 'r')
-        try {
-          const previewBuffer = Buffer.alloc(MAX_PREVIEW_BYTES)
-          const { bytesRead } = await fileHandle.read(previewBuffer, 0, MAX_PREVIEW_BYTES, 0)
-          content = previewBuffer.subarray(0, bytesRead)
-        } finally {
-          await fileHandle.close()
-        }
-      } else {
-        content = await fs.readFile(resolvedPath.absolutePath)
-      }
-    } catch (error) {
-      return {
-        state: 'error',
-        path: resolvedPath.relativePath,
-        language,
-        size: stat.stat.size,
-        error: this.formatFsError(
-          'Failed to read workspace file',
-          resolvedPath.absolutePath,
-          error,
-        ),
-      }
-    }
-    if (imageMimeType) {
-      return {
-        state: 'ok',
-        path: resolvedPath.relativePath,
-        previewType: 'image',
-        dataUrl: `data:${imageMimeType};base64,${content.toString('base64')}`,
-        mimeType: imageMimeType,
-        language: 'image',
-        size: stat.stat.size,
-      }
-    }
-
-    if (content.includes(0)) {
-      return {
-        state: 'binary',
-        path: resolvedPath.relativePath,
-        language: 'binary',
-        size: stat.stat.size,
-      }
-    }
-
-    return {
-      state: 'ok',
-      path: resolvedPath.relativePath,
-      previewType: 'text',
-      content: content.toString('utf8'),
-      language,
-      size: stat.stat.size,
-      truncated: content.length < stat.stat.size,
-      readBytes: content.length,
-    }
+    return { ...preview, path: resolvedPath.relativePath }
   }
 
   async readTree(
@@ -650,7 +569,7 @@ export class WorkspaceService {
     if (change.diff?.trim()) return change.diff
 
     const file = await this.readFile(sessionId, relativePath)
-    if (file.state !== 'ok' || file.previewType === 'image' || typeof file.content !== 'string') {
+    if (file.state !== 'text' || typeof file.content !== 'string') {
       return null
     }
     return this.buildSyntheticDiff('/dev/null', relativePath, '', file.content)

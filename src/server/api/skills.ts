@@ -13,7 +13,7 @@ import { isCommandEnabled } from '../../types/command.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import type { LoadedPlugin } from '../../types/plugin.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { detectImageMimeType } from '../services/imageMime.js'
+import { readFilePreview, type FilePreviewState } from '../services/filePreview.js'
 
 type SkillMeta = {
   name: string
@@ -37,9 +37,11 @@ type FileTreeNode = {
   children?: FileTreeNode[]
 }
 
+type SkillFileState = Exclude<FilePreviewState, 'missing' | 'error'>
+
 type SkillFile = {
   path: string
-  kind: 'text' | 'image' | 'binary' | 'too_large'
+  state: SkillFileState
   content: string
   language: string
   frontmatter?: Record<string, unknown>
@@ -127,17 +129,28 @@ async function loadSkillMeta(
   }
 }
 
-async function readSkillFile(fullPath: string, relPath: string): Promise<SkillFile> {
-  if (detectImageMimeType(fullPath)) return { path: relPath, kind: 'image', content: '', language: 'image' }
-  const { size } = await fs.stat(fullPath)
+async function readSkillFile(fullPath: string, relPath: string): Promise<SkillFile | null> {
   const language = detectLanguage(path.basename(fullPath))
-  if (size > MAX_FILE_SIZE) return { path: relPath, kind: 'too_large', content: '', language }
-  const data = await fs.readFile(fullPath)
-  if (data.includes(0)) return { path: relPath, kind: 'binary', content: '', language: 'binary' }
-  const content = data.toString('utf8')
-  if (relPath !== 'SKILL.md' || language !== 'markdown') return { path: relPath, kind: 'text', content, language }
-  const { frontmatter, body } = normalizeFrontmatter(content, fullPath)
-  return { path: relPath, kind: 'text', content, body, frontmatter, language, isEntry: true }
+  const preview = await readFilePreview(fullPath, { maxBytes: MAX_FILE_SIZE, oversize: 'refuse', language })
+
+  if (preview.state === 'missing') return null
+
+  if (preview.state === 'error') {
+    console.error('[Skills] Failed to read skill file:', fullPath, preview.error)
+    return null
+  }
+
+  const file: SkillFile = {
+    path: relPath,
+    state: preview.state,
+    content: preview.content ?? '',
+    language: preview.language,
+  }
+
+  if (file.state !== 'text' || relPath !== 'SKILL.md' || language !== 'markdown') return file
+
+  const { frontmatter, body } = normalizeFrontmatter(file.content, fullPath)
+  return { ...file, body, frontmatter, isEntry: true }
 }
 
 async function buildFileTree(
@@ -181,7 +194,9 @@ async function buildFileTree(
         if (node.children!.length === 0) delete node.children
       } else if (entry.isFile()) {
         try {
-          files.push(await readSkillFile(fullPath, relPath))
+          const file = await readSkillFile(fullPath, relPath)
+          if (!file) continue
+          files.push(file)
           nodes.push({ name: entry.name, path: relPath, type: 'file' })
           fileCount++
         } catch (error) {

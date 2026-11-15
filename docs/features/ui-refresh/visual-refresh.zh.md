@@ -36,7 +36,7 @@
 
 **服务端。** [openTargetService.ts](../../../src/server/services/openTargetService.ts) 的 `resolveOpenPath` 允许文件：编辑器直接打开文件，文件管理器打开它所在的目录。
 
-**技能详情页（第二轮）。** [SkillDetail.tsx](../../../desktop/src/components/skills/SkillDetail.tsx) 用 `Tabs` 新增的 `line` 变体做两个标签；[SkillFileTree.tsx](../../../desktop/src/components/skills/SkillFileTree.tsx) 用 `@pierre/trees` 显示文件树，样式与 Files 标签共用 [fileTreeCss.ts](../../../desktop/src/components/shared/fileTreeCss.ts)。设置页的内容区改成纵向弹性布局，详情页铺满剩余高度，「内容」标签的树和预览在面板内滚动，不再让整个设置页滚动。服务端 [skills.ts](../../../src/server/api/skills.ts) 给每个文件标 `kind`（`text`、`image`、`binary`、`too_large`），路径统一用 `/` 分隔；图片不随详情一起返回，选中时由页面通过 `/api/filesystem/file` 加载。图片扩展名到 MIME 类型的对应表只有一份，在 [imageMime.ts](../../../src/server/services/imageMime.ts)，技能详情、Files 预览和 `/api/filesystem/file` 共用。
+**技能详情页（第二轮）。** [SkillDetail.tsx](../../../desktop/src/components/skills/SkillDetail.tsx) 用 `Tabs` 新增的 `line` 变体做两个标签；[SkillFileTree.tsx](../../../desktop/src/components/skills/SkillFileTree.tsx) 用 `@pierre/trees` 显示文件树，样式与 Files 标签共用 [fileTreeCss.ts](../../../desktop/src/components/shared/fileTreeCss.ts)。设置页的内容区改成纵向弹性布局，详情页铺满剩余高度，「内容」标签的树和预览在面板内滚动，不再让整个设置页滚动。服务端 [skills.ts](../../../src/server/api/skills.ts) 给每个文件标 `state`（`text`、`image`、`binary`、`too_large`），路径统一用 `/` 分隔；图片不随详情一起返回，选中时由页面通过 `/api/filesystem/file` 加载。图片扩展名到 MIME 类型的对应表只有一份，在 [imageMime.ts](../../../src/server/services/imageMime.ts)，技能详情、Files 预览和 `/api/filesystem/file` 共用。
 
 ## 检查
 

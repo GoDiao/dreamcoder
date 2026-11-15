@@ -242,10 +242,11 @@ export type WorkspaceStatusResult = {
   error?: string
 }
 
+export type FilePreviewState = 'text' | 'image' | 'binary' | 'too_large' | 'missing' | 'error'
+
 export type WorkspaceReadFileResult = {
-  state: 'ok' | 'binary' | 'too_large' | 'missing' | 'error'
+  state: FilePreviewState
   path: string
-  previewType?: 'text' | 'image'
   content?: string
   dataUrl?: string
   mimeType?: string

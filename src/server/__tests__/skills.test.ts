@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -241,14 +241,38 @@ describe('Skills API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json() as {
-      detail: { files: Array<{ path: string; kind: string; content: string; body?: string }> }
+      detail: { files: Array<{ path: string; state: string; content: string; body?: string }> }
     }
     const byPath = new Map(body.detail.files.map((file) => [file.path, file]))
 
-    expect(byPath.get('SKILL.md')).toMatchObject({ kind: 'text', content: skillMd, body: 'asset body' })
-    expect(byPath.get('assets/logo.png')).toEqual({ path: 'assets/logo.png', kind: 'image', content: '', language: 'image' })
-    expect(byPath.get('tool.bin')).toMatchObject({ kind: 'binary', content: '' })
-    expect(byPath.get('big.txt')).toMatchObject({ kind: 'too_large', content: '' })
+    expect(byPath.get('SKILL.md')).toMatchObject({ state: 'text', content: skillMd, body: 'asset body' })
+    expect(byPath.get('assets/logo.png')).toEqual({ path: 'assets/logo.png', state: 'image', content: '', language: 'image' })
+    expect(byPath.get('tool.bin')).toMatchObject({ state: 'binary', content: '' })
+    expect(byPath.get('big.txt')).toMatchObject({ state: 'too_large', content: '' })
+  })
+
+  it.skipIf(process.platform === 'win32')('skips a skill file it cannot read, and says so', async () => {
+    const skillsRoot = path.join(tmpHome, '.claude', 'skills')
+    const skillMd = ['---', 'description: Unreadable asset', '---', '', 'asset body'].join('\n')
+    await writeSkill(skillsRoot, 'unreadable-skill', skillMd)
+    const unreadable = path.join(skillsRoot, 'unreadable-skill', 'secret.txt')
+    await fs.writeFile(unreadable, 'cannot read me')
+    await fs.chmod(unreadable, 0o000)
+
+    const errorSpy = spyOn(console, 'error')
+
+    try {
+      const { req, url, segments } = makeRequest('/api/skills/detail?source=user&name=unreadable-skill')
+      const res = await handleSkillsApi(req, url, segments)
+      const body = await res.json() as { detail: { files: Array<{ path: string }> } }
+
+      expect(res.status).toBe(200)
+      expect(body.detail.files.map(file => file.path)).not.toContain('secret.txt')
+      expect(errorSpy.mock.calls.some(call => String(call[0]).includes('Failed to read skill file'))).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+      await fs.chmod(unreadable, 0o600)
+    }
   })
 
   it('lists plugin skills after reload rereads an external enable toggle', async () => {

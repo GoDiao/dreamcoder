@@ -359,7 +359,7 @@ describe('WorkspaceService', () => {
     await fs.mkdir(path.join(workDir, 'folder'))
 
     await expect(service.readFile('session-1', 'note.ts')).resolves.toMatchObject({
-      state: 'ok',
+      state: 'text',
       language: 'typescript',
       size: 25,
       content: 'export const answer = 42\n',
@@ -370,8 +370,7 @@ describe('WorkspaceService', () => {
       size: 4,
     })
     await expect(service.readFile('session-1', 'image.png')).resolves.toMatchObject({
-      state: 'ok',
-      previewType: 'image',
+      state: 'image',
       language: 'image',
       mimeType: 'image/png',
       dataUrl: 'data:image/png;base64,iVBORwA=',
@@ -379,16 +378,14 @@ describe('WorkspaceService', () => {
     })
     const largeImage = await service.readFile('session-1', 'large-image.png')
     expect(largeImage).toMatchObject({
-      state: 'ok',
-      previewType: 'image',
+      state: 'image',
       language: 'image',
       mimeType: 'image/png',
       size: ONE_MIB + 5,
     })
     expect(largeImage.dataUrl).toStartWith('data:image/png;base64,')
     await expect(service.readFile('session-1', 'large.txt')).resolves.toMatchObject({
-      state: 'ok',
-      previewType: 'text',
+      state: 'text',
       language: 'text',
       size: ONE_MIB + 1,
       readBytes: ONE_MIB,

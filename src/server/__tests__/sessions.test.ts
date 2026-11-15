@@ -2761,7 +2761,7 @@ describe('Sessions API', () => {
       size: number
     }
     expect(fileBody).toMatchObject({
-      state: 'ok',
+      state: 'text',
       path: 'src/app.ts',
       language: 'typescript',
       size: 25,
@@ -2895,9 +2895,8 @@ describe('Sessions API', () => {
     )
     expect(fileRes.status).toBe(200)
     expect(await fileRes.json()).toMatchObject({
-      state: 'ok',
+      state: 'text',
       path: 'src/app.ts',
-      previewType: 'text',
       language: 'typescript',
       content: 'export const answer = 2\n',
     })
@@ -2909,14 +2908,12 @@ describe('Sessions API', () => {
     const imageBody = await imageRes.json() as {
       state: string
       path: string
-      previewType: string
       mimeType: string
       dataUrl: string
     }
     expect(imageBody).toMatchObject({
-      state: 'ok',
+      state: 'image',
       path: 'assets/pixel.png',
-      previewType: 'image',
       mimeType: 'image/png',
     })
     expect(imageBody.dataUrl).toStartWith('data:image/png;base64,')
