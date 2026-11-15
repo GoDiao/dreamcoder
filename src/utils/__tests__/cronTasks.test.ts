@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdir, writeFile, rm } from 'fs/promises'
+import { mkdir, readFile, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 
@@ -43,37 +43,31 @@ describe('updateCronTask integration', () => {
 })
 
 describe('CronTaskMeta type coverage', () => {
-  test('all UI fields are optional on CronTask', async () => {
-    // Verify all new fields exist on the type by creating tasks with them
-    const { addCronTask } = await import('../cronTasks.js')
+  test('keeps every UI field of a new task', async () => {
+    const { addCronTask, getCronFilePath } = await import('../cronTasks.js')
+    const { getSessionCronTasks, removeSessionCronTasks } = await import('../../bootstrap/state.js')
+    const projectFile = getCronFilePath()
+    const before = await readFile(projectFile, 'utf-8').catch(() => null)
+    const meta = {
+      name: 'test-name',
+      description: 'test description',
+      folder: '/test/folder',
+      model: 'claude-opus-4-7',
+      permissionMode: 'ask',
+      worktree: false,
+      frequency: 'daily',
+      scheduledTime: '09:00',
+    } as const
 
-    // Create a task with all metadata fields (durable=true writes to disk in test dir)
-    const tmpDir = join('/tmp', `cron-meta-test-${randomUUID().slice(0, 8)}`)
-    await mkdir(join(tmpDir, '.claude'), { recursive: true })
-
-    const id = await addCronTask(
-      '0 9 * * *',
-      'test prompt',
-      true, // recurring
-      true, // durable (writes to disk)
-      undefined, // agentId
-      {
-        name: 'test-name',
-        description: 'test description',
-        folder: '/test/folder',
-        model: 'claude-opus-4-7',
-        permissionMode: 'ask',
-        worktree: false,
-        frequency: 'daily',
-        scheduledTime: '09:00',
-      },
-    )
-
-    expect(typeof id).toBe('string')
-    expect(id.length).toBe(8) // Short ID
-
-    // Clean up
-    await rm(tmpDir, { recursive: true, force: true })
+    const id = await addCronTask('0 9 * * *', 'test prompt', true, false, undefined, meta)
+    try {
+      expect(id).toMatch(/^[0-9a-f]{8}$/)
+      expect(getSessionCronTasks().find(task => task.id === id)).toMatchObject({ cron: '0 9 * * *', prompt: 'test prompt', recurring: true, ...meta })
+    } finally {
+      removeSessionCronTasks([id])
+    }
+    expect(getSessionCronTasks().some(task => task.id === id)).toBe(false)
+    expect(await readFile(projectFile, 'utf-8').catch(() => null)).toBe(before)
   })
 })
 
