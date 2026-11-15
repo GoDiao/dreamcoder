@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "44683ba2-c3e1-46d4-a1c9-d39819694815",
+  "kind": "deck",
+  "title": "Creative Mode",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "opener",
+    "figures",
+    "stack",
+    "chart",
+    "process",
+    "compare",
+    "closing"
+  ]
+}

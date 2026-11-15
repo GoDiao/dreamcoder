@@ -2794,6 +2794,1486 @@
         "commit": "12d970eacc8971150e3c76470d2a9afe16dc2ed1",
         "path": "skills/swiss-creative-mode-template"
       }
+    },
+    {
+      "id": "8-bit-orbit",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "8-Bit Orbit",
+        "zh": "8 位轨道"
+      },
+      "description": {
+        "en": "Pixel-art neon arcade aesthetic on a deep navy void.",
+        "zh": "像素风的霓虹街机感，深海军蓝的虚空底色。"
+      },
+      "tags": [
+        "retro-tech",
+        "playful",
+        "cyberpunk",
+        "energetic",
+        "dark"
+      ],
+      "style": {
+        "en": "Neon arcade pixel look: deep navy void, neon pink, cyan and yellow pops, boxy digital display type with technical mono.",
+        "zh": "霓虹街机的像素风：深海军蓝底，粉、青、黄三色霓虹点缀，方正的数码标题配等宽字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/8-bit-orbit"
+      }
+    },
+    {
+      "id": "biennale-yellow",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Biennale Yellow",
+        "zh": "双年展黄"
+      },
+      "description": {
+        "en": "Solar yellow on warm parchment with deep indigo serif and atmospheric sun-glow gradients.",
+        "zh": "暖色羊皮纸上的太阳黄，深靛蓝衬线字和弥漫的日光渐变。"
+      },
+      "tags": [
+        "editorial",
+        "atmospheric",
+        "warm",
+        "cultural-institution",
+        "poster-like",
+        "light"
+      ],
+      "style": {
+        "en": "Warm cultural poster look: parchment ground, solar yellow glow, deep indigo serif headlines, grotesk body and mono labels.",
+        "zh": "温暖的文化海报感：羊皮纸底，太阳黄的光晕，深靛蓝衬线标题，配无衬线正文和等宽标签。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/biennale-yellow"
+      }
+    },
+    {
+      "id": "block-frame",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "BlockFrame",
+        "zh": "块框"
+      },
+      "description": {
+        "en": "Neobrutalist deck with pastel-neon color blocks and chunky black borders.",
+        "zh": "新粗野主义：粉彩霓虹色块配粗黑边框。"
+      },
+      "tags": [
+        "bold",
+        "playful",
+        "graphic",
+        "fresh",
+        "light"
+      ],
+      "style": {
+        "en": "Neobrutalist color blocks: off-white base, hot pink, sky blue, lime and yellow blocks in chunky black borders, bold grotesk.",
+        "zh": "新粗野主义色块：米白底，粉、天蓝、青柠、金黄色块套粗黑框，粗体无衬线字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/block-frame"
+      }
+    },
+    {
+      "id": "blue-professional",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Blue Professional",
+        "zh": "专业蓝"
+      },
+      "description": {
+        "en": "Cream paper background with electric cobalt blue accents; clean modern professional.",
+        "zh": "奶油色纸面配电光钴蓝强调，干净现代的商务风。"
+      },
+      "tags": [
+        "professional",
+        "modern",
+        "calm",
+        "trustworthy",
+        "light"
+      ],
+      "style": {
+        "en": "Clean modern business deck: warm cream paper, one electric cobalt blue accent, ink black text and soft greys.",
+        "zh": "干净现代的商务风：暖奶油纸面，只用一种电光钴蓝强调，墨黑正文配柔和的灰。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/blue-professional"
+      }
+    },
+    {
+      "id": "bold-poster",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Bold Poster",
+        "zh": "粗体海报"
+      },
+      "description": {
+        "en": "Editorial poster aesthetic with massive Shrikhand display and a single fire-engine red accent.",
+        "zh": "海报式的版面：巨大的 Shrikhand 手写体标题，只用一种消防车红做强调。"
+      },
+      "tags": [
+        "bold",
+        "editorial",
+        "loud",
+        "confident",
+        "light"
+      ],
+      "style": {
+        "en": "Loud light poster look: huge groovy Shrikhand display, editorial serif and grotesk body on white paper with one fire-engine red accent.",
+        "zh": "响亮的浅色海报风：巨大的复古手写体标题，衬线正文配无衬线小字，白纸底，只用一种正红强调。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/bold-poster"
+      }
+    },
+    {
+      "id": "broadside",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Broadside",
+        "zh": "大字报"
+      },
+      "description": {
+        "en": "Dark editorial canvas with a single fire orange accent and bilingual Latin/Chinese type stack.",
+        "zh": "深色报纸版面，只用一种火焰橙强调，带中英文字体。"
+      },
+      "tags": [
+        "editorial",
+        "dramatic",
+        "loud",
+        "newspaper",
+        "dark"
+      ],
+      "style": {
+        "en": "Dark newspaper broadside: near-black canvas, cream text, one fire-orange headline accent, condensed grotesk with Chinese sans.",
+        "zh": "深色报纸大字报：近黑底，奶油色文字，只用火焰橙标题强调，窄体无衬线配中文黑体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/broadside"
+      }
+    },
+    {
+      "id": "capsule",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Capsule",
+        "zh": "胶囊"
+      },
+      "description": {
+        "en": "Modular pill-shaped cards on warm bone with a full pastel-pop palette.",
+        "zh": "暖骨白底上的胶囊形模块卡片，整套粉彩色板。"
+      },
+      "tags": [
+        "playful",
+        "modern",
+        "warm",
+        "fresh",
+        "fun",
+        "light"
+      ],
+      "style": {
+        "en": "Playful modular pills: warm bone background, pill-shaped cards in a full pastel palette, Bodoni display with grotesk body.",
+        "zh": "活泼的胶囊模块：暖骨白底，胶囊形卡片配整套粉彩色，Bodoni 标题配无衬线正文。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/capsule"
+      }
+    },
+    {
+      "id": "cartesian",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Cartesian",
+        "zh": "笛卡尔"
+      },
+      "description": {
+        "en": "Quiet warm-neutral palette with classical Playfair serifs; tasteful and unhurried.",
+        "zh": "安静的暖中性色，古典 Playfair 衬线字，克制从容。"
+      },
+      "tags": [
+        "quiet",
+        "considered",
+        "elegant",
+        "warm-minimal",
+        "light"
+      ],
+      "style": {
+        "en": "Quiet warm-minimal deck: bone and stone neutrals with no saturated color, classical Playfair serifs and clean Inter body.",
+        "zh": "安静的暖调极简：骨白和石灰中性色，不用饱和色，古典衬线标题配干净的无衬线正文。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/cartesian"
+      }
+    },
+    {
+      "id": "cobalt-grid",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Cobalt Grid",
+        "zh": "钴蓝网格"
+      },
+      "description": {
+        "en": "Electric cobalt serifs on a graph-paper canvas, anchored by stair-stepped pixel-glitch decorations and slim hairline rules.",
+        "zh": "方格纸上的电光钴蓝衬线字，台阶状像素装饰和细线。"
+      },
+      "tags": [
+        "editorial",
+        "design-research",
+        "studious",
+        "modernist",
+        "tech-print",
+        "monochrome",
+        "light"
+      ],
+      "style": {
+        "en": "Design-research print look: ivory graph-paper canvas, electric cobalt serifs, stair-step pixel ornaments, hairline rules and mono labels.",
+        "zh": "设计研究的印刷感：象牙色方格纸底，电光钴蓝衬线字，台阶状像素装饰、细线和等宽标签。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/cobalt-grid"
+      }
+    },
+    {
+      "id": "coral",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Coral",
+        "zh": "珊瑚"
+      },
+      "description": {
+        "en": "Cream and coral on near-black, set in oversized Bebas Neue.",
+        "zh": "近黑底上的奶油色和珊瑚红，超大的 Bebas Neue 标题。"
+      },
+      "tags": [
+        "bold",
+        "warm",
+        "modern",
+        "confident",
+        "mixed"
+      ],
+      "style": {
+        "en": "Bold warm deck: near-black canvas, cream paper panels, one saturated coral accent, oversized Bebas Neue headlines with Inter body.",
+        "zh": "大胆温暖：近黑底配奶油纸面，只用珊瑚红强调，超大的窄体标题配无衬线正文。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/coral"
+      }
+    },
+    {
+      "id": "creative-mode",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Creative Mode",
+        "zh": "创作模式"
+      },
+      "description": {
+        "en": "Cream paper canvas with confident multi-color (green, pink, orange, yellow) accents and Archivo Black display.",
+        "zh": "奶油纸面配绿、粉、橙、黄多色强调，Archivo Black 标题。"
+      },
+      "tags": [
+        "creative",
+        "confident",
+        "playful",
+        "design-led",
+        "light"
+      ],
+      "style": {
+        "en": "Confident design-led deck: cream paper, forest green, hot pink, orange and mustard accents, heavy Archivo Black display.",
+        "zh": "自信的设计感：奶油纸面，森林绿、亮粉、橙、芥末黄多色强调，厚重的黑体标题。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/creative-mode"
+      }
+    },
+    {
+      "id": "daisy-days",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Daisy Days",
+        "zh": "雏菊日"
+      },
+      "description": {
+        "en": "Cheerful pastel deck with hand-drawn daisies, stars, and rainbows. Friendly, soft, and warm.",
+        "zh": "手绘雏菊、星星和彩虹的粉彩幻灯片，友好、柔和、温暖。"
+      },
+      "tags": [
+        "cheerful",
+        "playful",
+        "warm",
+        "sunny",
+        "wholesome",
+        "light"
+      ],
+      "style": {
+        "en": "Cheerful pastel deck: warm cream base, hand-drawn daisies, stars and rainbows, rounded Fredoka display with soft Quicksand body.",
+        "zh": "欢快的粉彩风：暖奶油底，手绘雏菊、星星和彩虹，圆润的标题字配柔和的正文。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/daisy-days"
+      }
+    },
+    {
+      "id": "editorial-forest",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Editorial Forest",
+        "zh": "森林社论"
+      },
+      "description": {
+        "en": "Forest green, dusty pink, and warm cream meet Source Serif 4 in a quiet, intentional quarterly-review deck.",
+        "zh": "森林绿、灰粉和暖奶油色，配 Source Serif 4，安静、用心的季度回顾。"
+      },
+      "tags": [
+        "editorial",
+        "quiet",
+        "considered",
+        "warm",
+        "intentional",
+        "mixed"
+      ],
+      "style": {
+        "en": "Quiet quarterly-review look: deep forest green, dusty pink and warm cream, Source Serif 4 headlines with JetBrains Mono labels.",
+        "zh": "安静的季度回顾：深森林绿、灰粉和暖奶油色，衬线标题配等宽标签。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/editorial-forest"
+      }
+    },
+    {
+      "id": "editorial-tri-tone",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Editorial Tri-Tone",
+        "zh": "三色社论"
+      },
+      "description": {
+        "en": "Three-color editorial system: dusty pink, mustard cream, and deep burgundy, set in Bricolage + Instrument Serif.",
+        "zh": "灰粉、芥末奶油和深酒红三色，Bricolage 配 Instrument Serif。"
+      },
+      "tags": [
+        "editorial",
+        "warm",
+        "intentional",
+        "moody",
+        "mixed"
+      ],
+      "style": {
+        "en": "Moody tri-tone editorial: dusty pink, mustard cream and deep burgundy as full-bleed blocks, Bricolage grotesk with Instrument Serif.",
+        "zh": "浓郁的三色杂志感：灰粉、芥末奶油和深酒红铺满色块，粗犷无衬线配衬线字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/editorial-tri-tone"
+      }
+    },
+    {
+      "id": "emerald-editorial",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Emerald Editorial",
+        "zh": "翡翠社论"
+      },
+      "description": {
+        "en": "A magazine-cover business deck: emerald + navy + paper, double-rule masthead ornaments, and a bold Bodoni-style display serif.",
+        "zh": "杂志封面式的商务幻灯片：翡翠绿、海军蓝和纸色，双线刊头装饰，粗壮的 Bodoni 标题。"
+      },
+      "tags": [
+        "editorial",
+        "considered",
+        "confident",
+        "magazine-cover",
+        "mixed"
+      ],
+      "style": {
+        "en": "Magazine-cover business deck: vivid emerald, deep navy and paper cream, double-rule masthead ornaments, bold Bodoni display serif.",
+        "zh": "杂志封面式的商务风：翡翠绿、深海军蓝和纸色，双线刊头装饰，粗壮的 Bodoni 衬线标题。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/emerald-editorial"
+      }
+    },
+    {
+      "id": "grove",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Grove",
+        "zh": "林间"
+      },
+      "description": {
+        "en": "Forest-green canvas with cream type, classical Playfair serifs, and a single rust accent.",
+        "zh": "森林绿底、奶油色文字、古典 Playfair 衬线字，只用一种铁锈红强调，带中文字体。"
+      },
+      "tags": [
+        "organic",
+        "considered",
+        "warm",
+        "literary",
+        "natural",
+        "mixed"
+      ],
+      "style": {
+        "en": "Organic literary deck: deep forest green canvas, bone type, classical Playfair serifs, one rust accent, with Chinese serif and sans.",
+        "zh": "自然的文学感：深森林绿底，骨白文字，古典衬线标题，只用铁锈红强调，带中文字体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/grove"
+      }
+    },
+    {
+      "id": "long-table",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Long Table",
+        "zh": "长桌"
+      },
+      "description": {
+        "en": "Warm cream and rust-red supper-club aesthetic with bold uppercase grotesk headlines, Fraunces serifs, and pill-shaped outlined buttons.",
+        "zh": "暖奶油和铁锈红的晚餐俱乐部风：大写粗体标题、Fraunces 衬线字和描边胶囊按钮。"
+      },
+      "tags": [
+        "warm",
+        "intimate",
+        "modern",
+        "friendly",
+        "small-batch",
+        "social",
+        "hospitality",
+        "light"
+      ],
+      "style": {
+        "en": "Warm supper-club look: buttery cream paper, one rust-red ink, bold uppercase grotesk headlines, Fraunces serifs and outlined pills.",
+        "zh": "温暖的晚餐俱乐部风：黄油奶油纸面，只用铁锈红，大写粗体标题，衬线字和描边胶囊。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/long-table"
+      }
+    },
+    {
+      "id": "mat",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Mat",
+        "zh": "垫"
+      },
+      "description": {
+        "en": "Dark sage canvas with bone paper and burnt-orange accent; mid-century modern with wood undertones.",
+        "zh": "深灰绿底、骨白纸面、焦橙强调，带木质调的中世纪现代风，带中文字体。"
+      },
+      "tags": [
+        "warm-modern",
+        "considered",
+        "tactile",
+        "mid-century",
+        "mixed"
+      ],
+      "style": {
+        "en": "Mid-century modern deck: muted sage canvas, bone paper, burnt-orange accent with wood undertones, Bricolage and DM Sans with Chinese sans.",
+        "zh": "中世纪现代风：灰绿底，骨白纸面，焦橙强调带木质调，粗犷无衬线配中文黑体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/mat"
+      }
+    },
+    {
+      "id": "monochrome",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Monochrome",
+        "zh": "单色"
+      },
+      "description": {
+        "en": "Ivory ledger paper with all-black type; Lora serif headlines, Jost body, no color at all.",
+        "zh": "象牙色账簿纸、全黑文字，Lora 衬线标题、Jost 正文，完全不用彩色，带中文字体。"
+      },
+      "tags": [
+        "restrained",
+        "literary",
+        "archival",
+        "ledger",
+        "light"
+      ],
+      "style": {
+        "en": "Restrained archival ledger: ivory paper, ink-black type only, Lora serif headlines, Jost body, lines and white space, Chinese fonts.",
+        "zh": "克制的档案账簿感：象牙色纸，只用墨黑，衬线标题配无衬线正文，靠线条和留白，带中文字体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/monochrome"
+      }
+    },
+    {
+      "id": "neo-grid-bold",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Neo-Grid Bold",
+        "zh": "新网格"
+      },
+      "description": {
+        "en": "Editorial neo-brutalism with a single neon yellow accent on off-white paper.",
+        "zh": "编辑式新粗野主义，米白纸面上只用一种霓虹黄强调。"
+      },
+      "tags": [
+        "confident",
+        "punchy",
+        "editorial",
+        "modern",
+        "light"
+      ],
+      "style": {
+        "en": "Punchy editorial neo-brutalism: off-white paper, ink black grid, one neon yellow accent used sparingly, Space Grotesk and mono.",
+        "zh": "有冲击力的编辑式新粗野主义：米白纸面，墨黑网格，少量霓虹黄强调，无衬线配等宽字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/neo-grid-bold"
+      }
+    },
+    {
+      "id": "peoples-platform",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "People's Platform (Block & Bold)",
+        "zh": "人民讲台"
+      },
+      "description": {
+        "en": "Activist poster energy: blue, orange, red on cream, with Alfa Slab + Caveat Brush.",
+        "zh": "行动派海报能量：奶油底上的蓝、橙、红，Alfa Slab 配 Caveat Brush 手写字。"
+      },
+      "tags": [
+        "activist",
+        "loud",
+        "graphic",
+        "honest",
+        "light"
+      ],
+      "style": {
+        "en": "Activist poster energy: cobalt blue, signal orange and warning red on cream, slab display, narrow grotesk and brush handwriting.",
+        "zh": "行动派海报：奶油底上的钴蓝、信号橙和警示红，粗衬线标题、窄体字和笔刷手写字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/peoples-platform"
+      }
+    },
+    {
+      "id": "pin-and-paper",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Pin & Paper",
+        "zh": "别针与纸"
+      },
+      "description": {
+        "en": "Yellow paper with safety-pin illustrations, ink-blue handwritten Caveat, paper-grain texture.",
+        "zh": "黄色纸面、别针插画、墨蓝手写 Caveat 字和纸张纹理。"
+      },
+      "tags": [
+        "crafted",
+        "handmade",
+        "warm",
+        "thoughtful",
+        "literary",
+        "light"
+      ],
+      "style": {
+        "en": "Handmade paper look: saturated yellow paper with grain, safety-pin drawings, ink-blue Caveat handwriting, rust, kraft and olive accents.",
+        "zh": "手作纸张感：带纹理的黄纸，别针插画，墨蓝手写字，铁锈红、牛皮纸色和橄榄绿点缀。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/pin-and-paper"
+      }
+    },
+    {
+      "id": "pink-script",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Pink Script — After Hours",
+        "zh": "粉色手稿·深夜"
+      },
+      "description": {
+        "en": "Black canvas, hot pink accent, pearl-cream paper, DM Serif Display headlines: late-night editorial luxury.",
+        "zh": "黑底、亮粉强调、珍珠白纸面，DM Serif Display 标题：深夜杂志的奢华感。"
+      },
+      "tags": [
+        "nocturnal",
+        "moody",
+        "intentional",
+        "luxe",
+        "expressive",
+        "dark"
+      ],
+      "style": {
+        "en": "Late-night editorial luxury: near-black canvas, one hot pink accent, pearl-cream paper panels, sharp serif headlines and mono labels.",
+        "zh": "深夜杂志的奢华感：近黑底色，只用一种亮粉强调，珍珠白纸面，锐利衬线标题配等宽标签。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/pink-script"
+      }
+    },
+    {
+      "id": "playful",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Playful",
+        "zh": "俏皮"
+      },
+      "description": {
+        "en": "Sun-warm peach background with Syne display: a friendly indie launch deck.",
+        "zh": "阳光般的桃色底和 Syne 标题：友好的独立产品发布风。"
+      },
+      "tags": [
+        "warm",
+        "approachable",
+        "indie",
+        "friendly",
+        "light"
+      ],
+      "style": {
+        "en": "Friendly indie launch deck: warm peach and sand backgrounds, ink-black structure, cream cards, quirky Syne display with grotesk body.",
+        "zh": "友好的独立产品发布风：暖桃色和沙色底，墨黑结构，奶油色卡片，个性标题配无衬线正文。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/playful"
+      }
+    },
+    {
+      "id": "raw-grid",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Raw Grid",
+        "zh": "原始网格"
+      },
+      "description": {
+        "en": "Neo-brutalist deck with thick borders, offset shadows, and a pink/sage/ink palette.",
+        "zh": "新粗野主义：粗边框、错位阴影、粉色、灰绿和墨黑。"
+      },
+      "tags": [
+        "raw",
+        "punchy",
+        "energetic",
+        "confident",
+        "light"
+      ],
+      "style": {
+        "en": "Raw neo-brutalist grid: white base, ink-black structure, flat soft pink and sage blocks, hard borders and offset shadows, system sans.",
+        "zh": "原始的新粗野主义网格：白底墨黑结构，平涂的粉色和灰绿块，硬边框和错位阴影。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/raw-grid"
+      }
+    },
+    {
+      "id": "retro-windows",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Retro Windows",
+        "zh": "复古视窗"
+      },
+      "description": {
+        "en": "Windows 95 chrome: gray title bars, MS Sans Serif, pixel typography, full nostalgia.",
+        "zh": "Windows 95 的界面：灰色标题栏、像素字体，满满的怀旧感。"
+      },
+      "tags": [
+        "nostalgic",
+        "retro",
+        "geeky",
+        "playful",
+        "light"
+      ],
+      "style": {
+        "en": "Nostalgic desktop chrome: 3D gray buttons, navy title bars, inset and outset borders, pixel display and terminal type.",
+        "zh": "怀旧的桌面界面：立体灰按钮、海军蓝标题栏、凹凸边框，像素标题和终端字体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/retro-windows"
+      }
+    },
+    {
+      "id": "retro-zine",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Retro Zine",
+        "zh": "复古杂志"
+      },
+      "description": {
+        "en": "Beige paper with green accent and Bebas Neue + Caveat: a riso-printed zine in HTML form.",
+        "zh": "米色纸面配一种绿色，Bebas Neue 加 Caveat：网页版的孔版印刷小志。"
+      },
+      "tags": [
+        "crafted",
+        "lo-fi",
+        "underground",
+        "warm-retro",
+        "light"
+      ],
+      "style": {
+        "en": "Lo-fi riso zine: beige paper, one saturated forest green, dark ink, Bebas Neue headlines, Caveat handwriting and grotesk body.",
+        "zh": "低保真的孔版小志：米色纸，只用一种森林绿，深色油墨，窄体标题配手写字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/retro-zine"
+      }
+    },
+    {
+      "id": "sakura-chroma",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Sakura Chroma",
+        "zh": "樱色"
+      },
+      "description": {
+        "en": "Vintage Japanese cassette-package aesthetic: cream paper, diagonal rainbow ribbons, condensed bold type, JIS-style spec checkboxes.",
+        "zh": "复古日本卡带包装风：奶油纸面、斜向彩虹色带、窄体粗字和规格勾选框，带日文字体。"
+      },
+      "tags": [
+        "retro",
+        "playful",
+        "kawaii-tech",
+        "warm",
+        "tactile",
+        "product-catalogue",
+        "light"
+      ],
+      "style": {
+        "en": "Vintage cassette packaging: cream paper, diagonal rainbow ribbons, condensed bold type, spec checkboxes, warm brown ink, Japanese font.",
+        "zh": "复古卡带包装风：奶油纸面，斜向彩虹色带，窄体粗字和规格勾选框，暖棕油墨，带日文字体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/sakura-chroma"
+      }
+    },
+    {
+      "id": "scatterbrain",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Scatterbrain",
+        "zh": "便签墙"
+      },
+      "description": {
+        "en": "Post-it inspired: pastel sticky notes, Caveat handwriting, Shrikhand and Zilla Slab type stack.",
+        "zh": "便利贴风格：粉彩便签、Caveat 手写字、Shrikhand 和 Zilla Slab。"
+      },
+      "tags": [
+        "playful",
+        "creative",
+        "warm",
+        "messy-on-purpose",
+        "workshop",
+        "light"
+      ],
+      "style": {
+        "en": "Messy workshop wall: off-white paper, pastel sticky notes, ink-brown text, Caveat handwriting, Shrikhand display and Zilla Slab.",
+        "zh": "刻意凌乱的工作坊墙：米白纸，粉彩便利贴，墨棕文字，手写字配复古粗体和衬线。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/scatterbrain"
+      }
+    },
+    {
+      "id": "signal",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Signal",
+        "zh": "信号"
+      },
+      "description": {
+        "en": "Deep navy canvas with bone paper and a single muted-gold accent; institutional with quiet weight.",
+        "zh": "深海军蓝底、骨白纸面，只用一种暗金强调，机构式的沉稳分量，带中文字体。"
+      },
+      "tags": [
+        "institutional",
+        "trustworthy",
+        "considered",
+        "weighty",
+        "mixed"
+      ],
+      "style": {
+        "en": "Institutional and weighty: deep navy canvas, bone paper alternate, one muted gold accent, Source Serif and DM Sans with Chinese fonts.",
+        "zh": "机构式的沉稳：深海军蓝底，骨白纸面交替，只用一种暗金强调，衬线配无衬线，带中文字体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/signal"
+      }
+    },
+    {
+      "id": "soft-editorial",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Soft Editorial",
+        "zh": "柔和社论"
+      },
+      "description": {
+        "en": "Cormorant Garamond serif on warm paper with sage, blush, and lemon accents.",
+        "zh": "暖纸面上的 Cormorant Garamond 衬线字，配灰绿、腮红粉和柠檬黄。"
+      },
+      "tags": [
+        "literary",
+        "elegant",
+        "quiet",
+        "warm-classical",
+        "light"
+      ],
+      "style": {
+        "en": "Literary Sunday spread: warm paper, deep ink, Cormorant Garamond serifs with Work Sans, soft sage, blush and lemon accents.",
+        "zh": "周日文艺版面：暖纸面深墨色，古典衬线配无衬线，灰绿、腮红粉和柠檬黄点缀。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/soft-editorial"
+      }
+    },
+    {
+      "id": "stencil-tablet",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Stencil & Tablet",
+        "zh": "模板与石板"
+      },
+      "description": {
+        "en": "Bone paper with stencil-cut headlines and a six-color earth palette: archaeology meets brand.",
+        "zh": "骨白纸面、镂空模板字标题和六种大地色：考古遇上品牌。"
+      },
+      "tags": [
+        "archival",
+        "earthy",
+        "tactile",
+        "considered",
+        "graphic",
+        "light"
+      ],
+      "style": {
+        "en": "Archival earthy deck: bone paper, stencil-cut headlines, sienna, magenta, orange, teal, blue and olive blocks, condensed grotesk.",
+        "zh": "考古遇上品牌：骨白纸面，镂空模板字标题，赭、洋红、橙、青、蓝、橄榄六色块，窄体字。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/stencil-tablet"
+      }
+    },
+    {
+      "id": "studio",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Studio",
+        "zh": "工作室"
+      },
+      "description": {
+        "en": "Black canvas with electric-yellow type; high-voltage design studio aesthetic.",
+        "zh": "黑底配电光黄字，高压设计工作室风，带中文字体。"
+      },
+      "tags": [
+        "electric",
+        "bold",
+        "graphic",
+        "design-led",
+        "high-contrast",
+        "dark"
+      ],
+      "style": {
+        "en": "High-voltage studio look: near-black canvas, one electric yellow for type and accent, reversing to yellow paper, condensed grotesk.",
+        "zh": "高压的工作室风：近黑底，电光黄同时做文字和强调，可反转成黄纸面，窄体无衬线。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/studio"
+      }
+    },
+    {
+      "id": "vellum",
+      "category": "slides",
+      "platform": null,
+      "scenario": null,
+      "entry": "index.html",
+      "acceptsDesignSystem": false,
+      "params": [],
+      "prompt": {
+        "en": "Keep deck.css, the fonts, the colors, the decoration and the kinds of slide of the example. Replace every text, name, number and date with the user's content, drop the slides the deck does not need from the slides list and delete their files, and copy the file of a slide of the same kind for each further slide of that kind. A layout the template lacks is built from its own fonts, colors and decoration. Page numbers come from the stage counters and are never typed; section numbers are content, so renumber them for the sections of the new deck.",
+        "zh": "保留示例的 deck.css、字体、配色、装饰和页面种类。把所有文字、名字、数字和日期换成用户的内容；用不到的页从 slides 列表里去掉并删除文件，同一种页需要更多时复制一个同种页面的文件。模板没有的版式用它自己的字体、配色和装饰来做。页码来自舞台的计数器，不要写进页面；章节号是内容，按新幻灯片的章节重新编号。"
+      },
+      "title": {
+        "en": "Vellum",
+        "zh": "羊皮纸"
+      },
+      "description": {
+        "en": "Deep navy canvas with warm-yellow Cormorant serifs and a single dusty teal accent. A quiet, scholarly aesthetic.",
+        "zh": "深海军蓝底色、暖黄 Cormorant 衬线字和一点灰青强调，安静的学术气质，带中文字体。"
+      },
+      "tags": [
+        "scholarly",
+        "literary",
+        "considered",
+        "quiet",
+        "intellectual",
+        "dark"
+      ],
+      "style": {
+        "en": "Quiet scholarly deck: deep periwinkle navy, warm yellow Cormorant serifs, DM Sans body, one dusty teal accent, with Chinese serif and sans.",
+        "zh": "安静的学术感：深蓝紫底色，暖黄古典衬线标题，干净的无衬线正文，一点灰青强调，带中文衬线和黑体。"
+      },
+      "license": {
+        "id": "MIT",
+        "file": null,
+        "copyright": "Copyright (c) 2026 Zara Zhang"
+      },
+      "author": "Zara Zhang",
+      "source": {
+        "repo": "https://github.com/zarazhangrui/beautiful-html-templates",
+        "commit": "e5e204fb1f3b06290846e7dcd7aceddabeceec8c",
+        "path": "templates/vellum"
+      }
     }
   ]
 }

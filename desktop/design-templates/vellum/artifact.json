@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "ad299c3e-ba93-4e40-ae74-af13bc36f648",
+  "kind": "deck",
+  "title": "Vellum",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "statement",
+    "text",
+    "stats",
+    "list",
+    "quote",
+    "compare",
+    "chart",
+    "end"
+  ]
+}

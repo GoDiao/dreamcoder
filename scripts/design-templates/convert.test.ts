@@ -150,7 +150,7 @@ describe('buildRecord', () => {
     expect(() => buildRecord({ ...base, metadata, curation: curation({ sourceDir: '../x' as never }) })).toThrow('unknown source folder')
   })
 
-  it('has no slides category and writes no kind', () => {
+  it('takes no slide templates, which have their own conversion, and writes no kind', () => {
     const metadata = parseFrontmatter(skill())
     expect(() => buildRecord({ ...base, metadata, curation: curation({ category: 'slides' as never }) })).toThrow('unknown category slides')
     expect('kind' in buildRecord({ ...base, metadata, curation: curation() })).toBe(false)
@@ -204,6 +204,17 @@ describe('convertTemplates', () => {
     await fs.writeFile(path.join(out, 'stale', 'index.html'), 'old')
     await run({ plain: curation() })
     expect(await fs.readdir(out)).not.toContain('stale')
+  })
+
+  it('keeps the slide templates of the catalog and their folders', async () => {
+    await writeTemplate('plain', { 'SKILL.md': skill(), 'example.html': 'x' })
+    const deck = { ...(await run({ plain: curation() })).templates[0]!, id: 'poster', category: 'slides' as const }
+    await fs.writeFile(path.join(out, 'catalog.json'), JSON.stringify({ version: 1, templates: [deck] }))
+    await fs.mkdir(path.join(out, 'poster', 'slides'), { recursive: true })
+    await fs.writeFile(path.join(out, 'poster', 'slides', 'cover.html'), '<section></section>')
+    const catalog = await run({ plain: curation() })
+    expect(catalog.templates.map(template => template.id)).toEqual(['poster', 'plain'])
+    expect(await fs.readFile(path.join(out, 'poster', 'slides', 'cover.html'), 'utf-8')).toBe('<section></section>')
   })
 
   it('fails and writes nothing when a template has no source folder, no SKILL.md or no example', async () => {

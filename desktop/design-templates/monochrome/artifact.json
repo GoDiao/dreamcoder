@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "id": "bcfa4a07-84b4-4801-ad9f-fa0df9e4b932",
+  "kind": "deck",
+  "title": "Monochrome",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "chapter",
+    "statement",
+    "split",
+    "stats",
+    "list",
+    "compare",
+    "quote",
+    "dense",
+    "chart",
+    "diagram",
+    "pie",
+    "vtimeline",
+    "cycle",
+    "pyramid",
+    "end"
+  ]
+}

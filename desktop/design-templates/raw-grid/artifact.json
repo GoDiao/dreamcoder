@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "8ffb56d1-9ebc-4b71-8646-a456d9f22762",
+  "kind": "deck",
+  "title": "Raw Grid",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "about",
+    "growth",
+    "services",
+    "featured",
+    "process",
+    "stats",
+    "quote",
+    "pricing",
+    "closing"
+  ]
+}

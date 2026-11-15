@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "f8a3b0e8-225b-47d0-9ff9-586c463663ad",
+  "kind": "deck",
+  "title": "People's Platform (Block & Bold)",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "toc",
+    "manifesto",
+    "pillars",
+    "stat",
+    "platform",
+    "quote",
+    "timeline",
+    "compare",
+    "close"
+  ]
+}

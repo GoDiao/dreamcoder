@@ -179,6 +179,17 @@ template contributors, bundled in its template folder as `LICENSE`:
 
 - `aster-atelier`
 
+## beautiful-html-templates slide templates
+
+DreamCoder bundles 34 slide templates converted from https://github.com/zarazhangrui/beautiful-html-templates
+(commit e5e204fb1f3b06290846e7dcd7aceddabeceec8c, folder `templates/`). The repository is MIT licensed,
+Copyright (c) 2026 Zara Zhang; the full text is bundled as
+`design-templates/LICENSE-beautiful-html-templates.txt`. Each template's example deck (`template.html`)
+was split into one file per slide and a shared `deck.css`, sized for a 1920 by 1080 stage, with its
+navigation script, slide counter and page-number text replaced by the DreamCoder deck stage. Its design
+note (`design.md`) is bundled as `DESIGN.md` with a notice about the conversion added after its front
+matter.
+
 ## Open Design design systems
 
 DreamCoder bundles 151 design systems (`DESIGN.md` and `tokens.css` each, with the name,

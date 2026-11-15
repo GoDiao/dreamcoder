@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "d8504dc5-b29c-403e-ba38-3857de4e4be8",
+  "kind": "deck",
+  "title": "Scatterbrain",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "quote",
+    "problem",
+    "growth",
+    "strategy",
+    "phases",
+    "moment",
+    "distribution",
+    "compare",
+    "closing"
+  ]
+}

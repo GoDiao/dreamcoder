@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "b5a54f1b-d06a-4f34-87e8-48a3e2cc6848",
+  "kind": "deck",
+  "title": "Pin & Paper",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "agenda",
+    "notes",
+    "sec",
+    "notice",
+    "chart",
+    "stats",
+    "quote",
+    "process",
+    "matrix",
+    "cta"
+  ]
+}

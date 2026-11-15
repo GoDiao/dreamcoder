@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "83dad1a4-8927-4802-b767-cb09fe1ad3bb",
+  "kind": "deck",
+  "title": "Long Table",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "manifesto",
+    "index",
+    "featured",
+    "menu",
+    "quote",
+    "cal",
+    "closing"
+  ]
+}

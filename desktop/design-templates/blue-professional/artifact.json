@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "c9a9e8c4-e80d-45bb-8c87-d1c32d9c54c9",
+  "kind": "deck",
+  "title": "Blue Professional",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "agenda",
+    "metrics",
+    "dashboard",
+    "split",
+    "bars",
+    "quote",
+    "timeline",
+    "detail",
+    "closing"
+  ]
+}

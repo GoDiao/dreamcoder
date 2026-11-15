@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "c2f0ff13-73ef-438c-89f7-336846d472f1",
+  "kind": "deck",
+  "title": "Mat",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "statement",
+    "split",
+    "stats",
+    "quote",
+    "list",
+    "compare",
+    "chart",
+    "end"
+  ]
+}

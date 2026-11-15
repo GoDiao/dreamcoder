@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "1617fd4b-ec90-4798-b409-01dd84b96238",
+  "kind": "deck",
+  "title": "Playful",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "overview",
+    "manifesto",
+    "growth",
+    "team",
+    "services",
+    "process",
+    "impact",
+    "works",
+    "closing"
+  ]
+}

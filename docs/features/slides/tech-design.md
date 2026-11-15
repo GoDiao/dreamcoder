@@ -1,6 +1,6 @@
 # 幻灯片（Slides）技术设计
 
-状态：第一阶段（格式和查看）已实现，2026-11-15，分支 `feat/slides`；第二、三阶段未做。维护者已确认的决定列在文末「已定」；已按一轮对照源码的独立审查修订（见文末「审查后的修订」），并在真实 Electron 里验证过关键假设和第一阶段的实现（见「已验证」）。实现和本文原稿不一致的地方已改进正文，并逐条列在文末「第一阶段的实现」。「现状」一节描述的是实现之前的代码（基线 `main` 的 `ee90358d`），那里的代码位置以这个提交为准。没有 PRD，目标和取舍来自维护者在对话里确认的方向。
+状态：第一阶段（格式和查看）已实现，2026-11-15，分支 `feat/slides`。第二阶段（模板和入口）已实现，34 套模板全部转换（先 3 套试点，维护者看过后批量转换其余 31 套）。第三阶段未做。维护者已确认的决定列在文末「已定」；已按一轮对照源码的独立审查修订（见文末「审查后的修订」），并在真实 Electron 里验证过关键假设和第一阶段的实现（见「已验证」）。实现和本文原稿不一致的地方已改进正文，并逐条列在文末「第一阶段的实现」。「现状」一节描述的是实现之前的代码（基线 `main` 的 `ee90358d`），那里的代码位置以这个提交为准。没有 PRD，目标和取舍来自维护者在对话里确认的方向。
 
 ## 背景
 
@@ -187,7 +187,8 @@ type ArtifactManifest = {
 - **相对路径一律从产物文件夹算起**（已验证）：图片写 `assets/chart.png`，嵌入页写 `embeds/demo.html`，不写 `../assets/...`。原因是页面文件被插进 `index.html` 这个文档里显示，浏览器按 `index.html` 的位置解析路径。`deck.css` 就在产物文件夹里，它里面的 `url()` 也是同一个基准。单独打开一个页面文件，引用会失效，这是预期内的。
 - 正文不放脚本和内联事件属性。动效用 CSS（`@keyframes`、`transition`）。
 - 需要脚本的内容用嵌入页：`<iframe src="embeds/<文件>.html">`，指向产物文件夹里的一个完整 HTML 文件，在 `deck.css` 里给它定宽高。嵌入页里可以跑脚本、引用产物文件夹里的库文件。嵌入页是完整的文档，它里面的相对路径按它自己的位置解析。
-- 页码不写进页面文件。舞台提供两个 CSS 计数器（见「舞台脚本」的「页码」），`deck.css` 里写一次，每页只放一个空元素。页面文件里不出现任何随页序变化的数字，包括小标题里的章节序号。
+- 页码不写进页面文件。舞台提供两个 CSS 计数器（见「舞台脚本」的「页码」），`deck.css` 里写一次，每页只放一个空元素。指向别的页的页码引用（目录里的 `p. 14`）也不写。
+- 章节号是内容，可以写进页面：章节扉页的大号数字、页眉的 `Chapter 02`、页脚的 `Chapter 02 of 05`。增加、删除或调换章节时，Agent 把后面受影响的章节号和「共几章」一起改对；检查回路里核对一遍（见「技能」）。
 - 分步出现：元素加 `class="fragment"`，按文档顺序一步出现一个。借用 reveal.js 的类名，因为模型熟悉；只借名字。
 - 字体可以在线加载，也可以把文件放进产物文件夹。
 
@@ -275,6 +276,8 @@ body
 - 独立 HTML：内联样式随文档一起导出；静态模式接管时再按文档里的页数写一遍，不依赖导出时带没带。
 
 **为什么**：原先 `layout.md` 让 Agent 把页码写进每一页（当时的理由是舞台不往页面里加东西）。验收时 Agent 做出来的幻灯片每页写死 `03 / 04`，小标题里还有 `02 / ARCHITECTURE`：每加一页要改所有页，第三阶段用户能调序和删除之后写死的数字会直接错。
+
+**页码和章节号分开处理**（维护者 2026-11-15 决定）。页码每页都有，完全由位置决定，用计数器。章节号是内容：分几章、哪一页是章节扉页，是写内容时定的，不随每一次加页、删页变化；第三阶段用户能直接改文字，写在页面里的章节号点开就能改，计数器生成的反而改不了。CSS 计数器也跨不了页去数章节（每页在舞台里各自一个包装元素，章节计数器要在舞台元素上重置，那是舞台的样式）。所以不为章节号加机制，交给 Agent 在改章节结构时一起改，检查回路里再核对。第一版规则把章节号也禁了，试点时 `pink-script` 的章节扉页只能显示本页页码，读者看到的是 `04` 而不是第二章的 `02`。
 
 ### 刷新
 
@@ -522,12 +525,13 @@ R -> S : 确认，或 refresh()
 - 新的内置技能 `/slides`，用户可调用，模型也可自行调用，和 `/design` 分开。注册方式同 `/design`（`src/skills/bundled/design.ts:253`）：正文短，讲总流程（访谈、选模板或从零开始、设计系统、制作、检查），具体做法放参考文件按需读取。文字自己写：
   - `format.md`：上文「页面文件」的规则，包括相对路径的基准、嵌入页的写法、按序列化后的写法写 HTML。
   - `interview.md`：先问清是演讲用还是阅读用（决定每页的内容量）、大约多少页、内容从哪来、风格或设计系统。
-  - `layout.md`：画面边距、字号下限、一页一个要点、同类页面用同一套结构；内容放不下就拆页，不缩字。页码用舞台的计数器，不写进页面；页脚这类不带序号的重复内容仍然写进每页。
-  - `checks.md`：见下面两节。
+  - `layout.md`：画面边距、字号下限、一页一个要点、同类页面用同一套结构；内容放不下就拆页，不缩字。页码用舞台的计数器，不写进页面；章节号是内容，写进页面，按章节顺序编、「共几章」和实际一致；页脚这类重复内容仍然写进每页。
+  - `checks.md`：见下面两节；最后一步按清单顺序读一遍章节号，核对连续、和所在章节对得上、「共几章」和目录与实际章节数一致。
+  - 幻灯片模板的说明里加一句：示例里的章节号和章节数是样例内容，按新幻灯片的章节结构重编。
   - 设计系统的提取方法和 `/design` 共用同一份参考内容；「怎么套用」那一步按产物种类给（见上文「设计系统」）。两个技能共用的文字（设计系统参考、访谈的通用规则、语言规则）和共用的提示词拼装放在 `src/skills/bundled/designSystemGuide.ts`。
-  - 第一阶段没有模板，流程是四步：访谈、设计系统、制作、检查。带一个已有的幻灯片产物路径调用时，提示词指明这份幻灯片并让 Agent 先读它。
+  - 流程是五步：访谈、选模板或从零开始、设计系统、制作、检查（第一阶段没有模板，是四步）。选了模板就跳过设计系统，按模板说明改：保留 `deck.css`、类名、版式和页面种类，换掉全部例子内容，多余的页从清单去掉并删文件，同一种页需要更多时复制同种页面。带一个已有的幻灯片产物路径调用时，提示词指明这份幻灯片并让 Agent 先读它，跳过选模板；这份幻灯片是从模板建的，还给出模板说明并跳过选设计系统。
 - 制作顺序：先写清单、`deck.css` 和封面，在新标签打开给用户看，再写其余页面。每加一页同时更新清单。
-- 模板索引各用各的：`/slides` 的提示词只列幻灯片模板，`/design` 的只列网页和原型（`renderDesignTemplateIndex` 的调用处按类别过滤，`src/skills/bundled/design.ts:246`）。带产物路径调用时（`/slides <产物路径>`）跳过选模板，做法同 `/design`（`src/skills/bundled/design.ts:236-244`）。
+- 模板索引各用各的：`/slides` 的提示词只列幻灯片模板，`/design` 的只列网页和原型（共用的 `templateIndexSection` 按类别过滤，`src/skills/bundled/designSystemGuide.ts`）。带产物路径调用时（`/slides <产物路径>`）跳过选模板，做法同 `/design`。选模板工具的说明改成「在 design 或 slides 技能里用」（`src/tools/ChooseDesignTemplateTool/prompt.ts`）。
 - 选模板工具接受目录里的任何模板 id，不按技能限制。两个技能各自的索引里没有对方的模板，所以不另加限制。
 - `/design` 的描述和正文加一句：要做幻灯片时改用 `/slides`。
 
@@ -549,42 +553,72 @@ R -> S : 确认，或 refresh()
 
 ## 模板
 
-- **类别**：`DesignTemplateCategory`（`src/utils/designTemplates.ts:26`）加 `slides`。
-- **模板文件夹就是一份完整的幻灯片产物**：固定入口、`artifact.json`（带 `kind: 'deck'` 和 `slides`）、`deck.css`、各页文件，加一份设计说明作为上下文文件。带清单是必须的：预览直接打开模板文件夹（`src/server/api/design.ts:44-50`），舞台脚本要读清单才知道有哪些页。
-- **从模板建产物**：`createArtifactFromTemplate` 现在总是新写一份清单并覆盖（`src/utils/designTemplates.ts:110-122`），对幻灯片会把 `slides` 丢掉，建出一份空的。改成：类别是 `slides` 时读模板自带的清单，保留 `kind` 和 `slides`，换上新的 `id`、标题、`designSystem` 和 `template`。
-- **给 Agent 的模板说明**按种类给：现在的说法是「入口文件就是要改的示例」（`designTemplateGuidance`，`src/utils/designTemplates.ts:131`），对幻灯片入口是固定的壳，要改的是 `deck.css` 和 `slides/`。
-- **来源**：[beautiful-html-templates](https://github.com/zarazhangrui/beautiful-html-templates)，固定在提交 `e5e204fb`（2026-06-09）。34 套，每套有设计说明（`design.md`）、一份约 10 页的示例幻灯片（`template.html`）和元数据（`template.json`：气质、场合、正式程度、密度、配色、字体）。frontend-slides 的模板包是它的一个子集（只有设计说明），所以直接从这个仓库收。
-- **许可**（2026-11-15 核实）：MIT，`Copyright (c) 2026 Zara Zhang`。模板里没有图片和字体文件。字体都是在线加载：主要是 Google Fonts，另有 8 套通过 CDN 加载中文字体。我们不分发字体文件；我们现有的网页模板里也有 25 个这样加载 Google Fonts。
-- **转换**（一次性，脚本放 `scripts/design-templates/`）。现有的转换和缩略图脚本是为单页模板写的，幻灯片要一条自己的路径：
-  1. 34 套全收。
-  2. 把每套的示例幻灯片拆成我们的结构：共用样式进 `deck.css`，每页一个文件，翻页脚本去掉，随视口变化的数值按比例换算到 1920×1080，生成清单。示例里依赖脚本的效果改成 CSS，或放进嵌入页。这一步由模型做，维护者抽查。
-  3. 设计说明原样带入，前面加一段声明：尺寸和结构以本设计的格式为准。
-  4. 元数据转成目录记录的标签和风格描述。
-  5. 缩略图：现有脚本用 `file://` 打开入口（`scripts/design-templates/thumbnails.ts:26`），幻灯片的入口要从保留路径取 `deck.js`、要 `fetch` 清单，`file://` 下都不行。缩略图脚本对幻灯片改为起一个只在脚本里用的本地静态服务，同时提供模板文件夹和 `deck.js`，按 1920×1080 截第一页。
-  6. 许可证和来源写进目录记录和 `THIRD_PARTY_NOTICES.md`。
-- `daisy-days` 的装饰 SVG 里有制作工具的署名注释，转换时去掉（上游的设计说明写明可以去掉）。
+- **类别**：`DesignTemplateCategory` 有 `web`、`prototype`、`slides` 三种，前后端各一份（`src/utils/designTemplates.ts`、`desktop/src/types/design.ts`）。幻灯片模板和网页、原型在同一个目录 `desktop/design-templates/catalog.json` 里。两条转换各管自己的类别：`convert.ts` 只转网页和原型，重跑时保留目录里的幻灯片记录和文件夹；`slides.ts apply` 只写幻灯片记录，保留其余的（`mergeCatalog`，`scripts/design-templates/convert.ts`）。
+- **模板文件夹就是一份完整的幻灯片产物**：固定入口、`artifact.json`（带 `kind: 'deck'` 和 `slides`）、`deck.css`、各页文件，加一份设计说明 `DESIGN.md`。带清单是必须的：预览直接打开模板文件夹（`src/server/api/design.ts`），舞台脚本要读清单才知道有哪些页。
+- **从模板建产物**：`createArtifactFromTemplate`（`src/utils/designTemplates.ts`）对 `slides` 类别先读模板自带的清单，种类不是 `deck`、没有 `slides` 或入口不对就拒绝，什么也不建；建出的清单保留 `kind` 和 `slides`，换上新的 `id`、标题、`template`。
+- **给 Agent 的模板说明按种类给**（`designTemplateGuidance`）：网页说「入口文件就是要改的示例」；幻灯片说「`index.html` 是固定的舞台文件，不改；要改的是 `deck.css`、清单里列的页和 `slides/` 下的文件，`DESIGN.md` 讲风格」。
+- **不接受设计系统**：每套幻灯片模板都是封闭的视觉系统（上游的使用说明明确要求不换字体、不换颜色），目录记录的 `acceptsDesignSystem` 一律为 `false`。要用设计系统就从零开始。
+- **目录记录**：英文标题取上游 `template.json` 的 `name`，英文简介取 `tagline`，标签取 `mood` 加 `scheme`（亮、暗、混合）；中文标题、中文简介和中英文风格描述写在 `scripts/design-templates/slide-curation.json`；生成提示词所有幻灯片模板共用一份（`SLIDE_TEMPLATE_PROMPT`，`scripts/design-templates/slides.ts`）；许可证取上游根目录的 `LICENSE`，作者 Zara Zhang；来源路径是 `templates/<id>`。
+- **来源**：[beautiful-html-templates](https://github.com/zarazhangrui/beautiful-html-templates)，固定在提交 `e5e204fb`（2026-06-09）。34 套，每套有设计说明（`design.md`）、一份约 10 页的示例幻灯片（`template.html`）和元数据（`template.json`：气质、场合、正式程度、密度、配色、字体）。frontend-slides 的模板包是它的一个子集（只有设计说明），所以直接从这个仓库收。本地克隆放在 `refs/artifacts/beautiful-html-templates`（被 git 忽略），转换脚本把它当输入读，不运行其中的任何脚本。
+- **许可**（2026-11-15 核实）：MIT，`Copyright (c) 2026 Zara Zhang`。模板里没有图片和字体文件。字体都是在线加载：主要是 Google Fonts，另有 8 套通过 Google Fonts 加载中文或日文字体（`Noto Sans SC`、`Noto Serif SC`、`Noto Sans JP`）。我们不分发字体文件；我们现有的网页模板里也有 25 个这样加载 Google Fonts。许可证全文随目录放在 `desktop/design-templates/LICENSE-beautiful-html-templates.txt`，`THIRD_PARTY_NOTICES.md` 有一条。
+
+### 转换
+
+脚本在 `scripts/design-templates/`：`slides.ts`（`draft`、`apply`、`shots` 三个命令）、`slideCss.ts`（长度换算，纯函数）、`thumbnails.ts`（加了幻灯片的路径）。无头浏览器用本机已有的 Chrome，经调试协议驱动（`scripts/lib/headlessChrome.ts`），不加依赖。每套分四步：
+
+1. **草稿**（`slides.ts draft --source <克隆> <id…>`，确定性的）。在无头 Chrome 的空白页里用浏览器自己的解析器读 `template.html`：先去掉 `script`、`noscript`、注释和所有 `on…` 属性，所以上游的脚本一行也不运行。按整理文件里的选择器取出每一页，根元素统一成 `<section>`，去掉 `active` 类和编号用的 `data-slide`、`data-index`、`data-label` 等属性，用浏览器的序列化写出页面文件（正好是 `format.md` 要求的写法）。样式：字体的 `<link>` 换成 `@import`；去掉小窗口和打印的媒体查询；按下面的规则换算长度；去掉注释和统一缩进。页面 id 取页面的种类类名（`slide-hero` → `hero`），没有就取标题，重复的加后缀。最后列出清理时要改的地方（`html`、`body` 的规则，`#id` 选择器，依赖 `.active` 的规则，`position: fixed`，靠 `opacity: 0` 藏起来的元素，自己的计数器，像 `03 / 12` 的文字，带 id 的元素）。
+2. **清理**（由模型做，逐套看截图）。按下面的清单把草稿改成能在舞台上正确显示、符合 `format.md` 和 `layout.md` 的幻灯片，并和上游截图对照。
+3. **定稿**（`slides.ts apply --source <克隆>`）。写固定入口、把标题设成上游的名字、生成 `DESIGN.md`（上游的设计说明，YAML 头之后加一段声明：来源和许可、已转换成本格式，凡是讲视口单位、导航、页码计数、脚本和单文件的地方以本格式为准）；把模板文件夹复制进一个临时的 `dc_artifacts/` 跑 `ArtifactCheck`；再做一遍机械检查（`finishProblems`）：不许有 `html`、`body` 的规则、`#id` 选择器、依赖 `.active` 的规则、`position: fixed`、写死的 `NN / NN`，不许有小于 20px 的字号。任何一条不过就失败，不写目录。通过的生成目录记录、合并进目录、复制许可证。
+4. **检查和缩略图**。`slides.ts check <id…>` 只做第 3 步的检查、不写目录，几个人同时清理不同的模板时用它（`apply` 每次重写整个目录）；检查里还有一条：模板文件夹里只能有格式规定的文件（清单、入口、`deck.css`、`DESIGN.md`、`slides/`、`embeds/`、`assets/`），转换时留下的备份文件会被拦下。`slides.ts draft` 可以用 `--out` 把草稿写到别的目录，不覆盖已清理的模板。`slides.ts shots --out <目录> <id…>` 起一个只在脚本里用的本地静态服务（同时提供模板文件夹和 `/__dreamcoder__/deck.js`），在 1920×1080 下逐页截图，并写出 `overflow()` 的结果。`thumbnails.ts slides` 用同样的方式截第一页（舞台的 `prepareCapture()` 去掉留边、等字体、结束有限的动画），再用 `sips` 压成最长边 640 的 JPEG，放 `desktop/public/design-templates/<id>.jpg`。
+
+**长度换算**。上游有两种写法：
+
+- 10 套用上游自己的 `<deck-stage>`，本来就是 1920×1080 的固定画布，像素值直接可用（整理文件里 `factor: 1`）。
+- 24 套是自适应网页：字号、间距写成 `clamp()` 和 `vw`、`vh`，固定像素（下限、边框、小字的 `10px`）是按笔记本窗口写的。照 1920 宽原样换算，标签只有 10px、正文 16px 左右，内容只占画面中间一块（上游自己的 1920×1080 截图就是这样），在侧栏里缩小显示后读不了，也不符合 `layout.md` 的字号下限。所以这些模板按「960×540 的窗口里的样子，整体放大两倍」换算（`factor: 2`）：`vw`、`vh` 按 1920×1080 的画面换算成像素（`1vw` = 19.2px），固定像素乘 2，再把只剩像素的 `clamp()`、`min()`、`max()`、`calc()` 算成一个值。效果是标签约 20px、正文约 24 到 26px、边距约 96px，和 `layout.md` 的下限基本吻合；以 `vw` 为主的大标题和上游 1920 下差不多。仍然小于下限的字号在清理时提到下限。
+
+**清理清单**（试点三套就是按这个做的，批量转换时交给转换的模型）：
+
+- 去掉 `html`、`body` 的规则，把字体、颜色、背景、字体平滑移到页面的基础类上；`*` 的重置改成 `.slide, .slide *`，不碰舞台的元素。
+- 去掉导航和计数的样式（进度条、页码浮层、圆点、按键提示、整条轨道的容器），这些元素不在页面里。
+- 基础类上去掉 `position`、`inset`、`width`、`height`、`opacity`、`transform`、`transition`、`pointer-events`、`z-index`、`flex: 0 0 …` 这些舞台负责的东西；依赖 `.active` 或 `[data-deck-active]` 的规则改成最终状态。只对 `<deck-stage>` 写的选择器（`deck-stage > section`）改成页面的类。
+- 页码：页码浮层换成每页一个空元素，样式里用 `counter(dc-slide)` 和 `counter(dc-slides)` 填，保留原来的位置、字体和颜色；页面里写死的页码（`03 / 09`、页眉里的本页页号、目录里的 `pp. 14`）去掉或换成计数器。章节号（扉页数字、`Chapter 02`、`Chapter 02 of 05`、目录的章节编号）是内容，保留上游的写法；上游自己编得前后不一致的，按页面顺序理顺。一个数字是页码还是章节号，看它是不是恰好等于本页的页序、在不同的页上是不是在给章节计数。加了页码元素之后检查对页面直接子元素的 `:last-child`、`:nth-child` 选择器是否还选得对。
+- 字号不小于 20px；文字不出画面、不互相压；页面内的 `overflow: auto` 改成 `hidden`（舞台里不该有滚动条）。
+- 例子内容可以改短来放下（例子本来就是占位内容），不改版式的结构。
+- 不改字体和颜色。
+- 页面 id 按内容起短名（`cover`、`agenda`、`growth`、`closing`），不要 `slide-3` 这种按位置的名字，也不要整句标题。
+- 判断页码的标准（维护者定）：每一页都有、数字等于页序的，不管前面写的是 `§`、`No.` 还是别的，都是页码，用计数器；只出现在章节扉页、或者同一章的各页共用同一个数字的，才是章节号。
+
+### 质量怎么保证
+
+转换者（人或模型）说转好了不算数，下面每一项都要由不依赖转换者的方式确认：
+
+- `slides.ts apply` 通过：`ArtifactCheck` 和上面的机械检查。
+- `slides.ts shots` 的 `overflow.json` 为空，或者列出的只有有意出画面的装饰。
+- 逐页看截图，和上游的截图（`screenshots/<id>-N.png`，每套 3 张）对照。
+- 在 Electron 探针里用真实的项目协议和 `deck.js` 打开每一套，跑 `overflow()`、查有没有占位页，并用应用自己的 PNG 导出逐页导出（试点就是这样验证的，见「已验证」）。
+- 最后由一个没参与转换的模型（Opus）对照上游截图和上游源码逐套审查，审查提出的问题改完再走一遍上面几项。
 
 ## 入口
 
 Slides 是独立入口，不并进 Design。
 
-- **Artifacts 页**：「新建」一栏加「Slides」方块，和 Design 并排；去掉「更多类型敬请期待」这句。
-- **Slides 开始页**：点方块进入。上方选项目，下面是幻灯片模板库（缩略图、标题、标签、搜索）和「从零开始」。
+- **Artifacts 页**：「新建」一栏是 Design 和 Slides 两个方块（调色板和 `Presentation` 图标，都带 New 角标），由一张两项的表画出来（`desktop/src/pages/ArtifactsPage.tsx`）；「更多类型敬请期待」这句和它的文案已删除。
+- **开始页**：原来的 `DesignMode` 改成按「范围」取参数的 `StartPage`（`desktop/src/components/design/StartPage.tsx`），不复制一份。范围是 `design` 或 `slides`，组件里一张表按范围给出：开始会话发的命令、可见的模板类别（design 是网页和原型，slides 只有幻灯片）、标题、没有项目时的提示、「从零开始」的提示、没有模板时的空状态、是否显示「复刻网站」（只有 design）。类别筛选只在本范围有不止一个类别时出现，「全部」只在本范围的类别里过滤。设计系统库两种范围都有。
   - 「用这个模板创建」：sidecar 把模板复制进 `dc_artifacts/<name>/` 并写清单，新开会话，发 `/slides <产物路径>`。
-  - 「从零开始」：新开会话，发 `/slides`。
-  - 可以选设计系统，做法同 Design 页。
-- **会话里输入 `/slides`**：当前会话直接开始，Agent 先访谈，再按需要用选模板工具推荐幻灯片模板。
-- **Design 页不出现幻灯片**。
-
-**实现上不复制 Design 页**：现在的 `DesignMode`（`desktop/src/components/design/DesignMode.tsx:31`）把项目选择、模板库、搜索、设计系统选择写在一个组件里。改成一个按「范围」取参数的开始页：范围决定可见的模板类别、是否显示类别筛选和「复刻网站」入口、开始会话时发的命令。Design 和 Slides 是它的两种范围。`startDesignSession`（`desktop/src/lib/startDesignSession.ts:13`）加一个命令参数，不另写一份。
+  - 「从零开始」：新开会话，发 `/slides`；选了设计系统时先把系统复制进项目，发 `/slides <系统目录>`。
+  - 模板预览在页头下面显示幻灯片工具条（翻页、页码、总览、演示），复用 `DeckControls`，只看页面上报的状态；网页模板不上报，不显示。
+- **状态**：`artifactViewStore` 的 `designing` 改成 `starting: 'design' | 'slides' | null`，方法是 `openStart(scope)` 和 `closeStart()`。
+- **开始会话**：`startDesignSession(project, command, start)`，`command` 是 `/design` 或 `/slides`，不另写一份（`desktop/src/lib/startDesignSession.ts`）。
+- **会话里输入 `/slides`**：当前会话直接开始，Agent 先访谈，再按需要用选模板工具推荐幻灯片模板。对话里选模板卡片的「预览」开的是普通浏览器标签，第一阶段的工具条在那里已经有。
+- **Design 页不出现幻灯片模板**，`/design` 的模板索引也不含（`templateIndexSection`，`src/skills/bundled/designSystemGuide.ts`，两个技能各传自己的类别）。
 
 ## 加了 `deck` 和 `slides` 之后要同步的地方
 
 种类和类别在前后端各有一份定义，TypeScript 不会全部报出来：
 
 - 产物种类：`src/utils/artifacts.ts:13`；`desktop/src/types/artifact.ts:1`；种类的显示名 `desktop/src/lib/artifactDisplay.ts:5-8`（这张表的类型是 `Record<string, …>`，漏了 `deck` 不会报错，运行时拿到空值）；i18n 的 `artifacts.kind.*`，中英文各一条。
-- 模板类别：`src/utils/designTemplates.ts:26`；`desktop/src/types/design.ts:1`；类别的显示名 `desktop/src/lib/designTemplates.ts:5-8`；`DesignMode.tsx:157` 里写死的类别列表，以及「全部」现在不过滤类别（`:69`）；选模板卡片 `DesignTemplateChoice.tsx`。
-- 转换脚本的测试里有一条断言「没有 slides 类别」（`scripts/design-templates/convert.test.ts`），要改。
+- 模板类别：`src/utils/designTemplates.ts`；`desktop/src/types/design.ts`；类别的显示名 `desktop/src/lib/designTemplates.ts` 和 i18n 的 `design.category.slides`；开始页里可见的类别由范围表决定，`filterDesignTemplates` 接受类别数组；选模板卡片 `DesignTemplateChoice.tsx` 用类别的显示名，不用改。（第二阶段已同步）
+- 网页模板的转换（`scripts/design-templates/convert.ts`）仍然只收网页和原型，它的测试改成「不收幻灯片模板、保留目录里的幻灯片模板」。
 
 ## 接口
 
@@ -649,7 +683,7 @@ Slides 是独立入口，不并进 Design。
 
 后面阶段要加的：
 
-- 第二阶段：从幻灯片模板建出的清单保留 `slides`；`/slides` 的索引只含幻灯片模板，`/design` 的不含；开始页两种范围各自的模板和命令；模板预览只有工具条没有编辑。
+- 第二阶段（已有）：从幻灯片模板建出的清单保留 `kind` 和 `slides`、清单不对时什么也不建、模板说明按种类给、内置的每套幻灯片模板复制进项目后通过 `ArtifactCheck`（`src/utils/__tests__/designTemplates.test.ts`）；`/slides` 的索引只含幻灯片模板、从模板建的幻灯片给模板说明并跳过选模板和选设计系统，`/design` 的索引不含幻灯片模板（`src/skills/bundled/slides.test.ts`、`design.test.ts`）；长度换算（`scripts/design-templates/slideCss.test.ts`）、页面 id、草稿的提示、定稿的机械检查、目录记录、`DESIGN.md` 的声明位置、定稿和合并目录（`slides.test.ts`）、网页模板转换保留幻灯片模板（`convert.test.ts`）；开始页两种范围各自的模板、命令、类别筛选和复刻卡片，模板预览有工具条（`StartPage.test.tsx`），开始会话的命令参数、store 的新状态、Artifacts 页的两个方块（各自的测试文件）。草稿步骤要用本机的 Chrome，没有单元测试，靠试点的截图验证。
 - 第三阶段：sidecar 的调序（同一组 id 通过，多一个或少一个 409）、删除页、内容写回（一致写入、不一致 409、id 不在清单里拒绝）；`order`、`edit` 触发对应接口；写回后不改标签的修改时间；编辑生成的新内容只改动目标元素、保留行内元素、不带运行状态。
 
 ## 分阶段
@@ -667,7 +701,7 @@ Slides 是独立入口，不并进 Design。
 
 结束时：Agent 能做幻灯片，用户能看、演示、评论、导出。
 
-**第二阶段：模板和入口**
+**第二阶段：模板和入口**（已实现，2026-11-15）
 
 - 模板类别及各处同步、从模板建产物保留清单、幻灯片的转换和缩略图脚本、34 套的转换和抽查。
 - `/slides` 的模板索引、开始页按范围取参数、Artifacts 页的 Slides 方块。
@@ -761,6 +795,39 @@ Slides 是独立入口，不并进 Design。
 | 独立 HTML 里没有总数时 | 把导出文件里的 `counter-reset` 删掉再打开：静态模式接管后舞台上重新有 `dc-slide 0 dc-slides 2`，PDF 仍是 `01 / 02`、`02 / 02` |
 | 打印样式 | `.dc-stage` 上带 `!important` 的规则不涉及计数器，上面几条 PDF 就是在打印样式下得到的 |
 
+### 第二阶段的 34 套模板（2026-11-15）
+
+试点三套之后，其余 31 套由 9 个子代理按「清理清单」分批清理，每套的结果由下面几项确认，不靠子代理的自述：
+
+| 要确认的事 | 结果 |
+|---|---|
+| `slides.ts apply`（`ArtifactCheck`、机械检查、多余文件） | 34 套都通过，目录里 34 条幻灯片模板 |
+| 脚本里逐页截图和 `overflow()` | 351 页；29 套为空，5 套只列出有意出画面的装饰（`cartesian` 的几何圆、`coral` 的折线、`daisy-days` 的花和云、`grove` 的水印数字、`sakura-chroma` 的彩带） |
+| 逐页看总览图并和上游截图对照 | 34 套都看过 |
+| Electron 探针：真实协议和 `deck.js`，每套跑 `overflow()`、查占位页，用 `capturePagePng` 逐页导出 | 34 套 351 页，没有占位页，`overflow()` 和脚本里的结果一致，导出的图和脚本截图一致 |
+| Opus 子代理逐套审查（只读） | 27 套「良好」；提出的问题改完后重新截图和检查，见「第二阶段的实现」 |
+
+批量时发现并修掉的转换脚本问题：
+
+- 带引号的 `url("data:…")` 里含有 `)`（6 套的噪点纹理就是这样写的）时，长度换算会把后面大段样式当成字符串跳过，那部分 `rem`、`vw`、`clamp()` 没有换算。受影响的 6 套里，2 套是倍数 1、没有视口单位，结果不变；3 套清理时已按 2 倍手工换算（和修好后的草稿核对过）；`scatterbrain` 先被按 1.5 倍重写，按修好后的草稿重做。
+- 页码检查把 `50/50` 当成了页码，现在只拦带空格的 `03 / 12` 和补零的 `03/12`；`#id` 检查把渐变里的颜色当成了选择器，现在只看选择器。
+
+### 第二阶段的试点模板（2026-11-15）
+
+`bold-poster`（浅色大字，上游是自适应网页）、`pink-script`（深色，上游是 1920 固定画布）、`vellum`（深蓝底，带中文字体，上游是自适应网页）按「转换」一节走完四步。
+
+| 要确认的事 | 结果 |
+|---|---|
+| `slides.ts apply`（`ArtifactCheck` 和机械检查） | 三套都通过 |
+| 脚本里逐页截图和 `overflow()` | 三套共 28 页，逐页看过；`overflow()` 都是空的 |
+| Electron 探针：真实的 `installBrowser`、项目协议和 `deck.js`，webview 里打开每一套 | 页数 10、9、9，没有占位页，`overflow()` 都是空的 |
+| 同一探针里用应用的 PNG 导出（`capturePagePng`，地址带 `#<id>`）逐页导出 | 28 张 1920×1080，和脚本里的截图一致 |
+| 缩略图 | 三张，都是第一页，没有留边 |
+
+清理时看截图发现并改掉的：`pink-script` 只对 `<deck-stage>` 写了页面背景，换掉选择器前整套是白底；`bold-poster` 加了页码元素后，`:last-child` 选不中最后一列，最后一列多出一条边框；`bold-poster` 的 `global` 页内容超出版心（`overflow()` 查不出来，因为没有出画面）；`pink-script` 的 `matrix` 页标题第三行压在表头上（上游也是这样）。
+
+和上游相比去掉或改了的，逐套记在下面「第二阶段的实现」。没有覆盖：示例里没有中文内容，`vellum` 的中文字体只确认了已加载样式，没有看过中文排版。
+
 ### 现有的 PNG 导出有同样的问题（本任务一并修）
 
 上面那条限制不只影响幻灯片。探针用应用现有的截图参数（`desktop/electron/pageExport.ts:41-52`）去截一个比 webview 高的普通页面（6 段不同颜色，共 3000 像素高），得到的图尺寸是对的，但内容全是第一屏的重复，后面 5 段颜色都没有出现。同一个页面放进隐藏窗口用同样的参数截，6 段颜色全部正确。
@@ -840,7 +907,7 @@ Slides 是独立入口，不并进 Design。
 | 静态模式「只有键盘操作」，没有写用哪些键进入演示 | `F` 进入演示并请求全屏，`O` 切换总览，Esc 由脚本自己退出；留边底部有一行按键提示。只在静态模式下有 | 独立文件里没有工具条，不给键就进不了演示；不给提示收到文件的人不知道有这些键 | `deck.js`（`keyActions`、`present`、`adopt`） |
 | 刷新只比较清单和页面文件 | 也比较 `deck.css` 和 `tokens.css`，变了就让 `<link>` 重新加载 | Agent 改样式是最常见的操作之一，不处理的话改了 `deck.css` 画面不变 | `deck.js`（`syncSheet`） |
 | 刷新只比较清单和页面文件，「文件变化」只指页面文本 | 也看页面直接引用的同源文件（嵌入页、图片、音视频）：用 `HEAD` 取状态码和 `ETag`，变了就只重新加载那个元素；项目协议为此加了 `ETag` 和对 `HEAD` 的处理 | 维护者验收时发现：嵌入页晚于页面写出时标签一直显示 `Not found`。Agent 之后改嵌入页、补图片也是同一个缺口 | `deck.js`（`syncReferences`、`reloadReference`）、`desktop/electron/browser.ts`（`respondWithFile`） |
-| 没有页码的机制；`layout.md` 让 Agent 把页码写进每一页 | 舞台提供 CSS 计数器 `dc-slide`、`dc-slides`；技能改成页码在 `deck.css` 里写一次，页面文件里不写任何随页序变化的数字 | 维护者验收时看到每页写死 `03 / 04`、小标题里写死章节序号；加页要改所有页，调序和删除之后会错 | `deck.js`（样式里的 `counter-increment`、`countSlides`）、`src/utils/deck.ts`、`src/skills/bundled/slides.ts` |
+| 没有页码的机制；`layout.md` 让 Agent 把页码写进每一页 | 舞台提供 CSS 计数器 `dc-slide`、`dc-slides`；技能改成页码在 `deck.css` 里写一次，页面文件里不写页码（第二阶段放宽：章节号是内容，可以写进页面，见「页码」） | 维护者验收时看到每页写死 `03 / 04`、小标题里写死章节序号；加页要改所有页，调序和删除之后会错 | `deck.js`（样式里的 `counter-increment`、`countSlides`）、`src/utils/deck.ts`、`src/skills/bundled/slides.ts` |
 | 刷新时清单读不出来的情况没有写 | 保持现有画面 | Agent 正在写清单时会读到不完整的内容 | `deck.js`（`refresh`） |
 | 引用「写明 `slides/<id>.html`」，没有写放在哪 | 放进引用的 `title`：`slides/<id>.html · 页标题` | 不改引用文本的格式和解析 | `browserGuests.ts`（`artifactReferenceLabel`） |
 | 设计系统用法说明「按产物种类给」 | `designSystemUsage` 多一个可选的种类参数；不给种类时两种都写 | `UseDesignSystem` 工具不知道系统要用在哪种产物上 | `src/utils/designSystems.ts` |
@@ -850,6 +917,42 @@ Slides 是独立入口，不并进 Design。
 | 「全屏查看本来就对所有种类提供」导出 | 全屏查看对画布不再给导出，和标签用同一个判断 | 画布导出的独立 HTML 打不开；两处不一致 | `desktop/src/lib/artifactTabs.ts`（`isExportableArtifact`）、`components/artifacts/ArtifactViewer.tsx` |
 | 工具条的位置没有写 | 地址栏下面单独一行 | 地址栏那一行已经放满；全屏查看的标题行是窗口拖动区域 | `desktop/src/components/artifacts/DeckControls.tsx` |
 | PNG 的视口「宽度、可选的高度和像素比」，网页只给宽度 | 视口总是给宽度和高度，另加 `wholePage` 说明截一屏还是截整页；网页给槽位元素的宽度和高度 | 只给宽度时主进程要自己定一个高度，用 `100vh` 排版的页面排出来和标签里不一样；取槽位而不取页面自己报的大小，是因为后者会带上 Agent 的视口模拟 | `desktop/electron/pageCapture.ts`、`desktop/src/lib/browserGuests.ts`（`browserGuestSize`）、`artifactExport.ts` |
+
+## 第二阶段的实现
+
+2026-11-15 实现机制、入口和 3 套试点。和本文原稿不一致的地方，正文已按实际做法改写，下表逐条列出。
+
+| 原稿 | 实际做法 | 原因 | 代码位置 |
+|---|---|---|---|
+| 「随视口变化的数值按比例换算到 1920×1080」 | 两种上游写法分开：固定画布的直接用；自适应的按「960×540 的窗口放大两倍」换算，见「长度换算」 | 照 1920 宽换算，标签 10px、正文 16px，不符合字号下限，侧栏里读不了 | `scripts/design-templates/slideCss.ts`、`slide-curation.json` 的 `factor` |
+| 「把每套的示例幻灯片拆成我们的结构……这一步由模型做」 | 拆页、样式和长度换算由脚本确定性地做（草稿），模型只做清理 | 长度换算每套上百处，模型手算容易错；浏览器的序列化正好是格式要求的写法 | `scripts/design-templates/slides.ts`（`draftTemplate`） |
+| 模板文件夹带「一份设计说明」 | 文件名 `DESIGN.md`，和设计系统的说明同名；声明段放在 YAML 头之后 | 放在最前面会让 YAML 头失效 | `slides.ts`（`withNotice`） |
+| 缩略图脚本「起一个本地静态服务……截第一页」 | 同时用这套服务做逐页截图和 `overflow()`（`shots` 命令）；无头 Chrome 改用调试协议驱动，以便调 `prepareCapture()` | 命令行截图调不了页面脚本，截到的是带留边的浏览模式 | `scripts/lib/headlessChrome.ts`、`slides.ts`（`serveDeck`、`openDeck`、`shootSlide`）、`thumbnails.ts` |
+| 没有写定稿时的检查 | 定稿时除了 `ArtifactCheck`，再拒绝 `html`、`body` 的规则、`#id` 选择器、`.active`、`position: fixed`、写死的 `NN / NN`、小于 20px 的字号 | 批量转换时质量不能只靠转换者自述 | `slides.ts`（`finishProblems`） |
+| 没有写幻灯片模板接不接受设计系统 | 一律不接受 | 每套是封闭的视觉系统 | `slides.ts`（`buildSlideRecord`） |
+| `DesignMode` 改成按范围取参数 | 改名为 `StartPage`；`artifactViewStore` 的 `designing` 改成 `starting`；`filterDesignTemplates` 接受类别数组 | 一个组件服务两个入口，名字跟着改 | `desktop/src/components/design/StartPage.tsx`、`desktop/src/stores/artifactViewStore.ts`、`desktop/src/lib/designTemplates.ts` |
+| 没有提开始页的模板预览 | 预览里接上 `DeckControls` | 原来的预览没有工具条，幻灯片模板只能看第一页 | `desktop/src/components/design/DesignTemplatePreview.tsx` |
+| 「页码……页面文件里不出现任何随页序变化的数字，包括小标题里的章节序号」 | 页码用计数器；章节号是内容，可以写进页面，改章节结构时一起改，检查回路里核对 | 维护者看过试点后决定，理由见「页码」 | `src/skills/bundled/slides.ts`（`format.md`、`layout.md`、`checks.md`）、`src/utils/designTemplates.ts`（`adaptTarget`）、`scripts/design-templates/slides.ts`（`SLIDE_TEMPLATE_PROMPT`） |
+| 两个技能的模板索引各自过滤 | 抽成共用的 `templateIndexSection` 和 `usedTemplateGuidance`，两个技能各传自己的类别 | 不写两遍 | `src/skills/bundled/designSystemGuide.ts` |
+
+**其余 31 套和上游相比**（逐套的清单在转换时的报告里，这里只列共同的和值得注意的）：
+
+- 共同：翻页脚本、导航、进度条、切页和入场动画去掉；页码浮层换成计数器；小于 20px 的字号提到 20px；例子内容有删短，放不下的地方收紧了间距。
+- 上游靠脚本画的图改成页面里的 SVG 或 CSS，数据、配色、类型不变，没有动画和悬停提示：`retro-windows`（三张 Chart.js 图）、`coral`、`cartesian`（两张）。上游自己画坏的图修成了能看的样子：`playful`（柱子高度塌成 0）、`neo-grid-bold`（堆叠后超过 100%，改成并排）、`8-bit-orbit`（柱高和数值本来要脚本填）。
+- `8-bit-orbit` 的星空、粒子和山脉原本由脚本生成，改成固定的静态元素。
+- `retro-windows` 是像素写死的窗口界面，按 2 倍放不下，整体用 1.5 倍；字号仍不小于 20px。这是唯一没按「长度换算」规则的一套。
+- `daisy-days` 每个装饰 SVG 自带的 `<style>` 挪进 `deck.css`；装饰按 2 倍放大后压住内容，单独缩到 1.2 倍。
+- `signal`、`grove` 的次要文字透明度调高了一点，原来在深底上读不清。这是唯一改了颜色的两套。
+- 页码按上面的标准改成计数器：`editorial-tri-tone` 每页的 `§ 03`…`§ 08`、`signal` 和 `grove` 页眉的本页页号、`broadside`、`monochrome` 等页眉里的页号。章节号保留并理顺：`neo-grid-bold` 扉页的 `02` 改成和目录一致的 `04`，`peoples-platform` 的 `Section 02` 改成和目录一致的 `03`；`pin-and-paper`、`stencil-tablet` 的阶段号在页面里没改，改的是页序（引言和数字两页挪到第三阶段的图表页后面），阶段号就不再倒退。
+- 页面 id 改成按内容起的短名（`coral`、`playful`、`raw-grid` 等 11 套原来是 `slide-3` 或整句标题）。
+
+**试点三套和上游相比**：
+
+- 三套共同：上游的翻页脚本、键盘提示、切页动画、页码浮层都不在了，翻页、页码和演示由舞台和应用的工具条提供；字体照旧在线加载。
+- `bold-poster`：去掉底部随进度变长的红条（要靠脚本）；页码浮层换成每页右下角的计数器，颜色跟随所在页（红底、深底页上原来是深色字，看不见）；封面上边距 54px 提到 72px；路线图页的小标签 18px 提到 20px；三栏页的 `overflow: auto` 改成 `hidden`；`global` 页收紧间距、把伦敦那张卡的文字改短。
+- `pink-script`：章节号保留上游的写法（扉页的大号 `02`、页眉的 `Chapter 0X`、页脚的 `Chapter 02 of 05`、目录的 `01`…`05`）。上游自己编得不一致：页眉编到 `Chapter 07`，页脚写共 5 章，目录的 5 章和页眉的顺序也对不上。按页面顺序理顺成 5 章（数字、分区、曲线、方法、对比），目录第 4、5 行改成「The Method」「The Field」，原来的「Voices & Encore」一行去掉，引言和邀请两页作收尾、页眉不带章节号。目录右栏的 `pp. 14` 这类页码引用换成一句短描述；页脚页码用计数器，当前页号保持粉色；`matrix` 页标题改成两行；表格里的小标签 16px 提到 20px。
+- `vellum`：去掉底部圆点和右下角的页码浮层；标签、说明、正文的字号从 14、16、20px 提到 20、20、24px；每页左下角注释里的 `01 / 09` 和页眉里的页号换成计数器，`[Field Note 03]` 改成 `[Field Note]`：这个 03 等于本页页序，和同一页页眉右侧的 `03`、左下角的 `03 / 09` 是同一个数，整套只有这一页叫 Field Note，不是章节或条目编号。封面的 `Essay 01` 不随页序，保留。
+- 没有标题元素的页（`bold-poster` 和 `pink-script` 的大标题是 `div`），引用和消息里用页面 id 当页名。
 
 ### 待应用内验收
 
@@ -863,3 +966,4 @@ Slides 是独立入口，不并进 Design。
 6. **评论**。在第 2 页上点选一个元素、选中一段文字各一次，引用卡片显示「产物名 / 页标题」，Agent 收到的文本里有 `slides/<id>.html`。
 7. **两种主题和两种语言**下的工具条，以及留边的底色跟随主题。
 8. **Windows**：全屏、PNG 的像素比。
+9. **Slides 入口**（第二阶段）：Artifacts 页有 Design 和 Slides 两个方块；Slides 开始页里 34 套幻灯片模板都在、缩略图正确，没有类别筛选和复刻卡片，预览能翻页；用一个模板创建后新会话收到 `/slides <产物路径>`，Agent 不再问要不要用模板，改出来的幻灯片保留模板的版式；Design 页没有幻灯片模板。sidecar 要重新构建才有新的技能文字。

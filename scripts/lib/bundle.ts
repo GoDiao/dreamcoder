@@ -11,10 +11,10 @@ export function sourceCommit(dir: string): string {
   return commit
 }
 
-export async function clearSubfolders(outDir: string): Promise<void> {
+export async function clearSubfolders(outDir: string, keep: ReadonlySet<string> = new Set()): Promise<void> {
   await mkdir(outDir, { recursive: true })
   for (const entry of await readdir(outDir, { withFileTypes: true })) {
-    if (entry.isDirectory()) await rm(join(outDir, entry.name), { recursive: true, force: true })
+    if (entry.isDirectory() && !keep.has(entry.name)) await rm(join(outDir, entry.name), { recursive: true, force: true })
   }
 }
 

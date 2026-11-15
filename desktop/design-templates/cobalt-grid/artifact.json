@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "54d5e64c-b907-494f-95eb-669d83b36e44",
+  "kind": "deck",
+  "title": "Cobalt Grid",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "manifesto",
+    "index",
+    "chapter",
+    "data",
+    "quote",
+    "table",
+    "colophon"
+  ]
+}

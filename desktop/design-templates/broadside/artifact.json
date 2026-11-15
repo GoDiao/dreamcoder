@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "id": "91a57777-e8ba-4132-9160-b02650154758",
+  "kind": "deck",
+  "title": "Broadside",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "chapter",
+    "statement",
+    "split",
+    "stats",
+    "fadelist",
+    "list",
+    "quote",
+    "compare",
+    "chart",
+    "diagram",
+    "pie",
+    "pyramid",
+    "vtimeline",
+    "cycle",
+    "end"
+  ]
+}

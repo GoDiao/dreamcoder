@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "a36a6f4c-9dcb-479e-9507-b78769e320ff",
+  "kind": "deck",
+  "title": "Signal",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "chapter",
+    "statement",
+    "split",
+    "stats",
+    "quote",
+    "list",
+    "compare",
+    "editorial",
+    "dense",
+    "statement-2",
+    "end",
+    "chart",
+    "diagram",
+    "pie",
+    "pyramid",
+    "vtimeline",
+    "cycle"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "0827f96e-de24-4c72-a834-318d134a344d",
+  "kind": "deck",
+  "title": "BlockFrame",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "services",
+    "layouts",
+    "growth",
+    "quote",
+    "process",
+    "timeline",
+    "impact",
+    "team",
+    "closing"
+  ]
+}

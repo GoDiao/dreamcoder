@@ -1,0 +1,672 @@
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,300;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
+
+:root {
+  --paper:    #F0EBDE;
+  --paper-2:  #E6E0CE;
+  --ink:      #1F2BE0;
+  --ink-soft: #5560E5;
+  --grid:     rgba(31, 43, 224, 0.10);
+  --rule:     #1F2BE0;
+}
+.slide, .slide *, .slide::before, .slide::after { box-sizing: border-box; }
+
+.slide h1, .slide h2, .slide h3, .slide p { margin: 0; font-weight: 400; }
+
+.slide {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(to right, var(--grid) 2px, transparent 2px),
+    linear-gradient(to bottom, var(--grid) 2px, transparent 2px);
+  background-size: 56px 56px;
+  font-family: 'Hanken Grotesk', 'Helvetica Neue', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.disp {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.body-tx {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.micro {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+}
+.mono {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.pagenum {
+  position: absolute;
+  right: 56px;
+  bottom: 96px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+  z-index: 9;
+}
+.pagenum::after {
+  content: counter(dc-slide, decimal-leading-zero) " / " counter(dc-slides, decimal-leading-zero);
+}
+
+.hairlines::before,
+.hairlines::after {
+  content: '';
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  height: 3px;
+  background: var(--ink);
+  z-index: 4;
+  pointer-events: none;
+}
+.hairlines::before { top: 56px; }
+.hairlines::after  { bottom: 40px; }
+
+.pixel-glitch {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+}
+.pixel-glitch svg { display: block; width: 100%; height: 100%; }
+
+.qr-block {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 3px;
+  background: var(--paper);
+  padding: 8px;
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.qr-block .px { background: var(--paper); }
+.qr-block .px.on { background: var(--ink); }
+
+
+.s-cover .titlewrap {
+  position: absolute;
+  left: 72px;
+  top: 200px;
+  z-index: 5;
+  max-width: 60%;
+}
+.s-cover .title {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 200px;
+  line-height: 0.92;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+.s-cover .subkicker {
+  margin-top: 130px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.s-cover .subkicker .l {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 26px;
+  color: var(--ink);
+}
+.s-cover .subkicker .ed {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-size: 56px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.s-cover .pixel-glitch {
+  top: 120px;
+  right: 72px;
+  width: 614px;
+  bottom: 220px;
+}
+
+.s-cover .qr-block {
+  top: 120px;
+  right: 240px;
+  width: 116px;
+  height: 116px;
+}
+
+.s-cover .vstack {
+  position: absolute;
+  right: 72px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex; flex-direction: column;
+  gap: 20px;
+  align-items: end;
+}
+.s-cover .vstack .v-row {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.s-cover .cfooter {
+
+  position: absolute;
+  left: 72px;
+  right: 400px;
+  bottom: 164px;
+  display: flex; justify-content: flex-start; align-items: end;
+  z-index: 5;
+  gap: 58px;
+}
+.s-cover .cfooter .colf {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 28px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.s-cover .cfooter .colf .ftag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 22px;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.s-manifesto .stmt-wrap {
+  position: absolute;
+  left: 154px;
+  right: 154px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  text-align: left;
+}
+.s-manifesto .stmt {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 119px;
+  line-height: 1.05;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.s-manifesto .stmt .roman {
+  font-style: normal;
+  font-weight: 500;
+}
+.s-manifesto .attr {
+  margin-top: 56px;
+  display: flex; gap: 28px; align-items: center;
+  border-top: 2px solid var(--ink);
+  padding-top: 20px;
+}
+.s-manifesto .attr .who {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 24px;
+  color: var(--ink);
+}
+.s-manifesto .attr .meta-tag {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 24px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  opacity: 0.78;
+}
+
+.s-index .frame {
+  position: absolute;
+  inset: 152px 72px 200px;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 40px;
+  z-index: 5;
+}
+.s-index .topbar {
+  display: flex; align-items: end; justify-content: space-between;
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 24px;
+  gap: 60px;
+}
+.s-index .topbar .h {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-size: 96px;
+  line-height: 0.95;
+  color: var(--ink);
+}
+.s-index .topbar .lab-tag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 24px;
+  color: var(--ink); text-align: right;
+}
+.s-index .list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  min-height: 0;
+  gap: 24px 58px;
+}
+.s-index .row { align-self: stretch; }
+.s-index .row {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 27px;
+  border-bottom: 2px solid rgba(31, 43, 224, 0.18);
+  padding-bottom: 24px;
+}
+.s-index .row .num-tag {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  padding-top: 12px;
+}
+.s-index .row h3 {
+  margin: 0 0 8px 0;
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 52px;
+  line-height: 1.05;
+  color: var(--ink);
+}
+.s-index .row p {
+  margin: 0;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 24px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.s-chapter .pixel-glitch {
+  top: 120px;
+  right: 0px;
+  width: 499px;
+  bottom: 220px;
+  opacity: 0.75;
+}
+.s-chapter .frame {
+  position: absolute;
+  left: 72px;
+  right: 576px;
+  top: 160px;
+  bottom: 220px;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  z-index: 5;
+  gap: 36px;
+}
+.s-chapter .nm-tag {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+.s-chapter .ttl {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 112px;
+  line-height: 1.0;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.s-chapter .lede {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: 56ch;
+}
+
+.s-data .frame {
+  position: absolute;
+  inset: 152px 72px 200px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 40px;
+  z-index: 5;
+}
+.s-data .topbar {
+  display: flex; align-items: end; justify-content: space-between;
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 24px;
+  gap: 60px;
+}
+.s-data .topbar .h {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-size: 92px;
+  line-height: 0.95;
+  color: var(--ink);
+}
+.s-data .topbar .lab-tag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 24px;
+  color: var(--ink); text-align: right;
+}
+.s-data .body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 0.8fr 1.6fr;
+  gap: 58px;
+}
+.s-data .col-a {
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 32px;
+}
+.s-data .stat .vbig {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 168px;
+  line-height: 0.92;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+}
+.s-data .stat .lab2 {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 26px;
+  color: var(--ink);
+  margin-top: 12px;
+}
+.s-data .stat .desc {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 24px;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: 44ch;
+  margin-top: 12px;
+}
+
+.s-data .chart {
+  min-height: 0;
+  display: flex; flex-direction: column; justify-content: end;
+  gap: 20px;
+}
+.s-data .chart .bars {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 20px;
+  align-items: end;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.s-data .chart .stack {
+  display: flex; flex-direction: column-reverse; gap: 6px;
+  height: 100%;
+}
+.s-data .chart .stack .cell {
+  flex: 1 1 0;
+  min-height: 12px;
+  background: rgba(31, 43, 224, 0.10);
+}
+.s-data .chart .stack .cell.on { background: var(--ink); }
+.s-data .chart .ticks {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 20px;
+  border-top: 3px solid var(--ink);
+  padding-top: 16px;
+}
+.s-data .chart .ticks .ticklab {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 24px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.s-quote .pixel-glitch {
+  top: 80px;
+  right: 72px;
+  width: 320px;
+  bottom: 150px;
+  opacity: 0.6;
+}
+.s-quote .qframe {
+  position: absolute;
+  left: 72px;
+  right: 440px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+}
+.s-quote .qkicker {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 24px;
+  color: var(--ink);
+  margin-bottom: 32px;
+}
+.s-quote .qbody {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 100px;
+  line-height: 1.05;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  max-width: 92%;
+}
+.s-quote .qattr {
+  margin-top: 48px;
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: end;
+  border-top: 2px solid var(--ink);
+  padding-top: 20px;
+}
+.s-quote .qattr .who-tag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 26px;
+  color: var(--ink);
+}
+.s-quote .qattr .role-meta {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 24px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  opacity: 0.78;
+}
+
+.s-table .frame {
+  position: absolute;
+  inset: 152px 72px 200px;
+  display: flex; flex-direction: column;
+  z-index: 5;
+}
+.s-table .topbar {
+  display: flex; align-items: end; justify-content: space-between;
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 24px;
+  margin-bottom: 28px;
+  gap: 60px;
+}
+.s-table .topbar .h {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-size: 92px;
+  line-height: 0.95;
+  color: var(--ink);
+}
+.s-table .topbar .lab-tag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 24px;
+  color: var(--ink); text-align: right;
+}
+.s-table .ledger {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+
+  justify-content: stretch;
+}
+.s-table .row {
+  display: grid;
+  grid-template-columns: 112px 0.9fr 1.3fr 0.7fr 0.5fr;
+  gap: 28px;
+  align-items: center;
+  padding: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  border-bottom: 2px solid rgba(31, 43, 224, 0.18);
+}
+.s-table .row.headrow {
+  border-bottom: 3px solid var(--ink);
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 12px 0;
+}
+.s-table .row.headrow > div {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 22px;
+  color: var(--ink);
+}
+.s-table .row.headrow > div:last-child { text-align: right; }
+.s-table .num-tag {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+.s-table .nm {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-size: 34px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.s-table .desc {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.s-table .mood-tag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  color: var(--ink);
+}
+.s-table .delta-tag {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 24px;
+  text-align: right;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+.s-table .delta-tag.up::before  { content: '↑ '; }
+.s-table .delta-tag.down::before { content: '↓ '; opacity: 0.6; }
+.s-table .delta-tag.flat::before { content: '— '; opacity: 0.6; }
+
+.s-colophon .pixel-glitch {
+  top: 160px;
+  left: 72px;
+  width: 499px;
+  bottom: 440px;
+  opacity: 0.75;
+}
+.s-colophon .qr-block {
+  top: 160px;
+  right: 72px;
+  width: 144px;
+  height: 144px;
+}
+.s-colophon .titlewrap {
+  position: absolute;
+  right: 72px;
+  top: 28%;
+  z-index: 5;
+  max-width: 56%;
+  text-align: right;
+}
+.s-colophon .ktag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 24px;
+  color: var(--ink);
+  margin-bottom: 28px;
+}
+.s-colophon .ttl {
+  font-family: 'Newsreader', Georgia, serif;
+
+  font-weight: 400;
+  font-size: 151px;
+  line-height: 0.96;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.s-colophon .col-footer {
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  bottom: 212px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.2fr;
+  gap: 46px;
+  z-index: 5;
+}
+.s-colophon .col-footer > div {
+  border-top: 3px solid var(--ink);
+  padding-top: 20px;
+}
+.s-colophon .col-footer .ftag {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: var(--ink);
+}
+.s-colophon .col-footer .ftxt {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 28px;
+  line-height: 1.5;
+  color: var(--ink);
+}

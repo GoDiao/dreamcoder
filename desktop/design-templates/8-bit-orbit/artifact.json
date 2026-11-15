@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "2a912a09-0c38-4381-8e68-1bee3cd27b00",
+  "kind": "deck",
+  "title": "8-Bit Orbit",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "intro",
+    "engines",
+    "growth",
+    "allocation",
+    "roadmap",
+    "vitals",
+    "quote",
+    "pricing",
+    "closing"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "478fe953-6cfc-4562-8aea-b4fb1098c80e",
+  "kind": "deck",
+  "title": "Retro Windows",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "agenda",
+    "summary",
+    "revenue",
+    "features",
+    "segments",
+    "metrics",
+    "org",
+    "roadmap",
+    "closing"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "6dbe2fe3-f4dc-4187-8877-02ddf6d2010f",
+  "kind": "deck",
+  "title": "Stencil & Tablet",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "agenda",
+    "princ",
+    "sec",
+    "consult",
+    "chart",
+    "stats",
+    "quote",
+    "process",
+    "matrix",
+    "cta"
+  ]
+}

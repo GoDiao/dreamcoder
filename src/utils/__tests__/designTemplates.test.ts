@@ -226,7 +226,7 @@ describe('the bundled catalog', () => {
     const catalog = await readDesignTemplateCatalog(dir)
     expect(catalog.templates.length).toBeGreaterThanOrEqual(8)
     const categories = new Set(catalog.templates.map(template => template.category))
-    expect([...categories].sort()).toEqual(['prototype', 'web'])
+    expect([...categories].sort()).toEqual(['prototype', 'slides', 'web'])
     expect(catalog.templates.some(template => 'kind' in template)).toBe(false)
     for (const template of catalog.templates) {
       await fs.stat(path.join(dir, template.id, template.entry))
@@ -235,6 +235,20 @@ describe('the bundled catalog', () => {
       expect(template.title.en && template.title.zh && template.description.zh && template.prompt.en && template.prompt.zh).toBeTruthy()
     }
     await fs.stat(path.join(dir, 'LICENSE-open-design.txt'))
+    await fs.stat(path.join(dir, 'LICENSE-beautiful-html-templates.txt'))
+  })
+
+  it('has slide templates that pass the deck check as they are copied into a project', async () => {
+    const dir = path.join(desktop, 'design-templates')
+    const slides = (await readDesignTemplateCatalog(dir)).templates.filter(template => template.category === 'slides')
+    expect(slides.length).toBe(34)
+    for (const template of slides) {
+      expect(template.acceptsDesignSystem).toBe(false)
+      const copy = path.join(root, 'dc_artifacts', template.id)
+      await fs.cp(path.join(dir, template.id), copy, { recursive: true })
+      expect(await checkArtifact(copy), template.id).toEqual([])
+      expect(await fs.readFile(path.join(copy, 'DESIGN.md'), 'utf-8')).toContain('beautiful-html-templates')
+    }
   })
 
   it('resolves from the development app root the sidecar is started with', async () => {

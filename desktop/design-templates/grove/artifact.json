@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "32ebd12c-e160-4430-9e82-038b819971fd",
+  "kind": "deck",
+  "title": "Grove",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "chapter",
+    "statement",
+    "split",
+    "stats",
+    "list",
+    "quote",
+    "compare",
+    "chapter-2",
+    "statement-2",
+    "chart",
+    "end"
+  ]
+}
