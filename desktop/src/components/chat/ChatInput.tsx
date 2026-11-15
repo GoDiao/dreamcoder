@@ -198,6 +198,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const isActive = chatState !== 'idle'
   const isWorkspaceMissing = activeSession?.workDirExists === false
   const hasWorkspaceReferences = !isMemberSession && workspaceReferences.length > 0
+  const fullComposer = primary && !isMemberSession
   const isHeroComposer = variant === 'hero' && primary && !isMemberSession && !compact
   const resolvedWorkDir = activeSession?.workDir || gitInfo?.workDir || undefined
   const showLaunchControls = primary && !isMemberSession && messageCount === 0
@@ -338,10 +339,10 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }, [refreshGitInfo])
 
   useEffect(() => {
-    if (isMemberSession || messageCount === 0) return
+    if (!fullComposer || messageCount === 0) return
     const timeout = setTimeout(refreshGitInfo, chatState === 'idle' ? 0 : 500)
     return () => clearTimeout(timeout)
-  }, [sessionId, chatState, isMemberSession, messageCount, refreshGitInfo, slashCommandCount])
+  }, [sessionId, chatState, fullComposer, messageCount, refreshGitInfo, slashCommandCount])
 
   useEffect(() => {
     if (!isMemberSession) return
@@ -730,7 +731,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }
 
   const handlePaste = (event: React.ClipboardEvent) => {
-    if (isMemberSession) return
+    if (!fullComposer) return
     const items = event.clipboardData?.items
     if (!items) return
     const files = clipboardImageFiles(items)
@@ -756,7 +757,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   }, [setComposerAttachments])
 
   const { isDragActive, dragHandlers } = useComposerFileDrop({
-    disabled: isMemberSession || isWorkspaceMissing,
+    disabled: !fullComposer || isWorkspaceMissing,
     onAttachments: appendAttachments,
     onError: (error) => {
       console.warn('[attachments] Failed to read dropped files', error)
@@ -991,7 +992,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
               dragHandlers={dragHandlers}
               overlays={overlays}
               mobile={isMobileComposer}
-              plusMenu={isMemberSession ? undefined : {
+              plusMenu={fullComposer ? {
                 open: plusMenuOpen,
                 onToggle: () => setPlusMenuOpen((value) => !value),
                 onClose: () => setPlusMenuOpen(false),
@@ -1000,7 +1001,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
                 addFilesLabel,
                 slashCommandsLabel,
                 toggleLabel: t('chat.composerTools'),
-              }}
+              } : undefined}
               textareaRef={textareaRef}
               textareaProps={{
                 value: input,
@@ -1022,7 +1023,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
               }}
             />
 
-            {!isMemberSession && (
+            {fullComposer && (
               <ComposerControls
                 testId="chat-input-controls"
                 left={(

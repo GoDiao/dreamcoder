@@ -127,7 +127,11 @@
   - 打字自动聚焦；
   - 运行状态变化时抢焦点；
   - 显示新会话的启动控件；
-  - 替换空的占位会话。
+  - 替换空的占位会话；
+  - 显示 "+" 菜单（添加文件、斜杠命令）和输入框下面的控制行（项目和分支、权限模式、模型、上下文用量）；
+  - 接受拖放和粘贴的文件或图片，拖放时也不出现提示层。粘贴文字照常。
+- 判断条件是 `ChatInput` 里的 `fullComposer = primary && !isMemberSession`。保留的有：输入框上方的引用条、直接输入 `/` 和 `@` 触发的菜单、发送和停止按钮、权限请求。模型和权限模式在分叉时从父会话继承（`forkSession`），side chat 里不能改；Detach 之后作为普通会话打开，`primary` 为真，输入框恢复完整。
+- 控制行不显示时，每轮结束后的 git 信息刷新也跳过。打开时仍读一次，因为 side chat 不在会话列表里，`@` 文件搜索的工作目录要从 git 信息里取。上下文用量组件不渲染，它的订阅也就没有了。
 - `cliTaskStore` 按会话分开存任务（`bySession`）。主视图和 side chat 各显示自己的任务栏。断开连接时清掉这个会话的任务，并用 `clearedCounts` 丢弃断开后才回来的旧请求结果。
 - Cmd+. 停止焦点所在的会话视图（`data-session-view`，`lib/sessionView.ts`）。焦点不在任何会话视图里时，停止主会话。
 
@@ -237,7 +241,7 @@ side chat 标签：
   - 对账：补上、删掉、空列表关闭面板、激活标签失效时改激活最后一个、请求期间删除和新建；
   - 重启后从 localStorage 恢复。
 - 其他测试文件：
-  - `ChatInput.test.tsx`：`primary` 为假时不抢焦点、不显示启动控件，发送到传入的会话；传入 `autoFocus` 时获得焦点；
+  - `ChatInput.test.tsx`：`primary` 为假时不抢焦点、不显示启动控件、不显示 "+" 菜单和控制行、不接受拖放和粘贴的文件，发送到传入的会话；传入 `autoFocus` 时获得焦点；
   - `lib/sideChats.test.ts`：接口失败时标签保留；
   - `sessionStore.test.ts`：Detach 后刷新列表；单个和批量删除的 side chat 警告；
   - `Sidebar.test.tsx`：批量删除的成功数只数选中的会话；
