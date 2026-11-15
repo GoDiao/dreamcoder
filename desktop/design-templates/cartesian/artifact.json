@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "23c70bac-1e13-4dcf-8268-1c06f54d395b",
+  "kind": "deck",
+  "title": "Cartesian",
+  "entry": "index.html",
+  "slides": [
+    "title",
+    "agenda",
+    "statement",
+    "barchart",
+    "twocol",
+    "cards",
+    "linechart",
+    "timeline",
+    "team",
+    "closing"
+  ]
+}

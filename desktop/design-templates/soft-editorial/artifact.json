@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "63652654-a14a-48b2-addd-2e9e6103bb6f",
+  "kind": "deck",
+  "title": "Soft Editorial",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "foreword",
+    "method",
+    "insights",
+    "closer",
+    "numbers",
+    "quote",
+    "next",
+    "consult",
+    "chart",
+    "process",
+    "matrix"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "c84832be-7f54-4920-9e1d-c7cfaf3238f3",
+  "kind": "deck",
+  "title": "Daisy Days",
+  "entry": "index.html",
+  "slides": [
+    "title",
+    "welcome",
+    "weekly",
+    "timeline",
+    "chart-bar",
+    "cards",
+    "quote",
+    "team",
+    "process",
+    "donut"
+  ]
+}

@@ -4,13 +4,15 @@ const STORAGE_KEY = 'dreamcoder-artifact-view'
 
 export type ViewedArtifact = { id: string; name: string; title: string }
 
+export type StartScope = 'design' | 'slides'
+
 type ArtifactViewStore = {
   viewing: ViewedArtifact | null
-  designing: boolean
+  starting: StartScope | null
   open: (artifact: ViewedArtifact) => void
   close: () => void
-  openDesign: () => void
-  closeDesign: () => void
+  openStart: (scope: StartScope) => void
+  closeStart: () => void
 }
 
 function isViewedArtifact(value: unknown): value is ViewedArtifact {
@@ -41,18 +43,18 @@ function store(artifact: ViewedArtifact | null) {
 
 export const useArtifactViewStore = create<ArtifactViewStore>((set) => ({
   viewing: readStored(),
-  designing: false,
+  starting: null,
   open: (artifact) => {
     store(artifact)
-    set({ viewing: artifact, designing: false })
+    set({ viewing: artifact, starting: null })
   },
   close: () => {
     store(null)
     set({ viewing: null })
   },
-  openDesign: () => {
+  openStart: (scope) => {
     store(null)
-    set({ viewing: null, designing: true })
+    set({ viewing: null, starting: scope })
   },
-  closeDesign: () => set({ designing: false }),
+  closeStart: () => set({ starting: null }),
 }))

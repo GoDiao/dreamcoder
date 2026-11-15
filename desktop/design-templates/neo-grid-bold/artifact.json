@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "e838fbfd-abd7-4670-a390-166be10e6dbb",
+  "kind": "deck",
+  "title": "Neo-Grid Bold",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "toc",
+    "stats",
+    "features",
+    "chart",
+    "section",
+    "quote",
+    "cta",
+    "consult",
+    "chart2",
+    "process2",
+    "matrix2"
+  ]
+}

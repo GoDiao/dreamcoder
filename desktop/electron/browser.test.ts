@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -193,13 +193,14 @@ describe('searching from the address bar', () => {
   })
 })
 
-const SHELL_DIR = '/app/dist/canvas-shell'
+const SHELL_DIR = '/app/dist/artifact-shell'
 
-const req = (url: string, range?: string) => ({ url, headers: { get: (name: string) => (name.toLowerCase() === 'range' ? (range ?? null) : null) } })
+const req = (url: string, range?: string, method = 'GET') => ({ url, method, headers: { get: (name: string) => (name.toLowerCase() === 'range' ? (range ?? null) : null) } })
 
 describe('project files', () => {
   const read = async (file: string) => ({
     size: 100,
+    mtimeMs: 1_700_000_000_000,
     contentType: 'text/plain',
     slice: (start: number, end: number) => `${path.basename(file)}:${start}-${end}`,
   })
@@ -267,7 +268,7 @@ describe('project files', () => {
     })
 
     it('leaves out Content-Type when the file source gives none', async () => {
-      const response = await serveProjectRequest(req(`${await projectBase()}/notes.txt`), roots, async () => ({ size: 1, contentType: null, slice: () => new Uint8Array(1) }), SHELL_DIR)
+      const response = await serveProjectRequest(req(`${await projectBase()}/notes.txt`), roots, async () => ({ size: 1, mtimeMs: 1, contentType: null, slice: () => new Uint8Array(1) }), SHELL_DIR)
       expect(response.headers.get('content-type')).toBeNull()
     })
 
@@ -321,6 +322,38 @@ describe('project files', () => {
       expect(cancelled).toBe(3)
     })
 
+    it('gives a file a tag that changes when the file is written again, so a page can tell without reading it', async () => {
+      const base = await projectBase()
+      const open = openProjectFile(fetchFile)
+      const first = (await serveProjectRequest(req(`${base}/clip.webm`), roots, open, SHELL_DIR)).headers.get('etag')
+      const again = (await serveProjectRequest(req(`${base}/clip.webm`, 'bytes=0-3'), roots, open, SHELL_DIR)).headers.get('etag')
+      expect(first).toMatch(/^"[0-9a-f]+-[0-9a-f]+"$/)
+      expect(again).toBe(first)
+
+      writeFileSync(path.join(project, 'clip.webm'), Buffer.concat([bytes, bytes]))
+      const longer = (await serveProjectRequest(req(`${base}/clip.webm`), roots, open, SHELL_DIR)).headers.get('etag')
+      expect(longer).not.toBe(first)
+
+      writeFileSync(path.join(project, 'clip.webm'), bytes)
+      utimesSync(path.join(project, 'clip.webm'), new Date(2_000_000_000_000), new Date(2_000_000_000_000))
+      const later = (await serveProjectRequest(req(`${base}/clip.webm`), roots, open, SHELL_DIR)).headers.get('etag')
+      expect(later).not.toBe(first)
+      expect(later).not.toBe(longer)
+    })
+
+    it('answers a HEAD request with the tag, type and size of the file and no content', async () => {
+      const base = await projectBase()
+      const head = await serveProjectRequest(req(`${base}/clip.webm`, undefined, 'HEAD'), roots, openProjectFile(fetchFile), SHELL_DIR)
+      expect(head.status).toBe(200)
+      expect(head.headers.get('etag')).toMatch(/^"[0-9a-f]+-[0-9a-f]+"$/)
+      expect(head.headers.get('content-type')).toBe('video/webm')
+      expect(head.headers.get('content-length')).toBe('20')
+      expect(head.body).toBeNull()
+
+      const missing = await serveProjectRequest(req(`${base}/nope.webm`, undefined, 'HEAD'), roots, openProjectFile(fetchFile), SHELL_DIR)
+      expect(missing.status).toBe(404)
+    })
+
     it('serves an empty file without a stream and refuses any range on it', async () => {
       const base = await projectBase()
       const open = openProjectFile(fetchFile)
@@ -344,12 +377,14 @@ describe('project files', () => {
     expect(reader).not.toHaveBeenCalled()
   })
 
-  it('serves the canvas script from the shell folder and nothing else below the reserved path', async () => {
+  it('serves the canvas and deck scripts from the shell folder and nothing else below the reserved path', async () => {
     const origin = await projectBase()
     const reader = vi.fn(read)
-    const script = await serveProjectRequest(req(`${origin}/__dreamcoder__/canvas.js`), roots, reader, SHELL_DIR)
-    expect(script.status).toBe(200)
-    expect(reader).toHaveBeenCalledWith(path.join(SHELL_DIR, 'canvas.js'))
+    for (const name of ['canvas.js', 'deck.js']) {
+      const script = await serveProjectRequest(req(`${origin}/__dreamcoder__/${name}`), roots, reader, SHELL_DIR)
+      expect(script.status).toBe(200)
+      expect(reader).toHaveBeenCalledWith(path.join(SHELL_DIR, name))
+    }
     reader.mockClear()
     for (const name of ['other.js', '..%2fsecret.txt', '..%2f..%2fetc%2fpasswd', 'canvas.js%2f..%2f..%2fx', 'sub%2fcanvas.js', '']) {
       expect((await serveProjectRequest(req(`${origin}/__dreamcoder__/${name}`), roots, reader, SHELL_DIR)).status).toBe(404)
@@ -418,8 +453,8 @@ function install(options: { labels?: typeof MENU_LABELS | null } = {}) {
     host,
     session,
     roots,
-    openFile: async () => ({ size: 4, contentType: 'text/html', slice: () => 'file' }),
-    canvasShellDir: SHELL_DIR,
+    openFile: async () => ({ size: 4, mtimeMs: 1, contentType: 'text/html', slice: () => 'file' }),
+    artifactShellDir: SHELL_DIR,
     notify,
     popupMenu,
     menuLabels: () => labels,

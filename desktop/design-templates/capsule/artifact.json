@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "e92bd84f-55c1-42aa-9fda-7388752229a1",
+  "kind": "deck",
+  "title": "Capsule",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "intro",
+    "foundation",
+    "indicators",
+    "quote",
+    "phases",
+    "metrics",
+    "architecture",
+    "vision",
+    "closing"
+  ]
+}

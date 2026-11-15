@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { checkArtifact } from '../artifactCheck.js'
 import {
   createArtifactFromTemplate,
+  designTemplateGuidance,
   readDesignTemplateCatalog,
   renderDesignTemplateIndex,
   resolveDesignTemplatesDir,
 } from '../designTemplates.js'
-import { templateRecord, writeTemplates } from './designTemplateFixtures.js'
+import { deckTemplateFiles, slideTemplateRecord, templateRecord, writeTemplates } from './designTemplateFixtures.js'
 import { parseArtifactManifest } from '../artifacts.js'
 import { bundledDirCandidates } from '../bundledContent.js'
 import { systemRecord, writeSystems } from './designSystemFixtures.js'
@@ -109,6 +111,51 @@ describe('createArtifactFromTemplate', () => {
   })
 })
 
+describe('createArtifactFromTemplate with a slide template', () => {
+  const templates = () => path.join(root, 'templates')
+  const artifacts = () => path.join(root, 'work', 'dc_artifacts')
+
+  it('keeps the kind and the slides of the template\'s own manifest, with a new id, title and template', async () => {
+    await writeTemplates(templates(), [slideTemplateRecord('poster')], { poster: deckTemplateFiles(['cover', 'agenda']) })
+    const created = await createArtifactFromTemplate({ templateId: 'poster', artifactsDir: artifacts(), templatesDir: templates(), title: 'Board review' })
+    const parsed = parseArtifactManifest(await fs.readFile(path.join(created.dir, 'artifact.json'), 'utf-8'))
+    expect(parsed.error).toBeNull()
+    expect(parsed.manifest).toMatchObject({
+      kind: 'deck',
+      title: 'Board review',
+      entry: 'index.html',
+      slides: ['cover', 'agenda'],
+      template: { id: 'poster', commit: 'def456' },
+    })
+    expect(parsed.manifest?.id).not.toBe('00000000-0000-4000-8000-000000000000')
+    expect(await fs.readFile(path.join(created.dir, 'slides', 'agenda.html'), 'utf-8')).toContain('<h1>agenda</h1>')
+    expect(await checkArtifact(created.dir)).toEqual([])
+  })
+
+  it('refuses a slide template whose manifest is missing or is not a deck, and creates nothing', async () => {
+    const files = deckTemplateFiles(['cover'])
+    await writeTemplates(templates(), [slideTemplateRecord('bare'), slideTemplateRecord('page')], {
+      bare: Object.fromEntries(Object.entries(files).filter(([file]) => file !== 'artifact.json')),
+      page: deckTemplateFiles(['cover'], { kind: 'page', slides: undefined }),
+    })
+    await expect(createArtifactFromTemplate({ templateId: 'bare', artifactsDir: artifacts(), templatesDir: templates() })).rejects.toThrow('is not a deck')
+    await expect(createArtifactFromTemplate({ templateId: 'page', artifactsDir: artifacts(), templatesDir: templates() })).rejects.toThrow('is not a deck')
+    expect(await fs.readdir(artifacts()).catch(() => [])).toEqual([])
+  })
+})
+
+describe('designTemplateGuidance', () => {
+  it('points a page at its entry file and a deck at deck.css, its slides and its design note, keeping the stage file', () => {
+    expect(designTemplateGuidance(templateRecord('saas'))).toContain('its entry file index.html is the example to adapt')
+    const deck = designTemplateGuidance(slideTemplateRecord('poster', { acceptsDesignSystem: false }))
+    expect(deck).toContain('index.html is the fixed stage file and stays as it is')
+    expect(deck).toContain('deck.css, the slides listed in artifact.json and their files in slides/')
+    expect(deck).toContain('DESIGN.md')
+    expect(deck).toContain('The section numbers and the number of sections in the example are sample content')
+    expect(deck).not.toContain('entry file index.html is the example')
+  })
+})
+
 describe('createArtifactFromTemplate with a design system', () => {
   const templates = () => path.join(root, 'templates')
   const systems = () => path.join(root, 'systems')
@@ -179,7 +226,7 @@ describe('the bundled catalog', () => {
     const catalog = await readDesignTemplateCatalog(dir)
     expect(catalog.templates.length).toBeGreaterThanOrEqual(8)
     const categories = new Set(catalog.templates.map(template => template.category))
-    expect([...categories].sort()).toEqual(['prototype', 'web'])
+    expect([...categories].sort()).toEqual(['prototype', 'slides', 'web'])
     expect(catalog.templates.some(template => 'kind' in template)).toBe(false)
     for (const template of catalog.templates) {
       await fs.stat(path.join(dir, template.id, template.entry))
@@ -188,6 +235,20 @@ describe('the bundled catalog', () => {
       expect(template.title.en && template.title.zh && template.description.zh && template.prompt.en && template.prompt.zh).toBeTruthy()
     }
     await fs.stat(path.join(dir, 'LICENSE-open-design.txt'))
+    await fs.stat(path.join(dir, 'LICENSE-beautiful-html-templates.txt'))
+  })
+
+  it('has slide templates that pass the deck check as they are copied into a project', async () => {
+    const dir = path.join(desktop, 'design-templates')
+    const slides = (await readDesignTemplateCatalog(dir)).templates.filter(template => template.category === 'slides')
+    expect(slides.length).toBe(34)
+    for (const template of slides) {
+      expect(template.acceptsDesignSystem).toBe(false)
+      const copy = path.join(root, 'dc_artifacts', template.id)
+      await fs.cp(path.join(dir, template.id), copy, { recursive: true })
+      expect(await checkArtifact(copy), template.id).toEqual([])
+      expect(await fs.readFile(path.join(copy, 'DESIGN.md'), 'utf-8')).toContain('beautiful-html-templates')
+    }
   })
 
   it('resolves from the development app root the sidecar is started with', async () => {

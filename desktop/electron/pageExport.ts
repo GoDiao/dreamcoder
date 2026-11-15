@@ -1,18 +1,19 @@
 import path from 'node:path'
 import type { BrowserExportFormat, BrowserExportMessages, BrowserExportResult, ElectronDialogFilter } from '../src/lib/shell/electronBridge'
 import type { GuestContents } from './browserCapture'
+import { MAX_PNG_HEIGHT, PageTooTall, type CaptureViewport } from './pageCapture'
 import { standaloneHtmlSource, type StandaloneResult } from './standaloneHtml'
 
-export type ExportInput = { format: BrowserExportFormat; suggestedName: string; messages: BrowserExportMessages }
+export type ExportInput = { format: BrowserExportFormat; suggestedName: string; messages: BrowserExportMessages; viewport?: CaptureViewport }
 
 export type ExportDeps = {
   chooseFile: (options: { defaultPath: string; filters: ElectronDialogFilter[] }) => Promise<string | null>
   confirm: (options: { message: string; proceed: string; cancel: string }) => Promise<boolean>
   writeFile: (file: string, data: Buffer | string) => Promise<void>
+  capturePng: (url: string, viewport: CaptureViewport) => Promise<Buffer>
 }
 
 export const EXPORT_LIMITS = { entryBytes: 5 * 1024 * 1024, assetBytes: 32 * 1024 * 1024, totalBytes: 100 * 1024 * 1024 }
-export const MAX_PNG_HEIGHT = 16_384
 const EXPORT_WORLD = 4243
 
 const FILTERS: Record<BrowserExportFormat, ElectronDialogFilter> = {
@@ -28,39 +29,6 @@ export function exportFileName(suggestedName: string, format: BrowserExportForma
 
 function withExtension(file: string, format: BrowserExportFormat) {
   return path.extname(file).toLowerCase() === `.${format}` ? file : `${file}.${format}`
-}
-
-class PageTooTall extends Error {}
-
-async function capturePng(contents: GuestContents): Promise<Buffer> {
-  const debuggerHandle = contents.debugger
-  const attachedHere = !debuggerHandle.isAttached()
-  if (attachedHere) debuggerHandle.attach('1.3')
-  try {
-    const metrics = (await debuggerHandle.sendCommand('Page.getLayoutMetrics')) as {
-      cssContentSize?: { width: number; height: number }
-      contentSize: { width: number; height: number }
-    }
-    const size = metrics.cssContentSize ?? metrics.contentSize
-    const width = Math.ceil(size.width)
-    const height = Math.ceil(size.height)
-    if (height > MAX_PNG_HEIGHT) throw new PageTooTall()
-    const shot = (await debuggerHandle.sendCommand('Page.captureScreenshot', {
-      format: 'png',
-      fromSurface: true,
-      captureBeyondViewport: true,
-      clip: { x: 0, y: 0, width, height, scale: 1 },
-    })) as { data: string }
-    return Buffer.from(shot.data, 'base64')
-  } finally {
-    if (attachedHere) {
-      try {
-        debuggerHandle.detach()
-      } catch (error) {
-        console.error('[browser] detaching the export debugger failed', error)
-      }
-    }
-  }
 }
 
 export async function exportPage(contents: GuestContents, input: ExportInput, deps: ExportDeps): Promise<BrowserExportResult> {
@@ -87,14 +55,19 @@ export async function exportPage(contents: GuestContents, input: ExportInput, de
     return { status: 'saved', path: file }
   }
 
-  const file = await choose()
-  if (!file) return { status: 'cancelled' }
   if (format === 'pdf') {
+    const file = await choose()
+    if (!file) return { status: 'cancelled' }
     await deps.writeFile(file, await contents.printToPDF({ printBackground: true, preferCSSPageSize: true }))
     return { status: 'saved', path: file }
   }
+
+  const { viewport } = input
+  if (!viewport) throw new Error('a PNG export needs the viewport to render the page in')
+  const file = await choose()
+  if (!file) return { status: 'cancelled' }
   try {
-    await deps.writeFile(file, await capturePng(contents))
+    await deps.writeFile(file, await deps.capturePng(contents.getURL(), viewport))
   } catch (error) {
     if (error instanceof PageTooTall) return { status: 'failed', reason: 'pageTooTall', maxHeight: MAX_PNG_HEIGHT }
     throw error

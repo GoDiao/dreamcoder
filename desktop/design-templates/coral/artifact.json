@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "9f3ca533-f247-41a6-8eb7-ccdfb733481a",
+  "kind": "deck",
+  "title": "Coral",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "overview",
+    "pillars",
+    "growth",
+    "impact",
+    "objectives",
+    "quote",
+    "timeline",
+    "team",
+    "closing"
+  ]
+}

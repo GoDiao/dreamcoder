@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { DESIGN_SYSTEMS_FOLDER, isSafeArtifactName, listSafeFolderNames, parseJsonObject } from './artifacts.js'
+import { DESIGN_SYSTEMS_FOLDER, isSafeArtifactName, listSafeFolderNames, parseJsonObject, type ArtifactKind } from './artifacts.js'
 import { uniqueName } from './artifactTransfer.js'
 import {
   BUNDLED_CATALOG_FILE,
@@ -14,6 +14,7 @@ import {
   type BundledSource,
   type LocalizedText,
 } from './bundledContent.js'
+import { DECK_STYLESHEET_FILE } from './deck.js'
 
 export const DESIGN_SYSTEMS_DIRNAME = 'design-systems'
 export const DESIGN_SYSTEM_MANIFEST_FILE = 'system.json'
@@ -176,10 +177,18 @@ export function designSystemReference(name: string): string {
   return `${DESIGN_SYSTEMS_FOLDER}/${name}`
 }
 
-export function designSystemUsage(name: string, dir: string): string {
+export function designSystemUsage(name: string, dir: string, kind?: ArtifactKind): string {
+  const values = 'take every color, font, size, space, radius and shadow from var(--*) instead of writing values'
+  const linkTokens = `In the artifact's entry HTML load the tokens with a relative path, for example <link rel="stylesheet" href="../${DESIGN_SYSTEMS_FOLDER}/${name}/${DESIGN_SYSTEM_TOKENS_FILE}"> for an entry directly inside the artifact folder, and ${values}.`
+  const deckTokens = `the app loads ${DESIGN_SYSTEM_TOKENS_FILE} before ${DECK_STYLESHEET_FILE} once artifact.json names the design system. Do not edit index.html and do not link the tokens anywhere; in ${DECK_STYLESHEET_FILE} ${values}.`
+  const apply = kind === 'deck'
+    ? [`This artifact is a deck: ${deckTokens}`]
+    : kind === undefined
+      ? [linkTokens, `A deck (kind "deck") is different: ${deckTokens}`]
+      : [linkTokens]
   return [
     `The design system "${name}" is at ${dir}. Read ${DESIGN_SYSTEM_DOC_FILE} there for the tone, type and component rules.`,
-    `In the artifact's entry HTML load the tokens with a relative path, for example <link rel="stylesheet" href="../${DESIGN_SYSTEMS_FOLDER}/${name}/${DESIGN_SYSTEM_TOKENS_FILE}"> for an entry directly inside the artifact folder, and take every color, font, size, space, radius and shadow from var(--*) instead of writing values.`,
+    ...apply,
     `Set "designSystem": "${designSystemReference(name)}" in the artifact's artifact.json.`,
   ].join('\n')
 }

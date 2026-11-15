@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { formatBrowserReferencePrompt, type BrowserReferenceData } from '../lib/browserReferences'
+import type { DesignStart } from '../lib/designStart'
 
 export type WorkspaceChatReferenceKind = 'file' | 'code-comment' | 'code-selection' | 'chat-selection' | 'browser'
 
@@ -21,6 +22,7 @@ export type WorkspaceChatReference = {
 
 type WorkspaceChatContextStore = {
   referencesBySession: Record<string, WorkspaceChatReference[] | undefined>
+  startsBySession: Record<string, DesignStart | undefined>
   addReference: (
     sessionId: string,
     reference: Omit<WorkspaceChatReference, 'id'> & { id?: string },
@@ -33,6 +35,8 @@ type WorkspaceChatContextStore = {
   ) => void
   markBrowserElementsStale: (sessionId: string, tabId: string, refs?: string[]) => void
   clearReferences: (sessionId: string) => void
+  setStart: (sessionId: string, start: DesignStart) => void
+  clearStart: (sessionId: string) => void
   clearSession: (sessionId: string) => void
 }
 
@@ -167,6 +171,7 @@ export function formatWorkspaceReferencePrompt(references: WorkspaceChatReferenc
 
 export const useWorkspaceChatContextStore = create<WorkspaceChatContextStore>((set) => ({
   referencesBySession: {},
+  startsBySession: {},
 
   addReference: (sessionId, input) =>
     set((state) => {
@@ -235,10 +240,21 @@ export const useWorkspaceChatContextStore = create<WorkspaceChatContextStore>((s
       },
     })),
 
+  setStart: (sessionId, start) =>
+    set((state) => ({ startsBySession: { ...state.startsBySession, [sessionId]: start } })),
+
+  clearStart: (sessionId) =>
+    set((state) => {
+      if (!(sessionId in state.startsBySession)) return state
+      const { [sessionId]: _removed, ...rest } = state.startsBySession
+      return { startsBySession: rest }
+    }),
+
   clearSession: (sessionId) =>
     set((state) => {
-      if (!(sessionId in state.referencesBySession)) return state
-      const { [sessionId]: _removed, ...rest } = state.referencesBySession
-      return { referencesBySession: rest }
+      if (!(sessionId in state.referencesBySession) && !(sessionId in state.startsBySession)) return state
+      const { [sessionId]: _references, ...references } = state.referencesBySession
+      const { [sessionId]: _start, ...starts } = state.startsBySession
+      return { referencesBySession: references, startsBySession: starts }
     }),
 }))

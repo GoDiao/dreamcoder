@@ -17,5 +17,6 @@
   - [session-links](features/session-links/tech-design.md): sessions that start other sessions and message each other.
   - [session-state](features/session-state/tech-design.md): session state owned by the server.
   - [side-chat](features/side-chat/tech-design.md): side chats, forked from a session and shown as tabs in its side panel.
+  - [slides](features/slides/tech-design.md): slide decks as an artifact kind (draft design).
   - [ui-refresh](features/ui-refresh/README.md): the UI refresh design log, mockups and checks.
 - [tutorial/](tutorial/README.en.md): a walkthrough of the codebase ([中文](tutorial/README.md)), also published on the website.

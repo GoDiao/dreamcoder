@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "93e9a13d-dd31-4665-90c6-b89570665496",
+  "kind": "deck",
+  "title": "Bold Poster",
+  "entry": "index.html",
+  "slides": [
+    "hero",
+    "red",
+    "summary",
+    "financial",
+    "stat",
+    "services",
+    "roadmap",
+    "pillars",
+    "global",
+    "close"
+  ]
+}

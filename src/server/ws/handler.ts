@@ -393,6 +393,7 @@ async function handleUserMessage(
   const result = await deliverUserTurn(ws.data.sessionId, message.content, {
     attachments: message.attachments,
     id: message.id,
+    title: message.title,
   })
   if (!result.ok && result.code === 'INVALID_SLASH_COMMAND_ARGS') {
     sendMessage(ws, { type: 'error', message: result.message ?? '', code: result.code })
@@ -403,6 +404,7 @@ export type DeliverUserTurnOptions = {
   attachments?: AttachmentRef[]
   id?: unknown
   origin?: UserMessageOrigin
+  title?: string
 }
 
 export type DeliverUserTurnResult = { ok: boolean; code?: string; message?: string }
@@ -452,7 +454,7 @@ export async function deliverUserTurn(
     }
     getSessionRuntime(sessionId).title = titleState
   }
-  const titleInput = getTitleInputForUserMessage(content, desktopSlashCommand)
+  const titleInput = getTitleInputForUserMessage(content, desktopSlashCommand, options.title)
   if (titleInput) {
     titleState.userMessageCount++
     titleState.allUserMessages.push(titleInput)
@@ -1058,10 +1060,12 @@ function getDesktopSlashCommand(content: string): ReturnType<typeof parseSlashCo
   return parsed
 }
 
-function getTitleInputForUserMessage(
+export function getTitleInputForUserMessage(
   content: string,
   command: ReturnType<typeof parseSlashCommand>,
+  title: string | undefined,
 ): string | null {
+  if (typeof title === 'string' && title.trim()) return title.trim()
   if (command?.commandName !== 'goal') return content
 
   const args = command.args.trim()

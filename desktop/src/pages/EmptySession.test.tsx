@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getRepositoryContext: vi.fn(),
   getTranscript: vi.fn(),
   getSlashCommands: vi.fn(),
-  listSkills: vi.fn(),
+  listSlashCommands: vi.fn(),
   search: vi.fn(),
   browse: vi.fn(),
   getTasksForList: vi.fn(),
@@ -35,7 +35,7 @@ vi.mock('../api/sessions', () => ({
 
 vi.mock('../api/skills', () => ({
   skillsApi: {
-    list: mocks.listSkills,
+    slashCommands: mocks.listSlashCommands,
   },
 }))
 
@@ -118,6 +118,7 @@ import { useTabStore } from '../stores/tabStore'
 import { useUIStore } from '../stores/uiStore'
 import { toast } from 'sonner'
 import { usePluginStore } from '../stores/pluginStore'
+import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
 import { useProviderStore } from '../stores/providerStore'
 import type { RepositoryContextResult } from '../api/sessions'
 
@@ -201,7 +202,7 @@ describe('EmptySession', () => {
     })
     mocks.getTranscript.mockResolvedValue({ items: [], agentNotifications: {}, lastTodos: null, hasMessagesAfterTaskCompletion: false })
     mocks.getSlashCommands.mockResolvedValue({ commands: [] })
-    mocks.listSkills.mockResolvedValue({ skills: [] })
+    mocks.listSlashCommands.mockResolvedValue({ commands: [] })
     mocks.search.mockResolvedValue({
       currentPath: '/workspace/project',
       parentPath: null,
@@ -342,14 +343,13 @@ describe('EmptySession', () => {
   })
 
   it('refreshes empty-session slash commands after plugin reloads', async () => {
-    mocks.listSkills
-      .mockResolvedValueOnce({ skills: [] })
+    mocks.listSlashCommands
+      .mockResolvedValueOnce({ commands: [] })
       .mockResolvedValueOnce({
-        skills: [
+        commands: [
           {
             name: 'draw:render',
             description: 'Render with the drawing plugin.',
-            userInvocable: true,
           },
         ],
       })
@@ -357,7 +357,7 @@ describe('EmptySession', () => {
     render(<EmptySession />)
 
     await waitFor(() => {
-      expect(mocks.listSkills).toHaveBeenCalledTimes(1)
+      expect(mocks.listSlashCommands).toHaveBeenCalledTimes(1)
     })
 
     act(() => {
@@ -376,27 +376,24 @@ describe('EmptySession', () => {
     })
 
     await waitFor(() => {
-      expect(mocks.listSkills).toHaveBeenCalledTimes(2)
+      expect(mocks.listSlashCommands).toHaveBeenCalledTimes(2)
     })
   })
 
   it('prioritizes enabled plugin slash commands by command name when filtering', async () => {
-    mocks.listSkills.mockResolvedValueOnce({
-      skills: [
+    mocks.listSlashCommands.mockResolvedValueOnce({
+      commands: [
         {
           name: 'agent-team-orchestrator',
           description: 'Agent Teams can use Subagent orchestration.',
-          userInvocable: true,
         },
         {
           name: 'lark-calendar',
           description: 'Includes suggestion helpers.',
-          userInvocable: true,
         },
         {
           name: 'superpowers:brainstorming',
           description: 'Creative work planning.',
-          userInvocable: true,
         },
       ],
     })
@@ -404,7 +401,7 @@ describe('EmptySession', () => {
     render(<EmptySession />)
 
     await waitFor(() => {
-      expect(mocks.listSkills).toHaveBeenCalledTimes(1)
+      expect(mocks.listSlashCommands).toHaveBeenCalledTimes(1)
     })
 
     fireEvent.change(screen.getByRole('textbox'), {
@@ -416,6 +413,155 @@ describe('EmptySession', () => {
         .getAllByRole('button')
         .filter((button) => button.textContent?.startsWith('/'))
       expect(commandButtons[0]).toHaveTextContent('/superpowers:brainstorming')
+    })
+  })
+
+  it('offers the built-in /design and /slides in the slash menu, ahead of skills with similar names', async () => {
+    mocks.listSlashCommands.mockResolvedValue({
+      commands: [
+        { name: 'design-interview', description: 'Interview about a design' },
+        { name: 'design', description: 'Design mode' },
+        { name: 'slides', description: 'Slides' },
+      ],
+    })
+    render(<EmptySession />)
+    await waitFor(() => expect(mocks.listSlashCommands).toHaveBeenCalledWith(undefined))
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '/design', selectionStart: 7 } })
+
+    await waitFor(() => {
+      const commandButtons = screen.getAllByRole('button').filter((button) => button.textContent?.startsWith('/'))
+      expect(commandButtons[0]).toHaveTextContent('/design')
+      expect(commandButtons[0]).not.toHaveTextContent('/design-interview')
+    })
+  })
+
+  describe('typing /design or /slides', () => {
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn()
+      useWorkspaceChatContextStore.setState(useWorkspaceChatContextStore.getInitialState(), true)
+      mocks.listSlashCommands.mockResolvedValue({
+        commands: [
+          { name: 'design-interview', description: 'Interview about a design' },
+          { name: 'slides', description: 'Slides' },
+        ],
+      })
+    })
+
+    const expectChip = async (input: HTMLElement, name: string, value: string, placeholder: string) => {
+      expect(await screen.findByText(name)).toBeInTheDocument()
+      expect(input).toHaveValue(value)
+      expect(input).toHaveAttribute('placeholder', placeholder)
+      expect(input).toHaveFocus()
+      expect(mocks.createSession).not.toHaveBeenCalled()
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+    }
+
+    it('turns the command picked in the slash menu, by click, Tab or Enter, into a chip on this page', async () => {
+      render(<EmptySession />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: '/sli', selectionStart: 4 } })
+      fireEvent.click(await screen.findByRole('button', { name: /\/slides/ }))
+      await expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+      await act(() => new Promise(requestAnimationFrame))
+
+      act(() => useNewSessionStore.getState().updateDraft({ start: null }))
+      fireEvent.change(input, { target: { value: '/sli', selectionStart: 4 } })
+      await screen.findByRole('button', { name: /\/slides/ })
+      fireEvent.keyDown(input, { key: 'Tab' })
+      await expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+      await act(() => new Promise(requestAnimationFrame))
+
+      act(() => useNewSessionStore.getState().updateDraft({ start: null }))
+      fireEvent.change(input, { target: { value: '/sli', selectionStart: 4 } })
+      await screen.findByRole('button', { name: /\/slides/ })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+    })
+
+    it('turns a whole command and Enter into a chip, even when the list only has a command with a similar name', async () => {
+      render(<EmptySession />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/design', selectionStart: 7 } })
+      await screen.findByRole('button', { name: /\/design-interview/ })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+      expect(useNewSessionStore.getState().start).toEqual({ command: '/design' })
+    })
+
+    it('turns the command into a chip at the space after it and keeps what follows in the box', async () => {
+      render(<EmptySession />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: '/design ', selectionStart: 8 } })
+      await expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+
+      act(() => useNewSessionStore.getState().updateDraft({ start: null }))
+      fireEvent.change(input, { target: { value: '/slides Q3 results', selectionStart: 18 } })
+      await expectChip(input, 'Slides', 'Q3 results', 'What is this deck about, and who is it for?')
+    })
+
+    it('sends through this page with the chosen project and branch, the command first and the words after it', async () => {
+      render(<EmptySession />)
+      fireEvent.click(screen.getByRole('button', { name: 'Pick project' }))
+      await waitFor(() => expect(screen.getByText('main')).toBeInTheDocument())
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/slides Q3 results', selectionStart: 18 } })
+      await screen.findByText('Slides')
+      await waitFor(() => expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled())
+
+      fireEvent.click(screen.getByRole('button', { name: /Run/i }))
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', expect.objectContaining({
+        type: 'user_message',
+        content: '/slides Q3 results',
+        title: 'Q3 results',
+      })))
+      expect(mocks.createSession).toHaveBeenCalledWith({
+        workDir: '/workspace/project',
+        repository: { branch: 'main', worktree: false },
+        permissionMode: 'default',
+      })
+      expect(useChatStore.getState().sessions['draft-session']?.messages.at(-1)).toMatchObject({
+        type: 'user_text',
+        content: 'Q3 results',
+        attachments: [{ type: 'artifact', name: 'Slides' }],
+      })
+      expect(useTabStore.getState().activeTabId).toBe('draft-session')
+      expect(useNewSessionStore.getState().start).toBeNull()
+    })
+
+    it('sends the chip alone as the command, and sends a plain message once the chip is removed', async () => {
+      render(<EmptySession />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/design ', selectionStart: 8 } })
+      await screen.findByText('Design')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Design' }))
+      expect(screen.queryByText('Design')).not.toBeInTheDocument()
+      expect(input).toHaveAttribute('placeholder', 'Ask anything...')
+      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled()
+
+      fireEvent.change(input, { target: { value: '/design ', selectionStart: 8 } })
+      await screen.findByText('Design')
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', expect.objectContaining({ content: '/design', title: 'Design' })))
+    })
+
+    it('leaves other slash commands to be sent as they are', async () => {
+      render(<EmptySession />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/design-interview', selectionStart: 17 } })
+      await screen.findByRole('button', { name: /\/design-interview/ })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith('draft-session', expect.objectContaining({ content: '/design-interview' })))
+      expect(useNewSessionStore.getState().start).toBeNull()
     })
   })
 

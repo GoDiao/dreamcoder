@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "6c79a1ec-21ab-4c24-8943-0b36915d7d40",
+  "kind": "deck",
+  "title": "Retro Zine",
+  "entry": "index.html",
+  "slides": [
+    "hero",
+    "split",
+    "statement",
+    "grid",
+    "visual",
+    "editorial",
+    "numbers",
+    "collage",
+    "rsvp",
+    "closing"
+  ]
+}

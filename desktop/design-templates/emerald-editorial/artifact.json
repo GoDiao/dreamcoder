@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "b0b28f05-0732-4ca2-b4ad-4dbf0dfa921b",
+  "kind": "deck",
+  "title": "Emerald Editorial",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "programme",
+    "opener",
+    "threads",
+    "chart",
+    "method",
+    "numbers",
+    "closing"
+  ]
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { GuestContents } from './browserCapture'
-import { EXPORT_LIMITS, exportFileName, exportPage, MAX_PNG_HEIGHT, type ExportDeps, type ExportInput } from './pageExport'
+import { MAX_PNG_HEIGHT, PageTooTall } from './pageCapture'
+import { EXPORT_LIMITS, exportFileName, exportPage, type ExportDeps, type ExportInput } from './pageExport'
 
 const messages = { externalLinks: '{count} external links stay online.', proceed: 'Save', cancel: 'Cancel' }
 const input = (format: ExportInput['format'], suggestedName = 'Quarterly report'): ExportInput => ({ format, suggestedName, messages })
@@ -14,39 +15,20 @@ function deps(overrides: Partial<ExportDeps> = {}): ExportDeps & { writes: Array
     writeFile: vi.fn(async (file, data) => {
       writes.push([file, data])
     }),
+    capturePng: vi.fn(async () => Buffer.from('PNGDATA')),
     ...overrides,
   }
 }
 
-function debuggerHandle(attached: boolean, layout = { width: 800, height: 3000 }) {
-  const handle = {
-    attached,
-    isAttached: () => handle.attached,
-    attach: vi.fn(() => {
-      if (handle.attached) throw new Error('Another debugger is already attached')
-      handle.attached = true
-    }),
-    detach: vi.fn(() => {
-      handle.attached = false
-    }),
-    sendCommand: vi.fn(async (method: string): Promise<unknown> => {
-      if (method === 'Page.getLayoutMetrics') return { cssContentSize: layout, contentSize: layout }
-      if (method === 'Page.captureScreenshot') return { data: Buffer.from('PNGDATA').toString('base64') }
-      return {}
-    }),
-  }
-  return handle
-}
-
-function guest(overrides: Partial<GuestContents> = {}, handle = debuggerHandle(false)): GuestContents {
+function guest(overrides: Partial<GuestContents> = {}): GuestContents {
   return {
     isDestroyed: () => false,
     hostWebContents: 'main',
     session: 'browser',
+    getURL: () => 'dreamcoder-project://abc/talk/index.html#agenda',
     capturePage: vi.fn(),
     printToPDF: vi.fn(async () => Buffer.from('PDFDATA')),
     executeJavaScriptInIsolatedWorld: vi.fn(),
-    debugger: handle,
     ...overrides,
   }
 }
@@ -87,83 +69,38 @@ describe('export PDF', () => {
 })
 
 describe('export PNG', () => {
-  it('captures the whole page beyond the viewport with its own debugger and detaches it afterwards', async () => {
-    const handle = debuggerHandle(false, { width: 800, height: 3000.4 })
-    const d = deps()
-    const outcome = await exportPage(guest({}, handle), input('png'), d)
+  const viewport = { width: 1920, height: 1080, scale: 1, wholePage: false }
 
-    expect(handle.attach).toHaveBeenCalledOnce()
-    expect(handle.sendCommand).toHaveBeenCalledWith('Page.captureScreenshot', {
-      format: 'png',
-      fromSurface: true,
-      captureBeyondViewport: true,
-      clip: { x: 0, y: 0, width: 800, height: 3001, scale: 1 },
-    })
-    expect(handle.detach).toHaveBeenCalledOnce()
-    expect(handle.attached).toBe(false)
+  it('renders the address of the page again in the given viewport and writes that picture, without touching the page itself', async () => {
+    const contents = guest()
+    const d = deps()
+    const outcome = await exportPage(contents, { ...input('png'), viewport }, d)
+
+    expect(d.capturePng).toHaveBeenCalledWith('dreamcoder-project://abc/talk/index.html#agenda', viewport)
+    expect(contents.capturePage).not.toHaveBeenCalled()
     expect(d.writes).toEqual([['/Users/me/out.file.png', Buffer.from('PNGDATA')]])
     expect(outcome).toEqual({ status: 'saved', path: '/Users/me/out.file.png' })
   })
 
-  it('reuses a debugger somebody else attached and leaves it attached', async () => {
-    const handle = debuggerHandle(true)
-    await exportPage(guest({}, handle), input('png'), deps())
-
-    expect(handle.attach).not.toHaveBeenCalled()
-    expect(handle.detach).not.toHaveBeenCalled()
-    expect(handle.attached).toBe(true)
-  })
-
-  it('detaches a debugger it attached even when capturing fails, so a later attach by the browser host works', async () => {
-    const handle = debuggerHandle(false)
-    handle.sendCommand.mockImplementation(async (method: string) => {
-      if (method === 'Page.getLayoutMetrics') return { contentSize: { width: 1, height: 1 } }
-      throw new Error('capture failed')
-    })
-    const d = deps()
-
-    await expect(exportPage(guest({}, handle), input('png'), d)).rejects.toThrow('capture failed')
-
-    expect(handle.detach).toHaveBeenCalledOnce()
-    expect(handle.attached).toBe(false)
-    expect(() => handle.attach()).not.toThrow()
+  it('refuses a page taller than the screenshot limit', async () => {
+    const d = deps({ capturePng: vi.fn(async () => { throw new PageTooTall() }) })
+    expect(await exportPage(guest(), { ...input('png'), viewport: { width: 800, height: 600, wholePage: true } }, d)).toEqual({ status: 'failed', reason: 'pageTooTall', maxHeight: MAX_PNG_HEIGHT })
     expect(d.writes).toEqual([])
   })
 
-  it('still reports the capture error when detaching fails', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const handle = debuggerHandle(false)
-    handle.detach.mockImplementation(() => {
-      throw new Error('already gone')
-    })
-
-    await expect(exportPage(guest({}, handle), input('png'), deps())).resolves.toMatchObject({ status: 'saved' })
-    expect(error).toHaveBeenCalledOnce()
-    error.mockRestore()
+  it('passes on any other capture error', async () => {
+    const d = deps({ capturePng: vi.fn(async () => { throw new Error('the page failed to load') }) })
+    await expect(exportPage(guest(), { ...input('png'), viewport }, d)).rejects.toThrow('the page failed to load')
   })
 
-  it('refuses a page taller than the screenshot limit and detaches', async () => {
-    const handle = debuggerHandle(false, { width: 800, height: MAX_PNG_HEIGHT + 1 })
-    const d = deps()
-
-    expect(await exportPage(guest({}, handle), input('png'), d)).toEqual({ status: 'failed', reason: 'pageTooTall', maxHeight: MAX_PNG_HEIGHT })
-    expect(handle.detach).toHaveBeenCalledOnce()
-    expect(d.writes).toEqual([])
+  it('does not render anything when the dialog is cancelled', async () => {
+    const d = deps({ chooseFile: vi.fn(async () => null) })
+    expect(await exportPage(guest(), { ...input('png'), viewport }, d)).toEqual({ status: 'cancelled' })
+    expect(d.capturePng).not.toHaveBeenCalled()
   })
 
-  it('does not attach when the dialog is cancelled', async () => {
-    const handle = debuggerHandle(false)
-    await exportPage(guest({}, handle), input('png'), deps({ chooseFile: vi.fn(async () => null) }))
-    expect(handle.attach).not.toHaveBeenCalled()
-  })
-
-  it('uses the css content size when the page reports one and the plain size otherwise', async () => {
-    const handle = debuggerHandle(false)
-    handle.sendCommand.mockImplementation(async (method: string) =>
-      method === 'Page.getLayoutMetrics' ? { contentSize: { width: 640, height: 480 } } : { data: '' },
-    )
-    await exportPage(guest({}, handle), input('png'), deps())
-    expect(handle.sendCommand).toHaveBeenCalledWith('Page.captureScreenshot', expect.objectContaining({ clip: expect.objectContaining({ width: 640, height: 480 }) }))
+  it('fails without a viewport to render in', async () => {
+    await expect(exportPage(guest(), input('png'), deps())).rejects.toThrow('needs the viewport')
   })
 })
 

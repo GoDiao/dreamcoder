@@ -1,0 +1,69 @@
+<section class="slide s-chart">
+  <div class="l">
+    <div class="label" style="color:var(--butter); margin-bottom: 20px;"><span class="slide-section"></span>— Composition</div>
+    <h2>How the days arrange themselves.</h2>
+    <p class="lede">A placeholder description for the chart on the right. Speak to the shape of the data — what rises, what plateaus — not the precise figures. Methodology and a one-line caveat live at the bottom.</p>
+    <div class="legend">
+      <div class="item"><i style="background:var(--pink); border:1px solid var(--burgundy);"></i> Studio hours, deep work <span class="cat">Series A</span></div>
+      <div class="item"><i style="background:var(--butter); border:2px solid var(--burgundy); border-radius:999px;"></i> Salon &amp; conversation <span class="cat">Series B</span></div>
+      <div class="item"><i style="background:var(--burgundy);"></i> Reading, drift, walking <span class="cat">Series C</span></div>
+      <div class="item"><i style="background:transparent; border-top: 3px dotted var(--butter); border-radius:0; height: 0;"></i> Correspondence, admin <span class="cat">Series D</span></div>
+    </div>
+    <div class="mono" style="margin-top: 40px; font-size:24px; letter-spacing:0.1em; text-transform:uppercase; opacity:0.5;">Source: internal logs · self-reported · n = 24 weeks</div>
+  </div>
+  <div class="r">
+    <div class="head">
+      <span class="ttl">Hours per week, by mode</span>
+      <span class="unit">Hrs / wk</span>
+    </div>
+    <svg class="chart" viewBox="0 0 720 380" preserveAspectRatio="none">
+
+      <g stroke="#7A1F35" stroke-opacity="0.15" stroke-width="1">
+        <line x1="60" y1="40" x2="720" y2="40"></line>
+        <line x1="60" y1="125" x2="720" y2="125"></line>
+        <line x1="60" y1="210" x2="720" y2="210"></line>
+        <line x1="60" y1="295" x2="720" y2="295"></line>
+        <line x1="60" y1="380" x2="720" y2="380"></line>
+      </g>
+
+      <g font-family="JetBrains Mono, monospace" font-size="24" fill="#7A1F35" fill-opacity="0.6">
+        <text x="0" y="48">40</text>
+        <text x="0" y="133">30</text>
+        <text x="0" y="218">20</text>
+        <text x="0" y="303">10</text>
+        <text x="8" y="380">0</text>
+      </g>
+
+
+      <path d="M 60 230 Q 120 200 180 180 T 300 145 T 420 120 T 540 100 T 660 80 L 660 380 L 60 380 Z" fill="#F2B6C6" fill-opacity="0.85"></path>
+      <path d="M 60 230 Q 120 200 180 180 T 300 145 T 420 120 T 540 100 T 660 80" fill="none" stroke="#7A1F35" stroke-width="3"></path>
+
+
+      <g fill="#7A1F35">
+        <rect x="80" y="320" width="22" height="60" rx="4"></rect>
+        <rect x="190" y="300" width="22" height="80" rx="4"></rect>
+        <rect x="300" y="285" width="22" height="95" rx="4"></rect>
+        <rect x="410" y="275" width="22" height="105" rx="4"></rect>
+        <rect x="520" y="260" width="22" height="120" rx="4"></rect>
+        <rect x="630" y="245" width="22" height="135" rx="4"></rect>
+      </g>
+
+
+      <path d="M 90 280 L 200 250 L 310 235 L 420 215 L 530 200 L 640 175" fill="none" stroke="#7A1F35" stroke-width="3"></path>
+      <g fill="#F2D86A" stroke="#7A1F35" stroke-width="3">
+        <circle cx="90" cy="280" r="8"></circle>
+        <circle cx="200" cy="250" r="8"></circle>
+        <circle cx="310" cy="235" r="8"></circle>
+        <circle cx="420" cy="215" r="8"></circle>
+        <circle cx="530" cy="200" r="8"></circle>
+        <circle cx="640" cy="175" r="8"></circle>
+      </g>
+
+
+      <path d="M 90 350 L 200 345 L 310 348 L 420 338 L 530 340 L 640 332" fill="none" stroke="#7A1F35" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" stroke-opacity="0.6"></path>
+    </svg>
+    <div class="xax">
+      <span>W·01</span><span>W·05</span><span>W·09</span><span>W·13</span><span>W·17</span><span>W·24</span>
+    </div>
+  </div>
+</section>

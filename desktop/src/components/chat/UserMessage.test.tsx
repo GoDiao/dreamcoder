@@ -21,6 +21,13 @@ describe('UserMessage', () => {
     expect(bubble.className).toContain('[word-break:break-word]')
   })
 
+  it('shows a start chip on its own when nothing was typed with it', () => {
+    const { container } = render(<UserMessage content="" attachments={[{ type: 'artifact', name: 'Slides · Grove' }]} />)
+
+    expect(screen.getByText('Slides · Grove')).not.toBeNull()
+    expect(container.textContent).toBe('Slides · Grove')
+  })
+
   it('shows a restored browser reference as a card and hides its fenced block', () => {
     const prompt = [
       formatBrowserReferencePrompt([

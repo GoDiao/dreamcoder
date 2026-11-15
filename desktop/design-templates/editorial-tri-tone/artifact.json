@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "286aaac9-ea6c-4ac9-b672-077b1800106b",
+  "kind": "deck",
+  "title": "Editorial Tri-Tone",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "manifesto",
+    "grid",
+    "stat",
+    "timeline",
+    "chart",
+    "quote",
+    "closer"
+  ]
+}

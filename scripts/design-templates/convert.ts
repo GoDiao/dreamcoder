@@ -9,7 +9,7 @@ import type {
 } from '../../src/utils/designTemplates.js'
 import { clearSubfolders, holderOf, parseLicense, readIfExists, sourceCommit } from '../lib/bundle.js'
 
-const CATEGORIES: readonly string[] = ['web', 'prototype']
+const CATEGORIES: readonly DesignTemplateCategory[] = ['web', 'prototype']
 const ENTRY_SOURCE_FILE = 'example.html'
 const ENTRY_FILE = 'index.html'
 const OWN_LICENSE_FILE = 'LICENSE'
@@ -137,6 +137,20 @@ export function buildRecord(input: BuildRecordInput): DesignTemplateRecord {
   }
 }
 
+export function mergeCatalog(
+  existing: DesignTemplateCatalog | null,
+  records: DesignTemplateRecord[],
+  owns: (category: DesignTemplateCategory) => boolean,
+): DesignTemplateCatalog {
+  const kept = (existing?.templates ?? []).filter(template => !owns(template.category))
+  return { version: 1, templates: [...kept, ...records] }
+}
+
+export async function readExistingCatalog(outDir: string): Promise<DesignTemplateCatalog | null> {
+  const text = await readIfExists(join(outDir, BUNDLED_CATALOG_FILE))
+  return text ? (JSON.parse(text) as DesignTemplateCatalog) : null
+}
+
 export type ConvertOptions = {
   sourceDir: string
   curation: Curation
@@ -177,7 +191,10 @@ export async function convertTemplates(options: ConvertOptions): Promise<DesignT
   }
 
   const outDir = resolve(options.outDir)
-  await clearSubfolders(outDir)
+  const existing = await readExistingCatalog(outDir)
+  const ownsPage = (category: DesignTemplateCategory) => CATEGORIES.includes(category)
+  const others = mergeCatalog(existing, [], ownsPage).templates
+  await clearSubfolders(outDir, new Set(others.map(template => template.id)))
   for (const { id, folder, ownLicense } of staged) {
     const target = join(outDir, id)
     await mkdir(target, { recursive: true })
@@ -185,7 +202,7 @@ export async function convertTemplates(options: ConvertOptions): Promise<DesignT
     if (ownLicense) await writeFile(join(target, OWN_LICENSE_FILE), ownLicense, 'utf-8')
   }
   await writeFile(join(outDir, ROOT_LICENSE_COPY), rootLicenseText, 'utf-8')
-  const catalog: DesignTemplateCatalog = { version: 1, templates: records }
+  const catalog = mergeCatalog(existing, records, ownsPage)
   await writeFile(join(outDir, BUNDLED_CATALOG_FILE), `${JSON.stringify(catalog, null, 2)}\n`, 'utf-8')
   return catalog
 }

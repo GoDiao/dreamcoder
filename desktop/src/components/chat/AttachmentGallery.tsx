@@ -1,10 +1,10 @@
-import { FileTextIcon, FolderIcon, MessageSquareIcon, XIcon } from 'lucide-react'
+import { FileTextIcon, FolderIcon, LayersIcon, MessageSquareIcon, XIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ImageGalleryModal } from './ImageGalleryModal'
 
 export type AttachmentPreview = {
   id?: string
-  type: 'image' | 'file'
+  type: 'image' | 'file' | 'artifact'
   name: string
   path?: string
   data?: string
@@ -82,7 +82,7 @@ export function AttachmentGallery({ attachments, variant = 'message', onRemove }
           const quotePreview = attachment.quote?.trim().replace(/\s+/g, ' ')
           const hasQuotePreview = !!quotePreview
 
-          const AttachmentIcon = hasQuotePreview ? MessageSquareIcon : attachment.isDirectory ? FolderIcon : FileTextIcon
+          const AttachmentIcon = attachment.type === 'artifact' ? LayersIcon : hasQuotePreview ? MessageSquareIcon : attachment.isDirectory ? FolderIcon : FileTextIcon
           return (
             <div
               key={attachment.id || `${attachment.name}-${index}`}

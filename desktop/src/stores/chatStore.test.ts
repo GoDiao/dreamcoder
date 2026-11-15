@@ -652,6 +652,25 @@ describe('chatStore history mapping', () => {
     ])
   })
 
+  it('sends a command shown as a chip like a typed command, with an empty bubble and the title it is given', () => {
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }) } })
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, '/slides /repo/dc_artifacts/grove', [], {
+      displayContent: '',
+      displayAttachments: [{ type: 'artifact', name: 'Slides · Grove' }],
+      title: 'Slides · Grove',
+    })
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]!.messages).toMatchObject([
+      { type: 'user_text', content: '', modelContent: '/slides /repo/dc_artifacts/grove', attachments: [{ type: 'artifact', name: 'Slides · Grove' }] },
+    ])
+    expect(sendMock).toHaveBeenCalledWith(TEST_SESSION_ID, expect.objectContaining({
+      type: 'user_message',
+      content: '/slides /repo/dc_artifacts/grove',
+      title: 'Slides · Grove',
+    }))
+  })
+
   it('treats the session as idle when the server says so, even if the local state still streams', () => {
     useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ chatState: 'idle' }) } })
     sendSnapshot(mirrorState({ turn: { phase: 'idle' } }))
@@ -3011,6 +3030,24 @@ describe('chatStore history mapping', () => {
       attachments: undefined,
       id: expect.any(String),
     })
+  })
+
+  it('titles a new placeholder session from the title it is given, not from the command', () => {
+    sessionStoreSnapshot.sessions = [{
+      id: TEST_SESSION_ID,
+      title: 'New Session',
+      createdAt: '2026-05-07T00:00:00.000Z',
+      modifiedAt: '2026-05-07T00:00:00.000Z',
+      messageCount: 0,
+      projectPath: '',
+      workDir: '/workspace/project',
+      workDirExists: true,
+    }]
+
+    useChatStore.getState().sendMessage(TEST_SESSION_ID, '/slides /workspace/project/dc_artifacts/grove', [], { displayContent: '', title: 'Slides · Grove' })
+
+    expect(updateSessionTitleMock).toHaveBeenCalledWith(TEST_SESSION_ID, 'Slides · Grove')
+    expect(updateTabTitleMock).toHaveBeenCalledWith(TEST_SESSION_ID, 'Slides · Grove')
   })
 })
 

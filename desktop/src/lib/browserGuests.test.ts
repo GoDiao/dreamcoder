@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BROWSER_PARTITION } from './shell/electronBridge'
 
-const artifactApiMocks = vi.hoisted(() => ({ open: vi.fn(), openById: vi.fn(), previewTemplate: vi.fn() }))
+const artifactApiMocks = vi.hoisted(() => ({ list: vi.fn(), open: vi.fn(), openById: vi.fn(), previewTemplate: vi.fn() }))
 
-vi.mock('../api/artifacts', () => ({ artifactsApi: { open: artifactApiMocks.open, openById: artifactApiMocks.openById } }))
+vi.mock('../api/artifacts', () => ({ artifactsApi: { list: artifactApiMocks.list, open: artifactApiMocks.open, openById: artifactApiMocks.openById } }))
 vi.mock('../api/design', () => ({ designApi: { preview: artifactApiMocks.previewTemplate } }))
 
 const shellMocks = vi.hoisted(() => ({
@@ -22,13 +22,16 @@ vi.mock('./shell', () => ({
 
 import {
   addBrowserSelectionToChat,
+  artifactReferenceLabel,
   browserGoBack,
+  browserGuestSize,
   browserReload,
   closeBrowser,
+  deckStageRect,
   openBrowserUrl,
-  canvasBoardLabel,
   placeBrowserGuest,
-  refreshCanvas,
+  presentDeck,
+  refreshArtifactShell,
   replayBrowserShortcut,
   resolveStoredBrowserUrl,
   setBrowserGuestLayer,
@@ -94,6 +97,7 @@ function makeReady(tabId: string, state: { url?: string; id?: number; execute?: 
     canGoForward: vi.fn(() => false),
     getWebContentsId: vi.fn(() => state.id ?? 11),
     executeJavaScript: state.execute ?? vi.fn(async () => undefined),
+    focus: vi.fn(),
   })
   webview.dispatchEvent(new Event('dom-ready'))
   return webview
@@ -244,6 +248,7 @@ describe('browser guests', () => {
       loading: false,
       canGoBack: true,
       canGoForward: false,
+      deck: null,
     })
 
     webview.dispatchEvent(new Event('did-start-loading'))
@@ -593,6 +598,14 @@ describe('resolveStoredBrowserUrl', () => {
     expect(artifactApiMocks.openById).toHaveBeenCalledWith('x')
   })
 
+  it('keeps the part after # of the stored address, so a deck reopens on the slide it was showing', async () => {
+    shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://fresh/talk/index.html' })
+    const url = await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/talk/index.html#agenda', root: '/repo/dc_artifacts' }, '/repo')
+
+    expect(url).toBe('dreamcoder-project://fresh/talk/index.html#agenda')
+    expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith(expect.objectContaining({ input: '/repo/dc_artifacts/talk/index.html' }))
+  })
+
   it('keeps the stored address when there is no root to resolve against or the page is gone', async () => {
     expect(await resolveStoredBrowserUrl({ url: 'dreamcoder-project://stale/a.html' }, null)).toBe('dreamcoder-project://stale/a.html')
     shellMocks.resolveBrowserInput.mockResolvedValue({ ok: false, reason: 'notFound' })
@@ -667,7 +680,16 @@ describe('canvas pages', () => {
     expect(handler).not.toHaveBeenCalled()
   })
 
-  describe('the color scheme of the canvas', () => {
+  it('ignores the message a canvas sends to say which artifact it is when a handler is set', () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+    const handler = vi.fn()
+    setCanvasMessageHandler('a', handler)
+    artifactApiMocks.list.mockResolvedValue({ artifacts: [] })
+    log(webviewOf('a').webview, 'dreamcoder-canvas:{"type":"ready","artifact":"canvas-1"}', SCRIPT)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  describe('the color scheme of an artifact shell', () => {
     const attach = (tabId: string, url: string) => {
       const execute = vi.fn(async (_code: string) => undefined)
       const webview = makeReady(tabId, { url, execute })
@@ -677,37 +699,33 @@ describe('canvas pages', () => {
 
     afterEach(() => {
       useUIStore.setState({ theme: 'light' })
-      setCanvasMessageHandler('b', null)
     })
 
-    it('sets the scheme of the app theme when a canvas page is ready, and again for every later load', () => {
+    it('sets the scheme of the app theme when a project page is ready, on whichever shell the page has, and again for every later load', () => {
       useUIStore.setState({ theme: 'midnight' })
       openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
-      setCanvasMessageHandler('a', () => undefined)
       const { webview, execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
-      expect(schemes(execute)).toEqual([expect.stringContaining('setScheme("dark")')])
+      expect(schemes(execute)).toEqual(['(window.__dreamcoderCanvas || window.__dreamcoderDeck)?.setScheme("dark")'])
       webview.dispatchEvent(new Event('dom-ready'))
       expect(execute).toHaveBeenCalledTimes(2)
     })
 
     it('uses light for a light theme', () => {
       openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
-      setCanvasMessageHandler('a', () => undefined)
       const { execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
       expect(schemes(execute)).toEqual([expect.stringContaining('setScheme("light")')])
     })
 
-    it('does not touch pages that are not canvases', () => {
+    it('does not run anything in pages that are not project pages', () => {
       useUIStore.setState({ theme: 'dark' })
       openBrowserUrl('s', 'a', 'https://example.com/')
       const { execute } = attach('a', 'https://example.com/')
       expect(execute).not.toHaveBeenCalled()
     })
 
-    it('updates every ready canvas tab when the theme changes and leaves other tabs alone', () => {
+    it('updates every ready project page when the theme changes and leaves other tabs alone', () => {
       openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
       openBrowserUrl('s', 'b', 'https://example.com/')
-      setCanvasMessageHandler('a', () => undefined)
       const canvas = attach('a', 'dreamcoder-project://abc/flow/index.html')
       const other = attach('b', 'https://example.com/')
       canvas.execute.mockClear()
@@ -721,7 +739,6 @@ describe('canvas pages', () => {
 
     it('does nothing when something other than the theme changes', () => {
       openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
-      setCanvasMessageHandler('a', () => undefined)
       const { execute } = attach('a', 'dreamcoder-project://abc/flow/index.html')
       execute.mockClear()
       useUIStore.setState({ sidebarOpen: false })
@@ -729,22 +746,30 @@ describe('canvas pages', () => {
     })
   })
 
-  it('asks a ready page to refresh its canvas and reports when it cannot', async () => {
+  it('asks the shell of a ready page to refresh and reports when it cannot', async () => {
     openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
-    expect(await refreshCanvas('a')).toBe(false)
+    expect(await refreshArtifactShell('a')).toBe(false)
     const webview = makeReady('a')
     const execute = vi.fn(async (_code: string) => undefined)
     Object.assign(webview, { executeJavaScript: execute })
-    expect(await refreshCanvas('a')).toBe(true)
-    expect(execute).toHaveBeenCalledWith(expect.stringContaining('__dreamcoderCanvas'))
-    expect(execute.mock.calls[0]![0]).toContain('refresh()')
+    expect(await refreshArtifactShell('a')).toBe(true)
+    expect(execute).toHaveBeenCalledWith('(window.__dreamcoderCanvas || window.__dreamcoderDeck) ? (window.__dreamcoderCanvas || window.__dreamcoderDeck).refresh() : false')
   })
 
-  it('reports false when the page has no canvas to refresh', async () => {
-    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+  it('reports false and logs when the page cannot be asked, so the caller reloads it instead', async () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/report/index.html')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    Object.assign(makeReady('a'), { executeJavaScript: vi.fn(async () => { throw new Error('navigating') }) })
+    expect(await refreshArtifactShell('a')).toBe(false)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('reports false when the page has no shell to refresh', async () => {
+    openBrowserUrl('s', 'a', 'dreamcoder-project://abc/report/index.html')
     const webview = makeReady('a')
     Object.assign(webview, { executeJavaScript: vi.fn(async (_code: string) => false) })
-    expect(await refreshCanvas('a')).toBe(false)
+    expect(await refreshArtifactShell('a')).toBe(false)
   })
 
   describe('the board of a selection', () => {
@@ -756,41 +781,289 @@ describe('canvas pages', () => {
         return boardTitle
       })
       Object.assign(webview, { executeJavaScript: execute })
-      setCanvasMessageHandler('a', () => undefined)
       return execute
     }
 
     it('names the artifact and the board a selection came from', async () => {
       const execute = readyCanvas('Home')
-      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBe('flow / Home')
+      expect(await artifactReferenceLabel('a', 'dreamcoder-project://abc/flow/home.html')).toEqual({ name: 'flow / Home' })
       expect(execute.mock.calls[0]![0]).toContain('boardTitle("dreamcoder-project://abc/flow/home.html")')
     })
 
-    it('gives a text selection in a board that name in the chat', async () => {
+    it('gives a text selection in a board that name in the chat and keeps the title of its page', async () => {
       readyCanvas('Home')
       await addBrowserSelectionToChat({ guestId: 11, text: 'hello', truncated: false, title: 'Home page', url: 'dreamcoder-project://abc/flow/home.html' })
-      expect(useWorkspaceChatContextStore.getState().referencesBySession.s?.at(-1)?.name).toBe('flow / Home')
+      const reference = useWorkspaceChatContextStore.getState().referencesBySession.s?.at(-1)
+      expect(reference?.name).toBe('flow / Home')
+      expect(reference?.browser?.title).toBe('Home page')
     })
 
-    it('says nothing when the page is not a canvas, the url is not a board or the page cannot answer', async () => {
+    it('says nothing when the page is not a project page, the url is not a board or the page cannot answer', async () => {
       openBrowserUrl('s', 'a', 'https://example.com/')
-      makeReady('a', { url: 'https://example.com/' })
-      expect(await canvasBoardLabel('a', 'https://example.com/x')).toBeNull()
+      const execute = vi.fn(async () => 'Home')
+      makeReady('a', { url: 'https://example.com/', execute })
+      expect(await artifactReferenceLabel('a', 'https://example.com/x')).toBeNull()
+      expect(execute).not.toHaveBeenCalled()
       closeBrowser('a')
       readyCanvas(null)
-      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/other.html')).toBeNull()
+      expect(await artifactReferenceLabel('a', 'dreamcoder-project://abc/flow/other.html')).toBeNull()
       closeBrowser('a')
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       readyCanvas(new Error('gone'))
-      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBeNull()
+      expect(await artifactReferenceLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBeNull()
       expect(warn).toHaveBeenCalled()
-    })
-
-    it('says nothing for a tab that has no canvas handler', async () => {
-      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
-      Object.assign(makeReady('a', { url: 'dreamcoder-project://abc/flow/index.html' }), { executeJavaScript: vi.fn(async () => 'Home') })
-      expect(await canvasBoardLabel('a', 'dreamcoder-project://abc/flow/home.html')).toBeNull()
     })
   })
 })
 
+describe('deck pages', () => {
+  const PAGE = 'dreamcoder-project://abc/talk/index.html'
+  const SCRIPT = 'dreamcoder-project://abc/__dreamcoder__/deck.js'
+  const state = (overrides: Record<string, unknown> = {}) => ({ type: 'state', artifact: 'deck-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse', ...overrides })
+  const log = (webview: HTMLElement, payload: unknown, sourceId = SCRIPT) =>
+    webview.dispatchEvent(Object.assign(new Event('console-message'), { message: `dreamcoder-deck:${JSON.stringify(payload)}`, sourceId }))
+  const deckOf = (tabId: string) => useBrowserStore.getState().pageByTab[tabId]?.deck
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  function openDeck(tabId = 'a', sessionId: string | null = 's') {
+    openBrowserUrl(sessionId, tabId, PAGE)
+    const execute = vi.fn(async (_code: string): Promise<unknown> => undefined)
+    const webview = makeReady(tabId, { url: `${PAGE}#agenda`, execute })
+    execute.mockClear()
+    return { webview, execute }
+  }
+
+  beforeEach(() => {
+    artifactApiMocks.list.mockResolvedValue({ artifacts: [] })
+  })
+
+  describe('the state of the deck', () => {
+    it('keeps what the deck script reports for the tab, whoever opened it', () => {
+      const { webview } = openDeck()
+      log(webview, state())
+      expect(deckOf('a')).toEqual({ artifact: 'deck-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse' })
+      log(webview, state({ slide: 'numbers', title: 'numbers', index: 2, mode: 'overview' }))
+      expect(deckOf('a')).toMatchObject({ slide: 'numbers', index: 2, mode: 'overview' })
+    })
+
+    it('ignores a state that another script logged or that is not a state', () => {
+      const { webview } = openDeck()
+      log(webview, state(), 'dreamcoder-project://abc/talk/embeds/demo.html')
+      log(webview, state(), 'https://example.com/__dreamcoder__/deck.js')
+      log(webview, state({ mode: 'edit' }))
+      log(webview, state({ index: 3 }))
+      expect(deckOf('a')).toBeNull()
+    })
+
+    it('forgets the deck when the tab goes to another page, and not when the deck only changes its address', () => {
+      const { webview } = openDeck()
+      log(webview, state())
+      webview.dispatchEvent(Object.assign(new Event('did-navigate-in-page'), { url: `${PAGE}#numbers` }))
+      expect(deckOf('a')).not.toBeNull()
+      webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'https://example.com/' }))
+      expect(deckOf('a')).toBeNull()
+    })
+  })
+
+  describe('recognising the artifact of a tab', () => {
+    const item = (overrides: Record<string, unknown> = {}) => ({
+      id: 'deck-1',
+      name: 'talk',
+      artifactsDir: '/repo/dc_artifacts',
+      workDir: '/repo',
+      latestMtimeMs: 42,
+      manifest: { version: 1, id: 'deck-1', kind: 'deck', title: 'Talk', entry: 'index.html' },
+      ...overrides,
+    })
+
+    beforeEach(() => {
+      artifactApiMocks.list.mockResolvedValue({ artifacts: [item()] })
+      artifactApiMocks.open.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/talk/index.html' })
+      shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: PAGE })
+    })
+
+    it('gives a tab the agent opened the root and the artifact of the deck it shows, once the address is confirmed to be its entry', async () => {
+      const { webview } = openDeck()
+      log(webview, state())
+      await flush()
+
+      expect(artifactApiMocks.open).toHaveBeenCalledWith('/repo/dc_artifacts', 'talk')
+      expect(shellMocks.resolveBrowserInput).toHaveBeenCalledWith(expect.objectContaining({ input: '/repo/dc_artifacts/talk/index.html', projectRoot: '/repo/dc_artifacts' }))
+      expect(browserTab('a')).toMatchObject({ root: '/repo/dc_artifacts', artifact: { id: 'deck-1', name: 'talk', mtimeMs: 42, deck: true } })
+    })
+
+    it('does the same for a canvas that says which artifact it is', async () => {
+      artifactApiMocks.list.mockResolvedValue({ artifacts: [item({ id: 'canvas-1', name: 'flow', workDir: null, manifest: { version: 1, id: 'canvas-1', kind: 'canvas', title: 'Flow', entry: 'index.html' } })] })
+      shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://abc/flow/index.html' })
+      openBrowserUrl('s', 'a', 'dreamcoder-project://abc/flow/index.html')
+      const webview = makeReady('a', { url: 'dreamcoder-project://abc/flow/index.html' })
+      webview.dispatchEvent(Object.assign(new Event('console-message'), { message: 'dreamcoder-canvas:{"type":"ready","artifact":"canvas-1"}', sourceId: 'dreamcoder-project://abc/__dreamcoder__/canvas.js' }))
+      await flush()
+
+      expect(artifactApiMocks.open).toHaveBeenCalledWith('global', 'flow')
+      expect(browserTab('a')).toMatchObject({ root: 'global', artifact: { id: 'canvas-1', name: 'flow', canvas: true } })
+    })
+
+    it('checks once for a deck, not again on every page turn', async () => {
+      artifactApiMocks.list.mockResolvedValue({ artifacts: [] })
+      const { webview } = openDeck()
+      log(webview, state())
+      log(webview, state({ slide: 'numbers', title: 'numbers', index: 2 }))
+      await flush()
+      expect(artifactApiMocks.list).toHaveBeenCalledOnce()
+
+      webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: PAGE }))
+      log(webview, state())
+      await flush()
+      expect(artifactApiMocks.list).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not believe the id a page reports when the address of the tab is not the entry of that artifact', async () => {
+      shellMocks.resolveBrowserInput.mockResolvedValue({ ok: true, url: 'dreamcoder-project://abc/real-talk/index.html' })
+      const { webview } = openDeck()
+      log(webview, state())
+      await flush()
+      expect(browserTab('a')).not.toHaveProperty('artifact')
+      expect(browserTab('a')).not.toHaveProperty('root')
+    })
+
+    it('leaves a deck that is not a registered artifact, such as a template preview, with its controls only', async () => {
+      artifactApiMocks.list.mockResolvedValue({ artifacts: [] })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const { webview } = openDeck()
+      log(webview, state({ artifact: 'template-deck' }))
+      await flush()
+      expect(deckOf('a')).not.toBeNull()
+      expect(browserTab('a')).not.toHaveProperty('artifact')
+      expect(artifactApiMocks.open).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it('asks nothing for a tab that already has its artifact, a template preview or a page outside a chat', async () => {
+      useWorkspacePanelStore.getState().patchTab('s', 'a', { root: '/repo/dc_artifacts', artifact: { id: 'deck-1', name: 'talk', mtimeMs: 1, deck: true } })
+      log(openDeck('a').webview, state())
+      log(openDeck('viewer', null).webview, state())
+      await flush()
+      expect(artifactApiMocks.list).not.toHaveBeenCalled()
+      expect(browserTab('a')).toMatchObject({ artifact: { mtimeMs: 1 } })
+      closeBrowser('viewer')
+    })
+
+    it('does not give the tab an artifact when the tab left the page while it was being checked', async () => {
+      const { webview } = openDeck()
+      log(webview, state())
+      Object.assign(webview, { getURL: vi.fn(() => 'https://example.com/') })
+      await flush()
+      expect(browserTab('a')).not.toHaveProperty('artifact')
+    })
+  })
+
+  describe('presenting', () => {
+    let fullscreenElement: Element | null
+
+    beforeEach(() => {
+      fullscreenElement = null
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fullscreenElement })
+      Object.defineProperty(document, 'exitFullscreen', {
+        configurable: true,
+        value: vi.fn(async () => {
+          fullscreenElement = null
+          document.dispatchEvent(new Event('fullscreenchange'))
+        }),
+      })
+    })
+
+    afterEach(() => {
+      Reflect.deleteProperty(document, 'fullscreenElement')
+      Reflect.deleteProperty(document, 'exitFullscreen')
+    })
+
+    function fullscreenSlot(tabId: string) {
+      const { slot } = webviewOf(tabId)
+      slot.requestFullscreen = vi.fn(async () => {
+        fullscreenElement = slot
+        document.dispatchEvent(new Event('fullscreenchange'))
+      })
+      return slot
+    }
+
+    it('makes the slot that holds the page full screen, gives the page the keyboard and then starts the presentation', async () => {
+      const { webview, execute } = openDeck()
+      const slot = fullscreenSlot('a')
+      await presentDeck('a')
+
+      expect(slot.requestFullscreen).toHaveBeenCalledOnce()
+      expect(webview.focus).toHaveBeenCalledOnce()
+      expect(execute.mock.calls.map((call) => call[0])).toEqual(['window.__dreamcoderDeck?.setMode("present")'])
+    })
+
+    it('leaves full screen when the page asks to leave the presentation, and then returns the deck to browse mode', async () => {
+      const { webview, execute } = openDeck()
+      fullscreenSlot('a')
+      await presentDeck('a')
+      log(webview, state({ mode: 'present' }))
+      execute.mockClear()
+
+      log(webview, { type: 'exit' })
+      expect(document.exitFullscreen).toHaveBeenCalledOnce()
+      expect(execute.mock.calls.map((call) => call[0])).toEqual(['window.__dreamcoderDeck?.setMode("browse")'])
+    })
+
+    it('returns the deck to browse mode when the system ends full screen', async () => {
+      const { webview, execute } = openDeck()
+      fullscreenSlot('a')
+      await presentDeck('a')
+      log(webview, state({ mode: 'present' }))
+      execute.mockClear()
+
+      fullscreenElement = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+      expect(execute.mock.calls.map((call) => call[0])).toEqual(['window.__dreamcoderDeck?.setMode("browse")'])
+    })
+
+    it('returns a deck that presents without full screen to browse mode when the page asks to leave', () => {
+      const { webview, execute } = openDeck()
+      log(webview, { type: 'exit' })
+      expect(document.exitFullscreen).not.toHaveBeenCalled()
+      expect(execute.mock.calls.map((call) => call[0])).toEqual(['window.__dreamcoderDeck?.setMode("browse")'])
+    })
+  })
+
+  describe('references to a slide', () => {
+    it('names the artifact and the current slide, and puts the file of the slide in the title the agent reads', async () => {
+      const { webview, execute } = openDeck()
+      log(webview, state())
+      expect(await artifactReferenceLabel('a', `${PAGE}#agenda`)).toEqual({ name: 'talk / Agenda', title: 'slides/agenda.html · Agenda' })
+      expect(execute).not.toHaveBeenCalled()
+    })
+
+    it('gives a text selection on a slide, or inside a page embedded in it, that name and title', async () => {
+      const { webview } = openDeck()
+      log(webview, state())
+      await addBrowserSelectionToChat({ guestId: 11, text: 'hello', truncated: false, title: 'Demo', url: 'dreamcoder-project://abc/talk/embeds/demo.html' })
+      const reference = useWorkspaceChatContextStore.getState().referencesBySession.s?.at(-1)
+      expect(reference?.name).toBe('talk / Agenda')
+      expect(reference?.browser?.title).toBe('slides/agenda.html · Agenda')
+    })
+  })
+
+  it('reads the place of the current slide from the deck and refuses anything that is not a rectangle', async () => {
+    const { execute } = openDeck()
+    execute.mockResolvedValueOnce({ x: 24, y: 114, width: 960, height: 540 })
+    expect(await deckStageRect('a')).toEqual({ x: 24, y: 114, width: 960, height: 540 })
+    execute.mockResolvedValueOnce({ x: 0, y: 0, width: 0, height: 0 })
+    expect(await deckStageRect('a')).toBeNull()
+    execute.mockResolvedValueOnce(null)
+    expect(await deckStageRect('a')).toBeNull()
+    expect(await deckStageRect('missing')).toBeNull()
+  })
+
+  it('gives the size the page is shown at', () => {
+    openDeck()
+    expect(browserGuestSize('a')).toBeNull()
+    placeBrowserGuest('a', stageAt(10, 20, 640.4, 480), true)
+    webviewOf('a').slot.getBoundingClientRect = () => rect(10, 20, 640.4, 479.6)
+    expect(browserGuestSize('a')).toEqual({ width: 640, height: 480 })
+  })
+})

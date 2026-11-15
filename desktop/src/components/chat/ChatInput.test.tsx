@@ -22,6 +22,12 @@ const mocks = vi.hoisted(() => ({
   wsSend: vi.fn(),
   dialogOpen: vi.fn(),
   syncMarks: vi.fn(),
+  createArtifact: vi.fn(),
+  installSystem: vi.fn(),
+}))
+
+vi.mock('../../api/design', () => ({
+  designApi: { createArtifact: mocks.createArtifact, installSystem: mocks.installSystem },
 }))
 
 vi.mock('../../api/sessions', () => ({
@@ -68,6 +74,12 @@ vi.mock('../../hooks/useMobileViewport', () => ({
 
 vi.mock('../controls/PermissionModeSelector', () => ({
   PermissionModeSelector: () => <button type="button">Permissions</button>,
+}))
+
+vi.mock('../shared/DirectoryPicker', () => ({
+  DirectoryPicker: ({ onChange }: { onChange: (path: string) => void }) => (
+    <button type="button" onClick={() => onChange('/other')}>Pick project</button>
+  ),
 }))
 
 vi.mock('../controls/ModelSelector', () => ({
@@ -1367,6 +1379,328 @@ describe('ChatInput file mentions', () => {
         .getAllByRole('button')
         .filter((button) => button.textContent?.startsWith('/'))
       expect(commandButtons[0]).toHaveTextContent('/superpowers:brainstorming')
+    })
+  })
+
+  describe('with a start from the Design or Slides page', () => {
+    const grove = { command: '/slides' as const, template: { id: 'grove', title: 'Grove', project: '/repo' } }
+    const lastMessage = () => useChatStore.getState().sessions[sessionId]?.messages.at(-1)
+
+    beforeEach(() => {
+      mocks.createArtifact.mockResolvedValue({ dir: '/repo/dc_artifacts/grove' })
+      mocks.installSystem.mockResolvedValue({ dir: '/repo/dc_artifacts/systems/paper' })
+    })
+
+    it('shows the start as a chip with a question for it in an empty chat, and takes the focus', async () => {
+      useSessionStore.setState({
+        sessions: [{ ...useSessionStore.getState().sessions[0]!, messageCount: 0 }],
+      })
+      useChatStore.setState({ sessions: { [sessionId]: { ...useChatStore.getState().sessions[sessionId]!, messages: [] } } })
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+
+      render(<ChatInput sessionId={sessionId} variant="hero" />)
+
+      expect(screen.getByText('Slides · Grove')).toBeInTheDocument()
+      const input = screen.getByRole('textbox')
+      expect(input).toHaveAttribute('placeholder', 'What is this deck about, and who is it for?')
+      expect(input).toHaveFocus()
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled())
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+    })
+
+    it('keeps the chip when picking another branch replaces the empty session, and sends it from the new one', async () => {
+      mocks.create.mockResolvedValueOnce({ sessionId: 'created-direct', workDir: '/repo' })
+      useSessionStore.setState({
+        sessions: [{ ...useSessionStore.getState().sessions[0]!, messageCount: 0 }],
+      })
+      useChatStore.setState({ sessions: { [sessionId]: { ...useChatStore.getState().sessions[sessionId]!, messages: [] } } })
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} variant="hero" />)
+
+      fireEvent.click(await screen.findByRole('button', { name: /Select branch: main/ }))
+      fireEvent.click(await screen.findByRole('option', { name: /feature\/a/ }))
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Q3 results', selectionStart: 10 } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith('created-direct', expect.objectContaining({
+        content: '/slides /repo/dc_artifacts/grove Q3 results',
+        title: 'Q3 results',
+      })))
+      expect(useWorkspaceChatContextStore.getState().startsBySession['created-direct']).toBeUndefined()
+    })
+
+    it('carries the chip over when picking another folder replaces the empty session', async () => {
+      mocks.create.mockResolvedValueOnce({ sessionId: 'created-elsewhere', workDir: '/other' })
+      useSessionStore.setState({
+        sessions: [{ ...useSessionStore.getState().sessions[0]!, messageCount: 0 }],
+      })
+      useChatStore.setState({ sessions: { [sessionId]: { ...useChatStore.getState().sessions[sessionId]!, messages: [] } } })
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      const { rerender } = render(<ChatInput sessionId={sessionId} variant="hero" />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Pick project' }))
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ workDir: '/other' })))
+      rerender(<ChatInput sessionId="created-elsewhere" variant="hero" />)
+
+      expect(useWorkspaceChatContextStore.getState().startsBySession['created-elsewhere']).toEqual(grove)
+      expect(screen.getByText('Slides · Grove')).toBeInTheDocument()
+    })
+
+    it('asks a question that fits the design start and the clone', () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design' })
+      const { unmount } = render(<ChatInput sessionId={sessionId} />)
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'What should this page do, and who is it for?')
+      unmount()
+
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', cloneAddress: 'https://example.com/' })
+      render(<ChatInput sessionId={sessionId} />)
+      expect(screen.getByText('Clone example.com')).toBeInTheDocument()
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Anything to change in the copy?')
+    })
+
+    it('creates the artifact only when sent, and sends the same command as before when nothing was typed', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, {
+        type: 'user_message',
+        id: expect.any(String),
+        content: '/slides /repo/dc_artifacts/grove',
+        attachments: [],
+        title: 'Slides · Grove',
+      }))
+      expect(mocks.createArtifact).toHaveBeenCalledWith({ project: '/repo', templateId: 'grove', title: 'Grove' })
+      expect(lastMessage()).toMatchObject({ type: 'user_text', content: '', attachments: [{ type: 'artifact', name: 'Slides · Grove' }] })
+      expect(useWorkspaceChatContextStore.getState().startsBySession[sessionId]).toBeUndefined()
+      expect(screen.queryByText('Slides · Grove')).not.toBeInTheDocument()
+    })
+
+    it('puts the command first and the typed words after it, and shows the chip and the words in the chat', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: 'Q3 results for the board' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({
+        content: '/slides /repo/dc_artifacts/grove Q3 results for the board',
+        title: 'Q3 results for the board',
+      })))
+      expect(lastMessage()).toMatchObject({
+        content: 'Q3 results for the board',
+        modelContent: '/slides /repo/dc_artifacts/grove Q3 results for the board',
+        attachments: [{ type: 'artifact', name: 'Slides · Grove' }],
+      })
+      expect(input).toHaveValue('')
+    })
+
+    it('starts each design entry the same way: from scratch, with a design system, and as a clone', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', designSystem: { id: 'paper', name: 'Paper' } })
+      render(<ChatInput sessionId={sessionId} />)
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design /repo/dc_artifacts/systems/paper' })))
+      expect(mocks.installSystem).toHaveBeenCalledWith(sessionId, 'paper')
+
+      act(() => useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design', cloneAddress: 'https://example.com/' }))
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design Clone a website https://example.com/' })))
+
+      act(() => useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/design' }))
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenLastCalledWith(sessionId, expect.objectContaining({ content: '/design', title: 'Design' })))
+    })
+
+    it('keeps the chip and the typed words when the artifact could not be created, so the user can send again', async () => {
+      mocks.createArtifact.mockRejectedValueOnce(new Error('disk full'))
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Q3 results' } })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('disk full'))
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+      expect(input).toHaveValue('Q3 results')
+      expect(screen.getByText('Slides · Grove')).toBeInTheDocument()
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({ content: '/slides /repo/dc_artifacts/grove Q3 results' })))
+    })
+
+    it('sends a plain message once the chip is removed', async () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, grove)
+      render(<ChatInput sessionId={sessionId} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Slides · Grove' }))
+      expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Ask Claude to edit, debug or explain...')
+      expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled()
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'hello' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, { type: 'user_message', id: expect.any(String), content: 'hello', attachments: [] })
+      expect(mocks.createArtifact).not.toHaveBeenCalled()
+      expect(useWorkspaceChatContextStore.getState().startsBySession[sessionId]).toBeUndefined()
+    })
+  })
+
+  describe('typing /slides or /design', () => {
+    const startOf = () => useWorkspaceChatContextStore.getState().startsBySession[sessionId]
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn()
+      useChatStore.setState({
+        sessions: {
+          [sessionId]: {
+            ...useChatStore.getState().sessions[sessionId]!,
+            slashCommands: [
+              { name: 'slides', description: 'Make a slide deck' },
+              { name: 'design', description: 'Design a page' },
+            ],
+          },
+        },
+      })
+    })
+
+    const expectChip = (input: HTMLElement, name: string, value: string, placeholder: string) => {
+      expect(screen.getByText(name)).toBeInTheDocument()
+      expect(input).toHaveValue(value)
+      expect(input).toHaveAttribute('placeholder', placeholder)
+      expect(input).toHaveFocus()
+      expect(mocks.wsSend).not.toHaveBeenCalled()
+    }
+
+    it('turns the command picked with the mouse in the slash menu into a chip', async () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/sli', selectionStart: 4 } })
+
+      fireEvent.click(await screen.findByRole('button', { name: /\/slides/ }))
+
+      expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+      expect(startOf()).toEqual({ command: '/slides' })
+    })
+
+    it('turns the command picked with Tab or Enter in the slash menu into a chip', async () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/desi', selectionStart: 5 } })
+      await screen.findByRole('button', { name: /\/design/ })
+      fireEvent.keyDown(input, { key: 'Tab' })
+      expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+      await act(() => new Promise(requestAnimationFrame))
+
+      fireEvent.change(input, { target: { value: '/sli', selectionStart: 4 } })
+      await screen.findByRole('button', { name: /\/slides/ })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+    })
+
+    it('turns a whole command followed by Enter into a chip instead of sending it', async () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/slides', selectionStart: 7 } })
+      await screen.findByRole('button', { name: /\/slides/ })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+    })
+
+    it('turns a whole command and Enter into a chip even when the list does not have it, instead of picking a similar command', async () => {
+      useChatStore.setState({
+        sessions: {
+          [sessionId]: {
+            ...useChatStore.getState().sessions[sessionId]!,
+            slashCommands: [{ name: 'design-interview', description: 'Interview about a design' }],
+          },
+        },
+      })
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/design', selectionStart: 7 } })
+      await screen.findByRole('button', { name: /\/design-interview/ })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+      expect(input).not.toHaveValue('/design-interview ')
+    })
+
+    it('turns the command into a chip at the space after it and keeps what follows as the words', async () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: '/slides ', selectionStart: 8 } })
+      expectChip(input, 'Slides', '', 'What is this deck about, and who is it for?')
+
+      fireEvent.change(input, { target: { value: 'Q3 results', selectionStart: 10 } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({ content: '/slides Q3 results', title: 'Q3 results' })))
+      expect(useChatStore.getState().sessions[sessionId]?.messages.at(-1)).toMatchObject({
+        content: 'Q3 results',
+        attachments: [{ type: 'artifact', name: 'Slides' }],
+      })
+    })
+
+    it('turns pasted text that starts with the command into a chip and the words', () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.paste(input, { clipboardData: { items: [], getData: () => '/design' } })
+      fireEvent.change(input, { target: { value: '/design', selectionStart: 7 } })
+      expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+
+      act(() => useWorkspaceChatContextStore.getState().clearStart(sessionId))
+      fireEvent.paste(input, { clipboardData: { items: [], getData: () => '/slides about the launch' } })
+      fireEvent.change(input, { target: { value: '/slides about the launch', selectionStart: 24 } })
+      expectChip(input, 'Slides', 'about the launch', 'What is this deck about, and who is it for?')
+    })
+
+    it('replaces a chip that is already there', () => {
+      useWorkspaceChatContextStore.getState().setStart(sessionId, { command: '/slides', template: { id: 'grove', title: 'Grove', project: '/repo' } })
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: '/design ', selectionStart: 8 } })
+
+      expect(screen.queryByText('Slides · Grove')).not.toBeInTheDocument()
+      expectChip(input, 'Design', '', 'What should this page do, and who is it for?')
+      expect(startOf()).toEqual({ command: '/design' })
+    })
+
+    it('leaves other slash commands as they were', async () => {
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: '/review', selectionStart: 7 } })
+      await screen.findByRole('button', { name: /\/review/ })
+
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, { type: 'user_message', id: expect.any(String), content: '/review', attachments: [] })
+      expect(startOf()).toBeUndefined()
+    })
+
+    it('works while a turn is running and sends the chip as a command, not as a queued message', async () => {
+      useChatStore.setState({ sessions: { [sessionId]: { ...useChatStore.getState().sessions[sessionId]!, chatState: 'streaming' } } })
+      render(<ChatInput sessionId={sessionId} />)
+      const input = screen.getByRole('textbox')
+
+      fireEvent.change(input, { target: { value: '/slides Q3 results', selectionStart: 18 } })
+      expect(screen.getByText('Slides')).toBeInTheDocument()
+      expect(input).toHaveValue('Q3 results')
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(mocks.wsSend).toHaveBeenCalledWith(sessionId, expect.objectContaining({ content: '/slides Q3 results', title: 'Q3 results' })))
+      expect(useChatStore.getState().sessions[sessionId]?.messages.at(-1)).toMatchObject({ type: 'user_text', content: 'Q3 results' })
     })
   })
 })

@@ -16,6 +16,8 @@ export const BROWSER_EXPORT_FORMATS = ['pdf', 'png', 'html'] as const
 export type BrowserExportFormat = (typeof BROWSER_EXPORT_FORMATS)[number]
 
 export type BrowserExportMessages = { externalLinks: string; proceed: string; cancel: string }
+export type BrowserExportViewport = { width: number; height: number; scale?: number; wholePage: boolean }
+export type BrowserCaptureRect = { x: number; y: number; width: number; height: number }
 
 export type BrowserExportResult =
   | { status: 'saved'; path: string }

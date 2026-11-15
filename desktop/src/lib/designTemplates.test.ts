@@ -23,46 +23,54 @@ const templates = [
 
 const ids = (found: DesignTemplate[]) => found.map((item) => item.id)
 
+const ALL = ['web', 'prototype', 'slides'] as const
+
 describe('filterDesignTemplates', () => {
-  it('keeps everything without a category and a query', () => {
-    expect(filterDesignTemplates(templates, null, '  ')).toHaveLength(3)
+  it('keeps only the templates of the given categories', () => {
+    const withSlides = [...templates, template('talk', 'slides')]
+    expect(ids(filterDesignTemplates(withSlides, ['web', 'prototype'], ''))).toEqual(['saas-landing', 'kanban', 'blog'])
+    expect(ids(filterDesignTemplates(withSlides, ['slides'], ''))).toEqual(['talk'])
+  })
+
+  it('keeps everything of every category without a query', () => {
+    expect(filterDesignTemplates(templates, ALL, '  ')).toHaveLength(3)
   })
 
   it('matches the id', () => {
-    expect(ids(filterDesignTemplates(templates, null, 'saas-land'))).toEqual(['saas-landing'])
+    expect(ids(filterDesignTemplates(templates, ALL, 'saas-land'))).toEqual(['saas-landing'])
   })
 
   it('matches the English title', () => {
-    expect(ids(filterDesignTemplates(templates, null, 'task board'))).toEqual(['kanban'])
+    expect(ids(filterDesignTemplates(templates, ALL, 'task board'))).toEqual(['kanban'])
   })
 
   it('matches the Chinese title', () => {
-    expect(ids(filterDesignTemplates(templates, null, '日志'))).toEqual(['blog'])
+    expect(ids(filterDesignTemplates(templates, ALL, '日志'))).toEqual(['blog'])
   })
 
   it('matches the English description', () => {
-    expect(ids(filterDesignTemplates(templates, null, 'pricing'))).toEqual(['saas-landing'])
+    expect(ids(filterDesignTemplates(templates, ALL, 'pricing'))).toEqual(['saas-landing'])
   })
 
   it('matches the Chinese description', () => {
-    expect(ids(filterDesignTemplates(templates, null, '分栏'))).toEqual(['kanban'])
+    expect(ids(filterDesignTemplates(templates, ALL, '分栏'))).toEqual(['kanban'])
   })
 
   it('matches any one of the tags', () => {
-    expect(ids(filterDesignTemplates(templates, null, 'drag'))).toEqual(['kanban'])
-    expect(ids(filterDesignTemplates(templates, null, 'editorial'))).toEqual(['blog'])
+    expect(ids(filterDesignTemplates(templates, ALL, 'drag'))).toEqual(['kanban'])
+    expect(ids(filterDesignTemplates(templates, ALL, 'editorial'))).toEqual(['blog'])
   })
 
   it('ignores case and surrounding spaces', () => {
-    expect(ids(filterDesignTemplates(templates, null, '  JOURNAL '))).toEqual(['blog'])
+    expect(ids(filterDesignTemplates(templates, ALL, '  JOURNAL '))).toEqual(['blog'])
   })
 
   it('combines category and query', () => {
-    expect(ids(filterDesignTemplates(templates, 'web', 'a'))).toEqual(['saas-landing', 'blog'])
-    expect(filterDesignTemplates(templates, 'prototype', 'journal')).toEqual([])
+    expect(ids(filterDesignTemplates(templates, ['web'], 'a'))).toEqual(['saas-landing', 'blog'])
+    expect(filterDesignTemplates(templates, ['prototype'], 'journal')).toEqual([])
   })
 
   it('returns nothing when no field matches', () => {
-    expect(filterDesignTemplates(templates, null, 'zzz')).toEqual([])
+    expect(filterDesignTemplates(templates, ALL, 'zzz')).toEqual([])
   })
 })

@@ -760,6 +760,23 @@ describe('artifact tabs', () => {
     expect(tabs[1] && 'artifact' in tabs[1] ? tabs[1].artifact : null).not.toHaveProperty('canvas')
   })
 
+  it('marks the tab of a deck artifact, and keeps the mark after a restart', async () => {
+    mocks.openArtifactMock.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/talk/index.html' })
+    await useWorkspacePanelStore.getState().openArtifact('s1', { ...item, name: 'talk', id: 'id-talk', manifest: { version: 1, id: 'id-talk', kind: 'deck', title: 'Talk', entry: 'index.html' } }, root)
+    const [opened] = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs
+    expect(opened).toMatchObject({ artifact: { id: 'id-talk', deck: true } })
+    expect(opened && 'artifact' in opened ? opened.artifact : null).not.toHaveProperty('canvas')
+
+    const saved = JSON.parse(localStorage.getItem('dreamcoder-workspace-panels')!)
+    saved.s2 = { isOpen: true, tabs: [{ id: 'bad', kind: 'browser', url: '', title: '', artifact: { id: 'x', name: 'x', mtimeMs: 1, deck: 'yes' } }], activeTabId: 'bad' }
+    localStorage.setItem('dreamcoder-workspace-panels', JSON.stringify(saved))
+    vi.resetModules()
+    const restarted = await import('./workspacePanelStore')
+    const restored = restarted.useWorkspacePanelStore.getState().panelByTab
+    expect(restored.s1?.tabs[0]).toMatchObject({ artifact: { id: 'id-talk', deck: true } })
+    expect(restored.s2?.tabs).toEqual([])
+  })
+
   it('keeps the tab of a board apart from the tab of its canvas and from the tab of another board', () => {
     const store = useWorkspacePanelStore.getState()
     const artifact = { id: 'id-flow', name: 'flow', mtimeMs: 1 }

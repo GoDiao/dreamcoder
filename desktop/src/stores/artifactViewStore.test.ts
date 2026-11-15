@@ -36,19 +36,20 @@ describe('artifactViewStore', () => {
     warn.mockRestore()
   })
 
-  it('shows the design mode in place of a viewed artifact and back, without remembering it across restarts', async () => {
+  it('shows a start page in place of a viewed artifact and back, without remembering it across restarts', async () => {
     const store = await freshStore()
     store.getState().open({ id: 'id-1', name: 'report', title: 'Report' })
-    store.getState().openDesign()
+    store.getState().openStart('slides')
 
-    expect(store.getState()).toMatchObject({ viewing: null, designing: true })
-    expect((await freshStore()).getState()).toMatchObject({ viewing: null, designing: false })
+    expect(store.getState()).toMatchObject({ viewing: null, starting: 'slides' })
+    expect((await freshStore()).getState()).toMatchObject({ viewing: null, starting: null })
 
     store.getState().open({ id: 'id-2', name: 'other', title: 'Other' })
-    expect(store.getState()).toMatchObject({ viewing: { id: 'id-2' }, designing: false })
+    expect(store.getState()).toMatchObject({ viewing: { id: 'id-2' }, starting: null })
 
-    store.getState().openDesign()
-    store.getState().closeDesign()
-    expect(store.getState().designing).toBe(false)
+    store.getState().openStart('design')
+    expect(store.getState().starting).toBe('design')
+    store.getState().closeStart()
+    expect(store.getState().starting).toBeNull()
   })
 })

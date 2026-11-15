@@ -122,6 +122,36 @@ describe('standalone HTML', () => {
     expect(externalLinks).toEqual([])
   })
 
+  it('inlines a same-origin iframe from the source of its file, with what that file refers to, into srcdoc', async () => {
+    file('/embeds/chart.html', '<!doctype html><html><head><link rel="stylesheet" href="chart.css"></head><body><img src="../assets/a.png"><script src="lib.js"></script></body></html>', 'text/html')
+    file('/embeds/chart.css', 'body{background:url(bg.png)}', 'text/css')
+    file('/embeds/bg.png', 'EMBEDBG', 'image/png')
+    file('/embeds/lib.js', 'draw()', 'text/javascript')
+    file('/assets/a.png', 'ASSET', 'image/png')
+    document.body.innerHTML = '<iframe src="embeds/chart.html" class="chart"></iframe>'
+
+    const { html } = await build()
+    const frame = new DOMParser().parseFromString(html, 'text/html').querySelector('iframe')!
+    const srcdoc = frame.getAttribute('srcdoc') ?? ''
+
+    expect(frame.hasAttribute('src')).toBe(false)
+    expect(frame.className).toBe('chart')
+    expect(srcdoc.startsWith('<!DOCTYPE html>')).toBe(true)
+    expect(srcdoc).toContain(dataUri('EMBEDBG', 'image/png'))
+    expect(srcdoc).toContain(dataUri('ASSET', 'image/png'))
+    expect(srcdoc).toContain('<script>draw()</script>')
+    expect(fetched).toContain(`${origin}/embeds/chart.html`)
+  })
+
+  it('leaves an iframe of another site in place and reports it as an external address', async () => {
+    document.body.innerHTML = '<iframe src="https://example.com/embed"></iframe><iframe src="/gone.html"></iframe>'
+    const { html, externalLinks } = await build()
+    expect(html).toContain('<iframe src="https://example.com/embed">')
+    expect(html).toContain('<iframe src="/gone.html">')
+    expect(html).not.toContain('srcdoc')
+    expect(externalLinks).toEqual(['https://example.com/embed'])
+  })
+
   it('does not change the page it was run on', async () => {
     file('/one.png', 'ONE', 'image/png')
     document.body.innerHTML = '<img src="/one.png">'

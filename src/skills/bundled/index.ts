@@ -24,6 +24,7 @@ export function initBundledSkills(): void {
   require('./browser.js').registerBrowserSkill()
   require('./artifacts.js').registerArtifactsSkill()
   require('./design.js').registerDesignSkill()
+  require('./slides.js').registerSlidesSkill()
   if (feature('KAIROS') || feature('KAIROS_DREAM')) {
     const { registerDreamSkill } = require('./dream.js')
     registerDreamSkill()

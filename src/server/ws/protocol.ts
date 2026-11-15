@@ -64,7 +64,7 @@ export function isBrowserSearchEngineId(value: unknown): value is BrowserSearchE
 
 export type ClientMessage =
   | { type: 'prewarm_session' }
-  | { type: 'user_message'; content: string; attachments?: AttachmentRef[]; id?: string }
+  | { type: 'user_message'; content: string; attachments?: AttachmentRef[]; id?: string; title?: string }
   | { type: 'request_snapshot' }
   | {
       type: 'permission_response'

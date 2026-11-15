@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "9d5984b0-c687-4845-a1cc-3362584e3c8a",
+  "kind": "deck",
+  "title": "Biennale Yellow",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "manifesto",
+    "programme",
+    "chapter",
+    "data",
+    "quote",
+    "cal",
+    "colophon"
+  ]
+}

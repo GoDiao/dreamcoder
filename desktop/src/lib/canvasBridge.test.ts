@@ -10,10 +10,17 @@ describe('parseCanvasMessage', () => {
     expect(parseCanvasMessage(line({ type: 'open', id: 'a' }), SCRIPT)).toEqual({ type: 'open', id: 'a' })
   })
 
+  it('reads the message that says which artifact the canvas shows', () => {
+    expect(parseCanvasMessage(line({ type: 'ready', artifact: 'canvas-1' }), SCRIPT)).toEqual({ type: 'ready', artifact: 'canvas-1' })
+    expect(parseCanvasMessage(line({ type: 'ready' }), SCRIPT)).toBeNull()
+    expect(parseCanvasMessage(line({ type: 'ready', artifact: 7 }), SCRIPT)).toBeNull()
+  })
+
   it('ignores a message that did not come from the canvas script, such as one logged by a board page', () => {
     const forged = line({ type: 'open', id: 'a' })
     expect(parseCanvasMessage(forged, 'dreamcoder-project://abc/flow/home.html')).toBeNull()
     expect(parseCanvasMessage(forged, 'dreamcoder-project://abc/x/__dreamcoder__/canvas.js/../home.html')).toBeNull()
+    expect(parseCanvasMessage(forged, 'https://example.com/__dreamcoder__/canvas.js')).toBeNull()
     expect(parseCanvasMessage(forged, '')).toBeNull()
     expect(parseCanvasMessage(forged, 'not a url')).toBeNull()
   })

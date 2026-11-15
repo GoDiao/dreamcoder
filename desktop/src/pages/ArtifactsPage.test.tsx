@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ load: vi.fn() }))
 
-vi.mock('../components/design/DesignMode', () => ({ DesignMode: () => <div data-testid="design-mode" /> }))
+vi.mock('../components/design/StartPage', () => ({ StartPage: ({ scope }: { scope: string }) => <div data-testid="start-page">{scope}</div> }))
 vi.mock('../components/artifacts/ArtifactViewer', () => ({
   ArtifactViewer: ({ viewing }: { viewing: { title: string } }) => <div data-testid="viewer">{viewing.title}</div>,
 }))
@@ -207,32 +207,46 @@ describe('ArtifactsPage', () => {
     expect(titles()).toHaveLength(3)
   })
 
-  it('opens the design mode from the Design entry and shows it in place of the list', () => {
+  it('opens the design start page from the Design entry and shows it in place of the list', () => {
     setItems([item({ name: 'a' })])
     render(<ArtifactsPage />)
 
     fireEvent.click(screen.getByTestId('design-entry'))
 
-    expect(screen.getByTestId('design-mode')).toBeInTheDocument()
+    expect(screen.getByTestId('start-page')).toHaveTextContent('design')
     expect(screen.queryByTestId('artifacts-page')).not.toBeInTheDocument()
   })
 
-  it('offers the Design entry when there are no artifacts yet', () => {
+  it('opens the slides start page from the Slides entry', () => {
+    setItems([item({ name: 'a' })])
+    render(<ArtifactsPage />)
+
+    fireEvent.click(screen.getByTestId('slides-entry'))
+
+    expect(screen.getByTestId('start-page')).toHaveTextContent('slides')
+    expect(useArtifactViewStore.getState().starting).toBe('slides')
+  })
+
+  it('offers the Design and Slides entries when there are no artifacts yet', () => {
     setItems([])
     render(<ArtifactsPage />)
 
     expect(screen.getByTestId('design-entry')).toBeInTheDocument()
+    expect(screen.getByTestId('slides-entry')).toBeInTheDocument()
   })
 
-  it('shows the Design entry as a tile under Make something new, named only Design', () => {
+  it('shows Design and Slides as tiles side by side under Make something new, with nothing promised beyond them', () => {
     setItems([item({ name: 'a' })])
     render(<ArtifactsPage />)
 
-    const entry = screen.getByRole('button', { name: 'Design' })
-    expect(entry).toBe(screen.getByTestId('design-entry'))
+    const design = screen.getByRole('button', { name: 'Design' })
+    const slides = screen.getByRole('button', { name: 'Slides' })
+    expect(design).toBe(screen.getByTestId('design-entry'))
+    expect(slides).toBe(screen.getByTestId('slides-entry'))
+    expect(slides.parentElement).toBe(design.parentElement)
     expect(screen.getByText('Make something new')).toBeInTheDocument()
-    expect(screen.getByText('More types coming soon')).toBeInTheDocument()
-    expect(entry.parentElement).not.toContainElement(screen.getByRole('searchbox', { name: 'Search artifacts' }))
+    expect(screen.queryByText('More types coming soon')).not.toBeInTheDocument()
+    expect(design.parentElement).not.toContainElement(screen.getByRole('searchbox', { name: 'Search artifacts' }))
   })
 
   it('switches between cards and list, passes the layout to the cards and remembers it between visits', () => {

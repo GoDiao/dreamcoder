@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "8d1e3f45-1e0e-4fe6-b5bf-ff1373b752b4",
+  "kind": "deck",
+  "title": "Studio",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "chapter",
+    "statement",
+    "split",
+    "stats",
+    "list",
+    "quote",
+    "compare",
+    "chapter-2",
+    "statement-2",
+    "chart",
+    "end"
+  ]
+}

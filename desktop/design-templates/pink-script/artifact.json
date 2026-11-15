@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "c37f321a-fc6d-4a0c-a3db-65304dcf74ca",
+  "kind": "deck",
+  "title": "Pink Script — After Hours",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "toc",
+    "stats",
+    "section",
+    "chart",
+    "process",
+    "matrix",
+    "quote",
+    "cta"
+  ]
+}

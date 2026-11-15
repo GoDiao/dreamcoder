@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { DeckState } from '../lib/deckBridge'
 import type { BrowserRefusal } from '../lib/shell/electronBridge'
 
 type BrowserPage = {
@@ -6,6 +7,7 @@ type BrowserPage = {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
+  deck: DeckState | null
 }
 
 type BrowserNotice =
@@ -29,6 +31,7 @@ export const EMPTY_BROWSER_PAGE: BrowserPage = {
   loading: false,
   canGoBack: false,
   canGoForward: false,
+  deck: null,
 }
 
 function withoutKey<T>(record: Record<string, T>, key: string) {

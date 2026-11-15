@@ -1,9 +1,9 @@
-import { LayoutGrid, List, Palette, RefreshCw } from 'lucide-react'
+import { LayoutGrid, List, Palette, Presentation, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '../i18n'
 import { ArtifactCard } from '../components/artifacts/ArtifactCard'
 import { ArtifactViewer } from '../components/artifacts/ArtifactViewer'
-import { DesignMode } from '../components/design/DesignMode'
+import { StartPage } from '../components/design/StartPage'
 import { FormSelect } from '../components/shared/FormSelect'
 import { LoadingBlock } from '../components/shared/LoadingBlock'
 import { SearchField } from '../components/shared/SearchField'
@@ -23,6 +23,11 @@ const ALL_PROJECTS = 'all'
 const UNBOUND_PROJECT = 'unbound'
 
 type Layout = 'grid' | 'list'
+
+const START_ENTRIES = [
+  { scope: 'design', icon: Palette, label: 'design.entry' },
+  { scope: 'slides', icon: Presentation, label: 'slides.entry' },
+] as const
 
 const LAYOUTS = [
   { value: 'grid', icon: LayoutGrid, label: 'artifactsPage.layoutGrid' },
@@ -53,9 +58,9 @@ export function ArtifactsPage() {
   const load = useArtifactListStore((state) => state.load)
   const writeVersion = useArtifactStore((state) => state.writeVersion)
   const viewing = useArtifactViewStore((state) => state.viewing)
-  const designing = useArtifactViewStore((state) => state.designing)
+  const starting = useArtifactViewStore((state) => state.starting)
   const openViewer = useArtifactViewStore((state) => state.open)
-  const openDesign = useArtifactViewStore((state) => state.openDesign)
+  const openStart = useArtifactViewStore((state) => state.openStart)
   const [query, setQuery] = useState('')
   const [project, setProject] = useState(ALL_PROJECTS)
   const [layout, setLayout] = useState<Layout>(readLayout)
@@ -89,7 +94,7 @@ export function ArtifactsPage() {
   }
 
   if (viewing) return <ArtifactViewer viewing={viewing} />
-  if (designing) return <DesignMode />
+  if (starting) return <StartPage scope={starting} />
 
   const projectOptions = [
     { value: ALL_PROJECTS, label: t('artifactsPage.allProjects') },
@@ -128,23 +133,25 @@ export function ArtifactsPage() {
       <div className="px-10 pb-8">
         <p className="mb-2 text-xs text-subtle-foreground">{t('artifactsPage.makeNew')}</p>
         <div className="mb-6 flex items-center gap-6">
-          <button
-            type="button"
-            onClick={openDesign}
-            data-testid="design-entry"
-            className="group flex w-36 flex-col gap-2 text-left focus-visible:outline-none"
-          >
-            <span className="flex h-24 items-center justify-center rounded-lg border border-border bg-primary/15 text-primary transition-colors group-hover:bg-primary/20 group-focus-visible:ring-2 group-focus-visible:ring-ring">
-              <Palette aria-hidden="true" size={40} strokeWidth={1.5} />
-            </span>
-            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-              {t('design.entry')}
-              <span aria-hidden="true" className="rounded-full border border-primary px-1.5 text-3xs font-normal text-primary">
-                {t('artifactsPage.badgeNew')}
+          {START_ENTRIES.map(({ scope, icon: Icon, label }) => (
+            <button
+              key={scope}
+              type="button"
+              onClick={() => openStart(scope)}
+              data-testid={`${scope}-entry`}
+              className="group flex w-36 flex-col gap-2 text-left focus-visible:outline-none"
+            >
+              <span className="flex h-24 items-center justify-center rounded-lg border border-border bg-primary/15 text-primary transition-colors group-hover:bg-primary/20 group-focus-visible:ring-2 group-focus-visible:ring-ring">
+                <Icon aria-hidden="true" size={40} strokeWidth={1.5} />
               </span>
-            </span>
-          </button>
-          <p className="text-sm text-subtle-foreground">{t('artifactsPage.moreSoon')}</p>
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                {t(label)}
+                <span aria-hidden="true" className="rounded-full border border-primary px-1.5 text-3xs font-normal text-primary">
+                  {t('artifactsPage.badgeNew')}
+                </span>
+              </span>
+            </button>
+          ))}
         </div>
         <div className="mb-5 flex items-center gap-3">
           <SearchField

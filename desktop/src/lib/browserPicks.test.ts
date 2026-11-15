@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const shellMocks = vi.hoisted(() => ({
   setBrowserPickMode: vi.fn(),
-  canvasBoardLabel: vi.fn(async (): Promise<string | null> => null),
+  artifactReferenceLabel: vi.fn(async (): Promise<{ name: string; title?: string } | null> => null),
 }))
 
 const imageMocks = vi.hoisted(() => ({
   prepareImageDataUrl: vi.fn(async (data: string, mimeType: string) => ({ data, mimeType })),
 }))
 
-vi.mock('./browserGuests', () => ({ canvasBoardLabel: shellMocks.canvasBoardLabel }))
+vi.mock('./browserGuests', () => ({ artifactReferenceLabel: shellMocks.artifactReferenceLabel }))
 
 vi.mock('./composerAttachments', () => ({ prepareImageDataUrl: imageMocks.prepareImageDataUrl }))
 
@@ -170,11 +170,20 @@ describe('browser picks', () => {
     })
 
     it('names the artifact and board in front of the element when the pick is inside a canvas board', async () => {
-      shellMocks.canvasBoardLabel.mockResolvedValueOnce('flow / Home')
+      shellMocks.artifactReferenceLabel.mockResolvedValueOnce({ name: 'flow / Home' })
       handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
       await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
-      expect(shellMocks.canvasBoardLabel).toHaveBeenCalledWith('t', 'https://example.com/a')
+      expect(shellMocks.artifactReferenceLabel).toHaveBeenCalledWith('t', 'https://example.com/a')
       expect(references()[0]?.name).toBe('flow / Home · button.buy')
+      expect(references()[0]?.browser?.title).toBe(VALUE.title)
+    })
+
+    it('names the artifact and slide in front of the element and puts the slide file in its title when the pick is on a deck slide', async () => {
+      shellMocks.artifactReferenceLabel.mockResolvedValueOnce({ name: 'talk / Agenda', title: 'slides/agenda.html · Agenda' })
+      handleBrowserPickStarted({ tabId: 't', sessionId: 's', pickId: 'p1' })
+      await handleBrowserPickDone({ tabId: 't', sessionId: 's', pickId: 'p1', ok: true, generation: 3, value: VALUE })
+      expect(references()[0]?.name).toBe('talk / Agenda · button.buy')
+      expect(references()[0]?.browser?.title).toBe('slides/agenda.html · Agenda')
     })
 
     it('keeps only the identity of a sensitive element', async () => {

@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import { t } from '../i18n'
 import { useBrowserStore } from '../stores/browserStore'
 import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
-import { canvasBoardLabel } from './browserGuests'
+import { artifactReferenceLabel } from './browserGuests'
 import { browserReferenceFromPick, browserReferenceName } from './browserReferences'
 import { prepareImageDataUrl } from './composerAttachments'
 import {
@@ -73,11 +73,12 @@ export async function handleBrowserPickDone(event: BrowserPickDone) {
       toast.error(t('browser.pickScreenshotFailed'))
     }
   }
-  const board = await canvasBoardLabel(event.tabId, browser.url)
+  const label = await artifactReferenceLabel(event.tabId, browser.url)
+  if (label?.title) browser.title = label.title
   store.replaceReference(event.sessionId, id, {
     kind: 'browser',
     path: browser.url,
-    name: board ? `${board} · ${browserReferenceName(browser)}` : browserReferenceName(browser),
+    name: label ? `${label.name} · ${browserReferenceName(browser)}` : browserReferenceName(browser),
     browser,
   })
 }

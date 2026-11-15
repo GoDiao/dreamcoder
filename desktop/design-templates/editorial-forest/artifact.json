@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "2408a40c-01e1-4a90-8137-481824c6fde0",
+  "kind": "deck",
+  "title": "Editorial Forest",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "agenda",
+    "statement",
+    "split",
+    "chart",
+    "plan",
+    "numbers",
+    "summary"
+  ]
+}

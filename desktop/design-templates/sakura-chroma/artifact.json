@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "7857c223-5e7b-481b-94ff-8b1489d1f8ab",
+  "kind": "deck",
+  "title": "Sakura Chroma",
+  "entry": "index.html",
+  "slides": [
+    "cover",
+    "manifesto",
+    "catalogue",
+    "stripe",
+    "data",
+    "quote",
+    "cal",
+    "colophon"
+  ]
+}

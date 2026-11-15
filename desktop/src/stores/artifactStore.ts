@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { sessionsApi } from '../api/sessions'
-import { browserReload, refreshCanvas } from '../lib/browserGuests'
+import { tabShowsArtifact } from '../lib/artifactTabs'
+import { browserReload, refreshArtifactShell } from '../lib/browserGuests'
 import { useWorkspacePanelStore, type BrowserTabArtifact, type WorkspaceTab } from './workspacePanelStore'
 
 const REFRESH_DEBOUNCE_MS = 300
@@ -27,7 +28,7 @@ function sessionsWithArtifactTabs() {
 }
 
 async function reloadTab(tab: ArtifactTab) {
-  if (tab.artifact.canvas && tab.artifact.board === undefined && (await refreshCanvas(tab.id))) return
+  if (tab.artifact.board === undefined && (await refreshArtifactShell(tab.id))) return
   browserReload(tab.id)
 }
 
@@ -38,7 +39,7 @@ export async function reloadChangedArtifactTabs() {
       const items = [...current, ...others]
       for (const tab of tabs) {
         const item = items.find((candidate) => candidate.id === tab.artifact.id)
-        if (!item || item.latestMtimeMs <= tab.artifact.mtimeMs) continue
+        if (!item || item.latestMtimeMs <= tab.artifact.mtimeMs || !tabShowsArtifact(tab)) continue
         useWorkspacePanelStore.getState().patchTab(sessionId, tab.id, { artifact: { ...tab.artifact, mtimeMs: item.latestMtimeMs } })
         await reloadTab(tab)
       }

@@ -93,10 +93,17 @@ describe('parseArtifactManifest', () => {
     expect(error).toContain('entry is required')
   })
 
-  test('does not accept a deck as a kind', () => {
-    const { manifest, error } = parseArtifactManifest(JSON.stringify({ version: 1, id: 'd', kind: 'deck', title: 'T', entry: 'index.html' }))
+  test('accepts a deck and keeps the string ids of its slides in order', () => {
+    const base = { version: 1, id: 'd', kind: 'deck', title: 'T', entry: 'index.html' }
+    expect(parseArtifactManifest(JSON.stringify(base))).toEqual({ manifest: { version: 1, id: 'd', kind: 'deck', title: 'T', entry: 'index.html' }, error: null })
+    expect(parseArtifactManifest(JSON.stringify({ ...base, slides: ['cover', 7, 'agenda', null, 'bad id'] })).manifest?.slides).toEqual(['cover', 'agenda', 'bad id'])
+    expect(parseArtifactManifest(JSON.stringify({ ...base, slides: 'cover' })).manifest?.slides).toBeUndefined()
+  })
+
+  test('does not accept an unknown kind', () => {
+    const { manifest, error } = parseArtifactManifest(JSON.stringify({ version: 1, id: 'd', kind: 'video', title: 'T', entry: 'index.html' }))
     expect(manifest).toBeNull()
-    expect(error).toContain('kind must be one of page, canvas')
+    expect(error).toContain('kind must be one of page, canvas, deck')
   })
 
   test('treats a manifest without an id as invalid', () => {

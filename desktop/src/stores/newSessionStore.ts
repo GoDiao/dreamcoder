@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ComposerAttachment } from '../lib/composerAttachments'
+import { designStartMessage, type DesignStart } from '../lib/designStart'
 import type { PermissionMode } from '../types/settings'
 import { useSessionStore } from './sessionStore'
 import { useChatStore } from './chatStore'
@@ -9,6 +10,7 @@ import { useTabStore } from './tabStore'
 type NewSessionDraft = {
   input: string
   attachments: ComposerAttachment[]
+  start: DesignStart | null
   workDir: string
   branch: string | null
   useWorktree: boolean
@@ -18,6 +20,7 @@ type NewSessionDraft = {
 const emptyDraft: NewSessionDraft = {
   input: '',
   attachments: [],
+  start: null,
   workDir: '',
   branch: null,
   useWorktree: false,
@@ -49,7 +52,7 @@ export const useNewSessionStore = create<NewSessionStore>((set, get) => ({
     const draft = get()
     if (workDir !== undefined) {
       draft.setWorkDir(workDir)
-    } else if (!draft.input && draft.attachments.length === 0) {
+    } else if (!draft.input && draft.attachments.length === 0 && !draft.start) {
       const activeId = useTabStore.getState().activeTabId
       const session = useSessionStore.getState().sessions.find((item) => item.id === activeId)
       const inherited = session?.workDir || session?.projectRoot
@@ -61,7 +64,7 @@ export const useNewSessionStore = create<NewSessionStore>((set, get) => ({
   submit: async (permissionMode, title) => {
     const draft = get()
     const text = draft.input.trim()
-    if (draft.isSubmitting || (!text && draft.attachments.length === 0)) return
+    if (draft.isSubmitting || (!text && draft.attachments.length === 0 && !draft.start)) return
     set({ isSubmitting: true })
     try {
       const runtime = useSessionRuntimeStore.getState().selections[DRAFT_RUNTIME_SELECTION_KEY]
@@ -71,14 +74,24 @@ export const useNewSessionStore = create<NewSessionStore>((set, get) => ({
         ...(runtime ? { runtime } : {}),
       })
       set({ createdSessionId: sessionId })
-      useChatStore.getState().connectToSession(sessionId)
-      useChatStore.getState().sendMessage(sessionId, text, draft.attachments.map((attachment) => ({
+      const startMessage = draft.start ? await designStartMessage(sessionId, draft.start, text) : null
+      const attachments = draft.attachments.map((attachment) => ({
         type: attachment.type,
         name: attachment.name,
         path: attachment.path,
         data: attachment.data,
         mimeType: attachment.mimeType,
-      })))
+      }))
+      useChatStore.getState().connectToSession(sessionId)
+      if (startMessage) {
+        useChatStore.getState().sendMessage(sessionId, startMessage.content, attachments, {
+          displayContent: startMessage.displayContent,
+          displayAttachments: [startMessage.chip, ...attachments],
+          title: startMessage.title,
+        })
+      } else {
+        useChatStore.getState().sendMessage(sessionId, text, attachments)
+      }
       useSessionRuntimeStore.getState().clearSelection(DRAFT_RUNTIME_SELECTION_KEY)
       set({ ...emptyDraft, createdSessionId: null })
       const destinationTabId = useTabStore.getState().activeTabId
