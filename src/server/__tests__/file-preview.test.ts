@@ -81,6 +81,27 @@ describe('readFilePreview', () => {
     expect(preview.content).toHaveLength(ONE_KIB)
   })
 
+  it('reads a file of exactly the limit, in both modes', async () => {
+    const dir = await makeTempDir('file-preview-limit-')
+    const file = path.join(dir, 'exact.txt')
+    await fs.writeFile(file, 'a'.repeat(ONE_KIB))
+
+    for (const oversize of ['refuse', 'truncate'] as const) {
+      const preview = await readFilePreview(file, options({ oversize }))
+
+      expect(preview).toMatchObject({ state: 'text', size: ONE_KIB, readBytes: ONE_KIB, truncated: false })
+    }
+  })
+
+  it('reports an error it cannot attribute to absence', async () => {
+    const dir = await makeTempDir('file-preview-error-')
+
+    await expect(readFilePreview(path.join(dir, 'bad\u0000name.ts'), options())).resolves.toMatchObject({
+      state: 'error',
+      size: 0,
+    })
+  })
+
   it('reports a missing file instead of throwing', async () => {
     const dir = await makeTempDir('file-preview-missing-')
 

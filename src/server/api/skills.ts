@@ -37,9 +37,11 @@ type FileTreeNode = {
   children?: FileTreeNode[]
 }
 
+type SkillFileState = Exclude<FilePreviewState, 'missing' | 'error'>
+
 type SkillFile = {
   path: string
-  state: FilePreviewState
+  state: SkillFileState
   content: string
   language: string
   frontmatter?: Record<string, unknown>
@@ -131,7 +133,12 @@ async function readSkillFile(fullPath: string, relPath: string): Promise<SkillFi
   const language = detectLanguage(path.basename(fullPath))
   const preview = await readFilePreview(fullPath, { maxBytes: MAX_FILE_SIZE, oversize: 'refuse', language })
 
-  if (preview.state === 'missing' || preview.state === 'error') return null
+  if (preview.state === 'missing') return null
+
+  if (preview.state === 'error') {
+    console.error('[Skills] Failed to read skill file:', fullPath, preview.error)
+    return null
+  }
 
   const file: SkillFile = {
     path: relPath,

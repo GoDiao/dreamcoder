@@ -713,7 +713,7 @@ describe('WorkspacePanel', () => {
       entries: Array<{ name: string; path: string; isDirectory: boolean }>
     }>()
     const fileRequest = deferred<{
-      state: 'ok'
+      state: 'text'
       path: string
       content: string
       language: string
@@ -782,7 +782,7 @@ describe('WorkspacePanel', () => {
     })
     await act(async () => {
       fileRequest.resolve({
-        state: 'ok',
+        state: 'text',
         path: 'src/index.ts',
         content: 'export const ready = true',
         language: 'typescript',
@@ -979,7 +979,7 @@ describe('WorkspacePanel', () => {
         },
       }))
 
-      getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'ok', path: 'src/App.tsx', content: 'export {}', language: 'tsx', size: 9 })
+      getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'text', path: 'src/App.tsx', content: 'export {}', language: 'tsx', size: 9 })
       const view = await renderPanel('session-narrow')
 
       await clickElement(view.getByRole('treeitem', { name: 'src/App.tsx' }))
@@ -1002,7 +1002,7 @@ describe('WorkspacePanel', () => {
         'session-tree-tab': { '': { state: 'ok', path: '', entries: [{ name: 'App.tsx', path: 'App.tsx', isDirectory: false }] } },
       },
     }))
-    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'ok', path: 'App.tsx', content: 'export {}', language: 'typescript', size: 9 })
+    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'text', path: 'App.tsx', content: 'export {}', language: 'typescript', size: 9 })
 
     const view = await renderPanel('session-tree-tab')
     await act(() => {
@@ -1045,7 +1045,7 @@ describe('WorkspacePanel', () => {
           title: 'theme.ts',
           language: 'typescript',
           content: 'export const theme = "dark"',
-          state: 'ok',
+          state: 'text',
           size: 27,
         }]),
     }))
@@ -1188,7 +1188,7 @@ describe('WorkspacePanel', () => {
           title: 'README.md',
           language: 'markdown',
           content: '# Project Notes\n\n- **Done** item\n\n```ts\nexport const ok = true\n```',
-          state: 'ok',
+          state: 'text',
           size: 70,
         }]),
     }))
@@ -1279,7 +1279,7 @@ describe('WorkspacePanel', () => {
           title: 'App.ts',
           language: 'text',
           content: 'const a = 1\nconst b = 2',
-          state: 'ok',
+          state: 'text',
           size: 24,
         }]),
       }))
@@ -1342,7 +1342,7 @@ describe('WorkspacePanel', () => {
         title: 'README.md',
         language: 'markdown',
         content: '# Project Notes\n\nShip the release.',
-        state: 'ok',
+        state: 'text',
         size: 34,
       }]),
     }))
@@ -1400,7 +1400,7 @@ describe('WorkspacePanel', () => {
         ? { state: 'ok', path, entries: [{ name: 'lib', path: 'src/lib', isDirectory: true }] }
         : { state: 'ok', path, entries: [{ name: 'a.ts', path: 'src/lib/a.ts', isDirectory: false }] }
     ))
-    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'ok', path: 'src/lib/a.ts', content: 'export {}', language: 'ts', size: 9 })
+    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'text', path: 'src/lib/a.ts', content: 'export {}', language: 'ts', size: 9 })
     await setWorkspaceState((state) => ({
       ...state,
       panelByTab: { ...state.panelByTab, 'session-reveal-load': { ...panelState({ id: 'files', kind: 'files' }), selectedFile: 'src/lib/a.ts' } },
@@ -1425,7 +1425,7 @@ describe('WorkspacePanel', () => {
 
   it('reveals a path segment in the file tree and opens a terminal in it from its menu', async () => {
     Object.assign(window, { [ELECTRON_BRIDGE_KEY]: {} })
-    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'ok', path: 'src/index.ts', content: 'export {}', language: 'ts', size: 9 })
+    getMocks().getWorkspaceFileMock.mockResolvedValue({ state: 'text', path: 'src/index.ts', content: 'export {}', language: 'ts', size: 9 })
     await setWorkspaceState((state) => ({
       ...state,
       panelByTab: { ...state.panelByTab, 'session-crumbs': { ...panelState({ id: 'files', kind: 'files' }), selectedFile: 'src/index.ts' } },
@@ -1764,7 +1764,7 @@ describe('WorkspacePanel', () => {
           title: 'App.tsx',
           language: 'tsx',
           content: 'const title = "Todo"\nexport default title',
-          state: 'ok',
+          state: 'text',
           size: 42,
         }]),
     }))
@@ -1802,7 +1802,7 @@ describe('WorkspacePanel', () => {
           title: 'App.ts',
           language: 'text',
           content: 'const title = "Todo"\nexport default title',
-          state: 'ok',
+          state: 'text',
           size: 42,
         }]),
     }))
@@ -1837,7 +1837,7 @@ describe('WorkspacePanel', () => {
           title: 'App.ts',
           language: 'text',
           content: 'const title = "Todo"\nexport default title',
-          state: 'ok',
+          state: 'text',
           size: 42,
         }]),
     }))
@@ -1867,7 +1867,7 @@ describe('WorkspacePanel', () => {
           title: 'App.ts',
           language: 'text',
           content: 'const title = "Todo"\nexport default title',
-          state: 'ok',
+          state: 'text',
           size: 42,
         }]),
     }))
@@ -1897,7 +1897,7 @@ describe('WorkspacePanel', () => {
           title: 'guide.md',
           language: 'markdown',
           content: '# Guide\nAlpha note and Beta note',
-          state: 'ok',
+          state: 'text',
           size: 33,
         }]),
     }))

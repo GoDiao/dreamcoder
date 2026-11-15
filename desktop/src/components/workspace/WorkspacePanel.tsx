@@ -553,7 +553,7 @@ function FileExpandedBody({
   const [wrap, setWrap] = useState(true)
   const state = loading || !entry ? 'loading' : entry.state ?? 'loading'
   const isDiff = entry?.kind === 'diff'
-  const isFileContent = state === 'text' || state === 'image' || state === 'ok'
+  const isFileContent = state === 'text' || state === 'image'
   const isImage = state === 'image'
   const isMarkdownFile = isFileContent && !isDiff && !isImage && entry ? isMarkdownPreview(entry) : false
   const isMarkdown = isMarkdownFile && (showPreview || !fill)
@@ -591,7 +591,7 @@ function FileExpandedBody({
         className={`${frameClass} bg-background`}
       />
     )
-  } else if (state === 'text' || state === 'ok') {
+  } else if (state === 'text') {
     content = (
       <CodeSurface
         path={path}
@@ -770,7 +770,7 @@ function PreviewBody({ sessionId, path, kind, fill = false, headerAction, aside,
   const fileMenu: FileMenu = [
     actions.addAction(filePath),
     actions.copySubmenu(filePath),
-    ...(entry?.state !== undefined && entry.state !== 'image' && entry.content !== undefined ? [actions.copyContents(entry.content)] : []),
+    ...(entry?.content !== undefined ? [actions.copyContents(entry.content)] : []),
   ]
   return (
     <FileExpandedBody
