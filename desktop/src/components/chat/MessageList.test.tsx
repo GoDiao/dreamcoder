@@ -45,6 +45,16 @@ function makeSessionState(overrides: Partial<PerSessionState> = {}): PerSessionS
   }
 }
 
+async function showTurnChangeFiles() {
+  const cards = await screen.findAllByRole('region', { name: 'Turn changed files' })
+  for (const card of cards) fireEvent.click(within(card).getByRole('button', { name: /files changed/ }))
+  return cards
+}
+
+function changedFile(path: string, container: HTMLElement = document.body) {
+  return within(container).queryByRole('button', { name: `Show diff for ${path}` })
+}
+
 function findTextNodeContaining(container: Element, text: string) {
   const walker = document.createTreeWalker(container, 4)
   let current = walker.nextNode()
@@ -3149,11 +3159,11 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    const cards = await screen.findAllByLabelText('Turn changed files')
+    const cards = await showTurnChangeFiles()
     expect(cards).toHaveLength(2)
-    expect(screen.getByText('src/first.ts')).toBeTruthy()
-    expect(screen.getByText('src/second.ts')).toBeTruthy()
-    expect(screen.queryByText('src/third.ts')).toBeNull()
+    expect(changedFile('src/first.ts')).toBeTruthy()
+    expect(changedFile('src/second.ts')).toBeTruthy()
+    expect(changedFile('src/third.ts')).toBeNull()
   })
 
   it('expands a historical turn diff through the turn checkpoint diff API', async () => {
@@ -3233,6 +3243,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
+    await showTurnChangeFiles()
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
     const diffSurface = await screen.findByTestId('workspace-code')
@@ -3302,6 +3313,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
+    await showTurnChangeFiles()
     fireEvent.click(await screen.findByRole('button', { name: 'Show diff for src/first.ts' }))
 
     await screen.findByTestId('workspace-code')
@@ -3367,7 +3379,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    expect(await screen.findByText('src/live.ts')).toBeTruthy()
+    await showTurnChangeFiles()
     fireEvent.click(screen.getByRole('button', { name: 'Show diff for src/live.ts' }))
     await screen.findByTestId('workspace-code')
     expect(sessionsApi.getTurnCheckpointDiff).toHaveBeenCalledWith(
@@ -3420,7 +3432,8 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    expect(await screen.findByText('src/blank-response.ts')).toBeTruthy()
+    await showTurnChangeFiles()
+    expect(changedFile('src/blank-response.ts')).toBeTruthy()
   })
 
   it('keeps historical turn change cards visible while the next turn is running', async () => {
@@ -3465,7 +3478,8 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    expect(await screen.findByText('src/first.ts')).toBeTruthy()
+    await showTurnChangeFiles()
+    expect(changedFile('src/first.ts')).toBeTruthy()
 
     act(() => {
       useChatStore.setState({
@@ -3479,7 +3493,7 @@ describe('MessageList nested tool calls', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText('src/first.ts')).toBeTruthy()
+      expect(changedFile('src/first.ts')).toBeTruthy()
     })
   })
 
@@ -3588,7 +3602,7 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    const historicalCard = (await screen.findAllByRole('region', { name: 'Turn changed files' })).find((card) => within(card).queryByText('src/first.ts'))
+    const historicalCard = (await showTurnChangeFiles()).find((card) => changedFile('src/first.ts', card))
     expect(historicalCard).toBeTruthy()
     fireEvent.click(
       within(historicalCard as HTMLElement).getByRole('button', {
@@ -3687,10 +3701,10 @@ describe('MessageList nested tool calls', () => {
 
     render(<MessageList sessionId={ACTIVE_TAB} />)
 
-    const cards = await screen.findAllByLabelText('Turn changed files')
+    const cards = await showTurnChangeFiles()
     expect(cards).toHaveLength(1)
-    expect(screen.getByText('src/first.ts')).toBeTruthy()
-    expect(screen.queryByText('src/second.ts')).toBeNull()
+    expect(changedFile('src/first.ts')).toBeTruthy()
+    expect(changedFile('src/second.ts')).toBeNull()
   })
 
   it('shows raw startup details under translated CLI startup errors', () => {

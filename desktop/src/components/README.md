@@ -59,6 +59,7 @@ that only renames props or passes them through does not belong here.
 | `CardButton` | A button with the card surface, hover, disabled and focus styles; sizing and borders come from the caller |
 | `ViewerHeader` | The header of a full-screen page viewer: back button, title and actions, as the window's title row (drag region, title bar height on macOS) |
 | `SearchField` | Input Group, Input and lucide search/clear icons |
+| `FilePathLabel` | A file path inside a row: the file name, then its folder in the subtle text color, truncated together; shared by the Changes tab and the turn change card in the conversation |
 | `SegmentedControl` | Single-selection Toggle Group |
 | `Dropdown` | Dropdown Menu radio items with optional descriptions, shared by settings selects and the workspace view switch |
 | `FormSelect` | Select with labelled triggers and empty application values encoded as nonempty Radix item values |

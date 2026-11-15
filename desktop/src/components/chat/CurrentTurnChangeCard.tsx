@@ -1,8 +1,10 @@
-import { ChevronRight, Undo2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileCode, Undo2 } from 'lucide-react'
 import { Button } from '../shared/ui/button'
-import { CardTitle, CardDescription } from '../shared/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../shared/ui/collapsible'
+import { FilePathLabel } from '../shared/FilePathLabel'
 import { useCallback, useMemo, useState } from 'react'
 import { sessionsApi, type SessionTurnCheckpoint } from '../../api/sessions'
+import { useMobileViewport } from '../../hooks/useMobileViewport'
 import { useTranslation } from '../../i18n'
 import { WorkspaceDiffSurface } from '../workspace/WorkspaceCodeSurface'
 
@@ -39,6 +41,8 @@ export function CurrentTurnChangeCard({
   onUndo,
 }: CurrentTurnChangeCardProps) {
   const t = useTranslation()
+  const isMobile = useMobileViewport()
+  const [open, setOpen] = useState(false)
   const [expandedPath, setExpandedPath] = useState<string | null>(null)
   const [diffByPath, setDiffByPath] = useState<Record<string, DiffPreviewState>>({})
 
@@ -97,9 +101,6 @@ export function CurrentTurnChangeCard({
   const cardLabel = isLatest
     ? t('chat.turnChangesLatestCardLabel')
     : t('chat.turnChangesHistoricalCardLabel')
-  const subtitle = isLatest
-    ? t('chat.turnChangesLatestSubtitle')
-    : t('chat.turnChangesHistoricalSubtitle')
   const undoLabel = isLatest
     ? t('chat.turnChangesLatestUndo')
     : t('chat.turnChangesHistoricalUndo')
@@ -108,93 +109,100 @@ export function CurrentTurnChangeCard({
     : t('chat.turnChangesHistoricalUndoAria')
 
   return (
-    <div role="region" className="mx-auto mb-5 w-full max-w-[860px] overflow-hidden rounded-xl bg-card text-sm text-card-foreground ring-1 ring-foreground/10"
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      role="region"
       aria-label={cardLabel}
+      data-testid="turn-change-card"
+      className="mx-auto mb-5 w-full max-w-[860px] overflow-hidden rounded-lg border border-border bg-card"
     >
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <CardTitle>
+      <div className="flex items-center gap-1 pr-2">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="row" type="button" className="min-w-0 flex-1">
+            <ChevronRight size={15} className="shrink-0 text-subtle-foreground transition-transform group-data-[state=open]/button:rotate-90" aria-hidden="true" />
+            <span className="min-w-0 truncate text-sm font-medium text-foreground">
               {t('chat.turnChangesTitle', { count: files.length })}
-            </CardTitle>
-            <span className="font-mono text-sm font-semibold text-success">
-              +{checkpoint.code.insertions}
             </span>
-            <span className="font-mono text-sm font-semibold text-destructive">
-              -{checkpoint.code.deletions}
+            <span className="shrink-0 whitespace-nowrap font-mono text-xs">
+              <span className="text-success">+{checkpoint.code.insertions}</span>{' '}
+              <span className="text-destructive">−{checkpoint.code.deletions}</span>
             </span>
-          </div>
-          <CardDescription>{subtitle}</CardDescription>
-        </div>
-
-        <Button variant="outline" size="sm"
+          </Button>
+        </CollapsibleTrigger>
+        <Button
+          variant="outline"
+          size={isMobile ? 'icon-sm' : 'xs'}
           type="button"
           onClick={onUndo}
           disabled={isUndoing}
           aria-label={undoAria}
+          title={isMobile ? undoLabel : undefined}
         >
-          <Undo2 data-icon="inline-start" />
-          {isUndoing ? t('chat.turnChangesUndoing') : undoLabel}
+          <Undo2 data-icon={isMobile ? undefined : 'inline-start'} aria-hidden="true" />
+          {!isMobile && (isUndoing ? t('chat.turnChangesUndoing') : undoLabel)}
         </Button>
       </div>
 
-      <div className="divide-y divide-border">
-        {files.map((fileEntry) => {
-          const isExpanded = expandedPath === fileEntry.apiPath
-          const diffState = diffByPath[fileEntry.apiPath]
-          return (
-            <div key={fileEntry.apiPath}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="row-lg"
-                aria-expanded={isExpanded}
-                onClick={() => toggleDiff(fileEntry)}
-                aria-label={t(
-                  isExpanded ? 'chat.turnChangesHideDiffAria' : 'chat.turnChangesShowDiffAria',
-                  { path: fileEntry.displayPath },
-                )}
-              >
-                <ChevronRight aria-hidden="true" className={isExpanded ? 'rotate-90' : undefined} />
-                <span className="min-w-0 flex-1 truncate font-mono text-sm">
-                  {fileEntry.displayPath}
-                </span>
-              </Button>
-
-              {isExpanded && (
-                <div className="border-t border-border bg-popover px-4 py-3">
-                  {diffState?.loading ? (
-                    <div className="text-xs text-subtle-foreground">
-                      {t('chat.turnChangesDiffLoading')}
-                    </div>
-                  ) : diffState?.error ? (
-                    <div className="text-xs text-destructive">
-                      {diffState.error}
-                    </div>
-                  ) : diffState?.diff ? (
-                    <WorkspaceDiffSurface
-                      value={diffState.diff}
-                      path={fileEntry.displayPath}
-                      className="max-h-[430px] overflow-auto rounded-md border border-border bg-code"
-                    />
-                  ) : (
-                    <div className="text-xs text-subtle-foreground">
-                      {t('chat.turnChangesDiffUnavailable')}
-                    </div>
+      <CollapsibleContent>
+        <div data-testid="turn-change-files" className="border-t border-border p-1">
+          {files.map((fileEntry) => {
+            const isExpanded = expandedPath === fileEntry.apiPath
+            const diffState = diffByPath[fileEntry.apiPath]
+            const Chevron = isExpanded ? ChevronDown : ChevronRight
+            return (
+              <div key={fileEntry.apiPath}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="row-sm"
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleDiff(fileEntry)}
+                  aria-label={t(
+                    isExpanded ? 'chat.turnChangesHideDiffAria' : 'chat.turnChangesShowDiffAria',
+                    { path: fileEntry.displayPath },
                   )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                >
+                  <Chevron size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
+                  <FileCode size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-subtle-foreground" />
+                  <FilePathLabel path={fileEntry.displayPath} />
+                </Button>
+
+                {isExpanded && (
+                  <div className="px-1.5 py-1.5">
+                    {diffState?.loading ? (
+                      <div className="text-xs text-subtle-foreground">
+                        {t('chat.turnChangesDiffLoading')}
+                      </div>
+                    ) : diffState?.error ? (
+                      <div className="text-xs text-destructive">
+                        {diffState.error}
+                      </div>
+                    ) : diffState?.diff ? (
+                      <WorkspaceDiffSurface
+                        value={diffState.diff}
+                        path={fileEntry.displayPath}
+                        className="max-h-[430px] overflow-auto rounded-md border border-border bg-code"
+                      />
+                    ) : (
+                      <div className="text-xs text-subtle-foreground">
+                        {t('chat.turnChangesDiffUnavailable')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </CollapsibleContent>
 
       {error && (
         <div className="border-t border-destructive/20 bg-destructive-surface/18 px-4 py-3 text-xs text-destructive">
           {error}
         </div>
       )}
-    </div>
+    </Collapsible>
   )
 }
 

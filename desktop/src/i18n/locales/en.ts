@@ -1504,8 +1504,6 @@ export const en = {
   'chat.turnChangesTitle': '{count} files changed',
   'chat.turnChangesLatestCardLabel': 'Turn changed files',
   'chat.turnChangesHistoricalCardLabel': 'Turn changed files',
-  'chat.turnChangesLatestSubtitle': 'Current turn checkpoint',
-  'chat.turnChangesHistoricalSubtitle': 'Saved turn checkpoint',
   'chat.turnChangesLatestUndo': 'Undo current turn',
   'chat.turnChangesHistoricalUndo': 'Rewind to before this turn',
   'chat.turnChangesUndoing': 'Undoing...',
