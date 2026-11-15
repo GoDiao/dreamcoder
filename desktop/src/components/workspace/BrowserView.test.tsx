@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   toggleBrowserPick: vi.fn(),
   stopBrowserPick: vi.fn(),
   updateUserSettings: vi.fn(),
+  useArtifactThumbnail: vi.fn(),
 }))
 
 vi.mock('../../lib/browserGuests', () => ({
@@ -46,6 +47,8 @@ vi.mock('../../lib/artifactExport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/artifactExport')>()),
   exportArtifactPage: mocks.exportArtifactPage,
 }))
+
+vi.mock('../../hooks/useArtifactThumbnail', () => ({ useArtifactThumbnail: mocks.useArtifactThumbnail }))
 
 vi.mock('../../lib/browserPicks', () => ({
   toggleBrowserPick: mocks.toggleBrowserPick,
@@ -308,6 +311,22 @@ describe('BrowserView', () => {
     expect(mocks.openBrowserUrlInSystem).toHaveBeenCalledWith('https://example.com/')
   })
 
+  describe('deck controls', () => {
+    const deck = { artifact: 'id-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse' as const }
+
+    it('shows the deck controls on any tab whose page reports a deck, with or without artifact data, and on no other tab', () => {
+      const view = render(<BrowserView sessionId="s1" tab={tab('t1', 'dreamcoder-project://id/talk/index.html')} projectRoot="/repo" />)
+      expect(screen.queryByTestId('deck-controls')).not.toBeInTheDocument()
+      act(() => useBrowserStore.getState().patchPage('t1', { deck }))
+      expect(screen.getByTestId('deck-position')).toHaveTextContent('2 / 3')
+      view.unmount()
+      cleanup()
+
+      render(<BrowserView sessionId="s1" tab={tab('t2', 'https://example.com/')} projectRoot="/repo" />)
+      expect(screen.queryByTestId('deck-controls')).not.toBeInTheDocument()
+    })
+  })
+
   describe('canvas messages', () => {
     const artifactTab = { ...tab('t1', 'dreamcoder-project://id/flow/index.html'), root: '/repo/dc_artifacts', artifact: { id: 'id-1', name: 'flow', mtimeMs: 1, canvas: true as const } }
 
@@ -373,6 +392,43 @@ describe('BrowserView', () => {
       for (const name of ['Export as PDF', 'Export as PNG image', 'Export as standalone HTML']) {
         expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('data-disabled')
       }
+    })
+
+    it('offers the three formats on a deck tab as well, and does not listen for canvas messages there', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      render(<BrowserView sessionId="s1" tab={{ ...artifactTab, url: 'dreamcoder-project://id/talk/index.html#agenda', artifact: { id: 'id-1', name: 'talk', mtimeMs: 1, deck: true } }} projectRoot="/repo" />)
+
+      await openMenu()
+
+      for (const name of ['Export as PDF', 'Export as PNG image', 'Export as standalone HTML']) {
+        expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('data-disabled')
+      }
+      expect(mocks.setCanvasMessageHandler).not.toHaveBeenCalled()
+    })
+
+    it('offers no export while an artifact tab shows another page, and offers it again when the tab is back on the artifact', async () => {
+      useBrowserStore.getState().patchPage('t1', { ready: true })
+      for (const url of ['http://localhost:3000/', 'dreamcoder-project://id/other/index.html']) {
+        const view = render(<BrowserView sessionId="s1" tab={{ ...artifactTab, url }} projectRoot="/repo" />)
+        await openMenu()
+        expect(screen.queryByRole('menuitem', { name: 'Export as PDF' })).not.toBeInTheDocument()
+        view.unmount()
+        cleanup()
+      }
+
+      render(<BrowserView sessionId="s1" tab={{ ...artifactTab, url: 'dreamcoder-project://id/report/pages/b.html' }} projectRoot="/repo" />)
+      await openMenu()
+      expect(screen.getByRole('menuitem', { name: 'Export as PDF' })).not.toHaveAttribute('data-disabled')
+    })
+
+    it('takes the thumbnail of an artifact only while its tab shows the artifact', () => {
+      const view = render(<BrowserView sessionId="s1" tab={artifactTab} projectRoot="/repo" />)
+      expect(mocks.useArtifactThumbnail).toHaveBeenLastCalledWith('t1', artifactTab.artifact)
+      view.unmount()
+      cleanup()
+
+      render(<BrowserView sessionId="s1" tab={{ ...artifactTab, url: 'http://localhost:3000/' }} projectRoot="/repo" />)
+      expect(mocks.useArtifactThumbnail).toHaveBeenLastCalledWith('t1', undefined)
     })
 
     it('disables them while the page is not ready and offers none on an ordinary page', async () => {

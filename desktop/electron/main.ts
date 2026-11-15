@@ -20,10 +20,11 @@ import { spawnSync } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { CANVAS_SHELL_DIRNAME } from '../../src/utils/canvas'
+import { ARTIFACT_SHELL_DIRNAME } from '../../src/utils/artifactShell'
 import { BROWSER_GRANT_DECISIONS, BROWSER_HOST_PATH, type BrowserGrantDecision } from '../../src/server/browserHost/protocol'
 import { BackgroundBrowserHost } from './backgroundBrowser'
-import { captureThumbnail, findGuest } from './browserCapture'
+import { captureThumbnail, findGuest, type CaptureRect } from './browserCapture'
+import { capturePagePng, MAX_CAPTURE_WIDTH, MAX_PNG_HEIGHT, type CaptureViewport } from './pageCapture'
 import { exportPage } from './pageExport'
 import {
   BROWSER_EXPORT_FORMATS,
@@ -108,7 +109,7 @@ let sidecar: SidecarRuntime | null = null
 let sidecarError: string | null = null
 let browserHost: BrowserHostHandle | null = null
 let backgroundBrowser: BackgroundBrowserHost | null = null
-let canvasShellDir = ''
+let artifactShellDir = ''
 let quitting = false
 const activeNotifications = new Set<Notification>()
 let saveTimer: NodeJS.Timeout | null = null
@@ -122,7 +123,7 @@ function hostTriple() {
   throw new Error(`unsupported platform: ${process.platform}-${process.arch}`)
 }
 
-type AppPaths = SidecarPaths & { webDist: string; canvasShellDir: string; trayIcon: string }
+type AppPaths = SidecarPaths & { webDist: string; artifactShellDir: string; trayIcon: string }
 
 function resolvePaths(): AppPaths {
   const exe = IS_WINDOWS ? '.exe' : ''
@@ -134,7 +135,7 @@ function resolvePaths(): AppPaths {
       appRoot: binDir,
       h5DistDir: dist,
       webDist: dist,
-      canvasShellDir: path.join(dist, CANVAS_SHELL_DIRNAME),
+      artifactShellDir: path.join(dist, ARTIFACT_SHELL_DIRNAME),
       trayIcon: path.join(process.resourcesPath, 'icons', 'tray.png'),
     }
   }
@@ -144,7 +145,7 @@ function resolvePaths(): AppPaths {
     ...devSidecarPaths(desktopRoot, hostTriple(), exe),
     h5DistDir: dist,
     webDist: dist,
-    canvasShellDir: path.join(desktopRoot, 'public', CANVAS_SHELL_DIRNAME),
+    artifactShellDir: path.join(desktopRoot, 'public', ARTIFACT_SHELL_DIRNAME),
     trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', 'tray.png'),
   }
 }
@@ -257,17 +258,20 @@ function showNotification(input: { title: string; body?: string; clickPayload?: 
   return true
 }
 
+function createHiddenWindow(partition: string, size: { width: number; height: number }) {
+  return new BrowserWindow({
+    show: false,
+    ...size,
+    webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false, webviewTag: false },
+  })
+}
+
 function createBackgroundBrowser() {
   return new BackgroundBrowserHost({
     createWindow: (partition) => {
       session.fromPartition(partition).setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
       session.fromPartition(partition).setPermissionCheckHandler(() => false)
-      return new BrowserWindow({
-        show: false,
-        width: 1280,
-        height: 800,
-        webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false, webviewTag: false },
-      })
+      return createHiddenWindow(partition, { width: 1280, height: 800 })
     },
     clearPartition: async (partition) => {
       const target = session.fromPartition(partition)
@@ -331,11 +335,42 @@ function exportMessagesArg(args: Record<string, unknown>): BrowserExportMessages
   }
 }
 
+function boundedNumber(value: unknown, name: string, min: number, max: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) throw new Error(`${name} must be a number between ${min} and ${max}`)
+  return value
+}
+
+function captureViewportArg(args: Record<string, unknown>): CaptureViewport | undefined {
+  const viewport = args.viewport as Record<string, unknown> | undefined
+  if (!viewport) return undefined
+  return {
+    width: Math.round(boundedNumber(viewport.width, 'viewport.width', 1, MAX_CAPTURE_WIDTH)),
+    height: Math.round(boundedNumber(viewport.height, 'viewport.height', 1, MAX_PNG_HEIGHT)),
+    ...(viewport.scale !== undefined && { scale: boundedNumber(viewport.scale, 'viewport.scale', 0.5, 4) }),
+    wholePage: viewport.wholePage === true,
+  }
+}
+
+function captureRectArg(args: Record<string, unknown>): CaptureRect | undefined {
+  const clip = args.clip as Record<string, unknown> | undefined
+  if (!clip) return undefined
+  return {
+    x: Math.round(boundedNumber(clip.x, 'clip.x', 0, MAX_CAPTURE_WIDTH)),
+    y: Math.round(boundedNumber(clip.y, 'clip.y', 0, MAX_PNG_HEIGHT)),
+    width: Math.round(boundedNumber(clip.width, 'clip.width', 1, MAX_CAPTURE_WIDTH)),
+    height: Math.round(boundedNumber(clip.height, 'clip.height', 1, MAX_PNG_HEIGHT)),
+  }
+}
+
 function exportBrowserPage(args: Record<string, unknown>) {
   return exportPage(
     browserGuest(integerArg(args, 'webContentsId')),
-    { format: exportFormatArg(args), suggestedName: String(args.suggestedName ?? ''), messages: exportMessagesArg(args) },
+    { format: exportFormatArg(args), suggestedName: String(args.suggestedName ?? ''), messages: exportMessagesArg(args), viewport: captureViewportArg(args) },
     {
+      capturePng: (url, viewport) => capturePagePng(url, viewport, {
+        createWindow: (size) => createHiddenWindow(BROWSER_PARTITION, size),
+        allowRedirect: (target) => classifyUrl(target, projectRoots) === 'allow',
+      }),
       chooseFile: async (options) => {
         const result = await dialog.showSaveDialog(window(), options)
         return result.canceled || !result.filePath ? null : result.filePath
@@ -454,7 +489,7 @@ const handlers: Record<string, Handler> = {
     await browserSession.clearAuthCache()
   },
   browser_export_page: (args) => exportBrowserPage(args),
-  browser_capture_thumbnail: (args) => captureThumbnail(browserGuest(integerArg(args, 'webContentsId'))),
+  browser_capture_thumbnail: (args) => captureThumbnail(browserGuest(integerArg(args, 'webContentsId')), captureRectArg(args)),
   browser_set_menu_labels: (args) => {
     browserMenuLabels = { addToChat: stringArg(args, 'addToChat'), copy: stringArg(args, 'copy') }
   },
@@ -575,7 +610,7 @@ function createWindow(startUrl: string) {
     session: session.fromPartition(BROWSER_PARTITION),
     roots: projectRoots,
     openFile: openProjectFile((url) => net.fetch(url)),
-    canvasShellDir,
+    artifactShellDir,
     notify: emit,
     popupMenu: (items) => Menu.buildFromTemplate(items).popup({ window: win }),
     menuLabels: () => browserMenuLabels,
@@ -632,7 +667,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     const paths = resolvePaths()
-    canvasShellDir = paths.canvasShellDir
+    artifactShellDir = paths.artifactShellDir
     if (!DEV_URL) serveDist(paths.webDist)
     installApplicationMenu()
     installTray(paths.trayIcon)

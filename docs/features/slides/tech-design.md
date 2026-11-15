@@ -1,6 +1,6 @@
 # 幻灯片（Slides）技术设计
 
-状态：草案，2026-11-15。维护者已确认的决定列在文末「已定」；已按一轮对照源码的独立审查修订（见文末「审查后的修订」），并在真实 Electron 里验证过关键假设（见「已验证」），待最终审阅。分支 `docs/slides-tech-design`，基线 `main` 的 `ee90358d`，文中代码位置以这个提交为准。没有 PRD，目标和取舍来自维护者在对话里确认的方向。
+状态：第一阶段（格式和查看）已实现，2026-11-15，分支 `feat/slides`；第二、三阶段未做。维护者已确认的决定列在文末「已定」；已按一轮对照源码的独立审查修订（见文末「审查后的修订」），并在真实 Electron 里验证过关键假设和第一阶段的实现（见「已验证」）。实现和本文原稿不一致的地方已改进正文，并逐条列在文末「第一阶段的实现」。「现状」一节描述的是实现之前的代码（基线 `main` 的 `ee90358d`），那里的代码位置以这个提交为准。没有 PRD，目标和取舍来自维护者在对话里确认的方向。
 
 ## 背景
 
@@ -44,6 +44,8 @@ Artifacts 现在有两种产物：网页（`page`）和画布（`canvas`）。�
 - H5 页面里的预览，和 Artifacts 现有范围一致。
 
 ## 现状
+
+本节是第一阶段实现之前的状态，保留作为设计的依据。
 
 - **产物种类**：`ARTIFACT_KINDS` 只有 `page`、`canvas`（`src/utils/artifacts.ts:13`）；清单解析在 `parseArtifactManifest`（`src/utils/artifacts.ts:142`），画布用 `boards` 字段列出画板。
 - **画布的做法可以照搬**：
@@ -153,7 +155,7 @@ type ArtifactManifest = {
 
 - `slides` 是页面 id 的有序列表，只给 `deck` 用。页序只存在这里。
 - 页面文件按约定是 `slides/<id>.html`，清单里不再存文件路径。id 只能是 `[A-Za-z0-9_-]{1,64}`。
-- 页面标题不存：总览和点选要用时，取这一页第一个标题元素的文字，没有就用 id。
+- 页面标题不存：点选和引用要用时，取这一页第一个标题元素（`h1` 到 `h6`）的文字，没有就用 id。
 - `slides/` 里没列进清单的文件不显示，`ArtifactCheck` 报出来。
 
 ### 入口文件
@@ -181,6 +183,7 @@ type ArtifactManifest = {
 - 画面固定 1920×1080 像素。页面里的尺寸都按这个画面写，不用视口单位，不写响应式断点。
 - 标签不限：`<section>` 里可以写任意 HTML 和 CSS。
 - 样式写在 `deck.css` 里，用类名选择，不用 `#id`。`deck.css` 不给 `html`、`body` 和 `dc-` 开头的类写规则，这些归舞台脚本。
+- 舞台给 `<section>` 定好画面尺寸、`box-sizing: border-box`、`position: relative` 和 `overflow: hidden`，其余（`display`、内边距、背景、颜色）由作者决定。没写背景的页是白底黑字，不随应用主题变。
 - **相对路径一律从产物文件夹算起**（已验证）：图片写 `assets/chart.png`，嵌入页写 `embeds/demo.html`，不写 `../assets/...`。原因是页面文件被插进 `index.html` 这个文档里显示，浏览器按 `index.html` 的位置解析路径。`deck.css` 就在产物文件夹里，它里面的 `url()` 也是同一个基准。单独打开一个页面文件，引用会失效，这是预期内的。
 - 正文不放脚本和内联事件属性。动效用 CSS（`@keyframes`、`transition`）。
 - 需要脚本的内容用嵌入页：`<iframe src="embeds/<文件>.html">`，指向产物文件夹里的一个完整 HTML 文件，在 `deck.css` 里给它定宽高。嵌入页里可以跑脚本、引用产物文件夹里的库文件。嵌入页是完整的文档，它里面的相对路径按它自己的位置解析。
@@ -196,7 +199,8 @@ type ArtifactManifest = {
 沿用清单的 `designSystem`。舞台脚本读到它，就在 `deck.css` 之前加一条指向 `../<designSystem>/tokens.css` 的样式链接。相应地：
 
 - `ArtifactCheck` 对 `deck` 只查设计系统的文件存在，不查「入口页链接了 `tokens.css`」。现有函数把两项写在一起（`src/utils/artifactCheck.ts:32-46`），要拆开。
-- 设计系统的用法说明现在要求改入口 HTML（`designSystemUsage`，`src/utils/designSystems.ts:179-184`；`/design` 的设计系统参考文件里也有同样的话）。对 `deck` 照做会改坏固定入口。这段文字改成按产物种类给：`deck` 只需在清单里写 `designSystem`。
+- 设计系统的用法说明现在要求改入口 HTML（`designSystemUsage`，`src/utils/designSystems.ts:179-184`；`/design` 的设计系统参考文件里也有同样的话）。对 `deck` 照做会改坏固定入口。这段文字改成按产物种类给：`deck` 只需在清单里写 `designSystem`。`UseDesignSystem` 工具不知道系统要用在哪种产物上，它返回的说明两种都写。
+- 设计系统的字号、间距、容器宽度是给网页定的，放到 1920×1080 的画面上太小。`/slides` 的设计系统参考文件让 Agent 只从 `var(--*)` 取颜色、字体、圆角、阴影、时长，幻灯片的字号和边距在 `deck.css` 里另定变量。
 
 ## 舞台脚本
 
@@ -213,37 +217,53 @@ type ArtifactManifest = {
 
 ```
 body
-  #dc-deck                    记当前模式
-    .dc-stage                 1920×1080，整体缩放
-      .dc-slide[data-slide]   每页一个包装，记是否当前页
-        section#<id>          页面文件的内容
+  #dc-deck[data-mode]         记当前模式
+    .dc-stage                 1920×1080，整体缩放；位置和比例记在它的 CSS 变量里
+      .dc-slide[data-slide]   每页一个包装，data-current 记是否当前页
+        section               页面文件的内容
+    .dc-notice                「还没有页面」「无法读取」
 ```
+
+舞台不给 `<section>` 加 `id`：地址里的 `#<页 id>` 如果对上某个元素的 `id`，浏览器会自己去滚动它。
+
+`deck.css` 和 `tokens.css` 用 `<link>` 加进 `<head>`（`tokens.css` 在前），这样它们里面的 `url()` 按各自的位置解析。舞台同时记着这两个文件上次取到的文本，见「刷新」。文档标题设成清单的 `title`。
 
 ### 缩放和切页
 
 - 舞台固定 1920×1080，用一个 `transform: scale()` 整体缩放到视口内，四周留边，不重排内容。
 - 非当前页用 `visibility: hidden` 加 `opacity: 0` 隐藏，不用 `display: none`。`deck.css` 里的版式类（如 `display: flex`）会盖掉 `display: none`，造成几页同时显示。
 - 留边的底色跟随应用主题，用画布已有的 `setScheme` 通道。页面内容的颜色由作者决定，不跟随主题。
+- 总览不另做一套缩略图：舞台本身变成一个网格（每格仍是 1920×1080），整个舞台用同一个 `scale()` 缩到视口宽度内，外层容器滚动。列数按视口宽度取 1 到 6。
 
 ### 三种模式
 
 | 模式 | 用途 | 分步 | 键盘 |
 |---|---|---|---|
 | 浏览（默认） | 在面板里看、评论、编辑 | 全部显示最终状态 | ←/→、PageUp/PageDown、Home/End 按页翻 |
-| 总览 | 所有页缩小排成网格，点一页回到浏览 | 最终状态 | 方向键移动选中，Enter 打开 |
-| 演示 | 全屏放映 | 按步出现 | ←/→、空格按步，Esc 退出 |
+| 总览 | 所有页缩小排成网格，点一页回到浏览 | 最终状态 | 方向键移动选中（上下按列数），Home/End，Enter 或 Esc 回到浏览 |
+| 演示 | 全屏放映 | 按步出现 | ←/→、PageUp/PageDown（翻页笔发的是这两个键）、空格按步，Home/End，Esc 退出 |
 
 总览用的是同一批节点换一种排法，不复制页面。
+
+带 Ctrl、Cmd、Alt 的按键和在输入框里的按键不处理。
+
+分步的运行状态：演示模式下，还没出现的分步元素带一个 `data-dc-pending` 属性，靠它隐藏。离开演示模式时全部去掉，所以浏览、总览和导出时 `<section>` 里没有舞台加的任何东西。
 
 ### 刷新
 
 脚本暴露 `refresh()`，产物文件变化时由渲染进程调用（见「应用侧」的「刷新」）：
 
-- 重新取清单和各页文件，和舞台记着的源文本比较。
+- 重新取清单、各页文件、`deck.css` 和 `tokens.css`，和舞台记着的文本比较。
 - 只替换内容变了的页；按新清单增加、去掉、重排页面。
-- 保留当前模式和当前页；当前页被去掉时停在相邻的页。
-- 用户正在编辑、还没提交的那一页不替换。
-- 没有变化时什么都不做。
+- `deck.css` 或 `tokens.css` 的文本变了，就给对应的 `<link>` 换一个带序号的地址让它重新加载。
+- 保留当前模式和当前页；当前页被去掉时停在相邻的页。当前页没变时不滚动总览：用户在总览里看着别处，Agent 每写一页都把画面拉回当前页是不对的。
+- 演示模式下当前页的内容变了，已经出现的步数不超过新内容的分步个数。
+- 用户正在编辑、还没提交的那一页不替换（第三阶段）。
+- 没有变化时什么都不做，也不发 `state`。
+- 清单读不出来（比如 Agent 正写到一半）时保持现有画面，只在控制台记一条；下一次文件变化会再刷新。
+- 连续的调用排队执行，不会乱序。
+
+不比较图片等其它资源：只换了一张图片而页面文件没变时，要手动重载才看得到。
 
 用整页重载代替它会把总览、演示和编辑状态全部清掉：Agent 一页一页写幻灯片时，用户会被反复扔回浏览模式。
 
@@ -266,8 +286,9 @@ body
 给独立 HTML 导出用。导出的文件里，文档已经带着渲染好的舞台，`deck.js` 被内联在里面。
 
 - 脚本等文档解析完（`DOMContentLoaded`）再判断：文档里已有 `#dc-deck` 且含页面时，不再 `fetch`，直接接管现有节点。不能在脚本一执行时就判断，因为导出文件里脚本标签可能排在舞台节点前面。
-- 接管时重置导出那一刻留下的运行状态：缩放重新计算，模式回到浏览，当前页按地址或第一页，去掉 `contenteditable`。舞台自己的样式标签带固定 id，已存在就不再加第二份。
-- 静态模式下没有编辑和调序，只有缩放、翻页和演示。
+- 接管时重置导出那一刻留下的运行状态：缩放重新计算，模式回到浏览，当前页按地址或第一页，分步的隐藏标记去掉（第三阶段再加上去掉 `contenteditable`）。舞台自己的样式标签带固定 id，已存在就不再加第二份。
+- 静态模式下没有编辑和调序，只有缩放、翻页、总览和演示。没有应用的工具条，所以多两个键：`F` 进入演示（脚本自己请求浏览器全屏），`O` 切换总览；演示里按 Esc 由脚本自己退出，不发 `exit`。留边的底部有一行很小的按键提示，只在浏览模式显示。这两个键和提示只在静态模式下有，应用里用工具条。
+- `refresh()` 在静态模式下直接返回 `false`。
 
 ### 对外接口
 
@@ -275,26 +296,25 @@ body
 
 | 方法 | 作用 |
 |---|---|
-| `state()` | 产物 id、当前页 id、序号、总页数、模式 |
-| `goTo(id)`、`next()`、`prev()` | 翻页 |
+| `state()` | 产物 id、当前页 id、当前页标题、序号（从 0 起，没有页时是 -1）、总页数、模式 |
+| `goTo(id)`、`next()`、`prev()` | 翻页；`next()`、`prev()` 在演示模式下按步走 |
 | `setMode(mode)` | 切换浏览、总览、演示 |
 | `setScheme(scheme)` | 留边底色 |
 | `refresh()` | 见「刷新」 |
 | `stageRect()` | 当前页在视口里的位置和大小，缩略图用 |
-| `overflow()` | 每一页里超出 1920×1080 画面的元素，Agent 检查用 |
-| `setEditing(on)`、`takeEdit()` | 见「用户编辑」 |
+| `overflow()` | 每一页里超出 1920×1080 画面的元素（只报最外层的那个），带类名、文字开头和以画面像素计的位置，Agent 检查用 |
+| `prepareCapture()` | 导出 PNG 用：去掉留边让当前页铺满视口，等样式表、当前页的图片和嵌入页、字体都加载完再返回 |
+| `setEditing(on)`、`takeEdit()` | 见「用户编辑」（第三阶段） |
 
 ## 应用侧
 
 ### 壳脚本的目录和常量
 
-现在目录叫 `canvas-shell`，常量叫 `CANVAS_*`。加了 `deck.js` 之后名字不再准确，改名为 `artifact-shell`，`desktop/public/artifact-shell/` 下放 `canvas.js` 和 `deck.js`。要动的地方：
+目录原来叫 `canvas-shell`，常量叫 `CANVAS_*`。加了 `deck.js` 之后名字不再准确，已改名为 `artifact-shell`，`desktop/public/artifact-shell/` 下放 `canvas.js` 和 `deck.js`：
 
-- `src/utils/canvas.ts:1-4`：保留前缀、目录名、文件白名单移到新文件 `src/utils/artifactShell.ts`；画布专有的（入口内容、画板路径规则）留下；幻灯片专有的放 `src/utils/deck.ts`。
-- `desktop/electron/main.ts`（`:23`、`:111`、`:125`、`:137`、`:147`、`:578`、`:635`）和 `desktop/electron/browser.ts`（`:277-285`、`:364`、`:479-485`）里的变量名和导入。`serveProjectRequest` 的逻辑不变，白名单多一项。
-- 测试里写死的路径：`desktop/electron/browser.test.ts`、`desktop/src/lib/canvasShell.test.ts`、`src/skills/bundled/artifacts.test.ts`。
-- `desktop/src/lib/canvasBridge.ts:2` 有自己的一份脚本路径常量（桌面前端代码不引用 `src/`），新的 `deckBridge.ts` 同样处理。
-- Artifacts 设计文档里提到目录名的两处。
+- `src/utils/artifactShell.ts`：保留前缀、目录名、文件白名单，以及画布和幻灯片共用的「固定入口」的生成和比较。`src/utils/canvas.ts` 只留画布专有的（入口内容、画板路径规则），`src/utils/deck.ts` 是幻灯片专有的（入口内容、`deck.css` 和 `slides/` 的名字、页面 id 的规则、画面尺寸）。
+- `desktop/electron/main.ts` 和 `desktop/electron/browser.ts` 里的变量名和导入。`serveProjectRequest` 的逻辑不变，白名单多一项。
+- 桌面前端代码不引用 `src/`，所以保留路径在 `desktop/src/lib/shellBridge.ts` 里另有一份，`canvasBridge.ts` 和 `deckBridge.ts` 各自拼出脚本路径。
 - 打包不受影响：`electron-builder.json` 整个复制 `dist`，没有配置点名这个目录。
 
 ### 页面和渲染进程的通道
@@ -302,14 +322,20 @@ body
 沿用画布的两条通道，改三处：
 
 1. **解析分层**：`canvasBridge.ts` 拆成通用的一层（前缀、来源脚本路径校验、JSON 解析）和各脚本自己的消息形状。新增 `deckBridge.ts`。
-2. **登记项记录是哪种壳**：`canvasHandlers`（`desktop/src/lib/browserGuests.ts:52`）已经是按标签登记的表，但它把「有登记」等同于「是画布」（`canvasBoardLabel` 的 `:164`、`applyCanvasScheme` 的 `:179`）。登记项改为带上壳的种类。全屏查看（`ArtifactViewer.tsx:37`）按产物种类登记对应的处理函数，不再对所有种类都登记画布的。
+2. **不再用「有登记」判断「是画布」**：`canvasHandlers`（`desktop/src/lib/browserGuests.ts`）只负责把画布的 `move`、`open` 交给登记的处理函数。原来靠它判断的三件事改成不看登记：
+   - 主题和刷新：对任何项目页面调同一句 `(window.__dreamcoderCanvas || window.__dreamcoderDeck)`，页面上有哪种壳就调哪种，都没有就什么也不做（`desktop/src/lib/shellBridge.ts`）。Agent 打开的画布因此也跟随主题。
+   - 引用的名称：标签的页面状态里有幻灯片状态就按幻灯片取，否则问画布脚本。
+   - 全屏查看（`ArtifactViewer.tsx`）只在产物是画布时登记画布的处理函数。
+
+   原稿写的是「登记项带上壳的种类」。第一阶段幻灯片没有需要登记的处理函数（`state`、`exit` 都在 `browserGuests.ts` 里直接处理），登记表里放种类没有用处；第三阶段的 `order`、`edit` 需要处理函数时再加幻灯片的登记。
 3. **页面自报身份**：壳脚本加载完发一条带产物 id 的消息（幻灯片用 `state`，画布加一条 `ready`）。监听处对所有标签都解析这条消息，不要求先有登记。
+4. **来源校验收紧**：除了路径是壳脚本的保留路径，还要求来源地址是项目协议。别的网站在自己的域名下放一个同路径的脚本，发的消息不被接受。
 
 幻灯片的消息（页面到渲染进程）：
 
 | 消息 | 内容 | 何时发 |
 |---|---|---|
-| `state` | 产物 id、当前页 id、序号、总页数、模式 | 加载完成、翻页、模式变化、刷新后 |
+| `state` | 产物 id、当前页 id、当前页标题、序号、总页数、模式 | 加载完成、翻页、模式变化、刷新后；内容和上一条相同时不发 |
 | `order` | 新的 id 列表 | 总览里拖动调序结束 |
 | `edit` | 页 id | 一处文字修改提交 |
 | `exit` | 无 | 演示模式里按 Esc |
@@ -323,22 +349,33 @@ body
 做法：由页面自报身份，渲染进程核对后补上元数据。
 
 1. 收到来源校验通过的 `state`，把幻灯片状态记进这个标签的页面状态（`useBrowserStore` 里已有的每标签记录）。**工具条只看这份状态**，所以任何显示着幻灯片的标签都有翻页、总览和演示，包括 Agent 打开的、模板预览的、全屏查看的。标签跳到别的页面时清掉。
-2. 标签还没有产物元数据时，用消息里的产物 id 向 sidecar 查位置（现有的 `artifactsApi.openById`，`desktop/src/lib/browserGuests.ts:274` 已在用），核对标签地址的路径确实是这个产物的入口，然后给标签补上 `root` 和 `artifact`（带 `deck: true`）。之后它和用户自己打开的产物标签没有区别：自动刷新、导出、编辑写回都生效。
+2. 标签还没有产物元数据时，用消息里的产物 id 在 sidecar 的产物列表里找到它（`artifactsApi.list`，再用 `artifactsApi.open` 取入口文件），把入口文件解析成地址，和标签当前的地址比较（协议、主机、路径都相同），相同才给标签补上 `root` 和 `artifact`（带 `deck: true`）。之后它和用户自己打开的产物标签没有区别：自动刷新、导出、缩略图、编辑写回都生效。实现在 `desktop/src/lib/artifactTabs.ts`。
+   - 用列表而不是 `openById`：标签的元数据还需要产物名、修改时间和「是不是全局区」，`openById` 只给路径。
+   - 每次页面加载只查一次（产物 id 和上一条 `state` 相同就不再查），翻页不会反复请求。
+   - 等结果的时候标签可能已经跳走，所以比较的是拿到结果那一刻的地址。
 3. 查不到的（模板预览的文件夹不是登记过的产物）保持原样：能翻页和演示，没有编辑。
 
 `BrowserTabArtifact`（`desktop/src/stores/workspacePanelStore.ts:45`）加 `deck?: true`，和 `canvas?: true` 并列；用户从列表打开产物时按清单的 `kind` 设置（`:524`），校验已存标签的地方（`:360`）同步。
+
+**标签是否正显示它的产物**。产物元数据一旦加上就不清：清掉的话，网页产物点了外链再后退就认不回来（网页不会自报）。但标签可能已经去了别的页面，尤其是 Agent 打开的标签：Agent 常用同一个标签接着去看别的地址。所以凡是按「这是产物标签」做事的地方，都先问一句标签现在显示的是不是这个产物：地址是项目协议的页面，且路径的第一段等于元数据里的产物名（`tabShowsArtifact`，`desktop/src/lib/artifactTabs.ts`；取路径第一段的 `artifactFolderOf` 也给引用名称用）。用到它的三处：
+
+- 文件变化时的刷新（`reloadChangedArtifactTabs`）：不显示该产物的标签跳过，不调壳脚本也不重载，记着的修改时间也不往前推，标签回到产物后下一次检查还会刷新。
+- 标签里的导出菜单。
+- 缩略图：不显示该产物时不截，免得把别的页面存成这个产物的缩略图。
+
+没有这一步的话，Agent 在认领过的标签里打开 `localhost:3000`，再改幻灯片文件，会把 localhost 那一页整页重载，导出菜单导出的也是 localhost。
 
 画布的 `ready` 走同一条路径，Agent 打开的画布标签因此也得到写回和刷新。这是现有的缺口，这次一并补上。Agent 打开的普通页面产物仍然不被识别（它没有壳脚本可以自报），不在本设计范围内。
 
 ### 刷新
 
-`reloadTab`（`desktop/src/stores/artifactStore.ts:29-32`）现在是「画布调 `refresh()`，其它整页重载」。改成「有壳脚本的标签调壳脚本的 `refresh()`，其它整页重载」，`refreshCanvas`（`desktop/src/lib/browserGuests.ts:198`）相应改成按登记的壳种类调用。
+`reloadTab`（`desktop/src/stores/artifactStore.ts`）原来是「画布调 `refresh()`，其它整页重载」，现在是「页面上有壳脚本就调它的 `refresh()`，没有就整页重载」：`refreshArtifactShell`（`desktop/src/lib/browserGuests.ts`）对页面调壳脚本的 `refresh()`，页面上没有壳脚本时返回 `false`，调用处据此改为整页重载。单张画板的标签仍然整页重载。
 
-写回之后**不更新标签记的修改时间**。下一次检查会多调一次 `refresh()`，它发现没有变化就什么都不做。画布当初更新这个时间，是因为多一次刷新会重载所有画板；幻灯片的 `refresh()` 没有这个问题，而更新时间反而会盖住同一时刻 Agent 的写入：sidecar 返回的是整个文件夹最新的修改时间（`src/server/services/artifactService.ts:378`），渲染进程记下它之后，就看不出 Agent 刚写的另一页是新的了。
+（第三阶段）写回之后**不更新标签记的修改时间**。下一次检查会多调一次 `refresh()`，它发现没有变化就什么都不做。画布当初更新这个时间，是因为多一次刷新会重载所有画板；幻灯片的 `refresh()` 没有这个问题，而更新时间反而会盖住同一时刻 Agent 的写入：sidecar 返回的是整个文件夹最新的修改时间（`src/server/services/artifactService.ts:378`），渲染进程记下它之后，就看不出 Agent 刚写的另一页是新的了。
 
 ### 工具条
 
-新组件 `DeckControls`，产物标签（`BrowserView.tsx`）和全屏查看（`ArtifactViewer.tsx`）共用。
+新组件 `DeckControls`（`desktop/src/components/artifacts/DeckControls.tsx`），产物标签（`BrowserView.tsx`）和全屏查看（`ArtifactViewer.tsx`）共用。它是地址栏（或查看器标题行）下面单独的一行，页面不是幻灯片时不占位置。导出仍在原来的菜单里。
 
 ```
 [‹] [›]  3 / 12   [总览] [演示]            [编辑] [删除本页]   …（导出）
@@ -350,38 +387,40 @@ body
 
 ### 演示
 
-- 点「演示」：渲染进程让这个 webview 所在的**槽位元素**进入全屏（`createGuest` 里创建的那个，`desktop/src/lib/browserGuests.ts:102-104`），再调 `setMode('present')`。不能对标签组件里的区域做全屏：webview 不在它里面，全屏出来是一块空白盖在 webview 上。全屏由渲染进程发起，因为点击发生在应用界面里。
-- 退出：页面发 `exit`，或全屏被系统退出时，渲染进程调 `setMode('browse')`。
+- 点「演示」：渲染进程让这个 webview 所在的**槽位元素**进入全屏（`createGuest` 里创建的那个），把键盘焦点交给 webview（否则方向键到不了页面），再调 `setMode('present')`。不能对标签组件里的区域做全屏：webview 不在它里面，全屏出来是一块空白盖在 webview 上。全屏由渲染进程发起，因为点击发生在应用界面里。
+- 退出：页面发 `exit` 时渲染进程退出全屏；全屏结束时（不管是这样退出的还是被系统退出的），渲染进程对还在演示模式的幻灯片调 `setMode('browse')`。页面发 `exit` 而槽位并不在全屏（比如 Agent 用 `evaluate` 进的演示模式），直接调 `setMode('browse')`。
 - 已验证：槽位全屏时 webview 铺满，页面按新尺寸重新缩放；macOS 上窗口进入系统全屏。焦点在页面里时，Esc 先到页面、全屏不会自己退出，所以必须走上面的 `exit` 消息由渲染进程退出全屏；焦点在应用界面上时，Esc 直接退出全屏，渲染进程从全屏变化事件得知。
 
 ## 导出
 
-幻灯片标签提供和页面一样的三种导出（`BrowserView.tsx:99` 的条件改为排除画布、不排除幻灯片；全屏查看本来就对所有种类提供）。
+幻灯片标签提供和页面一样的三种导出。「能不能导出」是一个判断（`isExportableArtifact`，`desktop/src/lib/artifactTabs.ts`）：画布不能，其余都能；标签和全屏查看都用它。全屏查看原来对画布也给导出，而导出的独立 HTML 里画布脚本会重新运行、读不到清单，现在和标签一致，不给。标签里另外要求标签正显示着这个产物（见「把标签认成产物标签」）。
 
 - **PDF**：不改导出代码。现有调用已经按页面的 `@page` 取纸张（`desktop/electron/pageExport.ts:93`），舞台脚本的打印样式让每页幻灯片占一张。已验证：3 页的幻灯片输出 3 页，每页 1440×810 点，即 1920×1080 像素。
 - **PNG**：所有种类的产物都改成在隐藏窗口里渲染后截图，不再在标签里的 webview 上截。
   - 原因：webview 实际渲染的画面只有它在窗口里看得见的那么大。截取范围一旦超过这个大小，超出的部分是已有画面的重复平铺，不是真实内容。放大倍数、扩大截取范围、模拟更大的视口、临时把 webview 撑大，结果都一样（见「已验证」）。这同时是现有的问题：比面板高的网页产物，现在导出的 PNG 就是这样。
   - 做法：主进程开一个不显示的窗口，用同一个浏览器分区（项目协议只在这个分区上有），加载标签当前的地址，等页面就绪后截图，然后销毁窗口，失败时也销毁。这个窗口只加载那一个地址，禁止跳转和开新窗口。主进程里已经有给网站复刻用的隐藏窗口（`desktop/electron/backgroundBrowser.ts`），窗口的创建和防护能共用的就共用。
   - 两种尺寸，由渲染进程在导出请求里给出：
-    - 幻灯片：视口 1920×1080，像素比 1，截一屏。得到正好 1920×1080 的当前页（地址里带着 `#<页 id>`）。
-    - 网页：视口宽度取标签当前的宽度，像素比不变，按整页内容高度截。画面的排版和用户在标签里看到的一致，高度上限仍是 16384 像素。
+    - 幻灯片：视口 1920×1080，像素比 1，截一屏。得到正好 1920×1080 的当前页（地址里带着 `#<页 id>`）。浏览模式本来有留边，所以截图前调舞台的 `prepareCapture()` 去掉留边。
+    - 网页：视口取标签当前的宽度和高度（槽位元素的大小，不是 Agent 模拟出来的大小），像素比不变，按整页内容高度截。画面的排版和用户在标签里看到的一致（高度也要给：页面用 `100vh` 排版时，视口高度不对排出来就不一样），高度上限仍是 16384 像素。系统设成一直显示滚动条时，标签里的页面比槽位窄一个滚动条的宽度，隐藏窗口里没有，排版会差这十几个像素。
+  - 就绪的判断（`desktop/electron/pageCapture.ts` 的 `pageSettled`）：页面加载完成后，幻灯片等 `prepareCapture()`，再等字体，然后把还在进行的有限时长动画和过渡直接推到结束（入场动画不会截在半透明的中间状态）。最多等 15 秒，超时就按当时的样子截并记一条日志。
+  - 窗口的尺寸用调试协议的视口覆盖来定，不依赖窗口本身能开多大（屏幕比 1920×1080 小也一样）。
   - 隐藏窗口是重新加载的页面，没有 Agent 设置的视口模拟，所以 PNG 不再需要暂停和恢复模拟（`desktop/src/lib/artifactExport.ts:34` 的条件改为只对 PDF 暂停）。
   - 代价：PNG 是页面**重新加载后**的样子，不带用户在标签里点出来的状态（展开的面板、填过的表单）。现在的导出本来能带上这些，但只在页面不超过可见范围时才是对的。画布仍然只能导出单张画板，单张画板走的也是这条路径。
 - **独立 HTML**：
-  - 导出前渲染进程先调 `setEditing(false)` 和 `setMode('browse')`。
+  - 导出前渲染进程先调 `setMode('browse')`（第三阶段再加 `setEditing(false)`）。
   - 现有导出复制当前 DOM，并把 `deck.js` 和舞台加的样式表内联进去。打开这个文件时脚本进入静态模式（见上），结果是一个可以离线翻页和演示的单文件。
-  - 嵌入页：现有导出不处理 iframe，导出后相对地址会失效。补一步：同源 iframe 按它的**源文件**生成内联版本（取文件文本、解析、内联资源），写进 `srcdoc`。不能用 iframe 当前的文档：嵌入页的脚本已经跑过一遍，序列化后再跑一遍，图表会画两次。这一步对普通页面产物同样生效。
+  - 嵌入页：现有导出不处理 iframe，导出后相对地址会失效。补一步：同源 iframe 按它的**源文件**生成内联版本（取文件文本、解析、内联资源），写进 `srcdoc`。不能用 iframe 当前的文档：嵌入页的脚本已经跑过一遍，序列化后再跑一遍，图表会画两次。这一步对普通页面产物同样生效。嵌套的 iframe 最多处理三层；别的网站的 iframe 保持原样，并计入「仍需联网的外链」。
 - 嵌入页在 PDF 和 PNG 里是导出那一刻的画面。
 
 ## 缩略图
 
-现有缩略图截的是整个视口（`desktop/electron/browserCapture.ts:44-50`），对幻灯片会带上留边，而且截到的是当时碰巧显示的那一页或总览。幻灯片只在「浏览模式、第一页」时截，并把 `stageRect()` 作为截取范围传给主进程。已验证：按范围截取可用，得到的就是不带留边的那一页（范围在 webview 的可见画面之内，不受上面 PNG 那个限制）。
+现有缩略图截的是整个视口（`desktop/electron/browserCapture.ts:44-50`），对幻灯片会带上留边，而且截到的是当时碰巧显示的那一页或总览。幻灯片只在「浏览模式、第一页」时截，并把 `stageRect()` 作为截取范围传给主进程。「是不是幻灯片」取自标签元数据的 `deck`（全屏查看取清单的 `kind`），这样页面还没报状态时不会先按普通页面截一张。已验证：按范围截取可用，得到的就是不带留边的那一页（范围在 webview 的可见画面之内，不受上面 PNG 那个限制）。
 
 ## 评论和点选
 
 - 只有当前页看得见、点得到，所以点选和文字选区一定落在当前页上。引用所属的页直接取标签状态里的当前页，不需要按元素反查。文字选区的结果里没有选择器，也只能这样做。
-- 引用的名称显示「产物名 / 页标题」，发给 Agent 的文本写明 `slides/<id>.html`。
-- `canvasBoardLabel` 的两个调用处（`desktop/src/lib/browserGuests.ts:409`、`desktop/src/lib/browserPicks.ts:76`）改为调一个按壳种类取名称的函数，画布和幻灯片各自实现。
+- 引用的名称显示「产物名 / 页标题」。发给 Agent 的文本里，引用的 `title` 一行写成 `slides/<id>.html · 页标题`（文件路径在前，标题再长也不会把它截掉）；`url` 一行仍是标签的地址，带 `#<页 id>`。不新增引用字段，引用文本的格式不变。
+- `canvasBoardLabel` 的两个调用处改为调 `artifactReferenceLabel`（`desktop/src/lib/browserGuests.ts`）：有幻灯片状态就按幻灯片给名称和标题，否则问画布脚本要画板标题。
 - Agent 的快照只包含看得见的内容，所以只看到当前页。Agent 要看别的页，用 `evaluate` 调 `goTo(id)`。
 
 ## 用户编辑
@@ -444,13 +483,14 @@ R -> S : 确认，或 refresh()
 
 ### 技能
 
-- `artifacts` 技能：`kind` 说明加 `deck`，给出固定入口的原文和文件布局。
+- `artifacts` 技能：`kind` 说明加 `deck`，给出固定入口的原文和文件布局，其余规则指向 `/slides`。
 - 新的内置技能 `/slides`，用户可调用，模型也可自行调用，和 `/design` 分开。注册方式同 `/design`（`src/skills/bundled/design.ts:253`）：正文短，讲总流程（访谈、选模板或从零开始、设计系统、制作、检查），具体做法放参考文件按需读取。文字自己写：
   - `format.md`：上文「页面文件」的规则，包括相对路径的基准、嵌入页的写法、按序列化后的写法写 HTML。
   - `interview.md`：先问清是演讲用还是阅读用（决定每页的内容量）、大约多少页、内容从哪来、风格或设计系统。
   - `layout.md`：画面边距、字号下限、一页一个要点、同类页面用同一套结构；内容放不下就拆页，不缩字。
   - `checks.md`：见下面两节。
-  - 设计系统的提取方法和 `/design` 共用同一份参考内容；「怎么套用」那一步按产物种类给（见上文「设计系统」）。
+  - 设计系统的提取方法和 `/design` 共用同一份参考内容；「怎么套用」那一步按产物种类给（见上文「设计系统」）。两个技能共用的文字（设计系统参考、访谈的通用规则、语言规则）和共用的提示词拼装放在 `src/skills/bundled/designSystemGuide.ts`。
+  - 第一阶段没有模板，流程是四步：访谈、设计系统、制作、检查。带一个已有的幻灯片产物路径调用时，提示词指明这份幻灯片并让 Agent 先读它。
 - 制作顺序：先写清单、`deck.css` 和封面，在新标签打开给用户看，再写其余页面。每加一页同时更新清单。
 - 模板索引各用各的：`/slides` 的提示词只列幻灯片模板，`/design` 的只列网页和原型（`renderDesignTemplateIndex` 的调用处按类别过滤，`src/skills/bundled/design.ts:246`）。带产物路径调用时（`/slides <产物路径>`）跳过选模板，做法同 `/design`（`src/skills/bundled/design.ts:236-244`）。
 - 选模板工具接受目录里的任何模板 id，不按技能限制。两个技能各自的索引里没有对方的模板，所以不另加限制。
@@ -462,10 +502,11 @@ R -> S : 确认，或 refresh()
 
 - 入口是固定内容；`deck.css` 存在。
 - `slides` 里的 id 合法、不重复，对应文件存在。
-- 每个页面文件以 `<section` 开头、以 `</section>` 结尾，没有 `<script>` 和内联事件属性。
-- 引用的本地文件存在。**页面文件的引用按产物文件夹解析**，不是按页面文件所在的 `slides/`；`referenceProblems`（`src/utils/artifactCheck.ts:48-58`）现在固定按所在文件的目录解析，要加一个基准目录参数。`deck.css` 和嵌入页按各自的位置解析。
-- 嵌入页必须在这个产物的文件夹内。现有检查只要求在 `dc_artifacts/` 内，这是一条新规则。
-- `slides/` 里有文件没列进清单时报出来。
+- 每个页面文件是一个 `<section>`：以 `<section` 开头、以 `</section>` 结尾，并且按开闭标签数下来，最外层只在文件末尾才闭合（一个文件里并排写两个 `<section>` 会报错，舞台对这样的文件显示占位）。没有 `<script>` 和内联事件属性（标签里的 `on…=`）。
+- 引用的本地文件存在。**页面文件的引用按产物文件夹解析**，不是按页面文件所在的 `slides/`；`referenceProblems`（`src/utils/artifactCheck.ts`）加了基准目录参数。`deck.css` 和嵌入页按各自的位置解析。
+- 嵌入页（页面文件里 `<iframe src>` 指向的本地文件）必须在这个产物的文件夹内。现有检查只要求在 `dc_artifacts/` 内，这是一条新规则。在文件夹内且存在的嵌入页，再检查它自己引用的本地文件。
+- `slides/` 里有 `.html` 文件没列进清单时报出来。
+- 设计系统：只查文件存在，不查入口有没有链接 `tokens.css`。
 
 ### 溢出检查
 
@@ -516,14 +557,14 @@ Slides 是独立入口，不并进 Design。
 |---|---|---|
 | 清单 `kind: 'deck'`、`slides` | 文件 | 页面 id 的有序列表 |
 | 保留路径 `/__dreamcoder__/deck.js` | 页面 → 主进程 | 白名单加一项 |
-| `window.__dreamcoderDeck` | 渲染进程、Agent → 页面 | 见「对外接口」 |
-| `state`、`order`、`edit`、`exit` | 页面 → 渲染进程 | `console-message`，前缀 `dreamcoder-deck:`，校验来源脚本 |
+| `window.__dreamcoderDeck` | 渲染进程、主进程（`prepareCapture`）、Agent → 页面 | 见「对外接口」 |
+| `state`、`exit`（第三阶段加 `order`、`edit`） | 页面 → 渲染进程 | `console-message`，前缀 `dreamcoder-deck:`，校验来源脚本 |
 | 画布的 `ready` | 页面 → 渲染进程 | 带产物 id，用于把标签认成产物标签 |
 | `PATCH /api/artifacts/slides/order` | 渲染进程 → sidecar | `dir`、`name`、`slides`。必须和清单当前的列表是同一组 id，否则 409 |
 | `DELETE /api/artifacts/slides` | 渲染进程 → sidecar | `dir`、`name`、`id`。从清单去掉这个 id 并删除文件 |
 | `PUT /api/artifacts/slides/content` | 渲染进程 → sidecar | `dir`、`name`、`id`、`html`、`previous`。id 必须在清单里；文件当前内容等于 `previous` 才写入，否则 409 |
-| PNG 导出请求 | 渲染进程 → 主进程 | 带渲染视口：宽度、可选的高度和像素比。主进程在隐藏窗口里按它渲染后截图；没给高度时按整页内容高度截 |
-| 缩略图请求的截取范围 | 渲染进程 → 主进程 | 可选的范围 |
+| PNG 导出请求 | 渲染进程 → 主进程 | `browser_export_page` 的 `viewport`：宽度、高度、可选的像素比，以及 `wholePage`。主进程在隐藏窗口里按这个视口渲染后截图；`wholePage` 为真时按整页内容高度截，否则只截一屏。地址由主进程从标签的 webContents 取，不由渲染进程给 |
+| 缩略图请求的截取范围 | 渲染进程 → 主进程 | `browser_capture_thumbnail` 的 `clip`，可选 |
 | 独立 HTML 导出 | 主进程 | 同源 iframe 按源文件内联成 `srcdoc` |
 | `resolveStoredBrowserUrl` | 渲染进程 | 重开时保留地址的 `#` 部分 |
 | `ArtifactCheck` | Agent | `deck` 分支；引用检查加基准目录参数 |
@@ -543,6 +584,7 @@ Slides 是独立入口，不并进 Design。
 - 写回和调序的冲突：见「用户编辑」。
 - 页面正文里有脚本：不执行；`ArtifactCheck` 报错。
 - 嵌入页文件不存在：iframe 是空的；`ArtifactCheck` 报错。
+- 已知限制：标签的产物元数据里的产物名是打开时记下的，「标签是否正显示它的产物」拿它和地址比。产物被搬进全局区、并且因为那里已有同名产物而改了文件夹名之后，重启重开的标签地址用的是新文件夹名，和记下的名字对不上，这个标签不再自动刷新，也没有导出菜单和缩略图。只在搬移加重名时发生；从 Artifacts 列表重新打开这个产物就恢复。上线前不为它加处理。
 
 ## 安全
 
@@ -554,21 +596,29 @@ Slides 是独立入口，不并进 Design。
 
 ## 测试
 
+第一阶段已有的测试：
+
 - 清单解析：`deck` 和 `slides` 的合法与非法形状（`src/utils/__tests__/artifacts.test.ts`）。
-- `ArtifactCheck` 的 `deck` 分支逐条，包括「页面文件的引用按产物文件夹解析」和「嵌入页在产物文件夹内」。
-- 舞台脚本（和 `canvasShell.test.ts` 同样的方式在 DOM 环境里跑）：渲染、翻页、分步、地址定位、总览、`overflow`；`refresh()` 只替换变了的页并保留模式；静态模式在脚本排在舞台节点之前时也能接管，并重置运行状态；编辑生成的新内容只改动目标元素、保留行内元素、不带运行状态。
-- `deckBridge` 的消息解析：前缀、来源、形状。
-- 把标签认成产物标签：没有元数据的标签收到 `state` 后补上元数据；地址和产物入口对不上时不补；模板预览只有工具条没有编辑。
-- sidecar：调序（同一组 id 通过，多一个或少一个 409）、删除页、内容写回（一致写入、不一致 409、id 不在清单里拒绝）。
-- 桌面：工具条按页面状态显示；`order`、`edit` 触发对应接口；写回后不改标签的修改时间；点选和文字选区的引用带当前页的标题和文件路径；开始页两种范围各自的模板和命令；全屏查看按种类登记处理函数。
-- 导出：PNG 走隐藏窗口，幻灯片和网页各自的视口参数，窗口用完即销毁、失败时也销毁，只有 PDF 暂停模拟；长页面的 PNG 内容正确要在真实 Electron 里验收（单元测试里的截图是模拟的，查不出这个问题）；独立 HTML 把同源 iframe 按源文件内联成 `srcdoc`；PDF 页数在真实 Electron 里验收，不进单元测试。
-- 模板和技能：从幻灯片模板建出的清单保留 `slides`；`/slides` 的索引只含幻灯片模板，`/design` 的不含；设计系统用法说明对 `deck` 不提入口 HTML。
+- `ArtifactCheck` 的 `deck` 分支逐条，包括「页面文件的引用按产物文件夹解析」和「嵌入页在产物文件夹内」（`src/utils/__tests__/artifactCheck.test.ts`）。
+- 舞台脚本，在 DOM 环境里跑真实的 `deck.js`（`desktop/src/lib/deckShell.test.ts`）：渲染、缩放、翻页、分步、地址定位、总览、`overflow`、`stageRect`；`refresh()` 只替换变了的页并保留模式；静态模式在脚本排在舞台节点之前时也能接管，并重置运行状态。
+- 画布脚本的 `ready`（`desktop/src/lib/canvasShell.test.ts`）。
+- 消息解析：前缀、来源、形状（`desktop/src/lib/deckBridge.test.ts`、`canvasBridge.test.ts`）。
+- 标签是否正显示它的产物、能不能导出（`desktop/src/lib/artifactTabs.test.ts`）；认领后的标签跳到别的地址时产物变化不重载、不出导出菜单、不截缩略图，跳回后恢复（`artifactStore.test.ts`、`BrowserView.test.tsx`）；全屏查看对画布不给导出（`ArtifactViewer.test.tsx`）。
+- 标签（`desktop/src/lib/browserGuests.test.ts`）：幻灯片状态记进页面状态、跳走时清掉；没有元数据的标签收到 `state` 或 `ready` 后补上元数据，地址和产物入口对不上时不补，没登记的产物只有工具条；演示的进入和三种退出；引用带当前页的标题和文件路径；主题和刷新对两种壳通用；重开保留 `#`。
+- 桌面：工具条按页面状态显示（`DeckControls.test.tsx`、`BrowserView.test.tsx`、`ArtifactViewer.test.tsx`）；全屏查看只对画布登记处理函数；缩略图只在浏览模式第一页按范围截（`useArtifactThumbnail.test.tsx`）；文件变化时幻灯片标签不整页重载（`artifactStore.test.ts`）。
+- 导出：PNG 走隐藏窗口，幻灯片和网页各自的视口参数，窗口用完即销毁、失败时也销毁，禁止跳转和开新窗口（`desktop/electron/pageCapture.test.ts`、`pageExport.test.ts`）；只有 PDF 暂停模拟，幻灯片导出 HTML 前回到浏览模式（`desktop/src/lib/artifactExport.test.ts`）；独立 HTML 把同源 iframe 按源文件内联成 `srcdoc`（`standaloneHtml.test.ts`）；缩略图按范围截（`browserCapture.test.ts`）。长页面的 PNG 内容正确、PDF 页数不进单元测试（截图是模拟的，查不出来），在真实 Electron 里验证，见「已验证」。
+- 技能（`src/skills/bundled/slides.test.ts`、`artifacts.test.ts`）：`/slides` 的流程和参考文件；参考文件里写的舞台接口和保留的类名前缀与 `deck.js` 对得上；`/slides` 的提示词里没有模板索引；设计系统用法说明对 `deck` 不提入口 HTML。
+
+后面阶段要加的：
+
+- 第二阶段：从幻灯片模板建出的清单保留 `slides`；`/slides` 的索引只含幻灯片模板，`/design` 的不含；开始页两种范围各自的模板和命令；模板预览只有工具条没有编辑。
+- 第三阶段：sidecar 的调序（同一组 id 通过，多一个或少一个 409）、删除页、内容写回（一致写入、不一致 409、id 不在清单里拒绝）；`order`、`edit` 触发对应接口；写回后不改标签的修改时间；编辑生成的新内容只改动目标元素、保留行内元素、不带运行状态。
 
 ## 分阶段
 
 按依赖顺序。每个阶段结束都是能用的状态。
 
-**第一阶段：格式和查看**
+**第一阶段：格式和查看**（已实现，2026-11-15）
 
 - 清单 `deck`、固定入口、壳脚本目录改名、`deck.js`（渲染、缩放、三种模式、刷新、地址、打印、静态模式）。
 - 通道的三处改动；把标签认成产物标签（含画布的 `ready`）；刷新改走壳脚本；工具条（翻页、页码、总览、演示）。
@@ -610,7 +660,33 @@ Slides 是独立入口，不并进 Design。
 
 - 按键是程序合成的，没有用真实键盘在系统全屏下试过 Esc。
 - 只在 macOS 上试过。Windows 上的全屏和像素比没有验证。
-- 探针里的舞台脚本是原型，不是最终实现。
+- 探针里的舞台脚本是原型，不是最终实现。（实现之后用真实的脚本重新验证过，见下一节。）
+
+### 第一阶段的实现（2026-11-15 再次验证）
+
+实现完成后又写了一个独立探针：Electron 45.0.0，macOS，像素比 2。和上一个探针不同，这一次用的是仓库里的真实模块：`installBrowser`（项目协议、保留路径、webview 的附加策略）、`capturePagePng`、`exportPage`、`captureThumbnail` 和真实的 `deck.js`；只有宿主页面是探针自己写的。探针是临时文件，不在仓库里，也没有启动应用本身。
+
+| 要确认的事 | 结果 |
+|---|---|
+| 现有 PNG 导出的问题能不能用旧代码复现 | 能。把基线上 `pageExport.ts` 的截图函数原样搬进探针，在 640×400 的 webview 里截一个 3000 像素高、6 段颜色的页面：输出 1250×6000，6 个取样点全是第一段的颜色 |
+| 新的 PNG 导出，同一个页面 | 输出 1280×6000（宽 640、像素比 2），6 段颜色全部正确；页面上一个 5 秒的淡入动画在截图里已是结束状态 |
+| 幻灯片的 PNG | 正好 1920×1080。左上角是页面背景色（没有留边），右下角 10 像素的色块在，第 540 行的 1 像素黑线只占那一行（上下两行是背景色），4 秒的淡入动画是结束状态，`tokens.css` 的变量和 `deck.css` 里的 `url()` 都生效。从开窗到出图约 0.4 秒 |
+| 用 `100vh` 排版的页面的 PNG | 视口 640×400、上下各半的两个色块：输出 1280×800，上半和下半的颜色都对 |
+| 带嵌入页的那一页的 PNG | 嵌入页的脚本运行了，画面里是脚本设的颜色 |
+| 隐藏窗口用完销毁 | 导出四次之后只剩宿主窗口 |
+| 视口覆盖在加载前设置 | 成立。先加载空白页、挂调试器、设视口，再加载目标地址，页面一开始就按目标尺寸排版 |
+| `console-message` 的来源 | 舞台脚本发的消息，来源地址是 `dreamcoder-project://<id>/__dreamcoder__/deck.js`，和校验的写法一致 |
+| 地址 | 加载后 webview 触发页内跳转事件，地址带上 `#cover` |
+| 页面文件里的 `<script>` | 不执行 |
+| 相对路径 | 页面里的图片、`deck.css` 里的 `url()`、嵌入页都按产物文件夹解析；嵌入页里的 `../assets/…` 按它自己的位置解析，脚本只运行一次 |
+| `overflow()` | 报出宽 2400 像素的那个元素，位置是画面像素（右边界 2496） |
+| 缩略图 | 按 `stageRect()` 截，得到 320×180，左上和左下取样都是页面背景色，没有留边 |
+| PDF | 浏览、总览、演示（两个分步还没出现）三种模式下各导一次：都是 3 页、每页 1440×810 点，三个文件大小相同 |
+| `refresh()` | 在总览模式下改一个页面文件和 `deck.css` 后调用：模式和当前页不变，页面内容和样式都更新 |
+| 按键（程序合成，焦点在 webview 里） | → 翻页；演示模式下空格出现一步；Esc 发出 `exit`，模式不自己变 |
+| 独立 HTML | 导出的单个文件用 `file://` 打开（地址带 `#agenda`）：停在那一页，`next()` 能翻页，样式和变量都在，嵌入页在 `srcdoc` 里、脚本只运行一次，舞台的样式标签只有一份，按 `O` 进入总览；除了文件本身没有任何网络请求 |
+
+没有覆盖、要在应用里验收的，见文末「第一阶段的实现」里的清单。
 
 ### 现有的 PNG 导出有同样的问题（本任务一并修）
 
@@ -670,3 +746,45 @@ Slides 是独立入口，不并进 Design。
 | 文字选区的结果里没有选择器，不能按元素反查所属的页 | `slideOf(selector)` | 直接取当前页，去掉这个方法 |
 | 序列化的差别不止引号和大小写 | 「只产生一处差异」 | 如实写明会规范化 |
 | 缩略图会截到当时显示的任意一页，带留边 | 没有提到 | 只截第一页，按舞台范围截 |
+
+## 第一阶段的实现
+
+2026-11-15 实现。和本文原稿不一致的地方，正文已按实际做法改写；下表逐条列出。实现完成后由一个独立的子代理对照本文审查了全部改动，没有发现必须修的问题；它提出的四条建议（检查放过并排的两个 `<section>`、刷新时总览被拉回当前页、网页 PNG 的视口高度写死、Artifacts 设计里一处旧名字）和三条顺带的问题（演示中步数超出、没有 `src` 的 iframe 让导出多等、刷新调用失败时没有退回整页重载）都已改掉。
+
+| 原稿 | 实际做法 | 原因 | 代码位置 |
+|---|---|---|---|
+| `state` 带产物 id、当前页 id、序号、总页数、模式 | 多带当前页的标题 | 引用的名称要用页标题；放进 `state` 之后渲染进程不用为每次点选再问页面一次 | `desktop/public/artifact-shell/deck.js`（`state`）、`desktop/src/lib/deckBridge.ts` |
+| 处理函数的登记项带上壳的种类 | 登记表仍只管画布的 `move`、`open`；主题、刷新、引用名称不再看登记 | 第一阶段幻灯片没有要登记的处理函数；原来靠「有登记」判断的三件事，用「页面上有没有壳脚本」和「标签有没有幻灯片状态」判断更直接，Agent 打开的画布也因此跟随主题 | `desktop/src/lib/shellBridge.ts`、`browserGuests.ts`（`applyShellScheme`、`refreshArtifactShell`、`artifactReferenceLabel`） |
+| 消息校验来源脚本的路径 | 还要求来源是项目协议 | 别的网站可以在自己的域名下放同路径的脚本 | `desktop/src/lib/shellBridge.ts`（`isShellScript`） |
+| 用 `artifactsApi.openById` 查产物位置 | 用 `artifactsApi.list` 找到产物，再用 `open` 取入口 | 元数据还需要产物名、修改时间和是否在全局区 | `desktop/src/lib/artifactTabs.ts` |
+| 对外接口没有导出专用的方法 | 加 `prepareCapture()` | 浏览模式有留边，1920×1080 的视口里页面不是原尺寸；另外截图前要等样式表、图片、嵌入页、字体 | `deck.js`（`prepareCapture`）、`desktop/electron/pageCapture.ts`（`pageSettled`） |
+| 「等页面就绪后截图」没有写怎么判断 | 加载完成、`prepareCapture()`、字体、把有限时长的动画推到结束；最多等 15 秒 | 入场动画会让截图停在中间状态；等不到时也要给出结果并销毁窗口 | `desktop/electron/pageCapture.ts` |
+| 隐藏窗口「禁止跳转」 | 页面自己发起的跳转和开新窗口一律拒绝；加载过程中服务器的重定向按标签同样的地址规则放行 | 标签当前的地址可能是会重定向的网址 | `desktop/electron/pageCapture.ts`（`guard`） |
+| 隐藏窗口的创建和防护与网站复刻共用 | 只共用窗口的创建（`createHiddenWindow`）；防护各写各的 | 两处的规则不同：复刻的窗口允许跳到放行的地址，导出的窗口不允许跳转 | `desktop/electron/main.ts`、`pageCapture.ts`、`backgroundBrowser.ts` |
+| 文档结构里是 `section#<id>` | 不给 `<section>` 加 `id` | 地址里的 `#<id>` 对上元素的 `id` 时浏览器会自己滚动；也不该改页面内容 | `deck.js`（`createEntry`、`fill`） |
+| 分步的运行状态没有写放在哪 | 演示模式下给还没出现的分步元素加 `data-dc-pending` 属性，离开演示模式时去掉 | 「第 N 步之前的分步元素」用纯 CSS 选不出来；属性在浏览、总览、导出时都不存在 | `deck.js`（`applyStep`） |
+| 键盘只列了基本的几个键 | 演示模式加 PageUp/PageDown，总览加 Esc 回到浏览，三种模式都有 Home/End | 翻页笔发的是 PageUp/PageDown | `deck.js`（`keyActions`） |
+| 静态模式「只有键盘操作」，没有写用哪些键进入演示 | `F` 进入演示并请求全屏，`O` 切换总览，Esc 由脚本自己退出；留边底部有一行按键提示。只在静态模式下有 | 独立文件里没有工具条，不给键就进不了演示；不给提示收到文件的人不知道有这些键 | `deck.js`（`keyActions`、`present`、`adopt`） |
+| 刷新只比较清单和页面文件 | 也比较 `deck.css` 和 `tokens.css`，变了就让 `<link>` 重新加载 | Agent 改样式是最常见的操作之一，不处理的话改了 `deck.css` 画面不变 | `deck.js`（`syncSheet`） |
+| 刷新时清单读不出来的情况没有写 | 保持现有画面 | Agent 正在写清单时会读到不完整的内容 | `deck.js`（`refresh`） |
+| 引用「写明 `slides/<id>.html`」，没有写放在哪 | 放进引用的 `title`：`slides/<id>.html · 页标题` | 不改引用文本的格式和解析 | `browserGuests.ts`（`artifactReferenceLabel`） |
+| 设计系统用法说明「按产物种类给」 | `designSystemUsage` 多一个可选的种类参数；不给种类时两种都写 | `UseDesignSystem` 工具不知道系统要用在哪种产物上 | `src/utils/designSystems.ts` |
+| 设计系统对幻灯片「只需在清单里写」 | 参考文件另外说明：字号和间距不取设计系统的，在 `deck.css` 里另定 | 设计系统的字号是给网页定的，在 1920×1080 的画面上太小 | `src/skills/bundled/designSystemGuide.ts` |
+| 文档标题 | 舞台把文档标题设成清单的 `title` | 固定入口的标题是「Deck」，标签和导出的文件都会显示它 | `deck.js`（`apply`） |
+| 没有提到标签离开产物之后的事 | 加「标签是否正显示它的产物」的判断，刷新、导出菜单、缩略图都先看它；元数据不清 | Agent 打开的标签现在会被认成产物标签，而 Agent 常用同一个标签去看别的地址；不加的话产物一变会把别的页面整页重载，导出的也是别的页面 | `desktop/src/lib/artifactTabs.ts`（`tabShowsArtifact`、`artifactFolderOf`）、`stores/artifactStore.ts`、`components/workspace/BrowserView.tsx` |
+| 「全屏查看本来就对所有种类提供」导出 | 全屏查看对画布不再给导出，和标签用同一个判断 | 画布导出的独立 HTML 打不开；两处不一致 | `desktop/src/lib/artifactTabs.ts`（`isExportableArtifact`）、`components/artifacts/ArtifactViewer.tsx` |
+| 工具条的位置没有写 | 地址栏下面单独一行 | 地址栏那一行已经放满；全屏查看的标题行是窗口拖动区域 | `desktop/src/components/artifacts/DeckControls.tsx` |
+| PNG 的视口「宽度、可选的高度和像素比」，网页只给宽度 | 视口总是给宽度和高度，另加 `wholePage` 说明截一屏还是截整页；网页给槽位元素的宽度和高度 | 只给宽度时主进程要自己定一个高度，用 `100vh` 排版的页面排出来和标签里不一样；取槽位而不取页面自己报的大小，是因为后者会带上 Agent 的视口模拟 | `desktop/electron/pageCapture.ts`、`desktop/src/lib/browserGuests.ts`（`browserGuestSize`）、`artifactExport.ts` |
+
+### 待应用内验收
+
+下面几项只有在真实应用里才能确认，探针和单元测试都覆盖不到。
+
+1. **现有 PNG 问题在应用里的复现和修正**。在 `main` 上的应用里打开一个比面板高的网页产物，导出 PNG，看图的下半部分是不是上半部分的重复；换到本分支再导出同一个产物，应当是完整的页面，宽度等于面板里页面的宽度。
+2. **幻灯片的三种导出**。让 Agent 用 `/slides` 做一份至少 3 页、带一个嵌入页的幻灯片：PNG 是 1920×1080 的当前页，没有留边；PDF 的页数等于幻灯片页数；独立 HTML 用浏览器直接打开能翻页，按 `F` 进入演示，按 `O` 进入总览，嵌入页正常。
+3. **演示和真实键盘**。点「演示」：窗口进入全屏，幻灯片铺满；方向键和空格翻页、出现分步；按 Esc 退出全屏并回到浏览模式。再试一次：进入演示后用 Cmd+Tab 切到别的应用再切回来，按 Esc 也应当退出并回到浏览模式。
+4. **Agent 打开的标签**。Agent 用 `navigate` 打开幻灯片的标签应当有工具条和导出菜单；Agent 再写一页时，标签停在用户正在看的那一页和模式上，页数加一。Agent 打开的画布标签里拖动画板，重开标签后位置保留。让 Agent 在同一个标签里再打开一个别的地址，然后改幻灯片文件：这个标签不应被重载，「更多」菜单里没有导出；后退回到幻灯片后导出菜单回来。
+5. **重启后回到原来那一页**。翻到第 3 页，重启应用，标签重新打开后仍在第 3 页。
+6. **评论**。在第 2 页上点选一个元素、选中一段文字各一次，引用卡片显示「产物名 / 页标题」，Agent 收到的文本里有 `slides/<id>.html`。
+7. **两种主题和两种语言**下的工具条，以及留边的底色跟随主题。
+8. **Windows**：全屏、PNG 的像素比。

@@ -10,6 +10,7 @@ import { browserReload } from '../../lib/browserGuests'
 import { continueArtifactInNewSession, continueArtifactInSession } from '../../lib/continueArtifactInSession'
 import { errorMessage } from '../../lib/errorMessage'
 import { artifactRoot } from '../../lib/artifactDisplay'
+import { isExportableArtifact } from '../../lib/artifactTabs'
 import { artifactProjectKey } from '../../lib/artifactProject'
 import { useArtifactListStore } from '../../stores/artifactListStore'
 import { useArtifactViewStore, type ViewedArtifact } from '../../stores/artifactViewStore'
@@ -18,6 +19,7 @@ import { ActionMenu, type MenuAction } from '../shared/ActionMenu'
 import { Button } from '../shared/ui/button'
 import { Tooltip as HintTooltip } from '../shared/Tooltip'
 import { ViewerHeader } from '../shared/ViewerHeader'
+import { DeckControls } from './DeckControls'
 
 export const ARTIFACT_VIEW_TAB = '__artifact-view-tab__'
 const MENU_SESSION_LIMIT = 8
@@ -27,14 +29,15 @@ export function ArtifactViewer({ viewing }: { viewing: ViewedArtifact }) {
   const close = useArtifactViewStore((state) => state.close)
   const sessions = useSessionStore((state) => state.sessions)
   const item = useArtifactListStore((state) => state.items.find((candidate) => candidate.id === viewing.id))
-  useArtifactThumbnail(ARTIFACT_VIEW_TAB, item?.id ? { id: item.id, mtimeMs: item.latestMtimeMs } : undefined)
+  const kind = item?.manifest?.kind
+  useArtifactThumbnail(ARTIFACT_VIEW_TAB, item?.id ? { id: item.id, mtimeMs: item.latestMtimeMs, deck: kind === 'deck' } : undefined)
   const stageRef = useStandaloneBrowserPage(
     ARTIFACT_VIEW_TAB,
     viewing.id,
     () => artifactsApi.openById(viewing.id),
     () => artifactsApi.markOpened(viewing.id),
   )
-  useCanvasTab(item ? { tabId: ARTIFACT_VIEW_TAB, sessionId: null, root: artifactRoot(item), name: item.name } : null)
+  useCanvasTab(item && kind === 'canvas' ? { tabId: ARTIFACT_VIEW_TAB, sessionId: null, root: artifactRoot(item), name: item.name } : null)
 
   const exportActions = useArtifactExportActions({ tabId: ARTIFACT_VIEW_TAB, sessionId: null, title: viewing.title })
   const report = (error: unknown) => toast.error(errorMessage(error))
@@ -68,16 +71,18 @@ export function ArtifactViewer({ viewing }: { viewing: ViewedArtifact }) {
             <RotateCw aria-hidden="true" />
           </Button>
         </HintTooltip>
-        <ActionMenu
-          label={t('artifactsPage.export')}
-          actions={exportActions}
-          trigger={
-            <Button variant="outline" size="sm">
-              <Download aria-hidden="true" />
-              {t('artifactsPage.export')}
-            </Button>
-          }
-        />
+        {isExportableArtifact({ canvas: kind === 'canvas' }) && (
+          <ActionMenu
+            label={t('artifactsPage.export')}
+            actions={exportActions}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Download aria-hidden="true" />
+                {t('artifactsPage.export')}
+              </Button>
+            }
+          />
+        )}
         <ActionMenu
           label={t('artifactsPage.continueInSession')}
           actions={actions}
@@ -89,6 +94,7 @@ export function ArtifactViewer({ viewing }: { viewing: ViewedArtifact }) {
           }
         />
       </ViewerHeader>
+      <DeckControls tabId={ARTIFACT_VIEW_TAB} />
       <div ref={stageRef} data-testid="artifact-viewer-stage" className="min-h-0 flex-1" />
     </div>
   )

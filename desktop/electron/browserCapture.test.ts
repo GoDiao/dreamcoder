@@ -16,10 +16,10 @@ function guest(overrides: Partial<GuestContents> = {}, host: unknown = 'main', s
     isDestroyed: () => false,
     hostWebContents: host,
     session,
+    getURL: () => 'dreamcoder-project://abc/talk/index.html',
     capturePage: vi.fn(async () => image(1280, 800)),
     printToPDF: vi.fn(),
     executeJavaScriptInIsolatedWorld: vi.fn(),
-    debugger: { isAttached: () => false, attach: vi.fn(), detach: vi.fn(), sendCommand: vi.fn() },
     ...overrides,
   }
 }
@@ -56,6 +56,14 @@ describe('captureThumbnail', () => {
     const data = await captureThumbnail(guest({ capturePage: async () => small }))
     expect(small.resized).not.toHaveBeenCalled()
     expect(Buffer.from(data, 'base64').toString()).toContain('jpeg:200x100')
+  })
+
+  it('captures only the given part of the page when there is one', async () => {
+    const capturePage = vi.fn(async () => image(960, 540))
+    const clip = { x: 24, y: 114, width: 960, height: 540 }
+    const data = await captureThumbnail(guest({ capturePage }), clip)
+    expect(capturePage).toHaveBeenCalledWith(clip)
+    expect(Buffer.from(data, 'base64').toString()).toBe(`jpeg:${THUMBNAIL_WIDTH}x180:q${THUMBNAIL_QUALITY}`)
   })
 
   it('refuses an empty capture', async () => {

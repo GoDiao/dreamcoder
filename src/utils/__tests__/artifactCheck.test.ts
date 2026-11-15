@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkArtifact } from '../artifactCheck.js'
 import { CANVAS_ENTRY_HTML, isCanvasEntryHtml, isSafeBoardFile } from '../canvas.js'
+import { DECK_ENTRY_HTML, isDeckEntryHtml, isSafeSlideId } from '../deck.js'
 
 let root: string
 let artifactsDir: string
@@ -72,11 +73,6 @@ describe('checkArtifact', () => {
     expect((await checkArtifact(dir))[0]).toContain('version must be 1')
     expect((await checkArtifact(join(root, 'elsewhere')))[0]).toContain('not an artifact folder')
     expect((await checkArtifact(join(artifactsDir, 'absent')))[0]).toContain('does not exist')
-  })
-
-  test('reports a manifest of kind deck as invalid', async () => {
-    const dir = await artifact('slides', '<p></p>', { version: 1, id: 'id', kind: 'deck', title: 'T', entry: 'index.html' })
-    expect((await checkArtifact(dir))[0]).toContain('kind must be one of page, canvas')
   })
 
   async function system(name: string, files: string[] = ['DESIGN.md', 'tokens.css']) {
@@ -185,3 +181,114 @@ describe('canvas helpers', () => {
   })
 })
 
+
+describe('checkArtifact for a deck', () => {
+  const deckManifest = (slides: unknown, extra: Record<string, unknown> = {}) => ({ version: 1, id: 'd', kind: 'deck', title: 'D', entry: 'index.html', slides, ...extra })
+  const slide = (body: string) => `<section class="slide">${body}</section>\n`
+
+  async function deck(slides: unknown, files: Record<string, string>, options: { entryHtml?: string; extra?: Record<string, unknown> } = {}) {
+    const dir = await artifact('talk', options.entryHtml ?? DECK_ENTRY_HTML, deckManifest(slides, options.extra))
+    for (const [file, content] of Object.entries({ 'deck.css': '', ...files })) {
+      await mkdir(join(dir, file, '..'), { recursive: true })
+      await writeFile(join(dir, file), content)
+    }
+    return dir
+  }
+
+  test('accepts the fixed entry file, deck.css and slides that exist', async () => {
+    const dir = await deck(['cover', 'agenda'], { 'slides/cover.html': slide('<h1>Hi</h1>'), 'slides/agenda.html': slide('<ul><li>a</li></ul>') })
+    expect(await checkArtifact(dir)).toEqual([])
+  })
+
+  test('reports an entry file that is not the deck entry file and a missing deck.css', async () => {
+    const dir = await artifact('talk', '<p>mine</p>', deckManifest([]))
+    expect(await checkArtifact(dir)).toEqual([
+      'The entry file "index.html" of a deck must be exactly the deck entry file from the artifacts skill.',
+      'deck.css does not exist.',
+    ])
+  })
+
+  test('reports slide ids that are not allowed, repeated or without a file', async () => {
+    const dir = await deck(['cover', '../cover', 'cover', 'gone'], { 'slides/cover.html': slide('x') })
+    expect(await checkArtifact(dir)).toEqual([
+      'Slide id "../cover" may only use letters, digits, "_" and "-", and at most 64 characters.',
+      'Slide id "cover" is used twice.',
+      'Slide "gone": slides/gone.html does not exist.',
+    ])
+  })
+
+  test('reports a slide that is not one section, has a script or an inline event attribute', async () => {
+    const dir = await deck(['page', 'two', 'nested', 'script', 'event', 'text'], {
+      'slides/page.html': '<!doctype html><html><body><section>x</section></body></html>',
+      'slides/two.html': '<section>one</section>\n<section>two</section>\n',
+      'slides/nested.html': slide('<section class="inner"><p>inside</p></section><section>again</section>'),
+      'slides/script.html': slide('<script>alert(1)</script>'),
+      'slides/event.html': slide('<button onclick="go()">go</button>'),
+      'slides/text.html': slide('<p>turn it on = done</p>'),
+    })
+    expect(await checkArtifact(dir)).toEqual([
+      'Slide "page": the file must hold exactly one <section> element and nothing before or after it.',
+      'Slide "two": the file must hold exactly one <section> element and nothing before or after it.',
+      'Slide "script": a slide cannot contain <script>. Put content that needs a script into an embedded page and show it with <iframe src="embeds/...">.',
+      'Slide "event": a slide cannot use inline event attributes such as onclick.',
+    ])
+  })
+
+  test('resolves what a slide references from the artifact folder, not from slides/', async () => {
+    const dir = await deck(['cover', 'wrong'], {
+      'slides/cover.html': slide('<img src="assets/chart.png"><iframe src="embeds/demo.html"></iframe>'),
+      'slides/wrong.html': slide('<img src="../assets/chart.png">'),
+      'assets/chart.png': '',
+      'embeds/demo.html': '<script src="lib.js"></script><img src="../assets/chart.png">',
+      'embeds/lib.js': '',
+    })
+    expect(await checkArtifact(dir)).toEqual(['Slide "wrong": "../assets/chart.png" does not exist.'])
+  })
+
+  test('resolves what deck.css and an embedded page reference from their own location', async () => {
+    const dir = await deck(['cover'], {
+      'deck.css': '.cover{background:url(assets/bg.png)} .x{background:url(assets/gone.png)}',
+      'slides/cover.html': slide('<iframe src="embeds/demo.html"></iframe>'),
+      'assets/bg.png': '',
+      'embeds/demo.html': '<img src="assets/bg.png">',
+    })
+    expect(await checkArtifact(dir)).toEqual(['deck.css: "assets/gone.png" does not exist.', 'embeds/demo.html: "assets/bg.png" does not exist.'])
+  })
+
+  test('reports an embedded page that is outside the folder of the deck or missing', async () => {
+    await artifact('other', '<p>o</p>')
+    const dir = await deck(['cover'], { 'slides/cover.html': slide('<iframe src="../other/index.html"></iframe><iframe src="embeds/gone.html"></iframe><iframe src="https://example.com/"></iframe>') })
+    expect(await checkArtifact(dir)).toEqual([
+      'Slide "cover": "embeds/gone.html" does not exist.',
+      `Slide "cover": the embedded page "../other/index.html" must be inside this artifact's folder.`,
+    ])
+  })
+
+  test('reports a slide file that the manifest does not list', async () => {
+    const dir = await deck(['cover'], { 'slides/cover.html': slide('x'), 'slides/draft.html': slide('y'), 'slides/notes.txt': '' })
+    expect(await checkArtifact(dir)).toEqual(['slides/draft.html is not listed in "slides" of artifact.json, so it is not shown.'])
+  })
+
+  test('checks that the design system of a deck exists without asking the entry to link its tokens', async () => {
+    await mkdir(join(artifactsDir, 'systems', 'alpha'), { recursive: true })
+    await writeFile(join(artifactsDir, 'systems', 'alpha', 'DESIGN.md'), '')
+    const dir = await deck(['cover'], { 'slides/cover.html': slide('x') }, { extra: { designSystem: 'systems/alpha' } })
+    expect(await checkArtifact(dir)).toEqual(['The design system "systems/alpha" has no tokens.css.'])
+    await writeFile(join(artifactsDir, 'systems', 'alpha', 'tokens.css'), '')
+    expect(await checkArtifact(dir)).toEqual([])
+  })
+})
+
+describe('deck helpers', () => {
+  test('the entry file check ignores whitespace and nothing else', () => {
+    expect(isDeckEntryHtml(DECK_ENTRY_HTML)).toBe(true)
+    expect(isDeckEntryHtml(DECK_ENTRY_HTML.replace(/\n/g, '\r\n  '))).toBe(true)
+    expect(isDeckEntryHtml(DECK_ENTRY_HTML.replace('deck.js', 'canvas.js'))).toBe(false)
+    expect(isDeckEntryHtml(DECK_ENTRY_HTML.replace('</body>', '<link rel="stylesheet" href="deck.css"></body>'))).toBe(false)
+  })
+
+  test('slide ids are short names of letters, digits, underscore and hyphen', () => {
+    expect(['cover', 'Q3_plan-2', 'a'.repeat(64)].every(isSafeSlideId)).toBe(true)
+    expect(['', 'a b', 'a/b', '../a', 'a.html', 'é', 'a'.repeat(65)].some(isSafeSlideId)).toBe(false)
+  })
+})

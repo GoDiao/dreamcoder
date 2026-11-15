@@ -5,14 +5,19 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   putThumbnail: vi.fn(),
   contentsId: vi.fn(),
+  stageRect: vi.fn(),
 }))
 
 vi.mock('../lib/shell', () => ({ captureBrowserThumbnail: mocks.capture }))
 vi.mock('../api/artifacts', () => ({ artifactsApi: { putThumbnail: mocks.putThumbnail } }))
-vi.mock('../lib/browserGuests', () => ({ getBrowserGuestContentsId: mocks.contentsId }))
+vi.mock('../lib/browserGuests', () => ({ getBrowserGuestContentsId: mocks.contentsId, deckStageRect: mocks.stageRect }))
 
-import { useBrowserStore } from '../stores/browserStore'
+import type { DeckState } from '../lib/deckBridge'
+import { EMPTY_BROWSER_PAGE, useBrowserStore } from '../stores/browserStore'
 import { resetCapturedThumbnails, useArtifactThumbnail } from './useArtifactThumbnail'
+
+const page = (overrides: Partial<typeof EMPTY_BROWSER_PAGE> = {}) => ({ ...EMPTY_BROWSER_PAGE, ready: true, ...overrides })
+const deckState = (overrides: Partial<DeckState> = {}): DeckState => ({ artifact: 'id-1', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', ...overrides })
 
 const settle = () => act(async () => {
   await vi.advanceTimersByTimeAsync(1_100)
@@ -25,7 +30,7 @@ describe('useArtifactThumbnail', () => {
     mocks.capture.mockResolvedValue('jpeg-base64')
     mocks.putThumbnail.mockResolvedValue({ ok: true })
     mocks.contentsId.mockReturnValue(31)
-    useBrowserStore.setState({ pageByTab: { t1: { ready: true, loading: false, canGoBack: false, canGoForward: false } } })
+    useBrowserStore.setState({ pageByTab: { t1: page() } })
   })
 
   afterEach(() => {
@@ -45,13 +50,13 @@ describe('useArtifactThumbnail', () => {
   })
 
   it('waits while the page is still loading or not ready', async () => {
-    useBrowserStore.setState({ pageByTab: { t1: { ready: true, loading: true, canGoBack: false, canGoForward: false } } })
+    useBrowserStore.setState({ pageByTab: { t1: page({ loading: true }) } })
     renderHook(() => useArtifactThumbnail('t1', { id: 'id-1', mtimeMs: 10 }))
     await settle()
     expect(mocks.capture).not.toHaveBeenCalled()
 
     act(() => {
-      useBrowserStore.setState({ pageByTab: { t1: { ready: true, loading: false, canGoBack: false, canGoForward: false } } })
+      useBrowserStore.setState({ pageByTab: { t1: page() } })
     })
     await settle()
     expect(mocks.capture).toHaveBeenCalledTimes(1)
@@ -105,5 +110,50 @@ describe('useArtifactThumbnail', () => {
     unmount()
     await settle()
     expect(mocks.capture).not.toHaveBeenCalled()
+  })
+
+  describe('for a deck', () => {
+    const clip = { x: 24, y: 114, width: 960, height: 540 }
+    const show = (deck: DeckState | null) => act(() => {
+      useBrowserStore.setState({ pageByTab: { t1: page({ deck }) } })
+    })
+
+    beforeEach(() => {
+      mocks.stageRect.mockResolvedValue(clip)
+    })
+
+    it('captures only the slide, without the margin around it, once the deck shows its first slide in browse mode', async () => {
+      renderHook(() => useArtifactThumbnail('t1', { id: 'id-1', mtimeMs: 10, deck: true }))
+      await settle()
+      expect(mocks.capture).not.toHaveBeenCalled()
+
+      show(deckState())
+      await settle()
+      expect(mocks.stageRect).toHaveBeenCalledWith('t1')
+      expect(mocks.capture).toHaveBeenCalledWith({ webContentsId: 31, clip })
+      expect(mocks.putThumbnail).toHaveBeenCalledWith('id-1', 10, 'jpeg-base64')
+    })
+
+    it('does not capture another slide, the overview or the presentation', async () => {
+      renderHook(() => useArtifactThumbnail('t1', { id: 'id-1', mtimeMs: 10, deck: true }))
+      for (const state of [deckState({ slide: 'agenda', index: 1 }), deckState({ mode: 'overview' }), deckState({ mode: 'present' }), deckState({ slide: null, index: -1, count: 0 })]) {
+        show(state)
+        await settle()
+      }
+      expect(mocks.capture).not.toHaveBeenCalled()
+    })
+
+    it('tries again later when the deck gives no place for the slide', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      mocks.stageRect.mockResolvedValueOnce(null)
+      const { rerender } = renderHook(({ mtimeMs }) => useArtifactThumbnail('t1', { id: 'id-1', mtimeMs, deck: true }), { initialProps: { mtimeMs: 10 } })
+      show(deckState())
+      await settle()
+      expect(mocks.capture).not.toHaveBeenCalled()
+
+      rerender({ mtimeMs: 11 })
+      await settle()
+      expect(mocks.capture).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { artifactsApi } from '../api/artifacts'
-import { getBrowserGuestContentsId } from '../lib/browserGuests'
+import { deckStageRect, getBrowserGuestContentsId } from '../lib/browserGuests'
 import { captureBrowserThumbnail } from '../lib/shell'
 import { useBrowserStore } from '../stores/browserStore'
 
@@ -11,10 +11,19 @@ export function resetCapturedThumbnails() {
   captured.clear()
 }
 
-export function useArtifactThumbnail(tabId: string, artifact: { id: string; mtimeMs: number } | undefined) {
+async function capture(tabId: string, webContentsId: number, deck: boolean) {
+  if (!deck) return captureBrowserThumbnail({ webContentsId })
+  const clip = await deckStageRect(tabId)
+  if (!clip) throw new Error('the deck has no slide to capture')
+  return captureBrowserThumbnail({ webContentsId, clip })
+}
+
+export function useArtifactThumbnail(tabId: string, artifact: { id: string; mtimeMs: number; deck?: boolean } | undefined) {
+  const deck = artifact?.deck === true
   const loaded = useBrowserStore((state) => {
     const page = state.pageByTab[tabId]
-    return page?.ready === true && page.loading === false
+    if (page?.ready !== true || page.loading) return false
+    return !deck || (page.deck?.mode === 'browse' && page.deck.index === 0)
   })
   const id = artifact?.id
   const mtimeMs = artifact?.mtimeMs
@@ -27,7 +36,7 @@ export function useArtifactThumbnail(tabId: string, artifact: { id: string; mtim
       const webContentsId = getBrowserGuestContentsId(tabId)
       if (webContentsId === null) return
       captured.add(key)
-      captureBrowserThumbnail({ webContentsId })
+      capture(tabId, webContentsId, deck)
         .then((data) => artifactsApi.putThumbnail(id, mtimeMs, data))
         .catch((error: unknown) => {
           captured.delete(key)
@@ -35,5 +44,5 @@ export function useArtifactThumbnail(tabId: string, artifact: { id: string; mtim
         })
     }, SETTLE_MS)
     return () => clearTimeout(timer)
-  }, [id, mtimeMs, loaded, tabId])
+  }, [id, mtimeMs, loaded, tabId, deck])
 }

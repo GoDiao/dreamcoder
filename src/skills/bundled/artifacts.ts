@@ -2,6 +2,7 @@ import { ARTIFACT_CHECK_TOOL_NAME } from '../../tools/ArtifactCheckTool/constant
 import { ARTIFACT_COPY_TOOL_NAME } from '../../tools/ArtifactCopyTool/constants.js'
 import { browserToolName } from '../../utils/browserControl/common.js'
 import { CANVAS_ENTRY_HTML, CANVAS_SCRIPT_PATH } from '../../utils/canvas.js'
+import { DECK_ENTRY_HTML, DECK_SCRIPT_PATH, DECK_STYLESHEET_FILE } from '../../utils/deck.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
 const navigate = browserToolName('navigate')
@@ -38,7 +39,7 @@ dc_artifacts/<name>/
 { "version": 1, "id": "3f1c9a52-8d4e-4b7a-9c61-0e2f5a7b8d13", "kind": "page", "title": "Quarterly report", "entry": "index.html" }
 \`\`\`
 
-\`id\` identifies the artifact for good, also after it moves: generate a new random UUID v4 for each new artifact and never change it afterwards. \`kind\` is \`page\` for pages and prototypes and \`canvas\` for a canvas (see Canvas below). \`entry\` is the HTML file relative to the artifact folder, and every kind needs one.
+\`id\` identifies the artifact for good, also after it moves: generate a new random UUID v4 for each new artifact and never change it afterwards. \`kind\` is \`page\` for pages and prototypes, \`canvas\` for a canvas (see Canvas below) and \`deck\` for slides (see Deck below). \`entry\` is the HTML file relative to the artifact folder, and every kind needs one.
 
 ## How to build it
 
@@ -82,6 +83,34 @@ ${CANVAS_ENTRY_HTML}\`\`\`
 - To read the canvas, take a \`${snapshot}\`. A snapshot lists at most 150 interactive elements and splits them between the boards, so a board that is far outside the view may get none. Its section header names the board and gives an iframe id: pass it as \`region\` to read just that board. Or open that board's file on its own with \`${navigate}\`.
 - A board's page gets no mouse or keyboard input on the canvas until it is in interaction mode: a \`${click}\`, \`${typeText}\` or hover aimed at an element inside a board lands on the canvas and does nothing. To act inside a board, first click the Interact button in that board's title bar (a snapshot lists it as a button named \`Interact: <board title>\`, or \`交互: <board title>\` when the app is in Chinese; the board id stands in for the title when the board has none); after that, clicks and typing reach its page. Click the same button again (\`Stop interacting: <board title>\`) or press Escape to leave; only one board is in interaction mode at a time. Reading the canvas (snapshot, screenshot, evaluate) needs no interaction mode. Or open that board's file on its own tab and work there.
 - A board cannot be exported on the canvas page. The user opens one board in its own tab and exports it there.
+
+## Deck
+
+A deck is a set of slides that the app shows on a fixed 1920 by 1080 stage, one at a time, with paging, an overview and a presentation mode. Use it when the user wants slides or a presentation. To make one, load the \`slides\` skill with the Skill tool and follow it; this section is only the layout.
+
+\`\`\`
+dc_artifacts/<name>/
+  artifact.json
+  index.html
+  ${DECK_STYLESHEET_FILE}
+  slides/
+    cover.html
+    agenda.html
+\`\`\`
+
+The manifest has \`"kind": "deck"\`, \`"entry": "index.html"\` and a \`slides\` list: the ids of the slides in order. The file of a slide is \`slides/<id>.html\`.
+
+\`\`\`json
+{ "version": 1, "id": "<new UUID v4>", "kind": "deck", "title": "Quarterly review", "entry": "index.html", "slides": ["cover", "agenda"] }
+\`\`\`
+
+- \`index.html\` is always exactly this text; do not change it, the app supplies the stage script it loads (${DECK_SCRIPT_PATH}), and that script loads ${DECK_STYLESHEET_FILE} and the slides:
+
+\`\`\`html
+${DECK_ENTRY_HTML}\`\`\`
+
+- A slide file holds one \`<section>\` element and nothing else. All styles are in ${DECK_STYLESHEET_FILE}. A slide has no script; the rules are in \`format.md\` of the \`slides\` skill.
+- A snapshot or screenshot shows only the current slide. Move with \`window.__dreamcoderDeck.goTo('<id>')\` through the browser evaluate tool.
 
 ## Show it and check it
 

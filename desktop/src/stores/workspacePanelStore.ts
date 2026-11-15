@@ -42,7 +42,7 @@ export type WorkspacePreviewEntry = {
   size?: number
 }
 
-export type BrowserTabArtifact = { id: string; name: string; mtimeMs: number; canvas?: true; board?: string }
+export type BrowserTabArtifact = { id: string; name: string; mtimeMs: number; canvas?: true; deck?: true; board?: string }
 
 export type BrowserTabTemplate = { id: string }
 
@@ -133,7 +133,7 @@ type WorkspacePanelStore = {
   syncSideChats: (sessionId: string) => Promise<void>
 }
 
-type WorkspaceTabPatch = { url?: string; title?: string; shell?: string; artifact?: BrowserTabArtifact }
+type WorkspaceTabPatch = { url?: string; title?: string; shell?: string; root?: string; artifact?: BrowserTabArtifact }
 
 const PANEL_STORAGE_KEY = 'dreamcoder-workspace-panels'
 const MAX_RECENT_FILES = 8
@@ -354,12 +354,24 @@ export function getShellDisplayName(shell: string | undefined) {
 
 type StoredPanel = Pick<WorkspacePanelSessionState, 'isOpen' | 'tabs' | 'activeTabId' | 'recentFiles' | 'selectedFile'>
 
+export function browserTabArtifact(item: { id: string; name: string; latestMtimeMs: number; manifest?: ArtifactListItem['manifest'] }): BrowserTabArtifact {
+  const kind = item.manifest?.kind
+  return {
+    id: item.id,
+    name: item.name,
+    mtimeMs: item.latestMtimeMs,
+    ...(kind === 'canvas' && { canvas: true as const }),
+    ...(kind === 'deck' && { deck: true as const }),
+  }
+}
+
 function isStoredBrowserTabArtifact(value: unknown): value is BrowserTabArtifact {
   if (!value || typeof value !== 'object') return false
   const artifact = value as Record<string, unknown>
   return typeof artifact.id === 'string' && typeof artifact.name === 'string' && typeof artifact.mtimeMs === 'number'
     && (artifact.board === undefined || typeof artifact.board === 'string')
     && (artifact.canvas === undefined || artifact.canvas === true)
+    && (artifact.deck === undefined || artifact.deck === true)
 }
 
 function isStoredBrowserTabTemplate(value: unknown): value is BrowserTabTemplate {
@@ -524,7 +536,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
 
   openArtifact: async (sessionId, item, root) => {
     if (!item.id) throw new Error('This artifact has no id')
-    const target: WorkspaceTabTarget = { kind: 'browser', url: '', root, artifact: { id: item.id, name: item.name, mtimeMs: item.latestMtimeMs, ...(item.manifest?.kind === 'canvas' && { canvas: true as const }) } }
+    const target: WorkspaceTabTarget = { kind: 'browser', url: '', root, artifact: browserTabArtifact({ ...item, id: item.id }) }
     const panel = getSessionPanelState(get().panelByTab, panelOwner(get().panelByTab, sessionId))
     if (panel.tabs.some((tab) => isSameTarget(tab, target))) {
       get().openTab(sessionId, target)

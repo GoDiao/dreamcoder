@@ -1,17 +1,18 @@
 import type { TranslationKey, useTranslation } from '../i18n'
-import type { ArtifactListItem } from '../types/artifact'
+import type { ArtifactKind, ArtifactListItem } from '../types/artifact'
 import { GLOBAL_ARTIFACTS_ROOT } from './artifactRoots'
 
-const KIND_LABELS: Record<string, TranslationKey> = {
+const KIND_LABELS: Record<ArtifactKind, TranslationKey> = {
   page: 'artifacts.kind.page',
   canvas: 'artifacts.kind.canvas',
+  deck: 'artifacts.kind.deck',
 }
 
 export function artifactDetail(t: ReturnType<typeof useTranslation>, item: Pick<ArtifactListItem, 'error' | 'entryMissing' | 'manifest'>): string {
   if (item.error) return t('artifacts.invalidManifest', { reason: item.error })
   if (item.entryMissing) return t('artifacts.entryMissing')
   const kind = item.manifest?.kind
-  return kind ? t(KIND_LABELS[kind]!) : ''
+  return kind ? t(KIND_LABELS[kind]) : ''
 }
 
 export function artifactTitle(item: Pick<ArtifactListItem, 'manifest' | 'name'>): string {

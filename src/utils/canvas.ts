@@ -1,22 +1,10 @@
-export const CANVAS_RESERVED_PREFIX = '/__dreamcoder__/'
-export const CANVAS_SCRIPT_PATH = `${CANVAS_RESERVED_PREFIX}canvas.js`
-export const CANVAS_SHELL_DIRNAME = 'canvas-shell'
-export const CANVAS_SHELL_FILES: readonly string[] = ['canvas.js']
+import { ARTIFACT_SHELL_PREFIX, isSameEntryHtml, shellEntryHtml } from './artifactShell.js'
 
-export const CANVAS_ENTRY_HTML = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Canvas</title>
-</head>
-<body>
-<script src="${CANVAS_SCRIPT_PATH}"></script>
-</body>
-</html>
-`
+export const CANVAS_SCRIPT_PATH = `${ARTIFACT_SHELL_PREFIX}canvas.js`
+export const CANVAS_ENTRY_HTML = shellEntryHtml('Canvas', CANVAS_SCRIPT_PATH)
 
 export function isCanvasEntryHtml(html: string): boolean {
-  return html.replace(/\s+/g, ' ').trim() === CANVAS_ENTRY_HTML.replace(/\s+/g, ' ').trim()
+  return isSameEntryHtml(html, CANVAS_ENTRY_HTML)
 }
 
 export function isSafeBoardFile(file: string): boolean {

@@ -10,7 +10,7 @@ export const ARTIFACT_ORIGIN_FILE = '.origin.json'
 export const DESIGN_SYSTEMS_FOLDER = 'systems'
 export const RESERVED_ARTIFACT_NAMES = [DESIGN_SYSTEMS_FOLDER]
 
-export const ARTIFACT_KINDS = ['page', 'canvas'] as const
+export const ARTIFACT_KINDS = ['page', 'canvas', 'deck'] as const
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
 
 export type ArtifactBoard = {
@@ -32,6 +32,7 @@ export type ArtifactManifest = {
   designSystem?: string
   template?: { id: string; commit: string }
   boards?: ArtifactBoard[]
+  slides?: string[]
 }
 
 export type ArtifactOrigin = {
@@ -114,6 +115,11 @@ function parseBoards(value: unknown): ArtifactBoard[] | undefined {
   return boards
 }
 
+function parseSlides(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
 export function parseJsonObject(
   raw: string,
   fileName: string,
@@ -167,6 +173,7 @@ export function parseArtifactManifest(raw: string): { manifest: ArtifactManifest
         template: { id: template.id, commit: template.commit },
       }),
       ...(record.boards !== undefined && { boards: parseBoards(record.boards) }),
+      ...(record.slides !== undefined && { slides: parseSlides(record.slides) }),
     },
     error: null,
   }

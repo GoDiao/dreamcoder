@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import canvasSource from '../../public/canvas-shell/canvas.js?raw'
+import canvasSource from '../../public/artifact-shell/canvas.js?raw'
 
 type Board = { id: string; file: string; title?: string; x: number; y: number; width: number; height: number }
 type Shell = { refresh: () => Promise<void>; view: () => { x: number; y: number; scale: number }; setScheme: (scheme: unknown) => void }
 
 const PREFIX = 'dreamcoder-canvas:'
 
-let manifest: { boards: Board[] } | null
+let manifest: { id?: string; boards: Board[] } | null
 let files: Set<string>
 let fetched: string[]
 let logs: unknown[]
@@ -35,13 +35,14 @@ const pageArea = (id: string) => element(id).querySelector('.board-bar')!.nextEl
 const interactButton = (id: string) => element(id).querySelector('.board-interact') as HTMLElement
 const openButton = (id: string) => element(id).querySelector('.board-open:not(.board-interact)') as HTMLElement
 
-const messages = () => logs.map((entry) => JSON.parse(String(entry).slice(PREFIX.length)) as Record<string, unknown>)
+const allMessages = () => logs.map((entry) => JSON.parse(String(entry).slice(PREFIX.length)) as Record<string, unknown>)
+const messages = () => allMessages().filter((message) => message.type !== 'ready')
 const element = (id: string) => document.querySelector(`[data-board="${id}"]`) as HTMLElement
 
 beforeEach(() => {
   document.head.innerHTML = ''
   document.body.innerHTML = ''
-  manifest = { boards: [board('home'), board('detail', { x: 500, title: 'Detail screen' })] }
+  manifest = { id: 'canvas-1', boards: [board('home'), board('detail', { x: 500, title: 'Detail screen' })] }
   files = new Set(['home.html', 'detail.html'])
   fetched = []
   logs = []
@@ -65,6 +66,17 @@ afterEach(() => {
 })
 
 describe('canvas shell boards', () => {
+  it('reports the id of its artifact once the manifest is read, and nothing when it cannot be read', async () => {
+    await start()
+    expect(allMessages()).toEqual([{ type: 'ready', artifact: 'canvas-1' }])
+
+    logs = []
+    document.body.innerHTML = ''
+    manifest = null
+    await start()
+    expect(allMessages()).toEqual([])
+  })
+
   it('puts every board in a same-origin iframe titled with the board title or id', async () => {
     await start()
     const frames = [...document.querySelectorAll('iframe')]

@@ -4,7 +4,7 @@ import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { CANVAS_RESERVED_PREFIX, CANVAS_SHELL_FILES } from '../../src/utils/canvas'
+import { ARTIFACT_SHELL_FILES, ARTIFACT_SHELL_PREFIX } from '../../src/utils/artifactShell'
 import {
   DEFAULT_BROWSER_SEARCH_ENGINE,
   isBrowserSearchEngineId,
@@ -274,15 +274,15 @@ export async function serveProjectRequest(
   request: ProjectRequest,
   roots: ProjectRoots,
   openFile: OpenProjectFile,
-  canvasShellDir: string,
+  artifactShellDir: string,
 ): Promise<Response> {
   const url = new URL(request.url)
   const range = request.headers.get('range')
-  if (url.pathname.startsWith(CANVAS_RESERVED_PREFIX)) {
-    const name = url.pathname.slice(CANVAS_RESERVED_PREFIX.length)
+  if (url.pathname.startsWith(ARTIFACT_SHELL_PREFIX)) {
+    const name = url.pathname.slice(ARTIFACT_SHELL_PREFIX.length)
     if (!roots.has(url.hostname)) return new Response('Forbidden', { status: 403 })
-    if (!CANVAS_SHELL_FILES.includes(name)) return new Response('Not found', { status: 404 })
-    return respondWithFile(path.join(canvasShellDir, name), range, openFile)
+    if (!ARTIFACT_SHELL_FILES.includes(name)) return new Response('Not found', { status: 404 })
+    return respondWithFile(path.join(artifactShellDir, name), range, openFile)
   }
   const result = await roots.fileFor(url)
   if ('file' in result) return respondWithFile(result.file, range, openFile)
@@ -361,7 +361,7 @@ type BrowserDeps = {
   session: BrowserSessionLike
   roots: ProjectRoots
   openFile: OpenProjectFile
-  canvasShellDir: string
+  artifactShellDir: string
   notify: (event: string, payload: unknown) => void
   popupMenu: (items: SelectionMenuItem[]) => void
   menuLabels: () => SelectionMenuLabels | null
@@ -476,13 +476,13 @@ export function chromeUserAgent(userAgent: string) {
 }
 
 export function installBrowser(deps: BrowserDeps) {
-  const { host, session, roots, openFile, canvasShellDir } = deps
+  const { host, session, roots, openFile, artifactShellDir } = deps
   session.setUserAgent(chromeUserAgent(session.getUserAgent()))
   session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   session.setPermissionCheckHandler(() => false)
   session.setDevicePermissionHandler(() => false)
   session.setDisplayMediaRequestHandler((_request, callback) => callback({}))
-  session.protocol.handle(PROJECT_SCHEME, (request) => serveProjectRequest(request, roots, openFile, canvasShellDir))
+  session.protocol.handle(PROJECT_SCHEME, (request) => serveProjectRequest(request, roots, openFile, artifactShellDir))
   host.on('will-attach-webview', ((event: PreventableEvent, webPreferences: WebPreferences, params: AttachParams) => {
     if (!applyAttachPolicy(webPreferences, params, roots)) event.preventDefault()
   }) as Listener)

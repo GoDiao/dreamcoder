@@ -9,7 +9,10 @@ import { designApi } from '../api/design'
 import { GLOBAL_ARTIFACTS_ROOT } from './artifactRoots'
 import { resolveBrowserInput, type BrowserBlockedEvent, type BrowserSelectionEvent, type BrowserShortcutEvent } from './shell'
 import { BROWSER_PARTITION } from './shell/electronBridge'
-import { CANVAS_REFRESH_CALL, canvasSchemeCall, parseCanvasMessage, type CanvasMessage } from './canvasBridge'
+import { adoptArtifactTab, artifactFolderOf } from './artifactTabs'
+import { canvasBoardTitleCall, parseCanvasMessage, type CanvasAction } from './canvasBridge'
+import { DECK_STAGE_RECT_CALL, deckModeCall, isDeckRect, parseDeckMessage, slideFile, type DeckRect } from './deckBridge'
+import { SHELL_REFRESH_CALL, shellSchemeCall } from './shellBridge'
 import { useUIStore } from '../stores/uiStore'
 import { themeColorScheme } from '../theme/colorScheme'
 
@@ -26,6 +29,7 @@ type WebviewElement = HTMLElement & {
   isLoading: () => boolean
   getWebContentsId: () => number
   executeJavaScript: (code: string) => Promise<unknown>
+  focus: () => void
 }
 
 type Guest = {
@@ -49,13 +53,14 @@ const ABORTED_LOAD = -3
 
 const guests = new Map<string, Guest>()
 const placements = new Map<string, Placement>()
-const canvasHandlers = new Map<string, (message: CanvasMessage) => void>()
+const canvasHandlers = new Map<string, (message: CanvasAction) => void>()
 let layer: HTMLElement | null = null
 let layerObserver: ResizeObserver | null = null
 let gestureActive = false
 let dismissingHostPopups = false
 let gestureListenersInstalled = false
 let themeSyncInstalled = false
+let presentationSyncInstalled = false
 
 export function setBrowserGuestLayer(element: HTMLElement | null) {
   if (element === layer) return
@@ -65,6 +70,7 @@ export function setBrowserGuestLayer(element: HTMLElement | null) {
   if (!element) return
   installGestureListeners()
   installThemeSync()
+  installPresentationSync()
   if (typeof ResizeObserver !== 'undefined') {
     layerObserver = new ResizeObserver(applyAllPlacements)
     layerObserver.observe(element)
@@ -122,7 +128,7 @@ function createGuest(sessionId: string | null, tabId: string, url: string) {
   const guest: Guest = { sessionId, tabId, slot, webview, ready: false, webContentsId: null }
   const store = useBrowserStore.getState()
   webview.addEventListener('dom-ready', () => {
-    applyCanvasScheme(guest)
+    applyShellScheme(guest)
     if (guest.ready) return
     guest.ready = true
     guest.webContentsId = webview.getWebContentsId()
@@ -137,6 +143,7 @@ function createGuest(sessionId: string | null, tabId: string, url: string) {
   webview.addEventListener('did-navigate', (event) => {
     const { url: navigatedUrl } = event as Event & { url: string }
     if (sessionId) useWorkspaceChatContextStore.getState().markBrowserElementsStale(sessionId, tabId)
+    store.patchPage(tabId, { deck: null })
     if (navigatedUrl.startsWith(ERROR_PAGE_PROTOCOL)) return
     store.setNotice(tabId, null)
     if (sessionId) useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { url: navigatedUrl })
@@ -150,35 +157,54 @@ function createGuest(sessionId: string | null, tabId: string, url: string) {
   })
   webview.addEventListener('console-message', (event) => {
     const { message, sourceId } = event as Event & { message: string; sourceId: string }
-    const handler = canvasHandlers.get(tabId)
-    const parsed = handler ? parseCanvasMessage(message, sourceId) : null
-    if (parsed) handler?.(parsed)
+    const canvas = parseCanvasMessage(message, sourceId)
+    if (canvas?.type === 'ready') adopt(guest, canvas.artifact)
+    else if (canvas) canvasHandlers.get(tabId)?.(canvas)
+    const deck = canvas ? null : parseDeckMessage(message, sourceId)
+    if (deck?.type === 'exit') leavePresentation(guest)
+    if (deck?.type !== 'state') return
+    const { type: _type, ...state } = deck
+    const known = useBrowserStore.getState().pageByTab[tabId]?.deck?.artifact
+    store.patchPage(tabId, { deck: state })
+    if (state.artifact && state.artifact !== known) adopt(guest, state.artifact)
   })
   webview.addEventListener('focus', dismissHostPopups)
   guests.set(tabId, guest)
   return guest
 }
 
-export async function canvasBoardLabel(tabId: string, documentUrl: string): Promise<string | null> {
+function adopt(guest: Guest, artifactId: string) {
+  if (!guest.sessionId) return
+  adoptArtifactTab({ sessionId: guest.sessionId, tabId: guest.tabId, artifactId, currentUrl: () => guest.webview.getURL() }).catch((error: unknown) => {
+    console.warn('[browser] could not recognise the artifact a tab shows', artifactId, error)
+  })
+}
+
+type ArtifactReferenceLabel = { name: string; title?: string }
+
+export async function artifactReferenceLabel(tabId: string, documentUrl: string): Promise<ArtifactReferenceLabel | null> {
   const guest = readyGuest(tabId)
-  if (!guest || !canvasHandlers.has(tabId)) return null
-  const topUrl = guest.webview.getURL()
-  if (!isProjectPageUrl(topUrl)) return null
-  const artifact = decodeURIComponent(new URL(topUrl).pathname).split('/').filter(Boolean)[0]
+  if (!guest) return null
+  const artifact = artifactFolderOf(guest.webview.getURL())
   if (!artifact) return null
+  const deck = useBrowserStore.getState().pageByTab[tabId]?.deck
+  if (deck?.slide) {
+    const slide = deck.title ?? deck.slide
+    return { name: `${artifact} / ${slide}`, title: `${slideFile(deck.slide)} · ${slide}` }
+  }
   try {
-    const board = await guest.webview.executeJavaScript(`window.__dreamcoderCanvas ? window.__dreamcoderCanvas.boardTitle(${JSON.stringify(documentUrl)}) : null`)
-    return typeof board === 'string' && board !== '' ? `${artifact} / ${board}` : null
+    const board = await guest.webview.executeJavaScript(canvasBoardTitleCall(documentUrl))
+    return typeof board === 'string' && board !== '' ? { name: `${artifact} / ${board}` } : null
   } catch (error) {
     console.warn('[browser] could not read the board of a selection', error)
     return null
   }
 }
 
-function applyCanvasScheme(guest: Guest) {
-  if (!canvasHandlers.has(guest.tabId)) return
-  const call = canvasSchemeCall(themeColorScheme(useUIStore.getState().theme))
-  guest.webview.executeJavaScript(call).catch((error: unknown) => console.warn('[browser] could not set the canvas color scheme', error))
+function applyShellScheme(guest: Guest) {
+  if (!isProjectPageUrl(guest.webview.getURL())) return
+  const call = shellSchemeCall(themeColorScheme(useUIStore.getState().theme))
+  guest.webview.executeJavaScript(call).catch((error: unknown) => console.warn('[browser] could not set the color scheme of the artifact shell', error))
 }
 
 function installThemeSync() {
@@ -186,19 +212,74 @@ function installThemeSync() {
   themeSyncInstalled = true
   useUIStore.subscribe((state, previous) => {
     if (state.theme === previous.theme) return
-    for (const guest of guests.values()) if (guest.ready) applyCanvasScheme(guest)
+    for (const guest of guests.values()) if (guest.ready) applyShellScheme(guest)
   })
 }
 
-export function setCanvasMessageHandler(tabId: string, handler: ((message: CanvasMessage) => void) | null) {
+export function setCanvasMessageHandler(tabId: string, handler: ((message: CanvasAction) => void) | null) {
   if (handler) canvasHandlers.set(tabId, handler)
   else canvasHandlers.delete(tabId)
 }
 
-export async function refreshCanvas(tabId: string): Promise<boolean> {
+export async function refreshArtifactShell(tabId: string): Promise<boolean> {
   const guest = readyGuest(tabId)
   if (!guest) return false
-  return (await guest.webview.executeJavaScript(CANVAS_REFRESH_CALL)) !== false
+  try {
+    return (await guest.webview.executeJavaScript(SHELL_REFRESH_CALL)) !== false
+  } catch (error) {
+    console.warn('[browser] could not refresh the artifact shell of a tab', tabId, error)
+    return false
+  }
+}
+
+function runInPage(guest: Guest, code: string) {
+  return guest.webview.executeJavaScript(code).then(
+    () => undefined,
+    (error: unknown) => console.warn('[browser] a call into the deck failed', error),
+  )
+}
+
+export async function runDeckCall(tabId: string, code: string) {
+  const guest = readyGuest(tabId)
+  if (guest) await runInPage(guest, code)
+}
+
+export async function deckStageRect(tabId: string): Promise<DeckRect | null> {
+  const rect = await readyGuest(tabId)?.webview.executeJavaScript(DECK_STAGE_RECT_CALL)
+  return isDeckRect(rect) ? rect : null
+}
+
+export async function presentDeck(tabId: string) {
+  const guest = readyGuest(tabId)
+  if (!guest) return
+  await guest.slot.requestFullscreen()
+  guest.webview.focus()
+  await runInPage(guest, deckModeCall('present'))
+}
+
+function leavePresentation(guest: Guest) {
+  if (document.fullscreenElement === guest.slot) {
+    document.exitFullscreen().catch((error: unknown) => console.warn('[browser] could not leave full screen', error))
+    return
+  }
+  void runInPage(guest, deckModeCall('browse'))
+}
+
+function installPresentationSync() {
+  if (presentationSyncInstalled) return
+  presentationSyncInstalled = true
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) return
+    const pages = useBrowserStore.getState().pageByTab
+    for (const guest of guests.values()) {
+      if (guest.ready && pages[guest.tabId]?.deck?.mode === 'present') void runInPage(guest, deckModeCall('browse'))
+    }
+  })
+}
+
+export function browserGuestSize(tabId: string) {
+  const rect = guests.get(tabId)?.slot.getBoundingClientRect()
+  return rect && rect.width > 0 && rect.height > 0 ? { width: Math.round(rect.width), height: Math.round(rect.height) } : null
 }
 
 export function hasBrowserGuest(tabId: string) {
@@ -258,24 +339,25 @@ export async function resolveStoredBrowserUrl(
   projectRoot: string | null,
 ): Promise<string> {
   if (!isProjectPageUrl(tab.url)) return tab.url
-  const relative = decodeURIComponent(new URL(tab.url).pathname).replace(/^\/+/, '')
+  const stored = new URL(tab.url)
+  const relative = decodeURIComponent(stored.pathname).replace(/^\/+/, '')
   if (!relative) return tab.url
-  const root = tab.root === undefined ? projectRoot : tab.root === GLOBAL_ARTIFACTS_ROOT ? null : tab.root
-  if (root) {
-    const result = await resolveUnderRoot(root, relative)
-    if (result.ok) return result.url
+  const reopened = async (rootDir: string, path: string) => {
+    const result = await resolveUnderRoot(rootDir, path)
+    return result.ok ? `${result.url}${stored.hash}` : null
   }
+  const root = tab.root === undefined ? projectRoot : tab.root === GLOBAL_ARTIFACTS_ROOT ? null : tab.root
+  const underRoot = root ? await reopened(root, relative) : null
+  if (underRoot) return underRoot
   if (tab.template) {
     const located = await designApi.preview(tab.template.id)
-    const result = await resolveUnderRoot(located.rootDir, relative)
-    return result.ok ? result.url : tab.url
+    return (await reopened(located.rootDir, relative)) ?? tab.url
   }
   if (!tab.artifact) return tab.url
   const located = await artifactsApi.openById(tab.artifact.id)
   const folder = located.filePath.slice(located.rootDir.length).split(/[\\/]/).filter(Boolean)[0]
   if (!folder) return tab.url
-  const result = await resolveUnderRoot(located.rootDir, [folder, ...relative.split('/').slice(1)].join('/'))
-  return result.ok ? result.url : tab.url
+  return (await reopened(located.rootDir, [folder, ...relative.split('/').slice(1)].join('/'))) ?? tab.url
 }
 
 export function browserGoBack(tabId: string) {
@@ -406,11 +488,12 @@ export async function addBrowserSelectionToChat(event: BrowserSelectionEvent) {
     text: capture.text,
     truncated: capture.truncated,
   }
-  const board = await canvasBoardLabel(guest.tabId, capture.url)
+  const label = await artifactReferenceLabel(guest.tabId, capture.url)
+  if (label?.title) browser.title = label.title
   useWorkspaceChatContextStore.getState().addReference(guest.sessionId, {
     kind: 'browser',
     path: capture.url,
-    name: board ?? browserReferenceName(browser),
+    name: label?.name ?? browserReferenceName(browser),
     browser,
   })
 }

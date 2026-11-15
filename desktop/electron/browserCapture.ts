@@ -7,21 +7,16 @@ export type CaptureImage = {
   toJPEG(quality: number): Buffer
 }
 
-type DebuggerLike = {
-  isAttached(): boolean
-  attach(protocolVersion?: string): void
-  detach(): void
-  sendCommand(method: string, params?: Record<string, unknown>): Promise<unknown>
-}
+export type CaptureRect = { x: number; y: number; width: number; height: number }
 
 export type GuestContents = {
   isDestroyed(): boolean
   hostWebContents: unknown
   session: unknown
-  capturePage(): Promise<CaptureImage>
+  getURL(): string
+  capturePage(rect?: CaptureRect): Promise<CaptureImage>
   printToPDF(options: Record<string, unknown>): Promise<Buffer>
   executeJavaScriptInIsolatedWorld(worldId: number, scripts: Array<{ code: string }>): Promise<unknown>
-  debugger: DebuggerLike
 }
 
 type GuestIdentity = Pick<GuestContents, 'isDestroyed' | 'hostWebContents' | 'session'>
@@ -41,8 +36,8 @@ export function findGuest<T extends GuestIdentity>(lookup: GuestLookup<T>, id: n
   return contents
 }
 
-export async function captureThumbnail(contents: GuestContents): Promise<string> {
-  const image = await contents.capturePage()
+export async function captureThumbnail(contents: GuestContents, clip?: CaptureRect): Promise<string> {
+  const image = await contents.capturePage(clip)
   const { width, height } = image.getSize()
   if (width === 0 || height === 0) throw new Error('the page has nothing to capture yet')
   const small = width > THUMBNAIL_WIDTH ? image.resize({ width: THUMBNAIL_WIDTH }) : image

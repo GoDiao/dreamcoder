@@ -2,9 +2,11 @@ import type { BrowserGrantDecision, BrowserPickValue } from '../../../../src/ser
 import type { AppMode, AppModeConfig, BrowserSearchEngineId } from '../../types/settings'
 import {
   ELECTRON_BRIDGE_KEY,
+  type BrowserCaptureRect,
   type BrowserExportFormat,
   type BrowserExportMessages,
   type BrowserExportResult,
+  type BrowserExportViewport,
   type BrowserRefusal,
   type BrowserResolveResult,
   type ElectronDialogFilter,
@@ -211,7 +213,7 @@ export function finishBrowserCloseTab(input: { requestId: string; closed: boolea
   return invokeInDesktop('browser_close_tab_done', input)
 }
 
-export function captureBrowserThumbnail(input: { webContentsId: number }) {
+export function captureBrowserThumbnail(input: { webContentsId: number; clip?: BrowserCaptureRect }) {
   return invoke<string>('browser_capture_thumbnail', input)
 }
 
@@ -220,6 +222,7 @@ export function exportBrowserPage(input: {
   format: BrowserExportFormat
   suggestedName: string
   messages: BrowserExportMessages
+  viewport?: BrowserExportViewport
 }) {
   return invoke<BrowserExportResult>('browser_export_page', input)
 }

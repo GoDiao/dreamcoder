@@ -18,6 +18,7 @@ import {
   resolveStoredBrowserUrl,
   submitBrowserInput,
 } from '../../lib/browserGuests'
+import { isExportableArtifact, tabShowsArtifact } from '../../lib/artifactTabs'
 import { errorMessage } from '../../lib/errorMessage'
 import { stopBrowserPick, toggleBrowserPick } from '../../lib/browserPicks'
 import { clearBrowserData, openBrowserUrlInSystem } from '../../lib/shell'
@@ -27,6 +28,7 @@ import { useBrowserStore } from '../../stores/browserStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { BROWSER_SEARCH_ENGINE_IDS, isBrowserSearchEngineId, type BrowserSearchEngineId } from '../../types/settings'
 import type { WorkspaceTab } from '../../stores/workspacePanelStore'
+import { DeckControls } from '../artifacts/DeckControls'
 import { ActionMenu } from '../shared/ActionMenu'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { Tooltip } from '../shared/Tooltip'
@@ -90,13 +92,14 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
   const [draft, setDraft] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const { url } = tab
-  useArtifactThumbnail(tab.id, tab.artifact?.board === undefined ? tab.artifact : undefined)
+  const shownArtifact = tabShowsArtifact(tab) ? tab.artifact : undefined
+  useArtifactThumbnail(tab.id, shownArtifact?.board === undefined ? shownArtifact : undefined)
   useCanvasTab(tab.root !== undefined && tab.artifact?.canvas ? { tabId: tab.id, sessionId, root: tab.root, name: tab.artifact.name, artifact: tab.artifact } : null)
   const designRequest = useDesignChoiceRequest(sessionId)
   const templateId = tab.template?.id
   const offeredTemplate = templateId !== undefined && designRequest !== null && parseDesignCandidates(designRequest.input).some((candidate) => candidate.id === templateId)
   const exportActions = useArtifactExportActions({ tabId: tab.id, sessionId, title: tab.title || tab.artifact?.name || '' })
-  const exportable = tab.artifact !== undefined && !tab.artifact.canvas
+  const exportable = shownArtifact !== undefined && isExportableArtifact(shownArtifact)
 
   useEffect(() => {
     setDraft(url)
@@ -244,6 +247,7 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
         )}
       </form>
 
+      <DeckControls tabId={tab.id} />
       <BrowserActivityBar sessionId={sessionId} tabId={tab.id} />
 
       {noticeText && (

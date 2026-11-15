@@ -5,12 +5,15 @@ const mocks = vi.hoisted(() => ({
   resume: vi.fn(),
   exportPage: vi.fn(),
   contentsId: vi.fn(),
+  size: vi.fn(),
+  runDeckCall: vi.fn(),
 }))
 
 vi.mock('../api/browser', () => ({ browserApi: { suspendEmulation: mocks.suspend, resumeEmulation: mocks.resume } }))
 vi.mock('./shell', () => ({ exportBrowserPage: mocks.exportPage }))
-vi.mock('./browserGuests', () => ({ getBrowserGuestContentsId: mocks.contentsId }))
+vi.mock('./browserGuests', () => ({ getBrowserGuestContentsId: mocks.contentsId, browserGuestSize: mocks.size, runDeckCall: mocks.runDeckCall }))
 
+import { EMPTY_BROWSER_PAGE, useBrowserStore } from '../stores/browserStore'
 import { describeExportResult, exportArtifactPage, exportDialogMessages } from './artifactExport'
 
 const messages = { externalLinks: 'links {count}', proceed: 'Save', cancel: 'Cancel' }
@@ -19,13 +22,20 @@ const input = { tabId: 't1', sessionId: 's1', title: 'Report', messages }
 describe('exportArtifactPage', () => {
   beforeEach(() => {
     mocks.contentsId.mockReturnValue(31)
+    mocks.size.mockReturnValue({ width: 640, height: 480 })
+    mocks.runDeckCall.mockResolvedValue(undefined)
     mocks.suspend.mockResolvedValue({ changed: true })
     mocks.resume.mockResolvedValue({ changed: true })
     mocks.exportPage.mockResolvedValue({ status: 'saved', path: '/out.pdf' })
   })
 
   afterEach(() => {
+    useBrowserStore.setState(useBrowserStore.getInitialState(), true)
     vi.clearAllMocks()
+  })
+
+  const showDeck = () => useBrowserStore.setState({
+    pageByTab: { t1: { ...EMPTY_BROWSER_PAGE, ready: true, deck: { artifact: 'd', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'overview' } } },
   })
 
   it('takes the emulated view away, exports and puts it back, in that order', async () => {
@@ -42,10 +52,45 @@ describe('exportArtifactPage', () => {
     expect(result).toEqual({ status: 'saved', path: '/out.pdf' })
   })
 
-  it('also does it for PNG', async () => {
+  it('leaves the emulated view alone for PNG, which is rendered again in a hidden window, and gives the size the page is shown at, so that it is laid out as in the tab and captured whole', async () => {
     await exportArtifactPage({ ...input, format: 'png' })
-    expect(mocks.suspend).toHaveBeenCalledOnce()
-    expect(mocks.resume).toHaveBeenCalledOnce()
+    expect(mocks.suspend).not.toHaveBeenCalled()
+    expect(mocks.resume).not.toHaveBeenCalled()
+    expect(mocks.size).toHaveBeenCalledWith('t1')
+    expect(mocks.exportPage).toHaveBeenCalledWith({ webContentsId: 31, format: 'png', suggestedName: 'Report', messages, viewport: { width: 640, height: 480, wholePage: true } })
+  })
+
+  it('exports the PNG of a deck as one slide of 1920 by 1080 at pixel ratio 1', async () => {
+    showDeck()
+    await exportArtifactPage({ ...input, format: 'png' })
+    expect(mocks.exportPage).toHaveBeenCalledWith(expect.objectContaining({ viewport: { width: 1920, height: 1080, scale: 1, wholePage: false } }))
+    expect(mocks.size).not.toHaveBeenCalled()
+  })
+
+  it('refuses a PNG of a page that is not shown, which has no size to render at', async () => {
+    mocks.size.mockReturnValue(null)
+    await expect(exportArtifactPage({ ...input, format: 'png' })).rejects.toThrow('not shown')
+    expect(mocks.exportPage).not.toHaveBeenCalled()
+  })
+
+  it('returns a deck to browse mode before building its standalone HTML, and not for the other formats', async () => {
+    showDeck()
+    const order: string[] = []
+    mocks.runDeckCall.mockImplementation(async () => { order.push('browse') })
+    mocks.exportPage.mockImplementation(async () => { order.push('export'); return { status: 'saved', path: '/out.html' } })
+
+    await exportArtifactPage({ ...input, format: 'html' })
+    expect(mocks.runDeckCall).toHaveBeenCalledWith('t1', 'window.__dreamcoderDeck?.setMode("browse")')
+    expect(order).toEqual(['browse', 'export'])
+
+    await exportArtifactPage({ ...input, format: 'pdf' })
+    await exportArtifactPage({ ...input, format: 'png' })
+    expect(mocks.runDeckCall).toHaveBeenCalledOnce()
+  })
+
+  it('does not call into a page that is not a deck before building its standalone HTML', async () => {
+    await exportArtifactPage({ ...input, format: 'html' })
+    expect(mocks.runDeckCall).not.toHaveBeenCalled()
   })
 
   it('leaves the emulated view alone for standalone HTML, which is built from the page itself', async () => {
@@ -66,7 +111,7 @@ describe('exportArtifactPage', () => {
     expect(mocks.resume).toHaveBeenCalledTimes(1)
 
     mocks.exportPage.mockResolvedValueOnce({ status: 'cancelled' })
-    expect(await exportArtifactPage({ ...input, format: 'png' })).toEqual({ status: 'cancelled' })
+    expect(await exportArtifactPage({ ...input, format: 'pdf' })).toEqual({ status: 'cancelled' })
     expect(mocks.resume).toHaveBeenCalledTimes(2)
   })
 

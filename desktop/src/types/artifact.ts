@@ -1,4 +1,4 @@
-export type ArtifactKind = 'page' | 'canvas'
+export type ArtifactKind = 'page' | 'canvas' | 'deck'
 
 export type ArtifactManifest = {
   version: 1
@@ -8,6 +8,7 @@ export type ArtifactManifest = {
   entry: string
   designSystem?: string
   template?: { id: string; commit: string }
+  slides?: string[]
 }
 
 export type ArtifactOrigin = {

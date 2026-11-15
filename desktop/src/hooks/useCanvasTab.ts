@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { artifactsApi } from '../api/artifacts'
 import { setCanvasMessageHandler, submitBrowserInput } from '../lib/browserGuests'
 import { errorMessage } from '../lib/errorMessage'
-import type { CanvasMessage } from '../lib/canvasBridge'
+import type { CanvasAction } from '../lib/canvasBridge'
 import { useWorkspacePanelStore, type BrowserTabArtifact } from '../stores/workspacePanelStore'
 
 type CanvasTarget = {
@@ -14,7 +14,7 @@ type CanvasTarget = {
   artifact?: BrowserTabArtifact
 }
 
-async function handle(target: CanvasTarget, message: CanvasMessage) {
+async function handle(target: CanvasTarget, message: CanvasAction) {
   const { tabId, sessionId, root, name } = target
   if (message.type === 'move') {
     const { latestMtimeMs } = await artifactsApi.moveBoard({ dir: root, name, boardId: message.id, x: message.x, y: message.y, width: message.width, height: message.height })

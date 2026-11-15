@@ -193,7 +193,7 @@ describe('searching from the address bar', () => {
   })
 })
 
-const SHELL_DIR = '/app/dist/canvas-shell'
+const SHELL_DIR = '/app/dist/artifact-shell'
 
 const req = (url: string, range?: string) => ({ url, headers: { get: (name: string) => (name.toLowerCase() === 'range' ? (range ?? null) : null) } })
 
@@ -344,12 +344,14 @@ describe('project files', () => {
     expect(reader).not.toHaveBeenCalled()
   })
 
-  it('serves the canvas script from the shell folder and nothing else below the reserved path', async () => {
+  it('serves the canvas and deck scripts from the shell folder and nothing else below the reserved path', async () => {
     const origin = await projectBase()
     const reader = vi.fn(read)
-    const script = await serveProjectRequest(req(`${origin}/__dreamcoder__/canvas.js`), roots, reader, SHELL_DIR)
-    expect(script.status).toBe(200)
-    expect(reader).toHaveBeenCalledWith(path.join(SHELL_DIR, 'canvas.js'))
+    for (const name of ['canvas.js', 'deck.js']) {
+      const script = await serveProjectRequest(req(`${origin}/__dreamcoder__/${name}`), roots, reader, SHELL_DIR)
+      expect(script.status).toBe(200)
+      expect(reader).toHaveBeenCalledWith(path.join(SHELL_DIR, name))
+    }
     reader.mockClear()
     for (const name of ['other.js', '..%2fsecret.txt', '..%2f..%2fetc%2fpasswd', 'canvas.js%2f..%2f..%2fx', 'sub%2fcanvas.js', '']) {
       expect((await serveProjectRequest(req(`${origin}/__dreamcoder__/${name}`), roots, reader, SHELL_DIR)).status).toBe(404)
@@ -419,7 +421,7 @@ function install(options: { labels?: typeof MENU_LABELS | null } = {}) {
     session,
     roots,
     openFile: async () => ({ size: 4, contentType: 'text/html', slice: () => 'file' }),
-    canvasShellDir: SHELL_DIR,
+    artifactShellDir: SHELL_DIR,
     notify,
     popupMenu,
     menuLabels: () => labels,

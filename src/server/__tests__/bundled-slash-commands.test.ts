@@ -55,6 +55,9 @@ describe('slash commands from bundled skills', () => {
     expect(design?.argumentHint).toBe('[artifact folder or request]')
     expect(design?.description).toContain('Design mode')
     expect(commands.map(command => command.name)).toContain('artifacts')
+    const slides = commands.find(command => command.name === 'slides')
+    expect(slides?.argumentHint).toBe('[deck folder or request]')
+    expect(slides?.description).toContain('slide deck')
   })
 
   it('leaves out skills that are disabled, hidden from users or not invocable', async () => {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getWorkspaceArtifacts: vi.fn(),
   browserReload: vi.fn(),
-  refreshCanvas: vi.fn(),
+  refreshArtifactShell: vi.fn(),
   closeBrowser: vi.fn(),
   submitBrowserInput: vi.fn(),
 }))
@@ -14,7 +14,7 @@ vi.mock('../api/sessions', () => ({
 
 vi.mock('../lib/browserGuests', () => ({
   browserReload: mocks.browserReload,
-  refreshCanvas: mocks.refreshCanvas,
+  refreshArtifactShell: mocks.refreshArtifactShell,
   closeBrowser: mocks.closeBrowser,
   submitBrowserInput: mocks.submitBrowserInput,
 }))
@@ -61,7 +61,7 @@ describe('artifactStore', () => {
   })
 
   const openArtifactTab = (sessionId: string, root: string, name: string, mtimeMs: number, id = `id-${name}`, canvas?: true) =>
-    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'browser', url: 'dreamcoder-project://id/report/index.html', root, artifact: { id, name, mtimeMs, ...(canvas && { canvas }) } })
+    useWorkspacePanelStore.getState().openTab(sessionId, { kind: 'browser', url: `dreamcoder-project://id/${name}/index.html`, root, artifact: { id, name, mtimeMs, ...(canvas && { canvas }) } })
 
   it('reloads only the artifact tabs whose files changed and remembers the new time', async () => {
     const changed = openArtifactTab('s1', '/repo/dc_artifacts', 'report', 100)
@@ -79,6 +79,30 @@ describe('artifactStore', () => {
     const tabs = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs
     expect(tabs.find((tab) => tab.id === changed)).toMatchObject({ artifact: { id: 'id-report', name: 'report', mtimeMs: 250 } })
     expect(tabs.find((tab) => tab.id === unchanged)).toMatchObject({ artifact: { id: 'id-other', name: 'other', mtimeMs: 100 } })
+  })
+
+  it('leaves a tab alone while it shows another page, and refreshes it once it shows the artifact again', async () => {
+    const tab = openArtifactTab('s1', '/repo/dc_artifacts', 'talk', 100)
+    const store = useWorkspacePanelStore.getState()
+    const artifactOf = () => {
+      const current = useWorkspacePanelStore.getState().panelByTab['s1']!.tabs.find((candidate) => candidate.id === tab)
+      return current && 'artifact' in current ? current.artifact : undefined
+    }
+    mocks.refreshArtifactShell.mockResolvedValue(false)
+    mocks.getWorkspaceArtifacts.mockResolvedValue({ current: [item({ id: 'id-talk', name: 'talk', latestMtimeMs: 200 })], others: [] })
+
+    for (const elsewhere of ['http://localhost:3000/', 'dreamcoder-project://id/other/index.html']) {
+      store.patchTab('s1', tab, { url: elsewhere })
+      await reloadChangedArtifactTabs()
+    }
+    expect(mocks.refreshArtifactShell).not.toHaveBeenCalled()
+    expect(mocks.browserReload).not.toHaveBeenCalled()
+    expect(artifactOf()?.mtimeMs).toBe(100)
+
+    store.patchTab('s1', tab, { url: 'dreamcoder-project://id/talk/index.html#agenda' })
+    await reloadChangedArtifactTabs()
+    expect(mocks.browserReload).toHaveBeenCalledWith(tab)
+    expect(artifactOf()?.mtimeMs).toBe(200)
   })
 
   it('finds an artifact that moved to another folder by its id', async () => {
@@ -99,9 +123,23 @@ describe('artifactStore', () => {
     expect(mocks.getWorkspaceArtifacts).not.toHaveBeenCalled()
   })
 
+  it('refreshes a deck tab in place, so paging state survives, instead of reloading the page', async () => {
+    const deck = useWorkspacePanelStore.getState().openTab('s1', { kind: 'browser', url: 'dreamcoder-project://id/talk/index.html#agenda', root: '/repo/dc_artifacts', artifact: { id: 'id-talk', name: 'talk', mtimeMs: 100, deck: true } })
+    mocks.refreshArtifactShell.mockResolvedValue(true)
+    mocks.getWorkspaceArtifacts.mockResolvedValue({
+      current: [item({ id: 'id-talk', name: 'talk', latestMtimeMs: 200, manifest: { version: 1, id: 'id-talk', kind: 'deck', title: 'Talk', entry: 'index.html' } })],
+      others: [],
+    })
+
+    await reloadChangedArtifactTabs()
+
+    expect(mocks.refreshArtifactShell).toHaveBeenCalledWith(deck)
+    expect(mocks.browserReload).not.toHaveBeenCalled()
+  })
+
   it('refreshes a canvas tab in place instead of reloading the page', async () => {
     const canvas = openArtifactTab('s1', '/repo/dc_artifacts', 'flow', 100, undefined, true)
-    mocks.refreshCanvas.mockResolvedValue(true)
+    mocks.refreshArtifactShell.mockResolvedValue(true)
     mocks.getWorkspaceArtifacts.mockResolvedValue({
       current: [item({ id: 'id-flow', name: 'flow', latestMtimeMs: 200, manifest: { version: 1, id: 'id-flow', kind: 'canvas', title: 'Flow', entry: 'index.html' } })],
       others: [],
@@ -109,13 +147,13 @@ describe('artifactStore', () => {
 
     await reloadChangedArtifactTabs()
 
-    expect(mocks.refreshCanvas).toHaveBeenCalledWith(canvas)
+    expect(mocks.refreshArtifactShell).toHaveBeenCalledWith(canvas)
     expect(mocks.browserReload).not.toHaveBeenCalled()
     const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs.find((candidate) => candidate.id === canvas)
     expect(tab && 'artifact' in tab ? tab.artifact?.mtimeMs : null).toBe(200)
   })
 
-  it('reloads the tab of a single board when its file changed and keeps the canvas refresh for the canvas', async () => {
+  it('reloads the tab of a single board when its file changed and keeps the shell refresh for the canvas', async () => {
     const board = useWorkspacePanelStore.getState().openTab('s1', { kind: 'browser', url: 'dreamcoder-project://id/flow/home.html', root: '/repo/dc_artifacts', artifact: { id: 'id-flow', name: 'flow', mtimeMs: 100, board: 'home' } })
     mocks.getWorkspaceArtifacts.mockResolvedValue({
       current: [item({ id: 'id-flow', name: 'flow', latestMtimeMs: 200, manifest: { version: 1, id: 'id-flow', kind: 'canvas', title: 'Flow', entry: 'index.html' } })],
@@ -125,14 +163,14 @@ describe('artifactStore', () => {
     await reloadChangedArtifactTabs()
 
     expect(mocks.browserReload).toHaveBeenCalledWith(board)
-    expect(mocks.refreshCanvas).not.toHaveBeenCalled()
+    expect(mocks.refreshArtifactShell).not.toHaveBeenCalled()
     const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs.find((candidate) => candidate.id === board)
     expect(tab && 'artifact' in tab ? tab.artifact : null).toEqual({ id: 'id-flow', name: 'flow', mtimeMs: 200, board: 'home' })
   })
 
   it('reloads a canvas tab whose page cannot be refreshed yet', async () => {
     const canvas = openArtifactTab('s1', '/repo/dc_artifacts', 'flow', 100, undefined, true)
-    mocks.refreshCanvas.mockResolvedValue(false)
+    mocks.refreshArtifactShell.mockResolvedValue(false)
     mocks.getWorkspaceArtifacts.mockResolvedValue({
       current: [item({ id: 'id-flow', name: 'flow', latestMtimeMs: 200, manifest: { version: 1, id: 'id-flow', kind: 'canvas', title: 'Flow', entry: 'index.html' } })],
       others: [],
@@ -152,7 +190,7 @@ describe('artifactStore', () => {
 
     await reloadChangedArtifactTabs()
 
-    expect(mocks.refreshCanvas).not.toHaveBeenCalled()
+    expect(mocks.refreshArtifactShell).not.toHaveBeenCalled()
     expect(mocks.browserReload).not.toHaveBeenCalled()
   })
 

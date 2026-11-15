@@ -38,6 +38,7 @@ vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
 import type { ArtifactListItem } from '../../types/artifact'
 import { useArtifactListStore } from '../../stores/artifactListStore'
 import { useArtifactViewStore } from '../../stores/artifactViewStore'
+import { useBrowserStore } from '../../stores/browserStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { ARTIFACT_VIEW_TAB, ArtifactViewer } from './ArtifactViewer'
 
@@ -95,6 +96,7 @@ describe('ArtifactViewer', () => {
     cleanup()
     useArtifactListStore.setState(useArtifactListStore.getInitialState(), true)
     useArtifactViewStore.setState(useArtifactViewStore.getInitialState(), true)
+    useBrowserStore.setState(useBrowserStore.getInitialState(), true)
     useSessionStore.setState(useSessionStore.getInitialState(), true)
     vi.clearAllMocks()
   })
@@ -118,11 +120,44 @@ describe('ArtifactViewer', () => {
     await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
   })
 
-  it('listens for the canvas messages of the page and stops when the viewer goes away', async () => {
+  it('listens for the canvas messages of a canvas and stops when the viewer goes away', async () => {
+    useArtifactListStore.setState({ items: [{ ...listed, manifest: { ...listed.manifest!, kind: 'canvas' } }] })
     const view = render(<ArtifactViewer viewing={viewing} />)
     await waitFor(() => expect(mocks.setCanvasMessageHandler).toHaveBeenCalledWith(ARTIFACT_VIEW_TAB, expect.any(Function)))
     view.unmount()
     expect(mocks.setCanvasMessageHandler).toHaveBeenLastCalledWith(ARTIFACT_VIEW_TAB, null)
+  })
+
+  it('offers no export for a canvas, as in a tab, and offers it for a page and a deck', async () => {
+    useArtifactListStore.setState({ items: [{ ...listed, manifest: { ...listed.manifest!, kind: 'canvas' } }] })
+    const canvas = render(<ArtifactViewer viewing={viewing} />)
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument()
+    canvas.unmount()
+
+    useArtifactListStore.setState({ items: [{ ...listed, manifest: { ...listed.manifest!, kind: 'deck' } }] })
+    render(<ArtifactViewer viewing={viewing} />)
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument()
+    await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
+  })
+
+  it('does not listen for canvas messages on a page or a deck', async () => {
+    const page = render(<ArtifactViewer viewing={viewing} />)
+    await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
+    page.unmount()
+    useArtifactListStore.setState({ items: [{ ...listed, manifest: { ...listed.manifest!, kind: 'deck' } }] })
+    render(<ArtifactViewer viewing={viewing} />)
+    await waitFor(() => expect(mocks.markOpened).toHaveBeenCalledTimes(2))
+    expect(mocks.setCanvasMessageHandler).not.toHaveBeenCalled()
+  })
+
+  it('shows the deck controls once the page reports a deck', async () => {
+    render(<ArtifactViewer viewing={viewing} />)
+    expect(screen.queryByTestId('deck-controls')).not.toBeInTheDocument()
+    act(() => {
+      useBrowserStore.getState().patchPage(ARTIFACT_VIEW_TAB, { deck: { artifact: 'id-report', slide: 'cover', title: 'Cover', index: 0, count: 2, mode: 'browse' } })
+    })
+    expect(screen.getByTestId('deck-position')).toHaveTextContent('1 / 2')
+    await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
   })
 
   it('closes the page when it goes away', () => {

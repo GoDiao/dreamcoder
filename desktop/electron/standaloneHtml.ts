@@ -79,6 +79,16 @@ export async function buildStandaloneHtml(limits: StandaloneLimits): Promise<Sta
     return result + text.slice(last)
   }
 
+  const stylesheetText = async (url: URL): Promise<string | null> => {
+    let text = stylesheets.get(url.href)
+    if (text === undefined) {
+      const file = await download(url)
+      text = file ? new TextDecoder().decode(file.bytes) : null
+      stylesheets.set(url.href, text)
+    }
+    return text
+  }
+
   const inlineCss = async (css: string, base: string, depth: number): Promise<string> => {
     const imported = await replaceAsync(
       css,
@@ -87,12 +97,7 @@ export async function buildStandaloneHtml(limits: StandaloneLimits): Promise<Sta
         const raw = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5] ?? ''
         const url = classify(raw, base)
         if (!url || depth >= 5) return match[0]
-        let text = stylesheets.get(url.href)
-        if (text === undefined) {
-          const file = await download(url)
-          text = file ? new TextDecoder().decode(file.bytes) : null
-          stylesheets.set(url.href, text)
-        }
+        const text = await stylesheetText(url)
         return text === null ? match[0] : inlineCss(text, url.href, depth + 1)
       },
     )
@@ -109,24 +114,15 @@ export async function buildStandaloneHtml(limits: StandaloneLimits): Promise<Sta
       return `${uri ?? match[1]}${match[2] ?? ''}, `
     }).then((text) => text.replace(/,\s*$/, ''))
 
-  const base = document.baseURI
-  if (new Blob([document.documentElement.outerHTML]).size > limits.entryBytes) return failure('entry', limits.entryBytes)
+  const serialize = (root: Element) => `${root.ownerDocument.doctype ? '<!DOCTYPE html>\n' : ''}${root.outerHTML}`
 
-  try {
-    const root = document.documentElement.cloneNode(true) as HTMLElement
-
+  const inlineTree = async (root: Element, base: string, depth: number): Promise<void> => {
     const pageStyles = Array.from(root.querySelectorAll('style'))
     for (const link of Array.from(root.querySelectorAll('link[rel~="stylesheet"][href]'))) {
       const url = classify(link.getAttribute('href') ?? '', base)
-      if (!url) continue
-      let text = stylesheets.get(url.href)
-      if (text === undefined) {
-        const file = await download(url)
-        text = file ? new TextDecoder().decode(file.bytes) : null
-        stylesheets.set(url.href, text)
-      }
-      if (text === null) continue
-      const style = document.createElement('style')
+      const text = url ? await stylesheetText(url) : null
+      if (!url || text === null) continue
+      const style = root.ownerDocument.createElement('style')
       const media = link.getAttribute('media')
       if (media) style.setAttribute('media', media)
       style.textContent = await inlineCss(text, url.href, 0)
@@ -165,7 +161,23 @@ export async function buildStandaloneHtml(limits: StandaloneLimits): Promise<Sta
     for (const element of Array.from(root.querySelectorAll('[srcset]'))) {
       element.setAttribute('srcset', await inlineSrcset(element.getAttribute('srcset') ?? '', base))
     }
+    for (const frame of Array.from(root.querySelectorAll('iframe[src]'))) {
+      const url = depth < 3 ? classify(frame.getAttribute('src') ?? '', base) : null
+      const file = url ? await download(url) : null
+      if (!url || !file) continue
+      const source = new DOMParser().parseFromString(new TextDecoder().decode(file.bytes), 'text/html')
+      await inlineTree(source.documentElement, url.href, depth + 1)
+      frame.removeAttribute('src')
+      frame.setAttribute('srcdoc', serialize(source.documentElement))
+    }
+  }
 
+  const base = document.baseURI
+  if (new Blob([document.documentElement.outerHTML]).size > limits.entryBytes) return failure('entry', limits.entryBytes)
+
+  try {
+    const root = document.documentElement.cloneNode(true) as HTMLElement
+    await inlineTree(root, base, 0)
     const html = `<!DOCTYPE html>\n${root.outerHTML}`
     if (new Blob([html]).size > limits.totalBytes) return failure('total', limits.totalBytes)
     return { ok: true, html, externalLinks: [...external] }

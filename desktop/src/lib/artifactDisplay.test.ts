@@ -3,7 +3,7 @@ import type { ArtifactListItem } from '../types/artifact'
 import { artifactBranch, artifactDetail, artifactKey, artifactOpenable, artifactRoot, artifactTitle } from './artifactDisplay'
 
 const t = ((key: string, params?: Record<string, string | number>) => (params ? `${key}:${params.reason}` : key)) as Parameters<typeof artifactDetail>[0]
-const manifest = (kind: 'page' | 'canvas'): ArtifactListItem['manifest'] => ({ version: 1, id: 'a', kind, title: 'A', entry: 'index.html' })
+const manifest = (kind: 'page' | 'canvas' | 'deck'): ArtifactListItem['manifest'] => ({ version: 1, id: 'a', kind, title: 'A', entry: 'index.html' })
 
 describe('artifactDetail', () => {
   it('reports a manifest error before anything else', () => {
@@ -17,6 +17,7 @@ describe('artifactDetail', () => {
   it('names the kind of a healthy artifact', () => {
     expect(artifactDetail(t, { error: null, entryMissing: false, manifest: manifest('page') })).toBe('artifacts.kind.page')
     expect(artifactDetail(t, { error: null, entryMissing: false, manifest: manifest('canvas') })).toBe('artifacts.kind.canvas')
+    expect(artifactDetail(t, { error: null, entryMissing: false, manifest: manifest('deck') })).toBe('artifacts.kind.deck')
   })
 
   it('is empty without a manifest', () => {

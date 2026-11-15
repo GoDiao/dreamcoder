@@ -504,6 +504,7 @@
   applyView()
   readManifest().then(
     function (manifest) {
+      emit({ type: 'ready', artifact: manifest.id })
       return render(manifest.boards, false)
     },
     function () {

@@ -1,9 +1,11 @@
 import { browserApi } from '../api/browser'
 import type { TranslationKey } from '../i18n'
-import { getBrowserGuestContentsId } from './browserGuests'
+import { useBrowserStore } from '../stores/browserStore'
+import { browserGuestSize, getBrowserGuestContentsId, runDeckCall } from './browserGuests'
+import { DECK_VIEWPORT, deckModeCall } from './deckBridge'
 import { formatBytes } from './formatBytes'
 import { exportBrowserPage } from './shell'
-import type { BrowserExportFormat, BrowserExportMessages, BrowserExportResult } from './shell/electronBridge'
+import type { BrowserExportFormat, BrowserExportMessages, BrowserExportResult, BrowserExportViewport } from './shell/electronBridge'
 
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string
 
@@ -22,6 +24,13 @@ export function exportDialogMessages(t: Translate): BrowserExportMessages {
   }
 }
 
+function pngViewport(tabId: string, deck: boolean): BrowserExportViewport {
+  if (deck) return DECK_VIEWPORT
+  const size = browserGuestSize(tabId)
+  if (!size) throw new Error('The page is not shown yet')
+  return { ...size, wholePage: true }
+}
+
 export async function exportArtifactPage(input: {
   tabId: string
   sessionId: string | null
@@ -31,7 +40,9 @@ export async function exportArtifactPage(input: {
 }): Promise<BrowserExportResult> {
   const webContentsId = getBrowserGuestContentsId(input.tabId)
   if (webContentsId === null) throw new Error('The page is not loaded yet')
-  const emulationSessionId = input.format === 'html' ? null : input.sessionId
+  const deck = useBrowserStore.getState().pageByTab[input.tabId]?.deck != null
+  if (deck && input.format === 'html') await runDeckCall(input.tabId, deckModeCall('browse'))
+  const emulationSessionId = input.format === 'pdf' ? input.sessionId : null
   if (emulationSessionId) await browserApi.suspendEmulation(emulationSessionId, input.tabId)
   try {
     return await exportBrowserPage({
@@ -39,6 +50,7 @@ export async function exportArtifactPage(input: {
       format: input.format,
       suggestedName: input.title,
       messages: input.messages,
+      ...(input.format === 'png' && { viewport: pngViewport(input.tabId, deck) }),
     })
   } finally {
     if (emulationSessionId) {

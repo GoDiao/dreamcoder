@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { clearBundledSkills, getBundledSkills } from '../bundledSkills.js'
 import { CANVAS_ENTRY_HTML, isCanvasEntryHtml } from '../../utils/canvas.js'
+import { DECK_ENTRY_HTML, isDeckEntryHtml } from '../../utils/deck.js'
 import { initBundledSkills } from './index.js'
 
-const canvasShell = readFileSync(join(import.meta.dir, '..', '..', '..', 'desktop', 'public', 'canvas-shell', 'canvas.js'), 'utf-8')
+const canvasShell = readFileSync(join(import.meta.dir, '..', '..', '..', 'desktop', 'public', 'artifact-shell', 'canvas.js'), 'utf-8')
 
 function shellLabel(language: 'en' | 'zh', key: 'interact' | 'stopInteract'): string {
   const table = new RegExp(`${language}: \\{[^}]*\\b${key}: '([^']+)'`).exec(canvasShell)
@@ -98,6 +99,20 @@ describe('artifacts skill', () => {
     const block = /```html\n([\s\S]*?)```/.exec(prompt)
     expect(block).not.toBeNull()
     expect(isCanvasEntryHtml(block![1]!)).toBe(true)
+  })
+
+  it('describes the deck: kind, manifest, the fixed entry file and where the rules are', async () => {
+    const prompt = await promptOf('')
+    expect(prompt).toContain('`deck` for slides')
+    expect(prompt).toContain('## Deck')
+    expect(prompt).toContain('"kind": "deck"')
+    expect(prompt).toContain('"slides": ["cover", "agenda"]')
+    expect(prompt).toContain(DECK_ENTRY_HTML)
+    expect(prompt).toContain('/__dreamcoder__/deck.js')
+    expect(prompt).toContain('load the `slides` skill')
+    expect(prompt).toContain("window.__dreamcoderDeck.goTo('<id>')")
+    const blocks = [...prompt.matchAll(/```html\n([\s\S]*?)```/g)].map(match => match[1]!)
+    expect(blocks.some(isDeckEntryHtml)).toBe(true)
   })
 })
 

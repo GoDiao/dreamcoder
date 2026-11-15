@@ -114,12 +114,13 @@ Bridge --> Bg : 宿主通道
 type ArtifactManifest = {
   version: 1
   id: string
-  kind: 'page' | 'canvas'
+  kind: 'page' | 'canvas' | 'deck'
   title: string
   entry?: string
   designSystem?: string
   template?: { id: string; commit: string }
   boards?: Array<{ id: string; file: string; title?: string; x: number; y: number; width: number; height: number }>
+  slides?: string[]
 }
 ```
 
@@ -128,6 +129,7 @@ type ArtifactManifest = {
 - `entry` 是相对产物文件夹的 HTML 路径，所有类型都必填。画布的入口是一个固定内容的小文件，只加载随应用发布的画布脚本（见「画布」）。
 - `designSystem` 是相对 `dc_artifacts/` 的设计系统路径；`template` 记来源模板。两者只在 Design 模式里出现，普通产物可以没有。
 - `boards` 只给 `canvas` 用，`file` 是产物文件夹内的相对路径。
+- `kind: 'deck'` 和 `slides` 是幻灯片，见[幻灯片技术设计](../slides/tech-design.md)。
 - 解析宽松：未知字段忽略，缺必填字段的产物照样列出，但标为「清单有误」并给出原因。
 
 ## 存放位置与归属
@@ -209,7 +211,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 ## 标签重启后重开
 
-项目页面的地址 `dreamcoder-project://<id>/<相对路径>` 里的 id 重启后失效。重启后，标签的地址若是 `dreamcoder-project`，取出相对路径，按标签记下的根目录重新解析出新地址再打开：
+项目页面的地址 `dreamcoder-project://<id>/<相对路径>` 里的 id 重启后失效。重启后，标签的地址若是 `dreamcoder-project`，取出相对路径，按标签记下的根目录重新解析出新地址再打开，地址里 `#` 之后的部分原样带回（幻灯片靠它回到原来那一页）：
 - 产物标签新增一个「根目录」字段：全局存放区的产物记一个固定标记，其他产物记所在 `dc_artifacts/` 的绝对路径。只按会话当前工作目录解析不够：别的 worktree、别的项目里的只读产物不在当前工作目录下，EnterWorktree 切换过的会话「当前」也和打开时不同。标签同时记产物 `id`；根目录已不在（worktree 经应用删除、产物已转进全局区）时，按 `id` 在全局区找到它。`isStoredTab`、`createTab`、`WorkspaceTabTarget`（`workspacePanelStore.ts`）同步加这两个字段。
 - 其余项目页按会话的工作目录解析；外部网址照旧。
 协议不变。这同时修好了所有项目 HTML 标签重启后空白的现有问题，不新增标签种类。
@@ -257,7 +259,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 ## 最近打开时间与缩略图
 
 - **最近打开时间**：是应用的状态，不属于项目文件。渲染进程打开产物后单独通知 sidecar（「已打开」接口），和解析打开路径的接口分开，解析不带副作用。存在应用数据目录的 JSON 里（和 ShowUI 数据同级），以产物 `id` 为键。
-- **缩略图**：产物在任一标签（会话面板里的标签或全屏查看）里加载完成、停一秒后，渲染进程请主进程截一张小图（`webContents.capturePage`，缩到宽 320、JPEG），再上传给 sidecar 存在应用数据目录，按产物 `id` 和文件夹里文件的最新修改时间作键；同一版本只截一次。没显示过的显示类型图标。
+- **缩略图**：产物在任一标签（会话面板里的标签或全屏查看）里加载完成、停一秒后，渲染进程请主进程截一张小图（`webContents.capturePage`，缩到宽 320、JPEG），再上传给 sidecar 存在应用数据目录，按产物 `id` 和文件夹里文件的最新修改时间作键；同一版本只截一次。没显示过的显示类型图标。幻灯片只在浏览模式、第一页时截，并只截那一页的范围（见幻灯片设计的「缩略图」）。
 
 ## 刷新
 
@@ -270,7 +272,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
   - 事件只在实时流里出现，不写进会话记录，切换会话、重连、加载历史都不会重复触发。
   - 协议变化同时更新服务端、桌面、H5 和类型。
 - **一轮结束**：会话从运行变成空闲时再检查一次，覆盖 Bash 写的文件。
-- **只重载变了的**：sidecar 的列表带每个产物文件夹里文件的最新修改时间。标签记住载入时的这个时间，只有变了才重载，用户正在看的没变的页面不会被打断。画布标签不整页重载，改让脚本重读清单、重载所有画板，保留平移和缩放（见「画布」）。
+- **只重载变了的**：sidecar 的列表带每个产物文件夹里文件的最新修改时间。标签记住载入时的这个时间，只有变了才重载，用户正在看的没变的页面不会被打断。页面带壳脚本的标签（画布、幻灯片）不整页重载，改调壳脚本的 `refresh()`：画布重读清单、重载所有画板，保留平移和缩放（见「画布」）；幻灯片只替换变了的页，保留当前页和模式。
 - **手动**：两个入口和产物标签都有刷新按钮，覆盖外部编辑器的改动。
 
 **为什么不放进会话状态**：刷新是一次性的动作，不是要镜像到各客户端的状态；列表永远从磁盘读。
@@ -279,7 +281,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 复用现有点选。点选结果的 `url`、`title` 改为取元素所在文档（`pageProgram.ts:1300` 处由 `location` 改为元素的 `ownerDocument`），和选择器指向同一个文档。这是现有的 bug，修了对所有页面的 iframe 点选都生效，不改点选协议。
 
-地址在 `dc_artifacts/` 下时，客户端从路径推出属于哪个产物、哪张画板，附件卡片显示「产物名 / 画板名」，发给 Agent 的文本里写明文件路径。画板里选中文字现在不能「添加到对话」：右键菜单只在顶层文档放行（`desktop/electron/browser.ts:324` 的 `inMainFrame`），敏感字段检测也只在顶层跑。放开时，只放行和页面同源的 iframe：敏感字段检测在主文档里递归进同源 iframe 跑，引用的地址取那个 iframe 的 `url`，标题用 `executeJavaScript('document.title')` 读（跑在页面的主环境里，页面可以改写返回值，标题本来就是页面自己定的，可以接受），这样选区能归到所在画板；跨源的 iframe 仍不放行。
+地址在 `dc_artifacts/` 下时，客户端从路径推出属于哪个产物、哪张画板，附件卡片显示「产物名 / 画板名」，发给 Agent 的文本里写明文件路径。幻灯片上的点选和选区显示「产物名 / 页标题」，引用的标题写成 `slides/<id>.html · 页标题`。画板里选中文字现在不能「添加到对话」：右键菜单只在顶层文档放行（`desktop/electron/browser.ts:324` 的 `inMainFrame`），敏感字段检测也只在顶层跑。放开时，只放行和页面同源的 iframe：敏感字段检测在主文档里递归进同源 iframe 跑，引用的地址取那个 iframe 的 `url`，标题用 `executeJavaScript('document.title')` 读（跑在页面的主环境里，页面可以改写返回值，标题本来就是页面自己定的，可以接受），这样选区能归到所在画板；跨源的 iframe 仍不放行。
 
 ## 版本
 
@@ -290,11 +292,12 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 导出在已经打开的产物标签上进行，由 Electron 主进程完成：渲染进程发导出请求（标签、格式），主进程弹系统保存对话框，生成文件，直接写到用户选的位置。sidecar 不经手导出。
 
 - **PDF**：`webContents.printToPDF`，带背景、按页面自己的 `@page` 尺寸。
-- **PNG**：主进程对页面自己的 `webContents.debugger` 用 `Page.captureScreenshot` 带 `captureBeyondViewport` 截整页（先取 `Page.getLayoutMetrics` 的内容尺寸作截取范围）。别人已经挂着 debugger 就直接用、不 detach；自己挂的，导出完（包括失败）一定 detach，免得 browser host 之后挂不上。页面高度超过 16384 像素时报错。
-- **独立 HTML**：在页面的独立执行环境里，按已解析的 DOM 收集样式表（含 `@import`、`url()`）、`<script src>`、图片（含 `srcset`）、字体，同源的用 `fetch` 取来转成 data URI，再把文档序列化成一个文件。不需要 HTML 解析库。外部网址保留外链，有外链时先用系统对话框提示数量、用户确认后才弹保存对话框。字体不做子集，zip 不做。已解析的 DOM 里脚本改过的内容，加上内联回来的脚本，打开独立文件时脚本会再跑一遍，页面靠脚本整页生成时可能重复，技能要求页面内容写在 HTML 里。
+- **PNG**：主进程开一个不显示的窗口（同一个浏览器分区），把标签当前的地址重新加载一遍，就绪后用 `Page.captureScreenshot` 截图，然后销毁窗口。渲染进程在请求里给出视口：网页给标签当前的宽度和高度，按整页内容高度截（先取 `Page.getLayoutMetrics`）；幻灯片给 1920×1080、像素比 1，截一屏。页面高度超过 16384 像素时报错。不再在标签里的 webview 上截：截取范围超过 webview 的可见画面时，输出是已有画面的重复平铺（2026-11-15 复现并修正，见幻灯片设计的「导出」和「已验证」）。代价是 PNG 不带用户在标签里点出来的状态。
+- **独立 HTML**：在页面的独立执行环境里，按已解析的 DOM 收集样式表（含 `@import`、`url()`）、`<script src>`、图片（含 `srcset`）、字体，同源的用 `fetch` 取来转成 data URI，再把文档序列化成一个文件。同源的 `<iframe src>` 按它的源文件取来、解析、同样内联，写进 `srcdoc`（最多三层）。不需要 HTML 解析库。外部网址保留外链，有外链时先用系统对话框提示数量、用户确认后才弹保存对话框。字体不做子集，zip 不做。已解析的 DOM 里脚本改过的内容，加上内联回来的脚本，打开独立文件时脚本会再跑一遍，页面靠脚本整页生成时可能重复，技能要求页面内容写在 HTML 里。
 - **上限**：参考 open-design（`apps/daemon/src/artifacts/standalone-html.ts`）的量级：入口文档 5 MB、单个资源 32 MB、导出结果 100 MB。超过时报错，写明超的是哪一项，并列出最大的五个资源。
-- **画布**：只能导出单张画板，先单独打开画板再导出。
-- **页面状态**：Agent 用 `emulate` 改过的尺寸或配色不应带进导出（PDF 和 PNG；独立 HTML 取自页面本身，不受影响）。模拟状态记在 sidecar（`src/server/browserHost/service.ts`），主进程没有。现有的 `resetEmulation` 会丢掉记录（每轮结束时调用），不能还原，所以 sidecar 新增「暂停」和「恢复」：暂停清掉页面上的模拟但保留记录，恢复按记录重新设置。渲染进程在导出前后调用 sidecar 的接口（主进程不和 sidecar 通信），导出失败或取消也要恢复；不属于会话的页面（全屏查看）没有模拟，不调用。
+- **画布**：只能导出单张画板，先单独打开画板再导出。画布页面本身在标签和全屏查看里都不提供导出（2026-11-15 起两处用同一个判断；全屏查看原来对画布也给导出，导出的独立 HTML 里画布脚本读不到清单）。
+- **标签去了别的页面**：产物标签的地址不在这个产物的文件夹里时，不提供导出，文件变化时也不刷新它、不截缩略图（见幻灯片设计的「把标签认成产物标签」）。
+- **页面状态**：Agent 用 `emulate` 改过的尺寸或配色不应带进导出（只有 PDF 需要处理；PNG 在隐藏窗口里重新加载，没有模拟；独立 HTML 取自页面本身，不受影响）。模拟状态记在 sidecar（`src/server/browserHost/service.ts`），主进程没有。现有的 `resetEmulation` 会丢掉记录（每轮结束时调用），不能还原，所以 sidecar 新增「暂停」和「恢复」：暂停清掉页面上的模拟但保留记录，恢复按记录重新设置。渲染进程在导出前后调用 sidecar 的接口（主进程不和 sidecar 通信），导出失败或取消也要恢复；不属于会话的页面（全屏查看）没有模拟，不调用。
 
 ## 画布
 
@@ -302,11 +305,12 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 - **为什么用入口小文件，不让 sidecar 把画布映射成保留路径上的外壳页**：现有的打开路径只认磁盘上真实存在的 HTML 文件（`resolveProjectFile`，`browser.ts:158-168`，`realpath` 失败即 `notFound`）；标签重启重开只取地址的路径部分再按文件解析，丢掉查询串（`browserGuests.ts` 的 `resolveStoredBrowserUrl`）；`resolveOpen` 对画布直接抛错（`artifactService.ts:377`）。入口是普通 HTML 之后，打开、重开、缩略图、导出、`navigate` 的产物映射、`ArtifactCheck` 都走现有路径，不需要查询串、特殊解析或画布专用分支。
 - **为什么脚本必须和画板同源**：同源 iframe 里快照、点击、点选都能用（快照读 iframe 要 `contentDocument`，`pageProgram.ts:660-662`）。由 sidecar 的 http 地址或另一个主机名提供，就跨源了。
-- **保留路径**：`serveProjectRequest`（`browser.ts:212`）在 `roots.fileFor` 之前判断 `/__dreamcoder__/`，只返回应用 `dist` 里 `canvas-shell/` 下的固定文件，目录由主进程已有的 `webDist` 传入（`main.ts` 的 `serveDist` 用的同一个目录；`desktop/public/` 随 `dist` 打包，`electron-builder.json` 的 `extraResources` 已含 `dist`）。代价：用户 `dc_artifacts/` 里真有 `__dreamcoder__` 目录时被它遮住。
+- **保留路径**：`serveProjectRequest`（`browser.ts:212`）在 `roots.fileFor` 之前判断 `/__dreamcoder__/`，只返回应用 `dist` 里 `artifact-shell/` 下的固定文件（`canvas.js`、`deck.js`），目录由主进程已有的 `webDist` 传入（`main.ts` 的 `serveDist` 用的同一个目录；`desktop/public/` 随 `dist` 打包，`electron-builder.json` 的 `extraResources` 已含 `dist`）。代价：用户 `dc_artifacts/` 里真有 `__dreamcoder__` 目录时被它遮住。
 - **画板文件的规则**：`board.file` 只能是产物文件夹内的相对路径。脚本拒绝绝对路径、带协议的地址和 `..`，`ArtifactCheck` 同样报错。外部网站不作画板：参考外部网站时截图存成图片画板，或在用户同意下重建本地副本。
 - **页面和渲染进程的通道**：页面没有 preload（`browser.ts:38`），只能借 webview 自带的两样东西，类型上都有（`electron.d.ts` 的 `WebviewTag`：`console-message` 事件带 `message`，`executeJavaScript` 方法）。
   - 页面到渲染进程：`console-message`，带固定前缀的 JSON，两种消息。`move`：画板 id 和新的 x、y、width、height，拖动或缩放结束时发。`open`：画板 id，用户点画板上的「在新标签打开」时发。`open` 不能让页面自己 `window.open`：`guardGuest` 的 `setWindowOpenHandler` 把地址加载进当前 webview（`browser.ts:374-377`），会替换掉画布。渲染进程在 `createGuest`（`browserGuests.ts`）里监听，只接受当前标签的、格式正确的、画板 id 在清单里的消息：`move` 调写回接口，`open` 新开标签。
   - 渲染进程到页面：`webview.executeJavaScript` 调脚本暴露的 `refresh()`。渲染进程里现在没有这两种用法，`WebviewElement` 类型（`browserGuests.ts:13-25`）要补方法。
+  - 2026-11-15 起，画布脚本读到清单后另发一条 `ready`（带产物 id），渲染进程据此把 Agent 打开的画布标签认成产物标签；主题和 `refresh()` 对任何项目页面上的壳脚本调用，不再要求标签先登记画布的处理函数（见幻灯片设计的「页面和渲染进程的通道」「把标签认成产物标签」）。
   - 已验证（2026-11-01，真实 Electron 45，webview 用和应用相同的策略：沙箱、`contextIsolation`、无 preload、自定义协议页面）：顶层页面和同源 iframe 里的 `console.log` 都触发 webview 的 `console-message`，`sourceId` 区分来源；`webview.executeJavaScript` 能调页面里的函数并拿到返回值。
 - **位置写回**：`PATCH /api/artifacts/boards`，参数 `dir`、`name`、画板 id、x、y、width、height。目录用 `resolveArtifactsDir` 校验（和 `GET /api/artifacts/open` 同一套），不依赖会话，全局区的产物和全屏查看也能用，也就不必放开工作区路由的非 GET 限制（`sessions.ts:169`）。sidecar 读-改-写，只改这四个字段，返回产物文件夹新的最新修改时间。
 - **刷新**：现在的 `reloadChangedArtifactTabs` 对任何变了的产物标签都调 `browserReload`（`artifactStore.ts:34-50`）。画布标签改为调 `refresh()`：脚本重读清单、重载所有画板，保留平移和缩放（sidecar 的列表只有文件夹级的修改时间，不做逐板判断）。位置写回会改 `artifact.json`，写回成功后渲染进程用接口返回的修改时间更新标签记的时间，否则下一次「一轮结束」检查会把用户自己的拖动当成外部改动。用户和 Agent 同时改同一个产物时，这个更新可能吞掉一次刷新，可以接受。
@@ -314,7 +318,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 - **快照额度**：一次快照最多 150 个元素（`snapshot/types.ts:101`），在各 iframe 之间均分，屏外的排在最后（`pageProgram.ts:687-720`），所以移出视口的画板可能分不到。技能规定这时用 `region` 读那张画板，或单独打开它。
 - **工具栏**：画布脚本在右上角固定一条工具栏：缩小、放大（以视口中心为锚点，每次 1.25 倍）、当前缩放百分比；点百分比展开菜单：25%、50%、75%、100%、150%、200% 和「适应全部画板」。百分比随按钮、滚轮、捏合、适应实时更新，范围仍是 0.1 到 4。工具栏是视口的兄弟节点，指针事件不会触发平移和画板拖动。不做快捷键、撤销重做、辅助线、记住视图。
 - **取整**：拖动或调整大小结束时，`x`、`y`、`width`、`height` 先取整再更新页面内的画板、再发 `move`；「没变化就不发」按取整后的值比较。
-- **主题通道**：画布配色由根元素的 `data-scheme` 决定，脚本不再用 `prefers-color-scheme`（webview 里它取自系统外观，不是应用主题）。脚本暴露 `setScheme('light' | 'dark')`，其它值忽略。渲染进程在画布标签每次 `dom-ready` 和应用主题变化时，用 `themeColorScheme(theme)` 经 `executeJavaScript` 调它（调用串 `canvasSchemeCall` 在 `canvasBridge.ts`）。画板 iframe 里的页面不变，仍取自己的 `prefers-color-scheme`；普通页面不动。
+- **主题通道**：画布配色由根元素的 `data-scheme` 决定，脚本不再用 `prefers-color-scheme`（webview 里它取自系统外观，不是应用主题）。脚本暴露 `setScheme('light' | 'dark')`，其它值忽略。渲染进程在项目页面每次 `dom-ready` 和应用主题变化时，用 `themeColorScheme(theme)` 经 `executeJavaScript` 调它（调用串 `shellSchemeCall` 在 `shellBridge.ts`，对画布和幻灯片的壳脚本通用，页面上没有壳脚本时什么也不做）。画板 iframe 里的页面不变，仍取自己的 `prefers-color-scheme`；普通页面不动。
 - **缩放手势**：Electron 默认关闭视觉缩放（`electron.d.ts` 里 `setVisualZoomLevelLimits` 的说明），应用里也没有调用它；合成的 ctrl+滚轮到达页面时 `ctrlKey` 为真，`visualViewport.scale` 和缩放系数都不变。脚本仍要对 ctrl+滚轮 `preventDefault`，否则页面会跟着滚动（实测不拦时滚动了、拦住后基本不滚）。真实触控板捏合没有测，合成事件不等同于手势。
 - **画板交互**：画板里的 iframe 默认不接收指针事件（`.board-frame{pointer-events:none}`），所以鼠标在画板上时，拖背景平移、滚轮和触控板双指平移、ctrl/⌘+滚轮缩放都照常作用在画布上。要在画板页面里点击、输入、滚动，先让这块画板进入交互状态：点标题栏里的「交互」按钮（无障碍名称是「交互: 画板标题」，英文页面是「Interact: 画板标题」）或双击画板页面区域；进入后画板描边高亮，按钮变成「退出交互」，iframe 接收指针事件。画布文档本身不允许选中文字（`#viewport{user-select:none}`）：否则双击画板页面区域会在画布文档里选中 iframe，选区高亮把整块画板盖成深色（真实 Electron 探针量到进入交互状态后页面像素从 (246,244,238) 变成 (67,66,65)，加这条规则后不变）；画板页面自己的文字选中不受影响。点画板外面、按 Escape（焦点在画板页面里也有效，脚本给同源 iframe 的文档挂了 keydown）或再点按钮退出；同一时刻只有一块画板处于交互状态；拖动画板或平移时，处于交互状态的画板的 iframe 临时不接收指针事件，避免平移被它吞掉。Agent 的点击是 CDP 在屏幕坐标上发的真实鼠标事件（`src/server/browserHost/service.ts` 的 `mouseClick`，只有单击），所以对没进入交互状态的画板里的元素点击会落在画布上、没有任何效果；快照、截图和 `evaluate` 读文档，不需要进入交互状态。这条规则写在 `artifacts` 技能的画布一节和 `design` 技能的画布参考文件里，按钮名称在快照里可见。
 
@@ -322,11 +326,9 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 # 第二部分：Design 模式
 
-## 幻灯片（以后再做）
+## 幻灯片（已另行设计）
 
-幻灯片不在当前范围：清单种类、模板类别、Design 页和技能里都没有它。下面是已经做过的调研，以后再做时不必重来。
-
-后续设计见 [幻灯片技术设计](../slides/tech-design.md)（2026-11-15，草案）。
+幻灯片在 2026-11-01 被拆出本文的范围，现在按[幻灯片技术设计](../slides/tech-design.md)分阶段做，第一阶段（格式和查看）已实现：清单种类 `deck`、舞台脚本、工具条、导出、`/slides` 技能。模板类别、Slides 入口和用户编辑还没做。下面是拆出时的调研，保留作背景。
 
 - **`deck` 只是一个标签。** 从模板建出的幻灯片产物，清单里 `kind` 是 `deck`，卡片上显示种类标签，但在应用里和普通页面完全一样：没有翻页控件、大纲或演示模式。
 - **按设计的导出方式只出一页。** 对 `simple-deck`（6 页）和 `html-ppt-zhangzara-raw-grid`（10 页）用导出的真实参数（`printBackground: true, preferCSSPageSize: true`）做 `printToPDF`：两个都只输出 1 页 Letter 竖版，只有第一张幻灯片的内容（PDF 里 `/Count 1`，`pdfinfo` 也是 1 页）。「幻灯片按页分页靠产物自己的打印样式」这个假设不成立。
@@ -383,7 +385,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 ## 设计系统
 
-**做法**：一个设计系统是 `dc_artifacts/systems/<name>/` 文件夹，含清单 `system.json`、`DESIGN.md`（用途、语气、排版、组件约定）和 `tokens.css`（CSS 变量），可选 `evidence.md`（提取时每个值的出处）。识别靠 `system.json`。`system.json` 记名称、来源（自带、Agent 提取；自带里转换来的另记上游仓库、提交）、许可证和作者。产物通过清单的 `designSystem` 引用，入口 HTML 用相对路径 `<link>` 引入 `tokens.css`。
+**做法**：一个设计系统是 `dc_artifacts/systems/<name>/` 文件夹，含清单 `system.json`、`DESIGN.md`（用途、语气、排版、组件约定）和 `tokens.css`（CSS 变量），可选 `evidence.md`（提取时每个值的出处）。识别靠 `system.json`。`system.json` 记名称、来源（自带、Agent 提取；自带里转换来的另记上游仓库、提交）、许可证和作者。产物通过清单的 `designSystem` 引用，入口 HTML 用相对路径 `<link>` 引入 `tokens.css`（幻灯片例外：入口是固定内容，`tokens.css` 由舞台脚本按清单加载，给 Agent 的用法说明按产物种类给）。
 
 **设计系统库**：随应用打包的一个目录，一条记录加一个文件夹（`DESIGN.md`、`tokens.css`），条目有两类：
 - 起步包：我们自己写的少量通用系统，不用真实品牌名，来源记「自带」。
@@ -400,7 +402,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 ## 技能
 
-两个内置技能，全部用我们自己的措辞写，不复制 baoyu-design 的文本（它自述几乎逐字搬自 claude.ai，来源有风险）；open-design 和 taste-skill 的方法可以参考。
+三个内置技能（第三个 `/slides` 见幻灯片设计的「技能」；设计系统的提取方法和访谈的通用规则由 `/design` 和 `/slides` 共用同一份文字），全部用我们自己的措辞写，不复制 baoyu-design 的文本（它自述几乎逐字搬自 claude.ai，来源有风险）；open-design 和 taste-skill 的方法可以参考。
 
 - **`artifacts`**：见「什么时候创建产物」。
 - **`/design`**：用户可调用，模型也可自行调用。正文短，讲设计模式的总流程：访谈、选模板或从零开始、设计系统、制作、检查。具体做法放在参考文件（`registerBundledSkill` 的 `files`）里按需读取：访谈、模板目录索引、设计系统的提取与套用、画布、检查回路、网站复刻。复刻参考文件只在用户明确要求复刻某个网站时才读，触发靠技能正文里的一句话，不靠参数标记（见「网站复刻」）。
