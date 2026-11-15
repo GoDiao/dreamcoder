@@ -45,8 +45,8 @@ vi.mock('../hooks/useMobileViewport', () => ({
 }))
 
 vi.mock('../components/chat/MessageList', () => ({
-  MessageList: ({ compact }: { compact?: boolean }) => (
-    <div data-testid="message-list" data-compact={compact ? 'true' : 'false'} />
+  MessageList: ({ compact, canStartSideChat }: { compact?: boolean; canStartSideChat?: boolean }) => (
+    <div data-testid="message-list" data-compact={compact ? 'true' : 'false'} data-side-chats={canStartSideChat ? 'true' : 'false'} />
   ),
 }))
 
@@ -612,6 +612,7 @@ describe('ActiveSession task polling', () => {
 
     expect(within(contentRow).getByTestId('message-list')).toBeInTheDocument()
     expect(within(contentRow).getByTestId('message-list')).toHaveAttribute('data-compact', 'true')
+    expect(within(contentRow).getByTestId('message-list')).toHaveAttribute('data-side-chats', 'true')
     expect(within(contentRow).getByTestId('workspace-panel')).toHaveTextContent(`workspace:${sessionId}`)
     expect(within(chatColumn).getByTestId('chat-input')).toBeInTheDocument()
     expect(within(chatColumn).getByTestId('chat-input')).toHaveAttribute('data-compact', 'true')
@@ -794,6 +795,7 @@ describe('ActiveSession task polling', () => {
 
     expect(screen.getByTestId('active-session-chat-column')).toHaveClass('min-w-0')
     expect(screen.getByTestId('message-list')).toHaveAttribute('data-compact', 'false')
+    expect(screen.getByTestId('message-list')).toHaveAttribute('data-side-chats', 'false')
     expect(screen.getByTestId('chat-input')).toHaveAttribute('data-compact', 'false')
     expect(screen.queryByRole('heading', { name: 'Mobile Session' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument()

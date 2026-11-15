@@ -127,7 +127,7 @@ type WorkspacePanelStore = {
   refreshPreviews: (sessionId: string) => Promise<void>
   releaseSession: (sessionId: string) => void
   clearSession: (sessionId: string) => void
-  createSideChat: (sessionId: string) => Promise<void>
+  createSideChat: (sessionId: string) => Promise<string>
   syncSideChats: (sessionId: string) => Promise<void>
 }
 
@@ -874,6 +874,7 @@ export const useWorkspacePanelStore = create<WorkspacePanelStore>((set, get) => 
   createSideChat: async (sessionId) => {
     const created = await sessionsApi.branch(sessionId, { kind: 'side' })
     get().openTab(sessionId, { kind: 'sideChat', sessionId: created.sessionId })
+    return created.sessionId
   },
 
   syncSideChats: async (sessionId) => {

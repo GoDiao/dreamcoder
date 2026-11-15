@@ -32,6 +32,7 @@ import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { getSelectionAnchor, useQuoteSelection } from '../../lib/selectionPopover'
 import { ASK_USER_QUESTION_TOOL, CHOOSE_DESIGN_TEMPLATE_TOOL, isInlineQuestionTool } from '../../lib/inlineQuestionTools'
 import { SelectionPopover } from '../shared/SelectionPopover'
+import { useStartSideChat } from '../../lib/sideChats'
 import {
   getHeightsForSession,
   getMetricsForSession,
@@ -358,34 +359,52 @@ function SelectableChatMessage({
   messageId,
   role,
   content,
+  canStartSideChat,
   children,
 }: {
   sessionId: string
   messageId: string
   role: ChatMessageRole
   content: string
+  canStartSideChat: boolean
   children: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const addReference = useWorkspaceChatContextStore((state) => state.addReference)
+  const sideChat = useStartSideChat(sessionId)
   const quote = useQuoteSelection((event) => getChatSelectionFromContainer(rootRef.current, event), `${messageId}:${content}`)
   const t = useTranslation()
   const sourceName = role === 'assistant'
     ? t('chat.assistantMessageReference')
     : t('chat.userMessageReference')
 
+  const selectionReference = () => quote.selection && {
+    kind: 'chat-selection' as const,
+    path: `chat://${role}/${messageId}`,
+    name: sourceName,
+    quote: quote.selection.text,
+    sourceRole: role,
+    messageId,
+  }
+
   const addCurrentSelectionToChat = () => {
-    if (!quote.selection) return
-    addReference(sessionId, {
-      kind: 'chat-selection',
-      path: `chat://${role}/${messageId}`,
-      name: sourceName,
-      quote: quote.selection.text,
-      sourceRole: role,
-      messageId,
-    })
+    const reference = selectionReference()
+    if (!reference) return
+    addReference(sessionId, reference)
     quote.dismiss()
   }
+
+  const startSideChatFromSelection = async () => {
+    const reference = selectionReference()
+    if (!reference) return
+    await sideChat.start(reference)
+    quote.dismiss()
+  }
+
+  const replyAction = { label: t('chat.replyToSelection'), onSelect: addCurrentSelectionToChat }
+  const actions = canStartSideChat
+    ? [{ label: t('chat.startSideChat'), loading: sideChat.starting, onSelect: () => void startSideChatFromSelection() }, replyAction]
+    : [replyAction]
 
   return (
     <div
@@ -393,7 +412,7 @@ function SelectableChatMessage({
       onMouseDown={quote.onMouseDown}
     >
       {children}
-      <SelectionPopover quote={quote} label={t('chat.replyToSelection')} onAdd={addCurrentSelectionToChat} />
+      <SelectionPopover quote={quote} label={t('chat.selectionActions')} actions={actions} />
     </div>
   )
 }
@@ -854,6 +873,7 @@ function MemoryEventCard({ message }: { message: MemoryEvent }) {
 type MessageListProps = {
   sessionId: string
   compact?: boolean
+  canStartSideChat?: boolean
 }
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48
@@ -1267,7 +1287,7 @@ const MeasuredRenderItem = memo(function MeasuredRenderItem({
   )
 })
 
-export function MessageList({ sessionId, compact = false }: MessageListProps) {
+export function MessageList({ sessionId, compact = false, canStartSideChat = false }: MessageListProps) {
   const branchSession = useSessionStore((s) => s.branchSession)
   const stopGeneration = useChatStore((s) => s.stopGeneration)
   const reloadHistory = useChatStore((s) => s.reloadHistory)
@@ -1884,6 +1904,7 @@ export function MessageList({ sessionId, compact = false }: MessageListProps) {
             }
             branchAction={branchActionByMessageId.get(item.message.id)}
             replyCopyText={replyCopyTextByMessageId.get(item.message.id)}
+            canStartSideChat={canStartSideChat}
           />
         )}
 
@@ -2015,6 +2036,7 @@ export const MessageBlock = memo(function MessageBlock({
   toolResult,
   branchAction,
   replyCopyText,
+  canStartSideChat = false,
 }: {
   sessionId: string
   message: UIMessage
@@ -2027,6 +2049,7 @@ export const MessageBlock = memo(function MessageBlock({
     onBranch: () => void
   }
   replyCopyText?: string
+  canStartSideChat?: boolean
 }) {
   const t = useTranslation()
 
@@ -2041,6 +2064,7 @@ export const MessageBlock = memo(function MessageBlock({
           messageId={message.id}
           role="user"
           content={message.content}
+          canStartSideChat={canStartSideChat}
         >
           <UserMessage
             content={message.content}
@@ -2057,6 +2081,7 @@ export const MessageBlock = memo(function MessageBlock({
           messageId={message.id}
           role="assistant"
           content={message.content}
+          canStartSideChat={canStartSideChat}
         >
           <AssistantMessage
             content={message.content}

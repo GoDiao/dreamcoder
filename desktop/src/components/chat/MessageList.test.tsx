@@ -5,6 +5,7 @@ import { relativizeWorkspacePath } from './CurrentTurnChangeCard'
 import { sessionsApi } from '../../api/sessions'
 import { useChatStore } from '../../stores/chatStore'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
+import { useWorkspacePanelStore } from '../../stores/workspacePanelStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useTabStore } from '../../stores/tabStore'
@@ -1635,7 +1636,7 @@ describe('MessageList nested tool calls', () => {
     await selectMessageText(userText, 'workspace selection behavior')
     const floatingAddButton = screen.getByRole('button', { name: 'Reply' })
 
-    expect(screen.getByRole('dialog', { name: 'Reply' }).parentElement?.parentElement).toBe(document.body)
+    expect(screen.getByRole('dialog', { name: 'Selected text' }).parentElement?.parentElement).toBe(document.body)
     expect(userText.closest('[data-message-shell]')?.contains(floatingAddButton)).toBe(false)
 
     fireEvent.click(floatingAddButton)
@@ -1683,6 +1684,84 @@ describe('MessageList nested tool calls', () => {
         quote: 'quote the selected lines',
       },
     ])
+  })
+
+  describe('starting a side chat from a selection', () => {
+    function showAssistantReply() {
+      useChatStore.setState({
+        sessions: {
+          [ACTIVE_TAB]: makeSessionState({
+            messages: [{ id: 'assistant-1', type: 'assistant_text', content: 'Ask about this part later.', timestamp: 1 }],
+          }),
+        },
+      })
+    }
+
+    beforeEach(() => {
+      useWorkspacePanelStore.setState(useWorkspacePanelStore.getInitialState(), true)
+      localStorage.clear()
+    })
+
+    it('offers it before Reply in the main conversation', async () => {
+      showAssistantReply()
+      render(<MessageList sessionId={ACTIVE_TAB} canStartSideChat />)
+
+      await selectMessageText(screen.getByText(/Ask about this part/), 'this part')
+
+      const actions = within(screen.getByRole('dialog', { name: 'Selected text' })).getAllByRole('button')
+      expect(actions.map((button) => button.textContent)).toEqual(['Start a side chat', 'Reply'])
+    })
+
+    it('offers only Reply inside a side chat', async () => {
+      showAssistantReply()
+      render(<MessageList sessionId={ACTIVE_TAB} />)
+
+      await selectMessageText(screen.getByText(/Ask about this part/), 'this part')
+
+      expect(within(screen.getByRole('dialog', { name: 'Selected text' })).getAllByRole('button').map((button) => button.textContent)).toEqual(['Reply'])
+    })
+
+    it('opens a new side chat with the selection quoted in its composer', async () => {
+      showAssistantReply()
+      const branch = vi.spyOn(sessionsApi, 'branch').mockResolvedValue({ sessionId: 'side-1', title: 'btw', workDir: '/repo', sourceSessionId: ACTIVE_TAB })
+      render(<MessageList sessionId={ACTIVE_TAB} canStartSideChat />)
+
+      await selectMessageText(screen.getByText(/Ask about this part/), 'this part')
+      fireEvent.click(screen.getByRole('button', { name: 'Start a side chat' }))
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Selected text' })).toBeNull())
+      expect(branch).toHaveBeenCalledWith(ACTIVE_TAB, { kind: 'side' })
+      expect(useWorkspacePanelStore.getState().panelByTab[ACTIVE_TAB]?.tabs).toMatchObject([{ kind: 'sideChat', sessionId: 'side-1' }])
+      expect(useWorkspaceChatContextStore.getState().referencesBySession).toEqual({
+        'side-1': [expect.objectContaining({ kind: 'chat-selection', path: 'chat://assistant/assistant-1', messageId: 'assistant-1', quote: 'this part' })],
+      })
+      expect(window.getSelection()?.toString()).toBe('')
+    })
+
+    it('blocks a second click while the side chat is being created', async () => {
+      showAssistantReply()
+      const branch = vi.spyOn(sessionsApi, 'branch').mockReturnValue(new Promise(() => {}))
+      render(<MessageList sessionId={ACTIVE_TAB} canStartSideChat />)
+
+      await selectMessageText(screen.getByText(/Ask about this part/), 'this part')
+      fireEvent.click(screen.getByRole('button', { name: 'Start a side chat' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Start a side chat' }))
+
+      expect(screen.getByRole('button', { name: 'Start a side chat' })).toHaveProperty('disabled', true)
+      expect(branch).toHaveBeenCalledOnce()
+    })
+
+    it('says why a side chat could not be started', async () => {
+      showAssistantReply()
+      vi.spyOn(sessionsApi, 'branch').mockRejectedValue(new Error('busy'))
+      render(<MessageList sessionId={ACTIVE_TAB} canStartSideChat />)
+
+      await selectMessageText(screen.getByText(/Ask about this part/), 'this part')
+      fireEvent.click(screen.getByRole('button', { name: 'Start a side chat' }))
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not start a side chat: busy'))
+      expect(useWorkspaceChatContextStore.getState().referencesBySession).toEqual({})
+    })
   })
 
   it('closes the selected-message action but keeps the selection when pressing outside the popover', async () => {

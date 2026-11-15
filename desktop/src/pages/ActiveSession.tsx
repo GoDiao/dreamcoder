@@ -196,6 +196,7 @@ export function ActiveSession() {
           <SessionConversation
             sessionId={activeTabId}
             compact={showPanel}
+            canStartSideChat={canUsePanel}
             beforeInput={<TeamStatusBar />}
           />
         </div>

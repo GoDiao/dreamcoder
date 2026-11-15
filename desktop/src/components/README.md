@@ -112,7 +112,7 @@ picker through `ui/input`.
 | `settings/SettingsDisclosureRow`, `chat/LocalSlashCommandPanel` | Collapsible and Tabs with shared buttons; existing content and loading behavior |
 | `chat/MessageActionBar`, `chat/ImageGalleryModal`, `chat/ToolResultBlock` | Shared buttons and CopyButton; existing copy, fork, navigation and expand actions |
 | `tasks/TaskRow` | Action Menu + Confirm Dialog; keyboard navigation, focus return, pending requests and retryable errors |
-| `shared/SelectionPopover` | Shared Popover + Button for chat replies and plain-code, Markdown and Pierre selection quotes; portals outside transformed message containers and preserves captured text and line coordinates |
+| `shared/SelectionPopover` | Shared Popover with a row of action buttons for chat selections (Start a side chat, Reply) and plain-code, Markdown and Pierre selection quotes; portals outside transformed message containers and preserves captured text and line coordinates |
 | `workspace/PreviewLimitBar` | Sticky bar with the shown/total line count and a show-all toggle, shared by the code and diff previews |
 | `workspace/WorkspaceQuotePopover` | SelectionPopover with the workspace "add to chat" action, shared by the code, Markdown and Pierre diff surfaces |
 | `CommandPalette/CommandPalette`, `layout/ShortcutsDialog` | Command and Kbd respectively, with existing navigation and shortcut data |

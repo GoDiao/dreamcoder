@@ -11,10 +11,13 @@ export function WorkspaceQuotePopover({ quote, onAddSelection }: {
     <SelectionPopover
       quote={quote}
       label={t('workspace.addSelectionToChat')}
-      onAdd={() => {
-        if (quote.selection) onAddSelection({ text: quote.selection.text, startLine: quote.selection.startLine, endLine: quote.selection.endLine })
-        quote.dismiss()
-      }}
+      actions={[{
+        label: t('workspace.addSelectionToChat'),
+        onSelect: () => {
+          if (quote.selection) onAddSelection({ text: quote.selection.text, startLine: quote.selection.startLine, endLine: quote.selection.endLine })
+          quote.dismiss()
+        },
+      }]}
     />
   )
 }

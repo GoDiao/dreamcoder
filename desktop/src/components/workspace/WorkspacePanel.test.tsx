@@ -346,7 +346,7 @@ vi.mock('../chat/SessionConversation', () => ({
 
 const sideChatActions = vi.hoisted(() => ({ closeSideChat: vi.fn(async () => {}), detachSideChat: vi.fn(async () => {}) }))
 
-vi.mock('../../lib/sideChats', () => sideChatActions)
+vi.mock('../../lib/sideChats', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/sideChats')>()), ...sideChatActions }))
 
 vi.mock('../../api/sessions', () => ({
   sessionsApi: (() => {
@@ -2005,6 +2005,26 @@ describe('WorkspacePanel', () => {
     await act(() => {
       useWorkspacePanelStore.getState().clearSession('session-terminals')
     })
+  })
+
+  it.each([
+    ['starts', undefined, null],
+    ['says why it could not start', new Error('busy'), 'Could not start a side chat: busy'],
+  ] as const)('%s a side chat from the new tab page', async (_name, failure, message) => {
+    await setWorkspaceState((state) => ({
+      ...state,
+      panelByTab: { ...state.panelByTab, 'session-launcher': panelState({ id: 'launcher', kind: 'launcher' }) },
+    }))
+    const create = vi.spyOn(useWorkspacePanelStore.getState(), 'createSideChat')
+    if (failure) create.mockRejectedValue(failure)
+    else create.mockResolvedValue('side-1')
+
+    const view = await renderPanel('session-launcher')
+    await clickElement(within(view.getByTestId('workspace-launcher')).getByRole('button', { name: 'Side chat' }))
+
+    expect(create).toHaveBeenCalledWith('session-launcher')
+    if (message) await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
+    else expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('opens tools and recent pages and files from the new tab page', async () => {

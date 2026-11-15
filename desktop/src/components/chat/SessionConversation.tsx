@@ -112,11 +112,13 @@ export function SessionConversation({
   sessionId,
   compact = false,
   primary = true,
+  canStartSideChat = false,
   beforeInput,
 }: {
   sessionId: string
   compact?: boolean
   primary?: boolean
+  canStartSideChat?: boolean
   beforeInput?: ReactNode
 }) {
   const t = useTranslation()
@@ -172,7 +174,7 @@ export function SessionConversation({
           </div>
         </div>
       ) : (
-        <MessageList sessionId={sessionId} compact={compact} />
+        <MessageList sessionId={sessionId} compact={compact} canStartSideChat={canStartSideChat} />
       )}
 
       {!isMemberSession && <SessionTaskBar sessionId={sessionId} />}

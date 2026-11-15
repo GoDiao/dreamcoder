@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useChatStore } from '../stores/chatStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { useWorkspacePanelStore, type WorkspaceTab } from '../stores/workspacePanelStore'
 import { closeSideChat, detachSideChat } from './sideChats'
@@ -21,6 +22,7 @@ describe.each([
   afterEach(() => {
     vi.restoreAllMocks()
     useWorkspacePanelStore.setState(useWorkspacePanelStore.getInitialState(), true)
+    useChatStore.setState({ sessions: {} })
     localStorage.clear()
   })
 
@@ -32,6 +34,16 @@ describe.each([
 
     expect(call).toHaveBeenCalledWith('side')
     expect(openTabIds()).toEqual([])
+  })
+
+  it('drops the side chat messages it loaded, so opening the session again reads its history afresh', async () => {
+    const tab = openSideChat()
+    useChatStore.setState({ sessions: { side: { ...useChatStore.getState().getSession('side'), messages: [{ id: 'own', type: 'user_text', content: 'own', timestamp: 1 }] } } })
+    vi.spyOn(useSessionStore.getState(), storeAction).mockResolvedValue()
+
+    await action('parent', tab)
+
+    expect(useChatStore.getState().sessions.side).toBeUndefined()
   })
 
   it('keeps the tab when the server refuses the change', async () => {

@@ -989,7 +989,7 @@ describe('artifact tabs', () => {
     it('starts a side chat from the parent and shows it as a tab', async () => {
       mocks.branchMock.mockResolvedValue({ sessionId: 'side-created', title: 'btw', workDir: '/repo', sourceSessionId: 'parent' })
 
-      await useWorkspacePanelStore.getState().createSideChat('parent')
+      await expect(useWorkspacePanelStore.getState().createSideChat('parent')).resolves.toBe('side-created')
 
       expect(mocks.branchMock).toHaveBeenCalledWith('parent', { kind: 'side' })
       const panel = useWorkspacePanelStore.getState().panelByTab.parent!

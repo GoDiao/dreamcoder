@@ -344,6 +344,62 @@ describe('side chats', () => {
     expect(sentinel?.message).toMatchObject({ content: [{ type: 'text', text: 'No response requested.' }] })
   })
 
+  async function appendToTranscript(sessionId: string, entries: Entry[]): Promise<void> {
+    const found = await sessionService.findSessionFile(sessionId)
+    await fs.appendFile(found!.filePath, entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n', 'utf-8')
+  }
+
+  function visibleTexts(items: Array<{ type: string; content?: unknown }>) {
+    return items.filter((item) => item.type === 'user_text' || item.type === 'assistant_text').map((item) => item.content)
+  }
+
+  it('shows only its own messages, while the model keeps the inherited ones', async () => {
+    const parentId = crypto.randomUUID()
+    const user = userEntry(parentId, 'parent question')
+    const reply = assistantEntry(parentId, 'parent answer', user.uuid)
+    const todos = toolUseEntry(parentId, 'todo-1', reply.uuid)
+    ;((todos.message as Entry).content as Entry[])[0] = { type: 'tool_use', id: 'todo-1', name: 'TodoWrite', input: { todos: [{ content: 'parent task', status: 'pending', activeForm: 'Doing it' }] } }
+    const todosDone = toolResultEntry(parentId, 'todo-1', todos.uuid)
+    const notification = userEntry(parentId, '<task-notification>\n<task-id>bg-1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<status>completed</status>\n<summary>Background command completed</summary>\n</task-notification>', { parentUuid: todosDone.uuid })
+    await writeTranscript(parentId, [metaEntry(), user, reply, todos, todosDone, notification])
+    const sideId = await sideChatOf(parentId)
+    const forkEnd = conversationMessages(await readEntries(sideId)).at(-1)!
+    const sideQuestion = userEntry(sideId, 'side question', { parentUuid: forkEnd.uuid, timestamp: '2026-01-01T00:05:00.000Z' })
+    await appendToTranscript(sideId, [sideQuestion, assistantEntry(sideId, 'side answer', sideQuestion.uuid)])
+
+    const transcript = await sessionService.getSessionTranscript(sideId)
+
+    expect(visibleTexts(transcript.items)).toEqual(['side question', 'side answer'])
+    expect(transcript.items.some((item) => item.type === 'tool_use' || item.type === 'tool_result')).toBe(false)
+    expect(transcript.agentNotifications).toEqual({})
+    expect(transcript.lastTodos).toBeNull()
+    expect(JSON.stringify(await sessionService.getSessionMessages(sideId))).toContain('parent question')
+    const parentTranscript = await sessionService.getSessionTranscript(parentId)
+    expect(visibleTexts(parentTranscript.items)).toEqual(['parent question', 'parent answer'])
+    expect(Object.keys(parentTranscript.agentNotifications)).toEqual(['toolu_bg'])
+    expect(parentTranscript.lastTodos).toHaveLength(1)
+  })
+
+  it('hides the note that answers a tool call the parent left open', async () => {
+    const parentId = crypto.randomUUID()
+    const user = userEntry(parentId, 'run it')
+    await writeTranscript(parentId, [metaEntry(), user, toolUseEntry(parentId, 'tool-open', user.uuid)])
+
+    const sideId = await sideChatOf(parentId)
+
+    expect((await sessionService.getSessionTranscript(sideId)).items).toEqual([])
+  })
+
+  it('shows the whole history once detached', async () => {
+    const parentId = crypto.randomUUID()
+    await writeConversation(parentId)
+    const sideId = await sideChatOf(parentId)
+
+    await detachSideChat(sideId)
+
+    expect(visibleTexts((await sessionService.getSessionTranscript(sideId)).items)).toEqual(['hello there', 'hi'])
+  })
+
   it('creates a side chat through the branch route without a target message', async () => {
     const parentId = crypto.randomUUID()
     await writeConversation(parentId, {}, 'Parent')

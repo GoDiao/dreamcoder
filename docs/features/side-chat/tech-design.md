@@ -1,6 +1,6 @@
 # Side chat：技术设计
 
-状态：已实现，在 `feat/side-chat` 分支上，基于 `main` 的 `2d145753`。文中的行号以这个分支合并时的代码为准，之后代码变了，行号可能对不上。
+状态：已实现。第一版随 PR #251 合并（`ee90358d`）；隐藏继承的消息和从选中文字新建在 `feat/side-chat-selection-entry` 分支上。文中的行号以这个分支的代码为准，之后代码变了，行号可能对不上。
 
 ## 背景
 
@@ -12,6 +12,8 @@
 
 - side chat 是从父会话最新位置完整分叉出来的会话。工具、MCP、卡片、附件都和普通会话一样，和父会话共用同一个工作目录，没有自己的 worktree。
 - 显示在父会话右侧面板里，作为一个标签页，和终端、浏览器、文件并列。一个会话可以开多个。
+- side chat 页面只显示它自己的消息，不显示从父会话继承来的部分。模型的上下文仍然是完整的分叉。
+- 两个入口：面板新标签页里的 "Side chat"；在主会话里选中文字，弹出条点 "Start a side chat"，选中的内容作为引用放进 side chat 的输入框。
 - 标签菜单可以重命名、Detach（变成普通的分叉会话，出现在左侧列表），以及关闭。关闭就是删除，不二次确认，正在运行的会先停掉。
 - 删除父会话时，它的 side chat 一起删除，不做归档。
 - 标题是 `btw: <第一条用户输入>`。
@@ -41,6 +43,18 @@
   - `always` 为真时，即使没有未完成的调用，也追加一条 isMeta 说明和一条 "No response requested."。
 - side chat 用 `SIDE_CHAT_NOTE`（`sessionLinksService.ts:32`，`always: true`），告诉模型父会话会继续执行上面那一轮，它只管下一条消息让它做的事。StartSession 的 fork 用 `always: false`，行为和以前一样。
 - 接口沿用 `POST /api/sessions/:id/branch`。body 带 `kind: 'side'` 时 `targetMessageId` 可以不传，从最新位置分叉，标题用 `exactTitle` 原样写成 `btw`，不加 "(Branch)"。
+
+### 显示：只显示 side chat 自己的消息
+
+- 分叉时复制来的每条记录都带 `forkedFrom`（`sessionBranching.ts:566`）。结尾的分叉说明和之后新写的记录不带。
+- `getSessionTranscript`（`sessionService.ts:1830`）发现会话的父关系是 `side` 时，先用 `withoutInheritedEntries`（`transcript/entries.ts:369`）去掉继承的记录，再转换成显示条目。去掉的有两类：
+  - 带 `forkedFrom` 的记录；
+  - 只回答继承来的工具调用的 `tool_result` 消息。分叉点正好在一次工具调用中间时，分叉说明就是这样一条消息，它对应的工具调用已经去掉了，不能单独显示出来。
+  - 另一条说明（isMeta 说明和 "No response requested."）本来就不显示。
+- 任务通知、子 agent 消息、最后的待办都从过滤后的记录里取，父会话的这些内容不带进 side chat。
+- 只过滤显示。模型的上下文来自 CLI 读的文件，不受影响。`getSessionMessages`（回退、从某条消息分叉、工作区用）也不过滤。
+- 导出（`GET /api/sessions/:id/export`）同样调用 `getSessionTranscript`，side chat 的导出也只含它自己的消息。导出入口只在主页面的会话标题栏菜单里，side chat 标签没有这个入口。
+- Detach 之后父关系变成 `forked`，不再过滤，显示完整历史。桌面端在 Detach 成功后关掉标签，关标签会断开连接并清掉这个会话的本地消息（`disposeTab` → `disconnectSession`）。之后在左侧列表打开它，会重新连接并重新读取，读到的是完整历史。
 
 ### 会话列表：服务端默认不返回 side chat
 
@@ -127,12 +141,25 @@ side chat 标签：
   - 只在请求发出时已有的标签里判断哪些过期，请求期间新开的标签不会被删掉。
   - 刚在本地删除的会话不会被补回来（`isDeletedSession`）。
 - `disposeTab` 遇到 side chat 标签时断开它的连接。父会话被释放或删除时，每个标签都会经过它。
-- 新建：面板的新标签页里有 "Side chat" 入口，调用 `createSideChat`。
+- 新建：两个入口都通过 `useStartSideChat`（`lib/sideChats.ts:20`）调用 `createSideChat`。它负责创建期间的 loading 状态和失败提示，`createSideChat` 返回新会话的 id。见下一节。
 - 标签菜单（`SideChatTabTrigger`，`WorkspacePanel.tsx:1218`）：
   - 重命名：用 `RenameSessionDialog`，和会话标题栏菜单共用；
   - Detach：运行中禁用，接口成功后关掉标签；
   - 关闭：接口成功后关掉标签。标签上的 × 也是关闭。
   - 失败时标签保留，并弹出带原因的提示（`lib/sideChats.ts`）。
+
+从选中文字新建：
+
+- `SelectionPopover` 接收一组动作，按顺序显示，中间有分隔线。动作在 loading 时禁用，防止重复点击。工作区的"添加到对话"弹出条也用它，只有一个动作。
+- 主会话的消息里选中文字时，弹出条是 "Start a side chat | Reply"（`SelectableChatMessage`，`MessageList.tsx:357`）。点前者：
+  1. 新建 side chat，标签在面板里打开；
+  2. 把和 Reply 相同的 `chat-selection` 引用加到新 side chat 名下，它出现在 side chat 输入框上方；
+  3. 关闭弹出条。不自动发送，等用户输入。
+- 每次点都新建一个 side chat，不复用已打开的。
+- 是否提供这个动作由 `canStartSideChat` 决定，`ActiveSession` 传入 `canUsePanel`（`ActiveSession.tsx:199`），也就是这个会话能不能用右侧面板。所以：
+  - side chat 自己的消息里只有 Reply，不再开一层；
+  - 手机布局（H5）和团队成员会话没有面板，也不提供。新标签页里的入口在这两种情况下同样看不到。
+- 新建后不把焦点移进 side chat 的输入框。side chat 的输入框不抢焦点（见上文 `primary`），要做到需要给它加一个"新建后聚焦"的信号，现有结构里没有。
 
 面板归属：side chat 的面板就是父会话的面板。
 
@@ -157,6 +184,7 @@ side chat 标签：
 - 删除或 Detach 期间有消息要启动这个会话：被启动拦截挡住，报 `SESSION_DELETED` 或 `SESSION_DETACHING`。
 - 两个客户端同时开着：A 把 side chat 分离成普通会话后，B 上的标签要到下次打开面板才消失。这期间 B 点关闭，会删掉这个已经是普通会话的会话。这是接受的情况，见"考虑过但没有采用的做法"。
 - 会话列表一页可能不满：side chat 占着文件下标但被过滤掉。侧栏只取第一页 100 个，side chat 多时，侧栏能显示的会话会相应少一些。
+- 从选中文字新建失败：弹出条关闭，弹出带原因的提示，引用不会加到任何会话名下。
 
 ## 测试
 
@@ -164,6 +192,7 @@ side chat 标签：
 
 - `session-links.test.ts` 的 "side chats" 组：
   - 分叉：没有未完成的工具调用时也追加说明，有时给它们补结果；
+  - 显示：只显示自己的消息，不带父会话的任务通知和待办，模型读到的消息仍完整；在工具调用中间分叉时说明不显示；Detach 后显示完整历史；
   - 分叉路由和 `side-chats` 路由，以及 branch 路由的三种 400；
   - 分页和 side chat 过滤；
   - 只读关系；
@@ -193,6 +222,10 @@ side chat 标签：
   - Detach 运行中禁用；
   - 菜单的 Detach、重命名，以及失败提示；
   - × 关闭。
+- `WorkspacePanel.test.tsx` 的新标签页：新建 side chat 和失败提示。
+- `MessageList.test.tsx` 的 "starting a side chat from a selection" 组：主会话里先 Start a side chat 再 Reply，side chat 里只有 Reply；新建后引用在新会话名下、弹出条关闭；创建期间不能重复点；失败提示。
+- `SelectionPopover.test.tsx`：多个动作各自生效，loading 的动作禁用。
+- `ActiveSession.test.tsx`：能用面板时提供入口，手机布局不提供。
 - `WorkspacePanel.sideChatPrewarm.test.tsx`：全部连接，只预热当前显示的那个。
 - `workspacePanelStore.test.ts` 的 "side chats" 组：
   - 各入口落到父会话面板；
