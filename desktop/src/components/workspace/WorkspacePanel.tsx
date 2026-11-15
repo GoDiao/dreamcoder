@@ -574,7 +574,6 @@ function FileExpandedBody({
       <WorkspaceDiffSurface
         value={entry?.diff ?? ''}
         path={path}
-        hideFileHeaders
         className={codeSurfaceClass}
         onAddLineComment={onAddLineComment}
         onAddSelection={onAddSelection}

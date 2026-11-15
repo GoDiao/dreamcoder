@@ -103,6 +103,19 @@ describe('CurrentTurnChangeCard', () => {
     expect(within(card()).getByRole('button', { name: 'Hide diff for README.md' })).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('shows the changed lines of a file without repeating its name above them', async () => {
+    const diff = ['--- a/README.md', '+++ b/README.md', '@@ -1 +1 @@', '-old title', '+new title', ''].join('\n')
+    vi.spyOn(sessionsApi, 'getTurnCheckpointDiff').mockResolvedValue({ state: 'ok', diff } as never)
+    renderCard()
+    fireEvent.click(summary())
+    fireEvent.click(fileRows()[1]!)
+    await waitFor(() => expect(card().querySelector('diffs-container')?.shadowRoot?.querySelector('[data-line-type="change-addition"]')).toBeTruthy())
+    const surface = card().querySelector('diffs-container')!.shadowRoot!
+    expect(surface.textContent).toContain('new title')
+    expect(surface.querySelector('[data-diffs-header]')).toBeNull()
+    expect(surface.textContent).not.toContain('README.md')
+  })
+
   it('names the undo of an earlier turn differently and shows that it is running', () => {
     renderCard({ isLatest: false, isUndoing: true })
     const undo = within(card()).getByRole('button', { name: 'Rewind to before this turn' })

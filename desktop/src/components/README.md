@@ -72,7 +72,7 @@ that only renames props or passes them through does not belong here.
 | `ResponsivePopover` | Popover on desktop and bottom sheet on mobile |
 | `CopyButton` | Button, Tooltip and `useCopyAndNotify`, which wraps the clipboard helper with localized success and failure toasts |
 | `DirectoryPicker`, `RepositoryLaunchControls` | DreamCoder project/branch workflows using shared popovers, Command and controls |
-| `PierreDiffSurface` | DreamCoder adapter around [`@pierre/diffs`](https://diffs.com), with token overrides in [`pierre.css`](shared/pierre.css) |
+| `PierreDiffSurface` | DreamCoder adapter around [`@pierre/diffs`](https://diffs.com), with token overrides in [`pierre.css`](shared/pierre.css). Pierre's own file header is always off; the caller shows the file name |
 | `DreamCoderIcon` | DreamCoder brand artwork; not a general-purpose icon set |
 | `UpdateChecker` | Nonblocking persistent Sonner notification with Card, Button and Progress; updater state remains in the existing store |
 

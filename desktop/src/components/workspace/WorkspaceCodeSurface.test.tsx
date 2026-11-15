@@ -75,7 +75,7 @@ describe('WorkspaceDiffSurface', () => {
   it('shows real line numbers and allows comments on added and context lines only', async () => {
     const onAddLineComment = vi.fn()
     render(
-      <WorkspaceDiffSurface value={DIFF} path="src/a.ts" hideFileHeaders onAddLineComment={onAddLineComment} />,
+      <WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={onAddLineComment} />,
     )
 
     expect(screen.queryByText('diff --git a/src/a.ts b/src/a.ts')).not.toBeInTheDocument()
@@ -100,7 +100,7 @@ describe('WorkspaceDiffSurface', () => {
   })
 
   it('offers a comment button in the diff gutter for new lines only', async () => {
-    render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" hideFileHeaders onAddLineComment={vi.fn()} />)
+    render(<WorkspaceDiffSurface value={DIFF} path="src/a.ts" onAddLineComment={vi.fn()} />)
     const shadow = document.querySelector('diffs-container')!.shadowRoot!
     await waitFor(() => expect(shadow.querySelector('[data-line-type="change-addition"]')).toBeTruthy())
     const hover = (selector: string) => {
