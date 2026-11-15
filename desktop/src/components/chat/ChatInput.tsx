@@ -35,7 +35,7 @@ import { FileSearchMenu, type FileSearchMenuHandle } from './FileSearchMenu'
 import { LocalSlashCommandPanel, type LocalSlashCommandName } from './LocalSlashCommandPanel'
 import { ContextUsageIndicator } from './ContextUsageIndicator'
 import { ProviderGateCard, useProviderMissing } from './ProviderRequiredNotice'
-import { ComposerBox, ComposerControls, resizeComposerTextarea } from './ComposerShell'
+import { ComposerBox, ComposerControls } from './ComposerShell'
 import { ProjectLabel } from './ProjectLabel'
 import {
   FALLBACK_SLASH_COMMANDS,
@@ -199,9 +199,9 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
   const isWorkspaceMissing = activeSession?.workDirExists === false
   const hasWorkspaceReferences = !isMemberSession && workspaceReferences.length > 0
   const fullComposer = primary && !isMemberSession
-  const isHeroComposer = variant === 'hero' && primary && !isMemberSession && !compact
+  const isHeroComposer = variant === 'hero' && fullComposer && !compact
   const resolvedWorkDir = activeSession?.workDir || gitInfo?.workDir || undefined
-  const showLaunchControls = primary && !isMemberSession && messageCount === 0
+  const showLaunchControls = fullComposer && messageCount === 0
   const useCompactControls = compact || isMobileComposer
   const activeLaunchWorkDir = showLaunchControls ? (launchWorkDir || resolvedWorkDir || '') : (resolvedWorkDir || '')
   const pendingSlashUiAction = !isMemberSession && input.trim().startsWith('/')
@@ -363,10 +363,6 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
       return nextWorkDir
     })
   }, [activeSession?.workDir, sessionId, gitInfo?.workDir, showLaunchControls])
-
-  useEffect(() => {
-    resizeComposerTextarea(textareaRef.current)
-  }, [input, providerMissing])
 
 
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createRef, useRef, useState } from 'react'
 import '@testing-library/jest-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ComposerBox } from './ComposerShell'
 
 function Harness({ onOuterEscape }: { onOuterEscape: () => void }) {
@@ -87,5 +87,68 @@ describe('ComposerBox plus menu', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Slash commands' }))
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus()
+  })
+})
+
+describe('ComposerBox height', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function renderBox(value: string) {
+    const textareaRef = createRef<HTMLTextAreaElement>()
+    const box = (text: string) => (
+      <ComposerBox
+        panelRef={createRef<HTMLDivElement>()}
+        testId="composer"
+        textareaRef={textareaRef}
+        textareaProps={{ 'aria-label': 'Message', value: text, onChange: () => {} }}
+        action={{ mode: 'send', disabled: true, onClick: () => {}, label: 'Send' }}
+      />
+    )
+    const view = render(box(value))
+    return { textarea: screen.getByRole('textbox', { name: 'Message' }), rerender: (text: string) => view.rerender(box(text)) }
+  }
+
+  function observeResizes() {
+    const callbacks: ResizeObserverCallback[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { callbacks.push(callback) }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    return (width: number) => {
+      for (const callback of callbacks) callback([{ contentRect: { width } } as ResizeObserverEntry], {} as ResizeObserver)
+    }
+  }
+
+  function setScrollHeight(textarea: HTMLElement, height: number) {
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: height })
+  }
+
+  it('measures again when the box gets wider, and only then', () => {
+    const resize = observeResizes()
+    const { textarea } = renderBox('')
+    setScrollHeight(textarea, 154)
+    resize(40)
+    expect(textarea.style.height).toBe('154px')
+
+    setScrollHeight(textarea, 32)
+    resize(400)
+    expect(textarea.style.height).toBe('32px')
+
+    setScrollHeight(textarea, 60)
+    resize(400)
+    expect(textarea.style.height).toBe('32px')
+  })
+
+  it('grows with its text up to the maximum height', () => {
+    const { textarea, rerender } = renderBox('')
+    setScrollHeight(textarea, 54)
+    rerender('two\nlines')
+    expect(textarea.style.height).toBe('54px')
+
+    setScrollHeight(textarea, 900)
+    rerender('many\nlines')
+    expect(textarea.style.height).toBe('200px')
   })
 })
