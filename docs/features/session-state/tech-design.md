@@ -229,6 +229,7 @@ type SessionState = {
   pendingPermissions: PendingPermission[]
   pendingBrowserGrants: PendingBrowserGrant[]
   browserActivity: BrowserActivity | null
+  artifactWait: { folder: string; title: string } | null
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
@@ -258,6 +259,7 @@ type RuntimeSelection = { providerId: string | null; modelId: string; effort?: s
 | `pendingPermissions` | OutputPipeline（出现、撤销）、CommandRouter（已处理） | 否，CLI 退出即失效 | — |
 | `pendingBrowserGrants` | 浏览器授权（出现、撤销） | 否，CLI 退出即失效 | — |
 | `browserActivity` | 浏览器服务（调用开始、结束） | 否 | — |
+| `artifactWait` | 产物编辑锁（这个会话的 Agent 写入在等用户改完某个产物时设上，解锁、CLI 取消等待时清掉；这一轮结束、进程结束或重启、清空对话时 reducer 一并清掉） | 否 | — |
 | `slashCommands` | OutputPipeline（`init`）、插件重载 | 否 | — |
 | `activeGoal` | OutputPipeline | 由 transcript 推导（现状） | 本地命令输出条目 |
 | `backgroundTasks` | OutputPipeline | 由 transcript 推导（现状） | — |

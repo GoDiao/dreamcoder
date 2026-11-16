@@ -37,6 +37,7 @@ export function StreamingIndicator({ sessionId }: { sessionId: string }) {
     return turn && turn.phase !== 'idle' ? turn.startedAt : undefined
   })
   const outputTokens = useChatStore((s) => s.sessions[sessionId]?.tokenUsage?.output_tokens ?? 0)
+  const waitingFor = useChatStore((s) => s.sessions[sessionId]?.mirror?.artifactWait?.title ?? null)
 
   useEffect(() => {
     if (!apiRetry) return undefined
@@ -80,7 +81,9 @@ export function StreamingIndicator({ sessionId }: { sessionId: string }) {
   }
 
   let verb: string
-  if (statusVerb) {
+  if (waitingFor !== null) {
+    verb = t('chat.waitingForArtifact', { title: waitingFor })
+  } else if (statusVerb) {
     verb = translateServerVerb(t, statusVerb)
   } else {
     verb = chatState === 'thinking'

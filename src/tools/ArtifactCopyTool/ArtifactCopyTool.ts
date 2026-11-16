@@ -1,14 +1,13 @@
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { z } from 'zod/v4'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { copyArtifactFolder } from '../../utils/artifactTransfer.js'
 import {
   ARTIFACTS_DIRNAME,
   ARTIFACT_MANIFEST_FILE,
-  artifactNameOf,
+  artifactFolderContaining,
   artifactsDirOf,
   isGlobalArtifactsPath,
-  isSafeArtifactName,
 } from '../../utils/artifacts.js'
 import { directoryExists } from '../../utils/bundledContent.js'
 import { getArtifactWorkRoot } from '../../utils/cwd.js'
@@ -18,6 +17,7 @@ import { expandPath } from '../../utils/path.js'
 import { announceArtifactWrite } from '../../utils/worktree.js'
 import { ARTIFACT_COPY_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, PROMPT } from './prompt.js'
+import { waitWhileUserEditsArtifact } from '../../utils/artifactEditLock.js'
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -33,11 +33,8 @@ type OutputSchema = ReturnType<typeof outputSchema>
 export type Output = z.infer<OutputSchema>
 
 function artifactFolderOf(path: string): { folder: string; name: string } | null {
-  const artifactsDir = artifactsDirOf(path)
-  const name = artifactNameOf(path)
-  if (!artifactsDir || !name || !isSafeArtifactName(name)) return null
-  const folder = join(artifactsDir, name)
-  return resolve(path) === folder ? { folder, name } : null
+  const folder = artifactFolderContaining(path)
+  return folder && resolve(path) === folder ? { folder, name: basename(folder) } : null
 }
 
 export const ArtifactCopyTool = buildTool({
@@ -90,9 +87,10 @@ export const ArtifactCopyTool = buildTool({
   renderToolUseMessage(input) {
     return input.path ?? null
   },
-  async call(input) {
+  async call(input, { abortController }) {
     const target = artifactFolderOf(expandPath(input.path))!
     const fromGlobalStore = isGlobalArtifactsPath(target.folder)
+    await waitWhileUserEditsArtifact(target.folder, abortController.signal)
     try {
       const copied = await copyArtifactFolder({
         source: target.folder,

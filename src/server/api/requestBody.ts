@@ -16,6 +16,24 @@ export function requireString(body: Record<string, unknown>, field: string): str
   return value
 }
 
+export function requireText(body: Record<string, unknown>, field: string): string {
+  const value = body[field]
+  if (typeof value !== 'string') throw ApiError.badRequest(`${field} must be a string`)
+  return value
+}
+
+export function requireStringList(body: Record<string, unknown>, field: string): string[] {
+  const value = body[field]
+  if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) throw ApiError.badRequest(`${field} must be a list of strings`)
+  return value
+}
+
+export function requireParam(url: URL, field: string): string {
+  const value = url.searchParams.get(field)
+  if (!value) throw ApiError.badRequest(`${field} is required`)
+  return value
+}
+
 export function optionalString(body: Record<string, unknown>, field: string): string | undefined {
   const value = body[field]
   if (value === undefined) return undefined

@@ -20,6 +20,7 @@ function mirror(turn: SessionState['turn']): SessionState {
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

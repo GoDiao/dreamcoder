@@ -35,7 +35,7 @@ describe('exportArtifactPage', () => {
   })
 
   const showDeck = () => useBrowserStore.setState({
-    pageByTab: { t1: { ...EMPTY_BROWSER_PAGE, ready: true, deck: { artifact: 'd', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'overview' } } },
+    pageByTab: { t1: { ...EMPTY_BROWSER_PAGE, ready: true, deck: { artifact: 'd', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'overview', editing: false } } },
   })
 
   it('takes the emulated view away, exports and puts it back, in that order', async () => {
@@ -73,19 +73,18 @@ describe('exportArtifactPage', () => {
     expect(mocks.exportPage).not.toHaveBeenCalled()
   })
 
-  it('returns a deck to browse mode before building its standalone HTML, and not for the other formats', async () => {
+  it('turns editing off and returns a deck to browse mode before building its standalone HTML, and not for the other formats', async () => {
     showDeck()
     const order: string[] = []
-    mocks.runDeckCall.mockImplementation(async () => { order.push('browse') })
+    mocks.runDeckCall.mockImplementation(async (_tabId: string, code: string) => { order.push(code) })
     mocks.exportPage.mockImplementation(async () => { order.push('export'); return { status: 'saved', path: '/out.html' } })
 
     await exportArtifactPage({ ...input, format: 'html' })
-    expect(mocks.runDeckCall).toHaveBeenCalledWith('t1', 'window.__dreamcoderDeck?.setMode("browse")')
-    expect(order).toEqual(['browse', 'export'])
+    expect(order).toEqual(['window.__dreamcoderDeck?.setEditing(false)', 'window.__dreamcoderDeck?.setMode("browse")', 'export'])
 
     await exportArtifactPage({ ...input, format: 'pdf' })
     await exportArtifactPage({ ...input, format: 'png' })
-    expect(mocks.runDeckCall).toHaveBeenCalledOnce()
+    expect(mocks.runDeckCall).toHaveBeenCalledTimes(2)
   })
 
   it('does not call into a page that is not a deck before building its standalone HTML', async () => {

@@ -55,6 +55,11 @@ export type BrowserActivity = {
   tabId: string
 }
 
+export type ArtifactWait = {
+  folder: string
+  title: string
+}
+
 export type ActiveGoal = {
   action: GoalEventAction
   status?: string
@@ -125,6 +130,7 @@ export type SessionState = {
   pendingPermissions: PendingPermission[]
   pendingBrowserGrants: PendingBrowserGrant[]
   browserActivity: BrowserActivity | null
+  artifactWait: ArtifactWait | null
   slashCommands: SessionSlashCommand[]
   activeGoal: ActiveGoal | null
   backgroundTasks: BackgroundTaskSummary[]
@@ -171,6 +177,7 @@ export type SessionStateEvent =
   | { type: 'browser_grant_requested'; grant: PendingBrowserGrant }
   | { type: 'browser_grant_closed'; requestId: string }
   | { type: 'browser_activity_changed'; activity: BrowserActivity | null }
+  | { type: 'artifact_wait_changed'; wait: ArtifactWait | null }
   | { type: 'slash_commands_reported'; commands: SessionSlashCommand[] }
   | { type: 'goal_reported'; goal: Omit<ActiveGoal, 'updatedAt'>; at: number }
   | { type: 'background_task_reported'; task: BackgroundTaskEvent; at: number }

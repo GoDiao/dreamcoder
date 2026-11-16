@@ -21,6 +21,7 @@ export function createSessionState(id: string): SessionState {
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],
@@ -130,10 +131,10 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
       return { ...state, turn: { phase: 'running', startedAt: event.at, activity: 'thinking' } }
 
     case 'turn_ended':
-      return { ...state, turn: { phase: 'idle' } }
+      return { ...state, turn: { phase: 'idle' }, artifactWait: null }
 
     case 'turn_state_reported':
-      if (event.state === 'idle') return { ...state, turn: { phase: 'idle' } }
+      if (event.state === 'idle') return { ...state, turn: { phase: 'idle' }, artifactWait: null }
       if (event.state === 'requires_action') {
         return { ...state, turn: { ...state.turn, phase: 'awaiting_permission', startedAt: state.turn.startedAt ?? event.at } }
       }
@@ -185,6 +186,9 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
 
     case 'browser_activity_changed':
       return { ...state, browserActivity: event.activity }
+
+    case 'artifact_wait_changed':
+      return { ...state, artifactWait: event.wait }
 
     case 'slash_commands_reported':
       return { ...state, slashCommands: event.commands }
@@ -244,6 +248,7 @@ function applyEvent(state: SessionState, event: SessionStateEvent): SessionState
         pendingPermissions: [],
         pendingBrowserGrants: [],
         browserActivity: null,
+        artifactWait: null,
         slashCommands: [],
         activeGoal: null,
         backgroundTasks: [],
@@ -284,6 +289,7 @@ function applyProcessPhase(
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    artifactWait: null,
     queuedMessages: [],
   }
 }

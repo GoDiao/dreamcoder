@@ -28,6 +28,8 @@ const evaluate = browserToolName('evaluate')
 
 const FRAME = `${DECK_WIDTH} by ${DECK_HEIGHT}`
 
+export const SLIDES_USER_CHANGES_RULE = `The user can change the text of a slide, reorder slides and delete slides in the app (see "When the user edits an artifact" in the \`artifacts\` skill). So before you change a deck, read its artifact.json again in full, every time, without an offset or a limit, and work from the \`slides\` list it holds now, not from the order you remember. When the order or the number of slides differs from what you last wrote, the user moved or deleted slides: section numbers, totals of sections ("of 05", a table of contents) and references from one slide to another ("see the next slide", the number of a step) may now be wrong. Check them in the order of \`slides\` and fix them along with your other changes. Keep the text the user typed into a slide unless they ask you to change it. A note that artifact.json or a slide file was modified, or a note in the user's message that they changed the deck in the app, means such a change by the user: read artifact.json again and check the same things.`
+
 export const SLIDES_SKILL_PROMPT = `# Slides
 
 The user wants a slide deck that is kept as an artifact: one HTML file per slide, shown by the app on a fixed ${FRAME} stage with paging, an overview and a presentation mode. Work in five steps. Where artifacts live, the manifest and the way to show an artifact are in the \`artifacts\` skill; load it with the Skill tool before you write any file. The reference files named below are in the base directory of this skill; read each one when its step comes.
@@ -160,6 +162,10 @@ The stage counts the slides in two CSS counters: \`${DECK_SLIDE_COUNTER}\` is th
 The numbers stay right when a slide is added, removed or moved, in the overview, in the presentation and in every export. Never type a page number into a slide file, neither the number of the slide nor the number of slides: no \`03 / 12\`, no \`p. 14\` pointing at another slide. Do not reset or increment these two counters yourself.
 
 Section numbers are different: they are content. How many sections the deck has and which slide opens one is decided with the content, so a section number may be typed into a slide, such as the large \`02\` on a divider, \`Chapter 02\` in a kicker or \`Chapter 02 of 05\` in a footer. When you add, remove or move a section, renumber every section number after it and every total of sections in the same step.
+
+## Changes the user makes in the app
+
+${SLIDES_USER_CHANGES_RULE}
 
 ## Write the HTML the way a browser serializes it
 

@@ -173,6 +173,24 @@ describe('session state reducer', () => {
     expect(reduce(active, { type: 'process_phase_changed', phase: 'running', generation: 1 }).browserActivity).toEqual({ tabId: 't1' })
   })
 
+  it('sets and clears the artifact the agent waits for and reports no change for a repeat', () => {
+    const wait = { folder: '/repo/dc_artifacts/talk', title: 'Talk' }
+    const waiting = reduce(createSessionState('s1'), { type: 'turn_started', at: 1 }, { type: 'artifact_wait_changed', wait })
+    expect(waiting.artifactWait).toEqual(wait)
+    expect(reduceSessionState(waiting, { type: 'artifact_wait_changed', wait }).patch).toEqual({})
+    expect(reduceSessionState(waiting, { type: 'artifact_wait_changed', wait: null }).patch).toEqual({ artifactWait: null })
+  })
+
+  it('drops the artifact wait when the turn ends, the process ends or starts again, or the conversation is cleared', () => {
+    const waiting = reduce(createSessionState('s1'), { type: 'turn_started', at: 1 }, { type: 'artifact_wait_changed', wait: { folder: '/repo/dc_artifacts/talk', title: 'Talk' } })
+    expect(reduce(waiting, { type: 'turn_ended' }).artifactWait).toBeNull()
+    expect(reduce(waiting, { type: 'turn_state_reported', state: 'idle', at: 2 }).artifactWait).toBeNull()
+    expect(reduce(waiting, { type: 'process_phase_changed', phase: 'stopped', generation: 1 }).artifactWait).toBeNull()
+    expect(reduce(waiting, { type: 'process_phase_changed', phase: 'starting', generation: 1 }).artifactWait).toBeNull()
+    expect(reduce(waiting, { type: 'conversation_cleared' }).artifactWait).toBeNull()
+    expect(reduce(waiting, { type: 'turn_activity_reported', activity: 'tool' }).artifactWait).toEqual({ folder: '/repo/dc_artifacts/talk', title: 'Talk' })
+  })
+
   it('keeps a queued restart until the next process starts', () => {
     const queued = reduce(createSessionState('s1'), { type: 'restart_queued', reason: 'permission' })
     expect(queued.process.pendingRestart).toBe('permission')

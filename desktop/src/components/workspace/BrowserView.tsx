@@ -94,7 +94,7 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
   const { url } = tab
   const shownArtifact = tabShowsArtifact(tab) ? tab.artifact : undefined
   useArtifactThumbnail(tab.id, shownArtifact?.board === undefined ? shownArtifact : undefined)
-  useCanvasTab(tab.root !== undefined && tab.artifact?.canvas ? { tabId: tab.id, sessionId, root: tab.root, name: tab.artifact.name, artifact: tab.artifact } : null)
+  useCanvasTab(tab.root !== undefined && tab.artifact?.canvas ? { tabId: tab.id, sessionId, root: tab.root, name: tab.artifact.name, title: tab.title || tab.artifact.name, artifact: tab.artifact } : null)
   const designRequest = useDesignChoiceRequest(sessionId)
   const templateId = tab.template?.id
   const offeredTemplate = templateId !== undefined && designRequest !== null && parseDesignCandidates(designRequest.input).some((candidate) => candidate.id === templateId)
@@ -247,7 +247,7 @@ export function BrowserView({ sessionId, tab, projectRoot }: { sessionId: string
         )}
       </form>
 
-      <DeckControls tabId={tab.id} />
+      <DeckControls tabId={tab.id} editTarget={shownArtifact?.deck && tab.root !== undefined ? { root: tab.root, name: shownArtifact.name, title: tab.title || shownArtifact.name, sessionId } : undefined} />
       <BrowserActivityBar sessionId={sessionId} tabId={tab.id} />
 
       {noticeText && (

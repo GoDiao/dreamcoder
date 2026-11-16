@@ -15,6 +15,16 @@
   var SLIDE_ID = /^[A-Za-z0-9_-]{1,64}$/
   var REFERENCES = 'iframe[src],img[src],video[src],audio[src],source[src]'
   var MODES = ['browse', 'overview', 'present']
+  var INLINE = /^(A|ABBR|B|BDI|BDO|BR|CITE|CODE|DATA|DEL|DFN|EM|I|INS|KBD|MARK|Q|S|SAMP|SMALL|SPAN|STRONG|SUB|SUP|TIME|U|VAR|WBR)$/
+  var DRAG_DISTANCE = 6
+  var MOVE_MS = 150
+  var ZOOM_MS = 220
+  var SAVED_MS = 600
+  var EASE = 'cubic-bezier(.2,0,0,1)'
+  var LIFT = '0 24px 96px rgba(0,0,0,.4)'
+  var LABEL = 22
+  var EDGE = 56
+  var EDGE_SPEED = 0.3
   var TEXT = {
     en: { empty: 'This deck has no slides yet', failed: 'Could not read the deck', missing: 'Could not read this slide', keys: '← → slides · F present · O overview · Esc back' },
     zh: { empty: '这份幻灯片还没有页面', failed: '无法读取幻灯片', missing: '无法读取这一页', keys: '← → 翻页 · F 演示 · O 总览 · Esc 返回' },
@@ -33,10 +43,23 @@
   var currentId = null
   var step = 0
   var columns = 1
+  var scale = 1
   var standalone = false
   var bare = false
   var reported = ''
   var bust = 0
+  var editing = false
+  var active = null
+  var held = false
+  var edits = []
+  var drag = null
+  var dragged = false
+  var motions = new WeakMap()
+  var hovered = null
+  var RAISED = { zIndex: 1 }
+  var LIFTED = { zIndex: 1, boxShadow: LIFT }
+  var LANDED = { zIndex: 1, boxShadow: 'none' }
+  var busy = false
   var queue = Promise.resolve()
   var resolveLoaded = null
   var loaded = new Promise(function (resolve) {
@@ -55,11 +78,18 @@
     '.dc-slide{counter-increment:dc-slide}',
     '.dc-slide[data-current]{visibility:visible;opacity:1}',
     '.dc-slide>section{position:relative;box-sizing:border-box;width:' + WIDTH + 'px;height:' + HEIGHT + 'px;overflow:hidden}',
-    '#dc-deck[data-mode=overview] .dc-stage{display:grid;grid-template-columns:repeat(var(--dc-columns,1),' + WIDTH + 'px);gap:' + GRID_GAP + 'px;width:max-content;height:auto;padding-bottom:var(--dc-tail,0px)}',
-    '#dc-deck[data-mode=overview] .dc-slide{position:relative;visibility:visible;opacity:1;cursor:pointer;outline:12px solid transparent;outline-offset:12px}',
+    '#dc-deck[data-mode=overview] .dc-stage{display:grid;grid-template-columns:repeat(var(--dc-columns,1),' + WIDTH + 'px);gap:calc(' + GRID_GAP + 'px + ' + LABEL + 'px / var(--dc-scale,1)) ' + GRID_GAP + 'px;width:max-content;height:auto;padding-bottom:var(--dc-tail,0px)}',
+    '#dc-deck[data-mode=overview] .dc-slide{position:relative;overflow:visible;visibility:visible;opacity:1;cursor:pointer;user-select:none;outline:12px solid transparent;outline-offset:12px;transition:outline-color .12s}',
+    '#dc-deck[data-mode=overview] .dc-slide:hover{outline-color:color-mix(in srgb,var(--dc-accent) 35%,transparent)}',
     '#dc-deck[data-mode=overview] .dc-slide[data-current]{outline-color:var(--dc-accent)}',
+    '#dc-deck[data-mode=overview] .dc-slide::after{content:counter(dc-slide);position:absolute;left:0;top:100%;padding-top:calc(7px / var(--dc-scale,1));font:calc(11px / var(--dc-scale,1))/1 system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--dc-ink)}',
+    '#dc-deck[data-mode=overview] .dc-slide[data-current]::after{color:var(--dc-accent)}',
     '#dc-deck[data-mode=overview] .dc-slide>section{pointer-events:none}',
     '[data-dc-pending]{visibility:hidden!important;opacity:0!important}',
+    '#dc-deck[data-editing] [data-dc-editable]{cursor:text;outline:4px solid color-mix(in srgb,var(--dc-accent) 40%,transparent);outline-offset:8px}',
+    '.dc-slide [contenteditable]{outline:4px solid var(--dc-accent);outline-offset:8px}',
+    '#dc-deck[data-editing][data-mode=overview] .dc-slide{cursor:grab}',
+    '#dc-deck[data-mode=overview] .dc-slide[data-dc-dragging]{z-index:1;box-shadow:' + LIFT + ';cursor:grabbing}',
     '.dc-missing{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:' + WIDTH + 'px;height:' + HEIGHT + 'px;font:36px system-ui,-apple-system,"Segoe UI",sans-serif;color:#6b6b66;background:#f4f4f2}',
     '.dc-notice{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:13px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--dc-ink);text-align:center}',
     '.dc-hint{position:absolute;left:0;right:0;bottom:5px;font:11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--dc-ink);text-align:center;pointer-events:none}',
@@ -72,6 +102,8 @@
     '.dc-slide{position:relative!important;visibility:visible!important;opacity:1!important;outline:0!important;break-after:page;break-inside:avoid}',
     '.dc-slide:last-child{break-after:auto}',
     '[data-dc-pending]{visibility:visible!important;opacity:1!important}',
+    '.dc-slide [contenteditable],[data-dc-editable]{outline:0!important}',
+    '.dc-slide::after{display:none!important}',
     '.dc-notice,.dc-hint{display:none!important}',
     '}',
   ].join('\n')
@@ -109,6 +141,7 @@
       index: index,
       count: entries.length,
       mode: mode,
+      editing: editing,
     }
   }
 
@@ -146,16 +179,16 @@
     if (mode === 'overview') {
       columns = Math.max(1, Math.min(MAX_COLUMNS, entries.length, Math.floor((width - GRID_PAD * 2) / MIN_THUMBNAIL)))
       var natural = columns * WIDTH + (columns - 1) * GRID_GAP
-      var fit = Math.max(0.01, (width - GRID_PAD * 2) / natural)
+      scale = Math.max(0.01, (width - GRID_PAD * 2) / natural)
       setVariable('--dc-columns', String(columns))
-      setVariable('--dc-scale', String(fit))
+      setVariable('--dc-scale', String(scale))
       setVariable('--dc-x', GRID_PAD + 'px')
       setVariable('--dc-y', GRID_PAD + 'px')
-      setVariable('--dc-tail', GRID_PAD / fit + 'px')
+      setVariable('--dc-tail', GRID_PAD / scale + 'px')
       return
     }
     var margin = bare || mode === 'present' ? 0 : MARGIN
-    var scale = Math.max(0.01, Math.min((width - margin * 2) / WIDTH, (height - margin * 2) / HEIGHT))
+    scale = Math.max(0.01, Math.min((width - margin * 2) / WIDTH, (height - margin * 2) / HEIGHT))
     setVariable('--dc-scale', String(scale))
     setVariable('--dc-x', (width - WIDTH * scale) / 2 + 'px')
     setVariable('--dc-y', (height - HEIGHT * scale) / 2 + 'px')
@@ -177,6 +210,7 @@
   function show(id) {
     var index = indexOf(id)
     if (index < 0) return false
+    if (active && active.entry.id !== id) finishEdit(true)
     currentId = id
     entries.forEach(function (entry) {
       if (entry.id === id) entry.element.setAttribute('data-current', '')
@@ -228,13 +262,25 @@
 
   function setMode(nextMode) {
     if (MODES.indexOf(nextMode) < 0 || nextMode === mode) return
+    finishEdit(true)
+    cancelDrag()
+    hover(null)
+    entries.forEach(stopMotion)
+    if (nextMode === 'present') markEditing(false)
+    var entry = entries[indexOf(currentId)]
+    var from = entry && mode !== 'present' && nextMode !== 'present' ? entry.element.getBoundingClientRect() : null
     mode = nextMode
     step = 0
     root.setAttribute('data-mode', mode)
     applyStep()
     layout()
-    var entry = entries[indexOf(currentId)]
     if (entry) reveal(entry)
+    if (from) {
+      glide(entry.element, from, entry.element.getBoundingClientRect(), RAISED, RAISED)
+      if (mode === 'overview') entries.forEach(function (other) {
+        if (other !== entry) fadeIn(other.element)
+      })
+    }
     report()
   }
 
@@ -265,7 +311,393 @@
     return !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || ''))
   }
 
+  function markBusy(on) {
+    if (busy === on) return
+    busy = on
+    emit({ type: 'busy', on: on })
+  }
+
+  function markEditing(on) {
+    editing = on
+    if (on) root.setAttribute('data-editing', '')
+    else {
+      root.removeAttribute('data-editing')
+      hover(null)
+    }
+  }
+
+  function setEditing(on) {
+    var next = !!on && !standalone && mode !== 'present'
+    if (next === editing) return
+    if (!next) {
+      finishEdit(true)
+      cancelDrag()
+    }
+    markEditing(next)
+    report()
+  }
+
+  function onlyInline(element) {
+    for (var i = 0; i < element.children.length; i += 1) {
+      var child = element.children[i]
+      if (!INLINE.test(child.tagName) || !onlyInline(child)) return false
+    }
+    return true
+  }
+
+  function editableBlock(element) {
+    return !!element && /\S/.test(element.textContent || '') && onlyInline(element)
+  }
+
+  function editableUnit(target, section) {
+    if (!(target instanceof HTMLElement) || target.closest('svg')) return null
+    var node = target
+    var outer = null
+    while (node !== section && INLINE.test(node.tagName)) {
+      outer = node
+      node = node.parentElement
+    }
+    if (node !== section && editableBlock(node)) return node
+    return editableBlock(outer) ? outer : null
+  }
+
+  function pathOf(element, section) {
+    var path = []
+    for (var node = element; node !== section; node = node.parentElement) path.unshift(Array.prototype.indexOf.call(node.parentElement.children, node))
+    return path
+  }
+
+  function follow(section, path) {
+    var node = section
+    for (var i = 0; node && i < path.length; i += 1) node = node.children[path[i]]
+    return node || null
+  }
+
+  function currentSection() {
+    var entry = entries[indexOf(currentId)]
+    var section = entry && entry.element.firstElementChild
+    return section && section.tagName === 'SECTION' ? { entry: entry, section: section } : null
+  }
+
+  function unitAt(target) {
+    if (!editing || mode !== 'browse') return null
+    var current = currentSection()
+    return current && current.section.contains(target) ? editableUnit(target, current.section) : null
+  }
+
+  function hover(unit) {
+    if (unit === hovered) return
+    if (hovered) hovered.removeAttribute('data-dc-editable')
+    hovered = unit
+    if (unit) unit.setAttribute('data-dc-editable', '')
+  }
+
+  function trimEnd(node) {
+    if (node) node.nodeValue = node.nodeValue.replace(/ $/, '')
+  }
+
+  function collapseSpace(element) {
+    var walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
+    var last = null
+    var open = true
+    while (walker.nextNode()) {
+      var node = walker.currentNode
+      if (node.nodeType !== Node.TEXT_NODE) {
+        if (node.tagName !== 'BR') continue
+        trimEnd(last)
+        last = null
+        open = true
+        continue
+      }
+      var value = node.nodeValue.replace(/[ \t\n\r\f]+/g, ' ')
+      if (open && value.charAt(0) === ' ') value = value.slice(1)
+      node.nodeValue = value
+      if (value === '') continue
+      open = value.charAt(value.length - 1) === ' '
+      last = node
+    }
+    trimEnd(last)
+  }
+
+  function breakLines(element) {
+    var walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    var nodes = []
+    while (walker.nextNode()) if (walker.currentNode.nodeValue !== '') nodes.push(walker.currentNode)
+    var last = nodes[nodes.length - 1]
+    if (last) last.nodeValue = last.nodeValue.replace(/\n+$/, '')
+    nodes.forEach(function (node) {
+      var lines = node.nodeValue.split('\n')
+      if (lines.length === 1) return
+      var parts = document.createDocumentFragment()
+      lines.forEach(function (line, index) {
+        if (index > 0) parts.appendChild(document.createElement('br'))
+        parts.appendChild(document.createTextNode(line))
+      })
+      node.parentNode.replaceChild(parts, node)
+    })
+  }
+
+  function startEdit(event) {
+    if (event.button !== 0 || (active && active.element.contains(event.target))) return
+    finishEdit(true)
+    var unit = unitAt(event.target)
+    if (!unit) return
+    hover(null)
+    var original = unit.innerHTML
+    var spaced = /^(pre|pre-wrap|pre-line|break-spaces)$/.test(getComputedStyle(unit).whiteSpace)
+    if (!spaced) collapseSpace(unit)
+    unit.setAttribute('contenteditable', 'plaintext-only')
+    unit.addEventListener('keydown', editKey)
+    unit.addEventListener('blur', editBlur)
+    active = { entry: entries[indexOf(currentId)], element: unit, original: original, before: unit.innerHTML, spaced: spaced }
+    markBusy(true)
+    unit.focus()
+  }
+
+  function editKey(event) {
+    if (event.isComposing) return
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      finishEdit(true)
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      finishEdit(false)
+    }
+  }
+
+  function editBlur() {
+    finishEdit(true)
+  }
+
+  function finishEdit(commit) {
+    var current = active
+    if (!current) return
+    active = null
+    var element = current.element
+    element.removeEventListener('keydown', editKey)
+    element.removeEventListener('blur', editBlur)
+    element.removeAttribute('contenteditable')
+    if (document.activeElement === element) element.blur()
+    if (commit && !current.spaced) breakLines(element)
+    var changed = commit && element.innerHTML !== current.before
+    if (!changed) element.innerHTML = current.original
+    var submitted = changed && submitEdit(current.entry, element)
+    if (submitted) {
+      element.animate([{ outline: '4px solid var(--dc-accent)', outlineOffset: '8px' }, { outline: '4px solid transparent', outlineOffset: '8px' }], { duration: SAVED_MS, easing: 'ease-out' })
+      report()
+    }
+    markBusy(false)
+    if (!held) return
+    held = false
+    if (!submitted) refresh()
+  }
+
+  function submitEdit(entry, element) {
+    var previous = entry.source
+    var copy = typeof previous === 'string' ? parseSection(previous) : null
+    var target = copy && follow(copy, pathOf(element, entry.element.firstElementChild))
+    if (!target) {
+      console.warn('[deck] could not place an edit in the source of a slide', entry.id)
+      return false
+    }
+    target.innerHTML = element.innerHTML
+    var html = previous.match(/^\s*/)[0] + copy.outerHTML + previous.match(/\s*$/)[0]
+    entry.source = html
+    edits.push({ id: entry.id, html: html, previous: previous })
+    emit({ type: 'edit' })
+    return true
+  }
+
+  function takeEdit() {
+    return edits.shift() || null
+  }
+
+  function moveEntry(entry, index) {
+    var from = entries.indexOf(entry)
+    if (from === index) return
+    entries.splice(from, 1)
+    entries.splice(index, 0, entry)
+    stage.insertBefore(entry.element, stage.children[index + (index > from ? 1 : 0)] || null)
+  }
+
+  function slotOf(index) {
+    return { x: (index % columns) * (WIDTH + GRID_GAP), y: Math.floor(index / columns) * (HEIGHT + GRID_GAP + LABEL / scale) }
+  }
+
+  function slotAt(clientX, clientY) {
+    var box = stage.getBoundingClientRect()
+    var pitch = slotOf(columns)
+    var column = Math.max(0, Math.min(columns - 1, Math.floor(((clientX - box.left) / scale + GRID_GAP / 2) / (WIDTH + GRID_GAP))))
+    var row = Math.max(0, Math.floor(((clientY - box.top) / scale + (pitch.y - HEIGHT) / 2) / pitch.y))
+    return Math.min(entries.length - 1, row * columns + column)
+  }
+
+  function stopMotion(entry) {
+    var running = motions.get(entry.element)
+    if (running) running.cancel()
+  }
+
+  function play(element, start, end, duration) {
+    motions.set(element, element.animate([start, end], { duration: duration, easing: EASE }))
+  }
+
+  function fadeIn(element) {
+    play(element, { opacity: 0 }, { opacity: 1 }, MOVE_MS)
+  }
+
+  function glide(element, from, to, start, end) {
+    if (to.width === 0 || (from.left === to.left && from.top === to.top && from.width === to.width)) return
+    var zoomed = from.width !== to.width
+    var transform = 'translate(' + (from.left - to.left) / scale + 'px,' + (from.top - to.top) / scale + 'px)' + (zoomed ? ' scale(' + from.width / to.width + ')' : '')
+    play(element, Object.assign({ transformOrigin: '0 0', transform: transform }, start), Object.assign({ transformOrigin: '0 0', transform: 'none' }, end), zoomed ? ZOOM_MS : MOVE_MS)
+  }
+
+  function flow(change, landing) {
+    if (mode !== 'overview') return change()
+    var before = entries.slice()
+    var boxes = before.map(boxOf)
+    var result = change()
+    before.forEach(stopMotion)
+    var targets = entries.map(boxOf)
+    entries.forEach(function (entry, index) {
+      var from = boxes[before.indexOf(entry)]
+      if (!from) fadeIn(entry.element)
+      else if (drag && entry === drag.entry) return
+      else if (entry === landing) glide(entry.element, from, targets[index], LIFTED, LANDED)
+      else glide(entry.element, from, targets[index])
+    })
+    return result
+  }
+
+  function boxOf(entry) {
+    return entry.element.getBoundingClientRect()
+  }
+
+  function carry() {
+    var box = stage.getBoundingClientRect()
+    var slot = slotOf(entries.indexOf(drag.entry))
+    var x = Math.max(0, Math.min(slotOf(columns - 1).x, (drag.clientX - box.left) / scale - drag.grab.x))
+    var y = Math.max(0, Math.min(slotOf(entries.length - 1).y, (drag.clientY - box.top) / scale - drag.grab.y))
+    drag.entry.element.style.transform = 'translate(' + (x - slot.x) + 'px,' + (y - slot.y) + 'px)'
+  }
+
+  function place() {
+    var to = slotAt(drag.clientX, drag.clientY)
+    if (to !== entries.indexOf(drag.entry)) {
+      flow(function () {
+        moveEntry(drag.entry, to)
+      })
+    }
+    carry()
+  }
+
+  function scrollAtEdge(current) {
+    if (drag !== current) return
+    var past = current.clientY < EDGE ? current.clientY - EDGE : Math.max(0, current.clientY - (window.innerHeight - EDGE))
+    var top = root.scrollTop
+    if (past !== 0) root.scrollTop = top + past * EDGE_SPEED
+    if (root.scrollTop !== top) place()
+    requestAnimationFrame(function () {
+      scrollAtEdge(current)
+    })
+  }
+
+  function drop(current) {
+    current.entry.element.removeAttribute('data-dc-dragging')
+    current.entry.element.removeAttribute('style')
+  }
+
+  function startDrag(event) {
+    dragged = false
+    if (!editing || mode !== 'overview' || event.button !== 0) return
+    var element = event.target.closest && event.target.closest('.dc-slide')
+    var index = element ? indexOf(element.getAttribute('data-slide')) : -1
+    if (index < 0) return
+    var box = stage.getBoundingClientRect()
+    var slot = slotOf(index)
+    drag = {
+      entry: entries[index],
+      x: event.clientX,
+      y: event.clientY,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      grab: { x: (event.clientX - box.left) / scale - slot.x, y: (event.clientY - box.top) / scale - slot.y },
+      moved: false,
+      before: entries.map(idOf),
+    }
+  }
+
+  function idOf(entry) {
+    return entry.id
+  }
+
+  function moveDrag(event) {
+    if (!drag) return
+    drag.clientX = event.clientX
+    drag.clientY = event.clientY
+    if (!drag.moved) {
+      if (Math.abs(event.clientX - drag.x) < DRAG_DISTANCE && Math.abs(event.clientY - drag.y) < DRAG_DISTANCE) return
+      drag.moved = true
+      drag.entry.element.setAttribute('data-dc-dragging', '')
+      markBusy(true)
+      scrollAtEdge(drag)
+    }
+    place()
+  }
+
+  function endDrag() {
+    var current = drag
+    if (!current) return
+    drag = null
+    if (!current.moved) return
+    dragged = true
+    flow(function () {
+      drop(current)
+    }, current.entry)
+    var ids = entries.map(idOf)
+    if (ids.join('\n') !== current.before.join('\n')) {
+      report()
+      emit({ type: 'order', slides: ids })
+    }
+    markBusy(false)
+  }
+
+  function cancelDrag() {
+    if (!drag) return
+    var current = drag
+    drag = null
+    dragged = current.moved
+    flow(function () {
+      drop(current)
+      current.before.forEach(function (id, index) {
+        moveEntry(entries[indexOf(id)], index)
+      })
+    }, current.entry)
+    markBusy(false)
+  }
+
+  function nudge(delta) {
+    var from = indexOf(currentId)
+    var to = Math.max(0, Math.min(entries.length - 1, from + delta))
+    if (from < 0 || to === from) return
+    flow(function () {
+      moveEntry(entries[from], to)
+    })
+    reveal(entries[to])
+    report()
+    emit({ type: 'order', slides: entries.map(idOf) })
+  }
+
+  function moveAction(event) {
+    var delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }[event.key]
+    if (!delta || !editing || mode !== 'overview' || drag || event.repeat) return null
+    return function () {
+      nudge(delta)
+    }
+  }
+
   function keyActions() {
+    if (drag && drag.moved) return { Escape: cancelDrag }
     var actions = {
       Home: function () {
         turn(-entries.length)
@@ -289,6 +721,11 @@
       }
       actions.Enter = actions.Escape = function () {
         setMode('browse')
+      }
+      if (!standalone) {
+        actions.Delete = actions.Backspace = function () {
+          if (currentId) emit({ type: 'delete' })
+        }
       }
     } else {
       actions.ArrowRight = actions.PageDown = next
@@ -424,10 +861,20 @@
     entries.forEach(function (entry) {
       known[entry.id] = entry
     })
-    var nextEntries = data.ids.map(function (id, index) {
+    var sources = {}
+    data.ids.forEach(function (id, index) {
+      sources[id] = data.sources[index]
+    })
+    var ids = data.ids
+    if (drag && ids.join('\n') === drag.before.join('\n')) ids = entries.map(idOf)
+    else cancelDrag()
+    if (active && ids.indexOf(active.entry.id) < 0) finishEdit(false)
+    var nextEntries = ids.map(function (id) {
       var entry = known[id] || createEntry(id)
-      if (entry.source !== data.sources[index]) {
-        fill(entry, data.sources[index])
+      if (entry.source === sources[id]) return entry
+      if (active && active.entry === entry) held = true
+      else {
+        fill(entry, sources[id])
         changed = true
       }
       return entry
@@ -515,7 +962,10 @@
       return load()
         .then(function (data) {
           var previous = indexOf(currentId)
-          if (apply(data)) keepPlace(currentId, previous)
+          var changed = flow(function () {
+            return apply(data)
+          })
+          if (changed) keepPlace(currentId, previous)
           return syncReferences()
         })
         .then(
@@ -632,13 +1082,31 @@
       if (id !== currentId) goTo(id)
     })
     document.addEventListener('keydown', function (event) {
-      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return
-      var action = keyActions()[event.key]
+      if (event.defaultPrevented || event.altKey || isTyping(event.target)) return
+      var action = event.ctrlKey || event.metaKey ? moveAction(event) : keyActions()[event.key]
       if (!action) return
       event.preventDefault()
       action()
     })
+    stage.addEventListener('pointerdown', function (event) {
+      startEdit(event)
+      startDrag(event)
+    })
+    stage.addEventListener('pointermove', function (event) {
+      var unit = unitAt(event.target)
+      hover(active && active.element === unit ? null : unit)
+    })
+    stage.addEventListener('pointerleave', function () {
+      hover(null)
+    })
+    document.addEventListener('pointermove', moveDrag)
+    document.addEventListener('pointerup', endDrag)
+    document.addEventListener('pointercancel', cancelDrag)
     stage.addEventListener('click', function (event) {
+      if (dragged) {
+        dragged = false
+        return
+      }
       if (mode !== 'overview') return
       var slide = event.target.closest('.dc-slide')
       if (!slide) return
@@ -682,6 +1150,10 @@
     stage = root.querySelector('.dc-stage')
     notice = root.querySelector('.dc-notice')
     root.setAttribute('data-mode', mode)
+    root.removeAttribute('data-editing')
+    Array.prototype.forEach.call(root.querySelectorAll('[contenteditable]'), function (element) {
+      element.removeAttribute('contenteditable')
+    })
     entries = Array.prototype.map.call(stage.querySelectorAll(':scope > .dc-slide'), function (element) {
       return { id: element.getAttribute('data-slide'), element: element, source: undefined }
     })
@@ -711,6 +1183,8 @@
     stageRect: stageRect,
     overflow: overflow,
     prepareCapture: prepareCapture,
+    setEditing: setEditing,
+    takeEdit: takeEdit,
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot)

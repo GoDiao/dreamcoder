@@ -42,6 +42,7 @@ function setGrants(grants: PendingBrowserGrant[], sessionId = SESSION_ID) {
     pendingPermissions: [],
     pendingBrowserGrants: grants,
     browserActivity: null,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

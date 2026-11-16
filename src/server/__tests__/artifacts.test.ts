@@ -6,10 +6,12 @@ import * as path from 'node:path'
 import { copyArtifactFolder } from '../../utils/artifactTransfer.js'
 import { getGlobalArtifactsDir } from '../../utils/artifacts.js'
 import { CANVAS_ENTRY_HTML } from '../../utils/canvas.js'
+import { DECK_ENTRY_HTML } from '../../utils/deck.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'
 import { handleArtifactsApi } from '../api/artifacts.js'
 import { handleSessionsApi } from '../api/sessions.js'
 import { systemRecord, writeSystems } from '../../utils/__tests__/designSystemFixtures.js'
+import { artifactEditLocks, createArtifactEditLocks, type ArtifactEditLocks } from '../services/artifactEditLocks.js'
 import { ArtifactService, GLOBAL_ARTIFACTS_MARKER } from '../services/artifactService.js'
 import { createStreamState, translateCliOutput } from '../session/translate.js'
 
@@ -17,6 +19,7 @@ const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
 
 let root: string
 let service: ArtifactService
+let locks: ArtifactEditLocks
 
 function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -61,7 +64,8 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'artifacts-service-'))
   await fs.mkdir(path.join(root, 'config', 'projects'), { recursive: true })
   process.env.DREAMCODER_CONFIG_DIR = path.join(root, 'config')
-  service = new ArtifactService()
+  locks = createArtifactEditLocks()
+  service = new ArtifactService(locks)
 })
 
 afterEach(async () => {
@@ -661,6 +665,7 @@ describe('canvas artifacts', () => {
     const { artifactsDir } = await setup()
     const before = JSON.parse(await fs.readFile(path.join(artifactsDir, 'flow', 'artifact.json'), 'utf-8'))
     const result = await service.updateBoard(artifactsDir, 'flow', 'detail', { x: 10.5, y: -20, width: 640, height: 480 })
+    expect(result).toMatchObject({ dir: path.join(artifactsDir, 'flow'), files: ['artifact.json'] })
     const after = JSON.parse(await fs.readFile(path.join(artifactsDir, 'flow', 'artifact.json'), 'utf-8'))
     expect(after.boards[1]).toEqual({ id: 'detail', file: 'detail.html', x: 10.5, y: -20, width: 640, height: 480 })
     expect(after.boards[0]).toEqual(before.boards[0])
@@ -668,6 +673,16 @@ describe('canvas artifacts', () => {
     const entry = (await service.listAll()).find(candidate => candidate.name === 'flow')!
     expect(result.latestMtimeMs).toBe(entry.latestMtimeMs)
     expect((await fs.readdir(path.join(artifactsDir, 'flow'))).filter(file => file.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('records a board write under the hold of the panel, so an agent waits until the panel lets go and hears what changed', async () => {
+    const { artifactsDir } = await setup()
+    await service.holdEdit(artifactsDir, 'flow', 'tab')
+    await service.updateBoard(artifactsDir, 'flow', 'detail', { x: 1, y: 2, width: 3, height: 4 })
+    const waiting = locks.wait(path.join(artifactsDir, 'flow'))
+    expect(await Promise.race([waiting, Bun.sleep(30).then(() => 'waiting')])).toBe('waiting')
+    await service.releaseEdit(artifactsDir, 'flow', 'tab')
+    expect(await waiting).toEqual(['artifact.json'])
   })
 
   it('refuses an unknown board, a page artifact and a folder that is not a known artifacts directory', async () => {
@@ -690,6 +705,148 @@ describe('canvas artifacts', () => {
     expect((await patch({ dir: artifactsDir, name: 'flow', boardId: 'home', x: 1, y: 2, width: 0, height: 4 })).status).toBe(400)
     expect((await patch({ dir: artifactsDir, name: 'flow', x: 1, y: 2, width: 3, height: 4 })).status).toBe(400)
     expect((await patch({ dir: artifactsDir, name: 'flow', boardId: 'zzz', x: 1, y: 2, width: 3, height: 4 })).status).toBe(404)
+  })
+})
+
+describe('deck artifacts', () => {
+  const deck = { version: 1, id: 'id-deck', kind: 'deck', title: 'Deck', entry: 'index.html', designSystem: 'brand', slides: ['cover', 'agenda', 'close'] }
+  const slide = (text: string) => `<section class="slide"><h1>${text}</h1></section>\n`
+
+  async function setup() {
+    const repo = await makeRepo('repo')
+    await writeSession(repo, 'session-1')
+    const artifactsDir = path.join(repo, 'dc_artifacts')
+    await writeArtifact(artifactsDir, 'talk', deck, { 'index.html': DECK_ENTRY_HTML, 'deck.css': '' })
+    await fs.mkdir(path.join(artifactsDir, 'talk', 'slides'))
+    for (const id of deck.slides) await fs.writeFile(path.join(artifactsDir, 'talk', 'slides', `${id}.html`), slide(id))
+    return { repo, artifactsDir, dir: path.join(artifactsDir, 'talk') }
+  }
+
+  const readManifest = async (dir: string) => JSON.parse(await fs.readFile(path.join(dir, 'artifact.json'), 'utf-8'))
+  const readSlide = (dir: string, id: string) => fs.readFile(path.join(dir, 'slides', `${id}.html`), 'utf-8')
+
+  async function call(method: string, resource: string, body?: Record<string, unknown>, query?: Record<string, string>) {
+    const url = new URL(`http://x/api/artifacts/slides${resource}${query ? `?${new URLSearchParams(query).toString()}` : ''}`)
+    const init: RequestInit = { method, ...(body && { body: JSON.stringify(body) }) }
+    const response = await handleArtifactsApi(new Request(url, init), url, url.pathname.split('/').filter(Boolean))
+    return { status: response.status, body: (await response.json()) as Record<string, any> }
+  }
+
+  it('reorders the slides when the new list holds the same ids, changes nothing else and gives back the deck folder', async () => {
+    const { artifactsDir, dir } = await setup()
+    const written = await service.reorderSlides(artifactsDir, 'talk', ['close', 'cover', 'agenda'])
+    expect(written).toEqual({ dir, files: ['artifact.json'], latestMtimeMs: (await fs.stat(path.join(dir, 'artifact.json'))).mtimeMs })
+    expect(await readManifest(dir)).toEqual({ ...deck, slides: ['close', 'cover', 'agenda'] })
+    expect((await fs.readdir(dir)).filter(file => file.includes('.tmp'))).toEqual([])
+  })
+
+  it('refuses an order that adds, drops or repeats an id with a conflict and leaves the manifest alone', async () => {
+    const { artifactsDir, dir } = await setup()
+    for (const slides of [['cover', 'agenda'], ['cover', 'agenda', 'close', 'extra'], ['cover', 'agenda', 'agenda'], ['cover', 'agenda', 'other']]) {
+      await expect(service.reorderSlides(artifactsDir, 'talk', slides)).rejects.toMatchObject({ statusCode: 409 })
+    }
+    expect((await readManifest(dir)).slides).toEqual(deck.slides)
+  })
+
+  it('deletes one slide from the manifest and its file', async () => {
+    const { artifactsDir, dir } = await setup()
+    expect(await service.deleteSlide(artifactsDir, 'talk', 'agenda')).toEqual({ dir, files: ['artifact.json', 'slides/agenda.html'], latestMtimeMs: expect.any(Number) })
+    expect(await readManifest(dir)).toEqual({ ...deck, slides: ['cover', 'close'] })
+    expect((await fs.readdir(path.join(dir, 'slides'))).sort()).toEqual(['close.html', 'cover.html'])
+  })
+
+  it('deletes a listed slide whose file is already gone and refuses an id that is not listed', async () => {
+    const { artifactsDir, dir } = await setup()
+    await fs.rm(path.join(dir, 'slides', 'close.html'))
+    await service.deleteSlide(artifactsDir, 'talk', 'close')
+    expect((await readManifest(dir)).slides).toEqual(['cover', 'agenda'])
+    await expect(service.deleteSlide(artifactsDir, 'talk', 'nope')).rejects.toMatchObject({ statusCode: 404 })
+    await expect(service.deleteSlide(artifactsDir, 'talk', '../x')).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('writes the content of a slide only when the file still holds the previous content', async () => {
+    const { artifactsDir, dir } = await setup()
+    await service.writeSlide(artifactsDir, 'talk', 'agenda', slide('Plan'), slide('agenda'))
+    expect(await readSlide(dir, 'agenda')).toBe(slide('Plan'))
+    await expect(service.writeSlide(artifactsDir, 'talk', 'agenda', slide('Again'), slide('agenda'))).rejects.toMatchObject({ statusCode: 409 })
+    expect(await readSlide(dir, 'agenda')).toBe(slide('Plan'))
+    expect((await fs.readdir(path.join(dir, 'slides'))).filter(file => file.includes('.tmp'))).toEqual([])
+  })
+
+  it('refuses to write a slide that is not in the manifest, has an unsafe id or is too large', async () => {
+    const { artifactsDir, dir } = await setup()
+    await fs.writeFile(path.join(dir, 'slides', 'stray.html'), slide('stray'))
+    await expect(service.writeSlide(artifactsDir, 'talk', 'stray', slide('x'), slide('stray'))).rejects.toMatchObject({ statusCode: 404 })
+    await expect(service.writeSlide(artifactsDir, 'talk', '../index', slide('x'), DECK_ENTRY_HTML)).rejects.toMatchObject({ statusCode: 400 })
+    await expect(service.writeSlide(artifactsDir, 'talk', 'cover', 'x'.repeat(2 * 1024 * 1024), slide('cover'))).rejects.toMatchObject({ statusCode: 400 })
+    expect(await readSlide(dir, 'stray')).toBe(slide('stray'))
+    expect(await readSlide(dir, 'cover')).toBe(slide('cover'))
+  })
+
+  it('does not touch a slide file that leads out of the artifact folder', async () => {
+    const { artifactsDir, dir } = await setup()
+    await fs.writeFile(path.join(root, 'outside.html'), slide('outside'))
+    await fs.rm(path.join(dir, 'slides', 'close.html'))
+    await fs.symlink(path.join(root, 'outside.html'), path.join(dir, 'slides', 'close.html'))
+    await expect(service.writeSlide(artifactsDir, 'talk', 'close', slide('x'), slide('outside'))).rejects.toMatchObject({ statusCode: 404 })
+    expect(await fs.readFile(path.join(root, 'outside.html'), 'utf-8')).toBe(slide('outside'))
+    await service.deleteSlide(artifactsDir, 'talk', 'close')
+    expect(await fs.readFile(path.join(root, 'outside.html'), 'utf-8')).toBe(slide('outside'))
+  })
+
+  it('refuses all three writes on an artifact that is not a deck or a folder that is not known', async () => {
+    const { artifactsDir } = await setup()
+    await writeArtifact(artifactsDir, 'plain', page('Plain'), { 'index.html': 'x' })
+    await expect(service.reorderSlides(artifactsDir, 'plain', [])).rejects.toThrow('not a deck')
+    await expect(service.deleteSlide(artifactsDir, 'plain', 'cover')).rejects.toThrow('not a deck')
+    await expect(service.writeSlide(artifactsDir, 'plain', 'cover', 'x', 'x')).rejects.toThrow('not a deck')
+    await expect(service.reorderSlides(path.join(root, 'elsewhere', 'dc_artifacts'), 'talk', deck.slides)).rejects.toThrow('known artifacts directory')
+  })
+
+  it('records slide writes under the hold of the panel, so an agent waits until the panel lets go and hears what changed', async () => {
+    const { artifactsDir, dir } = await setup()
+    await service.holdEdit(artifactsDir, 'talk', 'tab')
+    await service.writeSlide(artifactsDir, 'talk', 'agenda', slide('Plan'), slide('agenda'))
+    await service.reorderSlides(artifactsDir, 'talk', ['close', 'cover', 'agenda'])
+    const waiting = locks.wait(dir)
+    expect(await Promise.race([waiting, Bun.sleep(30).then(() => 'waiting')])).toBe('waiting')
+    await service.releaseEdit(artifactsDir, 'talk', 'tab')
+    expect(await waiting).toEqual(['slides/agenda.html', 'artifact.json'])
+  })
+
+  it('holds an artifact only while it writes when the panel holds nothing', async () => {
+    const { artifactsDir, dir } = await setup()
+    const writing = service.writeSlide(artifactsDir, 'talk', 'agenda', slide('Plan'), slide('agenda'))
+    await writing
+    expect(await locks.wait(dir)).toEqual([])
+  })
+
+  it('holds and releases an artifact for the user over HTTP', async () => {
+    const { artifactsDir, dir } = await setup()
+    const url = new URL('http://x/api/artifacts/edit-lock')
+    const hold = await handleArtifactsApi(new Request(url, { method: 'POST', body: JSON.stringify({ dir: artifactsDir, name: 'talk', holder: 'tab' }) }), url, ['api', 'artifacts', 'edit-lock'])
+    expect(hold.status).toBe(200)
+    const waiting = artifactEditLocks.wait(dir)
+    expect(await Promise.race([waiting, Bun.sleep(30).then(() => 'waiting')])).toBe('waiting')
+    const releaseUrl = new URL(`http://x/api/artifacts/edit-lock?${new URLSearchParams({ dir: artifactsDir, name: 'talk', holder: 'tab' }).toString()}`)
+    expect((await handleArtifactsApi(new Request(releaseUrl, { method: 'DELETE' }), releaseUrl, ['api', 'artifacts', 'edit-lock'])).status).toBe(200)
+    expect(await waiting).toEqual([])
+    const missing = await handleArtifactsApi(new Request(url, { method: 'POST', body: JSON.stringify({ dir: artifactsDir, name: 'gone', holder: 'tab' }) }), url, ['api', 'artifacts', 'edit-lock'])
+    expect(missing.status).toBe(404)
+  })
+
+  it('serves the three writes over HTTP and validates their parameters', async () => {
+    const { artifactsDir, dir } = await setup()
+    expect(await call('PATCH', '/order', { dir: artifactsDir, name: 'talk', slides: ['agenda', 'cover', 'close'] })).toEqual({ status: 200, body: { dir, files: ['artifact.json'], latestMtimeMs: expect.any(Number) } })
+    expect((await call('PATCH', '/order', { dir: artifactsDir, name: 'talk', slides: ['agenda'] })).status).toBe(409)
+    expect((await call('PATCH', '/order', { dir: artifactsDir, name: 'talk', slides: 'agenda' })).status).toBe(400)
+    expect((await call('PATCH', '/order', { dir: artifactsDir, name: 'talk', slides: ['agenda', 3] })).status).toBe(400)
+    expect(await call('PUT', '/content', { dir: artifactsDir, name: 'talk', id: 'cover', html: slide('Hi'), previous: slide('cover') })).toEqual({ status: 200, body: { dir, files: ['slides/cover.html'], latestMtimeMs: expect.any(Number) } })
+    expect((await call('PUT', '/content', { dir: artifactsDir, name: 'talk', id: 'cover', html: slide('Hi'), previous: slide('cover') })).status).toBe(409)
+    expect((await call('PUT', '/content', { dir: artifactsDir, name: 'talk', id: 'cover', html: slide('Hi') })).status).toBe(400)
+    expect(await call('DELETE', '', undefined, { dir: artifactsDir, name: 'talk', id: 'close' })).toEqual({ status: 200, body: { dir, files: ['artifact.json', 'slides/close.html'], latestMtimeMs: expect.any(Number) } })
+    expect((await call('DELETE', '', undefined, { dir: artifactsDir, name: 'talk' })).status).toBe(400)
+    expect(await readManifest(dir)).toEqual({ ...deck, slides: ['agenda', 'cover'] })
   })
 })
 

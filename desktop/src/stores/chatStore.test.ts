@@ -195,6 +195,7 @@ function mirrorState(overrides: Partial<SessionState> = {}): SessionState {
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

@@ -3,6 +3,7 @@ import { ARTIFACT_COPY_TOOL_NAME } from '../../tools/ArtifactCopyTool/constants.
 import { browserToolName } from '../../utils/browserControl/common.js'
 import { CANVAS_ENTRY_HTML, CANVAS_SCRIPT_PATH } from '../../utils/canvas.js'
 import { DECK_ENTRY_HTML, DECK_SCRIPT_PATH, DECK_STYLESHEET_FILE } from '../../utils/deck.js'
+import { SLIDES_USER_CHANGES_RULE } from './slides.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
 const navigate = browserToolName('navigate')
@@ -111,6 +112,13 @@ ${DECK_ENTRY_HTML}\`\`\`
 
 - A slide file holds one \`<section>\` element and nothing else. All styles are in ${DECK_STYLESHEET_FILE}. A slide has no script; the rules are in \`format.md\` of the \`slides\` skill.
 - A snapshot or screenshot shows only the current slide. Move with \`window.__dreamcoderDeck.goTo('<id>')\` through the browser evaluate tool.
+- ${SLIDES_USER_CHANGES_RULE}
+
+## When the user edits an artifact
+
+The user can change an artifact in the app: the text of a slide, the order of slides, deleting a slide, moving or resizing a board of a canvas. While the user is changing an artifact, a Write or Edit into it waits until they are done; if they changed files meanwhile, the tool refuses and names those files. A note that a file of an artifact was modified, or a note in the user's message that they changed an artifact in the app, means the same. In each case read the files the user changed before you change the artifact, keep their changes, then go on.
+
+Write the files of an artifact with Write and Edit, so that this waiting works. Use shell commands in an artifact folder only to delete or rename files.
 
 ## Show it and check it
 

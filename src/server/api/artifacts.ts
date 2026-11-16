@@ -1,5 +1,5 @@
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
-import { readBody, requireString } from './requestBody.js'
+import { readBody, requireParam, requireString, requireStringList, requireText } from './requestBody.js'
 import { artifactService } from '../services/artifactService.js'
 import { artifactThumbnailService } from '../services/artifactThumbnailService.js'
 import { conversationService } from '../services/conversationService.js'
@@ -33,6 +33,32 @@ async function patchBoard(req: Request): Promise<Response> {
   )
 }
 
+async function handleEditLock(req: Request, url: URL): Promise<Response> {
+  if (req.method === 'DELETE') {
+    await artifactService.releaseEdit(requireParam(url, 'dir'), requireParam(url, 'name'), requireParam(url, 'holder'))
+    return Response.json({ ok: true })
+  }
+  if (req.method !== 'POST') throw new ApiError(405, `Method ${req.method} not allowed`, 'METHOD_NOT_ALLOWED')
+  const body = await readBody(req)
+  await artifactService.holdEdit(requireString(body, 'dir'), requireString(body, 'name'), requireString(body, 'holder'))
+  return Response.json({ ok: true })
+}
+
+async function handleSlides(req: Request, url: URL, segments: string[]): Promise<Response> {
+  const resource = segments[3]
+  if (req.method === 'DELETE' && resource === undefined) {
+    return Response.json(await artifactService.deleteSlide(requireParam(url, 'dir'), requireParam(url, 'name'), requireParam(url, 'id')))
+  }
+  const body = await readBody(req)
+  if (req.method === 'PATCH' && resource === 'order') {
+    return Response.json(await artifactService.reorderSlides(requireString(body, 'dir'), requireString(body, 'name'), requireStringList(body, 'slides')))
+  }
+  if (req.method === 'PUT' && resource === 'content') {
+    return Response.json(await artifactService.writeSlide(requireString(body, 'dir'), requireString(body, 'name'), requireString(body, 'id'), requireText(body, 'html'), requireText(body, 'previous')))
+  }
+  throw new ApiError(405, `Method ${req.method} not allowed`, 'METHOD_NOT_ALLOWED')
+}
+
 async function handleArtifactsPost(req: Request, segments: string[]): Promise<Response> {
   const body = await readBody(req)
   switch (segments[2]) {
@@ -52,6 +78,8 @@ async function handleArtifactsPost(req: Request, segments: string[]): Promise<Re
 
 export async function handleArtifactsApi(req: Request, url: URL, segments: string[]): Promise<Response> {
   try {
+    if (segments[2] === 'slides') return await handleSlides(req, url, segments)
+    if (segments[2] === 'edit-lock') return await handleEditLock(req, url)
     if (req.method === 'POST') return await handleArtifactsPost(req, segments)
     if (req.method === 'PUT' && segments[2] === 'thumbnail') return await putThumbnail(req)
     if (req.method === 'PATCH' && segments[2] === 'boards') return await patchBoard(req)
@@ -62,9 +90,7 @@ export async function handleArtifactsApi(req: Request, url: URL, segments: strin
       case undefined:
         return Response.json({ artifacts: await artifactService.listAll() })
       case 'thumbnail': {
-        const id = url.searchParams.get('id')
-        if (!id) throw ApiError.badRequest('id is required')
-        const image = await artifactThumbnailService.read(id)
+        const image = await artifactThumbnailService.read(requireParam(url, 'id'))
         if (!image) throw ApiError.notFound('No thumbnail for this artifact')
         return new Response(image, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' } })
       }

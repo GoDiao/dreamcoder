@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   submitBrowserInput: vi.fn(),
   browserReload: vi.fn(),
   setCanvasMessageHandler: vi.fn(),
+  setDeckMessageHandler: vi.fn(),
+  applyDeckEdit: vi.fn(),
+  flushDeckEdits: vi.fn(async () => undefined),
   continueInSession: vi.fn(),
   continueInNewSession: vi.fn(),
   toastError: vi.fn(),
@@ -24,6 +27,7 @@ vi.mock('../../lib/browserGuests', () => ({
   submitBrowserInput: mocks.submitBrowserInput,
   browserReload: mocks.browserReload,
   setCanvasMessageHandler: mocks.setCanvasMessageHandler,
+  setDeckMessageHandler: mocks.setDeckMessageHandler,
 }))
 vi.mock('../../lib/continueArtifactInSession', () => ({
   continueArtifactInSession: mocks.continueInSession,
@@ -34,6 +38,7 @@ vi.mock('../../lib/artifactExport', async (importOriginal) => ({
   exportArtifactPage: mocks.exportArtifactPage,
 }))
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
+vi.mock('../../lib/deckEdits', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/deckEdits')>()), applyDeckEdit: mocks.applyDeckEdit, flushDeckEdits: mocks.flushDeckEdits }))
 
 import type { ArtifactListItem } from '../../types/artifact'
 import { useArtifactListStore } from '../../stores/artifactListStore'
@@ -154,9 +159,23 @@ describe('ArtifactViewer', () => {
     render(<ArtifactViewer viewing={viewing} />)
     expect(screen.queryByTestId('deck-controls')).not.toBeInTheDocument()
     act(() => {
-      useBrowserStore.getState().patchPage(ARTIFACT_VIEW_TAB, { deck: { artifact: 'id-report', slide: 'cover', title: 'Cover', index: 0, count: 2, mode: 'browse' } })
+      useBrowserStore.getState().patchPage(ARTIFACT_VIEW_TAB, { deck: { artifact: 'id-report', slide: 'cover', title: 'Cover', index: 0, count: 2, mode: 'browse', editing: false } })
     })
     expect(screen.getByTestId('deck-position')).toHaveTextContent('1 / 2')
+    await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
+  })
+
+  it('offers editing on a deck and writes the edits back to the artifact it shows', async () => {
+    mocks.applyDeckEdit.mockResolvedValue(undefined)
+    useArtifactListStore.setState({ items: [{ ...listed, manifest: { ...listed.manifest!, kind: 'deck' } }] })
+    act(() => {
+      useBrowserStore.getState().patchPage(ARTIFACT_VIEW_TAB, { deck: { artifact: 'id-report', slide: 'cover', title: 'Cover', index: 0, count: 2, mode: 'browse', editing: false } })
+    })
+    render(<ArtifactViewer viewing={viewing} />)
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    const handler = mocks.setDeckMessageHandler.mock.calls.find((call) => call[0] === ARTIFACT_VIEW_TAB && call[1])?.[1]
+    handler({ type: 'edit' })
+    expect(mocks.applyDeckEdit).toHaveBeenCalledWith({ tabId: ARTIFACT_VIEW_TAB, root: '/repo/dc_artifacts', name: 'report', title: listed.manifest!.title, sessionId: null }, { type: 'edit' })
     await waitFor(() => expect(mocks.markOpened).toHaveBeenCalled())
   })
 
