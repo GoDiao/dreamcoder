@@ -316,6 +316,75 @@ function clearPendingDelta(sessionId: string): void {
   pendingDeltaBySession.delete(sessionId)
 }
 
+const pendingThinkingBySession = new Map<string, string>()
+const thinkingFlushTimerBySession = new Map<string, ReturnType<typeof setTimeout>>()
+
+function consumePendingThinking(sessionId: string): string {
+  const flushTimer = thinkingFlushTimerBySession.get(sessionId)
+  if (flushTimer) {
+    clearTimeout(flushTimer)
+    thinkingFlushTimerBySession.delete(sessionId)
+  }
+  const text = pendingThinkingBySession.get(sessionId) ?? ''
+  pendingThinkingBySession.delete(sessionId)
+  return text
+}
+
+function appendPendingThinking(sessionId: string, text: string): void {
+  pendingThinkingBySession.set(
+    sessionId,
+    `${pendingThinkingBySession.get(sessionId) ?? ''}${text}`,
+  )
+}
+
+function clearPendingThinking(sessionId: string): void {
+  const flushTimer = thinkingFlushTimerBySession.get(sessionId)
+  if (flushTimer) {
+    clearTimeout(flushTimer)
+    thinkingFlushTimerBySession.delete(sessionId)
+  }
+  pendingThinkingBySession.delete(sessionId)
+}
+
+function mergeThinkingIntoMessages(
+  messages: UIMessage[],
+  content: string,
+  timestamp: number,
+): { messages: UIMessage[]; activeThinkingId: string } {
+  const last = messages[messages.length - 1]
+  if (last && last.type === 'thinking') {
+    const updated = [...messages]
+    updated[updated.length - 1] = { ...last, content: last.content + content }
+    return { messages: updated, activeThinkingId: last.id }
+  }
+  const id = nextId()
+  return {
+    messages: appendMessage(messages, { id, type: 'thinking', content, timestamp }),
+    activeThinkingId: id,
+  }
+}
+
+function flushPendingThinking(sessionId: string): void {
+  const text = consumePendingThinking(sessionId)
+  if (!text) return
+  const now = Date.now()
+  useChatStore.setState((s) => ({
+    sessions: updateSessionIn(s.sessions, sessionId, (sess) => {
+      const pendingText = `${sess.streamingText}${consumePendingDelta(sessionId)}`
+      const base = pendingText.trim()
+        ? appendAssistantTextMessage(sess.messages, pendingText, now)
+        : sess.messages
+      const merged = mergeThinkingIntoMessages(base, text, now)
+      return {
+        messages: merged.messages,
+        chatState: 'thinking',
+        activeThinkingId: merged.activeThinkingId,
+        streamingText: '',
+      }
+    }),
+  }))
+}
+
 function consumePendingToolInputDelta(sessionId: string): string {
   const flushTimer = toolInputFlushTimerBySession.get(sessionId)
   if (flushTimer) {
@@ -802,6 +871,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const text = consumePendingDelta(sessionId)
       set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, (sess) => ({ streamingText: sess.streamingText + text })) }))
     }
+    flushPendingThinking(sessionId)
     clearPendingToolInputDelta(sessionId)
     clearPendingTaskToolUseIds(sessionId)
     useCLITaskStore.getState().clearTasks(sessionId)
@@ -967,6 +1037,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const text = consumePendingDelta(sessionId)
       set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, (sess) => ({ streamingText: sess.streamingText + text })) }))
     }
+    flushPendingThinking(sessionId)
     clearPendingToolInputDelta(sessionId)
     set((s) => {
       const session = s.sessions[sessionId]
@@ -1138,6 +1209,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   clearMessages: (sessionId) => {
+    clearPendingThinking(sessionId)
     clearPendingTaskToolUseIds(sessionId)
     clearPendingToolInputDelta(sessionId)
     set((s) => ({ sessions: updateSessionIn(s.sessions, sessionId, () => ({
@@ -1190,6 +1262,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const session = get().sessions[sessionId]
         if (!session) break
         if (session.messages.some((message) => message.type === 'user_text' && message.transcriptMessageId === msg.id)) break
+        flushPendingThinking(sessionId)
         update((s) => {
           const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
           const base = pendingText.trim() ? appendAssistantTextMessage(s.messages, pendingText, Date.now()) : s.messages
@@ -1224,6 +1297,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       case 'content_start': {
         const session = get().sessions[sessionId]
         if (!session) break
+        flushPendingThinking(sessionId)
         const pendingText = `${session.streamingText}${consumePendingDelta(sessionId)}`
         if (msg.blockType !== 'text' && pendingText.trim()) {
           update((s) => ({
@@ -1343,28 +1417,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         break
 
       case 'thinking':
-        update((s) => {
-          const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
-          const base = pendingText.trim()
-            ? appendAssistantTextMessage(s.messages, pendingText, Date.now())
-            : s.messages
-          const last = base[base.length - 1]
-          if (last && last.type === 'thinking') {
-            const updated = [...base]
-            updated[updated.length - 1] = { ...last, content: last.content + msg.text }
-            return { messages: updated, chatState: 'thinking', activeThinkingId: last.id, streamingText: '' }
-          }
-          const id = nextId()
-          return {
-            messages: appendMessage(base, { id, type: 'thinking', content: msg.text, timestamp: Date.now() }),
-            chatState: 'thinking',
-            activeThinkingId: id,
-            streamingText: '',
-          }
-        })
+        if (!get().sessions[sessionId]) break
+        appendPendingThinking(sessionId, msg.text)
+        if (!thinkingFlushTimerBySession.has(sessionId)) {
+          const timer = setTimeout(() => {
+            thinkingFlushTimerBySession.delete(sessionId)
+            flushPendingThinking(sessionId)
+          }, 50)
+          thinkingFlushTimerBySession.set(sessionId, timer)
+        }
         break
 
       case 'tool_use_complete': {
+        flushPendingThinking(sessionId)
         clearPendingToolInputDelta(sessionId)
         const session = get().sessions[sessionId]
         const toolName = msg.toolName || session?.activeToolName || 'unknown'
@@ -1450,6 +1515,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       case 'message_complete': {
         const session = get().sessions[sessionId]
         if (!session) break
+        flushPendingThinking(sessionId)
         const wasAgentRunning = session.chatState !== 'idle'
         const text = `${session.streamingText}${consumePendingDelta(sessionId)}`
         let completionMessages = session.messages
@@ -1489,6 +1555,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       case 'error':
         if (SILENT_PERMISSION_ERROR_CODES.has(msg.code)) break
+        flushPendingThinking(sessionId)
         update((s) => {
           const pendingText = `${s.streamingText}${consumePendingDelta(sessionId)}`
           let newMessages = s.messages
@@ -1543,6 +1610,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             })
         }
         if (msg.subtype === 'session_cleared') {
+          clearPendingThinking(sessionId)
           update(() => ({
             messages: [],
             streamingText: '',
@@ -1859,6 +1927,10 @@ function applyMirror(sessionId: string, next: SessionState): void {
         streamingText = ''
       } else {
         streamingText = pendingText
+      }
+      const pendingThinking = consumePendingThinking(sessionId)
+      if (pendingThinking) {
+        messages = mergeThinkingIntoMessages(messages, pendingThinking, now).messages
       }
     }
 

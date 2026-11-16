@@ -2560,10 +2560,106 @@ describe('chatStore history mapping', () => {
       type: 'thinking',
       text: 'internal note',
     })
+    vi.advanceTimersByTime(60)
 
     expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
       { type: 'assistant_text', content: 'visible answer before thinking' },
       { type: 'thinking', content: 'internal note' },
+    ])
+
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
+  it('batches thinking deltas into one store update per window', () => {
+    vi.useFakeTimers()
+
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }),
+      },
+    })
+
+    let updates = 0
+    const unsubscribe = useChatStore.subscribe(() => {
+      updates += 1
+    })
+
+    for (const chunk of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']) {
+      useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'thinking', text: chunk })
+    }
+
+    expect(updates).toBe(0)
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toHaveLength(0)
+
+    vi.advanceTimersByTime(60)
+    unsubscribe()
+
+    expect(updates).toBe(1)
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
+      { type: 'thinking', content: 'onetwothreefourfivesixseveneightnineten' },
+    ])
+
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
+  it('flushes thinking at content_start so the text keeps the streaming state', () => {
+    vi.useFakeTimers()
+
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }),
+      },
+    })
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'thinking', text: 'internal note' })
+    vi.advanceTimersByTime(60)
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState).toBe('thinking')
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeThinkingId).not.toBeNull()
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'content_start', blockType: 'text' })
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState).toBe('streaming')
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeThinkingId).toBeNull()
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'content_delta', text: 'the answer' })
+    vi.advanceTimersByTime(60)
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.chatState).toBe('streaming')
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.activeThinkingId).toBeNull()
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.streamingText).toBe('the answer')
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, {
+      type: 'message_complete',
+      usage: { input_tokens: 1, output_tokens: 2 },
+    })
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
+      { type: 'thinking', content: 'internal note' },
+      { type: 'assistant_text', content: 'the answer' },
+    ])
+
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
+  it('flushes thinking before a message from another client lands', () => {
+    vi.useFakeTimers()
+
+    useChatStore.setState({
+      sessions: {
+        [TEST_SESSION_ID]: makeSession({ chatState: 'streaming' }),
+      },
+    })
+
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'thinking', text: 'internal note' })
+    useChatStore.getState().handleServerMessage(TEST_SESSION_ID, { type: 'user_message', id: 'phone-1', content: 'from phone' })
+
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]?.messages).toMatchObject([
+      { type: 'thinking', content: 'internal note' },
+      { type: 'user_text', content: 'from phone' },
     ])
 
     vi.runOnlyPendingTimers()
