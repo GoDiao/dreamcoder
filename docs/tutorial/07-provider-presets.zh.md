@@ -1,3 +1,5 @@
+[English](./07-provider-presets.en.md) | 简体中文
+
 # 添加 Provider 预设
 
 本指南介绍如何把一个服务商加入 DreamCoder 的内置 Provider 列表，并说明预设 JSON、设置表单和连接测试之间的关系。本指南不涉及新增 API 协议，也不改变 Provider 运行机制。
@@ -21,7 +23,7 @@
 | `needsApiKey` | 是 | 保存或测试前，表单是否要求用户填写密钥。 |
 | `websiteUrl` | 是 | 服务商网站。 |
 | `apiKeyUrl` | 否 | 服务商管理 API 密钥的页面链接。 |
-| `authStrategy` | 否 | 当前 API 格式对应的认证方式。 |
+| `authStrategy` | 否 | API 密钥的发送方式。它与 `apiFormat` 分开设置，可选值见下文。 |
 | `defaultEnv` | 否 | Provider 配置使用的非机密环境变量默认值。不要在此填写真实 API 密钥或其他秘密。 |
 | `modelContextWindows` | 否 | 按模型 ID 记录的已知上下文窗口大小。值必须是 16,000 至 10,000,000 之间的整数。 |
 
@@ -47,13 +49,25 @@
 }
 ```
 
-上面的 `.invalid` 域名和模型 ID 都是占位符，不代表真实服务商配置。数组中的内置 `custom` 预设必须保留在最后；现有测试还要求 LM Studio 和 Ollama 这两个本地预设紧邻它之前。
+上面的 `.invalid` 域名和模型 ID 都是占位符，不代表真实服务商配置。请把新条目插入到 `lmstudio` 之前。最后三个预设必须依次保持为 `lmstudio`、`ollama` 和 `custom`：预设测试会检查这一顺序，而且添加服务商时，表单会把最后一个预设作为后备预设。
 
-如果服务商需要表单默认认证方式以外的行为，请明确设置 `authStrategy`。`defaultEnv` 只适用于非机密兼容性设置，不用于存放凭证。用户应在表单中输入自己的密钥。不要把真实密钥放入预设、示例、截图或测试夹具。
+如果服务商需要表单默认认证方式以外的行为，请明确设置 `authStrategy`。它决定密钥怎样发送，与 `apiFormat` 是两个独立的设置。对于 Anthropic 格式的请求，它决定请求头（[`upstream/client.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/upstream/client.ts)）以及传给 CLI 的环境变量（[`providerRuntimeEnv.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/services/providerRuntimeEnv.ts)）：
+
+| 取值 | 密钥的发送方式 |
+| --- | --- |
+| `api_key` | 放在 `x-api-key` 请求头中（`ANTHROPIC_API_KEY`）。 |
+| `auth_token` | 作为 `Authorization` 中的 Bearer 令牌（`ANTHROPIC_AUTH_TOKEN`），同时 `ANTHROPIC_API_KEY` 为空。 |
+| `auth_token_empty_api_key` | 与 `auth_token` 相同。 |
+| `dual_same_token` | 以上两处同时发送同一个密钥。 |
+| `dual_dummy` | 两处都发送占位值 `dummy`，适用于不校验密钥的本地服务。 |
+
+`openai_chat` 和 `openai_responses` 格式的请求始终以 Bearer 令牌发送密钥。
+
+`defaultEnv` 只适用于非机密兼容性设置，不用于存放凭证。用户应在表单中输入自己的密钥。不要把真实密钥放入预设、示例、截图或测试夹具。
 
 ## 更新预设测试
 
-在 [`src/server/__tests__/provider-presets.test.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/__tests__/provider-presets.test.ts) 中增加断言，按新增 ID 查找预设，并验证官方文档支持的 URL、API 格式、初始模型及新增的可选默认值。该测试文件已经覆盖 `GET /api/providers/presets` 返回配置列表，也会校验部分预设与服务商发布的信息一致。保留关于 `custom` 顺序的断言。
+在 [`src/server/__tests__/provider-presets.test.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/__tests__/provider-presets.test.ts) 中增加断言，按新增 ID 查找预设，并验证官方文档支持的 URL、API 格式、初始模型及新增的可选默认值。该测试文件已经覆盖 `GET /api/providers/presets` 返回配置列表，也会校验部分预设与服务商发布的信息一致。保留关于 `lmstudio`、`ollama` 和 `custom` 顺序的断言。
 
 设置表单从同一个 `GET /api/providers/presets` 接口读取列表。选择预设时，表单会填入 URL、API 格式、认证方式、初始模型、快速模型和已知上下文窗口。相关界面逻辑位于 [`ProviderFormModal.tsx`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/desktop/src/components/settings/ProviderFormModal.tsx)。普通预设不需要再添加一份独立 UI 注册表。
 
@@ -71,9 +85,9 @@ bun run test -- --run src/components/settings/ProviderFormModal.test.tsx
 
 ## 在应用中测试连接
 
-启动 DreamCoder，打开 **Settings → Providers → Add provider**。选择新增预设；若需要密钥，请输入有效密钥，并确认表单中的第一个模型已在该账户中启用。保存之前选择 **Test Connection**。
+启动 DreamCoder，打开**设置**，选择**服务商**，然后点击**添加服务商**。选择新增预设；若需要密钥，请输入有效密钥，并确认表单中的第一个模型已在该账户中启用。保存之前点击**测试连接**。基础 URL 或第一个模型为空时，该按钮不可用；如果预设需要密钥而没有填写，点击后不会有任何反应，也不会显示提示。
 
-表单会把当前尚未保存的 URL、API 格式、认证方式、密钥和第一个模型发送到 `POST /api/providers/test`。服务端校验请求后调用 `ProviderService`，向该模型发送简短的流式请求并读取响应。成功表示当前配置可以访问所选模型；它不代表列表中所有模型都可用，也不代表完整的编程智能体会话已经验证。如果该端点支持模型发现，**Discover models** 是独立操作，可用于填充模型列表。
+表单会把当前尚未保存的 URL、API 格式、认证方式、密钥和第一个模型发送到 `POST /api/providers/test`。服务端校验请求后调用 `ProviderService`，向该模型发送简短的流式请求并读取响应。成功表示当前配置可以访问所选模型；它不代表列表中所有模型都可用，也不代表完整的编程智能体会话已经验证。如果该端点支持模型发现，**获取模型**是独立操作，可用于填充模型列表。
 
 不要把真实 API 密钥粘贴到 issue 评论、拉取请求、截图或日志中。只在本机设置表单中使用个人密钥；如果密钥已泄露，请删除或轮换。
 
