@@ -5,6 +5,7 @@ import { clearBundledSkills, getBundledSkills } from '../bundledSkills.js'
 import { CANVAS_ENTRY_HTML, isCanvasEntryHtml } from '../../utils/canvas.js'
 import { DECK_ENTRY_HTML, isDeckEntryHtml } from '../../utils/deck.js'
 import { initBundledSkills } from './index.js'
+import { SLIDES_USER_CHANGES_RULE } from './slides.js'
 
 const canvasShell = readFileSync(join(import.meta.dir, '..', '..', '..', 'desktop', 'public', 'artifact-shell', 'canvas.js'), 'utf-8')
 
@@ -113,6 +114,19 @@ describe('artifacts skill', () => {
     expect(prompt).toContain("window.__dreamcoderDeck.goTo('<id>')")
     const blocks = [...prompt.matchAll(/```html\n([\s\S]*?)```/g)].map(match => match[1]!)
     expect(blocks.some(isDeckEntryHtml)).toBe(true)
+  })
+
+  it('tells the agent that the user edits artifacts in the app, that writes wait for the user, and to write with Write and Edit', async () => {
+    const prompt = await promptOf('')
+    expect(prompt).toContain('## When the user edits an artifact')
+    expect(prompt).toContain('a Write or Edit into it waits until they are done')
+    expect(prompt).toContain('read the files the user changed before you change the artifact, keep their changes')
+    expect(prompt).toContain('Use shell commands in an artifact folder only to delete or rename files.')
+  })
+
+  it('gives a session that edits a deck without the slides skill the same rule about changes the user made in the app', async () => {
+    const prompt = await promptOf('')
+    expect(prompt).toContain(SLIDES_USER_CHANGES_RULE)
   })
 })
 

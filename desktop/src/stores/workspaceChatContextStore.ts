@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { formatBrowserReferencePrompt, type BrowserReferenceData } from '../lib/browserReferences'
+import { formatArtifactEditPrompt, type ArtifactEdit } from '../lib/artifactEditReference'
 import type { DesignStart } from '../lib/designStart'
 
-export type WorkspaceChatReferenceKind = 'file' | 'code-comment' | 'code-selection' | 'chat-selection' | 'browser'
+export type WorkspaceChatReferenceKind = 'file' | 'code-comment' | 'code-selection' | 'chat-selection' | 'browser' | 'artifact-edit'
 
 export type WorkspaceChatReference = {
   id: string
@@ -18,6 +19,7 @@ export type WorkspaceChatReference = {
   sourceRole?: 'user' | 'assistant'
   messageId?: string
   browser?: BrowserReferenceData
+  artifactEdit?: ArtifactEdit
 }
 
 type WorkspaceChatContextStore = {
@@ -41,7 +43,7 @@ type WorkspaceChatContextStore = {
 }
 
 function makeReferenceId(reference: Omit<WorkspaceChatReference, 'id'>) {
-  if (reference.kind === 'browser') return getReferenceDedupKey(reference)
+  if (reference.kind === 'browser' || reference.kind === 'artifact-edit') return getReferenceDedupKey(reference)
   const linePart = reference.lineStart
     ? `${reference.lineStart}-${reference.lineEnd ?? reference.lineStart}`
     : reference.messageId ?? 'file'
@@ -50,7 +52,7 @@ function makeReferenceId(reference: Omit<WorkspaceChatReference, 'id'>) {
 }
 
 function getReferenceDedupKey(reference: Omit<WorkspaceChatReference, 'id'>) {
-  if (reference.kind === 'file') return `${reference.kind}:${reference.path}`
+  if (reference.kind === 'file' || reference.kind === 'artifact-edit') return `${reference.kind}:${reference.path}`
   if (reference.kind === 'browser') {
     const { browser } = reference
     if (browser?.pendingPickId) return `${reference.kind}:pending:${browser.pendingPickId}`
@@ -122,10 +124,12 @@ export function formatWorkspaceReferencePrompt(references: WorkspaceChatReferenc
   const chatReferencesWithContext = references.filter((reference) =>
     reference.kind === 'chat-selection' && !!reference.quote?.trim(),
   )
+  const artifactEditBlock = formatArtifactEditPrompt(references.filter((reference) => reference.kind === 'artifact-edit'))
   if (
     browserReferences.length === 0 &&
     workspaceReferencesWithContext.length === 0 &&
-    chatReferencesWithContext.length === 0
+    chatReferencesWithContext.length === 0 &&
+    !artifactEditBlock
   ) return ''
 
   const workspaceLines = workspaceReferencesWithContext.length > 0
@@ -166,7 +170,7 @@ export function formatWorkspaceReferencePrompt(references: WorkspaceChatReferenc
     browserReferences.map((reference) => ({ browser: reference.browser, note: reference.note })),
   )
   const rest = [...workspaceLines, ...chatLines].join('\n')
-  return [browserBlock, rest].filter(Boolean).join('\n\n')
+  return [browserBlock, rest, artifactEditBlock].filter(Boolean).join('\n\n')
 }
 
 export const useWorkspaceChatContextStore = create<WorkspaceChatContextStore>((set) => ({

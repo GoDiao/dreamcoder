@@ -30,6 +30,7 @@ import { refreshBrowserMarksBeforeSend } from '../../lib/browserMarks'
 import { DESIGN_START_ATTACHMENT_ID, designStartAttachment, designStartMessage, designStartOfCommand, designStartPlaceholder, typedDesignStart, type DesignStart } from '../../lib/designStart'
 import { errorMessage } from '../../lib/errorMessage'
 import { browserReferenceAttachment } from '../../lib/browserReferenceView'
+import { artifactEditAttachment } from '../../lib/artifactEditReference'
 import { AttachmentGallery } from './AttachmentGallery'
 import { ComposerDropOverlay } from './ComposerDropOverlay'
 import { RepositoryLaunchControls, type RepositoryLaunchError } from '../shared/RepositoryLaunchControls'
@@ -74,7 +75,7 @@ type ChatInputProps = {
 const EMPTY_WORKSPACE_REFERENCES: WorkspaceChatReference[] = []
 const EMPTY_SLASH_COMMANDS: PerSessionState['slashCommands'] = []
 
-function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendingLabel: string): Attachment {
+function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendingLabel: string): Attachment | (UIAttachment & { id: string }) {
   if (reference.kind === 'browser' && reference.browser) {
     if (reference.browser.pendingPickId) return { id: reference.id, type: 'file', name: pendingLabel }
     return {
@@ -83,6 +84,7 @@ function workspaceReferenceToAttachment(reference: WorkspaceChatReference, pendi
       previewUrl: reference.browser.element?.screenshot?.data,
     }
   }
+  if (reference.kind === 'artifact-edit') return { id: reference.id, ...artifactEditAttachment(reference) }
   return {
     id: reference.id,
     name: reference.name,
@@ -618,7 +620,7 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         : []
     })
     const workspaceAttachmentPayload: AttachmentRef[] = references
-      .filter((reference) => reference.kind !== 'chat-selection' && reference.kind !== 'browser')
+      .filter((reference) => reference.kind !== 'chat-selection' && reference.kind !== 'browser' && reference.kind !== 'artifact-edit')
       .map((reference) => ({
         type: 'file' as const,
         name: reference.name,
@@ -629,12 +631,13 @@ export function ChatInput({ sessionId, variant = 'default', compact = false, pri
         note: reference.note,
         quote: reference.quote,
       }))
-    const visibleAttachmentPayload: AttachmentRef[] = [
+    const visibleAttachmentPayload: Array<AttachmentRef | UIAttachment> = [
       ...uploadAttachmentPayload,
-      ...references.map((reference): AttachmentRef => {
+      ...references.map((reference): AttachmentRef | UIAttachment => {
         if (reference.kind === 'browser' && reference.browser) {
           return browserReferenceAttachment({ browser: reference.browser, note: reference.note })
         }
+        if (reference.kind === 'artifact-edit') return artifactEditAttachment(reference)
         return {
           type: 'file' as const,
           name: reference.name,

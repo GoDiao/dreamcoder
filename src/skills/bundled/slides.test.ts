@@ -203,6 +203,16 @@ describe('slides skill reference files', () => {
     expect(layout).not.toContain('page marker')
   })
 
+  it('tells the agent that the user edits decks in the app, to read the manifest in full before every change and to check section numbers against the order', async () => {
+    const format = await reference('format.md')
+    expect(format).toContain('## Changes the user makes in the app')
+    expect(format).toContain('read its artifact.json again in full')
+    expect(format).toContain('the user moved or deleted slides')
+    expect(format).toContain('references from one slide to another')
+    expect(format).toContain('was modified')
+    expect(format).toContain('a note in the user\'s message that they changed the deck in the app')
+  })
+
   it('asks about use, length, content and look in the interview, with the shared rules', async () => {
     const interview = await reference('interview.md')
     expect(interview).toContain('a speaker presents it to a room, or people read it on their own')

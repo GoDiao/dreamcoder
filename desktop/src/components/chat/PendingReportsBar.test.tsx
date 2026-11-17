@@ -24,6 +24,7 @@ function setReports(pendingReports: Reports) {
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity: null,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

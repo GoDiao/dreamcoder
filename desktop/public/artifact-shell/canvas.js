@@ -404,6 +404,10 @@
     var dx = (event.clientX - drag.startX) / view.scale
     var dy = (event.clientY - drag.startY) / view.scale
     var board = drag.entry.board
+    if (!drag.busy) {
+      drag.busy = true
+      emit({ type: 'busy', on: true })
+    }
     if (drag.mode === 'move') {
       board.x = drag.origin.x + dx
       board.y = drag.origin.y + dy
@@ -419,6 +423,7 @@
     var board = activeDrag.entry.board
     var origin = activeDrag.origin
     var entry = activeDrag.entry
+    var busy = activeDrag.busy
     activeDrag = null
     document.body.classList.remove('dragging')
     board.x = Math.round(board.x)
@@ -426,8 +431,9 @@
     board.width = Math.round(board.width)
     board.height = Math.round(board.height)
     place(entry.element, board)
-    if (board.x === origin.x && board.y === origin.y && board.width === origin.width && board.height === origin.height) return
-    emit({ type: 'move', id: board.id, x: board.x, y: board.y, width: board.width, height: board.height })
+    var moved = board.x !== origin.x || board.y !== origin.y || board.width !== origin.width || board.height !== origin.height
+    if (moved) emit({ type: 'move', id: board.id, x: board.x, y: board.y, width: board.width, height: board.height })
+    if (busy) emit({ type: 'busy', on: false })
   }
   document.addEventListener('pointerup', endDrag)
   document.addEventListener('pointercancel', endDrag)

@@ -14,6 +14,10 @@ export function setHostRequester(requester: HostRequester | null): void {
   activeRequester = requester
 }
 
+export function hasHostRequester(): boolean {
+  return activeRequester !== null
+}
+
 export async function requestHost<T>(
   request: HostRequest,
   schema: z.ZodType<T>,

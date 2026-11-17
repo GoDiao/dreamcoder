@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { artifactsApi } from '../api/artifacts'
+import { inArtifactTurn, markArtifactBusy, noteArtifactEdit, stopArtifactHold } from '../lib/artifactUserEdits'
 import { setCanvasMessageHandler, submitBrowserInput } from '../lib/browserGuests'
 import { errorMessage } from '../lib/errorMessage'
 import type { CanvasAction } from '../lib/canvasBridge'
@@ -11,16 +12,25 @@ type CanvasTarget = {
   sessionId: string | null
   root: string
   name: string
+  title: string
   artifact?: BrowserTabArtifact
 }
 
 async function handle(target: CanvasTarget, message: CanvasAction) {
   const { tabId, sessionId, root, name } = target
+  const editTarget = { tabId, sessionId, root, name, title: target.title }
+  if (message.type === 'busy') {
+    markArtifactBusy(editTarget, message.on)
+    return
+  }
   if (message.type === 'move') {
-    const { latestMtimeMs } = await artifactsApi.moveBoard({ dir: root, name, boardId: message.id, x: message.x, y: message.y, width: message.width, height: message.height })
-    if (sessionId && target.artifact) {
-      useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { artifact: { ...target.artifact, mtimeMs: latestMtimeMs } })
-    }
+    await inArtifactTurn(editTarget, async () => {
+      const { latestMtimeMs, ...written } = await artifactsApi.moveBoard({ dir: root, name, boardId: message.id, x: message.x, y: message.y, width: message.width, height: message.height })
+      if (sessionId && target.artifact) {
+        useWorkspacePanelStore.getState().patchTab(sessionId, tabId, { artifact: { ...target.artifact, mtimeMs: latestMtimeMs } })
+      }
+      noteArtifactEdit(editTarget, written)
+    })
     return
   }
   const opened = await artifactsApi.open(root, name, message.id)
@@ -43,14 +53,18 @@ export function useCanvasTab(target: CanvasTarget | null) {
   const sessionId = target?.sessionId
   const root = target?.root
   const name = target?.name
+  const title = target?.title
   const artifact = target?.artifact
 
   useEffect(() => {
-    if (tabId === undefined || sessionId === undefined || root === undefined || name === undefined) return
-    const current: CanvasTarget = { tabId, sessionId, root, name, ...(artifact ? { artifact } : {}) }
+    if (tabId === undefined || sessionId === undefined || root === undefined || name === undefined || title === undefined) return
+    const current: CanvasTarget = { tabId, sessionId, root, name, title, ...(artifact ? { artifact } : {}) }
     setCanvasMessageHandler(tabId, (message) => {
       handle(current, message).catch((error: unknown) => toast.error(errorMessage(error)))
     })
-    return () => setCanvasMessageHandler(tabId, null)
-  }, [tabId, sessionId, root, name, artifact])
+    return () => {
+      setCanvasMessageHandler(tabId, null)
+      stopArtifactHold(tabId)
+    }
+  }, [tabId, sessionId, root, name, title, artifact])
 }

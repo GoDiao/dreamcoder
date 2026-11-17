@@ -264,6 +264,7 @@ describe('ConversationService', () => {
     const service = new ConversationService() as any
     const env = (await service.buildChildEnv(tmpDir)) as Record<string, string>
     expect(env.DREAMCODER_SESSION_LINKS).toBe('1')
+    expect(env.DREAMCODER_ARTIFACT_EDIT_LOCKS).toBe('1')
     expect(env.CLAUDE_CODE_EAGER_FLUSH).toBe('1')
   })
 

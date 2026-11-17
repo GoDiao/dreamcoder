@@ -40,6 +40,7 @@ import { getBrowserRuntime } from '../browserHost/runtime.js'
 import { installSessionPersistence } from '../session/persistence.js'
 import { OutputPipeline } from '../session/outputPipeline.js'
 import { normalizeSessionSlashCommands, translateCliOutput } from '../session/translate.js'
+import { artifactEditLocks } from '../services/artifactEditLocks.js'
 import { artifactService } from '../services/artifactService.js'
 import {
   createLinkedSession,
@@ -313,8 +314,12 @@ export function handleRawCliMessage(sessionId: string, cliMsg: any): void {
   }
   if (
     cliMsg.type === 'control_request' &&
-    (sessionLinks.handleControlRequest(sessionId, cliMsg) || kanbanControl.handleControlRequest(sessionId, cliMsg))
+    (sessionLinks.handleControlRequest(sessionId, cliMsg) || kanbanControl.handleControlRequest(sessionId, cliMsg) || artifactEditLocks.handleControlRequest(sessionId, cliMsg))
   ) {
+    return
+  }
+  if (cliMsg.type === 'control_cancel_request' && typeof cliMsg.request_id === 'string') {
+    artifactEditLocks.cancelWait(sessionId, cliMsg.request_id)
     return
   }
   if (cliMsg.type !== 'control_response') return

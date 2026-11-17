@@ -5,14 +5,19 @@ import { join } from 'node:path'
 import { getOriginalCwd, setOriginalCwd } from '../../bootstrap/state.js'
 import { getGlobalArtifactsDir } from '../../utils/artifacts.js'
 import { runWithCwdOverride } from '../../utils/cwd.js'
+import { ARTIFACT_EDIT_LOCKS_ENV } from '../../utils/artifactEditLock.js'
+import { setHostRequester } from '../../utils/hostRequests.js'
 import { drainSdkEvents } from '../../utils/sdkEventQueue.js'
 import { ARTIFACT_COPY_TOOL_NAME } from './constants.js'
 import { ArtifactCopyTool } from './ArtifactCopyTool.js'
 
 const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
+const originalLocksEnv = process.env[ARTIFACT_EDIT_LOCKS_ENV]
 const originalCwd = getOriginalCwd()
 let root: string
 let project: string
+
+const context = () => ({ abortController: new AbortController() }) as never
 
 beforeEach(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'artifact-copy-')))
@@ -23,6 +28,9 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  setHostRequester(null)
+  if (originalLocksEnv === undefined) delete process.env[ARTIFACT_EDIT_LOCKS_ENV]
+  else process.env[ARTIFACT_EDIT_LOCKS_ENV] = originalLocksEnv
   setOriginalCwd(originalCwd)
   if (originalConfigDir === undefined) delete process.env.DREAMCODER_CONFIG_DIR
   else process.env.DREAMCODER_CONFIG_DIR = originalConfigDir
@@ -69,7 +77,7 @@ describe('ArtifactCopy validation and permission', () => {
 describe('ArtifactCopy call', () => {
   test('copies an artifact of another project and leaves the original', async () => {
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    const { data } = await ArtifactCopyTool.call({ path: foreign }, {} as never, undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
     expect(data).toEqual({ name: 'a', path: join(project, 'dc_artifacts', 'a'), movedFromGlobalStore: false })
     expect(await exists(join(foreign, 'index.html'))).toBe(true)
     expect(await exists(join(project, 'dc_artifacts', 'a', 'index.html'))).toBe(true)
@@ -80,7 +88,7 @@ describe('ArtifactCopy call', () => {
   test('tells the sidecar the copy was written, so the lists refresh at once', async () => {
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
     drainSdkEvents()
-    await ArtifactCopyTool.call({ path: foreign }, {} as never, undefined as never, undefined as never)
+    await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
     const events = drainSdkEvents()
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({
@@ -90,9 +98,27 @@ describe('ArtifactCopy call', () => {
     })
   })
 
+  test('waits until the user is no longer editing the artifact before it moves it', async () => {
+    const global = await artifact(getGlobalArtifactsDir(), 'g')
+    process.env[ARTIFACT_EDIT_LOCKS_ENV] = '1'
+    let release = () => {}
+    const asked = new Promise<unknown>((resolveAsked) => {
+      setHostRequester(<T,>(request: Record<string, unknown>) => {
+        resolveAsked(request)
+        return new Promise<T>((resolve) => { release = () => resolve({ files: ['index.html'] } as T) })
+      })
+    })
+    const copying = ArtifactCopyTool.call({ path: global }, context(), undefined as never, undefined as never)
+    expect(await asked).toEqual({ subtype: 'artifact_edit_wait', path: global })
+    expect(await exists(global)).toBe(true)
+    release()
+    await copying
+    expect(await exists(global)).toBe(false)
+  })
+
   test('moves an artifact out of the global store', async () => {
     const global = await artifact(getGlobalArtifactsDir(), 'g')
-    const { data } = await ArtifactCopyTool.call({ path: global }, {} as never, undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: global }, context(), undefined as never, undefined as never)
     expect(data.movedFromGlobalStore).toBe(true)
     expect(await exists(global)).toBe(false)
     expect(await exists(join(project, 'dc_artifacts', 'g', 'index.html'))).toBe(true)
@@ -103,7 +129,7 @@ describe('ArtifactCopy call', () => {
     const worktree = join(root, 'worktree')
     await mkdir(worktree, { recursive: true })
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    await runWithCwdOverride(worktree, () => ArtifactCopyTool.call({ path: foreign }, {} as never, undefined as never, undefined as never))
+    await runWithCwdOverride(worktree, () => ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never))
     expect(await exists(join(worktree, 'dc_artifacts', 'a', 'index.html'))).toBe(true)
     expect(await exists(join(project, 'dc_artifacts', 'a'))).toBe(false)
   })
@@ -111,7 +137,7 @@ describe('ArtifactCopy call', () => {
   test('adds a number to the name when it is taken', async () => {
     await artifact(join(project, 'dc_artifacts'), 'a')
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    const { data } = await ArtifactCopyTool.call({ path: foreign }, {} as never, undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
     expect(data.name).toBe('a-2')
   })
 })

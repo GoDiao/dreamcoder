@@ -11,7 +11,7 @@ import { resolveBrowserInput, type BrowserBlockedEvent, type BrowserSelectionEve
 import { BROWSER_PARTITION } from './shell/electronBridge'
 import { adoptArtifactTab, artifactFolderOf } from './artifactTabs'
 import { canvasBoardTitleCall, parseCanvasMessage, type CanvasAction } from './canvasBridge'
-import { DECK_STAGE_RECT_CALL, deckModeCall, isDeckRect, parseDeckMessage, slideFile, type DeckRect } from './deckBridge'
+import { DECK_STAGE_RECT_CALL, DECK_TAKE_EDIT_CALL, deckModeCall, isDeckEdit, isDeckRect, parseDeckMessage, slideFile, type DeckEdit, type DeckRect, type DeckRequest } from './deckBridge'
 import { SHELL_REFRESH_CALL, shellSchemeCall } from './shellBridge'
 import { useUIStore } from '../stores/uiStore'
 import { themeColorScheme } from '../theme/colorScheme'
@@ -54,6 +54,7 @@ const ABORTED_LOAD = -3
 const guests = new Map<string, Guest>()
 const placements = new Map<string, Placement>()
 const canvasHandlers = new Map<string, (message: CanvasAction) => void>()
+const deckHandlers = new Map<string, (message: DeckRequest) => void>()
 let layer: HTMLElement | null = null
 let layerObserver: ResizeObserver | null = null
 let gestureActive = false
@@ -162,7 +163,10 @@ function createGuest(sessionId: string | null, tabId: string, url: string) {
     else if (canvas) canvasHandlers.get(tabId)?.(canvas)
     const deck = canvas ? null : parseDeckMessage(message, sourceId)
     if (deck?.type === 'exit') leavePresentation(guest)
-    if (deck?.type !== 'state') return
+    if (deck?.type !== 'state') {
+      if (deck && deck.type !== 'exit') deckHandlers.get(tabId)?.(deck)
+      return
+    }
     const { type: _type, ...state } = deck
     const known = useBrowserStore.getState().pageByTab[tabId]?.deck?.artifact
     store.patchPage(tabId, { deck: state })
@@ -219,6 +223,16 @@ function installThemeSync() {
 export function setCanvasMessageHandler(tabId: string, handler: ((message: CanvasAction) => void) | null) {
   if (handler) canvasHandlers.set(tabId, handler)
   else canvasHandlers.delete(tabId)
+}
+
+export function setDeckMessageHandler(tabId: string, handler: ((message: DeckRequest) => void) | null) {
+  if (handler) deckHandlers.set(tabId, handler)
+  else deckHandlers.delete(tabId)
+}
+
+export async function takeDeckEdit(tabId: string): Promise<DeckEdit | null> {
+  const edit = await readyGuest(tabId)?.webview.executeJavaScript(DECK_TAKE_EDIT_CALL)
+  return isDeckEdit(edit) ? edit : null
 }
 
 export async function refreshArtifactShell(tabId: string): Promise<boolean> {

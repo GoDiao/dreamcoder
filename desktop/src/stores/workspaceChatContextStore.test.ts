@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { artifactEditReference } from '../lib/artifactEditReference'
 import {
   formatWorkspaceReferencePrompt,
   useWorkspaceChatContextStore,
@@ -9,6 +10,38 @@ const initialState = useWorkspaceChatContextStore.getInitialState()
 describe('workspaceChatContextStore', () => {
   beforeEach(() => {
     useWorkspaceChatContextStore.setState(initialState, true)
+  })
+
+  it('keeps one edit chip per artifact, replacing the older one', () => {
+    const store = useWorkspaceChatContextStore.getState()
+    store.addReference('session-1', artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['slides/a.html'] }))
+    store.addReference('session-1', artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk v2', files: ['artifact.json'] }))
+    store.addReference('session-1', artifactEditReference({ dir: '/repo/dc_artifacts/flow', title: 'Flow', files: ['artifact.json'] }))
+    const references = useWorkspaceChatContextStore.getState().referencesBySession['session-1'] ?? []
+    expect(references.map((reference) => [reference.kind, reference.path, reference.name])).toEqual([
+      ['artifact-edit', '/repo/dc_artifacts/talk', 'Edited: Talk v2'],
+      ['artifact-edit', '/repo/dc_artifacts/flow', 'Edited: Flow'],
+    ])
+  })
+
+  it('merges the files of an earlier edit of the same artifact', () => {
+    const first = artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['slides/a.html'] })
+    const second = artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['artifact.json', 'slides/a.html'], slides: true }, first.artifactEdit)
+    expect(second.artifactEdit).toEqual({ title: 'Talk', files: ['slides/a.html', 'artifact.json'], slides: true })
+    expect(artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['slides/b.html'] }, second.artifactEdit).artifactEdit.slides).toBe(true)
+  })
+
+  it('tells the model which artifacts the user changed, which files, and for slides what else to check', () => {
+    const store = useWorkspaceChatContextStore.getState()
+    store.addReference('session-1', artifactEditReference({ dir: '/repo/dc_artifacts/flow', title: 'Flow', files: ['artifact.json'] }))
+    const plain = formatWorkspaceReferencePrompt(useWorkspaceChatContextStore.getState().referencesBySession['session-1'] ?? [])
+    expect(plain).toContain('The user changed these artifacts in the app:\n- /repo/dc_artifacts/flow: artifact.json')
+    expect(plain).toContain('read the files the user changed and keep their changes')
+    expect(plain).not.toContain('section numbers')
+    store.addReference('session-1', artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['artifact.json', 'slides/a.html'], slides: true }))
+    const slides = formatWorkspaceReferencePrompt(useWorkspaceChatContextStore.getState().referencesBySession['session-1'] ?? [])
+    expect(slides).toContain('- /repo/dc_artifacts/talk: artifact.json, slides/a.html')
+    expect(slides).toContain('the section numbers, the totals of sections and the references between slides')
   })
 
   it('deduplicates file references per session', () => {

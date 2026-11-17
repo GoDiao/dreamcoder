@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readdir, readFile, realpath, stat } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { getClaudeConfigHomeDir } from './envUtils.js'
 import { isSameOrInsidePathForPlatform } from './windowsDrivePath.js'
 
@@ -66,6 +66,12 @@ export function artifactsDirOf(path: string): string | null {
   const index = segments.indexOf(ARTIFACTS_DIRNAME)
   if (index < 0) return null
   return segments.slice(0, index + 1).join(sep)
+}
+
+export function artifactFolderContaining(path: string): string | null {
+  const artifactsDir = artifactsDirOf(path)
+  const name = artifactNameOf(path)
+  return artifactsDir && name && isSafeArtifactName(name) ? join(artifactsDir, name) : null
 }
 
 export function artifactNameOf(path: string): string | null {
@@ -223,16 +229,19 @@ export async function scanArtifactsDir(artifactsDir: string): Promise<ArtifactEn
   return entries
 }
 
-export async function resolveArtifactEntryFile(entry: ArtifactEntry): Promise<string | null> {
-  if (!entry.manifest) return null
-  const candidate = resolve(entry.dir, entry.manifest.entry)
-  if (!isSameOrInsidePathForPlatform(candidate, entry.dir)) return null
+export async function fileInsideFolder(dir: string, file: string): Promise<string | null> {
+  const candidate = resolve(dir, file)
+  if (!isSameOrInsidePathForPlatform(candidate, dir)) return null
   try {
-    const [realEntry, realDir] = await Promise.all([realpath(candidate), realpath(entry.dir)])
-    return isSameOrInsidePathForPlatform(realEntry, realDir) ? candidate : null
+    const [real, realDir] = await Promise.all([realpath(candidate), realpath(dir)])
+    return isSameOrInsidePathForPlatform(real, realDir) ? candidate : null
   } catch {
     return null
   }
+}
+
+export async function resolveArtifactEntryFile(entry: ArtifactEntry): Promise<string | null> {
+  return entry.manifest ? fileInsideFolder(entry.dir, entry.manifest.entry) : null
 }
 
 export type ArtifactOpenInput = { rootDir: string; filePath: string }
@@ -240,14 +249,13 @@ export type ArtifactOpenInput = { rootDir: string; filePath: string }
 export async function resolveArtifactOpenInput(input: string, baseDir: string | null): Promise<ArtifactOpenInput | null> {
   if (/^[a-z][a-z0-9+.-]{1,}:/i.test(input)) return null
   const resolved = resolve(baseDir ?? '', input)
-  const rootDir = artifactsDirOf(resolved)
-  const name = artifactNameOf(resolved)
-  if (!rootDir || !name || !isSafeArtifactName(name)) return null
-  const folder = join(rootDir, name)
+  const folder = artifactFolderContaining(resolved)
+  if (!folder) return null
+  const rootDir = dirname(folder)
   if (resolved !== folder && resolved !== join(folder, ARTIFACT_MANIFEST_FILE)) {
     return { rootDir, filePath: resolved }
   }
-  const entry = await readArtifactEntry(rootDir, name)
+  const entry = await readArtifactEntry(rootDir, basename(folder))
   const filePath = entry ? await resolveArtifactEntryFile(entry) : null
   return filePath ? { rootDir, filePath } : null
 }

@@ -17,7 +17,7 @@ import { EMPTY_BROWSER_PAGE, useBrowserStore } from '../stores/browserStore'
 import { resetCapturedThumbnails, useArtifactThumbnail } from './useArtifactThumbnail'
 
 const page = (overrides: Partial<typeof EMPTY_BROWSER_PAGE> = {}) => ({ ...EMPTY_BROWSER_PAGE, ready: true, ...overrides })
-const deckState = (overrides: Partial<DeckState> = {}): DeckState => ({ artifact: 'id-1', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', ...overrides })
+const deckState = (overrides: Partial<DeckState> = {}): DeckState => ({ artifact: 'id-1', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', editing: false, ...overrides })
 
 const settle = () => act(async () => {
   await vi.advanceTimersByTimeAsync(1_100)

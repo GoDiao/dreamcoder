@@ -2,7 +2,7 @@ import { browserApi } from '../api/browser'
 import type { TranslationKey } from '../i18n'
 import { useBrowserStore } from '../stores/browserStore'
 import { browserGuestSize, getBrowserGuestContentsId, runDeckCall } from './browserGuests'
-import { DECK_VIEWPORT, deckModeCall } from './deckBridge'
+import { DECK_VIEWPORT, deckEditingCall, deckModeCall } from './deckBridge'
 import { formatBytes } from './formatBytes'
 import { exportBrowserPage } from './shell'
 import type { BrowserExportFormat, BrowserExportMessages, BrowserExportResult, BrowserExportViewport } from './shell/electronBridge'
@@ -41,7 +41,10 @@ export async function exportArtifactPage(input: {
   const webContentsId = getBrowserGuestContentsId(input.tabId)
   if (webContentsId === null) throw new Error('The page is not loaded yet')
   const deck = useBrowserStore.getState().pageByTab[input.tabId]?.deck != null
-  if (deck && input.format === 'html') await runDeckCall(input.tabId, deckModeCall('browse'))
+  if (deck && input.format === 'html') {
+    await runDeckCall(input.tabId, deckEditingCall(false))
+    await runDeckCall(input.tabId, deckModeCall('browse'))
+  }
   const emulationSessionId = input.format === 'pdf' ? input.sessionId : null
   if (emulationSessionId) await browserApi.suspendEmulation(emulationSessionId, input.tabId)
   try {

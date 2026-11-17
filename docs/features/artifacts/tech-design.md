@@ -287,6 +287,71 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 不做新机制。Agent 经 Write/Edit 改的产物文件进入文件历史，可以用现有的回退功能回到某一轮。不进文件历史的：Bash 写的文件、新建时复制的模板文件、画板位置写回；超过 100 个快照的旧版本会被丢弃。第一版不加「版本」视图。
 
+## 用户在应用里改产物：锁和通知
+
+2026-11-16 实现。维护者定：用户在应用里改产物时上锁，Agent 写同一个产物要等；用户改完后告诉 Agent 改了什么，Agent 先读再继续。这是所有种类的通用行为。现在能在应用里改的有幻灯片（改字、调页序、删一页，见[幻灯片设计](../slides/tech-design.md)的「用户编辑」）和画布（拖动、缩放画板）；以后的文档类型也走这条路。
+
+### 用户写入只有一条路
+
+sidecar 的四个用户写入 `writeSlide`、`reorderSlides`、`deleteSlide`、`updateBoard` 都经过 `ArtifactService.asUser`（`src/server/services/artifactService.ts`）：写入期间以自己的名义持有锁，执行写入，记下改了哪些文件，写完放开自己这一份，返回 `{ dir, files, latestMtimeMs }`（产物文件夹的绝对路径、相对它的文件和文件夹里最新的修改时间，时间在锁内取）。渲染进程用返回值出块，不自己拼路径（全局区的产物在标签里只记了标记）。
+
+### 锁
+
+- 归 sidecar，在内存里（`src/server/services/artifactEditLocks.ts`），粒度是一个产物文件夹，按真实路径比较。应用退出时 sidecar 和 CLI 一起退出，不会留下锁。
+- 一把锁可以有几个持有者：每个标签（持有者 id 是标签 id）和每次进行中的用户写入各算一个，各自有 20 秒的期限。所有持有者都放开（或过期）才算解锁。所以同一份产物开在两个标签里，一个标签改完不会放开另一个标签正在改的那一份；面板没有上锁时的一次写入（比如切回标签后补写之前留下的修改），写完锁就没了，Agent 不用多等。
+- **什么时候上锁只在页面脚本里定**：脚本在用户真正开始改的时候发 `busy: true`，改完发 `busy: false`。幻灯片（`deck.js` 的 `markBusy`）：点开一段文字到提交或取消；拖动调序从第一次移动到松手。画布（`canvas.js` 的拖动处理）：从第一次移动到松手。只开着「编辑」不上锁。删除一页由渲染进程在用户确认后自己上锁、删完解锁。
+- 渲染进程收到 `busy: true` 调 `POST /api/artifacts/edit-lock`（带标签 id 作为持有者）上锁，之后每 5 秒续一次；收到 `busy: false` 停止续期，把 `DELETE /api/artifacts/edit-lock` 排进这个标签的写回队列，排在已经发出的写回后面，所以解锁一定在用户的修改写进去之后（`desktop/src/lib/artifactUserEdits.ts`）。轮到这次解锁时，如果这个标签又开始改了（比如 Enter 提交一段后马上点开下一段），就不解锁。解锁失败只记日志，不重载页面。
+- 写回函数注销时（标签关了、切到别的会话、全屏查看关了）停止续期，锁到期自己失效。没有结束信号时，Agent 最多多等 20 秒。
+
+### Agent 等锁
+
+- Write、Edit 在执行一开始检查：目标路径在某个产物文件夹里、并且这个 CLI 是 DreamCoder 的 sidecar 启动的（sidecar 给 CLI 设环境变量 `DREAMCODER_ARTIFACT_EDIT_LOCKS`；单纯的 `-p` 运行和别的宿主也有 `requestHost`，但不会回答这个请求）时，向 sidecar 发控制请求 `artifact_edit_wait`（`src/utils/artifactEditLock.ts`；走现有的 `requestHost`，和看板、会话工具同一条路）。sidecar 没锁时立刻回答；有锁时等到解锁再回答，回答里是锁期间用户改过的文件。
+- 回答里有文件：工具拒绝这次写入，结果写明用户刚在应用里改了这个产物的哪些文件，要先读、保留用户的改动再改。没有文件（用户取消了编辑，或锁过期）：照常写，原有的「读过之后被改过」检查照常起作用。
+- `ArtifactCopy` 在复制之前等源产物的锁（全局区的产物会被移走），不拒绝。`UseDesignSystem`、选模板只建新文件夹，新文件夹不会被锁，不等。
+- 用户中断这一轮：工具的中止信号取消等待，CLI 发 `control_cancel_request` 并立刻返回；sidecar 之后的回答 CLI 会丢掉。
+- **界面上说明在等谁**（维护者 2026-11-16 要求）：sidecar 收到 `artifact_edit_wait` 时，只有锁真的上着才把这个会话的状态 `artifactWait` 设成 `{ folder, title }`（标题读产物清单，读不到用文件夹名）；锁没上着时立刻回答、状态不动，所以不会闪一下。解锁回答时、CLI 发来 `control_cancel_request`（用户中断）时清掉；这一轮结束、进程结束或重启、清空对话时由 reducer 一并清掉。同一个会话同时有几处在等时显示最近的一处。对话里的进行中提示（`StreamingIndicator`，桌面端和 H5 是同一份前端）在有 `artifactWait` 时显示「正在等你改完「<标题>」...」，代替「运行中」。
+  - 放法：和 `browserActivity` 一样，是会话状态里一个独立的可空字段，经 reducer 改；没有塞进 `turn.activity` 的枚举，因为它带着产物信息，生命周期也由锁服务管。显示位置用 `turn.activity` 的那处（对话里的进行中提示），没有用 `browserActivity` 的 `BrowserActivityBar`：那一条挂在浏览器标签上方，说明的是「Agent 正在操作这个标签」，而等锁说明的是这一轮为什么停着，属于对话。
+- 不是 sidecar 启动的 CLI（终端里直接跑、`-p`、别的 SDK 宿主）不问、不等，Write、Edit 和以前一样。
+
+### 告诉 Agent
+
+- **等过锁的那次写**：见上，工具结果里列出文件。
+- **没在写的 Agent**：用户的写入成功后，面板所在会话的输入框上方出现一个块「已修改：<标题>」（引用种类 `artifact-edit`，名字、模型看到的话和显示都在 `desktop/src/lib/artifactEditReference.ts`）。一份产物一个块，连续操作把改过的文件合并进去。下一条消息带给模型：用户在应用里改了这些产物、各改了哪些文件，动它之前先读这些文件、保留用户的改动；幻灯片调过序或删过页时，再要求核对章节号、章节总数和页面之间的引用。块可以点叉去掉；写回失败或冲突不出块；全屏查看没有会话，照常上锁，不出块。
+- **CLI 现成的「文件被改过」提示**仍然有，只算顺带；它在哪些情况下成立见幻灯片设计的「章节号和 Agent」。
+- **技能**：`artifacts` 技能的「When the user edits an artifact」：用户可能在应用里改产物；写入会等；收到工具结果、提示或块带来的那句话时先读被改的文件；产物里的文件用 Write、Edit 写，这样等锁才生效，命令行只用于删除和改名。幻灯片的章节号规则留在 `/slides`，两处含义一致。
+
+```plantuml
+@startuml
+actor 用户
+participant "页面脚本" as P
+participant "渲染进程" as R
+participant "sidecar" as S
+participant "CLI 的 Write/Edit" as C
+
+用户 -> P : 点开一段文字
+P -> R : busy true
+R -> S : POST edit-lock（之后每 5 秒续）
+C -> S : artifact_edit_wait（要写的路径）
+note right of S : 有锁，先不回答
+用户 -> P : 改字，Enter
+P -> R : edit；busy false
+R -> S : PUT 页面内容
+S -> S : 写入，记下 slides/x.html
+R -> S : DELETE edit-lock
+S --> C : { files: [slides/x.html] }
+C -> C : 拒绝这次写入，结果里列出文件
+R -> R : 输入框上方出「已修改」块
+@enduml
+```
+
+### 已接受的代价
+
+- Agent 用命令行写产物里的文件，锁管不到（技能要求用 Write、Edit）。
+- 用户一直在改，Agent 一直等。
+- 全屏查看时不出块；刷新应用后没发出的块会丢；已发出的消息刷新后显示原文。
+- 锁在 Agent 的写开始时检查：sidecar 上锁的那一刻 Agent 的写已经在进行的话（Agent 刚问完、没锁，还没写下去时用户恰好点开文字），两者仍可能交错，窗口是写一个文件的时间。维护者 2026-11-16 确认不防。
+- 等过锁、用户改的是别的文件时也拒绝这次写入，让 Agent 先读：多一轮调用，换来一条简单的规则。
+
 ## 导出
 
 导出在已经打开的产物标签上进行，由 Electron 主进程完成：渲染进程发导出请求（标签、格式），主进程弹系统保存对话框，生成文件，直接写到用户选的位置。sidecar 不经手导出。
@@ -308,11 +373,11 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 - **保留路径**：`serveProjectRequest`（`browser.ts:212`）在 `roots.fileFor` 之前判断 `/__dreamcoder__/`，只返回应用 `dist` 里 `artifact-shell/` 下的固定文件（`canvas.js`、`deck.js`），目录由主进程已有的 `webDist` 传入（`main.ts` 的 `serveDist` 用的同一个目录；`desktop/public/` 随 `dist` 打包，`electron-builder.json` 的 `extraResources` 已含 `dist`）。代价：用户 `dc_artifacts/` 里真有 `__dreamcoder__` 目录时被它遮住。
 - **画板文件的规则**：`board.file` 只能是产物文件夹内的相对路径。脚本拒绝绝对路径、带协议的地址和 `..`，`ArtifactCheck` 同样报错。外部网站不作画板：参考外部网站时截图存成图片画板，或在用户同意下重建本地副本。
 - **页面和渲染进程的通道**：页面没有 preload（`browser.ts:38`），只能借 webview 自带的两样东西，类型上都有（`electron.d.ts` 的 `WebviewTag`：`console-message` 事件带 `message`，`executeJavaScript` 方法）。
-  - 页面到渲染进程：`console-message`，带固定前缀的 JSON，两种消息。`move`：画板 id 和新的 x、y、width、height，拖动或缩放结束时发。`open`：画板 id，用户点画板上的「在新标签打开」时发。`open` 不能让页面自己 `window.open`：`guardGuest` 的 `setWindowOpenHandler` 把地址加载进当前 webview（`browser.ts:374-377`），会替换掉画布。渲染进程在 `createGuest`（`browserGuests.ts`）里监听，只接受当前标签的、格式正确的、画板 id 在清单里的消息：`move` 调写回接口，`open` 新开标签。
+  - 页面到渲染进程：`console-message`，带固定前缀的 JSON，三种消息。`move`：画板 id 和新的 x、y、width、height，拖动或缩放结束时发。`open`：画板 id，用户点画板上的「在新标签打开」时发。`busy`：`{ on }`，拖动或缩放画板第一次移动时发 `true`，松手时发 `false`，渲染进程据此上锁和解锁（见「用户在应用里改产物：锁和通知」）。`open` 不能让页面自己 `window.open`：`guardGuest` 的 `setWindowOpenHandler` 把地址加载进当前 webview（`browser.ts:374-377`），会替换掉画布。渲染进程在 `createGuest`（`browserGuests.ts`）里监听，只接受当前标签的、格式正确的、画板 id 在清单里的消息：`move` 调写回接口，`open` 新开标签，`busy` 上锁或解锁。
   - 渲染进程到页面：`webview.executeJavaScript` 调脚本暴露的 `refresh()`。渲染进程里现在没有这两种用法，`WebviewElement` 类型（`browserGuests.ts:13-25`）要补方法。
   - 2026-11-15 起，画布脚本读到清单后另发一条 `ready`（带产物 id），渲染进程据此把 Agent 打开的画布标签认成产物标签；主题和 `refresh()` 对任何项目页面上的壳脚本调用，不再要求标签先登记画布的处理函数（见幻灯片设计的「页面和渲染进程的通道」「把标签认成产物标签」）。
   - 已验证（2026-11-01，真实 Electron 45，webview 用和应用相同的策略：沙箱、`contextIsolation`、无 preload、自定义协议页面）：顶层页面和同源 iframe 里的 `console.log` 都触发 webview 的 `console-message`，`sourceId` 区分来源；`webview.executeJavaScript` 能调页面里的函数并拿到返回值。
-- **位置写回**：`PATCH /api/artifacts/boards`，参数 `dir`、`name`、画板 id、x、y、width、height。目录用 `resolveArtifactsDir` 校验（和 `GET /api/artifacts/open` 同一套），不依赖会话，全局区的产物和全屏查看也能用，也就不必放开工作区路由的非 GET 限制（`sessions.ts:169`）。sidecar 读-改-写，只改这四个字段，返回产物文件夹新的最新修改时间。
+- **位置写回**：`PATCH /api/artifacts/boards`，参数 `dir`、`name`、画板 id、x、y、width、height。目录用 `resolveArtifactsDir` 校验（和 `GET /api/artifacts/open` 同一套），不依赖会话，全局区的产物和全屏查看也能用，也就不必放开工作区路由的非 GET 限制（`sessions.ts:169`）。sidecar 读-改-写，只改这四个字段；写入期间持有这份产物的锁，返回 `{ dir, files, latestMtimeMs }`（产物文件夹、改过的文件和文件夹新的最新修改时间，时间在锁内取）。
 - **刷新**：现在的 `reloadChangedArtifactTabs` 对任何变了的产物标签都调 `browserReload`（`artifactStore.ts:34-50`）。画布标签改为调 `refresh()`：脚本重读清单、重载所有画板，保留平移和缩放（sidecar 的列表只有文件夹级的修改时间，不做逐板判断）。位置写回会改 `artifact.json`，写回成功后渲染进程用接口返回的修改时间更新标签记的时间，否则下一次「一轮结束」检查会把用户自己的拖动当成外部改动。用户和 Agent 同时改同一个产物时，这个更新可能吞掉一次刷新，可以接受。
 - **画板 iframe 的标题**：脚本给每个 iframe 设 `title`（画板的 `title`，没有则用 `id`），快照的段头取它（`pageProgram.ts:788`），段头编号可以作为 `region` 参数只读那一张。
 - **快照额度**：一次快照最多 150 个元素（`snapshot/types.ts:101`），在各 iframe 之间均分，屏外的排在最后（`pageProgram.ts:687-720`），所以移出视口的画板可能分不到。技能规定这时用 `region` 读那张画板，或单独打开它。
@@ -328,7 +393,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 
 ## 幻灯片（已另行设计）
 
-幻灯片在 2026-11-01 被拆出本文的范围，现在按[幻灯片技术设计](../slides/tech-design.md)分阶段做，第一阶段（格式和查看）已实现：清单种类 `deck`、舞台脚本、工具条、导出、`/slides` 技能。模板类别、Slides 入口和用户编辑还没做。下面是拆出时的调研，保留作背景。
+幻灯片在 2026-11-01 被拆出本文的范围，现在按[幻灯片技术设计](../slides/tech-design.md)分阶段做，三个阶段都已实现：清单种类 `deck`、舞台脚本、工具条、导出、`/slides` 技能（第一阶段），模板类别和 Slides 入口（第二阶段），用户改文字、调页序和删除页（第三阶段）。下面是拆出时的调研，保留作背景。
 
 - **`deck` 只是一个标签。** 从模板建出的幻灯片产物，清单里 `kind` 是 `deck`，卡片上显示种类标签，但在应用里和普通页面完全一样：没有翻页控件、大纲或演示模式。
 - **按设计的导出方式只出一页。** 对 `simple-deck`（6 页）和 `html-ppt-zhangzara-raw-grid`（10 页）用导出的真实参数（`printBackground: true, preferCSSPageSize: true`）做 `printToPDF`：两个都只输出 1 页 Letter 竖版，只有第一张幻灯片的内容（PDF 里 `/Count 1`，`pdfinfo` 也是 1 页）。「幻灯片按页分页靠产物自己的打印样式」这个假设不成立。
@@ -451,7 +516,9 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 | `GET /api/artifacts/open?dir=&name=` | 客户端 → sidecar | 按产物所在的 `dc_artifacts/` 绝对路径（全局存放区用固定标记 `global`）加产物名解析打开路径，返回协议根目录和入口文件，也可只给产物 `id`，在所有已知位置里按 `id` 找（标签重开用），无副作用，不依赖会话；全屏查看和会话面板共用 |
 | `POST /api/artifacts/opened` | 客户端 → sidecar | 产物 `id`；记录最近打开 |
 | `POST /api/artifacts/copy` | 客户端 → sidecar | 产物 `id`、会话 id；「在会话里继续」用它把产物复制进会话的工作目录（来源在全局区时搬进去），返回新位置和 `id` |
-| `PATCH /api/artifacts/boards` | 客户端 → sidecar | `dir`、`name`、画板 id、x/y/width/height，只改这几个字段，返回产物文件夹新的最新修改时间；不依赖会话 |
+| `PATCH /api/artifacts/boards` | 客户端 → sidecar | `dir`、`name`、画板 id、x/y/width/height，只改这几个字段，写入期间持锁，返回 `{ dir, files, latestMtimeMs }`；不依赖会话 |
+| `POST`、`DELETE /api/artifacts/edit-lock` | 客户端 → sidecar | `dir`、`name`、`holder`（标签 id），`POST` 在请求体里，`DELETE` 在查询串里。用户开始改时上锁（每 5 秒续），改完解锁；20 秒没续自己失效 |
+| 控制请求 `artifact_edit_wait` | CLI → sidecar | Write、Edit 写产物文件前、`ArtifactCopy` 复制前等锁；回答里是锁期间用户改过的文件 |
 | `PUT /api/artifacts/thumbnail` | 客户端 → sidecar | 产物 `id`、文件修改时间、图片（base64 的 JPEG，不超过 256 KB）；存缩略图 |
 | `POST /api/browser/emulation/suspend`、`POST /api/browser/emulation/resume` | 客户端 → sidecar | 会话 id、标签 id；导出前后暂停和恢复页面上 Agent 设置的模拟，期间保留记录 |
 | `GET /api/artifacts/thumbnail?id=` | 客户端 → sidecar | 返回该产物的缩略图 JPEG，没有则 404；`GET /api/artifacts` 的每项带缩略图的时间 |
@@ -465,7 +532,7 @@ Agent 做一个服务页面放在侧边栏展示，不算产物，不进 Artifac
 | 浏览器工具 `close_tab` | Agent → sidecar | 关闭 Agent 自己开的标签；`navigate` 的结果带标签 id，技能规定检查时复用同一个标签 |
 | 导出请求 | 渲染进程 → Electron 主进程 | 页面的 webContents id、格式、建议文件名、对话框文字；主进程弹保存对话框、生成、写盘，只写用户选的位置 |
 | 点选结果 `url`、`title` | 页面程序 → 客户端 | 改为元素所在文档，字段不变 |
-| 画布脚本 ↔ 渲染进程 | `console-message` / `executeJavaScript` | 脚本发 `move`（画板位置）和 `open`（在新标签打开某张画板）；渲染进程调脚本的 `refresh()` 重读清单、重载画板 |
+| 画布脚本 ↔ 渲染进程 | `console-message` / `executeJavaScript` | 脚本发 `move`（画板位置）、`open`（在新标签打开某张画板）和 `busy`（开始和结束拖动，用来上锁和解锁）；渲染进程调脚本的 `refresh()` 重读清单、重载画板 |
 | 浏览器会话（`POST`、`DELETE`、`PUT /json/new`、`/json/close/<id>`、页面目标的 WebSocket） | 复刻脚本 → sidecar | 令牌鉴权，形状同上游适配器的 `connectOverDaemon`；sidecar 经宿主通道转给主进程的隐藏窗口 |
 | 宿主通道的后台会话命令和 CDP 事件推送 | sidecar ↔ Electron 主进程 | 创建目标、关闭目标、转发 CDP、销毁会话；CDP 事件主动推送 |
 | 复刻脚本 | Agent → Bash | `BUN_BE_BUN=1 <CLI 可执行文件> <脚本>.mjs`，脚本在 `desktop/web-clone/` |
@@ -529,7 +596,7 @@ A -> 用户 : 回复，附截图
 # 安全
 
 - 产物 HTML 是 Agent 写的任意页面，在侧边浏览器的沙箱分区里运行，和打开任何项目 HTML 一样。它可以联网，这与 ShowUI 不同，是有意的。
-- 画布脚本上报的日志，同源页面都能伪造。渲染进程只接受当前标签的、格式正确的、画板 id 存在于清单的 `move`、`open` 消息，最坏结果是改动画板位置或多开一个标签。
+- 画布脚本上报的日志，同源页面都能伪造。渲染进程只接受当前标签的、格式正确的 `move`、`open`（画板 id 存在于清单）和 `busy` 消息，最坏结果是改动画板位置、多开一个标签，或让 Agent 写这份产物时一直等到这个标签关掉（渲染进程收到 `busy: true` 后每 5 秒续一次，标签关掉后约 20 秒锁才失效）。
 - 复刻的后台浏览器：会话接口要令牌；隐藏窗口用独立的内存分区，看不到用户的登录状态；脚本对外部来源的 `Page.navigate` 要用户授权；会话结束销毁窗口和分区。脚本经 Bash 运行，走现有的 Bash 权限询问。
 - 模板内容含 HTML 和脚本，与 Agent 写的产物同等对待。设计系统包是文本和 CSS。
 - 导出只写用户在系统对话框里选的位置。
@@ -538,13 +605,19 @@ A -> 用户 : 回复，附截图
 
 - **sidecar**：产物扫描（有效、缺字段、`systems` 保留、软链接指出工作目录、目录不存在、中途切换的工作目录和子 Agent 的 worktree 都被扫描、全局存放区）；删除入口先搬产物再删目录（`ExitWorktree`、子 Agent 无改动自动删除、30 天清理、团队成员含 `rm` 兜底、钩子路径都走它），搬移失败不删、重名加后缀，子 Agent 结果带转入提示；`.git/info/exclude` 只写一次；产物位置检查（四处调用结果一致：Write、Edit、NotebookEdit、表内 Bash 命令、PowerShell 被拒，读取免确认；bypass 模式下同样拒绝；Bash `cd` 到别的 worktree 后写入仍被拒；EnterWorktree、ExitWorktree 之后按新工作根判断；工作根下 Write/Edit 不弹确认，plan 模式和受保护文件名仍询问，用户 deny/ask 规则优先；全局区产物读免确认、写被拒）；`id`（搬移保留、复制换新、缺失时标清单有误；最近打开、缩略图、索引、标签重开都按它找到搬移后的产物）；`artifact_written` 事件（主线程、前台和后台子 Agent、团队成员的写入都发出，失败和被拒的不发，不进会话记录）；「复制进项目」（全局来源校验后删除、复制失败不删、worktree 来源保留、重名加后缀）；已知工作目录（会话记录、`git worktree list`、事件登记）；「产物 → 会话」对应（写入事件、轮次快照里的变化含 Bash 写入、两个会话轮次重叠时都记）；「已打开」；打开路径解析（入口、清单有误）；最近打开记录；画板位置写回只改指定字段、目录校验含软链接；浏览器会话接口（令牌、授权转发、会话结束的清理）；`close_tab` 只关 Agent 自己开的标签；模板新建复制并写清单、复制失败不留文件夹；设计系统库的转换和复制（含失败不留文件夹）；`navigate` 的新开标签和产物映射。
 - **Electron**：保留路径只返回画布脚本，其他路径照旧走项目文件；导出拒绝没有对话框结果的写入；后台浏览器（隐藏窗口的创建和销毁、分区隔离、跳转规则、调试器转发）。
-- **页面程序**：画布脚本（拒绝画板文件的绝对路径、协议地址和 `..`，`move`、`open` 消息，`refresh()` 保留平移缩放）；iframe 里点选时 `url`、`title` 是元素所在文档的，顶层不变；同源 iframe 里的文字选区能「添加到对话」，并归到所在画板。
+- **页面程序**：画布脚本（拒绝画板文件的绝对路径、协议地址和 `..`，`move`、`open`、`busy` 消息，`refresh()` 保留平移缩放）；iframe 里点选时 `url`、`title` 是元素所在文档的，顶层不变；同源 iframe 里的文字选区能「添加到对话」，并归到所在画板。
 - **桌面**：Artifacts 页列表、筛选、清单有误、空状态、全屏查看；会话入口的排序、本会话标记和「添加到对话」；`browser` 标签重启重开（项目页、模板预览、别的 worktree 和全局区的产物、EnterWorktree 之后打开的产物）；即时刷新只认实时消息、回放不触发、只重载变了的标签、面板关着也工作；`console-message` 前缀消息的校验，画布标签的刷新走 `refresh()` 且自己的写回不触发刷新；点选附件显示产物和画板名；两种主题和两种语言。
 - **CLI**：产物检查工具（缺字段、入口缺失、引用的本地文件缺失、引用了 `dc_artifacts/` 之外的文件、画布的入口小文件和画板文件），和 sidecar 共用的检查模块；全局存放区位置在 CLI 和 sidecar 两边一致。
 - **真实模型**：写入被拒后，技能已加载和未加载两种情况下 Agent 都改走「复制进项目」，子 Agent 和团队成员的工具集里有这个工具；Agent 团队成员写产物后，发起会话即时刷新、归属正确。
 - **技能**：`artifacts` 和 `/design` 的注册与参考文件解压；Agent 写到当前工作目录（含子 Agent 的 worktree）的 `dc_artifacts/`。「先征求同意」靠模型自己调用 `artifacts` 技能，要用真实模型验证：用户没要求时说「把这个整理一下」，Agent 先问再写；用户说「做成 artifact」，Agent 直接写；只要图表时，Agent 用 ShowUI。
 - **转换脚本**：模板元数据转成目录记录，缺许可证的按根目录处理并署名，素材来源缺失的条目报错。
 - **端到端**（真实 Electron）：Agent 建一个产物并在新标签打开；Artifacts 页看到它并全屏查看；另一个会话里「添加到对话」后 Agent 接着改；打开画布、拖动画板后清单更新且画布不重载；画布里「在新标签打开」；导出 PDF 和独立 HTML 各一次；快照段头显示画板名；复刻脚本经应用提供的浏览器会话跑完 `recon-site` 和 `asset-harvest`（本地起一个测试站）；Agent 复刻一个本地测试站。
+- **用户在应用里改产物**（见「用户在应用里改产物：锁和通知」）：
+  - 锁（`src/server/__tests__/artifact-edit-locks.test.ts`）：等待时会话状态出现并带产物标题（读不到清单用文件夹名），没锁时不出现，解锁和 CLI 取消时清掉，sidecar 把 `control_cancel_request` 交给锁服务；没锁时立刻回答；所有持有者放开才解锁；解锁后回答并带上锁期间改过的文件（合并、去重）；结束信号不来时自己失效、续期后继续保持；控制请求按路径找到产物文件夹，产物外的路径立刻回答；真实的 Write 在锁期间等待、解锁后写入；Edit 等过锁、用户改了文件时被拒绝并列出文件，文件保留用户的内容；中断这一轮时等待取消、不写；不是 sidecar 启动的 CLI、没有宿主或产物外的文件不问；`ArtifactCopy` 在移动之前等源产物（`ArtifactCopyTool.test.ts`）；sidecar 给 CLI 设环境变量（`conversation-service.test.ts`）。
+  - 用户写入（`src/server/__tests__/artifacts.test.ts`）：幻灯片的写回和画布的 `updateBoard` 都上锁、返回 `{ dir, files, latestMtimeMs }`，Agent 等到解锁并拿到改过的文件；上锁和解锁的接口。
+  - 渲染进程：页面脚本在真正开始改和改完时发 `busy`（`deckShell.test.ts`、`canvasShell.test.ts`），消息解析（`deckBridge.test.ts`、`canvasBridge.test.ts`）；收到 `busy` 上锁并续期，写回之后才解锁，又开始改时不解锁，解锁失败不重载，注销时停止续期（`artifactUserEdits.test.ts`、`DeckControls.test.tsx`），删除前后上锁和解锁（`deckEdits.test.ts`、`useCanvasTab.test.tsx`）；改字、调序、删页、拖画板都出块，一份产物一个、文件合并，失败和没有会话不出（同上）；块的名字、合并和模型看到的话（`workspaceChatContextStore.test.ts`），发送和去掉（`ChatInput.test.tsx`）。
+  - 会话状态：`artifactWait` 的设置和清除，这一轮结束、进程结束或重启、清空对话时清掉（`src/server/__tests__/session-state.test.ts`）；进行中提示显示等待的产物、中英文（`StreamingIndicator.test.tsx`）。
+  - 技能文字（`src/skills/bundled/artifacts.test.ts`、`slides.test.ts`）。
 
 # 分阶段
 
@@ -580,6 +653,10 @@ A -> 用户 : 回复，附截图
 - **画布外壳放在保留路径上，由 sidecar 映射成带查询串的地址**：现有的打开路径只认磁盘上的文件、标签重开会丢查询串，要新增解析入口和特殊分支。改为入口小文件加载保留路径上的脚本。放弃。
 - **复刻要求用户装 Chrome、Edge 或 Chromium**：macOS 不保证有，失败时用户无从处理。改为应用自己提供浏览器会话，也不留这条兜底。放弃。
 - **重写 web-clone 的脚本**：上游已经成熟，MIT 允许直接用；只改浏览器适配器。放弃。
+- **用户在应用里改产物时的锁**没选的做法：
+  - **磁盘上的锁记录**（带过期时间，sidecar 续期，CLI 的工具自己读）。控制请求可行，就不用它：锁的状态只在 sidecar 一处，应用退出不留残留，也符合「CLI 只通过控制请求找 server」。
+  - **锁住「编辑开关开着」的整段时间**。用户开着编辑时 Agent 什么都写不了。只锁真正在改的那一下；时机在页面脚本里一处，要改容易。
+  - **等过锁之后照常写不同的文件，只在结果里附一句**。要改 Write、Edit 的结果格式，而用户调过序时 Agent 往往正需要先重读清单。
 
 # 以后的编辑器
 
@@ -874,3 +951,9 @@ A -> 用户 : 回复，附截图
 | 「复制成功后工具直接发 `artifact_written` 事件」 | 三个会写 `dc_artifacts/` 的工具（`ArtifactCopy`、`UseDesignSystem`、`ChooseDesignTemplate`）共用 `announceArtifactWrite`：先把 `dc_artifacts/` 写进 `info/exclude`，再发事件；放在 `worktree.ts`，因为放进 `artifactEvents.ts` 会让工具执行入口多一层对 `worktree.ts` 的导入 | 同一对调用在三处各写一遍 | `src/utils/worktree.ts` |
 | 未写 | 没有这个字段，「未绑定项目」就是 `workDir === null`；打开产物时桌面端用 `artifactRoot(item)` 求根目录，`openArtifact` 直接收根目录 | 两个字段永远一致，在会话里继续时手工构造的条目还会给出错误的值 | `desktop/src/lib/artifactDisplay.ts`、`desktop/src/stores/workspacePanelStore.ts` |
 | 未写（页面顶部） | Artifacts 页、Design 页、全屏查看器和模板预览的标题行就是窗口的标题行：整行是拖动区域，按钮不拖动；查看器和预览的标题行高度等于 macOS 标题栏高度，侧栏收起时让开红绿灯（`useTitleRow`，会话页用同一套）。`AppShell` 对这些页面和会话页一样，macOS 上不画拖动条 | 把 Artifacts 标签算成没有自带标题行时，macOS 上会画出一条 44px 的空白拖动条，把页面往下推；回到「除定时任务外都自带标题行」的判断，拖动由各页的标题行承担。[未验证] 没有真的拖动过窗口，只量了真实 Electron 里这些行的 `app-region` 是 `drag`、查看器标题行从顶部开始且高 44px | `desktop/src/components/layout/AppShell.tsx`（`pageHasTitleRow`）、`desktop/src/hooks/useTitleRow.ts`、`desktop/src/components/shared/ViewerHeader.tsx`、`desktop/src/pages/ArtifactsPage.tsx`、`desktop/src/components/design/DesignMode.tsx` |
+
+### 用户在应用里改产物：审查后的修正（2026-11-16）
+
+一个 Opus 子代理审查了实现，以下几处已改，正文写的是改后的做法：只在 sidecar 启动的 CLI 里问（原来凭「有 `requestHost`」判断，`-p` 运行里每次写产物文件都会失败）；写回函数注销时停止续期（原来标签关了以后会一直续，Agent 一直等）；锁按持有者计（原来一次解锁会放开另一个标签或同一个标签下一段编辑的锁）；面板没上锁时的写入写完就放开；解锁失败不重载页面。代码在 `src/server/services/artifactEditLocks.ts`、`src/utils/artifactEditLock.ts`、`desktop/src/lib/artifactUserEdits.ts`。
+
+第二次审查（同日，按维度分组的四个 Opus 子代理）后又改了：四个用户写入只解析一次产物文件夹，返回同一个形状 `{ dir, files, latestMtimeMs }`，时间在锁内取；「文件仍在产物文件夹内」的判断并成一个函数（`fileInsideFolder`，`src/utils/artifacts.ts`）；控制请求 `artifact_edit_wait` 登记进请求联合类型。

@@ -36,6 +36,8 @@ import {
   resolveStoredBrowserUrl,
   setBrowserGuestLayer,
   setCanvasMessageHandler,
+  setDeckMessageHandler,
+  takeDeckEdit,
   showBlockedNavigation,
   submitBrowserInput,
 } from './browserGuests'
@@ -841,7 +843,7 @@ describe('deck pages', () => {
     it('keeps what the deck script reports for the tab, whoever opened it', () => {
       const { webview } = openDeck()
       log(webview, state())
-      expect(deckOf('a')).toEqual({ artifact: 'deck-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse' })
+      expect(deckOf('a')).toEqual({ artifact: 'deck-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse', editing: false })
       log(webview, state({ slide: 'numbers', title: 'numbers', index: 2, mode: 'overview' }))
       expect(deckOf('a')).toMatchObject({ slide: 'numbers', index: 2, mode: 'overview' })
     })
@@ -862,6 +864,41 @@ describe('deck pages', () => {
       expect(deckOf('a')).not.toBeNull()
       webview.dispatchEvent(Object.assign(new Event('did-navigate'), { url: 'https://example.com/' }))
       expect(deckOf('a')).toBeNull()
+    })
+  })
+
+  describe('edits made in the deck', () => {
+    afterEach(() => {
+      setDeckMessageHandler('a', null)
+    })
+
+    it('passes a new order and an edit to the handler of the tab, and neither the state nor messages of other tabs', () => {
+      const { webview } = openDeck()
+      openDeck('b')
+      const handler = vi.fn()
+      setDeckMessageHandler('a', handler)
+      log(webview, state())
+      log(webview, { type: 'order', slides: ['numbers', 'agenda', 'cover'] })
+      log(webview, { type: 'edit' })
+      log(webview, { type: 'delete' })
+      log(webview, { type: 'exit' })
+      log(webview, { type: 'edit' }, 'dreamcoder-project://abc/talk/embeds/demo.html')
+      log(webviewOf('b').webview, { type: 'edit' })
+      expect(handler.mock.calls).toEqual([[{ type: 'order', slides: ['numbers', 'agenda', 'cover'] }], [{ type: 'edit' }], [{ type: 'delete' }]])
+
+      setDeckMessageHandler('a', null)
+      log(webview, { type: 'edit' })
+      expect(handler).toHaveBeenCalledTimes(3)
+    })
+
+    it('takes the edit the deck holds, and nothing when the page gives something else', async () => {
+      const { execute } = openDeck()
+      execute.mockResolvedValueOnce({ id: 'agenda', html: '<section>b</section>', previous: '<section>a</section>' })
+      expect(await takeDeckEdit('a')).toEqual({ id: 'agenda', html: '<section>b</section>', previous: '<section>a</section>' })
+      expect(execute).toHaveBeenCalledWith('window.__dreamcoderDeck ? window.__dreamcoderDeck.takeEdit() : null')
+      execute.mockResolvedValueOnce({ id: 'agenda' })
+      expect(await takeDeckEdit('a')).toBeNull()
+      expect(await takeDeckEdit('missing')).toBeNull()
     })
   })
 

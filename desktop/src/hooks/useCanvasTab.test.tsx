@@ -4,24 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   moveBoard: vi.fn(),
   open: vi.fn(),
+  holdEdit: vi.fn(),
+  releaseEdit: vi.fn(),
+  refreshArtifactShell: vi.fn(),
   setCanvasMessageHandler: vi.fn(),
   submitBrowserInput: vi.fn(),
   toastError: vi.fn(),
 }))
 
-vi.mock('../api/artifacts', () => ({ artifactsApi: { moveBoard: mocks.moveBoard, open: mocks.open } }))
+vi.mock('../api/artifacts', () => ({ artifactsApi: { moveBoard: mocks.moveBoard, open: mocks.open, holdEdit: mocks.holdEdit, releaseEdit: mocks.releaseEdit } }))
 vi.mock('../lib/browserGuests', () => ({
   setCanvasMessageHandler: mocks.setCanvasMessageHandler,
   submitBrowserInput: mocks.submitBrowserInput,
+  refreshArtifactShell: mocks.refreshArtifactShell,
 }))
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
 
 import type { CanvasMessage } from '../lib/canvasBridge'
+import { useWorkspaceChatContextStore } from '../stores/workspaceChatContextStore'
 import { useWorkspacePanelStore } from '../stores/workspacePanelStore'
 import { useCanvasTab } from './useCanvasTab'
 
 const canvasArtifact = { id: 'id-flow', name: 'flow', mtimeMs: 1, canvas: true as const }
-const target = { tabId: 't1', sessionId: 's1' as string | null, root: '/repo/dc_artifacts', name: 'flow', artifact: canvasArtifact }
+const target = { tabId: 't1', sessionId: 's1' as string | null, root: '/repo/dc_artifacts', name: 'flow', title: 'Flow', artifact: canvasArtifact }
+const edits = () => (useWorkspaceChatContextStore.getState().referencesBySession.s1 ?? []).filter((reference) => reference.kind === 'artifact-edit')
 
 function handlerOf(): (message: CanvasMessage) => void {
   const call = mocks.setCanvasMessageHandler.mock.calls.filter(([, handler]) => handler !== null).at(-1)
@@ -36,7 +42,11 @@ describe('useCanvasTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.moveBoard.mockResolvedValue({ latestMtimeMs: 777 })
+    mocks.moveBoard.mockResolvedValue({ latestMtimeMs: 777, dir: '/repo/dc_artifacts/flow', files: ['artifact.json'] })
+    mocks.holdEdit.mockResolvedValue({ ok: true })
+    mocks.releaseEdit.mockResolvedValue({ ok: true })
+    mocks.refreshArtifactShell.mockResolvedValue(true)
+    useWorkspaceChatContextStore.setState(useWorkspaceChatContextStore.getInitialState(), true)
     mocks.open.mockResolvedValue({ rootDir: '/repo/dc_artifacts', filePath: '/repo/dc_artifacts/flow/home.html' })
     mocks.submitBrowserInput.mockResolvedValue(undefined)
     useWorkspacePanelStore.setState({
@@ -52,11 +62,16 @@ describe('useCanvasTab', () => {
     localStorage.clear()
   })
 
-  it('registers a handler for the tab and removes it again', () => {
+  it('registers a handler for the tab and removes it again, and stops holding the canvas then', () => {
     const view = renderHook(() => useCanvasTab(target))
     expect(mocks.setCanvasMessageHandler).toHaveBeenCalledWith('t1', expect.any(Function))
+    vi.useFakeTimers()
+    handlerOf()({ type: 'busy', on: true })
     view.unmount()
     expect(mocks.setCanvasMessageHandler).toHaveBeenLastCalledWith('t1', null)
+    vi.advanceTimersByTime(30_000)
+    expect(mocks.holdEdit).toHaveBeenCalledOnce()
+    vi.useRealTimers()
   })
 
   it('registers nothing without a target', () => {
@@ -80,6 +95,34 @@ describe('useCanvasTab', () => {
     expect(mocks.moveBoard).toHaveBeenCalledTimes(1)
     const tab = useWorkspacePanelStore.getState().panelByTab.s1?.tabs[0]
     expect(tab && 'artifact' in tab ? tab.artifact?.mtimeMs : null).toBe(1)
+  })
+
+  it('holds the canvas while a board is dragged and releases it after the board is written', async () => {
+    renderHook(() => useCanvasTab(target))
+    handlerOf()({ type: 'busy', on: true })
+    expect(mocks.holdEdit).toHaveBeenCalledWith('/repo/dc_artifacts', 'flow', 't1')
+    handlerOf()({ type: 'move', id: 'home', x: 1, y: 2, width: 3, height: 4 })
+    handlerOf()({ type: 'busy', on: false })
+    await vi.waitFor(() => expect(mocks.releaseEdit).toHaveBeenCalledWith('/repo/dc_artifacts', 'flow', 't1'))
+    expect(mocks.moveBoard.mock.invocationCallOrder[0]).toBeLessThan(mocks.releaseEdit.mock.invocationCallOrder[0]!)
+  })
+
+  it('tells the agent of the chat that the user moved a board, with one chip for the canvas', async () => {
+    renderHook(() => useCanvasTab(target))
+    handlerOf()({ type: 'move', id: 'home', x: 1, y: 2, width: 3, height: 4 })
+    handlerOf()({ type: 'move', id: 'detail', x: 1, y: 2, width: 3, height: 4 })
+    await vi.waitFor(() => expect(mocks.moveBoard).toHaveBeenCalledTimes(2))
+    await flush()
+    expect(edits()).toMatchObject([{ path: '/repo/dc_artifacts/flow', name: 'Edited: Flow', artifactEdit: { files: ['artifact.json'], slides: false } }])
+  })
+
+  it('adds no chip for a canvas that belongs to no chat or a move that failed', async () => {
+    mocks.moveBoard.mockRejectedValueOnce(new Error('disk full'))
+    renderHook(() => useCanvasTab(target))
+    handlerOf()({ type: 'move', id: 'home', x: 1, y: 2, width: 3, height: 4 })
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('disk full'))
+    expect(mocks.refreshArtifactShell).toHaveBeenCalledWith('t1')
+    expect(edits()).toEqual([])
   })
 
   it('opens a board in a new tab of the chat', async () => {

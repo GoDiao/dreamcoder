@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   browserStop: vi.fn(),
   hasBrowserGuest: vi.fn(),
   setCanvasMessageHandler: vi.fn(),
+  setDeckMessageHandler: vi.fn(),
+  applyDeckEdit: vi.fn(),
+  flushDeckEdits: vi.fn(async () => undefined),
   openBrowserUrl: vi.fn(),
   placeBrowserGuest: vi.fn(),
   release: vi.fn(),
@@ -35,6 +38,7 @@ vi.mock('../../lib/browserGuests', () => ({
   browserStop: mocks.browserStop,
   hasBrowserGuest: mocks.hasBrowserGuest,
   setCanvasMessageHandler: mocks.setCanvasMessageHandler,
+  setDeckMessageHandler: mocks.setDeckMessageHandler,
   openBrowserUrl: mocks.openBrowserUrl,
   placeBrowserGuest: mocks.placeBrowserGuest,
   reloadAllBrowsers: mocks.reloadAllBrowsers,
@@ -49,6 +53,7 @@ vi.mock('../../lib/artifactExport', async (importOriginal) => ({
 }))
 
 vi.mock('../../hooks/useArtifactThumbnail', () => ({ useArtifactThumbnail: mocks.useArtifactThumbnail }))
+vi.mock('../../lib/deckEdits', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/deckEdits')>()), applyDeckEdit: mocks.applyDeckEdit, flushDeckEdits: mocks.flushDeckEdits }))
 
 vi.mock('../../lib/browserPicks', () => ({
   toggleBrowserPick: mocks.toggleBrowserPick,
@@ -312,7 +317,29 @@ describe('BrowserView', () => {
   })
 
   describe('deck controls', () => {
-    const deck = { artifact: 'id-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse' as const }
+    const deck = { artifact: 'id-1', slide: 'agenda', title: 'Agenda', index: 1, count: 3, mode: 'browse' as const, editing: false }
+    const deckTab = (url: string) => ({ ...tab('t1', url), root: '/repo/dc_artifacts', artifact: { id: 'id-1', name: 'talk', mtimeMs: 1, deck: true as const } })
+
+    it('offers editing on a tab that shows its deck and writes the edits back to that artifact', () => {
+      mocks.applyDeckEdit.mockResolvedValue(undefined)
+      act(() => useBrowserStore.getState().patchPage('t1', { deck }))
+      render(<BrowserView sessionId="s1" tab={deckTab('dreamcoder-project://id/talk/index.html#agenda')} projectRoot="/repo" />)
+      expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+      const handler = mocks.setDeckMessageHandler.mock.calls.find((call) => call[0] === 't1' && call[1])?.[1]
+      handler({ type: 'order', slides: ['b', 'a'] })
+      expect(mocks.applyDeckEdit).toHaveBeenCalledWith({ tabId: 't1', root: '/repo/dc_artifacts', name: 'talk', title: 'talk', sessionId: 's1' }, { type: 'order', slides: ['b', 'a'] })
+    })
+
+    it('offers no editing on a deck tab without artifact data or on an artifact tab that shows another page', () => {
+      act(() => useBrowserStore.getState().patchPage('t1', { deck }))
+      const unknown = render(<BrowserView sessionId="s1" tab={tab('t1', 'dreamcoder-project://id/talk/index.html')} projectRoot="/repo" />)
+      expect(screen.getByTestId('deck-controls')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      unknown.unmount()
+      render(<BrowserView sessionId="s1" tab={deckTab('dreamcoder-project://id/other/index.html')} projectRoot="/repo" />)
+      expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      expect(mocks.setDeckMessageHandler).not.toHaveBeenCalledWith('t1', expect.any(Function))
+    })
 
     it('shows the deck controls on any tab whose page reports a deck, with or without artifact data, and on no other tab', () => {
       const view = render(<BrowserView sessionId="s1" tab={tab('t1', 'dreamcoder-project://id/talk/index.html')} projectRoot="/repo" />)
@@ -571,6 +598,7 @@ describe('BrowserView', () => {
             pendingPermissions: [],
             pendingBrowserGrants: [],
             browserActivity: { tabId: 't1' },
+            artifactWait: null,
             slashCommands: [],
             activeGoal: null,
             backgroundTasks: [],

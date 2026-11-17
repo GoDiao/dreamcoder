@@ -75,6 +75,7 @@ import {
   getPatchForEdit,
   preserveQuoteStyle,
 } from './utils.js'
+import { refuseWriteAfterUserEdits } from '../../utils/artifactEditLock.js'
 
 // V8/Bun string length limit is ~2^30 characters (~1 billion). For typical
 // ASCII/Latin-1 files, 1 byte on disk = 1 character, so 1 GiB in stat bytes
@@ -391,6 +392,7 @@ export const FileEditTool = buildTool({
       userModified,
       updateFileHistoryState,
       dynamicSkillDirTriggers,
+      abortController,
     },
     _,
     parentMessage,
@@ -400,6 +402,7 @@ export const FileEditTool = buildTool({
     // 1. Get current state
     const fs = getFsImplementation()
     const absoluteFilePath = expandPath(file_path)
+    await refuseWriteAfterUserEdits(absoluteFilePath, abortController.signal)
 
     // Discover skills from this file's path (fire-and-forget, non-blocking)
     // Skip in simple mode - no skills available

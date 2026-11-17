@@ -92,6 +92,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useTabStore } from '../../stores/tabStore'
 import { parseBrowserReferencePrompt } from '../../lib/browserReferences'
+import { artifactEditReference } from '../../lib/artifactEditReference'
 import { useWorkspaceChatContextStore } from '../../stores/workspaceChatContextStore'
 import { useProviderStore } from '../../stores/providerStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -913,6 +914,38 @@ describe('ChatInput file mentions', () => {
     expect(sent.content).not.toContain('stale')
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  it('shows one chip for an artifact the user edited in the panel, tells the model to check it when sent and then drops the chip', async () => {
+    useWorkspaceChatContextStore.getState().addReference(sessionId, artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['artifact.json'], slides: true }))
+    useWorkspaceChatContextStore.getState().addReference(sessionId, artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['artifact.json'], slides: true }))
+    render(<ChatInput sessionId={sessionId} compact />)
+    expect(screen.getAllByText('Edited: Talk')).toHaveLength(1)
+
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'continue' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    const sent = mocks.wsSend.mock.calls[0]?.[1] as { content: string; attachments: unknown[] }
+    expect(sent.content).toContain('The user changed these artifacts in the app')
+    expect(sent.content).toContain('/repo/dc_artifacts/talk')
+    expect(sent.content.endsWith('continue')).toBe(true)
+    expect(sent.attachments).toEqual([])
+    expect(useWorkspaceChatContextStore.getState().referencesBySession[sessionId]).toEqual([])
+    const messages = useChatStore.getState().sessions[sessionId]?.messages ?? []
+    expect(messages[messages.length - 1]).toMatchObject({ type: 'user_text', content: 'continue', attachments: [{ type: 'artifact', name: 'Edited: Talk' }] })
+  })
+
+  it('says nothing about the artifact once its chip is removed', async () => {
+    useWorkspaceChatContextStore.getState().addReference(sessionId, artifactEditReference({ dir: '/repo/dc_artifacts/talk', title: 'Talk', files: ['artifact.json'], slides: true }))
+    render(<ChatInput sessionId={sessionId} compact />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Edited: Talk' }))
+    const input = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'continue' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(mocks.wsSend).toHaveBeenCalled())
+    expect((mocks.wsSend.mock.calls[0]?.[1] as { content: string }).content).toBe('continue')
   })
 
   it('does not wait for the page when no element was picked', async () => {

@@ -52,6 +52,7 @@ import {
   renderToolUseRejectedMessage,
   userFacingName,
 } from './UI.js'
+import { refuseWriteAfterUserEdits } from '../../utils/artifactEditLock.js'
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -222,11 +223,12 @@ export const FileWriteTool = buildTool({
   },
   async call(
     { file_path, content },
-    { readFileState, updateFileHistoryState, dynamicSkillDirTriggers },
+    { readFileState, updateFileHistoryState, dynamicSkillDirTriggers, abortController },
     _,
     parentMessage,
   ) {
     const fullFilePath = expandPath(file_path)
+    await refuseWriteAfterUserEdits(fullFilePath, abortController.signal)
     const dir = dirname(fullFilePath)
 
     // Discover skills from this file's path (fire-and-forget, non-blocking)

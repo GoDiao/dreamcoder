@@ -90,10 +90,14 @@ export async function readRecoverableJsonFile<T>({
 }
 
 export async function writeJsonFileAtomic(filePath: string, value: unknown): Promise<void> {
+  await writeTextFileAtomic(filePath, JSON.stringify(value, null, 2) + '\n')
+}
+
+export async function writeTextFileAtomic(filePath: string, text: string): Promise<void> {
   const tmpFile = `${filePath}.tmp.${process.pid}.${Date.now()}.${randomBytes(6).toString('hex')}`
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   try {
-    await fs.writeFile(tmpFile, JSON.stringify(value, null, 2) + '\n', 'utf-8')
+    await fs.writeFile(tmpFile, text, 'utf-8')
     await fs.rename(tmpFile, filePath)
   } catch (error) {
     await fs.unlink(tmpFile).catch(() => {})

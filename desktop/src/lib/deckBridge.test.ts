@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DECK_LOG_PREFIX, deckModeCall, isDeckRect, parseDeckMessage, slideFile } from './deckBridge'
+import { DECK_LOG_PREFIX, deckEditingCall, deckModeCall, isDeckEdit, isDeckRect, parseDeckMessage, slideFile } from './deckBridge'
 
 const SCRIPT = 'dreamcoder-project://abc/__dreamcoder__/deck.js'
 const line = (payload: unknown) => `${DECK_LOG_PREFIX}${JSON.stringify(payload)}`
-const state = (overrides: Record<string, unknown> = {}) => ({ type: 'state', artifact: 'deck-1', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', ...overrides })
+const state = (overrides: Record<string, unknown> = {}) => ({ type: 'state', artifact: 'deck-1', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', editing: false, ...overrides })
 
 describe('parseDeckMessage', () => {
   it('reads the state of a deck and the request to leave the presentation', () => {
@@ -14,7 +14,27 @@ describe('parseDeckMessage', () => {
 
   it('reads the state of a deck without slides or without an artifact id, and drops fields it does not know', () => {
     const empty = state({ artifact: null, slide: null, title: null, index: -1, count: 0, extra: 'x' })
-    expect(parseDeckMessage(line(empty), SCRIPT)).toEqual({ type: 'state', artifact: null, slide: null, title: null, index: -1, count: 0, mode: 'browse' })
+    expect(parseDeckMessage(line(empty), SCRIPT)).toEqual({ type: 'state', artifact: null, slide: null, title: null, index: -1, count: 0, mode: 'browse', editing: false })
+  })
+
+  it('reads whether editing is on, and takes a state without the field as not editing', () => {
+    expect(parseDeckMessage(line(state({ editing: true })), SCRIPT)).toMatchObject({ editing: true })
+    const { editing: _editing, ...older } = state()
+    expect(parseDeckMessage(line(older), SCRIPT)).toMatchObject({ editing: false })
+  })
+
+  it('reads a new order of the slides, an edit and a request to delete the current slide', () => {
+    expect(parseDeckMessage(line({ type: 'order', slides: ['b', 'a'] }), SCRIPT)).toEqual({ type: 'order', slides: ['b', 'a'] })
+    expect(parseDeckMessage(line({ type: 'edit', extra: 'x' }), SCRIPT)).toEqual({ type: 'edit' })
+    expect(parseDeckMessage(line({ type: 'delete' }), SCRIPT)).toEqual({ type: 'delete' })
+    expect(parseDeckMessage(line({ type: 'busy', on: true }), SCRIPT)).toEqual({ type: 'busy', on: true })
+    expect(parseDeckMessage(line({ type: 'busy', on: 'yes' }), SCRIPT)).toBeNull()
+  })
+
+  it('ignores an order with ids that are not slide ids', () => {
+    for (const bad of [{ type: 'order', slides: 'a' }, { type: 'order', slides: ['a', 3] }, { type: 'order', slides: ['../x'] }]) {
+      expect(parseDeckMessage(line(bad), SCRIPT)).toBeNull()
+    }
   })
 
   it('ignores a message that did not come from the deck script, such as one logged by a slide, an embedded page or another site', () => {
@@ -30,7 +50,7 @@ describe('parseDeckMessage', () => {
     expect(parseDeckMessage('hello', SCRIPT)).toBeNull()
     expect(parseDeckMessage(`dreamcoder-canvas:${JSON.stringify(state())}`, SCRIPT)).toBeNull()
     expect(parseDeckMessage(`${DECK_LOG_PREFIX}{`, SCRIPT)).toBeNull()
-    expect(parseDeckMessage(line({ type: 'order', slides: ['a'] }), SCRIPT)).toBeNull()
+    expect(parseDeckMessage(line({ type: 'zoom' }), SCRIPT)).toBeNull()
     expect(parseDeckMessage(line(null), SCRIPT)).toBeNull()
     expect(parseDeckMessage(line([state()]), SCRIPT)).toBeNull()
   })
@@ -46,6 +66,18 @@ describe('deck calls', () => {
   it('builds the call that sets a mode and the path of a slide file', () => {
     expect(deckModeCall('overview')).toBe('window.__dreamcoderDeck?.setMode("overview")')
     expect(slideFile('agenda')).toBe('slides/agenda.html')
+  })
+
+  it('builds the call that turns editing on or off', () => {
+    expect(deckEditingCall(true)).toBe('window.__dreamcoderDeck?.setEditing(true)')
+    expect(deckEditingCall(false)).toBe('window.__dreamcoderDeck?.setEditing(false)')
+  })
+
+  it('accepts only an edit with a slide id and the new and previous text', () => {
+    expect(isDeckEdit({ id: 'cover', html: '<section></section>', previous: '<section>x</section>' })).toBe(true)
+    expect(isDeckEdit({ id: '../cover', html: '', previous: '' })).toBe(false)
+    expect(isDeckEdit({ id: 'cover', html: '<section></section>' })).toBe(false)
+    expect(isDeckEdit(null)).toBe(false)
   })
 
   it('accepts only a rectangle with a size', () => {

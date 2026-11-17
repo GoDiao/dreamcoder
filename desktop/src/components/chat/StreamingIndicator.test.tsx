@@ -47,6 +47,7 @@ function sessionWithTurn(sessionId: string, turn: SessionState['turn']): PerSess
       pendingPermissions: [],
       pendingBrowserGrants: [],
       browserActivity: null,
+      artifactWait: null,
       slashCommands: [],
       activeGoal: null,
       backgroundTasks: [],
@@ -131,5 +132,36 @@ describe('StreamingIndicator elapsed time', () => {
       vi.advanceTimersByTime(5000)
     })
     expect(screen.queryByText(/^\d+s$/)).not.toBeInTheDocument()
+  })
+})
+
+describe('StreamingIndicator while the agent waits for the user', () => {
+  const waiting = (wait: SessionState['artifactWait']) => {
+    const session = sessionWithTurn('a', { phase: 'running', startedAt: NOW, activity: 'tool' })
+    return { ...session, chatState: 'tool_executing' as const, mirror: { ...session.mirror!, artifactWait: wait } }
+  }
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('says it waits for the user to finish editing the artifact, and goes back to the usual text once that ends', () => {
+    useSettingsStore.setState({ locale: 'en' })
+    useChatStore.setState({ sessions: { a: waiting({ folder: '/repo/dc_artifacts/talk', title: 'Quarterly review' }) } })
+    render(<StreamingIndicator sessionId="a" />)
+    expect(screen.getByText('Waiting for you to finish editing “Quarterly review”...')).toBeInTheDocument()
+
+    act(() => {
+      useChatStore.setState({ sessions: { a: waiting(null) } })
+    })
+    expect(screen.queryByText(/Waiting for you/)).not.toBeInTheDocument()
+    expect(screen.getByText('Running...')).toBeInTheDocument()
+  })
+
+  it('uses the language of the app', () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    useChatStore.setState({ sessions: { a: waiting({ folder: '/repo/dc_artifacts/talk', title: 'Talk' }) } })
+    render(<StreamingIndicator sessionId="a" />)
+    expect(screen.getByText('正在等你改完「Talk」...')).toBeInTheDocument()
   })
 })

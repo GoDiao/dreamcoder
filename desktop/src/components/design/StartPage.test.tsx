@@ -560,7 +560,7 @@ describe('StartPage', () => {
       expect(screen.queryByTestId('deck-controls')).not.toBeInTheDocument()
 
       act(() => {
-        useBrowserStore.getState().patchPage(DESIGN_PREVIEW_TAB, { deck: { artifact: 'id-talk', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse' } })
+        useBrowserStore.getState().patchPage(DESIGN_PREVIEW_TAB, { deck: { artifact: 'id-talk', slide: 'cover', title: 'Cover', index: 0, count: 3, mode: 'browse', editing: false } })
       })
 
       const controls = screen.getByTestId('deck-controls')

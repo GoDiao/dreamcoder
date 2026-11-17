@@ -37,7 +37,7 @@ export function ArtifactViewer({ viewing }: { viewing: ViewedArtifact }) {
     () => artifactsApi.openById(viewing.id),
     () => artifactsApi.markOpened(viewing.id),
   )
-  useCanvasTab(item && kind === 'canvas' ? { tabId: ARTIFACT_VIEW_TAB, sessionId: null, root: artifactRoot(item), name: item.name } : null)
+  useCanvasTab(item && kind === 'canvas' ? { tabId: ARTIFACT_VIEW_TAB, sessionId: null, root: artifactRoot(item), name: item.name, title: item.manifest?.title ?? item.name } : null)
 
   const exportActions = useArtifactExportActions({ tabId: ARTIFACT_VIEW_TAB, sessionId: null, title: viewing.title })
   const report = (error: unknown) => toast.error(errorMessage(error))
@@ -94,7 +94,7 @@ export function ArtifactViewer({ viewing }: { viewing: ViewedArtifact }) {
           }
         />
       </ViewerHeader>
-      <DeckControls tabId={ARTIFACT_VIEW_TAB} />
+      <DeckControls tabId={ARTIFACT_VIEW_TAB} editTarget={item && kind === 'deck' ? { root: artifactRoot(item), name: item.name, title: item.manifest?.title ?? item.name, sessionId: null } : undefined} />
       <div ref={stageRef} data-testid="artifact-viewer-stage" className="min-h-0 flex-1" />
     </div>
   )

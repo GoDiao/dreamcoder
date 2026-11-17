@@ -28,6 +28,7 @@ function mirror(browserActivity: SessionState['browserActivity']): SessionState 
     pendingPermissions: [],
     pendingBrowserGrants: [],
     browserActivity,
+    artifactWait: null,
     slashCommands: [],
     activeGoal: null,
     backgroundTasks: [],

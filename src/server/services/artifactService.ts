@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -13,11 +14,13 @@ import {
   latestMtimeMs,
   readArtifactEntry,
   resolveArtifactEntryFile,
+  fileInsideFolder,
   scanArtifactsDir,
   type ArtifactEntry,
 } from '../../utils/artifacts.js'
 import { isSameOrInsidePathForPlatform } from '../../utils/windowsDrivePath.js'
 import { isSafeBoardFile } from '../../utils/canvas.js'
+import { isSafeSlideId, slideFile } from '../../utils/deck.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { copyArtifactFolder } from '../../utils/artifactTransfer.js'
@@ -31,12 +34,14 @@ import {
 } from '../../utils/designSystems.js'
 import { ensureArtifactsDirExcluded } from '../../utils/worktree.js'
 import { listGitWorktrees } from './repositoryLaunchService.js'
-import { readRecoverableJsonFile, normalizeJsonObject, writeJsonFileAtomic } from './recoverableJsonFile.js'
+import { readRecoverableJsonFile, normalizeJsonObject, writeJsonFileAtomic, writeTextFileAtomic } from './recoverableJsonFile.js'
 import { ArtifactSessionIndex, type ArtifactSessionMark } from './artifactSessionIndex.js'
+import { artifactEditLocks, type ArtifactEditLocks } from './artifactEditLocks.js'
 import { artifactThumbnailService } from './artifactThumbnailService.js'
 import { sessionService } from './sessionService.js'
 
 export const GLOBAL_ARTIFACTS_MARKER = 'global'
+const MAX_SLIDE_BYTES = 1024 * 1024
 
 export type ArtifactListItem = {
   name: string
@@ -69,6 +74,8 @@ export type ArtifactOpenTarget = {
   rootDir: string
   filePath: string
 }
+
+type UserWrite = { dir: string; files: string[]; latestMtimeMs: number }
 
 type KnownWorkDir = { workDir: string; projectRoot: string | null; branch: string | null }
 
@@ -112,6 +119,8 @@ export class ArtifactService {
   private opened: OpenedTimes | null = null
   private readonly sessionIndex = new ArtifactSessionIndex()
   private readonly turnSnapshots = new Map<string, Map<string, string>>()
+
+  constructor(private readonly locks: ArtifactEditLocks = artifactEditLocks) {}
 
   private async loadRegistry(): Promise<ArtifactRegistry> {
     if (!this.registry) {
@@ -335,8 +344,7 @@ export class ArtifactService {
   }
 
   async resolveOpen(dir: string, name: string, boardId?: string): Promise<ArtifactOpenTarget> {
-    if (!isSafeArtifactName(name)) throw ApiError.badRequest('Invalid artifact name')
-    const rootDir = await this.resolveArtifactsDir(dir)
+    const rootDir = path.dirname(await this.artifactFolder(dir, name))
     const entry = await readArtifactEntry(rootDir, name)
     if (!entry) throw ApiError.notFound(`Artifact not found: ${name}`)
     if (!entry.manifest) throw ApiError.badRequest(entry.error ?? 'Invalid artifact manifest')
@@ -351,11 +359,9 @@ export class ArtifactService {
     const board = entry.manifest.boards?.find(candidate => candidate.id === boardId)
     if (!board) throw ApiError.notFound(`Board not found: ${boardId}`)
     if (!isSafeBoardFile(board.file)) throw ApiError.badRequest(`Board file is not allowed: ${board.file}`)
-    const candidate = path.resolve(entry.dir, board.file)
-    const real = await fs.realpath(candidate).catch(() => null)
-    const realDir = await fs.realpath(entry.dir)
-    if (!real || !isSameOrInsidePathForPlatform(real, realDir)) throw ApiError.notFound(`Board file not found: ${board.file}`)
-    return candidate
+    const file = await fileInsideFolder(entry.dir, board.file)
+    if (!file) throw ApiError.notFound(`Board file not found: ${board.file}`)
+    return file
   }
 
   async updateBoard(
@@ -363,19 +369,97 @@ export class ArtifactService {
     name: string,
     boardId: string,
     rect: { x: number; y: number; width: number; height: number },
-  ): Promise<{ latestMtimeMs: number }> {
+  ): Promise<UserWrite> {
+    return this.asUser(dir, name, async folder => {
+      const canvas = await this.readManifestOf(folder, 'canvas')
+      const boards = canvas.raw.boards as Array<Record<string, unknown>> | undefined
+      const board = boards?.find(candidate => candidate.id === boardId)
+      if (!board) throw ApiError.notFound(`Board not found: ${boardId}`)
+      Object.assign(board, { x: rect.x, y: rect.y, width: rect.width, height: rect.height })
+      await writeJsonFileAtomic(canvas.manifestFile, canvas.raw)
+      return [ARTIFACT_MANIFEST_FILE]
+    })
+  }
+
+  private async artifactFolder(dir: string, name: string): Promise<string> {
     if (!isSafeArtifactName(name)) throw ApiError.badRequest('Invalid artifact name')
-    const rootDir = await this.resolveArtifactsDir(dir)
-    const entry = await readArtifactEntry(rootDir, name)
+    return path.join(await this.resolveArtifactsDir(dir), name)
+  }
+
+  private async asUser(dir: string, name: string, write: (folder: string) => Promise<string[]>): Promise<UserWrite> {
+    const folder = await this.artifactFolder(dir, name)
+    const holder = `write:${randomUUID()}`
+    await this.locks.hold(folder, holder)
+    try {
+      const files = await write(folder)
+      await this.locks.record(folder, files)
+      return { dir: folder, files, latestMtimeMs: await latestMtimeMs(folder) }
+    } finally {
+      await this.locks.release(folder, holder)
+    }
+  }
+
+  async holdEdit(dir: string, name: string, holder: string): Promise<void> {
+    const folder = await this.artifactFolder(dir, name)
+    if (!(await pathExists(folder))) throw ApiError.notFound(`Artifact not found: ${name}`)
+    await this.locks.hold(folder, holder)
+  }
+
+  async releaseEdit(dir: string, name: string, holder: string): Promise<void> {
+    await this.locks.release(await this.artifactFolder(dir, name), holder)
+  }
+
+  private async readManifestOf(folder: string, kind: 'deck' | 'canvas') {
+    const name = path.basename(folder)
+    const entry = await readArtifactEntry(path.dirname(folder), name)
     if (!entry) throw ApiError.notFound(`Artifact not found: ${name}`)
-    if (entry.manifest?.kind !== 'canvas') throw ApiError.badRequest('The artifact is not a canvas')
-    const file = path.join(entry.dir, ARTIFACT_MANIFEST_FILE)
-    const raw = JSON.parse(await fs.readFile(file, 'utf-8')) as { boards?: Array<Record<string, unknown>> }
-    const board = raw.boards?.find(candidate => candidate.id === boardId)
-    if (!board) throw ApiError.notFound(`Board not found: ${boardId}`)
-    Object.assign(board, { x: rect.x, y: rect.y, width: rect.width, height: rect.height })
-    await writeJsonFileAtomic(file, raw)
-    return { latestMtimeMs: await latestMtimeMs(entry.dir) }
+    if (entry.manifest?.kind !== kind) throw ApiError.badRequest(`The artifact is not a ${kind}`)
+    const manifestFile = path.join(entry.dir, ARTIFACT_MANIFEST_FILE)
+    const raw = JSON.parse(await fs.readFile(manifestFile, 'utf-8')) as Record<string, unknown>
+    return { dir: entry.dir, manifestFile, raw, manifest: entry.manifest }
+  }
+
+  private async readDeck(folder: string) {
+    const deck = await this.readManifestOf(folder, 'deck')
+    return { ...deck, slides: deck.manifest.slides ?? [] }
+  }
+
+  private async slidePath(deckDir: string, slides: string[], id: string): Promise<string | null> {
+    if (!isSafeSlideId(id)) throw ApiError.badRequest('Invalid slide id')
+    if (!slides.includes(id)) throw ApiError.notFound(`Slide not found: ${id}`)
+    return fileInsideFolder(deckDir, slideFile(id))
+  }
+
+  async reorderSlides(dir: string, name: string, slides: string[]): Promise<UserWrite> {
+    return this.asUser(dir, name, async folder => {
+      const deck = await this.readDeck(folder)
+      const sameIds = slides.length === deck.slides.length && new Set(slides).size === slides.length && slides.every(id => deck.slides.includes(id))
+      if (!sameIds) throw ApiError.conflict('The slides changed since the deck was shown')
+      await writeJsonFileAtomic(deck.manifestFile, { ...deck.raw, slides })
+      return [ARTIFACT_MANIFEST_FILE]
+    })
+  }
+
+  async deleteSlide(dir: string, name: string, id: string): Promise<UserWrite> {
+    return this.asUser(dir, name, async folder => {
+      const deck = await this.readDeck(folder)
+      const file = await this.slidePath(deck.dir, deck.slides, id)
+      await writeJsonFileAtomic(deck.manifestFile, { ...deck.raw, slides: deck.slides.filter(candidate => candidate !== id) })
+      if (file) await fs.rm(file, { force: true })
+      return [ARTIFACT_MANIFEST_FILE, slideFile(id)]
+    })
+  }
+
+  async writeSlide(dir: string, name: string, id: string, html: string, previous: string): Promise<UserWrite> {
+    if (Buffer.byteLength(html) > MAX_SLIDE_BYTES) throw ApiError.badRequest('The slide is too large')
+    return this.asUser(dir, name, async folder => {
+      const deck = await this.readDeck(folder)
+      const file = await this.slidePath(deck.dir, deck.slides, id)
+      if (!file) throw ApiError.notFound(`Slide file not found: ${slideFile(id)}`)
+      if ((await fs.readFile(file, 'utf-8')) !== previous) throw ApiError.conflict('The slide changed since it was shown')
+      await writeTextFileAtomic(file, html)
+      return [slideFile(id)]
+    })
   }
 
   async copyIntoWorkDir(id: string, targetWorkDir: string): Promise<{ id: string; name: string; artifactsDir: string; dir: string }> {

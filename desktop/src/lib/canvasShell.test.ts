@@ -36,7 +36,8 @@ const interactButton = (id: string) => element(id).querySelector('.board-interac
 const openButton = (id: string) => element(id).querySelector('.board-open:not(.board-interact)') as HTMLElement
 
 const allMessages = () => logs.map((entry) => JSON.parse(String(entry).slice(PREFIX.length)) as Record<string, unknown>)
-const messages = () => allMessages().filter((message) => message.type !== 'ready')
+const messages = () => allMessages().filter((message) => message.type !== 'ready' && message.type !== 'busy')
+const busy = () => allMessages().filter((message) => message.type === 'busy').map((message) => message.on)
 const element = (id: string) => document.querySelector(`[data-board="${id}"]`) as HTMLElement
 
 beforeEach(() => {
@@ -171,6 +172,23 @@ describe('canvas shell messages', () => {
     pointer('pointerdown', bar, 100, 100)
     pointer('pointerup', document, 100, 100)
     expect(messages()).toEqual([])
+    expect(busy()).toEqual([])
+  })
+
+  it('says it is busy from the first move of a drag until after the board is reported', async () => {
+    await start()
+    pointer('pointerdown', element('home').querySelector('.board-bar')!, 100, 100)
+    expect(busy()).toEqual([])
+    pointer('pointermove', document, 120, 110)
+    pointer('pointermove', document, 160, 140)
+    expect(allMessages().filter((message) => message.type !== 'ready')).toEqual([{ type: 'busy', on: true }])
+    pointer('pointerup', document, 160, 140)
+    expect(allMessages().filter((message) => message.type !== 'ready').map((message) => message.type === 'busy' ? `busy ${message.on}` : message.type)).toEqual(['busy true', 'move', 'busy false'])
+
+    pointer('pointerdown', element('home').querySelector('.board-resize')!, 0, 0)
+    pointer('pointermove', document, 0.2, 0.2)
+    pointer('pointerup', document, 0.2, 0.2)
+    expect(busy()).toEqual([true, false, true, false])
   })
 
   it('reports a resized board and keeps a minimum size', async () => {

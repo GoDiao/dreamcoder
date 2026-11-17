@@ -10,6 +10,12 @@ describe('parseCanvasMessage', () => {
     expect(parseCanvasMessage(line({ type: 'open', id: 'a' }), SCRIPT)).toEqual({ type: 'open', id: 'a' })
   })
 
+  it('reads when a drag starts and ends being an edit', () => {
+    expect(parseCanvasMessage(line({ type: 'busy', on: true }), SCRIPT)).toEqual({ type: 'busy', on: true })
+    expect(parseCanvasMessage(line({ type: 'busy', on: false }), SCRIPT)).toEqual({ type: 'busy', on: false })
+    expect(parseCanvasMessage(line({ type: 'busy' }), SCRIPT)).toBeNull()
+  })
+
   it('reads the message that says which artifact the canvas shows', () => {
     expect(parseCanvasMessage(line({ type: 'ready', artifact: 'canvas-1' }), SCRIPT)).toEqual({ type: 'ready', artifact: 'canvas-1' })
     expect(parseCanvasMessage(line({ type: 'ready' }), SCRIPT)).toBeNull()

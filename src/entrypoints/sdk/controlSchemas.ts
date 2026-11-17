@@ -864,6 +864,23 @@ export const SDKControlKanbanQueryRequestSchema = lazySchema(() =>
     .describe('Asks the host for cards on the project board of the calling session, or what creating a card needs the user to approve.'),
 )
 
+export const SDKControlArtifactEditWaitRequestSchema = lazySchema(() =>
+  z
+    .object({
+      subtype: z.literal('artifact_edit_wait'),
+      path: z.string(),
+    })
+    .describe('Asks the host to answer once the user is no longer editing the artifact that holds the path, before the agent writes it.'),
+)
+
+export const SDKControlArtifactEditWaitResponseSchema = lazySchema(() =>
+  z
+    .object({
+      files: z.array(z.string()),
+    })
+    .describe('Files of the artifact, relative to its folder, that the user changed while the agent waited; empty when the user was not editing it.'),
+)
+
 export const SDKControlKanbanQueryResponseSchema = lazySchema(() =>
   z
     .object({
@@ -930,6 +947,7 @@ export const SDKControlRequestInnerSchema = lazySchema(() =>
     SDKControlSessionRenameRequestSchema(),
     SDKControlKanbanQueryRequestSchema(),
     SDKControlKanbanCommandRequestSchema(),
+    SDKControlArtifactEditWaitRequestSchema(),
   ]),
 )
 
