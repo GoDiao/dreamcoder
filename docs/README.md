@@ -14,6 +14,7 @@
   - [computer-use](features/computer-use/tech-design.md): Computer Use through cua-driver, with its [decision records](features/computer-use/adr.md).
   - [kanban](features/kanban/README.md): a persistent project board shared by people and agent sessions (first version implemented on `feat/kanban`).
   - [performance](features/performance/optimization-report.md): performance audit report.
+  - [remote-backend](features/remote-backend/tech-design.md): remote serving mode, the server half of running the sidecar on a remote host behind an SSH tunnel.
   - [session-links](features/session-links/tech-design.md): sessions that start other sessions and message each other.
   - [session-state](features/session-state/tech-design.md): session state owned by the server.
   - [side-chat](features/side-chat/tech-design.md): side chats, forked from a session and shown as tabs in its side panel.

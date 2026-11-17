@@ -24,6 +24,7 @@ import { handleWebCloneRoute } from './browserHost/webClone.js'
 import { WEB_CLONE_BROWSER_PATH } from './browserHost/names.js'
 import { startBrowserHostTokenReader } from './browserHost/stdinToken.js'
 import { H5AccessService } from './services/h5AccessService.js'
+import { assertRemoteServingStartup, guardRemoteServing, isRemoteServingRequested, refuseUnlessLoopbackHost } from './remoteServing.js'
 import { setServerEndpoint } from './ws/sessionRuntime.js'
 
 function readArgValue(flag: string): string | undefined {
@@ -43,12 +44,13 @@ function resolveServerOptions() {
   const host = readArgValue('--host') || process.env.SERVER_HOST || '127.0.0.1'
   const cliPath = readArgValue('--cli-path')
   const authRequired = hasArgFlag('--auth-required')
+  const remoteServing = hasArgFlag('--remote-serving')
 
   if (cliPath) {
     process.env.CLAUDE_CLI_PATH = cliPath
   }
 
-  return { port, host, authRequired }
+  return { port, host, authRequired, remoteServing }
 }
 
 const SERVER_OPTIONS = resolveServerOptions()
@@ -144,6 +146,8 @@ export function startServer(port = PORT, host = HOST) {
   const forceAuth =
     SERVER_OPTIONS.authRequired ||
     process.env.SERVER_AUTH_REQUIRED === '1'
+  const remoteServing = isRemoteServingRequested(SERVER_OPTIONS.remoteServing)
+  if (remoteServing) assertRemoteServingStartup({ host, authRequired: forceAuth })
   const h5AccessService = new H5AccessService()
 
   let server: ReturnType<typeof Bun.serve<ServerSocketData>>
@@ -155,12 +159,20 @@ export function startServer(port = PORT, host = HOST) {
       idleTimeout: 60,
 
       async fetch(req, server) {
+        if (remoteServing) {
+          const hostRefusal = refuseUnlessLoopbackHost(req)
+          if (hostRefusal) return hostRefusal
+        }
         await ensurePersistentStorageUpgraded()
         const url = new URL(req.url)
         const origin = req.headers.get('Origin')
         const clientAddress = server.requestIP(req)?.address ?? null
         const h5RequestContext = { clientAddress }
         const h5Settings = await h5AccessService.getSettings()
+        if (remoteServing) {
+          const refusal = await guardRemoteServing({ request: req, url, clientAddress, h5Enabled: h5Settings.enabled })
+          if (refusal) return refusal
+        }
         const h5PublicOrigin = originFromUrl(h5Settings.publicBaseUrl)
         const cors = await resolveCors(origin, url.origin, {
           h5Enabled: h5Settings.enabled,
@@ -426,6 +438,7 @@ export function startServer(port = PORT, host = HOST) {
   const mem = process.memoryUsage()
   console.log(`[mem:sidecar] server:startup rss=${(mem.rss/1024/1024).toFixed(1)}MB heapUsed=${(mem.heapUsed/1024/1024).toFixed(1)}MB`)
   console.log(`[Server] Claude Code API server running at http://${host}:${port}`)
+  if (remoteServing) console.log('[Server] Remote-serving mode: every /api and /ws request needs the H5 access token')
   return server
 }
 
