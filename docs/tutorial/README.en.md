@@ -38,6 +38,7 @@ You need basic TypeScript and `async/await`, and you should know what HTTP and W
 | [Part 4: Session persistence and context engineering](./04-session-context.en.md) | How the same set of messages differs on disk, after resume and in a model request, and how auto-compaction works |
 | [Part 5: Streaming responses and failure recovery](./05-streaming-recovery.en.md) | Running tools while the model is still producing output, and what has already run and what will repeat on cancellation and fallback |
 | [Part 6: Model access and desktop integration](./06-desktop-integration.en.md) | How provider configuration reaches the CLI, session processes and message channels, protocol conversion for the OpenAI format, and continuing on a phone |
+| [Part 7: Adding a provider preset](./07-provider-presets.en.md) | How to add a built-in provider preset, validate its metadata, and test a connection from the settings form |
 
 ## Reading conventions
 
