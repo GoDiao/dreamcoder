@@ -1,6 +1,6 @@
 # Harness 调整
 
-状态：调研完成，改造方案未定。本文是总览；五个维度的详细对比在 [comparison/](comparison) 下。
+状态：长期进行，跟踪见 [RFC: Harness evolution](https://github.com/GoDiao/dreamcoder/issues/261)。本文是总览；五个维度的详细对比在 [comparison/](comparison) 下，代理层的专项评审在 [proxy/](proxy) 下。
 
 ## 背景
 
@@ -117,6 +117,22 @@ DreamCoder 的 CLI 派生自 Claude Code 2.1.92（`src/constants/claudeCodeCompa
 - Task 工具和计划模式对非 Claude 模型是否降级或改为按需。
 - 记忆说明保留多少。
 - 产品工具按什么条件发送（会话是否用到该功能，或一律延迟加载）。
+
+## 代理层专项评审
+
+第一个落地的区域是 CLI 和第三方提供方之间的代理层（`src/server/proxy`、`src/server/upstream`，以及相关的提供方配置）。三份评审逐项对照了 Codex 和 ZCode，共 45 条发现，每条写了现状、场景、两家做法、改法方向和确定程度：
+
+| 文件 | 范围 | 编号 |
+|---|---|---|
+| [proxy/request.md](proxy/request.md) | 请求方向：从 CLI 的请求到发往上游的字节 | P-REQ-01 到 16 |
+| [proxy/response.md](proxy/response.md) | 响应方向：从上游的流到 CLI 收到的 Anthropic 格式 | P-RES-01 到 15 |
+| [proxy/transport.md](proxy/transport.md) | 传输、容错和提供方配置 | P-NET-01 到 14 |
+
+按三批处理，每批一个 issue，挂在 RFC 下面：
+
+1. 请求通路的基础问题：计费行、60 秒空闲断开和流空闲超时、base URL、取消传到上游、`NO_PROXY`、缓存键和缓存命中统计，以及请求头配置、日志、`count_tokens` 等小项。
+2. 上下文、错误和流的健壮性：上下文溢出识别、用量为 0、错误结构化和 `retry-after`、重试分类、结束原因映射、流提前结束和流中错误。
+3. 按模型的能力：先设计一张按模型的规则表，再接上推理强度和思考开关、能力声明、推理数据回传、图片和 PDF、上下文窗口和输出上限。
 
 ## 详细报告
 
