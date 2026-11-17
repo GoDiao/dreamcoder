@@ -4,6 +4,12 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-17
+
+Sessions now work together: they start and message each other, share a project board, and open side chats. The agent can also make slide decks. These notes cover everything since 0.8.0.
+
+Thanks to everyone who contributed to this release: @AIR-Xie, @Oscar-Williams, @WhitePepperLambSoup, @henricop, @imshah-id and @iruzen-dono.
+
 ### Added
 
 - **Provider preset contributor guide.** Adds English and Chinese instructions for adding a built-in provider preset, updating its API tests, and checking connectivity from the settings form.
