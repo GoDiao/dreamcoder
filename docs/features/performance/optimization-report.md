@@ -67,7 +67,7 @@ CLI subprocess → SDK WebSocket → Server 翻译 → Client WebSocket
 
 ### 4. chatStore 状态形状重构
 
-**现状**：`chatStore.ts` 2600 行巨石，`updateSessionIn` 每次创建新 sessions Record + 新 session 对象。`content_delta` 有 50ms 节流缓解，但其他消息类型（status、thinking、tool_result 等）均无节流，立即触发全量 spread。
+**现状**：`chatStore.ts` 2600 行巨石，`updateSessionIn` 每次创建新 sessions Record + 新 session 对象。`content_delta` 与 `thinking` 均有 50ms 节流缓解，但其他消息类型（status、tool_result 等）均无节流，立即触发全量 spread。
 
 - `desktop/src/stores/chatStore.ts:732-740` — `updateSessionIn` 全量 spread
 - `desktop/src/stores/chatStore.ts:1212-1215` — `update()` 辅助函数包装每个消息处理
