@@ -4,6 +4,12 @@ All notable changes to DreamCoder will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-17
+
+Sessions now work together: they start and message each other, share a project board, and open side chats. The agent can also make slide decks. These notes cover everything since 0.8.0.
+
+Thanks to everyone who contributed to this release: @AIR-Xie, @Oscar-Williams, @WhitePepperLambSoup, @henricop, @imshah-id and @iruzen-dono.
+
 ### Added
 
 - **Sessions can start other sessions and message each other.** The agent can start a new session with `StartSession`, either fresh with a brief or as a fork of its own conversation, optionally in a new git worktree; you approve every new session, whatever the permission mode. Any session can message any other with `SendMessage`, across projects: a message wakes the receiver, and a progress report from a child to its parent waits for the parent's next turn instead of interrupting it (a parent that is already working sees it right away). Reports waiting for the parent are listed above its message box. The server stamps who sent each message, so a session cannot pass itself off as you or as another session. `ListSessions` lists sessions, and `RenameSession` lets the agent rename its own session (#239).
