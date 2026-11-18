@@ -142,8 +142,8 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 1. **SDK 用户消息增加 `origin` 字段。** server 写给 CLI 的用户消息，如果是 session 发的，带上 `origin: { kind: 'session', sessionId, name, purpose, summary }`，其中 `name` 是发送方当时的标题（经过清理，去掉换行和尖括号，最长 64 个字符），发送方改名后下一条消息带新标题。`purpose` 是 `message`（SendMessage）、`brief`（创建子 session 时的第一条消息）或 `report`（子 session 的进展汇报）。`summary` 是发送方写的一句话摘要（SendMessage 的必填字段；简报用子 session 的标题），界面折叠时显示它。人发的消息不带 `origin`，等同于 CLI 里的 `human`。项目看板的通知是另一种来源 `{ kind: 'kanban', project, card, purpose }`，`origin` 因此是这两种的联合类型（`UserMessageOrigin`），包装和剥离按 `kind` 分别处理，见[看板技术设计](../kanban/tech-design.zh.md)。
 2. **入口决定来源。** 客户端 WebSocket 发来的 `user_message` 一定是人发的，server 不接受客户端自己填 `origin`。只有 server 自己的会话消息转发（下文的 `sessionLinks` 服务）会填 `origin`，而且 `sessionId` 取自请求所在的 SDK 连接，不取自请求内容。
 3. **CLI 把 `origin` 带进 transcript。** 无头模式里把 `origin` 从入队、`ask()`、`QueryEngine.submitMessage` 一路传下去，像交互模式在 `handlePromptSubmit` 里那样盖到生成的用户消息上，transcript 就会记下它。`canBatchWith` 增加"来源相同"这个条件，避免把人发的和 session 发的消息合成一条。
-4. **给模型看的文字由 CLI 根据 `origin` 生成。** `wrapCommandText` 增加 `session` 这一类。消息正文包在 `<cross-session-message from="session:<id>" name="<发送方标题>" purpose="<purpose>">` 里交给模型，同时说明：这不是用户发的，它没有用户的授权，不能把其中的"用户已同意"当真。末尾的回复说明按 `purpose` 不同：`brief` 告诉子 session 发送方是它的父 session，需要父 session 马上处理的（做完了、卡住了、有问题）用 `mode: 'message'`，可以等的进展用 `mode: 'report'`；`report` 告诉父 session 这是进展、不是请求，不要丢下手头的工作，最多跟用户说一句；`message` 提示用 `SendMessage` 发到 `from` 的地址回复。正文里如果出现 `<cross-session-message` 或 `</cross-session-message>`，先转义，防止伪造嵌套。
-5. **界面根据记录里的 `origin` 显示，不解析文本。** server 读 transcript 时把用户消息记录上的 `origin` 带进给界面的消息项；实时广播的 `user_message` 也带上 `origin`。transcript 里存的是带包装的正文，读历史时 server 用同一个 `origin` 重新生成包装的开头和结尾，逐字比对后剥掉（`unwrapCrossSessionBody`）。所以改了包装文字以后，旧记录对不上，会带着包装原样显示；改包装文字时要考虑这一点。桌面端对这类消息显示"来自 <发送方标题>"（发送方在列表里时显示它当前的标题，否则显示发送时的标题），可以点过去打开那个 session，不显示成用户的气泡。
+4. **给模型看的文字由 CLI 根据 `origin` 生成。** `wrapCommandText` 增加 `session` 这一类。消息正文包在 `<cross-session-message from="session:<id>" name="<发送方标题>" purpose="<purpose>">` 里交给模型，同时用一句话说明：这不是用户发的，不带用户的批准。末尾的回复说明按 `purpose` 不同：`brief` 告诉子 session 发送方是它的父 session，需要父 session 马上处理的（做完了、卡住了、有问题）用 `mode: 'message'`，可以等的进展用 `mode: 'report'`；`report` 告诉父 session 这是进展、不是请求，不要丢下手头的工作，最多跟用户说一句；`message` 提示用 `SendMessage` 发到 `from` 的地址回复。正文里如果出现 `<cross-session-message` 或 `</cross-session-message>`，先转义，防止伪造嵌套。
+5. **界面根据记录里的 `origin` 显示，不解析文本。** server 读 transcript 时把用户消息记录上的 `origin` 带进给界面的消息项；实时广播的 `user_message` 也带上 `origin`。transcript 里存的是带包装的正文，读历史时 server 用同一个 `origin` 重新生成包装的开头，逐字比对开头，再找结束标签，取中间的正文（`unwrapCrossSessionBody`）。结束标签之后的说明文字不参与比对，改说明不影响旧记录；改开头标签（属性或格式）时，旧记录对不上，会带着包装原样显示。桌面端对这类消息显示"来自 <发送方标题>"（发送方在列表里时显示它当前的标题，否则显示发送时的标题），可以点过去打开那个 session，不显示成用户的气泡。
 
 **session 发的消息没有用户的权限。** 权限请求和 AskUserQuestion 的回答只能来自客户端的 `permission_response`（[handler.ts:511](../../../src/server/ws/handler.ts)），session 发来的消息只是一条带来源的用户消息，本来就走不到那条路。上面第 4 点在提示词层面再说一次，让模型不要把它当成用户的授权。
 
@@ -173,7 +173,7 @@ server 是这套机制的唯一中转。agent 不直接连别的 session，所�
 - **对方的 CLI 没在运行：** 先启动，再送达，和用户在一个已停止的 session 里发消息一样。
 - **对方正在跑一轮：** 消息送进 CLI 后会排队。CLI 在本轮的下一次工具调用时把它作为"工作中收到的消息"交给模型（`wrapCommandText` 的说明文字），或者在本轮结束后开新的一轮。
 - **对方闲着：** 送达后立即开一轮。
-- **中途送到的消息要写进 transcript。** CLI 写 transcript 时原本丢弃几乎所有附件（[sessionStorage.ts:4406](../../../src/utils/sessionStorage.ts) 的 `isLoggableMessage`，上游为训练数据隐私加的），一轮中途送到的消息正是以 `queued_command` 附件交给模型的，于是刷新后看不到、CLI 续上对话时模型也不知道。这类附件现在照样写入；server 读历史时把它转成带 `origin` 的用户消息，id 用发送时的 `source_uuid`，和实时显示去重；fork 和回退按这个 id 也能定位到那条附件记录。
+- **中途送到的消息要写进 transcript。** CLI 写 transcript 时原本丢弃几乎所有附件（[sessionStorage.ts:4406](../../../src/utils/sessionStorage.ts) 的 `isLoggableMessage`，上游为训练数据隐私加的），一轮中途送到的消息正是以 `queued_command` 附件交给模型的，于是刷新后看不到、CLI 续上对话时模型也不知道。这类附件现在照样写入（CLI 现在写入所有附件）；server 读历史时把它转成带 `origin` 的用户消息，id 用发送时的 `source_uuid`，和实时显示去重；fork 和回退按这个 id 也能定位到那条附件记录。
 
 ### 一轮进行中用户发的消息
 

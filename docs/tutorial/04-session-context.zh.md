@@ -73,7 +73,7 @@ async function request(history, file) {                         // 第 3 步
 
 ```jsonl
 {"type":"system","subtype":"compact_boundary","uuid":"b1","parentUuid":null,"logicalParentUuid":"u4"}
-{"type":"user","uuid":"s1","parentUuid":"b1","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation… read the full transcript at: …"}}
+{"type":"user","uuid":"s1","parentUuid":"b1","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation… search the session transcript with Grep: …"}}
 ```
 
 边界的 `parentUuid` 为 `null`，之后再次恢复时回溯到 `b1` 就停止，恢复的 `messages` 从 `[b1, s1, …]` 开始。桌面显示历史时按文件顺序读取，不在边界处截断，因此用户仍能看到 `u1`～`a3`。
@@ -85,9 +85,9 @@ async function request(history, file) {                         // 第 3 步
 | `u4`（本次输入） | 进入循环前写入 | 追加在末尾 | 未压缩时有；压缩后计入摘要 |
 | `b1` 边界 | 压缩后追加 | 下次恢复时链从这里开始 | 在数组首位，API 层过滤 |
 | `s1` 摘要 | 压缩后追加 | 下次恢复时有 | 有 |
-| 压缩后的文件附件 | 默认不写入 | 下次恢复时无 | 有 |
+| 压缩后的文件附件 | 压缩后追加 | 下次恢复时有 | 有 |
 
-**磁盘上存在一条消息，是否意味着下一次请求一定包含它？** 不一定。元数据行不进入消息历史；恢复只读取沿 `parentUuid` 回溯得到的一条链，最后一个压缩边界之前的消息不在链上；恢复时还会过滤未配对的 `tool_use` 等消息；请求前还可能继续截取或压缩。反过来，请求中也有磁盘上没有的内容：系统提示词、用户上下文和压缩后生成的文件附件。要知道模型在某一轮看到了什么，应看这一轮的 `messagesForQuery` 与提示词；要审计或重新打开会话，应看磁盘记录。
+**磁盘上存在一条消息，是否意味着下一次请求一定包含它？** 不一定。元数据行不进入消息历史；恢复只读取沿 `parentUuid` 回溯得到的一条链，最后一个压缩边界之前的消息不在链上；恢复时还会过滤未配对的 `tool_use` 等消息；请求前还可能继续截取或压缩。反过来，请求中也有磁盘上没有的内容：系统提示词和用户上下文。要知道模型在某一轮看到了什么，应看这一轮的 `messagesForQuery` 与提示词；要审计或重新打开会话，应看磁盘记录。
 
 下面按四步看这些差异分别在哪段代码中产生。
 
@@ -203,7 +203,7 @@ return [
 
 - 边界是 `subtype: 'compact_boundary'` 的 `system` 消息，写入时 `parentUuid` 设为 `null`，`logicalParentUuid` 记录压缩前的最后一条消息。[`createCompactBoundaryMessage()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/messages.ts#L4619)、[`insertMessageChain()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/sessionStorage.ts#L1069)
 - 摘要是带 `isCompactSummary: true` 的用户消息，正文附有 transcript 路径，模型需要压缩前的细节时可以读取这个文件。[`compactConversation()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L621)、[`getCompactUserSummaryMessage()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/prompt.ts#L349)
-- 附件包括按读取记录重新生成的最近文件，最多 5 个，默认不写入 JSONL。[`createPostCompactFileAttachments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L1415)
+- 附件包括按读取记录重新生成的最近文件，最多 5 个，和其他附件一样写入 JSONL。[`createPostCompactFileAttachments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L1415)
 
 ## 设计分析
 
@@ -221,7 +221,7 @@ JSONL 保存全部对话，供桌面显示、恢复和审计；每次请求只�
 
 > 首次阅读可以先跳过本节，读完第五篇再回来看。
 
-**恢复时的中断处理。** [`deserializeMessagesWithInterruptDetection()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/conversationRecovery.ts#L164) 先过滤没有对应结果的 `tool_use` 及其后的合成消息，再去掉只有 thinking 或只有空白文本的孤立助手消息。判断上一轮在中途被打断时，它追加一条 `isMeta` 的用户消息 `Continue from where you left off.`；最后一条相关消息是用户消息时，它插入一条合成助手消息，使消息序列满足 API 格式。桌面显示历史时，[`shouldHideTranscriptEntry()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L654) 会隐藏这类合成消息，[`entriesToMessages()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L1986) 按文件顺序读取条目。
+**恢复时的中断处理。** [`deserializeMessagesWithInterruptDetection()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/conversationRecovery.ts#L164) 先过滤没有对应结果的 `tool_use` 及其后的合成消息，再去掉只有 thinking 或只有空白文本的孤立助手消息。它只记录上一轮是否在中途被打断（`interrupted_turn` 或 `interrupted_prompt`），不往消息里加东西；只有开启自动续跑（`CLAUDE_CODE_RESUME_INTERRUPTED_TURN`）时，`print.ts` 才重发被打断的提示，或排入一条 `isMeta` 的 `Continue from where you left off.`。旧会话的 transcript 里可能还有以前插入的合成助手消息，桌面显示历史时，[`shouldHideTranscriptEntry()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L654) 会隐藏它们，[`entriesToMessages()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L1986) 按文件顺序读取条目。
 
 **自动压缩不一定发生。** 请求来源为 `session_memory` 或 `compact`、自动压缩被关闭，或部分功能开关生效时，`shouldAutoCompact()` 直接返回 `false`。连续失败达到 3 次后，本会话不再发起自动压缩。[`MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/autoCompact.ts#L70)
 

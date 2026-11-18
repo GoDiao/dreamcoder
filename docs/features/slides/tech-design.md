@@ -536,7 +536,7 @@ R -> S : 成功：不用做什么\n冲突或失败：refresh()
 
 1. **技能文字**（`SLIDES_USER_CHANGES_RULE`，`src/skills/bundled/slides.ts`）：用户能在应用里改文字、调序、删页；所以每次改幻灯片之前，重新完整读一次 `artifact.json`（不带范围），按它现在的 `slides` 工作，不按记忆里的顺序；顺序或数量和自己上次写的不一样，就是用户调过序或删过页，要按 `slides` 的顺序核对章节号、「共几章」和页面之间的互相引用；用户在页面里打的字，除非用户要求，不改回去。收到「artifact.json 或某页被修改了」的提示，或者用户消息里带着「用户在应用里改了这份幻灯片」的那句话（下一层），含义相同。这段话放在 `/slides` 的 `format.md`，也放进 `artifacts` 技能的 Deck 一节：不经过 `/slides`、只靠 `artifacts` 技能改幻灯片的会话也会读到。
 2. **锁和输入框上的块**（通用行为，见[Artifacts 设计](../artifacts/tech-design.md)的「用户在应用里改产物：锁和通知」）：用户改的时候 Agent 的写入等锁，等过锁、用户改了文件时写入被拒绝并列出文件；Agent 没在写时，写回成功后面板所在会话的输入框上方出现「已修改：<标题>」块，改字、调序、删页都出，一份幻灯片一个，改过的文件合并。下一条消息带给模型：用户改了哪些文件，先读、保留用户的改动；调过序或删过页时（块记着这一点），再要求重读 `artifact.json`，按 `slides` 核对章节号、章节总数和页面之间的引用，改正对不上的地方。全屏查看没有会话，不出块。
-3. **CLI 现成的「文件被改过」提示**，只算顺带的好处。CLI 每一轮（包括一轮里每次工具调用之间）对记录里的文件检查修改时间，比记录新的就读一次，把变化的片段作为附件带给模型：「Note: <文件> was modified, either by the user or by a linter…」（`getChangedFiles`，`src/utils/attachments.ts`；文字在 `src/utils/messages.ts` 的 `edited_text_file`）。
+3. **CLI 现成的「文件被改过」提示**，只算顺带的好处。CLI 每一轮（包括一轮里每次工具调用之间）对记录里的文件检查修改时间，比记录新的就读一次，把变化的片段作为附件带给模型：「Note: <文件> was modified after you last read it, by something other than your own edits…」（`getChangedFiles`，`src/utils/attachments.ts`；文字在 `src/utils/messages.ts` 的 `edited_text_file`）。
 
 第 3 层在我们的用法下逐条验证过，写成了测试（`src/server/__tests__/deckEditNotice.test.ts`：真实的 Write、Edit、Read 工具和真实的 `ArtifactService` 写回，再调 `getChangedFiles`）。这个测试固定的是我们依赖的 CLI 行为，CLI 改了它会提醒：
 

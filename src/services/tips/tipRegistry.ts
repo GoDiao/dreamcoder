@@ -246,13 +246,6 @@ const externalTips: Tip[] = [
       process.env.CLAUDE_CODE_USE_POWERSHELL_TOOL === undefined,
   },
   {
-    id: 'status-line',
-    content: async () =>
-      'Use /statusline to set up a custom status line that will display beneath the input box',
-    cooldownSessions: 25,
-    isRelevant: async () => getSettings_DEPRECATED().statusLine === undefined,
-  },
-  {
     id: 'prompt-queue',
     content: async () =>
       'Hit Enter to queue up additional messages while Claude is working.',

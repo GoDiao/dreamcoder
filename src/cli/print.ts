@@ -1228,16 +1228,21 @@ function runHeadlessStreaming(
       `[print.ts] Auto-resuming interrupted turn (kind: ${turnInterruptionState.kind})`,
     )
 
-    // Remove the interrupted message and its sentinel, then re-enqueue so
-    // the model sees it exactly once. For mid-turn interruptions, the
-    // deserialization layer transforms them into interrupted_prompt by
-    // appending a synthetic "Continue from where you left off." message.
-    removeInterruptedMessage(mutableMessages, turnInterruptionState.message)
-    enqueue({
-      mode: 'prompt',
-      value: turnInterruptionState.message.message.content,
-      uuid: randomUUID(),
-    })
+    if (turnInterruptionState.kind === 'interrupted_prompt') {
+      removeInterruptedMessage(mutableMessages, turnInterruptionState.message)
+      enqueue({
+        mode: 'prompt',
+        value: turnInterruptionState.message.message.content,
+        uuid: randomUUID(),
+      })
+    } else {
+      enqueue({
+        mode: 'prompt',
+        value: 'Continue from where you left off.',
+        uuid: randomUUID(),
+        isMeta: true,
+      })
+    }
   }
 
   const modelOptions = getModelOptions()
@@ -4908,8 +4913,8 @@ function emitLoadError(
 }
 
 /**
- * Removes an interrupted user message and its synthetic assistant sentinel
- * from the message array. Used during gateway-triggered restarts to clean up
+ * Removes an interrupted user message from the message array. Used during
+ * gateway-triggered restarts to clean up
  * the message history before re-enqueuing the interrupted prompt.
  *
  * @internal Exported for testing
@@ -4920,9 +4925,7 @@ export function removeInterruptedMessage(
 ): void {
   const idx = messages.findIndex(m => m.uuid === interruptedUserMessage.uuid)
   if (idx !== -1) {
-    // Remove the user message and the sentinel that immediately follows it.
-    // splice safely handles the case where idx is the last element.
-    messages.splice(idx, 2)
+    messages.splice(idx, 1)
   }
 }
 

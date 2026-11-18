@@ -9,9 +9,10 @@ import {
 import type { ToolUseContext } from '../Tool.js'
 import {
   ensureThreadGoalHookFromTranscript,
-  isGoalPromptHookCommand,
+  goalContinuationText,
 } from '../goals/goalState.js'
-import type { HookResult } from '../types/hooks.js'
+import { isGoalPromptHookCommand } from '../goals/goalHookMarker.js'
+import type { HookBlockingError } from '../types/hooks.js'
 import type { HookProgress } from '../types/hooks.js'
 import type {
   AssistantMessage,
@@ -67,15 +68,16 @@ import {
 type StopHookResult = {
   blockingErrors: Message[]
   preventContinuation: boolean
+  goalContinued?: boolean
 }
 
-export function shouldLetGoalPromptHookContinue(
-  result: Pick<HookResult, 'blockingError' | 'preventContinuation'>,
-): boolean {
-  return Boolean(
-    result.preventContinuation &&
-      isGoalPromptHookCommand(result.blockingError?.command),
-  )
+export function stopHookBlockingContent(
+  blockingError: HookBlockingError,
+  goalContinuations: number,
+): string | null {
+  return isGoalPromptHookCommand(blockingError.command)
+    ? goalContinuationText(blockingError, goalContinuations)
+    : getStopHookMessage(blockingError)
 }
 
 export async function* handleStopHooks(
@@ -86,7 +88,8 @@ export async function* handleStopHooks(
   systemContext: { [k: string]: string },
   toolUseContext: ToolUseContext,
   querySource: QuerySource,
-  stopHookActive?: boolean,
+  stopHookActive: boolean | undefined,
+  goalContinuations: number,
 ): AsyncGenerator<
   | StreamEvent
   | RequestStartEvent
@@ -205,6 +208,7 @@ export async function* handleStopHooks(
     const hookErrors: string[] = []
     const hookInfos: StopHookInfo[] = []
     let goalCompleted = false
+    let goalContinued = false
 
     for await (const result of generator) {
       if (result.message) {
@@ -267,30 +271,36 @@ export async function* handleStopHooks(
         }
       }
       if (result.blockingError) {
-        const userMessage = createUserMessage({
-          content: getStopHookMessage(result.blockingError),
-          isMeta: true, // Hide from UI (shown in summary message instead)
-        })
-        blockingErrors.push(userMessage)
-        yield userMessage
-        hasOutput = true
-        // Add to hookErrors so it appears in the summary
-        hookErrors.push(result.blockingError.blockingError)
+        const blockingContent = stopHookBlockingContent(
+          result.blockingError,
+          goalContinuations,
+        )
+        if (blockingContent !== null) {
+          if (isGoalPromptHookCommand(result.blockingError.command)) {
+            goalContinued = true
+          }
+          const userMessage = createUserMessage({
+            content: blockingContent,
+            isMeta: true,
+          })
+          blockingErrors.push(userMessage)
+          yield userMessage
+          hasOutput = true
+          hookErrors.push(result.blockingError.blockingError)
+        }
       }
       // Check if hook wants to prevent continuation
       if (result.preventContinuation) {
-        if (!shouldLetGoalPromptHookContinue(result)) {
-          preventedContinuation = true
-          stopReason = result.stopReason || 'Stop hook prevented continuation'
-          // Create attachment to track the stopped continuation (for structured data)
-          yield createAttachmentMessage({
-            type: 'hook_stopped_continuation',
-            message: stopReason,
-            hookName: 'Stop',
-            toolUseID: stopHookToolUseID,
-            hookEvent: 'Stop',
-          })
-        }
+        preventedContinuation = true
+        stopReason = result.stopReason || 'Stop hook prevented continuation'
+        // Create attachment to track the stopped continuation (for structured data)
+        yield createAttachmentMessage({
+          type: 'hook_stopped_continuation',
+          message: stopReason,
+          hookName: 'Stop',
+          toolUseID: stopHookToolUseID,
+          hookEvent: 'Stop',
+        })
       }
 
       // Check if we were aborted during hook execution
@@ -348,7 +358,7 @@ export async function* handleStopHooks(
 
     // Collect blocking errors from stop hooks
     if (blockingErrors.length > 0) {
-      return { blockingErrors, preventContinuation: false }
+      return { blockingErrors, preventContinuation: false, goalContinued }
     }
 
     // After Stop hooks pass, run TeammateIdle and TaskCompleted hooks if this is a teammate

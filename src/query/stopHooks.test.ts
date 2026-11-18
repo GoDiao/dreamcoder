@@ -1,38 +1,27 @@
 import { describe, expect, test } from 'bun:test'
-import { shouldLetGoalPromptHookContinue } from './stopHooks.js'
+import { getStopHookMessage } from '../utils/hooks.js'
+import { PROMPT_HOOK_UNMET_PREFIX } from '../utils/hooks/execPromptHook.js'
+import { stopHookBlockingContent } from './stopHooks.js'
 
-describe('stop hook goal continuation', () => {
-  test('converts unmet managed /goal prompt hooks into normal blocking continuation', () => {
-    expect(
-      shouldLetGoalPromptHookContinue({
-        preventContinuation: true,
-        blockingError: {
-          blockingError: 'Prompt hook condition was not met: keep working',
-          command: '<dreamcoder-goal-hook>\nship the feature',
-        },
-      }),
-    ).toBe(true)
+const goalBlockingError = {
+  blockingError: `${PROMPT_HOOK_UNMET_PREFIX}keep working`,
+  command: '<dreamcoder-goal-hook>\n<goal-objective>\nship the feature\n</goal-objective>',
+}
+const userBlockingError = {
+  blockingError: `${PROMPT_HOOK_UNMET_PREFIX}stop`,
+  command: 'ordinary prompt hook',
+}
+
+describe('text a Stop hook result sends to the model', () => {
+  test('an unmet /goal under the limit continues with the goal continuation', () => {
+    expect(stopHookBlockingContent(goalBlockingError, 3)).toStartWith('Automatic /goal continuation (4 of 10).')
   })
 
-  test('preserves prevent-continuation semantics for non-goal hooks', () => {
-    expect(
-      shouldLetGoalPromptHookContinue({
-        preventContinuation: true,
-        blockingError: {
-          blockingError: 'Prompt hook condition was not met: stop',
-          command: 'ordinary prompt hook',
-        },
-      }),
-    ).toBe(false)
+  test('an unmet /goal at the limit sends nothing, so the turn ends', () => {
+    expect(stopHookBlockingContent(goalBlockingError, 10)).toBeNull()
+  })
 
-    expect(
-      shouldLetGoalPromptHookContinue({
-        preventContinuation: false,
-        blockingError: {
-          blockingError: 'Prompt hook condition was not met: keep working',
-          command: '<dreamcoder-goal-hook>\nship the feature',
-        },
-      }),
-    ).toBe(false)
+  test("the user's own hook keeps the standard Stop hook feedback", () => {
+    expect(stopHookBlockingContent(userBlockingError, 0)).toBe(getStopHookMessage(userBlockingError))
   })
 })

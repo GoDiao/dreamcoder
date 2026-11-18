@@ -349,10 +349,7 @@ export function getPatchForEdits({
   return { patch, updatedFile }
 }
 
-// Cap on edited_text_file attachment snippets. Format-on-save of a large file
-// previously injected the entire file per turn (observed max 16.1KB, ~14K
-// tokens/session). 8KB preserves meaningful context while bounding worst case.
-const DIFF_SNIPPET_MAX_BYTES = 8192
+const DIFF_SNIPPET_MAX_BYTES = 2048
 
 /**
  * Used for attachments, to show snippets when files change.
@@ -402,7 +399,7 @@ export function getSnippetForTwoFileDiff(
   const kept =
     cutoff > 0 ? full.slice(0, cutoff) : full.slice(0, DIFF_SNIPPET_MAX_BYTES)
   const remaining = countCharInString(full, '\n', kept.length) + 1
-  return `${kept}\n\n... [${remaining} lines truncated] ...`
+  return `${kept}\n\n... [${remaining} lines truncated; Read the file for the full content] ...`
 }
 
 const CONTEXT_LINES = 4

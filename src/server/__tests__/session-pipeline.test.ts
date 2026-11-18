@@ -7,6 +7,7 @@ import {
   __resetWebSocketHandlerStateForTests,
   getSessionState,
   handleWebSocket,
+  translateCliMessage,
   type WebSocketData,
 } from '../ws/handler.js'
 import { conversationService } from '../services/conversationService.js'
@@ -275,5 +276,44 @@ describe('session state in the WebSocket handler', () => {
     for (const timer of timers) timer()
 
     expect(stopSession).not.toHaveBeenCalled()
+  })
+
+  function stopWithCapturedTimers(sessionId: string) {
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    spyOn(conversationService, 'getGeneration').mockReturnValue(1)
+    spyOn(conversationService, 'onOutput').mockImplementation(() => {})
+    spyOn(conversationService, 'sendInterrupt').mockReturnValue(true)
+    spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue(null)
+    const stopSession = spyOn(conversationService, 'stopSession').mockImplementation(() => {})
+    const timers: Array<() => void> = []
+    spyOn(globalThis, 'setTimeout').mockImplementation(((callback: () => void) => {
+      timers.push(callback)
+      return 0
+    }) as any)
+    const ws = makeClientSocket(sessionId)
+    handleWebSocket.open(ws)
+    sessionStateStore.apply(sessionId, { type: 'process_phase_changed', phase: 'running', generation: 1 })
+    handleWebSocket.message(ws, JSON.stringify({ type: 'stop_generation' }))
+    return { stopSession, runTimers: () => timers.forEach((timer) => timer()) }
+  }
+
+  it('keeps the CLI running when the interrupt ended the turn', () => {
+    const sessionId = `stop-turn-ended-${crypto.randomUUID()}`
+    const { stopSession, runTimers } = stopWithCapturedTimers(sessionId)
+
+    translateCliMessage({ type: 'result', is_error: true, subtype: 'error_during_execution', usage: {} }, sessionId)
+    runTimers()
+
+    expect(stopSession).not.toHaveBeenCalled()
+    expect(getSessionState(sessionId)?.process).toEqual({ phase: 'running', generation: 1 })
+  })
+
+  it('ends the CLI when the turn did not stop after the interrupt', () => {
+    const sessionId = `stop-turn-stuck-${crypto.randomUUID()}`
+    const { stopSession, runTimers } = stopWithCapturedTimers(sessionId)
+
+    runTimers()
+
+    expect(stopSession).toHaveBeenCalledWith(sessionId, 1)
   })
 })

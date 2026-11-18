@@ -1,4 +1,4 @@
-import { isClaudeModelName } from '../services/attributionHeaderPolicy.js'
+import { isClaudeModelName } from '../../utils/model/claudeModelName.js'
 import { ProviderService } from '../services/providerService.js'
 import { sendToUpstream } from '../upstream/client.js'
 import { anthropicErrorResponse } from '../upstream/upstreamError.js'

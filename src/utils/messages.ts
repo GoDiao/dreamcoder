@@ -82,7 +82,6 @@ import {
 } from './attachments.js'
 import { quote } from './bash/shellQuote.js'
 import { formatNumber, formatTokens } from './format.js'
-import { getPewterLedgerVariant } from './planModeV2.js'
 import { jsonStringify } from './slowOperations.js'
 
 // Hook attachments that have a hookName field (excludes HookPermissionDecisionAttachment)
@@ -104,7 +103,6 @@ import type {
   SDKAssistantMessageError,
 } from 'src/entrypoints/agentSdkTypes.js'
 import { EXPLORE_AGENT } from 'src/tools/AgentTool/built-in/exploreAgent.js'
-import { PLAN_AGENT } from 'src/tools/AgentTool/built-in/planAgent.js'
 import { areExplorePlanAgentsEnabled } from 'src/tools/AgentTool/builtInAgents.js'
 import { AGENT_TOOL_NAME } from 'src/tools/AgentTool/constants.js'
 import { ASK_USER_QUESTION_TOOL_NAME } from 'src/tools/AskUserQuestionTool/prompt.js'
@@ -163,11 +161,6 @@ import {
 import { safeParseJSON } from './json.js'
 import { logError, logMCPDebug } from './log.js'
 import { normalizeLegacyToolName } from './permissions/permissionRuleParser.js'
-import {
-  getPlanModeV2AgentCount,
-  getPlanModeV2ExploreAgentCount,
-  isPlanModeInterviewPhaseEnabled,
-} from './planModeV2.js'
 import { escapeRegExp } from './stringUtils.js'
 import { isTodoV2Enabled } from './tasks.js'
 
@@ -1998,7 +1991,9 @@ function relocateToolReferenceSiblings(
 export function normalizeMessagesForAPI(
   messages: Message[],
   tools: Tools = [],
+  options: { foldIntoToolResults?: boolean } = {},
 ): (UserMessage | AssistantMessage)[] {
+  const foldIntoToolResults = options.foldIntoToolResults ?? true
   // Build set of available tool names for filtering unavailable tool references
   const availableToolNames = new Set(tools.map(t => t.name))
 
@@ -2289,7 +2284,8 @@ export function normalizeMessagesForAPI(
           const lastMessage = last(result)
           if (lastMessage?.type === 'user') {
             result[result.length - 1] = attachmentMessage.reduce(
-              (p, c) => mergeUserMessagesAndToolResults(p, c),
+              (p, c) =>
+                mergeUserMessagesAndToolResults(p, c, foldIntoToolResults),
               lastMessage,
             )
             return
@@ -2396,6 +2392,7 @@ export function normalizeMessagesForAPI(
 export function mergeUserMessagesAndToolResults(
   a: UserMessage,
   b: UserMessage,
+  foldIntoToolResults = true,
 ): UserMessage {
   const lastContent = normalizeUserTextContent(a.message.content)
   const currentContent = normalizeUserTextContent(b.message.content)
@@ -2404,7 +2401,9 @@ export function mergeUserMessagesAndToolResults(
     message: {
       ...a.message,
       content: hoistToolResults(
-        mergeUserContentBlocks(lastContent, currentContent),
+        foldIntoToolResults
+          ? mergeUserContentBlocks(lastContent, currentContent)
+          : [...lastContent, ...currentContent],
       ),
     },
   }
@@ -3242,155 +3241,7 @@ function getPlanModeInstructions(attachment: {
   if (attachment.reminderType === 'sparse') {
     return getPlanModeV2SparseInstructions(attachment)
   }
-  return getPlanModeV2Instructions(attachment)
-}
-
-// --
-// Plan file structure experiment arms.
-// Each arm returns the full Phase 4 section so the surrounding template
-// stays a flat string interpolation with no conditionals inline.
-
-export const PLAN_PHASE4_CONTROL = `### Phase 4: Final Plan
-Goal: Write your final plan to the plan file (the only file you can edit).
-- Begin with a **Context** section: explain why this change is being made — the problem or need it addresses, what prompted it, and the intended outcome
-- Include only your recommended approach, not all alternatives
-- Ensure that the plan file is concise enough to scan quickly, but detailed enough to execute effectively
-- Include the paths of critical files to be modified
-- Reference existing functions and utilities you found that should be reused, with their file paths
-- Include a verification section describing how to test the changes end-to-end (run the code, use MCP tools, run tests)`
-
-const PLAN_PHASE4_TRIM = `### Phase 4: Final Plan
-Goal: Write your final plan to the plan file (the only file you can edit).
-- One-line **Context**: what is being changed and why
-- Include only your recommended approach, not all alternatives
-- List the paths of files to be modified
-- Reference existing functions and utilities to reuse, with their file paths
-- End with **Verification**: the single command to run to confirm the change works (no numbered test procedures)`
-
-const PLAN_PHASE4_CUT = `### Phase 4: Final Plan
-Goal: Write your final plan to the plan file (the only file you can edit).
-- Do NOT write a Context or Background section. The user just told you what they want.
-- List the paths of files to be modified and what changes in each (one line per file)
-- Reference existing functions and utilities to reuse, with their file paths
-- End with **Verification**: the single command that confirms the change works
-- Most good plans are under 40 lines. Prose is a sign you are padding.`
-
-const PLAN_PHASE4_CAP = `### Phase 4: Final Plan
-Goal: Write your final plan to the plan file (the only file you can edit).
-- Do NOT write a Context, Background, or Overview section. The user just told you what they want.
-- Do NOT restate the user's request. Do NOT write prose paragraphs.
-- List the paths of files to be modified and what changes in each (one bullet per file)
-- Reference existing functions to reuse, with file:line
-- End with the single verification command
-- **Hard limit: 40 lines.** If the plan is longer, delete prose — not file paths.`
-
-function getPlanPhase4Section(): string {
-  const variant = getPewterLedgerVariant()
-  switch (variant) {
-    case 'trim':
-      return PLAN_PHASE4_TRIM
-    case 'cut':
-      return PLAN_PHASE4_CUT
-    case 'cap':
-      return PLAN_PHASE4_CAP
-    case null:
-      return PLAN_PHASE4_CONTROL
-    default:
-      variant satisfies never
-      return PLAN_PHASE4_CONTROL
-  }
-}
-
-function getPlanModeV2Instructions(attachment: {
-  isSubAgent?: boolean
-  planFilePath?: string
-  planExists?: boolean
-}): UserMessage[] {
-  if (attachment.isSubAgent) {
-    return []
-  }
-
-  // When interview phase is enabled, use the iterative workflow.
-  if (isPlanModeInterviewPhaseEnabled()) {
-    return getPlanModeInterviewInstructions(attachment)
-  }
-
-  const agentCount = getPlanModeV2AgentCount()
-  const exploreAgentCount = getPlanModeV2ExploreAgentCount()
-  const planFileInfo = attachment.planExists
-    ? `A plan file already exists at ${attachment.planFilePath}. You can read it and make incremental edits using the ${FileEditTool.name} tool.`
-    : `No plan file exists yet. You should create your plan at ${attachment.planFilePath} using the ${FileWriteTool.name} tool.`
-
-  const content = `Plan mode is active. The user indicated that they do not want you to execute yet -- you MUST NOT make any edits (with the exception of the plan file mentioned below), run any non-readonly tools (including changing configs or making commits), or otherwise make any changes to the system. This supercedes any other instructions you have received.
-
-## Plan File Info:
-${planFileInfo}
-You should build your plan incrementally by writing to or editing this file. NOTE that this is the only file you are allowed to edit - other than this you are only allowed to take READ-ONLY actions.
-
-## Plan Workflow
-
-### Phase 1: Initial Understanding
-Goal: Gain a comprehensive understanding of the user's request by reading through code and asking them questions. Critical: In this phase you should only use the ${EXPLORE_AGENT.agentType} subagent type.
-
-1. Focus on understanding the user's request and the code associated with their request. Actively search for existing functions, utilities, and patterns that can be reused — avoid proposing new code when suitable implementations already exist.
-
-2. **Launch up to ${exploreAgentCount} ${EXPLORE_AGENT.agentType} agents IN PARALLEL** (single message, multiple tool calls) to efficiently explore the codebase.
-   - Use 1 agent when the task is isolated to known files, the user provided specific file paths, or you're making a small targeted change.
-   - Use multiple agents when: the scope is uncertain, multiple areas of the codebase are involved, or you need to understand existing patterns before planning.
-   - Quality over quantity - ${exploreAgentCount} agents maximum, but you should try to use the minimum number of agents necessary (usually just 1)
-   - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: One agent searches for existing implementations, another explores related components, a third investigating testing patterns
-
-### Phase 2: Design
-Goal: Design an implementation approach.
-
-Launch ${PLAN_AGENT.agentType} agent(s) to design the implementation based on the user's intent and your exploration results from Phase 1.
-
-You can launch up to ${agentCount} agent(s) in parallel.
-
-**Guidelines:**
-- **Default**: Launch at least 1 Plan agent for most tasks - it helps validate your understanding and consider alternatives
-- **Skip agents**: Only for truly trivial tasks (typo fixes, single-line changes, simple renames)
-${
-  agentCount > 1
-    ? `- **Multiple agents**: Use up to ${agentCount} agents for complex tasks that benefit from different perspectives
-
-Examples of when to use multiple agents:
-- The task touches multiple parts of the codebase
-- It's a large refactor or architectural change
-- There are many edge cases to consider
-- You'd benefit from exploring different approaches
-
-Example perspectives by task type:
-- New feature: simplicity vs performance vs maintainability
-- Bug fix: root cause vs workaround vs prevention
-- Refactoring: minimal change vs clean architecture
-`
-    : ''
-}
-In the agent prompt:
-- Provide comprehensive background context from Phase 1 exploration including filenames and code path traces
-- Describe requirements and constraints
-- Request a detailed implementation plan
-
-### Phase 3: Review
-Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's intentions.
-1. Read the critical files identified by agents to deepen your understanding
-2. Ensure that the plans align with the user's original request
-3. Use ${ASK_USER_QUESTION_TOOL_NAME} to clarify any remaining questions with the user
-
-${getPlanPhase4Section()}
-
-### Phase 5: Call ${ExitPlanModeV2Tool.name}
-At the very end of your turn, once you have asked the user questions and are happy with your final plan file - you should always call ${ExitPlanModeV2Tool.name} to indicate to the user that you are done planning.
-This is critical - your turn should only end with either using the ${ASK_USER_QUESTION_TOOL_NAME} tool OR calling ${ExitPlanModeV2Tool.name}. Do not stop unless it's for these 2 reasons
-
-**Important:** Use ${ASK_USER_QUESTION_TOOL_NAME} ONLY to clarify requirements or choose between approaches. Use ${ExitPlanModeV2Tool.name} to request plan approval. Do NOT ask about plan approval in any other way - no text questions, no AskUserQuestion. Phrases like "Is this plan okay?", "Should I proceed?", "How does this plan look?", "Any changes before we start?", or similar MUST use ${ExitPlanModeV2Tool.name}.
-
-NOTE: At any point in time through this workflow you should feel free to ask the user questions or clarifications using the ${ASK_USER_QUESTION_TOOL_NAME} tool. Don't make large assumptions about user intent. The goal is to present a well researched plan to the user, and tie any loose ends before implementation begins.`
-
-  return wrapMessagesInSystemReminder([
-    createUserMessage({ content, isMeta: true }),
-  ])
+  return getPlanModeInterviewInstructions(attachment)
 }
 
 function getReadOnlyToolNames(): string {
@@ -3482,11 +3333,7 @@ Your turn should only end by either:
 function getPlanModeV2SparseInstructions(attachment: {
   planFilePath: string
 }): UserMessage[] {
-  const workflowDescription = isPlanModeInterviewPhaseEnabled()
-    ? 'Follow iterative workflow: explore codebase, interview user, write to plan incrementally.'
-    : 'Follow 5-phase workflow.'
-
-  const content = `Plan mode still active (see full instructions earlier in conversation). Read-only except plan file (${attachment.planFilePath}). ${workflowDescription} End turns with ${ASK_USER_QUESTION_TOOL_NAME} (for clarifications) or ${ExitPlanModeV2Tool.name} (for plan approval). Never ask about plan approval via text or AskUserQuestion.`
+  const content = `Plan mode still active (see full instructions earlier in conversation). Read-only except plan file (${attachment.planFilePath}). Follow iterative workflow: explore codebase, interview user, write to plan incrementally. End turns with ${ASK_USER_QUESTION_TOOL_NAME} (for clarifications) or ${ExitPlanModeV2Tool.name} (for plan approval). Never ask about plan approval via text or AskUserQuestion.`
 
   return wrapMessagesInSystemReminder([
     createUserMessage({ content, isMeta: true }),
@@ -3635,7 +3482,7 @@ Read the team config to discover your teammates' names. Check the task list peri
     case 'edited_text_file':
       return wrapMessagesInSystemReminder([
         createUserMessage({
-          content: `Note: ${attachment.filename} was modified, either by the user or by a linter. This change was intentional, so make sure to take it into account as you proceed (ie. don't revert it unless the user asks you to). Don't tell the user this, since they are already aware. Here are the relevant changes (shown with line numbers):\n${attachment.snippet}`,
+          content: `Note: ${attachment.filename} was modified after you last read it, by something other than your own edits: a command you ran, the user, or another session working in the same directory. Take the change into account as you proceed, and don't revert it unless the user asks you to. Here are the relevant changes (shown with line numbers):\n${attachment.snippet}`,
           isMeta: true,
         }),
       ])
@@ -3828,7 +3675,7 @@ Read the team config to discover your teammates' names. Check the task list peri
       }
       return wrapMessagesInSystemReminder([
         createUserMessage({
-          content: `The following skills are available for use with the Skill tool:\n\n${attachment.content}`,
+          content: `${attachment.isInitial ? 'The following skills are available for use with the Skill tool' : 'These skills are now also available for use with the Skill tool'}:\n\n${attachment.content}`,
           isMeta: true,
         }),
       ])

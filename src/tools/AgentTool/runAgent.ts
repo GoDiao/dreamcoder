@@ -10,7 +10,7 @@ import {
   enhanceSystemPromptWithEnvDetails,
 } from '../../constants/prompts.js'
 import type { QuerySource } from '../../constants/querySource.js'
-import { getSystemContext, getUserContext } from '../../context.js'
+import { getSubagentUserContext, getSystemContext } from '../../context.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import { query } from '../../query.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
@@ -386,7 +386,7 @@ export async function* runAgent({
       : createFileStateCacheWithSizeLimit(READ_FILE_STATE_CACHE_SIZE)
 
   const [baseUserContext, baseSystemContext] = await Promise.all([
-    override?.userContext ?? getUserContext(),
+    override?.userContext ?? getSubagentUserContext(),
     override?.systemContext ?? getSystemContext(),
   ])
 
