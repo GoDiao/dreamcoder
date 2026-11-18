@@ -323,6 +323,34 @@ describe('titleService', () => {
     }
   })
 
+  test('title prompt names the session instead of answering and uses the user language', async () => {
+    let requestBody: Record<string, unknown> | null = null
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        requestBody = await req.json() as Record<string, unknown>
+        return Response.json({
+          type: 'message',
+          content: [{ type: 'text', text: '{"title":"Trace ok"}' }],
+        })
+      },
+    })
+
+    try {
+      await writeLoggedProvider(server.port)
+
+      await expect(generateTitle('帮我看看为什么 bun test 在 CI 上失败？')).resolves.toBe('Trace ok')
+      const system = requestBody?.system
+      expect(typeof system).toBe('string')
+      expect(system).toContain('title-generation task, not a conversation')
+      expect(system).toContain('Never answer the user\'s question')
+      expect(system).toContain('user\'s primary language')
+    } finally {
+      server.stop(true)
+    }
+  })
+
   test('logs why the title request failed upstream', async () => {
     const server = Bun.serve({
       hostname: '127.0.0.1',

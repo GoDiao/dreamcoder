@@ -19,6 +19,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Session title generation tells the model to name the conversation instead of answering it, and to write the title in the user's language (#277).
 - A provider in OpenAI format whose base URL already ends in a version, such as `https://open.bigmodel.cn/api/paas/v4` or Gemini's `.../v1beta/openai`, works: requests, model lists and the connection test no longer add another `/v1`. Base URLs without a version still get `/v1` (#262).
 - A streamed reply through the local proxy is no longer cut off when the provider pauses for more than 60 seconds, and stopping a reply or deleting a session now also stops the request to the provider before it starts answering (#262).
 - With a manual HTTP proxy set in the network settings, the agent reaches the app's local proxy directly instead of sending those requests to the HTTP proxy (#262).
