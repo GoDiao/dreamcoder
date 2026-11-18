@@ -36,6 +36,7 @@
 | [第四篇：会话持久化与上下文工程](./04-session-context.zh.md) | 同一组消息在磁盘、恢复后和模型请求中的差别，自动压缩怎样工作 |
 | [第五篇：流式响应与故障恢复](./05-streaming-recovery.zh.md) | 模型输出期间就执行工具，取消和回退时哪些已经执行、哪些会重复 |
 | [第六篇：模型接入与桌面端集成](./06-desktop-integration.zh.md) | Provider 配置怎样进入 CLI，会话进程与消息通道，OpenAI 格式的协议转换和手机接续 |
+| [第七篇：添加 Provider 预设](./07-provider-presets.zh.md) | 如何添加内置 Provider 预设、校验配置，并在设置表单中测试连接 |
 
 ## 阅读约定
 

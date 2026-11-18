@@ -46,7 +46,7 @@ DreamCoder runs its desktop app and session service locally, bringing model conf
 *   **Design and clone**: Start from 60+ templates and 156+ design systems with `/design`: the agent interviews you first, then builds a web page or app prototype. It can also clone a website. Results are kept in your project's `dc_artifacts/`, ready to export, keep editing, or compare side by side on a canvas.
 *   **Plan work on a board**: A project board keeps tasks, owners, reviewers and progress for you and your sessions, across sessions and worktrees.
 *   **Continue on your phone**: Enable H5 Access to reach desktop sessions from a phone browser on the same LAN. Access across networks requires a reverse proxy you configure yourself.
-*   **Learn how a coding agent works**: A seven-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
+*   **Learn how a coding agent works**: An eight-part source code walkthrough follows one code change through the execution loop, tools, permissions, sessions, and desktop integration, then shows how to add a provider preset. See the [Coding Agent Implementation Guide](docs/tutorial/README.en.md).
 
 Provider settings and API keys are stored in local files. When you use a cloud model, requests are sent to your chosen provider. See the [privacy notice](PRIVACY.md).
 
@@ -180,7 +180,7 @@ The templates and most of the design systems are converted from [Open Design](ht
 
 ## 📖 Source Code Walkthrough
 
-To learn how a coding agent works under the hood, read the [Coding Agent Implementation Guide](docs/tutorial/README.en.md) (also available in [Chinese](docs/tutorial/README.md)). The seven-part series follows one small code change through the execution loop, code tools, permissions, sessions and context, streaming and failure recovery, and desktop integration, with source links for each point.
+To learn how a coding agent works under the hood, read the [Coding Agent Implementation Guide](docs/tutorial/README.en.md) (also available in [Chinese](docs/tutorial/README.md)). The eight-part series follows one small code change through the execution loop, code tools, permissions, sessions and context, streaming and failure recovery, and desktop integration, then shows how to add a provider preset, with source links for each point.
 
 ---
 

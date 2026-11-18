@@ -6,6 +6,33 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Added
 
+- **Provider preset contributor guide.** Adds English and Chinese instructions for adding a built-in provider preset, updating its API tests, and checking connectivity from the settings form (#260). Thanks @harshit3355.
+
+### Changed
+
+- Thinking text in a streaming reply is batched like the reply text, so a long thinking block updates the conversation once per 50 ms instead of on every chunk (#258). Thanks @iruzen-dono.
+- **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
+- Providers in OpenAI format can run several tool calls in one step and get tool definitions without schema fields they do not use, and replies show the model you chose instead of the dated version the provider reports (#262).
+- Every request the app itself sends to a provider (through the local proxy, for session titles and for connection tests) is recorded in the diagnostics log with the provider, model, status, timings, the provider's request id and how it ended, including errors in the middle of a stream and clients that disconnect; never the key or the request body (#262).
+- **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and asks again without streaming, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
+- Providers in OpenAI format can carry extra request headers and query parameters, such as Azure's `api-version`. The settings form does not offer them yet; for now they are set by editing the provider in `providers.json`. Authentication and the content type still come from the provider settings and override a header of the same name (#262).
+
+### Fixed
+
+- A provider in OpenAI format whose base URL already ends in a version, such as `https://open.bigmodel.cn/api/paas/v4` or Gemini's `.../v1beta/openai`, works: requests, model lists and the connection test no longer add another `/v1`. Base URLs without a version still get `/v1` (#262).
+- A streamed reply through the local proxy is no longer cut off when the provider pauses for more than 60 seconds, and stopping a reply or deleting a session now also stops the request to the provider before it starts answering (#262).
+- With a manual HTTP proxy set in the network settings, the agent reaches the app's local proxy directly instead of sending those requests to the HTTP proxy (#262).
+- Replies from some providers no longer come back empty; the provider's error message is shown instead (#262).
+- `/context` in the terminal no longer sends a request to the model for each part of the context when the provider is reached through the local proxy; it uses the local estimate (#262).
+
+## [0.9.0] — 2026-11-17
+
+Sessions now work together: they start and message each other, share a project board, and open side chats. The agent can also make slide decks. These notes cover everything since 0.8.0.
+
+Thanks to everyone who contributed to this release: @AIR-Xie, @Oscar-Williams, @WhitePepperLambSoup, @henricop, @imshah-id and @iruzen-dono.
+
+### Added
+
 - **Sessions can start other sessions and message each other.** The agent can start a new session with `StartSession`, either fresh with a brief or as a fork of its own conversation, optionally in a new git worktree; you approve every new session, whatever the permission mode. Any session can message any other with `SendMessage`, across projects: a message wakes the receiver, and a progress report from a child to its parent waits for the parent's next turn instead of interrupting it (a parent that is already working sees it right away). Reports waiting for the parent are listed above its message box. The server stamps who sent each message, so a session cannot pass itself off as you or as another session. `ListSessions` lists sessions, and `RenameSession` lets the agent rename its own session (#239).
 - **Sessions are nested in the sidebar.** Sessions the agent started, and conversations you forked, appear under the session they came from, with an icon for each kind and a count that collapses or expands them. Messages from another session appear in the conversation as a one-line row with the sender, which expands to the full text (#239).
 - **Project board.** Each project gets a persistent board of tasks and sub-tasks that you and your sessions share; every worktree of the project uses the same board. Open it from the project in the sidebar. A task records its owner, reviewer and creator, acceptance criteria, priority, dependencies, progress, and the owner's and reviewer's reports. Sessions read and update the board with four tools (`KanbanList`, `KanbanGet`, `KanbanCreate`, `KanbanUpdate`): they split work into sub-tasks, record progress, block a task with a question, submit their work and review it. The board notifies the sessions involved when they are assigned, when work is submitted, blocked, sent back, reset or cancelled, and when you comment. `StartSession` can start a session as a task's owner or reviewer. The board page has a board view and a hierarchy view, opens a task in the side panel, and lists what waits on you under "Needs me": blocked tasks, deliveries to accept and tasks whose owner session is gone. You approve every time a session creates the board, starts a session on a task, cancels a task, changes acceptance criteria it did not set, or makes itself a reviewer; only a task's creator or you choose its reviewer (#242).
@@ -25,19 +52,9 @@ All notable changes to DreamCoder will be documented in this file.
 - The "open project" button in the session header is a split button: the icon opens the project in the editor you used last, the arrow lists the other editors and file managers.
 - **A message you send while the agent is working waits for the next turn.** It used to be slipped into the running turn. Queued messages are listed above the message box, where you can withdraw one or send the queue now, which stops the current turn and starts the next one; Stop does the same while messages are queued. Queued messages survive a model or permission change that restarts the agent at the end of the turn (#239).
 - The skill page and the Files tab read file previews through one shared reader, so both classify text, images, binary and oversized files the same way (#255). Thanks @iruzen-dono.
-- **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
-- Providers in OpenAI format can run several tool calls in one step and get tool definitions without schema fields they do not use, and replies show the model you chose instead of the dated version the provider reports (#262).
-- Every request the app itself sends to a provider (through the local proxy, for session titles and for connection tests) is recorded in the diagnostics log with the provider, model, status, timings, the provider's request id and how it ended, including errors in the middle of a stream and clients that disconnect; never the key or the request body (#262).
-- **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and asks again without streaming, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
-- Providers in OpenAI format can carry extra request headers and query parameters, such as Azure's `api-version`. The settings form does not offer them yet; for now they are set by editing the provider in `providers.json`. Authentication and the content type still come from the provider settings and override a header of the same name (#262).
 
 ### Fixed
 
-- A provider in OpenAI format whose base URL already ends in a version, such as `https://open.bigmodel.cn/api/paas/v4` or Gemini's `.../v1beta/openai`, works: requests, model lists and the connection test no longer add another `/v1`. Base URLs without a version still get `/v1` (#262).
-- A streamed reply through the local proxy is no longer cut off when the provider pauses for more than 60 seconds, and stopping a reply or deleting a session now also stops the request to the provider before it starts answering (#262).
-- With a manual HTTP proxy set in the network settings, the agent reaches the app's local proxy directly instead of sending those requests to the HTTP proxy (#262).
-- Replies from some providers no longer come back empty; the provider's error message is shown instead (#262).
-- `/context` in the terminal no longer sends a request to the model for each part of the context when the provider is reached through the local proxy; it uses the local estimate (#262).
 - The slash menu on the new task page lists the built-in commands such as `/design`; it used to list only skills on disk.
 - A deleted session no longer comes back as an empty session in the sidebar. It happened to sessions with a title you had set that were deleted while their agent was still running.
 - Exporting an artifact as a PNG image shows the whole page. On a page taller than the side panel, everything below the visible part used to repeat the visible part. The image now shows the page as it loads, without what you clicked or typed in the tab.
