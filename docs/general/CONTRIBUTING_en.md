@@ -117,7 +117,7 @@ dreamcoder/
 └── docs/                  # Documentation
 ```
 
-Provider preset contributions have a focused guide in the website documentation under "Adding Provider Presets".
+Provider preset contributions have a focused guide: [Adding a provider preset](../tutorial/07-provider-presets.en.md), part 7 of the Coding Agent Implementation Guide.
 
 ## Development Environment
 

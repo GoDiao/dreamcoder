@@ -118,7 +118,7 @@ dreamcoder/
 └── docs/                  # 文档
 ```
 
-如果你要新增 Provider 预设，请先阅读网站技术手册中的“新增 Provider 预设”。
+如果你要新增 Provider 预设，请先阅读[《添加 Provider 预设》](../tutorial/07-provider-presets.zh.md)（《编程智能体实现指南》第七篇）。
 
 ## 开发环境
 
