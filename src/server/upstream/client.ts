@@ -12,7 +12,7 @@ import type {
   OpenAIChatResponse,
   OpenAIResponsesResponse,
 } from '../proxy/transform/types.js'
-import { getManualNetworkProxyUrl, loadNetworkSettings } from '../services/networkSettings.js'
+import { getManualNetworkProxyUrl, loadNetworkSettings, type NetworkSettings } from '../services/networkSettings.js'
 import {
   getPresetAuthStrategy,
   getPresetDefaultEnv,
@@ -20,14 +20,24 @@ import {
   stripContextSuffix,
 } from '../services/providerRuntimeEnv.js'
 import type { ApiFormat, ProviderAuthStrategy, DiscoveredProviderModel, SavedProvider } from '../types/provider.js'
-import { normalizeUpstreamBaseUrl } from './baseUrl.js'
+import { normalizeUpstreamBaseUrl, openaiUpstreamBaseUrl } from './baseUrl.js'
 import { fillContextWindows } from './contextWindows/index.js'
+import { superviseAnthropicStream } from './anthropicStream.js'
+import {
+  recordUpstreamRequest,
+  type UpstreamOutcome,
+  type UpstreamRequestInfo,
+  type UpstreamResponseInfo,
+} from './requestLog.js'
 
 export type UpstreamTarget = {
+  providerId?: string
   baseUrl: string
   apiKey: string
   apiFormat: ApiFormat
   authStrategy: ProviderAuthStrategy
+  extraHeaders?: Record<string, string>
+  queryParams?: Record<string, string>
 }
 
 export type UpstreamResult =
@@ -47,38 +57,93 @@ type UpstreamRequest = {
 
 export function resolveUpstreamTarget(provider: SavedProvider): UpstreamTarget {
   return {
+    providerId: provider.id,
     baseUrl: provider.baseUrl,
     apiKey: resolveProviderApiKey(provider, getPresetDefaultEnv(provider.presetId)),
     apiFormat: provider.apiFormat ?? 'anthropic',
     authStrategy: provider.authStrategy ?? getPresetAuthStrategy(provider.presetId),
+    ...(provider.extraHeaders && { extraHeaders: provider.extraHeaders }),
+    ...(provider.queryParams && { queryParams: provider.queryParams }),
   }
+}
+
+type SendOptions = { timeoutMs?: number; signal?: AbortSignal; sessionId?: string }
+type RequestContext = {
+  networkSettings: NetworkSettings
+  timeoutMs: number
+  startedAt: number
+  signal?: AbortSignal
+  sessionId?: string
 }
 
 export async function sendToUpstream(
   target: UpstreamTarget,
   request: AnthropicRequest,
-  options?: { timeoutMs?: number },
+  options?: SendOptions,
 ): Promise<UpstreamResult> {
+  const anthropicRequest = { ...request, model: stripContextSuffix(request.model) }
+  const info: UpstreamRequestInfo = {
+    providerId: target.providerId,
+    model: anthropicRequest.model,
+    baseUrl: target.baseUrl,
+    apiFormat: target.apiFormat,
+    stream: request.stream === true,
+    startedAt: Date.now(),
+  }
   const networkSettings = await loadNetworkSettings()
   const timeoutMs = options?.timeoutMs ?? networkSettings.aiRequestTimeoutMs
-  const isStream = request.stream === true
-  const anthropicRequest = { ...request, model: stripContextSuffix(request.model) }
-  const upstreamRequest = buildUpstreamRequest(target, anthropicRequest)
+  const response: UpstreamResponseInfo = {}
+  const result = await requestUpstream(target, anthropicRequest, response, {
+    networkSettings,
+    timeoutMs,
+    startedAt: info.startedAt,
+    signal: options?.signal,
+    sessionId: options?.sessionId,
+  })
+  const record = (outcome: UpstreamOutcome) => recordUpstreamRequest(
+    info,
+    response,
+    outcome.outcome === 'error' && options?.signal?.aborted ? { outcome: 'client_disconnected' } : outcome,
+  )
+
+  if (!result.ok) {
+    record({ outcome: options?.signal?.aborted ? 'client_aborted' : 'error', error: result.error })
+    return result
+  }
+  if ('stream' in result) {
+    return { ...result, stream: superviseAnthropicStream(result.stream, timeoutMs, record) }
+  }
+  record({ outcome: 'completed' })
+  return result
+}
+
+async function requestUpstream(
+  target: UpstreamTarget,
+  anthropicRequest: AnthropicRequest,
+  responseInfo: UpstreamResponseInfo,
+  { networkSettings, timeoutMs, startedAt, signal, sessionId }: RequestContext,
+): Promise<UpstreamResult> {
+  const isStream = anthropicRequest.stream === true
 
   let response: Response
   try {
+    const upstreamRequest = buildUpstreamRequest(target, anthropicRequest, sessionId)
     response = await fetchWithTimeout(upstreamRequest.url, {
       method: 'POST',
       headers: upstreamRequest.headers,
       body: upstreamRequest.body,
       ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
-    }, timeoutMs, isStream)
+    }, timeoutMs, isStream, signal)
   } catch (err) {
     if (err instanceof DOMException && err.name === 'TimeoutError') {
       return { ok: false, error: `Request timed out (${Math.round(timeoutMs / 1000)}s)` }
     }
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+
+  responseInfo.status = response.status
+  responseInfo.requestId = response.headers.get('x-request-id') ?? response.headers.get('request-id') ?? undefined
+  responseInfo.headersMs = Date.now() - startedAt
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '')
@@ -118,13 +183,15 @@ export async function sendToUpstream(
 
 export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: string): Promise<UpstreamModelsResult> {
   const networkSettings = await loadNetworkSettings()
-  const base = normalizeUpstreamBaseUrl(target.baseUrl)
+  const modelsUrl = target.apiFormat === 'anthropic'
+    ? `${normalizeUpstreamBaseUrl(target.baseUrl)}/v1/models`
+    : withQueryParams(`${openaiUpstreamBaseUrl(target.baseUrl)}/models`, target.queryParams)
   const headers = target.apiFormat === 'anthropic'
     ? {
         'anthropic-version': '2023-06-01',
         ...buildAnthropicAuthHeaders(target.apiKey, target.authStrategy),
       }
-    : { Authorization: `Bearer ${target.apiKey}` }
+    : mergeHeaders(target.extraHeaders, { Authorization: `Bearer ${target.apiKey}` })
 
   const seen = new Set<string>()
   const models: DiscoveredProviderModel[] = []
@@ -133,7 +200,7 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
   let afterId = ''
 
   for (let page = 0; page < maxPages; page += 1) {
-    const url = new URL(`${base}/v1/models`)
+    const url = new URL(modelsUrl)
     if (target.apiFormat === 'anthropic') {
       url.searchParams.set('limit', '1000')
       if (afterId) url.searchParams.set('after_id', afterId)
@@ -199,32 +266,31 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
   return { ok: false, httpStatus: 502, error: `Upstream model pagination exceeded ${maxPages} pages` }
 }
 
-function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest): UpstreamRequest {
-  const base = normalizeUpstreamBaseUrl(target.baseUrl)
-
+function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest, sessionId?: string): UpstreamRequest {
   if (target.apiFormat === 'openai_chat') {
+    const base = openaiUpstreamBaseUrl(target.baseUrl)
     const compat = shouldUseDeepSeekReasoningCompat(base)
     const transformed = anthropicToOpenaiChat(request, {
       roundTripReasoningContent: compat,
       passThinkingToggle: compat,
     })
     return {
-      url: `${base}/v1/chat/completions`,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
+      url: withQueryParams(`${base}/chat/completions`, target.queryParams),
+      headers: openaiHeaders(target),
       body: signClaudeCodeCCHInTransformedString(JSON.stringify(transformed)),
     }
   }
 
   if (target.apiFormat === 'openai_responses') {
     return {
-      url: `${base}/v1/responses`,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
-      body: signClaudeCodeCCHInTransformedString(JSON.stringify(anthropicToOpenaiResponses(request))),
+      url: withQueryParams(`${openaiUpstreamBaseUrl(target.baseUrl)}/responses`, target.queryParams),
+      headers: openaiHeaders(target),
+      body: signClaudeCodeCCHInTransformedString(JSON.stringify(anthropicToOpenaiResponses(request, { promptCacheKey: sessionId }))),
     }
   }
 
   return {
-    url: `${base}/v1/messages`,
+    url: `${normalizeUpstreamBaseUrl(target.baseUrl)}/v1/messages`,
     headers: {
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
@@ -232,6 +298,29 @@ function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest)
     },
     body: JSON.stringify(request),
   }
+}
+
+function openaiHeaders(target: UpstreamTarget): Record<string, string> {
+  return mergeHeaders(target.extraHeaders, {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${target.apiKey}`,
+  })
+}
+
+function mergeHeaders(
+  configured: Record<string, string> | undefined,
+  own: Record<string, string>,
+): Record<string, string> {
+  const ownNames = new Set(Object.keys(own).map((name) => name.toLowerCase()))
+  const kept = Object.entries(configured ?? {}).filter(([name]) => !ownNames.has(name.toLowerCase()))
+  return { ...Object.fromEntries(kept), ...own }
+}
+
+function withQueryParams(url: string, queryParams: Record<string, string> | undefined): string {
+  if (!queryParams || Object.keys(queryParams).length === 0) return url
+  const parsed = new URL(url)
+  for (const [name, value] of Object.entries(queryParams)) parsed.searchParams.set(name, value)
+  return parsed.toString()
 }
 
 function buildAnthropicAuthHeaders(apiKey: string, authStrategy: ProviderAuthStrategy): Record<string, string> {
@@ -260,9 +349,12 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
   isStream: boolean,
+  callerSignal?: AbortSignal,
 ): Promise<Response> {
+  const withCaller = (signal: AbortSignal) => callerSignal ? AbortSignal.any([callerSignal, signal]) : signal
+
   if (!isStream) {
-    return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+    return fetch(url, { ...init, signal: withCaller(AbortSignal.timeout(timeoutMs)) })
   }
 
   const controller = new AbortController()
@@ -270,7 +362,7 @@ async function fetchWithTimeout(
     controller.abort(new DOMException('The operation timed out.', 'TimeoutError'))
   }, timeoutMs)
   try {
-    return await fetch(url, { ...init, signal: controller.signal })
+    return await fetch(url, { ...init, signal: withCaller(controller.signal) })
   } finally {
     clearTimeout(timer)
   }

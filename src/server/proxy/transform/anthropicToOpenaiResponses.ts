@@ -6,8 +6,12 @@ import type {
   OpenAIResponsesContentPart,
 } from './types.js'
 import { extractToolResultContent } from './toolArguments.js'
+import { cleanToolSchema } from './toolSchema.js'
 
-export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIResponsesRequest {
+export function anthropicToOpenaiResponses(
+  body: AnthropicRequest,
+  options: { promptCacheKey?: string } = {},
+): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
 
   for (const msg of body.messages) {
@@ -20,6 +24,8 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
     stream: body.stream,
     store: false,
   }
+
+  if (options.promptCacheKey) result.prompt_cache_key = options.promptCacheKey
 
   if (body.system) {
     if (typeof body.system === 'string') {
@@ -39,9 +45,10 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
         type: 'function',
         name: t.name,
         description: t.description,
-        parameters: t.input_schema,
+        parameters: cleanToolSchema(t.input_schema),
         strict: false,
       }))
+    if (result.tools.length > 0) result.parallel_tool_calls = true
   }
 
   if (body.tool_choice !== undefined) {

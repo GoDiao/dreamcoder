@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
+import { PROVIDER_PROXIED_ENV_KEY } from '../../utils/providerProxy.js'
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
 import type {
   ApiFormat,
@@ -33,6 +34,7 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   MODEL_CONTEXT_WINDOWS_ENV_KEY,
   'DREAMCODER_OPENAI_OAUTH_PROVIDER',
   'OPENAI_CODEX_OAUTH_FILE',
+  PROVIDER_PROXIED_ENV_KEY,
 ] as const
 
 const CUSTOM_PROVIDER_MODEL_CAPABILITIES = 'thinking,effort,adaptive_thinking,max_effort'
@@ -249,6 +251,7 @@ export function buildProviderManagedEnv(
     ANTHROPIC_DEFAULT_SONNET_MODEL: stripContextSuffix(selectedModel),
     ANTHROPIC_DEFAULT_OPUS_MODEL: stripContextSuffix(selectedModel),
     ...attributionHeaderEnvForModel(selectedModel),
+    ...(needsProxy && { [PROVIDER_PROXIED_ENV_KEY]: '1' }),
   }
 }
 

@@ -90,12 +90,57 @@ describe('network settings', () => {
 
     expect(settings.aiRequestTimeoutMs).toBe(180_000)
     expect(getManualNetworkProxyUrl(settings)).toBe('http://127.0.0.1:7890')
-    expect(buildNetworkEnvironment(settings)).toEqual({
+    expect(buildNetworkEnvironment(settings, { NO_PROXY: 'corp.internal' })).toEqual({
       API_TIMEOUT_MS: '180000',
+      CLAUDE_ENABLE_STREAM_WATCHDOG: '1',
+      CLAUDE_STREAM_IDLE_TIMEOUT_MS: '180000',
       HTTP_PROXY: 'http://127.0.0.1:7890',
       HTTPS_PROXY: 'http://127.0.0.1:7890',
       http_proxy: 'http://127.0.0.1:7890',
       https_proxy: 'http://127.0.0.1:7890',
+      NO_PROXY: 'corp.internal,127.0.0.1,localhost,::1',
+      no_proxy: 'corp.internal,127.0.0.1,localhost,::1',
     })
+  })
+
+  it('keeps an inherited NO_PROXY wildcard as it is', () => {
+    const settings = normalizeNetworkSettings({
+      network: { proxy: { mode: 'manual', url: 'http://proxy.corp:8080' } },
+    })
+
+    expect(buildNetworkEnvironment(settings, { NO_PROXY: '*' })).toMatchObject({ NO_PROXY: '*', no_proxy: '*' })
+  })
+
+  it('lets a CLI with a manual proxy reach the local server directly', async () => {
+    let proxyHits = 0
+    const externalProxy = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        proxyHits += 1
+        return new Response('through the external proxy', { status: 502 })
+      },
+    })
+    const localServer = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('direct') })
+    const settings = normalizeNetworkSettings({
+      network: { proxy: { mode: 'manual', url: `http://127.0.0.1:${externalProxy.port}` } },
+    })
+    const { HTTP_PROXY: _a, HTTPS_PROXY: _b, http_proxy: _c, https_proxy: _d, NO_PROXY: _e, no_proxy: _f, ...baseEnv } = process.env
+
+    try {
+      const child = Bun.spawn([
+        process.execPath,
+        '-e',
+        `const res = await fetch('http://127.0.0.1:${localServer.port}/', { proxy: process.env.HTTPS_PROXY }); console.log(await res.text())`,
+      ], { env: { ...baseEnv, ...buildNetworkEnvironment(settings, baseEnv) }, stdout: 'pipe' })
+      const output = (await new Response(child.stdout).text()).trim()
+      await child.exited
+
+      expect(output).toBe('direct')
+      expect(proxyHits).toBe(0)
+    } finally {
+      externalProxy.stop(true)
+      localServer.stop(true)
+    }
   })
 })

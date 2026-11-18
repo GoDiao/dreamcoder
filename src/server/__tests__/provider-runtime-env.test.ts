@@ -4,6 +4,7 @@ import * as os from 'os'
 import * as path from 'path'
 
 import {
+  buildProviderManagedEnv,
   mergeActiveProviderManagedEnv,
   readActiveProviderManagedEnv,
   resolveProviderDefaultModel,
@@ -136,5 +137,24 @@ describe('providerRuntimeEnv', () => {
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gpt-5.5',
       DISABLE_AUTOUPDATER: '1',
     })
+  })
+
+  test.each([
+    ['openai_chat', '1'],
+    ['openai_responses', '1'],
+    ['anthropic', undefined],
+  ] as const)('marks providers reached through the local proxy (%s)', (apiFormat, expected) => {
+    const env = buildProviderManagedEnv({
+      id: 'p1',
+      presetId: 'custom',
+      name: 'Provider',
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.example.com',
+      apiFormat,
+      runtimeKind: 'anthropic_compatible',
+      models: [{ id: 'model-main' }],
+    })
+
+    expect(env.DREAMCODER_PROVIDER_PROXIED).toBe(expected)
   })
 })

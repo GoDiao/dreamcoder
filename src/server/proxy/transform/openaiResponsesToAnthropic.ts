@@ -25,7 +25,7 @@ export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, mo
     type: 'message',
     role: 'assistant',
     content,
-    model: response.model || model,
+    model,
     stop_reason: mapStatus(response.status, hasToolUse),
     stop_sequence: null,
     usage: mapResponsesUsage(response.usage),

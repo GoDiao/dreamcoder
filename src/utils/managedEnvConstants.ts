@@ -1,3 +1,5 @@
+import { PROVIDER_PROXIED_ENV_KEY } from './providerProxy.js'
+
 /**
  * Environment variables that control inference routing: which provider to use,
  * which endpoint to hit, and which model IDs to send.
@@ -43,6 +45,7 @@ const PROVIDER_MANAGED_ENV_VARS = new Set([
   'CLAUDE_CODE_SKIP_AZURE_OPENAI_AUTH',
   'DREAMCODER_OPENAI_OAUTH_PROVIDER',
   'OPENAI_CODEX_OAUTH_FILE',
+  PROVIDER_PROXIED_ENV_KEY,
   // Model defaults — often set to provider-specific ID formats
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',

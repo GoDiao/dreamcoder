@@ -9,6 +9,7 @@ import { FakeDesktop } from '../browserHost/testSupport.js'
 import { ConversationService } from '../services/conversationService.js'
 import { ProviderService } from '../services/providerService.js'
 import { resetTerminalShellEnvironmentCacheForTests } from '../../utils/terminalShellEnvironment.js'
+import { PROVIDER_PROXIED_ENV_KEY } from '../../utils/providerProxy.js'
 
 describe('ConversationService', () => {
   let tmpDir: string
@@ -234,12 +235,40 @@ describe('ConversationService', () => {
       'utf-8',
     )
 
-    const service = new ConversationService() as any
-    const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
+    const originalNoProxy = process.env.NO_PROXY
+    const originalLowerNoProxy = process.env.no_proxy
+    process.env.NO_PROXY = 'corp.internal'
+    delete process.env.no_proxy
+    try {
+      const service = new ConversationService() as any
+      const env = (await service.buildChildEnv('/tmp')) as Record<string, string>
 
-    expect(env.API_TIMEOUT_MS).toBe('180000')
-    expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
-    expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+      expect(env.API_TIMEOUT_MS).toBe('180000')
+      expect(env.CLAUDE_ENABLE_STREAM_WATCHDOG).toBe('1')
+      expect(env.CLAUDE_STREAM_IDLE_TIMEOUT_MS).toBe('180000')
+      expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
+      expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+      expect(env.NO_PROXY).toBe('corp.internal,127.0.0.1,localhost,::1')
+    } finally {
+      if (originalNoProxy === undefined) delete process.env.NO_PROXY
+      else process.env.NO_PROXY = originalNoProxy
+      if (originalLowerNoProxy === undefined) delete process.env.no_proxy
+      else process.env.no_proxy = originalLowerNoProxy
+    }
+  })
+
+  test('buildChildEnv drops an inherited local proxy marker when the host chooses the provider', async () => {
+    const originalProxied = process.env[PROVIDER_PROXIED_ENV_KEY]
+    process.env[PROVIDER_PROXIED_ENV_KEY] = '1'
+    try {
+      const service = new ConversationService() as any
+      const env = (await service.buildChildEnv('/tmp', undefined, { providerId: null })) as Record<string, string>
+
+      expect(env[PROVIDER_PROXIED_ENV_KEY]).toBeUndefined()
+    } finally {
+      if (originalProxied === undefined) delete process.env[PROVIDER_PROXIED_ENV_KEY]
+      else process.env[PROVIDER_PROXIED_ENV_KEY] = originalProxied
+    }
   })
 
   test('buildChildEnv gives a session of a connected desktop a browser endpoint and its own token', async () => {

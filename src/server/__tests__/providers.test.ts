@@ -5,6 +5,7 @@ import * as os from 'os'
 import { ProviderService } from '../services/providerService.js'
 import { handleProvidersApi } from '../api/providers.js'
 import { handleProxyRequest } from '../proxy/handler.js'
+import { resolveUpstreamTarget } from '../upstream/client.js'
 import type { CreateProviderInput } from '../types/provider.js'
 
 let tmpDir: string
@@ -773,8 +774,91 @@ describe('ProviderService', () => {
     })
   })
 
+  describe('extra headers and query parameters', () => {
+    test('saves them for OpenAI-format providers and hands them to the upstream client', async () => {
+      const svc = new ProviderService()
+      const provider = await svc.addProvider(sampleInput({
+        apiFormat: 'openai_chat',
+        extraHeaders: { 'HTTP-Referer': 'https://dreamcoder.dev' },
+        queryParams: { 'api-version': '2024-10-21' },
+      }))
+
+      expect(resolveUpstreamTarget(await svc.getProvider(provider.id))).toMatchObject({
+        extraHeaders: { 'HTTP-Referer': 'https://dreamcoder.dev' },
+        queryParams: { 'api-version': '2024-10-21' },
+      })
+    })
+
+    test('rejects them for Anthropic-format providers', async () => {
+      const svc = new ProviderService()
+
+      await expect(svc.addProvider(sampleInput({ apiFormat: 'anthropic', queryParams: { a: 'b' } }))).rejects.toThrow()
+      const provider = await svc.addProvider(sampleInput({ apiFormat: 'openai_chat', extraHeaders: { 'X-Title': 'DreamCoder' } }))
+      await expect(svc.updateProvider(provider.id, { apiFormat: 'anthropic' })).rejects.toThrow()
+    })
+
+    test('clears them with null', async () => {
+      const svc = new ProviderService()
+      const provider = await svc.addProvider(sampleInput({ apiFormat: 'openai_chat', extraHeaders: { 'X-Title': 'DreamCoder' } }))
+
+      const updated = await svc.updateProvider(provider.id, { extraHeaders: null, apiFormat: 'anthropic' })
+
+      expect(updated.extraHeaders).toBeUndefined()
+    })
+  })
+
   describe('handleProxyRequest', () => {
-    test('injects Claude Code billing attribution with compat version and signed CCH', async () => {
+    test('injects Claude Code billing attribution with compat version and signed CCH for Claude models', async () => {
+      const originalFetch = globalThis.fetch
+      const originalEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
+      delete process.env.CLAUDE_CODE_ENTRYPOINT
+      const calls: Array<{ body: Record<string, unknown> }> = []
+      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown> })
+        return new Response(JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion',
+          created: 0,
+          model: 'gpt-4',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }) as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const provider = await svc.addProvider(sampleInput({ apiFormat: 'openai_chat' }))
+        await svc.activateProvider(provider.id)
+
+        const req = new Request('http://localhost:3456/proxy/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 64,
+            messages: [{ role: 'user', content: 'hello from proxy' }],
+          }),
+        })
+
+        const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
+        expect(res.status).toBe(200)
+
+        const system = calls[0].body.messages as Array<Record<string, string>>
+        expect(system[0].role).toBe('system')
+        expect(system[0].content).toMatch(
+          /^x-anthropic-billing-header: cc_version=2\.1\.92\.693; cc_entrypoint=unknown; cch=[0-9a-f]{5};$/,
+        )
+      } finally {
+        globalThis.fetch = originalFetch
+        if (originalEntrypoint === undefined) delete process.env.CLAUDE_CODE_ENTRYPOINT
+        else process.env.CLAUDE_CODE_ENTRYPOINT = originalEntrypoint
+      }
+    })
+
+    test('leaves the system prompt without billing attribution for non-Claude models', async () => {
       const originalFetch = globalThis.fetch
       const originalEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
       delete process.env.CLAUDE_CODE_ENTRYPOINT
@@ -809,19 +893,58 @@ describe('ProviderService', () => {
           }),
         })
 
-        const res = await handleProxyRequest(req, new URL(req.url))
+        const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
         expect(res.status).toBe(200)
 
-        const system = calls[0].body.messages as Array<Record<string, string>>
-        expect(system[0].role).toBe('system')
-        expect(system[0].content).toMatch(
-          /^x-anthropic-billing-header: cc_version=2\.1\.92\.693; cc_entrypoint=unknown; cch=[0-9a-f]{5};$/,
-        )
+        expect(calls[0].body.messages).toEqual([{ role: 'user', content: 'hello from proxy' }])
       } finally {
         globalThis.fetch = originalFetch
         if (originalEntrypoint === undefined) delete process.env.CLAUDE_CODE_ENTRYPOINT
         else process.env.CLAUDE_CODE_ENTRYPOINT = originalEntrypoint
       }
+    })
+
+    test.each([
+      ['openai_responses', 'session-abc'],
+      ['openai_chat', undefined],
+    ] as const)('sends the CLI session id as prompt_cache_key for %s: %p', async (apiFormat, expected) => {
+      const originalFetch = globalThis.fetch
+      const bodies: Array<Record<string, unknown>> = []
+      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+        return Response.json(apiFormat === 'openai_chat'
+          ? { id: 'c', object: 'chat.completion', created: 0, model: 'gpt-4', choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] }
+          : { id: 'r', object: 'response', model: 'gpt-4', status: 'completed', output: [] })
+      }) as typeof fetch
+
+      try {
+        const provider = await new ProviderService().addProvider(sampleInput({ apiFormat }))
+        const req = new Request(`http://localhost:3456/proxy/providers/${provider.id}/v1/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Claude-Code-Session-Id': 'session-abc' },
+          body: JSON.stringify({ model: 'gpt-4', max_tokens: 64, messages: [{ role: 'user', content: 'hi' }] }),
+        })
+
+        const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
+
+        expect(res.status).toBe(200)
+        expect(bodies[0]!.prompt_cache_key).toBe(expected)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test.each([
+      '/proxy/v1/messages/count_tokens',
+      '/proxy/providers/p1/v1/messages/count_tokens',
+      '/proxy/v1/models',
+    ])('answers %s with an Anthropic not_found_error', async (pathname) => {
+      const req = new Request(`http://localhost:3456${pathname}`, { method: 'POST', body: '{}' })
+
+      const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
+
+      expect(res.status).toBe(404)
+      expect(await res.json()).toMatchObject({ type: 'error', error: { type: 'not_found_error' } })
     })
   })
 

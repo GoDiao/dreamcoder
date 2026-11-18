@@ -1,6 +1,7 @@
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
 import { mapResponsesUsage } from '../transform/openaiResponsesToAnthropic.js'
 import type { OpenAIResponsesUsage } from '../transform/types.js'
+import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 
 type StreamState = {
   nextContentIndex: number
@@ -29,8 +30,7 @@ export function openaiResponsesStreamToAnthropic(
   model: string,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const sse = new SseDecoder()
 
   const state: StreamState = {
     nextContentIndex: 0,
@@ -47,57 +47,23 @@ export function openaiResponsesStreamToAnthropic(
 
   return new ReadableStream({
     async start(controller) {
-      let currentEvent = ''
+      const handle = (messages: SseMessage[]) => {
+        for (const message of messages) {
+          if (message.type === 'event') handleEvent(message.event, message.data.trim(), state, controller, encoder)
+          else if (!state.messageStopped) controller.enqueue(encoder.encode(formatSse('ping', { type: 'ping' })))
+        }
+      }
 
       try {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            const trimmed = line.trim()
-
-            if (trimmed.startsWith('event: ')) {
-              currentEvent = trimmed.slice(7).trim()
-              continue
-            }
-
-            if (trimmed.startsWith('data: ')) {
-              const jsonStr = trimmed.slice(6)
-              if (jsonStr === '[DONE]') {
-                if (!state.messageStopped) {
-                  state.messageStopped = true
-                  if (!state.messageStarted) {
-                    emitMessageStart(state, controller, encoder, model)
-                  }
-                  controller.enqueue(encoder.encode(formatSse('message_stop', { type: 'message_stop' })))
-                }
-                continue
-              }
-
-              let data: Record<string, unknown>
-              try {
-                data = JSON.parse(jsonStr)
-              } catch {
-                continue
-              }
-
-              if (!state.messageStopped) {
-                processEvent(currentEvent || String(data.type ?? ''), data, state, controller, encoder)
-              }
-              currentEvent = ''
-              continue
-            }
-
-            if (trimmed === '') {
-              currentEvent = ''
-            }
-          }
+          handle(sse.push(value))
         }
+        handle(sse.flush())
+
+        const body = sse.unframedBody()
+        if (body) emitUnframedError(body, controller, encoder)
       } catch (err) {
         if (!cancelled) controller.error(err)
         return
@@ -111,11 +77,47 @@ export function openaiResponsesStreamToAnthropic(
   })
 }
 
+function handleEvent(
+  event: string,
+  data: string,
+  state: StreamState,
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+): void {
+  if (data === '[DONE]') {
+    if (!state.messageStopped) {
+      state.messageStopped = true
+      if (!state.messageStarted) {
+        emitMessageStart(state, controller, encoder)
+      }
+      controller.enqueue(encoder.encode(formatSse('message_stop', { type: 'message_stop' })))
+    }
+    return
+  }
+
+  const parsed = parseSseJson(data)
+  if (state.messageStopped || !parsed || typeof parsed !== 'object') return
+  const record = parsed as Record<string, unknown>
+  processEvent(event || String(record.type ?? ''), record, state, controller, encoder)
+}
+
+function emitUnframedError(
+  body: string,
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+): void {
+  const parsed = parseSseJson(body) as Record<string, unknown> | undefined
+  if (!parsed || typeof parsed !== 'object' || !parsed.error) return
+  controller.enqueue(encoder.encode(formatSse('error', {
+    type: 'error',
+    error: { type: 'api_error', message: upstreamErrorMessage(parsed) },
+  })))
+}
+
 function emitMessageStart(
   state: StreamState,
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
-  model: string,
 ): void {
   state.messageStarted = true
   controller.enqueue(encoder.encode(formatSse('message_start', {
@@ -125,7 +127,7 @@ function emitMessageStart(
       type: 'message',
       role: 'assistant',
       content: [],
-      model,
+      model: state.model,
       stop_reason: null,
       stop_sequence: null,
       usage: { input_tokens: 0, output_tokens: 0 },
@@ -142,14 +144,12 @@ function processEvent(
 ): void {
   switch (event) {
     case 'response.created': {
-      const response = data as Record<string, unknown>
-      state.model = (response.model as string) || state.model
-      emitMessageStart(state, controller, encoder, state.model)
+      emitMessageStart(state, controller, encoder)
       break
     }
 
     case 'response.output_item.added': {
-      if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
+      if (!state.messageStarted) emitMessageStart(state, controller, encoder)
       const item = data.item as Record<string, unknown> | undefined
       if (!item) break
 
@@ -174,7 +174,7 @@ function processEvent(
     }
 
     case 'response.content_part.added': {
-      if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
+      if (!state.messageStarted) emitMessageStart(state, controller, encoder)
       const part = data.part as Record<string, unknown> | undefined
       if (part?.type !== 'output_text' && part?.type !== 'refusal') break
 
@@ -272,7 +272,7 @@ function processEvent(
       if (index === undefined) {
         index = state.nextContentIndex++
         state.reasoningIndexByItemId.set(itemId, index)
-        if (!state.messageStarted) emitMessageStart(state, controller, encoder, state.model)
+        if (!state.messageStarted) emitMessageStart(state, controller, encoder)
         controller.enqueue(encoder.encode(formatSse('content_block_start', {
           type: 'content_block_start',
           index,

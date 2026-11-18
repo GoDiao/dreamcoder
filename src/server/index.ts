@@ -363,7 +363,7 @@ export function startServer(port = PORT, host = HOST) {
             }
           }
           try {
-            const response = await handleProxyRequest(req, url)
+            const response = await handleProxyRequest(req, url, server)
             return withCors(response, cors)
           } catch (error) {
             void diagnosticsService.recordEvent({

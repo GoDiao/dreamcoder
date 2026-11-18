@@ -5,6 +5,7 @@ import {
   OpenAIResponsesStreamError,
   openaiResponsesStreamToAnthropicResponse,
 } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { SseDecoder } from '../proxy/streaming/sse.js'
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -607,6 +608,118 @@ describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
     )
 
     expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
+  })
+})
+
+describe('SSE framing', () => {
+  const chatChunk = (delta: Record<string, unknown>, finishReason: string | null = null) => JSON.stringify({
+    id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'gpt-4', choices: [{ index: 0, delta, finish_reason: finishReason }],
+  })
+
+  test('a CRLF split across chunks ends one line, not two', () => {
+    const decoder = new SseDecoder()
+    const encoder = new TextEncoder()
+    const messages = [
+      ...decoder.push(encoder.encode('data: a\r')),
+      ...decoder.push(encoder.encode('\ndata: b\r')),
+      ...decoder.push(encoder.encode('\n\r\n')),
+      ...decoder.flush(),
+    ]
+
+    expect(messages).toEqual([{ type: 'event', event: '', data: 'a\nb' }])
+  })
+
+  test('the last event is dispatched at the end of the stream without a closing blank line', () => {
+    const decoder = new SseDecoder()
+
+    expect(decoder.push(new TextEncoder().encode('event: x\ndata: y\n'))).toEqual([])
+    expect(decoder.flush()).toEqual([{ type: 'event', event: 'x', data: 'y' }])
+  })
+
+  test('chat stream accepts field lines without a space after the colon and CRLF line endings', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      `data:${chatChunk({ role: 'assistant', content: 'Hi' })}\r\n\r\n`,
+      `data:${chatChunk({}, 'stop')}\r\n\r\n`,
+      'data:[DONE]\r\n\r\n',
+    ]), 'gpt-4'))
+
+    expect(events.map(e => e.event)).toEqual([
+      'message_start', 'content_block_start', 'content_block_delta', 'content_block_stop', 'message_delta', 'message_stop',
+    ])
+  })
+
+  test('chat stream joins an event split over several data lines', async () => {
+    const [head, tail] = [chatChunk({ role: 'assistant', content: 'Hi' }).slice(0, 20), chatChunk({ role: 'assistant', content: 'Hi' }).slice(20)]
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      `data: ${head}\ndata: ${tail}\n\n`,
+      `data: ${chatChunk({}, 'stop')}\n\n`,
+      'data: [DONE]\n\n',
+    ]), 'gpt-4'))
+
+    expect(events.find(e => e.event === 'content_block_delta')?.data.delta).toEqual({ type: 'text_delta', text: 'Hi' })
+  })
+
+  test.each([
+    ['openaiChatStreamToAnthropic', openaiChatStreamToAnthropic],
+    ['openaiResponsesStreamToAnthropic', openaiResponsesStreamToAnthropic],
+  ] as const)('%s surfaces a formatted JSON error body sent with status 200', async (_name, convert) => {
+    const body = JSON.stringify({ error: { message: 'invalid model', code: 'model_not_found' } }, null, 2)
+    const events = await collectSse(convert(makeStream([body]), 'gpt-4'))
+
+    expect(events.map(e => e.event)).toEqual(['error'])
+    expect((events[0]!.data as { error: { message: string } }).error.message).toBe('invalid model')
+  })
+
+  test('responses stream accepts event and data lines without a space after the colon', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      'event:response.content_part.added\ndata:{"output_index":0,"content_index":0,"part":{"type":"output_text","text":""}}\n\n',
+      'event:response.output_text.delta\ndata:{"output_index":0,"content_index":0,"delta":"Hello"}\n\n',
+      'event:response.completed\ndata:{"response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":1}}}\n\n',
+    ]), 'gpt-4o'))
+
+    expect(events.find(e => e.event === 'content_block_delta')?.data.delta).toEqual({ type: 'text_delta', text: 'Hello' })
+    expect(events.at(-1)?.event).toBe('message_stop')
+  })
+
+  test('responses fallback reader accepts data lines without a space after the colon', async () => {
+    const response = {
+      id: 'resp_1', model: 'm', status: 'completed',
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
+    }
+    const result = await openaiResponsesStreamToAnthropicResponse(
+      makeStream([`event:response.completed\ndata:${JSON.stringify({ type: 'response.completed', response })}\n\n`]),
+      'm',
+    )
+
+    expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
+  })
+})
+
+describe('response model name', () => {
+  test('chat stream reports the requested model, not the snapshot the upstream returns', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      'data: {"id":"c1","object":"chat.completion.chunk","created":0,"model":"gpt-4.1-2025-04-14","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]), 'gpt-4.1'))
+
+    expect((events.find(e => e.event === 'message_start')!.data.message as { model: string }).model).toBe('gpt-4.1')
+  })
+
+  test('responses stream reports the requested model, not the snapshot the upstream returns', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      'event: response.created\ndata: {"id":"r1","model":"gpt-4.1-2025-04-14","status":"in_progress"}\n\n',
+      'event: response.completed\ndata: {"response":{"status":"completed"}}\n\n',
+    ]), 'gpt-4.1'))
+
+    expect((events.find(e => e.event === 'message_start')!.data.message as { model: string }).model).toBe('gpt-4.1')
+  })
+
+  test('responses fallback reader reports the requested model', async () => {
+    const result = await openaiResponsesStreamToAnthropicResponse(makeStream([
+      `event: response.completed\ndata: ${JSON.stringify({ response: { id: 'r1', model: 'gpt-4.1-2025-04-14', status: 'completed', output: [] } })}\n\n`,
+    ]), 'gpt-4.1')
+
+    expect(result.model).toBe('gpt-4.1')
   })
 })
 

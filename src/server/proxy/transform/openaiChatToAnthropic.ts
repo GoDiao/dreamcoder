@@ -53,7 +53,7 @@ export function openaiChatToAnthropic(response: OpenAIChatResponse, model: strin
     type: 'message',
     role: 'assistant',
     content,
-    model: response.model || model,
+    model,
     stop_reason: mapStopReason(choice.finish_reason, content.some((block) => block.type === 'tool_use')),
     stop_sequence: null,
     usage: mapUsage(response.usage),
@@ -82,7 +82,10 @@ export function mapUsage(usage?: OpenAIChatResponse['usage']): AnthropicResponse
   if (!usage) {
     return { input_tokens: 0, output_tokens: 0 }
   }
-  const cached = usage.prompt_tokens_details?.cached_tokens || 0
+  const cached = usage.prompt_tokens_details?.cached_tokens
+    || usage.prompt_cache_hit_tokens
+    || usage.cached_tokens
+    || 0
   return {
     input_tokens: Math.max(0, (usage.prompt_tokens || 0) - cached),
     output_tokens: usage.completion_tokens || 0,
@@ -96,7 +99,7 @@ function createEmptyResponse(response: OpenAIChatResponse, model: string): Anthr
     type: 'message',
     role: 'assistant',
     content: [{ type: 'text', text: '' }],
-    model: response.model || model,
+    model,
     stop_reason: 'end_turn',
     stop_sequence: null,
     usage: mapUsage(response.usage),

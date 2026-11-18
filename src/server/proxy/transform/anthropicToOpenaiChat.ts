@@ -9,6 +9,7 @@ import type {
   OpenAITool,
 } from './types.js'
 import { extractToolResultContent } from './toolArguments.js'
+import { cleanToolSchema } from './toolSchema.js'
 
 export function anthropicToOpenaiChat(
   body: AnthropicRequest,
@@ -52,9 +53,10 @@ export function anthropicToOpenaiChat(
         function: {
           name: t.name,
           description: t.description,
-          parameters: t.input_schema,
+          parameters: cleanToolSchema(t.input_schema),
         },
       }))
+    if (result.tools.length > 0) result.parallel_tool_calls = true
   }
 
   if (body.tool_choice !== undefined) {

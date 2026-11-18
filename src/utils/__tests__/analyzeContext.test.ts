@@ -1,12 +1,14 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type {
   AssistantMessage,
   AttachmentMessage,
   UserMessage,
 } from '../../types/message.js'
+import * as tokenEstimation from '../../services/tokenEstimation.js'
 import { roughTokenCountEstimation } from '../../services/tokenEstimation.js'
 import { jsonStringify } from '../slowOperations.js'
 import {
+  countToolDefinitionTokens,
   estimateTokensForContextMessages,
   processAssistantMessage,
   processAttachment,
@@ -243,5 +245,40 @@ describe('processAttachment', () => {
     expect(roughTokenCountEstimation(jsonStringify(attachment))).toBeGreaterThan(
       100_000,
     )
+  })
+})
+
+describe('counting context through the local proxy', () => {
+  const originalProxied = process.env.DREAMCODER_PROVIDER_PROXIED
+  const spies: Array<{ mockRestore: () => void }> = []
+
+  afterEach(() => {
+    for (const spy of spies.splice(0)) spy.mockRestore()
+    if (originalProxied === undefined) delete process.env.DREAMCODER_PROVIDER_PROXIED
+    else process.env.DREAMCODER_PROVIDER_PROXIED = originalProxied
+  })
+
+  test('uses the local estimate instead of a Haiku request when the provider goes through the proxy', async () => {
+    process.env.DREAMCODER_PROVIDER_PROXIED = '1'
+    const apiCount = spyOn(tokenEstimation, 'countMessagesTokensWithAPI').mockResolvedValue(null)
+    const haiku = spyOn(tokenEstimation, 'countTokensViaHaikuFallback').mockResolvedValue(42)
+    spies.push(apiCount, haiku)
+
+    const tokens = await countToolDefinitionTokens([], async () => { throw new Error('unused') }, null)
+
+    expect(haiku).not.toHaveBeenCalled()
+    expect(tokens).toBe(estimateTokensForContextMessages([], []))
+  })
+
+  test('still falls back to Haiku for providers reached directly', async () => {
+    delete process.env.DREAMCODER_PROVIDER_PROXIED
+    const apiCount = spyOn(tokenEstimation, 'countMessagesTokensWithAPI').mockResolvedValue(null)
+    const haiku = spyOn(tokenEstimation, 'countTokensViaHaikuFallback').mockResolvedValue(42)
+    spies.push(apiCount, haiku)
+
+    const tokens = await countToolDefinitionTokens([], async () => { throw new Error('unused') }, null)
+
+    expect(haiku).toHaveBeenCalledTimes(1)
+    expect(tokens).toBe(42)
   })
 })

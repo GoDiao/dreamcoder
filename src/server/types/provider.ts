@@ -44,6 +44,8 @@ export const ModelContextWindowsSchema = z.record(
   ModelContextWindowSchema,
 )
 
+export const ProviderStringMapSchema = z.record(z.string(), z.string())
+
 export const SavedProviderSchema = z.object({
   id: z.string(),
   presetId: z.string(),
@@ -56,6 +58,8 @@ export const SavedProviderSchema = z.object({
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
+  extraHeaders: ProviderStringMapSchema.optional(),
+  queryParams: ProviderStringMapSchema.optional(),
   notes: z.string().optional(),
 })
 
@@ -76,6 +80,8 @@ export const CreateProviderSchema = z.object({
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
   modelContextWindows: ModelContextWindowsSchema.optional(),
+  extraHeaders: ProviderStringMapSchema.optional(),
+  queryParams: ProviderStringMapSchema.optional(),
   notes: z.string().optional(),
 })
 
@@ -89,6 +95,8 @@ export const UpdateProviderSchema = z.object({
   models: ProviderModelsSchema.min(1).optional(),
   fastModel: z.string().trim().min(1).nullable().optional(),
   modelContextWindows: ModelContextWindowsSchema.nullable().optional(),
+  extraHeaders: ProviderStringMapSchema.nullable().optional(),
+  queryParams: ProviderStringMapSchema.nullable().optional(),
   notes: z.string().optional(),
 })
 
