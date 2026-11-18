@@ -13,7 +13,43 @@ import { createUserMessage, extractTextContent } from '../messages.js'
 import { getSmallFastModel } from '../model/model.js'
 import type { PromptHook } from '../settings/types.js'
 import { asSystemPrompt } from '../systemPromptType.js'
+import { z } from 'zod/v4'
+import { lazySchema } from '../lazySchema.js'
 import { addArgumentsToPrompt, hookResponseSchema } from './hookHelpers.js'
+import { isGoalPromptHookCommand } from '../../goals/goalHookMarker.js'
+
+export const PROMPT_HOOK_UNMET_PREFIX = 'Prompt hook condition was not met: '
+
+export const promptHookResponseSchema = lazySchema(() =>
+  hookResponseSchema().extend({ blocked: z.boolean().optional() }),
+)
+
+export function unmetPromptHookResult(
+  hook: PromptHook,
+  response: { reason?: string; blocked?: boolean },
+): HookResult {
+  if (!isGoalPromptHookCommand(hook.prompt)) {
+    return {
+      hook,
+      outcome: 'blocking',
+      blockingError: {
+        blockingError: `${PROMPT_HOOK_UNMET_PREFIX}${response.reason}`,
+        command: hook.prompt,
+      },
+      preventContinuation: true,
+      stopReason: response.reason,
+    }
+  }
+  if (response.blocked) return { hook, outcome: 'blocking' }
+  return {
+    hook,
+    outcome: 'blocking',
+    blockingError: {
+      blockingError: `${PROMPT_HOOK_UNMET_PREFIX}${response.reason}`,
+      command: hook.prompt,
+    },
+  }
+}
 
 /**
  * Execute a prompt-based hook using an LLM
@@ -91,6 +127,7 @@ Your response must be a JSON object matching one of the following schemas:
               properties: {
                 ok: { type: 'boolean' },
                 reason: { type: 'string' },
+                blocked: { type: 'boolean' },
               },
               required: ['ok'],
               additionalProperties: false,
@@ -130,7 +167,7 @@ Your response must be a JSON object matching one of the following schemas:
         }
       }
 
-      const parsed = hookResponseSchema().safeParse(json)
+      const parsed = promptHookResponseSchema().safeParse(json)
       if (!parsed.success) {
         logForDebugging(
           `Hooks: model response does not conform to expected schema: ${parsed.error.message}`,
@@ -152,19 +189,8 @@ Your response must be a JSON object matching one of the following schemas:
 
       // Failed to meet condition
       if (!parsed.data.ok) {
-        logForDebugging(
-          `Hooks: Prompt hook condition was not met: ${parsed.data.reason}`,
-        )
-        return {
-          hook,
-          outcome: 'blocking',
-          blockingError: {
-            blockingError: `Prompt hook condition was not met: ${parsed.data.reason}`,
-            command: hook.prompt,
-          },
-          preventContinuation: true,
-          stopReason: parsed.data.reason,
-        }
+        logForDebugging(`Hooks: ${PROMPT_HOOK_UNMET_PREFIX}${parsed.data.reason}`)
+        return unmetPromptHookResult(hook, parsed.data)
       }
 
       // Condition was met

@@ -529,6 +529,7 @@ export type Attachment =
       type: 'skill_listing'
       content: string
       skillCount: number
+      skillNames: string[]
       isInitial: boolean
     }
   | {
@@ -860,10 +861,10 @@ export async function getAttachments(
       Promise.resolve(getCompanionIntroAttachment(messages)),
     ),
     maybe('changed_files', () => getChangedFiles(context)),
-    maybe('nested_memory', () => getNestedMemoryAttachments(context)),
+    maybe('nested_memory', () => getNestedMemoryAttachments(context, messages)),
     // relevant_memories moved to async prefetch (startRelevantMemoryPrefetch)
     maybe('dynamic_skill', () => getDynamicSkillAttachments(context)),
-    maybe('skill_listing', () => getSkillListingAttachments(context)),
+    maybe('skill_listing', () => getSkillListingAttachments(context, messages)),
     // Inter-turn skill discovery now runs via startSkillDiscoveryPrefetch
     // (query.ts, concurrent with the main turn). The blocking call that
     // previously lived here was the assistant_turn signal — 97% of those
@@ -2144,12 +2145,23 @@ export async function getChangedFiles(
   return results.filter(result => result != null) as Attachment[]
 }
 
+export function nestedMemoryPathsInHistory(
+  messages: Message[] | undefined,
+): string[] {
+  return (messages ?? []).flatMap(msg =>
+    msg.type === 'attachment' && msg.attachment.type === 'nested_memory'
+      ? [msg.attachment.path]
+      : [],
+  )
+}
+
 /**
  * Processes paths that need nested memory attachments and checks for nested CLAUDE.md files
  * Uses nestedMemoryAttachmentTriggers field from ToolUseContext
  */
 async function getNestedMemoryAttachments(
   toolUseContext: ToolUseContext,
+  messages: Message[] | undefined,
 ): Promise<Attachment[]> {
   // Check triggers first — getAppState() waits for a React render cycle,
   // and the common case is an empty trigger set.
@@ -2158,6 +2170,10 @@ async function getNestedMemoryAttachments(
     toolUseContext.nestedMemoryAttachmentTriggers.size === 0
   ) {
     return []
+  }
+
+  for (const path of nestedMemoryPathsInHistory(messages)) {
+    toolUseContext.loadedNestedMemoryPaths?.add(path)
   }
 
   const appState = toolUseContext.getAppState()
@@ -2584,41 +2600,6 @@ async function getDynamicSkillAttachments(
   return attachments
 }
 
-// Track which skills have been sent to avoid re-sending. Keyed by agentId
-// (empty string = main thread) so subagents get their own turn-0 listing —
-// without per-agent scoping, the main thread populating this Set would cause
-// every subagent's filterToBundledAndMcp result to dedup to empty.
-const sentSkillNames = new Map<string, Set<string>>()
-
-// Called when the skill set genuinely changes (plugin reload, skill file
-// change on disk) so new skills get announced. NOT called on compact —
-// post-compact re-injection costs ~4K tokens/event for marginal benefit.
-export function resetSentSkillNames(): void {
-  sentSkillNames.clear()
-  suppressNext = false
-}
-
-/**
- * Suppress the next skill-listing injection. Called by conversationRecovery
- * on --resume when a skill_listing attachment already exists in the
- * transcript.
- *
- * `sentSkillNames` is module-scope — process-local. Each `claude -p` spawn
- * starts with an empty Map, so without this every resume re-injects the
- * full ~600-token listing even though it's already in the conversation from
- * the prior process. Shows up on every --resume; particularly loud for
- * daemons that respawn frequently.
- *
- * Trade-off: skills added between sessions won't be announced until the
- * next non-resume session. Acceptable — skill_listing was never meant to
- * cover cross-process deltas, and the agent can still call them (they're
- * in the Skill tool's runtime registry regardless).
- */
-export function suppressNextSkillListing(): void {
-  suppressNext = true
-}
-let suppressNext = false
-
 // When skill-search is enabled and the filtered (bundled + MCP) listing exceeds
 // this count, fall back to bundled-only. Protects MCP-heavy users (100+ servers)
 // from truncation while keeping the turn-0 guarantee for typical setups.
@@ -2642,8 +2623,9 @@ export function filterToBundledAndMcp(commands: Command[]): Command[] {
   return filtered
 }
 
-async function getSkillListingAttachments(
+export async function getSkillListingAttachments(
   toolUseContext: ToolUseContext,
+  messages: Message[] | undefined,
 ): Promise<Attachment[]> {
   if (process.env.NODE_ENV === 'test') {
     return []
@@ -2680,58 +2662,35 @@ async function getSkillListingAttachments(
     allCommands = filterToBundledAndMcp(allCommands)
   }
 
-  const agentKey = toolUseContext.agentId ?? ''
-  let sent = sentSkillNames.get(agentKey)
-  if (!sent) {
-    sent = new Set()
-    sentSkillNames.set(agentKey, sent)
-  }
-
-  // Resume path: prior process already injected a listing; it's in the
-  // transcript. Mark everything current as sent so only post-resume deltas
-  // (skills loaded later via /reload-plugins etc) get announced.
-  if (suppressNext) {
-    suppressNext = false
-    for (const cmd of allCommands) {
-      sent.add(cmd.name)
-    }
-    return []
-  }
-
-  // Find skills we haven't sent yet
-  const newSkills = allCommands.filter(cmd => !sent.has(cmd.name))
-
-  if (newSkills.length === 0) {
-    return []
-  }
-
-  // If no skills have been sent yet, this is the initial batch
-  const isInitial = sent.size === 0
-
-  // Mark as sent
-  for (const cmd of newSkills) {
-    sent.add(cmd.name)
-  }
-
-  logForDebugging(
-    `Sending ${newSkills.length} skills via attachment (${isInitial ? 'initial' : 'dynamic'}, ${sent.size} total sent)`,
+  const listing = skillListingForHistory(
+    allCommands,
+    messages,
+    getContextWindowForModel(toolUseContext.options.mainLoopModel, getSdkBetas()),
   )
+  return listing ? [listing] : []
+}
 
-  // Format within budget using existing logic
-  const contextWindowTokens = getContextWindowForModel(
-    toolUseContext.options.mainLoopModel,
-    getSdkBetas(),
-  )
-  const content = formatCommandsWithinBudget(newSkills, contextWindowTokens)
+export function skillListingForHistory(
+  commands: Command[],
+  messages: Message[] | undefined,
+  contextWindowTokens: number,
+): Attachment | null {
+  const announced = new Set<string>()
+  for (const msg of messages ?? []) {
+    if (msg.type !== 'attachment' || msg.attachment.type !== 'skill_listing') continue
+    for (const name of msg.attachment.skillNames) announced.add(name)
+  }
 
-  return [
-    {
-      type: 'skill_listing',
-      content,
-      skillCount: newSkills.length,
-      isInitial,
-    },
-  ]
+  const newSkills = commands.filter(cmd => !announced.has(cmd.name))
+  if (newSkills.length === 0) return null
+
+  return {
+    type: 'skill_listing',
+    content: formatCommandsWithinBudget(newSkills, contextWindowTokens),
+    skillCount: newSkills.length,
+    skillNames: newSkills.map(cmd => cmd.name),
+    isInitial: announced.size === 0,
+  }
 }
 
 // getSkillDiscoveryAttachment moved to skillSearch/prefetch.ts as

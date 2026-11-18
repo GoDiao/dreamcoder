@@ -200,6 +200,7 @@ import { count } from "../../utils/array.js";
 import { insertBlockAfterToolResults } from "../../utils/contentArray.js";
 import { validateBoundedIntEnvVar } from "../../utils/envValidation.js";
 import { safeParseJSON } from "../../utils/json.js";
+import { isClaudeModelName } from "../../utils/model/claudeModelName.js";
 import { getInferenceProfileBackingModel } from "../../utils/model/bedrock.js";
 import {
   normalizeModelStringForAPI,
@@ -1316,7 +1317,9 @@ async function* queryModel(
   });
 
   queryCheckpoint("query_message_normalization_start");
-  let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools);
+  let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools, {
+    foldIntoToolResults: isClaudeModelName(options.model),
+  });
   queryCheckpoint("query_message_normalization_end");
 
   // Model-specific post-processing: strip tool-search-specific fields if the

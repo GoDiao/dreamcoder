@@ -123,6 +123,28 @@ describe('interpretTranscript', () => {
     expect(items).toHaveLength(3)
   })
 
+  it('drops the transcript pointer from a summary written by the current CLI', () => {
+    const items = interpretTranscript([
+      { id: 'compact-boundary', type: 'system', content: 'Conversation compacted', timestamp: '2026-05-19T10:00:00.000Z' },
+      {
+        id: 'compact-summary',
+        type: 'user',
+        content: [
+          'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
+          '',
+          'Kept the billing import implementation details.',
+          '',
+          'If you need exact details from before compaction (code, error messages, output you produced), search the session transcript with Grep: /tmp/transcript.jsonl. It is a JSONL file, usually too large to Read in one call.',
+        ].join('\n'),
+        timestamp: '2026-05-19T10:00:01.000Z',
+      },
+    ])
+
+    expect(items).toMatchObject([
+      { type: 'compact_summary', summary: 'Kept the billing import implementation details.' },
+    ])
+  })
+
   it('drops the /compact stdout that follows a compaction summary', () => {
     const items = interpretTranscript([
       {

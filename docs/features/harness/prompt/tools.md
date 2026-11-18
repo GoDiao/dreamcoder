@@ -111,6 +111,7 @@
 
 ### T-TOOL-04 Read 描述说模型能看图、能读 PDF，并称「Claude Code is a multimodal LLM」；经代理时图片和 PDF 都到不了模型
 
+- 状态：已修复（#270）：经代理时描述写明图片和 PDF 内容到不了模型；直连时保留图片说明，去掉「Claude Code」。代理侧见 P-REQ-03/04。
 - 类型：问题
 - 严重程度：中
 - 体量：图片句 165 字符、PDF 句 253 字符、截图句 323 字符，每个请求都发。
@@ -184,6 +185,7 @@
 
 ### T-TOOL-09 计划模式有三份流程说明，EnterPlanMode 的结果说「不要写任何文件」，计划模式提醒又要求写计划文件
 
+- 状态：已修复（#270）：只保留计划模式提醒里的 interview 流程；EnterPlanMode 描述删掉「What Happens」，结果只允许写计划文件。
 - 类型：问题
 - 严重程度：中
 - 体量：EnterPlanMode 描述「What Happens in Plan Mode」370 字符（每个请求）；EnterPlanMode 结果 472 字符（每次进入）；计划模式提醒（T-INJ 范围）。
@@ -213,6 +215,7 @@
 
 ### T-TOOL-11 AskUserQuestion 的 schema 暴露三个内部字段，以及桌面端不渲染的 `preview`；`preview` 的描述指向描述里不存在的段落
 
+- 状态：已修复（#270）：发给模型的 schema 去掉 `answers`、`annotations`、`metadata` 和选项的 `preview`，内部 schema 不变。
 - 类型：问题
 - 严重程度：中
 - 体量：schema 2,966 字符，其中 `answers`/`annotations`/`metadata` 955 字符、`preview` 241 字符；工具标 D，本场景每个请求都发。
@@ -241,6 +244,7 @@
 
 ### T-TOOL-13 EnterWorktree/ExitWorktree 与桌面端自己的 worktree 流程重复，文字里有 hook、tmux、退出时提示等桌面端没有的行为
 
+- 状态：已修复（#270）：描述去掉 hook、tmux 和退出提示，写明桌面端面板仍显示原目录。核实结果：会话中途进入 worktree 后桌面端面板不跟随（CLI 只在 init 时报告 cwd），未修。
 - 状态：维护者已定（2026-11-18）：保留这两个工具；按桌面端的实际行为改描述，并核实桌面端面板是否跟随 CLI 进入 worktree。
 - 类型：问题
 - 严重程度：中
@@ -297,6 +301,7 @@
 
 ### T-TOOL-17 Agent 描述里约 1.2K 字符的示例和 agent 条目对本场景无用：示例 agent 不存在，statusline-setup 配置的是桌面端没有的界面
 
+- 状态：部分修复（#270）：statusline-setup 已从内置列表删除（同 T-SYS-12）；示例段和 build-validator 句未改。
 - 类型：优化
 - 严重程度：低
 - 体量：示例段 1,002 字符、statusline-setup 一行约 110 字符、「build-validator / test-runner」一句约 150 字符，每个请求都发。
@@ -341,6 +346,7 @@
 
 ### T-TOOL-21 缺少「编辑后不必重读验证」的说明；Edit 的「最小 old_string」提示只给 ant
 
+- 状态：部分修复（#270）：ant 专用的「最小 old_string」提示已删除；「编辑后不必重读」未定。
 - 状态：维护者已定（2026-11-18）：「最小 old_string」这条 ant 专用提示随 ant 分支一起删除；「编辑后不必重读」未定。
 - 类型：缺失
 - 严重程度：低

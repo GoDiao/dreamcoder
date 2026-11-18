@@ -10,7 +10,14 @@ describe('isLoggableMessage', () => {
     expect(isLoggableMessage(attachment('queued_command'))).toBe(true)
   })
 
-  test('still drops other attachments', () => {
-    expect(isLoggableMessage(attachment('date_change'))).toBe(false)
+  test.each(['file', 'nested_memory', 'skill_listing', 'date_change', 'edited_text_file', 'hook_additional_context'])(
+    'keeps a %s attachment so a restarted CLI sees the same history',
+    (type) => {
+      expect(isLoggableMessage(attachment(type))).toBe(true)
+    },
+  )
+
+  test('drops progress messages', () => {
+    expect(isLoggableMessage({ type: 'progress', uuid: 'p-1' } as unknown as Message)).toBe(false)
   })
 })

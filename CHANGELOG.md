@@ -16,9 +16,17 @@ All notable changes to DreamCoder will be documented in this file.
 - Every request the app itself sends to a provider (through the local proxy, for session titles and for connection tests) is recorded in the diagnostics log with the provider, model, status, timings, the provider's request id and how it ended, including errors in the middle of a stream and clients that disconnect; never the key or the request body (#262).
 - **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and starts it again, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
 - Providers in OpenAI format can carry extra request headers and query parameters, such as Azure's `api-version`. The settings form does not offer them yet; for now they are set by editing the provider in `providers.json`. Authentication and the content type still come from the provider settings and override a header of the same name (#262).
+- The agent's instructions describe DreamCoder instead of Claude Code: the environment section no longer lists Claude models, Claude Code's products or `/fast`, and says replies are shown in the DreamCoder app; `/help` and feedback point to DreamCoder; the worktree tools, the Read tool and the `update-config` skill describe what the app actually does (#270).
+- Plan mode follows one procedure: the agent explores, asks you questions and writes the plan file as it goes, instead of being told in one place not to write any file and in another to launch planning subagents (#270).
+- With models other than Claude, notes that arrive in the middle of a turn (messages from other sessions, board notifications, reminders) are sent as their own message instead of being appended to the last tool result (#270).
+- The notice for a file that changed after the agent read it no longer claims you or a linter changed it or asks the agent to keep it from you, and shows at most about 2 KB of the change (#270).
 
 ### Fixed
 
+- **Saving a memory no longer asks for approval every time.** Writes to the project's memory folder are allowed like the instructions say, also in bypass mode (#270).
+- **Stopping a reply keeps the session's context.** Stop ends the agent process only when the reply has not stopped a few seconds after you press Stop, and a restarted agent keeps uploaded images and files, instruction files from subfolders and files restored after compaction, without adding a "Continue from where you left off." message (#270).
+- The agent knows the available skills again after compaction, gets only newly added skills when the skill folders change, and does not get the whole list again after a restart (#270).
+- **`/goal` keeps working until the goal is met.** Before, the turn ended at the first check that found the goal unmet. Each automatic continuation now tells the agent the goal, what is still missing and how many continuations are left. The turn ends and the goal stays active when the agent needs something only you can provide, or after 10 continuations in a row without a message from you (#270).
 - A provider in OpenAI format whose base URL already ends in a version, such as `https://open.bigmodel.cn/api/paas/v4` or Gemini's `.../v1beta/openai`, works: requests, model lists and the connection test no longer add another `/v1`. Base URLs without a version still get `/v1` (#262).
 - A streamed reply through the local proxy is no longer cut off when the provider pauses for more than 60 seconds, and stopping a reply or deleting a session now also stops the request to the provider before it starts answering (#262).
 - With a manual HTTP proxy set in the network settings, the agent reaches the app's local proxy directly instead of sending those requests to the HTTP proxy (#262).
@@ -32,6 +40,10 @@ All notable changes to DreamCoder will be documented in this file.
 - **A wrong API key or an empty balance is reported at once.** For providers that use an API key, the agent no longer retries authentication failures and quota or balance errors for minutes before showing them; it shows the provider's message right away (#263).
 - When the output limit cuts off a tool call in the middle of its arguments, the agent no longer runs the tool with missing arguments; the model is told the call was cut off and retries with smaller pieces (#263).
 - **A reply that breaks off in the middle is retried as a stream.** When a provider's stream fails partway, the agent removes the half-finished reply from the conversation, the app and the session history, and asks again with streaming, instead of switching to a slower request without streaming that long answers could not finish within the timeout. Retries before and during a stream share one limit (#263).
+
+### Removed
+
+- The status line setup agent and the `/statusline` command; they set up the terminal's `statusLine` setting, which the app does not run (#270).
 
 ## [0.9.0] — 2026-11-17
 

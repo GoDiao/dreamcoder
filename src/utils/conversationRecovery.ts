@@ -18,21 +18,16 @@ import type {
   NormalizedUserMessage,
 } from '../types/message.js'
 import { PERMISSION_MODES } from '../types/permissions.js'
-import { suppressNextSkillListing } from './attachments.js'
 import {
   copyFileHistoryForResume,
   type FileHistorySnapshot,
 } from './fileHistory.js'
 import { logError } from './log.js'
 import {
-  createAssistantMessage,
-  createUserMessage,
   filterOrphanedThinkingOnlyMessages,
   filterUnresolvedToolUses,
   filterWhitespaceOnlyAssistantMessages,
   isToolUseResultMessage,
-  NO_RESPONSE_REQUESTED,
-  normalizeMessages,
 } from './messages.js'
 import { copyPlanForResume } from './plans.js'
 import { processSessionStartHooks } from './sessionStart.js'
@@ -131,6 +126,28 @@ function migrateLegacyAttachmentTypes(message: Message): Message {
   return message
 }
 
+function sessionStartContextOf(message: Message): string | null {
+  if (
+    message.type !== 'attachment' ||
+    message.attachment.type !== 'hook_additional_context' ||
+    message.attachment.hookEvent !== 'SessionStart'
+  ) {
+    return null
+  }
+  return JSON.stringify(message.attachment.content)
+}
+
+export function withoutRepeatedSessionStartContext<T extends Message>(
+  history: Message[],
+  hookMessages: T[],
+): T[] {
+  const lastContext = history.map(sessionStartContextOf).findLast(context => context !== null)
+  return hookMessages.filter(message => {
+    const context = sessionStartContextOf(message)
+    return context === null || context !== lastContext
+  })
+}
+
 export type TeleportRemoteResponse = {
   log: Message[]
   branch?: string
@@ -138,6 +155,7 @@ export type TeleportRemoteResponse = {
 
 export type TurnInterruptionState =
   | { kind: 'none' }
+  | { kind: 'interrupted_turn' }
   | { kind: 'interrupted_prompt'; message: NormalizedUserMessage }
 
 export type DeserializeResult = {
@@ -147,8 +165,7 @@ export type DeserializeResult = {
 
 /**
  * Deserializes messages from a log file into the format expected by the REPL.
- * Filters unresolved tool uses, orphaned thinking messages, and appends a
- * synthetic assistant sentinel when the last message is from the user.
+ * Filters unresolved tool uses and orphaned thinking messages.
  * @internal Exported for testing - use loadConversationForResume instead
  */
 export function deserializeMessages(serializedMessages: Message[]): Message[] {
@@ -201,48 +218,7 @@ export function deserializeMessagesWithInterruptDetection(
       filteredThinking,
     ) as NormalizedMessage[]
 
-    const internalState = detectTurnInterruption(filteredMessages)
-
-    // Transform mid-turn interruptions into interrupted_prompt by appending
-    // a synthetic continuation message. This unifies both interruption kinds
-    // so the consumer only needs to handle interrupted_prompt.
-    let turnInterruptionState: TurnInterruptionState
-    if (internalState.kind === 'interrupted_turn') {
-      const [continuationMessage] = normalizeMessages([
-        createUserMessage({
-          content: 'Continue from where you left off.',
-          isMeta: true,
-        }),
-      ])
-      filteredMessages.push(continuationMessage!)
-      turnInterruptionState = {
-        kind: 'interrupted_prompt',
-        message: continuationMessage!,
-      }
-    } else {
-      turnInterruptionState = internalState
-    }
-
-    // Append a synthetic assistant sentinel after the last user message so
-    // the conversation is API-valid if no resume action is taken. Skip past
-    // trailing system/progress messages and insert right after the user
-    // message so removeInterruptedMessage's splice(idx, 2) removes the
-    // correct pair.
-    const lastRelevantIdx = filteredMessages.findLastIndex(
-      m => m.type !== 'system' && m.type !== 'progress',
-    )
-    if (
-      lastRelevantIdx !== -1 &&
-      filteredMessages[lastRelevantIdx]!.type === 'user'
-    ) {
-      filteredMessages.splice(
-        lastRelevantIdx + 1,
-        0,
-        createAssistantMessage({
-          content: NO_RESPONSE_REQUESTED,
-        }) as NormalizedMessage,
-      )
-    }
+    const turnInterruptionState = detectTurnInterruption(filteredMessages)
 
     return { messages: filteredMessages, turnInterruptionState }
   } catch (error) {
@@ -250,14 +226,6 @@ export function deserializeMessagesWithInterruptDetection(
     throw error
   }
 }
-
-/**
- * Internal 3-way result from detection, before transforming interrupted_turn
- * into interrupted_prompt with a synthetic continuation message.
- */
-type InternalInterruptionState =
-  | TurnInterruptionState
-  | { kind: 'interrupted_turn' }
 
 /**
  * Determines whether the conversation was interrupted mid-turn based on the
@@ -271,7 +239,7 @@ type InternalInterruptionState =
  */
 function detectTurnInterruption(
   messages: NormalizedMessage[],
-): InternalInterruptionState {
+): TurnInterruptionState {
   if (messages.length === 0) {
     return { kind: 'none' }
   }
@@ -391,13 +359,6 @@ export function restoreSkillStateFromMessages(messages: Message[]): void {
           addInvokedSkill(skill.name, skill.path, skill.content, null)
         }
       }
-    }
-    // A prior process already injected the skills-available reminder — it's
-    // in the transcript the model is about to see. sentSkillNames is
-    // process-local, so without this every resume re-announces the same
-    // ~600 tokens. Fire-once latch; consumed on the first attachment pass.
-    if (message.attachment.type === 'skill_listing') {
-      suppressNextSkillListing()
     }
   }
 }
@@ -538,11 +499,8 @@ export async function loadConversationForResume(
     const deserialized = deserializeMessagesWithInterruptDetection(messages!)
     messages = deserialized.messages
 
-    // Process session start hooks for resume
     const hookMessages = await processSessionStartHooks('resume', { sessionId })
-
-    // Append hook messages to the conversation
-    messages.push(...hookMessages)
+    messages.push(...withoutRepeatedSessionStartContext(messages, hookMessages))
 
     return {
       messages,

@@ -873,9 +873,12 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
     store.apply(sessionId, { type: 'process_phase_changed', phase: 'stopping', generation })
 
     setTimeout(() => {
-      if (conversationService.getGeneration(sessionId) === generation && conversationService.hasSession(sessionId)) {
+      if (conversationService.getGeneration(sessionId) !== generation || !conversationService.hasSession(sessionId)) return
+      if (getPipeline(sessionId).stream.stopRequested) {
         console.log(`[WS] Force-killing CLI subprocess for session: ${sessionId}`)
         conversationService.stopSession(sessionId, generation)
+      } else {
+        store.apply(sessionId, { type: 'process_phase_changed', phase: 'running', generation })
       }
     }, 3_000)
   }

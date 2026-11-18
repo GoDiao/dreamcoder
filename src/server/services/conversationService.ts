@@ -25,6 +25,7 @@ import { SettingsService } from './settingsService.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { permissionModeCliArgs } from './permissionModes.js'
 import { SHOW_UI_ENABLED_ENV } from '../../tools/ShowUITool/constants.js'
+import { DESKTOP_HOST_ENV } from '../../utils/desktopHost.js'
 import { SESSION_LINKS_ENABLED_ENV } from '../../tools/StartSessionTool/constants.js'
 import { ARTIFACT_EDIT_LOCKS_ENV } from '../../utils/artifactEditLock.js'
 import type { SessionReport, UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
@@ -1055,6 +1056,7 @@ export class ConversationService {
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
       CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: '1',
       [SHOW_UI_ENABLED_ENV]: '1',
+      [DESKTOP_HOST_ENV]: '1',
       [SESSION_LINKS_ENABLED_ENV]: '1',
       [ARTIFACT_EDIT_LOCKS_ENV]: '1',
       CLAUDE_CODE_EAGER_FLUSH: '1',

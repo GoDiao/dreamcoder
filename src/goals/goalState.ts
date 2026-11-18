@@ -15,6 +15,9 @@ import {
   shouldDisableAllHooksIncludingManaged,
 } from '../utils/hooks/hooksConfigSnapshot.js'
 import type { PromptHook } from '../utils/settings/types.js'
+import type { HookBlockingError } from '../types/hooks.js'
+import { PROMPT_HOOK_UNMET_PREFIX } from '../utils/hooks/execPromptHook.js'
+import { GOAL_HOOK_MARKER, isGoalPromptHookCommand } from './goalHookMarker.js'
 
 export type ThreadGoal = {
   threadId: string
@@ -27,7 +30,7 @@ export type ParsedGoalCommand =
   | { type: 'clear' }
   | { type: 'set'; objective: string }
 
-const GOAL_HOOK_MARKER = '<dreamcoder-goal-hook>'
+export const MAX_GOAL_CONTINUATIONS = 10
 const GOAL_HOOK_TIMEOUT_SECONDS = 45
 const RESERVED_GOAL_ARGS = new Set(['status', 'pause', 'resume', 'complete'])
 const goalsByThread = new Map<string, ThreadGoal>()
@@ -119,15 +122,33 @@ export function ensureThreadGoalHookFromTranscript(
   return setThreadGoalHook(context, threadId, restored, now)
 }
 
-export function isGoalPromptHookCommand(command: string | undefined): boolean {
-  return typeof command === 'string' && command.includes(GOAL_HOOK_MARKER)
-}
-
 export function goalObjectiveFromHookCommand(command: string | undefined): string | null {
   if (!isGoalPromptHookCommand(command)) return null
   const text = command ?? ''
   const objective = readXmlTag(text, 'goal-objective')
   return objective || null
+}
+
+export function goalContinuationText(
+  blockingError: HookBlockingError,
+  done: number,
+): string | null {
+  if (done >= MAX_GOAL_CONTINUATIONS) return null
+  const current = done + 1
+  const objective = goalObjectiveFromHookCommand(blockingError.command) ?? ''
+  const missing = blockingError.blockingError.startsWith(PROMPT_HOOK_UNMET_PREFIX)
+    ? blockingError.blockingError.slice(PROMPT_HOOK_UNMET_PREFIX.length)
+    : blockingError.blockingError
+  const next =
+    current === MAX_GOAL_CONTINUATIONS
+      ? 'This is the last automatic continuation for this message: finish what you can, then report what is done and what is still missing.'
+      : 'Keep working toward the goal. If you cannot make progress without the user (missing access, or a decision only they can make), say what blocks you and stop; the goal stays active until it is met or the user runs /goal clear.'
+  return [
+    `Automatic /goal continuation (${current} of ${MAX_GOAL_CONTINUATIONS}). The goal the user set is not met yet, so this turn continues instead of ending.`,
+    `<goal>${objective}</goal>`,
+    `What the evaluator says is still missing: ${missing}`,
+    next,
+  ].join('\n')
 }
 
 export function isGoalLocalCommandOutputContent(content: string): boolean {
@@ -152,6 +173,7 @@ function createGoalPromptHook(objective: string): PromptHook {
       '',
       'Return {"ok": true} only when the objective is completely satisfied.',
       'Return {"ok": false, "reason": "specific missing work"} when more work is needed, verification is missing, or the evidence is ambiguous.',
+      'Return {"ok": false, "blocked": true, "reason": "what the user must provide or decide"} when the latest assistant turn says it cannot make progress without the user (missing access, or a decision only the user can make) and the transcript supports that.',
       'Return only the JSON object. Do not include markdown, prose, or the objective text.',
     ].join('\n'),
     timeout: GOAL_HOOK_TIMEOUT_SECONDS,

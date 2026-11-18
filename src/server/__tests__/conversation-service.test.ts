@@ -171,6 +171,16 @@ describe('ConversationService', () => {
     expect(env.CLAUDE_COWORK_MEMORY_PATH_OVERRIDE).not.toContain('myself_code')
   })
 
+  test('buildChildEnv tells the CLI it runs in the DreamCoder app', async () => {
+    const service = new ConversationService() as any
+    const workDir = path.join(tmpDir, 'workspace', 'host')
+    await fs.mkdir(workDir, { recursive: true })
+
+    const env = (await service.buildChildEnv(workDir)) as Record<string, string>
+
+    expect(env.DREAMCODER_DESKTOP_HOST).toBe('1')
+  })
+
   test.skipIf(process.platform === 'win32')('buildChildEnv inherits exported terminal shell variables for desktop CLI sessions', async () => {
     const shellPath = path.join(tmpDir, 'zsh')
     const nodeBin = path.join(tmpDir, 'node-bin')

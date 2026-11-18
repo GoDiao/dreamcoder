@@ -73,7 +73,7 @@ A short session usually falls into the first case, and the user context and syst
 
 ```jsonl
 {"type":"system","subtype":"compact_boundary","uuid":"b1","parentUuid":null,"logicalParentUuid":"u4"}
-{"type":"user","uuid":"s1","parentUuid":"b1","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation… read the full transcript at: …"}}
+{"type":"user","uuid":"s1","parentUuid":"b1","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation… search the session transcript with Grep: …"}}
 ```
 
 The boundary's `parentUuid` is `null`, so on a later resume the walk back stops at `b1`, and the restored `messages` start from `[b1, s1, …]`. When the desktop app displays history it reads in file order and does not cut off at the boundary, so the user can still see `u1` to `a3`.
@@ -85,9 +85,9 @@ The boundary's `parentUuid` is `null`, so on a later resume the walk back stops 
 | `u4` (current input) | Written before entering the loop | Appended at the end | Present when not compacted; included in the summary after compaction |
 | `b1` boundary | Appended after compaction | The chain starts here on the next resume | First in the array, filtered at the API layer |
 | `s1` summary | Appended after compaction | Present on the next resume | Present |
-| File attachments after compaction | Not written by default | Absent on the next resume | Present |
+| File attachments after compaction | Appended after compaction | Present on the next resume | Present |
 
-**If a message exists on disk, does the next request necessarily include it?** Not necessarily. Metadata lines do not enter the message history. Resume reads only the one chain obtained by walking back along `parentUuid`, and messages before the last compact boundary are not on that chain. Resume also filters messages such as unpaired `tool_use`. Before a request, further trimming or compaction may still happen. Conversely, a request also contains content that is not on disk: the system prompt, the user context, and the file attachments generated after compaction. To know what the model saw in a given turn, look at that turn's `messagesForQuery` and prompts. To audit or reopen a session, look at the record on disk.
+**If a message exists on disk, does the next request necessarily include it?** Not necessarily. Metadata lines do not enter the message history. Resume reads only the one chain obtained by walking back along `parentUuid`, and messages before the last compact boundary are not on that chain. Resume also filters messages such as unpaired `tool_use`. Before a request, further trimming or compaction may still happen. Conversely, a request also contains content that is not on disk: the system prompt and the user context. To know what the model saw in a given turn, look at that turn's `messagesForQuery` and prompts. To audit or reopen a session, look at the record on disk.
 
 The following sections go through the four steps and show which code produces each of these differences.
 
@@ -203,7 +203,7 @@ return [
 
 - The boundary is a `system` message with `subtype: 'compact_boundary'`. When it is written, `parentUuid` is set to `null`, and `logicalParentUuid` records the last message before compaction. [`createCompactBoundaryMessage()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/messages.ts#L4619), [`insertMessageChain()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/sessionStorage.ts#L1069)
 - The summary is a user message with `isCompactSummary: true`. Its body includes the transcript path, so the model can read that file when it needs details from before compaction. [`compactConversation()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L621), [`getCompactUserSummaryMessage()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/prompt.ts#L349)
-- The attachments include up to 5 recent files, regenerated from the read records. They are not written to the JSONL by default. [`createPostCompactFileAttachments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L1415)
+- The attachments include up to 5 recent files, regenerated from the read records. They are written to the JSONL like other attachments. [`createPostCompactFileAttachments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/compact.ts#L1415)
 
 ## Design analysis
 
@@ -221,7 +221,7 @@ The normal recording and compaction paths described here use append-only writes.
 
 > You can skip this section on a first read and come back to it after reading Part 5.
 
-**Interruption handling on resume.** [`deserializeMessagesWithInterruptDetection()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/conversationRecovery.ts#L164) first filters out `tool_use` blocks that have no corresponding result, together with the synthetic messages after them, and then removes orphaned assistant messages that contain only thinking or only whitespace text. When it determines that the previous turn was interrupted midway, it appends an `isMeta` user message `Continue from where you left off.`. When the last relevant message is a user message, it inserts a synthetic assistant message so that the message sequence satisfies the API format. When the desktop app displays history, [`shouldHideTranscriptEntry()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L654) hides these synthetic messages, and [`entriesToMessages()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L1986) reads entries in file order.
+**Interruption handling on resume.** [`deserializeMessagesWithInterruptDetection()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/utils/conversationRecovery.ts#L164) first filters out `tool_use` blocks that have no corresponding result, together with the synthetic messages after them, and then removes orphaned assistant messages that contain only thinking or only whitespace text. It only records whether the previous turn was interrupted midway (`interrupted_turn` or `interrupted_prompt`) and adds nothing to the messages. Only when auto-resume is turned on (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN`) does `print.ts` resend the interrupted prompt or queue an `isMeta` `Continue from where you left off.`. Transcripts of older sessions may still contain the synthetic assistant messages inserted before; when the desktop app displays history, [`shouldHideTranscriptEntry()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L654) hides them, and [`entriesToMessages()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/services/sessionService.ts#L1986) reads entries in file order.
 
 **Auto-compaction does not always happen.** When the request source is `session_memory` or `compact`, when auto-compaction is turned off, or when certain feature flags are in effect, `shouldAutoCompact()` returns `false` immediately. After 3 consecutive failures, the session no longer attempts auto-compaction. [`MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/services/compact/autoCompact.ts#L70)
 

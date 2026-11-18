@@ -9,7 +9,6 @@ import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { applyPermissionUpdate } from '../../utils/permissions/PermissionUpdate.js'
 import { prepareContextForPlanMode } from '../../utils/permissions/permissionSetup.js'
-import { isPlanModeInterviewPhaseEnabled } from '../../utils/planModeV2.js'
 import { ENTER_PLAN_MODE_TOOL_NAME } from './constants.js'
 import { getEnterPlanModeToolPrompt } from './prompt.js'
 import {
@@ -101,21 +100,9 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
     }
   },
   mapToolResultToToolResultBlockParam({ message }, toolUseID) {
-    const instructions = isPlanModeInterviewPhaseEnabled()
-      ? `${message}
+    const instructions = `${message}
 
 DO NOT write or edit any files except the plan file. Detailed workflow instructions will follow.`
-      : `${message}
-
-In plan mode, you should:
-1. Thoroughly explore the codebase to understand existing patterns
-2. Identify similar features and architectural approaches
-3. Consider multiple approaches and their trade-offs
-4. Use AskUserQuestion if you need to clarify the approach
-5. Design a concrete implementation strategy
-6. When ready, use ExitPlanMode to present your plan for approval
-
-Remember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase.`
 
     return {
       type: 'tool_result',
