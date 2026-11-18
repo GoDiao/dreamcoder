@@ -7,10 +7,8 @@ import { getOpenAIOAuthTokens } from './storage.js'
 import { anthropicToOpenaiResponses } from '../../server/proxy/transform/anthropicToOpenaiResponses.js'
 import { openaiResponsesToAnthropic } from '../../server/proxy/transform/openaiResponsesToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropic.js'
-import {
-  OpenAIResponsesStreamError,
-  openaiResponsesStreamToAnthropicResponse,
-} from '../../server/proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { openaiResponsesStreamToAnthropicResponse } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { anthropicErrorResponse, UpstreamReplyError } from '../../server/upstream/upstreamError.js'
 import type { AnthropicRequest } from '../../server/proxy/transform/types.js'
 import { logForDebugging } from '../../utils/debug.js'
 
@@ -111,29 +109,15 @@ export function buildOpenAICodexFetch(
       )
     }
 
-    if (upstream.body && isEventStreamResponse(upstream)) {
-      try {
-        const responseBody = await openaiResponsesStreamToAnthropicResponse(
-          upstream.body,
-          mappedModel,
-        )
-        return Response.json(responseBody)
-      } catch (error) {
-        if (!(error instanceof OpenAIResponsesStreamError)) throw error
-        return Response.json(
-          {
-            type: 'error',
-            error: { type: 'api_error', message: error.message },
-          },
-          { status: 502 },
-        )
-      }
+    try {
+      const responseBody = upstream.body && isEventStreamResponse(upstream)
+        ? await openaiResponsesStreamToAnthropicResponse(upstream.body, mappedModel)
+        : openaiResponsesToAnthropic(await upstream.json(), mappedModel)
+      return Response.json(responseBody)
+    } catch (error) {
+      if (!(error instanceof UpstreamReplyError)) throw error
+      return anthropicErrorResponse(error.error)
     }
-
-    const responseBody = await upstream.json()
-    return Response.json(
-      openaiResponsesToAnthropic(responseBody, mappedModel),
-    )
   }
 }
 

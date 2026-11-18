@@ -92,6 +92,7 @@ describe('network settings', () => {
     expect(getManualNetworkProxyUrl(settings)).toBe('http://127.0.0.1:7890')
     expect(buildNetworkEnvironment(settings, { NO_PROXY: 'corp.internal' })).toEqual({
       API_TIMEOUT_MS: '180000',
+      CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK: '1',
       CLAUDE_ENABLE_STREAM_WATCHDOG: '1',
       CLAUDE_STREAM_IDLE_TIMEOUT_MS: '180000',
       HTTP_PROXY: 'http://127.0.0.1:7890',

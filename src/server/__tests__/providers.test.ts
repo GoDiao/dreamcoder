@@ -946,6 +946,35 @@ describe('ProviderService', () => {
       expect(res.status).toBe(404)
       expect(await res.json()).toMatchObject({ type: 'error', error: { type: 'not_found_error' } })
     })
+
+    test('answers an upstream error in Anthropic form with the retry and request id headers', async () => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => Response.json(
+        { error: { message: 'Rate limit reached, please try again in 20s.', code: 'rate_limit_exceeded' } },
+        { status: 429, headers: { 'retry-after': '20', 'x-request-id': 'req_abc' } },
+      )) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const provider = await svc.addProvider(sampleInput({ apiFormat: 'openai_chat' }))
+        const req = new Request(`http://localhost:3456/proxy/providers/${provider.id}/v1/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ model: 'model-main', max_tokens: 16, messages: [{ role: 'user', content: 'hi' }] }),
+        })
+
+        const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
+
+        expect(res.status).toBe(429)
+        expect(res.headers.get('retry-after')).toBe('20')
+        expect(res.headers.get('request-id')).toBe('req_abc')
+        expect(await res.json()).toEqual({
+          type: 'error',
+          error: { type: 'rate_limit_error', message: 'Rate limit reached, please try again in 20s.' },
+        })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
   })
 
   describe('discoverModels', () => {
@@ -1173,6 +1202,44 @@ describe('ProviderService', () => {
       }
     })
 
+    test('shows only the HTTP status when a rejected connection test has an empty body', async () => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => new Response('', { status: 502 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity).toMatchObject({ success: false, error: 'HTTP 502', httpStatus: 502 })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    test('shows the HTTP status with the provider message when the connection test is rejected', async () => {
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async () => Response.json({ error: { message: 'Incorrect API key provided' } }, { status: 401 })) as unknown as typeof fetch
+
+      try {
+        const svc = new ProviderService()
+        const result = await svc.testProviderConfig({
+          baseUrl: 'https://api.example.com',
+          apiKey: 'sk-test',
+          modelId: 'gpt-main',
+          apiFormat: 'openai_chat',
+        })
+
+        expect(result.connectivity).toMatchObject({ success: false, error: 'HTTP 401: Incorrect API key provided', httpStatus: 401 })
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
     test.each([
       ['a JSON error body', '{"error":{"message":"invalid api key"}}', 'invalid api key'],
       ['an HTML page', '<html>hi</html>', 'no valid Chat Completions chunks'],
@@ -1387,10 +1454,11 @@ describe('Providers API', () => {
         apiFormat: 'openai_chat',
       })
       const res = await handleProvidersApi(req, url, segments)
-      const body = (await res.json()) as { error: string }
+      const body = (await res.json()) as { error: string; message: string }
 
       expect(res.status).toBe(400)
       expect(body.error).toBe('MODEL_DISCOVERY_FAILED')
+      expect(body.message).toBe('HTTP 401: unauthorized')
     } finally {
       server.stop(true)
     }

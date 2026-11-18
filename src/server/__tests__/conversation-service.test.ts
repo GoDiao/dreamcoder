@@ -245,6 +245,7 @@ describe('ConversationService', () => {
 
       expect(env.API_TIMEOUT_MS).toBe('180000')
       expect(env.CLAUDE_ENABLE_STREAM_WATCHDOG).toBe('1')
+      expect(env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK).toBe('1')
       expect(env.CLAUDE_STREAM_IDLE_TIMEOUT_MS).toBe('180000')
       expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
       expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')

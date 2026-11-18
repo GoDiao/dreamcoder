@@ -526,6 +526,62 @@ describe('chatStore history mapping', () => {
     vi.useRealTimers()
   })
 
+  it('drops what a retried reply already streamed and keeps the earlier turn', () => {
+    vi.useFakeTimers()
+    const earlier: UIMessage[] = [
+      { id: 'u1', type: 'user_text', content: 'do it', timestamp: 1 },
+      { id: 'a1', type: 'assistant_text', content: 'Reading the file.', transcriptMessageId: 'cli-a1', timestamp: 2 },
+      { id: 't1', type: 'tool_use', toolName: 'Read', toolUseId: 'toolu_read', input: {}, timestamp: 3 },
+      { id: 'r1', type: 'tool_result', toolUseId: 'toolu_read', content: 'file', isError: false, timestamp: 4 },
+    ]
+    useChatStore.setState({ sessions: { [TEST_SESSION_ID]: makeSession({ messages: earlier, chatState: 'streaming' }) } })
+    const send = (msg: Parameters<ReturnType<typeof useChatStore.getState>['handleServerMessage']>[1]) =>
+      useChatStore.getState().handleServerMessage(TEST_SESSION_ID, msg)
+
+    send({ type: 'thinking', text: 'planning' })
+    send({ type: 'content_start', blockType: 'text' })
+    send({ type: 'content_delta', text: 'Now I write' })
+    send({ type: 'message_id', id: 'cli-a2' })
+    send({ type: 'content_start', blockType: 'tool_use', toolName: 'Write', toolUseId: 'toolu_write' })
+    send({ type: 'content_delta', toolInput: '{"file_pa' })
+    send({ type: 'content_start', blockType: 'tool_use', toolName: 'Grep', toolUseId: 'toolu_sub', parentToolUseId: 'toolu_agent' })
+    send({ type: 'tool_use_complete', toolName: 'Grep', toolUseId: 'toolu_sub', input: { pattern: 'x' }, parentToolUseId: 'toolu_agent' })
+    send({ type: 'content_start', blockType: 'text' })
+    send({ type: 'content_delta', text: 'half a sen' })
+    send({ type: 'content_start', blockType: 'tool_use', toolName: 'Edit', toolUseId: 'toolu_edit' })
+    send({ type: 'content_delta', toolInput: '{"old_str' })
+    vi.runOnlyPendingTimers()
+    send({ type: 'thinking', text: 'checking again' })
+    vi.runOnlyPendingTimers()
+    send({ type: 'content_delta', text: 'and then' })
+    vi.runOnlyPendingTimers()
+    expect(useChatStore.getState().sessions[TEST_SESSION_ID]).toMatchObject({
+      activeToolUseId: 'toolu_edit',
+      activeToolName: 'Edit',
+      activeThinkingId: expect.any(String),
+      streamingText: 'and then',
+      streamingToolInput: '{"old_str',
+    })
+
+    send({ type: 'reply_retracted' })
+    vi.runOnlyPendingTimers()
+
+    const session = useChatStore.getState().sessions[TEST_SESSION_ID]!
+    expect(session.messages).toEqual([
+      ...earlier,
+      expect.objectContaining({ type: 'tool_use', toolUseId: 'toolu_sub', parentToolUseId: 'toolu_agent' }),
+    ])
+    expect(session).toMatchObject({
+      chatState: 'thinking',
+      streamingText: '',
+      streamingToolInput: '',
+      activeToolUseId: null,
+      activeToolName: null,
+      activeThinkingId: null,
+    })
+    vi.useRealTimers()
+  })
+
   it('builds on history and keeps only live messages history does not have yet', async () => {
     vi.mocked(sessionsApi.getTranscript).mockResolvedValueOnce(transcriptOf([
       { id: 'u1', type: 'user_text', content: 'prompt', transcriptMessageId: 'u1', timestamp: 1 },

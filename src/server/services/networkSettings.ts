@@ -82,6 +82,7 @@ export function buildNetworkEnvironment(
   const timeout = String(settings.aiRequestTimeoutMs)
   return {
     API_TIMEOUT_MS: timeout,
+    CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK: '1',
     CLAUDE_ENABLE_STREAM_WATCHDOG: '1',
     CLAUDE_STREAM_IDLE_TIMEOUT_MS: timeout,
     ...buildProxyEnvironment(settings, inheritedEnv),

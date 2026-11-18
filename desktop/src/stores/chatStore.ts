@@ -583,6 +583,18 @@ function mergeHistoryWithLiveMessages(history: UIMessage[], live: UIMessage[]): 
 
 const liveStartBySession = new Map<string, number>()
 
+const STREAMED_REPLY_TYPES = new Set<UIMessage['type']>(['assistant_text', 'thinking', 'tool_use'])
+
+function dropRetractedReply(messages: UIMessage[]): UIMessage[] {
+  const replyStart = messages.findLastIndex((message) => message.type === 'user_text' || message.type === 'tool_result') + 1
+  const kept = messages.filter((message, index) =>
+    index < replyStart ||
+    !STREAMED_REPLY_TYPES.has(message.type) ||
+    (message.type === 'tool_use' && !!message.parentToolUseId),
+  )
+  return kept.length === messages.length ? messages : kept
+}
+
 function tagLatestAssistantText(messages: UIMessage[], pendingText: string, id: string, timestamp: number): UIMessage[] {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]!
@@ -1346,6 +1358,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
         break
       }
+
+      case 'reply_retracted':
+        textDeltaBuffer.clear(sessionId)
+        thinkingDeltaBuffer.clear(sessionId)
+        toolInputDeltaBuffer.clear(sessionId)
+        update((s) => ({
+          messages: dropRetractedReply(s.messages),
+          streamingText: '',
+          streamingToolInput: '',
+          activeThinkingId: null,
+          activeToolUseId: null,
+          activeToolName: null,
+          chatState: 'thinking',
+        }))
+        break
 
       case 'api_retry': {
         const attempt = Math.max(1, Math.trunc(msg.attempt))

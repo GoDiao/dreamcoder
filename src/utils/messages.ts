@@ -156,6 +156,10 @@ import { stripIdeContextTags } from './displayTags.js'
 import { hasEmbeddedSearchTools } from './embeddedTools.js'
 import { formatFileSize } from './format.js'
 import { validateImagesForAPI } from './imageValidation.js'
+import {
+  parseToolArguments,
+  readInvalidToolArguments,
+} from './invalidToolArguments.js'
 import { safeParseJSON } from './json.js'
 import { logError, logMCPDebug } from './log.js'
 import { normalizeLegacyToolName } from './permissions/permissionRuleParser.js'
@@ -2768,12 +2772,8 @@ export function normalizeContentFromAPI(
         // TODO: This needs patching as recursive fields can still be stringified
         let normalizedInput: unknown
         if (typeof contentBlock.input === 'string') {
-          const parsed = safeParseJSON(contentBlock.input)
-          if (parsed === null && contentBlock.input.length > 0) {
-            // TET/FC-v3 diagnostic: the streamed tool input JSON failed to
-            // parse. We fall back to {} which means downstream validation
-            // sees empty input. The raw prefix goes to debug log only — no
-            // PII-tagged proto column exists for it yet.
+          normalizedInput = parseToolArguments(contentBlock.input)
+          if (readInvalidToolArguments(normalizedInput)) {
             logEvent('tengu_tool_input_json_parse_fail', {
               toolName: sanitizeToolNameForAnalytics(contentBlock.name),
               inputLen: contentBlock.input.length,
@@ -2785,13 +2785,16 @@ export function normalizeContentFromAPI(
               )
             }
           }
-          normalizedInput = parsed ?? {}
         } else {
           normalizedInput = contentBlock.input
         }
 
         // Then apply tool-specific corrections
-        if (typeof normalizedInput === 'object' && normalizedInput !== null) {
+        if (
+          typeof normalizedInput === 'object' &&
+          normalizedInput !== null &&
+          !readInvalidToolArguments(normalizedInput)
+        ) {
           const tool = findToolByName(tools, contentBlock.name)
           if (tool) {
             try {

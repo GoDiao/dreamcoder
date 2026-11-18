@@ -1,5 +1,6 @@
 import { parseSseJson, SseDecoder, type SseMessage } from '../proxy/streaming/sse.js'
 import type { UpstreamOutcome } from './requestLog.js'
+import { anthropicErrorBody, apiError } from './upstreamError.js'
 
 export function superviseAnthropicStream(
   stream: ReadableStream<Uint8Array>,
@@ -39,10 +40,7 @@ export function superviseAnthropicStream(
         timer = setTimeout(() => {
           const message = `No response from the provider for ${Math.round(idleTimeoutMs / 1000)}s`
           if (!finish({ outcome: 'idle_timeout', error: message })) return
-          controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({
-            type: 'error',
-            error: { type: 'api_error', message },
-          })}\n\n`))
+          controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(anthropicErrorBody(apiError(message)))}\n\n`))
           controller.close()
           reader.cancel(new DOMException('Stream idle timeout', 'TimeoutError')).catch((err: unknown) => {
             console.error('[Upstream] Cancelling the provider stream after an idle timeout failed:', err)

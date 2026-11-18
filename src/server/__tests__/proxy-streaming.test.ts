@@ -1,10 +1,8 @@
 import { describe, test, expect } from 'bun:test'
 import { openaiChatStreamToAnthropic } from '../proxy/streaming/openaiChatStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiResponsesStreamToAnthropic.js'
-import {
-  OpenAIResponsesStreamError,
-  openaiResponsesStreamToAnthropicResponse,
-} from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { UpstreamReplyError } from '../upstream/upstreamError.js'
 import { SseDecoder } from '../proxy/streaming/sse.js'
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
@@ -588,7 +586,7 @@ describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
       'm',
     )
 
-    await expect(result).rejects.toBeInstanceOf(OpenAIResponsesStreamError)
+    await expect(result).rejects.toBeInstanceOf(UpstreamReplyError)
     await expect(result).rejects.toThrow(message)
   })
 
@@ -743,5 +741,282 @@ describe('stream cancellation', () => {
     await reader.cancel('client gone')
 
     expect(upstreamCancelReason).toBe('client gone')
+  })
+})
+
+function chatChunk(choice: Record<string, unknown>, extra?: Record<string, unknown>): string {
+  return `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'm', choices: [{ index: 0, ...choice }], ...extra })}\n\n`
+}
+
+describe('chat stream usage', () => {
+  test('reads usage that the provider puts inside the choice (Moonshot)', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: 'stop', usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 } }),
+      'data: [DONE]\n\n',
+    ]), 'kimi-k2.6'))
+
+    expect(events.find((e) => e.event === 'message_delta')!.data.usage).toEqual({ input_tokens: 1000, output_tokens: 20, cache_read_input_tokens: 0 })
+  })
+
+  test('leaves usage out instead of reporting zero when the provider sends none', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: 'stop' }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    expect(events.find((e) => e.event === 'message_delta')!.data).not.toHaveProperty('usage')
+  })
+})
+
+function eventNames(events: Array<{ event: string }>): string[] {
+  return events.map((e) => e.event)
+}
+
+function lastError(events: Array<{ event: string; data: Record<string, unknown> }>): { type: string; message: string } {
+  const last = events.at(-1)!
+  expect(last.event).toBe('error')
+  return (last.data as { error: { type: string; message: string } }).error
+}
+
+describe('chat stream finish reasons', () => {
+  test('passes a full context window through so the CLI can tell the user', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: 'model_context_window_exceeded' }),
+      'data: [DONE]\n\n',
+    ]), 'glm-4.6'))
+
+    expect((events.find((e) => e.event === 'message_delta')!.data.delta as { stop_reason: string }).stop_reason)
+      .toBe('model_context_window_exceeded')
+  })
+
+  test.each(['content_filter', 'sensitive'])('reports %s as an error instead of a normal end', async (reason) => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: reason }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    expect(eventNames(events)).not.toContain('message_stop')
+    expect(lastError(events)).toEqual({
+      type: 'invalid_request_error',
+      message: `The provider's content filter stopped the reply (finish_reason: ${reason}).`,
+    })
+  })
+
+  test.each(['network_error', 'insufficient_system_resource'])('reports %s as a server error', async (reason) => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: reason }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    expect(eventNames(events)).not.toContain('message_stop')
+    expect(lastError(events)).toEqual({
+      type: 'api_error',
+      message: `The provider stopped the reply because of an error on its side (finish_reason: ${reason}).`,
+    })
+  })
+})
+
+describe('chat stream errors and early ends', () => {
+  test('keeps a context overflow code from an error in the middle of the stream', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      'data: {"error":{"message":"Your input exceeds the context window of this model.","code":"context_length_exceeded"}}\n\n',
+    ]), 'm'))
+
+    expect(lastError(events)).toEqual({
+      type: 'invalid_request_error',
+      message: 'prompt is too long · Your input exceeds the context window of this model.',
+    })
+  })
+
+  test('reports a stream that closes before any end marker', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Half an ans' }, finish_reason: null }),
+    ]), 'm'))
+
+    expect(eventNames(events)).not.toContain('message_stop')
+    expect(lastError(events)).toEqual({
+      type: 'api_error',
+      message: 'The provider closed the stream before the reply finished.',
+    })
+  })
+
+  test('accepts [DONE] without a finish reason as a normal end', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    expect(eventNames(events).at(-1)).toBe('message_stop')
+  })
+
+  test('reports a reply with chunks but no content and no usage', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { role: 'assistant' }, finish_reason: null }),
+      chatChunk({ delta: {}, finish_reason: 'stop' }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    expect(lastError(events)).toEqual({ type: 'api_error', message: 'The provider returned an empty reply.' })
+  })
+})
+
+describe('chat stream deltas with several kinds of content', () => {
+  test('keeps reasoning, text and a tool call that arrive in one delta', async () => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({
+        delta: {
+          reasoning_content: 'think',
+          content: 'Let me look.',
+          tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'Read', arguments: '{"file_path":"a.ts"}' } }],
+        },
+        finish_reason: 'tool_calls',
+      }),
+      'data: [DONE]\n\n',
+    ]), 'm'))
+
+    const starts = events.filter((e) => e.event === 'content_block_start').map((e) => (e.data.content_block as { type: string }).type)
+    const deltas = events.filter((e) => e.event === 'content_block_delta').map((e) => e.data.delta)
+    expect(starts).toEqual(['thinking', 'text', 'tool_use'])
+    expect(deltas).toEqual([
+      { type: 'thinking_delta', thinking: 'think' },
+      { type: 'text_delta', text: 'Let me look.' },
+      { type: 'input_json_delta', partial_json: '{"file_path":"a.ts"}' },
+    ])
+    expect(eventNames(events).at(-1)).toBe('message_stop')
+  })
+})
+
+function responsesEvent(type: string, data: Record<string, unknown>): string {
+  return `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
+}
+
+const responseCreated = responsesEvent('response.created', { response: { id: 'r1', model: 'gpt-4.1' } })
+
+function completed(usage?: Record<string, number>): string {
+  return responsesEvent('response.completed', { response: { id: 'r1', status: 'completed', ...(usage && { usage }) } })
+}
+
+describe('responses stream ends', () => {
+  test('reports an incomplete reply stopped by the content filter as an error', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.incomplete', { response: { status: 'incomplete', incomplete_details: { reason: 'content_filter' } } }),
+    ]), 'gpt-4.1'))
+
+    expect(eventNames(events)).not.toContain('message_stop')
+    expect(lastError(events)).toEqual({
+      type: 'invalid_request_error',
+      message: "The provider's content filter stopped the reply (incomplete: content_filter).",
+    })
+  })
+
+  test('keeps a context overflow code from response.failed', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.failed', { response: { status: 'failed', error: { code: 'context_length_exceeded', message: 'Your input exceeds the context window of this model.' } } }),
+    ]), 'gpt-4.1'))
+
+    expect(lastError(events)).toEqual({
+      type: 'invalid_request_error',
+      message: 'prompt is too long · Your input exceeds the context window of this model.',
+    })
+  })
+
+  test('reports a stream that closes before response.completed', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.content_part.added', { output_index: 0, content_index: 0, part: { type: 'output_text', text: '' } }),
+      responsesEvent('response.output_text.delta', { output_index: 0, content_index: 0, delta: 'Half an ans' }),
+    ]), 'gpt-4.1'))
+
+    expect(eventNames(events)).not.toContain('message_stop')
+    expect(lastError(events)).toEqual({ type: 'api_error', message: 'The provider closed the stream before the reply finished.' })
+  })
+
+  test('leaves usage out when response.completed has none', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([responseCreated, completed()]), 'gpt-4.1'))
+
+    expect(events.find((e) => e.event === 'message_delta')!.data).not.toHaveProperty('usage')
+  })
+})
+
+describe('responses stream without every delta event', () => {
+  function blocksAndDeltas(events: Array<{ event: string; data: Record<string, unknown> }>) {
+    return events
+      .filter((e) => e.event.startsWith('content_block'))
+      .map((e) => e.event === 'content_block_delta' ? e.data.delta : e.event === 'content_block_start' ? e.data.content_block : 'stop')
+  }
+
+  test('opens a text block for a text delta without content_part.added and closes it on completion', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.output_text.delta', { output_index: 0, content_index: 0, delta: 'Hello' }),
+      completed({ input_tokens: 5, output_tokens: 1 }),
+    ]), 'gpt-4.1'))
+
+    expect(blocksAndDeltas(events)).toEqual([{ type: 'text', text: '' }, { type: 'text_delta', text: 'Hello' }, 'stop'])
+    expect(eventNames(events).slice(-2)).toEqual(['message_delta', 'message_stop'])
+  })
+
+  test('takes the arguments from function_call_arguments.done when no deltas came', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.output_item.added', { output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'Read' } }),
+      responsesEvent('response.function_call_arguments.done', { item_id: 'fc_1', output_index: 0, arguments: '{"file_path":"a.ts"}' }),
+      completed({ input_tokens: 5, output_tokens: 1 }),
+    ]), 'gpt-4.1'))
+
+    expect(blocksAndDeltas(events)).toEqual([
+      { type: 'tool_use', id: 'call_1', name: 'Read', input: {} },
+      { type: 'input_json_delta', partial_json: '{"file_path":"a.ts"}' },
+      'stop',
+    ])
+  })
+
+  test('reads a message that only arrives as a completed output item', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.output_item.done', {
+        output_index: 0,
+        item: { type: 'message', id: 'msg_1', role: 'assistant', content: [{ type: 'output_text', text: 'Hello there' }] },
+      }),
+      completed({ input_tokens: 5, output_tokens: 2 }),
+    ]), 'gpt-4.1'))
+
+    expect(blocksAndDeltas(events)).toEqual([{ type: 'text', text: '' }, { type: 'text_delta', text: 'Hello there' }, 'stop'])
+  })
+
+  test('closes a tool block on completion when function_call_arguments.done never came', async () => {
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
+      responseCreated,
+      responsesEvent('response.output_item.added', { output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'Read' } }),
+      responsesEvent('response.function_call_arguments.delta', { item_id: 'fc_1', output_index: 0, delta: '{"file_path":"a.ts"}' }),
+      completed({ input_tokens: 5, output_tokens: 1 }),
+    ]), 'gpt-4.1'))
+
+    expect(blocksAndDeltas(events).at(-1)).toBe('stop')
+    expect((events.find((e) => e.event === 'message_delta')!.data.delta as { stop_reason: string }).stop_reason).toBe('tool_use')
+  })
+})
+
+describe('stream error classification', () => {
+  test.each([
+    ['insufficient_quota', 'You exceeded your current quota.', 'billing_error'],
+    ['rate_limit_exceeded', 'Rate limit reached.', 'rate_limit_error'],
+    ['invalid_api_key', 'Incorrect API key provided', 'authentication_error'],
+    ['server_error', 'The server had an error.', 'api_error'],
+  ])('maps a %s error in the middle of a chat stream', async (code, message, type) => {
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
+      chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
+      `data: ${JSON.stringify({ error: { message, code } })}\n\n`,
+    ]), 'm'))
+
+    expect(lastError(events)).toEqual({ type, message })
   })
 })

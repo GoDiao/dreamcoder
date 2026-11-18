@@ -157,4 +157,37 @@ describe('buildOpenAICodexFetch', () => {
       error: { type: 'api_error', message: 'model overloaded' },
     })
   })
+
+  test.each([
+    ['a JSON reply', () => Response.json({
+      id: 'resp_1',
+      object: 'response',
+      created_at: 0,
+      model: 'gpt-5.5',
+      status: 'incomplete',
+      incomplete_details: { reason: 'content_filter' },
+      output: [],
+    })],
+    ['a streamed reply', () => new Response([
+      'event: response.incomplete',
+      'data: {"type":"response.incomplete","response":{"id":"resp_1","status":"incomplete","incomplete_details":{"reason":"content_filter"},"output":[]}}',
+      '',
+    ].join('\n'), { headers: { 'Content-Type': 'text/event-stream' } })],
+  ])('answers a content-filtered %s for a non-streaming caller with an Anthropic error', async (_kind, reply) => {
+    const openAIFetch = buildOpenAICodexFetch(async () => reply(), 'test')
+    const response = await openAIFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: 'gpt-5.5',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'Say ok' }],
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      type: 'error',
+      error: { type: 'invalid_request_error', message: "The provider's content filter stopped the reply (incomplete: content_filter)." },
+    })
+  })
 })

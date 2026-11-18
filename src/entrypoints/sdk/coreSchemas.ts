@@ -1646,6 +1646,19 @@ export const SDKAPIRetryMessageSchema = lazySchema(() =>
     ),
 )
 
+export const SDKStreamRetractedMessageSchema = lazySchema(() =>
+  z
+    .object({
+      type: z.literal('system'),
+      subtype: z.literal('stream_retracted'),
+      uuid: UUIDPlaceholder(),
+      session_id: z.string(),
+    })
+    .describe(
+      'Emitted when a stream broke in the middle and will be opened again. Everything streamed since the last user message or tool result belongs to the failed attempt and is replaced by the retried reply.',
+    ),
+)
+
 export const SDKLocalCommandOutputMessageSchema = lazySchema(() =>
   z
     .object({
@@ -1922,6 +1935,7 @@ export const SDKMessageSchema = lazySchema(() =>
     SDKCompactBoundaryMessageSchema(),
     SDKStatusMessageSchema(),
     SDKAPIRetryMessageSchema(),
+    SDKStreamRetractedMessageSchema(),
     SDKLocalCommandOutputMessageSchema(),
     SDKHookStartedMessageSchema(),
     SDKHookProgressMessageSchema(),

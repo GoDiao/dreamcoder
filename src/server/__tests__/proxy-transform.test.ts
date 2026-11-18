@@ -261,6 +261,23 @@ describe('anthropicToOpenaiChat', () => {
 })
 
 describe('openaiChatToAnthropic', () => {
+  test('reads usage that the provider puts inside the choice (Moonshot)', () => {
+    const res = {
+      id: 'chatcmpl-1',
+      object: 'chat.completion',
+      created: 0,
+      model: 'kimi-k2.6',
+      choices: [{
+        index: 0,
+        message: { role: 'assistant', content: 'ok' },
+        finish_reason: 'stop',
+        usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 },
+      }],
+    } as unknown as OpenAIChatResponse
+
+    expect(openaiChatToAnthropic(res, 'kimi-k2.6').usage).toEqual({ input_tokens: 1000, output_tokens: 20, cache_read_input_tokens: 0 })
+  })
+
   test('basic text response', () => {
     const res: OpenAIChatResponse = {
       id: 'chatcmpl-1',
@@ -375,7 +392,9 @@ describe('openaiChatToAnthropic', () => {
     expect(openaiChatToAnthropic(make('stop'), 'gpt-4').stop_reason).toBe('end_turn')
     expect(openaiChatToAnthropic(make('length'), 'gpt-4').stop_reason).toBe('max_tokens')
     expect(openaiChatToAnthropic(make('tool_calls'), 'gpt-4').stop_reason).toBe('tool_use')
-    expect(openaiChatToAnthropic(make('content_filter'), 'gpt-4').stop_reason).toBe('end_turn')
+    expect(openaiChatToAnthropic(make('model_context_window_exceeded'), 'gpt-4').stop_reason).toBe('model_context_window_exceeded')
+    expect(() => openaiChatToAnthropic(make('content_filter'), 'gpt-4'))
+      .toThrow("The provider's content filter stopped the reply (finish_reason: content_filter).")
   })
 
   test('empty choices', () => {
@@ -667,6 +686,22 @@ describe('anthropicToOpenaiResponses', () => {
 })
 
 describe('openaiResponsesToAnthropic', () => {
+  test.each([
+    [{ reason: 'max_output_tokens' }, 'max_tokens'],
+    [undefined, 'max_tokens'],
+  ])('maps an incomplete reply with %o to %s', (details, stopReason) => {
+    const res = { id: 'r1', object: 'response', created_at: 0, model: 'gpt-4.1', status: 'incomplete', incomplete_details: details, output: [] } as OpenAIResponsesResponse
+
+    expect(openaiResponsesToAnthropic(res, 'gpt-4.1').stop_reason).toBe(stopReason)
+  })
+
+  test('reports an incomplete reply stopped by the content filter as an error', () => {
+    const res = { id: 'r1', object: 'response', created_at: 0, model: 'gpt-4.1', status: 'incomplete', incomplete_details: { reason: 'content_filter' }, output: [] } as OpenAIResponsesResponse
+
+    expect(() => openaiResponsesToAnthropic(res, 'gpt-4.1'))
+      .toThrow("The provider's content filter stopped the reply (incomplete: content_filter).")
+  })
+
   test('basic text response', () => {
     const res: OpenAIResponsesResponse = {
       id: 'resp_1',

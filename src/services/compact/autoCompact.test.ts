@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { getAutoCompactThreshold, getEffectiveContextWindowSize } from './autoCompact.js'
+import { getAutoCompactThreshold, getEffectiveContextWindowSize, shouldAutoCompact } from './autoCompact.js'
+import { createAssistantMessage, createUserMessage } from '../../utils/messages.js'
 import { getContextWindowForModel } from '../../utils/context.js'
 import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
@@ -92,5 +93,42 @@ describe('auto-compact threshold', () => {
     resetSettingsCache()
     expect(getAutoCompactThreshold('glm-5.1')).toBe(90_000)
     expect(getAutoCompactThreshold('deepseek-v4-pro')).toBe(490_000)
+  })
+})
+
+describe('auto compact without usage from the provider', () => {
+  const zeroUsage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+  }
+
+  function reply(content: string, usage: typeof zeroUsage) {
+    const message = createAssistantMessage({ content, usage: usage as never })
+    message.message.model = 'kimi-k2.6'
+    return message
+  }
+
+  test('falls back to the local estimate when the last reply reports zero usage', async () => {
+    const messages = [
+      createUserMessage({ content: 'x'.repeat(1_200_000) }),
+      reply('done', zeroUsage),
+      createUserMessage({ content: 'next' }),
+    ]
+
+    expect(await shouldAutoCompact(messages, 'kimi-k2.6')).toBe(true)
+  })
+
+  test('uses the last reply that does report usage', async () => {
+    const messages = [
+      createUserMessage({ content: 'hello' }),
+      reply('first', { ...zeroUsage, input_tokens: 250_000 }),
+      createUserMessage({ content: 'more' }),
+      reply('second', zeroUsage),
+      createUserMessage({ content: 'next' }),
+    ]
+
+    expect(await shouldAutoCompact(messages, 'kimi-k2.6')).toBe(true)
   })
 })

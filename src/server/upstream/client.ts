@@ -21,6 +21,13 @@ import {
 } from '../services/providerRuntimeEnv.js'
 import type { ApiFormat, ProviderAuthStrategy, DiscoveredProviderModel, SavedProvider } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl, openaiUpstreamBaseUrl } from './baseUrl.js'
+import {
+  toFailure,
+  upstreamBodyFailure,
+  upstreamHttpFailure,
+  UpstreamReplyError,
+  type UpstreamFailure,
+} from './upstreamError.js'
 import { fillContextWindows } from './contextWindows/index.js'
 import { superviseAnthropicStream } from './anthropicStream.js'
 import {
@@ -43,11 +50,11 @@ export type UpstreamTarget = {
 export type UpstreamResult =
   | { ok: true; httpStatus: number; message: AnthropicResponse }
   | { ok: true; httpStatus: number; stream: ReadableStream<Uint8Array> }
-  | { ok: false; httpStatus?: number; error: string }
+  | UpstreamFailure
 
 export type UpstreamModelsResult =
   | { ok: true; httpStatus: number; models: DiscoveredProviderModel[] }
-  | { ok: false; httpStatus?: number; error: string }
+  | UpstreamFailure
 
 type UpstreamRequest = {
   url: string
@@ -146,12 +153,7 @@ async function requestUpstream(
   responseInfo.headersMs = Date.now() - startedAt
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => '')
-    return {
-      ok: false,
-      httpStatus: response.status,
-      error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
-    }
+    return upstreamHttpFailure(response.status, await response.text().catch(() => ''), response.headers)
   }
 
   if (isStream) {
@@ -166,6 +168,7 @@ async function requestUpstream(
   }
 
   const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  if (body?.error && typeof body.error === 'object') return upstreamBodyFailure(body)
   const invalid = validateResponseBody(body, target.apiFormat)
   if (invalid) {
     return { ok: false, httpStatus: 502, error: invalid }
@@ -177,6 +180,7 @@ async function requestUpstream(
       message: toAnthropicMessage(target.apiFormat, body!, anthropicRequest.model),
     }
   } catch (err) {
+    if (err instanceof UpstreamReplyError) return toFailure(err.error, {})
     return { ok: false, httpStatus: 502, error: err instanceof Error ? err.message : String(err) }
   }
 }
@@ -221,12 +225,7 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => '')
-      return {
-        ok: false,
-        httpStatus: response.status,
-        error: `Upstream returned HTTP ${response.status}: ${errText.slice(0, 500)}`,
-      }
+      return upstreamHttpFailure(response.status, await response.text().catch(() => ''), response.headers)
     }
 
     const body = await response.json().catch(() => null) as Record<string, unknown> | null
@@ -390,9 +389,6 @@ function toAnthropicMessage(
 
 function validateResponseBody(body: Record<string, unknown> | null, format: ApiFormat): string | null {
   if (!body) return 'Empty response — not a valid API endpoint'
-  if (body.error && typeof body.error === 'object') {
-    return ((body.error as Record<string, unknown>).message as string) || 'Error in response body'
-  }
   if (format === 'openai_chat') {
     return Array.isArray(body.choices) && body.choices.length > 0
       ? null
