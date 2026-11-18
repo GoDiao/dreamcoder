@@ -6,7 +6,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Added
 
-- **Provider preset contributor guide.** Adds English and Chinese instructions for adding a built-in provider preset, updating its API tests, and checking connectivity from the settings form (#260).
+- **Provider preset contributor guide.** Adds English and Chinese instructions for adding a built-in provider preset, updating its API tests, and checking connectivity from the settings form (#260). Thanks @harshit3355.
 
 ## [0.9.0] — 2026-11-17
 
