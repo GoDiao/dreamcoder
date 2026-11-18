@@ -11,6 +11,7 @@ import {
 import { CronService } from '../services/cronService.js'
 import { ProviderService } from '../services/providerService.js'
 import { resetTerminalShellEnvironmentCacheForTests } from '../../utils/terminalShellEnvironment.js'
+import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 
 const originalConfigDir = process.env.DREAMCODER_CONFIG_DIR
 const originalPath = process.env.PATH
@@ -287,6 +288,33 @@ describe('cron scheduler launcher resolution', () => {
 
     expect(run.status).toBe('failed')
     expect(run.error).toContain('No provider configured')
+  })
+
+  it('gives a scheduled task the network timeout and stream watchdog settings', async () => {
+    await fs.mkdir(path.join(tmpDir, 'config'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'config', 'settings.json'),
+      JSON.stringify({ network: { aiRequestTimeoutMs: 180_000 } }),
+      'utf-8',
+    )
+    resetSettingsCache()
+    const scheduler = new CronScheduler(new CronService()) as any
+
+    try {
+      const env = await scheduler.buildTaskChildEnv(tmpDir, { id: 't', cron: '* * * * *', prompt: 'p', createdAt: 0 })
+
+      expect({
+        API_TIMEOUT_MS: env.API_TIMEOUT_MS,
+        CLAUDE_ENABLE_STREAM_WATCHDOG: env.CLAUDE_ENABLE_STREAM_WATCHDOG,
+        CLAUDE_STREAM_IDLE_TIMEOUT_MS: env.CLAUDE_STREAM_IDLE_TIMEOUT_MS,
+      }).toEqual({
+        API_TIMEOUT_MS: '180000',
+        CLAUDE_ENABLE_STREAM_WATCHDOG: '1',
+        CLAUDE_STREAM_IDLE_TIMEOUT_MS: '180000',
+      })
+    } finally {
+      resetSettingsCache()
+    }
   })
 
   it('starts a task in its own permission mode', () => {

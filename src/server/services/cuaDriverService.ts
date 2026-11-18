@@ -763,13 +763,10 @@ export function defaultDeps(): CuaDriverDeps {
       await writeFile(path, data, 'utf8')
     },
     networkEnv: async () => {
-      const { loadNetworkSettings, buildNetworkEnvironment } = await import(
+      const { loadNetworkSettings, buildProxyEnvironment } = await import(
         './networkSettings.js'
       )
-      const { API_TIMEOUT_MS: _timeout, ...env } = buildNetworkEnvironment(
-        await loadNetworkSettings(),
-      )
-      return env
+      return buildProxyEnvironment(await loadNetworkSettings(), process.env)
     },
   }
 }

@@ -402,6 +402,19 @@ describe('openaiChatToAnthropic', () => {
     const result = openaiChatToAnthropic(res, 'gpt-4')
     expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 50, cache_read_input_tokens: 80 })
   })
+
+  test.each([
+    ['DeepSeek prompt_cache_hit_tokens', { prompt_cache_hit_tokens: 80 }],
+    ['Moonshot top-level cached_tokens', { cached_tokens: 80 }],
+  ])('cached tokens mapping from %s', (_name, cacheFields) => {
+    const res: OpenAIChatResponse = {
+      id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150, ...cacheFields },
+    }
+    const result = openaiChatToAnthropic(res, 'gpt-4')
+    expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 50, cache_read_input_tokens: 80 })
+  })
 })
 
 describe('anthropicToOpenaiResponses', () => {
@@ -783,5 +796,67 @@ describe('openaiResponsesToAnthropic', () => {
     }
     const result = openaiResponsesToAnthropic(res, 'gpt-4o')
     expect(result.content).toEqual([{ type: 'text', text: '' }])
+  })
+})
+
+describe('response model name', () => {
+  test('chat responses report the requested model, not the snapshot the upstream returns', () => {
+    const res: OpenAIChatResponse = {
+      id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4.1-2025-04-14',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+    }
+    expect(openaiChatToAnthropic(res, 'gpt-4.1').model).toBe('gpt-4.1')
+    expect(openaiChatToAnthropic({ ...res, choices: [] }, 'gpt-4.1').model).toBe('gpt-4.1')
+  })
+
+  test('Responses API results report the requested model, not the snapshot the upstream returns', () => {
+    const res: OpenAIResponsesResponse = {
+      id: 'r', object: 'response', created_at: 0, model: 'gpt-4.1-2025-04-14', status: 'completed', output: [],
+    }
+    expect(openaiResponsesToAnthropic(res, 'gpt-4.1').model).toBe('gpt-4.1')
+  })
+})
+
+describe('tool request options', () => {
+  const tool = { name: 'Read', description: 'Read a file', input_schema: { type: 'object', properties: { path: { type: 'string' } } } }
+  const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
+
+  test.each([
+    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req) as { parallel_tool_calls?: boolean }],
+    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req) as { parallel_tool_calls?: boolean }],
+  ] as const)('%s allows parallel tool calls only when tools are sent', (_name, convert) => {
+    expect(convert({ ...base, tools: [tool] }).parallel_tool_calls).toBe(true)
+    expect(convert(base).parallel_tool_calls).toBeUndefined()
+  })
+  test.each([
+    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req).tools![0]!.function.parameters],
+    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req).tools![0]!.parameters],
+  ] as const)('%s drops the schema URL and the safe-integer bounds zod adds', (_name, parametersOf) => {
+    const inputSchema = {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: -9007199254740991, maximum: 9007199254740991 },
+        offset: { type: 'integer', minimum: 0, maximum: 9007199254740991 },
+        items: { type: 'array', items: { type: 'object', properties: { n: { type: 'integer', exclusiveMinimum: 0, maximum: 9007199254740991 } } } },
+        url: { type: 'string', format: 'uri' },
+        $schema: { type: 'string', description: 'a parameter that happens to be named $schema' },
+      },
+      required: ['limit'],
+      additionalProperties: false,
+    }
+
+    expect(parametersOf({ ...base, tools: [{ name: 'T', input_schema: inputSchema }] })).toEqual({
+      type: 'object',
+      properties: {
+        limit: { type: 'integer' },
+        offset: { type: 'integer', minimum: 0 },
+        items: { type: 'array', items: { type: 'object', properties: { n: { type: 'integer', exclusiveMinimum: 0 } } } },
+        url: { type: 'string', format: 'uri' },
+        $schema: { type: 'string', description: 'a parameter that happens to be named $schema' },
+      },
+      required: ['limit'],
+      additionalProperties: false,
+    })
   })
 })

@@ -15,6 +15,7 @@ import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalS
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { applyAgentTeamsSetting } from './agentTeamsEnv.js'
 import { SettingsService } from './settingsService.js'
+import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
 import { isPermissionMode, permissionModeCliArgs } from './permissionModes.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
@@ -577,7 +578,8 @@ export class CronScheduler {
   ): Promise<Record<string, string | undefined>> {
     const cleanEnv = await getProcessEnvWithTerminalShellEnvironment()
     delete cleanEnv.CLAUDE_CODE_OAUTH_TOKEN
-    applyAgentTeamsSetting(cleanEnv, await new SettingsService().getUserSettings())
+    const userSettings = await new SettingsService().getUserSettings()
+    applyAgentTeamsSetting(cleanEnv, userSettings)
 
     if (this.shouldStripInheritedProviderEnv(task.providerId)) {
       for (const key of Object.keys(cleanEnv)) {
@@ -604,6 +606,7 @@ export class CronScheduler {
       CALLER_DIR: workDir,
       PWD: workDir,
       DREAMCODER_SKIP_DOTENV: '1',
+      ...buildNetworkEnvironment(normalizeNetworkSettings(userSettings), cleanEnv),
       ...(explicitProviderEnv
         ? {
             CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: '1',

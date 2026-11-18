@@ -128,9 +128,12 @@ export class ProviderService {
       models: normalizeProviderModels(input.models),
       ...(input.fastModel !== undefined && { fastModel: input.fastModel }),
       ...(input.modelContextWindows !== undefined && { modelContextWindows: input.modelContextWindows }),
+      ...(input.extraHeaders !== undefined && { extraHeaders: input.extraHeaders }),
+      ...(input.queryParams !== undefined && { queryParams: input.queryParams }),
       ...(input.notes !== undefined && { notes: input.notes }),
     }
     this.assertFastModel(provider)
+    this.assertRequestOptions(provider)
 
     index.providers.push(provider)
     await this.writeIndex(index)
@@ -154,15 +157,20 @@ export class ProviderService {
       ...(input.models !== undefined && { models: normalizeProviderModels(input.models) }),
       ...(typeof input.fastModel === 'string' && { fastModel: input.fastModel }),
       ...(input.modelContextWindows !== undefined && input.modelContextWindows !== null && { modelContextWindows: input.modelContextWindows }),
+      ...(input.extraHeaders != null && { extraHeaders: input.extraHeaders }),
+      ...(input.queryParams != null && { queryParams: input.queryParams }),
       ...(input.notes !== undefined && { notes: input.notes }),
     }
     if (input.modelContextWindows === null) {
       delete updated.modelContextWindows
     }
+    if (input.extraHeaders === null) delete updated.extraHeaders
+    if (input.queryParams === null) delete updated.queryParams
     if (input.fastModel === null || (input.fastModel === undefined && input.models !== undefined && !updated.models.some((model) => model.id === updated.fastModel))) {
       delete updated.fastModel
     }
     this.assertFastModel(updated)
+    this.assertRequestOptions(updated)
 
     index.providers[idx] = updated
     await this.writeIndex(index)
@@ -316,6 +324,14 @@ export class ProviderService {
       throw new ApiError(upstreamRejected ? 400 : 502, result.error, 'MODEL_DISCOVERY_FAILED')
     }
     return result.models
+  }
+
+  private assertRequestOptions(provider: SavedProvider): void {
+    const hasOptions = Object.keys(provider.extraHeaders ?? {}).length > 0
+      || Object.keys(provider.queryParams ?? {}).length > 0
+    if (hasOptions && provider.apiFormat === 'anthropic') {
+      throw ApiError.badRequest('Extra headers and query parameters only apply to OpenAI-format providers')
+    }
   }
 
   private assertFastModel(provider: SavedProvider): void {

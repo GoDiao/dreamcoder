@@ -17,6 +17,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
+import { PROVIDER_PROXIED_ENV_KEY } from '../../utils/providerProxy.js'
 import { browserMcpChildEnv, webCloneChildEnv } from '../browserHost/childEnv.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
 import { buildNetworkEnvironment, normalizeNetworkSettings } from './networkSettings.js'
@@ -1008,6 +1009,7 @@ export class ConversationService {
       'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
       'DREAMCODER_OPENAI_OAUTH_PROVIDER',
       'OPENAI_CODEX_OAUTH_FILE',
+      PROVIDER_PROXIED_ENV_KEY,
     ] as const
 
     const cleanEnv = await getProcessEnvWithTerminalShellEnvironment()
@@ -1033,7 +1035,7 @@ export class ConversationService {
         ? await this.providerService.getProviderRuntimeEnv(options.providerId, options.model)
         : null
     const userSettings = await new SettingsService().getUserSettings()
-    const networkEnv = buildNetworkEnvironment(normalizeNetworkSettings(userSettings))
+    const networkEnv = buildNetworkEnvironment(normalizeNetworkSettings(userSettings), cleanEnv)
     applyAgentTeamsSetting(cleanEnv, userSettings)
     const attributionHeaderEnv = attributionHeaderEnvForModel(
       options?.model?.trim() ||

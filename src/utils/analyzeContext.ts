@@ -61,6 +61,7 @@ import { errorMessage, toError } from './errors.js'
 import { logError } from './log.js'
 import { normalizeMessagesForAPI } from './messages.js'
 import { getRuntimeMainLoopModel } from './model/model.js'
+import { isProviderProxied } from './providerProxy.js'
 import type { SettingSource } from './settings/constants.js'
 import { jsonStringify } from './slowOperations.js'
 import { buildEffectiveSystemPrompt } from './systemPrompt.js'
@@ -108,6 +109,9 @@ async function countTokensWithFallback(
     const result = await countMessagesTokensWithAPI(messages, tools)
     if (result !== null) {
       return result
+    }
+    if (isProviderProxied()) {
+      return estimateTokensForContextMessages(messages, tools)
     }
     logForDebugging(
       `countTokensWithFallback: API returned null, trying haiku fallback (${tools.length} tools)`,

@@ -1,6 +1,7 @@
 import type { OpenAIChatStreamChunk } from '../transform/types.js'
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
 import { mapUsage } from '../transform/openaiChatToAnthropic.js'
+import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 
 type ContentBlockType = 'text' | 'thinking' | 'tool_use'
 
@@ -66,8 +67,7 @@ export function openaiChatStreamToAnthropic(
   model: string,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const sse = new SseDecoder()
   const state = createState(model)
   const reader = upstream.getReader()
   let cancelled = false
@@ -75,59 +75,24 @@ export function openaiChatStreamToAnthropic(
   return new ReadableStream({
     async start(controller) {
       let errored = false
+      const handle = (messages: SseMessage[]) => {
+        for (const message of messages) {
+          if (message.type === 'event') handleData(message.data.trim(), state, controller, encoder)
+          else if (!state.messageStopSent) controller.enqueue(encoder.encode(formatSse('ping', { type: 'ping' })))
+        }
+      }
 
       try {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed || trimmed.startsWith(':')) continue
-
-            if (trimmed === 'data: [DONE]') {
-              finalizeStream(state)
-              flushQueue(state, controller, encoder)
-              continue
-            }
-
-            if (!trimmed.startsWith('data: ')) {
-              if (!state.upstreamError && trimmed.startsWith('{')) {
-                state.upstreamError = readUpstreamError(parseJson(trimmed))
-              }
-              continue
-            }
-            const jsonStr = trimmed.slice(6)
-
-            let chunk: OpenAIChatStreamChunk
-            try {
-              chunk = JSON.parse(jsonStr)
-            } catch {
-              continue
-            }
-
-            if (state.upstreamError) continue
-            const upstreamError = readUpstreamError(chunk)
-            if (upstreamError) {
-              state.upstreamError = upstreamError
-              finalizeStream(state)
-              flushQueue(state, controller, encoder)
-              continue
-            }
-            if (Array.isArray(chunk.choices)) state.sawValidChunk = true
-
-            processChunk(chunk, state)
-            flushQueue(state, controller, encoder)
-          }
+          handle(sse.push(value))
         }
+        handle(sse.flush())
 
-        const rest = buffer.trim()
-        if (!state.upstreamError && rest.startsWith('{')) {
-          state.upstreamError = readUpstreamError(parseJson(rest))
+        const body = sse.unframedBody()
+        if (!state.upstreamError && body) {
+          state.upstreamError = readUpstreamError(parseSseJson(body))
         }
       } catch (err) {
         errored = true
@@ -145,6 +110,33 @@ export function openaiChatStreamToAnthropic(
       return reader.cancel(reason)
     },
   })
+}
+
+function handleData(
+  data: string,
+  state: StreamState,
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+): void {
+  if (data === '[DONE]') {
+    finalizeStream(state)
+    flushQueue(state, controller, encoder)
+    return
+  }
+
+  const chunk = parseSseJson(data) as OpenAIChatStreamChunk | undefined
+  if (!chunk || state.upstreamError) return
+  const upstreamError = readUpstreamError(chunk)
+  if (upstreamError) {
+    state.upstreamError = upstreamError
+    finalizeStream(state)
+    flushQueue(state, controller, encoder)
+    return
+  }
+  if (Array.isArray(chunk.choices)) state.sawValidChunk = true
+
+  processChunk(chunk, state)
+  flushQueue(state, controller, encoder)
 }
 
 function enqueue(state: StreamState, event: string, data: unknown): void {
@@ -301,7 +293,6 @@ function processChunk(chunk: OpenAIChatStreamChunk, state: StreamState): void {
     return
   }
 
-  state.model = chunk.model || state.model
   ensureMessageStart(state, chunk.id)
 
   const delta = choice.delta as DeltaEx
@@ -473,14 +464,6 @@ function mergeUsageIntoHeldDelta(
   state.messageDeltaSent = true
   state.queue.push(state.heldMessageDelta)
   state.heldMessageDelta = null
-}
-
-function parseJson(text: string): unknown {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
 }
 
 function readUpstreamError(chunk: unknown): string | null {

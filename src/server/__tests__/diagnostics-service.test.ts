@@ -89,6 +89,26 @@ describe('DiagnosticsService', () => {
     expect(runtime).not.toContain('sk-secret-token')
   })
 
+  test('writes an event to the config dir that was current when it was recorded', async () => {
+    const laterDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dreamcoder-diagnostics-later-'))
+    const service = new DiagnosticsService()
+
+    try {
+      const pending = service.recordEvent({ type: 'upstream_request', severity: 'warn', summary: 'recorded first' })
+      process.env.DREAMCODER_CONFIG_DIR = laterDir
+      await pending
+
+      const firstLog = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'diagnostics.jsonl'), 'utf-8')
+      const firstRuntimeLog = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'diagnostics', 'runtime-errors.log'), 'utf-8')
+      expect(firstLog).toContain('recorded first')
+      expect(firstRuntimeLog).toContain('recorded first')
+      expect(await fs.readdir(laterDir)).toEqual([])
+    } finally {
+      process.env.DREAMCODER_CONFIG_DIR = tmpDir
+      await fs.rm(laterDir, { recursive: true, force: true })
+    }
+  })
+
   test('exports a single diagnostics tarball without provider secrets', async () => {
     const service = new DiagnosticsService()
     await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })

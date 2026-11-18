@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
+import { diagnosticsService, type DiagnosticEventInput } from '../services/diagnosticsService.js'
 import { normalizeUpstreamBaseUrl } from '../upstream/baseUrl.js'
-import { resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
+import { fetchUpstreamModels, resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
 import type { AnthropicRequest } from '../proxy/transform/types.js'
 import type { SavedProvider } from '../types/provider.js'
 
@@ -106,6 +107,51 @@ describe('upstream client', () => {
   })
 
   test.each([
+    ['openai_chat', 'https://open.bigmodel.cn/api/paas/v4', 'https://open.bigmodel.cn/api/paas/v4/chat/completions'],
+    ['openai_chat', 'https://ark.cn-beijing.volces.com/api/v3/', 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'],
+    ['openai_chat', 'https://generativelanguage.googleapis.com/v1beta/openai', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'],
+    ['openai_responses', 'https://api.openai.com/v1', 'https://api.openai.com/v1/responses'],
+    ['openai_responses', 'https://api.openai.com', 'https://api.openai.com/v1/responses'],
+    ['openai_chat', 'https://relay.example.com/openai-compatible', 'https://relay.example.com/openai-compatible/v1/chat/completions'],
+  ] as const)('%s base URL %s is used as %s', async (apiFormat, baseUrl, expected) => {
+    mockFetch(() => Response.json(apiFormat === 'openai_chat' ? openaiChatMessage : {
+      id: 'resp_1',
+      object: 'response',
+      model: 'model-main',
+      status: 'completed',
+      output: [],
+    }))
+
+    await sendToUpstream(target({ apiFormat, baseUrl }), request)
+
+    expect(calls[0].url).toBe(expected)
+  })
+
+  test('lists OpenAI-format models under a base URL that already ends in a version', async () => {
+    let requestPath = ''
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(req) {
+        requestPath = new URL(req.url).pathname
+        return Response.json({ data: [{ id: 'glm-4.6' }] })
+      },
+    })
+
+    try {
+      const result = await fetchUpstreamModels(target({
+        apiFormat: 'openai_chat',
+        baseUrl: `http://127.0.0.1:${server.port}/api/paas/v4`,
+      }))
+
+      expect(requestPath).toBe('/api/paas/v4/models')
+      expect(result.ok && result.models).toEqual([{ id: 'glm-4.6' }])
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test.each([
     ['api_key', { 'x-api-key': 'sk-test' }, ['authorization']],
     ['auth_token', { Authorization: 'Bearer sk-test' }, ['x-api-key']],
     ['auth_token_empty_api_key', { Authorization: 'Bearer sk-test' }, ['x-api-key']],
@@ -200,10 +246,275 @@ describe('upstream client', () => {
     }
 
     expect(resolveUpstreamTarget(provider)).toEqual({
+      providerId: 'p1',
       baseUrl: 'http://localhost:1234',
       apiKey: 'lmstudio',
       apiFormat: 'anthropic',
       authStrategy: 'auth_token_empty_api_key',
+    })
+  })
+
+  describe('extra headers and query parameters', () => {
+    test('adds configured headers first and lets auth and content type from the provider settings win', async () => {
+      mockFetch(() => Response.json(openaiChatMessage))
+
+      await sendToUpstream(target({
+        apiFormat: 'openai_chat',
+        baseUrl: 'https://example.openai.azure.com/openai/v1',
+        extraHeaders: { 'HTTP-Referer': 'https://dreamcoder.dev', authorization: 'Bearer from-config', 'content-type': 'text/plain' },
+        queryParams: { 'api-version': '2024-10-21' },
+      }), request)
+
+      expect(calls[0].url).toBe('https://example.openai.azure.com/openai/v1/chat/completions?api-version=2024-10-21')
+      expect(calls[0].headers).toEqual({
+        'HTTP-Referer': 'https://dreamcoder.dev',
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer sk-test',
+      })
+    })
+
+    test('lists models with the configured headers and query parameters', async () => {
+      let seen = { search: '', referer: '' }
+      const server = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch(req) {
+          seen = { search: new URL(req.url).search, referer: req.headers.get('http-referer') ?? '' }
+          return Response.json({ data: [{ id: 'm' }] })
+        },
+      })
+
+      try {
+        await fetchUpstreamModels(target({
+          apiFormat: 'openai_chat',
+          baseUrl: `http://127.0.0.1:${server.port}/v1`,
+          extraHeaders: { 'HTTP-Referer': 'https://dreamcoder.dev' },
+          queryParams: { 'api-version': '2024-10-21' },
+        }))
+
+        expect(seen).toEqual({ search: '?api-version=2024-10-21', referer: 'https://dreamcoder.dev' })
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test('reports an invalid configured header instead of throwing', async () => {
+      const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => Response.json(openaiChatMessage) })
+
+      try {
+        const result = await sendToUpstream(target({
+          apiFormat: 'openai_chat',
+          baseUrl: `http://127.0.0.1:${server.port}`,
+          extraHeaders: { 'Bad Header': 'x' },
+        }), request)
+
+        expect(result.ok).toBe(false)
+        expect(result.ok === false && result.error).toContain('Bad Header')
+      } finally {
+        server.stop(true)
+      }
+    })
+  })
+
+  describe('stream idle timeout', () => {
+    const encoder = new TextEncoder()
+
+    async function readWithGuard(stream: ReadableStream<Uint8Array>): Promise<string> {
+      return Promise.race([
+        new Response(stream).text(),
+        Bun.sleep(3_000).then(() => 'still waiting'),
+      ])
+    }
+
+    function hangingUpstream(start: (controller: ReadableStreamDefaultController<Uint8Array>) => void, onCancel: () => void) {
+      return new Response(new ReadableStream<Uint8Array>({ start, cancel: onCancel }), {
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    }
+
+    test('ends a stream with an error and cancels the upstream when no event reaches the client in time', async () => {
+      let upstreamCancelled = false
+      mockFetch(() => hangingUpstream((controller) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'm', choices: [{ index: 0, delta: { role: 'assistant', content: 'Hi' }, finish_reason: null }] })}\n\n`))
+      }, () => { upstreamCancelled = true }))
+
+      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
+      const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
+
+      expect(text).toContain('"text":"Hi"')
+      expect(text).toMatch(/event: error\ndata: .*No response from the provider/)
+      expect(upstreamCancelled).toBe(true)
+    })
+
+    test('keep-alive comments become ping events but do not count as activity', async () => {
+      let timer: ReturnType<typeof setInterval> | undefined
+      mockFetch(() => hangingUpstream((controller) => {
+        timer = setInterval(() => controller.enqueue(encoder.encode(': OPENROUTER PROCESSING\n\n')), 50)
+      }, () => clearInterval(timer)))
+
+      try {
+        const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
+        const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
+
+        expect(text).toContain('event: ping\ndata: {"type":"ping"}')
+        expect(text).toContain('event: error')
+      } finally {
+        clearInterval(timer)
+      }
+    })
+
+    test('upstream events that produce nothing for the client do not count as activity', async () => {
+      let timer: ReturnType<typeof setInterval> | undefined
+      mockFetch(() => hangingUpstream((controller) => {
+        controller.enqueue(encoder.encode('event: response.created\ndata: {"type":"response.created","response":{"id":"r1"}}\n\n'))
+        timer = setInterval(() => controller.enqueue(encoder.encode('event: response.in_progress\ndata: {"type":"response.in_progress"}\n\n')), 50)
+      }, () => clearInterval(timer)))
+
+      try {
+        const result = await sendToUpstream(target({ apiFormat: 'openai_responses' }), { ...request, stream: true }, { timeoutMs: 300 })
+        const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
+
+        expect(text).toContain('event: message_start')
+        expect(text).toContain('event: error')
+      } finally {
+        clearInterval(timer)
+      }
+    })
+  })
+
+  describe('diagnostics', () => {
+    let events: DiagnosticEventInput[]
+    let recordSpy: ReturnType<typeof spyOn>
+
+    beforeEach(() => {
+      events = []
+      recordSpy = spyOn(diagnosticsService, 'recordEvent').mockImplementation(async (event) => {
+        events.push(event)
+      })
+    })
+
+    afterEach(() => {
+      recordSpy.mockRestore()
+    })
+
+    const upstreamEvents = () => events.filter((event) => event.type === 'upstream_request')
+    const chatChunk = (delta: Record<string, unknown>, finishReason: string | null = null) =>
+      `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'model-main', choices: [{ index: 0, delta, finish_reason: finishReason }] })}\n\n`
+
+    test('records a successful request without the key or the request body', async () => {
+      mockFetch(() => Response.json(openaiChatMessage, { headers: { 'x-request-id': 'req_123' } }))
+
+      await sendToUpstream(target({ apiFormat: 'openai_chat', providerId: 'p1' }), request)
+
+      expect(upstreamEvents()).toHaveLength(1)
+      const [event] = upstreamEvents()
+      expect(event!.severity).toBe('info')
+      expect(event!.details).toMatchObject({
+        providerId: 'p1',
+        model: 'model-main',
+        host: 'api.example.com',
+        apiFormat: 'openai_chat',
+        stream: false,
+        status: 200,
+        requestId: 'req_123',
+        outcome: 'completed',
+      })
+      expect(typeof (event!.details as { durationMs: unknown }).durationMs).toBe('number')
+      expect(JSON.stringify(event)).not.toContain('sk-test')
+      expect(JSON.stringify(event)).not.toContain('hello')
+    })
+
+    test('records an upstream HTTP error as a warning', async () => {
+      mockFetch(() => new Response('slow down', { status: 429 }))
+
+      await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.severity).toBe('warn')
+      expect(upstreamEvents()[0]!.details).toMatchObject({ status: 429, outcome: 'error', error: 'Upstream returned HTTP 429: slow down' })
+    })
+
+    test('records an error reported in the middle of a stream when the stream ends', async () => {
+      mockFetch(() => new Response(
+        chatChunk({ role: 'assistant', content: 'Hi' }) + 'data: {"error":{"message":"overloaded"}}\n\n',
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      ))
+
+      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true })
+      expect(upstreamEvents()).toHaveLength(0)
+      await new Response((result as { stream: ReadableStream<Uint8Array> }).stream).text()
+
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.severity).toBe('warn')
+      expect(upstreamEvents()[0]!.details).toMatchObject({ stream: true, status: 200, outcome: 'error', error: 'overloaded' })
+    })
+
+    test('records a request the client aborted before the upstream answered', async () => {
+      globalThis.fetch = mock((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        const abort = () => reject(new DOMException('The operation was aborted.', 'AbortError'))
+        if (init?.signal?.aborted) abort()
+        init?.signal?.addEventListener('abort', abort)
+      })) as unknown as typeof fetch
+      const client = new AbortController()
+
+      const pending = sendToUpstream(target({ apiFormat: 'openai_chat' }), request, { signal: client.signal })
+      client.abort()
+      const result = await pending
+
+      expect(result.ok).toBe(false)
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.severity).toBe('info')
+      expect(upstreamEvents()[0]!.details).toMatchObject({ outcome: 'client_aborted' })
+    })
+
+    test('records a client that disconnects as a disconnect when the upstream read fails first', async () => {
+      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(chatChunk({ role: 'assistant', content: 'Hi' })))
+          init?.signal?.addEventListener('abort', () => controller.error(new DOMException('The operation was aborted.', 'AbortError')))
+        },
+      }), { headers: { 'Content-Type': 'text/event-stream' } })) as unknown as typeof fetch
+      const client = new AbortController()
+
+      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { signal: client.signal })
+      const reader = (result as { stream: ReadableStream<Uint8Array> }).stream.getReader()
+      await reader.read()
+      client.abort()
+      await reader.read().catch(() => null)
+
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.details).toMatchObject({ stream: true, outcome: 'client_disconnected' })
+    })
+
+    test('records an idle timeout as its own outcome', async () => {
+      mockFetch(() => new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(chatChunk({ role: 'assistant', content: 'Hi' })))
+        },
+      }), { headers: { 'Content-Type': 'text/event-stream' } }))
+
+      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 200 })
+      await new Response((result as { stream: ReadableStream<Uint8Array> }).stream).text()
+
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.severity).toBe('warn')
+      expect(upstreamEvents()[0]!.details).toMatchObject({ stream: true, outcome: 'idle_timeout' })
+    })
+
+    test('records a client that disconnects in the middle of a stream', async () => {
+      mockFetch(() => new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(chatChunk({ role: 'assistant', content: 'Hi' })))
+        },
+      }), { headers: { 'Content-Type': 'text/event-stream' } }))
+
+      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true })
+      const reader = (result as { stream: ReadableStream<Uint8Array> }).stream.getReader()
+      await reader.read()
+      await reader.cancel('client gone')
+
+      expect(upstreamEvents()).toHaveLength(1)
+      expect(upstreamEvents()[0]!.details).toMatchObject({ stream: true, outcome: 'client_disconnected' })
     })
   })
 })

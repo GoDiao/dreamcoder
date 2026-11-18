@@ -55,11 +55,12 @@ DreamCoder 的 CLI 派生自 Claude Code 2.1.92（`src/constants/claudeCodeCompa
 
 ### 1. 提供方的前缀缓存失效
 
-- 代理给每个请求的 system 开头补一行计费标识（`src/server/proxy/handler.ts:64`，`src/server/proxy/claudeCodeAttribution.ts:29`），这一步不看模型名。
+- 代理给每个请求的 system 开头补一行计费标识（`src/server/proxy/handler.ts:64`，`src/server/proxy/claudeCodeAttribution.ts:29`），修复前这一步不看模型名。
 - 发出前，这一行里的 `cch=00000` 被替换成整个请求体的哈希（`src/server/upstream/client.ts:211-224`，`src/utils/claudeCodeCch.ts:57-59`）。请求体每轮都不同，所以这一行每轮都变，位置在 system 的第 79–83 个字符。
 - 除这一行外，DreamCoder 的前缀本来是稳定的：system 各段会话内缓存，日期和 git 状态只算一次，工具按名字排序。
 - 代理还丢掉了 `cache_control`，也不发会话亲和信息。
-- 后果（推断，没有实测）：固定部分约 3 万 token 加全部历史，每个请求都按全价计。详见 [request-cache.md](comparison/request-cache.md)。
+- 后果：固定部分约 3 万 token 加全部历史，每个请求都按全价计。详见 [request-cache.md](comparison/request-cache.md)。
+- 实测（#262，OpenRouter 测试 key）：OpenAI 和 GLM 把工具定义排在 system 之前，带计费行时每轮只命中工具定义那一段，system 和历史全部未命中；去掉计费行后同一会话后续轮次命中约 99%。DeepSeek 经 DeepInfra 这条路上，这一行在到达模型前被去掉了，不受影响。已在 #262 修复：代理只对 Claude 模型加这一行。
 
 ### 2. 代理翻译丢信息
 

@@ -30,6 +30,8 @@ export type SavedProvider = {
   models: ProviderModel[]
   fastModel?: string
   modelContextWindows?: ModelContextWindows
+  extraHeaders?: Record<string, string>
+  queryParams?: Record<string, string>
   notes?: string
 }
 
@@ -44,6 +46,8 @@ export type CreateProviderInput = {
   models: ProviderModel[]
   fastModel?: string
   modelContextWindows?: ModelContextWindows
+  extraHeaders?: Record<string, string>
+  queryParams?: Record<string, string>
   notes?: string
 }
 
@@ -57,6 +61,8 @@ export type UpdateProviderInput = {
   models?: ProviderModel[]
   fastModel?: string | null
   modelContextWindows?: ModelContextWindows | null
+  extraHeaders?: Record<string, string> | null
+  queryParams?: Record<string, string> | null
   notes?: string
 }
 

@@ -43,6 +43,7 @@
 
 ### P-RES-03 上游流停滞时没有任何超时，回合一直挂着
 
+- 状态：已在 #262 修复：代理在转换后的流上计空闲时间，时长取「AI 请求超时」，只有发给 CLI 的非 `ping` 事件才重置计时；超时后发 SSE `error` 并取消上游。上游的 `:` 注释转成 `ping` 事件，但不算活动。更正：「以后开启 CLI 看门狗也不会误杀只发 keep-alive 的长推理」不成立，Anthropic SDK 收到 `ping` 直接跳过（`@anthropic-ai/sdk/core/streaming.js:96-98`），看门狗看不到它。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -167,6 +168,7 @@
 
 ### P-RES-11 缓存命中只读 `prompt_tokens_details.cached_tokens`
 
+- 状态：已在 #262 修复：依次读 `prompt_tokens_details.cached_tokens`、`prompt_cache_hit_tokens`、`cached_tokens`。
 - 类型：优化
 - 严重程度：低
 - 现状：`mapUsage` 只读 `prompt_tokens_details.cached_tokens`（openaiChatToAnthropic.ts:85）；Responses 只读 `input_tokens_details.cached_tokens`（openaiResponsesToAnthropic.ts:38）。CLI 把 `cache_read_input_tokens` 计入上下文和费用（src/utils/tokens.ts:46-53），桌面端单列“缓存读/写”（desktop/src/components/chat/LocalSlashCommandPanel.tsx:291）。
@@ -187,6 +189,7 @@
 
 ### P-RES-13 用户取消在非流式请求和流式响应头到达之前传不到上游
 
+- 状态：已在 #262 修复，见 P-NET-05。
 - 类型：问题
 - 严重程度：低
 - 现状：`handleProxyRequest` 调 `sendToUpstream` 时不传 `req.signal`（src/server/proxy/handler.ts:64）；`sendToUpstream` 只用超时信号（src/server/upstream/client.ts:70-75, 264-276）。流开始之后的取消可以传到上游（流转换器的 `cancel` 取消上游 body，openaiChatStreamToAnthropic.ts:143-146，有测试 src/server/__tests__/proxy-streaming.test.ts:613-637）。
@@ -197,6 +200,7 @@
 
 ### P-RES-14 SSE 解析不完全按规范
 
+- 状态：已在 #262 修复：三处解析（两个流转换器和 Responses 的非流式回退）共用 `src/server/proxy/streaming/sse.ts` 的分帧；没有任何 SSE 事件的响应体整体按 JSON 解析取错误信息，两个流转换器都识别。
 - 类型：优化
 - 严重程度：低
 - 现状：
@@ -210,6 +214,7 @@
 
 ### P-RES-15 响应里的模型名来源不一致
 
+- 状态：已在 #262 修复：流式和非流式响应的 `model` 都用请求的模型名。
 - 类型：优化
 - 严重程度：低
 - 现状：chat 流用上游 chunk 的 `model` 覆盖（openaiChatStreamToAnthropic.ts:304），非流式用 `response.model`（openaiChatToAnthropic.ts:56；openaiResponsesToAnthropic.ts:28），Responses 流实际总用请求的模型名（见 P-RES-09 第 4 点）。这个名字写进转录的 `message.model`，桌面端按它分模型统计并查上下文窗口（src/server/services/sessionService.ts:897, 1000-1015）。

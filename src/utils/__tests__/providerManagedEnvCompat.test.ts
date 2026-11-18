@@ -41,4 +41,8 @@ describe('provider managed env compatibility', () => {
   test('treats attribution header routing as provider-managed env', () => {
     expect(isProviderManagedEnvVar('CLAUDE_CODE_ATTRIBUTION_HEADER')).toBe(true)
   })
+
+  test('treats the local proxy marker as provider-managed env', () => {
+    expect(isProviderManagedEnvVar('DREAMCODER_PROVIDER_PROXIED')).toBe(true)
+  })
 })

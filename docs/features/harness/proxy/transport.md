@@ -13,6 +13,7 @@
 
 ### P-NET-01 本地 Bun 服务的 60 秒空闲超时会切断走代理的请求，导致重试和重复计费
 
+- 状态：已在 #262 修复：代理处理函数对每个请求调用 `server.timeout(req, 0)`。更正：#262 实测 Bun 1.4.2 下，POST 请求在处理函数返回响应之前，即使沉默 70 秒也不会被 60 秒的 `idleTimeout` 切断（GET 会）；会被切断的是流式响应发出后中途停顿的情况。所以第 2、6 步里「非流式请求也受 60 秒限制」不成立。另外 `idleTimeout` 的计时粒度约 4 秒。
 - 类型：问题
 - 严重程度：高
 - 现状：
@@ -78,6 +79,7 @@
 
 ### P-NET-05 代理不随 CLI 中止上游请求：非流式请求和等待响应头期间的请求会跑完并计费
 
+- 状态：已在 #262 修复：`sendToUpstream` 接收调用方的取消信号，与超时信号合并；代理传入 `req.signal`。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -91,6 +93,7 @@
 
 ### P-NET-06 OpenAI 格式的 base URL 被强制改成 `.../v1/...`，版本号不是 v1 的提供方都会 404
 
+- 状态：已在 #262 修复：OpenAI 格式下，base URL 末段是版本号（`/v4`、`/v1beta` 等）或 `<版本>/openai` 时当完整前缀；否则仍补 `/v1`，已保存的配置行为不变。请求、拉取模型和测试连接共用这一个函数。表单占位示例未改。
 - 类型：问题
 - 严重程度：中
 - 现状：`normalizeUpstreamBaseUrl` 只去掉末尾的 `/v1`（src/server/upstream/baseUrl.ts:1-3），然后固定拼上 `/v1/chat/completions` 或 `/v1/responses`（src/server/upstream/client.ts:211-222）；拉取模型列表固定拼 `/v1/models`（client.ts:121, 136）。界面上 base URL 的占位符只举了 Anthropic 的例子（desktop/src/i18n/locales/en.ts:500）。
@@ -101,6 +104,7 @@
 
 ### P-NET-07 手动代理模式下，CLI 访问本地代理的请求也被送进外部 HTTP 代理
 
+- 状态：已在 #262 修复：手动代理模式下 CLI 环境写入 `NO_PROXY`/`no_proxy`（与继承值合并，加上 `127.0.0.1,localhost,::1`；继承值为 `*` 时原样保留）。实测 Bun 的 fetch 在设置了 `NO_PROXY` 时，即使显式传了 `proxy` 选项也会直连，所以 `getProxyFetchOptions` 未改。系统代理模式未处理。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -114,6 +118,7 @@
 
 ### P-NET-08 直连路径没有流空闲超时，连接半开时会话无限等待；两条路径的超时语义不一致
 
+- 状态：已在 #262 修复：服务端给 CLI 设 `CLAUDE_ENABLE_STREAM_WATCHDOG=1`，`CLAUDE_STREAM_IDLE_TIMEOUT_MS` 与 `API_TIMEOUT_MS` 相同（「AI 请求超时」），代理侧用同一个时长，两条路径都按「多久没有内容事件」计。`ping` 不重置 CLI 看门狗（SDK 跳过 ping），所以代理也不让 ping 重置自己的计时。两条路径超时后，CLI 都走同一个 catch，退回非流式把请求重发一次（`claude.ts:2519-2558`），除非设了 `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK`。
 - 类型：问题
 - 严重程度：中
 - 现状：CLI 的流空闲看门狗默认关闭，要设 `CLAUDE_ENABLE_STREAM_WATCHDOG` 才开（src/services/api/claude.ts:1924-1928）。SDK 的 `timeout`（= `API_TIMEOUT_MS`）只管到响应头（推断：SDK 行为，claude.ts:1916-1923 的注释也这样说明）。代理路径的上游 fetch 在拿到响应头后清掉定时器（src/server/upstream/client.ts:268-276），此后唯一的空闲限制是 P-NET-01 的 Bun 60 秒。结果：代理路径 60 秒（对静默推理太短），直连路径没有上限。
@@ -148,6 +153,7 @@
 
 ### P-NET-11 走代理的提供方不能配置额外请求头和 query 参数
 
+- 状态：部分在 #262 修复：提供方配置加了可选的 `extraHeaders` 和 `queryParams`，只对 `openai_chat`/`openai_responses` 生效，anthropic 格式保存时拒绝。请求头按固定顺序合并：先放配置的头，再放鉴权头和 `Content-Type`，后者覆盖前者（不区分大小写）。请求都会带上；测试连接和拉取模型只对已保存的提供方带上，未保存配置的这两个输入等做表单时补字段。桌面端表单和直连路径未做：直连路径的头要走 `ANTHROPIC_CUSTOM_HEADERS`，它不在受管 key（`providerRuntimeEnv.ts:19`）里，纳入后会清掉用户手写的同名设置；query 参数在直连路径上需要改 CLI。
 - 类型：优化
 - 严重程度：低
 - 现状：代理发往上游的请求头只有 `Content-Type` 和 `Authorization: Bearer`（src/server/upstream/client.ts:213, 221），URL 不带 query 参数；OpenAI 格式下 `authStrategy` 不起作用。`SavedProvider` 没有请求头字段（src/server/types/provider.ts:46-59）。直连路径的 CLI 支持 `ANTHROPIC_CUSTOM_HEADERS`（src/services/api/client.ts:404-428），但提供方表单不会写入它。
@@ -158,6 +164,7 @@
 
 ### P-NET-12 代理日志不足以诊断失败的上游请求，也没有逐请求的统计
 
+- 状态：已在 #262 修复：`sendToUpstream` 对每个上游请求记一条 `upstream_request` 诊断事件（提供方、模型、主机、格式、状态、响应头耗时、总耗时、上游 request id、结果），流式请求在流结束时记，结果分为正常结束、流中错误、未正常结束、空闲超时、客户端中止和客户端断开（调用方已中止后出现的错误按客户端断开记）；不含 key 和正文。
 - 类型：优化
 - 严重程度：低
 - 现状：代理只在上游返回非 2xx 或网络失败时打一行 `console.error('[Proxy] Upstream request failed:', result.error)`（src/server/proxy/handler.ts:67），被诊断服务捕获并脱敏写入 diagnostics 文件（src/server/services/diagnosticsService.ts:70-112）。这一行没有提供方 id、模型、上游主机和路径、apiFormat、耗时、上游 request id。流中途的上游错误（SSE `error`）、上游连接中断、Bun 空闲断开都不记录。成功请求不记录。token 用量只来自 CLI 写入转录的 usage，由会话服务汇总（src/server/services/sessionService.ts:868-890）；代理侧没有按提供方和模型的请求数、失败数、延迟统计。key 不会出现在这行日志里（只含上游响应体前 500 字），诊断文件按键名再做一次脱敏（diagnosticsService.ts:42, 258-270）。
@@ -168,6 +175,7 @@
 
 ### P-NET-13 代理不支持 count_tokens；终端里的 `/context` 会把每个统计项变成一次完整生成
 
+- 状态：已在 #262 修复，用的是第二种做法：代理对 `count_tokens` 和其他未知路径都返回 Anthropic 格式的 `not_found_error`。服务端给经代理的提供方设 `DREAMCODER_PROVIDER_PROXIED=1`，CLI 的 `/context` 计数在 API 计数返回 null 时直接用本地粗估，不再发 Haiku 请求。FileRead 的大小检查不变（仍是 404 → null → 按文件类型粗估）。没有采用本地估算，因为代理拿不到文件类型，会让 FileRead 对 JSON 文件少算约一半。
 - 类型：问题
 - 严重程度：低
 - 现状：

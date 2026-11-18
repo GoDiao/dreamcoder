@@ -78,13 +78,16 @@ export class DiagnosticsService {
       ...(input.details !== undefined ? { details: this.sanitizeValue(input.details) } : {}),
     }
 
+    const logDir = this.getLogDir()
+    const diagnosticsPath = this.getDiagnosticsPath()
+    const runtimeErrorsPath = this.getRuntimeErrorsPath()
     try {
       await this.ensureLogDir()
-      await fs.appendFile(this.getDiagnosticsPath(), JSON.stringify(event) + '\n', 'utf-8')
+      await fs.appendFile(diagnosticsPath, JSON.stringify(event) + '\n', 'utf-8')
       if (event.severity === 'warn' || event.severity === 'error') {
-        await fs.appendFile(this.getRuntimeErrorsPath(), this.formatRuntimeLogEntry(event), 'utf-8')
+        await fs.appendFile(runtimeErrorsPath, this.formatRuntimeLogEntry(event), 'utf-8')
       }
-      await this.enforceRetention().catch(() => {})
+      await this.enforceRetention(logDir).catch(() => {})
     } catch {
     }
   }
@@ -488,8 +491,7 @@ export class DiagnosticsService {
     }
   }
 
-  private async enforceRetention(): Promise<void> {
-    const dir = this.getLogDir()
+  private async enforceRetention(dir: string): Promise<void> {
     const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000
     const files = await this.listFiles(dir)
 

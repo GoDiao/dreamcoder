@@ -1,3 +1,4 @@
+import { getNoProxy } from '../../utils/proxy.js'
 import { SettingsService } from './settingsService.js'
 
 export type NetworkProxyMode = 'system' | 'manual'
@@ -13,6 +14,8 @@ export type NetworkSettings = {
 export const DEFAULT_AI_REQUEST_TIMEOUT_MS = 120_000
 export const MIN_AI_REQUEST_TIMEOUT_MS = 5_000
 export const MAX_AI_REQUEST_TIMEOUT_MS = 600_000
+
+const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
 const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   aiRequestTimeoutMs: DEFAULT_AI_REQUEST_TIMEOUT_MS,
@@ -72,20 +75,41 @@ export function getManualNetworkProxyUrl(settings: NetworkSettings): string | un
   return url || undefined
 }
 
-export function buildNetworkEnvironment(settings: NetworkSettings): Record<string, string> {
-  const env: Record<string, string> = {
-    API_TIMEOUT_MS: String(settings.aiRequestTimeoutMs),
+export function buildNetworkEnvironment(
+  settings: NetworkSettings,
+  inheritedEnv: Record<string, string | undefined>,
+): Record<string, string> {
+  const timeout = String(settings.aiRequestTimeoutMs)
+  return {
+    API_TIMEOUT_MS: timeout,
+    CLAUDE_ENABLE_STREAM_WATCHDOG: '1',
+    CLAUDE_STREAM_IDLE_TIMEOUT_MS: timeout,
+    ...buildProxyEnvironment(settings, inheritedEnv),
   }
+}
+
+export function buildProxyEnvironment(
+  settings: NetworkSettings,
+  inheritedEnv: Record<string, string | undefined>,
+): Record<string, string> {
   const proxyUrl = getManualNetworkProxyUrl(settings)
+  if (!proxyUrl) return {}
 
-  if (proxyUrl) {
-    env.HTTP_PROXY = proxyUrl
-    env.HTTPS_PROXY = proxyUrl
-    env.http_proxy = proxyUrl
-    env.https_proxy = proxyUrl
+  const noProxy = mergeNoProxy(getNoProxy(inheritedEnv))
+  return {
+    HTTP_PROXY: proxyUrl,
+    HTTPS_PROXY: proxyUrl,
+    http_proxy: proxyUrl,
+    https_proxy: proxyUrl,
+    NO_PROXY: noProxy,
+    no_proxy: noProxy,
   }
+}
 
-  return env
+function mergeNoProxy(inherited: string | undefined): string {
+  if (inherited?.trim() === '*') return '*'
+  const entries = (inherited ?? '').split(/[,\s]+/).filter(Boolean)
+  return [...new Set([...entries, ...LOOPBACK_HOSTS])].join(',')
 }
 
 export async function loadNetworkSettings(): Promise<NetworkSettings> {

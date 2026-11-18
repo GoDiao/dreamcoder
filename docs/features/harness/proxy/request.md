@@ -10,6 +10,7 @@
 
 ### P-REQ-01 代理给每个请求的 system 首行加计费行，`cch` 随整个请求体变化，提供方前缀缓存从第一行起失配
 
+- 状态：已在 #262 修复：代理只对模型名以 `claude` 开头的请求加计费行并签名，判断复用 `attributionHeaderPolicy`。实测（OpenRouter，`openai/gpt-4.1-mini`、`z-ai/glm-4.6`）：带计费行时每轮只命中排在 system 之前的工具定义，去掉后同一会话后续轮次命中约 99%。
 - 类型：问题
 - 严重程度：高
 - 现状（按执行顺序）：
@@ -84,6 +85,7 @@
 
 ### P-REQ-06 OpenAI 格式的 baseUrl 被强制改成 `<去掉 /v1 的 base>/v1/...`，路径里版本段不是 `/v1` 的端点无法接入
 
+- 状态：已在 #262 修复，见 P-NET-06。
 - 类型：问题
 - 严重程度：中
 - 现状：`normalizeUpstreamBaseUrl` 去掉结尾的 `/v1`（`src/server/upstream/baseUrl.ts:1-3`），然后固定拼 `/v1/chat/completions`、`/v1/responses`、`/v1/models`（`src/server/upstream/client.ts:136,212,220`）。测试也按这个行为写（`src/server/__tests__/upstream-client.test.ts:79-84`）。界面上 Base URL 的占位示例是 Anthropic 风格（`desktop/src/i18n/locales/en.ts:500`），没有说明 OpenAI 格式的写法。
@@ -134,6 +136,7 @@
 
 ### P-REQ-10 没有任何缓存键或会话亲和信息，CLI 已经提供的会话 id 被丢弃
 
+- 状态：部分在 #262 修复：`openai_responses` 发 `prompt_cache_key`（取 `X-Claude-Code-Session-Id`）。`openai_chat` 是否发、`cache_control` 是否转发，归 #264 按模型处理。
 - 类型：优化
 - 严重程度：中
 - 现状：CLI 给每个请求带 `X-Claude-Code-Session-Id` 头（`src/services/api/client.ts:155-158`）和 `metadata.user_id`（内含 `session_id`、`device_id`，`src/services/api/claude.ts:502-527,1764`），还在 system、工具和最后一条消息上标 `cache_control`。代理只读 body（`handler.ts:54-64`），类型里没有 `metadata`（`types.ts:161-181`），发往上游的头只有 `Content-Type` 和 `Authorization`（`client.ts:213,221`）。
@@ -158,6 +161,7 @@
 
 ### P-REQ-12 不发送 `parallel_tool_calls`
 
+- 状态：已在 #262 修复：两种格式在有工具时发 `parallel_tool_calls: true`。
 - 类型：优化
 - 严重程度：低
 - 现状：chat 与 Responses 请求都没有 `parallel_tool_calls`（`types.ts:32-46,107-125`）；CLI 侧也不使用 `disable_parallel_tool_use`（grep 无结果）。
@@ -168,6 +172,7 @@
 
 ### P-REQ-13 工具 schema 原样转发，带 `$schema`、超大 `maximum` 等提供方用不上的关键字
 
+- 状态：已在 #262 修复：工具 schema 去掉字符串值的 `$schema` 和等于安全整数边界的 `maximum`/`minimum`，其他关键字不动。
 - 类型：优化
 - 严重程度：低
 - 现状：内置工具的 schema 由 zod v4 `toJSONSchema` 生成（`src/utils/zodToJsonSchema.ts:5,17-23`），形状如 `{"$schema":"https://json-schema.org/draft/2020-12/schema", …, "additionalProperties":false}`，整数字段带 `"maximum":9007199254740991`，URL 字段带 `"format":"uri"`（本地用仓库 zod 打印确认）。代理把 `input_schema` 原样作为 `parameters`（`anthropicToOpenaiChat.ts:47-58`；`anthropicToOpenaiResponses.ts:35-45`）。MCP 工具的 schema 也原样转发。

@@ -91,7 +91,7 @@ describe('proxy network settings', () => {
           body: JSON.stringify(body),
         },
       )
-      const res = await handleProxyRequest(req, new URL(req.url))
+      const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
 
       expect(res.status).toBe(200)
       expect(timeoutCalls).toEqual([45_000])
@@ -160,7 +160,7 @@ describe('proxy network settings', () => {
           body: JSON.stringify(body),
         },
       )
-      const res = await handleProxyRequest(req, new URL(req.url))
+      const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
 
       expect(res.status).toBe(200)
       expect(timeoutCalls).toEqual([45_000])
@@ -170,7 +170,7 @@ describe('proxy network settings', () => {
     }
   })
 
-  test('uses configured AI request timeout only while opening streaming upstream requests', async () => {
+  test('uses the configured AI request timeout for opening a stream and for idle gaps, and clears it when the stream ends', async () => {
     await fs.writeFile(
       path.join(tmpDir, 'settings.json'),
       JSON.stringify({
@@ -242,12 +242,13 @@ describe('proxy network settings', () => {
           body: JSON.stringify(body),
         },
       )
-      const res = await handleProxyRequest(req, new URL(req.url))
+      const res = await handleProxyRequest(req, new URL(req.url), { timeout: () => {} })
       await res.text()
 
       expect(res.status).toBe(200)
       expect(timeoutCalls).toEqual([])
-      expect(timers).toEqual([{ ms: 180_000, cleared: true }])
+      expect(timers.length).toBeGreaterThanOrEqual(2)
+      expect(timers.every((timer) => timer.ms === 180_000 && timer.cleared)).toBe(true)
     } finally {
       globalThis.clearTimeout = originalClearTimeout
       globalThis.setTimeout = originalSetTimeout
@@ -255,4 +256,107 @@ describe('proxy network settings', () => {
       globalThis.fetch = originalFetch
     }
   })
+
+  test('keeps a proxied stream open while the upstream pauses longer than the server idle timeout', async () => {
+    const encoder = new TextEncoder()
+    const chunk = (delta: Record<string, unknown>, finishReason: string | null = null) =>
+      encoder.encode(`data: ${JSON.stringify({
+        id: 'chatcmpl-slow',
+        object: 'chat.completion.chunk',
+        created: 0,
+        model: 'model-main',
+        choices: [{ index: 0, delta, finish_reason: finishReason }],
+      })}\n\n`)
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => new Response(new ReadableStream({
+        async start(controller) {
+          controller.enqueue(chunk({ role: 'assistant', content: 'before ' }))
+          await Bun.sleep(5_000)
+          controller.enqueue(chunk({ content: 'after' }, 'stop'))
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        },
+      }), { headers: { 'Content-Type': 'text/event-stream' } }),
+    })
+    const provider = await new ProviderService().addProvider({
+      presetId: 'custom',
+      name: 'Slow Upstream',
+      baseUrl: `http://127.0.0.1:${upstream.port}`,
+      apiKey: 'sk-test',
+      apiFormat: 'openai_chat',
+      models: [{ id: 'model-main' }],
+    })
+    const proxy = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      idleTimeout: 1,
+      fetch: (req, server) => handleProxyRequest(req, new URL(req.url), server),
+    })
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${proxy.port}/proxy/providers/${provider.id}/v1/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'model-main', max_tokens: 64, stream: true, messages: [{ role: 'user', content: 'hello' }] }),
+      })
+      const text = await res.text()
+
+      expect(text).toContain('"text":"after"')
+      expect(text).toContain('message_stop')
+    } finally {
+      proxy.stop(true)
+      upstream.stop(true)
+    }
+  }, 15_000)
+
+  test.each([false, true])('aborts the upstream request when the client disconnects before upstream headers (stream: %p)', async (stream) => {
+    const upstreamReceived = Promise.withResolvers<void>()
+    const upstreamAborted = Promise.withResolvers<string>()
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(req) {
+        req.signal.addEventListener('abort', () => upstreamAborted.resolve('aborted'))
+        upstreamReceived.resolve()
+        return new Promise<Response>(() => {})
+      },
+    })
+    const provider = await new ProviderService().addProvider({
+      presetId: 'custom',
+      name: 'Hanging Upstream',
+      baseUrl: `http://127.0.0.1:${upstream.port}`,
+      apiKey: 'sk-test',
+      apiFormat: 'openai_chat',
+      models: [{ id: 'model-main' }],
+    })
+    const proxy = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: (req, server) => handleProxyRequest(req, new URL(req.url), server),
+    })
+    const client = new AbortController()
+
+    try {
+      const pending = fetch(`http://127.0.0.1:${proxy.port}/proxy/providers/${provider.id}/v1/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'model-main', max_tokens: 64, stream, messages: [{ role: 'user', content: 'hello' }] }),
+        signal: client.signal,
+      }).catch(() => null)
+      await upstreamReceived.promise
+      client.abort()
+      await pending
+
+      const outcome = await Promise.race([
+        upstreamAborted.promise,
+        Bun.sleep(3_000).then(() => 'still running'),
+      ])
+      expect(outcome).toBe('aborted')
+    } finally {
+      proxy.stop(true)
+      upstream.stop(true)
+    }
+  }, 10_000)
 })

@@ -1,3 +1,4 @@
+import { isClaudeModelName } from '../services/attributionHeaderPolicy.js'
 import { ProviderService } from '../services/providerService.js'
 import { sendToUpstream } from '../upstream/client.js'
 import { ensureClaudeCodeAttribution } from './claudeCodeAttribution.js'
@@ -5,7 +6,12 @@ import type { AnthropicRequest } from './transform/types.js'
 
 const providerService = new ProviderService()
 
-export async function handleProxyRequest(req: Request, url: URL): Promise<Response> {
+export type ProxyServer = {
+  timeout(request: Request, seconds: number): void
+}
+
+export async function handleProxyRequest(req: Request, url: URL, server: ProxyServer): Promise<Response> {
+  server.timeout(req, 0)
   const providerMatch = url.pathname.match(/^\/proxy\/providers\/([^/]+)\/v1\/messages$/)
   const providerId = providerMatch ? decodeURIComponent(providerMatch[1]!) : undefined
   const isActiveProxyPath = url.pathname === '/proxy/v1/messages'
@@ -13,8 +19,11 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
   if (req.method !== 'POST' || (!isActiveProxyPath && !providerMatch)) {
     return Response.json(
       {
-        error: 'Not Found',
-        message: 'Proxy only handles POST /proxy/v1/messages and POST /proxy/providers/:providerId/v1/messages',
+        type: 'error',
+        error: {
+          type: 'not_found_error',
+          message: 'Proxy only handles POST /proxy/v1/messages and POST /proxy/providers/:providerId/v1/messages',
+        },
       },
       { status: 404 },
     )
@@ -61,10 +70,13 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
     )
   }
 
-  const result = await sendToUpstream(target, ensureClaudeCodeAttribution(body))
+  const upstreamBody = isClaudeModelName(body.model) ? ensureClaudeCodeAttribution(body) : body
+  const result = await sendToUpstream(target, upstreamBody, {
+    signal: req.signal,
+    sessionId: req.headers.get('x-claude-code-session-id') ?? undefined,
+  })
 
   if (!result.ok) {
-    console.error('[Proxy] Upstream request failed:', result.error)
     return Response.json(
       { type: 'error', error: { type: 'api_error', message: result.error } },
       { status: result.httpStatus ?? 502 },
