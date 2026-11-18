@@ -1,6 +1,6 @@
 # Harness 调整
 
-状态：长期进行，跟踪见 [RFC: Harness evolution](https://github.com/GoDiao/dreamcoder/issues/261)。本文是总览；五个维度的详细对比在 [comparison/](comparison) 下，代理层的专项评审在 [proxy/](proxy) 下。
+状态：长期进行，跟踪见 [RFC: Harness evolution](https://github.com/GoDiao/dreamcoder/issues/261)。本文是总览；五个维度的详细对比在 [comparison/](comparison) 下，代理层的专项评审在 [proxy/](proxy) 下，文字层的专项评审在 [prompt/](prompt) 下。
 
 ## 背景
 
@@ -135,6 +135,26 @@ DreamCoder 的 CLI 派生自 Claude Code 2.1.92（`src/constants/claudeCodeCompa
 1. 请求通路的基础问题：计费行、60 秒空闲断开和流空闲超时、base URL、取消传到上游、`NO_PROXY`、缓存键和缓存命中统计，以及请求头配置、日志、`count_tokens` 等小项。
 2. 上下文、错误和流的健壮性：上下文溢出识别、用量为 0、错误结构化和 `retry-after`、重试分类、结束原因映射、流提前结束和流中错误。
 3. 按模型的能力：先设计一张按模型的规则表，再接上推理强度和思考开关、能力声明、推理数据回传、图片和 PDF、上下文窗口和输出上限。
+
+## 文字层专项评审
+
+第二个专项区域是模型读到的、对话以外的全部文字：系统提示词、工具描述、会话开始时加载的上下文、会话中途注入的文字。四份评审逐项对照了 Codex 和 ZCode，共 79 条发现。写法和代理层评审相同：每条都有现状、场景、两家的做法、改法方向和确定程度。
+
+| 文件 | 范围 | 编号 |
+|---|---|---|
+| [prompt/system.md](prompt/system.md) | 系统提示词：主会话各段、子 agent、压缩和标题等辅助请求 | T-SYS-01 到 18 |
+| [prompt/tools.md](prompt/tools.md) | 工具描述和 schema，以及工具自己返回的固定文字 | T-TOOL-01 到 22 |
+| [prompt/context.md](prompt/context.md) | 上下文加载：指令文件、记忆、环境、清单类上下文、压缩和子 agent | T-CTX-01 到 16 |
+| [prompt/reminders.md](prompt/reminders.md) | 会话中途注入：提醒、附件、合成消息、服务器对用户输入的包装 | T-INJ-01 到 23 |
+
+维护者已定的条目在报告里有状态行。主要结论：
+
+- 指令文件按 `DREAMCODER.md` > `AGENTS.md` > `CLAUDE.md` 的优先级读取，每个目录读一个。
+- CLI 重启（用户停止后、切换 effort、模型或提供方时）会丢掉中途注入的上下文，并让前缀缓存失效。
+- 提交署名、读文件后的恶意软件条款、环境段等文字是写给 Claude Code 的；身份行保持不变。
+- 只在 Anthropic 内部构建生效的条文不打开，直接删除。
+
+正确性部分由一个总 issue 跟踪，其中范围清楚的条目拆成子 issue。缩小固定部分和补充缺失的指引改变模型行为，等基准任务集建好后再开。
 
 ## 详细报告
 
