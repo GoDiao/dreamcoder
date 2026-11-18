@@ -59,17 +59,20 @@ export type OpenAIChatResponse = {
       tool_calls?: OpenAIToolCall[]
     }
     finish_reason: string | null
+    usage?: OpenAIChatUsage
   }>
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-    prompt_tokens_details?: {
-      cached_tokens?: number
-    }
-    prompt_cache_hit_tokens?: number
+  usage?: OpenAIChatUsage
+}
+
+export type OpenAIChatUsage = {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  prompt_tokens_details?: {
     cached_tokens?: number
   }
+  prompt_cache_hit_tokens?: number
+  cached_tokens?: number
 }
 
 export type OpenAIChatStreamChunk = {
@@ -93,8 +96,9 @@ export type OpenAIChatStreamChunk = {
       }>
     }
     finish_reason: string | null
+    usage?: OpenAIChatUsage
   }>
-  usage?: OpenAIChatResponse['usage']
+  usage?: OpenAIChatUsage
 }
 
 export type OpenAIResponsesContentPart =
@@ -140,6 +144,7 @@ export type OpenAIResponsesResponse = {
   created_at: number
   model: string
   status: string
+  incomplete_details?: { reason?: string } | null
   output: OpenAIResponsesOutputItem[]
   usage?: OpenAIResponsesUsage
 }
@@ -154,7 +159,7 @@ export type OpenAIResponsesUsage = {
 export type AnthropicContentBlock =
   | { type: 'text'; text: string; cache_control?: unknown }
   | { type: 'image'; source: { type: 'base64'; media_type: string; data: string }; cache_control?: unknown }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown>; cache_control?: unknown }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> | string; cache_control?: unknown }
   | { type: 'tool_result'; tool_use_id: string; content: string | AnthropicContentBlock[]; is_error?: boolean; cache_control?: unknown }
   | { type: 'thinking'; thinking: string; signature?: string }
 

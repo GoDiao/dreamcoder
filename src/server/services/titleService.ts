@@ -3,6 +3,7 @@ import { SettingsService } from './settingsService.js'
 import { sessionService } from './sessionService.js'
 import { cleanSessionTitleSource, hasSessionTitleMarkup } from '../../utils/sessionTitleText.js'
 import { resolveUpstreamTarget, sendToUpstream } from '../upstream/client.js'
+import { describeFailure } from '../upstream/upstreamError.js'
 
 const TITLE_MAX_LEN = 50
 const TITLE_MAX_OUTPUT_TOKENS = 100
@@ -89,7 +90,7 @@ export async function generateTitle(
     }, { timeoutMs: 15_000 })
 
     if (!result.ok) {
-      return fail(excerptForLog(result.error))
+      return fail(excerptForLog(describeFailure(result)))
     }
     if (!('message' in result)) return fail('upstream returned a stream')
     const block = result.message.content.find((b) => b.type === 'text')

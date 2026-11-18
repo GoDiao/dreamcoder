@@ -1,9 +1,18 @@
 import type {
   OpenAIChatResponse,
+  OpenAIChatUsage,
   AnthropicResponse,
   AnthropicContentBlock,
 } from './types.js'
+import {
+  contentFilterError,
+  providerSideError,
+  UpstreamReplyError,
+  type AnthropicError,
+} from '../../upstream/upstreamError.js'
 import { parseOpenAIToolArguments } from './toolArguments.js'
+
+export type ChatFinish = { stopReason: string } | { error: AnthropicError }
 
 export function openaiChatToAnthropic(response: OpenAIChatResponse, model: string): AnthropicResponse {
   const choice = response.choices?.[0]
@@ -48,37 +57,53 @@ export function openaiChatToAnthropic(response: OpenAIChatResponse, model: strin
     content.push({ type: 'text', text: '' })
   }
 
+  const finish = mapChatFinishReason(choice.finish_reason, content.some((block) => block.type === 'tool_use'))
+  if ('error' in finish) {
+    throw new UpstreamReplyError(finish.error)
+  }
+
   return {
     id: response.id || `msg_${Date.now()}`,
     type: 'message',
     role: 'assistant',
     content,
     model,
-    stop_reason: mapStopReason(choice.finish_reason, content.some((block) => block.type === 'tool_use')),
+    stop_reason: finish.stopReason,
     stop_sequence: null,
-    usage: mapUsage(response.usage),
+    usage: mapUsage(chatUsage(response)),
   }
 }
 
 // Gemini ends a tool-calling turn with finish_reason "stop"; report tool_use whenever the
 // message carries tool_use blocks.
-function mapStopReason(reason: string | null, hasToolUse: boolean): string {
-  const stopReason = mapFinishReason(reason)
-  return hasToolUse && stopReason === 'end_turn' ? 'tool_use' : stopReason
-}
-
-function mapFinishReason(reason: string | null): string {
+export function mapChatFinishReason(reason: string | null, hasToolUse: boolean): ChatFinish {
   switch (reason) {
-    case 'stop': return 'end_turn'
-    case 'tool_calls': return 'tool_use'
-    case 'length': return 'max_tokens'
-    case 'content_filter': return 'end_turn'
-    default: return 'end_turn'
+    case 'tool_calls':
+    case 'function_call':
+      return { stopReason: 'tool_use' }
+    case 'length':
+      return { stopReason: 'max_tokens' }
+    case 'model_context_window_exceeded':
+      return { stopReason: 'model_context_window_exceeded' }
+    case 'content_filter':
+    case 'sensitive':
+      return { error: contentFilterError(`finish_reason: ${reason}`) }
+    case 'network_error':
+    case 'insufficient_system_resource':
+      return { error: providerSideError(`finish_reason: ${reason}`) }
+    default:
+      return { stopReason: hasToolUse ? 'tool_use' : 'end_turn' }
   }
 }
 
+export function chatUsage(
+  response: { usage?: OpenAIChatUsage; choices?: Array<{ usage?: OpenAIChatUsage }> },
+): OpenAIChatUsage | undefined {
+  return response.usage ?? response.choices?.[0]?.usage
+}
+
 // OpenAI counts cached tokens inside prompt_tokens; Anthropic's input_tokens excludes cache reads.
-export function mapUsage(usage?: OpenAIChatResponse['usage']): AnthropicResponse['usage'] {
+export function mapUsage(usage?: OpenAIChatUsage): AnthropicResponse['usage'] {
   if (!usage) {
     return { input_tokens: 0, output_tokens: 0 }
   }
@@ -102,6 +127,6 @@ function createEmptyResponse(response: OpenAIChatResponse, model: string): Anthr
     model,
     stop_reason: 'end_turn',
     stop_sequence: null,
-    usage: mapUsage(response.usage),
+    usage: mapUsage(chatUsage(response)),
   }
 }

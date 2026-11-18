@@ -8,6 +8,7 @@
 
 ### P-RES-01 上游没给 usage 时代理写 0，CLI 的上下文估算以 0 为基准，自动压缩不会触发
 
+- 状态：已在 #263 修复：代理在 chunk 顶层没有 usage 时读 `choices[0].usage`（流式和非流式）；上游没给 usage 时 `message_delta` 不带 usage，不再写 0。CLI 的 `getTokenUsage` 把全 0 的 usage 当作没有，`tokenCountWithEstimation` 继续往前找有效 usage，找不到就整段本地估算，自动压缩照常按估算触发。
 - 类型：问题
 - 严重程度：高
 - 现状：
@@ -60,6 +61,7 @@
 
 ### P-RES-04 上游在结束标记之前正常关闭连接，被当成正常结束，回答被截断且不重试
 
+- 状态：已在 #263 修复：chat 流既没有 `finish_reason` 也没有 `[DONE]` 就结束时、Responses 流没有 `response.completed`/`incomplete`/`failed` 就结束时，代理发 SSE `error`（「The provider closed the stream before the reply finished.」）。只有 `[DONE]` 没有 `finish_reason` 仍按正常结束。CLI 收到后撤回部分回复并重新建立流，见 P-RES-06。直连路径（anthropic 格式）上，已有块完成、但没有 message_delta 就正常关闭的流仍按正常结束处理，列为后续。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -75,6 +77,7 @@
 
 ### P-RES-05 finish_reason 映射过粗：内容过滤、资源不足、上下文用满都变成 end_turn；Responses 的内容过滤变成 max_tokens
 
+- 状态：已在 #263 修复：chat 流和非流式共用一个映射：`model_context_window_exceeded` 原样传给 CLI；`content_filter`、`sensitive` 转成 `invalid_request_error`（「The provider's content filter stopped the reply ...」）；`network_error`、`insufficient_system_resource` 转成 `api_error`；其余未知取值仍按 end_turn。Responses 的 `incomplete` 按 `incomplete_details.reason` 区分：`max_output_tokens` 或没有原因时为 max_tokens，`content_filter` 同上，其他原因转成 `api_error`。流式时以 SSE `error` 发出，非流式时为对应状态码的错误响应。CLI 专门处理的 stop_reason 只有 max_tokens、model_context_window_exceeded 和 refusal（src/services/api/claude.ts:2321-2355），其余都按正常结束；refusal 的文案指向 Anthropic 使用政策，所以内容过滤不映射到它。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -95,6 +98,7 @@
 
 ### P-RES-06 流中途的上游错误丢掉错误码和状态，CLI 一律改走非流式请求，长回答在 120 秒总时长内完不成
 
+- 状态：已在 #263 修复：流中途的错误用 P-NET-04 的同一张分类表映射：上下文溢出转成 `prompt is too long`，额度或余额不足为 `billing_error`，鉴权失败为 `authentication_error`，限流为 `rate_limit_error`，其余为 `api_error`。服务端给 CLI 设 `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK=1`，流出错后不再改走非流式请求。报告里「设了这个变量就交给 withRetry 用流式重试」不成立：withRetry 只包住建立流这一步（src/services/api/claude.ts 的 withRetry 调用），读流在它外面，单设变量时流中途的错误直接成为错误消息。所以 #263 在 `queryModel` 里把「建立流加读流」放进一个外层循环：读流出错且 `isRetryableStreamError` 判为可重试（不是用户中止，不是 invalid_request、鉴权、权限、额度一类）时，撤回已产出的部分消息，按 withRetry 的退避重新建立流。外层重来和 withRetry 内部的重试共用一个次数：整个调用的请求总数不超过 `getDefaultMaxRetries() + 1`。撤回的去向见 docs/features/session-state/tech-design.md 的 `reply_retracted`。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -113,6 +117,7 @@
 
 ### P-RES-07 被截断或损坏的工具参数在 CLI 里变成 `{}`，模型看到“缺参数”而不是“参数被截断”
 
+- 状态：已在 #263 修复：参数解析统一在 CLI 的 `normalizeContentFromAPI`（src/utils/messages.ts）。参数为空串或 JSON `null` 时视为没有参数（`{}`）。其余情况下，非流式代理在参数不是合法 JSON 对象时把原始字符串交给 CLI，不再生成 `{raw}`；CLI 解析失败或得到的不是对象时，input 写成保留键 `__dreamcoder_invalid_arguments: { receivedChars, parseError }`（只记长度和错误，不记原文）。`runToolUse` 见到保留键就不执行工具，回给模型一条 is_error 的说明：参数不完整，很可能被输出上限截断，请缩短参数重试。保留键的写入和判断都在 `src/utils/invalidToolArguments.ts`。Anthropic 官方路径上因 max_tokens 截断的工具调用走同一条路。桌面端把这种调用显示为没有摘要的工具卡片，输入区以 JSON 显示保留键，结果区显示错误说明。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -130,6 +135,7 @@
 
 ### P-RES-08 同一个 delta 同时带正文、推理或工具调用时，只处理其中一种，其余被丢弃
 
+- 状态：已在 #263 修复：同一个 delta 依次处理推理、正文和工具调用，每类按原有规则开关块。
 - 类型：问题
 - 严重程度：中
 - 现状：`detectBlockTransition` 按 tool_calls → content → reasoning 的顺序只返回一种类型（openaiChatStreamToAnthropic.ts:270-292），`processChunk` 只调用对应的一个处理函数（:320-330）。同一 delta 里的其余字段直接丢弃。
@@ -144,6 +150,7 @@
 
 ### P-RES-09 Responses 流转换只依赖增量事件，不读完整 item，也不在结束时关闭文本和工具块
 
+- 状态：已在 #263 修复：文本增量没有 `content_part.added` 时自动开块；`output_item.added`、`function_call_arguments.done`、`output_text.done` 和 `output_item.done` 里的完整参数或文本在没有收到增量时补发；`response.completed` 和 `incomplete` 时关闭所有还开着的块。模型名一项 #262 已改为使用请求的模型名。
 - 类型：问题
 - 严重程度：低
 - 现状：
@@ -179,6 +186,7 @@
 
 ### P-RES-12 有合法 chunk 但没有任何内容的回复，CLI 静默结束
 
+- 状态：已在 #263 修复：chat 流正常结束（end_turn）时，如果没有任何内容块也没有 usage，代理发 SSE `error`（「The provider returned an empty reply.」）。因输出上限结束（max_tokens）的不算空回复。
 - 类型：优化
 - 严重程度：低
 - 现状：chat 流里只要出现过带 `choices` 的 chunk 就算合法（openaiChatStreamToAnthropic.ts:121），结束时发 end_turn（:518-527）。CLI 的空流检查要求“没有块且没有 stop_reason”（claude.ts:2400），此时 stop_reason 已是 end_turn，检查不触发，本次请求不产出任何助手消息。

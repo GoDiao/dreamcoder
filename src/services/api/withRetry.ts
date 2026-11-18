@@ -11,17 +11,22 @@ import { isAwsCredentialsProviderError } from 'src/utils/aws.js'
 import { logForDebugging } from 'src/utils/debug.js'
 import { logError } from 'src/utils/log.js'
 import { createSystemAPIErrorMessage } from 'src/utils/messages.js'
-import { getAPIProviderForStatsig } from 'src/utils/model/providers.js'
+import {
+  getAPIProviderForStatsig,
+  isFirstPartyAnthropicBaseUrl,
+} from 'src/utils/model/providers.js'
 import {
   clearApiKeyHelperCache,
   clearAwsCredentialsCache,
   clearGcpCredentialsCache,
   getClaudeAIOAuthTokens,
+  getConfiguredApiKeyHelper,
   handleOAuth401Error,
   isClaudeAISubscriber,
   isEnterpriseSubscriber,
 } from '../../utils/auth.js'
 import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isQuotaErrorText } from '../../utils/providerErrors.js'
 import { errorMessage } from '../../utils/errors.js'
 import {
   type CooldownReason,
@@ -36,6 +41,7 @@ import { disableKeepAlive } from '../../utils/proxy.js'
 import { sleep } from '../../utils/sleep.js'
 import type { ThinkingConfig } from '../../utils/thinking.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js'
+import { shouldUseOpenAICodexAuth } from '../openaiAuth/fetch.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
@@ -516,7 +522,23 @@ export async function* withRetry<T>(
   throw new CannotRetryError(lastError, retryContext)
 }
 
-function getRetryAfter(error: unknown): string | null {
+const NON_RETRYABLE_STREAM_ERROR_TYPES = new Set([
+  'invalid_request_error',
+  'authentication_error',
+  'permission_error',
+  'billing_error',
+  'not_found_error',
+  'request_too_large',
+])
+
+export function isRetryableStreamError(error: unknown): boolean {
+  if (error instanceof APIUserAbortError) return false
+  if (!(error instanceof APIError)) return true
+  if (error.status !== undefined) return shouldRetry(error)
+  return !NON_RETRYABLE_STREAM_ERROR_TYPES.has(String(error.type))
+}
+
+export function getRetryAfter(error: unknown): string | null {
   return (
     ((error as { headers?: { 'retry-after'?: string } }).headers?.[
       'retry-after'
@@ -699,6 +721,10 @@ function shouldRetry(error: APIError): boolean {
     return false
   }
 
+  if (!isFirstPartyAnthropicBaseUrl() && isQuotaErrorText(error.message)) {
+    return false
+  }
+
   // Persistent mode: 429/529 always retryable, bypass subscriber gates and
   // x-should-retry header.
   if (isPersistentRetryEnabled() && isTransientCapacityError(error)) {
@@ -772,7 +798,7 @@ function shouldRetry(error: APIError): boolean {
   // OAuth token handling is done in the main retry loop via handleOAuth401Error.
   if (error.status === 401) {
     clearApiKeyHelperCache()
-    return true
+    return canRefreshCredentials()
   }
 
   // Retry on 403 "token revoked" (same refresh logic as 401, see above)
@@ -784,6 +810,15 @@ function shouldRetry(error: APIError): boolean {
   if (error.status && error.status >= 500) return true
 
   return false
+}
+
+function canRefreshCredentials(): boolean {
+  return (
+    isFirstPartyAnthropicBaseUrl() ||
+    !!getConfiguredApiKeyHelper() ||
+    !!getClaudeAIOAuthTokens()?.accessToken ||
+    shouldUseOpenAICodexAuth()
+  )
 }
 
 export function getDefaultMaxRetries(): number {

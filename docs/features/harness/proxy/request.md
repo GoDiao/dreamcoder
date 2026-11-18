@@ -52,7 +52,7 @@
 - 严重程度：高
 - 现状：
   1. Read 工具读整份 PDF 时，tool_result 只写 `PDF file read: <路径> (<大小>)`（`src/tools/FileReadTool/FileReadTool.ts:670-676`），PDF 内容放在随后一条 meta user 消息的 `document` 块里（`FileReadTool.ts:997-1011`）。是否走这条路只看 `isPDFSupported()`，它只排除 `claude-3-haiku`（`src/utils/pdfUtils.ts:59-61`），对第三方模型都为真。
-  2. chat 转换 `convertUserMessage` 只处理 text、image、tool_result（`anthropicToOpenaiChat.ts:108-121`），`document` 块没有分支，被直接跳过；Responses 转换同样只处理 text、image、tool_use、tool_result（`anthropicToOpenaiResponses.ts:82-105`）。只有出现在 tool_result 内部时才会留下 `[omitted content: document]`（`src/server/proxy/transform/toolArguments.ts:43-44`）。
+  2. chat 转换 `convertUserMessage` 只处理 text、image、tool_result（`anthropicToOpenaiChat.ts:108-121`），`document` 块没有分支，被直接跳过；Responses 转换同样只处理 text、image、tool_use、tool_result（`anthropicToOpenaiResponses.ts:82-105`）。只有出现在 tool_result 内部时才会留下 `[omitted content: document]`（`src/server/proxy/transform/toolArguments.ts:36-37`）。
 - 场景：Qwen 预设或任何自定义 OpenAI 格式提供方，用户让模型「读一下 spec.pdf 并总结」。模型调用 Read，收到「PDF file read: spec.pdf (120KB)」，后面没有任何内容，也没有提示内容缺失；模型据此编造总结，或认为已读而不再尝试 `pages` 参数（该参数会把页面转成图片，见 `FileReadTool.ts:886-944`）。
 - 参考：ZCode 对 file 块：模型声明支持 PDF 时作为 SDK file part 发送，不支持时换成明确的「不支持该媒体」文本（`zcode:apps/zcode-cli/packages/adapters/src/model/transform.ts:540-563`；`zcode:apps/zcode-cli/packages/adapters/src/model/media-transform-policy.ts:8-15`；基线规则 `supportsPdf:false`，`modelRules[0]`）。Codex：无 PDF 读取。
 - 改法方向：代理对 `document` 块不再静默跳过：模型支持 PDF 输入时转成 chat 的 file 内容块 / Responses 的 `input_file`，否则换成一段明确文本（说明 PDF 未送达、可用 `pages` 参数按页读取）；或由服务端告知 CLI 当前提供方不支持 PDF，让 `isPDFSupported` 为假。
@@ -62,7 +62,7 @@
 
 - 类型：问题
 - 严重程度：高
-- 现状：tool_result 的内容块经 `extractToolResultContent` 拍平成字符串，图片变成 `[image omitted: <mime>]`（`toolArguments.ts:29-38`），chat（`anthropicToOpenaiChat.ts:114-120`）和 Responses（`anthropicToOpenaiResponses.ts:98-104`）都这样。产生图片结果的工具：Read 读图片（`FileReadTool.ts:650-666`）、Bash 输出 data URI（`src/tools/BashTool/utils.ts:71-90`）、内置浏览器截图（MCP 内容 `{type:'image'}`，`src/server/browserHost/service.ts:826`）以及其他返回图片的 MCP 工具。
+- 现状：tool_result 的内容块经 `extractToolResultContent` 拍平成字符串，图片变成 `[image omitted: <mime>]`（`toolArguments.ts:22-31`），chat（`anthropicToOpenaiChat.ts:114-120`）和 Responses（`anthropicToOpenaiResponses.ts:98-104`）都这样。产生图片结果的工具：Read 读图片（`FileReadTool.ts:650-666`）、Bash 输出 data URI（`src/tools/BashTool/utils.ts:71-90`）、内置浏览器截图（MCP 内容 `{type:'image'}`，`src/server/browserHost/service.ts:826`）以及其他返回图片的 MCP 工具。
 - 场景：自定义 `openai_chat` 接一个视觉模型（例如 `qwen3-vl-plus` 或 OpenRouter 上的 Claude/GPT），用户让 agent 在内置浏览器里检查页面布局。截图工具返回 JPEG，上游只收到 `[image omitted: image/jpeg]`，模型无法完成任务，通常会反复截图，多花轮数。
 - 参考：
   - ZCode（chat）：tool 消息里保留文本，图片移到紧随其后的一条 user 消息，并按模型输入能力决定保留还是换成说明文字（`zcode:apps/zcode-cli/packages/adapters/src/model/transform.ts:59-66,120-151`；`tool-result-media-projection.ts:26-39`）。
@@ -236,7 +236,7 @@ DreamCoder 缺少的配置维度：推理字段的写法与档位、输出上限
 - `tool_choice`：auto→auto、any→required、none→none、tool→指定函数（`anthropicToOpenaiChat.ts:175-187`；Responses 为扁平形状 `anthropicToOpenaiResponses.ts:125-137`）。CLI 唯一发 `type:'tool'` 的地方是 WebSearch 的小模型分支，受 `tengu_plum_vx3` 控制、默认关（`WebSearchTool.ts:395-414`）。
 - `stop_sequences`：chat 转为 `stop`，Responses 丢弃（`anthropicToOpenaiChat.ts:43-45`）。CLI 只在 yolo 分类器和 sideQuery 中使用（`src/utils/permissions/yoloClassifier.ts:792`；`src/utils/sideQuery.ts:187`），本场景默认不触发。
 - `temperature`：只在思考关闭时发 1（`claude.ts:1741-1745`），即 WebFetch 二次处理、hook 等辅助请求和用户关闭思考时；未找到会因此报错的具体模型。
-- `defer_loading` 与 `tool_reference`：代理场景下 ToolSearch 默认关闭（ANTHROPIC_BASE_URL 非 Anthropic 官方，`src/utils/toolSearch.ts:296-309`），服务端不设 `ENABLE_TOOL_SEARCH`；用户手动开启时 `tool_reference` 会变成 `[omitted content: tool_reference]`（`toolArguments.ts:43-44`），所有工具仍全量发送。
+- `defer_loading` 与 `tool_reference`：代理场景下 ToolSearch 默认关闭（ANTHROPIC_BASE_URL 非 Anthropic 官方，`src/utils/toolSearch.ts:296-309`），服务端不设 `ENABLE_TOOL_SEARCH`；用户手动开启时 `tool_reference` 会变成 `[omitted content: tool_reference]`（`toolArguments.ts:36-37`），所有工具仍全量发送。
 - 工具名长度：MCP 工具名只做字符替换、不截断（`src/services/mcp/normalization.ts:17-23`；`mcpStringUtils.ts:50-52`），超过 64 字符时 Anthropic 与 OpenAI 端点都会拒绝，不是代理特有的问题。
 - 空内容：空数组 content 转成 `content: ''`（`anthropicToOpenaiChat.ts:93-96`）；ZCode 用 `(no content)` 防止提供方把空串当缺失（`zcode:apps/zcode-cli/packages/adapters/src/model/transform.ts:457-469`）。没找到 CLI 发出空 user content 的具体路径，未列为发现。
 - 多个 assistant 文本块用 `+=` 直接相连、没有分隔（`anthropicToOpenaiChat.ts:144-145`）；CLI 把 tool_use 重排为连续段（`messages.ts:2318-2330`），两段文本会被粘在一起。影响很小，未列为发现。
@@ -259,7 +259,7 @@ DreamCoder 缺少的配置维度：推理字段的写法与档位、输出上限
 | `max_tokens` 和 effort 不转发 | 确认，并补充 | `types.ts:35-36,112` 有字段无赋值；`types.ts:161-181` 无 `output_config`。补充：`thinking: adaptive/disabled` 也不产生任何字段，带 budget 的映射在现有配置下走不到；直接转发 32000 会超出部分模型上限（P-REQ-02、P-REQ-05）。 |
 | 上游错误统一包成 `api_error`，响应头（含 `retry-after`）丢失 | 不在本部分范围 | 代码位置与描述一致（`handler.ts:66-71`；`client.ts:83-89`），留给错误方向的评审。 |
 | `reasoning_content` 只对 deepseek 与 opencode.ai 域名写回 | 确认，并补充 | `client.ts:206-210,251-256`；`anthropicToOpenaiChat.ts:146-147,168-170`。补充：同一判断还打开 `thinking.type` 透传，对 opencode.ai 上的所有模型生效；Responses 路径完全不回传（P-REQ-07、P-REQ-08）。 |
-| 工具结果里的图片变成 `[image omitted]` | 确认，并补充 | `toolArguments.ts:37-38`，chat 与 Responses 两条路径都是。补充：PDF 的 `document` 块不在 tool_result 里，被完全静默丢弃（P-REQ-03）；Responses 本可在 `function_call_output` 里带图片（P-REQ-04）。 |
+| 工具结果里的图片变成 `[image omitted]` | 确认，并补充 | `toolArguments.ts:30-31`，chat 与 Responses 两条路径都是。补充：PDF 的 `document` 块不在 tool_result 里，被完全静默丢弃（P-REQ-03）；Responses 本可在 `function_call_output` 里带图片（P-REQ-04）。 |
 | 流式工具调用没有 id 时被丢弃 | 不在本部分范围 | 响应方向。 |
 | `cache_control` 被丢弃，不发缓存键或会话头 | 确认，并补充 | `types.ts:149-181` 只声明不使用；`client.ts:213,221` 只有两个头。补充：CLI 已经给代理带了 `X-Claude-Code-Session-Id` 和 `metadata.user_id`，代理没读（P-REQ-10）。 |
 

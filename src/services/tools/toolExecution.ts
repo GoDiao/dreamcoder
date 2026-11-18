@@ -69,6 +69,10 @@ import {
   TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
 } from '../../utils/errors.js'
 import { executePermissionDeniedHooks } from '../../utils/hooks.js'
+import {
+  invalidToolArgumentsMessage,
+  readInvalidToolArguments,
+} from '../../utils/invalidToolArguments.js'
 import { logError } from '../../utils/log.js'
 import {
   CANCEL_MESSAGE,
@@ -405,6 +409,26 @@ export async function* runToolUse(
           },
         ],
         toolUseResult: `Error: No such tool available: ${toolName}`,
+        sourceToolAssistantUUID: assistantMessage.uuid,
+      }),
+    }
+    return
+  }
+
+  const invalidArguments = readInvalidToolArguments(toolUse.input)
+  if (invalidArguments) {
+    const message = invalidToolArgumentsMessage(invalidArguments)
+    yield {
+      message: createUserMessage({
+        content: [
+          {
+            type: 'tool_result',
+            content: `<tool_use_error>${message}</tool_use_error>`,
+            is_error: true,
+            tool_use_id: toolUse.id,
+          },
+        ],
+        toolUseResult: message,
         sourceToolAssistantUUID: assistantMessage.uuid,
       }),
     }

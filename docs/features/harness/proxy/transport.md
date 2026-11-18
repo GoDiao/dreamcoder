@@ -31,6 +31,7 @@
 
 ### P-NET-02 提供方的上下文溢出错误认不出来，会话卡死，手动 /compact 也救不回来
 
+- 状态：已在 #263 修复：溢出错误的识别表放在 `src/utils/providerErrors.ts`，代理和 CLI 共用。代理把识别出的溢出错误改写成 400 `invalid_request_error`，消息以 `prompt is too long` 开头，能解析出数字时带上 `N tokens > M maximum`；CLI 的 `errors.ts` 对直连路径用同一张表识别，并能从 OpenAI、OpenRouter、Gemini、Moonshot 的文案里解析出 token 数。`/compact` 的截头重试因此能按超出的 token 数删掉最早的几轮。OpenRouter 实测文案：`This endpoint's maximum context length is 128000 tokens. However, you requested about 270016 tokens ...`，它在转发前就拒绝，流式、非流式和 Responses 端点相同。本构建里被动压缩是空实现，溢出后需要用户手动 `/compact`。
 - 类型：问题
 - 严重程度：高
 - 现状：
@@ -46,6 +47,7 @@
 
 ### P-NET-03 代理转发错误时把原因转义进字符串、丢掉响应头，429 时用户看不到原因
 
+- 状态：已在 #263 修复：代理解析上游错误正文，取出 message 和 code，`error.type` 按状态码映射，原文作为 `error.message`；透传 `retry-after`、`retry-after-ms` 和 `x-request-id`，并把 request id 也写进 `request-id`（SDK 读这个头）。按错误内容决定是否重试见 P-NET-04。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -61,6 +63,7 @@
 
 ### P-NET-04 重试分类按 Anthropic 设计，对第三方提供方会重试不该重试的错误、等待过久
 
+- 状态：已在 #263 修复：分类表在 `src/utils/providerErrors.ts`，代理和 CLI 直连路径共用。代理：额度或余额不足（HTTP 402，`insufficient_quota`、`exceeded_current_quota_error`、`billing_hard_limit_reached`、智谱 1113 等，原来是 429 的也算）改成 402 `billing_error`；401、403 保留状态码；这两类都加 `x-should-retry: false`，CLI 不再重试。限流保留 429 和 `retry-after`；5xx 照常重试，503 不改成 `overloaded_error`；2xx 正文里的错误按内容分类，分不出的为 502。CLI 直连路径：非 Anthropic 官方地址上的额度类错误不重试；401 只在能刷新凭据时重试（Anthropic 官方地址、配置了 apiKeyHelper、Claude 登录或 OpenAI 登录）。已知限制：代理自己的超时和网络错误仍按 5xx 重试，上游完全不回响应头时，非流式请求和等待响应头的阶段最坏要等「重试次数 × AI 请求超时」。
 - 类型：问题
 - 严重程度：中
 - 现状（主循环请求 `maxRetries` 默认 10，即最多 11 次，src/services/api/withRetry.ts:52, 789-794；SDK 自身重试关闭，claude.ts:1831）：

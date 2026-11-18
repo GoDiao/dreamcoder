@@ -86,6 +86,7 @@ import { setCwd } from './utils/Shell.js'
 import {
   flushSessionStorage,
   recordTranscript,
+  removeTranscriptMessage,
 } from './utils/sessionStorage.js'
 import { asSystemPrompt } from './utils/systemPromptType.js'
 import { resolveThemeSetting } from './utils/systemTheme.js'
@@ -710,6 +711,7 @@ export class QueryEngine {
     let structuredOutputFromTool: unknown
     // Track the last stop_reason from assistant messages
     let lastStopReason: string | null = null
+    let pendingAssistantRecord: Promise<unknown> = Promise.resolve()
     // Reference-based watermark so error_during_execution's errors[] is
     // turn-scoped. A length-based index breaks when the 100-entry ring buffer
     // shift()s during the turn — the index slides. If this entry is rotated
@@ -773,7 +775,7 @@ export class QueryEngine {
           // useLogMessages.ts fire-and-forgets. enqueueWrite is
           // order-preserving so fire-and-forget here is safe.
           if (message.type === 'assistant') {
-            void recordTranscript(messages)
+            pendingAssistantRecord = recordTranscript(messages)
           } else {
             await recordTranscript(messages)
           }
@@ -803,9 +805,17 @@ export class QueryEngine {
       }
 
       switch (message.type) {
-        case 'tombstone':
-          // Tombstone messages are control signals for removing messages, skip them
+        case 'tombstone': {
+          const retractedUuid = message.message.uuid
+          removeMessageByUuid(this.mutableMessages, retractedUuid)
+          removeMessageByUuid(messages, retractedUuid)
+          if (persistSession) {
+            await pendingAssistantRecord
+            await flushSessionStorage()
+            await removeTranscriptMessage(retractedUuid)
+          }
           break
+        }
         case 'assistant':
           // Capture stop_reason if already set (synthetic messages). For
           // streamed responses, this is null at content_block_stop time;
@@ -996,6 +1006,14 @@ export class QueryEngine {
               session_id: getSessionId(),
               uuid: message.uuid,
               compact_metadata: toSDKCompactMetadata(message.compactMetadata),
+            }
+          }
+          if (message.subtype === 'api_error' && message.streamRestart) {
+            yield {
+              type: 'system',
+              subtype: 'stream_retracted' as const,
+              session_id: getSessionId(),
+              uuid: message.uuid,
             }
           }
           if (message.subtype === 'api_error') {
@@ -1396,4 +1414,9 @@ export async function* ask({
   } finally {
     setReadFileCache(engine.getReadFileState())
   }
+}
+
+function removeMessageByUuid(messages: Message[], uuid: string): void {
+  const index = messages.findIndex(message => message.uuid === uuid)
+  if (index !== -1) messages.splice(index, 1)
 }

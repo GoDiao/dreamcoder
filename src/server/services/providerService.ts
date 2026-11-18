@@ -18,6 +18,7 @@ import {
 } from './providerRuntimeEnv.js'
 import { loadNetworkSettings } from './networkSettings.js'
 import { fetchUpstreamModels, resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
+import { describeFailure } from '../upstream/upstreamError.js'
 import type {
   SavedProvider,
   ProvidersIndex,
@@ -321,7 +322,7 @@ export class ProviderService {
     const result = await fetchUpstreamModels(target, presetId)
     if (!result.ok) {
       const upstreamRejected = result.httpStatus !== undefined && result.httpStatus >= 400 && result.httpStatus < 500
-      throw new ApiError(upstreamRejected ? 400 : 502, result.error, 'MODEL_DISCOVERY_FAILED')
+      throw new ApiError(upstreamRejected ? 400 : 502, describeFailure(result), 'MODEL_DISCOVERY_FAILED')
     }
     return result.models
   }
@@ -368,7 +369,7 @@ export class ProviderService {
         connectivity: {
           success: false,
           latencyMs: Date.now() - start,
-          error: result.error,
+          error: describeFailure(result),
           modelUsed: modelId,
           httpStatus: result.httpStatus,
         },

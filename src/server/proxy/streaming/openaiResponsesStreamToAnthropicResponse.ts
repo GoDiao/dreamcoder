@@ -1,5 +1,6 @@
 import { openaiResponsesToAnthropic } from '../transform/openaiResponsesToAnthropic.js'
-import { upstreamErrorMessage } from './openaiResponsesStreamToAnthropic.js'
+import { UpstreamReplyError, type AnthropicError } from '../../upstream/upstreamError.js'
+import { errorFromEvent } from './openaiResponsesStreamToAnthropic.js'
 import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 import type {
   AnthropicResponse,
@@ -14,8 +15,6 @@ type StreamFallbackState = {
   usage: OpenAIResponsesResponse['usage']
 }
 
-export class OpenAIResponsesStreamError extends Error {}
-
 export async function openaiResponsesStreamToAnthropicResponse(
   upstream: ReadableStream<Uint8Array>,
   model: string,
@@ -23,7 +22,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
   const sse = new SseDecoder()
   const reader = upstream.getReader()
   let completedResponse: OpenAIResponsesResponse | null = null
-  let upstreamError: string | null = null
+  let upstreamError: AnthropicError | null = null
 
   const fallback: StreamFallbackState = {
     id: `resp_${Date.now()}`,
@@ -43,7 +42,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
       if (event === 'response.completed' || event === 'response.incomplete') {
         if (isOpenAIResponsesResponse(data.response)) completedResponse = data.response
       } else if (event === 'response.failed' || event === 'error') {
-        upstreamError = upstreamErrorMessage(data)
+        upstreamError = errorFromEvent(data)
       } else {
         updateFallbackState(event, data, fallback)
       }
@@ -58,7 +57,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
   handle(sse.flush())
 
   if (!completedResponse && upstreamError !== null) {
-    throw new OpenAIResponsesStreamError(upstreamError)
+    throw new UpstreamReplyError(upstreamError)
   }
 
   return openaiResponsesToAnthropic(

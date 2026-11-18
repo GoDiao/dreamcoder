@@ -72,8 +72,10 @@ import { isEnvTruthy } from "../../utils/envUtils.js";
 import { errorMessage } from "../../utils/errors.js";
 import { computeFingerprintFromMessages } from "../../utils/fingerprint.js";
 import { captureAPIRequest, logError } from "../../utils/log.js";
+import { sleep } from "../../utils/sleep.js";
 import {
   createAssistantAPIErrorMessage,
+  createSystemAPIErrorMessage,
   createUserMessage,
   ensureToolResultPairing,
   normalizeContentFromAPI,
@@ -108,6 +110,7 @@ const autoModeStateModule = feature("TRANSCRIPT_CLASSIFIER")
 
 import type { ClientOptions } from "@anthropic-ai/sdk";
 import {
+  APIConnectionError,
   APIConnectionTimeoutError,
   APIError,
   APIUserAbortError,
@@ -250,7 +253,11 @@ import {
 import {
   CannotRetryError,
   FallbackTriggeredError,
+  getDefaultMaxRetries,
+  getRetryAfter,
+  getRetryDelay,
   is529Error,
+  isRetryableStreamError,
   type RetryContext,
   withRetry,
 } from "./withRetry.js";
@@ -1823,711 +1830,780 @@ async function* queryModel(
   let isFastModeRequest = isFastMode; // Keep separate state as it may change if falling back
   let isAdvisorInProgress = false;
 
+  const maxStreamRequests = getDefaultMaxRetries() + 1;
+  let streamRequests = 0;
+
   try {
     queryCheckpoint("query_client_creation_start");
-    const generator = withRetry(
-      () =>
-        getAnthropicClient({
-          maxRetries: 0, // Disabled auto-retry in favor of manual implementation
-          model: options.model,
-          fetchOverride: options.fetchOverride,
-          source: options.querySource,
-        }),
-      async (anthropic, attempt, context) => {
-        attemptNumber = attempt;
-        isFastModeRequest = context.fastMode ?? false;
-        start = Date.now();
-        attemptStartTimes.push(start);
-        // Client has been created by withRetry's getClient() call. This fires
-        // once per attempt; on retries the client is usually cached (withRetry
-        // only calls getClient() again after auth errors), so the delta from
-        // client_creation_start is meaningful on attempt 1.
-        queryCheckpoint("query_client_creation_end");
-
-        const params = paramsFromContext(context);
-        captureAPIRequest(params, options.querySource); // Capture for bug reports
-
-        maxOutputTokens = params.max_tokens;
-
-        // Fire immediately before the fetch is dispatched. .withResponse() below
-        // awaits until response headers arrive, so this MUST be before the await
-        // or the "Network TTFB" phase measurement is wrong.
-        queryCheckpoint("query_api_request_sent");
-        if (!options.agentId) {
-          headlessProfilerCheckpoint("api_request_sent");
-        }
-
-        // Generate and track client request ID so timeouts (which return no
-        // server request ID) can still be correlated with server logs.
-        // First-party only — 3P providers don't log it (inc-4029 class).
-        clientRequestId =
-          getAPIProvider() === "firstParty" && isFirstPartyAnthropicBaseUrl()
-            ? randomUUID()
-            : undefined;
-
-        // Use raw stream instead of BetaMessageStream to avoid O(n²) partial JSON parsing
-        // BetaMessageStream calls partialParse() on every input_json_delta, which we don't need
-        // since we handle tool input accumulation ourselves
-        // biome-ignore lint/plugin: main conversation loop handles attribution separately
-        const result = await anthropic.beta.messages
-          .create(
-            { ...params, stream: true },
-            {
-              signal,
-              ...(clientRequestId && {
-                headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
-              }),
-            },
-          )
-          .withResponse();
-        queryCheckpoint("query_response_headers_received");
-        streamRequestId = result.request_id;
-        streamResponse = result.response;
-        return result.data;
-      },
-      {
-        model: options.model,
-        fallbackModel: options.fallbackModel,
-        thinkingConfig,
-        ...(isFastModeEnabled() ? { fastMode: isFastMode } : false),
-        signal,
-        querySource: options.querySource,
-      },
-    );
-
-    let e;
-    do {
-      e = await generator.next();
-
-      // yield API error messages (the stream has a 'controller' property, error messages don't)
-      if (!("controller" in e.value)) {
-        yield e.value;
-      }
-    } while (!e.done);
-    stream = e.value as Stream<BetaRawMessageStreamEvent>;
-
-    // reset state
-    newMessages.length = 0;
-    ttftMs = 0;
-    partialMessage = undefined;
-    contentBlocks.length = 0;
-    usage = EMPTY_USAGE;
-    stopReason = null;
-    isAdvisorInProgress = false;
-
-    // Streaming idle timeout watchdog: abort the stream if no chunks arrive
-    // for STREAM_IDLE_TIMEOUT_MS. Unlike the stall detection below (which only
-    // fires when the *next* chunk arrives), this uses setTimeout to actively
-    // kill hung streams. Without this, a silently dropped connection can hang
-    // the session indefinitely since the SDK's request timeout only covers the
-    // initial fetch(), not the streaming body.
-    const streamWatchdogEnabled = isEnvTruthy(
-      process.env.CLAUDE_ENABLE_STREAM_WATCHDOG,
-    );
-    const STREAM_IDLE_TIMEOUT_MS =
-      parseInt(process.env.CLAUDE_STREAM_IDLE_TIMEOUT_MS || "", 10) || 90_000;
-    const STREAM_IDLE_WARNING_MS = STREAM_IDLE_TIMEOUT_MS / 2;
-    let streamIdleAborted = false;
-    // performance.now() snapshot when watchdog fires, for measuring abort propagation delay
-    let streamWatchdogFiredAt: number | null = null;
-    let streamIdleWarningTimer: ReturnType<typeof setTimeout> | null = null;
-    let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
-    function clearStreamIdleTimers(): void {
-      if (streamIdleWarningTimer !== null) {
-        clearTimeout(streamIdleWarningTimer);
-        streamIdleWarningTimer = null;
-      }
-      if (streamIdleTimer !== null) {
-        clearTimeout(streamIdleTimer);
-        streamIdleTimer = null;
-      }
-    }
-    function resetStreamIdleTimer(): void {
-      clearStreamIdleTimers();
-      if (!streamWatchdogEnabled) {
-        return;
-      }
-      streamIdleWarningTimer = setTimeout(
-        (warnMs) => {
-          logForDebugging(
-            `Streaming idle warning: no chunks received for ${warnMs / 1000}s`,
-            { level: "warn" },
-          );
-          logForDiagnosticsNoPII("warn", "cli_streaming_idle_warning");
-        },
-        STREAM_IDLE_WARNING_MS,
-        STREAM_IDLE_WARNING_MS,
-      );
-      streamIdleTimer = setTimeout(() => {
-        streamIdleAborted = true;
-        streamWatchdogFiredAt = performance.now();
-        logForDebugging(
-          `Streaming idle timeout: no chunks received for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, aborting stream`,
-          { level: "error" },
-        );
-        logForDiagnosticsNoPII("error", "cli_streaming_idle_timeout");
-        logEvent("tengu_streaming_idle_timeout", {
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          timeout_ms: STREAM_IDLE_TIMEOUT_MS,
-        });
-        releaseStreamResources();
-      }, STREAM_IDLE_TIMEOUT_MS);
-    }
-    resetStreamIdleTimer();
-
     startSessionActivity("api_call");
-    try {
-      // stream in and accumulate state
-      let isFirstChunk = true;
-      let lastEventTime: number | null = null; // Set after first chunk to avoid measuring TTFB as a stall
-      const STALL_THRESHOLD_MS = 30_000; // 30 seconds
-      let totalStallTime = 0;
-      let stallCount = 0;
+    streamAttempts: for (;;) {
+      const generator = withRetry(
+        () =>
+          getAnthropicClient({
+            maxRetries: 0, // Disabled auto-retry in favor of manual implementation
+            model: options.model,
+            fetchOverride: options.fetchOverride,
+            source: options.querySource,
+          }),
+        async (anthropic, attempt, context) => {
+          attemptNumber = attempt;
+          streamRequests += 1;
+          isFastModeRequest = context.fastMode ?? false;
+          start = Date.now();
+          attemptStartTimes.push(start);
+          // Client has been created by withRetry's getClient() call. This fires
+          // once per attempt; on retries the client is usually cached (withRetry
+          // only calls getClient() again after auth errors), so the delta from
+          // client_creation_start is meaningful on attempt 1.
+          queryCheckpoint("query_client_creation_end");
 
-      for await (const part of stream) {
-        resetStreamIdleTimer();
-        const now = Date.now();
+          const params = paramsFromContext(context);
+          captureAPIRequest(params, options.querySource); // Capture for bug reports
 
-        // Detect and log streaming stalls (only after first event to avoid counting TTFB)
-        if (lastEventTime !== null) {
-          const timeSinceLastEvent = now - lastEventTime;
-          if (timeSinceLastEvent > STALL_THRESHOLD_MS) {
-            stallCount++;
-            totalStallTime += timeSinceLastEvent;
+          maxOutputTokens = params.max_tokens;
+
+          // Fire immediately before the fetch is dispatched. .withResponse() below
+          // awaits until response headers arrive, so this MUST be before the await
+          // or the "Network TTFB" phase measurement is wrong.
+          queryCheckpoint("query_api_request_sent");
+          if (!options.agentId) {
+            headlessProfilerCheckpoint("api_request_sent");
+          }
+
+          // Generate and track client request ID so timeouts (which return no
+          // server request ID) can still be correlated with server logs.
+          // First-party only — 3P providers don't log it (inc-4029 class).
+          clientRequestId =
+            getAPIProvider() === "firstParty" && isFirstPartyAnthropicBaseUrl()
+              ? randomUUID()
+              : undefined;
+
+          // Use raw stream instead of BetaMessageStream to avoid O(n²) partial JSON parsing
+          // BetaMessageStream calls partialParse() on every input_json_delta, which we don't need
+          // since we handle tool input accumulation ourselves
+          // biome-ignore lint/plugin: main conversation loop handles attribution separately
+          const result = await anthropic.beta.messages
+            .create(
+              { ...params, stream: true },
+              {
+                signal,
+                ...(clientRequestId && {
+                  headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
+                }),
+              },
+            )
+            .withResponse();
+          queryCheckpoint("query_response_headers_received");
+          streamRequestId = result.request_id;
+          streamResponse = result.response;
+          return result.data;
+        },
+        {
+          model: options.model,
+          fallbackModel: options.fallbackModel,
+          thinkingConfig,
+          ...(isFastModeEnabled() ? { fastMode: isFastMode } : false),
+          signal,
+          querySource: options.querySource,
+          maxRetries: maxStreamRequests - streamRequests - 1,
+        },
+      );
+
+      let e;
+      do {
+        e = await generator.next();
+
+        // yield API error messages (the stream has a 'controller' property, error messages don't)
+        if (!("controller" in e.value)) {
+          yield e.value;
+        }
+      } while (!e.done);
+      stream = e.value as Stream<BetaRawMessageStreamEvent>;
+
+      // reset state
+      newMessages.length = 0;
+      ttftMs = 0;
+      partialMessage = undefined;
+      contentBlocks.length = 0;
+      usage = EMPTY_USAGE;
+      stopReason = null;
+      isAdvisorInProgress = false;
+
+      // Streaming idle timeout watchdog: abort the stream if no chunks arrive
+      // for STREAM_IDLE_TIMEOUT_MS. Unlike the stall detection below (which only
+      // fires when the *next* chunk arrives), this uses setTimeout to actively
+      // kill hung streams. Without this, a silently dropped connection can hang
+      // the session indefinitely since the SDK's request timeout only covers the
+      // initial fetch(), not the streaming body.
+      const streamWatchdogEnabled = isEnvTruthy(
+        process.env.CLAUDE_ENABLE_STREAM_WATCHDOG,
+      );
+      const STREAM_IDLE_TIMEOUT_MS =
+        parseInt(process.env.CLAUDE_STREAM_IDLE_TIMEOUT_MS || "", 10) || 90_000;
+      const STREAM_IDLE_WARNING_MS = STREAM_IDLE_TIMEOUT_MS / 2;
+      let streamIdleAborted = false;
+      // performance.now() snapshot when watchdog fires, for measuring abort propagation delay
+      let streamWatchdogFiredAt: number | null = null;
+      let streamIdleWarningTimer: ReturnType<typeof setTimeout> | null = null;
+      let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
+      function clearStreamIdleTimers(): void {
+        if (streamIdleWarningTimer !== null) {
+          clearTimeout(streamIdleWarningTimer);
+          streamIdleWarningTimer = null;
+        }
+        if (streamIdleTimer !== null) {
+          clearTimeout(streamIdleTimer);
+          streamIdleTimer = null;
+        }
+      }
+      function resetStreamIdleTimer(): void {
+        clearStreamIdleTimers();
+        if (!streamWatchdogEnabled) {
+          return;
+        }
+        streamIdleWarningTimer = setTimeout(
+          (warnMs) => {
             logForDebugging(
-              `Streaming stall detected: ${(timeSinceLastEvent / 1000).toFixed(1)}s gap between events (stall #${stallCount})`,
+              `Streaming idle warning: no chunks received for ${warnMs / 1000}s`,
               { level: "warn" },
             );
-            logEvent("tengu_streaming_stall", {
-              stall_duration_ms: timeSinceLastEvent,
-              stall_count: stallCount,
-              total_stall_time_ms: totalStallTime,
-              event_type:
-                part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              model:
-                options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              request_id: (streamRequestId ??
-                "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-            });
-          }
-        }
-        lastEventTime = now;
-
-        if (isFirstChunk) {
-          logForDebugging("Stream started - received first chunk");
-          queryCheckpoint("query_first_chunk_received");
-          if (!options.agentId) {
-            headlessProfilerCheckpoint("first_chunk");
-          }
-          endQueryProfile();
-          isFirstChunk = false;
-        }
-
-        switch (part.type) {
-          case "message_start": {
-            partialMessage = part.message;
-            ttftMs = Date.now() - start;
-            usage = updateUsage(usage, part.message?.usage);
-            // Capture research from message_start if available (internal only).
-            // Always overwrite with the latest value.
-            if (
-              process.env.USER_TYPE === "ant" &&
-              "research" in (part.message as unknown as Record<string, unknown>)
-            ) {
-              research = (part.message as unknown as Record<string, unknown>)
-                .research;
-            }
-            break;
-          }
-          case "content_block_start":
-            switch (part.content_block.type) {
-              case "tool_use":
-                contentBlocks[part.index] = {
-                  ...part.content_block,
-                  input: "",
-                };
-                break;
-              case "server_tool_use":
-                contentBlocks[part.index] = {
-                  ...part.content_block,
-                  input: "" as unknown as { [key: string]: unknown },
-                };
-                if ((part.content_block.name as string) === "advisor") {
-                  isAdvisorInProgress = true;
-                  logForDebugging(`[AdvisorTool] Advisor tool called`);
-                  logEvent("tengu_advisor_tool_call", {
-                    model:
-                      options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    advisor_model: (advisorModel ??
-                      "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                  });
-                }
-                break;
-              case "text":
-                contentBlocks[part.index] = {
-                  ...part.content_block,
-                  // awkwardly, the sdk sometimes returns text as part of a
-                  // content_block_start message, then returns the same text
-                  // again in a content_block_delta message. we ignore it here
-                  // since there doesn't seem to be a way to detect when a
-                  // content_block_delta message duplicates the text.
-                  text: "",
-                };
-                break;
-              case "thinking":
-                contentBlocks[part.index] = {
-                  ...part.content_block,
-                  // also awkward
-                  thinking: "",
-                  // initialize signature to ensure field exists even if signature_delta never arrives
-                  signature: "",
-                };
-                break;
-              default:
-                // even more awkwardly, the sdk mutates the contents of text blocks
-                // as it works. we want the blocks to be immutable, so that we can
-                // accumulate state ourselves.
-                contentBlocks[part.index] = { ...part.content_block };
-                if (
-                  (part.content_block.type as string) === "advisor_tool_result"
-                ) {
-                  isAdvisorInProgress = false;
-                  logForDebugging(`[AdvisorTool] Advisor tool result received`);
-                }
-                break;
-            }
-            break;
-          case "content_block_delta": {
-            const contentBlock = contentBlocks[part.index];
-            const delta = part.delta as typeof part.delta | ConnectorTextDelta;
-            if (!contentBlock) {
-              logEvent("tengu_streaming_error", {
-                error_type:
-                  "content_block_not_found_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_index: part.index,
-              });
-              throw new RangeError("Content block not found");
-            }
-            if (
-              feature("CONNECTOR_TEXT") &&
-              delta.type === "connector_text_delta"
-            ) {
-              if (contentBlock.type !== "connector_text") {
-                logEvent("tengu_streaming_error", {
-                  error_type:
-                    "content_block_type_mismatch_connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                  expected_type:
-                    "connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                  actual_type:
-                    contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                });
-                throw new Error("Content block is not a connector_text block");
-              }
-              contentBlock.connector_text += delta.connector_text;
-            } else {
-              switch (delta.type) {
-                case "citations_delta":
-                  // TODO: handle citations
-                  break;
-                case "input_json_delta":
-                  if (
-                    contentBlock.type !== "tool_use" &&
-                    contentBlock.type !== "server_tool_use"
-                  ) {
-                    logEvent("tengu_streaming_error", {
-                      error_type:
-                        "content_block_type_mismatch_input_json" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        "tool_use" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    });
-                    throw new Error("Content block is not a input_json block");
-                  }
-                  if (typeof contentBlock.input !== "string") {
-                    logEvent("tengu_streaming_error", {
-                      error_type:
-                        "content_block_input_not_string" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      input_type:
-                        typeof contentBlock.input as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    });
-                    throw new Error("Content block input is not a string");
-                  }
-                  contentBlock.input += delta.partial_json;
-                  break;
-                case "text_delta":
-                  if (contentBlock.type !== "text") {
-                    logEvent("tengu_streaming_error", {
-                      error_type:
-                        "content_block_type_mismatch_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        "text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    });
-                    throw new Error("Content block is not a text block");
-                  }
-                  contentBlock.text += delta.text;
-                  break;
-                case "signature_delta":
-                  if (
-                    feature("CONNECTOR_TEXT") &&
-                    contentBlock.type === "connector_text"
-                  ) {
-                    contentBlock.signature = delta.signature;
-                    break;
-                  }
-                  if (contentBlock.type !== "thinking") {
-                    logEvent("tengu_streaming_error", {
-                      error_type:
-                        "content_block_type_mismatch_thinking_signature" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    });
-                    throw new Error("Content block is not a thinking block");
-                  }
-                  contentBlock.signature = delta.signature;
-                  break;
-                case "thinking_delta":
-                  if (contentBlock.type !== "thinking") {
-                    logEvent("tengu_streaming_error", {
-                      error_type:
-                        "content_block_type_mismatch_thinking_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                    });
-                    throw new Error("Content block is not a thinking block");
-                  }
-                  contentBlock.thinking += delta.thinking;
-                  break;
-              }
-            }
-            // Capture research from content_block_delta if available (internal only).
-            // Always overwrite with the latest value.
-            if (process.env.USER_TYPE === "ant" && "research" in part) {
-              research = (part as { research: unknown }).research;
-            }
-            break;
-          }
-          case "content_block_stop": {
-            const contentBlock = contentBlocks[part.index];
-            if (!contentBlock) {
-              logEvent("tengu_streaming_error", {
-                error_type:
-                  "content_block_not_found_stop" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_index: part.index,
-              });
-              throw new RangeError("Content block not found");
-            }
-            if (!partialMessage) {
-              logEvent("tengu_streaming_error", {
-                error_type:
-                  "partial_message_not_found" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              });
-              throw new Error("Message not found");
-            }
-            const m: AssistantMessage = {
-              message: {
-                ...partialMessage,
-                content: normalizeContentFromAPI(
-                  [contentBlock] as BetaContentBlock[],
-                  tools,
-                  options.agentId,
-                ),
-              },
-              requestId: streamRequestId ?? undefined,
-              type: "assistant",
-              uuid: randomUUID(),
-              timestamp: new Date().toISOString(),
-              ...(process.env.USER_TYPE === "ant" &&
-                research !== undefined && { research }),
-              ...(advisorModel && { advisorModel }),
-            };
-            newMessages.push(m);
-            yield m;
-            break;
-          }
-          case "message_delta": {
-            usage = updateUsage(usage, part.usage);
-            // Capture research from message_delta if available (internal only).
-            // Always overwrite with the latest value. Also write back to
-            // already-yielded messages since message_delta arrives after
-            // content_block_stop.
-            if (
-              process.env.USER_TYPE === "ant" &&
-              "research" in (part as unknown as Record<string, unknown>)
-            ) {
-              research = (part as unknown as Record<string, unknown>).research;
-              for (const msg of newMessages) {
-                msg.research = research;
-              }
-            }
-
-            // Write final usage and stop_reason back to the last yielded
-            // message. Messages are created at content_block_stop from
-            // partialMessage, which was set at message_start before any tokens
-            // were generated (output_tokens: 0, stop_reason: null).
-            // message_delta arrives after content_block_stop with the real
-            // values.
-            //
-            // IMPORTANT: Use direct property mutation, not object replacement.
-            // The transcript write queue holds a reference to message.message
-            // and serializes it lazily (100ms flush interval). Object
-            // replacement ({ ...lastMsg.message, usage }) would disconnect
-            // the queued reference; direct mutation ensures the transcript
-            // captures the final values.
-            stopReason = part.delta.stop_reason;
-
-            const lastMsg = newMessages.at(-1);
-            if (lastMsg) {
-              lastMsg.message.usage = usage;
-              lastMsg.message.stop_reason = stopReason;
-            }
-
-            // Update cost
-            const costUSDForPart = calculateUSDCost(resolvedModel, usage);
-            costUSD += addToTotalSessionCost(
-              costUSDForPart,
-              usage,
-              options.model,
-            );
-
-            const refusalMessage = getErrorMessageIfRefusal(
-              part.delta.stop_reason,
-              options.model,
-            );
-            if (refusalMessage) {
-              yield refusalMessage;
-            }
-
-            if (stopReason === "max_tokens") {
-              logEvent("tengu_max_tokens_reached", {
-                max_tokens: maxOutputTokens,
-              });
-              yield createAssistantAPIErrorMessage({
-                content: `${API_ERROR_MESSAGE_PREFIX}: Claude's response exceeded the ${
-                  maxOutputTokens
-                } output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.`,
-                apiError: "max_output_tokens",
-                error: "max_output_tokens",
-              });
-            }
-
-            if (stopReason === "model_context_window_exceeded") {
-              logEvent("tengu_context_window_exceeded", {
-                max_tokens: maxOutputTokens,
-                output_tokens: usage.output_tokens,
-              });
-              // Reuse the max_output_tokens recovery path — from the model's
-              // perspective, both mean "response was cut off, continue from
-              // where you left off."
-              yield createAssistantAPIErrorMessage({
-                content: `${API_ERROR_MESSAGE_PREFIX}: The model has reached its context window limit.`,
-                apiError: "max_output_tokens",
-                error: "max_output_tokens",
-              });
-            }
-            break;
-          }
-          case "message_stop":
-            break;
-        }
-
-        yield {
-          type: "stream_event",
-          event: part,
-          ...(part.type === "message_start" ? { ttftMs } : undefined),
-        };
-      }
-      // Clear the idle timeout watchdog now that the stream loop has exited
-      clearStreamIdleTimers();
-
-      // If the stream was aborted by our idle timeout watchdog, fall back to
-      // non-streaming retry rather than treating it as a completed stream.
-      if (streamIdleAborted) {
-        // Instrumentation: proves the for-await exited after the watchdog fired
-        // (vs. hung forever). exit_delay_ms measures abort propagation latency:
-        // 0-10ms = abort worked; >>1000ms = something else woke the loop.
-        const exitDelayMs =
-          streamWatchdogFiredAt !== null
-            ? Math.round(performance.now() - streamWatchdogFiredAt)
-            : -1;
-        logForDiagnosticsNoPII(
-          "info",
-          "cli_stream_loop_exited_after_watchdog_clean",
+            logForDiagnosticsNoPII("warn", "cli_streaming_idle_warning");
+          },
+          STREAM_IDLE_WARNING_MS,
+          STREAM_IDLE_WARNING_MS,
         );
-        logEvent("tengu_stream_loop_exited_after_watchdog", {
-          request_id: (streamRequestId ??
-            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          exit_delay_ms: exitDelayMs,
-          exit_path:
-            "clean" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        });
-        // Prevent double-emit: this throw lands in the catch block below,
-        // whose exit_path='error' probe guards on streamWatchdogFiredAt.
-        streamWatchdogFiredAt = null;
-        throw new Error("Stream idle timeout - no chunks received");
-      }
-
-      // Detect when the stream completed without producing any assistant messages.
-      // This covers two proxy failure modes:
-      // 1. No events at all (!partialMessage): proxy returned 200 with non-SSE body
-      // 2. Partial events (partialMessage set but no content blocks completed AND
-      //    no stop_reason received): proxy returned message_start but stream ended
-      //    before content_block_stop and before message_delta with stop_reason
-      // BetaMessageStream had the first check in _endRequest() but the raw Stream
-      // does not - without it the generator silently returns no assistant messages,
-      // causing "Execution error" in -p mode.
-      // Note: We must check stopReason to avoid false positives. For example, with
-      // structured output (--json-schema), the model calls a StructuredOutput tool
-      // on turn 1, then on turn 2 responds with end_turn and no content blocks.
-      // That's a legitimate empty response, not an incomplete stream.
-      if (!partialMessage || (newMessages.length === 0 && !stopReason)) {
-        logForDebugging(
-          !partialMessage
-            ? "Stream completed without receiving message_start event - triggering non-streaming fallback"
-            : "Stream completed with message_start but no content blocks completed - triggering non-streaming fallback",
-          { level: "error" },
-        );
-        logEvent("tengu_stream_no_events", {
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        });
-        throw new Error("Stream ended without receiving any events");
-      }
-
-      // Log summary if any stalls occurred during streaming
-      if (stallCount > 0) {
-        logForDebugging(
-          `Streaming completed with ${stallCount} stall(s), total stall time: ${(totalStallTime / 1000).toFixed(1)}s`,
-          { level: "warn" },
-        );
-        logEvent("tengu_streaming_stall_summary", {
-          stall_count: stallCount,
-          total_stall_time_ms: totalStallTime,
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        });
-      }
-
-      // Check if the cache actually broke based on response tokens
-      if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
-        void checkResponseForCacheBreak(
-          options.querySource,
-          usage.cache_read_input_tokens,
-          usage.cache_creation_input_tokens,
-          messages,
-          options.agentId,
-          streamRequestId,
-        );
-      }
-
-      // Process fallback percentage header and quota status if available
-      // streamResponse is set when the stream is created in the withRetry callback above
-      // TypeScript's control flow analysis can't track that streamResponse is set in the callback
-      // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-      const resp = streamResponse as unknown as Response | undefined;
-      if (resp) {
-        extractQuotaStatusFromHeaders(resp.headers);
-        // Store headers for gateway detection
-        responseHeaders = resp.headers;
-      }
-    } catch (streamingError) {
-      // Clear the idle timeout watchdog on error path too
-      clearStreamIdleTimers();
-
-      // Instrumentation: if the watchdog had already fired and the for-await
-      // threw (rather than exiting cleanly), record that the loop DID exit and
-      // how long after the watchdog. Distinguishes true hangs from error exits.
-      if (streamIdleAborted && streamWatchdogFiredAt !== null) {
-        const exitDelayMs = Math.round(
-          performance.now() - streamWatchdogFiredAt,
-        );
-        logForDiagnosticsNoPII(
-          "info",
-          "cli_stream_loop_exited_after_watchdog_error",
-        );
-        logEvent("tengu_stream_loop_exited_after_watchdog", {
-          request_id: (streamRequestId ??
-            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          exit_delay_ms: exitDelayMs,
-          exit_path:
-            "error" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          error_name:
-            streamingError instanceof Error
-              ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-              : ("unknown" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        });
-      }
-
-      if (streamingError instanceof APIUserAbortError) {
-        // Check if the abort signal was triggered by the user (ESC key)
-        // If the signal is aborted, it's a user-initiated abort
-        // If not, it's likely a timeout from the SDK
-        if (signal.aborted) {
-          // This is a real user abort (ESC key was pressed)
+        streamIdleTimer = setTimeout(() => {
+          streamIdleAborted = true;
+          streamWatchdogFiredAt = performance.now();
           logForDebugging(
-            `Streaming aborted by user: ${errorMessage(streamingError)}`,
-          );
-          if (isAdvisorInProgress) {
-            logEvent("tengu_advisor_tool_interrupted", {
-              model:
-                options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              advisor_model: (advisorModel ??
-                "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-            });
-          }
-          throw streamingError;
-        } else {
-          // The SDK threw APIUserAbortError but our signal wasn't aborted
-          // This means it's a timeout from the SDK's internal timeout
-          logForDebugging(
-            `Streaming timeout (SDK abort): ${streamingError.message}`,
+            `Streaming idle timeout: no chunks received for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, aborting stream`,
             { level: "error" },
           );
-          // Throw a more specific error for timeout
-          throw new APIConnectionTimeoutError({ message: "Request timed out" });
-        }
+          logForDiagnosticsNoPII("error", "cli_streaming_idle_timeout");
+          logEvent("tengu_streaming_idle_timeout", {
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            timeout_ms: STREAM_IDLE_TIMEOUT_MS,
+          });
+          releaseStreamResources();
+        }, STREAM_IDLE_TIMEOUT_MS);
       }
+      resetStreamIdleTimer();
 
-      // When the flag is enabled, skip the non-streaming fallback and let the
-      // error propagate to withRetry. The mid-stream fallback causes double tool
-      // execution when streaming tool execution is active: the partial stream
-      // starts a tool, then the non-streaming retry produces the same tool_use
-      // and runs it again. See inc-4258.
-      const disableFallback =
-        isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK) ||
-        getFeatureValue_CACHED_MAY_BE_STALE(
-          "tengu_disable_streaming_to_non_streaming_fallback",
-          false,
-        );
+      try {
+        // stream in and accumulate state
+        let isFirstChunk = true;
+        let lastEventTime: number | null = null; // Set after first chunk to avoid measuring TTFB as a stall
+        const STALL_THRESHOLD_MS = 30_000; // 30 seconds
+        let totalStallTime = 0;
+        let stallCount = 0;
 
-      if (disableFallback) {
+        for await (const part of stream) {
+          resetStreamIdleTimer();
+          const now = Date.now();
+
+          // Detect and log streaming stalls (only after first event to avoid counting TTFB)
+          if (lastEventTime !== null) {
+            const timeSinceLastEvent = now - lastEventTime;
+            if (timeSinceLastEvent > STALL_THRESHOLD_MS) {
+              stallCount++;
+              totalStallTime += timeSinceLastEvent;
+              logForDebugging(
+                `Streaming stall detected: ${(timeSinceLastEvent / 1000).toFixed(1)}s gap between events (stall #${stallCount})`,
+                { level: "warn" },
+              );
+              logEvent("tengu_streaming_stall", {
+                stall_duration_ms: timeSinceLastEvent,
+                stall_count: stallCount,
+                total_stall_time_ms: totalStallTime,
+                event_type:
+                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                model:
+                  options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                request_id: (streamRequestId ??
+                  "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              });
+            }
+          }
+          lastEventTime = now;
+
+          if (isFirstChunk) {
+            logForDebugging("Stream started - received first chunk");
+            queryCheckpoint("query_first_chunk_received");
+            if (!options.agentId) {
+              headlessProfilerCheckpoint("first_chunk");
+            }
+            endQueryProfile();
+            isFirstChunk = false;
+          }
+
+          switch (part.type) {
+            case "message_start": {
+              partialMessage = part.message;
+              ttftMs = Date.now() - start;
+              usage = updateUsage(usage, part.message?.usage);
+              // Capture research from message_start if available (internal only).
+              // Always overwrite with the latest value.
+              if (
+                process.env.USER_TYPE === "ant" &&
+                "research" in (part.message as unknown as Record<string, unknown>)
+              ) {
+                research = (part.message as unknown as Record<string, unknown>)
+                  .research;
+              }
+              break;
+            }
+            case "content_block_start":
+              switch (part.content_block.type) {
+                case "tool_use":
+                  contentBlocks[part.index] = {
+                    ...part.content_block,
+                    input: "",
+                  };
+                  break;
+                case "server_tool_use":
+                  contentBlocks[part.index] = {
+                    ...part.content_block,
+                    input: "" as unknown as { [key: string]: unknown },
+                  };
+                  if ((part.content_block.name as string) === "advisor") {
+                    isAdvisorInProgress = true;
+                    logForDebugging(`[AdvisorTool] Advisor tool called`);
+                    logEvent("tengu_advisor_tool_call", {
+                      model:
+                        options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      advisor_model: (advisorModel ??
+                        "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                    });
+                  }
+                  break;
+                case "text":
+                  contentBlocks[part.index] = {
+                    ...part.content_block,
+                    // awkwardly, the sdk sometimes returns text as part of a
+                    // content_block_start message, then returns the same text
+                    // again in a content_block_delta message. we ignore it here
+                    // since there doesn't seem to be a way to detect when a
+                    // content_block_delta message duplicates the text.
+                    text: "",
+                  };
+                  break;
+                case "thinking":
+                  contentBlocks[part.index] = {
+                    ...part.content_block,
+                    // also awkward
+                    thinking: "",
+                    // initialize signature to ensure field exists even if signature_delta never arrives
+                    signature: "",
+                  };
+                  break;
+                default:
+                  // even more awkwardly, the sdk mutates the contents of text blocks
+                  // as it works. we want the blocks to be immutable, so that we can
+                  // accumulate state ourselves.
+                  contentBlocks[part.index] = { ...part.content_block };
+                  if (
+                    (part.content_block.type as string) === "advisor_tool_result"
+                  ) {
+                    isAdvisorInProgress = false;
+                    logForDebugging(`[AdvisorTool] Advisor tool result received`);
+                  }
+                  break;
+              }
+              break;
+            case "content_block_delta": {
+              const contentBlock = contentBlocks[part.index];
+              const delta = part.delta as typeof part.delta | ConnectorTextDelta;
+              if (!contentBlock) {
+                logEvent("tengu_streaming_error", {
+                  error_type:
+                    "content_block_not_found_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  part_type:
+                    part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  part_index: part.index,
+                });
+                throw new RangeError("Content block not found");
+              }
+              if (
+                feature("CONNECTOR_TEXT") &&
+                delta.type === "connector_text_delta"
+              ) {
+                if (contentBlock.type !== "connector_text") {
+                  logEvent("tengu_streaming_error", {
+                    error_type:
+                      "content_block_type_mismatch_connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                    expected_type:
+                      "connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                    actual_type:
+                      contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  });
+                  throw new Error("Content block is not a connector_text block");
+                }
+                contentBlock.connector_text += delta.connector_text;
+              } else {
+                switch (delta.type) {
+                  case "citations_delta":
+                    // TODO: handle citations
+                    break;
+                  case "input_json_delta":
+                    if (
+                      contentBlock.type !== "tool_use" &&
+                      contentBlock.type !== "server_tool_use"
+                    ) {
+                      logEvent("tengu_streaming_error", {
+                        error_type:
+                          "content_block_type_mismatch_input_json" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        expected_type:
+                          "tool_use" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        actual_type:
+                          contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      });
+                      throw new Error("Content block is not a input_json block");
+                    }
+                    if (typeof contentBlock.input !== "string") {
+                      logEvent("tengu_streaming_error", {
+                        error_type:
+                          "content_block_input_not_string" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        input_type:
+                          typeof contentBlock.input as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      });
+                      throw new Error("Content block input is not a string");
+                    }
+                    contentBlock.input += delta.partial_json;
+                    break;
+                  case "text_delta":
+                    if (contentBlock.type !== "text") {
+                      logEvent("tengu_streaming_error", {
+                        error_type:
+                          "content_block_type_mismatch_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        expected_type:
+                          "text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        actual_type:
+                          contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      });
+                      throw new Error("Content block is not a text block");
+                    }
+                    contentBlock.text += delta.text;
+                    break;
+                  case "signature_delta":
+                    if (
+                      feature("CONNECTOR_TEXT") &&
+                      contentBlock.type === "connector_text"
+                    ) {
+                      contentBlock.signature = delta.signature;
+                      break;
+                    }
+                    if (contentBlock.type !== "thinking") {
+                      logEvent("tengu_streaming_error", {
+                        error_type:
+                          "content_block_type_mismatch_thinking_signature" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        expected_type:
+                          "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        actual_type:
+                          contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      });
+                      throw new Error("Content block is not a thinking block");
+                    }
+                    contentBlock.signature = delta.signature;
+                    break;
+                  case "thinking_delta":
+                    if (contentBlock.type !== "thinking") {
+                      logEvent("tengu_streaming_error", {
+                        error_type:
+                          "content_block_type_mismatch_thinking_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        expected_type:
+                          "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        actual_type:
+                          contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      });
+                      throw new Error("Content block is not a thinking block");
+                    }
+                    contentBlock.thinking += delta.thinking;
+                    break;
+                }
+              }
+              // Capture research from content_block_delta if available (internal only).
+              // Always overwrite with the latest value.
+              if (process.env.USER_TYPE === "ant" && "research" in part) {
+                research = (part as { research: unknown }).research;
+              }
+              break;
+            }
+            case "content_block_stop": {
+              const contentBlock = contentBlocks[part.index];
+              if (!contentBlock) {
+                logEvent("tengu_streaming_error", {
+                  error_type:
+                    "content_block_not_found_stop" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  part_type:
+                    part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  part_index: part.index,
+                });
+                throw new RangeError("Content block not found");
+              }
+              if (!partialMessage) {
+                logEvent("tengu_streaming_error", {
+                  error_type:
+                    "partial_message_not_found" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  part_type:
+                    part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                });
+                throw new Error("Message not found");
+              }
+              const m: AssistantMessage = {
+                message: {
+                  ...partialMessage,
+                  content: normalizeContentFromAPI(
+                    [contentBlock] as BetaContentBlock[],
+                    tools,
+                    options.agentId,
+                  ),
+                },
+                requestId: streamRequestId ?? undefined,
+                type: "assistant",
+                uuid: randomUUID(),
+                timestamp: new Date().toISOString(),
+                ...(process.env.USER_TYPE === "ant" &&
+                  research !== undefined && { research }),
+                ...(advisorModel && { advisorModel }),
+              };
+              newMessages.push(m);
+              yield m;
+              break;
+            }
+            case "message_delta": {
+              usage = updateUsage(usage, part.usage);
+              // Capture research from message_delta if available (internal only).
+              // Always overwrite with the latest value. Also write back to
+              // already-yielded messages since message_delta arrives after
+              // content_block_stop.
+              if (
+                process.env.USER_TYPE === "ant" &&
+                "research" in (part as unknown as Record<string, unknown>)
+              ) {
+                research = (part as unknown as Record<string, unknown>).research;
+                for (const msg of newMessages) {
+                  msg.research = research;
+                }
+              }
+
+              // Write final usage and stop_reason back to the last yielded
+              // message. Messages are created at content_block_stop from
+              // partialMessage, which was set at message_start before any tokens
+              // were generated (output_tokens: 0, stop_reason: null).
+              // message_delta arrives after content_block_stop with the real
+              // values.
+              //
+              // IMPORTANT: Use direct property mutation, not object replacement.
+              // The transcript write queue holds a reference to message.message
+              // and serializes it lazily (100ms flush interval). Object
+              // replacement ({ ...lastMsg.message, usage }) would disconnect
+              // the queued reference; direct mutation ensures the transcript
+              // captures the final values.
+              stopReason = part.delta.stop_reason;
+
+              const lastMsg = newMessages.at(-1);
+              if (lastMsg) {
+                lastMsg.message.usage = usage;
+                lastMsg.message.stop_reason = stopReason;
+              }
+
+              // Update cost
+              const costUSDForPart = calculateUSDCost(resolvedModel, usage);
+              costUSD += addToTotalSessionCost(
+                costUSDForPart,
+                usage,
+                options.model,
+              );
+
+              const refusalMessage = getErrorMessageIfRefusal(
+                part.delta.stop_reason,
+                options.model,
+              );
+              if (refusalMessage) {
+                yield refusalMessage;
+              }
+
+              if (stopReason === "max_tokens") {
+                logEvent("tengu_max_tokens_reached", {
+                  max_tokens: maxOutputTokens,
+                });
+                yield createAssistantAPIErrorMessage({
+                  content: `${API_ERROR_MESSAGE_PREFIX}: Claude's response exceeded the ${
+                    maxOutputTokens
+                  } output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.`,
+                  apiError: "max_output_tokens",
+                  error: "max_output_tokens",
+                });
+              }
+
+              if (stopReason === "model_context_window_exceeded") {
+                logEvent("tengu_context_window_exceeded", {
+                  max_tokens: maxOutputTokens,
+                  output_tokens: usage.output_tokens,
+                });
+                // Reuse the max_output_tokens recovery path — from the model's
+                // perspective, both mean "response was cut off, continue from
+                // where you left off."
+                yield createAssistantAPIErrorMessage({
+                  content: `${API_ERROR_MESSAGE_PREFIX}: The model has reached its context window limit.`,
+                  apiError: "max_output_tokens",
+                  error: "max_output_tokens",
+                });
+              }
+              break;
+            }
+            case "message_stop":
+              break;
+          }
+
+          yield {
+            type: "stream_event",
+            event: part,
+            ...(part.type === "message_start" ? { ttftMs } : undefined),
+          };
+        }
+        // Clear the idle timeout watchdog now that the stream loop has exited
+        clearStreamIdleTimers();
+
+        // If the stream was aborted by our idle timeout watchdog, fall back to
+        // non-streaming retry rather than treating it as a completed stream.
+        if (streamIdleAborted) {
+          // Instrumentation: proves the for-await exited after the watchdog fired
+          // (vs. hung forever). exit_delay_ms measures abort propagation latency:
+          // 0-10ms = abort worked; >>1000ms = something else woke the loop.
+          const exitDelayMs =
+            streamWatchdogFiredAt !== null
+              ? Math.round(performance.now() - streamWatchdogFiredAt)
+              : -1;
+          logForDiagnosticsNoPII(
+            "info",
+            "cli_stream_loop_exited_after_watchdog_clean",
+          );
+          logEvent("tengu_stream_loop_exited_after_watchdog", {
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            exit_delay_ms: exitDelayMs,
+            exit_path:
+              "clean" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          });
+          // Prevent double-emit: this throw lands in the catch block below,
+          // whose exit_path='error' probe guards on streamWatchdogFiredAt.
+          streamWatchdogFiredAt = null;
+          throw new Error("Stream idle timeout - no chunks received");
+        }
+
+        // Detect when the stream completed without producing any assistant messages.
+        // This covers two proxy failure modes:
+        // 1. No events at all (!partialMessage): proxy returned 200 with non-SSE body
+        // 2. Partial events (partialMessage set but no content blocks completed AND
+        //    no stop_reason received): proxy returned message_start but stream ended
+        //    before content_block_stop and before message_delta with stop_reason
+        // BetaMessageStream had the first check in _endRequest() but the raw Stream
+        // does not - without it the generator silently returns no assistant messages,
+        // causing "Execution error" in -p mode.
+        // Note: We must check stopReason to avoid false positives. For example, with
+        // structured output (--json-schema), the model calls a StructuredOutput tool
+        // on turn 1, then on turn 2 responds with end_turn and no content blocks.
+        // That's a legitimate empty response, not an incomplete stream.
+        if (!partialMessage || (newMessages.length === 0 && !stopReason)) {
+          logForDebugging(
+            !partialMessage
+              ? "Stream completed without receiving message_start event - triggering non-streaming fallback"
+              : "Stream completed with message_start but no content blocks completed - triggering non-streaming fallback",
+            { level: "error" },
+          );
+          logEvent("tengu_stream_no_events", {
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          });
+          throw new Error("Stream ended without receiving any events");
+        }
+
+        // Log summary if any stalls occurred during streaming
+        if (stallCount > 0) {
+          logForDebugging(
+            `Streaming completed with ${stallCount} stall(s), total stall time: ${(totalStallTime / 1000).toFixed(1)}s`,
+            { level: "warn" },
+          );
+          logEvent("tengu_streaming_stall_summary", {
+            stall_count: stallCount,
+            total_stall_time_ms: totalStallTime,
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          });
+        }
+
+        // Check if the cache actually broke based on response tokens
+        if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
+          void checkResponseForCacheBreak(
+            options.querySource,
+            usage.cache_read_input_tokens,
+            usage.cache_creation_input_tokens,
+            messages,
+            options.agentId,
+            streamRequestId,
+          );
+        }
+
+        // Process fallback percentage header and quota status if available
+        // streamResponse is set when the stream is created in the withRetry callback above
+        // TypeScript's control flow analysis can't track that streamResponse is set in the callback
+        // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
+        const resp = streamResponse as unknown as Response | undefined;
+        if (resp) {
+          extractQuotaStatusFromHeaders(resp.headers);
+          // Store headers for gateway detection
+          responseHeaders = resp.headers;
+        }
+      } catch (streamingError) {
+        // Clear the idle timeout watchdog on error path too
+        clearStreamIdleTimers();
+
+        // Instrumentation: if the watchdog had already fired and the for-await
+        // threw (rather than exiting cleanly), record that the loop DID exit and
+        // how long after the watchdog. Distinguishes true hangs from error exits.
+        if (streamIdleAborted && streamWatchdogFiredAt !== null) {
+          const exitDelayMs = Math.round(
+            performance.now() - streamWatchdogFiredAt,
+          );
+          logForDiagnosticsNoPII(
+            "info",
+            "cli_stream_loop_exited_after_watchdog_error",
+          );
+          logEvent("tengu_stream_loop_exited_after_watchdog", {
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            exit_delay_ms: exitDelayMs,
+            exit_path:
+              "error" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            error_name:
+              streamingError instanceof Error
+                ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
+                : ("unknown" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          });
+        }
+
+        if (streamingError instanceof APIUserAbortError) {
+          // Check if the abort signal was triggered by the user (ESC key)
+          // If the signal is aborted, it's a user-initiated abort
+          // If not, it's likely a timeout from the SDK
+          if (signal.aborted) {
+            // This is a real user abort (ESC key was pressed)
+            logForDebugging(
+              `Streaming aborted by user: ${errorMessage(streamingError)}`,
+            );
+            if (isAdvisorInProgress) {
+              logEvent("tengu_advisor_tool_interrupted", {
+                model:
+                  options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                advisor_model: (advisorModel ??
+                  "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              });
+            }
+            throw streamingError;
+          } else {
+            // The SDK threw APIUserAbortError but our signal wasn't aborted
+            // This means it's a timeout from the SDK's internal timeout
+            logForDebugging(
+              `Streaming timeout (SDK abort): ${streamingError.message}`,
+              { level: "error" },
+            );
+            // Throw a more specific error for timeout
+            throw new APIConnectionTimeoutError({ message: "Request timed out" });
+          }
+        }
+
+        // When the flag is enabled, skip the non-streaming fallback and let the
+        // error propagate to withRetry. The mid-stream fallback causes double tool
+        // execution when streaming tool execution is active: the partial stream
+        // starts a tool, then the non-streaming retry produces the same tool_use
+        // and runs it again. See inc-4258.
+        const disableFallback =
+          isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK) ||
+          getFeatureValue_CACHED_MAY_BE_STALE(
+            "tengu_disable_streaming_to_non_streaming_fallback",
+            false,
+          );
+
+        if (disableFallback) {
+          logForDebugging(
+            `Error streaming (non-streaming fallback disabled): ${errorMessage(streamingError)}`,
+            { level: "error" },
+          );
+          logEvent("tengu_streaming_fallback_to_non_streaming", {
+            model:
+              options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            error:
+              streamingError instanceof Error
+                ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
+                : (String(
+                    streamingError,
+                  ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+            attemptNumber,
+            maxOutputTokens,
+            thinkingType:
+              thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            fallback_disabled: true,
+            request_id: (streamRequestId ??
+              "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            fallback_cause: (streamIdleAborted
+              ? "watchdog"
+              : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          });
+          if (
+            !signal.aborted &&
+            streamRequests < maxStreamRequests &&
+            isRetryableStreamError(streamingError)
+          ) {
+            const retryError =
+              streamingError instanceof APIError
+                ? streamingError
+                : new APIConnectionError({
+                    message: errorMessage(streamingError),
+                  });
+            const delayMs = getRetryDelay(
+              streamRequests,
+              getRetryAfter(streamingError),
+            );
+            releaseStreamResources();
+            options.onStreamingFallback?.();
+            yield {
+              ...createSystemAPIErrorMessage(
+                retryError,
+                delayMs,
+                streamRequests,
+                maxStreamRequests - 1,
+              ),
+              streamRestart: true,
+            };
+            await sleep(delayMs, signal, {
+              abortError: () => new APIUserAbortError(),
+            });
+            continue streamAttempts;
+          }
+          throw streamingError;
+        }
+
         logForDebugging(
-          `Error streaming (non-streaming fallback disabled): ${errorMessage(streamingError)}`,
+          `Error streaming, falling back to non-streaming mode: ${errorMessage(streamingError)}`,
           { level: "error" },
         );
+        didFallBackToNonStreaming = true;
+        if (options.onStreamingFallback) {
+          options.onStreamingFallback();
+        }
+
         logEvent("tengu_streaming_fallback_to_non_streaming", {
           model:
             options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -2541,110 +2617,80 @@ async function* queryModel(
           maxOutputTokens,
           thinkingType:
             thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          fallback_disabled: true,
+          fallback_disabled: false,
           request_id: (streamRequestId ??
             "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           fallback_cause: (streamIdleAborted
             ? "watchdog"
             : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         });
-        throw streamingError;
-      }
 
-      logForDebugging(
-        `Error streaming, falling back to non-streaming mode: ${errorMessage(streamingError)}`,
-        { level: "error" },
-      );
-      didFallBackToNonStreaming = true;
-      if (options.onStreamingFallback) {
-        options.onStreamingFallback();
-      }
+        // Fall back to non-streaming mode with retries.
+        // If the streaming failure was itself a 529, count it toward the
+        // consecutive-529 budget so total 529s-before-model-fallback is the
+        // same whether the overload was hit in streaming or non-streaming mode.
+        // This is a speculative fix for https://github.com/anthropics/claude-code/issues/1513
+        // Instrumentation: proves executeNonStreamingRequest was entered (vs. the
+        // fallback event firing but the call itself hanging at dispatch).
+        logForDiagnosticsNoPII("info", "cli_nonstreaming_fallback_started");
+        logEvent("tengu_nonstreaming_fallback_started", {
+          request_id: (streamRequestId ??
+            "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          model:
+            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          fallback_cause: (streamIdleAborted
+            ? "watchdog"
+            : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        });
+        const result = yield* executeNonStreamingRequest(
+          { model: options.model, source: options.querySource },
+          {
+            model: options.model,
+            fallbackModel: options.fallbackModel,
+            thinkingConfig,
+            ...(isFastModeEnabled() && { fastMode: isFastMode }),
+            signal,
+            initialConsecutive529Errors: is529Error(streamingError) ? 1 : 0,
+            querySource: options.querySource,
+          },
+          paramsFromContext,
+          (attempt, _startTime, tokens) => {
+            attemptNumber = attempt;
+            maxOutputTokens = tokens;
+          },
+          (params) => captureAPIRequest(params, options.querySource),
+          streamRequestId,
+        );
 
-      logEvent("tengu_streaming_fallback_to_non_streaming", {
-        model:
-          options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        error:
-          streamingError instanceof Error
-            ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-            : (String(
-                streamingError,
-              ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
-        attemptNumber,
-        maxOutputTokens,
-        thinkingType:
-          thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        fallback_disabled: false,
-        request_id: (streamRequestId ??
-          "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        fallback_cause: (streamIdleAborted
-          ? "watchdog"
-          : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      });
-
-      // Fall back to non-streaming mode with retries.
-      // If the streaming failure was itself a 529, count it toward the
-      // consecutive-529 budget so total 529s-before-model-fallback is the
-      // same whether the overload was hit in streaming or non-streaming mode.
-      // This is a speculative fix for https://github.com/anthropics/claude-code/issues/1513
-      // Instrumentation: proves executeNonStreamingRequest was entered (vs. the
-      // fallback event firing but the call itself hanging at dispatch).
-      logForDiagnosticsNoPII("info", "cli_nonstreaming_fallback_started");
-      logEvent("tengu_nonstreaming_fallback_started", {
-        request_id: (streamRequestId ??
-          "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        model:
-          options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        fallback_cause: (streamIdleAborted
-          ? "watchdog"
-          : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      });
-      const result = yield* executeNonStreamingRequest(
-        { model: options.model, source: options.querySource },
-        {
-          model: options.model,
-          fallbackModel: options.fallbackModel,
-          thinkingConfig,
-          ...(isFastModeEnabled() && { fastMode: isFastMode }),
-          signal,
-          initialConsecutive529Errors: is529Error(streamingError) ? 1 : 0,
-          querySource: options.querySource,
-        },
-        paramsFromContext,
-        (attempt, _startTime, tokens) => {
-          attemptNumber = attempt;
-          maxOutputTokens = tokens;
-        },
-        (params) => captureAPIRequest(params, options.querySource),
-        streamRequestId,
-      );
-
-      const m: AssistantMessage = {
-        message: {
-          ...result,
-          usage: normalizeUsage(result.usage),
-          content: normalizeContentFromAPI(
-            result.content,
-            tools,
-            options.agentId,
-          ),
-        },
-        requestId: streamRequestId ?? undefined,
-        type: "assistant",
-        uuid: randomUUID(),
-        timestamp: new Date().toISOString(),
-        ...(process.env.USER_TYPE === "ant" &&
-          research !== undefined && {
-            research,
+        const m: AssistantMessage = {
+          message: {
+            ...result,
+            usage: normalizeUsage(result.usage),
+            content: normalizeContentFromAPI(
+              result.content,
+              tools,
+              options.agentId,
+            ),
+          },
+          requestId: streamRequestId ?? undefined,
+          type: "assistant",
+          uuid: randomUUID(),
+          timestamp: new Date().toISOString(),
+          ...(process.env.USER_TYPE === "ant" &&
+            research !== undefined && {
+              research,
+            }),
+          ...(advisorModel && {
+            advisorModel,
           }),
-        ...(advisorModel && {
-          advisorModel,
-        }),
-      };
-      newMessages.push(m);
-      fallbackMessage = m;
-      yield m;
-    } finally {
-      clearStreamIdleTimers();
+        };
+        newMessages.push(m);
+        fallbackMessage = m;
+        yield m;
+      } finally {
+        clearStreamIdleTimers();
+      }
+      break;
     }
   } catch (errorFromRetry) {
     // FallbackTriggeredError must propagate to query.ts, which performs the

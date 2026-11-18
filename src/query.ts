@@ -739,6 +739,7 @@ async function* queryLoop(
                   toolUseContext,
                 )
               }
+              streamingFallbackOccured = false
             }
             // Backfill tool_use inputs on a cloned message before yield so
             // SDK stream output and transcript serialization see legacy/derived

@@ -108,6 +108,7 @@ export type ServerMessage =
   | { type: 'tool_result'; toolUseId: string; content: unknown; isError: boolean; parentToolUseId?: string }
   | { type: 'permission_resolved'; requestId: string; allowed: boolean; by: ClientKind }
   | { type: 'message_complete'; usage: TokenUsage }
+  | { type: 'reply_retracted' }
   | { type: 'thinking'; text: string }
   | {
       type: 'api_retry'

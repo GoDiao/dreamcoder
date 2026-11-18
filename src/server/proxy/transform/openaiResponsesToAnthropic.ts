@@ -5,6 +5,12 @@ import type {
   AnthropicResponse,
   AnthropicContentBlock,
 } from './types.js'
+import {
+  apiError,
+  contentFilterError,
+  UpstreamReplyError,
+} from '../../upstream/upstreamError.js'
+import type { ChatFinish } from './openaiChatToAnthropic.js'
 import { parseOpenAIToolArguments } from './toolArguments.js'
 
 export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, model: string): AnthropicResponse {
@@ -20,13 +26,18 @@ export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, mo
     content.push({ type: 'text', text: '' })
   }
 
+  const finish = mapResponsesStatus(response.status, response.incomplete_details?.reason, hasToolUse)
+  if ('error' in finish) {
+    throw new UpstreamReplyError(finish.error)
+  }
+
   return {
     id: response.id || `msg_${Date.now()}`,
     type: 'message',
     role: 'assistant',
     content,
     model,
-    stop_reason: mapStatus(response.status, hasToolUse),
+    stop_reason: finish.stopReason,
     stop_sequence: null,
     usage: mapResponsesUsage(response.usage),
   }
@@ -80,12 +91,9 @@ function convertOutputItem(item: OpenAIResponsesOutputItem, content: AnthropicCo
   }
 }
 
-function mapStatus(status: string, hasToolUse: boolean): string {
-  switch (status) {
-    case 'completed': return hasToolUse ? 'tool_use' : 'end_turn'
-    case 'failed': return 'end_turn'
-    case 'cancelled': return 'end_turn'
-    case 'incomplete': return 'max_tokens'
-    default: return 'end_turn'
-  }
+export function mapResponsesStatus(status: string | undefined, incompleteReason: string | undefined, hasToolUse: boolean): ChatFinish {
+  if (status !== 'incomplete') return { stopReason: hasToolUse ? 'tool_use' : 'end_turn' }
+  if (!incompleteReason || incompleteReason === 'max_output_tokens') return { stopReason: 'max_tokens' }
+  if (incompleteReason === 'content_filter') return { error: contentFilterError(`incomplete: ${incompleteReason}`) }
+  return { error: apiError(`The provider ended the reply before it finished (incomplete: ${incompleteReason}).`) }
 }

@@ -1,6 +1,7 @@
 import { isClaudeModelName } from '../services/attributionHeaderPolicy.js'
 import { ProviderService } from '../services/providerService.js'
 import { sendToUpstream } from '../upstream/client.js'
+import { anthropicErrorResponse } from '../upstream/upstreamError.js'
 import { ensureClaudeCodeAttribution } from './claudeCodeAttribution.js'
 import type { AnthropicRequest } from './transform/types.js'
 
@@ -77,9 +78,9 @@ export async function handleProxyRequest(req: Request, url: URL, server: ProxySe
   })
 
   if (!result.ok) {
-    return Response.json(
-      { type: 'error', error: { type: 'api_error', message: result.error } },
-      { status: result.httpStatus ?? 502 },
+    return anthropicErrorResponse(
+      { status: result.httpStatus ?? 502, type: result.errorType ?? 'api_error', message: result.error },
+      result.headers,
     )
   }
 

@@ -1,6 +1,14 @@
-import type { OpenAIChatStreamChunk } from '../transform/types.js'
+import type { OpenAIChatStreamChunk, OpenAIChatUsage } from '../transform/types.js'
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
-import { mapUsage } from '../transform/openaiChatToAnthropic.js'
+import { chatUsage, mapChatFinishReason, mapUsage } from '../transform/openaiChatToAnthropic.js'
+import {
+  anthropicErrorBody,
+  apiError,
+  readProviderError,
+  streamClosedEarlyError,
+  toAnthropicError,
+  type AnthropicError,
+} from '../../upstream/upstreamError.js'
 import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 
 type ContentBlockType = 'text' | 'thinking' | 'tool_use'
@@ -35,7 +43,10 @@ type StreamState = {
   heldMessageDelta: SseEvent | null
 
   sawValidChunk: boolean
-  upstreamError: string | null
+  sawDone: boolean
+  sawUsage: boolean
+  stopReason: string | null
+  upstreamError: AnthropicError | null
 }
 
 function formatSse(event: string, data: unknown): string {
@@ -58,6 +69,9 @@ function createState(model: string): StreamState {
     messageStopSent: false,
     heldMessageDelta: null,
     sawValidChunk: false,
+    sawDone: false,
+    sawUsage: false,
+    stopReason: null,
     upstreamError: null,
   }
 }
@@ -119,6 +133,7 @@ function handleData(
   encoder: TextEncoder,
 ): void {
   if (data === '[DONE]') {
+    state.sawDone = true
     finalizeStream(state)
     flushQueue(state, controller, encoder)
     return
@@ -136,6 +151,7 @@ function handleData(
   if (Array.isArray(chunk.choices)) state.sawValidChunk = true
 
   processChunk(chunk, state)
+  if (state.upstreamError) finalizeStream(state)
   flushQueue(state, controller, encoder)
 }
 
@@ -259,70 +275,37 @@ function extractReasoning(delta: DeltaEx): { thinking: string; signature: string
   return null
 }
 
-function detectBlockTransition(
-  delta: DeltaEx,
-  state: StreamState,
-): { type: ContentBlockType; isNew: boolean } | null {
-  if (delta.tool_calls && delta.tool_calls.length > 0) {
-    const tc = delta.tool_calls[0]
-    const isNew = state.currentBlockType !== 'tool_use' || !!(tc.function?.name)
-    return { type: 'tool_use', isNew }
-  }
-
-  if (delta.content != null && delta.content !== '') {
-    const isNew = state.currentBlockType !== 'text' || !state.blockStartSent
-    return { type: 'text', isNew }
-  }
-
-  const reasoning = extractReasoning(delta)
-  if (reasoning) {
-    const isNew = state.currentBlockType !== 'thinking' || !state.blockStartSent
-    return { type: 'thinking', isNew }
-  }
-
-  return null
+function leaveBlockFor(type: ContentBlockType, state: StreamState): void {
+  if (!state.blockStartSent || state.blockStopSent || state.currentBlockType === type) return
+  if (state.currentBlockType === 'tool_use') closeAllToolBlocks(state)
+  else closeCurrentBlock(state)
 }
 
 function processChunk(chunk: OpenAIChatStreamChunk, state: StreamState): void {
   const choice = chunk.choices?.[0]
-
-  if (!choice) {
-    if (chunk.usage && state.heldMessageDelta) {
-      mergeUsageIntoHeldDelta(state, chunk.usage)
-    }
-    return
-  }
+  const usage = chatUsage(chunk)
+  if (usage && state.heldMessageDelta) mergeUsageIntoHeldDelta(state, usage)
+  if (!choice) return
 
   ensureMessageStart(state, chunk.id)
 
   const delta = choice.delta as DeltaEx
 
-  const transition = detectBlockTransition(delta, state)
-
-  if (transition) {
-    if (transition.isNew && state.blockStartSent && !state.blockStopSent) {
-      if (state.currentBlockType === 'tool_use' && transition.type !== 'tool_use') {
-        closeAllToolBlocks(state)
-      } else if (state.currentBlockType !== 'tool_use') {
-        closeCurrentBlock(state)
-      }
-    }
-
-    switch (transition.type) {
-      case 'thinking':
-        handleThinking(delta, state)
-        break
-      case 'text':
-        handleText(delta, state)
-        break
-      case 'tool_use':
-        handleToolCalls(delta, state)
-        break
-    }
+  if (extractReasoning(delta)) {
+    leaveBlockFor('thinking', state)
+    handleThinking(delta, state)
+  }
+  if (delta.content != null && delta.content !== '') {
+    leaveBlockFor('text', state)
+    handleText(delta, state)
+  }
+  if (delta.tool_calls && delta.tool_calls.length > 0) {
+    leaveBlockFor('tool_use', state)
+    handleToolCalls(delta, state)
   }
 
   if (choice.finish_reason) {
-    handleFinishReason(choice.finish_reason, chunk, state)
+    handleFinishReason(choice.finish_reason, usage, state)
   }
 }
 
@@ -423,29 +406,31 @@ function handleToolCalls(delta: DeltaEx, state: StreamState): void {
 
 function handleFinishReason(
   finishReason: string,
-  chunk: OpenAIChatStreamChunk,
+  usage: OpenAIChatUsage | undefined,
   state: StreamState,
 ): void {
   if (state.messageDeltaSent) return
 
-  closeAllOpenBlocks(state)
+  const finish = mapChatFinishReason(finishReason, state.sawToolUse)
+  if ('error' in finish) {
+    state.upstreamError = finish.error
+    return
+  }
 
-  let stopReason = mapFinishReason(finishReason)
-  // Gemini ends a tool-calling turn with finish_reason "stop"; clients that keep going only
-  // on stop_reason "tool_use" would otherwise not run the tools.
-  if (state.sawToolUse && stopReason === 'end_turn') stopReason = 'tool_use'
-  const usage = mapUsage(chunk.usage)
+  closeAllOpenBlocks(state)
+  state.stopReason = finish.stopReason
 
   const messageDelta: SseEvent = {
     event: 'message_delta',
     data: {
       type: 'message_delta',
-      delta: { stop_reason: stopReason, stop_sequence: null },
-      usage,
+      delta: { stop_reason: finish.stopReason, stop_sequence: null },
+      ...(usage && { usage: mapUsage(usage) }),
     },
   }
 
-  if (chunk.usage) {
+  if (usage) {
+    state.sawUsage = true
     state.messageDeltaSent = true
     state.queue.push(messageDelta)
   } else {
@@ -453,38 +438,42 @@ function handleFinishReason(
   }
 }
 
-function mergeUsageIntoHeldDelta(
-  state: StreamState,
-  usage: NonNullable<OpenAIChatStreamChunk['usage']>,
-): void {
+function mergeUsageIntoHeldDelta(state: StreamState, usage: OpenAIChatUsage): void {
   if (!state.heldMessageDelta) return
 
   const data = state.heldMessageDelta.data as Record<string, unknown>
   data.usage = mapUsage(usage)
+  state.sawUsage = true
   state.messageDeltaSent = true
   state.queue.push(state.heldMessageDelta)
   state.heldMessageDelta = null
 }
 
-function readUpstreamError(chunk: unknown): string | null {
+function readUpstreamError(chunk: unknown): AnthropicError | null {
   const error = (chunk as { error?: unknown } | null)?.error
   if (!error || typeof error !== 'object') return null
-  const message = (error as { message?: unknown }).message
-  return typeof message === 'string' && message ? message : 'Upstream returned an error'
+  return toAnthropicError(undefined, readProviderError(chunk) ?? { message: 'Upstream returned an error' })
+}
+
+function endError(state: StreamState): AnthropicError | null {
+  if (state.upstreamError) return state.upstreamError
+  if (!state.sawValidChunk) return apiError('Upstream returned no valid Chat Completions chunks')
+  if (!state.sawDone && !state.messageDeltaSent && !state.heldMessageDelta) {
+    return streamClosedEarlyError()
+  }
+  if (state.nextContentIndex === 0 && !state.sawUsage && (state.stopReason ?? 'end_turn') === 'end_turn') {
+    return apiError('The provider returned an empty reply.')
+  }
+  return null
 }
 
 function finalizeStream(state: StreamState): void {
   if (state.messageStopSent) return
   state.messageStopSent = true
 
-  if (state.upstreamError || !state.sawValidChunk) {
-    enqueue(state, 'error', {
-      type: 'error',
-      error: {
-        type: 'api_error',
-        message: state.upstreamError ?? 'Upstream returned no valid Chat Completions chunks',
-      },
-    })
+  const error = endError(state)
+  if (error) {
+    enqueue(state, 'error', anthropicErrorBody(error))
     return
   }
 
@@ -502,20 +491,9 @@ function finalizeStream(state: StreamState): void {
     state.messageDeltaSent = true
     enqueue(state, 'message_delta', {
       type: 'message_delta',
-      delta: { stop_reason: 'end_turn', stop_sequence: null },
-      usage: { output_tokens: 0 },
+      delta: { stop_reason: state.sawToolUse ? 'tool_use' : 'end_turn', stop_sequence: null },
     })
   }
 
   enqueue(state, 'message_stop', { type: 'message_stop' })
-}
-
-function mapFinishReason(reason: string): string {
-  switch (reason) {
-    case 'stop': return 'end_turn'
-    case 'tool_calls': return 'tool_use'
-    case 'length': return 'max_tokens'
-    case 'content_filter': return 'end_turn'
-    default: return 'end_turn'
-  }
 }

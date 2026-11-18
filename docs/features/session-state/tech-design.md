@@ -44,7 +44,7 @@ DreamCoder 的每个会话由服务端拉起一个 CLI 进程执行，桌面端�
 
 客户端发：`prewarm_session`、`user_message`、`permission_response`、`set_permission_mode`、`set_runtime_config`、`stop_generation`、`ping`。
 
-服务端发：流式内容（`content_start`、`content_delta`、`tool_use_complete`、`tool_result`、`thinking`、`message_complete`），状态类（`status`、`permission_mode`、`permission_request`、`session_title_updated`、`team_*`、`task_update`、`background_task`），以及 `error`、`system_notification`、`transcript_item`、`api_retry`。定义在 `src/server/ws/protocol.ts`。
+服务端发：流式内容（`content_start`、`content_delta`、`tool_use_complete`、`tool_result`、`thinking`、`message_complete`、`reply_retracted`），状态类（`status`、`permission_mode`、`permission_request`、`session_title_updated`、`team_*`、`task_update`、`background_task`），以及 `error`、`system_notification`、`transcript_item`、`api_retry`。定义在 `src/server/ws/protocol.ts`。
 
 ### 已核实的主要问题
 
@@ -300,6 +300,16 @@ CLI 源码注释提到，末尾的 `idle` 事件曾让一些客户端卡在「�
 - `session_patch`：`version` 是应用这次变化之后的版本号。客户端收到的 `version` 不等于本地版本加一时，丢弃这个 patch 并发 `request_snapshot`。
 - `changes` 只包含变化的顶层字段，每个顶层字段整体替换，不做深层合并 `[assumption]`。这样客户端的应用逻辑最简单，代价是 `pendingPermissions` 这类数组每次整体下发，数据量很小，可以接受。
 
+流式内容另有一条撤回消息（#263）：
+
+```ts
+| { type: 'reply_retracted' }
+```
+
+- 来源：CLI 读流时出错并重新建立流之前，输出 stream-json 系统消息 `{ type: 'system', subtype: 'stream_retracted' }`（`src/QueryEngine.ts`）。
+- 服务端 `translate` 收到后清空这次回复的流式翻译状态（进行中的块、待补全的工具块、已流式发出的工具 id），广播 `reply_retracted`，并用现有的 `turn_activity_reported` 事件经 reducer 把 `turn.activity` 改回 `thinking`。消息内容不在 `SessionState` 里，所以撤回不需要新的状态事件。
+- 客户端（桌面与 H5 同一份 `chatStore`）收到后丢掉流式缓冲，并删掉最后一条用户消息或工具结果之后、属于主线程的 `assistant_text`、`thinking` 和 `tool_use`。
+
 ### WebSocket：客户端 → 服务端
 
 - 新增 `{ type: 'request_snapshot' }`。
@@ -425,6 +435,7 @@ Store --> C : patch(effective=bypass, pendingRestart=无)
 - **重启期间的请求**：带着旧代号的强杀、删除操作被忽略；新请求排在 `runtimeTransition` 之后执行（沿用现有的串行队列思路）。
 - **持久化写入失败**：内存状态照常生效并广播，记一条诊断事件（`diagnosticsService`），下一次写入重试整条记录。不会因为写盘失败回滚界面。
 - **恢复时 transcript 损坏或缺字段**：按恢复顺序退回全局默认，记诊断事件。
+- **读流中途出错后重新建立流**：CLI 在 `mutableMessages` 和 transcript 里删掉失败那次已经完整产出的部分消息（`QueryEngine` 处理 `tombstone`），服务端和客户端按上面的 `reply_retracted` 丢掉已显示的流式内容。重试成功后，客户端只看到重试得到的完整回复，下一轮历史里也没有失败那次的部分消息。
 
 ## 横切关注点
 

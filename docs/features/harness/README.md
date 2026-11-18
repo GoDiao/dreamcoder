@@ -66,9 +66,9 @@ DreamCoder 的 CLI 派生自 Claude Code 2.1.92（`src/constants/claudeCodeCompa
 
 - 推理强度：CLI 对自定义提供方发 `thinking:{type:'adaptive'}`，代理只在带预算或类型为 `enabled` 时写 `reasoning_effort`（`src/server/proxy/transform/anthropicToOpenaiChat.ts:64-72`），桌面上选的 Effort 不起作用。
 - 输出上限：`max_tokens` 不转发，实际用上游默认值。
-- 错误：上游错误统一包成 `api_error`，`retry-after` 丢失；CLI 针对 Anthropic 的错误识别（上下文过长、过载）对翻译后的错误不命中。
+- 错误：上游错误统一包成 `api_error`，`retry-after` 丢失；CLI 针对 Anthropic 的错误识别（上下文过长、过载）对翻译后的错误不命中。已在 #263 修复：代理解析上游错误并透传 `retry-after`，代理和 CLI 按同一张表分类（见 proxy/transport.md 的 P-NET-03、P-NET-04）。
 - 推理内容：只对 DeepSeek 一类上游写回历史里的 `reasoning_content`，Kimi、GLM 的会丢。
-- 图片：工具结果里的图片被换成 `[image omitted]`（`src/server/proxy/transform/toolArguments.ts:38`）。
+- 图片：工具结果里的图片被换成 `[image omitted]`（`src/server/proxy/transform/toolArguments.ts:31`）。
 - 工具调用：chat 流里没有 id 的工具调用整个被丢掉。
 
 详见 [model-adaptation.md](comparison/model-adaptation.md)。
@@ -100,6 +100,7 @@ DreamCoder 的 CLI 派生自 Claude Code 2.1.92（`src/constants/claudeCodeCompa
 - 外部构建里没有「完成前先验证」的条文。
 - 没有空响应重试和重复调用提醒（ZCode 有）。
 - 不在内置表里的模型（如 GLM-5.3、Kimi-K3），上下文窗口按 200K 计。
+- 工具在一次模型回复读完之后才执行：`tengu_streaming_tool_execution2` 在 DreamCoder 里打不开（见 loop-execution.md）。
 
 详见 [loop-execution.md](comparison/loop-execution.md)。
 

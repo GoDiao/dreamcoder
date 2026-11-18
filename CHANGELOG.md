@@ -14,7 +14,7 @@ All notable changes to DreamCoder will be documented in this file.
 - **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
 - Providers in OpenAI format can run several tool calls in one step and get tool definitions without schema fields they do not use, and replies show the model you chose instead of the dated version the provider reports (#262).
 - Every request the app itself sends to a provider (through the local proxy, for session titles and for connection tests) is recorded in the diagnostics log with the provider, model, status, timings, the provider's request id and how it ended, including errors in the middle of a stream and clients that disconnect; never the key or the request body (#262).
-- **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and asks again without streaming, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
+- **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and starts it again, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
 - Providers in OpenAI format can carry extra request headers and query parameters, such as Azure's `api-version`. The settings form does not offer them yet; for now they are set by editing the provider in `providers.json`. Authentication and the content type still come from the provider settings and override a header of the same name (#262).
 
 ### Fixed
@@ -24,6 +24,14 @@ All notable changes to DreamCoder will be documented in this file.
 - With a manual HTTP proxy set in the network settings, the agent reaches the app's local proxy directly instead of sending those requests to the HTTP proxy (#262).
 - Replies from some providers no longer come back empty; the provider's error message is shown instead (#262).
 - `/context` in the terminal no longer sends a request to the model for each part of the context when the provider is reached through the local proxy; it uses the local estimate (#262).
+- **A session that outgrows a third-party model's context can be compacted again.** Context overflow errors from OpenAI, OpenRouter, DashScope, Moonshot, Zhipu and Gemini are recognized as "Prompt is too long", so `/compact` drops the oldest turns and succeeds instead of failing the same way (#263).
+- Auto-compaction also triggers for providers that do not report token usage; the agent estimates the context itself instead of counting it as empty (#263).
+- Errors from providers in OpenAI format show the provider's own message, such as the reason for a 429, instead of a cut-off JSON fragment, and the agent waits as long as the provider's `retry-after` asks before trying again (#263).
+- A reply that the provider stops with its content filter or because of an error on its side, a stream that closes before the reply is complete, and a reply with no content now show an error instead of looking finished (#263).
+- Replies from providers in OpenAI format no longer lose text when one chunk carries reasoning, text and a tool call together, and Responses-format replies keep text and tool arguments that only arrive in completed events (#263).
+- **A wrong API key or an empty balance is reported at once.** For providers that use an API key, the agent no longer retries authentication failures and quota or balance errors for minutes before showing them; it shows the provider's message right away (#263).
+- When the output limit cuts off a tool call in the middle of its arguments, the agent no longer runs the tool with missing arguments; the model is told the call was cut off and retries with smaller pieces (#263).
+- **A reply that breaks off in the middle is retried as a stream.** When a provider's stream fails partway, the agent removes the half-finished reply from the conversation, the app and the session history, and asks again with streaming, instead of switching to a slower request without streaming that long answers could not finish within the timeout. Retries before and during a stream share one limit (#263).
 
 ## [0.9.0] — 2026-11-17
 

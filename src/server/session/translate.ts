@@ -463,6 +463,15 @@ function translateMessages(
 
     case 'system': {
       const subtype = cliMsg.subtype
+      if (subtype === 'stream_retracted') {
+        streamState.hasReceivedStreamEvents = false
+        streamState.activeBlockTypes.clear()
+        streamState.activeToolBlocks.clear()
+        streamState.pendingToolBlocks.clear()
+        streamState.streamedToolUseIds.clear()
+        events.push({ type: 'turn_activity_reported', activity: 'thinking' })
+        return [{ type: 'reply_retracted' }]
+      }
       if (subtype === 'api_retry') {
         const apiRetryMessage = toApiRetryServerMessage(cliMsg)
         return apiRetryMessage ? [apiRetryMessage] : []

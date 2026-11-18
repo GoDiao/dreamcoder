@@ -194,12 +194,103 @@ describe('upstream client', () => {
     expect(text).toContain('message_stop')
   })
 
-  test('reports upstream HTTP errors with status and body', async () => {
+  test('reports an upstream HTTP error with its status, an Anthropic error type and the plain body', async () => {
     mockFetch(() => new Response('model not found', { status: 404 }))
 
     const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
 
-    expect(result).toEqual({ ok: false, httpStatus: 404, error: 'Upstream returned HTTP 404: model not found' })
+    expect(result).toEqual({ ok: false, httpStatus: 404, errorType: 'not_found_error', error: 'model not found', headers: {} })
+  })
+
+  test('reads the message out of a JSON error body and keeps the retry and request id headers', async () => {
+    mockFetch(() => Response.json(
+      { error: { message: 'Rate limit reached for gpt-4.1, please try again in 20s.', type: 'requests', code: 'rate_limit_exceeded' } },
+      { status: 429, headers: { 'retry-after': '20', 'retry-after-ms': '20000', 'x-request-id': 'req_abc', 'set-cookie': 'a=b' } },
+    ))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toEqual({
+      ok: false,
+      httpStatus: 429,
+      errorType: 'rate_limit_error',
+      error: 'Rate limit reached for gpt-4.1, please try again in 20s.',
+      headers: { 'retry-after': '20', 'retry-after-ms': '20000', 'x-request-id': 'req_abc', 'request-id': 'req_abc' },
+    })
+  })
+
+  test('keeps at most 500 characters of a long provider message', async () => {
+    mockFetch(() => Response.json({ error: { message: 'x'.repeat(5000) } }, { status: 500 }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result.ok === false && result.error).toBe('x'.repeat(500))
+  })
+
+  test.each([
+    ['OpenAI insufficient_quota', 429, { error: { message: 'You exceeded your current quota, please check your plan and billing details.', type: 'insufficient_quota', code: 'insufficient_quota' } }],
+    ['Moonshot exceeded_current_quota_error', 429, { error: { message: 'Your account has exceeded the current quota.', type: 'exceeded_current_quota_error' } }],
+    ['Zhipu 1113', 429, { error: { code: '1113', message: '余额不足或无可用资源包,请充值。' } }],
+    ['DeepSeek 402', 402, { error: { message: 'Insufficient Balance', type: 'unknown_error' } }],
+    ['OpenRouter 402', 402, { error: { message: 'Insufficient credits. Add more using https://openrouter.ai/settings/credits', code: 402 } }],
+  ])('reports %s as a billing error the CLI does not retry', async (_kind, status, body) => {
+    mockFetch(() => Response.json(body, { status }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toMatchObject({ ok: false, httpStatus: 402, errorType: 'billing_error', headers: { 'x-should-retry': 'false' } })
+  })
+
+  test.each([
+    [401, 'authentication_error'],
+    [403, 'permission_error'],
+  ] as const)('tells the CLI not to retry a %i from the provider', async (status, type) => {
+    mockFetch(() => Response.json({ error: { message: 'Incorrect API key provided', code: 'invalid_api_key' } }, { status }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toEqual({
+      ok: false,
+      httpStatus: status,
+      errorType: type,
+      error: 'Incorrect API key provided',
+      headers: { 'x-should-retry': 'false' },
+    })
+  })
+
+  test.each([
+    ['a quota error', { error: { message: 'You exceeded your current quota.', code: 'insufficient_quota' } }, 402, 'billing_error'],
+    ['an unknown error', { error: { message: 'something broke' } }, 502, 'api_error'],
+  ] as const)('maps %s inside a 2xx body by its content', async (_kind, body, status, type) => {
+    mockFetch(() => Response.json(body))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toMatchObject({ ok: false, httpStatus: status, errorType: type })
+  })
+
+  test.each([
+    [
+      'an OpenRouter message with token counts',
+      { error: { message: "This endpoint's maximum context length is 128000 tokens. However, you requested about 270016 tokens (270000 of text input, 16 in the output).", code: 400 } },
+      "prompt is too long: 270016 tokens > 128000 maximum · This endpoint's maximum context length is 128000 tokens. However, you requested about 270016 tokens (270000 of text input, 16 in the output).",
+    ],
+    [
+      'an OpenAI error code',
+      { error: { message: 'Your input exceeds the context window of this model.', type: 'invalid_request_error', code: 'context_length_exceeded' } },
+      'prompt is too long · Your input exceeds the context window of this model.',
+    ],
+    [
+      'a Zhipu business code',
+      { error: { code: '1261', message: 'Prompt exceeds max length' } },
+      'prompt is too long · Prompt exceeds max length',
+    ],
+  ])('turns a context overflow reported as %s into the Anthropic prompt-too-long error', async (_kind, body, message) => {
+    mockFetch(() => Response.json(body, { status: 400 }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toEqual({ ok: false, httpStatus: 400, errorType: 'invalid_request_error', error: message, headers: {} })
   })
 
   test('rejects responses that do not match the declared format', async () => {
@@ -212,6 +303,17 @@ describe('upstream client', () => {
       httpStatus: 502,
       error: 'Response missing choices — not a valid Chat Completions endpoint',
     })
+  })
+
+  test.each([
+    ['content_filter', 400, 'invalid_request_error', "The provider's content filter stopped the reply (finish_reason: content_filter)."],
+    ['insufficient_system_resource', 502, 'api_error', 'The provider stopped the reply because of an error on its side (finish_reason: insufficient_system_resource).'],
+  ] as const)('reports a non-streaming reply that ended with %s as an error', async (reason, status, type, message) => {
+    mockFetch(() => Response.json({ ...openaiChatMessage, choices: [{ index: 0, message: { role: 'assistant', content: 'Hi' }, finish_reason: reason }] }))
+
+    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+
+    expect(result).toEqual({ ok: false, httpStatus: status, errorType: type, error: message, headers: {} })
   })
 
   test('reports conversion failures as 502 instead of throwing', async () => {
@@ -431,7 +533,7 @@ describe('upstream client', () => {
 
       expect(upstreamEvents()).toHaveLength(1)
       expect(upstreamEvents()[0]!.severity).toBe('warn')
-      expect(upstreamEvents()[0]!.details).toMatchObject({ status: 429, outcome: 'error', error: 'Upstream returned HTTP 429: slow down' })
+      expect(upstreamEvents()[0]!.details).toMatchObject({ status: 429, outcome: 'error', error: 'slow down' })
     })
 
     test('records an error reported in the middle of a stream when the stream ends', async () => {

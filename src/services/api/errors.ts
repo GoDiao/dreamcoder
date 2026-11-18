@@ -50,6 +50,7 @@ import {
 } from '../claudeAiLimits.js'
 import { shouldProcessRateLimits } from '../rateLimitMocking.js' // Used for /mock-limits command
 import { extractConnectionErrorDetails, formatAPIError } from './errorUtils.js'
+import { isContextOverflowText, parseContextOverflowTokens } from '../../utils/providerErrors.js'
 
 export const API_ERROR_MESSAGE_PREFIX = 'API Error'
 
@@ -86,13 +87,8 @@ export function parsePromptTooLongTokenCounts(rawMessage: string): {
   actualTokens: number | undefined
   limitTokens: number | undefined
 } {
-  const match = rawMessage.match(
-    /prompt is too long[^0-9]*(\d+)\s*tokens?\s*>\s*(\d+)/i,
-  )
-  return {
-    actualTokens: match ? parseInt(match[1]!, 10) : undefined,
-    limitTokens: match ? parseInt(match[2]!, 10) : undefined,
-  }
+  const { actualTokens, limitTokens } = parseContextOverflowTokens(rawMessage)
+  return { actualTokens, limitTokens }
 }
 
 /**
@@ -559,10 +555,7 @@ export function getAssistantMessageFromError(
 
   // Handle prompt too long errors (Vertex returns 413, direct API returns 400)
   // Use case-insensitive check since Vertex returns "Prompt is too long" (capitalized)
-  if (
-    error instanceof Error &&
-    error.message.toLowerCase().includes('prompt is too long')
-  ) {
+  if (error instanceof Error && isContextOverflowText(error.message)) {
     // Content stays generic (UI matches on exact string). The raw error with
     // token counts goes into errorDetails — reactive compact's retry loop
     // parses the gap from there via getPromptTooLongTokenGap.
@@ -1008,12 +1001,7 @@ export function classifyAPIError(error: unknown): string {
   }
 
   // Prompt/content size errors
-  if (
-    error instanceof Error &&
-    error.message
-      .toLowerCase()
-      .includes(PROMPT_TOO_LONG_ERROR_MESSAGE.toLowerCase())
-  ) {
+  if (error instanceof Error && isContextOverflowText(error.message)) {
     return 'prompt_too_long'
   }
 
