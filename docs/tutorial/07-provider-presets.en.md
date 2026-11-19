@@ -25,13 +25,12 @@ Each entry describes a provider endpoint and model defaults:
 | `apiKeyUrl` | no | Direct link to the provider's key-management page. |
 | `authStrategy` | no | How the API key is sent. It is set separately from `apiFormat`; see the values below. |
 | `defaultEnv` | no | Non-secret environment defaults passed through the provider configuration. Never put a real API key or other secret here. |
-| `modelContextWindows` | no | Known context-window sizes keyed by model ID. Values must be integers from 16,000 through 10,000,000. |
 
 The accepted API formats and authentication strategies are defined in [`src/server/types/provider.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/types/provider.ts). A preset only selects these existing behaviors; adding a format or a new authentication flow is a separate runtime change.
 
 ## Add an entry
 
-Before editing, confirm the base URL, API format, authentication requirements, model IDs, and any context-window values from the provider's own documentation. Only include defaults that are stable and supported by those sources. Do not infer a model ID or context size from a marketing name.
+Before editing, confirm the base URL, API format, authentication requirements, and model IDs from the provider's own documentation. Only include defaults that are stable and supported by those sources. Do not infer a model ID from a marketing name. Model facts such as context windows, output limits and thinking levels do not go in the preset; they live in the per-model rule table `src/server/config/modelRules.json` (see [model-rules.md](../features/harness/model-rules.md)), each entry with its source.
 
 Add the entry to `providerPresets.json`. For example, this abbreviated shape shows the required fields; replace every illustrative value with verified provider information:
 
@@ -69,7 +68,7 @@ Requests in the `openai_chat` and `openai_responses` formats always send the key
 
 Extend [`src/server/__tests__/provider-presets.test.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/__tests__/provider-presets.test.ts) to find the new ID and assert its documented URL, API format, initial models, and any optional defaults you added. The test file already checks that `GET /api/providers/presets` returns the configured list and that selected provider defaults match their published details. Keep the ordering assertions for `lmstudio`, `ollama` and `custom` intact.
 
-The form reads this same list from `GET /api/providers/presets`. Selecting a preset copies its URL, API format, authentication strategy, initial models, fast model, and any known context windows into the form. The UI behavior lives in [`ProviderFormModal.tsx`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/desktop/src/components/settings/ProviderFormModal.tsx); no separate UI registry is needed for a normal preset.
+The form reads this same list from `GET /api/providers/presets`. Selecting a preset copies its URL, API format, authentication strategy, initial models and fast model into the form. The UI behavior lives in [`ProviderFormModal.tsx`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/desktop/src/components/settings/ProviderFormModal.tsx); no separate UI registry is needed for a normal preset.
 
 Run the focused server test from the repository root:
 
@@ -94,7 +93,7 @@ Do not paste real API keys into issue comments, pull requests, screenshots, or l
 ## Checklist
 
 - The preset uses provider-documented endpoint and model values.
-- Optional auth, environment, and context-window fields are justified by the existing schema.
+- Optional auth and environment fields are justified by the existing schema.
 - The preset test asserts the new entry and preserves required ordering.
 - The focused server test passes; relevant desktop checks pass if form behavior changed.
 - The connection test succeeds locally, or the PR explains why it could not be run.

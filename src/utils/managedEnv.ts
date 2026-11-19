@@ -9,7 +9,6 @@ import {
   isProviderManagedEnvVar,
   SAFE_ENV_VARS,
 } from './managedEnvConstants.js'
-import { normalizeLegacyDeepSeekManagedEnv } from './providerManagedEnvCompat.js'
 import { clearMTLSCache } from './mtls.js'
 import { clearProxyCache, configureGlobalAgents } from './proxy.js'
 import { isSettingSourceEnabled } from './settings/constants.js'
@@ -105,8 +104,7 @@ function getDreamcoderSettingsEnv(): Record<string, string> {
     const dreamcoderSettingsPath = join(getClaudeConfigHomeDir(), 'dreamcoder', 'settings.json')
     const raw = readFileSync(dreamcoderSettingsPath, 'utf-8')
     const parsed = JSON.parse(raw) as { env?: Record<string, string> }
-    const settingsEnv = normalizeLegacyDeepSeekManagedEnv(parsed.env ?? {}).env
-    return mergeActiveProviderManagedEnv(settingsEnv, getClaudeConfigHomeDir())
+    return mergeActiveProviderManagedEnv(parsed.env ?? {}, getClaudeConfigHomeDir())
   } catch {
     return mergeActiveProviderManagedEnv({}, getClaudeConfigHomeDir())
   }

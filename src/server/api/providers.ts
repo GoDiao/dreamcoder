@@ -45,22 +45,9 @@ export async function handleProvidersApi(
       return Response.json(status)
     }
 
-    if (id === 'settings') {
-      if (req.method === 'GET') {
-        return Response.json(await providerService.getManagedSettings())
-      }
-      if (req.method === 'PUT') {
-        const body = await parseJsonBody(req)
-        await providerService.updateManagedSettings(body)
-        return Response.json({ ok: true })
-      }
-      throw methodNotAllowed(req.method)
-    }
-
     if (!id) {
       if (req.method === 'GET') {
-        const { providers, activeId } = await providerService.listProviders()
-        return Response.json({ providers, activeId })
+        return Response.json(await providerService.listProviderViews())
       }
       if (req.method === 'POST') {
         return await handleCreate(req)
@@ -72,6 +59,11 @@ export async function handleProvidersApi(
       if (req.method !== 'POST') throw methodNotAllowed(req.method)
       await providerService.activateProvider(id)
       return Response.json({ ok: true })
+    }
+
+    if (action === 'refresh-models') {
+      if (req.method !== 'POST') throw methodNotAllowed(req.method)
+      return Response.json(await providerService.refreshDiscoveredModels(id))
     }
 
     if (action === 'test') {
@@ -122,7 +114,7 @@ async function handleCreate(req: Request): Promise<Response> {
   try {
     const input = CreateProviderSchema.parse(body)
     const provider = await providerService.addProvider(input)
-    return Response.json({ provider }, { status: 201 })
+    return Response.json(await providerService.refreshDiscoveredModels(provider.id), { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) throw ApiError.badRequest(err.issues.map((i) => i.message).join('; '))
     throw err
@@ -133,8 +125,8 @@ async function handleUpdate(req: Request, id: string): Promise<Response> {
   const body = await parseJsonBody(req)
   try {
     const input = UpdateProviderSchema.parse(body)
-    const provider = await providerService.updateProvider(id, input)
-    return Response.json({ provider })
+    await providerService.updateProvider(id, input)
+    return Response.json(await providerService.refreshDiscoveredModels(id))
   } catch (err) {
     if (err instanceof z.ZodError) throw ApiError.badRequest(err.issues.map((i) => i.message).join('; '))
     throw err

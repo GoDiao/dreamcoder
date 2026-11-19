@@ -1,5 +1,6 @@
 import type { AppState } from '../../state/AppState.js'
 import { logForDebugging } from '../debug.js'
+import { effortFromSettings } from '../effort.js'
 import { updateHooksConfigSnapshot } from '../hooks/hooksConfigSnapshot.js'
 import {
   createDisabledBypassPermissionsContext,
@@ -72,7 +73,7 @@ export function applySettingsChange(
     // itself changed — otherwise unrelated settings churn (e.g. tips dismissal
     // on startup) would clobber a --effort CLI flag value held in AppState.
     const prevEffort = prev.settings.effortLevel
-    const newEffort = newSettings.effortLevel
+    const newEffort = effortFromSettings(newSettings.effortLevel)
     const effortChanged = prevEffort !== newEffort
 
     return {

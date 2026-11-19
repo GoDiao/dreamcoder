@@ -132,6 +132,7 @@
 
 ### P-NET-09 自定义提供方对所有模型一律声明全部思考能力，没有按模型的能力配置
 
+- 状态：已在 #264 修复：能力声明换成按模型的规则表，custom 提供方不再一律声明全部能力。见 [model-rules.md](../model-rules.md)。
 - 类型：问题
 - 严重程度：中
 - 现状：`presetId === 'custom'` 时，三档模型的 `*_SUPPORTED_CAPABILITIES` 都设为 `thinking,effort,adaptive_thinking,max_effort`，主模型同时作为 SONNET 和 OPUS 默认模型（src/server/services/providerRuntimeEnv.ts:38, 229-250），与 `apiFormat` 和模型无关。CLI 按这些覆盖值决定发 `thinking:{type:'adaptive'}`，允许 `max` 档 effort（src/utils/model/modelSupportOverrides.ts:30-48；thinking.ts:91-95, 125-129；effort.ts:28-31, 53-56；claude.ts:1649-1659）。`SavedProvider` 没有能力字段，界面上无法修改（src/server/types/provider.ts:46-59）。
@@ -142,6 +143,7 @@
 
 ### P-NET-10 Qwen 预设没有声明上下文窗口；窗口只在用户手动「拉取模型」时获取，未知模型一律当 200,000
 
+- 状态：已在 #264 修复：保存提供方时拉取模型的窗口、输出上限、图片和 PDF 并存下，未知模型的窗口按兜底 131,072。见 [model-rules.md](../model-rules.md)「关键流程」。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -193,6 +195,7 @@
 
 ### P-NET-14 各预设的能力声明不一致，同一个 Effort/思考开关在不同预设上产生不同的请求字段
 
+- 状态：已在 #264 修复：预设只保留连接信息，能力和写法都由规则表按模型和端点决定。见 [model-rules.md](../model-rules.md)。
 - 类型：优化
 - 严重程度：低
 - 现状：DeepSeek 预设声明三档 `thinking,effort,adaptive_thinking,max_effort`；Kimi、智谱预设不声明能力，只设 `DREAMCODER_SEND_DISABLED_THINKING=1`；Qwen 什么都不设（src/server/config/providerPresets.json）。不声明能力时，CLI 对 `kimi-k2.6`、`glm-5.1` 判定不支持 thinking（非一方地址时只认 sonnet-4/opus-4，src/utils/thinking.ts:91-117），但判定支持 effort（未知名字在 firstParty 下返回 true，src/utils/effort.ts:23-49）。于是 Kimi、智谱直连时：思考开启，不发 `thinking`，由提供方默认决定；思考关闭，发 `thinking:{type:'disabled'}`（claude.ts:1596-1600, 1674-1678）；两种情况下都可能发 `output_config.effort`（claude.ts:1607-1616, 439-465）。

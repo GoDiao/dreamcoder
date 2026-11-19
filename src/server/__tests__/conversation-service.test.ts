@@ -460,8 +460,35 @@ describe('ConversationService', () => {
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe('provider-key')
     expect(env.ANTHROPIC_API_KEY).toBe('')
     expect(env.ANTHROPIC_MODEL).toBe('deepseek-v4-pro')
-    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe('thinking,effort,adaptive_thinking,max_effort')
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+    expect(JSON.parse(env.DREAMCODER_MODEL_RULES!).models['deepseek-v4-pro'].effortLevels).toEqual(['low', 'high', 'max'])
     expect(env.CLAUDE_CODE_ATTRIBUTION_HEADER).toBe('0')
+  })
+
+  test('buildChildEnv drops an inherited model rules variable for an official Anthropic provider', async () => {
+    const original = process.env.DREAMCODER_MODEL_RULES
+    process.env.DREAMCODER_MODEL_RULES = '{"stale":true}'
+    try {
+      const provider = await new ProviderService().addProvider({
+        presetId: 'custom',
+        name: 'Anthropic',
+        apiKey: 'provider-key',
+        baseUrl: 'https://api.anthropic.com',
+        apiFormat: 'anthropic',
+        models: [{ id: 'claude-opus-4-7' }],
+      })
+
+      const service = new ConversationService() as any
+      const env = (await service.buildChildEnv('/tmp', undefined, {
+        providerId: provider.id,
+        model: 'claude-opus-4-7',
+      })) as Record<string, string>
+
+      expect(env.DREAMCODER_MODEL_RULES).toBeUndefined()
+    } finally {
+      if (original === undefined) delete process.env.DREAMCODER_MODEL_RULES
+      else process.env.DREAMCODER_MODEL_RULES = original
+    }
   })
 
 

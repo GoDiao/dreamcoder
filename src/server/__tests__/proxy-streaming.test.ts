@@ -4,6 +4,10 @@ import { openaiResponsesStreamToAnthropic } from '../proxy/streaming/openaiRespo
 import { openaiResponsesStreamToAnthropicResponse } from '../proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
 import { UpstreamReplyError } from '../upstream/upstreamError.js'
 import { SseDecoder } from '../proxy/streaming/sse.js'
+import { resolveFallbackModelRules } from '../services/modelRules/resolveModelRules.js'
+
+const CHAT_RULES = resolveFallbackModelRules({ baseUrl: 'https://llm.example.com/v1', apiFormat: 'openai_chat' })
+const RESPONSES_RULES = resolveFallbackModelRules({ baseUrl: 'https://llm.example.com/v1', apiFormat: 'openai_responses' })
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -58,7 +62,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
+    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES)
     const events = await collectSse(anthropicStream)
 
     const eventTypes = events.map((e) => e.event)
@@ -92,7 +96,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
+    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES)
     const events = await collectSse(anthropicStream)
 
     const toolStart = events.find(
@@ -118,7 +122,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini', CHAT_RULES))
 
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.delta as Record<string, unknown>).stop_reason).toBe('tool_use')
@@ -132,7 +136,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini', CHAT_RULES))
 
     const toolStarts = events.filter(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
@@ -154,7 +158,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gemini', CHAT_RULES))
 
     const toolStarts = events.filter(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'tool_use',
@@ -173,7 +177,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gpt-4'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gpt-4', CHAT_RULES))
     const jsonDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'input_json_delta',
     )
@@ -189,7 +193,7 @@ describe('openaiChatStreamToAnthropic', () => {
 
   test('empty stream (just DONE) surfaces an error instead of an empty reply', async () => {
     const upstream = makeStream(['data: [DONE]\n\n'])
-    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4')
+    const anthropicStream = openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES)
     const events = await collectSse(anthropicStream)
     expect(events.map((e) => e.event)).toEqual(['error'])
   })
@@ -200,7 +204,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: {"error":{"message":"quota exceeded"}}\n\n',
       'data: [DONE]\n\n',
     ])
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES))
     const types = events.map((e) => e.event)
     expect(types.at(-1)).toBe('error')
     expect(types).not.toContain('message_stop')
@@ -216,7 +220,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES))
     const types = events.map((e) => e.event)
 
     const stopIdx = types.indexOf('content_block_stop')
@@ -239,7 +243,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'deepseek-chat'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'deepseek-chat', CHAT_RULES))
 
     const thinkingStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'thinking',
@@ -270,7 +274,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'glm-5'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'glm-5', CHAT_RULES))
 
     const thinkingDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'thinking_delta',
@@ -288,7 +292,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'o3'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'o3', CHAT_RULES))
 
     const thinkingDeltas = events.filter(
       (e) => e.event === 'content_block_delta' && (e.data.delta as Record<string, unknown>)?.type === 'thinking_delta',
@@ -306,7 +310,7 @@ describe('openaiChatStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4'))
+    const events = await collectSse(openaiChatStreamToAnthropic(upstream, 'gpt-4', CHAT_RULES))
     const types = events.map((e) => e.event)
 
     const firstBlockStop = types.indexOf('content_block_stop')
@@ -323,7 +327,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'deepseek-chat'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'deepseek-chat', CHAT_RULES))
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     // prompt_tokens includes the cached 900; Anthropic's input_tokens does not.
     expect(msgDelta.data.usage).toEqual({
@@ -341,7 +345,7 @@ describe('openaiChatStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gpt-4'))
+    const events = await collectSse(openaiChatStreamToAnthropic(makeStream(sseChunks), 'gpt-4', CHAT_RULES))
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     expect((msgDelta.data.usage as Record<string, number>).input_tokens).toBe(500)
     expect((msgDelta.data.usage as Record<string, number>).output_tokens).toBe(10)
@@ -361,7 +365,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const anthropicStream = openaiResponsesStreamToAnthropic(upstream, 'gpt-4o')
+    const anthropicStream = openaiResponsesStreamToAnthropic(upstream, 'gpt-4o', RESPONSES_RULES)
     const events = await collectSse(anthropicStream)
 
     const eventTypes = events.map((e) => e.event)
@@ -395,7 +399,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
     ]
 
     const upstream = makeStream(sseChunks)
-    const anthropicStream = openaiResponsesStreamToAnthropic(upstream, 'gpt-4o')
+    const anthropicStream = openaiResponsesStreamToAnthropic(upstream, 'gpt-4o', RESPONSES_RULES)
     const events = await collectSse(anthropicStream)
 
     const toolStart = events.find(
@@ -418,7 +422,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
       'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","model":"gpt-4o"}}\n\n',
       'event: response.failed\ndata: {"type":"response.failed","response":{"status":"failed","error":{"code":"insufficient_quota","message":"quota exceeded"}}}\n\n',
     ])
-    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o', RESPONSES_RULES))
     const last = events.at(-1)!
     expect(last.event).toBe('error')
     expect((last.data.error as Record<string, unknown>).message).toBe('quota exceeded')
@@ -429,7 +433,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
     const upstream = makeStream([
       'data: {"type":"error","code":"rate_limit_exceeded","message":"slow down"}\n\n',
     ])
-    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'gpt-4o', RESPONSES_RULES))
     expect(events.map((e) => e.event)).toEqual(['error'])
     expect((events[0].data.error as Record<string, unknown>).message).toBe('slow down')
   })
@@ -439,7 +443,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
       'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","model":"o4-mini"}}\n\n',
       'event: response.incomplete\ndata: {"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":5,"output_tokens":16}}}\n\n',
     ])
-    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'o4-mini'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(upstream, 'o4-mini', RESPONSES_RULES))
     const delta = events.find((e) => e.event === 'message_delta')!
     expect((delta.data.delta as Record<string, unknown>).stop_reason).toBe('max_tokens')
     expect(events.at(-1)!.event).toBe('message_stop')
@@ -462,7 +466,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
       'data: [DONE]\n\n',
     ]
 
-    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-oss-20b'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-oss-20b', RESPONSES_RULES))
 
     const blocks = events
       .filter((e) => e.event === 'content_block_start' || e.event === 'content_block_stop')
@@ -495,7 +499,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
       'event: response.completed\ndata: {"response":{"id":"r-reason","model":"o3","status":"completed","usage":{"input_tokens":50,"output_tokens":20}}}\n\n',
     ]
 
-    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'o3'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'o3', RESPONSES_RULES))
 
     const thinkingStart = events.find(
       (e) => e.event === 'content_block_start' && (e.data.content_block as Record<string, unknown>)?.type === 'thinking',
@@ -529,7 +533,7 @@ describe('openaiResponsesStreamToAnthropic', () => {
       'event: response.completed\ndata: {"response":{"id":"r-cache","model":"gpt-4o","status":"completed","usage":{"input_tokens":100,"output_tokens":5,"total_tokens":105,"input_tokens_details":{"cached_tokens":80}}}}\n\n',
     ]
 
-    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-4o'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream(sseChunks), 'gpt-4o', RESPONSES_RULES))
     const msgDelta = events.find((e) => e.event === 'message_delta')!
     // input_tokens includes the cached 80; Anthropic's input_tokens does not.
     expect(msgDelta.data.usage).toEqual({
@@ -559,7 +563,7 @@ describe('openaiResponsesStreamToAnthropicResponse', () => {
     }
     const result = await openaiResponsesStreamToAnthropicResponse(
       makeStream([`event: ${event}\ndata: ${JSON.stringify({ type: event, response })}\n\n`]),
-      'm',
+      'm', RESPONSES_RULES,
     )
 
     expect(result.stop_reason).toBe(stopReason)
@@ -583,7 +587,7 @@ describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
         'event: response.created\ndata: {"type":"response.created","id":"resp_1","status":"in_progress"}\n\n',
         `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
       ]),
-      'm',
+      'm', RESPONSES_RULES,
     )
 
     await expect(result).rejects.toBeInstanceOf(UpstreamReplyError)
@@ -602,7 +606,7 @@ describe('openaiResponsesStreamToAnthropicResponse upstream errors', () => {
         'event: error\ndata: {"type":"error","error":{"message":"transient"}}\n\n',
         `event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response })}\n\n`,
       ]),
-      'm',
+      'm', RESPONSES_RULES,
     )
 
     expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
@@ -639,7 +643,7 @@ describe('SSE framing', () => {
       `data:${chatChunk({ role: 'assistant', content: 'Hi' })}\r\n\r\n`,
       `data:${chatChunk({}, 'stop')}\r\n\r\n`,
       'data:[DONE]\r\n\r\n',
-    ]), 'gpt-4'))
+    ]), 'gpt-4', CHAT_RULES))
 
     expect(events.map(e => e.event)).toEqual([
       'message_start', 'content_block_start', 'content_block_delta', 'content_block_stop', 'message_delta', 'message_stop',
@@ -652,7 +656,7 @@ describe('SSE framing', () => {
       `data: ${head}\ndata: ${tail}\n\n`,
       `data: ${chatChunk({}, 'stop')}\n\n`,
       'data: [DONE]\n\n',
-    ]), 'gpt-4'))
+    ]), 'gpt-4', CHAT_RULES))
 
     expect(events.find(e => e.event === 'content_block_delta')?.data.delta).toEqual({ type: 'text_delta', text: 'Hi' })
   })
@@ -662,7 +666,7 @@ describe('SSE framing', () => {
     ['openaiResponsesStreamToAnthropic', openaiResponsesStreamToAnthropic],
   ] as const)('%s surfaces a formatted JSON error body sent with status 200', async (_name, convert) => {
     const body = JSON.stringify({ error: { message: 'invalid model', code: 'model_not_found' } }, null, 2)
-    const events = await collectSse(convert(makeStream([body]), 'gpt-4'))
+    const events = await collectSse(convert(makeStream([body]), 'gpt-4', CHAT_RULES))
 
     expect(events.map(e => e.event)).toEqual(['error'])
     expect((events[0]!.data as { error: { message: string } }).error.message).toBe('invalid model')
@@ -673,7 +677,7 @@ describe('SSE framing', () => {
       'event:response.content_part.added\ndata:{"output_index":0,"content_index":0,"part":{"type":"output_text","text":""}}\n\n',
       'event:response.output_text.delta\ndata:{"output_index":0,"content_index":0,"delta":"Hello"}\n\n',
       'event:response.completed\ndata:{"response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":1}}}\n\n',
-    ]), 'gpt-4o'))
+    ]), 'gpt-4o', RESPONSES_RULES))
 
     expect(events.find(e => e.event === 'content_block_delta')?.data.delta).toEqual({ type: 'text_delta', text: 'Hello' })
     expect(events.at(-1)?.event).toBe('message_stop')
@@ -686,7 +690,7 @@ describe('SSE framing', () => {
     }
     const result = await openaiResponsesStreamToAnthropicResponse(
       makeStream([`event:response.completed\ndata:${JSON.stringify({ type: 'response.completed', response })}\n\n`]),
-      'm',
+      'm', RESPONSES_RULES,
     )
 
     expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
@@ -698,7 +702,7 @@ describe('response model name', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
       'data: {"id":"c1","object":"chat.completion.chunk","created":0,"model":"gpt-4.1-2025-04-14","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}]}\n\n',
       'data: [DONE]\n\n',
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', CHAT_RULES))
 
     expect((events.find(e => e.event === 'message_start')!.data.message as { model: string }).model).toBe('gpt-4.1')
   })
@@ -707,7 +711,7 @@ describe('response model name', () => {
     const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
       'event: response.created\ndata: {"id":"r1","model":"gpt-4.1-2025-04-14","status":"in_progress"}\n\n',
       'event: response.completed\ndata: {"response":{"status":"completed"}}\n\n',
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect((events.find(e => e.event === 'message_start')!.data.message as { model: string }).model).toBe('gpt-4.1')
   })
@@ -715,7 +719,7 @@ describe('response model name', () => {
   test('responses fallback reader reports the requested model', async () => {
     const result = await openaiResponsesStreamToAnthropicResponse(makeStream([
       `event: response.completed\ndata: ${JSON.stringify({ response: { id: 'r1', model: 'gpt-4.1-2025-04-14', status: 'completed', output: [] } })}\n\n`,
-    ]), 'gpt-4.1')
+    ]), 'gpt-4.1', RESPONSES_RULES)
 
     expect(result.model).toBe('gpt-4.1')
   })
@@ -736,7 +740,7 @@ describe('stream cancellation', () => {
       },
     })
 
-    const reader = convert(upstream, 'm').getReader()
+    const reader = convert(upstream, 'm', CHAT_RULES).getReader()
     await reader.read()
     await reader.cancel('client gone')
 
@@ -754,7 +758,7 @@ describe('chat stream usage', () => {
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: 'stop', usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 } }),
       'data: [DONE]\n\n',
-    ]), 'kimi-k2.6'))
+    ]), 'kimi-k2.6', CHAT_RULES))
 
     expect(events.find((e) => e.event === 'message_delta')!.data.usage).toEqual({ input_tokens: 1000, output_tokens: 20, cache_read_input_tokens: 0 })
   })
@@ -764,7 +768,7 @@ describe('chat stream usage', () => {
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: 'stop' }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(events.find((e) => e.event === 'message_delta')!.data).not.toHaveProperty('usage')
   })
@@ -786,7 +790,7 @@ describe('chat stream finish reasons', () => {
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: 'model_context_window_exceeded' }),
       'data: [DONE]\n\n',
-    ]), 'glm-4.6'))
+    ]), 'glm-4.6', CHAT_RULES))
 
     expect((events.find((e) => e.event === 'message_delta')!.data.delta as { stop_reason: string }).stop_reason)
       .toBe('model_context_window_exceeded')
@@ -797,7 +801,7 @@ describe('chat stream finish reasons', () => {
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: reason }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(eventNames(events)).not.toContain('message_stop')
     expect(lastError(events)).toEqual({
@@ -811,7 +815,7 @@ describe('chat stream finish reasons', () => {
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: reason }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(eventNames(events)).not.toContain('message_stop')
     expect(lastError(events)).toEqual({
@@ -826,7 +830,7 @@ describe('chat stream errors and early ends', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       'data: {"error":{"message":"Your input exceeds the context window of this model.","code":"context_length_exceeded"}}\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(lastError(events)).toEqual({
       type: 'invalid_request_error',
@@ -837,7 +841,7 @@ describe('chat stream errors and early ends', () => {
   test('reports a stream that closes before any end marker', async () => {
     const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
       chatChunk({ delta: { content: 'Half an ans' }, finish_reason: null }),
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(eventNames(events)).not.toContain('message_stop')
     expect(lastError(events)).toEqual({
@@ -850,7 +854,7 @@ describe('chat stream errors and early ends', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(eventNames(events).at(-1)).toBe('message_stop')
   })
@@ -860,7 +864,7 @@ describe('chat stream errors and early ends', () => {
       chatChunk({ delta: { role: 'assistant' }, finish_reason: null }),
       chatChunk({ delta: {}, finish_reason: 'stop' }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(lastError(events)).toEqual({ type: 'api_error', message: 'The provider returned an empty reply.' })
   })
@@ -878,13 +882,14 @@ describe('chat stream deltas with several kinds of content', () => {
         finish_reason: 'tool_calls',
       }),
       'data: [DONE]\n\n',
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     const starts = events.filter((e) => e.event === 'content_block_start').map((e) => (e.data.content_block as { type: string }).type)
     const deltas = events.filter((e) => e.event === 'content_block_delta').map((e) => e.data.delta)
     expect(starts).toEqual(['thinking', 'text', 'tool_use'])
     expect(deltas).toEqual([
       { type: 'thinking_delta', thinking: 'think' },
+      { type: 'signature_delta', signature: 'dc1:reasoning_content:' },
       { type: 'text_delta', text: 'Let me look.' },
       { type: 'input_json_delta', partial_json: '{"file_path":"a.ts"}' },
     ])
@@ -907,7 +912,7 @@ describe('responses stream ends', () => {
     const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
       responseCreated,
       responsesEvent('response.incomplete', { response: { status: 'incomplete', incomplete_details: { reason: 'content_filter' } } }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(eventNames(events)).not.toContain('message_stop')
     expect(lastError(events)).toEqual({
@@ -920,7 +925,7 @@ describe('responses stream ends', () => {
     const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([
       responseCreated,
       responsesEvent('response.failed', { response: { status: 'failed', error: { code: 'context_length_exceeded', message: 'Your input exceeds the context window of this model.' } } }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(lastError(events)).toEqual({
       type: 'invalid_request_error',
@@ -933,14 +938,14 @@ describe('responses stream ends', () => {
       responseCreated,
       responsesEvent('response.content_part.added', { output_index: 0, content_index: 0, part: { type: 'output_text', text: '' } }),
       responsesEvent('response.output_text.delta', { output_index: 0, content_index: 0, delta: 'Half an ans' }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(eventNames(events)).not.toContain('message_stop')
     expect(lastError(events)).toEqual({ type: 'api_error', message: 'The provider closed the stream before the reply finished.' })
   })
 
   test('leaves usage out when response.completed has none', async () => {
-    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([responseCreated, completed()]), 'gpt-4.1'))
+    const events = await collectSse(openaiResponsesStreamToAnthropic(makeStream([responseCreated, completed()]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(events.find((e) => e.event === 'message_delta')!.data).not.toHaveProperty('usage')
   })
@@ -958,7 +963,7 @@ describe('responses stream without every delta event', () => {
       responseCreated,
       responsesEvent('response.output_text.delta', { output_index: 0, content_index: 0, delta: 'Hello' }),
       completed({ input_tokens: 5, output_tokens: 1 }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(blocksAndDeltas(events)).toEqual([{ type: 'text', text: '' }, { type: 'text_delta', text: 'Hello' }, 'stop'])
     expect(eventNames(events).slice(-2)).toEqual(['message_delta', 'message_stop'])
@@ -970,7 +975,7 @@ describe('responses stream without every delta event', () => {
       responsesEvent('response.output_item.added', { output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'Read' } }),
       responsesEvent('response.function_call_arguments.done', { item_id: 'fc_1', output_index: 0, arguments: '{"file_path":"a.ts"}' }),
       completed({ input_tokens: 5, output_tokens: 1 }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(blocksAndDeltas(events)).toEqual([
       { type: 'tool_use', id: 'call_1', name: 'Read', input: {} },
@@ -987,7 +992,7 @@ describe('responses stream without every delta event', () => {
         item: { type: 'message', id: 'msg_1', role: 'assistant', content: [{ type: 'output_text', text: 'Hello there' }] },
       }),
       completed({ input_tokens: 5, output_tokens: 2 }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(blocksAndDeltas(events)).toEqual([{ type: 'text', text: '' }, { type: 'text_delta', text: 'Hello there' }, 'stop'])
   })
@@ -998,7 +1003,7 @@ describe('responses stream without every delta event', () => {
       responsesEvent('response.output_item.added', { output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'Read' } }),
       responsesEvent('response.function_call_arguments.delta', { item_id: 'fc_1', output_index: 0, delta: '{"file_path":"a.ts"}' }),
       completed({ input_tokens: 5, output_tokens: 1 }),
-    ]), 'gpt-4.1'))
+    ]), 'gpt-4.1', RESPONSES_RULES))
 
     expect(blocksAndDeltas(events).at(-1)).toBe('stop')
     expect((events.find((e) => e.event === 'message_delta')!.data.delta as { stop_reason: string }).stop_reason).toBe('tool_use')
@@ -1015,7 +1020,7 @@ describe('stream error classification', () => {
     const events = await collectSse(openaiChatStreamToAnthropic(makeStream([
       chatChunk({ delta: { content: 'Hi' }, finish_reason: null }),
       `data: ${JSON.stringify({ error: { message, code } })}\n\n`,
-    ]), 'm'))
+    ]), 'm', CHAT_RULES))
 
     expect(lastError(events)).toEqual({ type, message })
   })

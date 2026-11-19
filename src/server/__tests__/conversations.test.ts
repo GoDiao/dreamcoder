@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { ConversationService, ConversationStartupError, conversationService } from '../services/conversationService.js'
 import { SessionService, sessionService } from '../services/sessionService.js'
+import { ManagedSettingsService } from '../services/managedSettingsService.js'
 import { ProviderService } from '../services/providerService.js'
 import { getSessionState } from '../ws/handler.js'
 
@@ -1223,7 +1224,10 @@ describe('WebSocket Chat Integration', () => {
       models: [{ id: 'minimax-m2' }],
     })
     await providerService.activateProvider(provider.id)
-    await providerService.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
+    await new ManagedSettingsService().updateSettings((current) => ({
+      settings: { ...current, model: 'claude-haiku-4-5', modelContext: '1m' },
+      result: undefined,
+    }))
 
     const originalStartSession = conversationService.startSession.bind(conversationService)
     const startOptions: Array<{ model?: string; providerId?: string | null }> = []
@@ -1248,7 +1252,10 @@ describe('WebSocket Chat Integration', () => {
     } finally {
       conversationService.startSession = originalStartSession as typeof conversationService.startSession
       conversationService.stopSession(sessionId)
-      await providerService.updateManagedSettings({ model: undefined, modelContext: undefined })
+      await new ManagedSettingsService().updateSettings((current) => ({
+        settings: { ...current, model: undefined, modelContext: undefined },
+        result: undefined,
+      }))
       await providerService.activateProvider(defaultProviderId)
     }
   }, 20_000)

@@ -7,6 +7,7 @@ import { conversationService } from '../services/conversationService.js'
 import { handleSettingsApi } from '../api/settings.js'
 import { handleModelsApi } from '../api/models.js'
 import { handleStatusApi, resetUsage, addUsage } from '../api/status.js'
+import { ManagedSettingsService } from '../services/managedSettingsService.js'
 import { ProviderService } from '../services/providerService.js'
 import {
   clearOpenAIOAuthTokenCache,
@@ -558,7 +559,10 @@ describe('Models API', () => {
       fastModel: 'glm-4.5-air',
     })
     await providerSvc.activateProvider(provider.id)
-    await providerSvc.updateManagedSettings({ model: 'claude-haiku-4-5', modelContext: '1m' })
+    await new ManagedSettingsService().updateSettings((current) => ({
+      settings: { ...current, model: 'claude-haiku-4-5', modelContext: '1m' },
+      result: undefined,
+    }))
 
     const { req, url, segments } = makeRequest('GET', '/api/models/current')
     const res = await handleModelsApi(req, url, segments)

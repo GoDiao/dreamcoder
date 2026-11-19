@@ -12,18 +12,7 @@
     "needsApiKey": true,
     "websiteUrl": "https://platform.deepseek.com",
     "apiKeyUrl": "https://platform.deepseek.com/api_keys",
-    "authStrategy": "auth_token",
-    "defaultEnv": {
-      "ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort",
-      "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort",
-      "ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES": "thinking,effort,adaptive_thinking,max_effort"
-    },
-    "modelContextWindows": {
-      "deepseek-v4-pro": 1000000,
-      "deepseek-v4-flash": 1000000,
-      "deepseek-chat": 1000000,
-      "deepseek-reasoner": 1000000
-    }
+    "authStrategy": "auth_token"
   },
   {
     "id": "qwen",
@@ -51,14 +40,7 @@
     "needsApiKey": true,
     "websiteUrl": "https://platform.moonshot.cn",
     "apiKeyUrl": "https://platform.kimi.com/console/api-keys",
-    "authStrategy": "auth_token",
-    "defaultEnv": {
-      "DREAMCODER_SEND_DISABLED_THINKING": "1"
-    },
-    "modelContextWindows": {
-      "kimi-k2.6": 262144,
-      "kimi-k2.5": 262144
-    }
+    "authStrategy": "auth_token"
   },
   {
     "id": "zhipuglm",
@@ -73,15 +55,7 @@
     "defaultFastModel": "glm-4.5-air",
     "needsApiKey": true,
     "websiteUrl": "https://open.bigmodel.cn",
-    "authStrategy": "auth_token",
-    "defaultEnv": {
-      "DREAMCODER_SEND_DISABLED_THINKING": "1"
-    },
-    "modelContextWindows": {
-      "glm-5.1": 200000,
-      "glm-5-turbo": 200000,
-      "glm-4.5-air": 128000
-    }
+    "authStrategy": "auth_token"
   },
   {
     "id": "lmstudio",

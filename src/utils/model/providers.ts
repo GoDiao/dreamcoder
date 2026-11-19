@@ -34,8 +34,12 @@ export function isFirstPartyAnthropicBaseUrl(): boolean {
   if (!baseUrl) {
     return true
   }
+  return isFirstPartyAnthropicHost(baseUrl)
+}
+
+export function isFirstPartyAnthropicHost(url: string): boolean {
   try {
-    const host = new URL(baseUrl).host
+    const host = new URL(url).host
     const allowedHosts = ['api.anthropic.com']
     if (process.env.USER_TYPE === 'ant') {
       allowedHosts.push('api-staging.anthropic.com')

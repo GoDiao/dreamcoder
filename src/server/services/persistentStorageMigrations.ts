@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { randomBytes } from 'node:crypto'
-import { normalizeLegacyDeepSeekManagedEnv } from '../../utils/providerManagedEnvCompat.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { ModelContextWindowSchema } from '../../utils/model/modelRules.js'
 
 export const CURRENT_PROVIDER_INDEX_SCHEMA_VERSION = 2
 
@@ -25,6 +25,77 @@ type LegacyRootProvider = {
   isActive?: boolean
   notes?: string
 }
+
+const RETIRED_MANAGED_ENV_KEYS = [
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
+  'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
+  'DREAMCODER_SEND_DISABLED_THINKING',
+] as const
+
+const LEGACY_PRESET_CONTEXT_WINDOWS: Record<string, Record<string, number>> = {
+  deepseek: {
+    'deepseek-v4-pro': 1_000_000,
+    'deepseek-v4-flash': 1_000_000,
+    'deepseek-chat': 1_000_000,
+    'deepseek-reasoner': 1_000_000,
+  },
+  kimi: {
+    'kimi-k2.6': 262_144,
+    'kimi-k2.5': 262_144,
+  },
+  zhipuglm: {
+    'glm-5.1': 200_000,
+    'glm-5-turbo': 200_000,
+    'glm-4.5-air': 128_000,
+  },
+}
+
+const LEGACY_CLI_CONTEXT_WINDOWS: Record<string, number> = {
+  'claude-opus-4-7': 1_000_000,
+  'claude-sonnet-4-6': 200_000,
+  'claude-haiku-4-5': 200_000,
+  'deepseek-v4-pro': 1_000_000,
+  'deepseek-v4-flash': 1_000_000,
+  'deepseek-chat': 1_000_000,
+  'deepseek-reasoner': 1_000_000,
+  'kimi-k2.6': 262_144,
+  'kimi-k2.5': 262_144,
+  'kimi-k2-0905-preview': 262_144,
+  'kimi-k2-turbo-preview': 262_144,
+  'kimi-k2-thinking': 262_144,
+  'kimi-k2-thinking-turbo': 262_144,
+  'minimax-m2.7': 204_800,
+  'minimax-m2.7-highspeed': 204_800,
+  'minimax-m2.5': 204_800,
+  'minimax-m2.5-highspeed': 204_800,
+  'minimax-m2.1': 204_800,
+  'minimax-m2.1-highspeed': 204_800,
+  'minimax-m2': 204_800,
+  'glm-5.1': 200_000,
+  'glm-5': 200_000,
+  'glm-5-turbo': 200_000,
+  'glm-4.7': 200_000,
+  'glm-4.6': 200_000,
+  'glm-4.5': 128_000,
+  'glm-4.5-air': 128_000,
+}
+
+const LEGACY_CLI_CONTEXT_WINDOW_PATTERNS: Array<[RegExp, number]> = [
+  [/^anthropic\/claude-opus-4\.7\b/i, 1_000_000],
+  [/^anthropic\/claude-sonnet-4\.6\b/i, 200_000],
+  [/^anthropic\/claude-haiku-4\.5\b/i, 200_000],
+  [/^openai\/gpt-4\.1\b/i, 1_047_576],
+  [/^openai\/gpt-5(?:[.-]\d+)?\b/i, 400_000],
+  [/^google\/gemini-(?:2\.0|2\.5|3)/i, 1_048_576],
+  [/^gemini-(?:2\.0|2\.5|3)/i, 1_048_576],
+  [/^qwen\/qwen3\.5-(?:plus|flash)\b/i, 1_000_000],
+  [/^qwen3\.5-(?:plus|flash)\b/i, 1_000_000],
+  [/^qwen\/qwen3-max\b/i, 262_144],
+  [/^qwen3-max\b/i, 262_144],
+  [/qwen-long/i, 10_000_000],
+]
 
 let migrationPromise: Promise<MigrationReport> | null = null
 let migrationConfigDir: string | null = null
@@ -123,6 +194,30 @@ async function quarantineMalformedFile(filePath: string): Promise<void> {
   await fs.rename(filePath, invalidPath)
 }
 
+function legacyCliContextWindow(modelId: string): number | undefined {
+  const key = modelId.trim().replace(/\[1m\]$/i, '').replace(/:1m$/i, '').toLowerCase()
+  return LEGACY_CLI_CONTEXT_WINDOWS[key]
+    ?? LEGACY_CLI_CONTEXT_WINDOW_PATTERNS.find(([pattern]) => pattern.test(key))?.[1]
+}
+
+function isLegacyDefaultContextWindow(presetId: unknown, modelId: string, window: number): boolean {
+  const presetWindows = typeof presetId === 'string' ? LEGACY_PRESET_CONTEXT_WINDOWS[presetId] : undefined
+  return presetWindows?.[modelId] === window || legacyCliContextWindow(modelId) === window
+}
+
+function migrateModelContextWindows(provider: JsonObject): JsonObject {
+  if (!Object.hasOwn(provider, 'modelContextWindows')) return provider
+  const { modelContextWindows, ...rest } = provider
+  const overrides: JsonObject = isRecord(rest.modelOverrides) ? { ...rest.modelOverrides } : {}
+  for (const [modelId, value] of Object.entries(isRecord(modelContextWindows) ? modelContextWindows : {})) {
+    const window = ModelContextWindowSchema.safeParse(value)
+    if (!window.success || isLegacyDefaultContextWindow(provider.presetId, modelId, window.data)) continue
+    const existing = overrides[modelId]
+    overrides[modelId] = { contextWindow: window.data, ...(isRecord(existing) ? existing : {}) }
+  }
+  return Object.keys(overrides).length > 0 ? { ...rest, modelOverrides: overrides } : rest
+}
+
 function migrateProvidersIndex(value: unknown): JsonObject {
   if (!isRecord(value) || !Array.isArray(value.providers)) {
     return {
@@ -133,7 +228,7 @@ function migrateProvidersIndex(value: unknown): JsonObject {
   }
 
   const { activeProviderId: _legacyActiveProviderId, ...rest } = value
-  const providers = value.providers.filter(isSavedProvider).map((provider) => {
+  const providers = value.providers.filter(isSavedProvider).map(migrateModelContextWindows).map((provider) => {
     if (isProviderModels(provider.models)) {
       return {
         ...provider,
@@ -190,9 +285,10 @@ function migrateManagedSettings(value: unknown): JsonObject {
   if (value.env !== undefined && !isRecord(value.env)) {
     return { ...value, env: {} }
   }
-  if (isRecord(value.env)) {
-    const { env, changed } = normalizeLegacyDeepSeekManagedEnv(value.env as Record<string, string>)
-    if (changed) return { ...value, env }
+  if (isRecord(value.env) && RETIRED_MANAGED_ENV_KEYS.some((key) => Object.hasOwn(value.env as JsonObject, key))) {
+    const env = { ...value.env }
+    for (const key of RETIRED_MANAGED_ENV_KEYS) delete env[key]
+    return { ...value, env }
   }
   return value
 }

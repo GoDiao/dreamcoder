@@ -17,6 +17,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { findCanonicalGitRoot } from '../../utils/git.js'
 import { sanitizePath } from '../../utils/path.js'
 import { getProcessEnvWithTerminalShellEnvironment } from '../../utils/terminalShellEnvironment.js'
+import { MODEL_RULES_ENV_KEY } from '../../utils/model/modelRules.js'
 import { PROVIDER_PROXIED_ENV_KEY } from '../../utils/providerProxy.js'
 import { browserMcpChildEnv, webCloneChildEnv } from '../browserHost/childEnv.js'
 import { attributionHeaderEnvForModel } from './attributionHeaderPolicy.js'
@@ -999,15 +1000,11 @@ export class ConversationService {
       'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
       'ANTHROPIC_SMALL_FAST_MODEL',
-      'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
       'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
       'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
-      'DREAMCODER_SEND_DISABLED_THINKING',
       'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
       'CLAUDE_CODE_ATTRIBUTION_HEADER',
-      'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
+      MODEL_RULES_ENV_KEY,
       'DREAMCODER_OPENAI_OAUTH_PROVIDER',
       'OPENAI_CODEX_OAUTH_FILE',
       PROVIDER_PROXIED_ENV_KEY,
@@ -1134,15 +1131,10 @@ export class ConversationService {
         'ANTHROPIC_AUTH_TOKEN',
         'ANTHROPIC_MODEL',
         'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-        'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
         'ANTHROPIC_DEFAULT_SONNET_MODEL',
-        'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
         'ANTHROPIC_DEFAULT_OPUS_MODEL',
-        'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
-        'DREAMCODER_SEND_DISABLED_THINKING',
         'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
         'CLAUDE_CODE_ATTRIBUTION_HEADER',
-        'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS',
       ].some((key) => typeof env[key] === 'string' && env[key]!.trim().length > 0)
     } catch {
       return false

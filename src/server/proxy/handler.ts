@@ -30,8 +30,8 @@ export async function handleProxyRequest(req: Request, url: URL, server: ProxySe
     )
   }
 
-  const target = await providerService.getProviderForProxy(providerId)
-  if (!target) {
+  const upstream = await providerService.getProviderForProxy(providerId)
+  if (!upstream) {
     return Response.json(
       {
         type: 'error',
@@ -46,7 +46,7 @@ export async function handleProxyRequest(req: Request, url: URL, server: ProxySe
     )
   }
 
-  if (target.apiFormat === 'anthropic') {
+  if (upstream.target.apiFormat === 'anthropic') {
     return Response.json(
       {
         type: 'error',
@@ -72,7 +72,7 @@ export async function handleProxyRequest(req: Request, url: URL, server: ProxySe
   }
 
   const upstreamBody = isClaudeModelName(body.model) ? ensureClaudeCodeAttribution(body) : body
-  const result = await sendToUpstream(target, upstreamBody, {
+  const result = await sendToUpstream(upstream, upstreamBody, {
     signal: req.signal,
     sessionId: req.headers.get('x-claude-code-session-id') ?? undefined,
   })

@@ -13,6 +13,7 @@ import {
   MODEL_CONTEXT_WINDOW_DEFAULT,
   getContextWindowForModel,
   getModelMaxOutputTokens,
+  maxOutputTokensFromRules,
 } from '../../utils/context.js'
 import { getCanonicalName } from '../../utils/model/model.js'
 import {
@@ -43,6 +44,10 @@ import type { PermissionMode } from '../ws/protocol.js'
 import type { PendingReport, TitleSource } from '../session/state/types.js'
 import { permissionModeFromTranscriptEntries } from './permissionModes.js'
 import { runtimeSelectionFromTranscriptEntries } from './runtimeSelection.js'
+import { ProviderService } from './providerService.js'
+import { isOfficialAnthropicProvider } from './modelRules/officialAnthropicProvider.js'
+import { resolveModelRules } from './modelRules/resolveModelRules.js'
+import { toCliModelRules } from './modelRules/cliModelRulesEnv.js'
 import type { RuntimeSelection } from '../session/state/types.js'
 import { queuedCommandSourceUuid } from '../../utils/queuedCommandEntry.js'
 import { isSessionParentKind, type SessionParent } from '../../utils/sessionBranching.js'
@@ -834,6 +839,27 @@ export class SessionService {
     }
   }
 
+  private async transcriptModelLimits(
+    entries: RawEntry[],
+  ): Promise<(model: string) => { contextWindow: number; maxOutputTokens: number }> {
+    const { providers, activeId } = await new ProviderService().listProviders()
+    const providerId = runtimeSelectionFromTranscriptEntries(entries)?.providerId ?? activeId
+    const provider = providers.find((candidate) => candidate.id === providerId)
+    if (provider && !isOfficialAnthropicProvider(provider)) {
+      return (model) => {
+        const rules = toCliModelRules(resolveModelRules(provider, model), provider.apiFormat)
+        return {
+          contextWindow: rules.contextWindow,
+          maxOutputTokens: maxOutputTokensFromRules(rules).default,
+        }
+      }
+    }
+    return (model) => ({
+      contextWindow: this.getTranscriptContextWindow(model),
+      maxOutputTokens: getModelMaxOutputTokens(model).default,
+    })
+  }
+
   async getTranscriptMetadata(sessionId: string): Promise<TranscriptMetadataSnapshot | null> {
     const found = await this.findSessionFile(sessionId)
     if (!found) return null
@@ -894,7 +920,7 @@ export class SessionService {
 
     if (!latest) return null
 
-    const rawMaxTokens = this.getTranscriptContextWindow(latest.model)
+    const rawMaxTokens = (await this.transcriptModelLimits(entries))(latest.model).contextWindow
     const promptTokens = latest.inputTokens + latest.cacheReadInputTokens + latest.cacheCreationInputTokens
     const totalTokens = calculateCurrentContextTokenTotal(promptTokens, {
       input_tokens: latest.inputTokens,
@@ -952,6 +978,7 @@ export class SessionService {
     if (!found) return null
 
     const entries = await this.readJsonlFile(found.filePath)
+    const modelLimits = await this.transcriptModelLimits(entries)
     const models = new Map<string, TranscriptUsageSnapshot['models'][number]>()
     let totalCostUSD = 0
     let totalInputTokens = 0
@@ -1013,8 +1040,7 @@ export class SessionService {
           webSearchRequests: 0,
           costUSD: 0,
           costDisplay: '$0.0000',
-          contextWindow: this.getTranscriptContextWindow(model),
-          maxOutputTokens: getModelMaxOutputTokens(model).default,
+          ...modelLimits(model),
         }
         models.set(model, modelUsage)
       }

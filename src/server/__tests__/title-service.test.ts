@@ -409,6 +409,67 @@ describe('titleService', () => {
     ].join(' '))).toBe('/frontend-design @website')
   })
 
+  async function titleRequestBody(
+    model: string,
+    options: { userSettings?: Record<string, unknown>; modelOverrides?: Record<string, unknown> } = {},
+  ): Promise<Record<string, unknown> | null> {
+    let requestBody: Record<string, unknown> | null = null
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        requestBody = await req.json() as Record<string, unknown>
+        return Response.json({ type: 'message', content: [{ type: 'text', text: '{"title":"Trace ok"}' }] })
+      },
+    })
+    try {
+      await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
+      if (options.userSettings) {
+        await fs.writeFile(path.join(tmpDir, 'settings.json'), JSON.stringify(options.userSettings))
+      }
+      await fs.writeFile(
+        path.join(tmpDir, 'dreamcoder', 'providers.json'),
+        JSON.stringify({
+          activeId: 'rules-test',
+          providers: [{
+            id: 'rules-test',
+            presetId: 'custom',
+            name: 'Rules',
+            apiKey: 'test-key',
+            baseUrl: `http://127.0.0.1:${server.port}/anthropic`,
+            apiFormat: 'anthropic',
+            models: [{ id: model }],
+            ...(options.modelOverrides ? { modelOverrides: options.modelOverrides } : {}),
+          }],
+        }),
+      )
+      await expect(generateTitle('explain this')).resolves.toBe('Trace ok')
+      return requestBody
+    } finally {
+      server.stop(true)
+    }
+  }
+
+  test('disables thinking for a model that can turn it off even when desktop thinking is on', async () => {
+    const body = await titleRequestBody('glm-4.5-air', { userSettings: { alwaysThinkingEnabled: true } })
+    expect(body?.thinking).toEqual({ type: 'disabled' })
+  })
+
+  test('sends the weakest level and no disabled thinking for an always-thinking model', async () => {
+    const body = await titleRequestBody('kimi-k3', {
+      userSettings: { alwaysThinkingEnabled: false },
+      modelOverrides: { 'kimi-k3': { reasoningDialect: 'anthropic_adaptive' } },
+    })
+    expect(body?.thinking).toBeUndefined()
+    expect(body?.output_config).toEqual({ effort: 'low' })
+  })
+
+  test('sends no thinking fields for a model that cannot think', async () => {
+    const body = await titleRequestBody('mystery-model', { userSettings: { alwaysThinkingEnabled: false } })
+    expect(body?.thinking).toBeUndefined()
+    expect(body?.output_config).toBeUndefined()
+  })
+
   test('does not persist automatic titles over a user custom title', async () => {
     const { sessionId } = await sessionService.createSession(os.tmpdir())
     await sessionService.renameSession(sessionId, 'My fixed name')

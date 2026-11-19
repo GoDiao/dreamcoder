@@ -1,24 +1,31 @@
-import { asRecord, asRecords, hostnameOf, windowsById, type ContextWindowSource } from './source.js'
+import { hostnameOf } from '../baseUrl.js'
+import { asRecord, asRecords, inputModalities, metadataById, type ModelMetadataSource, type RawModelMetadata } from './source.js'
 
 const QWEN_HOSTS = new Set(['dashscope.aliyuncs.com', 'dashscope-intl.aliyuncs.com'])
 const PAGE_SIZE = 100
 const MAX_PAGES = 10
 
-export const qwenSource: ContextWindowSource = {
+function readQwenModel(entry: Record<string, unknown>): RawModelMetadata {
+  const info = asRecord(entry.model_info)
+  return {
+    contextWindow: info?.context_window,
+    maxOutputTokens: info?.max_output_tokens,
+    ...inputModalities(asRecord(entry.inference_metadata)?.request_modality),
+  }
+}
+
+export const qwenSource: ModelMetadataSource = {
   id: 'qwen',
   matches: ({ baseUrl }) => QWEN_HOSTS.has(hostnameOf(baseUrl)),
-  windows: async ({ baseUrl, fetchJson }) => {
+  metadata: async ({ baseUrl, fetchJson }) => {
     const origin = new URL(baseUrl).origin
-    const windows = new Map<string, unknown>()
+    const metadata = new Map<string, RawModelMetadata>()
     for (let page = 1; page <= MAX_PAGES; page += 1) {
       const output = asRecord(asRecord(await fetchJson(`${origin}/api/v1/models?page_no=${page}&page_size=${PAGE_SIZE}`))?.output)
       const entries = asRecords(output?.models)
-      for (const [id, value] of windowsById(entries, 'model', (entry) => {
-        const info = asRecord(entry.model_info)
-        return info?.max_input_tokens ?? info?.context_window
-      })) windows.set(id, value)
-      if (entries.length === 0 || typeof output?.total !== 'number' || windows.size >= output.total) break
+      for (const [id, value] of metadataById(entries, 'model', readQwenModel)) metadata.set(id, value)
+      if (entries.length === 0 || typeof output?.total !== 'number' || metadata.size >= output.total) break
     }
-    return windows
+    return metadata
   },
 }

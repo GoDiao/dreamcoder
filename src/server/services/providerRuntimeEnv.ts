@@ -1,9 +1,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
+import { MODEL_RULES_ENV_KEY } from '../../utils/model/modelRules.js'
 import { PROVIDER_PROXIED_ENV_KEY } from '../../utils/providerProxy.js'
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
+import { ModelOverrideSchema, type ModelOverride } from '../types/modelRules.js'
 import type {
   ApiFormat,
   ProviderModel,
@@ -12,6 +13,7 @@ import type {
   SavedProvider,
 } from '../types/provider.js'
 import { normalizeUpstreamBaseUrl } from '../upstream/baseUrl.js'
+import { validFields } from './modelRules/validFields.js'
 import {
   ATTRIBUTION_HEADER_ENV_KEY,
   attributionHeaderEnvForModel,
@@ -24,20 +26,16 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL',
-  'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
-  'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
   'ANTHROPIC_DEFAULT_OPUS_MODEL',
-  'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
   'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
   ATTRIBUTION_HEADER_ENV_KEY,
-  MODEL_CONTEXT_WINDOWS_ENV_KEY,
+  MODEL_RULES_ENV_KEY,
   'DREAMCODER_OPENAI_OAUTH_PROVIDER',
   'OPENAI_CODEX_OAUTH_FILE',
   PROVIDER_PROXIED_ENV_KEY,
 ] as const
 
-const CUSTOM_PROVIDER_MODEL_CAPABILITIES = 'thinking,effort,adaptive_thinking,max_effort'
 const AUTH_ENV_KEYS = new Set(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -101,11 +99,33 @@ export function resolveProviderDefaultModel(
   return models[0]?.id ?? ''
 }
 
+function withValidModelOverrides(provider: SavedProvider): SavedProvider {
+  const stored: unknown = provider.modelOverrides
+  if (stored === undefined) return provider
+  const { modelOverrides: _modelOverrides, ...rest } = provider
+  const dropped = (model: string, field: string) => {
+    console.warn('[providers] Dropped invalid model override', { providerId: provider.id, model, field })
+  }
+  if (!isRecord(stored)) {
+    dropped('*', '*')
+    return rest
+  }
+  const valid: Record<string, ModelOverride> = {}
+  for (const [model, override] of Object.entries(stored)) {
+    if (!isRecord(override)) {
+      dropped(model, '*')
+      continue
+    }
+    valid[model] = validFields(override, ModelOverrideSchema.shape, (field) => dropped(model, field))
+  }
+  return { ...rest, modelOverrides: valid }
+}
+
 export function normalizeSavedProvider(provider: SavedProvider): SavedProvider {
   const models = normalizeProviderModels(provider.models)
   const fastModel = provider.fastModel?.trim()
   return {
-    ...provider,
+    ...withValidModelOverrides(provider),
     apiFormat: provider.apiFormat ?? 'anthropic',
     runtimeKind: provider.runtimeKind ?? 'anthropic_compatible',
     models,
@@ -154,10 +174,6 @@ function omitAuthEnv(env: Record<string, string>): Record<string, string> {
 
 export function getPresetAuthStrategy(presetId: string): ProviderAuthStrategy {
   return PROVIDER_PRESETS.find((preset) => preset.id === presetId)?.authStrategy ?? 'auth_token'
-}
-
-function getPresetModelContextWindows(presetId: string): Record<string, number> {
-  return PROVIDER_PRESETS.find((preset) => preset.id === presetId)?.modelContextWindows ?? {}
 }
 
 export function resolveProviderApiKey(
@@ -222,27 +238,10 @@ export function buildProviderManagedEnv(
   const fastModel = provider.fastModel && models.some((model) => model.id === provider.fastModel)
     ? provider.fastModel
     : selectedModel
-  const modelContextWindows = {
-    ...getPresetModelContextWindows(provider.presetId),
-    ...(provider.modelContextWindows ?? {}),
-  }
-
   const presetDefaultEnv = getPresetDefaultEnv(provider.presetId)
-  const customProviderCapabilityEnv =
-    provider.presetId === 'custom'
-      ? {
-          ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES: CUSTOM_PROVIDER_MODEL_CAPABILITIES,
-          ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES: CUSTOM_PROVIDER_MODEL_CAPABILITIES,
-          ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES: CUSTOM_PROVIDER_MODEL_CAPABILITIES,
-        }
-      : {}
 
   return {
     ...omitAuthEnv(presetDefaultEnv),
-    ...customProviderCapabilityEnv,
-    ...(Object.keys(modelContextWindows).length > 0 && {
-      [MODEL_CONTEXT_WINDOWS_ENV_KEY]: JSON.stringify(modelContextWindows),
-    }),
     ANTHROPIC_BASE_URL: baseUrl,
     ...buildProviderAuthEnv(provider, presetDefaultEnv, needsProxy),
     ANTHROPIC_MODEL: stripContextSuffix(selectedModel),

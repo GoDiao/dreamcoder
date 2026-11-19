@@ -5,16 +5,16 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
-  DiscoveredProviderModel,
+  ProviderModel,
+  ProviderSaveResult,
   DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
 
 type ProvidersResponse = { providers: SavedProvider[]; activeId: string | null }
-type ProviderResponse = { provider: SavedProvider }
 type PresetsResponse = { presets: ProviderPreset[] }
 type TestResultResponse = { result: ProviderTestResult }
-type ModelsResponse = { models: DiscoveredProviderModel[] }
+type ModelsResponse = { models: ProviderModel[] }
 type AuthStatusResponse = {
   hasAuth: boolean
   source: 'dreamcoder-provider' | 'original-settings' | 'env' | 'none'
@@ -34,24 +34,20 @@ export const providersApi = {
     return api.get<AuthStatusResponse>('/api/providers/auth-status')
   },
 
-  getSettings() {
-    return api.get<Record<string, unknown>>('/api/providers/settings')
-  },
-
-  updateSettings(settings: Record<string, unknown>) {
-    return api.put<{ ok: true }>('/api/providers/settings', settings)
-  },
-
   create(input: CreateProviderInput) {
-    return api.post<ProviderResponse>('/api/providers', input)
+    return api.post<ProviderSaveResult>('/api/providers', input)
   },
 
   update(id: string, input: UpdateProviderInput) {
-    return api.put<ProviderResponse>(`/api/providers/${id}`, input)
+    return api.put<ProviderSaveResult>(`/api/providers/${id}`, input)
   },
 
   delete(id: string) {
     return api.delete<{ ok: true }>(`/api/providers/${id}`)
+  },
+
+  refreshModels(id: string) {
+    return api.post<ProviderSaveResult>(`/api/providers/${id}/refresh-models`)
   },
 
   activate(id: string) {

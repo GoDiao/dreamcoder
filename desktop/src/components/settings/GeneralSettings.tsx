@@ -11,7 +11,7 @@ import { SettingsGroup, SettingsRow } from './SettingsRow'
 import { SettingsSelect } from './SettingsSelect'
 import { SettingsDisclosureRow } from './SettingsDisclosureRow'
 import { terminalApi } from '../../api/terminal'
-import type { EffortLevel, ThemeMode, WebSearchMode, AppMode } from '../../types/settings'
+import { EFFORT_LEVELS, type EffortLevel, type ThemeMode, type WebSearchMode, type AppMode } from '../../types/settings'
 import type { Locale } from '../../i18n'
 import { useUIStore } from '../../stores/uiStore'
 import { isDesktopRuntime } from '../../lib/desktopRuntime'
@@ -123,12 +123,7 @@ export function GeneralSettings() {
       ? t('settings.general.autoCompactDefaultOption', { percent })
       : `${percent}%`,
   }))
-  const EFFORT_OPTIONS: Array<{ value: EffortLevel; label: string }> = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'max', label: 'Max' },
-  ]
+  const EFFORT_OPTIONS = EFFORT_LEVELS.map((level) => ({ value: level, label: t(`settings.general.effort.${level}`) }))
 
   const LANGUAGES: Array<{ value: Locale; label: string }> = [
     { value: 'en', label: 'English' },

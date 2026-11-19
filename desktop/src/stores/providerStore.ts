@@ -8,7 +8,8 @@ import type {
   UpdateProviderInput,
   TestProviderConfigInput,
   ProviderTestResult,
-  DiscoveredProviderModel,
+  ProviderModel,
+  ProviderSaveResult,
   DiscoverProviderModelsInput,
 } from '../types/provider'
 import type { ProviderPreset } from '../types/providerPreset'
@@ -25,13 +26,14 @@ type ProviderStore = {
 
   fetchProviders: () => Promise<void>
   fetchPresets: () => Promise<void>
-  createProvider: (input: CreateProviderInput) => Promise<SavedProvider>
-  updateProvider: (id: string, input: UpdateProviderInput) => Promise<SavedProvider>
+  createProvider: (input: CreateProviderInput) => Promise<ProviderSaveResult>
+  updateProvider: (id: string, input: UpdateProviderInput) => Promise<ProviderSaveResult>
+  refreshProviderModels: (id: string) => Promise<ProviderSaveResult>
   deleteProvider: (id: string) => Promise<void>
   activateProvider: (id: string) => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
   testConfig: (input: TestProviderConfigInput) => Promise<ProviderTestResult>
-  discoverModels: (input: DiscoverProviderModelsInput) => Promise<DiscoveredProviderModel[]>
+  discoverModels: (input: DiscoverProviderModelsInput) => Promise<ProviderModel[]>
 }
 
 function providerModelIds(provider: SavedProvider): Set<string> {
@@ -123,17 +125,23 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   },
 
   createProvider: async (input) => {
-    const { provider } = await providersApi.create(input)
+    const result = await providersApi.create(input)
     await get().fetchProviders()
-    return provider
+    return result
   },
 
   updateProvider: async (id, input) => {
-    const { provider } = await providersApi.update(id, input)
+    const result = await providersApi.update(id, input)
     await get().fetchProviders()
-    refreshConnectedSessionsForProvider(provider, get().activeId)
-    if (provider.id === get().activeId) await useSettingsStore.getState().fetchAll()
-    return provider
+    refreshConnectedSessionsForProvider(result.provider, get().activeId)
+    if (result.provider.id === get().activeId) await useSettingsStore.getState().fetchAll()
+    return result
+  },
+
+  refreshProviderModels: async (id) => {
+    const result = await providersApi.refreshModels(id)
+    await get().fetchProviders()
+    return result
   },
 
   deleteProvider: async (id) => {
