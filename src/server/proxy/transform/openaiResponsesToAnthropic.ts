@@ -10,15 +10,34 @@ import {
   contentFilterError,
   UpstreamReplyError,
 } from '../../upstream/upstreamError.js'
+import type { ResolvedModelRules } from '../../types/modelRules.js'
 import type { ChatFinish } from './openaiChatToAnthropic.js'
+import { reasoningSignature } from './reasoningReplay.js'
 import { parseOpenAIToolArguments } from './toolArguments.js'
 
-export function openaiResponsesToAnthropic(response: OpenAIResponsesResponse, model: string): AnthropicResponse {
+export function responsesReasoningSignature(item: Record<string, unknown>, rules: ResolvedModelRules): string | undefined {
+  const encrypted = item.encrypted_content
+  return typeof encrypted === 'string' && encrypted ? reasoningSignature(rules, 'encrypted_content', encrypted) : undefined
+}
+
+export function responsesReasoningText(item: Record<string, unknown>): string {
+  if (!Array.isArray(item.summary)) return ''
+  return (item.summary as Array<Record<string, unknown>>)
+    .map(part => typeof part.text === 'string' ? part.text : '')
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+export function openaiResponsesToAnthropic(
+  response: OpenAIResponsesResponse,
+  model: string,
+  rules: ResolvedModelRules,
+): AnthropicResponse {
   const content: AnthropicContentBlock[] = []
   let hasToolUse = false
 
   for (const item of response.output || []) {
-    convertOutputItem(item, content)
+    convertOutputItem(item, content, rules)
     if (item.type === 'function_call') hasToolUse = true
   }
 
@@ -54,7 +73,7 @@ export function mapResponsesUsage(usage?: OpenAIResponsesUsage): AnthropicRespon
   }
 }
 
-function convertOutputItem(item: OpenAIResponsesOutputItem, content: AnthropicContentBlock[]): void {
+function convertOutputItem(item: OpenAIResponsesOutputItem, content: AnthropicContentBlock[], rules: ResolvedModelRules): void {
   switch (item.type) {
     case 'message': {
       for (const part of item.content || []) {
@@ -76,16 +95,10 @@ function convertOutputItem(item: OpenAIResponsesOutputItem, content: AnthropicCo
       break
     }
     case 'reasoning': {
-      if (item.summary) {
-        for (const s of item.summary) {
-          if (s.text) {
-            content.push({
-              type: 'thinking',
-              thinking: s.text,
-            })
-          }
-        }
-      }
+      const thinking = responsesReasoningText(item)
+      const signature = responsesReasoningSignature(item, rules)
+      if (signature) content.push({ type: 'thinking', thinking, signature })
+      else if (thinking) content.push({ type: 'thinking', thinking })
       break
     }
   }

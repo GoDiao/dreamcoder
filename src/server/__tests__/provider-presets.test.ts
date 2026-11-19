@@ -27,15 +27,9 @@ afterEach(async () => {
 function makeRequest(
   method: string,
   urlStr: string,
-  body?: Record<string, unknown>,
 ): { req: Request; url: URL; segments: string[] } {
   const url = new URL(urlStr, 'http://localhost:3456')
-  const init: RequestInit = { method }
-  if (body) {
-    init.headers = { 'Content-Type': 'application/json' }
-    init.body = JSON.stringify(body)
-  }
-  const req = new Request(url.toString(), init)
+  const req = new Request(url.toString(), { method })
   const segments = url.pathname.split('/').filter(Boolean)
   return { req, url, segments }
 }
@@ -80,10 +74,7 @@ describe('provider presets API', () => {
       { id: 'deepseek-v4-flash' },
     ])
     expect(deepseek?.defaultFastModel).toBe('deepseek-v4-flash')
-    expect(deepseek?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
-    expect(deepseek?.defaultEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe(
-      'thinking,effort,adaptive_thinking,max_effort',
-    )
+    expect(deepseek?.defaultEnv).toBeUndefined()
     expect(zhipu?.authStrategy).toBe('auth_token')
     expect(zhipu?.defaultModels).toEqual([
       { id: 'glm-5.1' },
@@ -94,14 +85,14 @@ describe('provider presets API', () => {
     expect(kimi?.baseUrl).toBe('https://api.kimi.com/coding')
     expect(kimi?.authStrategy).toBe('auth_token')
     expect(kimi?.defaultModels).toEqual([{ id: 'kimi-k2.6' }])
-    expect(kimi?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
+    expect(kimi?.defaultEnv).toBeUndefined()
+    expect(zhipu?.defaultEnv).toBeUndefined()
   })
 
   test('configured presets can expose optional API key metadata', () => {
     const lmstudio = PROVIDER_PRESETS.find((preset) => preset.id === 'lmstudio')
     const ollama = PROVIDER_PRESETS.find((preset) => preset.id === 'ollama')
     const deepseek = PROVIDER_PRESETS.find((preset) => preset.id === 'deepseek')
-    const zhipu = PROVIDER_PRESETS.find((preset) => preset.id === 'zhipuglm')
     const kimi = PROVIDER_PRESETS.find((preset) => preset.id === 'kimi')
     const custom = PROVIDER_PRESETS.find((preset) => preset.id === 'custom')
 
@@ -114,47 +105,9 @@ describe('provider presets API', () => {
       ANTHROPIC_AUTH_TOKEN: 'ollama',
     })
     expect(deepseek?.apiKeyUrl).toBe('https://platform.deepseek.com/api_keys')
-    expect(deepseek?.modelContextWindows?.['deepseek-v4-pro']).toBe(1000000)
-    expect(deepseek?.modelContextWindows?.['deepseek-v4-flash']).toBe(1000000)
-    expect(zhipu?.defaultEnv?.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
-    expect(zhipu?.modelContextWindows?.['glm-5.1']).toBe(200000)
-    expect(zhipu?.modelContextWindows?.['glm-4.5-air']).toBe(128000)
     expect(kimi?.apiKeyUrl).toBe('https://platform.kimi.com/console/api-keys')
-    expect(kimi?.modelContextWindows?.['kimi-k2.6']).toBe(262144)
+    expect(PROVIDER_PRESETS.some((preset) => 'modelContextWindows' in preset)).toBe(false)
     expect(custom?.authStrategy).toBe('auth_token')
     expect(custom?.defaultEnv).toBeUndefined()
-  })
-
-  test('GET and PUT /api/providers/settings read and write dreamcoder settings.json', async () => {
-    const initial = {
-      env: {
-        ANTHROPIC_MODEL: 'glm-5.1',
-      },
-      model: 'glm-5.1',
-    }
-    await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
-    await fs.writeFile(
-      path.join(tmpDir, 'dreamcoder', 'settings.json'),
-      JSON.stringify(initial, null, 2),
-      'utf-8',
-    )
-
-    const getReq = makeRequest('GET', '/api/providers/settings')
-    const getRes = await handleProvidersApi(getReq.req, getReq.url, getReq.segments)
-    expect(getRes.status).toBe(200)
-    expect(await getRes.json()).toEqual(initial)
-
-    const updateBody = {
-      model: 'kimi-k2.6',
-      env: {
-        ANTHROPIC_MODEL: 'kimi-k2.6',
-      },
-    }
-    const putReq = makeRequest('PUT', '/api/providers/settings', updateBody)
-    const putRes = await handleProvidersApi(putReq.req, putReq.url, putReq.segments)
-    expect(putRes.status).toBe(200)
-
-    const updatedRaw = await fs.readFile(path.join(tmpDir, 'dreamcoder', 'settings.json'), 'utf-8')
-    expect(JSON.parse(updatedRaw)).toEqual(updateBody)
   })
 })

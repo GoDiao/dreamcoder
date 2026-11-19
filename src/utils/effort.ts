@@ -4,30 +4,29 @@ import { getInitialSettings } from './settings/settings.js'
 import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
 import { getAPIProvider } from './model/providers.js'
-import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
+import {
+  EFFORT_LEVELS,
+  getCliModelRules,
+  getCliModelRulesEnv,
+  resolveEffortForLevels,
+} from './model/modelRules.js'
 import { isEnvTruthy } from './envUtils.js'
 import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
 
 export type { EffortLevel }
-
-export const EFFORT_LEVELS = [
-  'low',
-  'medium',
-  'high',
-  'max',
-] as const satisfies readonly EffortLevel[]
+export { EFFORT_LEVELS }
 
 export type EffortValue = EffortLevel | number
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports the effort parameter.
 export function modelSupportsEffort(model: string): boolean {
+  const rules = getCliModelRules(model)
+  if (rules) {
+    return rules.effortLevels.length > 0
+  }
   const m = model.toLowerCase()
   if (isEnvTruthy(process.env.CLAUDE_CODE_ALWAYS_ENABLE_EFFORT)) {
     return true
-  }
-  const supported3P = get3PModelCapabilityOverride(model, 'effort')
-  if (supported3P !== undefined) {
-    return supported3P
   }
   // Supported by a subset of Claude 4 models
   if (m.includes('opus-4-6') || m.includes('sonnet-4-6')) {
@@ -51,9 +50,9 @@ export function modelSupportsEffort(model: string): boolean {
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
 // Per API docs, 'max' is Opus 4.7 only for public models — other models return an error.
 export function modelSupportsMaxEffort(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'max_effort')
-  if (supported3P !== undefined) {
-    return supported3P
+  const rules = getCliModelRules(model)
+  if (rules) {
+    return rules.effortLevels.includes('max')
   }
   if (model.toLowerCase().includes('opus-4-6')) {
     return true
@@ -62,6 +61,10 @@ export function modelSupportsMaxEffort(model: string): boolean {
     return true
   }
   return false
+}
+
+export function normalizeEffortLevel(value: unknown): EffortLevel {
+  return typeof value === 'string' && isEffortLevel(value) ? value : 'medium'
 }
 
 export function isEffortLevel(value: string): value is EffortLevel {
@@ -104,10 +107,16 @@ export function toPersistableEffort(
   return undefined
 }
 
+export function effortFromSettings(
+  level: EffortLevel | undefined,
+): EffortLevel | undefined {
+  return getCliModelRulesEnv() ? undefined : level
+}
+
 export function getInitialEffortSetting(): EffortLevel | undefined {
   // toPersistableEffort filters 'max' for non-ants on read, so a manually
   // edited settings.json doesn't leak session-scoped max into a fresh session.
-  return toPersistableEffort(getInitialSettings().effortLevel)
+  return toPersistableEffort(effortFromSettings(getInitialSettings().effortLevel))
 }
 
 /**
@@ -156,6 +165,12 @@ export function resolveAppliedEffort(
   const envOverride = getEffortEnvOverride()
   if (envOverride === null) {
     return undefined
+  }
+  const rulesEnv = getCliModelRulesEnv()
+  const rules = getCliModelRules(model)
+  if (rulesEnv && rules) {
+    const requested = envOverride ?? appStateEffortValue ?? rulesEnv.defaultEffort
+    return resolveEffortForLevels(convertEffortValueToLevel(requested), rules.effortLevels)
   }
   const resolved =
     envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
@@ -279,6 +294,10 @@ export function getOpusDefaultEffortConfig(): OpusDefaultEffortConfig {
 export function getDefaultEffortForModel(
   model: string,
 ): EffortValue | undefined {
+  const rulesEnv = getCliModelRulesEnv()
+  if (rulesEnv) {
+    return rulesEnv.defaultEffort
+  }
   if (process.env.USER_TYPE === 'ant') {
     const config = getAntModelOverrideConfig()
     const isDefaultModel =

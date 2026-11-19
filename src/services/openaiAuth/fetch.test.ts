@@ -89,6 +89,37 @@ describe('buildOpenAICodexFetch', () => {
     })
   })
 
+  test('writes the requested reasoning level with the built-in rules for the Codex model', async () => {
+    const bodies: Array<Record<string, unknown>> = []
+    const fetchOverride: typeof fetch = async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return Response.json({
+        id: 'resp_effort',
+        object: 'response',
+        created_at: 1_779_118_000,
+        model: 'gpt-5.4',
+        status: 'completed',
+        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+      })
+    }
+
+    const openAIFetch = buildOpenAICodexFetch(fetchOverride, 'test')
+    await openAIFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: 'gpt-5.4',
+        max_tokens: 64,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'high' },
+        messages: [{ role: 'user', content: 'Say ok' }],
+      }),
+    })
+
+    expect(bodies[0].reasoning).toEqual({ effort: 'high' })
+    expect(bodies[0]).not.toHaveProperty('max_output_tokens')
+  })
+
   test('uses streamed Codex responses even for non-streaming Anthropic callers', async () => {
     const upstreamCalls: Array<{
       url: string

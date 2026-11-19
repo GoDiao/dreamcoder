@@ -1,17 +1,10 @@
 import { create } from 'zustand'
 import type { RuntimeSelection } from '../types/runtime'
-import type { EffortLevel } from '../types/settings'
+import { isEffortLevel } from '../types/settings'
 
 const STORAGE_KEY = 'dreamcoder-session-runtime'
 
 export const DRAFT_RUNTIME_SELECTION_KEY = '__draft__'
-
-/** Mirrors the server's EFFORT_LEVELS (src/server/api/models.ts). */
-export const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'max']
-
-export function isEffortLevel(value: unknown): value is EffortLevel {
-  return typeof value === 'string' && (EFFORT_LEVELS as readonly string[]).includes(value)
-}
 
 function sanitizeSelection(selection: RuntimeSelection): RuntimeSelection {
   if (selection.effort === undefined || isEffortLevel(selection.effort)) return selection

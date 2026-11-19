@@ -9,6 +9,9 @@ import {
   toAnthropicError,
   type AnthropicError,
 } from '../../upstream/upstreamError.js'
+import type { ResolvedModelRules } from '../../types/modelRules.js'
+import { ChatReasoningBuffer, readChatReasoning } from '../transform/reasoningReplay.js'
+import { ThinkTagSplitter, type TextSegment } from '../transform/thinkTags.js'
 import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 
 type ContentBlockType = 'text' | 'thinking' | 'tool_use'
@@ -42,6 +45,10 @@ type StreamState = {
 
   heldMessageDelta: SseEvent | null
 
+  rules: ResolvedModelRules
+  reasoning: ChatReasoningBuffer | null
+  thinkTags: ThinkTagSplitter | null
+
   sawValidChunk: boolean
   sawDone: boolean
   sawUsage: boolean
@@ -53,7 +60,7 @@ function formatSse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 }
 
-function createState(model: string): StreamState {
+function createState(model: string, rules: ResolvedModelRules): StreamState {
   return {
     queue: [],
     currentBlockType: 'text',
@@ -68,6 +75,9 @@ function createState(model: string): StreamState {
     messageDeltaSent: false,
     messageStopSent: false,
     heldMessageDelta: null,
+    rules,
+    reasoning: null,
+    thinkTags: rules.thinkTagsInText ? new ThinkTagSplitter() : null,
     sawValidChunk: false,
     sawDone: false,
     sawUsage: false,
@@ -79,10 +89,11 @@ function createState(model: string): StreamState {
 export function openaiChatStreamToAnthropic(
   upstream: ReadableStream<Uint8Array>,
   model: string,
+  rules: ResolvedModelRules,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
   const sse = new SseDecoder()
-  const state = createState(model)
+  const state = createState(model, rules)
   const reader = upstream.getReader()
   let cancelled = false
 
@@ -194,6 +205,7 @@ function openBlock(state: StreamState, blockType: ContentBlockType, block: Recor
   state.currentBlockIndex = index
   state.blockStartSent = true
   state.blockStopSent = false
+  state.reasoning = blockType === 'thinking' ? new ChatReasoningBuffer() : null
   enqueue(state, 'content_block_start', {
     type: 'content_block_start',
     index,
@@ -213,6 +225,9 @@ function emitDelta(state: StreamState, index: number, delta: Record<string, unkn
 function closeCurrentBlock(state: StreamState): void {
   if (!state.blockStartSent || state.blockStopSent) return
   state.blockStopSent = true
+  const signature = state.currentBlockType === 'thinking' ? state.reasoning?.signatureFor(state.rules) : undefined
+  if (signature) emitDelta(state, state.currentBlockIndex, { type: 'signature_delta', signature })
+  state.reasoning = null
   enqueue(state, 'content_block_stop', {
     type: 'content_block_stop',
     index: state.currentBlockIndex,
@@ -235,6 +250,7 @@ function closeAllToolBlocks(state: StreamState): void {
 }
 
 function closeAllOpenBlocks(state: StreamState): void {
+  if (state.thinkTags) handleTextSegments(state.thinkTags.flush(), state)
   if (state.currentBlockType !== 'tool_use') {
     closeCurrentBlock(state)
   }
@@ -249,30 +265,6 @@ type DeltaEx = Record<string, unknown> & {
     type?: string
     function?: { name?: string; arguments?: string }
   }>
-}
-
-function extractReasoning(delta: DeltaEx): { thinking: string; signature: string } | null {
-  if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
-    return { thinking: delta.reasoning_content, signature: '' }
-  }
-
-  if (typeof delta.reasoning === 'string' && delta.reasoning) {
-    return { thinking: delta.reasoning, signature: '' }
-  }
-
-  const thinkingBlocks = delta.thinking_blocks as Array<Record<string, unknown>> | undefined
-  if (Array.isArray(thinkingBlocks) && thinkingBlocks.length > 0) {
-    const block = thinkingBlocks[0]
-    if (block.type === 'thinking') {
-      const thinking = (block.thinking as string) || ''
-      const signature = (block.signature as string) || ''
-      if (thinking || signature) {
-        return { thinking, signature }
-      }
-    }
-  }
-
-  return null
 }
 
 function leaveBlockFor(type: ContentBlockType, state: StreamState): void {
@@ -291,14 +283,12 @@ function processChunk(chunk: OpenAIChatStreamChunk, state: StreamState): void {
 
   const delta = choice.delta as DeltaEx
 
-  if (extractReasoning(delta)) {
-    leaveBlockFor('thinking', state)
-    handleThinking(delta, state)
+  for (const piece of readChatReasoning(delta)) {
+    ensureBlock('thinking', state)
+    state.reasoning?.add(piece)
+    emitThinking(piece.thinking, state)
   }
-  if (delta.content != null && delta.content !== '') {
-    leaveBlockFor('text', state)
-    handleText(delta, state)
-  }
+  handleText(delta, state)
   if (delta.tool_calls && delta.tool_calls.length > 0) {
     leaveBlockFor('tool_use', state)
     handleToolCalls(delta, state)
@@ -309,36 +299,27 @@ function processChunk(chunk: OpenAIChatStreamChunk, state: StreamState): void {
   }
 }
 
-function handleThinking(delta: DeltaEx, state: StreamState): void {
-  const reasoning = extractReasoning(delta)
-  if (!reasoning) return
+function ensureBlock(type: 'thinking' | 'text', state: StreamState): void {
+  if (state.currentBlockType === type && state.blockStartSent && !state.blockStopSent) return
+  leaveBlockFor(type, state)
+  openBlock(state, type, type === 'thinking' ? { type: 'thinking', thinking: '' } : { type: 'text', text: '' })
+}
 
-  if (state.currentBlockType !== 'thinking' || !state.blockStartSent) {
-    openBlock(state, 'thinking', { type: 'thinking', thinking: '' })
-  }
+function emitThinking(thinking: string, state: StreamState): void {
+  if (thinking) emitDelta(state, state.currentBlockIndex, { type: 'thinking_delta', thinking })
+}
 
-  if (reasoning.thinking) {
-    emitDelta(state, state.currentBlockIndex, {
-      type: 'thinking_delta', thinking: reasoning.thinking,
-    })
-  }
-  if (reasoning.signature) {
-    emitDelta(state, state.currentBlockIndex, {
-      type: 'signature_delta', signature: reasoning.signature,
-    })
+function handleTextSegments(segments: TextSegment[], state: StreamState): void {
+  for (const segment of segments) {
+    ensureBlock(segment.kind, state)
+    if (segment.kind === 'thinking') emitThinking(segment.text, state)
+    else emitDelta(state, state.currentBlockIndex, { type: 'text_delta', text: segment.text })
   }
 }
 
 function handleText(delta: DeltaEx, state: StreamState): void {
   if (delta.content == null || delta.content === '') return
-
-  if (state.currentBlockType !== 'text' || !state.blockStartSent) {
-    openBlock(state, 'text', { type: 'text', text: '' })
-  }
-
-  emitDelta(state, state.currentBlockIndex, {
-    type: 'text_delta', text: delta.content,
-  })
+  handleTextSegments(state.thinkTags ? state.thinkTags.push(delta.content) : [{ kind: 'text', text: delta.content }], state)
 }
 
 // Some OpenAI-compatible servers (Gemini's endpoint) stream every parallel call whole,

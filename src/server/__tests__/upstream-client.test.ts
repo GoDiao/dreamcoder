@@ -36,6 +36,11 @@ function target(overrides?: Partial<UpstreamTarget>): UpstreamTarget {
   }
 }
 
+function upstream(overrides?: Partial<UpstreamTarget>) {
+  const resolved = target(overrides)
+  return { target: resolved, provider: { baseUrl: resolved.baseUrl, apiFormat: resolved.apiFormat } }
+}
+
 const request: AnthropicRequest = {
   model: 'model-main[1m]',
   max_tokens: 16,
@@ -98,7 +103,7 @@ describe('upstream client', () => {
   ] as const)('%s requests go to %s and come back as an Anthropic message', async (apiFormat, suffix, upstreamBody) => {
     mockFetch(() => Response.json(upstreamBody))
 
-    const result = await sendToUpstream(target({ apiFormat, baseUrl: 'https://api.example.com/v1' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat, baseUrl: 'https://api.example.com/v1' }), request)
 
     expect(calls[0].url).toBe(`https://api.example.com${suffix}`)
     expect(calls[0].body.model).toBe('model-main')
@@ -122,7 +127,7 @@ describe('upstream client', () => {
       output: [],
     }))
 
-    await sendToUpstream(target({ apiFormat, baseUrl }), request)
+    await sendToUpstream(upstream({ apiFormat, baseUrl }), request)
 
     expect(calls[0].url).toBe(expected)
   })
@@ -160,7 +165,7 @@ describe('upstream client', () => {
   ] as const)('anthropic auth strategy %s sets the expected headers', async (authStrategy, expected, absent) => {
     mockFetch(() => Response.json(anthropicMessage))
 
-    await sendToUpstream(target({ authStrategy }), request)
+    await sendToUpstream(upstream({ authStrategy }), request)
 
     expect(calls[0].headers).toMatchObject(expected)
     for (const header of absent) {
@@ -171,7 +176,7 @@ describe('upstream client', () => {
   test('OpenAI formats always use bearer auth regardless of auth strategy', async () => {
     mockFetch(() => Response.json(openaiChatMessage))
 
-    await sendToUpstream(target({ apiFormat: 'openai_chat', authStrategy: 'api_key' }), request)
+    await sendToUpstream(upstream({ apiFormat: 'openai_chat', authStrategy: 'api_key' }), request)
 
     expect(calls[0].headers.Authorization).toBe('Bearer sk-test')
     expect(calls[0].headers['x-api-key']).toBeUndefined()
@@ -185,7 +190,7 @@ describe('upstream client', () => {
     const sse = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
     mockFetch(() => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true })
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true })
 
     expect(result.ok && 'stream' in result).toBe(true)
     const text = await new Response((result as { stream: ReadableStream<Uint8Array> }).stream).text()
@@ -197,7 +202,7 @@ describe('upstream client', () => {
   test('reports an upstream HTTP error with its status, an Anthropic error type and the plain body', async () => {
     mockFetch(() => new Response('model not found', { status: 404 }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({ ok: false, httpStatus: 404, errorType: 'not_found_error', error: 'model not found', headers: {} })
   })
@@ -208,7 +213,7 @@ describe('upstream client', () => {
       { status: 429, headers: { 'retry-after': '20', 'retry-after-ms': '20000', 'x-request-id': 'req_abc', 'set-cookie': 'a=b' } },
     ))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({
       ok: false,
@@ -222,7 +227,7 @@ describe('upstream client', () => {
   test('keeps at most 500 characters of a long provider message', async () => {
     mockFetch(() => Response.json({ error: { message: 'x'.repeat(5000) } }, { status: 500 }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result.ok === false && result.error).toBe('x'.repeat(500))
   })
@@ -236,7 +241,7 @@ describe('upstream client', () => {
   ])('reports %s as a billing error the CLI does not retry', async (_kind, status, body) => {
     mockFetch(() => Response.json(body, { status }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toMatchObject({ ok: false, httpStatus: 402, errorType: 'billing_error', headers: { 'x-should-retry': 'false' } })
   })
@@ -247,7 +252,7 @@ describe('upstream client', () => {
   ] as const)('tells the CLI not to retry a %i from the provider', async (status, type) => {
     mockFetch(() => Response.json({ error: { message: 'Incorrect API key provided', code: 'invalid_api_key' } }, { status }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({
       ok: false,
@@ -264,7 +269,7 @@ describe('upstream client', () => {
   ] as const)('maps %s inside a 2xx body by its content', async (_kind, body, status, type) => {
     mockFetch(() => Response.json(body))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toMatchObject({ ok: false, httpStatus: status, errorType: type })
   })
@@ -288,7 +293,7 @@ describe('upstream client', () => {
   ])('turns a context overflow reported as %s into the Anthropic prompt-too-long error', async (_kind, body, message) => {
     mockFetch(() => Response.json(body, { status: 400 }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({ ok: false, httpStatus: 400, errorType: 'invalid_request_error', error: message, headers: {} })
   })
@@ -296,7 +301,7 @@ describe('upstream client', () => {
   test('rejects responses that do not match the declared format', async () => {
     mockFetch(() => Response.json({ hello: 'world' }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({
       ok: false,
@@ -311,7 +316,7 @@ describe('upstream client', () => {
   ] as const)('reports a non-streaming reply that ended with %s as an error', async (reason, status, type, message) => {
     mockFetch(() => Response.json({ ...openaiChatMessage, choices: [{ index: 0, message: { role: 'assistant', content: 'Hi' }, finish_reason: reason }] }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result).toEqual({ ok: false, httpStatus: status, errorType: type, error: message, headers: {} })
   })
@@ -319,7 +324,7 @@ describe('upstream client', () => {
   test('reports conversion failures as 502 instead of throwing', async () => {
     mockFetch(() => Response.json({ choices: [{}] }))
 
-    const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+    const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
     expect(result.ok).toBe(false)
     expect(result.ok === false && result.httpStatus).toBe(502)
@@ -330,7 +335,7 @@ describe('upstream client', () => {
       throw new Error('connect ECONNREFUSED')
     }) as unknown as typeof fetch
 
-    const result = await sendToUpstream(target(), request)
+    const result = await sendToUpstream(upstream(), request)
 
     expect(result).toEqual({ ok: false, error: 'connect ECONNREFUSED' })
   })
@@ -360,7 +365,7 @@ describe('upstream client', () => {
     test('adds configured headers first and lets auth and content type from the provider settings win', async () => {
       mockFetch(() => Response.json(openaiChatMessage))
 
-      await sendToUpstream(target({
+      await sendToUpstream(upstream({
         apiFormat: 'openai_chat',
         baseUrl: 'https://example.openai.azure.com/openai/v1',
         extraHeaders: { 'HTTP-Referer': 'https://dreamcoder.dev', authorization: 'Bearer from-config', 'content-type': 'text/plain' },
@@ -404,7 +409,7 @@ describe('upstream client', () => {
       const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => Response.json(openaiChatMessage) })
 
       try {
-        const result = await sendToUpstream(target({
+        const result = await sendToUpstream(upstream({
           apiFormat: 'openai_chat',
           baseUrl: `http://127.0.0.1:${server.port}`,
           extraHeaders: { 'Bad Header': 'x' },
@@ -440,7 +445,7 @@ describe('upstream client', () => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 0, model: 'm', choices: [{ index: 0, delta: { role: 'assistant', content: 'Hi' }, finish_reason: null }] })}\n\n`))
       }, () => { upstreamCancelled = true }))
 
-      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
+      const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
       const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
 
       expect(text).toContain('"text":"Hi"')
@@ -455,7 +460,7 @@ describe('upstream client', () => {
       }, () => clearInterval(timer)))
 
       try {
-        const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
+        const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 300 })
         const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
 
         expect(text).toContain('event: ping\ndata: {"type":"ping"}')
@@ -473,7 +478,7 @@ describe('upstream client', () => {
       }, () => clearInterval(timer)))
 
       try {
-        const result = await sendToUpstream(target({ apiFormat: 'openai_responses' }), { ...request, stream: true }, { timeoutMs: 300 })
+        const result = await sendToUpstream(upstream({ apiFormat: 'openai_responses' }), { ...request, stream: true }, { timeoutMs: 300 })
         const text = await readWithGuard((result as { stream: ReadableStream<Uint8Array> }).stream)
 
         expect(text).toContain('event: message_start')
@@ -506,7 +511,7 @@ describe('upstream client', () => {
     test('records a successful request without the key or the request body', async () => {
       mockFetch(() => Response.json(openaiChatMessage, { headers: { 'x-request-id': 'req_123' } }))
 
-      await sendToUpstream(target({ apiFormat: 'openai_chat', providerId: 'p1' }), request)
+      await sendToUpstream(upstream({ apiFormat: 'openai_chat', providerId: 'p1' }), request)
 
       expect(upstreamEvents()).toHaveLength(1)
       const [event] = upstreamEvents()
@@ -529,7 +534,7 @@ describe('upstream client', () => {
     test('records an upstream HTTP error as a warning', async () => {
       mockFetch(() => new Response('slow down', { status: 429 }))
 
-      await sendToUpstream(target({ apiFormat: 'openai_chat' }), request)
+      await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request)
 
       expect(upstreamEvents()).toHaveLength(1)
       expect(upstreamEvents()[0]!.severity).toBe('warn')
@@ -542,7 +547,7 @@ describe('upstream client', () => {
         { headers: { 'Content-Type': 'text/event-stream' } },
       ))
 
-      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true })
+      const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true })
       expect(upstreamEvents()).toHaveLength(0)
       await new Response((result as { stream: ReadableStream<Uint8Array> }).stream).text()
 
@@ -559,7 +564,7 @@ describe('upstream client', () => {
       })) as unknown as typeof fetch
       const client = new AbortController()
 
-      const pending = sendToUpstream(target({ apiFormat: 'openai_chat' }), request, { signal: client.signal })
+      const pending = sendToUpstream(upstream({ apiFormat: 'openai_chat' }), request, { signal: client.signal })
       client.abort()
       const result = await pending
 
@@ -578,7 +583,7 @@ describe('upstream client', () => {
       }), { headers: { 'Content-Type': 'text/event-stream' } })) as unknown as typeof fetch
       const client = new AbortController()
 
-      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { signal: client.signal })
+      const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { signal: client.signal })
       const reader = (result as { stream: ReadableStream<Uint8Array> }).stream.getReader()
       await reader.read()
       client.abort()
@@ -595,7 +600,7 @@ describe('upstream client', () => {
         },
       }), { headers: { 'Content-Type': 'text/event-stream' } }))
 
-      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 200 })
+      const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true }, { timeoutMs: 200 })
       await new Response((result as { stream: ReadableStream<Uint8Array> }).stream).text()
 
       expect(upstreamEvents()).toHaveLength(1)
@@ -610,7 +615,7 @@ describe('upstream client', () => {
         },
       }), { headers: { 'Content-Type': 'text/event-stream' } }))
 
-      const result = await sendToUpstream(target({ apiFormat: 'openai_chat' }), { ...request, stream: true })
+      const result = await sendToUpstream(upstream({ apiFormat: 'openai_chat' }), { ...request, stream: true })
       const reader = (result as { stream: ReadableStream<Uint8Array> }).stream.getReader()
       await reader.read()
       await reader.cancel('client gone')

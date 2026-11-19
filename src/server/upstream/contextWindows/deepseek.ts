@@ -1,10 +1,12 @@
-import { asRecord, asRecords, hostnameOf, windowsById, type ContextWindowSource } from './source.js'
+import { hostnameOf } from '../baseUrl.js'
+import { readListedMetadata } from './listed.js'
+import { asRecord, asRecords, metadataById, type ModelMetadataSource } from './source.js'
 
-export const deepseekSource: ContextWindowSource = {
+export const deepseekSource: ModelMetadataSource = {
   id: 'deepseek',
   matches: ({ baseUrl }) => hostnameOf(baseUrl) === 'api.deepseek.com',
-  windows: async ({ baseUrl, fetchJson }) => {
+  metadata: async ({ baseUrl, fetchJson }) => {
     const body = asRecord(await fetchJson(`${new URL(baseUrl).origin}/models`))
-    return windowsById(asRecords(body?.data), 'id', (entry) => entry.context_window)
+    return metadataById(asRecords(body?.data), 'id', readListedMetadata)
   },
 }

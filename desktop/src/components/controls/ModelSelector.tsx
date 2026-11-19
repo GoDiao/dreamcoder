@@ -5,9 +5,9 @@ import { useChatStore, useSessionRuntimeSelection } from '../../stores/chatStore
 import { useProviderStore } from '../../stores/providerStore'
 import { DRAFT_RUNTIME_SELECTION_KEY, useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import type { SavedProvider } from '../../types/provider'
+import type { ResolvedModelRulesView, SavedProvider } from '../../types/provider'
 import type { RuntimeSelection } from '../../types/runtime'
-import type { EffortLevel, ModelInfo } from '../../types/settings'
+import { EFFORT_LEVELS, type EffortLevel, type ModelInfo } from '../../types/settings'
 import { Tooltip } from '../shared/Tooltip'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '../shared/ui/select'
 
@@ -15,11 +15,13 @@ function runtimeOptionKey(providerId: string | null, modelId: string) {
   return JSON.stringify([providerId, modelId])
 }
 
+type ProviderModelChoice = ModelInfo & { view?: ResolvedModelRulesView }
+
 type ProviderChoice = {
   providerId: string
   providerName: string
   isDefault: boolean
-  models: ModelInfo[]
+  models: ProviderModelChoice[]
 }
 
 type Props = {
@@ -32,12 +34,13 @@ type Props = {
 
 function buildProviderModels(
   provider: SavedProvider,
-): ModelInfo[] {
+): ProviderModelChoice[] {
   return provider.models.map((model) => ({
     id: model.id,
     name: model.name || model.id,
     description: model.name ? model.id : '',
     context: '',
+    view: provider.resolvedModels?.[model.id],
   }))
 }
 
@@ -95,13 +98,6 @@ export function ModelSelector({
   const runtimeSelection = draftRuntimeSelection ?? sessionSelection
   const requestedProvidersRef = useRef(false)
 
-  const EFFORT_OPTIONS: { value: EffortLevel; label: string }[] = [
-    { value: 'low', label: t('settings.general.effort.low') },
-    { value: 'medium', label: t('settings.general.effort.medium') },
-    { value: 'high', label: t('settings.general.effort.high') },
-    { value: 'max', label: t('settings.general.effort.max') },
-  ]
-
   useEffect(() => {
     if (providersLoading || requestedProvidersRef.current) return
     requestedProvidersRef.current = true
@@ -125,7 +121,7 @@ export function ModelSelector({
       }
 
   const selectedProviderChoice = providerChoices.find((choice) => choice.providerId === activeRuntimeSelection.providerId) ?? null
-  const selectedRuntimeModel = selectedProviderChoice?.models.find((model) => model.id === activeRuntimeSelection.modelId)
+  const selectedRuntimeModel: ProviderModelChoice = selectedProviderChoice?.models.find((model) => model.id === activeRuntimeSelection.modelId)
     ?? {
       id: activeRuntimeSelection.modelId,
       name: activeRuntimeSelection.modelId,
@@ -136,8 +132,11 @@ export function ModelSelector({
   const buttonModelLabel = selectedRuntimeModel.name
   const buttonProviderLabel = selectedProviderChoice?.providerName ?? activeProviderName ?? t('model.noProvider')
 
-  const selectedEffort: EffortLevel = activeRuntimeSelection.effort ?? effortLevel
-  const selectedEffortLabel = EFFORT_OPTIONS.find((option) => option.value === selectedEffort)?.label
+  const modelView = selectedRuntimeModel.view
+  const effortLevels: readonly EffortLevel[] = modelView ? modelView.effortLevels : EFFORT_LEVELS
+  const requestedEffort: EffortLevel = activeRuntimeSelection.effort ?? effortLevel
+  const selectedEffort: EffortLevel = modelView?.appliedEffort?.[requestedEffort] ?? requestedEffort
+  const selectedEffortLabel = t(`settings.general.effort.${selectedEffort}`)
   const triggerTitle = [buttonModelLabel, buttonProviderLabel].filter(Boolean).join('\n')
 
   const handleRuntimeSelect = (selection: RuntimeSelection) => {
@@ -189,7 +188,10 @@ export function ModelSelector({
                   {choice.isDefault && <span className="ml-1.5 font-normal opacity-70">{t('settings.providers.default')}</span>}
                 </SelectLabel>
                 {choice.models.map((model) => (
-                  <SelectItem key={model.id} value={runtimeOptionKey(choice.providerId, model.id)}>{model.name}</SelectItem>
+                  <SelectItem key={model.id} value={runtimeOptionKey(choice.providerId, model.id)}>
+                    {model.name}
+                    {model.view?.usedFallback && <span className="text-2xs text-muted-foreground">{t('settings.providers.usesGenericDefaults')}</span>}
+                  </SelectItem>
                 ))}
               </SelectGroup>
             </Fragment>
@@ -197,16 +199,18 @@ export function ModelSelector({
         </SelectContent>
       </Select>
 
-      <Select value={selectedEffort} onValueChange={(next) => handleEffortChange(next as EffortLevel)} disabled={disabled}>
-        <SelectTrigger variant="ghost" size="toolbar" aria-label={`${t('model.effort')}: ${selectedEffortLabel}`}>
-          <SelectValue>{compact ? selectedEffortLabel : `${t('model.effort')} ${selectedEffortLabel}`}</SelectValue>
-        </SelectTrigger>
-        <SelectContent position="popper" align="start" collisionPadding={8}>
-          <SelectGroup>
-            {EFFORT_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      {effortLevels.length > 0 && (
+        <Select value={selectedEffort} onValueChange={(next) => handleEffortChange(next as EffortLevel)} disabled={disabled}>
+          <SelectTrigger variant="ghost" size="toolbar" aria-label={`${t('model.effort')}: ${selectedEffortLabel}`}>
+            <SelectValue>{compact ? selectedEffortLabel : `${t('model.effort')} ${selectedEffortLabel}`}</SelectValue>
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" collisionPadding={8}>
+            <SelectGroup>
+              {effortLevels.map((level) => <SelectItem key={level} value={level}>{t(`settings.general.effort.${level}`)}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
     </>
   )
 }

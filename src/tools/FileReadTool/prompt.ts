@@ -1,5 +1,6 @@
+import { getMainLoopModel } from '../../utils/model/model.js'
+import { getCliModelRules } from '../../utils/model/modelRules.js'
 import { isPDFSupported } from '../../utils/pdfUtils.js'
-import { isProviderProxied } from '../../utils/providerProxy.js'
 import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
 
 // Use a string constant for tool names to avoid circular dependencies
@@ -45,13 +46,13 @@ ${getMediaInstructions()}
 }
 
 function getMediaInstructions(): string {
-  if (isProviderProxied()) {
-    return '- Image and PDF contents do not reach you through this tool in this session: reading an image returns only a placeholder, and reading a PDF returns only its path and size. Do not describe an image or PDF you have not seen.'
+  const model = getMainLoopModel()
+  const pdfInstruction = isPDFSupported(model)
+    ? '\n- This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages parameter to read specific page ranges (e.g., pages: "1-5"). Reading a large PDF without the pages parameter will fail. Maximum 20 pages per request.'
+    : ''
+  if (getCliModelRules(model)?.image === false) {
+    return `- Images do not reach the current model: reading an image returns a short text note in its place. Do not describe an image you have not seen.${pdfInstruction}`
   }
-  return `- This tool can read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually.${
-    isPDFSupported()
-      ? '\n- This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages parameter to read specific page ranges (e.g., pages: "1-5"). Reading a large PDF without the pages parameter will fail. Maximum 20 pages per request.'
-      : ''
-  }
+  return `- This tool can read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually.${pdfInstruction}
 - You will regularly be asked to read screenshots. If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths.`
 }

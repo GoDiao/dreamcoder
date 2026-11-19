@@ -53,6 +53,7 @@ import { logError } from '../../utils/log.js'
 import { isAutoMemFile } from '../../utils/memoryFileDetection.js'
 import { createUserMessage } from '../../utils/messages.js'
 import { getCanonicalName, getMainLoopModel } from '../../utils/model/model.js'
+import { getCliModelRules } from '../../utils/model/modelRules.js'
 import {
   mapNotebookCellsToToolResult,
   readNotebook,
@@ -890,7 +891,15 @@ async function callInner(
 
   // --- PDF ---
   if (isPDFExtension(ext)) {
+    const model = context.options.mainLoopModel
     if (pages) {
+      if (getCliModelRules(model)?.image === false) {
+        throw new Error(
+          isPDFSupported(model)
+            ? 'This model cannot read PDF pages as images. Read the PDF without the pages parameter.'
+            : 'This model cannot read PDF files.',
+        )
+      }
       const parsedRange = parsePDFPageRange(pages)
       const extractResult = await extractPDFPages(
         resolvedFilePath,
@@ -952,12 +961,18 @@ async function callInner(
       )
     }
 
+    if (!isPDFSupported(model)) {
+      throw new Error(
+        'Reading full PDFs is not supported with this model. Use a newer model (Sonnet 3.5 v2 or later), ' +
+          `or use the pages parameter to read specific page ranges (e.g., pages: "1-5", maximum ${PDF_MAX_PAGES_PER_READ} pages per request). ` +
+          'Page extraction requires poppler-utils: install with `brew install poppler` on macOS or `apt-get install poppler-utils` on Debian/Ubuntu.',
+      )
+    }
+
     const fs = getFsImplementation()
     const stats = await fs.stat(resolvedFilePath)
-    const shouldExtractPages =
-      !isPDFSupported() || stats.size > PDF_EXTRACT_SIZE_THRESHOLD
 
-    if (shouldExtractPages) {
+    if (stats.size > PDF_EXTRACT_SIZE_THRESHOLD) {
       const extractResult = await extractPDFPages(resolvedFilePath)
       if (extractResult.success) {
         logEvent('tengu_pdf_page_extraction', {
@@ -972,14 +987,6 @@ async function callInner(
           fileSize: stats.size,
         })
       }
-    }
-
-    if (!isPDFSupported()) {
-      throw new Error(
-        'Reading full PDFs is not supported with this model. Use a newer model (Sonnet 3.5 v2 or later), ' +
-          `or use the pages parameter to read specific page ranges (e.g., pages: "1-5", maximum ${PDF_MAX_PAGES_PER_READ} pages per request). ` +
-          'Page extraction requires poppler-utils: install with `brew install poppler` on macOS or `apt-get install poppler-utils` on Debian/Ubuntu.',
-      )
     }
 
     const readResult = await readPDF(resolvedFilePath)

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { openaiChatToAnthropic } from '../../../server/proxy/transform/openaiChatToAnthropic.js'
 import { parseOpenAIToolArguments } from '../../../server/proxy/transform/toolArguments.js'
+import { resolveFallbackModelRules } from '../../../server/services/modelRules/resolveModelRules.js'
 import type { OpenAIChatResponse } from '../../../server/proxy/transform/types.js'
 import type { Tool, ToolUseContext, Tools } from '../../../Tool.js'
 import type { AssistantMessage } from '../../../types/message.js'
@@ -61,7 +62,11 @@ describe('truncated tool arguments', () => {
       }],
     } as OpenAIChatResponse
 
-    const block = openaiChatToAnthropic(response, 'deepseek-chat').content[0]
+    const block = openaiChatToAnthropic(
+      response,
+      'deepseek-chat',
+      resolveFallbackModelRules({ baseUrl: 'https://api.deepseek.com', apiFormat: 'openai_chat' }),
+    ).content[0]
 
     expect(block).toMatchObject({ type: 'tool_use', input: truncated })
   })

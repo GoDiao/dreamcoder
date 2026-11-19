@@ -27,6 +27,7 @@
 
 ### P-REQ-02 Effort 与思考开关在两种 OpenAI 格式上都到不了上游
 
+- 状态：已在 #264 修复：CLI 按模型规则总是带明确档位，代理读 `thinking.type` 和 `output_config.effort`，按端点的写法生成字段，档位不在模型列表里时取比它高的最低一档。见 [model-rules.md](../model-rules.md)「思考的写法」。
 - 类型：问题
 - 严重程度：高
 - 现状：
@@ -48,6 +49,7 @@
 
 ### P-REQ-03 PDF（document 块）在两种格式上被静默丢弃，模型只看到「已读取」
 
+- 状态：已在 #264 修复：模型规则 `input.pdf` 为 true 时，chat 用 `file` 部件、Responses 用 `input_file` 携带 PDF；为 false 时换成说明文字，提示用 Read 的 `pages` 参数。见 [model-rules.md](../model-rules.md)。
 - 类型：问题
 - 严重程度：高
 - 现状：
@@ -60,6 +62,7 @@
 
 ### P-REQ-04 工具结果里的图片被换成文字占位，视觉模型看不到截图
 
+- 状态：已在 #264 修复：模型支持图片时，chat 把工具结果里的图片挪到紧接着的 user 消息，Responses 直接放进工具输出；不支持时换成说明文字。见 [model-rules.md](../model-rules.md)。
 - 类型：问题
 - 严重程度：高
 - 现状：tool_result 的内容块经 `extractToolResultContent` 拍平成字符串，图片变成 `[image omitted: <mime>]`（`toolArguments.ts:22-31`），chat（`anthropicToOpenaiChat.ts:114-120`）和 Responses（`anthropicToOpenaiResponses.ts:98-104`）都这样。产生图片结果的工具：Read 读图片（`FileReadTool.ts:650-666`）、Bash 输出 data URI（`src/tools/BashTool/utils.ts:71-90`）、内置浏览器截图（MCP 内容 `{type:'image'}`，`src/server/browserHost/service.ts:826`）以及其他返回图片的 MCP 工具。
@@ -72,6 +75,7 @@
 
 ### P-REQ-05 `max_tokens` 不转发；上游按自身默认值截断，CLI 的截断提示与实际不符
 
+- 状态：已在 #264 修复：上限有出处（模型表、站点、拉取值或用户覆盖）时，代理按 `maxTokensField` 发 min(CLI 请求值, 模型上限)；来自兜底时不发。见 [model-rules.md](../model-rules.md)「只发有出处的上限」。
 - 类型：问题
 - 严重程度：中
 - 现状：CLI 对第三方模型默认 `max_tokens: 32000`（`src/utils/context.ts:203-262`；`src/services/api/claude.ts:3454-3474`，放进请求 `claude.ts:1765`）。`OpenAIChatRequest` 有 `max_tokens`、`max_completion_tokens` 字段但没有任何赋值（`types.ts:35-36`；`anthropicToOpenaiChat.ts:32-76`），`OpenAIResponsesRequest.max_output_tokens` 同样无赋值（`types.ts:112`；`anthropicToOpenaiResponses.ts:17-62`）。直接照抄 32000 也不行：它不是按模型给出的值。
@@ -99,6 +103,7 @@
 
 ### P-REQ-07 历史推理内容只对 deepseek / opencode.ai 域名回传，判断依据是域名而不是模型或上游实际返回的字段
 
+- 状态：已在 #264 修复：代理把推理的来源字段编码进思考块签名（`dc1:<source>:<payload>`），下一轮按来源写回，不再看域名；旧会话没有标记的思考块只在站点条目设了 `unmarkedReasoningReplay` 时写回（DeepSeek）。见 [model-rules.md](../model-rules.md)「推理回传」。
 - 类型：问题
 - 严重程度：中
 - 现状：`shouldUseDeepSeekReasoningCompat` 只看 baseUrl 是否含 `deepseek` 或 `opencode.ai`（`src/server/upstream/client.ts:251-256`），命中时同时打开两件事：把历史 thinking 写回 `reasoning_content`、透传 `thinking.type`（`client.ts:206-210`；`anthropicToOpenaiChat.ts:73-75,146-147,168-170`）。其他上游的历史 thinking 全部丢弃。Responses 路径从不回传推理（见 P-REQ-08）。响应侧把 `reasoning_content` / `reasoning` / `thinking_blocks` 都转成 thinking 块，signature 为空（见 model-adaptation.md Q2），请求侧因此不知道这段推理原来来自哪个字段。
@@ -112,6 +117,7 @@
 
 ### P-REQ-08 Responses 路径不回传 reasoning item、不请求 `encrypted_content`、不请求推理摘要
 
+- 状态：已在 #264 修复：写回开着且模型能思考时，Responses 请求带 `include: ["reasoning.encrypted_content"]`，`encrypted_content` 记进签名并在下一轮还原成 reasoning item。推理摘要（`reasoning.summary`）仍不请求。见 [model-rules.md](../model-rules.md)「推理回传」。
 - 类型：问题
 - 严重程度：中
 - 现状：Responses 请求固定 `store:false`（`anthropicToOpenaiResponses.ts:17-22`），没有 `include`、没有 `reasoning.summary`（`types.ts:107-125`）；历史中的 thinking 块在 `convertMessageToInputItems` 里没有分支，被丢弃（`anthropicToOpenaiResponses.ts:82-105`）。
@@ -122,6 +128,7 @@
 
 ### P-REQ-09 原生 web_search 服务端工具被翻译成一个没有参数的普通函数，搜索「成功」但没有结果，也不会回退到 Tavily/Brave
 
+- 状态：已在 #264 修复：CLI 按模型规则的 `nativeWebSearch` 选择搜索后端，不支持时不提供原生工具，改用 Tavily 或 Brave。见 [model-rules.md](../model-rules.md)。
 - 类型：问题
 - 严重程度：中
 - 现状：
@@ -136,7 +143,7 @@
 
 ### P-REQ-10 没有任何缓存键或会话亲和信息，CLI 已经提供的会话 id 被丢弃
 
-- 状态：部分在 #262 修复：`openai_responses` 发 `prompt_cache_key`（取 `X-Claude-Code-Session-Id`）。`openai_chat` 是否发、`cache_control` 是否转发，归 #264 按模型处理。
+- 状态：部分在 #262 修复：`openai_responses` 发 `prompt_cache_key`。`openai_chat` 的缓存键和 `cache_control` 转发未处理，见 [#288](https://github.com/GoDiao/dreamcoder/issues/288)。
 - 类型：优化
 - 严重程度：中
 - 现状：CLI 给每个请求带 `X-Claude-Code-Session-Id` 头（`src/services/api/client.ts:155-158`）和 `metadata.user_id`（内含 `session_id`、`device_id`，`src/services/api/claude.ts:502-527,1764`），还在 system、工具和最后一条消息上标 `cache_control`。代理只读 body（`handler.ts:54-64`），类型里没有 `metadata`（`types.ts:161-181`），发往上游的头只有 `Content-Type` 和 `Authorization`（`client.ts:213,221`）。
@@ -151,6 +158,7 @@
 
 ### P-REQ-11 用户图片无条件以 `image_url` 发给上游，不看模型是否支持图像
 
+- 状态：已在 #264 修复：模型规则 `input.image` 为 false 时，用户图片换成说明文字。见 [model-rules.md](../model-rules.md)。
 - 类型：问题
 - 严重程度：中
 - 现状：user 消息里的 image 块直接转成 `image_url` data URL（`anthropicToOpenaiChat.ts:111-113`）或 `input_image`（`anthropicToOpenaiResponses.ts:85-89`）。DreamCoder 没有模型图像能力的配置（`src/server/types/provider.ts:47-60` 无此字段），代理拿到的 `UpstreamTarget` 也只有 baseUrl、key、格式和鉴权（`client.ts:26-31`）。
@@ -183,6 +191,7 @@
 
 ### P-REQ-14 服务端标题请求在 OpenAI 格式上既不限输出也关不掉思考
 
+- 状态：已在 #264 修复：标题请求按辅助调用处理，能关思考的模型关掉，不能关的带最弱一档；输出上限按 P-REQ-05 的规则发。见 [model-rules.md](../model-rules.md)「档位从哪里来」。
 - 类型：问题
 - 严重程度：低
 - 现状：标题请求是非流式、15 秒超时、`max_tokens: 100`，只有用户设置 `alwaysThinkingEnabled === false` 时才带 `thinking:{type:'disabled'}`（`src/server/services/titleService.ts:82-89,177-180`）。经 `sendToUpstream` 转换后：`max_tokens` 丢弃（P-REQ-05），`disabled` 只在 deepseek/opencode.ai 域名透传，其余上游没有关闭思考的字段（P-REQ-02）。
@@ -193,6 +202,7 @@
 
 ### P-REQ-15 结构化输出（`output_config.format`）被丢弃
 
+- 状态：已在 #264 修复：模型规则 `structuredOutput` 为 true 时，chat 写 `response_format`、Responses 写 `text.format`；为 false 时 CLI 不写 `output_config.format`，代理也不发。见 [model-rules.md](../model-rules.md)。
 - 类型：优化
 - 严重程度：低
 - 现状：prompt 类 hook 用 `outputFormat` 要求 JSON schema 输出（`src/utils/hooks/execPromptHook.ts:61-98`），CLI 放进 `output_config.format`（`claude.ts:1626-1636`）；代理类型里没有 `output_config`（`types.ts:161-181`），不转成 `response_format` / `text.format`。hook 只靠 system 里的文字要求返回 JSON，解析失败时报 `JSON validation failed`（`execPromptHook.ts:110-127`）。
@@ -203,6 +213,7 @@
 
 ### P-REQ-16 提供方缺少自定义请求头、查询参数和请求体补丁的配置项
 
+- 状态：请求头和查询参数在 #267 加入；按模型的请求体补丁（`extraBody`）在 #264 加入，在写法生成的字段之后深合并。见 [model-rules.md](../model-rules.md)。
 - 类型：优化
 - 严重程度：低
 - 现状：`SavedProvider` 只有 baseUrl、key、鉴权方式、格式、模型、上下文窗口（`src/server/types/provider.ts:47-60`）；`UpstreamTarget` 不带 presetId 和模型信息（`client.ts:26-31`），代理里唯一的提供方分支是 P-REQ-07 的域名判断。上游请求头固定为 `Content-Type` + `Authorization: Bearer`（`client.ts:213,221`）。

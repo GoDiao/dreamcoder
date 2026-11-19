@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../i18n'
 import { Modal } from '../shared/Modal'
 import { Input } from '../shared/ui/input'
@@ -14,15 +15,16 @@ import { getPresetDisplayName } from './presetDisplayName'
 import { ProviderIcon } from './ProviderIcon'
 import { CommandItem, CommandList } from '../shared/ui/command'
 import { Popover, PopoverAnchor, PopoverContent } from '../shared/ui/popover'
-import type { SavedProvider, UpdateProviderInput, ProviderTestResult, ProviderModel, DiscoveredProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
+import type { SavedProvider, UpdateProviderInput, ProviderSaveResult, ProviderTestResult, ProviderModel, ApiFormat, ProviderAuthStrategy } from '../../types/provider'
 import type { ProviderPreset } from '../../types/providerPreset'
-import {
-  API_KEY_JSON_PLACEHOLDER,
-  maskSettingsJsonSecrets,
-  restoreSettingsJsonSecrets,
-  stripProviderSettingsJsonEnv,
-} from '../../lib/providerSettingsJson'
 import { openExternalUrl } from '../../lib/externalUrl'
+import {
+  ModelRulesEditor,
+  buildModelOverrides,
+  hasModelOverrideDraftError,
+  toModelOverrideDraft,
+  type ModelOverrideDraft,
+} from './ModelRulesEditor'
 
 type ProviderFormProps = {
   open: boolean
@@ -40,115 +42,16 @@ function requirePreset(preset: ProviderPreset | undefined): ProviderPreset {
   return preset
 }
 
-const MODEL_CONTEXT_WINDOWS_ENV_KEY = 'CLAUDE_CODE_MODEL_CONTEXT_WINDOWS'
-const MODEL_CONTEXT_WINDOW_MIN = 16000
-const MODEL_CONTEXT_WINDOW_MAX = 10000000
 const DEFAULT_PROVIDER_AUTH_STRATEGY: ProviderAuthStrategy = 'auth_token'
-const AUTH_ENV_KEYS = new Set(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])
-type ModelContextInputs = Record<string, string>
 
 function getPresetAuthStrategy(preset: ProviderPreset): ProviderAuthStrategy {
   return preset.authStrategy ?? DEFAULT_PROVIDER_AUTH_STRATEGY
 }
 
-function omitAuthEnv(env: Record<string, string> | undefined): Record<string, string> {
-  if (!env) return {}
+function getModelOverrideDrafts(provider?: SavedProvider): Record<string, ModelOverrideDraft> {
   return Object.fromEntries(
-    Object.entries(env).filter(([key]) => !AUTH_ENV_KEYS.has(key.toUpperCase())),
+    Object.entries(provider?.modelOverrides ?? {}).map(([id, override]) => [id, toModelOverrideDraft(override)]),
   )
-}
-
-function getProviderAuthValue(apiKey: string, preset: ProviderPreset): string {
-  return apiKey || preset.defaultEnv?.ANTHROPIC_AUTH_TOKEN || preset.defaultEnv?.ANTHROPIC_API_KEY || (preset.needsApiKey ? '(your API key)' : '')
-}
-
-function buildSettingsJsonAuthEnv(
-  apiFormat: ApiFormat,
-  authStrategy: ProviderAuthStrategy,
-  apiKey: string,
-  preset: ProviderPreset,
-): Record<string, string> {
-  if (apiFormat !== 'anthropic') {
-    return { ANTHROPIC_API_KEY: 'proxy-managed' }
-  }
-
-  const value = getProviderAuthValue(apiKey, preset)
-  switch (authStrategy) {
-    case 'api_key':
-      return value ? { ANTHROPIC_API_KEY: value } : {}
-    case 'auth_token':
-      return value ? { ANTHROPIC_AUTH_TOKEN: value } : {}
-    case 'auth_token_empty_api_key':
-      return {
-        ANTHROPIC_API_KEY: '',
-        ...(value ? { ANTHROPIC_AUTH_TOKEN: value } : {}),
-      }
-    case 'dual_same_token':
-      return value ? { ANTHROPIC_API_KEY: value, ANTHROPIC_AUTH_TOKEN: value } : {}
-    case 'dual_dummy':
-      return { ANTHROPIC_API_KEY: 'dummy', ANTHROPIC_AUTH_TOKEN: 'dummy' }
-  }
-}
-
-function inferAuthStrategyFromEnv(env: Record<string, string>): ProviderAuthStrategy | null {
-  if (env.ANTHROPIC_API_KEY === 'dummy' && env.ANTHROPIC_AUTH_TOKEN === 'dummy') return 'dual_dummy'
-  if (env.ANTHROPIC_API_KEY === '' && env.ANTHROPIC_AUTH_TOKEN) return 'auth_token_empty_api_key'
-  if (env.ANTHROPIC_API_KEY && env.ANTHROPIC_AUTH_TOKEN && env.ANTHROPIC_API_KEY === env.ANTHROPIC_AUTH_TOKEN) return 'dual_same_token'
-  if (env.ANTHROPIC_AUTH_TOKEN) return 'auth_token'
-  if (env.ANTHROPIC_API_KEY) return 'api_key'
-  return null
-}
-
-function getModelContextWindowErrorKey(value: string): 'number' | 'range' | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  if (!Number.isInteger(parsed)) return 'number'
-  if (parsed < MODEL_CONTEXT_WINDOW_MIN || parsed > MODEL_CONTEXT_WINDOW_MAX) return 'range'
-  return null
-}
-
-function parseModelContextWindowsInput(value: string): number | undefined {
-  const trimmed = value.trim()
-  if (!trimmed || getModelContextWindowErrorKey(trimmed)) return undefined
-  return Number(trimmed)
-}
-
-function getModelContextInputValue(
-  model: string | undefined,
-  preset: ProviderPreset,
-  provider?: SavedProvider,
-): string {
-  const trimmedModel = model?.trim()
-  if (!trimmedModel) return ''
-  const value = provider?.modelContextWindows?.[trimmedModel] ?? preset.modelContextWindows?.[trimmedModel]
-  return value !== undefined ? String(value) : ''
-}
-
-function getModelContextInputs(
-  models: ProviderModel[],
-  preset: ProviderPreset,
-  provider?: SavedProvider,
-): ModelContextInputs {
-  return Object.fromEntries(models.map((model) => [
-    model.id,
-    getModelContextInputValue(model.id, preset, provider),
-  ]))
-}
-
-function buildModelContextWindows(
-  models: ProviderModel[],
-  inputs: ModelContextInputs,
-): Record<string, number> {
-  const windows: Record<string, number> = {}
-  for (const model of models) {
-    const id = model.id.trim()
-    const parsed = parseModelContextWindowsInput(inputs[id] ?? '')
-    if (id && parsed !== undefined) {
-      windows[id] = parsed
-    }
-  }
-  return windows
 }
 
 function normalizeModels(models: ProviderModel[]): ProviderModel[] {
@@ -162,85 +65,6 @@ function normalizeModels(models: ProviderModel[]): ProviderModel[] {
   })
 }
 
-function runtimeModelMapping(models: ProviderModel[], fastModel?: string): {
-  main: string
-  fast: string
-} {
-  const main = models[0]?.id ?? ''
-  return {
-    main,
-    fast: fastModel && models.some((model) => model.id === fastModel) ? fastModel : main,
-  }
-}
-
-function updateSettingsJsonModelContextWindows(
-  raw: string,
-  modelContextWindows: Record<string, number>,
-): string {
-  try {
-    const parsed = JSON.parse(raw || '{}') as { env?: Record<string, unknown> }
-    const existingEnv = parsed.env && typeof parsed.env === 'object' && !Array.isArray(parsed.env)
-      ? parsed.env
-      : {}
-    const env = { ...existingEnv }
-    if (Object.keys(modelContextWindows).length > 0) {
-      env[MODEL_CONTEXT_WINDOWS_ENV_KEY] = JSON.stringify(modelContextWindows)
-    } else {
-      delete env[MODEL_CONTEXT_WINDOWS_ENV_KEY]
-    }
-    parsed.env = env
-    return JSON.stringify(parsed, null, 2)
-  } catch {
-    return raw
-  }
-}
-
-function updateSettingsJsonModels(raw: string, models: ProviderModel[], fastModel?: string): string {
-  try {
-    const parsed = JSON.parse(raw || '{}') as { env?: Record<string, unknown> }
-    const existingEnv = parsed.env && typeof parsed.env === 'object' && !Array.isArray(parsed.env)
-      ? parsed.env
-      : {}
-    const runtime = runtimeModelMapping(models, fastModel)
-    parsed.env = {
-      ...existingEnv,
-      ANTHROPIC_MODEL: runtime.main,
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
-      ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
-    }
-    return JSON.stringify(parsed, null, 2)
-  } catch {
-    return raw
-  }
-}
-
-function updateSettingsJsonProviderConnection(
-  raw: string,
-  apiFormat: ApiFormat,
-  authStrategy: ProviderAuthStrategy,
-  apiKey: string,
-  preset: ProviderPreset,
-  baseUrl: string,
-): string {
-  try {
-    const parsed = JSON.parse(raw || '{}') as { env?: Record<string, unknown> }
-    const existingEnv = parsed.env && typeof parsed.env === 'object' && !Array.isArray(parsed.env)
-      ? parsed.env
-      : {}
-    const env = { ...existingEnv }
-    delete env.ANTHROPIC_API_KEY
-    delete env.ANTHROPIC_AUTH_TOKEN
-    env.ANTHROPIC_BASE_URL = apiFormat !== 'anthropic' ? 'http://127.0.0.1:3456/proxy' : baseUrl
-    Object.assign(env, buildSettingsJsonAuthEnv(apiFormat, authStrategy, apiKey, preset))
-    parsed.env = env
-    return JSON.stringify(parsed, null, 2)
-  } catch {
-    return raw
-  }
-}
-
 function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
   return {
     id: provider?.presetId ?? 'custom',
@@ -250,7 +74,6 @@ function buildFallbackPreset(provider?: SavedProvider): ProviderPreset {
     authStrategy: provider?.authStrategy,
     defaultModels: provider?.models ?? [],
     defaultFastModel: provider?.fastModel,
-    modelContextWindows: provider?.modelContextWindows,
     needsApiKey: true,
     websiteUrl: '',
   }
@@ -372,13 +195,14 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const updateProvider = useProviderStore((state) => state.updateProvider)
   const testConfig = useProviderStore((state) => state.testConfig)
   const discoverModels = useProviderStore((state) => state.discoverModels)
+  const refreshProviderModels = useProviderStore((state) => state.refreshProviderModels)
+  const storedResolvedModels = useProviderStore((state) => (
+    provider ? state.providers.find((candidate) => candidate.id === provider.id)?.resolvedModels : undefined
+  ))
+  const addToast = useUIStore((state) => state.addToast)
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const t = useTranslation()
 
-  const presetDefaultEnvKeys = useMemo(
-    () => presets.flatMap((preset) => Object.keys(preset.defaultEnv ?? {})),
-    [presets],
-  )
   const fallbackPreset = provider
     ? buildFallbackPreset(provider)
     : requirePreset(presets[presets.length - 1])
@@ -401,9 +225,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [fastModel, setFastModel] = useState(
     provider ? (provider.fastModel ?? '') : (initialPreset.defaultFastModel ?? ''),
   )
-  const [modelContextInputs, setModelContextInputs] = useState<ModelContextInputs>(
-    getModelContextInputs(provider?.models ?? initialPreset.defaultModels, initialPreset, provider),
+  const [modelOverrideDrafts, setModelOverrideDrafts] = useState<Record<string, ModelOverrideDraft>>(
+    () => getModelOverrideDrafts(provider),
   )
+  const [isRefreshingModelInfo, setIsRefreshingModelInfo] = useState(false)
+  const [modelInfoRefresh, setModelInfoRefresh] = useState<ProviderSaveResult['modelDiscovery'] | { ok: true } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null)
   const [isTesting, setIsTesting] = useState(false)
@@ -411,14 +237,9 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [discoveryCount, setDiscoveryCount] = useState<number | null>(null)
-  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredProviderModel[]>([])
+  const [discoveredModels, setDiscoveredModels] = useState<ProviderModel[]>([])
   const [newModelId, setNewModelId] = useState('')
   const [newModelName, setNewModelName] = useState('')
-  const [settingsJson, setSettingsJson] = useState('')
-  const [settingsReady, setSettingsReady] = useState(false)
-  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false)
-  const [settingsJsonError, setSettingsJsonError] = useState<string | null>(null)
-  const jsonPastedRef = useRef(false)
   const discoveryRequestRef = useRef(0)
   const discoveredSelectionRef = useRef<{ id: string; name: string } | null>(null)
 
@@ -442,49 +263,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     clearDiscoveredSelection()
   }
 
-  useEffect(() => {
-    if (jsonPastedRef.current) {
-      jsonPastedRef.current = false
-      return
-    }
-    let cancelled = false
-    setSettingsLoadFailed(false)
-    import('../../api/providers').then(({ providersApi }) => providersApi.getSettings()).then((settings) => {
-      if (cancelled) return
-      const needsProxy = apiFormat !== 'anthropic'
-      const modelContextWindows = buildModelContextWindows(models, modelContextInputs)
-      const normalizedModels = normalizeModels(models)
-      const runtime = runtimeModelMapping(normalizedModels, fastModel)
-      const existingEnv = (settings.env as Record<string, string>) || {}
-      const cleanedEnv = stripProviderSettingsJsonEnv(existingEnv, presetDefaultEnvKeys)
-      const merged = {
-        ...settings,
-        skipWebFetchPreflight: settings.skipWebFetchPreflight ?? true,
-        env: {
-          ...cleanedEnv,
-          ...omitAuthEnv(selectedPreset.defaultEnv),
-          ...(Object.keys(modelContextWindows).length > 0
-            ? { [MODEL_CONTEXT_WINDOWS_ENV_KEY]: JSON.stringify(modelContextWindows) }
-            : {}),
-          ANTHROPIC_BASE_URL: needsProxy ? 'http://127.0.0.1:3456/proxy' : baseUrl,
-          ...buildSettingsJsonAuthEnv(apiFormat, authStrategy, apiKey, selectedPreset),
-          ANTHROPIC_MODEL: runtime.main,
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: runtime.fast,
-          ANTHROPIC_SMALL_FAST_MODEL: runtime.fast,
-          ANTHROPIC_DEFAULT_SONNET_MODEL: runtime.main,
-          ANTHROPIC_DEFAULT_OPUS_MODEL: runtime.main,
-        },
-      }
-      setSettingsJson(JSON.stringify(merged, null, 2))
-      setSettingsReady(true)
-    }).catch(() => {
-      if (!cancelled) setSettingsLoadFailed(true)
-    })
-    return () => { cancelled = true }
-  }, [selectedPreset.id])
-
   const handlePresetChange = (preset: ProviderPreset) => {
-    if (preset.id !== selectedPreset.id) setSettingsReady(false)
     setSelectedPreset(preset)
     setName(getPresetDisplayName(preset, t))
     setBaseUrl(preset.baseUrl)
@@ -493,21 +272,18 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     setAuthStrategy(getPresetAuthStrategy(preset))
     setModels(preset.defaultModels.map((model) => ({ ...model })))
     setFastModel(preset.defaultFastModel ?? '')
-    setModelContextInputs(getModelContextInputs(preset.defaultModels, preset))
+    setModelOverrideDrafts({})
     setTestResult(null)
     resetDiscovery()
   }
 
   const isCustom = selectedPreset.id === 'custom'
   const requiresApiKey = selectedPreset.needsApiKey !== false
-  const hasModelContextWindowError = models.some((model) => (
-    !!getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
-  ))
-  const canSubmit = settingsReady && name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !settingsJsonError && !hasModelContextWindowError
+  const resolvedModels = storedResolvedModels ?? provider?.resolvedModels
+  const showModelRules = !provider || resolvedModels !== undefined
+  const hasModelOverrideError = models.some((model) => hasModelOverrideDraftError(modelOverrideDrafts[model.id]))
+  const canSubmit = name.trim() && baseUrl.trim() && (mode === 'edit' || !requiresApiKey || apiKey.trim()) && models.length > 0 && !hasModelOverrideError
   const apiKeyUrl = selectedPreset.apiKeyUrl?.trim()
-  const displayedSettingsJson = showApiKey
-    ? settingsJson
-    : maskSettingsJsonSecrets(settingsJson)
   const apiFormatOptions: Array<{ value: ApiFormat; label: string }> = [
     { value: 'anthropic', label: t('settings.providers.apiFormatAnthropic') },
     { value: 'openai_chat', label: t('settings.providers.apiFormatOpenaiChat') },
@@ -520,39 +296,27 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     { value: 'dual_same_token', label: t('settings.providers.authStrategyDualSameToken'), description: t('settings.providers.authStrategyDualSameTokenDesc') },
     { value: 'dual_dummy', label: t('settings.providers.authStrategyDualDummy'), description: t('settings.providers.authStrategyDualDummyDesc') },
   ]
-  useEffect(() => {
-    if (!settingsReady) return
-    setSettingsJson((current) => updateSettingsJsonModelContextWindows(
-      current,
-      buildModelContextWindows(models, modelContextInputs),
-    ))
-  }, [settingsReady, models, modelContextInputs])
   const handleBaseUrlChange = (value: string) => {
     resetDiscovery()
     setBaseUrl(value)
-    setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, authStrategy, apiKey, selectedPreset, value))
   }
   const handleApiKeyChange = (value: string) => {
     resetDiscovery()
     setApiKey(value)
-    setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, authStrategy, value, selectedPreset, baseUrl))
   }
   const handleApiFormatChange = (value: ApiFormat) => {
     resetDiscovery()
     setApiFormat(value)
-    setSettingsJson((current) => updateSettingsJsonProviderConnection(current, value, authStrategy, apiKey, selectedPreset, baseUrl))
   }
   const handleAuthStrategyChange = (value: ProviderAuthStrategy) => {
     resetDiscovery()
     setAuthStrategy(value)
-    setSettingsJson((current) => updateSettingsJsonProviderConnection(current, apiFormat, value, apiKey, selectedPreset, baseUrl))
   }
   const updateModels = (nextModels: ProviderModel[], nextFastModel = fastModel) => {
     const normalized = normalizeModels(nextModels)
     const validFastModel = normalized.some((model) => model.id === nextFastModel) ? nextFastModel : ''
     setModels(nextModels)
     setFastModel(validFastModel)
-    setSettingsJson((current) => updateSettingsJsonModels(current, normalized, validFastModel))
   }
   const moveModel = (index: number, offset: number) => {
     const nextModels = [...models]
@@ -561,8 +325,21 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     nextModels.splice(index + offset, 0, moved)
     updateModels(nextModels)
   }
-  const handleModelContextWindowChange = (modelId: string, value: string) => {
-    setModelContextInputs((current) => ({ ...current, [modelId]: value }))
+  const handleModelOverrideChange = (modelId: string, draft: ModelOverrideDraft) => {
+    setModelOverrideDrafts((current) => ({ ...current, [modelId]: draft }))
+  }
+  const handleRefreshModelInfo = async () => {
+    if (!provider) return
+    setIsRefreshingModelInfo(true)
+    setModelInfoRefresh(null)
+    try {
+      const result = await refreshProviderModels(provider.id)
+      setModelInfoRefresh(result.modelDiscovery ?? { ok: true })
+    } catch (err) {
+      setModelInfoRefresh({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setIsRefreshingModelInfo(false)
+    }
   }
   const selectDiscoveredModel = (model: ProviderModel) => {
     const name = model.name ?? ''
@@ -586,15 +363,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       })
       if (requestId !== discoveryRequestRef.current) return
       setDiscoveredModels(fetched)
-      setModelContextInputs((current) => {
-        const next = { ...current }
-        for (const model of fetched) {
-          if (Object.prototype.hasOwnProperty.call(current, model.id) && !current[model.id]?.trim() && model.contextWindow !== undefined) {
-            next[model.id] = String(model.contextWindow)
-          }
-        }
-        return next
-      })
       setDiscoveryCount(fetched.length)
       setModelsApiFormat(apiFormat)
     } catch (err) {
@@ -611,10 +379,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
     const suggestion = discoveredModels.find((model) => model.id === id)
     const name = newModelName.trim() || suggestion?.name
     const nextModels = [...models, { id, ...(name ? { name } : {}) }]
-    setModelContextInputs((current) => ({
-      ...current,
-      [id]: getModelContextInputValue(id, selectedPreset, provider) || (suggestion?.contextWindow !== undefined ? String(suggestion.contextWindow) : ''),
-    }))
     updateModels(nextModels)
     discoveredSelectionRef.current = null
     setNewModelId('')
@@ -643,21 +407,13 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
   const handleSubmit = async () => {
     if (!canSubmit) return
     const normalizedModels = normalizeModels(models)
-    const parsedModelContextWindows = buildModelContextWindows(models, modelContextInputs)
+    const modelOverrides = buildModelOverrides(normalizedModels, modelOverrideDrafts)
     setIsSubmitting(true)
     setSaveError(null)
     try {
-      if (settingsJson.trim()) {
-        try {
-          const parsed = restoreSettingsJsonSecrets(JSON.parse(settingsJson), settingsJson, apiKey)
-          const { providersApi } = await import('../../api/providers')
-          await providersApi.updateSettings(parsed)
-        } catch {
-        }
-      }
-
+      let modelDiscovery: ProviderSaveResult['modelDiscovery']
       if (mode === 'create') {
-        const created = await createProvider({
+        const result = await createProvider({
           presetId: selectedPreset.id,
           name: name.trim(),
           apiKey: apiKey.trim(),
@@ -666,10 +422,11 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           apiFormat,
           models: normalizedModels,
           ...(fastModel && { fastModel }),
-          ...(Object.keys(parsedModelContextWindows).length > 0 && { modelContextWindows: parsedModelContextWindows }),
+          ...(Object.keys(modelOverrides).length > 0 && { modelOverrides }),
           notes: notes.trim() || undefined,
         })
-        await onCreated?.(created)
+        modelDiscovery = result.modelDiscovery
+        await onCreated?.(result.provider)
       } else if (provider) {
         const input: UpdateProviderInput = {
           name: name.trim(),
@@ -678,15 +435,20 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           apiFormat,
           models: normalizedModels,
           fastModel: fastModel || null,
-          modelContextWindows: Object.keys(parsedModelContextWindows).length > 0
-            ? parsedModelContextWindows
-            : null,
+          modelOverrides,
           notes: notes.trim() || undefined,
         }
         if (apiKey.trim()) input.apiKey = apiKey.trim()
-        await updateProvider(provider.id, input)
+        const result = await updateProvider(provider.id, input)
+        modelDiscovery = result.modelDiscovery
       }
       await fetchSettings()
+      if (modelDiscovery) {
+        const key = mode === 'edit' ? 'settings.providers.savedModelDiscoveryFailed' : 'settings.providers.modelDiscoveryFailed'
+        addToast({ type: 'warning', message: t(key, { error: modelDiscovery.error }) })
+      } else if (mode === 'edit') {
+        addToast({ type: 'info', message: t('settings.providers.modelRulesApplyLater') })
+      }
       onClose()
     } catch (err) {
       console.error('Failed to save provider:', err)
@@ -737,11 +499,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
       width={720}
       footer={
         <>
-          {settingsLoadFailed && (
-            <p role="alert" className="mr-auto self-center text-xs text-destructive">
-              {t('settings.providers.settingsLoadFailed')}
-            </p>
-          )}
           {saveError && (
             <p role="alert" className="mr-auto self-center text-xs text-destructive [overflow-wrap:anywhere]">
               {t('settings.providers.saveFailed', { error: saveError })}
@@ -844,10 +601,25 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
             <label className="text-sm font-medium text-foreground">{t('settings.providers.models')}</label>
-            <Button variant="outline" size="sm" onClick={handleDiscoverModels} loading={isDiscovering} disabled={!baseUrl.trim()}>
-              {t('settings.providers.fetchModels')}
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              {mode === 'edit' && provider && showModelRules && (
+                <Button variant="outline" size="sm" onClick={handleRefreshModelInfo} loading={isRefreshingModelInfo}>
+                  {t('settings.providers.refreshModelInfo')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleDiscoverModels} loading={isDiscovering} disabled={!baseUrl.trim()}>
+                {t('settings.providers.fetchModels')}
+              </Button>
+            </div>
           </div>
+          {modelInfoRefresh && !modelInfoRefresh.ok && (
+            <p role="alert" className="mb-2 text-2xs text-warning [overflow-wrap:anywhere]">
+              {t('settings.providers.modelDiscoveryFailed', { error: modelInfoRefresh.error })}
+            </p>
+          )}
+          {modelInfoRefresh?.ok && (
+            <p role="status" className="mb-2 text-2xs text-muted-foreground">{t('settings.providers.modelInfoRefreshed')}</p>
+          )}
           {discoveryError && (
             <p role="alert" className="mb-2 text-2xs text-destructive">{discoveryError}</p>
           )}
@@ -894,88 +666,84 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           </div>
           <div className="mt-3 space-y-2">
             {models.map((model, index) => {
-              const errorKey = getModelContextWindowErrorKey(modelContextInputs[model.id] ?? '')
+              const view = resolvedModels?.[model.id]
               return (
-                <div key={model.id} className="flex flex-wrap items-start gap-2 rounded-md border border-border bg-card p-2">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      aria-label={t('settings.providers.displayName')}
-                      value={model.name ?? ''}
-                      onChange={(event) => updateModels(models.map((entry, candidateIndex) => (
-                        candidateIndex === index
-                          ? { ...entry, name: event.target.value || undefined }
-                          : entry
-                      )))}
-                      placeholder={model.id}
-                    />
-                    <div className="mt-1 truncate text-2xs text-subtle-foreground">{model.id}</div>
-                    {index === 0 && (
-                      <div className="mt-1 text-2xs font-medium text-primary">{t('settings.providers.defaultModel')}</div>
-                    )}
-                    {model.name && duplicateModelNames.has(model.name.trim()) && (
-                      <div className="mt-1 text-2xs text-warning">{t('settings.providers.duplicateDisplayName')}</div>
-                    )}
-                  </div>
-                  <div className="w-36 min-w-0">
-                    <Input
-                      aria-label={t('settings.providers.modelContextWindowLabel', { model: model.id })}
-                      aria-invalid={!!errorKey}
-                      inputMode="numeric"
-                      value={modelContextInputs[model.id] ?? ''}
-                      onChange={(event) => handleModelContextWindowChange(model.id, event.target.value)}
-                      placeholder={t('settings.providers.contextWindowPlaceholder')}
-                    />
-                    <div className={`mt-1 text-2xs ${errorKey ? 'text-destructive' : 'text-subtle-foreground'}`}>
-                      {errorKey
-                        ? t(errorKey === 'number'
-                          ? 'settings.providers.modelContextWindowNumberError'
-                          : 'settings.providers.modelContextWindowRangeError')
-                        : t('settings.providers.modelContextWindow')}
+                <div key={model.id} data-testid={`model-card-${model.id}`} className="rounded-md border border-border bg-card p-2">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <Input
+                        aria-label={t('settings.providers.displayName')}
+                        value={model.name ?? ''}
+                        onChange={(event) => updateModels(models.map((entry, candidateIndex) => (
+                          candidateIndex === index
+                            ? { ...entry, name: event.target.value || undefined }
+                            : entry
+                        )))}
+                        placeholder={model.id}
+                      />
+                      <div className="mt-1 truncate text-2xs text-subtle-foreground">{model.id}</div>
+                      {(index === 0 || view?.usedFallback) && (
+                        <div className="mt-1 flex flex-wrap gap-x-2 text-2xs">
+                          {index === 0 && <span className="font-medium text-primary">{t('settings.providers.defaultModel')}</span>}
+                          {view?.usedFallback && <span className="text-muted-foreground">{t('settings.providers.usesGenericDefaults')}</span>}
+                        </div>
+                      )}
+                      {model.name && duplicateModelNames.has(model.name.trim()) && (
+                        <div className="mt-1 text-2xs text-warning">{t('settings.providers.duplicateDisplayName')}</div>
+                      )}
                     </div>
+                    <Button
+                      variant="ghost-muted"
+                      size="icon"
+                      disabled={index === 0}
+                      onClick={() => moveModel(index, -1)}
+                      aria-label={t('settings.providers.moveModelUp')}
+                    >
+                      <ArrowUpIcon aria-hidden="true" size={18} />
+                    </Button>
+                    <Button
+                      variant="ghost-muted"
+                      size="icon"
+                      disabled={index === models.length - 1}
+                      onClick={() => moveModel(index, 1)}
+                      aria-label={t('settings.providers.moveModelDown')}
+                    >
+                      <ArrowDownIcon aria-hidden="true" size={18} />
+                    </Button>
+                    <Button
+                      variant="ghost-destructive"
+                      size="icon"
+                      onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
+                      aria-label={t('common.delete')}
+                    >
+                      <Trash2Icon aria-hidden="true" size={18} />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost-muted"
-                    size="icon"
-                    disabled={index === 0}
-                    onClick={() => moveModel(index, -1)}
-                    aria-label={t('settings.providers.moveModelUp')}
-                  >
-                    <ArrowUpIcon aria-hidden="true" size={18} />
-                  </Button>
-                  <Button
-                    variant="ghost-muted"
-                    size="icon"
-                    disabled={index === models.length - 1}
-                    onClick={() => moveModel(index, 1)}
-                    aria-label={t('settings.providers.moveModelDown')}
-                  >
-                    <ArrowDownIcon aria-hidden="true" size={18} />
-                  </Button>
-                  <Button
-                    variant="ghost-destructive"
-                    size="icon"
-                    onClick={() => updateModels(models.filter((_, candidateIndex) => candidateIndex !== index), fastModel === model.id ? '' : fastModel)}
-                    aria-label={t('common.delete')}
-                  >
-                    <Trash2Icon aria-hidden="true" size={18} />
-                  </Button>
+                  {showModelRules && (
+                    <ModelRulesEditor
+                      modelId={model.id}
+                      view={view}
+                      saved={provider?.modelOverrides?.[model.id]}
+                      draft={modelOverrideDrafts[model.id]}
+                      onChange={(draft) => handleModelOverrideChange(model.id, draft)}
+                    />
+                  )}
                 </div>
               )
             })}
           </div>
-          <p className="mt-1 text-2xs text-subtle-foreground">
-            {t('settings.providers.modelContextWindowsDesc')}
-          </p>
+          {showModelRules && (
+            <p className="mt-1 text-2xs text-subtle-foreground">
+              {t('settings.providers.modelRulesDesc')}
+            </p>
+          )}
           <div className="mt-3">
             <label htmlFor="provider-fast-model" className="mb-1 block text-sm font-medium text-foreground">{t('settings.providers.fastModel')}</label>
             <FormSelect
               id="provider-fast-model"
               label={t('settings.providers.fastModel')}
               value={fastModel}
-              onChange={(nextFastModel) => {
-                setFastModel(nextFastModel)
-                setSettingsJson((current) => updateSettingsJsonModels(current, normalizeModels(models), nextFastModel))
-              }}
+              onChange={setFastModel}
               options={[
                 { value: '', label: t('settings.providers.fastModelDefault') },
                 ...models.map((model) => ({ value: model.id, label: model.name || model.id })),
@@ -1000,75 +768,6 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, onCreated }
           )}
         </div>
 
-        <div>
-          <label className="text-sm font-medium text-foreground mb-2 block">{t('settings.providers.settingsJson')}</label>
-          <textarea
-            aria-label={t('settings.providers.settingsJson')}
-            aria-invalid={!!settingsJsonError}
-            disabled={!settingsReady}
-            value={displayedSettingsJson}
-            onChange={(e) => {
-              const raw = e.target.value
-              try {
-                const parsed = restoreSettingsJsonSecrets(JSON.parse(raw), settingsJson, apiKey)
-                setSettingsJsonError(null)
-                const env = parsed.env as Record<string, string> | undefined
-                if (env) {
-                  const nextApiKey = env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY
-                  const validNextApiKey = nextApiKey && nextApiKey !== '(your API key)' && nextApiKey !== API_KEY_JSON_PLACEHOLDER
-                    ? nextApiKey
-                    : undefined
-                  const nextAuthStrategy = inferAuthStrategyFromEnv(env)
-                  const connectionChanged = (
-                    (!!env.ANTHROPIC_BASE_URL && env.ANTHROPIC_BASE_URL !== baseUrl) ||
-                    (!!validNextApiKey && validNextApiKey !== apiKey) ||
-                    (!!nextAuthStrategy && nextAuthStrategy !== authStrategy)
-                  )
-                  if (connectionChanged) resetDiscovery()
-                  if (env.ANTHROPIC_BASE_URL) {
-                    setBaseUrl(env.ANTHROPIC_BASE_URL)
-                    if (mode === 'create') {
-                      const matchedPreset = presets.find((p) => p.id !== 'custom' && p.baseUrl === env.ANTHROPIC_BASE_URL)
-                      const targetPreset = requirePreset(
-                        matchedPreset ?? presets.find((p) => p.id === 'custom'),
-                      )
-                      if (targetPreset.id !== selectedPreset.id) {
-                        jsonPastedRef.current = true
-                        setSelectedPreset(targetPreset)
-                      }
-                    }
-                  }
-                  if (validNextApiKey) {
-                    setApiKey(validNextApiKey)
-                  }
-                  if (nextAuthStrategy) {
-                    setAuthStrategy(nextAuthStrategy)
-                  }
-                }
-                const normalizedModels = normalizeModels(models)
-                setSettingsJson(updateSettingsJsonModelContextWindows(
-                  updateSettingsJsonModels(JSON.stringify(parsed, null, 2), normalizedModels, fastModel),
-                  buildModelContextWindows(normalizedModels, modelContextInputs),
-                ))
-              } catch (err) {
-                setSettingsJson(raw)
-                setSettingsJsonError(err instanceof Error ? err.message : 'Invalid JSON')
-              }
-            }}
-            rows={16}
-            spellCheck={false}
-            className={`field-sizing-fixed w-full resize-y rounded-lg border bg-card px-3 py-3 font-mono text-xs leading-relaxed text-muted-foreground outline-none ${
-              settingsJsonError
-                ? 'border-destructive focus:border-destructive'
-                : 'border-border'
-            }`}
-          />
-          {settingsJsonError && (
-            <p className="text-2xs text-destructive mt-1">{t('settings.providers.jsonError', { error: settingsJsonError })}</p>
-          )}
-          <p className="text-2xs text-subtle-foreground mt-1">{t('settings.providers.settingsJsonModelsGenerated')}</p>
-          <p className="text-2xs text-subtle-foreground mt-1">{t('settings.providers.settingsJsonDesc')}</p>
-        </div>
       </div>
     </Modal>
   )

@@ -6,17 +6,17 @@ import { join } from 'node:path'
 import { getAutoCompactThreshold, getEffectiveContextWindowSize, shouldAutoCompact } from './autoCompact.js'
 import { createAssistantMessage, createUserMessage } from '../../utils/messages.js'
 import { getContextWindowForModel } from '../../utils/context.js'
-import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
+import { MODEL_RULES_ENV_KEY } from '../../utils/model/modelRules.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 
 let originalAutoCompactWindow: string | undefined
-let originalContextWindows: string | undefined
+let originalModelRules: string | undefined
 
 beforeEach(() => {
   originalAutoCompactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
-  originalContextWindows = process.env[MODEL_CONTEXT_WINDOWS_ENV_KEY]
+  originalModelRules = process.env[MODEL_RULES_ENV_KEY]
   delete process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
-  delete process.env[MODEL_CONTEXT_WINDOWS_ENV_KEY]
+  delete process.env[MODEL_RULES_ENV_KEY]
 })
 
 afterEach(() => {
@@ -25,20 +25,17 @@ afterEach(() => {
   } else {
     process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = originalAutoCompactWindow
   }
-  if (originalContextWindows === undefined) {
-    delete process.env[MODEL_CONTEXT_WINDOWS_ENV_KEY]
+  if (originalModelRules === undefined) {
+    delete process.env[MODEL_RULES_ENV_KEY]
   } else {
-    process.env[MODEL_CONTEXT_WINDOWS_ENV_KEY] = originalContextWindows
+    process.env[MODEL_RULES_ENV_KEY] = originalModelRules
   }
 })
 
 describe('model context window resolution', () => {
-  test('uses built-in windows for current third-party coding models', () => {
-    expect(getContextWindowForModel('deepseek-v4-pro')).toBe(1_000_000)
-    expect(getContextWindowForModel('MiniMax-M2.7')).toBe(204_800)
-    expect(getContextWindowForModel('kimi-k2.6')).toBe(262_144)
-    expect(getContextWindowForModel('glm-5.1')).toBe(200_000)
-    expect(getContextWindowForModel('glm-4.5-air')).toBe(128_000)
+  test('uses built-in windows for Claude models', () => {
+    expect(getContextWindowForModel('claude-opus-4-7')).toBe(1_000_000)
+    expect(getContextWindowForModel('claude-haiku-4-5')).toBe(200_000)
   })
 
   test('uses Codex OAuth effective context windows for OpenAI GPT models', () => {
@@ -48,14 +45,24 @@ describe('model context window resolution', () => {
     expect(getContextWindowForModel('gpt-5.3-codex-spark')).toBe(121_600)
   })
 
-  test('uses per-model provider overrides before built-in defaults', () => {
-    process.env[MODEL_CONTEXT_WINDOWS_ENV_KEY] = JSON.stringify({
-      'deepseek-v4-pro': 500_000,
-      'custom-model': 300_000,
+  test('uses the model rules window before built-in defaults', () => {
+    const rules = {
+      thinkingWhenOn: 'omit',
+      thinkingWhenOff: 'omit',
+      effortLevels: [],
+      pdf: false,
+      image: true,
+      nativeWebSearch: false,
+      structuredOutput: false,
+    }
+    process.env[MODEL_RULES_ENV_KEY] = JSON.stringify({
+      models: { 'deepseek-v4-pro': { ...rules, contextWindow: 500_000 } },
+      fallback: { ...rules, contextWindow: 300_000 },
+      defaultEffort: 'medium',
     })
 
     expect(getContextWindowForModel('deepseek-v4-pro')).toBe(500_000)
-    expect(getContextWindowForModel('provider/custom-model')).toBe(300_000)
+    expect(getContextWindowForModel('claude-opus-4-7')).toBe(300_000)
   })
 
   test('global auto compact window can raise unknown models above the default', () => {
@@ -84,15 +91,15 @@ describe('auto-compact threshold', () => {
   })
 
   test('compacts at 90% of the window left after the summary reserve by default', () => {
-    expect(getAutoCompactThreshold('glm-5.1')).toBe(162_000)
-    expect(getAutoCompactThreshold('deepseek-v4-pro')).toBe(882_000)
+    expect(getAutoCompactThreshold('claude-sonnet-4-6')).toBe(162_000)
+    expect(getAutoCompactThreshold('claude-opus-4-7')).toBe(882_000)
   })
 
   test('uses the percentage from user settings', async () => {
     await writeFile(join(configDir, 'settings.json'), JSON.stringify({ autoCompactPercent: 50 }))
     resetSettingsCache()
-    expect(getAutoCompactThreshold('glm-5.1')).toBe(90_000)
-    expect(getAutoCompactThreshold('deepseek-v4-pro')).toBe(490_000)
+    expect(getAutoCompactThreshold('claude-sonnet-4-6')).toBe(90_000)
+    expect(getAutoCompactThreshold('claude-opus-4-7')).toBe(490_000)
   })
 })
 

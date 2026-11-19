@@ -10,7 +10,7 @@ import {
   resolveEffectiveH5PublicBaseUrl,
   validateH5PublicBaseUrl,
 } from '../services/h5AccessService.js'
-import { ProviderService } from '../services/providerService.js'
+import { ManagedSettingsService } from '../services/managedSettingsService.js'
 
 let tmpDir: string
 let originalConfigDir: string | undefined
@@ -440,15 +440,14 @@ describe('H5AccessService', () => {
 
   test('concurrent h5 enable and provider managed settings update preserve both fields', async () => {
     const h5Service = new H5AccessService()
-    const providerService = new ProviderService()
+    const managedSettings = new ManagedSettingsService()
 
     await Promise.all([
       h5Service.enable(),
-      providerService.updateManagedSettings({
-        env: {
-          ANTHROPIC_MODEL: 'keep-me',
-        },
-      }),
+      managedSettings.updateSettings((current) => ({
+        settings: { ...current, env: { ANTHROPIC_MODEL: 'keep-me' } },
+        result: undefined,
+      })),
     ])
 
     const saved = JSON.parse(await fs.readFile(getManagedSettingsPath(), 'utf-8')) as {

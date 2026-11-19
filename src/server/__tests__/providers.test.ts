@@ -186,7 +186,7 @@ describe('ProviderService', () => {
       await expect(fs.readFile(path.join(tmpDir, 'dreamcoder', 'settings.json'), 'utf-8')).rejects.toThrow()
     })
 
-    test('custom providers declare thinking and effort capability passthrough for user-defined models', async () => {
+    test('custom providers get per-model rules instead of blanket capability variables', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
         models: [{ id: 'deepseek-ai/DeepSeek-V4-Pro' }],
@@ -195,21 +195,18 @@ describe('ProviderService', () => {
 
       await svc.activateProvider(provider.id)
 
-      const settings = await readSettings()
-      const env = settings.env as Record<string, string>
+      const env = (await readSettings()).env as Record<string, string>
+      const runtimeEnv = await svc.getProviderRuntimeEnv(provider.id)
+      const rules = JSON.parse(runtimeEnv.DREAMCODER_MODEL_RULES!) as {
+        models: Record<string, { thinkingWhenOn: string }>
+      }
       expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('deepseek-ai/DeepSeek-V4-Pro')
-      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
-      expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
-      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
+      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+      expect(runtimeEnv.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+      expect(rules.models['deepseek-ai/deepseek-v4-pro']?.thinkingWhenOn).toBe('budget')
     })
 
-    test('DeepSeek preset follows the global thinking toggle instead of forcing disabled thinking', async () => {
+    test('DeepSeek preset writes no capability or thinking variables into settings', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
         presetId: 'deepseek',
@@ -224,15 +221,9 @@ describe('ProviderService', () => {
       const settings = await readSettings()
       const env = settings.env as Record<string, string>
       expect(env.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
-      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
-      expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
-      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES).toBe(
-        'thinking,effort,adaptive_thinking,max_effort',
-      )
+      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+      expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
     })
 
     test('adding additional providers should keep activeId unchanged', async () => {
@@ -250,21 +241,6 @@ describe('ProviderService', () => {
       const provider = await svc.addProvider(sampleInput({ notes: 'dev environment' }))
 
       expect(provider.notes).toBe('dev environment')
-    })
-
-    test('should preserve optional model context windows', async () => {
-      const svc = new ProviderService()
-      const provider = await svc.addProvider(sampleInput({
-        modelContextWindows: {
-          'model-main': 300000,
-          'model-haiku': 128000,
-        },
-      }))
-
-      expect(provider.modelContextWindows).toEqual({
-        'model-main': 300000,
-        'model-haiku': 128000,
-      })
     })
   })
 
@@ -396,36 +372,6 @@ describe('ProviderService', () => {
       expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('gpt-5.5')
       expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('gpt-5.5')
       expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('gpt-5.5')
-    })
-
-    test('updating active provider should override and clear model context windows', async () => {
-      const svc = new ProviderService()
-      const added = await svc.addProvider(sampleInput({
-        modelContextWindows: { 'model-main': 300000 },
-      }))
-      await svc.activateProvider(added.id)
-
-      let settings = await readSettings()
-      let env = settings.env as Record<string, string>
-      expect(JSON.parse(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'model-main': 300000,
-      })
-
-      await svc.updateProvider(added.id, {
-        modelContextWindows: { 'model-main': 500000 },
-      })
-
-      settings = await readSettings()
-      env = settings.env as Record<string, string>
-      expect(JSON.parse(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'model-main': 500000,
-      })
-
-      await svc.updateProvider(added.id, { modelContextWindows: null })
-
-      settings = await readSettings()
-      env = settings.env as Record<string, string>
-      expect(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBeUndefined()
     })
   })
 
@@ -597,7 +543,7 @@ describe('ProviderService', () => {
       expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
     })
 
-    test('should include preset default env on activation and runtime env', async () => {
+    test('Kimi preset writes no thinking or window variables on activation', async () => {
       const svc = new ProviderService()
       const provider = await svc.addProvider(sampleInput({
         presetId: 'kimi',
@@ -606,22 +552,10 @@ describe('ProviderService', () => {
 
       await svc.activateProvider(provider.id)
 
-      const settings = await readSettings()
-      const env = settings.env as Record<string, string>
-      expect(env.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
+      const env = (await readSettings()).env as Record<string, string>
+      expect(env.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
+      expect(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBeUndefined()
       expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
-      expect(JSON.parse(env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'kimi-k2.6': 262144,
-        'kimi-k2.5': 262144,
-      })
-
-      const runtimeEnv = await svc.getProviderRuntimeEnv(provider.id)
-      expect(runtimeEnv.DREAMCODER_SEND_DISABLED_THINKING).toBe('1')
-      expect(runtimeEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined()
-      expect(JSON.parse(runtimeEnv.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS)).toEqual({
-        'kimi-k2.6': 262144,
-        'kimi-k2.5': 262144,
-      })
     })
 
     test('auth status treats preset default auth as active provider auth', async () => {
@@ -768,9 +702,10 @@ describe('ProviderService', () => {
 
       const active = await svc.getProviderForProxy()
       expect(active).not.toBeNull()
-      expect(active!.baseUrl).toBe(provider.baseUrl)
-      expect(active!.apiKey).toBe(provider.apiKey)
-      expect(active!.apiFormat).toBe('anthropic')
+      expect(active!.target.baseUrl).toBe(provider.baseUrl)
+      expect(active!.target.apiKey).toBe(provider.apiKey)
+      expect(active!.target.apiFormat).toBe('anthropic')
+      expect(active!.provider).toMatchObject({ baseUrl: provider.baseUrl, apiFormat: 'anthropic' })
     })
   })
 
@@ -1490,6 +1425,8 @@ describe('Providers API', () => {
   })
 
   test('POST /api/providers should create a provider', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock(async () => Response.json({ data: [] })) as unknown as typeof fetch
     const { req, url, segments } = makeRequest('POST', '/api/providers', {
       presetId: 'custom',
       name: 'New Provider',
@@ -1499,7 +1436,9 @@ describe('Providers API', () => {
       models: [{ id: 'gpt-4' }, { id: 'gpt-4-haiku' }],
       fastModel: 'gpt-4-haiku',
     })
-    const res = await handleProvidersApi(req, url, segments)
+    const res = await handleProvidersApi(req, url, segments).finally(() => {
+      globalThis.fetch = originalFetch
+    })
 
     expect(res.status).toBe(201)
     const body = (await res.json()) as { provider: { name: string; models: Array<{ id: string }> } }
@@ -1553,10 +1492,14 @@ describe('Providers API', () => {
     const svc = new ProviderService()
     const added = await svc.addProvider(sampleInput())
 
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock(async () => Response.json({ data: [] })) as unknown as typeof fetch
     const { req, url, segments } = makeRequest('PUT', `/api/providers/${added.id}`, {
       name: 'Renamed Provider',
     })
-    const res = await handleProvidersApi(req, url, segments)
+    const res = await handleProvidersApi(req, url, segments).finally(() => {
+      globalThis.fetch = originalFetch
+    })
 
     expect(res.status).toBe(200)
     const body = (await res.json()) as { provider: { name: string } }

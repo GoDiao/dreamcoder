@@ -18,8 +18,9 @@ import { getAnthropicClient } from '../services/api/client.js'
 import { normalizeUsage } from '../services/api/emptyUsage.js'
 import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js'
 import { computeFingerprint } from './fingerprint.js'
+import type { EffortLevel } from './effort.js'
 import { normalizeModelStringForAPI } from './model/model.js'
-import { shouldSendExplicitDisabledThinking } from './thinking.js'
+import { auxiliaryThinking, getCliModelRules, modelSupportsStructuredOutput } from './model/modelRules.js'
 
 type MessageParam = Anthropic.MessageParam
 type TextBlockParam = Anthropic.TextBlockParam
@@ -130,9 +131,10 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     source: 'side_query',
   })
   const betas = [...getModelBetas(model)]
+  const format = modelSupportsStructuredOutput(model) ? output_format : undefined
   // Add structured-outputs beta if using output_format and provider supports it
   if (
-    output_format &&
+    format &&
     modelSupportsStructuredOutputs(model) &&
     !betas.includes(STRUCTURED_OUTPUTS_BETA_HEADER)
   ) {
@@ -169,7 +171,15 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
         : []),
   ].filter((block): block is TextBlockParam => block !== null)
 
-  const thinkingConfig = resolveSideQueryThinkingConfig(thinking, max_tokens)
+  const { thinking: thinkingConfig, effort } = resolveSideQueryThinkingConfig(
+    model,
+    thinking,
+    max_tokens,
+  )
+  const outputConfig = {
+    ...(format && { format }),
+    ...(effort && { effort }),
+  }
 
   const normalizedModel = normalizeModelStringForAPI(model)
   const start = Date.now()
@@ -182,7 +192,9 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
       messages,
       ...(tools && { tools }),
       ...(tool_choice && { tool_choice }),
-      ...(output_format && { output_config: { format: output_format } }),
+      ...(Object.keys(outputConfig).length > 0 && {
+        output_config: outputConfig,
+      }),
       ...(temperature !== undefined && { temperature }),
       ...(stop_sequences && { stop_sequences }),
       ...(thinkingConfig && { thinking: thinkingConfig }),
@@ -218,20 +230,34 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
 }
 
 export function resolveSideQueryThinkingConfig(
+  model: string,
   thinking: SideQueryOptions['thinking'],
   maxTokens: number,
-): BetaThinkingConfigParam | undefined {
-  if (
-    thinking === false ||
-    (thinking === undefined && shouldSendExplicitDisabledThinking())
-  ) {
-    return { type: 'disabled' }
+): { thinking?: BetaThinkingConfigParam; effort?: EffortLevel } {
+  const rules = getCliModelRules(model)
+  if (!rules) {
+    if (thinking === false) return { thinking: { type: 'disabled' } }
+    if (thinking === undefined) return {}
+    return { thinking: budgetThinking(thinking, maxTokens) }
   }
-  if (thinking !== undefined) {
-    return {
-      type: 'enabled',
-      budget_tokens: Math.min(thinking, maxTokens - 1),
-    }
+  const budget = typeof thinking === 'number' ? thinking : undefined
+  const auxiliary = auxiliaryThinking(rules, budget !== undefined)
+  if (auxiliary.thinking === 'off') return { thinking: { type: 'disabled' } }
+  if (budget === undefined || rules.thinkingWhenOn === 'omit') {
+    return { effort: auxiliary.effort }
   }
-  return undefined
+  return {
+    thinking:
+      rules.thinkingWhenOn === 'adaptive'
+        ? { type: 'adaptive' }
+        : budgetThinking(budget, maxTokens),
+    effort: auxiliary.effort,
+  }
+}
+
+function budgetThinking(
+  budget: number,
+  maxTokens: number,
+): BetaThinkingConfigParam {
+  return { type: 'enabled', budget_tokens: Math.min(budget, maxTokens - 1) }
 }

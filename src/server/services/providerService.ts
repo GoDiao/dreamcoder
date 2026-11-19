@@ -17,10 +17,26 @@ import {
   normalizeProvidersIndex,
 } from './providerRuntimeEnv.js'
 import { loadNetworkSettings } from './networkSettings.js'
-import { fetchUpstreamModels, resolveUpstreamTarget, sendToUpstream, type UpstreamTarget } from '../upstream/client.js'
+import { SettingsService } from './settingsService.js'
+import { auxiliaryRequestFields } from './modelRules/auxiliaryRequest.js'
+import { buildCliModelRulesEnv, buildResolvedModelsView } from './modelRules/cliModelRulesEnv.js'
+import { isOfficialAnthropicProvider } from './modelRules/officialAnthropicProvider.js'
+import type { ModelRulesProvider } from './modelRules/resolveModelRules.js'
+import {
+  fetchUpstreamModels,
+  resolveUpstreamTarget,
+  sendToUpstream,
+  type ProxyUpstream,
+  type UpstreamTarget,
+} from '../upstream/client.js'
 import { describeFailure } from '../upstream/upstreamError.js'
+import {
+  dialectFitsFormat,
+  type DiscoveredModel,
+} from '../types/modelRules.js'
 import type {
   SavedProvider,
+  ProviderListItem,
   ProvidersIndex,
   CreateProviderInput,
   UpdateProviderInput,
@@ -30,13 +46,37 @@ import type {
   ProviderAuthStrategy,
   DiscoverProviderModelsInput,
   DiscoveredProviderModel,
+  ProviderSaveResult,
 } from '../types/provider.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { MODEL_RULES_ENV_KEY, normalizeModelId } from '../../utils/model/modelRules.js'
+
+const SAVE_DISCOVERY_TIMEOUT_MS = 10_000
 
 const DEFAULT_INDEX: ProvidersIndex = {
   schemaVersion: CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
   activeId: null,
   providers: [],
+}
+
+function withoutStaleDiscovery(existing: SavedProvider, next: SavedProvider): SavedProvider {
+  if (existing.baseUrl === next.baseUrl && existing.apiFormat === next.apiFormat) return next
+  const { discoveredModels: _discoveredModels, discoveredAt: _discoveredAt, ...rest } = next
+  return rest
+}
+
+function discoveredModelsFor(provider: SavedProvider, models: DiscoveredProviderModel[]): Record<string, DiscoveredModel> {
+  const providerModelIds = new Set(provider.models.map((model) => normalizeModelId(model.id)))
+  const discovered: Record<string, DiscoveredModel> = {}
+  for (const { id, name: _name, ...metadata } of models) {
+    if (providerModelIds.has(normalizeModelId(id)) && Object.keys(metadata).length > 0) discovered[id] = metadata
+  }
+  return discovered
+}
+
+function discoveryWarning(provider: SavedProvider, error: string): ProviderSaveResult {
+  console.warn('[providers] Model metadata refresh failed', { providerId: provider.id, error })
+  return { provider, modelDiscovery: { ok: false, error } }
 }
 
 export class ProviderService {
@@ -95,16 +135,20 @@ export class ProviderService {
     return this.readSettings()
   }
 
-  async updateManagedSettings(settings: Record<string, unknown>): Promise<void> {
-    await this.managedSettingsService.updateSettings((current) => ({
-      settings: Object.assign({}, current, settings),
-      result: undefined,
-    }))
-  }
-
   async listProviders(): Promise<{ providers: SavedProvider[]; activeId: string | null }> {
     const index = await this.readIndex()
     return { providers: index.providers, activeId: index.activeId }
+  }
+
+  async listProviderViews(): Promise<{ providers: ProviderListItem[]; activeId: string | null }> {
+    const { providers, activeId } = await this.listProviders()
+    return {
+      activeId,
+      providers: providers.map((provider) => {
+        const resolvedModels = buildResolvedModelsView(provider, provider.models.map((model) => model.id))
+        return resolvedModels ? { ...provider, resolvedModels } : provider
+      }),
+    }
   }
 
   async getProvider(id: string): Promise<SavedProvider> {
@@ -128,13 +172,14 @@ export class ProviderService {
       runtimeKind: input.runtimeKind ?? 'anthropic_compatible',
       models: normalizeProviderModels(input.models),
       ...(input.fastModel !== undefined && { fastModel: input.fastModel }),
-      ...(input.modelContextWindows !== undefined && { modelContextWindows: input.modelContextWindows }),
+      ...(input.modelOverrides !== undefined && { modelOverrides: input.modelOverrides }),
       ...(input.extraHeaders !== undefined && { extraHeaders: input.extraHeaders }),
       ...(input.queryParams !== undefined && { queryParams: input.queryParams }),
       ...(input.notes !== undefined && { notes: input.notes }),
     }
     this.assertFastModel(provider)
     this.assertRequestOptions(provider)
+    this.assertModelOverrides(provider)
 
     index.providers.push(provider)
     await this.writeIndex(index)
@@ -147,7 +192,7 @@ export class ProviderService {
     if (idx === -1) throw ApiError.notFound(`Provider not found: ${id}`)
 
     const existing = index.providers[idx]
-    const updated: SavedProvider = {
+    const updated: SavedProvider = withoutStaleDiscovery(existing, {
       ...existing,
       ...(input.name !== undefined && { name: input.name }),
       ...(input.apiKey !== undefined && { apiKey: input.apiKey }),
@@ -157,14 +202,11 @@ export class ProviderService {
       ...(input.runtimeKind !== undefined && { runtimeKind: input.runtimeKind }),
       ...(input.models !== undefined && { models: normalizeProviderModels(input.models) }),
       ...(typeof input.fastModel === 'string' && { fastModel: input.fastModel }),
-      ...(input.modelContextWindows !== undefined && input.modelContextWindows !== null && { modelContextWindows: input.modelContextWindows }),
+      ...(input.modelOverrides !== undefined && { modelOverrides: input.modelOverrides }),
       ...(input.extraHeaders != null && { extraHeaders: input.extraHeaders }),
       ...(input.queryParams != null && { queryParams: input.queryParams }),
       ...(input.notes !== undefined && { notes: input.notes }),
-    }
-    if (input.modelContextWindows === null) {
-      delete updated.modelContextWindows
-    }
+    })
     if (input.extraHeaders === null) delete updated.extraHeaders
     if (input.queryParams === null) delete updated.queryParams
     if (input.fastModel === null || (input.fastModel === undefined && input.models !== undefined && !updated.models.some((model) => model.id === updated.fastModel))) {
@@ -172,6 +214,7 @@ export class ProviderService {
     }
     this.assertFastModel(updated)
     this.assertRequestOptions(updated)
+    this.assertModelOverrides(updated)
 
     index.providers[idx] = updated
     await this.writeIndex(index)
@@ -220,10 +263,22 @@ export class ProviderService {
 
   async getProviderRuntimeEnv(id: string, modelId?: string): Promise<Record<string, string>> {
     const provider = await this.getProvider(id)
-    return this.buildManagedEnv(provider, {
+    const env = this.buildManagedEnv(provider, {
       proxyPath: `/proxy/providers/${provider.id}`,
       modelId,
     })
+    if (isOfficialAnthropicProvider(provider)) return env
+
+    const { effort } = await new SettingsService().getUserSettings()
+    const modelIds = [
+      env.ANTHROPIC_MODEL,
+      env.ANTHROPIC_SMALL_FAST_MODEL,
+      ...provider.models.map((model) => model.id),
+    ].filter((model): model is string => !!model)
+    return {
+      ...env,
+      [MODEL_RULES_ENV_KEY]: JSON.stringify(buildCliModelRulesEnv(provider, modelIds, effort)),
+    }
   }
 
   private async syncToSettings(provider: SavedProvider): Promise<void> {
@@ -284,29 +339,34 @@ export class ProviderService {
     return { hasAuth: false, source: 'none' }
   }
 
-  async getProviderForProxy(providerId?: string): Promise<UpstreamTarget | null> {
+  async getProviderForProxy(providerId?: string): Promise<ProxyUpstream | null> {
     if (providerId) {
-      return resolveUpstreamTarget(await this.getProvider(providerId))
+      const provider = await this.getProvider(providerId)
+      return { target: resolveUpstreamTarget(provider), provider }
     }
 
     const index = await this.readIndex()
     if (!index.activeId) return null
     const provider = await this.getProvider(index.activeId).catch(() => null)
-    return provider ? resolveUpstreamTarget(provider) : null
+    return provider ? { target: resolveUpstreamTarget(provider), provider } : null
   }
 
   async testProvider(
     id: string,
     overrides?: { baseUrl?: string; modelId?: string; apiFormat?: ApiFormat; authStrategy?: ProviderAuthStrategy },
   ): Promise<ProviderTestResult> {
-    const provider = await this.getProvider(id)
-    const target = resolveUpstreamTarget(provider)
-    return this.runProviderTest({
-      ...target,
-      baseUrl: overrides?.baseUrl || target.baseUrl,
-      apiFormat: overrides?.apiFormat ?? target.apiFormat,
-      authStrategy: overrides?.authStrategy ?? target.authStrategy,
-    }, overrides?.modelId || getProviderDefaultModel(provider))
+    const saved = await this.getProvider(id)
+    const provider = withoutStaleDiscovery(saved, {
+      ...saved,
+      ...(overrides?.baseUrl && { baseUrl: overrides.baseUrl }),
+      ...(overrides?.apiFormat && { apiFormat: overrides.apiFormat }),
+      ...(overrides?.authStrategy && { authStrategy: overrides.authStrategy }),
+    })
+    return this.runProviderTest(
+      resolveUpstreamTarget(provider),
+      provider,
+      overrides?.modelId || getProviderDefaultModel(provider),
+    )
   }
 
   async discoverModels(input: DiscoverProviderModelsInput): Promise<DiscoveredProviderModel[]> {
@@ -315,7 +375,34 @@ export class ProviderService {
       apiKey: input.apiKey,
       apiFormat: input.apiFormat ?? 'anthropic',
       authStrategy: input.authStrategy ?? 'api_key',
+      ...(input.extraHeaders && { extraHeaders: input.extraHeaders }),
+      ...(input.queryParams && { queryParams: input.queryParams }),
     }, input.presetId)
+  }
+
+  async refreshDiscoveredModels(id: string): Promise<ProviderSaveResult> {
+    const provider = await this.getProvider(id)
+    let result: Awaited<ReturnType<typeof fetchUpstreamModels>>
+    try {
+      result = await fetchUpstreamModels(resolveUpstreamTarget(provider), provider.presetId, SAVE_DISCOVERY_TIMEOUT_MS)
+    } catch (error) {
+      return discoveryWarning(provider, error instanceof Error ? error.message : String(error))
+    }
+    if (!result.ok) return discoveryWarning(provider, describeFailure(result))
+
+    const index = await this.readIndex()
+    const idx = index.providers.findIndex((p) => p.id === id)
+    if (idx === -1) throw ApiError.notFound(`Provider not found: ${id}`)
+    const { discoveredModels: _previous, ...current } = index.providers[idx]!
+    const discoveredModels = discoveredModelsFor(current, result.models)
+    const updated: SavedProvider = {
+      ...current,
+      ...(Object.keys(discoveredModels).length > 0 && { discoveredModels }),
+      discoveredAt: new Date().toISOString(),
+    }
+    index.providers[idx] = updated
+    await this.writeIndex(index)
+    return { provider: updated }
   }
 
   private async fetchModels(target: UpstreamTarget, presetId?: string): Promise<DiscoveredProviderModel[]> {
@@ -335,6 +422,28 @@ export class ProviderService {
     }
   }
 
+  private assertModelOverrides(provider: SavedProvider): void {
+    const seen = new Map<string, string>()
+    for (const [modelId, override] of Object.entries(provider.modelOverrides ?? {})) {
+      const key = normalizeModelId(modelId)
+      const previous = seen.get(key)
+      if (previous !== undefined) {
+        throw new ApiError(400, `Model overrides for ${previous} and ${modelId} name the same model`, 'MODEL_OVERRIDE_DUPLICATE')
+      }
+      seen.set(key, modelId)
+      if (provider.apiFormat === 'anthropic' && Object.keys(override.extraBody ?? {}).length > 0) {
+        throw new ApiError(400, `Extra body fields for ${modelId} only apply to OpenAI-format providers`, 'MODEL_OVERRIDE_EXTRA_BODY_ANTHROPIC')
+      }
+      if (override.reasoningDialect && !dialectFitsFormat(override.reasoningDialect, provider.apiFormat)) {
+        throw new ApiError(
+          400,
+          `Reasoning dialect ${override.reasoningDialect} for ${modelId} does not fit API format ${provider.apiFormat}`,
+          'MODEL_OVERRIDE_DIALECT_MISMATCH',
+        )
+      }
+    }
+  }
+
   private assertFastModel(provider: SavedProvider): void {
     if (provider.fastModel && !provider.models.some((model) => model.id === provider.fastModel)) {
       throw ApiError.badRequest('Fast model must be one of the provider models')
@@ -342,26 +451,32 @@ export class ProviderService {
   }
 
   async testProviderConfig(input: TestProviderInput): Promise<ProviderTestResult> {
+    const apiFormat = input.apiFormat ?? 'anthropic'
     return this.runProviderTest({
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
-      apiFormat: input.apiFormat ?? 'anthropic',
+      apiFormat,
       authStrategy: input.authStrategy ?? 'api_key',
-    }, input.modelId)
+    }, { baseUrl: input.baseUrl, apiFormat }, input.modelId)
   }
 
-  private async runProviderTest(target: UpstreamTarget, modelId: string): Promise<ProviderTestResult> {
+  private async runProviderTest(
+    target: UpstreamTarget,
+    provider: ModelRulesProvider,
+    modelId: string,
+  ): Promise<ProviderTestResult> {
     if (!target.baseUrl || (!target.apiKey && target.authStrategy !== 'dual_dummy')) {
       return { connectivity: { success: false, latencyMs: 0, error: 'Missing baseUrl or apiKey' } }
     }
 
     const { aiRequestTimeoutMs } = await loadNetworkSettings()
     const start = Date.now()
-    const result = await sendToUpstream(target, {
+    const result = await sendToUpstream({ target, provider }, {
       model: modelId,
       max_tokens: 16,
       stream: true,
       messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
+      ...auxiliaryRequestFields(provider, modelId),
     }, { timeoutMs: aiRequestTimeoutMs })
 
     if (!result.ok) {

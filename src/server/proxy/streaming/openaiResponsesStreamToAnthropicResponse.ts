@@ -1,3 +1,4 @@
+import type { ResolvedModelRules } from '../../types/modelRules.js'
 import { openaiResponsesToAnthropic } from '../transform/openaiResponsesToAnthropic.js'
 import { UpstreamReplyError, type AnthropicError } from '../../upstream/upstreamError.js'
 import { errorFromEvent } from './openaiResponsesStreamToAnthropic.js'
@@ -18,6 +19,7 @@ type StreamFallbackState = {
 export async function openaiResponsesStreamToAnthropicResponse(
   upstream: ReadableStream<Uint8Array>,
   model: string,
+  rules: ResolvedModelRules,
 ): Promise<AnthropicResponse> {
   const sse = new SseDecoder()
   const reader = upstream.getReader()
@@ -63,6 +65,7 @@ export async function openaiResponsesStreamToAnthropicResponse(
   return openaiResponsesToAnthropic(
     completedResponse ?? buildFallbackResponse(fallback, model),
     model,
+    rules,
   )
 }
 

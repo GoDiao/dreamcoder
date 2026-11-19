@@ -26,6 +26,7 @@
 
 ### P-RES-02 提供方要求回传的推理数据在响应方向就被丢弃（Gemini 的 thought_signature、OpenRouter 的 reasoning_details、Responses 的 encrypted_content）
 
+- 状态：部分在 #264 修复：OpenRouter 的 `reasoning_details` 和 Responses 的 `encrypted_content` 记进思考块签名并在下一轮写回；Gemini 的 `thought_signature` 不在本轮。见 [model-rules.md](../model-rules.md)「推理回传」。
 - 类型：问题
 - 严重程度：高（Gemini 3 场景成立时功能失效；其余为推理质量和 token 损失）
 - 现状：
@@ -165,6 +166,7 @@
 
 ### P-RES-10 正文里的 `<think>` 标签原样当作回答
 
+- 状态：已在 #264 修复：模型规则 `thinkTagsInText` 为 true 时，chat 的流式和非流式响应把正文里的 `<think>` 内容拆成思考块；Responses 没有做。见 [model-rules.md](../model-rules.md)。
 - 类型：优化
 - 严重程度：低
 - 现状：chat 流与非流式只从专用字段取推理（openaiChatStreamToAnthropic.ts:246-268；openaiChatToAnthropic.ts:18-30），`content` 原样成为 text 块（:358-368；:32-34）。服务端标题生成也直接用 text（src/server/services/titleService.ts:95-100）。

@@ -3,6 +3,7 @@ import { ProviderService } from '../services/providerService.js'
 import { resolveProviderDefaultModel } from '../services/providerRuntimeEnv.js'
 import type { ProviderModel } from '../types/provider.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
+import { EFFORT_LEVELS, isEffortLevel, normalizeEffortLevel } from '../../utils/effort.js'
 
 const DEFAULT_MODELS = [
   {
@@ -25,10 +26,7 @@ const DEFAULT_MODELS = [
   },
 ] as const
 
-export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
-
 const DEFAULT_MODEL = 'claude-opus-4-7'
-const DEFAULT_EFFORT = 'medium'
 
 const settingsService = new SettingsService()
 const providerService = new ProviderService()
@@ -67,12 +65,6 @@ function getStandaloneModelList(): ApiModelInfo[] {
   }
 
   return models
-}
-
-function normalizeEffortLevel(value: unknown): (typeof EFFORT_LEVELS)[number] {
-  return typeof value === 'string' && EFFORT_LEVELS.includes(value as (typeof EFFORT_LEVELS)[number])
-    ? value as (typeof EFFORT_LEVELS)[number]
-    : DEFAULT_EFFORT
 }
 
 export async function handleModelsApi(
@@ -199,7 +191,7 @@ async function handleEffort(req: Request): Promise<Response> {
     if (typeof level !== 'string') {
       throw ApiError.badRequest('Missing or invalid "level" in request body')
     }
-    if (!EFFORT_LEVELS.includes(level as (typeof EFFORT_LEVELS)[number])) {
+    if (!isEffortLevel(level)) {
       throw ApiError.badRequest(
         `Invalid effort level: "${level}". Valid levels: ${EFFORT_LEVELS.join(', ')}`,
       )

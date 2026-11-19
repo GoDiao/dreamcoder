@@ -319,6 +319,34 @@ describe('cron scheduler launcher resolution', () => {
     }
   })
 
+  it('gives a task without a provider the active provider rules and the global effort', async () => {
+    await fs.mkdir(path.join(tmpDir, 'config'), { recursive: true })
+    await fs.writeFile(path.join(tmpDir, 'config', 'settings.json'), JSON.stringify({ effort: 'low' }), 'utf-8')
+    const providerService = new ProviderService()
+    const provider = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Rules',
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.deepseek.com/anthropic',
+      apiFormat: 'anthropic',
+      runtimeKind: 'anthropic_compatible',
+      models: [{ id: 'deepseek-v4-pro' }],
+    })
+    await providerService.activateProvider(provider.id)
+    const scheduler = new CronScheduler(new CronService()) as any
+
+    const env = await scheduler.buildTaskChildEnv(tmpDir, { id: 't', cron: '* * * * *', prompt: 'p', createdAt: 0 })
+    const rules = JSON.parse(env.DREAMCODER_MODEL_RULES) as {
+      defaultEffort: string
+      models: Record<string, { effortLevels: string[] }>
+    }
+
+    expect(rules.defaultEffort).toBe('low')
+    expect(rules.models['deepseek-v4-pro']?.effortLevels).toEqual(['low', 'high', 'max'])
+    expect(env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST).toBe('1')
+    expect(env.ANTHROPIC_MODEL).toBe('deepseek-v4-pro')
+  })
+
   it('starts a task in its own permission mode', () => {
     const scheduler = new CronScheduler(new CronService()) as any
     const task = { id: 't', cron: '* * * * *', prompt: 'p', createdAt: 0 }

@@ -5,7 +5,8 @@ import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { getModelCapability } from './model/modelCapabilities.js'
-import { getConfiguredOrBuiltInModelContextWindow } from './model/modelContextWindows.js'
+import { getBuiltInModelContextWindow } from './model/modelContextWindows.js'
+import { type CliModelRules, getCliModelRules } from './model/modelRules.js'
 
 // Default fallback when the model-specific capability is unknown.
 export const MODEL_CONTEXT_WINDOW_DEFAULT = 200_000
@@ -73,7 +74,8 @@ export function getContextWindowForModel(
     return 1_000_000
   }
 
-  const configuredWindow = getConfiguredOrBuiltInModelContextWindow(model)
+  const configuredWindow =
+    getCliModelRules(model)?.contextWindow ?? getBuiltInModelContextWindow(model)
   if (configuredWindow !== undefined) {
     if (
       configuredWindow > MODEL_CONTEXT_WINDOW_DEFAULT &&
@@ -197,6 +199,17 @@ export function calculateCurrentContextTokenTotal(
   return contextWindow !== undefined ? Math.min(total, contextWindow) : total
 }
 
+export function maxOutputTokensFromRules(
+  rules: Pick<CliModelRules, 'maxOutputTokens'>,
+): { default: number; upperLimit: number } {
+  return rules.maxOutputTokens === undefined
+    ? { default: MAX_OUTPUT_TOKENS_DEFAULT, upperLimit: MAX_OUTPUT_TOKENS_UPPER_LIMIT }
+    : {
+        default: Math.min(MAX_OUTPUT_TOKENS_DEFAULT, rules.maxOutputTokens),
+        upperLimit: rules.maxOutputTokens,
+      }
+}
+
 /**
  * Returns the model's default and upper limit for max output tokens.
  */
@@ -215,6 +228,9 @@ export function getModelMaxOutputTokens(model: string): {
       return { default: defaultTokens, upperLimit }
     }
   }
+
+  const rules = getCliModelRules(model)
+  if (rules) return maxOutputTokensFromRules(rules)
 
   const m = getCanonicalName(model)
 
