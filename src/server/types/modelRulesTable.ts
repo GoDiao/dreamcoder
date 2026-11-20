@@ -36,6 +36,27 @@ const SiteRuleEntrySchema = z
   .strict()
 export type SiteRuleEntry = z.infer<typeof SiteRuleEntrySchema>
 
+const CorrectionEntrySchema = z
+  .object({
+    match: z.object({ modelId: z.string().min(1) }).strict(),
+    source: z
+      .object({
+        url: z.string().url(),
+        modelsDevPr: z.union([z.string().url(), z.literal('')]),
+        checkedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        note: z.string().min(1).optional(),
+      })
+      .strict(),
+    rules: ModelRuleFieldsSchema.pick({
+      contextWindow: true,
+      maxOutputTokens: true,
+      reasoning: true,
+      input: true,
+    }),
+  })
+  .strict()
+export type CorrectionEntry = z.infer<typeof CorrectionEntrySchema>
+
 export const ModelRulesTableSchema = z
   .object({
     fallback: z.object({ rules: CompleteModelRuleFieldsSchema }).strict(),
@@ -47,6 +68,7 @@ export const ModelRulesTableSchema = z
       })
       .strict(),
     models: z.array(ModelRuleEntrySchema),
+    corrections: z.array(CorrectionEntrySchema),
     sites: z.array(SiteRuleEntrySchema),
   })
   .strict()

@@ -216,3 +216,34 @@ The scripts are unchanged except `scripts/lib/system-browser.mjs` and
 `scripts/lib/playwright-loader.mjs`, which now reach a browser only through the browser session
 that the DreamCoder desktop app provides; the code that started a system browser or looked for one
 was removed.
+
+## models.dev catalog snapshot
+
+DreamCoder bundles a snapshot of the model catalog from https://models.dev
+(https://github.com/anomalyco/models.dev, `https://models.dev/api.json`) as
+`src/server/config/modelsDev.json`, and refreshes it at runtime from the same URL. The snapshot
+keeps only the fields DreamCoder reads (context and output limits, reasoning and its options,
+input modalities, and each provider's and model's API URL) and drops each model's `id`, which
+repeats its key. The data is MIT licensed:
+
+MIT License
+
+Copyright (c) 2025 models.dev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

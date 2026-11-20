@@ -5,6 +5,9 @@ import * as path from 'path'
 
 import { ProviderService } from '../services/providerService.js'
 import { SessionService } from '../services/sessionService.js'
+import { useTestModelsDevCatalog } from './fixtures/modelsDevCatalog.js'
+
+useTestModelsDevCatalog()
 
 let configDir: string
 let workDir: string

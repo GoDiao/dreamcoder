@@ -1,4 +1,4 @@
-import { normalizeModelId } from '../../../utils/model/modelRules.js'
+import { findLongestPrefix, normalizeModelId } from '../../../utils/model/modelRules.js'
 import {
   dialectFitsFormat,
   type DiscoveredModel,
@@ -8,9 +8,12 @@ import {
   type ReasoningControl,
   type ResolvedModelRules,
 } from '../../types/modelRules.js'
-import type { ModelRulesTable, SiteRuleEntry } from '../../types/modelRulesTable.js'
+import type { CorrectionEntry, ModelRulesTable, SiteRuleEntry } from '../../types/modelRulesTable.js'
 import type { ApiFormat } from '../../types/provider.js'
 import { hostnameOf } from '../../upstream/baseUrl.js'
+import { lookupModelsDevModel, modelsDevCandidateKeys, type ModelsDevIndex } from '../modelsDev/catalog.js'
+import { currentModelsDevIndex } from '../modelsDev/modelsDevStore.js'
+import { modelsDevRuleFields } from '../modelsDev/ruleFields.js'
 import { BUILTIN_MODEL_RULES } from './builtinModelRules.js'
 
 export type ModelRulesProvider = {
@@ -18,29 +21,6 @@ export type ModelRulesProvider = {
   apiFormat: ApiFormat
   modelOverrides?: Record<string, ModelOverride>
   discoveredModels?: Record<string, DiscoveredModel>
-}
-
-const PREFIX_SEPARATORS = new Set(['-', ':', '/', '@', '_'])
-
-function prefixMatches(name: string, prefix: string): boolean {
-  if (!name.startsWith(prefix)) return false
-  if (name.length === prefix.length) return true
-  return PREFIX_SEPARATORS.has(prefix.at(-1)!) || PREFIX_SEPARATORS.has(name[prefix.length]!)
-}
-
-function findLongestPrefix<T>(name: string, entries: readonly T[], prefixOf: (entry: T) => string): T | undefined {
-  const find = (candidate: string) => {
-    let best: { entry: T; length: number } | undefined
-    for (const entry of entries) {
-      const prefix = normalizeModelId(prefixOf(entry))
-      if (prefixMatches(candidate, prefix) && prefix.length > (best?.length ?? -1)) {
-        best = { entry, length: prefix.length }
-      }
-    }
-    return best?.entry
-  }
-  const slash = name.indexOf('/')
-  return find(name) ?? (slash >= 0 ? find(name.slice(slash + 1)) : undefined)
 }
 
 function hostMatches(host: string, entryHost: string): boolean {
@@ -112,14 +92,22 @@ function findHostEntry(table: ModelRulesTable, provider: ModelRulesProvider): Si
   return best
 }
 
-function findPrefixEntry(table: ModelRulesTable, hostEntry: SiteRuleEntry, name: string): SiteRuleEntry | undefined {
+function findPrefixEntry(table: ModelRulesTable, hostEntry: SiteRuleEntry, modelId: string): SiteRuleEntry | undefined {
   const candidates = table.sites.filter(
     entry =>
       entry.match.modelPrefix !== undefined &&
       entry.match.host === hostEntry.match.host &&
       entry.match.apiFormat === hostEntry.match.apiFormat,
   )
-  return findLongestPrefix(name, candidates, entry => entry.match.modelPrefix ?? '')
+  return findLongestPrefix(modelId, candidates, entry => entry.match.modelPrefix ?? '')
+}
+
+function findCorrection(table: ModelRulesTable, modelId: string): CorrectionEntry | undefined {
+  for (const key of modelsDevCandidateKeys(modelId)) {
+    const correction = table.corrections.find(entry => normalizeModelId(entry.match.modelId) === key)
+    if (correction) return correction
+  }
+  return undefined
 }
 
 function mergeReasoningLevels(
@@ -135,8 +123,7 @@ function mergeReasoningLevels(
   return { control: alwaysOn.includes(current.control) ? 'always' : 'toggle', levels: [] }
 }
 
-function applyDiscovered(state: ResolvedModelRules, discovered: DiscoveredModel, apiFormat: ApiFormat): void {
-  const { reasoning, reasoningDialect } = discovered
+function applyDiscovered(state: ResolvedModelRules, discovered: DiscoveredModel): void {
   applyFields(
     state,
     {
@@ -146,7 +133,6 @@ function applyDiscovered(state: ResolvedModelRules, discovered: DiscoveredModel,
         image: state.sources.image === 'fallback' ? discovered.image : undefined,
         pdf: state.sources.pdf === 'fallback' ? discovered.pdf : undefined,
       },
-      ...(reasoning && state.sources.reasoning === 'fallback' && fittingEndpointFields({ reasoning, reasoningDialect }, apiFormat)),
     },
     'discovered',
   )
@@ -188,29 +174,34 @@ function finish(state: ResolvedModelRules): ResolvedModelRules {
 
 export function resolveModelRulesFromTable(
   table: ModelRulesTable,
+  modelsDev: ModelsDevIndex,
   provider: ModelRulesProvider,
   modelId: string,
 ): ResolvedModelRules {
   const state = initialState(table)
   const name = normalizeModelId(modelId)
   applyFields(state, table.formats[provider.apiFormat], 'format')
-  const modelEntry = findLongestPrefix(name, table.models, entry => entry.match.modelPrefix)
+  const modelEntry = findLongestPrefix(modelId, table.models, entry => entry.match.modelPrefix)
   if (modelEntry) applyFields(state, fittingEndpointFields(modelEntry.rules, provider.apiFormat), 'model')
+  const catalogMatch = lookupModelsDevModel(modelsDev, provider.baseUrl, modelId)
+  if (catalogMatch) applyFields(state, modelsDevRuleFields(catalogMatch.model), 'modelsDev')
+  const correction = findCorrection(table, catalogMatch?.id ?? modelId)
+  if (correction) applyFields(state, correction.rules, 'model')
   const hostEntry = findHostEntry(table, provider)
   if (hostEntry) {
     applyFields(state, hostEntry.rules, 'site')
-    const prefixEntry = findPrefixEntry(table, hostEntry, name)
+    const prefixEntry = findPrefixEntry(table, hostEntry, modelId)
     if (prefixEntry) applyFields(state, prefixEntry.rules, 'site')
   }
   const discovered = lookupByModelId(provider.discoveredModels, name)
-  if (discovered) applyDiscovered(state, discovered, provider.apiFormat)
+  if (discovered) applyDiscovered(state, discovered)
   const override = lookupByModelId(provider.modelOverrides, name)
   if (override) applyOverride(state, override, provider, modelId)
   return finish(state)
 }
 
 export function resolveModelRules(provider: ModelRulesProvider, modelId: string): ResolvedModelRules {
-  return resolveModelRulesFromTable(BUILTIN_MODEL_RULES, provider, modelId)
+  return resolveModelRulesFromTable(BUILTIN_MODEL_RULES, currentModelsDevIndex(), provider, modelId)
 }
 
 export function resolveFallbackModelRules(provider: ModelRulesProvider): ResolvedModelRules {

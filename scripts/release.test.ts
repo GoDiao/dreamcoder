@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { bumpVersion, isPrerelease } from './release.js'
+import { bumpVersion, isPrerelease, releaseFileUpdates } from './release.js'
+import { MODELS_DEV_SNAPSHOT_PATH } from './update-models-dev.js'
 
 describe('release version bump', () => {
   test('bumps a stable version by keyword', () => {
@@ -25,5 +26,20 @@ describe('release version bump', () => {
   test('marks versions with a pre-release suffix', () => {
     expect(isPrerelease('0.8.0-beta.1')).toBe(true)
     expect(isPrerelease('0.8.0')).toBe(false)
+  })
+})
+
+describe('release file updates', () => {
+  test('include the refreshed models.dev snapshot with the version files', async () => {
+    const updates = await releaseFileUpdates('9.9.9', async () => 'snapshot')
+    expect(updates.map((update) => update.path)).toEqual(['package.json', 'desktop/package.json', MODELS_DEV_SNAPSHOT_PATH])
+    expect(updates.at(-1)?.content).toBe('snapshot')
+    expect(updates[0]?.content).toContain('"version": "9.9.9"')
+  })
+
+  test('fail before anything is written when the snapshot cannot be fetched', async () => {
+    await expect(releaseFileUpdates('9.9.9', async () => {
+      throw new Error('offline')
+    })).rejects.toThrow('offline')
   })
 })

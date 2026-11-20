@@ -9,6 +9,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { fetchModelsDevSnapshot, MODELS_DEV_SNAPSHOT_PATH } from './update-models-dev.js'
+
 const root = path.resolve(import.meta.dir, '..')
 const USAGE = 'Usage: bun run scripts/release.ts <patch|minor|major|x.y.z|x.y.z-pre.N> [--dry]'
 
@@ -63,11 +65,23 @@ export function bumpVersion(current: string, bump: string): string {
   }
 }
 
-if (import.meta.main) {
-  main()
+export async function releaseFileUpdates(
+  next: string,
+  fetchSnapshot: () => Promise<string> = fetchModelsDevSnapshot,
+): Promise<{ path: string; content: string }[]> {
+  const versionUpdates = VERSION_FILES.map((file) => {
+    const content = file.update(readFileSync(path.join(root, file.path), 'utf-8'), next)
+    if (!file.updated(content, next)) throw new Error(`Could not set the version in ${file.path}`)
+    return { path: file.path, content }
+  })
+  return [...versionUpdates, { path: MODELS_DEV_SNAPSHOT_PATH, content: await fetchSnapshot() }]
 }
 
-function main(): void {
+if (import.meta.main) {
+  await main()
+}
+
+async function main(): Promise<void> {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry')
   const bumpArg = args.find((a) => a !== '--dry')
@@ -96,26 +110,24 @@ function main(): void {
 
   if (dryRun) {
     console.log('Files that would be updated:')
-    for (const file of VERSION_FILES) {
-      console.log(`  - ${file.path}`)
+    for (const file of [...VERSION_FILES.map((entry) => entry.path), MODELS_DEV_SNAPSHOT_PATH]) {
+      console.log(`  - ${file}`)
     }
     process.exit(0)
   }
 
   // Compute and check every file before writing any, so a failure leaves nothing half-bumped.
-  const updates = VERSION_FILES.map((file) => {
-    const filePath = path.join(root, file.path)
-    const content = file.update(readFileSync(filePath, 'utf-8'), next)
-    if (!file.updated(content, next)) {
-      console.error(`  Could not set the version in ${file.path}; nothing was written.`)
-      process.exit(1)
-    }
-    return { file, filePath, content }
-  })
+  let updates: Awaited<ReturnType<typeof releaseFileUpdates>>
+  try {
+    updates = await releaseFileUpdates(next)
+  } catch (error) {
+    console.error(`  ${error instanceof Error ? error.message : String(error)}; nothing was written.`)
+    process.exit(1)
+  }
 
-  for (const { file, filePath, content } of updates) {
-    writeFileSync(filePath, content)
-    console.log(`  Updated: ${file.path}`)
+  for (const update of updates) {
+    writeFileSync(path.join(root, update.path), update.content)
+    console.log(`  Updated: ${update.path}`)
   }
 
   if (!hasChangelogSection) {
