@@ -208,7 +208,7 @@ const baseUrl = needsProxy
 当前的转换代码会丢失这些信息：
 
 - `tool_result` 的内容为数组时只保留文本块，`is_error` 标记不传给上游。[Chat Completions](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiChat.ts#L135)、[Responses](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiResponses.ts#L127)
-- 请求不带 `max_tokens`，由服务商使用自己的默认值。[`anthropicToOpenaiChat()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiChat.ts#L49)
+- 模型的输出上限已知时，请求带 CLI 的 `max_tokens` 和这个上限中较小的那个；未知时不带，由服务商使用自己的默认值。[`applyRequestRules()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/requestRules.ts#L93-L97)
 - 名为 `BatchTool` 的工具定义不发给上游。[`anthropicToOpenaiChat()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiChat.ts#L63)
 - 转成 Responses 格式时跳过 `thinking` 块。[`anthropicToOpenaiResponses.ts`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiResponses.ts#L140)
 - 上游返回的工具参数不能解析为 JSON 对象时，转成 `{ raw: ... }` 作为 `tool_use.input`。[`parseOpenAIToolArguments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/toolArguments.ts#L5)
