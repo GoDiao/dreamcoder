@@ -205,13 +205,13 @@ const baseUrl = needsProxy
 | 助手消息中的 `tool_use`（`id`） | 助手消息的 `tool_calls[].id` | `function_call` 项的 `call_id` |
 | 用户消息中的 `tool_result`（`tool_use_id`） | `role: 'tool'` 消息的 `tool_call_id` | `function_call_output` 项的 `call_id` |
 
-当前的转换代码会丢失这些信息：
+转换时的取舍：
 
-- `tool_result` 的内容为数组时只保留文本块，`is_error` 标记不传给上游。[Chat Completions](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiChat.ts#L135)、[Responses](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiResponses.ts#L127)
+- `tool_result` 里的图片和 PDF 交给能接收的模型，接收不了的换成一段说明文字。Chat Completions 把它们放进紧接着的 user 消息，Responses 放在 `function_call_output` 里。`is_error` 标记不传给上游。[`toolResultParts()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/media.ts#L40)、[Chat Completions](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/anthropicToOpenaiChat.ts#L121-L133)、[Responses](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/anthropicToOpenaiResponses.ts#L126-L131)
 - 模型的输出上限已知时，请求带 CLI 的 `max_tokens` 和这个上限中较小的那个；未知时不带，由服务商使用自己的默认值。[`applyRequestRules()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/requestRules.ts#L93-L97)
-- 名为 `BatchTool` 的工具定义不发给上游。[`anthropicToOpenaiChat()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiChat.ts#L63)
-- 转成 Responses 格式时跳过 `thinking` 块。[`anthropicToOpenaiResponses.ts`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/anthropicToOpenaiResponses.ts#L140)
-- 上游返回的工具参数不能解析为 JSON 对象时，转成 `{ raw: ... }` 作为 `tool_use.input`。[`parseOpenAIToolArguments()`](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/proxy/transform/toolArguments.ts#L5)
+- 名为 `BatchTool` 的工具定义不发给上游。[`anthropicToOpenaiChat()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/anthropicToOpenaiChat.ts#L54)
+- `thinking` 块只在原本来自同一种格式、且模型规则允许回传推理时才发回上游，其余跳过。[`chatReasoningReplay()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/reasoningReplay.ts#L65)、[`responsesReasoningItem()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/reasoningReplay.ts#L94-L105)
+- 上游返回的工具参数不是 JSON 对象时，原字符串作为 `tool_use.input` 交给 CLI。[`parseOpenAIToolArguments()`](https://github.com/GoDiao/dreamcoder/blob/6ec720970c6e0b8d5659d154d71ef28106000392/src/server/proxy/transform/toolArguments.ts#L7-L14)
 
 ## 扩展阅读：手机 H5 接续同一个会话
 
