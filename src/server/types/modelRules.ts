@@ -129,6 +129,7 @@ const FieldSourceSchema = z.enum([
   'fallback',
   'format',
   'model',
+  'modelsDev',
   'site',
   'discovered',
   'user',
@@ -164,8 +165,6 @@ export const DiscoveredModelSchema = z.object({
   maxOutputTokens: MaxOutputTokensSchema.optional(),
   image: z.boolean().optional(),
   pdf: z.boolean().optional(),
-  reasoning: ModelRuleFieldsSchema.shape.reasoning,
-  reasoningDialect: ReasoningDialectSchema.optional(),
 })
 export type DiscoveredModel = z.infer<typeof DiscoveredModelSchema>
 

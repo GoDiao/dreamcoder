@@ -30,7 +30,7 @@ The accepted API formats and authentication strategies are defined in [`src/serv
 
 ## Add an entry
 
-Before editing, confirm the base URL, API format, authentication requirements, and model IDs from the provider's own documentation. Only include defaults that are stable and supported by those sources. Do not infer a model ID from a marketing name. Model facts such as context windows, output limits and thinking levels do not go in the preset; they live in the per-model rule table `src/server/config/modelRules.json` (see [model-rules.md](../features/harness/model-rules.md)), each entry with its source.
+Before editing, confirm the base URL, API format, authentication requirements, and model IDs from the provider's own documentation. Only include defaults that are stable and supported by those sources. Do not infer a model ID from a marketing name. Model facts such as context windows, output limits and thinking levels do not go in the preset. They come from [models.dev](https://models.dev): a snapshot ships in `src/server/config/modelsDev.json` and the app refreshes it hourly. The per-model rule table `src/server/config/modelRules.json` holds only what models.dev lacks, plus corrections that a vendor's documentation proves, each entry with its source (see [model-rules.md](../features/harness/model-rules.md)).
 
 Add the entry to `providerPresets.json`. For example, this abbreviated shape shows the required fields; replace every illustrative value with verified provider information:
 

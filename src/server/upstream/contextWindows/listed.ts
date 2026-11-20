@@ -4,7 +4,7 @@ function firstNumber(values: unknown[]): unknown {
   return values.find((value) => typeof value === 'number')
 }
 
-export function readListedMetadata(entry: Record<string, unknown>): RawModelMetadata {
+function readListedMetadata(entry: Record<string, unknown>): RawModelMetadata {
   const capabilities = asRecord(entry.capabilities)
   const modalities = inputModalities(asRecord(entry.architecture)?.input_modalities ?? entry.input_modalities)
   return {

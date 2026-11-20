@@ -54,13 +54,47 @@ const FIXED_FALLBACK_CLI_MODEL_RULES: CliModelRules = {
   structuredOutput: false,
 }
 
-export function normalizeModelId(modelId: string): string {
+function cleanModelId(modelId: string): string {
   return modelId
     .trim()
     .replace(/\[[12]m\]$/i, '')
     .replace(/:1m$/i, '')
     .toLowerCase()
-    .replaceAll('.', '-')
+}
+
+export function normalizeModelId(modelId: string): string {
+  return cleanModelId(modelId).replaceAll('.', '-')
+}
+
+const MODEL_ID_SEPARATORS = new Set(['-', ':', '/', '@', '_'])
+
+function modelIdPrefixMatches(normalized: string, boundary: string, prefix: string): boolean {
+  if (!normalized.startsWith(prefix)) return false
+  if (normalized.length === prefix.length) return true
+  return MODEL_ID_SEPARATORS.has(prefix.at(-1)!) || MODEL_ID_SEPARATORS.has(boundary[prefix.length]!)
+}
+
+export function findLongestPrefix<T>(
+  modelId: string,
+  entries: Iterable<T>,
+  prefixOf: (entry: T) => string,
+  splitsAtDot = true,
+): T | undefined {
+  const name = cleanModelId(modelId)
+  const find = (candidate: string) => {
+    const normalized = candidate.replaceAll('.', '-')
+    const boundary = splitsAtDot ? normalized : candidate
+    let best: { entry: T; length: number } | undefined
+    for (const entry of entries) {
+      const prefix = normalizeModelId(prefixOf(entry))
+      if (modelIdPrefixMatches(normalized, boundary, prefix) && prefix.length > (best?.length ?? -1)) {
+        best = { entry, length: prefix.length }
+      }
+    }
+    return best?.entry
+  }
+  const slash = name.indexOf('/')
+  return find(name) ?? (slash >= 0 ? find(name.slice(slash + 1)) : undefined)
 }
 
 function sortLevels(levels: readonly EffortLevel[]): EffortLevel[] {

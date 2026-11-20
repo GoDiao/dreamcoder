@@ -2,9 +2,13 @@ import { describe, expect, test } from 'bun:test'
 
 import modelRulesJson from '../config/modelRules.json'
 import { BUILTIN_MODEL_RULES } from '../services/modelRules/builtinModelRules.js'
+import { resolveModelRulesFromTable } from '../services/modelRules/resolveModelRules.js'
 import { dialectFitsFormat, type ModelRuleFields } from '../types/modelRules.js'
 import { ModelRulesTableSchema } from '../types/modelRulesTable.js'
 import { ApiFormatSchema } from '../types/provider.js'
+import { buildModelsDevIndex, lookupModelsDevModel, VENDOR_PROVIDER_IDS } from '../services/modelsDev/catalog.js'
+import { bundledModelsDevData } from '../services/modelsDev/modelsDevStore.js'
+import { modelsDevRuleFields } from '../services/modelsDev/ruleFields.js'
 import { EFFORT_LEVELS } from '../../utils/effort.js'
 import {
   MODEL_CONTEXT_WINDOW_MAX,
@@ -13,6 +17,7 @@ import {
 } from '../../utils/model/modelRules.js'
 
 const CAPABILITY_FIELDS = ['contextWindow', 'maxOutputTokens', 'reasoning', 'input', 'structuredOutput'] as const
+const MODELS_DEV_FIELDS = ['contextWindow', 'maxOutputTokens', 'reasoning', 'input'] as const
 const ENDPOINT_FIELDS = [
   'reasoningDialect',
   'maxTokensField',
@@ -24,9 +29,15 @@ const ENDPOINT_FIELDS = [
 ] as const
 const PROXY_ONLY_FIELDS = ['extraBody', 'maxTokensField', 'thinkTagsInText', 'reasoningReplay', 'unmarkedReasoningReplay'] as const
 
-const { models, sites, formats } = BUILTIN_MODEL_RULES
-const entries = [...models, ...sites]
+const { models, corrections, sites, formats } = BUILTIN_MODEL_RULES
+const entries = [...models, ...corrections, ...sites]
 const allRules: ModelRuleFields[] = [...entries.map(entry => entry.rules), ...Object.values(formats)]
+
+const snapshotIndex = buildModelsDevIndex(bundledModelsDevData().catalog)
+
+function snapshotModel(modelId: string) {
+  return lookupModelsDevModel(snapshotIndex, '', modelId)?.model
+}
 
 function setFields(rules: ModelRuleFields, fields: readonly (keyof ModelRuleFields)[]): string[] {
   return fields.filter(field => rules[field] !== undefined)
@@ -138,9 +149,99 @@ describe('built-in model rules', () => {
     expect(ModelRulesTableSchema.safeParse(table).success).toBe(false)
   })
 
+  test('model entries only cover models models.dev lacks, or fields it does not have', () => {
+    for (const entry of models) {
+      if (!snapshotModel(entry.match.modelPrefix)) continue
+      expect({ prefix: entry.match.modelPrefix, fields: setFields(entry.rules, MODELS_DEV_FIELDS) }).toEqual({
+        prefix: entry.match.modelPrefix,
+        fields: [],
+      })
+    }
+  })
+
+  test('every correction changes a value models.dev still lists', () => {
+    for (const entry of corrections) {
+      const id = entry.match.modelId
+      const model = snapshotModel(id)
+      expect({ id, found: model !== undefined }).toEqual({ id, found: true })
+      const listed = modelsDevRuleFields(model!)
+      const changed = setFields(entry.rules, MODELS_DEV_FIELDS).filter(
+        field => JSON.stringify(entry.rules[field]) !== JSON.stringify(listed[field]),
+      )
+      expect({ id, changed: changed.length > 0 }).toEqual({ id, changed: true })
+    }
+  })
+
+  test('corrections are unique after normalization', () => {
+    const ids = corrections.map(entry => normalizeModelId(entry.match.modelId))
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  test('the schema requires a vendor document link on a correction and allows an empty models.dev PR', () => {
+    const correction = (source: Record<string, unknown>, rules: Record<string, unknown> = { reasoning: { control: 'toggle' } }) => ({
+      ...structuredClone(modelRulesJson),
+      corrections: [{ match: { modelId: 'x' }, source, rules }],
+    })
+    const valid = { url: 'https://vendor.test/docs', modelsDevPr: '', checkedAt: '2026-11-20' }
+    expect(ModelRulesTableSchema.safeParse(correction(valid)).success).toBe(true)
+    expect(ModelRulesTableSchema.safeParse(correction({ ...valid, modelsDevPr: 'https://github.com/anomalyco/models.dev/pull/1' })).success).toBe(true)
+    const { url: _url, ...withoutUrl } = valid
+    expect(ModelRulesTableSchema.safeParse(correction(withoutUrl)).success).toBe(false)
+    const { modelsDevPr: _pr, ...withoutPr } = valid
+    expect(ModelRulesTableSchema.safeParse(correction(withoutPr)).success).toBe(false)
+    expect(ModelRulesTableSchema.safeParse(correction(valid, { reasoningDialect: 'anthropic_adaptive' })).success).toBe(false)
+    expect(ModelRulesTableSchema.safeParse(correction(valid, { structuredOutput: true })).success).toBe(false)
+  })
+
   test('the schema requires a complete fallback', () => {
     const table = structuredClone(modelRulesJson) as { fallback: { rules: Record<string, unknown> } }
     delete table.fallback.rules.maxTokensField
     expect(ModelRulesTableSchema.safeParse(table).success).toBe(false)
+  })
+})
+
+describe('bundled models.dev snapshot', () => {
+  test('parses and has a valid fetch time', () => {
+    const { fetchedAt } = bundledModelsDevData()
+    expect(Number.isNaN(Date.parse(fetchedAt))).toBe(false)
+  })
+
+  test('has every vendor provider and a full catalog', () => {
+    const { catalog } = bundledModelsDevData()
+    for (const id of VENDOR_PROVIDER_IDS) expect({ id, present: id in catalog }).toEqual({ id, present: true })
+    const modelCount = Object.values(catalog).reduce((count, provider) => count + Object.keys(provider.models).length, 0)
+    expect(modelCount).toBeGreaterThan(2_000)
+  })
+})
+
+describe('Anthropic corrections on the bundled snapshot', () => {
+  const relay = { baseUrl: 'https://relay.example.com', apiFormat: 'anthropic' } as const
+  const resolve = (modelId: string) => resolveModelRulesFromTable(BUILTIN_MODEL_RULES, snapshotIndex, relay, modelId)
+
+  test.each([
+    ['claude-haiku-4-5', 'toggle'],
+    ['claude-haiku-4-5-20251001', 'toggle'],
+    ['claude-sonnet-4-5', 'toggle'],
+    ['claude-sonnet-4-5-20250929', 'toggle'],
+    ['claude-opus-4-5', 'toggle_effort'],
+    ['claude-opus-4-5-20251101', 'toggle_effort'],
+    ['claude-opus-4-6', 'toggle_effort'],
+    ['claude-sonnet-4-6', 'toggle_effort'],
+    ['claude-opus-4-7', 'toggle_effort'],
+    ['claude-opus-4-8', 'toggle_effort'],
+    ['claude-opus-5', 'toggle_effort'],
+    ['anthropic/claude-opus-4.7', 'toggle_effort'],
+    ['claude-opus-4-6-relay-thinking', 'toggle_effort'],
+    ['claude-sonnet-4-5-20250929-relay-thinking', 'toggle'],
+  ] as const)('%s can turn thinking off', (modelId, control) => {
+    const rules = resolve(modelId)
+    expect(rules.reasoning.control).toBe(control)
+    expect(rules.sources.reasoning).toBe('model')
+  })
+
+  test.each(['claude-opus-5-5', 'claude-opus-5-5-relay-thinking', 'claude-sonnet-5-5', 'claude-fable-5-2'])('%s keeps the models.dev thinking mode', modelId => {
+    const rules = resolve(modelId)
+    expect(rules.reasoning.control).toBe('effort')
+    expect(rules.sources.reasoning).toBe('modelsDev')
   })
 })

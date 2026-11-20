@@ -10,8 +10,6 @@ export type RawModelMetadata = {
   maxOutputTokens?: unknown
   image?: unknown
   pdf?: unknown
-  reasoning?: unknown
-  reasoningDialect?: unknown
 }
 
 export type ModelMetadataSource = {

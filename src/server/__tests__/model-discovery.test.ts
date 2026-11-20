@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 
 describe('listed model metadata', () => {
-  test('reads OpenRouter context lengths through the provider service, then reads reasoning from the public list', async () => {
+  test('reads OpenRouter context lengths through the provider service from its list alone', async () => {
     respondWith(() => Response.json({ data: [
       { id: 'vendor/model', name: 'Model', context_length: 131072 },
       { id: 'vendor/other', context_length: 1000000 },
@@ -58,7 +58,7 @@ describe('listed model metadata', () => {
       { id: 'vendor/model', name: 'Model', contextWindow: 131072 },
       { id: 'vendor/other', contextWindow: 1000000 },
     ])
-    expect(calls.map(({ url }) => url)).toEqual(['https://openrouter.ai/api/v1/models', 'https://openrouter.ai/api/v1/models'])
+    expect(calls.map(({ url }) => url)).toEqual(['https://openrouter.ai/api/v1/models'])
   })
 
   test('prefers max_input_tokens, then context_length, then context_window, and reads output limits separately', async () => {
@@ -99,63 +99,14 @@ describe('listed model metadata', () => {
     ] })
   })
 
-  test('reads OpenRouter reasoning support into thinking control and levels', async () => {
-    respondWith(() => Response.json({ data: [
-      { id: 'nvidia/nemotron', supported_parameters: ['reasoning'], reasoning: { mandatory: false, supported_efforts: ['high', 'medium', 'none'] } },
-      { id: 'z-ai/glm-flash', supported_parameters: ['reasoning'], reasoning: { mandatory: true, supported_efforts: ['max', 'xhigh', 'high', 'low'] } },
-      { id: 'vendor/budget-only', supported_parameters: ['reasoning'], reasoning: { mandatory: false } },
-      { id: 'vendor/minimal-only', supported_parameters: ['reasoning'], reasoning: { mandatory: true, supported_efforts: ['minimal'] } },
-      { id: 'vendor/param-only', supported_parameters: ['include_reasoning', 'reasoning'] },
-      { id: 'vendor/plain', supported_parameters: ['temperature'] },
-    ] }))
-    const models = await fetchUpstreamModels({ ...target, baseUrl: 'https://openrouter.ai/api/v1' })
-    const dialect = { reasoningDialect: 'anthropic_adaptive' }
-    expect(models).toEqual({ ok: true, httpStatus: 200, models: [
-      { id: 'nvidia/nemotron', reasoning: { control: 'toggle_effort', levels: ['medium', 'high'] }, ...dialect },
-      { id: 'z-ai/glm-flash', reasoning: { control: 'effort', levels: ['low', 'high', 'max'] }, ...dialect },
-      { id: 'vendor/budget-only', reasoning: { control: 'toggle_effort', levels: ['low', 'medium', 'high', 'max'] }, ...dialect },
-      { id: 'vendor/minimal-only', reasoning: { control: 'always', levels: [] }, ...dialect },
-      { id: 'vendor/param-only', reasoning: { control: 'toggle_effort', levels: ['low', 'medium', 'high', 'max'] }, ...dialect },
-      { id: 'vendor/plain' },
-    ] })
-    expect(calls).toHaveLength(2)
-  })
-
-  test('reads OpenRouter reasoning for the ids its Anthropic endpoint lists', async () => {
-    const chatList = { data: [
-      { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', context_length: 1000000, supported_parameters: ['include_reasoning', 'reasoning', 'reasoning_effort'], reasoning: { mandatory: false, default_enabled: true, supports_max_tokens: true, supported_efforts: ['high', 'medium', 'none'], default_effort: 'high' } },
-      { id: '~z-ai/glm-flash-latest', context_length: 1048576, supported_parameters: ['include_reasoning', 'reasoning', 'reasoning_effort'], reasoning: { mandatory: true, default_enabled: true, supported_efforts: ['max', 'high', 'low'], default_effort: 'max' } },
-      { id: 'anthropic/claude-opus-4.7', context_length: 1000000, supported_parameters: ['include_reasoning', 'reasoning'], reasoning: { mandatory: false, default_enabled: false, supported_efforts: ['max', 'xhigh', 'high', 'medium', 'low', 'none'] } },
-    ] }
-    const anthropicList = { data: [
-      { id: 'anthropic/nvidia/nemotron-3-ultra-550b-a55b:free[1m]', type: 'model', display_name: 'NVIDIA: Nemotron 3 Ultra (free)', max_input_tokens: 1000000, max_tokens: 65536, capabilities: null },
-      { id: 'anthropic/~z-ai/glm-flash-latest[1m]', type: 'model', display_name: 'Z.ai: GLM Flash Latest', max_input_tokens: 1048576, max_tokens: 1048576, capabilities: null },
-      { id: 'anthropic/claude-opus-4.7[1m]', type: 'model', display_name: 'Anthropic: Claude Opus 4.7', max_input_tokens: 1000000, max_tokens: 128000, capabilities: null },
-    ], has_more: false }
-    respondWith(({ init }) => Response.json(new Headers(init?.headers).has('anthropic-version') ? anthropicList : chatList))
-    const toggle = { control: 'toggle_effort', levels: ['medium', 'high'] }
-    const mandatory = { control: 'effort', levels: ['low', 'high', 'max'] }
-    const claude = { control: 'toggle_effort', levels: ['low', 'medium', 'high', 'max'] }
-    const dialect = { reasoningDialect: 'anthropic_adaptive' }
-
-    expect(await fetchUpstreamModels({ ...target, baseUrl: 'https://openrouter.ai/api', apiFormat: 'anthropic' })).toMatchObject({ ok: true, models: [
-      { id: 'anthropic/nvidia/nemotron-3-ultra-550b-a55b:free[1m]', reasoning: toggle, ...dialect },
-      { id: 'anthropic/~z-ai/glm-flash-latest[1m]', reasoning: mandatory, ...dialect },
-      { id: 'anthropic/claude-opus-4.7[1m]', reasoning: claude, ...dialect },
-    ] })
-    expect(await fetchUpstreamModels({ ...target, baseUrl: 'https://openrouter.ai/api/v1' })).toMatchObject({ ok: true, models: [
-      { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', reasoning: toggle, ...dialect },
-      { id: '~z-ai/glm-flash-latest', reasoning: mandatory, ...dialect },
-      { id: 'anthropic/claude-opus-4.7', reasoning: claude, ...dialect },
-    ] })
-    expect(calls).toHaveLength(4)
-  })
-
-  test('reads reasoning support only from OpenRouter', async () => {
+  test('reads no reasoning support from model lists, OpenRouter included', async () => {
     respondWith(() => Response.json({ data: [
       { id: 'vendor/model', supported_parameters: ['reasoning'], reasoning: { mandatory: false, supported_efforts: ['high', 'none'] } },
     ] }))
-    expect(await fetchUpstreamModels(target)).toEqual({ ok: true, httpStatus: 200, models: [{ id: 'vendor/model' }] })
+    for (const baseUrl of [target.baseUrl, 'https://openrouter.ai/api/v1']) {
+      expect(await fetchUpstreamModels({ ...target, baseUrl })).toEqual({ ok: true, httpStatus: 200, models: [{ id: 'vendor/model' }] })
+    }
+    expect(calls).toHaveLength(2)
   })
 
   test('reads Moonshot image support', async () => {
@@ -348,56 +299,18 @@ describe('LM Studio model metadata', () => {
   })
 })
 
-describe('DeepSeek model metadata', () => {
-  test('reads the window, output limit and input modalities from the root models endpoint with the key', async () => {
-    respondWith(({ url }) => new URL(url).pathname === '/models'
-      ? Response.json({ data: [
-        { id: 'deepseek-v4-pro', context_window: 1000000, max_output_tokens: 384000, input_modalities: ['text'] },
-        { id: 'deepseek-v4-flash', context_window: 1000000, input_modalities: ['text', 'image'] },
-      ] })
-      : Response.json({ data: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-v4-flash' }] }))
-    expect(await fetchUpstreamModels({ ...target, apiFormat: 'anthropic', baseUrl: 'https://api.deepseek.com/anthropic' })).toEqual({ ok: true, httpStatus: 200, models: [
-      { id: 'deepseek-v4-pro', contextWindow: 1000000, maxOutputTokens: 384000, image: false },
-      { id: 'deepseek-v4-flash', contextWindow: 1000000, image: true },
-    ] })
+describe('DeepSeek and DashScope model metadata', () => {
+  test('come from the model list alone, with no request to their native endpoints', async () => {
+    respondWith(() => Response.json({ data: [{ id: 'deepseek-v4-pro', context_length: 1000000 }] }))
+    expect(await fetchUpstreamModels({ ...target, apiFormat: 'anthropic', baseUrl: 'https://api.deepseek.com/anthropic' })).toEqual({
+      ok: true, httpStatus: 200, models: [{ id: 'deepseek-v4-pro', contextWindow: 1000000 }],
+    })
+    expect(await fetchUpstreamModels({ ...target, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' })).toEqual({
+      ok: true, httpStatus: 200, models: [{ id: 'deepseek-v4-pro', contextWindow: 1000000 }],
+    })
     expect(calls.map(({ url }) => url)).toEqual([
       'https://api.deepseek.com/anthropic/v1/models?limit=1000',
-      'https://api.deepseek.com/models',
+      'https://dashscope.aliyuncs.com/compatible-mode/v1/models',
     ])
-    expect(calls[1]!.init?.headers).toEqual({ Authorization: 'Bearer test-key' })
-  })
-})
-
-describe('Qwen model metadata', () => {
-  test('reads context_window, max_output_tokens and request_modality from the native models endpoint across pages', async () => {
-    respondWith(({ url }) => {
-      const parsed = new URL(url)
-      if (parsed.pathname !== '/api/v1/models') return Response.json({ data: [{ id: 'qwen-max' }, { id: 'qwen-plus' }, { id: 'qwen-coder' }] })
-      return Response.json({ output: parsed.searchParams.get('page_no') === '1'
-        ? { total: 3, models: [
-          { model: 'qwen-max', model_info: { context_window: 131072, max_input_tokens: 130048, max_output_tokens: 8192 }, inference_metadata: { request_modality: ['Text'] } },
-          { model: 'qwen-plus', model_info: { context_window: 1000000 }, inference_metadata: { request_modality: ['Text', 'Image', 'Video'] } },
-        ] }
-        : { total: 3, models: [{ model: 'qwen-coder', model_info: { max_input_tokens: 262144 } }] } })
-    })
-    expect(await fetchUpstreamModels({ ...target, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' })).toEqual({ ok: true, httpStatus: 200, models: [
-      { id: 'qwen-max', contextWindow: 131072, maxOutputTokens: 8192, image: false },
-      { id: 'qwen-plus', contextWindow: 1000000, image: true },
-      { id: 'qwen-coder' },
-    ] })
-    expect(calls.slice(1).map(({ url }) => url)).toEqual([
-      'https://dashscope.aliyuncs.com/api/v1/models?page_no=1&page_size=100',
-      'https://dashscope.aliyuncs.com/api/v1/models?page_no=2&page_size=100',
-    ])
-  })
-
-  test('stops paging when a page is empty', async () => {
-    respondWith(({ url }) => new URL(url).pathname === '/api/v1/models'
-      ? Response.json({ output: { total: 50, models: [] } })
-      : Response.json({ data: [{ id: 'qwen-max' }] }))
-    expect(await fetchUpstreamModels({ ...target, baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1' })).toEqual({
-      ok: true, httpStatus: 200, models: [{ id: 'qwen-max' }],
-    })
-    expect(calls).toHaveLength(2)
   })
 })

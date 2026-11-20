@@ -2,6 +2,8 @@
 
 状态：已实现（`feat/model-rules`，2026-11-19），方向由维护者确认（2026-11-18）。对应 [#264](https://github.com/GoDiao/dreamcoder/issues/264)。文中 path:line 指改动前的 `052a0e63`。
 
+模型能力数据改用 models.dev：已实现（`feat/models-dev-9422c8`，2026-11-20），对应 [#291](https://github.com/GoDiao/dreamcoder/issues/291)，方向和修正层由维护者确认（2026-11-20）。「models.dev 目录」一节和其他各节里标 #291 的内容，path:line 指改动前的 `ec1e232b`；数据核对日期 2026-11-20（线上 `https://models.dev/api.json`，324 个服务商，10,028 个模型，ETag `a3ef5c96…`）。
+
 ## 背景
 
 DreamCoder 通过本地代理把 CLI 的 Anthropic 请求转成 OpenAI chat 或 Responses 格式，接 DeepSeek、Qwen、Kimi、GLM、MiniMax、OpenRouter 等提供方。CLI 继承自 Claude Code，按 Claude 的模型名推断能力；第三方模型的能力只能按提供方声明，代理拿不到任何模型信息。结果是同一个设置在不同模型上要么传不到上游，要么传了上游不认的字段（见 [proxy/request.md](proxy/request.md)、[proxy/response.md](proxy/response.md)、[proxy/transport.md](proxy/transport.md) 的 P-REQ、P-RES、P-NET 各条）。
@@ -13,6 +15,7 @@ DreamCoder 通过本地代理把 CLI 的 Anthropic 请求转成 OpenAI chat 或 
 目标：
 
 - 一张规则表，sidecar 负责存放和解析，代理和 CLI 读同一份解析结果。
+- 模型能力（窗口、输出上限、思考控制方式和档位、图片、PDF）取自公开目录 models.dev（#291）：随包带一份全量快照，sidecar 运行时拉线上数据并缓存。结构化输出仍由我们的表决定。新模型不改代码、不发版也能拿到正确数据。我们的表只留 models.dev 没有的模型和字段，以及有厂商文档证明 models.dev 写错的修正。
 - 已知模型有条目，任何没收录的模型都能通过一条通用兜底条目正常工作，并且界面能看出它在用兜底。
 - 模型本身的事实（窗口、输出上限、思考控制方式和档位、图片、PDF、结构化输出）和端点的写法（思考写到哪个字段、输出上限字段名、原生搜索、额外请求体字段）分开描述。
 - 用户可以按「提供方 + 模型」覆盖窗口、输出上限、思考档位、图片、PDF。
@@ -21,8 +24,8 @@ DreamCoder 通过本地代理把 CLI 的 Anthropic 请求转成 OpenAI chat 或 
 
 非目标：
 
-- 不做远程下发，表随应用版本发布。
-- 不接外部实时目录（models.dev 一类）。
+- 我们自己的表（写法、站点条目、models.dev 没有的模型和字段）随应用版本发布，不做远程下发。远程更新的只有 models.dev 目录。
+- 不用 models.dev 的价格，不做费用显示；不用 opencode 的 v2 接口（`models.opencode.ai`，实验版）。
 - 写法（`reasoningDialect`）和 `extraBody` 这一轮不提供设置界面，只能在 `providers.json` 里写。
 - 不覆盖文字层的问题（#270 及其子 issue，包括 Read 工具描述里关于图片和 PDF 的条文）。
 - 提供方是官方 Anthropic 地址、或者完全没有提供方时，不走这张表，CLI 按原有逻辑推断 Claude 的能力。桌面端没有提供方时会话起不来（`src/server/services/conversationService.ts:1100-1108` 抛 `PROVIDER_NOT_CONFIGURED`），所以后一种情况只出现在终端路径。
@@ -73,6 +76,7 @@ DreamCoder 通过本地代理把 CLI 的 Anthropic 请求转成 OpenAI chat 或 
 
 ```
             内置表 modelRules.json ──┐
+ models.dev 目录（快照 / 缓存 / 线上）┤
   提供方 discoveredModels（保存时拉取）├──► resolveModelRules(provider, modelId) ──► ResolvedModelRules
        提供方 modelOverrides（用户）─┘            （sidecar）
                                                       │
@@ -83,14 +87,16 @@ DreamCoder 通过本地代理把 CLI 的 Anthropic 请求转成 OpenAI chat 或 
 ```
 
 1. **两层规则**。模型层描述模型本身，端点层描述端点怎么写。两层用同一种条目形状，区别只在匹配条件；模型层只设能力字段，端点字段只在站点层（可以带模型前缀）和 apiFormat 层设。
-2. **六层叠加**，从低到高，后面的按字段覆盖前面的：
+2. **八层叠加**，从低到高，后面的按字段覆盖前面的：
    1. 通用兜底
    2. 按 apiFormat 的默认写法
-   3. 模型条目
-   4. 站点条目：先叠只按 host 和 apiFormat 匹配的条目，再叠同一 host 和 apiFormat 下带模型前缀的条目
-   5. 提供方 models 接口拉到的数值
-   6. 用户覆盖
-3. **每层（站点层的两步各算一层）只取一条命中的条目**。模型层按最长前缀；站点层先按 host 和 apiFormat 取一条，再在同一 host 和 apiFormat 下按模型前缀取最长的一条。不像 ZCode 那样把所有命中的规则叠加。
+   3. 我们的模型条目（只剩 models.dev 没有的模型和字段，#291）
+   4. models.dev（#291）：只设能力字段
+   5. 修正（#291）：有厂商文档证明 models.dev 写错的能力字段，见「修正层」
+   6. 站点条目：先叠只按 host 和 apiFormat 匹配的条目，再叠同一 host 和 apiFormat 下带模型前缀的条目
+   7. 提供方 models 接口拉到的数值
+   8. 用户覆盖
+3. **每层（站点层的两步各算一层）只取一条命中的条目**。模型层按最长前缀；models.dev 层按「models.dev 目录」一节的查找规则取一个模型（先精确，再最长前缀）；修正层按 models.dev 命中的那个 id 精确匹配；站点层先按 host 和 apiFormat 取一条，再在同一 host 和 apiFormat 下按模型前缀取最长的一条。不像 ZCode 那样把所有命中的规则叠加。
 4. **思考的写法是一个封闭枚举**，由代理代码实现，表里只选用哪一种。其余固定字段放 `extraBody`。
 5. **推理回传按来源字段**。代理在思考块上记下推理从哪个字段来，下一轮原样写回。
 6. **sidecar 解析，CLI 和代理只读结果**。旧的三档能力变量、`CLAUDE_CODE_MODEL_CONTEXT_WINDOWS`、`DREAMCODER_SEND_DISABLED_THINKING` 直接删除。
@@ -153,11 +159,11 @@ type SiteRuleEntry = {
 
 `source` 只用于维护和测试，不参与解析。
 
-**各层能设哪些字段。** 兜底层给出全部字段。apiFormat 层和站点层只设端点字段：`reasoningDialect`、`maxTokensField`、`nativeWebSearch`、`extraBody`、`reasoningReplay`、`unmarkedReasoningReplay`、`thinkTagsInText`。模型能力字段（窗口、输出上限、`reasoning`、`input`、`structuredOutput`）只由模型层、拉取值和用户覆盖设置，站点条目带 `modelPrefix` 时也可以设。拉取值另外可以带 `reasoningDialect`，只和它的 `reasoning` 一起、在下层为兜底时生效（见「拉取能读到什么」）。这样，表里查不到的模型，能力字段一定来自兜底，不会被 apiFormat 层或站点层的默认值改掉。
+**各层能设哪些字段。** 兜底层给出全部字段。apiFormat 层和站点层只设端点字段：`reasoningDialect`、`maxTokensField`、`nativeWebSearch`、`extraBody`、`reasoningReplay`、`unmarkedReasoningReplay`、`thinkTagsInText`。模型能力字段（窗口、输出上限、`reasoning`、`input`、`structuredOutput`）只由模型层、models.dev 层、修正层、拉取值和用户覆盖设置，站点条目带 `modelPrefix` 时也可以设。models.dev 层和修正层只设能力字段，从不设端点字段，也不设 `structuredOutput`（#291；修正条目的 schema 只收窗口、输出上限、`reasoning`、`input` 四个字段）。拉取值也只设能力字段：#291 删掉 OpenRouter 发现之后，拉取值不再带 `reasoning` 和 `reasoningDialect`。这样，表里和 models.dev 都查不到的模型，能力字段一定来自兜底，不会被 apiFormat 层或站点层的默认值改掉。
 
 模型层不设端点字段，包括 `extraBody` 和 `reasoningDialect`：模型条目对所有 host 都生效，同一个模型经 OpenRouter、DeepInfra 等中转时，厂商端点专有的字段和写法可能被拒。唯一的例外是 Claude 条目的 anthropic 写法：Claude 模型的 anthropic 兼容中转用的是原生请求形状，`claude-opus-4-7` 只接受 adaptive（官方 [thinking 排错页](https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting) 写明它拒绝 `enabled` 加 `budget_tokens`），按 apiFormat 层默认的 budget 写法会收到 400。所以模型条目可以设 `reasoningDialect`，但只在它和提供方 apiFormat 配套时生效（同用户覆盖，都用 `dialectFitsFormat` 判断），不配套时静默忽略；站点层在模型层之后叠加，已登记的站点仍以站点为准。Claude 条目同样可以设 `nativeWebSearch: true`：Claude 的 anthropic 中转基本都转发原生 `web_search` 工具（维护者决定），它只在提供方 apiFormat 为 anthropic 时生效，openai 格式上 CLI 发出的服务端工具到不了上游。已登记的 anthropic 站点（DeepSeek、Kimi Code、智谱、MiniMax）是厂商自己的端点，host 条目设 `nativeWebSearch: false`，这些端点上的 Claude 名字不开原生搜索。例：custom、anthropic 格式、`https://relay.example.com` 上的 `claude-opus-4-7` 发 adaptive 加 effort；`api.kimi.com` 上同名模型仍按站点的 `anthropic_disable_only`；OpenRouter chat 上的 `anthropic/claude-opus-4-7` 仍用 `openrouter` 写法，也不用原生搜索。数据测试只允许 Claude 条目设 anthropic 写法和 `nativeWebSearch`，其余端点字段模型层一律不设。跟某个厂商端点绑定的字段一律放在带 `modelPrefix` 的站点条目里，例如 `api.moonshot.ai` 加 `kimi-k2` 的 `thinking.keep: 'all'`、`open.bigmodel.cn` 加 `glm-` 的 `clear_thinking: false`。不带 `modelPrefix` 的站点条目，`extraBody` 只放对这个 host 上任何模型都安全的字段。表里没有站点条目的中转，用 apiFormat 层的默认写法。
 
-**只发有出处的上限。** 代理只在 `sources.maxOutputTokens` 是 `model`、`site`、`discovered` 或 `user` 时发输出上限字段，值为 min(CLI 请求值, `maxOutputTokens`)。来自兜底时不发，交给提供方的默认值。CLI 仍按兜底的 32,000 做预算。理由：兜底的 32,000 不是这个模型的事实，发出去会让输出上限更低的模型直接返回 400。
+**只发有出处的上限。** 代理只在 `sources.maxOutputTokens` 不是 `fallback`（即 `model`、`modelsDev`、`site`、`discovered` 或 `user`）时发输出上限字段，值为 min(CLI 请求值, `maxOutputTokens`)。来自兜底时不发，交给提供方的默认值。CLI 仍按兜底的 32,000 做预算。理由：兜底的 32,000 不是这个模型的事实，发出去会让输出上限更低的模型直接返回 400。
 
 **anthropic 格式提供方上哪些字段起作用。** 这类提供方的会话请求由 CLI 直接发给上游，不经过代理，所以只有 CLI 读的字段起作用：窗口、输出上限、`reasoning`、`reasoningDialect`（决定 CLI 怎么发思考）、`input.pdf`、`input.image`（只影响 Read 的 `pages` 路径）、`structuredOutput`、`nativeWebSearch`。`extraBody`、`maxTokensField`、`thinkTagsInText`、`reasoningReplay`、`unmarkedReasoningReplay` 对它们不起作用。API 入口拒绝 anthropic 格式提供方的 `modelOverrides[*].extraBody`，和 #267 拒绝它们的 `extraHeaders` 一样（`providerService.ts:330-336`）。数据测试保证 anthropic 格式的站点条目不设这几个字段。
 
@@ -169,12 +175,15 @@ type SiteRuleEntry = {
 {
   "fallback": { "rules": { } },
   "formats": { "anthropic": { }, "openai_chat": { }, "openai_responses": { } },
-  "models": [ { "match": { "modelPrefix": "deepseek-v4-pro" }, "source": { }, "rules": { } } ],
+  "models": [ { "match": { "modelPrefix": "qwen4-max" }, "source": { }, "rules": { } } ],
+  "corrections": [ { "match": { "modelId": "…" }, "source": { "url": "…", "modelsDevPr": "", "checkedAt": "…" }, "rules": { } } ],
   "sites": [ { "match": { "host": "openrouter.ai", "apiFormat": "openai_chat" }, "source": { }, "rules": { } } ]
 }
 ```
 
 - `fallback` 必须给出全部字段，解析结果因此总是完整的。
+- `corrections` 是修正层（#291），和 `models` 分开放，方便以后整节核对、删除，见「修正层」。
+- `models` 只收两类条目（#291）：models.dev 的厂商服务商里查不到的模型（完整条目），以及 models.dev 查得到、但要设 models.dev 没有的字段的模型（只写那些字段：`structuredOutput`，以及 Claude 条目的 `reasoningDialect` 和 `nativeWebSearch`）。models.dev 查得到的值不在表里重复，冲突以 models.dev 为准。数据测试用随包快照保证这一点，见「models.dev 目录」。
 - `formats` 三条只设端点字段：
 
 | apiFormat | `reasoningDialect` | `maxTokensField` | 其他 |
@@ -192,7 +201,8 @@ type SiteRuleEntry = {
 
 - **名字规范化**：模型名和条目里的 `modelPrefix` 都做同样的处理：去掉 `[1m]`、`[2m]`、`:1m` 后缀，转小写，把 `.` 换成 `-`。换点号是因为同一个模型在不同地方写法不同，例如 OpenRouter 写 `anthropic/claude-opus-4.7`（现有代码 `modelContextWindows.ts:36-38` 也是这样写的），厂商写 `claude-opus-4-7`。两边都换，`gpt-5.4` 和 `gpt-5-4`、`qwen3.5-plus` 和 `qwen3-5-plus` 也就等价。这个函数叫 `normalizeModelId`，放在 `src/utils/model/modelRules.ts`，server 的解析、CLI 的查找、`modelOverrides` 和 `discoveredModels` 的键查找都用它，全仓只留这一个规范化函数：现有的 `normalizeModelContextKey`（`src/utils/model/modelContextWindows.ts:50-56`，只去后缀、转小写，不换点号）并进来，CLI 内置窗口表的查找也改用它。
 - **覆盖和拉取值的键**：`modelOverrides`、`discoveredModels` 按用户或上游给的原始 id 存键。查找时把存的键和要查的 id 都过一遍 `normalizeModelId` 再比较，所以代理拿到去掉 `[1m]` 后缀的 id（`client.ts:91`）也能找到。两个键规范化后相同时，取在 map 里先出现的那个，并在保存时由 API 拒绝这种重复。
-- **前缀要在边界上结束**：前缀命中后，名字里紧接着的下一个字符必须是结尾或分隔符（`-`、`:`、`/`、`@`、`_`），前缀本身以分隔符结尾时（例如 `glm-`）除外。没有这条，`glm-4.5v` 会命中 `glm-4.5`（视觉模型被当成不收图片），加上点号换连字符后，`gpt-5-2025-08-07`（GPT-5 的快照 id）还会命中 `gpt-5.2`、`gpt-4-1106-preview` 会命中 `gpt-4.1`。有边界之后：`glm-4.5v` 里 `glm-4-5` 后面是 `v`，不命中，落到兜底；`gpt-5-2025-08-07` 里 `gpt-5-2` 后面是 `0`，不命中，改为命中 `gpt-5`；`gpt-4-1106-preview` 里 `gpt-4-1` 后面是 `1`，不命中，落到兜底。
+- **前缀要在边界上结束**：前缀命中后，名字里紧接着的下一个字符必须是结尾或分隔符（`-`、`:`、`/`、`@`、`_`），前缀本身以分隔符结尾时（例如 `glm-`）除外。没有这条，`glm-4.5v` 会命中 `glm-4.5`（视觉模型被当成不收图片），加上点号换连字符后，`gpt-5-2025-08-07`（GPT-5 的快照 id）还会命中 `gpt-5.2`、`gpt-4-1106-preview` 会命中 `gpt-4.1`。有边界之后：`glm-4.5v` 里 `glm-4-5` 后面是 `v`，模型层不命中；`gpt-5-2025-08-07` 里 `gpt-5-2` 后面是 `0`，不命中，改为命中 `gpt-5`；`gpt-4-1106-preview` 里 `gpt-4-1` 后面是 `1`，模型层不命中。#291 之后 models.dev 层会给这两个值：`glm-4.5v` 在 `zai` 下精确命中，`gpt-4-1106-preview` 按最长前缀落到 `gpt-4`。
+- **models.dev 层**（#291）先按完整 id、去日期后缀、剥一层 `vendor/` 精确查找，都没命中再按最长前缀查 models.dev 的 id，边界规则和这里相同，只是点号不算断开处，见「models.dev 目录」的「查找」。
 - **模型层**：在 `models` 里找 `modelPrefix` 是规范化名前缀且满足边界的条目，取前缀最长的一条。没有命中时，如果名字是 `vendor/rest` 形式，就用 `rest` 再找一次（只剥一层，例如 `deepseek/deepseek-v4-pro` 命中 `deepseek-v4-pro`）。
 - **站点层**：取 base URL 的 host（小写，去端口），和提供方的 apiFormat 一起匹配。
   - 第一步：在不带 `modelPrefix` 的条目里找 apiFormat 相同、host 相等或是其后缀（例如 `.maas.aliyuncs.com`）的条目，取 host 最长的一条。
@@ -219,11 +229,11 @@ discoveredModels?: Record<string, {
   maxOutputTokens?: number
   image?: boolean
   pdf?: boolean
-  reasoning?: { control: ReasoningControl; levels?: EffortLevel[] }
-  reasoningDialect?: ReasoningDialect
 }>
 discoveredAt?: string
 ```
+
+#291 从 `discoveredModels` 里去掉了 `reasoning` 和 `reasoningDialect`（`src/server/types/modelRules.ts:162-169`），它们只由已删除的 OpenRouter 发现写入（`src/server/upstream/contextWindows/openrouter.ts:14-25`）。磁盘上已存的这两个键不需要迁移：读取提供方时 `discoveredModels` 原样透传、不做 schema 校验（`src/server/services/providerRuntimeEnv.ts:125-136`），解析只读认识的字段，所以它们被忽略；下次保存或「刷新模型信息」时整份 `discoveredModels` 被替换（`src/server/services/providerService.ts:396-401`），它们随之消失。
 
 放在顶层不放在模型条目上，原因是模型条目会被 `normalizeProviderModels`（`providerRuntimeEnv.ts:73-84`）和每次启动都跑的迁移 `dedupeModels`（`src/server/services/persistentStorageMigrations.ts:177-186`）裁成 `{id, name}`，新字段下次启动就会从磁盘上消失。顶层字段经 `...provider` 保留（`providerRuntimeEnv.ts:104-116`，`persistentStorageMigrations.ts:136-144`）。
 
@@ -252,7 +262,7 @@ discoveredAt?: string
 ### 解析结果
 
 ```ts
-type FieldSource = 'fallback' | 'format' | 'model' | 'site' | 'discovered' | 'user'
+type FieldSource = 'fallback' | 'format' | 'model' | 'modelsDev' | 'site' | 'discovered' | 'user'
 
 type ResolvedModelRules = Required<Omit<ModelRuleFields, 'reasoning' | 'input'>> & {
   reasoning: { control: ReasoningControl; levels: EffortLevel[] }
@@ -264,8 +274,176 @@ type ResolvedModelRules = Required<Omit<ModelRuleFields, 'reasoning' | 'input'>>
 
 - `sources` 记录每个能力字段最终取自哪一层，用于界面提示、发不发输出上限和排查。
 - `usedFallback` 为 `sources.reasoning === 'fallback'`，也就是没有任何一层说过这个模型怎么思考。命中只带端点字段的前缀条目（例如 `glm-` 站点条目只有 `extraBody`）不改变 `sources.reasoning`，所以表里没有的 GLM 型号仍然显示兜底标记。
-- 拉取值的位置：窗口和输出上限在第 5 层，覆盖内置表。图片和 PDF 的拉取值只在 `sources.image` 或 `sources.pdf` 仍是 `fallback` 时使用，来源记为 `discovered`。原因是列表接口给的数字是端点的事实，通常比内置表新；模态字段各家写法不一，误读的代价比数字大。
-- 思考的拉取值（目前只有 OpenRouter 给）和图片、PDF 一样，只在 `sources.reasoning` 仍是 `fallback` 时使用，来源记为 `discovered`，表里已有的模型不受影响。它带的 `reasoningDialect` 同样要和提供方的 apiFormat 配套才生效（`dialectFitsFormat`），所以只在 anthropic 格式上起作用；OpenRouter chat 仍用站点层的 `openrouter` 写法。
+- 拉取值的位置：窗口和输出上限在第 7 层，覆盖内置表、models.dev 和修正。图片和 PDF 的拉取值只在 `sources.image` 或 `sources.pdf` 仍是 `fallback` 时使用，来源记为 `discovered`。原因是列表接口给的数字是端点的事实（例如中转自己的窗口）；模态字段各家写法不一，误读的代价比数字大。#291 之后多数模型的图片和 PDF 来自 models.dev，拉取的模态值主要对本地服务和 models.dev 没有的模型起作用。
+- 思考没有拉取值（#291 删掉了 OpenRouter 发现）：`reasoning` 只来自兜底、我们的模型条目、models.dev、修正、带前缀的站点条目和用户覆盖。
+- 来源 `modelsDev` 在界面上显示为「models.dev」，见「桌面端和 H5」。修正层不另设来源，记为 `model`，界面上和内置表一样显示「内置」（维护者决定，不另加 i18n）。代理「只发有出处的上限」的判断是「来源不是 `fallback`」（`src/server/proxy/transform/requestRules.ts:94`），CLI 写 `maxOutputTokens` 的判断相同（`src/server/services/modelRules/cliModelRulesEnv.ts:54`），所以来自 models.dev 的上限会发出，不用改这两处。
+
+## models.dev 目录
+
+本节是 #291 新增的内容。[models.dev](https://models.dev)（[anomalyco/models.dev](https://github.com/anomalyco/models.dev)，原 `sst/models.dev`，旧地址会重定向过来，MIT）按服务商列出模型的窗口、输出上限、思考方式、输入模态等，opencode 只用它作为模型数据来源。我们用稳定的 v1 接口 `https://models.dev/api.json`。
+
+### 读哪些字段
+
+每个服务商读 `id` 和 `api`（它的 base URL）；每个模型读：
+
+| models.dev 字段 | 用途 |
+|---|---|
+| `id` | 查找 |
+| `limit.context`、`limit.output` | 窗口、输出上限 |
+| `reasoning`、`reasoning_options` | 思考控制方式和档位，见「思考方式的对应」 |
+| `modalities.input` | 图片、PDF |
+| `provider.api` | 模型自己的 base URL，只用于 base URL 映射 |
+
+issue 列的 `interleaved`、`tool_call`、`status` 不读，所以不存（`interleaved` 是推理回传字段的写法，属于写法层，不在本次范围）。`structured_output` 也不读（负责人决定）：models.dev 有这个字段（2026-11-20 的线上数据里 7,442 个模型带它），但只写「Supports structured output feature」，没说是否接受 JSON Schema；我们的 `structuredOutput` 决定代理要不要把 `json_schema` 格式转发给上游（`src/server/proxy/transform/requestRules.ts:83`）。DeepSeek（[create-chat-completion](https://api-docs.deepseek.com/api/create-chat-completion)）和 Z.ai（[chat-completion](https://docs.z.ai/api-reference/llm/chat-completion)）的 `response_format` 只接受 `text` 和 `json_object`，models.dev 却标了 true。所以 `structuredOutput` 算 models.dev 没有的字段，留在我们的表里。只留这些字段、全部 324 个服务商的快照（不存和键相同的 `id`）是 1,888,556 字节（gzip 后 117,406 字节），线上原文 6,782,933 字节。
+
+### 快照和刷新脚本
+
+- 快照放在 `src/server/config/modelsDev.json`，形状是 `{ "fetchedAt": "<ISO 时间>", "catalog": { "<服务商 id>": { "api": "…", "models": { "<模型 id>": { … } } } } }`，`catalog` 是 api.json 按上表裁剪后的子集，形状不变，所以快照、缓存和线上数据走同一个解析函数。脚本每个模型写一行，发版 PR 的 diff 能看出哪些模型变了。
+- 快照以文本导入（`import … with { type: 'text' }`，仓库里已有先例 `src/utils/releaseNotes.ts:4`），第一次查找时才 `JSON.parse`。原因：CLI 进程也会加载这条模块链（`src/services/api/client.ts:30` → `src/services/openaiAuth/fetch.ts:11` → `resolveModelRules`），而 server 和 CLI 是同一个编译产物（`desktop/sidecars/dreamcoder-sidecar.ts:30-38`）。2026-11-20 在本机用 `bun build --compile` 实测：直接 import 这份 JSON 要 33–42 ms，文本导入约 2 ms，用到时解析约 5–8 ms。CLI 只有 Codex 登录路径会真正解析它。
+- 刷新脚本 `scripts/update-models-dev.ts`：拉 `https://models.dev/api.json`，用和运行时同一个解析函数裁剪、校验，写回快照。`scripts/release.ts` 在非 `--dry` 模式下先跑它，再改版本号文件；拉取或校验失败时什么都不写、退出（和它现在「先算好所有文件再写」的做法一致，`scripts/release.ts:105-118`）。这样每次发版的快照都是当天的数据。
+
+### 运行时拉取和缓存
+
+全部在 sidecar，Electron 主进程不参与。
+
+- 模块放在 `src/server/services/modelsDev/`：
+  - `catalog.ts`：裁剪后目录的 zod schema、`parseModelsDevCatalog(raw)`（只留上表的字段；单个模型不合法时跳过这个模型，不让整份目录失败；一个服务商都解析不出来时整份拒绝）、快照的写法、查找索引和 `lookupModelsDevModel(index, baseUrl, modelId)`。
+  - `ruleFields.ts`：`modelsDevRuleFields(model): ModelRuleFields`，见「字段对应」。
+  - `modelsDevStore.ts`：持有当前目录，对外给 `currentModelsDevIndex()` 和替换目录的 `setModelsDevData()`（刷新和测试共用）。它只依赖 `catalog.ts` 和快照，因为 CLI 也加载解析模块链。
+  - `modelsDevRefresh.ts`：缓存读写、拉取和 `startModelsDevRefresh()`，依赖网络设置，只由 sidecar 的两个入口加载。没有启动刷新的进程（CLI、测试）一直用快照。
+- `resolveModelRules`（`src/server/services/modelRules/resolveModelRules.ts:212-214`）取 `currentModelsDevIndex()`；`resolveModelRulesFromTable`（`:189-210`）改为同时接收表和目录索引，测试传自己的目录。
+- 启动刷新的地方是两个进程入口：`desktop/sidecars/dreamcoder-sidecar.ts` 的 server 分支（`:30-35`）和 `src/server/index.ts` 的 `import.meta.main`（`:460-462`），不放进 `startServer`（`src/server/index.ts:134`）。原因是有七个测试文件直接调 `startServer`（例如 `src/server/__tests__/conversations.test.ts`、`e2e/business-flow.test.ts`），测试不能访问网络。
+- 缓存文件 `<配置目录>/dreamcoder/cache/models-dev.json`，和 `providers.json` 同在 `getClaudeConfigHomeDir()/dreamcoder` 下（`src/server/services/providerService.ts:93-103`），内容 `{ fetchedAt, etag, catalog }`，先写临时文件再改名（同 `writeIndex`，`providerService.ts:123`）。CLI 不读它。
+- 启动时：读缓存（不合法就忽略并记日志）；缓存和快照取 `fetchedAt` 较新的一份作为当前目录，所以升级应用后不会用回比随包快照还旧的缓存；当前目录早于一小时前时立即拉一次；之后每小时检查一次，定时器 `unref`，不拖住进程退出。同一时间只有一个拉取在进行。
+- 请求：`GET https://models.dev/api.json`，有缓存的 ETag 时带 `If-None-Match`（线上返回 ETag 和 `cache-control: max-age=0, must-revalidate`，所以没变化时是 304，不重下 6.8 MB）；代理设置用网络设置里的手动代理，和拉取模型元数据的做法一样（`src/server/upstream/contextWindows/index.ts:35`）；总超时 60 秒。200：解析成功就替换内存里的目录并写缓存。304：只更新缓存的 `fetchedAt`。
+- 新数据何时生效：代理每个请求都解析，下一个请求就用新数据；CLI 的规则变量在 CLI 启动时生成，下次启动 CLI 时生效；设置页在下次 `GET /api/providers` 时更新。和「已运行会话何时生效」一节相同。
+
+### 拉取失败和离线
+
+- 网络错误、超时、非 2xx、响应不是 JSON、解析后一个服务商都没有：记一条 `[modelsDev] refresh failed` 警告（带原因），保留当前目录（缓存或快照），一小时后再试。不影响启动，也不阻塞任何请求。
+- 一直离线时用随包快照，或者以前拉到的缓存（取较新的）。新装且离线时就是快照。
+- 缓存写失败：记日志，内存里的新目录照用，下次启动回到旧缓存或快照。
+- 缓存文件损坏：忽略并记日志，下次拉取成功时被覆盖。
+
+### 查找
+
+输入是提供方的 base URL 和模型 id，输出是一个 models.dev 模型或者没有。
+
+**模型 id 的候选键。** 先用 `normalizeModelId`（`src/utils/model/modelRules.ts:57-67`：去 `[1m]`、`:1m` 后缀，转小写，`.` 换 `-`）规范化，models.dev 的 id 建索引时也这样规范化，所以不区分大小写（models.dev 有 `MiniMax-M3`），`gpt-5.4` 和 `gpt-5-4` 等价。规范化后同一服务商里重复的 id 只有两处（`aimlapi`、`tencent-token-plan`，都是第三方），取先出现的。候选键按顺序：
+
+1. 规范化后的完整 id；
+2. 去掉日期后缀的 id：结尾的 `-YYYYMMDD`、`@YYYYMMDD`、`-YYYY-MM-DD`；
+3. 如果 id 是 `vendor/rest` 形式，`rest` 和去掉日期后缀的 `rest`（只剥一层，和我们模型层的规则一样）。
+
+例：`claude-opus-4-5-20251101` 在 `anthropic` 下本来就有，第 1 步命中；没有的话第 2 步查 `claude-opus-4-5`。`anthropic/nvidia/nemotron-3-ultra-550b-a55b:free[1m]`（OpenRouter Anthropic 端点列出的 id）第 1 步不中，第 3 步用 `nvidia/nemotron-3-ultra-550b-a55b:free` 在 `openrouter` 下命中，取代了原来 `openrouter.ts:8-12` 的 id 换算。4 位的日期（`-0528`、`-2512`）不当日期后缀，它们在 models.dev 里多是版本号。
+
+**最后一步：最长前缀（维护者决定，2026-11-20）。** 上面的候选键在所有服务商里都没命中时，再按同样的服务商顺序，找规范化后的名字（和剥一层 `vendor/` 后的名字）以哪个 models.dev id 开头、而且在分隔符处结束（`-`、`:`、`/`、`@`、`_`）。每个服务商里取最长的一个，先试完整名字再试剥一层 `vendor/` 的名字，第一个有结果的服务商为准；扫描和模型层共用 `findLongestPrefix`（`src/utils/model/modelRules.ts`）。和模型层的区别只有一处：断开处看请求原来的写法，点号不算分隔符。精确命中在任何服务商里都优先于前缀命中。这一步给未登记中转上带额外后缀的 id 用，例如 `claude-sonnet-4-5-20250929-thinking` 落到 `claude-sonnet-4-5-20250929`、`claude-opus-4-6-thinking` 落到 `claude-opus-4-6`、`gpt-5-codex-high` 落到 `gpt-5`（快照里带 `-thinking` 后缀的 id 有 52 个，不区分大小写是 62 个，除 `alibaba`、`alibaba-cn` 的 3 个外都在第三方服务商下）。没有这一步，这类 id 会落到兜底（窗口 131,072、不能思考），而 #291 之前它们能靠我们表里的前缀条目拿到数据。边界挡住 `claude-sonnet-4-5x` 落到 `claude-sonnet-4-5` 这类情况。点号写的是版本号，`deepseek-v3.2` 和 `deepseek-v3` 是两个模型：models.dev 的 id 是一个个具体模型，不是系列，所以这一步不在点号处断开，`deepseek-v3.2` 不会落到 `deepseek-v3`（窗口 65,536、不能思考），`gpt-5.3-chat-latest` 不会落到 `gpt-5`，它们由模型层或兜底决定。我们自己的模型条目和站点条目写的是系列（`kimi-k2` 要管到 `kimi-k2.6`，`gpt-5` 管到 `gpt-5.x`），所以那两层仍然在点号处断开。用连字符写的版本号（`-4-0`、4 位的 `-0528`、`-0324`）这一步分不出来，models.dev 没有带它的 id 时会落到不带它的 id（`mistral-large-4-0` → `mistral-large-4`）。2026-11-20 在本机实测，一次解析在完全查不到时约 32 微秒，命中时约 16–19 微秒。
+
+**查哪些服务商，按顺序：** 先查 base URL 对应的服务商，再查厂商服务商列表。每个服务商依次试上面的候选键，第一个命中的就是结果。base URL 对应的服务商里没有这个模型时，继续查厂商列表，而不是直接落到兜底（推断：同一个模型在厂商自己那里的数据比通用兜底更接近事实，例如 OpenRouter 还没收录的新模型）。
+
+**base URL 映射。** 索引由每个服务商的 `api` 和它的模型的 `provider.api` 组成，跳过带 `${…}` 模板的地址（例如 `google-vertex`、`azure`）和非 http(s) 地址（阿里的 `wss://` 实时接口）。比较 host（用 `URL.parse` 取 hostname，小写、不带端口）和路径（转小写，按 `/` 切开，丢掉空段）：
+
+1. 只看 host 相同的地址。
+2. 其中路径和提供方路径「一个是另一个按 `/` 分段的前缀」的，算兼容，取共同段数最多的；同分的几个服务商都取，按 id 排序。
+3. 没有兼容的：host 相同的地址只属于一个服务商时取它，否则不取。
+
+不按 host 后缀匹配（和站点层不同）：models.dev 的地址都是完整 host。
+
+| 提供方 base URL | 对应的服务商 | 说明 |
+|---|---|---|
+| `https://api.deepseek.com/anthropic`（DeepSeek 预设） | `deepseek` | `api` 是 `https://api.deepseek.com`，路径为空，是前缀 |
+| `https://dashscope.aliyuncs.com/compatible-mode/v1`（Qwen 预设） | `alibaba-cn` | 完全一致 |
+| `https://api.kimi.com/coding`（Kimi 预设） | `kimi-code-plan-cn` | 它的地址是 `/coding/v1`，提供方路径是它的前缀；`kimi-for-coding` 因此有数据 |
+| `https://open.bigmodel.cn/api/anthropic`（智谱预设） | 无 | 同 host 的 `zhipuai`（`/api/paas/v4`）和 `zhipuai-coding-plan`（`/api/coding/paas/v4`）路径都不兼容，有两个服务商，不取；按厂商列表在 `zai` 里查到 GLM |
+| `https://openrouter.ai/api`（Anthropic 格式）、`https://openrouter.ai/api/v1` | `openrouter` | |
+| `https://api.minimax.io/anthropic` | `minimax`、`minimax-coding-plan` | 两个服务商的地址完全相同，按 id 顺序都查 |
+| `https://relay.example.com/v1` | 无 | 按厂商列表查，保持「中转按模型 id 拿厂商数据」 |
+
+**厂商服务商列表**（代码里的常量，数据测试保证每个 id 都在快照里）：`openai`、`anthropic`、`google`、`xai`、`deepseek`、`zai`、`zhipuai`、`moonshotai`、`moonshotai-cn`、`minimax`、`minimax-cn`、`mistral`、`alibaba`、`alibaba-cn`。顺序有讲究：`alibaba-cn` 也托管 `deepseek-v4-pro`、`glm-5.1`、`kimi-k2.6`、`MiniMax-M2.5`，`mistral` 托管 `glm-5-2`（规范化后和 `glm-5.2` 相同），所以它们排在后面，厂商自己的数据先命中；国内站排在国际站后面，只补国际站没有的模型。
+
+### 字段对应
+
+| models.dev | 我们的字段 | 规则 |
+|---|---|---|
+| `limit.context` | `contextWindow` | 在 `ModelContextWindowSchema` 的范围内（16,000 到 10,000,000，`src/utils/model/modelRules.ts:6-20`）才设，否则不设，由下层决定 |
+| `limit.output` | `maxOutputTokens` | 正整数才设 |
+| `modalities.input` 含 `image` / `pdf` | `input.image` / `input.pdf` | 有 `modalities.input` 时两个都设（不含即 false），没有时都不设 |
+| `reasoning`、`reasoning_options` | `reasoning` | 见下表；没有 `reasoning` 字段时不设 |
+
+### 思考方式的对应
+
+规则：`reasoning: false` → `none`；`reasoning: true` 且没有 `reasoning_options` → `always`，没有档位。否则：
+
+- 能关 = 有 `toggle`，或 `effort` 的取值含 `none`。只有 `budget_tokens`、没有 `toggle` 的不算能关（负责人决定）：`gemini-2.5-pro` 的预算下限是 128，关不掉，按「有预算就能关」会发出关思考的请求。代价是 Claude 4.5 系列在 models.dev 里也只有 `budget_tokens`，变成不能关，由修正层补回来。
+- 档位 = `effort` 的取值和 CLI 的 `low`、`medium`、`high`、`max` 取交集，按从低到高排。`minimal`、`xhigh`、`none` 丢掉，和现在一样。
+- 有档位：能关 → `toggle_effort`，否则 `effort`。没有档位：能关 → `toggle`，否则 `always`。
+
+| models.dev | 我们的 `control` | 例 |
+|---|---|---|
+| `reasoning: false` | `none` | `gpt-4o` |
+| `reasoning: true`，没有选项 | `always` | `kimi-k2.7-code-highspeed` |
+| `toggle` | `toggle` | `kimi-k2.6` |
+| `effort`，不含 `none` | `effort` | `gpt-5-pro`、`claude-opus-4-7` |
+| `effort`，含 `none` | `toggle_effort` | `gpt-5.4-mini` |
+| `effort` + `toggle` | `toggle_effort` | `claude-sonnet-5` |
+| 只有 `budget_tokens` | `always` | `claude-sonnet-4-5`、`gemini-2.5-pro` |
+| `budget_tokens` + `toggle` | `toggle` | `gemini-2.5-flash` |
+| `budget_tokens` + `effort` | `effort` | `claude-opus-4-5` |
+
+写法（`reasoningDialect`）不从 models.dev 推，仍由 apiFormat 层、我们的 Claude 条目和站点条目决定。
+
+### 和手查条目的比较（2026-11-20）
+
+用上面的查找规则和思考对应，把 #291 之前 `modelRules.json` 的 54 条模型条目逐条和线上数据比（只比条目写了的字段）：
+
+- 查不到的：`claude-mythos-5`、`claude-opus-4-1`、`claude-opus-4`、`claude-sonnet-4`、`qwen4-max`（厂商服务商里没有，只在第三方服务商下出现），以及两条前缀写法的系列条目 `kimi-k2`、`gemini-3`（models.dev 没有叫这两个名字的模型，但系列里的现行型号 `kimi-k2.6`、`kimi-k2.7-code`、`gemini-3.1-pro-preview`、`gemini-3.8-flash` 等都在）。前五条保留为完整条目；两条系列条目只留 `structuredOutput`，见「内置表的初始条目」。
+- 完全一致的 21 条：`qwen3.5-plus`、`qwen3.5-flash`、`qwen-plus`、`qwen-max`、`kimi-k2.7-code`、`minimax-m3`、`gpt-5.4`、`gpt-5.5`、GPT-6 的 5 条、`gpt-4.1`、`claude-fable-5`、`claude-opus-5-5`、`claude-sonnet-5-5`、`claude-sonnet-5`、`claude-haiku-5-5`、`claude-opus-4-6`、`claude-sonnet-4-6`。
+- 只差在单位或取整的：GLM 的「128K/200K」我们记成 128,000/200,000，models.dev 是 131,072/204,800（`glm-5`、`glm-4.7`、`glm-4.6` 的窗口，GLM 各型号的输出上限）。
+- 会改变行为的差异，按「以 models.dev 为准」都取 models.dev 的值：
+
+| 模型 | 字段 | 我们 | models.dev | 影响 |
+|---|---|---|---|---|
+| `claude-opus-4-7`、`claude-opus-4-8`、`claude-opus-5` | 思考 | `toggle_effort` | `effort`（只有 effort，没有 toggle） | 不能关思考：用户关了思考，请求照常带档位，不发 disabled |
+| `claude-opus-4-5` | 思考 | `toggle` | `effort`（low、medium、high，加 `budget_tokens`） | 不能关思考；经代理时多了档位；anthropic 格式上写法仍是 `anthropic_budget`，CLI 不发 effort（「从解析结果推导 CLI 字段」） |
+| `claude-sonnet-4-5`、`claude-haiku-4-5` | 思考 | `toggle` | `always`（只有 `budget_tokens`） | 不能关思考 |
+| `glm-5.1`、`glm-5`、`glm-5-turbo`、`glm-4.7`、`glm-4.6` | 思考 | `toggle_effort`，四档 | `toggle` | 档位选择器对这些型号消失，不再发 `reasoning_effort` |
+| `glm-5.3` | 思考 | `always` 带档位 | `effort` | 等价：都不能关、都有档位 |
+| `kimi-k3`、`minimax-m3.1-flash` | 思考 | `always` 带档位 | `effort` | 等价 |
+| `gemini-2.5-pro` | 思考 | `always`，三档 | `always`（只有 `budget_tokens`，下限 128） | 档位选择器消失 |
+| `gemini-2.5-flash` | 思考 | `toggle_effort`，三档 | `toggle` | 档位选择器消失 |
+| `qwen3-max` | 思考、输出 | `toggle`、32,768 | `none`、65,536 | 不再发思考字段 |
+| `kimi-k3` | 输出 | 131,072 | 1,048,576 | 输出上限按 models.dev |
+| `qwen-long` | 窗口 | 1,000,000 | 10,000,000 | 我们按 HTTP 请求上限记 1M，models.dev 记模型上限 |
+| `gpt-5`、`gpt-5.1`、`gpt-5.2` | PDF | 是 | 否 | PDF 不再直接发，改走 Read 的 `pages` 转图片 |
+
+负责人逐条核对了厂商文档（2026-11-20）：
+
+- Claude 那几行是 models.dev 漏了 `toggle`，写成修正，见下一节。
+- `gemini-2.5-pro` 关不掉，和 Google 文档一致；GLM 4.6、4.7、5、5.1 只有开关，Z.ai 的 `reasoning_effort` 写明只有 GLM-5.2 及以上支持，是我们原来的表写错了；`gpt-5` 系列不收 PDF，OpenAI 模型页的输入只写了文本和图片。这几项以 models.dev 为准，不修正。
+- `qwen3-max` 阿里云文档里没找到能确认的说法（未核实），先按 models.dev。
+- 结构化输出不从 models.dev 读，见「读哪些字段」，表里原来的值保留。
+
+### 修正层
+
+models.dev 和厂商文档不一致、且会改变行为时，在 models.dev 之上加一条修正（维护者选的方案，2026-11-20）。修正是临时的：上游合并修正之后，这条就删掉。
+
+- 位置：`modelRules.json` 的 `corrections`，和 `models` 分开，方便整节核对和删除。叠加顺序在 models.dev 之后、站点层之前。
+- 匹配：拿 models.dev 层实际命中的那个 id（`lookupModelsDevModel` 的结果；models.dev 没查到时用请求的 id），用 models.dev 层的候选键（`modelsDevCandidateKeys`：规范化后的完整 id、去日期后缀、剥一层 `vendor/`）和 `match.modelId` 精确匹配，修正本身不按前缀。所以 `claude-haiku-4-5-20251001` 命中 `claude-haiku-4-5` 的修正；`claude-opus-4-6-thinking` 在 models.dev 落到 `claude-opus-4-6`，也拿到它的修正；`claude-opus-5-5-thinking` 落到的是 `claude-opus-5-5`，不会套上 `claude-opus-5` 的修正。修正对所有 host 都生效，和它修的是模型本身的事实一致。
+- 字段：只收 models.dev 层会设的字段（窗口、输出上限、`reasoning`、`input`），schema 是 `ModelRuleFieldsSchema.pick(...)`，写端点字段或 `structuredOutput` 会被拒。
+- 来源：`source.url` 是证明 models.dev 写错的厂商文档链接，必填，缺了启动时 zod 校验失败；`source.modelsDevPr` 是给 anomalyco/models.dev 提的修正 PR 链接，没提时写空字符串 `""`；还有 `checkedAt`，可选 `note`。
+- 来源标签：解析结果里记为 `model`，界面上显示「内置」，不另加 i18n。
+- 数据测试：每条修正必须在随包快照里查得到对应模型（查不到的应该写成模型条目），而且至少有一个字段和 models.dev 的值不同；快照刷新后上游已经改对，测试失败，提示删掉这条。
+- 初始条目（负责人核对，2026-11-20）：8 条 Anthropic 模型，依据是 [thinking 排错页](https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting) 的逐模型表，这些模型都能通过请求字段关掉思考，models.dev 漏了 `toggle`。修正统一是加上「能关」，档位沿用 models.dev 的。8 条的 `modelsDevPr` 都是 [anomalyco/models.dev#14144](https://github.com/anomalyco/models.dev/pull/14144)。
+
+| 模型 | models.dev | 官方表 | 修正后 |
+|---|---|---|---|
+| `claude-haiku-4-5`、`claude-sonnet-4-5` | 只有 `budget_tokens`（`always`） | 只有 Extended，默认关 | `toggle` |
+| `claude-opus-4-5` | `effort` + `budget_tokens`（`effort`） | 只有 Extended，默认关 | `toggle_effort`：low、medium、high |
+| `claude-opus-4-6`、`claude-sonnet-4-6` | `effort` + `budget_tokens`（`effort`） | Adaptive 加 Extended，默认关 | `toggle_effort`：low、medium、high、max |
+| `claude-opus-4-7`、`claude-opus-4-8` | 只有 `effort` | 只有 Adaptive，默认关，接受 `disabled` | `toggle_effort`：low、medium、high、max |
+| `claude-opus-5` | 只有 `effort` | 默认开；effort 为 high 及以下时接受 `disabled` | `toggle_effort`：low、medium、high、max |
+
+  不修正：`claude-opus-5-5`、`claude-fable-*`（官方表是始终思考，只有 effort 是对的）；`claude-sonnet-5`、`claude-haiku-5-5`（models.dev 已经有 `toggle`）；`claude-sonnet-5-5`（关思考要用专门的 `between_tools`，我们的写法层发不了，按只有 effort 处理）。
 
 ## 思考的写法
 
@@ -364,7 +542,8 @@ CLI 怎样识别辅助调用：`queryHaiku` 在传给 `queryModel` 的选项里�
 
 - 新目录 `src/server/services/modelRules/`：`builtinModelRules.ts`（读取和校验 JSON）、`resolveModelRules.ts`（叠加和匹配）、`cliModelRulesEnv.ts`（推导 CLI 字段、生成 CLI 的环境变量、界面视图）、`officialAnthropicProvider.ts`（`isOfficialAnthropicProvider`）、`auxiliaryRequest.ts`（标题和连接测试的思考字段）。
 - 类型和 schema：覆盖、拉取值、解析结果、视图在 `src/server/types/modelRules.ts`；表文件的条目 schema 在 `src/server/types/modelRulesTable.ts`。分成两个文件是因为 `provider.ts` 要引用覆盖的 schema，而表文件 schema 要引用 `provider.ts` 的 `ApiFormatSchema`，放在一起会循环导入。
-- `resolveModelRules(provider: SavedProvider, modelId: string): ResolvedModelRules` 是纯函数，输入里已经带着提供方的覆盖和拉取值，方便测试。
+- `resolveModelRules(provider: SavedProvider, modelId: string): ResolvedModelRules` 读当前的 models.dev 目录；`resolveModelRulesFromTable(table, catalogIndex, provider, modelId)` 是纯函数，输入里带着表、目录和提供方的覆盖、拉取值，方便测试。
+- models.dev 目录的模块在 `src/server/services/modelsDev/`（#291），见「models.dev 目录」。
 
 ### 代理
 
@@ -483,6 +662,7 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 - 「使用通用默认值」标记放在模型下拉项上（`ModelSelector.tsx:192` 的 `SelectItem`），不放在触发器上，因为触发器宽度有限（`ModelSelector.tsx:178`）。不在每一轮提示。
 - 档位列表在根目录只有一份：定义在 `src/utils/model/modelRules.ts`（叶子模块，`EffortLevelSchema` 由它生成），`src/utils/effort.ts` 转出，server 改为 import `src/utils/effort.ts`。桌面端是独立包，只在 `desktop/src/types/settings.ts` 保留一份，`sessionRuntimeStore` 和组件都从那里取。
 - 已保存、server 不给 `resolvedModels` 的提供方（官方 Anthropic 地址），表单不显示按模型覆盖：覆盖对它们不生效。
+- 来源 `modelsDev`（#291）：桌面端的 `FieldSource`（`desktop/src/types/provider.ts:32`）加上它，`InheritedSource` 自然包含它；`ModelRulesEditor` 的来源文案表（`desktop/src/components/settings/ModelRulesEditor.tsx:35-40`）加一项，新 i18n 键 `settings.providers.sourceModelsDev`，中英文都是「models.dev」。说明文字 `settings.providers.modelRulesDesc`（`en.ts:559`、`zh.ts:561`）改为把 models.dev 列进来源。
 - H5 用同一套 React 组件，设置页的提供方标签对 H5 可见（`desktop/src/pages/Settings.tsx:146`），所以改动对 H5 同样生效，要在手机宽度下检查。
 
 ## 提供方表单
@@ -493,7 +673,7 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 
 - 卡片上显示一行摘要：窗口、输出上限、思考（关闭、档位列表或始终开启）、图片、PDF。用到兜底时在「默认模型」小字的位置（`ProviderFormModal.tsx:912-914`）加「使用通用默认值」。
 - 摘要后面一个展开按钮。展开后在同一张卡片里占整行，显示五个字段：
-  - 窗口、输出上限：数字输入，占位文字是继承来的值和它的来源（内置、提供方接口、兜底）。
+  - 窗口、输出上限：数字输入，占位文字是继承来的值和它的来源（models.dev、内置、提供方接口、兜底）。
   - 思考：`low/medium/high/max` 多选，外加「能思考但没有档位」和「不支持思考」两个选项，合成规则见上文。
   - 图片、PDF：三态，分别是继承、支持、不支持，用 `desktop/src/components/shared/SegmentedControl`（`shared/ui/switch.tsx` 的 `Switch` 只有两态）。
   - 每个字段旁边有「恢复默认」，清掉这个字段的覆盖。
@@ -520,31 +700,17 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 
 ### 拉取能读到什么
 
-现有来源（`src/server/upstream/contextWindows/*`）的返回值从「窗口」改为「模型元数据」。各家接口实际返回的字段（核对日期 2026-11-18，来源见「内置表的初始条目」）：
+现有来源（`src/server/upstream/contextWindows/*`）的返回值从「窗口」改为「模型元数据」。#291 删掉了 OpenRouter、DeepSeek、百炼三个专用来源（`openrouter.ts`、`deepseek.ts`、`qwen.ts`，注册在 `src/server/upstream/contextWindows/index.ts:14-21`），这些服务商的模型数据改由 models.dev 按 base URL 给出（见「models.dev 目录」的查找）。留下的来源（核对日期 2026-11-18）：
 
 | 来源 | 窗口 | 输出上限 | 模态 |
 |---|---|---|---|
-| DeepSeek `GET /models` | `context_window` | `max_output_tokens` | `input_modalities` |
-| 百炼原生 `GET /api/v1/models` | `model_info.context_window` | `model_info.max_output_tokens` | `inference_metadata.request_modality` |
-| Moonshot `GET /v1/models` | `context_length` | 无 | `supports_image_in` |
-| OpenRouter `GET /api/v1/models` | `context_length` | `top_provider.max_completion_tokens` | `architecture.input_modalities` |
-| Anthropic 格式 `GET /v1/models` | `max_input_tokens` | `max_tokens` | `capabilities` |
-| MiniMax `GET /v1/models` | 无 | 无 | 无 |
-| 智谱 | 未找到官方的列表接口 | | |
-| Ollama `POST /api/show`、LM Studio | 现有代码已读窗口 | 推断：无 | 推断：`capabilities` 含 vision |
+| 提供方模型列表本身（`listed.ts`，所有提供方都读） | `max_input_tokens`、`context_length`、`context_window` | `max_tokens`、`max_output_tokens`、`top_provider.max_completion_tokens` | `capabilities`、`architecture.input_modalities`、`input_modalities`、`supports_image_in` |
+| Ollama `POST /api/show`（`ollama.ts`） | `<架构>.context_length` | 无 | `capabilities` 含 vision |
+| LM Studio `GET /api/v1/models`（`lmstudio.ts`） | `max_context_length` | 无 | `capabilities.vision` |
 
-思考只从 OpenRouter 读（`src/server/upstream/contextWindows/openrouter.ts`），其他上游的列表没有这类字段，不猜。
-
-- 读哪份列表：不管提供方是 chat 格式还是 anthropic 格式，都另外请求一次公开的 `GET https://openrouter.ai/api/v1/models`（OpenAI 格式，不带 Anthropic 请求头），不用保存时已经拉到的列表。原因是 anthropic 格式的拉取带 `anthropic-version` 请求头，OpenRouter 对它返回 Anthropic 格式的列表，只有 `max_input_tokens`、`max_tokens`，没有思考相关的字段（2026-11-19 核对：386 条，都没有）。两种格式走同一条路径，代价是 chat 格式保存时多一次 GET。
-- ID 换算：anthropic 端点列出的 ID 是 OpenAI 列表里的 ID 加上 `anthropic/` 前缀和 `[1m]` 后缀，例如 `anthropic/nvidia/nemotron-3-ultra-550b-a55b:free[1m]` 对应 `nvidia/nemotron-3-ultra-550b-a55b:free`。Claude 型号不加前缀，只加后缀：`anthropic/claude-opus-4.7[1m]` 对应 `anthropic/claude-opus-4.7`。所以换算时先去掉 `[1m]`、`[2m]` 后缀；去掉 `anthropic/` 之后如果还剩一个 `/`，才去掉这个前缀。2026-11-19 核对时，anthropic 端点的 386 个 ID 按这条规则全部能在 OpenAI 列表里找到；OpenAI 列表的 479 个 ID 里没有带两个 `/` 的，所以 chat 格式的 ID 换算后不变。
-
-按 [models API](https://openrouter.ai/docs/api/api-reference/models/get-models) 和 [reasoning tokens](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)：
-
-- 能不能思考：`supported_parameters` 含 `reasoning`，或者有 `reasoning` 对象（官方说非推理模型和路由模型不带这个对象）。两者都没有的，不记拉取值，仍走兜底。
-- 能不能关：`reasoning.mandatory` 为 `true` 时官方说 effort `none` 会被拒绝，记为不能关（`effort`，没有档位时 `always`）；否则能关（`toggle_effort`，没有档位时 `toggle`）。
-- 档位：`reasoning.supported_efforts` 和 CLI 的四档（low、medium、high、max）取交集，按从低到高排。`minimal`、`xhigh`、`none` 不在 CLI 档位里，不收。`supported_efforts` 为空或没有时，官方说是不限制，记为四档都可选：只支持 `max_tokens` 的模型，OpenRouter 会把 effort 换算成预算。
-- 关思考时发什么：chat 格式用站点层的 `openrouter` 写法，发 `reasoning: { effort: 'none' }`（官方：none 完全关闭推理）。anthropic 格式（OpenRouter 的 Messages 接口）用拉取值带的 `anthropic_adaptive`：开启时发 `thinking: { type: 'adaptive' }` 加 `output_config.effort`，OpenRouter 换成各家的 effort；关闭时发 `thinking: { type: 'disabled' }`，换成 `reasoning: { enabled: false }`。没有给 anthropic 格式的 OpenRouter 加站点条目，因为站点层会盖过模型层，表里只支持 budget 的 Claude 型号（例如 `claude-opus-4-5`）会被改成 adaptive，而 OpenRouter 会把 Claude 的思考字段原样转给 Anthropic。
-- 2026-11-19 核对时，OpenRouter 列表里有 358 个模型带 `reasoning` 对象，6 个只在 `supported_parameters` 里声明。
+- 列表本身读到的值照常存进 `discoveredModels`，例如 OpenRouter chat 格式的列表带 `context_length` 和 `top_provider.max_completion_tokens`，Moonshot 的列表带 `context_length`、`supports_image_in`，Anthropic 格式的列表带 `max_input_tokens`、`max_tokens`、`capabilities`。它们是这个端点自己报的值，叠在 models.dev 和修正之上（第 7 层）。
+- 思考不从任何列表读。原来只有 OpenRouter 的公开列表给思考信息，现在 OpenRouter 的思考来自 models.dev 的 `openrouter` 服务商（issue 核对：它的 380 个模型里，是否接受 `reasoning` 和 OpenRouter 自己的接口只差 1 个）。OpenRouter 的接口不作为通用来源，也不留兜底：它的值是 OpenRouter 实际提供的值，不是厂商的值（例如 `claude-sonnet-4-5` 列 1M 窗口、`glm-5.2` 列 943,718 输出），套到直连和中转上会错。代价：`:batch` 变体和 OpenRouter 先于 models.dev 上架的少数模型，在 models.dev 收录之前，`openrouter` 服务商里查不到，再按厂商列表查（`:batch` 后缀的 id 在厂商那里也查不到，走兜底）。
+- OpenRouter 发现的拉取值原来带 `anthropic_adaptive` 写法（`openrouter.ts:24`），让 Anthropic 格式的 OpenRouter 提供方发 adaptive 加 effort。删掉发现之后，这个写法改由站点条目 `openrouter.ai` + anthropic 给出（负责人决定，见「站点层」），行为不变。
 
 ### 启动会话
 
@@ -557,13 +723,14 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 用户在 custom 提供方（`openrouter.ai`，openai_chat）选了 `deepseek/deepseek-v4-pro`，effort 选 `max`。
 
 1. 兜底给出完整字段。apiFormat 层只设端点字段：`reasoningDialect: reasoning_effort`、`maxTokensField: max_tokens`。
-2. 模型层：`deepseek/deepseek-v4-pro` 不命中，剥一层后命中 `deepseek-v4-pro`：窗口 1,048,576，输出 393,216，`control: toggle_effort`，`levels: [low, high, max]`。模型层不设写法。
-3. 站点层：第一步命中 `openrouter.ai` + openai_chat，`reasoningDialect: openrouter`，覆盖 apiFormat 层的 `reasoning_effort`；第二步没有前缀条目。同一个模型在 `api.deepseek.com` 上则命中那里的站点条目，用 `thinking_type`。
-4. 拉取层：保存时从 OpenRouter 读到窗口 1,048,576、输出 393,216，和内置一致。
-5. CLI 的规则是 `thinkingWhenOn: adaptive`、`effortLevels: [low, high, max]`，发 `thinking:{type:'adaptive'}`、`output_config.effort:'max'`、`max_tokens: 32000`。
-6. 代理按 `openrouter` 写法发 `reasoning:{effort:'max'}`。`sources.maxOutputTokens` 是 `model`，所以发 `max_tokens: 32000`（不超过 393,216）。
+2. 模型层：#291 之后表里没有 DeepSeek 条目，不命中。
+3. models.dev 层：base URL 的 host 是 `openrouter.ai`，对应 `openrouter` 服务商，`deepseek/deepseek-v4-pro` 在那里直接命中：窗口 1,048,576，输出 393,216，只收文本。思考是 `effort` 取值 `none`、`high`、`xhigh`（2026-11-20 数据），含 `none` 所以能关，和 CLI 档位的交集只有 `high`：`control: toggle_effort`，`levels: [high]`。同一个模型在 `api.deepseek.com` 上对应 `deepseek` 服务商，那里是 `toggle` 加 `low`、`high`、`max`。
+4. 站点层：第一步命中 `openrouter.ai` + openai_chat，`reasoningDialect: openrouter`，覆盖 apiFormat 层的 `reasoning_effort`；第二步没有前缀条目。同一个模型在 `api.deepseek.com` 上则命中那里的站点条目，用 `thinking_type`。
+5. 拉取层：保存时从 OpenRouter 的列表读到窗口 1,048,576、输出 393,216，和 models.dev 一致。
+6. CLI 的规则是 `thinkingWhenOn: adaptive`、`effortLevels: [high]`，选的 `max` 按「取比它高的最低一档，没有就取最高一档」换成 `high`，发 `thinking:{type:'adaptive'}`、`output_config.effort:'high'`、`max_tokens: 32000`。
+7. 代理按 `openrouter` 写法发 `reasoning:{effort:'high'}`。`sources.maxOutputTokens` 是 `discovered`（第 5 步的拉取值在第 7 层覆盖 models.dev），不是兜底，所以发 `max_tokens: 32000`（不超过 393,216）。
 
-同一个提供方上换成表里没有的模型时：能力字段都来自兜底，`control: 'none'` 所以不发思考字段，`sources.maxOutputTokens` 是 `fallback` 所以不发 `max_tokens`。
+同一个提供方上换成表里和 models.dev 都没有的模型时：能力字段都来自兜底，`control: 'none'` 所以不发思考字段，`sources.maxOutputTokens` 是 `fallback` 所以不发 `max_tokens`。
 
 改前：代理不读 `output_config`，`adaptive` 也不产生字段，所以上游用自己的默认思考设置，也不发 `max_tokens`。如果是 DeepSeek 官方地址，代理还会原样透传 `thinking:{type:'adaptive'}`（`anthropicToOpenaiChat.ts:75-77`）。
 
@@ -617,52 +784,40 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 - `unverified`：只在第三方或搜索摘要里见到。
 - `conflict`：官方页面之间说法不一，取较保守的值。
 
-退役的模型不收录，走兜底，包括 DeepSeek 的 `deepseek-chat` 和 `deepseek-reasoner`（2026-07-24 停用），以及 MiniMax M2 系列（2026-11-18 退役）。例外是 `claude-opus-4-1`、`claude-opus-4`、`claude-sonnet-4`：Anthropic API 上已退役，Bedrock 和 Google Cloud 仍在提供，中转可能转发到那里。前缀写成规范化之前的样子，匹配时两边都做规范化。
+#291 之后模型层只留 models.dev 没有的东西（见「内置表文件」）。#264 收录的 54 条里，5 条在 models.dev 的厂商服务商里查不到，保留为完整条目；其余 49 条删掉窗口、输出上限、思考、图片和 PDF，有 `structuredOutput` 的 46 条留下它（Claude 条目同时留写法和原生搜索），没有的 3 条（`qwen3-max`、`minimax-m3`、`minimax-m3.1-flash`）整条删掉；和 models.dev 的比较见「models.dev 目录」。删掉的条目和它们的来源链接留在 git 历史（`ec1e232b` 的 `src/server/config/modelRules.json`）。
+
+`claude-opus-4-1`、`claude-opus-4`、`claude-sonnet-4` 在 Anthropic API 上已退役，Bedrock 和 Google Cloud 仍在提供，中转可能转发到那里，所以保留。前缀写成规范化之前的样子，匹配时两边都做规范化。
 
 ### 模型层
 
+完整条目（models.dev 的厂商服务商里没有这个模型）：
+
 | 前缀 | 窗口 | 输出 | 思考 | 图片 / PDF | 结构化 | 状态 | 来源 |
 |---|---|---|---|---|---|---|---|
-| `deepseek-v4-pro` | 1,048,576 | 393,216 | toggle_effort：low, high, max | 否 / 否 | 否（只有 json_object） | verified | [pricing](https://api-docs.deepseek.com/quick_start/pricing)、[list-models](https://api-docs.deepseek.com/api/list-models) |
-| `deepseek-flash`、`deepseek-v4-flash` | 1,048,576 | 393,216 | 同上 | 是 / 否 | 否 | verified（v4-flash 已成为 deepseek-flash 的别名） | 同上、[updates](https://api-docs.deepseek.com/updates) |
-| `qwen3.5-plus`、`qwen3.5-flash` | 1,000,000 | 65,536 | toggle，默认开 | 是 / 未写 | 是 | verified | [qwen3-5-plus](https://www.alibabacloud.com/help/en/model-studio/qwen3-5-plus)、[qwen3-5-flash](https://www.alibabacloud.com/help/en/model-studio/qwen3-5-flash) |
-| `qwen-plus` | 1,000,000 | 32,768 | toggle，默认关 | 否 / 否 | 是 | verified | [qwen-plus](https://www.alibabacloud.com/help/en/model-studio/qwen-plus) |
-| `qwen-max` | 32,768 | 8,192 | none | 否 / 否 | 是 | conflict：模型页 32,768，总览页 128K | [qwen-max](https://www.alibabacloud.com/help/en/model-studio/qwen-max) |
-| `qwen3-max` | 262,144 | 32,768 | toggle | 未核实 | 未核实 | unverified：官方页 404 | 搜索摘要 |
 | `qwen4-max` | 1,000,000 | 131,072 | toggle_effort：low, high（官方档位 low、high、xhigh，默认 high；xhigh 没有对应的 CLI 档位） | 是 / 未写 | 是 | verified（2026-11-19 按 qwen4-max 页核对） | [qwen4-max](https://www.alibabacloud.com/help/en/model-studio/qwen4-max) |
-| `qwen-long` | 1,000,000 | 8,192 | none | 否 / 否 | 否 | verified；官方写 10,000,000，但 HTTP 请求最多 1M，我们按 1M | [qwen-long](https://www.alibabacloud.com/help/en/model-studio/qwen-long) |
-| `kimi-k2.7-code` | 262,144 | 未写 | always（`thinking.type` 只收 enabled，传 disabled 报错；不支持 `reasoning_effort`） | 未核实 | 是 | verified（2026-11-19 按 chat 页核对）；已弃用，2026 年 12 月底下线 | [chat](https://platform.kimi.ai/docs/api/chat.md) |
-| `kimi-k2` | 262,144 | 未写 | toggle | 未核实 | 是 | verified 窗口；输出未核实；K2 全系 2026 年 12 月下旬下线 | [models-overview](https://platform.kimi.ai/docs/api/models-overview.md) |
-| `kimi-k3` | 1,048,576 | 131,072 | always：low, high, max | 是 / 未写 | 是 | verified；输出取默认值 131,072（最大 1,048,576） | [chat](https://platform.kimi.ai/docs/api/chat.md) |
-| `glm-5.1`、`glm-5`、`glm-5-turbo`、`glm-4.7`、`glm-4.6` | 200,000 | 128,000 | toggle_effort：low, medium, high, max | 否 / 否 | 否 | verified「200K/128K」；精确值未核实（OpenRouter 报 204,800） | [glm-5.1](https://docs.z.ai/guides/llm/glm-5.1) 等 |
-| `glm-4.5`（含 `glm-4.5-air`） | 128,000 | 96,000 | toggle | 否 / 否 | 否 | 同上 | [glm-4.5](https://docs.z.ai/guides/llm/glm-4.5) |
-| `glm-5.3` | 1,000,000 | 128,000 | always：low, high, max | 否 / 否（只收文本） | 否（只有 json_object） | verified（2026-11-19 按 glm-5.3 页核对） | [glm-5.3](https://docs.z.ai/guides/llm/glm-5.3) |
-| `glm-5.2` | 1,000,000 | 128,000 | toggle_effort：high, max（官方说 low、medium 按 high 处理，xhigh 按 max 处理） | 否 / 否（只收文本） | 否（文档只写 json_object） | verified（2026-11-19 按 glm-5.2 页和 chat-completion 参考核对） | [glm-5.2](https://docs.z.ai/guides/llm/glm-5.2)、[chat-completion](https://docs.z.ai/api-reference/llm/chat-completion) |
-| `minimax-m3.1-flash` | 1,000,000 | 524,288 | always：low, medium, high, max | 是 / 未写 | 未写 | verified | [text-chat-openai](https://platform.minimax.io/docs/api-reference/text-chat-openai.md) |
-| `minimax-m3` | 1,000,000 | 524,288 | toggle（adaptive/disabled） | 是 / 未写 | 未写 | verified | 同上 |
-| `gpt-5`、`gpt-5.1`、`gpt-5.2` | 400,000 | 128,000 | gpt-5：effort（low, medium, high）；5.1、5.2：toggle_effort（low, medium, high） | 是 / 是 | 是 | verified | [gpt-5](https://developers.openai.com/api/docs/models/gpt-5) 等 |
-| `gpt-5.4`、`gpt-5.5` | 1,050,000 | 128,000 | toggle_effort：low, medium, high | 是 / 是 | 是 | verified | [gpt-5.4](https://developers.openai.com/api/docs/models/gpt-5.4)、[gpt-5.5](https://developers.openai.com/api/docs/models/gpt-5.5) |
-| `gpt-6-luna`、`gpt-6.1-terra` | 1,050,000 | 128,000 | toggle_effort：low, medium, high, max（官方 none 到 max，none 即关思考） | 是 / 是 | 是 | verified | [gpt-6-luna](https://developers.openai.com/api/docs/models/gpt-6-luna)、[gpt-6.1-terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) |
-| `gpt-6.1-sol`、`gpt-6.2-sol`、`gpt-6.2-astra` | 1,050,000 | 128,000 | effort：low, medium, high, max（官方拒绝 none，不能关思考） | 是 / 是 | 是 | verified | [gpt-6.1-sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[gpt-6.2-sol](https://developers.openai.com/api/docs/models/gpt-6.2-sol)、[gpt-6.2-astra](https://developers.openai.com/api/docs/models/gpt-6.2-astra) |
-| `gpt-4.1` | 1,047,576 | 32,768 | none | 是 / 是 | 是 | verified | [gpt-4.1](https://developers.openai.com/api/docs/models/gpt-4.1) |
-| `gemini-2.5-pro` | 1,048,576 | 65,536 | always：low, medium, high | 是 / 是 | 是 | verified | [2.5-pro](https://aistudio.google.com/docs/models/gemini-2.5-pro) |
-| `gemini-2.5-flash` | 1,048,576 | 65,536 | toggle_effort：low, medium, high | 是 / 未写 | 是 | verified | [2.5-flash](https://aistudio.google.com/docs/models/gemini-2.5-flash) |
-| `gemini-3` | 1,048,576 | 65,536 | always：low, medium, high | 是 / 是 | 是 | verified（3.1-pro-preview、3.8-flash） | [thinking](https://aistudio.google.com/docs/thinking) |
-| `claude-fable-5`、`claude-mythos-5`、`claude-opus-5-5`、`claude-sonnet-5-5` | 1,000,000 | 128,000 | effort：low, medium, high, max；写法 `anthropic_adaptive`（Fable、Mythos、Opus 5.5 始终思考，`disabled` 返回 400；Sonnet 5.5 也拒绝 `disabled`，它要的 `between_tools` 不在写法里） | 是 / 是 | 是 | verified | [models overview](https://platform.claude.com/docs/en/about-claude/models/overview)、[thinking 排错页](https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting)、[effort](https://platform.claude.com/docs/en/build-with-claude/effort)、[structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)、[web search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) |
-| `claude-opus-5`、`claude-sonnet-5`、`claude-haiku-5-5`、`claude-opus-4-8`、`claude-opus-4-7`、`claude-opus-4-6`、`claude-sonnet-4-6` | 1,000,000 | 128,000 | toggle_effort：low, medium, high, max；写法 `anthropic_adaptive` | 是 / 是 | 是 | verified | 同上 |
-| `claude-opus-4-5`、`claude-sonnet-4-5`、`claude-haiku-4-5` | 200,000 | 64,000 | toggle（只支持 budget；Opus 4.5 虽认 effort，budget 写法不发 effort） | 是 / 是 | 是 | verified | 同上 |
+| `claude-mythos-5` | 1,000,000 | 128,000 | effort：low, medium, high, max；写法 `anthropic_adaptive`（始终思考，`disabled` 返回 400） | 是 / 是 | 是 | verified | [models overview](https://platform.claude.com/docs/en/about-claude/models/overview)、[thinking 排错页](https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting)、[effort](https://platform.claude.com/docs/en/build-with-claude/effort) |
 | `claude-opus-4-1`、`claude-opus-4` | 200,000 | 32,000 | toggle | 是 / 是 | 否 | verified；Anthropic API 已退役 | 同上 |
 | `claude-sonnet-4` | 200,000 | 64,000 | toggle | 是 / 是 | 否 | verified；Anthropic API 已退役 | 同上 |
 
+只设 models.dev 没有的字段的条目（能力字段来自 models.dev）：
+
+| 前缀 | 字段 | 来源 |
+|---|---|---|
+| `claude-fable-5`、`claude-opus-5-5`、`claude-sonnet-5-5`、`claude-opus-5`、`claude-sonnet-5`、`claude-haiku-5-5`、`claude-opus-4-8`、`claude-opus-4-7`、`claude-opus-4-6`、`claude-sonnet-4-6` | `reasoningDialect: anthropic_adaptive`、`nativeWebSearch: true` | [thinking 排错页](https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting)、[web search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) |
+| `claude-opus-4-5`、`claude-sonnet-4-5`、`claude-haiku-4-5` | `nativeWebSearch: true`（只支持 budget，用 apiFormat 层的 `anthropic_budget`） | 同上 |
+
+修正层（`corrections`）：8 条 Anthropic 模型，见「models.dev 目录」的「修正层」。
+
+另外 46 条只写 `structuredOutput`（#264 时按厂商文档核对的值，models.dev 的这个字段不读），Claude 条目还带写法和原生搜索；它们的其他能力字段来自 models.dev。
+
 说明：
 
-- 表中写「未写」的，是官方页面没有提到，解析时不填，由下层或兜底决定。`kimi-k2` 的输出上限没找到出处，所以不填，来源是兜底，代理不发输出上限字段。
-- Gemini 4、Kimi Code 专用 id（`k3.1-pro`、`kimi-for-coding`）这次没收录。Gemini 4 的规格页面信息不全；Kimi Code 的窗口按会员档位不同（[Kimi Code docs](https://www.kimi.com/code/docs/en/)）。收录哪些新模型是表的日常维护，不影响设计。
-- GPT-6 系列按 [models](https://developers.openai.com/api/docs/models) 页和各型号页收录。`xhigh` 不在 CLI 的档位里，不收（同 Claude）。PDF 按 [file inputs](https://developers.openai.com/api/docs/guides/file-inputs) 的说法记为支持：收图片的模型都能读 PDF 的文字和页面图。`gpt-6-cyber` 只出现在专用模型列表里，没有规格，不收录。
-- GPT-6 的「推理 + 工具」有限制，代码不做特殊处理，用户按格式选：Chat Completions 下 `gpt-6-luna` 只在 effort 为 none（关思考）时能调函数；`gpt-6.1-sol`、`gpt-6.1-terra` 调工具必须走 Responses。所以接这几个型号时用 `openai_responses` 格式；用 `openai_chat` 并开着思考时，带工具的请求会被上游拒绝。
-- Claude 条目只在有提供方时生效，例如 OpenRouter 的 `anthropic/claude-opus-4.7`（规范化后命中 `claude-opus-4-7`）。没有提供方时 CLI 走原逻辑。
-- Claude 条目除最后两行（Anthropic 的 web search 支持列表里没有它们）都设 `nativeWebSearch: true`，只在 anthropic 格式提供方生效。
-- 1M 窗口对表里的 1M 型号是默认值，不需要 beta 头（[context windows](https://platform.claude.com/docs/en/build-with-claude/context-windows)）。CLI 官方路径的内置表（`modelContextWindows.ts:5`）把 `claude-sonnet-4-6` 写成 200,000，比官方页小；那是没有提供方时的原逻辑，本 PR 不改。
+- 「未写」是官方页面没有提到，解析时不填，由下层或兜底决定。
+- `claude-fable-5` 前缀也覆盖 models.dev 里的 `claude-fable-5-1`、`claude-fable-5-2`（前缀边界是 `-`），它们拿到 adaptive 写法和原生搜索，能力字段来自 models.dev。
+- Claude 条目只在有提供方时生效，例如 OpenRouter 的 `anthropic/claude-opus-4.7`（剥一层、规范化后命中 `claude-opus-4-7`）。没有提供方时 CLI 走原逻辑。
+- `nativeWebSearch: true` 只在 anthropic 格式提供方生效。最后两行完整条目（Anthropic 的 web search 支持列表里没有它们）不设。
+- 原来按系列写的 `kimi-k2`、`gemini-3` 前缀条目只留 `structuredOutput`：系列里的现行型号其他字段 models.dev 都有。K2 里 models.dev 没有的旧 id（`kimi-k2-0905-preview`、`kimi-k2-turbo-preview`）的其他字段落到兜底，K2 全系 2026 年 12 月下旬下线。
+- 收录新模型不再是表的日常维护：models.dev 收录后自动生效。表里只在 models.dev 长期缺某个模型、或者要设它没有的字段时才加条目，加之前先看能不能给 anomalyco/models.dev 提补充。
 
 ### 站点层
 
@@ -680,6 +835,7 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 | `api.minimax.io` | openai_chat | `thinking_adaptive` | `max_completion_tokens` | `extraBody: { reasoning_split: true }` | [text-chat-openai](https://platform.minimax.io/docs/api-reference/text-chat-openai.md) |
 | `api.minimax.io` | anthropic | `anthropic_adaptive` | `max_tokens` | | [text-chat-anthropic](https://platform.minimax.io/docs/api-reference/text-chat-anthropic.md) |
 | `openrouter.ai` | openai_chat | `openrouter` | `max_tokens` | | [reasoning-tokens](https://openrouter.ai/docs/use-cases/reasoning-tokens) |
+| `openrouter.ai` | anthropic | `anthropic_adaptive` | `max_tokens` | #291 加：代替 OpenRouter 发现原来带的写法。OpenRouter 把 Messages 请求里的 `thinking.type: adaptive` 和 `output_config.effort` 换算成统一的 `reasoning` 参数，对所有推理模型生效，不限 Claude（2026-11-20 核对）。Claude 4.5 型号收到 adaptive 时能正常开关思考（2026-11-20 实测，见「未决问题与风险」） | [reasoning-tokens](https://openrouter.ai/docs/use-cases/reasoning-tokens) |
 | `api.openai.com` | openai_chat | `reasoning_effort` | `max_completion_tokens` | | [chat create](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) |
 | `api.openai.com` | openai_responses | `responses_reasoning` | `max_output_tokens` | | [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) |
 | `generativelanguage.googleapis.com` | openai_chat | `reasoning_effort` | `max_tokens`（未核实） | | [openai compat](https://aistudio.google.com/docs/openai) |
@@ -699,7 +855,7 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 ### 发现的问题，作为后续处理
 
 - 预设里引用的模型有的已经弃用或成了别名：Kimi 预设只有 `kimi-k2.6`；Qwen 预设的快速模型 `qwen-turbo` 在官方页面上已经找不到；DeepSeek 的 `deepseek-v4-flash` 成了别名。更新预设是另一件事，这次不改，另开 issue 跟踪。
-- 我们现在的窗口数字有几处和官方不一致：DeepSeek 是 1,048,576 不是 1,000,000；`gpt-5.4` 和 `gpt-5.5` 是 1,050,000；MiniMax M2 的 204,800 没核实到。并进新表时一起改，另开 issue 跟踪。
+- 我们现在的窗口数字有几处和官方不一致：DeepSeek 是 1,048,576 不是 1,000,000；`gpt-5.4` 和 `gpt-5.5` 是 1,050,000；MiniMax M2 的 204,800 没核实到。并进新表时一起改，另开 issue 跟踪。#291 之后这些数字来自 models.dev，不再由我们维护。
 
 ## #264 各项怎样落到表上
 
@@ -709,7 +865,7 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 | P-NET-09、P-NET-14 能力按提供方声明 | 模型层 `reasoning`，CLI 的 `thinkingWhenOn`、`thinkingWhenOff`、`effortLevels` | custom 不再一律全开；Kimi、GLM 不再收到它们不认的 effort |
 | P-RES-02、P-REQ-07、P-REQ-08 推理不回传 | `reasoningReplay`、`unmarkedReasoningReplay`，签名里的来源字段 | 响应方向记录来源，请求方向原样写回；删除按 host 的判断。Gemini 工具调用签名不在本轮 |
 | P-REQ-03、P-REQ-04、P-REQ-11 PDF 和图片 | `input.image`、`input.pdf` | 支持时按各格式的方式携带（chat 的 `file`、Responses 的 `input_file`，工具结果里的图片同理）；不支持时换成说明文字；CLI 的 Read 按模型判断 |
-| P-NET-10 未列出模型的窗口 | `contextWindow`，取值顺序为用户覆盖、拉取值、表、兜底 | 保存时拉取并存下 |
+| P-NET-10 未列出模型的窗口 | `contextWindow`，取值顺序为用户覆盖、拉取值、站点前缀条目、models.dev、表、兜底 | 保存时拉取并存下；#291 起多数模型的窗口来自 models.dev |
 | P-REQ-05 输出上限 | `maxOutputTokens`、`maxTokensField`、`sources` | 上限有出处时发 min(CLI 请求值, 上限)，来自兜底时不发；CLI 的升级重试不超过上限 |
 | P-REQ-09 原生搜索变成空函数 | `nativeWebSearch` | CLI 按它选搜索后端，不支持时不提供原生工具 |
 | P-REQ-14 标题生成 | 同一套写法和输出上限 | 标题请求按辅助调用处理：能关的模型关掉思考，不能关的带最弱一档；能限制输出 |
@@ -722,22 +878,45 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - 内置表 JSON 不合法：sidecar 启动时 zod 校验失败，直接报错退出。这是打包错误，测试会拦住。
 - `providers.json` 里的覆盖不合法：API 入口拒绝，返回 400，带错误码（`MODEL_OVERRIDE_DUPLICATE`、`MODEL_OVERRIDE_EXTRA_BODY_ANTHROPIC`、`MODEL_OVERRIDE_DIALECT_MISMATCH`），表单和 #267 拒绝请求头时一样显示 server 返回的说明。表单本身只编辑窗口、输出上限、档位、图片、PDF，只有手写进文件的 `extraBody` 和写法会触发这几种拒绝。手写进文件的不合法覆盖，在读取时丢弃这一个字段，并记日志写明提供方、模型和字段。
 - 保存时拉取失败：保存照常完成，响应带警告；已有的 `discoveredModels` 保留不清空。
+- models.dev 拉取失败或离线：用缓存或随包快照，记警告，一小时后再试，见「models.dev 目录」的「拉取失败和离线」。随包快照不合法是打包错误，数据测试会拦住。线上数据里单个模型不合法时只跳过这个模型。
 - CLI 没有 `DREAMCODER_MODEL_RULES`：按原逻辑运行。变量存在但解析失败：记日志，全部模型按 `fallback`；`fallback` 也解析失败时按兜底条目的固定值。CLI 不会因此不能启动。
 - 写法和档位不匹配（例如用户把档位覆盖成上游不认的值）：上游返回 400，按 #263 的错误分类显示给用户，不重试。
 
 ## 测试策略
 
 - `resolveModelRules` 的单元测试：
-  - 六层叠加的每一层都能覆盖下一层；
+  - 八层叠加的每一层都能覆盖下一层，models.dev 层在我们的模型条目之上，修正层在 models.dev 之上、站点层之下；models.dev 层不设端点字段，所以模型条目的 Claude 写法仍然生效；修正的来源记为 `model`；
   - 最长前缀；剥一层 `vendor/`；去掉 `[1m]` 后缀；点号和连字符等价；
   - 前缀边界：`gpt-5-2025-08-07` 命中 `gpt-5` 不命中 `gpt-5.2`，`gpt-4-1106-preview` 不命中 `gpt-4.1`，`glm-4.5v`、`glm-4.6v`、`glm-5v-turbo` 不命中 `glm-4.5`、`glm-4.6`、`glm-5`；
   - 站点层两步：前缀条目叠在 host 条目之上，host 条目的写法保留（例如智谱 `glm-5.1` 仍用 `thinking_type`）；
   - 同一 host 按 apiFormat 取不同条目；
   - `usedFallback` 和 `sources`，包括命中只带端点字段的前缀条目时仍为兜底；
   - 用户 `reasoningLevels` 和下层 `control` 的每种组合；
-  - 图片、PDF 和思考的拉取值只在下层为兜底时生效；思考拉取值带的写法要和 apiFormat 配套。
+  - 图片、PDF 的拉取值只在下层为兜底时生效；磁盘上旧的拉取值里带的 `reasoning`、`reasoningDialect` 被忽略。
+- models.dev 的单元测试（#291，用测试目录，不用快照里的数字）：
+  - 解析：只留要读的字段；单个模型不合法时跳过它，其余照用；一个服务商都没有时整份拒绝；
+  - 候选键：大小写、点号；`-YYYYMMDD`、`@YYYYMMDD`、`-YYYY-MM-DD` 去掉后查到，4 位数字后缀不当日期；完整 id 优先于去日期的 id；`vendor/rest` 剥一层；`[1m]` 后缀；
+  - 最长前缀：候选键都没命中时取在分隔符处结束的最长 models.dev id，不跨边界（`claude-sonnet-4-5x` 不命中）；点号写的版本号不断开（`deepseek-v3.2`、`deepseek-v3.2-thinking` 查不到 `deepseek-v3`，`deepseek-v3-0324`、`deepseek-v3-thinking` 能查到）；精确命中在任何服务商里都优先，包括映射服务商有前缀命中、厂商服务商有精确命中的情况；修正跟着 models.dev 命中的 id 走（`corrected-thinking` 拿到 `corrected` 的修正，`corrected-pro-thinking` 不拿）；随包快照上 `claude-opus-4-6-relay-thinking` 等变成能关，`claude-opus-5-5-relay-thinking` 保持只有 effort；
+  - base URL 映射：路径前缀两个方向（`api.deepseek.com/anthropic`、`openrouter.ai/api`、`api.kimi.com/coding`）；同 host 多个服务商时按路径选（`api.z.ai/api/paas/v4` 和 `/api/coding/paas/v4`）；都不兼容时不取（`open.bigmodel.cn/api/anthropic`）；同一地址的几个服务商都查；带 `${…}` 的地址不进索引；
+  - 服务商顺序：base URL 对应的服务商没有这个模型时按厂商列表查；厂商列表里排在前面的先命中（`glm-5.2` 取 `zai` 不取 `mistral`、`alibaba-cn`）；
+  - 字段对应：思考对应表每一行各一例，包括只有 `budget_tokens` 时为 `always`；窗口超出范围不设；`structured_output` 不读；没有 `modalities.input` 不设图片和 PDF；
+  - 解析结果里 `sources` 记为 `modelsDev`，`usedFallback` 为 false；
+  - 修正层：叠在 models.dev 之上，来源记为 `model`；按完整 id、去日期后缀、剥一层 vendor 匹配，不按前缀；schema 缺厂商文档链接时报错、`modelsDevPr` 可以为空字符串、写端点字段或 `structuredOutput` 被拒；机制测试用自造的修正条目，另用随包快照验证 8 条修正和 3 个带日期的 id 都变成能关，不修正的 `claude-opus-5-5` 等保持 models.dev 的值；
+  - 结构化输出：models.dev 的 `structured_output` 不读，来源一直是我们的表或兜底；
+  - 站点条目 `openrouter.ai` + anthropic：models.dev 给档位的非 Claude 模型得到 adaptive 和档位（`modelRules-cli.test.ts`）。
+- models.dev 刷新的测试（`globalThis.fetch` 换成测试函数，测试结束还原；缓存目录用临时目录）：
+  - 启动时缓存比快照新就用缓存，旧就用快照；
+  - 当前目录不到一小时不拉，超过一小时拉；
+  - 200 替换目录并写缓存，下一次解析就用新数据；304 只更新 `fetchedAt`，带上了 `If-None-Match`；
+  - 网络错误、非 2xx、不是 JSON、没有服务商：保留当前目录、记警告、不写缓存；
+  - 缓存文件损坏时忽略；同时触发两次刷新只发一个请求。
+  - 刷新只从两个进程入口启动，`startServer` 不碰它，所以在进程内调 `startServer` 的测试不访问网络。以子进程运行 `src/server/index.ts` 的测试（`diagnostics-service.test.ts`）会走到入口，测试先在临时配置目录里写一份刚生成的缓存，入口读到它就不拉取。
+- 快照的数据测试：快照能被解析，`fetchedAt` 是合法时间；厂商列表里的每个 id 都在快照里；查得到的模型数量不少于一个下限（防止误写进空目录）。
+- 刷新脚本的测试：给定一份 api.json 样本，写出的快照只含要读的字段、每个模型一行，`release.ts` 在拉取失败时不改任何文件。
 - 内置表的数据测试：
   - 每条有 `source.url` 和 `checkedAt`；
+  - 每条模型条目要么在快照里按查找规则查不到（完整条目），要么只设 models.dev 没有的字段（`structuredOutput`、`reasoningDialect`、`nativeWebSearch` 等），不设窗口、输出上限、思考、图片、PDF（#291 决定 2 的守卫：快照刷新后 models.dev 收录了某个完整条目的模型，测试会失败，提示删掉它）；
+  - 每条修正在快照里查得到对应模型，并且至少有一个字段和 models.dev 不同（上游改对之后测试失败，提示删掉这条修正）；
   - `models` 的 `modelPrefix` 唯一，`sites` 的 (host, apiFormat, modelPrefix) 唯一；
   - 窗口在合法范围内；`levels` 都在 `EFFORT_LEVELS` 里；`control` 为 `effort` 或 `toggle_effort` 的条目 `levels` 非空；
   - 模型条目里没有端点字段，只有 Claude 条目可以设 anthropic 写法和 `nativeWebSearch`；`extraBody` 没有保留键；anthropic 格式的站点条目不设对它们不起作用的字段；
@@ -768,7 +947,8 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
   - settings.json 里的已退役键被删掉；
   - 旧的 DeepSeek 兼容配置能正常加载；
   - 重复启动不改写文件。
-- 桌面端测试：effort 选择器按模型过滤档位，触发器显示换算后的档位（DeepSeek 上全局缺省显示 High）；兜底标记；覆盖表单的继承值、恢复默认、提交内容。浅色和深色主题、中英文、H5 手机宽度都要手动看一遍。
+- 桌面端测试：effort 选择器按模型过滤档位，触发器显示换算后的档位（DeepSeek 上全局缺省显示 High）；兜底标记；覆盖表单的继承值、恢复默认、提交内容；来源是 `modelsDev` 时继承值旁显示「models.dev」（#291）。浅色和深色主题、中英文、H5 手机宽度都要手动看一遍。
+- 已有测试里依赖具体模型数值的（`proxy-model-rules`、`modelRules-cli`、`modelRules-resolve`、`modelRulesRequest`、`settings` 等，#291 之前这些数值来自我们的表）：用 `src/server/__tests__/fixtures/modelsDevCatalog.ts` 的 `useTestModelsDevCatalog()`：`beforeEach` 里用刷新时用的同一个函数（`setModelsDevData`）换成测试目录，`afterEach` 还原，不依赖随包快照里的数字。测试目录按 #291 之前表里的数值写，所以这些测试的期望值大多不用改，改的只是来源（`model` 变成 `modelsDev`）。只测前缀匹配的用例改用测试自己的表和空目录。否则每次发版刷新快照，数字一变测试就失败。只验证「来自 models.dev」这类关系的测试可以直接用快照。
 
 ## 迁移与发布
 
@@ -777,7 +957,14 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - `providers.json` 的 `modelContextWindows` 由启动迁移转成 `modelOverrides`，规则见上文。转换是幂等的，不会每次启动都改写文件。
 - `dreamcoder/settings.json` 里的已退役键由 `migrateManagedSettings` 删除，见「已退役键的清理」。
 
-在同一个 PR 里完成，按下面的顺序实现，后面的步骤依赖第一步：
+#291 的磁盘数据和发布：
+
+- `providers.json` 不迁移。`discoveredModels` 里旧的 `reasoning`、`reasoningDialect` 被忽略，下次刷新时消失；旧的 DeepSeek、百炼专用接口拉到的窗口、输出上限、模态照常读取（它们是这些端点自己报的值），下次刷新时换成列表本身给的值或者没有。`modelOverrides` 不变。
+- 新文件：缓存 `dreamcoder/cache/models-dev.json`，没有时用快照。
+- 发版：`scripts/release.ts` 先刷新快照，见「快照和刷新脚本」。快照刷新后数据测试失败，说明 models.dev 收录了我们表里的某个完整条目的模型，或者厂商列表里的服务商被改名，按测试提示改表或列表。
+- #291 在一个 PR 里完成：目录模块和快照、刷新脚本、解析里加 models.dev 层、删表里的条目和三个发现来源、桌面端来源文案、文档和教程（`docs/tutorial/07-provider-presets.*.md` 第 33 行说模型事实写在 `modelRules.json`，改为说来自 models.dev，表里只放它没有的）。
+
+#264 在同一个 PR 里完成，按下面的顺序实现，后面的步骤依赖第一步：
 
 1. 内置表、解析函数、`DREAMCODER_MODEL_RULES` 的生成、CLI 各处改读、旧变量删除、存储字段和迁移。代理暂时不改，行为变化只在 CLI 侧：effort 和思考按模型判断，窗口和输出上限按表。
 2. 代理的思考写法、输出上限、结构化输出（P-REQ-02、P-REQ-05、P-REQ-15、P-REQ-14）。
@@ -789,7 +976,13 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 
 - **照搬 Codex：已知条目加一条兜底，没有端点层。** Codex 只支持 Responses 一种格式，条目里不需要描述字段写法（Codex `codex-rs/model-provider-info/src/lib.rs:102-138`）。我们的问题大多出在写法上：同一个 DeepSeek 模型，在官方 chat 接口要发 `thinking` 加 `reasoning_effort`，在 OpenRouter 要发 `reasoning.effort`。没有端点层就只能回到按 host 写代码。
 - **照搬 ZCode：所有命中的规则依次叠加，写法用表达式语言。** 叠加没有「最具体优先」，宽松正则容易误命中，维护要靠「通用的写在前面」这种约定（ZCode `packages/provider/src/config/model-config.ts:387-423`）。表达式语言（受限 CEL）的灵活性我们用不上：我们自己做协议翻译，写法的种类有限，写成代码更容易测试。ZCode 的 chat 默认写法一次发四个思考字段，对严格的端点可能报 400（推断）。
-- **用 opencode 的外部目录（models.dev）。** 中国厂商的细节整理得最全，但依赖网络，随包快照约 8MB，目录格式还是实验版，而且目录一变应用行为就变。推理字段的写法仍然靠约 50 个按 SDK 包和模型名写的函数（opencode `packages/core/src/variant.ts:606-690`）。可以作为写条目时核对事实的参考资料。
+- **用 opencode 的外部目录（models.dev）。** #264 时没有采用：当时看的是 opencode 用的 v2 目录（实验版，快照约 8MB）。#291 改为采用，用的是稳定的 v1 接口，裁剪后约 1.9MB，并且只取模型能力，写法仍是我们自己的枚举（opencode 的写法也是手写的，`packages/core/src/variant.ts:606-690`）。#291 考虑过、没有采用的做法：
+  - 把全部手查条目作为「修正值」叠在 models.dev 之上：没有采用，维护者决定以 models.dev 为准；只有能用厂商文档证明、会改变行为的错误才进修正层，而且是临时的，见「修正层」。
+  - 用 opencode 的 v2 接口（`models.opencode.ai`）：实验版。
+  - 只打包常用的几家服务商：base URL 能对上的服务商越多，中转和小服务商拿到的数据越准；全量 gzip 后约 0.12MB。
+  - 保留 OpenRouter 自己的 models 接口作为兜底：它的值是 OpenRouter 实际提供的值，不是厂商的值，套到直连和中转上会错（见「拉取能读到什么」）。
+  - 运行时刷新放进 `startServer`：测试会调 `startServer`，测试不能访问网络；所以放在两个进程入口。
+  - 快照用 JSON 直接 import：编译产物里每次 CLI 启动多 30–40ms，见「快照和刷新脚本」。
 - **写法用数据描述（字段路径加取值），不用枚举。** 灵活，但等于半个表达式语言，测试要覆盖任意组合。维护者确认用封闭枚举。
 - **CLI 环境变量只放选中模型和快速模型。** agent 定义、skill、plugin 命令、hook 可以写任意模型 id，所以要带上提供方的全部模型和兜底。
 - **把 `DREAMCODER_MODEL_RULES` 放进 `buildProviderManagedEnv`。** 会写进 settings.json、出现在编辑器里，并让 CLI 进程执行 server 的解析代码，见「CLI」一节。
@@ -805,7 +998,7 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - `anthropic_budget` 写法下 `budget_tokens` 等于 `max_tokens` 减 1，即 31,999 对 32,000（`src/services/api/claude.ts:1669-1676`），思考可能用掉全部输出额度。
 - opencode.ai 上的旧会话不再写回推理（`client.ts:339-344` 的特判删掉后，opencode.ai 没有站点条目）。
 - 档位换算会升档：按「取比它高的最低一档」，DeepSeek（low、high、max）上全局 effort 为缺省的 medium 时发 high。改前 DeepSeek 预设只在用户设了全局 effort 时才发 effort（`getDefaultEffortForModel` 对 DeepSeek 返回 undefined，`src/utils/effort.ts:279-329`），没设时由上游默认（DeepSeek chat 接口文档写默认 high；anthropic 接口的默认未核实）。改后默认总发 high，和 chat 接口的默认一致；推理更长，花费可能比改前略高（推断）。
-- 前缀边界挡不住同一系列里的非推理模型：`gpt-5-chat-latest` 会命中 `gpt-5`，被当成 `effort` 模型。需要时为它单独加条目。
+- 前缀边界挡不住同一系列里的非推理模型：`gpt-5-chat-latest` 在 models.dev 的 `openai` 下没有（只在第三方服务商下），按最长前缀落到 `gpt-5`，被当成 `effort` 模型。模型层条目在 models.dev 层之下，修正按命中的 id（`gpt-5`）查，两者都改不了它；需要时用用户覆盖，或在对应站点加带 `modelPrefix` 的条目（站点层在 models.dev 之上）。
 - CLI 的 Codex 登录路径（`src/services/openaiAuth/fetch.ts`）本来就 import 代理的 Responses 转换函数。转换函数现在必须带规则，这条路径用 `resolveModelRules({ baseUrl: Codex 端点, apiFormat: 'openai_responses' }, 模型)` 取内置表的规则，于是多 import 了一个 server 模块。思考档位按请求里的 `output_config.effort` 写进 `reasoning.effort`，不再按 thinking budget 换算。这条路径去掉 `max_output_tokens`：main 上它从不发这个字段，ChatGPT 的 Codex 后端是否接受没有核实。和下一条属于同一类已有的分层问题。
 - `src/utils/managedEnv.ts:4` 现在就 import 了 server 代码（`mergeActiveProviderManagedEnv`），这是已有的分层问题，不是本设计引入的；本设计删掉的是同文件 `:12, 108` 对 `providerManagedEnvCompat` 的引用。
 - 一批关思考的内部调用不走 `auxiliary`：`compact.ts:1301`、`awaySummary.ts:44`、`execPromptHook.ts:71`、`execAgentHook.ts:134`、`apiQueryHookHelper.ts:88`、`skillImprovement.ts:236`、`generateAgent.ts:152`、insights 的 `queryWithModel`。toggle 类模型照样发 disabled；`effort`/`always` 模型带 `defaultEffort` 换算后的档位，不是最弱一档。不在维护者列的辅助调用范围内，接受。
@@ -814,8 +1007,27 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - `none` 模型在 `anthropic_disable_only` 写法下（例如 Kimi Code 上的 `kimi-for-coding`）按模型摘要显示「不能思考」，但上游默认开着思考。思考开关是全局的，只影响显示。
 
 
-- 表里的数值会过期。这次核对时，多数中国厂商已经出了下一代，K2 和 MiniMax M2 系列已经或即将下线。拉取值和用户覆盖可以兜住大部分情况；表的维护要跟着版本发布走。
-- 这次核对用的是网页摘要，写进 JSON 前要人工打开来源页再核对一遍。
+- 表里的数值过期的问题由 models.dev 接手（#291）。反过来，models.dev 的错误现在直接影响行为，而且不用发版：线上数据变了，一小时内所有用户都会用上。能用厂商文档证明的错误写进修正层，同时给 anomalyco/models.dev 提修正，见「修正层」。「和手查条目的比较」里的差异，除修正层的 8 条外，都按 models.dev 生效。
+- 用户覆盖兜不住「能不能关思考」：`reasoningLevels` 合成规则里（`mergeReasoningLevels`，`src/server/services/modelRules/resolveModelRules.ts:113-124`），下层是 `effort` 时用户选档位后仍是 `effort`，下层是 `effort` 或 `always` 时选「能思考、不选档位」得到 `always`；覆盖的 schema 里也没有直接写 `control` 的字段（`ModelOverrideSchema`，`src/server/types/modelRules.ts:151-159`）。这是 #264 有意的设计（「effort 本来就不能关」），不是实现缺陷；但下层的数据可能写错时，用户在界面上没有办法改回「能关」，只能等修正层或上游修正。
+- 站点条目 `openrouter.ai` + anthropic 的 `anthropic_adaptive` 是整个 host 生效的，所以经它的 Claude 4.5 及更早型号也发 adaptive，而 #291 之前它们按模型条目发 budget（OpenRouter 发现的写法只在表里没有思考信息时才用）。2026-11-20 负责人用测试 key 实测 `https://openrouter.ai/api/v1/messages` 上的 `anthropic/claude-haiku-4.5` 和 `anthropic/claude-sonnet-4.5`：adaptive 加 `output_config.effort`（high、low 各一次）、`disabled`、`enabled` 加 `budget_tokens: 1024`，全部返回 200。adaptive 时返回思考块；disabled 时只有正文，思考 token 为 0。所以旧型号用 adaptive 时开关思考都正常。但档位看不出效果：effort 取 high 和 low 时思考 token 数相近（haiku 267 和 284，sonnet 193 和 174），sonnet 的 adaptive 加 high 和 budget 1024 的用量完全一样，多半被 OpenRouter 换算成了固定预算。修正之后 `claude-haiku-4-5`、`claude-sonnet-4-5` 是 `toggle`，没有档位选择器；`claude-opus-4-5` 有档位，经 OpenRouter 时选的档位可能同样不起作用（推断，没有测 opus-4-5）。代码不改。
+- sidecar 每小时请求一次 `https://models.dev/api.json`，没有关掉它的设置（opencode 有 `OPENCODE_DISABLE_MODELS_FETCH`）。本次不加，需要时再加。
+- 内存和首次查找：2026-11-20 在本机用 bun 1.4.2 量（`Bun.gc(true)` 后比较 `process.memoryUsage()`，三次）：加载 `modelsDevStore` 并建好索引后 `heapUsed` 多 10.9 MB；第一次 `currentModelsDevIndex()`（文本 `JSON.parse`、zod 逐个模型校验、建索引）35–68 ms，之后不再花这笔时间。sidecar 在第一次解析规则时付一次；CLI 只有 Codex 登录路径会付。
+- models.dev 的窗口小于 16,000 的模型（小模型、嵌入模型）不设窗口，落到兜底的 131,072，会高估。和 #291 之前表里没有这些模型时一样。
+- 不读 `limit.input`。例如 `gpt-5.4-mini` 的窗口 400,000、输入上限 272,000、输出 128,000，三者相加一致；输入上限明显小于「窗口减输出」的模型会压缩得偏晚（未核实有没有这样的模型）。
+- CLI 进程里的 Codex 登录路径（`src/services/openaiAuth/fetch.ts:11`）只用随包快照，不读 sidecar 的缓存。数据最多旧到上一次发版。
+- 同一 base URL 对应几个服务商时（例如 `minimax` 和 `minimax-coding-plan`），按 id 顺序先查到的为准；两边同名模型的数据不同时，结果取决于 id 排序（推断：同一家的两个服务商数据相同）。
+
+### 和 #289 的关系
+
+[#289](https://github.com/GoDiao/dreamcoder/issues/289)：CLI 直连官方 Anthropic 地址时，窗口来自 CLI 内置的三条表（`src/utils/model/modelContextWindows.ts:3-7`，`claude-sonnet-4-6` 写成 200,000），官方现在 4.6 及以后都是 1M。
+
+判断：#291 提供了数据，但不顺带解决 #289，建议之后单独做。
+
+- 数据上可以：models.dev 的 `anthropic` 服务商有全部现行 Claude 型号，`claude-sonnet-4-6`、`claude-opus-4-6` 到 5.x 都是 1,000,000，4.5 及以前是 200,000（2026-11-20）。
+- 但直连路径是有意不走规则表的：官方地址不生成 `DREAMCODER_MODEL_RULES`（见「CLI」一节），终端里直接运行的 CLI 也没有 sidecar。要让它读 models.dev，得另外决定怎么读：CLI 在 `src/utils` 里直接查随包快照（要把目录的解析和查找从 `src/server/services/modelsDev/` 挪到 `src/utils/model/`，因为 `src/utils` 不能 import server 代码），还是由 sidecar 给官方地址也传一份只有窗口的变量（终端路径仍然没有）。
+- 还要处理和现有逻辑的交互：`[1m]` 后缀、`CLAUDE_CODE_DISABLE_1M_CONTEXT`（`src/utils/context.ts:34-42`）、`getModelCapability` 和 Sonnet 1M 实验（`context.ts:94-120`）。这些和 #291 的改动不重叠，放在一起会让这个 PR 同时改官方路径的行为。
+- #291 做完后 #289 的改动面很小：选定读法，把 `getBuiltInModelContextWindow` 改成查 `anthropic` 服务商，删掉三条内置窗口。
+
 - Gemini 原生 OpenAI 兼容端点上多轮工具调用缺 `thought_signature` 可能被拒，本轮不处理，见「推理回传」。
 - 签名里编码来源字段后，会话中途从 OpenAI 格式提供方换到 anthropic 格式提供方时，历史里的 `dc1:` 签名会被原样发给 anthropic 兼容端点，可能被拒（推断）。这和 CLI 换 key 后签名失效属于同一类问题（`src/utils/messages.ts:5157-5163`）。这一版不处理，出现时再修。
 - agent teams 队友在第三方提供方下用硬编码的 Claude id（`src/utils/swarm/teammateModel.ts:8-10`），这一版按兜底处理。正确的做法是让它默认继承主模型，留给 agent teams 的工作处理。
@@ -867,3 +1079,14 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - effort 档位的副本：`src/server/api/models.ts:28`、`desktop/src/stores/sessionRuntimeStore.ts:9-10`、`ModelSelector.tsx:98-103`、`GeneralSettings.tsx:126-131`。
 
 文档：`docs/features/harness/comparison/model-adaptation.md`、`docs/features/harness/proxy/transport.md`、`docs/features/harness/proxy/request.md` 提到这些环境变量；`docs/tutorial/07-provider-presets.en.md` 和 `07-provider-presets.zh.md` 讲预设的 `modelContextWindows` 字段。实现时同步。
+
+#291 删除和修改：
+
+- 发现来源：`src/server/upstream/contextWindows/openrouter.ts`、`deepseek.ts`、`qwen.ts` 整个文件，以及它们在 `contextWindows/index.ts:6, 9, 11, 16, 19-20` 的注册；`source.ts:13-14` 的 `reasoning`、`reasoningDialect`。测试：`src/server/__tests__/model-discovery.test.ts` 里 OpenRouter 思考、DeepSeek、Qwen 的用例（`:52`、`:102-160`、`:351-403`），`:204` 的「没有专用来源时不多发请求」改为针对剩下的来源。
+- 拉取值的思考：`DiscoveredModelSchema` 的 `reasoning`、`reasoningDialect`（`src/server/types/modelRules.ts:167-168`）；`applyDiscovered` 的思考分支（`src/server/services/modelRules/resolveModelRules.ts:139, 149`）。测试：`modelRules-resolve.test.ts` 和 `modelRules-cli.test.ts:258` 里来源为 `discovered` 的思考用例。
+- 表：`src/server/config/modelRules.json` 的 49 条模型条目删掉 models.dev 给的能力字段，其中 46 条留下 `structuredOutput`（Claude 条目同时留写法和原生搜索），3 条整条删除（见「内置表的初始条目」）。数据测试 `src/server/__tests__/modelRules-builtin.test.ts` 里针对这些条目的断言改写。
+- 来源标签：`FieldSource` 加 `modelsDev`（`src/server/types/modelRules.ts:128-135`、`desktop/src/types/provider.ts:32`）；`ModelRulesEditor.tsx:35-40`；i18n `settings.providers.sourceModelsDev`（新）、`settings.providers.modelRulesDesc`（`en.ts:559`、`zh.ts:561`）；`desktop/src/components/settings/resolvedViewFixture.ts`。
+- 新增：`src/server/services/modelsDev/`（`catalog.ts`、`ruleFields.ts`、`modelsDevStore.ts`、`modelsDevRefresh.ts`）、`src/server/config/modelsDev.json`、`scripts/update-models-dev.ts`；`scripts/release.ts` 调用它；两个进程入口启动刷新。
+- 修正层：`modelRules.json` 的 `corrections`（8 条 Anthropic 模型）、`src/server/types/modelRulesTable.ts` 的 `CorrectionEntrySchema`、`resolveModelRulesFromTable` 在 models.dev 之后叠修正。
+- 站点条目：`openrouter.ai` + anthropic，写法 `anthropic_adaptive`。
+- 文档：`docs/tutorial/07-provider-presets.en.md:33`、`07-provider-presets.zh.md:33`。CHANGELOG 在 `## [Unreleased]` 下加一条。
